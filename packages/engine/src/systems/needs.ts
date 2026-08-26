@@ -30,7 +30,9 @@ export function sleepRegenPerTick(state: WorldState, config: SimConfig, agentId:
 // Exported because the cold doubles exactly this, and never a second copy of it.
 export function awakeEnergyDecay(config: SimConfig, a: AgentBody): number {
   const elder = ageBand(config, a.ageDays) === 'elder'
-  return config.needs.energyDecayAwakePerTick * (elder ? config.aging.elderEnergyDecayMultiplier : 1)
+  return (
+    config.needs.energyDecayAwakePerTick * (elder ? config.aging.elderEnergyDecayMultiplier : 1)
+  )
 }
 
 // A conversation partner within earshot keeps social from decaying and instead regenerates it.
@@ -57,20 +59,26 @@ export function needsSystem(ctx: TickCtx): void {
   const { needs: cfg } = ctx.config
   const target = warmthTarget(ctx.state(), ctx.config)
   const winter = simTimeFromTick(ctx.state().tick).season === 'winter'
-  const hungerDecay = cfg.hungerDecayPerTick * (winter ? ctx.config.seasons.winter.hungerDecayMultiplier : 1)
+  const hungerDecay =
+    cfg.hungerDecayPerTick * (winter ? ctx.config.seasons.winter.hungerDecayMultiplier : 1)
   for (const id of Object.keys(ctx.state().agents).sort()) {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
     if (a.needs.hunger > 0) ctx.emit('need_changed', { id, need: 'hunger', delta: -hungerDecay })
     if (a.asleep) {
       if (a.needs.energy < 100) {
-        ctx.emit('need_changed', { id, need: 'energy', delta: sleepRegenPerTick(ctx.state(), ctx.config, id) })
+        ctx.emit('need_changed', {
+          id,
+          need: 'energy',
+          delta: sleepRegenPerTick(ctx.state(), ctx.config, id),
+        })
       }
     } else if (a.needs.energy > 0) {
       ctx.emit('need_changed', { id, need: 'energy', delta: -awakeEnergyDecay(ctx.config, a) })
     }
     if (socialRegenActive(ctx, id)) {
-      if (a.needs.social < 100) ctx.emit('need_changed', { id, need: 'social', delta: cfg.socialRegenConversingPerTick })
+      if (a.needs.social < 100)
+        ctx.emit('need_changed', { id, need: 'social', delta: cfg.socialRegenConversingPerTick })
     } else if (a.needs.social > 0) {
       ctx.emit('need_changed', { id, need: 'social', delta: -cfg.socialDecayPerTick })
     }

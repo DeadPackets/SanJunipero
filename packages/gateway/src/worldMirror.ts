@@ -24,13 +24,23 @@ export class WorldMirror {
     this.#config = opts.config
     this.#terrain = opts.terrain
     const db = opts.db
-    this.#selLatestSnap = db.prepare('SELECT tick, seq, state FROM snapshots ORDER BY id DESC LIMIT 1')
-    this.#selSnapAtOrBefore = db.prepare('SELECT tick, seq, state FROM snapshots WHERE tick <= ? ORDER BY tick DESC, id DESC LIMIT 1')
-    this.#selEventsFrom = db.prepare('SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq')
-    this.#selEventsRange = db.prepare('SELECT seq, tick, type, payload FROM events WHERE seq > ? AND tick <= ? ORDER BY seq')
+    this.#selLatestSnap = db.prepare(
+      'SELECT tick, seq, state FROM snapshots ORDER BY id DESC LIMIT 1',
+    )
+    this.#selSnapAtOrBefore = db.prepare(
+      'SELECT tick, seq, state FROM snapshots WHERE tick <= ? ORDER BY tick DESC, id DESC LIMIT 1',
+    )
+    this.#selEventsFrom = db.prepare(
+      'SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq',
+    )
+    this.#selEventsRange = db.prepare(
+      'SELECT seq, tick, type, payload FROM events WHERE seq > ? AND tick <= ? ORDER BY seq',
+    )
 
     const snap = this.#selLatestSnap.get() as SnapRow | undefined
-    this.#state = snap ? (JSON.parse(snap.state) as WorldState) : genesisState(this.#config, this.#terrain)
+    this.#state = snap
+      ? (JSON.parse(snap.state) as WorldState)
+      : genesisState(this.#config, this.#terrain)
     this.#seq = snap ? snap.seq : 0
     for (const row of this.#selEventsFrom.all(this.#seq) as EvRow[]) {
       const ev = parseEv(row)
@@ -39,8 +49,12 @@ export class WorldMirror {
     }
   }
 
-  state(): WorldState { return this.#state }
-  seq(): number { return this.#seq }
+  state(): WorldState {
+    return this.#state
+  }
+  seq(): number {
+    return this.#seq
+  }
 
   poll(): Array<{ tick: number; events: SimEvent[] }> {
     const groups: Array<{ tick: number; events: SimEvent[] }> = []
@@ -56,9 +70,12 @@ export class WorldMirror {
   }
 
   stateAt(tick: number): WorldState {
-    if (tick > this.#state.tick) throw new RangeError(`stateAt(${tick}): beyond live tick ${this.#state.tick}`)
+    if (tick > this.#state.tick)
+      throw new RangeError(`stateAt(${tick}): beyond live tick ${this.#state.tick}`)
     const snap = this.#selSnapAtOrBefore.get(tick) as SnapRow | undefined
-    let state = snap ? (JSON.parse(snap.state) as WorldState) : genesisState(this.#config, this.#terrain)
+    let state = snap
+      ? (JSON.parse(snap.state) as WorldState)
+      : genesisState(this.#config, this.#terrain)
     const fromSeq = snap ? snap.seq : 0
     for (const row of this.#selEventsRange.all(fromSeq, tick) as EvRow[]) {
       state = fold(state, parseEv(row), this.#config)

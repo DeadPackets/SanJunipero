@@ -3,11 +3,17 @@ import { ClientMsg, ServerMsg, momentToTick, tickToMoment, PROTOCOL_VERSION } fr
 
 describe('protocol', () => {
   it('round-trips a tick message', () => {
-    const msg = { t: 'tick', tick: 42, events: [{ seq: 7, tick: 42, type: 'agent_moved', payload: { id: 'a', x: 1, y: 2 } }] }
+    const msg = {
+      t: 'tick',
+      tick: 42,
+      events: [{ seq: 7, tick: 42, type: 'agent_moved', payload: { id: 'a', x: 1, y: 2 } }],
+    }
     expect(ServerMsg.parse(msg)).toEqual(msg)
   })
   it('rejects unknown keys and unknown discriminants', () => {
-    expect(() => ClientMsg.parse({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null, extra: 1 })).toThrow()
+    expect(() =>
+      ClientMsg.parse({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null, extra: 1 }),
+    ).toThrow()
     expect(() => ServerMsg.parse({ t: 'mutate_world' })).toThrow()
   })
   it('is at version 2: the snapshot requires laws, so a v1 client cannot be served', () => {

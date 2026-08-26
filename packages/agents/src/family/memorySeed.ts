@@ -47,7 +47,9 @@ function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
       }
     }
     case 'structure_completed':
-      return home(str('id')) ? { text: 'The house you were born in was finished.', importance: 6, tags: ['home'] } : null
+      return home(str('id'))
+        ? { text: 'The house you were born in was finished.', importance: 6, tags: ['home'] }
+        : null
     case 'structure_inscribed':
       return home(str('structureId'))
         ? {
@@ -75,7 +77,11 @@ function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
     case 'item_moved': {
       const loc = p.loc as { t?: string; id?: string } | undefined
       return loc?.t === 'structure' && loc.id === ctx.homeStructureId
-        ? { text: 'Something was set down inside the house you were born in.', importance: 2, tags: ['home'] }
+        ? {
+            text: 'Something was set down inside the house you were born in.',
+            importance: 2,
+            tags: ['home'],
+          }
         : null
     }
     case 'item_taken':
@@ -83,20 +89,34 @@ function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
         ? {
             text: `${who(ctx, str('takerId'), true)} was seen taking a ${str('kind')} that was ${who(ctx, str('ownerId'), false)}.`,
             importance: 6,
-            tags: [str('takerId'), str('ownerId')].flatMap((id) => (kin(id) ? [ctx.relation(id)!] : [])),
+            tags: [str('takerId'), str('ownerId')].flatMap((id) =>
+              kin(id) ? [ctx.relation(id)!] : [],
+            ),
           }
         : null
     case 'agent_born': {
       if (str('id') === ctx.childId) {
-        return { text: 'You were born to your mother and your father, in this town.', importance: 10, tags: ['mother', 'father'] }
+        return {
+          text: 'You were born to your mother and your father, in this town.',
+          importance: 10,
+          tags: ['mother', 'father'],
+        }
       }
       return kin(str('motherId')) || kin(str('fatherId'))
-        ? { text: 'Another child was born to your household before you.', importance: 8, tags: ['mother', 'father'] }
+        ? {
+            text: 'Another child was born to your household before you.',
+            importance: 8,
+            tags: ['mother', 'father'],
+          }
         : null
     }
     case 'agent_died':
       return kin(str('agentId'))
-        ? { text: `${who(ctx, str('agentId'), true)} died.`, importance: 10, tags: [ctx.relation(str('agentId'))!] }
+        ? {
+            text: `${who(ctx, str('agentId'), true)} died.`,
+            importance: 10,
+            tags: [ctx.relation(str('agentId'))!],
+          }
         : null
     default:
       return null

@@ -2,11 +2,23 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import {
-  CHRONICLE_WEIGHTS, DEFAULT_CONFIG, DISCOVERY_EVENT, chronicleIcon, chronicleLine,
-  discoveryHeadline, stateHash, type ChronicleLookup, type SimEvent,
+  CHRONICLE_WEIGHTS,
+  DEFAULT_CONFIG,
+  DISCOVERY_EVENT,
+  chronicleIcon,
+  chronicleLine,
+  discoveryHeadline,
+  stateHash,
+  type ChronicleLookup,
+  type SimEvent,
 } from '@sj/shared'
 import {
-  EventStore, RngStreams, TickLoop, genesisState, openDb, replayFromGenesis,
+  EventStore,
+  RngStreams,
+  TickLoop,
+  genesisState,
+  openDb,
+  replayFromGenesis,
   type TileId,
 } from '@sj/engine'
 // NO CROSS-PACKAGE IMPORTS: `packages/web` is a DOM/bundler project and `packages/agents` is not
@@ -26,19 +38,28 @@ function markWeights(): Record<string, number> {
   if (body === undefined) throw new Error('MARK_WEIGHT is not where GATE G-D can read it')
   const out: Record<string, number> = {}
   for (const [, k, v] of body.matchAll(/(\w+):\s*(\d+)/g)) out[k!] = Number(v)
-  if (Object.keys(out).length < 9) throw new Error(`GATE G-D read only ${Object.keys(out).length} mark weights`)
+  if (Object.keys(out).length < 9)
+    throw new Error(`GATE G-D read only ${Object.keys(out).length} mark weights`)
   return out
 }
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
+  Array.from({ length: 8 }, () => 0 as TileId),
+)
 
 const PAYLOAD = {
-  recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft' as const,
-  byId: 'a1', intent: 'i want to carry water in a stitched hide', makes: ['waterskin'],
+  recipeId: 'recipe:waterskin',
+  name: 'stitch a waterskin',
+  kind: 'craft' as const,
+  byId: 'a1',
+  intent: 'i want to carry water in a stitched hide',
+  makes: ['waterskin'],
 }
 
 const LOOK: ChronicleLookup = {
-  agentName: () => 'Maret', structureKind: () => 'house', mysteryProse: () => null,
+  agentName: () => 'Maret',
+  structureKind: () => 'house',
+  mysteryProse: () => null,
 }
 
 /** A world log with those rows in it, and nothing else — the shape the archive reads. */
@@ -54,9 +75,14 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
     const store = new EventStore(openDb(':memory:'))
     const before = stateHash(genesisState(DEFAULT_CONFIG, GRASS))
     const loop = new TickLoop({
-      store, state: genesisState(DEFAULT_CONFIG, GRASS), rng: new RngStreams('gd'),
-      config: DEFAULT_CONFIG, snapshotEveryTicks: 600,
-      onTick: ({ tick, emit }) => { if (tick === 1) emit(DISCOVERY_EVENT, PAYLOAD) },
+      store,
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('gd'),
+      config: DEFAULT_CONFIG,
+      snapshotEveryTicks: 600,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) emit(DISCOVERY_EVENT, PAYLOAD)
+      },
     })
     loop.step()
 
@@ -72,22 +98,28 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
     // announcements drain at the TOP of the tick, before queued intents, or the log would read
     // "used the verb" before "the verb existed"
     expect(bridge).toContain('announce(type: string')
-    expect(bridge.indexOf('this.#announcements = []')).toBeLessThan(bridge.indexOf('const queue = this.#queue'))
+    expect(bridge.indexOf('this.#announcements = []')).toBeLessThan(
+      bridge.indexOf('const queue = this.#queue'),
+    )
 
     const live = read('packages/agents/scripts/g11-deepworld.ts')
-    const wired = ['onCodified', 'bridge.announce', 'discoveryArt.onDiscovery']
-      .map((needle) => live.indexOf(needle))
-    expect(wired.every((i) => i > 0), 'the live seam is not wired').toBe(true)
-    expect([...wired].sort((a, b) => a - b)).toEqual(wired)   // in that order
+    const wired = ['onCodified', 'bridge.announce', 'discoveryArt.onDiscovery'].map((needle) =>
+      live.indexOf(needle),
+    )
+    expect(
+      wired.every((i) => i > 0),
+      'the live seam is not wired',
+    ).toBe(true)
+    expect([...wired].sort((a, b) => a - b)).toEqual(wired) // in that order
   })
 
   it('2. carries all four credits, and the archive resolves the inventor to a name', () => {
     const db = worldWith([{ tick: 40, payload: PAYLOAD }])
     const [row] = readDiscoveries(db, (id) => (id === 'a1' ? 'Maret' : id))
-    expect(row!.by).toBe('Maret')             // who
+    expect(row!.by).toBe('Maret') // who
     expect(row!.byId).toBe('a1')
-    expect(row!.tick).toBe(40)                // when
-    expect(row!.intent).toBe(PAYLOAD.intent)  // from what
+    expect(row!.tick).toBe(40) // when
+    expect(row!.intent).toBe(PAYLOAD.intent) // from what
     expect(row!.makes).toEqual(['waterskin']) // what it unlocked
   })
 
@@ -112,8 +144,9 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
     expect(line).not.toContain(PAYLOAD.intent)
     expect(discoveryHeadline({ ...PAYLOAD, by: 'Maret' })).not.toContain(PAYLOAD.intent)
     // and the archive, which no agent can reach, is the one place that DOES carry it
-    expect(readDiscoveries(worldWith([{ tick: 40, payload: PAYLOAD }]), () => 'Maret')[0]!.intent)
-      .toBe(PAYLOAD.intent)
+    expect(
+      readDiscoveries(worldWith([{ tick: 40, payload: PAYLOAD }]), () => 'Maret')[0]!.intent,
+    ).toBe(PAYLOAD.intent)
   })
 
   it('6. asks the forge for the one thing nobody has drawn', () => {
@@ -127,23 +160,34 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
   })
 
   it('8. NOT VACUOUS: the archive is non-empty for the world it is measured on', () => {
-    expect(readDiscoveries(worldWith([{ tick: 40, payload: PAYLOAD }]), () => 'Maret').length)
-      .toBeGreaterThan(0)
+    expect(
+      readDiscoveries(worldWith([{ tick: 40, payload: PAYLOAD }]), () => 'Maret').length,
+    ).toBeGreaterThan(0)
   })
 
   it('9. the coined word travels the same road, and is not the craft', () => {
     const word = {
-      recipeId: 'express:dance', name: 'dance', kind: 'word' as const,
-      byId: 'a2', intent: 'i want to dance by the fire', makes: [] as string[],
+      recipeId: 'express:dance',
+      name: 'dance',
+      kind: 'word' as const,
+      byId: 'a2',
+      intent: 'i want to dance by the fire',
+      makes: [] as string[],
     }
     const rows = readDiscoveries(
-      worldWith([{ tick: 40, payload: PAYLOAD }, { tick: 90, payload: word }]),
+      worldWith([
+        { tick: 40, payload: PAYLOAD },
+        { tick: 90, payload: word },
+      ]),
       (id) => (id === 'a1' ? 'Maret' : 'Sena'),
     )
     expect(rows.map((r) => r.kind)).toEqual(['craft', 'word'])
-    expect(chronicleLine({ seq: 2, tick: 90, type: DISCOVERY_EVENT, payload: word },
-      { ...LOOK, agentName: () => 'Sena' }))
-      .toBe('Sena gave the town a word for it — dance.')
+    expect(
+      chronicleLine(
+        { seq: 2, tick: 90, type: DISCOVERY_EVENT, payload: word },
+        { ...LOOK, agentName: () => 'Sena' },
+      ),
+    ).toBe('Sena gave the town a word for it — dance.')
     expect(artNeededFor(word.makes, new Set())).toEqual([])
   })
 })

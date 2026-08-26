@@ -8,8 +8,15 @@ import type { Milestone } from './types.js'
 // words verbatim before it is allowed to be true.
 
 export const SEMANTIC_CONCEPTS = [
-  'god_afterlife', 'fear_of_death', 'love_expression', 'justice_claim', 'joke', 'metaphor',
-  'lie', 'multi_day_plan', 'past_reference',
+  'god_afterlife',
+  'fear_of_death',
+  'love_expression',
+  'justice_claim',
+  'joke',
+  'metaphor',
+  'lie',
+  'multi_day_plan',
+  'past_reference',
 ] as const
 export type SemanticConcept = (typeof SEMANTIC_CONCEPTS)[number]
 
@@ -69,21 +76,24 @@ export type SemanticCandidateRow = {
 
 // The verdict shape, `.strict()`. A hit cites either a logged event or a remembered record —
 // never neither, because a claim with no provenance cannot be checked.
-export const SemanticHitSchema = z.object({
-  conceptKind: z.string().min(1),
-  agentId: z.string().min(1),
-  day: z.number().int().nonnegative(),
-  sourceKind: z.enum(['speech', 'thought', 'journal']),
-  eventSeq: z.number().int().nonnegative().optional(),
-  memoryRef: z.string().min(1).optional(),
-  quote: z.string().min(1),
-  quote2: z.string().min(1).optional(),
-  provenance2: z.string().min(1).optional(),
-  confidence: z.number().min(0).max(1),
-  rationale: z.string().min(1),
-}).strict().refine((h) => h.eventSeq !== undefined || h.memoryRef !== undefined, {
-  message: 'a hit must cite an event or a remembered record',
-})
+export const SemanticHitSchema = z
+  .object({
+    conceptKind: z.string().min(1),
+    agentId: z.string().min(1),
+    day: z.number().int().nonnegative(),
+    sourceKind: z.enum(['speech', 'thought', 'journal']),
+    eventSeq: z.number().int().nonnegative().optional(),
+    memoryRef: z.string().min(1).optional(),
+    quote: z.string().min(1),
+    quote2: z.string().min(1).optional(),
+    provenance2: z.string().min(1).optional(),
+    confidence: z.number().min(0).max(1),
+    rationale: z.string().min(1),
+  })
+  .strict()
+  .refine((h) => h.eventSeq !== undefined || h.memoryRef !== undefined, {
+    message: 'a hit must cite an event or a remembered record',
+  })
 export const SemanticVerdictSchema = z.object({ hits: z.array(SemanticHitSchema) }).strict()
 export type SemanticHit = z.infer<typeof SemanticHitSchema>
 
@@ -94,7 +104,8 @@ const SEMANTIC_HEADER = `You read one day of a town's words: what people said al
 // Every id the model must answer with, with the plain sentence that says what it is. The pass
 // renders only the ones still unfound, which is what makes the nightly cost decay to nothing.
 export const CONCEPT_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  god_afterlife: 'god_afterlife: speaking of gods, of the dead continuing, of anything beyond the world',
+  god_afterlife:
+    'god_afterlife: speaking of gods, of the dead continuing, of anything beyond the world',
   fear_of_death: 'fear_of_death: naming death as a thing to be afraid of',
   love_expression: 'love_expression: saying love, in whatever words they have for it',
   justice_claim: 'justice_claim: claiming something is owed, deserved, or unfair',
@@ -114,12 +125,15 @@ const LIE_CONTRACT = `The lie contract, and there is no lie without all of it:
 4. Not irony, not politeness, not a joke; if the same words are a joke, they are not a lie.
 5. Being wrong is not lying. Compare the person against themselves and never against what you know to be true; an honest error is honest.`
 
-const CONFIDENCE_RULE = 'Give a confidence between 0 and 1 for every hit, and one plain sentence of rationale.'
+const CONFIDENCE_RULE =
+  'Give a confidence between 0 and 1 for every hit, and one plain sentence of rationale.'
 
 // The contract rides along only while a lie is still to be found — one more way the nightly
 // prompt shrinks as the town's firsts land.
 export function semanticInstruction(concepts: readonly string[]): string {
-  const rows = concepts.map((c) => CONCEPT_DESCRIPTIONS[c]).filter((d): d is string => d !== undefined)
+  const rows = concepts
+    .map((c) => CONCEPT_DESCRIPTIONS[c])
+    .filter((d): d is string => d !== undefined)
   const parts = [SEMANTIC_HEADER, rows.join('\n'), VERBATIM_RULE]
   if (concepts.includes('lie')) parts.push(LIE_CONTRACT)
   parts.push(CONFIDENCE_RULE)
@@ -130,15 +144,20 @@ export function semanticInstruction(concepts: readonly string[]): string {
 export const SEMANTIC_INSTRUCTION = semanticInstruction(SEMANTIC_CONCEPTS)
 
 function renderRecords(records: TranscriptRecord[]): string {
-  return records.map((r) => {
-    const ref = r.eventSeq !== undefined ? `eventSeq ${r.eventSeq}` : `memoryRef ${r.memoryRef}`
-    return `[${r.sourceKind} | ${r.agentId} | tick ${r.tick} | ${ref}] ${r.text}`
-  }).join('\n')
+  return records
+    .map((r) => {
+      const ref = r.eventSeq !== undefined ? `eventSeq ${r.eventSeq}` : `memoryRef ${r.memoryRef}`
+      return `[${r.sourceKind} | ${r.agentId} | tick ${r.tick} | ${ref}] ${r.text}`
+    })
+    .join('\n')
 }
 
 const findRecord = (records: TranscriptRecord[], hit: SemanticHit): TranscriptRecord | undefined =>
-  records.find((r) => (hit.eventSeq !== undefined && r.eventSeq === hit.eventSeq)
-    || (hit.memoryRef !== undefined && r.memoryRef === hit.memoryRef))
+  records.find(
+    (r) =>
+      (hit.eventSeq !== undefined && r.eventSeq === hit.eventSeq) ||
+      (hit.memoryRef !== undefined && r.memoryRef === hit.memoryRef),
+  )
 
 const findInner = (records: TranscriptRecord[], hit: SemanticHit): TranscriptRecord | undefined =>
   records.find((r) => r.memoryRef === hit.provenance2 || String(r.eventSeq) === hit.provenance2)
@@ -167,11 +186,13 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
   // unreachable. A night nobody can read has no semantic firsts, and it says so in an alert.
   let value: z.infer<typeof SemanticVerdictSchema>
   try {
-    value = (await deps.llm.object({
-      schema: SemanticVerdictSchema,
-      system,
-      messages: [{ role: 'user', content: renderRecords(deps.records) }],
-    })).value
+    value = (
+      await deps.llm.object({
+        schema: SemanticVerdictSchema,
+        system,
+        messages: [{ role: 'user', content: renderRecords(deps.records) }],
+      })
+    ).value
   } catch (err) {
     insertAlert(deps.db, {
       agentId: null,
@@ -191,27 +212,63 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
   for (const hit of hits) {
     const void_ = (reason: string): void => {
       deps.store.insertSemanticCandidate({
-        conceptKind: hit.conceptKind, agentId: hit.agentId, day: hit.day, sourceKind: hit.sourceKind,
-        quote: hit.quote, confidence: hit.confidence, rationale: hit.rationale, reason,
+        conceptKind: hit.conceptKind,
+        agentId: hit.agentId,
+        day: hit.day,
+        sourceKind: hit.sourceKind,
+        quote: hit.quote,
+        confidence: hit.confidence,
+        rationale: hit.rationale,
+        reason,
       })
     }
-    if (!remaining.includes(hit.conceptKind)) { void_('not_in_the_catalog'); continue }
+    if (!remaining.includes(hit.conceptKind)) {
+      void_('not_in_the_catalog')
+      continue
+    }
 
     const source = findRecord(deps.records, hit)
-    if (source === undefined || !source.text.includes(hit.quote)) { void_('quote_not_in_source'); continue }
-    if (source.agentId !== hit.agentId) { void_('quote_belongs_to_another_body'); continue }
+    if (source === undefined || !source.text.includes(hit.quote)) {
+      void_('quote_not_in_source')
+      continue
+    }
+    if (source.agentId !== hit.agentId) {
+      void_('quote_belongs_to_another_body')
+      continue
+    }
 
     const isLie = hit.conceptKind === 'lie'
     if (isLie) {
-      if (jokedWords.has(hit.quote)) { void_('joke_on_the_same_words'); continue }
-      if (hit.quote2 === undefined || hit.provenance2 === undefined) { void_('one_sided_suspicion'); continue }
+      if (jokedWords.has(hit.quote)) {
+        void_('joke_on_the_same_words')
+        continue
+      }
+      if (hit.quote2 === undefined || hit.provenance2 === undefined) {
+        void_('one_sided_suspicion')
+        continue
+      }
       const inner = findInner(deps.records, hit)
-      if (inner === undefined || !inner.text.includes(hit.quote2)) { void_('inner_quote_not_in_source'); continue }
-      if (inner.agentId !== hit.agentId) { void_('inner_record_belongs_to_another_body'); continue }
-      if (inner.tick > source.tick) { void_('inner_record_postdates_speech'); continue }
-      if (source.tick - inner.tick > cfg.lieTopicWindowTicks) { void_('sides_out_of_window'); continue }
+      if (inner === undefined || !inner.text.includes(hit.quote2)) {
+        void_('inner_quote_not_in_source')
+        continue
+      }
+      if (inner.agentId !== hit.agentId) {
+        void_('inner_record_belongs_to_another_body')
+        continue
+      }
+      if (inner.tick > source.tick) {
+        void_('inner_record_postdates_speech')
+        continue
+      }
+      if (source.tick - inner.tick > cfg.lieTopicWindowTicks) {
+        void_('sides_out_of_window')
+        continue
+      }
     }
-    if (hit.confidence < (isLie ? cfg.lieMinConfidence : cfg.minConfidence)) { void_('below_confidence'); continue }
+    if (hit.confidence < (isLie ? cfg.lieMinConfidence : cfg.minConfidence)) {
+      void_('below_confidence')
+      continue
+    }
 
     // Everything above is mechanical, so a bad second hit still says why it failed; a GOOD
     // second hit of a concept already taken tonight is simply a recurrence.

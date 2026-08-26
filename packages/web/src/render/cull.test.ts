@@ -29,13 +29,19 @@ describe('boxInView — the visible rect, and the overhang a footprint cannot se
     // so only the overhang in the box itself can save this one.
     const below: ViewRect = { x: b.sx0 - 100, y: ground - 650, w: 800, h: 500 }
     const bottom = below.y + below.h
-    expect(b.sy0).toBeLessThan(bottom)                        // the roof is inside
-    expect(ground - bottom).toBeGreaterThan(CULL_MARGIN_PX)   // the ground is well outside
+    expect(b.sy0).toBeLessThan(bottom) // the roof is inside
+    expect(ground - bottom).toBeGreaterThan(CULL_MARGIN_PX) // the ground is well outside
     expect(boxInView(b, below)).toBe(true)
   })
 
   it('is inclusive at the margin and exclusive one pixel past it', () => {
-    const at: DepthBox = { ...tileDepthBox('a', 0, 0), sx0: -CULL_MARGIN_PX - 10, sx1: -CULL_MARGIN_PX, sy0: 0, sy1: 10 }
+    const at: DepthBox = {
+      ...tileDepthBox('a', 0, 0),
+      sx0: -CULL_MARGIN_PX - 10,
+      sx1: -CULL_MARGIN_PX,
+      sy0: 0,
+      sy1: 10,
+    }
     const past: DepthBox = { ...at, sx1: -CULL_MARGIN_PX - 1 }
     expect(boxInView(at, VIEW)).toBe(true)
     expect(boxInView(past, VIEW)).toBe(false)
@@ -76,7 +82,10 @@ describe('cullByBox', () => {
 describe('nothing ever pops in at an edge', () => {
   const boxes = bigTown(2).map((s) => structureDepthBox(s.id, s))
 
-  for (const [name, axis] of [['panning east', 'x'], ['panning south', 'y']] as const) {
+  for (const [name, axis] of [
+    ['panning east', 'x'],
+    ['panning south', 'y'],
+  ] as const) {
     it(`${name}: no box is hidden while any of its painted pixels are on screen`, () => {
       const offenders: string[] = []
       for (let step = -2000; step <= 2000; step += 17) {
@@ -97,7 +106,8 @@ describe('nothing ever pops in at an edge', () => {
     for (let step = -1500; step <= 1500; step += 13) {
       const view: ViewRect = { x: step, y: step / 2, w: 800, h: 600 }
       for (const b of bodies) {
-        if (drawnIntersectsView(b, view)) expect(boxInView(b, view), `${b.id} at ${step}`).toBe(true)
+        if (drawnIntersectsView(b, view))
+          expect(boxInView(b, view), `${b.id} at ${step}`).toBe(true)
       }
     }
   })

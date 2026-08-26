@@ -37,7 +37,8 @@ export function minimapFit(b: CameraBounds, w = MINIMAP_W, h = MINIMAP_H): Minim
   const bw = Math.max(1, b.maxX - b.minX)
   const bh = Math.max(1, b.maxY - b.minY)
   const scale = Math.min(w / bw, h / bh)
-  const mw = bw * scale, mh = bh * scale
+  const mw = bw * scale,
+    mh = bh * scale
   return { w, h, scale, x0: b.minX, y0: b.minY, ox: (w - mw) / 2, oy: (h - mh) / 2, mw, mh }
 }
 
@@ -59,7 +60,14 @@ export function mapToWorld(mx: number, my: number, f: MinimapFit): { sx: number;
  * that loses a crossing is still a lattice, a channel that loses one is two channels.
  */
 export const MAP_KIND_PRIORITY: readonly TerrainTileKind[] = [
-  'water', 'road', 'farmland', 'forest', 'rock', 'sand', 'earth', 'grass',
+  'water',
+  'road',
+  'farmland',
+  'forest',
+  'rock',
+  'sand',
+  'earth',
+  'grass',
 ]
 
 const RANK = new Map<TerrainTileKind, number>(MAP_KIND_PRIORITY.map((k, i) => [k, i]))
@@ -98,10 +106,16 @@ export function minimapPixels(
       const id = row[x]!
       const s = tileToScreen(x, y)
       const p = worldToMap(s.sx, s.sy + TILE_H / 2, f)
-      const mx = Math.floor(p.mx), my = Math.floor(p.my)
+      const mx = Math.floor(p.mx),
+        my = Math.floor(p.my)
       if (mx < 0 || my < 0 || mx >= f.w || my >= f.h) continue
-      put(px, rank, my * f.w + mx, TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR,
-        RANK.get(tileKind(id)) ?? WEAKEST)
+      put(
+        px,
+        rank,
+        my * f.w + mx,
+        TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR,
+        RANK.get(tileKind(id)) ?? WEAKEST,
+      )
     }
   }
 
@@ -113,12 +127,19 @@ export function minimapPixels(
       const t = screenToTile(p.sx, p.sy)
       const id = terrain[t.y]?.[t.x]
       if (id === undefined) continue
-      put(px, rank, i, TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR, RANK.get(tileKind(id)) ?? WEAKEST)
+      put(
+        px,
+        rank,
+        i,
+        TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR,
+        RANK.get(tileKind(id)) ?? WEAKEST,
+      )
     }
   }
 
   for (const s of structures) {
-    const cx = s.x + s.w / 2 - 0.5, cy = s.y + s.h / 2 - 0.5
+    const cx = s.x + s.w / 2 - 0.5,
+      cy = s.y + s.h / 2 - 0.5
     const c = worldToMap((cx - cy) * (TILE_W / 2), (cx + cy) * (TILE_H / 2), f)
     const rw = Math.max(1, Math.round((s.w + s.h) * (TILE_W / 2) * f.scale))
     const rh = Math.max(1, Math.round((s.w + s.h) * (TILE_H / 2) * f.scale))
@@ -146,12 +167,14 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 /** The camera's rectangle on the map: grown to a size a viewer can see, shifted back inside the
  *  widget, then cut to the canvas — in that order, so it keeps the view's own CENTRE. */
 export function minimapViewBox(
-  view: ViewRect, f: MinimapFit,
+  view: ViewRect,
+  f: MinimapFit,
 ): { x: number; y: number; w: number; h: number } {
   const a = worldToMap(view.x, view.y, f)
   let w = Math.min(f.w, Math.max(VIEW_MIN_PX, view.w * f.scale))
   let h = Math.min(f.h, Math.max(VIEW_MIN_PX, view.h * f.scale))
-  const cx = a.mx + (view.w * f.scale) / 2, cy = a.my + (view.h * f.scale) / 2
+  const cx = a.mx + (view.w * f.scale) / 2,
+    cy = a.my + (view.h * f.scale) / 2
   let x = clamp(cx - w / 2, 0, Math.max(0, f.w - w))
   let y = clamp(cy - h / 2, 0, Math.max(0, f.h - h))
   if (x + w > f.w) w = f.w - x
@@ -165,9 +188,14 @@ export function minimapViewBox(
 export const IDLE_SLOP_PX = 1
 
 export function viewHoldsTown(view: ViewRect, f: MinimapFit): boolean {
-  const b = minimapViewBox(view, f), s = IDLE_SLOP_PX
-  return b.x <= f.ox + s && b.y <= f.oy + s
-    && b.x + b.w >= f.ox + f.mw - s && b.y + b.h >= f.oy + f.mh - s
+  const b = minimapViewBox(view, f),
+    s = IDLE_SLOP_PX
+  return (
+    b.x <= f.ox + s &&
+    b.y <= f.oy + s &&
+    b.x + b.w >= f.ox + f.mw - s &&
+    b.y + b.h >= f.oy + f.mh - s
+  )
 }
 
 // ── going there ───────────────────────────────────────────────────────────────────────────
@@ -189,18 +217,22 @@ export function pageTarget(view: ViewRect, dx: number, dy: number): { sx: number
   }
 }
 
-export type MinimapAction =
-  | { kind: 'page'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 }
-  | { kind: 'whole' }
+export type MinimapAction = { kind: 'page'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | { kind: 'whole' }
 
 export function minimapActionFor(key: string): MinimapAction | null {
   switch (key) {
-    case 'ArrowLeft': return { kind: 'page', dx: -1, dy: 0 }
-    case 'ArrowRight': return { kind: 'page', dx: 1, dy: 0 }
-    case 'ArrowUp': return { kind: 'page', dx: 0, dy: -1 }
-    case 'ArrowDown': return { kind: 'page', dx: 0, dy: 1 }
-    case 'Home': return { kind: 'whole' }
-    default: return null
+    case 'ArrowLeft':
+      return { kind: 'page', dx: -1, dy: 0 }
+    case 'ArrowRight':
+      return { kind: 'page', dx: 1, dy: 0 }
+    case 'ArrowUp':
+      return { kind: 'page', dx: 0, dy: -1 }
+    case 'ArrowDown':
+      return { kind: 'page', dx: 0, dy: 1 }
+    case 'Home':
+      return { kind: 'whole' }
+    default:
+      return null
   }
 }
 
@@ -226,7 +258,9 @@ export function onMinimap(p: MapPerson, focusId: string | null): boolean {
 /** One dot per person, deduplicated to the map's own pixel grid, so the cost is bounded by the
  *  MAP and not by the population. The watched person is exempt from the dedup and drawn LAST. */
 export function peopleDots(
-  people: ReadonlyArray<MapPerson>, f: MinimapFit, focusId: string | null,
+  people: ReadonlyArray<MapPerson>,
+  f: MinimapFit,
+  focusId: string | null,
 ): PersonDot[] {
   const seen = new Set<number>()
   const out: PersonDot[] = []
@@ -235,8 +269,12 @@ export function peopleDots(
     if (!onMinimap(p, focusId)) continue
     const s = tileToScreen(p.x, p.y)
     const m = worldToMap(s.sx, s.sy, f)
-    const mx = Math.round(m.mx), my = Math.round(m.my)
-    if (p.id === focusId) { her = { mx, my, focus: true }; continue }
+    const mx = Math.round(m.mx),
+      my = Math.round(m.my)
+    if (p.id === focusId) {
+      her = { mx, my, focus: true }
+      continue
+    }
     if (mx < 0 || my < 0 || mx >= f.w || my >= f.h) continue
     const key = my * f.w + mx
     if (seen.has(key)) continue
@@ -251,10 +289,10 @@ export function peopleDots(
 
 /** No single colour clears 3:1 over every ground the raster can draw, so every mark is TWO
  *  TONE: a `--deep` halo carrying a light core. Opacity is not a contrast strategy. */
-export const MARK_HALO = 0x241f2b     // --deep
-export const MARK_VIEW = 0xf2c879     // --honey: where the camera is
-export const MARK_PERSON = 0xfff6e9   // --cream: somebody
-export const MARK_WATCHED = 0xe8785a  // --ember: the one you are following
+export const MARK_HALO = 0x241f2b // --deep
+export const MARK_VIEW = 0xf2c879 // --honey: where the camera is
+export const MARK_PERSON = 0xfff6e9 // --cream: somebody
+export const MARK_WATCHED = 0xe8785a // --ember: the one you are following
 
 /** Two tones are not always enough: on `forest` both `--ember` (1.95) and `--deep` (2.85) fall
  *  under 3:1, so the watched marker is THREE tones — deep halo, cream ring, ember core. */
@@ -269,21 +307,43 @@ export const WATCHED_RING_PX = 7
 
 export type MapOp = { x: number; y: number; w: number; h: number; color: number }
 
-function ring(out: MapOp[], x: number, y: number, w: number, h: number, t: number, color: number, f: MinimapFit): void {
+function ring(
+  out: MapOp[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  t: number,
+  color: number,
+  f: MinimapFit,
+): void {
   for (const r of [
-    { x, y, w, h: t }, { x, y: y + h - t, w, h: t },
-    { x, y: y + t, w: t, h: h - 2 * t }, { x: x + w - t, y: y + t, w: t, h: h - 2 * t },
+    { x, y, w, h: t },
+    { x, y: y + h - t, w, h: t },
+    { x, y: y + t, w: t, h: h - 2 * t },
+    { x: x + w - t, y: y + t, w: t, h: h - 2 * t },
   ]) {
-    const x0 = clamp(r.x, 0, f.w), y0 = clamp(r.y, 0, f.h)
-    const x1 = clamp(r.x + r.w, 0, f.w), y1 = clamp(r.y + r.h, 0, f.h)
+    const x0 = clamp(r.x, 0, f.w),
+      y0 = clamp(r.y, 0, f.h)
+    const x1 = clamp(r.x + r.w, 0, f.w),
+      y1 = clamp(r.y + r.h, 0, f.h)
     if (x1 - x0 <= 0 || y1 - y0 <= 0) continue
     out.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0, color })
   }
 }
 
-function blob(out: MapOp[], mx: number, my: number, size: number, color: number, f: MinimapFit): void {
-  const x0 = clamp(mx - size / 2, 0, f.w), y0 = clamp(my - size / 2, 0, f.h)
-  const x1 = clamp(mx + size / 2, 0, f.w), y1 = clamp(my + size / 2, 0, f.h)
+function blob(
+  out: MapOp[],
+  mx: number,
+  my: number,
+  size: number,
+  color: number,
+  f: MinimapFit,
+): void {
+  const x0 = clamp(mx - size / 2, 0, f.w),
+    y0 = clamp(my - size / 2, 0, f.h)
+  const x1 = clamp(mx + size / 2, 0, f.w),
+    y1 = clamp(my + size / 2, 0, f.h)
   if (x1 - x0 <= 0 || y1 - y0 <= 0) return
   out.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0, color })
 }
@@ -324,19 +384,20 @@ export function overlayOps(view: ViewRect, dots: readonly PersonDot[], f: Minima
  *  replaces the canvas, and the film strip, the moment player and the timeline take the bottom
  *  band the map lives in. */
 export const MINIMAP_ON_LENS: Readonly<Record<Lens, boolean>> = {
-  map: true,           // the map's own lens
-  inspector: true,     // a right-hand slide-over; the bottom-left corner stays free
-  discoveries: true,   // the same slide-over, the same free corner — measured, not assumed
-  laws: true,          // the same again
-  society: false,      // the graph REPLACES the canvas: a map of a town nobody is drawing
-  director: false,     // the film strip and the moment player take the bottom band
-  chronicle: false,    // the timeline takes it too
+  map: true, // the map's own lens
+  inspector: true, // a right-hand slide-over; the bottom-left corner stays free
+  discoveries: true, // the same slide-over, the same free corner — measured, not assumed
+  laws: true, // the same again
+  society: false, // the graph REPLACES the canvas: a map of a town nobody is drawing
+  director: false, // the film strip and the moment player take the bottom band
+  chronicle: false, // the timeline takes it too
 }
 
 /** The lenses that get a map, for a reader rather than a compiler. Derived, never transcribed:
  *  a list beside the table is a second place for a lens to go missing. */
-export const MINIMAP_LENSES: readonly Lens[] =
-  (Object.keys(MINIMAP_ON_LENS) as Lens[]).filter((l) => MINIMAP_ON_LENS[l])
+export const MINIMAP_LENSES: readonly Lens[] = (Object.keys(MINIMAP_ON_LENS) as Lens[]).filter(
+  (l) => MINIMAP_ON_LENS[l],
+)
 
 export function minimapShown(lens: Lens, insideId: string | null, hidden: boolean): boolean {
   return !hidden && insideId === null && MINIMAP_ON_LENS[lens]

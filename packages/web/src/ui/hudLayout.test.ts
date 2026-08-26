@@ -4,10 +4,24 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { HudDock } from './HudDock.js'
 import {
-  DEFAULT_HUD, DOCKABLE, DOCKABLE_LABEL, DOCK_SLOTS, HUD_PEEK_PX, HUD_STORAGE_KEY,
-  HUD_TOGGLE_KEY, SLOTS_FOR, SLOT_LABEL, canDock, hiddenCount, hudReducer, hudToggle,
-  isFullyHidden, loadHud, saveHud,
-  type DockSlot, type HudLayout,
+  DEFAULT_HUD,
+  DOCKABLE,
+  DOCKABLE_LABEL,
+  DOCK_SLOTS,
+  HUD_PEEK_PX,
+  HUD_STORAGE_KEY,
+  HUD_TOGGLE_KEY,
+  SLOTS_FOR,
+  SLOT_LABEL,
+  canDock,
+  hiddenCount,
+  hudReducer,
+  hudToggle,
+  isFullyHidden,
+  loadHud,
+  saveHud,
+  type DockSlot,
+  type HudLayout,
 } from './hudLayout.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
@@ -16,18 +30,31 @@ const EMOJI = /\p{Extended_Pictographic}/u
 function fakeStorage(seed: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(seed))
   return {
-    get length() { return map.size },
+    get length() {
+      return map.size
+    },
     clear: () => map.clear(),
     getItem: (k) => map.get(k) ?? null,
     key: (i) => [...map.keys()][i] ?? null,
-    removeItem: (k) => { map.delete(k) },
-    setItem: (k, v) => { map.set(k, v) },
+    removeItem: (k) => {
+      map.delete(k)
+    },
+    setItem: (k, v) => {
+      map.set(k, v)
+    },
   }
 }
 const brokenStorage = (): Storage => ({
-  length: 0, clear: () => {}, key: () => null, removeItem: () => {},
-  getItem: () => { throw new Error('blocked') },
-  setItem: () => { throw new Error('blocked') },
+  length: 0,
+  clear: () => {},
+  key: () => null,
+  removeItem: () => {},
+  getItem: () => {
+    throw new Error('blocked')
+  },
+  setItem: () => {
+    throw new Error('blocked')
+  },
 })
 
 describe('hudReducer — moving one thing moves one thing', () => {
@@ -40,8 +67,9 @@ describe('hudReducer — moving one thing moves one thing', () => {
   })
 
   it('returns the SAME object when nothing moved', () => {
-    expect(hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'controlBar', to: 'bottom' }))
-      .toBe(DEFAULT_HUD)
+    expect(hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'controlBar', to: 'bottom' })).toBe(
+      DEFAULT_HUD,
+    )
   })
 
   it('hide-all puts every dockable away, and says so', () => {
@@ -53,8 +81,9 @@ describe('hudReducer — moving one thing moves one thing', () => {
   })
 
   it('show-all restores exactly the defaults — a clean round trip', () => {
-    expect(hudReducer(hudReducer(DEFAULT_HUD, { kind: 'hide-all' }), { kind: 'show-all' }))
-      .toEqual(DEFAULT_HUD)
+    expect(hudReducer(hudReducer(DEFAULT_HUD, { kind: 'hide-all' }), { kind: 'show-all' })).toEqual(
+      DEFAULT_HUD,
+    )
   })
 
   it('reset from ANY reachable layout equals the defaults', () => {
@@ -104,9 +133,11 @@ describe('SLOTS_FOR — a surface is only offered a slot the renderer can place 
   })
 
   it('a stored layout naming an unplaceable slot loads as the default for that surface', () => {
-    const l = loadHud(fakeStorage({
-      [HUD_STORAGE_KEY]: '{"timeline":"left","statusStrip":"hidden","controlBar":"right"}',
-    }))
+    const l = loadHud(
+      fakeStorage({
+        [HUD_STORAGE_KEY]: '{"timeline":"left","statusStrip":"hidden","controlBar":"right"}',
+      }),
+    )
     expect(l.timeline).toBe(DEFAULT_HUD.timeline)
     expect(l.statusStrip).toBe('hidden')
     expect(l.controlBar).toBe('right')
@@ -132,9 +163,11 @@ describe('loadHud / saveHud — a preference, never a requirement', () => {
   })
 
   it('drops a bad slot and keeps the good ones beside it', () => {
-    const l = loadHud(fakeStorage({
-      [HUD_STORAGE_KEY]: '{"controlBar":"nope","timeline":"hidden","nonsense":"top"}',
-    }))
+    const l = loadHud(
+      fakeStorage({
+        [HUD_STORAGE_KEY]: '{"controlBar":"nope","timeline":"hidden","nonsense":"top"}',
+      }),
+    )
     expect(l.controlBar).toBe(DEFAULT_HUD.controlBar)
     expect(l.timeline).toBe('hidden')
     expect(Object.keys(l).sort()).toEqual([...DOCKABLE].sort())
@@ -153,7 +186,9 @@ describe('loadHud / saveHud — a preference, never a requirement', () => {
 
 describe('HudDock — a viewer can never hide the way back', () => {
   const render = (layout: HudLayout, open = false): string =>
-    renderToStaticMarkup(createElement(HudDock, { layout, open, onEvent: () => {}, onOpen: () => {} }))
+    renderToStaticMarkup(
+      createElement(HudDock, { layout, open, onEvent: () => {}, onOpen: () => {} }),
+    )
 
   /** 20 sampled layouts, including the two extremes */
   function* sample(): Generator<HudLayout> {
@@ -204,11 +239,10 @@ describe('HudDock — a viewer can never hide the way back', () => {
   it('marks where each surface currently sits, and only there', () => {
     const layout = hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'controlBar', to: 'left' })
     const html = render(layout, true)
-    const pressed = [...html.matchAll(/data-dock="([^"]+)"[^>]*aria-pressed="true"/g)]
-      .map((m) => m[1])
-    expect(pressed.sort()).toEqual(
-      DOCKABLE.map((k) => `${k}:${layout[k]}`).sort(),
+    const pressed = [...html.matchAll(/data-dock="([^"]+)"[^>]*aria-pressed="true"/g)].map(
+      (m) => m[1],
     )
+    expect(pressed.sort()).toEqual(DOCKABLE.map((k) => `${k}:${layout[k]}`).sort())
   })
 
   it('names the key that undoes any amount of hiding', () => {

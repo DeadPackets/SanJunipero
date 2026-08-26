@@ -1,6 +1,13 @@
 import {
-  INTERIOR_TILE, ROOM_TILES, WALL_H_PX, WALL_KINDS, alongWall, interiorToScreen, wallOfTile,
-  type Tile, type WallKind,
+  INTERIOR_TILE,
+  ROOM_TILES,
+  WALL_H_PX,
+  WALL_KINDS,
+  alongWall,
+  interiorToScreen,
+  wallOfTile,
+  type Tile,
+  type WallKind,
 } from './interiorMap.js'
 
 // Geometry for a room's floor and its two visible walls, in interior pixels on the 128×64
@@ -44,15 +51,15 @@ export const FAR_ROW_SHADE_ALPHA = 0.22
 /** Every colour the shell paints, all MASTER_PALETTE members. This is the art-independent
  *  room: with an interior tileset the walls and floor come from it and only the light is code. */
 export const ROOM_SHELL_PAINT = {
-  floor: 0xf6e8d5,        // warm paper — the landed INTERIOR_FLOOR, kept
-  floorSeam: 0xd4bc9e,    // board seams
-  wallLit: 0xe8d5bc,      // back-right catches the light from the doorway
-  wallShade: 0xb89d7e,    // back-left falls away
-  wallCourse: 0x9c6b47,   // the grain of both walls
-  skirting: 0x7e512b,     // the board where a wall meets the floor
-  threshold: 0xf2c879,    // honey — the same tone the exterior door sill is drawn in
-  hearthPool: 0xf2c879,   // firelight
-  doorwayPool: 0xd6eaf2,  // daylight, coming in cold against the fire
+  floor: 0xf6e8d5, // warm paper — the landed INTERIOR_FLOOR, kept
+  floorSeam: 0xd4bc9e, // board seams
+  wallLit: 0xe8d5bc, // back-right catches the light from the doorway
+  wallShade: 0xb89d7e, // back-left falls away
+  wallCourse: 0x9c6b47, // the grain of both walls
+  skirting: 0x7e512b, // the board where a wall meets the floor
+  threshold: 0xf2c879, // honey — the same tone the exterior door sill is drawn in
+  hearthPool: 0xf2c879, // firelight
+  doorwayPool: 0xd6eaf2, // daylight, coming in cold against the fire
 } as const
 
 /** --ink. Every silhouette rim in the room. */
@@ -68,8 +75,10 @@ export type Line4 = [number, number, number, number]
  *  far vertex, exactly where the room container is positioned. */
 export function floorPolyOf(room: RoomSize = ROOM_TILES): number[] {
   const c = [
-    interiorToScreen(0, 0), interiorToScreen(room.w, 0),
-    interiorToScreen(room.w, room.h), interiorToScreen(0, room.h),
+    interiorToScreen(0, 0),
+    interiorToScreen(room.w, 0),
+    interiorToScreen(room.w, room.h),
+    interiorToScreen(0, room.h),
   ]
   return c.flatMap((p) => [p.sx, p.sy])
 }
@@ -78,15 +87,18 @@ export function floorPolyOf(room: RoomSize = ROOM_TILES): number[] {
  *  material laid over another, like the flagstone under a hearth. */
 export function floorRegionPoly(r: { x0: number; y0: number; x1: number; y1: number }): number[] {
   const c = [
-    interiorToScreen(r.x0, r.y0), interiorToScreen(r.x1, r.y0),
-    interiorToScreen(r.x1, r.y1), interiorToScreen(r.x0, r.y1),
+    interiorToScreen(r.x0, r.y0),
+    interiorToScreen(r.x1, r.y0),
+    interiorToScreen(r.x1, r.y1),
+    interiorToScreen(r.x0, r.y1),
   ]
   return c.flatMap((p) => [p.sx, p.sy])
 }
 
 /** The centre of the ground a piece stands on: a two-tile-deep piece foots two tiles out. */
 export function tileSpanCentre(
-  tile: Tile, size: { w: number; h: number },
+  tile: Tile,
+  size: { w: number; h: number },
 ): { sx: number; sy: number } {
   return interiorToScreen(tile.x + size.w / 2, tile.y + size.h / 2)
 }
@@ -104,7 +116,8 @@ function wallBase(kind: WallKind, room: RoomSize): { sx: number; sy: number } {
 
 /** The two back walls as closed quads: each base edge, raised by `wallH` interior pixels. */
 export function wallPolys(
-  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): Record<WallKind, number[]> {
   const out = {} as Record<WallKind, number[]>
   for (const kind of WALL_KINDS) {
@@ -116,7 +129,8 @@ export function wallPolys(
 
 /** Horizontal courses up each wall, parallel to its own base edge. */
 export function wallCourses(
-  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): Record<WallKind, Line4[]> {
   const out = {} as Record<WallKind, Line4[]>
   for (const kind of WALL_KINDS) {
@@ -144,7 +158,8 @@ export function skirtingPolys(room: RoomSize = ROOM_TILES): Record<WallKind, num
 export function floorBoards(room: RoomSize = ROOM_TILES): Line4[] {
   const lines: Line4[] = []
   for (let y = FLOOR_BOARD_TILES; y < room.h; y += FLOOR_BOARD_TILES) {
-    const a = interiorToScreen(0, y), b = interiorToScreen(room.w, y)
+    const a = interiorToScreen(0, y),
+      b = interiorToScreen(room.w, y)
     lines.push([a.sx, a.sy, b.sx, b.sy])
   }
   return lines
@@ -184,8 +199,10 @@ export function ceilingBeams(bayTiles: number, room: RoomSize = ROOM_TILES): num
   for (let i = 0; (i + 0.5) * bayTiles < room.w; i++) {
     const cx = (i + 0.5) * bayTiles
     const c = [
-      interiorToScreen(cx - BEAM_HALF_TILES, 0), interiorToScreen(cx + BEAM_HALF_TILES, 0),
-      interiorToScreen(cx + BEAM_HALF_TILES, room.h), interiorToScreen(cx - BEAM_HALF_TILES, room.h),
+      interiorToScreen(cx - BEAM_HALF_TILES, 0),
+      interiorToScreen(cx + BEAM_HALF_TILES, 0),
+      interiorToScreen(cx + BEAM_HALF_TILES, room.h),
+      interiorToScreen(cx - BEAM_HALF_TILES, room.h),
     ]
     out.push(c.flatMap((p) => [p.sx, p.sy]))
   }
@@ -197,19 +214,26 @@ export type FloorPool = { sx: number; sy: number; radius: number; alpha: number 
 /** Light from the doorway and from any furnishing that provides it. The doorway pool always
  *  exists and comes first, so the painter lays the ambient light down before any fire. */
 export function floorPools(
-  items: ReadonlyArray<{ tile: Tile; light: boolean }>, room: RoomSize = ROOM_TILES,
+  items: ReadonlyArray<{ tile: Tile; light: boolean }>,
+  room: RoomSize = ROOM_TILES,
 ): FloorPool[] {
   const door = interiorToScreen(room.w, room.h)
-  const pools: FloorPool[] = [{
-    sx: door.sx, sy: door.sy,
-    radius: DOORWAY_POOL_R_TILES * INTERIOR_TILE.w, alpha: DOORWAY_POOL_ALPHA,
-  }]
+  const pools: FloorPool[] = [
+    {
+      sx: door.sx,
+      sy: door.sy,
+      radius: DOORWAY_POOL_R_TILES * INTERIOR_TILE.w,
+      alpha: DOORWAY_POOL_ALPHA,
+    },
+  ]
   for (const item of items) {
     if (!item.light) continue
     const c = tileCentreScreen(item.tile.x, item.tile.y)
     pools.push({
-      sx: c.sx, sy: c.sy,
-      radius: HEARTH_POOL_R_TILES * INTERIOR_TILE.w, alpha: HEARTH_POOL_ALPHA,
+      sx: c.sx,
+      sy: c.sy,
+      radius: HEARTH_POOL_R_TILES * INTERIOR_TILE.w,
+      alpha: HEARTH_POOL_ALPHA,
     })
   }
   return pools
@@ -222,15 +246,26 @@ export function roomMaskPoly(room: RoomSize = ROOM_TILES, wallH: number = WALL_H
   const w = wallBase('back-left', room)
   const near = interiorToScreen(room.w, room.h)
   return [
-    w.sx, w.sy - wallH, 0, -wallH, e.sx, e.sy - wallH,
-    e.sx, e.sy, near.sx, near.sy, w.sx, w.sy,
+    w.sx,
+    w.sy - wallH,
+    0,
+    -wallH,
+    e.sx,
+    e.sy - wallH,
+    e.sx,
+    e.sy,
+    near.sx,
+    near.sy,
+    w.sx,
+    w.sy,
   ]
 }
 
 /** The whole drawn box: wall top down to the floor's near vertex. The camera centres this,
  *  never the floor alone, or the walls push the top of the room off the stage. */
 export function roomBox(
-  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): { top: number; bottom: number; height: number } {
   const top = -wallH
   const bottom = (room.w + room.h) * (INTERIOR_TILE.h / 2)
@@ -244,7 +279,11 @@ export function roomZoomFor(_screenH: number): number {
 
 /** How much of the room's box a stage this tall cannot show; 0 when it all fits. `ROOM_MARGIN_Y`
  *  is deliberately NOT counted here — it is paid out of slack by `roomOriginY`. */
-export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number {
+export function roomCropPx(
+  screenH: number,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
+): number {
   return Math.max(0, roomBox(room, wallH).height * ROOM_ZOOM - screenH)
 }
 
@@ -256,7 +295,10 @@ export function roomWidthPx(room: RoomSize = ROOM_TILES): number {
 
 /** How much of the room's box a stage this size cannot show, in each axis. 0 where it fits. */
 export function roomCrop(
-  screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  screenW: number,
+  screenH: number,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): { x: number; y: number } {
   return {
     x: Math.max(0, roomWidthPx(room) * ROOM_ZOOM - screenW),
@@ -267,7 +309,10 @@ export function roomCrop(
 /** The camera's allowed travel, which is exactly the crop: split either way in x, because
  *  `roomOriginX` centres, and downward only in y, because `roomOriginY` pins the wall top. */
 export function roomPanRange(
-  screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  screenW: number,
+  screenH: number,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): { minX: number; maxX: number; minY: number; maxY: number } {
   const crop = roomCrop(screenW, screenH, room, wallH)
   // `0 - x` and not `-x`: a room that fits must give a range of [+0, +0], or the clamp hands
@@ -281,11 +326,15 @@ const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.m
  *  added to the `roomOrigin*` placement; a `null` focus offsets by 0 in both axes. */
 export function roomPanTo(
   focus: { sx: number; sy: number } | null,
-  screenW: number, screenH: number, zoom: number,
-  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  screenW: number,
+  screenH: number,
+  zoom: number,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): { dx: number; dy: number } {
   const range = roomPanRange(screenW, screenH, room, wallH)
-  if (focus === null) return { dx: clamp(0, range.minX, range.maxX), dy: clamp(0, range.minY, range.maxY) }
+  if (focus === null)
+    return { dx: clamp(0, range.minX, range.maxX), dy: clamp(0, range.minY, range.maxY) }
   const originX = roomOriginX(screenW, zoom, room)
   const originY = roomOriginY(screenH, 0, zoom, room, wallH)
   return {
@@ -330,12 +379,15 @@ export function roomOriginX(screenW: number, zoom: number, room: RoomSize = ROOM
 /** Where the room container's origin goes so the box is centred in a stage `screenH` tall,
  *  lifted clear of the bottom chrome by `offsetY` — clamped to the headroom that exists. */
 export function roomOriginY(
-  screenH: number, offsetY: number, zoom: number, room: RoomSize = ROOM_TILES,
+  screenH: number,
+  offsetY: number,
+  zoom: number,
+  room: RoomSize = ROOM_TILES,
   wallH: number = WALL_H_PX,
 ): number {
   const box = roomBox(room, wallH)
   const centred = screenH / 2 - ((box.top + box.bottom) / 2) * zoom
-  const headroom = centred + box.top * zoom     // stage above the wall top, centred
+  const headroom = centred + box.top * zoom // stage above the wall top, centred
   // A short stage loses the near corner, not the wall top — the walls carry the room's detail.
   if (headroom < ROOM_MARGIN_Y) return Math.max(0, headroom) - box.top * zoom
   return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
@@ -364,7 +416,9 @@ const strokeLines = (g: ShellPainter, lines: Line4[], color: number, alpha: numb
 
 /** The back plane: two walls, their grain, their skirting and the corner they meet in. */
 export function drawWalls(
-  g: ShellPainter, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+  g: ShellPainter,
+  room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): void {
   g.clear()
   const walls = wallPolys(room, wallH)
@@ -384,7 +438,8 @@ export function drawWalls(
 /** The floor's surface and its grain. `surface` is `null` when the caller has already laid a
  *  continuous material down under this pass. */
 export function drawFloorBase(
-  g: ShellPainter, room: RoomSize = ROOM_TILES,
+  g: ShellPainter,
+  room: RoomSize = ROOM_TILES,
   surface: number | null = ROOM_SHELL_PAINT.floor,
 ): void {
   if (surface !== null) {
@@ -400,7 +455,9 @@ export function drawFloorBase(
 /** The light on the floor and the threshold it falls through. The caller MUST mask this to
  *  `floorPolyOf`: the doorway pool and the threshold straddle the near vertex by construction. */
 export function drawFloorLight(
-  g: ShellPainter, pools: readonly FloorPool[], room: RoomSize = ROOM_TILES,
+  g: ShellPainter,
+  pools: readonly FloorPool[],
+  room: RoomSize = ROOM_TILES,
   beams: readonly number[][] = [],
 ): void {
   for (const beam of beams) {
@@ -428,8 +485,10 @@ export function drawFloorTop(g: ShellPainter, room: RoomSize = ROOM_TILES): void
  *  plane reads as receding rather than as a card seen face-on. */
 export function farRowShade(room: RoomSize = ROOM_TILES, row: number): number[] {
   const corners = [
-    interiorToScreen(0, row), interiorToScreen(room.w, row),
-    interiorToScreen(room.w, row + 1), interiorToScreen(0, row + 1),
+    interiorToScreen(0, row),
+    interiorToScreen(room.w, row),
+    interiorToScreen(room.w, row + 1),
+    interiorToScreen(0, row + 1),
   ]
   return corners.flatMap((p) => [p.sx, p.sy])
 }

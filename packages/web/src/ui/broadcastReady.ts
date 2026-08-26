@@ -17,13 +17,10 @@ export const READINESS: readonly string[] = [
 export const MACHINE_CHECKABLE: readonly string[] = ['R2', 'R4', 'R7', 'R8']
 
 export function readinessReport(lines: readonly ReadinessLine[]): string {
-  const rows = lines.map((l) =>
-    `| ${l.id} | ${l.requirement} | ${l.measured} | ${l.pass ? 'PASS' : 'OPEN'} |`)
-  return [
-    '| id | requirement | measured | verdict |',
-    '|---|---|---|---|',
-    ...rows,
-  ].join('\n')
+  const rows = lines.map(
+    (l) => `| ${l.id} | ${l.requirement} | ${l.measured} | ${l.pass ? 'PASS' : 'OPEN'} |`,
+  )
+  return ['| id | requirement | measured | verdict |', '|---|---|---|---|', ...rows].join('\n')
 }
 
 // ── R4 · nothing on screen is a machine word ──────────────────────────────────────────────
@@ -37,7 +34,10 @@ const IDLIKE = /\b[0-9a-f]{8}-[0-9a-f]{4}|\b(?:structure|agent|item|crop)_[a-z0-
 /** A big bare integer: no unit after it, not a clock, not a day. `4820` on screen tells a
  *  viewer nothing; `Day 120`, `82%`, `19:31` and `3 days` all tell them something. */
 const UNITS = 'px|ms|s|days?|nights?|ticks?|people|steps?|of\\b'
-const BARE_INT = new RegExp(`(?<!Day\\s)(?<![\\d.:%])\\b\\d{3,}\\b(?![\\d.:%]|\\s*(?:${UNITS}))`, 'i')
+const BARE_INT = new RegExp(
+  `(?<!Day\\s)(?<![\\d.:%])\\b\\d{3,}\\b(?![\\d.:%]|\\s*(?:${UNITS}))`,
+  'i',
+)
 
 export type StringSite = { where: string; text: string }
 
@@ -45,7 +45,12 @@ export type StringSite = { where: string; text: string }
 export function machineWordOffenders(sites: readonly StringSite[]): string[] {
   const out: string[] = []
   for (const s of sites) {
-    for (const [name, re] of [['slug', SLUG], ['path', DOTTED], ['id', IDLIKE], ['number', BARE_INT]] as const) {
+    for (const [name, re] of [
+      ['slug', SLUG],
+      ['path', DOTTED],
+      ['id', IDLIKE],
+      ['number', BARE_INT],
+    ] as const) {
       if (re.test(s.text)) out.push(`${s.where} — ${name} — ${JSON.stringify(s.text)}`)
     }
   }
@@ -62,7 +67,8 @@ export function kindWords(kind: string): string {
 
 /** "1080p" is 1920 x 1080 and the mobile player is 480 CSS px WIDE, so the scale is 480/1920 =
  *  0.25, not the 480/1080 the plan used. */
-export const TWITCH_SOURCE_W = 1920, TWITCH_SOURCE_H = 1080
+export const TWITCH_SOURCE_W = 1920,
+  TWITCH_SOURCE_H = 1080
 export const TWITCH_PLAYER_W = 480
 export const TWITCH_SCALE = TWITCH_PLAYER_W / TWITCH_SOURCE_W
 /** The frame, at that scale, in the viewer's pixels: 480 x 270. */
@@ -92,7 +98,9 @@ export type Caption = { what: string; px: number }
 export function captionShortfall(captions: readonly Caption[]): string[] {
   return captions
     .filter((c) => !captionReads(c.px))
-    .map((c) => `${c.what} — ${captionAtScale(c.px).toFixed(2)}px of ${captionMinPx().toFixed(1)}px`)
+    .map(
+      (c) => `${c.what} — ${captionAtScale(c.px).toFixed(2)}px of ${captionMinPx().toFixed(1)}px`,
+    )
 }
 
 // ── R7 · the three broadcast widths ───────────────────────────────────────────────────────
@@ -109,11 +117,15 @@ export function stageWidthAt(width: number, rails: Rails): number {
 }
 
 /** `width — why` for every broadcast width the chrome does not fit in. */
-export function layoutOffenders(rails: Rails, widths: readonly number[] = BROADCAST_WIDTHS): string[] {
+export function layoutOffenders(
+  rails: Rails,
+  widths: readonly number[] = BROADCAST_WIDTHS,
+): string[] {
   const out: string[] = []
   for (const w of widths) {
     const stage = stageWidthAt(w, rails)
-    if (stage < STAGE_MIN_PX) out.push(`${w} — stage is ${stage}px with the panel open, under ${STAGE_MIN_PX}`)
+    if (stage < STAGE_MIN_PX)
+      out.push(`${w} — stage is ${stage}px with the panel open, under ${STAGE_MIN_PX}`)
     const bar = rails.controlItem * rails.controlCount
     if (bar > stage) out.push(`${w} — the control bar needs ${bar}px and has ${stage}px`)
     if (rails.stripCard * 2 > stage) out.push(`${w} — the filmstrip cannot show two postcards`)
@@ -129,7 +141,7 @@ export type BadgeState = 'waking' | 'live' | 'past' | 'stale'
 
 export function tickBadgeState(link: LinkState, live: boolean, awake: boolean): BadgeState {
   if (!awake) return 'waking'
-  if (link !== 'online') return 'stale'  // the figures are the last ones we were told
+  if (link !== 'online') return 'stale' // the figures are the last ones we were told
   return live ? 'live' : 'past'
 }
 

@@ -7,11 +7,22 @@ import { SHOWCASE_CONFIG } from './devWorld.js'
 import { devTown } from './devTown.js'
 import { showcaseTerrain } from './showcaseMap.js'
 import {
-  DEV_FAST_FORWARD_FOR_INTERIORS, FOUNDERS, FOUNDERS_HOME_ID, GO_HOME_BELOW, LEAVE_HOME_ABOVE,
+  DEV_FAST_FORWARD_FOR_INTERIORS,
+  FOUNDERS,
+  FOUNDERS_HOME_ID,
+  GO_HOME_BELOW,
+  LEAVE_HOME_ABOVE,
   type FounderDef,
-  MASON_KIND, MASON_WOOD_KIND,
-  arrivesStanding, devHoldings, foundersFor, homeIntent, homeOf, makeFoundersOnTick,
-  townStructuresFor, walkEnergyCost,
+  MASON_KIND,
+  MASON_WOOD_KIND,
+  arrivesStanding,
+  devHoldings,
+  foundersFor,
+  homeIntent,
+  homeOf,
+  makeFoundersOnTick,
+  townStructuresFor,
+  walkEnergyCost,
 } from './founders.js'
 
 // The dev world after its first tick: five founders, six finished buildings.
@@ -27,7 +38,10 @@ function townAtTick1(): WorldState {
 
 const spend = (state: WorldState, id: string, energy: number): WorldState => ({
   ...state,
-  agents: { ...state.agents, [id]: { ...state.agents[id]!, needs: { ...state.agents[id]!.needs, energy } } },
+  agents: {
+    ...state.agents,
+    [id]: { ...state.agents[id]!, needs: { ...state.agents[id]!.needs, energy } },
+  },
 })
 
 const putAt = (state: WorldState, id: string, x: number, y: number): WorldState => ({
@@ -52,18 +66,29 @@ describe('homeIntent', () => {
   // this one is asked of a founder who can still get there.
   it('walks a spent founder to the door of the one dwelling', () => {
     const s = putAt(spend(base, 'omar', 20), 'omar', 6, 32)
-    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'walk',
+      params: { x: door.x, y: door.y },
+    })
   })
 
   it('goes in once the founder is standing at the door', () => {
     const s = putAt(spend(base, 'omar', 10), 'omar', door.x, door.y)
-    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'enter', params: { structureId: FOUNDERS_HOME_ID } })
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'enter',
+      params: { structureId: FOUNDERS_HOME_ID },
+    })
   })
 
   it('sleeps indoors, then comes out again once rested', () => {
     const inside = putInside(base, 'omar', FOUNDERS_HOME_ID)
-    expect(homeIntent(spend(inside, 'omar', 10), SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
-    expect(homeIntent(spend(inside, 'omar', LEAVE_HOME_ABOVE + 1), SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'exit', params: {} })
+    expect(homeIntent(spend(inside, 'omar', 10), SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'sleep',
+      params: {},
+    })
+    expect(
+      homeIntent(spend(inside, 'omar', LEAVE_HOME_ABOVE + 1), SHOWCASE_CONFIG, 'omar'),
+    ).toEqual({ verb: 'exit', params: {} })
   })
 
   it('says nothing about someone who is not there', () => {
@@ -83,8 +108,14 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
     const s = at(door.x + 10, door.y, 50)
     const cost = walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)!
     const path = findPath(s, s.agents['omar']!, door, SHOWCASE_CONFIG)!
-    const tired = Math.max(SHOWCASE_CONFIG.movement.baseTicksPerTile, SHOWCASE_CONFIG.movement.debuffTicksPerTile)
-    expect(cost).toBeCloseTo(path.length * tired * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick, 10)
+    const tired = Math.max(
+      SHOWCASE_CONFIG.movement.baseTicksPerTile,
+      SHOWCASE_CONFIG.movement.debuffTicksPerTile,
+    )
+    expect(cost).toBeCloseTo(
+      path.length * tired * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick,
+      10,
+    )
     // Priced at the TIRED rate: a body that sets out fresh is under the debuff threshold long
     // before it arrives, and quoting today's speed under-prices exactly the long late journeys.
     expect(tired).toBeGreaterThan(SHOWCASE_CONFIG.movement.baseTicksPerTile)
@@ -99,8 +130,10 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
     // The same body, the same energy, thirty tiles out: the walk has already eaten the margin.
     const far = at(6, 32, energy)
     expect(walkEnergyCost(far, SHOWCASE_CONFIG, 'omar', door)!).toBeGreaterThan(1)
-    expect(homeIntent(far, SHOWCASE_CONFIG, 'omar'))
-      .toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+    expect(homeIntent(far, SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'walk',
+      params: { x: door.x, y: door.y },
+    })
   })
 
   it('★ AND LIES DOWN WHERE IT IS when the walk home is no longer affordable at all', () => {
@@ -116,8 +149,11 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
     // to it. `walkEnergyCost` says null and the body must still be given an answer.
     const moat = (s: WorldState, x: number, y: number): WorldState => ({
       ...s,
-      terrain: s.terrain.map((row, ty) => row.map((t, tx) =>
-        Math.abs(tx - x) <= 1 && Math.abs(ty - y) <= 1 && !(tx === x && ty === y) ? 2 : t)),
+      terrain: s.terrain.map((row, ty) =>
+        row.map((t, tx) =>
+          Math.abs(tx - x) <= 1 && Math.abs(ty - y) <= 1 && !(tx === x && ty === y) ? 2 : t,
+        ),
+      ),
     })
     const s = moat(putAt(spend(base, 'omar', 10), 'omar', 6, 32), 6, 32)
     expect(walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)).toBeNull()
@@ -140,7 +176,10 @@ describe('makeFoundersOnTick interiors switch', () => {
     const state = spent()
     const out: string[] = []
     const onTick = makeFoundersOnTick(
-      SHOWCASE_CONFIG, new RngStreams('founders-test'), () => state, { interiors },
+      SHOWCASE_CONFIG,
+      new RngStreams('founders-test'),
+      () => state,
+      { interiors },
     )
     onTick({
       tick: 2,
@@ -153,7 +192,7 @@ describe('makeFoundersOnTick interiors switch', () => {
     return out
   }
 
-  it('is OFF by default — no gate\'s world folds an event it did not fold before', () => {
+  it("is OFF by default — no gate's world folds an event it did not fold before", () => {
     expect(verbsStarted(false)).not.toContain('enter')
   })
 
@@ -164,7 +203,8 @@ describe('makeFoundersOnTick interiors switch', () => {
   // The patrol arm has no `homeIntent` behind it to catch a body that overreaches. Asked on the
   // FIXTURE waypoints, because the showcase's well-and-back leg is too short to bite.
   it('★ will not set out on a leg the legs cannot pay for — it lies down instead', () => {
-    const HERE = { x: 5, y: 5 }, YONDER = { x: 58, y: 60 }   // opposite corners of the fixture
+    const HERE = { x: 5, y: 5 },
+      YONDER = { x: 58, y: 60 } // opposite corners of the fixture
     const far = FOUNDERS.map((f) => ({ ...f, patrol: [HERE, YONDER] as FounderDef['patrol'] }))
     const started = (energy: number): string[] => {
       const state = putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
@@ -185,7 +225,6 @@ describe('makeFoundersOnTick interiors switch', () => {
   })
 })
 
-
 // ---------------------------------------------------------------- U25: five roofs, not one
 
 const SHOWCASE_STRUCTURES = devTown().structures
@@ -194,9 +233,9 @@ const SHOWCASE_STRUCTURES = devTown().structures
 function showcaseTownAtTick1(): WorldState {
   let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
   const events: Array<{ type: string; payload: unknown }> = []
-  const onTick = makeFoundersOnTick(
-    SHOWCASE_CONFIG, new RngStreams('u25'), () => state, { structures: SHOWCASE_STRUCTURES },
-  )
+  const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
+    structures: SHOWCASE_STRUCTURES,
+  })
   onTick({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
   let seq = 0
   for (const e of events) state = fold(state, { seq: ++seq, tick: 1, ...e }, SHOWCASE_CONFIG)
@@ -232,10 +271,10 @@ describe('U25 — the humans were all sleeping inside one house', () => {
   // errand any of them has; the run ends when all five are indoors.
   it('puts five tired founders under five different roofs', () => {
     let state = showcaseTownAtTick1()
-    const onTick = makeFoundersOnTick(
-      SHOWCASE_CONFIG, new RngStreams('u25'), () => state,
-      { interiors: true, structures: SHOWCASE_STRUCTURES },
-    )
+    const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
+      interiors: true,
+      structures: SHOWCASE_STRUCTURES,
+    })
     let seq = 1000
     for (let tick = 2; tick <= 400; tick++) {
       // Tired enough that home is the only errand, rested enough that home is still reachable:
@@ -260,7 +299,10 @@ describe('homeIntent routes an owner to their own door', () => {
       const mine = homeOf(town, id)!
       const door = doorTile(town, mine)!
       const s = putAt(spend(town, id, 10), id, door.x + 4, door.y)
-      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({
+        verb: 'walk',
+        params: { x: door.x, y: door.y },
+      })
     }
     const doors = FOUNDER_IDS.map((id) => doorTile(town, homeOf(town, id)!)!)
     expect(new Set(doors.map((d) => `${d.x},${d.y}`)).size).toBe(5)
@@ -271,7 +313,10 @@ describe('homeIntent routes an owner to their own door', () => {
       const mine = homeOf(town, id)!
       const door = doorTile(town, mine)!
       const s = putAt(spend(town, id, 10), id, door.x, door.y)
-      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({ verb: 'enter', params: { structureId: mine.id } })
+      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({
+        verb: 'enter',
+        params: { structureId: mine.id },
+      })
     }
   })
 
@@ -280,7 +325,10 @@ describe('homeIntent routes an owner to their own door', () => {
     const door = doorTile(base, base.structures[FOUNDERS_HOME_ID]!)!
     const s = putAt(spend(base, 'omar', 20), 'omar', 6, 32)
     expect(homeOf(base, 'omar')).toBeNull()
-    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'walk',
+      params: { x: door.x, y: door.y },
+    })
   })
 })
 
@@ -300,17 +348,17 @@ describe('foundersFor', () => {
     const keys = defs.map((d) => `${d.spawn.x},${d.spawn.y}`)
     expect(new Set(keys).size).toBe(5)
     const terrain = showcaseTerrain()
-    for (const d of defs) expect(terrain[d.spawn.y]![d.spawn.x]).not.toBe(2)   // never in the river
+    for (const d of defs) expect(terrain[d.spawn.y]![d.spawn.x]).not.toBe(2) // never in the river
   })
 })
 
 describe('the interiors demo window', () => {
   it('starts before the first measured trip indoors, not after it', () => {
     expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeLessThan(814)
-    expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeGreaterThan(600)   // not a whole day of waiting
+    expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeGreaterThan(600) // not a whole day of waiting
   })
 
-  it('keeps home ahead of the patrol policy\'s own outdoor sleep', () => {
+  it("keeps home ahead of the patrol policy's own outdoor sleep", () => {
     expect(GO_HOME_BELOW).toBeGreaterThan(20)
     expect(LEAVE_HOME_ABOVE).toBeGreaterThan(GO_HOME_BELOW)
   })
@@ -325,9 +373,16 @@ describe('the storerooms hold something', () => {
     const structures = townStructuresFor('showcase')
     let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
     const events: Array<{ type: string; payload: unknown }> = []
-    const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('holdings-test'), () => state, {
-      structures, founders: foundersFor(structures), holdings: true,
-    })
+    const onTick = makeFoundersOnTick(
+      SHOWCASE_CONFIG,
+      new RngStreams('holdings-test'),
+      () => state,
+      {
+        structures,
+        founders: foundersFor(structures),
+        holdings: true,
+      },
+    )
     onTick({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
     let seq = 0
     for (const e of events) state = fold(state, { seq: ++seq, tick: 1, ...e }, SHOWCASE_CONFIG)
@@ -341,8 +396,9 @@ describe('the storerooms hold something', () => {
     // the landed script emits agents and buildings and not one item, which is why a panel
     // with passing tests had never rendered against data
     expect(devHoldings([]).length).toBe(0)
-    expect(Object.values(showcaseAtTick1().items).filter((i) => i.loc.t === 'structure').length)
-      .toBeGreaterThan(0)   // RED against the landed script, which stores zero
+    expect(
+      Object.values(showcaseAtTick1().items).filter((i) => i.loc.t === 'structure').length,
+    ).toBeGreaterThan(0) // RED against the landed script, which stores zero
   })
 
   it('fills the public storehouse past the card’s cap, so "and N more" is real', () => {
@@ -392,12 +448,14 @@ describe('the storerooms hold something', () => {
     const structures = townStructuresFor('showcase')
     const holdings = devHoldings(structures)
     const woodByStructure = new Set(
-      holdings.filter((h) => h.kind === MASON_WOOD_KIND).map((h) => h.structureId))
+      holdings.filter((h) => h.kind === MASON_WOOD_KIND).map((h) => h.structureId),
+    )
     for (const f of FOUNDERS) {
       const home = structures.find((s) => s.owner === f.id)
       expect(home, `${f.id} owns no roof`).toBeDefined()
-      expect(woodByStructure.has(home!.id), `${f.id}'s own home holds no ${MASON_WOOD_KIND}`)
-        .toBe(true)
+      expect(woodByStructure.has(home!.id), `${f.id}'s own home holds no ${MASON_WOOD_KIND}`).toBe(
+        true,
+      )
     }
   })
 

@@ -1,12 +1,40 @@
 import { describe, it, expect } from 'vitest'
 import {
-  BLOCK, STREET, PITCH, PLOT_OFFSETS, MAX_ALONG, MAX_DEEP, MIN_SEP, TOWN_FACINGS,
-  ISO_HALF_W, ISO_HALF_H, screenOf, centreOf,
-  riverCentre, isRiverWater, isRiverBank, RIVER_GROUND, DRY_GROUND,
-  blockRect, blockTiles, frontageTiles, blockIsPlattable, plotsOf, place, placedTiles,
-  ringBlocks, plattedBlocks, freePlots, streetTiles, doorFrontOf,
-  latticeFloor, closestPair, townErrors, townExtent,
-  type Ground, type Plot,
+  BLOCK,
+  STREET,
+  PITCH,
+  PLOT_OFFSETS,
+  MAX_ALONG,
+  MAX_DEEP,
+  MIN_SEP,
+  TOWN_FACINGS,
+  ISO_HALF_W,
+  ISO_HALF_H,
+  screenOf,
+  centreOf,
+  riverCentre,
+  isRiverWater,
+  isRiverBank,
+  RIVER_GROUND,
+  DRY_GROUND,
+  blockRect,
+  blockTiles,
+  frontageTiles,
+  blockIsPlattable,
+  plotsOf,
+  place,
+  placedTiles,
+  ringBlocks,
+  plattedBlocks,
+  freePlots,
+  streetTiles,
+  doorFrontOf,
+  latticeFloor,
+  closestPair,
+  townErrors,
+  townExtent,
+  type Ground,
+  type Plot,
 } from './townGrammar.js'
 
 // Not "this town has no overlaps" but "no town this grammar can generate has one": 2 496 pairings
@@ -86,13 +114,22 @@ describe('the lattice', () => {
   // building grows away from it, so a building's tiles are a subset of its own block's.
   it('never lets a legal building leave its own block', () => {
     let checked = 0
-    for (const b of [[0, 0], [1, 0], [0, 1], [-1, -1], [3, -2]] as const)
+    for (const b of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [-1, -1],
+      [3, -2],
+    ] as const)
       for (const p of plotsOf(b[0], b[1])) {
         const own = new Set(blockTiles(b[0], b[1]).map((t) => `${t.dx},${t.dy}`))
         for (let along = 1; along <= MAX_ALONG; along++)
           for (let deep = 1; deep <= MAX_DEEP; deep++) {
             for (const t of placedTiles(place(p, 'x', along, deep, null))) {
-              expect(own.has(`${t.dx},${t.dy}`), `${p.slot} ${along}×${deep} at ${t.dx},${t.dy}`).toBe(true)
+              expect(
+                own.has(`${t.dx},${t.dy}`),
+                `${p.slot} ${along}×${deep} at ${t.dx},${t.dy}`,
+              ).toBe(true)
               checked++
             }
           }
@@ -147,7 +184,9 @@ describe('the genesis town and a grown one come out of ONE function', () => {
   })
 
   it('offers plots nearest the square first, so the town densifies before it sprawls', () => {
-    const ring = freePlots(3, RIVER_GROUND).map((p) => Math.max(Math.abs(p.block.i), Math.abs(p.block.j)))
+    const ring = freePlots(3, RIVER_GROUND).map((p) =>
+      Math.max(Math.abs(p.block.i), Math.abs(p.block.j)),
+    )
     expect(ring).toEqual([...ring].sort((a, b) => a - b))
   })
 
@@ -172,7 +211,9 @@ const EVERY_SIZE: ReadonlyArray<{ along: number; deep: number }> = Array.from(
 
 /** every legal building on every plot the grammar offers out to `rings` */
 function everyBuilding(rings: number, ground: Ground) {
-  return freePlots(rings, ground).flatMap((p) => EVERY_SIZE.map((s) => place(p, 'x', s.along, s.deep, null)))
+  return freePlots(rings, ground).flatMap((p) =>
+    EVERY_SIZE.map((s) => place(p, 'x', s.along, s.deep, null)),
+  )
 }
 
 describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
@@ -189,7 +230,7 @@ describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
   // The lemma is what makes this hold at every ring: a block is platted only if every one of its
   // tiles is dry, so the property belongs to the plat rule and not to a ring count.
   it('holds against an adversarial river the reference never drew', () => {
-    const stripes: Ground = (dx, dy) => (((dx * 7 + dy * 13) % 23) === 0 ? 'water' : 'dry')
+    const stripes: Ground = (dx, dy) => ((dx * 7 + dy * 13) % 23 === 0 ? 'water' : 'dry')
     let wet = 0
     for (const b of everyBuilding(3, stripes))
       for (const t of placedTiles(b)) if (stripes(t.dx, t.dy) !== 'dry') wet++
@@ -222,7 +263,10 @@ describe('★ EVERY DOOR FRONTS A ROAD', () => {
       expect(all.length).toBeGreaterThan(0)
       for (const b of all) {
         const d = doorFrontOf(b)
-        expect(road.has(`${d.dx},${d.dy}`), `${b.facing} door at ${d.dx},${d.dy} fronts no road`).toBe(true)
+        expect(
+          road.has(`${d.dx},${d.dy}`),
+          `${b.facing} door at ${d.dx},${d.dy} fronts no road`,
+        ).toBe(true)
       }
     })
   }
@@ -236,8 +280,11 @@ describe('★ EVERY DOOR FRONTS A ROAD', () => {
   // A special case that widened the main street once ran a phantom road row at y = -3 through the
   // frontage of block (0,-1). There is none here, and this is the guard that keeps it so.
   it('never lays a street tile on a block, at any ring', () => {
-    const onBlock = new Set(plattedBlocks(3, RIVER_GROUND).flatMap((b) =>
-      blockTiles(b.i, b.j).map((t) => `${t.dx},${t.dy}`)))
+    const onBlock = new Set(
+      plattedBlocks(3, RIVER_GROUND).flatMap((b) =>
+        blockTiles(b.i, b.j).map((t) => `${t.dx},${t.dy}`),
+      ),
+    )
     for (const t of streetTiles(3, RIVER_GROUND))
       expect(onBlock.has(`${t.dx},${t.dy}`), `a street on a block at ${t.dx},${t.dy}`).toBe(false)
   })
@@ -249,12 +296,17 @@ describe('★ EVERY DOOR FRONTS A ROAD', () => {
 
 describe('the town is as large as it has grown', () => {
   it('measures its extent from the built set, never from a map size', () => {
-    const built = [place(plotsOf(0, -1)[0]!, 'house', 2, 2, null), place(plotsOf(1, 1)[2]!, 'house', 2, 2, null)]
+    const built = [
+      place(plotsOf(0, -1)[0]!, 'house', 2, 2, null),
+      place(plotsOf(1, 1)[2]!, 'house', 2, 2, null),
+    ]
     const e = townExtent(built)
     expect(e.tiles).toEqual({ dx0: 2, dy0: -5, dx1: 34, dy1: 22 })
     expect(e.screen).toEqual({
-      sx0: screenOf(2, 22).sx, sy0: screenOf(2, -5).sy,
-      sx1: screenOf(34, -5).sx, sy1: screenOf(34, 22).sy,
+      sx0: screenOf(2, 22).sx,
+      sy0: screenOf(2, -5).sy,
+      sx1: screenOf(34, -5).sx,
+      sy1: screenOf(34, 22).sy,
     })
     expect(centreOf(built[0]!)).toEqual(screenOf(3, -4))
     expect(townExtent([]).tiles).toBeNull()
@@ -279,18 +331,32 @@ describe('the town is as large as it has grown', () => {
 // The reference's own genesis and grown towns, rebuilt here from the exported grammar so the
 // numbers above are measured on the same buildings the Python measured.
 const REFERENCE_GENESIS: ReadonlyArray<[string, number, number, string | null]> = [
-  ['storehouse', 2, 2, null], ['house', 2, 2, 'amara'], ['house', 2, 2, 'yusuf'],
-  ['cottage', 3, 2, null], ['house', 2, 2, 'nadia'], ['cabin', 2, 2, null],
-  ['house', 2, 2, 'omar'], ['house', 2, 2, 'salma'], ['farmhouse', 4, 2, null],
+  ['storehouse', 2, 2, null],
+  ['house', 2, 2, 'amara'],
+  ['house', 2, 2, 'yusuf'],
+  ['cottage', 3, 2, null],
+  ['house', 2, 2, 'nadia'],
+  ['cabin', 2, 2, null],
+  ['house', 2, 2, 'omar'],
+  ['house', 2, 2, 'salma'],
+  ['farmhouse', 4, 2, null],
 ]
 const REFERENCE_LATER: ReadonlyArray<[string, number, number]> = [
-  ['house', 2, 2], ['cabin', 2, 2], ['cottage', 3, 2], ['storehouse', 2, 2],
-  ['workshop', 2, 2], ['house', 2, 2], ['barn', 4, 2], ['house', 2, 2],
+  ['house', 2, 2],
+  ['cabin', 2, 2],
+  ['cottage', 3, 2],
+  ['storehouse', 2, 2],
+  ['workshop', 2, 2],
+  ['house', 2, 2],
+  ['barn', 4, 2],
+  ['house', 2, 2],
 ]
 
 function referenceTown(rings: number, extra = 0) {
   const ps = freePlots(rings, RIVER_GROUND)
-  const out = REFERENCE_GENESIS.map(([kind, along, deep, owner], n) => place(ps[n]!, kind, along, deep, owner))
+  const out = REFERENCE_GENESIS.map(([kind, along, deep, owner], n) =>
+    place(ps[n]!, kind, along, deep, owner),
+  )
   for (let k = 0; k < extra; k++) {
     const p = ps[REFERENCE_GENESIS.length + k]
     if (p === undefined) break

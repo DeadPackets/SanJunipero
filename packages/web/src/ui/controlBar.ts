@@ -35,18 +35,25 @@ export type ControlCtx = {
 }
 
 export const LENS_GLYPH: Readonly<Record<Lens, string>> = {
-  map: 'tile', inspector: 'folk', chronicle: 'scroll', discoveries: 'find',
-  society: 'bond', director: 'reel', laws: 'book',
+  map: 'tile',
+  inspector: 'folk',
+  chronicle: 'scroll',
+  discoveries: 'find',
+  society: 'bond',
+  director: 'reel',
+  laws: 'book',
 }
 
 export function controlItems(ctx: ControlCtx): ControlItem[] {
-  const out: ControlItem[] = [{
-    id: 'live',
-    group: 'time',
-    label: ctx.live ? 'Watching now' : 'Back to now',
-    glyph: 'now',
-    state: ctx.live ? 'on' : 'off',
-  }]
+  const out: ControlItem[] = [
+    {
+      id: 'live',
+      group: 'time',
+      label: ctx.live ? 'Watching now' : 'Back to now',
+      glyph: 'now',
+      state: ctx.live ? 'on' : 'off',
+    },
+  ]
 
   const atMin = ctx.zoom <= ZOOM_STOPS[0]
   const atMax = ctx.zoom >= ZOOM_STOPS[ZOOM_STOPS.length - 1]!
@@ -116,14 +123,22 @@ export function actionFor(item: ControlItem): ControlAction {
     return { kind: 'lens', lens: item.id.slice('lens-'.length) as Lens }
   }
   switch (item.id) {
-    case 'live': return { kind: 'live' }
-    case 'zoom-out': return { kind: 'zoom', dir: -1 }
-    case 'zoom-in': return { kind: 'zoom', dir: 1 }
-    case 'fit': return { kind: 'fit' }
-    case 'unfollow': return { kind: 'follow', agentId: null }
-    case 'exit-interior': return { kind: 'exit-interior' }
-    case 'hud': return { kind: 'hud', op: item.state === 'on' ? 'show' : 'hide' }
-    default: return { kind: 'fit' }
+    case 'live':
+      return { kind: 'live' }
+    case 'zoom-out':
+      return { kind: 'zoom', dir: -1 }
+    case 'zoom-in':
+      return { kind: 'zoom', dir: 1 }
+    case 'fit':
+      return { kind: 'fit' }
+    case 'unfollow':
+      return { kind: 'follow', agentId: null }
+    case 'exit-interior':
+      return { kind: 'exit-interior' }
+    case 'hud':
+      return { kind: 'hud', op: item.state === 'on' ? 'show' : 'hide' }
+    default:
+      return { kind: 'fit' }
   }
 }
 
@@ -135,14 +150,25 @@ export const CONTROL_BAR_H = 56
 
 // ── the glyphs: 8×8 palette pixels, never a character from the reader's font (P3) ────────
 
-const INK = '#43394A', HONEY = '#F2C879', SAND = '#E8D5BC', WATER = '#7FB0C9'
-const SAGE = '#93B573', ROSE = '#C47876', EMBER = '#E8785A'
+const INK = '#43394A',
+  HONEY = '#F2C879',
+  SAND = '#E8D5BC',
+  WATER = '#7FB0C9'
+const SAGE = '#93B573',
+  ROSE = '#C47876',
+  EMBER = '#E8785A'
 
 /** Every fill a control glyph may use — all MASTER_PALETTE members, asserted as a set. */
 export const CONTROL_GLYPH_PALETTE: readonly string[] = [INK, HONEY, SAND, WATER, SAGE, ROSE, EMBER]
 
 const KEY: Readonly<Record<string, string>> = {
-  i: INK, h: HONEY, s: SAND, w: WATER, g: SAGE, r: ROSE, e: EMBER,
+  i: INK,
+  h: HONEY,
+  s: SAND,
+  w: WATER,
+  g: SAGE,
+  r: ROSE,
+  e: EMBER,
 }
 
 export const CONTROL_GLYPH_PX = 8
@@ -154,7 +180,7 @@ export type GlyphPixel = readonly [number, number, string]
 function art(...rows: string[]): GlyphPixel[] {
   const out: GlyphPixel[] = []
   rows.forEach((row, y) => {
-    [...row].forEach((ch, x) => {
+    ;[...row].forEach((ch, x) => {
       const fill = KEY[ch]
       if (fill !== undefined) out.push([x, y, fill] as const)
     })

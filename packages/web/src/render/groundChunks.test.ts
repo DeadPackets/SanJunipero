@@ -1,9 +1,21 @@
 import { Container, Sprite, type Bounds, type RenderTexture } from 'pixi.js'
 import { describe, expect, it } from 'vitest'
 import {
-  CHUNK_BLEED_PX, CHUNK_BYTES_PER_PX, CHUNK_PX_H, CHUNK_PX_W, CHUNK_RETAIN,
-  GPU_MIN_MAX_TEXTURE_PX, allChunks, bucketLayers, chunkAt, chunkBoundariesAreWhole,
-  chunkKey, chunkTextureBytes, chunksInView, createChunkResidency, groundGrid,
+  CHUNK_BLEED_PX,
+  CHUNK_BYTES_PER_PX,
+  CHUNK_PX_H,
+  CHUNK_PX_W,
+  CHUNK_RETAIN,
+  GPU_MIN_MAX_TEXTURE_PX,
+  allChunks,
+  bucketLayers,
+  chunkAt,
+  chunkBoundariesAreWhole,
+  chunkKey,
+  chunkTextureBytes,
+  chunksInView,
+  createChunkResidency,
+  groundGrid,
   wholeMapTextureBytes,
 } from './groundChunks.js'
 import { ZOOM_STOPS } from './camera.js'
@@ -33,8 +45,12 @@ const gridFor = (rings: number) => {
 }
 
 /** The view a camera at `z` shows, placed at a bake-space offset. World space, as `viewRect()`. */
-const viewAt = (z: number, bx: number, by: number, offsetX: number): ViewRect =>
-  ({ x: bx - offsetX, y: by, w: STAGE.w / z, h: STAGE.h / z })
+const viewAt = (z: number, bx: number, by: number, offsetX: number): ViewRect => ({
+  x: bx - offsetX,
+  y: by,
+  w: STAGE.w / z,
+  h: STAGE.h / z,
+})
 
 // ── ★ THE SEAM LAW ──────────────────────────────────────────────────────────────────────────
 
@@ -70,13 +86,15 @@ describe('★ the seam law: a chunk boundary never lands between two screen pixe
     const grid = gridFor(3)
     for (let r = 0; r < grid.rows; r++) {
       for (let c = 0; c + 1 < grid.cols; c++) {
-        const a = chunkAt(grid, c, r), b = chunkAt(grid, c + 1, r)
-        expect(a.x + a.texW).toBeGreaterThan(b.x)   // a holds b's first column
+        const a = chunkAt(grid, c, r),
+          b = chunkAt(grid, c + 1, r)
+        expect(a.x + a.texW).toBeGreaterThan(b.x) // a holds b's first column
       }
     }
     for (let c = 0; c < grid.cols; c++) {
       for (let r = 0; r + 1 < grid.rows; r++) {
-        const a = chunkAt(grid, c, r), b = chunkAt(grid, c, r + 1)
+        const a = chunkAt(grid, c, r),
+          b = chunkAt(grid, c, r + 1)
         expect(a.y + a.texH).toBeGreaterThan(b.y)
       }
     }
@@ -105,13 +123,17 @@ describe('★ every shape reaches every chunk its paint touches', () => {
     const f = fieldFor(3)
     const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
     const buckets = bucketLayers(grid, f.layers)
-    let straddling = 0, checked = 0
+    let straddling = 0,
+      checked = 0
 
     for (const [li, layer] of f.layers.entries()) {
       for (const s of layer.shapes) {
         // the tile's own painted diamond, no slack — the pixels that MUST be somewhere
         const bx = s.sx + grid.offsetX
-        const x0 = bx - TILE_W / 2, x1 = bx + TILE_W / 2, y0 = s.sy, y1 = s.sy + TILE_H
+        const x0 = bx - TILE_W / 2,
+          x1 = bx + TILE_W / 2,
+          y0 = s.sy,
+          y1 = s.sy + TILE_H
         const want: string[] = []
         for (let r = 0; r < grid.rows; r++) {
           for (let c = 0; c < grid.cols; c++) {
@@ -125,14 +147,18 @@ describe('★ every shape reaches every chunk its paint touches', () => {
           const stack = buckets.get(key)
           expect(stack, `chunk ${key} has no bucket`).toBeDefined()
           expect(stack![li]!.id).toBe(layer.id)
-          expect(stack![li]!.shapes, `${layer.id} shape ${s.sx},${s.sy} missing from ${key}`)
-            .toContain(s)
+          expect(
+            stack![li]!.shapes,
+            `${layer.id} shape ${s.sx},${s.sy} missing from ${key}`,
+          ).toContain(s)
         }
       }
     }
-    expect(straddling).toBeGreaterThan(0)   // the case the law exists for actually occurs
+    expect(straddling).toBeGreaterThan(0) // the case the law exists for actually occurs
     // eslint-disable-next-line no-console
-    console.log(`COVERAGE, three rings: ${checked} shape-in-chunk claims, ${straddling} shapes straddle a boundary`)
+    console.log(
+      `COVERAGE, three rings: ${checked} shape-in-chunk claims, ${straddling} shapes straddle a boundary`,
+    )
   })
 
   it('★ every chunk carries every layer at its ORIGINAL index — the material matrix reads it', () => {
@@ -172,8 +198,16 @@ describe('the ground asks the entity cull’s own question', () => {
     const shown = new Set(chunksInView(grid, view).map((k) => k.key))
     for (const k of allChunks(grid)) {
       const box: DepthBox = {
-        id: k.key, rank: 0 as never, x0: 0, y0: 0, x1: 0, y1: 0,
-        sx0: k.x - grid.offsetX, sy0: k.y, sx1: k.x - grid.offsetX + k.w, sy1: k.y + k.h,
+        id: k.key,
+        rank: 0 as never,
+        x0: 0,
+        y0: 0,
+        x1: 0,
+        y1: 0,
+        sx0: k.x - grid.offsetX,
+        sy0: k.y,
+        sx1: k.x - grid.offsetX + k.w,
+        sy1: k.y + k.h,
       }
       expect(shown.has(k.key)).toBe(boxInView(box, view, CULL_MARGIN_PX))
       expect(shown.has(k.key)).toBe(
@@ -194,7 +228,9 @@ describe('what stays on the GPU', () => {
     res.setGrid(grid)
     const view = viewAt(0.25, 6000, 3000, grid.offsetX)
     const step = res.update(view)
-    const want = chunksInView(grid, view).map((k) => k.key).sort()
+    const want = chunksInView(grid, view)
+      .map((k) => k.key)
+      .sort()
     expect(step.bake.map((k) => k.key).sort()).toEqual(want)
     expect(step.evict).toEqual([])
     expect(res.resident().sort()).toEqual(want)
@@ -239,25 +275,34 @@ const gridForSide = (side: number) =>
   groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2))
 
 /** The WORST a view can do, swept across the whole field: straddling a boundary touches one more column and row than sitting on one, and a view at the edge touches fewer. */
-function peakVisible(grid: ReturnType<typeof gridForSide>, z: number): {
-  bytes: number; chunks: number
+function peakVisible(
+  grid: ReturnType<typeof gridForSide>,
+  z: number,
+): {
+  bytes: number
+  chunks: number
 } {
-  const vw = STAGE.w / z, vh = STAGE.h / z
+  const vw = STAGE.w / z,
+    vh = STAGE.h / z
   const step = 128
-  let bytes = 0, chunks = 0
+  let bytes = 0,
+    chunks = 0
   for (let by = 0; by <= Math.max(0, grid.fieldH - vh); by += step) {
     for (let bx = 0; bx <= Math.max(0, grid.fieldW - vw); bx += step) {
       const shown = chunksInView(grid, viewAt(z, bx, by, grid.offsetX))
       const b = shown.reduce((n, k) => n + chunkTextureBytes(k), 0)
-      if (b > bytes) { bytes = b; chunks = shown.length }
+      if (b > bytes) {
+        bytes = b
+        chunks = shown.length
+      }
     }
   }
   return { bytes, chunks }
 }
 
 /** What the retained ring can add on top of the working set, worst case. */
-const RETAIN_BYTES = CHUNK_RETAIN * (CHUNK_PX_W + CHUNK_BLEED_PX) * (CHUNK_PX_H + CHUNK_BLEED_PX)
-  * CHUNK_BYTES_PER_PX
+const RETAIN_BYTES =
+  CHUNK_RETAIN * (CHUNK_PX_W + CHUNK_BLEED_PX) * (CHUNK_PX_H + CHUNK_BLEED_PX) * CHUNK_BYTES_PER_PX
 
 describe('★ VRAM at one, three, five and ten rings — before and after', () => {
   it('reports the whole table and holds the two claims that matter', () => {
@@ -280,18 +325,18 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
       }
       const side = bigTownTerrain(rings).length
       lines.push(
-        `${String(rings).padStart(5)} | ${String(side * side).padStart(7)} | `
-        + `${`${grid.fieldW}x${grid.fieldH}`.padStart(17)} | `
-        + `${`${(before / MB).toFixed(1)}MB`.padStart(7)} | ${String(Math.max(grid.fieldW, grid.fieldH)).padStart(7)} |`
-        + `${cells.join(' |')} | ${maxDim}`,
+        `${String(rings).padStart(5)} | ${String(side * side).padStart(7)} | ` +
+          `${`${grid.fieldW}x${grid.fieldH}`.padStart(17)} | ` +
+          `${`${(before / MB).toFixed(1)}MB`.padStart(7)} | ${String(Math.max(grid.fieldW, grid.fieldH)).padStart(7)} |` +
+          `${cells.join(' |')} | ${maxDim}`,
       )
     }
     // eslint-disable-next-line no-console
     console.log(
-      'GROUND VRAM — BEFORE is the landed whole-map texture; AFTER is the peak working set of\n'
-      + `chunks over a ${STAGE.w}x${STAGE.h} stage, swept across the field. Add up to `
-      + `${(RETAIN_BYTES / MB).toFixed(1)}MB for the\nretained ring of ${CHUNK_RETAIN}.\n`
-      + lines.join('\n'),
+      'GROUND VRAM — BEFORE is the landed whole-map texture; AFTER is the peak working set of\n' +
+        `chunks over a ${STAGE.w}x${STAGE.h} stage, swept across the field. Add up to ` +
+        `${(RETAIN_BYTES / MB).toFixed(1)}MB for the\nretained ring of ${CHUNK_RETAIN}.\n` +
+        lines.join('\n'),
     )
 
     // ★ CLAIM 1 — the largest single allocation now fits every conforming GPU, at every size,
@@ -301,12 +346,15 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
         expect(Math.max(k.texW, k.texH)).toBeLessThanOrEqual(GPU_MIN_MAX_TEXTURE_PX)
       }
     }
-    expect(Math.max(gridFor(1).fieldW, gridFor(1).fieldH)).toBeLessThanOrEqual(GPU_MIN_MAX_TEXTURE_PX)
+    expect(Math.max(gridFor(1).fieldW, gridFor(1).fieldH)).toBeLessThanOrEqual(
+      GPU_MIN_MAX_TEXTURE_PX,
+    )
     expect(Math.max(gridFor(3).fieldW, gridFor(3).fieldH)).toBeGreaterThan(GPU_MIN_MAX_TEXTURE_PX)
 
     // the ten-ring bake is the one the camera lane named, and it is now a fraction of itself
-    expect(after[10]![0.25]! + RETAIN_BYTES)
-      .toBeLessThan(wholeMapTextureBytes(gridFor(10).fieldW, gridFor(10).fieldH))
+    expect(after[10]![0.25]! + RETAIN_BYTES).toBeLessThan(
+      wholeMapTextureBytes(gridFor(10).fieldW, gridFor(10).fieldH),
+    )
   })
 
   it('the chunk size is near the bottom of its own cost curve, not a round number', () => {
@@ -314,20 +362,29 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     // row) and DRAW CALLS, one per resident chunk, because nothing batches across textures.
     const side = 2 * 10 * 19 + 19
     const rows: string[] = []
-    for (const [w, h] of [[256, 128], [512, 256], [1024, 512], [2048, 1024]] as const) {
+    for (const [w, h] of [
+      [256, 128],
+      [512, 256],
+      [1024, 512],
+      [2048, 1024],
+    ] as const) {
       // one phase, not the swept peak above — this is a comparison BETWEEN sizes, and the
       // phase penalty is the same shape for all four
-      const vw = STAGE.w / 0.25 + 2 * CULL_MARGIN_PX, vh = STAGE.h / 0.25 + 2 * CULL_MARGIN_PX
-      const cols = Math.floor(vw / w) + 1, rowsN = Math.floor(vh / h) + 1
+      const vw = STAGE.w / 0.25 + 2 * CULL_MARGIN_PX,
+        vh = STAGE.h / 0.25 + 2 * CULL_MARGIN_PX
+      const cols = Math.floor(vw / w) + 1,
+        rowsN = Math.floor(vh / h) + 1
       const chunks = cols * rowsN
       const bytes = chunks * (w + CHUNK_BLEED_PX) * (h + CHUNK_BLEED_PX) * CHUNK_BYTES_PER_PX
       const waste = bytes / (vw * vh * CHUNK_BYTES_PER_PX) - 1
-      rows.push(`${`${w}x${h}`.padStart(9)}: ${String(chunks).padStart(4)} draw calls, `
-        + `${(bytes / MB).toFixed(1).padStart(6)} MB, ${(waste * 100).toFixed(1).padStart(5)}% over the view`)
+      rows.push(
+        `${`${w}x${h}`.padStart(9)}: ${String(chunks).padStart(4)} draw calls, ` +
+          `${(bytes / MB).toFixed(1).padStart(6)} MB, ${(waste * 100).toFixed(1).padStart(5)}% over the view`,
+      )
     }
     // eslint-disable-next-line no-console
     console.log(`CHUNK SIZE, ten rings (side ${side}) at the 0.25 stop\n  ${rows.join('\n  ')}`)
-    expect(CHUNK_PX_W / CHUNK_PX_H).toBe(TILE_W / TILE_H)   // one chunk is a square of tiles
+    expect(CHUNK_PX_W / CHUNK_PX_H).toBe(TILE_W / TILE_H) // one chunk is a square of tiles
     expect(rows).toHaveLength(4)
   })
 
@@ -344,7 +401,9 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     const rows: string[] = []
     for (const z of ZOOM_STOPS) {
       const got = GROWN_SIDES.map(([, s]) => peakVisible(gridForSide(s), z))
-      rows.push(`z=${String(z).padEnd(5)} ${got.map((g) => `${(g.bytes / MB).toFixed(1)}MB/${g.chunks}`.padStart(12)).join('')}`)
+      rows.push(
+        `z=${String(z).padEnd(5)} ${got.map((g) => `${(g.bytes / MB).toFixed(1)}MB/${g.chunks}`.padStart(12)).join('')}`,
+      )
       // Convergence, not equality: a field barely bigger than the view runs off its own edge and
       // its clipped last column and row cost LESS than full chunks, so small sides sit under the
       // asymptote. The claim is that the size of the world is not a term in the answer.
@@ -353,14 +412,17 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
       for (const g of got) expect(g.bytes).toBeLessThanOrEqual(asymptote)
     }
     // eslint-disable-next-line no-console
-    console.log(`WORKING SET vs WORLD SIZE — ${GROWN_SIDES.map(([n]) => n).join(' | ')}\n  ${rows.join('\n  ')}`)
+    console.log(
+      `WORKING SET vs WORLD SIZE — ${GROWN_SIDES.map(([n]) => n).join(' | ')}\n  ${rows.join('\n  ')}`,
+    )
   })
 
   it('★ nothing here knows a world size: an arbitrary terrain grids and tiles exactly', () => {
     // Not ring counts and not powers of two — sizes nobody would pick, so a constant hiding in
     // the arithmetic has nothing to agree with.
     for (const side of [7, 63, 129, 250, 251, 440, 1001]) {
-      const fieldW = (side + side) * (TILE_W / 2), fieldH = (side + side) * (TILE_H / 2)
+      const fieldW = (side + side) * (TILE_W / 2),
+        fieldH = (side + side) * (TILE_H / 2)
       const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2))
       expect(grid.cols).toBe(Math.ceil(fieldW / CHUNK_PX_W))
       expect(grid.rows).toBe(Math.ceil(fieldH / CHUNK_PX_H))
@@ -377,7 +439,10 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     // Two terrains of different sizes through the SAME baker: the grid must follow the array.
     const d = drive(1)
     const wide = gridForSide(250)
-    for (const [rings, want] of [[1, gridFor(1)], [3, gridFor(3)]] as const) {
+    for (const [rings, want] of [
+      [1, gridFor(1)],
+      [3, gridFor(3)],
+    ] as const) {
       d.baker.setView(viewAt(1, want.fieldW / 2, want.fieldH / 2, want.offsetX))
       d.baker.rebake(bigTownTerrain(rings) as never, [])
       // every resident chunk is inside the grid THIS terrain implies
@@ -395,7 +460,13 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
 // `createGroundBaker` itself, stubbed only where it needs a GPU: everything it allocates below
 // is the production path.
 
-type Bake = { at: { x: number; y: number }; texW: number; texH: number; kids: number; bounds: Bounds }
+type Bake = {
+  at: { x: number; y: number }
+  texW: number
+  texH: number
+  kids: number
+  bounds: Bounds
+}
 
 function drive(rings: number) {
   const renders: Bake[] = []
@@ -403,8 +474,10 @@ function drive(rings: number) {
     render: (o: { container: Container; target: RenderTexture; clear: boolean }) => {
       renders.push({
         at: { x: o.container.position.x, y: o.container.position.y },
-        texW: o.target.width, texH: o.target.height,
-        kids: o.container.children.length, bounds: o.container.getBounds(),
+        texW: o.target.width,
+        texH: o.target.height,
+        kids: o.container.children.length,
+        bounds: o.container.getBounds(),
       })
     },
   }
@@ -429,30 +502,39 @@ describe('★ what the real baker puts on the GPU', () => {
     for (const s of d.root.children as Sprite[]) {
       expect(s.texture.source.scaleMode).toBe('nearest')
       expect(s.texture.source.resolution).toBe(1)
-      expect(Math.max(s.texture.width, s.texture.height))
-        .toBeLessThanOrEqual(CHUNK_PX_W + CHUNK_BLEED_PX)
+      expect(Math.max(s.texture.width, s.texture.height)).toBeLessThanOrEqual(
+        CHUNK_PX_W + CHUNK_BLEED_PX,
+      )
     }
     // eslint-disable-next-line no-console
-    console.log(`REAL BAKER, ten rings @1x: ${v.chunks} chunks, ${(v.bytes / MB).toFixed(1)} MB, `
-      + `largest allocation ${v.maxDimPx} px (whole-map bake was 12768 px / 310.9 MB)`)
+    console.log(
+      `REAL BAKER, ten rings @1x: ${v.chunks} chunks, ${(v.bytes / MB).toFixed(1)} MB, ` +
+        `largest allocation ${v.maxDimPx} px (whole-map bake was 12768 px / 310.9 MB)`,
+    )
   })
 
   it('★ panning the whole width of a ten-ring town never grows what is resident', () => {
     const d = drive(10)
     d.baker.setView(viewAt(0.25, 0, 0, d.grid.offsetX))
     d.baker.rebake(d.terrain, [])
-    let peak = 0, peakChunks = 0
+    let peak = 0,
+      peakChunks = 0
     for (let bx = 0; bx < d.grid.fieldW; bx += CHUNK_PX_W / 2) {
       d.baker.setView(viewAt(0.25, bx, d.grid.fieldH / 2, d.grid.offsetX))
       const v = d.baker.vram()
-      if (v.bytes > peak) { peak = v.bytes; peakChunks = v.chunks }
+      if (v.bytes > peak) {
+        peak = v.bytes
+        peakChunks = v.chunks
+      }
     }
     expect(peakChunks).toBeGreaterThan(0)
     const whole = wholeMapTextureBytes(d.grid.fieldW, d.grid.fieldH)
     expect(peak).toBeLessThan(whole)
     // eslint-disable-next-line no-console
-    console.log(`PAN SWEEP, ten rings @0.25 across ${d.grid.fieldW} px: peak `
-      + `${(peak / MB).toFixed(1)} MB vs ${(whole / MB).toFixed(1)} MB whole-map`)
+    console.log(
+      `PAN SWEEP, ten rings @0.25 across ${d.grid.fieldW} px: peak ` +
+        `${(peak / MB).toFixed(1)} MB vs ${(whole / MB).toFixed(1)} MB whole-map`,
+    )
   })
 
   it('zooming out to the widest stop and back in releases what it stopped needing', () => {
@@ -482,10 +564,15 @@ describe('★ what the real baker puts on the GPU', () => {
       expect(s.anchor.x).toBe(0)
       expect(s.anchor.y).toBe(0)
       // the sprite's top-left IS its chunk's top-left in bake space, less the offset
-      const bakeX = s.position.x + d.grid.offsetX, bakeY = s.position.y
+      const bakeX = s.position.x + d.grid.offsetX,
+        bakeY = s.position.y
       expect(bakeX % CHUNK_PX_W).toBe(0)
       expect(bakeY % CHUNK_PX_H).toBe(0)
-      for (const [dx, dy] of [[0, 0], [1, 1], [CHUNK_PX_W - 1, CHUNK_PX_H - 1]] as const) {
+      for (const [dx, dy] of [
+        [0, 0],
+        [1, 1],
+        [CHUNK_PX_W - 1, CHUNK_PX_H - 1],
+      ] as const) {
         // where the single whole-map sprite put bake point B, against where this chunk puts it
         const whole = { x: bakeX + dx - d.grid.offsetX, y: bakeY + dy }
         const chunked = { x: s.position.x + dx, y: s.position.y + dy }
@@ -515,10 +602,13 @@ describe('★ what the real baker puts on the GPU', () => {
       // legitimately draw nothing; every chunk that DOES carry ground must land on its target.
       if (r.kids === 0) continue
       painted++
-      expect(r.bounds.maxX, `${r.at.x},${r.at.y} draws entirely left of its target`)
-        .toBeGreaterThan(0)
-      expect(r.bounds.minX, `${r.at.x},${r.at.y} draws entirely right of its target`)
-        .toBeLessThan(r.texW)
+      expect(
+        r.bounds.maxX,
+        `${r.at.x},${r.at.y} draws entirely left of its target`,
+      ).toBeGreaterThan(0)
+      expect(r.bounds.minX, `${r.at.x},${r.at.y} draws entirely right of its target`).toBeLessThan(
+        r.texW,
+      )
       expect(r.bounds.maxY).toBeGreaterThan(0)
       expect(r.bounds.minY).toBeLessThan(r.texH)
     }

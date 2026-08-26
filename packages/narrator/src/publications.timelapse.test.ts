@@ -3,7 +3,12 @@ import { timelapseCaptions } from './publications.js'
 import type { ChapterRow } from './types.js'
 
 const chapters: ChapterRow[] = [1, 2, 3, 4, 5, 6, 7].map((day) => ({
-  id: day, day, title: `The Tale of Day ${day}`, text: 'x', citations: [day], sceneIds: [],
+  id: day,
+  day,
+  title: `The Tale of Day ${day}`,
+  text: 'x',
+  citations: [day],
+  sceneIds: [],
 }))
 
 describe('timelapseCaptions', () => {

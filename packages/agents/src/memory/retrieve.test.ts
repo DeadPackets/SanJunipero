@@ -17,7 +17,9 @@ const TICKS_PER_DAY = 1440
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
-async function makeStore(agentId = 'tamar'): Promise<{ db: Database.Database; store: MemoryStore }> {
+async function makeStore(
+  agentId = 'tamar',
+): Promise<{ db: Database.Database; store: MemoryStore }> {
   const db = openAgentDb(':memory:')
   const store = new MemoryStore(db, agentId, await FakeEmbedder.create())
   return { db, store }
@@ -37,9 +39,9 @@ describe('keywords and cuesToQuery', () => {
   })
 
   it('cuesToQuery joins people + place + topics by spaces', () => {
-    expect(cuesToQuery({ people: ['yusuf', 'omar'], place: 'storehouse', topics: ['firewood'] })).toBe(
-      'yusuf omar storehouse firewood',
-    )
+    expect(
+      cuesToQuery({ people: ['yusuf', 'omar'], place: 'storehouse', topics: ['firewood'] }),
+    ).toBe('yusuf omar storehouse firewood')
     expect(cuesToQuery({ people: ['yusuf'], place: null, topics: [] })).toBe('yusuf')
   })
 })
@@ -63,7 +65,11 @@ describe('hybrid retrieval', () => {
       importance: 5,
       tags: EMPTY_TAGS,
     })
-    const results = await retrieveAmbient(store, { people: ['yusuf'], place: null, topics: [] }, now)
+    const results = await retrieveAmbient(
+      store,
+      { people: ['yusuf'], place: null, topics: [] },
+      now,
+    )
     const ids = results.map((r) => r.id)
     expect(ids.indexOf(tagged)).toBeGreaterThanOrEqual(0)
     expect(ids.indexOf(untagged)).toBeGreaterThanOrEqual(0)
@@ -140,8 +146,20 @@ describe('hybrid retrieval', () => {
     const { store } = await makeStore()
     const text = 'the mill wheel turned all night'
     const now = 10 * TICKS_PER_DAY
-    const old = await store.insertMemory({ tick: 0, kind: 'perception', text, importance: 5, tags: EMPTY_TAGS })
-    const newer = await store.insertMemory({ tick: now, kind: 'perception', text, importance: 5, tags: EMPTY_TAGS })
+    const old = await store.insertMemory({
+      tick: 0,
+      kind: 'perception',
+      text,
+      importance: 5,
+      tags: EMPTY_TAGS,
+    })
+    const newer = await store.insertMemory({
+      tick: now,
+      kind: 'perception',
+      text,
+      importance: 5,
+      tags: EMPTY_TAGS,
+    })
     const results = await recall(store, text, now)
     const ids = results.map((r) => r.id)
     expect(ids.indexOf(newer)).toBeLessThan(ids.indexOf(old))
@@ -174,9 +192,11 @@ describe('hybrid retrieval', () => {
     expect(oldRow.parts.recency).toBeCloseTo(0.5 ** (30 / (2 * 10)), 12)
     expect(recentRow.parts.recency).toBeCloseTo(0.5 ** (1 / (2 * 1)), 12)
     const oldContrib =
-      DEFAULT_WEIGHTS.recency * oldRow.parts.recency + DEFAULT_WEIGHTS.importance * oldRow.parts.importance
+      DEFAULT_WEIGHTS.recency * oldRow.parts.recency +
+      DEFAULT_WEIGHTS.importance * oldRow.parts.importance
     const recentContrib =
-      DEFAULT_WEIGHTS.recency * recentRow.parts.recency + DEFAULT_WEIGHTS.importance * recentRow.parts.importance
+      DEFAULT_WEIGHTS.recency * recentRow.parts.recency +
+      DEFAULT_WEIGHTS.importance * recentRow.parts.importance
     expect(oldContrib).toBeGreaterThan(recentContrib)
   })
 
@@ -238,7 +258,9 @@ describe('hybrid retrieval', () => {
     )
     expect(richResults.length).toBeGreaterThanOrEqual(MISS_MIN_RESULTS)
     expect(richResults[0]!.score).toBeGreaterThanOrEqual(MISS_TOP_SCORE)
-    const missCount = richDb.prepare('SELECT COUNT(*) AS n FROM recall_misses').get() as { n: number }
+    const missCount = richDb.prepare('SELECT COUNT(*) AS n FROM recall_misses').get() as {
+      n: number
+    }
     expect(missCount.n).toBe(0)
   })
 
@@ -262,7 +284,11 @@ describe('hybrid retrieval', () => {
       importance: 5,
       tags: { people: [], place: 'river', objects: [], topics: ['deer'] },
     })
-    const results = await retrieveAmbient(bob, { people: ['yusuf'], place: null, topics: ['firewood'] }, now)
+    const results = await retrieveAmbient(
+      bob,
+      { people: ['yusuf'], place: null, topics: ['firewood'] },
+      now,
+    )
     const ids = results.map((r) => r.id)
     expect(ids).not.toContain(aId)
     expect(ids).toContain(bId)

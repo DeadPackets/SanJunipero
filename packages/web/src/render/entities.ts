@@ -11,7 +11,11 @@ import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hit
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
-  BUILDING_PX_PER_TILE, TextureBook, buildingArt, fadeArtIn, textureUrlFor,
+  BUILDING_PX_PER_TILE,
+  TextureBook,
+  buildingArt,
+  fadeArtIn,
+  textureUrlFor,
   type BuildingArt,
 } from './textures.js'
 
@@ -43,7 +47,9 @@ export function enterableKind(config: SimConfig | null, kind: string): boolean {
 /** Whether clicking this building walks into it. A shell still going up has no room to walk
  *  into, and a well has no room at all — both answer with their story instead. */
 export function entersOnClick(
-  config: SimConfig | null, state: WorldState | null, structureId: string,
+  config: SimConfig | null,
+  state: WorldState | null,
+  structureId: string,
 ): boolean {
   const s = state?.structures[structureId]
   return s !== undefined && s.stage === 'complete' && enterableKind(config, s.kind)
@@ -52,7 +58,9 @@ export function entersOnClick(
 /** The building is named FIRST and the offer follows on a middot: `hoverLabel` already spends an em-dash, so an em-dash here read as three phrases on two identical separators. */
 export const LOOK_INSIDE = 'Look inside'
 export function structureHoverText(
-  config: SimConfig | null, state: WorldState | null, structureId: string,
+  config: SimConfig | null,
+  state: WorldState | null,
+  structureId: string,
 ): string | null {
   const name = hoverLabel(state, 'structure', structureId)
   if (name === null) return null
@@ -78,7 +86,12 @@ export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
 /** The hitbox of the structure itself, in the sprite's local space — the drawn cell's footprint swept up its own height, or the built form's plinth and volume when there is no art.
  *  The 24 px floor is a SCREEN size, so the shape is re-cut when the camera scale moves. */
 export function structureHitPoints(
-  kind: string, w: number, h: number, scale: number, zoom = 1, hasArt = true,
+  kind: string,
+  w: number,
+  h: number,
+  scale: number,
+  zoom = 1,
+  hasArt = true,
 ): number[] {
   const k = scale === 0 ? 1 : scale
   const local = hasArt
@@ -88,7 +101,10 @@ export function structureHitPoints(
 }
 
 type Entry = {
-  sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null
+  sprite: Sprite
+  url: string
+  pips: Graphics | null
+  form: Graphics | null
   /** the kind and ground plan the hit prism is cut from */
   kind: string
   footprint: { w: number; h: number }
@@ -103,7 +119,8 @@ type Entry = {
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
 type SyncState = {
-  entries: Map<string, Entry>; lastAssetsSeq: number
+  entries: Map<string, Entry>
+  lastAssetsSeq: number
   onDoor: ((structureId: string) => void) | null
   /** the camera scale every structure prism was last cut for */
   hitZoom: number
@@ -120,8 +137,12 @@ function setTexture(book: TextureBook, entry: Entry, url: string): void {
 // v4 hi-res buildings anchor at the manifest feet point and downscale smoothly to the
 // footprint diamond; v2/placeholder art keeps the bottom-center anchor at natural size.
 function applyBuildingArt(
-  book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null,
-  footprint: { w: number; h: number }, kind: string,
+  book: TextureBook,
+  entry: Entry,
+  art: BuildingArt,
+  swapFrom: string | null,
+  footprint: { w: number; h: number },
+  kind: string,
 ): void {
   // No art in any root: draw the built form. It is a child of the sprite, so it inherits depth,
   // position and tint, and disappears the moment real art arrives.
@@ -152,12 +173,12 @@ function applyBuildingArt(
   void p.then((t) => {
     if (entry.url !== art.url || entry.sprite.destroyed) return // superseded or torn down mid-load
     entry.sprite.texture = t
-    if (swapping) fadeArtIn(entry.sprite)   // finish line 8: art arrives, it does not pop in
+    if (swapping) fadeArtIn(entry.sprite) // finish line 8: art arrives, it does not pop in
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)
     const scale = art.scale ?? 1
     entry.sprite.scale.set(scale)
-    cutHitPrism(entry)   // the prism is scaled with the sprite, so a new scale re-cuts it
+    cutHitPrism(entry) // the prism is scaled with the sprite, so a new scale re-cuts it
   })
 }
 
@@ -181,17 +202,26 @@ function drawPips(g: Graphics, filled: number): void {
 async function provenanceText(structureId: string, state: WorldState | null): Promise<string> {
   const res = await fetch(`/api/structure/${structureId}/provenance`)
   if (!res.ok) return 'No one remembers who began this.'
-  const p = (await res.json()) as { kind: string; plannedTick: number; builderId: string; completedTick: number | null }
+  const p = (await res.json()) as {
+    kind: string
+    plannedTick: number
+    builderId: string
+    completedTick: number | null
+  }
   const begun = tickToMoment(p.plannedTick)
   const name = state?.agents[p.builderId]?.name ?? p.builderId
-  const finish = p.completedTick === null ? 'still rising' : `finished Day ${tickToMoment(p.completedTick).day}`
+  const finish =
+    p.completedTick === null ? 'still rising' : `finished Day ${tickToMoment(p.completedTick).day}`
   let text = `Begun by ${name} on Day ${begun.day} ${begun.time} — ${finish}`
   // the "why" line: the builder's journal entry nearest plannedTick, omitted when the journal is empty
   const jres = await fetch(`/api/agent/${p.builderId}/journal`)
   if (jres.ok) {
     const entries = (await jres.json()) as Array<{ tick: number; text: string }>
     const nearest = entries.reduce<{ tick: number; text: string } | null>(
-      (best, e) => (best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick) ? e : best),
+      (best, e) =>
+        best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick)
+          ? e
+          : best,
       null,
     )
     if (nearest !== null) text += `\n"${nearest.text}"`
@@ -223,20 +253,29 @@ function showPopover(text: string, x: number, y: number): void {
 }
 
 // lookup for effect layers (placement bounce, fire glow anchoring)
-export function entitySpriteOf(scene: Scene, kind: 'structure' | 'item' | 'crop', id: string): Sprite | null {
+export function entitySpriteOf(
+  scene: Scene,
+  kind: 'structure' | 'item' | 'crop',
+  id: string,
+): Sprite | null {
   return syncStates.get(scene)?.entries.get(`${kind}:${id}`)?.sprite ?? null
 }
 
 // diff-based sync, called once per store change
 export function syncEntities(
-  scene: Scene, book: TextureBook, store: WorldStore, onDoor?: (structureId: string) => void,
+  scene: Scene,
+  book: TextureBook,
+  store: WorldStore,
+  onDoor?: (structureId: string) => void,
 ): void {
   const state = store.getState()
   if (state === null) return
   let sync = syncStates.get(scene)
   if (sync === undefined) {
     sync = {
-      entries: new Map(), lastAssetsSeq: store.assetsSeq(), onDoor: null,
+      entries: new Map(),
+      lastAssetsSeq: store.assetsSeq(),
+      onDoor: null,
       hitZoom: scene.getZoom(),
     }
     syncStates.set(scene, sync)
@@ -269,9 +308,10 @@ export function syncEntities(
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
-      const text = kind === 'structure'
-        ? structureHoverText(store.getConfig(), store.getState(), id)
-        : hoverLabel(store.getState(), kind, id)
+      const text =
+        kind === 'structure'
+          ? structureHoverText(store.getConfig(), store.getState(), id)
+          : hoverLabel(store.getState(), kind, id)
       // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
       // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
       if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
@@ -297,18 +337,32 @@ export function syncEntities(
           sync!.onDoor?.(sid)
           return
         }
-        void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
+        void provenanceText(sid, store.getState()).then((text) =>
+          showPopover(text, e.client.x, e.client.y),
+        )
       })
       entry = {
-        sprite, url: '', pips: null, form: null, kind: s.kind,
-        footprint: { w: s.w, h: s.h }, hitZoom: sync.hitZoom,
+        sprite,
+        url: '',
+        pips: null,
+        form: null,
+        kind: s.kind,
+        footprint: { w: s.w, h: s.h },
+        hitZoom: sync.hitZoom,
         depth: { box: structureDepthBox(key, s), node: sprite },
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       // This is what cuts the prism — both of its branches do, and there is no frame between
       // the sprite existing and the shape being right.
-      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h, s.facing), null, s, s.kind)
+      applyBuildingArt(
+        book,
+        entry,
+        buildingArt(records, s.kind, s.w, s.h, s.facing),
+        null,
+        s,
+        s.kind,
+      )
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
@@ -355,8 +409,13 @@ export function syncEntities(
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
       entry = {
-        sprite, url: '', pips: null, form: null, kind: it.kind,
-        footprint: { w: 1, h: 1 }, hitZoom: 1,
+        sprite,
+        url: '',
+        pips: null,
+        form: null,
+        kind: it.kind,
+        footprint: { w: 1, h: 1 },
+        hitZoom: 1,
         depth: { box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX), node: sprite },
       }
       sync.entries.set(key, entry)
@@ -386,8 +445,13 @@ export function syncEntities(
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
       entry = {
-        sprite, url: '', pips: null, form: null, kind: c.kind,
-        footprint: { w: 1, h: 1 }, hitZoom: 1,
+        sprite,
+        url: '',
+        pips: null,
+        form: null,
+        kind: c.kind,
+        footprint: { w: 1, h: 1 },
+        hitZoom: 1,
         depth: { box: tileDepthBox(key, c.x, c.y), node: sprite },
       }
       sync.entries.set(key, entry)

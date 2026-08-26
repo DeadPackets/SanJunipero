@@ -21,7 +21,7 @@ vi.mock('pixi.js', () => {
     visible = true
     eventMode = ''
     position = new Point()
-    width = 0     // real Pixi: a getter over the bounds, 0 for a container with no children
+    width = 0 // real Pixi: a getter over the bounds, 0 for a container with no children
     height = 0
     addChild(...cs: Container[]): void {
       this.children.push(...cs)
@@ -35,7 +35,7 @@ vi.mock('pixi.js', () => {
     height = 10
     constructor(opts?: { text?: string; style?: unknown }) {
       super()
-      if (bitmapThrows) throw new Error('Cannot read properties of null (reading \'alphaMode\')')
+      if (bitmapThrows) throw new Error("Cannot read properties of null (reading 'alphaMode')")
       this.text = opts?.text ?? ''
     }
   }
@@ -57,7 +57,11 @@ vi.mock('pixi.js', () => {
 
 const { BitmapText: MockBitmapText, Text: MockText } = await import('pixi.js')
 const {
-  LABEL_RESOLUTION, WORLD_FONT_FAMILY, bitmapFontKey, bitmapFontInstalled, createWorldLabel,
+  LABEL_RESOLUTION,
+  WORLD_FONT_FAMILY,
+  bitmapFontKey,
+  bitmapFontInstalled,
+  createWorldLabel,
 } = await import('./worldLabel.js')
 
 const style = { fontFamily: WORLD_FONT_FAMILY, fontSize: 12, fill: 0x43394a }
@@ -106,7 +110,7 @@ describe('createWorldLabel — a missing font costs one label, never the view', 
     expect(label.text).toBe('')
     expect(label.width).toBe(0)
     expect(label.height).toBe(0)
-    label.anchor.set(0.5, 1)   // every caller does this; a void label must take it
+    label.anchor.set(0.5, 1) // every caller does this; a void label must take it
   })
 
   it('is safe to build with no text at all — the state every hover tag starts in', () => {

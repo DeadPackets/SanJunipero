@@ -48,7 +48,9 @@ function claims(
 ): { ownerName?: string; crafterMarkName?: string; spoiling?: true } {
   return {
     ...(i.ownerName === undefined || i.ownerName === selfName ? {} : { ownerName: i.ownerName }),
-    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName ? {} : { crafterMarkName: i.crafterMarkName }),
+    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName
+      ? {}
+      : { crafterMarkName: i.crafterMarkName }),
     ...(i.spoiling === undefined ? {} : { spoiling: i.spoiling }),
   }
 }
@@ -56,7 +58,9 @@ function claims(
 // Reads `isExposed`'s own order forward — a roof, then what is on your back, then a fire — so
 // the sentence a mind gets and the number its body loses cannot disagree.
 function coldOf(
-  state: WorldState, config: SimConfig, agentId: string,
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
 ): { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' } | undefined {
   if (!config.warmth.enabled) return undefined
   const a = state.agents[agentId]
@@ -65,7 +69,8 @@ function coldOf(
   if (ambient >= config.warmth.comfortBand) return undefined
   if (isExposed(state, config, agentId)) return { biting: true }
   if (a.insideId !== undefined) return { keptOffBy: 'walls' }
-  if (ambient + insulationOf(state, config, agentId) >= config.warmth.comfortBand) return { keptOffBy: 'coat' }
+  if (ambient + insulationOf(state, config, agentId) >= config.warmth.comfortBand)
+    return { keptOffBy: 'coat' }
   return { keptOffBy: 'fire' }
 }
 
@@ -187,7 +192,11 @@ export class EngineBridge {
     this.#announcements.push({ type, payload })
   }
 
-  submit(agentId: string, intent: Intent, onResult?: (result: SubmitResult) => void): Promise<SubmitResult> {
+  submit(
+    agentId: string,
+    intent: Intent,
+    onResult?: (result: SubmitResult) => void,
+  ): Promise<SubmitResult> {
     return new Promise<SubmitResult>((resolve) => {
       this.#queue.push({ agentId, intent, onResult, resolve })
     })
@@ -256,7 +265,10 @@ export class EngineBridge {
     let bestD = Infinity
     const offer = (px: number, py: number): void => {
       const d = Math.abs(px - x) + Math.abs(py - y)
-      if (d < bestD || (d === bestD && best !== null && (py < best.y || (py === best.y && px < best.x)))) {
+      if (
+        d < bestD ||
+        (d === bestD && best !== null && (py < best.y || (py === best.y && px < best.x)))
+      ) {
         bestD = d
         best = { x: px, y: py }
       }

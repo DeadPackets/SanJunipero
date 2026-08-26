@@ -5,11 +5,31 @@ import { MASTER_PALETTE } from './palette.js'
 import { decodePng, type RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
-  BORDER_TOLERANCE, CALM_ROAD_ID, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
-  DEFRAME_MAX_PASSES, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin,
-  deframe, toMaterialGrid, materialVeto, seamlessMaterial,
-  diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
-  seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
+  BORDER_TOLERANCE,
+  CALM_ROAD_ID,
+  CANDIDATE_MARGIN,
+  MATERIAL_PX,
+  ROAD_MATERIAL_ID,
+  SEAM_TOLERANCE,
+  DEFRAME_MAX_PASSES,
+  TERRAIN_COMMISSIONS,
+  TILING_CRITERION_PROMPT,
+  borderReport,
+  cropMargin,
+  deframe,
+  toMaterialGrid,
+  materialVeto,
+  seamlessMaterial,
+  diamondFromMaterial,
+  generationItems,
+  materialFromCandidate,
+  planTerrainProgram,
+  seamReport,
+  seasonTintFrom,
+  selfTile3x3,
+  stencilRoadTile,
+  terrainAssetId,
+  terrainBoilerplate,
 } from './terrainGen.js'
 import { paintRoadAutotile } from './roadTiles.js'
 
@@ -21,7 +41,8 @@ function seamlessSquare(px = MATERIAL_PX): RawImage {
   const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   // two real MASTER_PALETTE greens, so quantizing is a no-op and the measurement is not
   // reading palette-snap noise: one base tone with an even sparse speckle of the other
-  const base = [0x93, 0xb5, 0x73], speck = [0x6f, 0x94, 0x55]
+  const base = [0x93, 0xb5, 0x73],
+    speck = [0x6f, 0x94, 0x55]
   for (let y = 0; y < px; y++) {
     for (let x = 0; x < px; x++) {
       const h = (Math.imul(x + 1, 0x27d4eb2d) ^ Math.imul(y + 1, 0x165667b1)) >>> 0
@@ -82,7 +103,7 @@ describe('planTerrainProgram', () => {
     const ids = plan.map((p) => p.assetId)
     expect(new Set(ids).size).toBe(ids.length)
     for (const id of ids) expect(id).toMatch(/^terrain:[a-z0-9:\-]+$/)
-    expect(planTerrainProgram().map((p) => p.assetId)).toEqual(ids)   // pure
+    expect(planTerrainProgram().map((p) => p.assetId)).toEqual(ids) // pure
   })
 
   it('asks every commission through the same style boilerplate', () => {
@@ -105,7 +126,7 @@ describe('materialFromCandidate', () => {
     const m = materialFromCandidate(bigCandidate(seamlessSquare))
     expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])
     for (let i = 0; i < m.data.length; i += 4) {
-      expect(m.data[i + 3]).toBe(255)          // ground is never see-through
+      expect(m.data[i + 3]).toBe(255) // ground is never see-through
       expect(PALETTE_HEXES).toContain((m.data[i]! << 16) | (m.data[i + 1]! << 8) | m.data[i + 2]!)
     }
   })
@@ -155,8 +176,9 @@ describe('materialVeto', () => {
   // The one the absolute check cannot see: earth's wrap delta is 2.9 against a tolerance of 14,
   // and still 5x its own interior noise — a visible line on smooth ground.
   it('vetoes a wrap that is quiet in absolute terms and loud against its own grain', async () => {
-    const earth = await decodePng(readFileSync(
-      new URL('./fixtures/pixel-gates/terrain-earth-seamed.png', import.meta.url)))
+    const earth = await decodePng(
+      readFileSync(new URL('./fixtures/pixel-gates/terrain-earth-seamed.png', import.meta.url)),
+    )
     expect(seamReport(earth).pass).toBe(true)
     expect(borderReport(earth).framed).toBe(false)
     expect(materialVeto(earth)).toMatch(/interior noise/)
@@ -167,8 +189,10 @@ describe('materialVeto', () => {
 describe('seamlessMaterial', () => {
   // The four offenders as they shipped BEFORE the construction landed, frozen: a gate proven
   // against the live content directory stops being proven the moment the content is fixed.
-  const offender = async (name: string): Promise<RawImage> => decodePng(readFileSync(
-    new URL(`./fixtures/pixel-gates/terrain-${name}-seamed.png`, import.meta.url)))
+  const offender = async (name: string): Promise<RawImage> =>
+    decodePng(
+      readFileSync(new URL(`./fixtures/pixel-gates/terrain-${name}-seamed.png`, import.meta.url)),
+    )
 
   it('closes the wrap on the material with the loudest seam of the thirteen', async () => {
     const rock = await offender('rock')
@@ -238,20 +262,36 @@ describe('diamondFromMaterial', () => {
 
   it('fills the four edge midpoints and clears the four square corners (alignment law)', () => {
     const at = (x: number, y: number): number => tile.data[(y * TERRAIN_TILE_W + x) * 4 + 3]!
-    for (const [x, y] of [[16, 0], [16, 15], [0, 7], [31, 7]] as const) expect(at(x, y)).toBe(255)
-    for (const [x, y] of [[0, 0], [31, 0], [0, 15], [31, 15]] as const) expect(at(x, y)).toBe(0)
+    for (const [x, y] of [
+      [16, 0],
+      [16, 15],
+      [0, 7],
+      [31, 7],
+    ] as const)
+      expect(at(x, y)).toBe(255)
+    for (const [x, y] of [
+      [0, 0],
+      [31, 0],
+      [0, 15],
+      [31, 15],
+    ] as const)
+      expect(at(x, y)).toBe(0)
   })
 
   it('stays palette-true through the cut', () => {
     for (let i = 0; i < tile.data.length; i += 4) {
       if (tile.data[i + 3] === 0) continue
-      expect(PALETTE_HEXES).toContain((tile.data[i]! << 16) | (tile.data[i + 1]! << 8) | tile.data[i + 2]!)
+      expect(PALETTE_HEXES).toContain(
+        (tile.data[i]! << 16) | (tile.data[i + 1]! << 8) | tile.data[i + 2]!,
+      )
     }
   })
 
   it('is deterministic', () => {
     const m = materialFromCandidate(bigCandidate(seamlessSquare))
-    expect(Buffer.from(diamondFromMaterial(m).data)).toEqual(Buffer.from(diamondFromMaterial(m).data))
+    expect(Buffer.from(diamondFromMaterial(m).data)).toEqual(
+      Buffer.from(diamondFromMaterial(m).data),
+    )
   })
 })
 
@@ -263,7 +303,6 @@ describe('TERRAIN_COMMISSIONS', () => {
   })
 })
 
-
 describe('generationItems', () => {
   const plan = planTerrainProgram()
   const gen = generationItems(plan)
@@ -271,7 +310,9 @@ describe('generationItems', () => {
   it('pays for one road surface, not fifteen — a lattice must be ONE road', () => {
     expect(gen.filter((p) => p.sort === 'road')).toHaveLength(0)
     expect(gen.some((p) => p.assetId === ROAD_MATERIAL_ID)).toBe(true)
-    expect(plan.filter((p) => p.sort === 'road').every((p) => p.generateFrom === ROAD_MATERIAL_ID)).toBe(true)
+    expect(
+      plan.filter((p) => p.sort === 'road').every((p) => p.generateFrom === ROAD_MATERIAL_ID),
+    ).toBe(true)
   })
 
   it('is every ground, the calm ribbon material, and every season', () => {
@@ -285,7 +326,9 @@ describe('generationItems', () => {
     const generated = new Set(gen.map((p) => p.assetId))
     for (const p of plan) {
       if (p.generateFrom === undefined) continue
-      expect(generated, `${p.assetId} is cut from a material nobody generates`).toContain(p.generateFrom)
+      expect(generated, `${p.assetId} is cut from a material nobody generates`).toContain(
+        p.generateFrom,
+      )
     }
   })
 })
@@ -293,7 +336,7 @@ describe('generationItems', () => {
 describe('stencilRoadTile', () => {
   const material = materialFromCandidate(bigCandidate(seamlessSquare))
 
-  it('keeps C13\'s road geometry exactly, pixel for pixel', () => {
+  it("keeps C13's road geometry exactly, pixel for pixel", () => {
     for (const key of ['cross', 'straight-ns', 'cap-w', 't-no-e'] as const) {
       const stencil = paintRoadAutotile(key)
       const out = stencilRoadTile(material, key)
@@ -338,16 +381,21 @@ describe('seasonTintFrom', () => {
   })
 
   it('reads the grade off the generated art, and never runs away', () => {
-    const dark: RawImage = { width: summer.width, height: summer.height, data: new Uint8ClampedArray(summer.data) }
+    const dark: RawImage = {
+      width: summer.width,
+      height: summer.height,
+      data: new Uint8ClampedArray(summer.data),
+    }
     for (let i = 0; i < dark.data.length; i += 4) {
-      dark.data[i] = 0; dark.data[i + 1] = 0; dark.data[i + 2] = 0
+      dark.data[i] = 0
+      dark.data[i + 1] = 0
+      dark.data[i + 2] = 0
     }
     const t = seasonTintFrom(dark, summer)
-    expect(t.r).toBeGreaterThanOrEqual(0.6)     // clamped, never a black sheet
+    expect(t.r).toBeGreaterThanOrEqual(0.6) // clamped, never a black sheet
     expect(t.r).toBeLessThan(1)
   })
 })
-
 
 // A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the wrap, so
 // `seamReport` reads 0.0 while the material renders as a grid of framed cards.
@@ -357,7 +405,7 @@ describe('borderReport', () => {
     for (let y = 0; y < px; y++) {
       for (let x = 0; x < px; x++) {
         if (x >= ring && y >= ring && x < px - ring && y < px - ring) continue
-        img.data.set([120, 40, 160, 255], (y * px + x) * 4)     // a violet rim
+        img.data.set([120, 40, 160, 255], (y * px + x) * 4) // a violet rim
       }
     }
     return img
@@ -389,7 +437,6 @@ describe('borderReport', () => {
     expect(borderReport(m)).toEqual(borderReport(m))
   })
 })
-
 
 describe('cropMargin', () => {
   // the rim a model actually drew: ~4% of a 512 square, which is 20px
@@ -437,7 +484,6 @@ describe('cropMargin', () => {
   })
 })
 
-
 describe('deframe', () => {
   const framedMaterial = (rim: number): RawImage => {
     const px = MATERIAL_PX
@@ -445,7 +491,7 @@ describe('deframe', () => {
     for (let y = 0; y < px; y++) {
       for (let x = 0; x < px; x++) {
         if (x >= rim && y >= rim && x < px - rim && y < px - rim) continue
-        img.data.set([0x43, 0x39, 0x4a, 255], (y * px + x) * 4)     // an ink rim
+        img.data.set([0x43, 0x39, 0x4a, 255], (y * px + x) * 4) // an ink rim
       }
     }
     return toMaterialGrid(img)
@@ -464,12 +510,13 @@ describe('deframe', () => {
     const r = deframe(framed)
     expect(borderReport(r.material).framed).toBe(false)
     expect(r.passes).toBeGreaterThan(0)
-    expect(r.material.width).toBe(MATERIAL_PX)      // still on the material grid
+    expect(r.material.width).toBe(MATERIAL_PX) // still on the material grid
   })
 
   it('gives up rather than looping, and says how hard it tried', () => {
     const allRim: RawImage = {
-      width: MATERIAL_PX, height: MATERIAL_PX,
+      width: MATERIAL_PX,
+      height: MATERIAL_PX,
       data: new Uint8ClampedArray(MATERIAL_PX * MATERIAL_PX * 4),
     }
     for (let i = 0; i < allRim.data.length; i += 4) allRim.data.set([0x43, 0x39, 0x4a, 255], i)

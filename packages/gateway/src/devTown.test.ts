@@ -43,7 +43,13 @@ describe('devTown — one town, not two', () => {
     // Six kinds over eleven roofs, where the eleven used to be five copies of one home and a
     // matched pair of sheds. The cottage, the cabin and the farmhouse are unowned fixtures.
     expect(count(town.structures)).toEqual({
-      house: 5, cottage: 1, cabin: 1, farmhouse: 1, storehouse: 1, well: 1, fire_pit: 1,
+      house: 5,
+      cottage: 1,
+      cabin: 1,
+      farmhouse: 1,
+      storehouse: 1,
+      well: 1,
+      fire_pit: 1,
     })
   })
 
@@ -104,9 +110,16 @@ describe('devTown — one town, not two', () => {
 describe('townStructuresFor', () => {
   it('keeps the scripted fixture byte-identical, so no landed gate moves', () => {
     expect(TOWN_STRUCTURES).toEqual(FROZEN_TOWN_STRUCTURES)
-    expect(townStructuresFor('scripted').map((s) => ({
-      id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h,
-    }))).toEqual(FROZEN_TOWN_STRUCTURES)
+    expect(
+      townStructuresFor('scripted').map((s) => ({
+        id: s.id,
+        kind: s.kind,
+        x: s.x,
+        y: s.y,
+        w: s.w,
+        h: s.h,
+      })),
+    ).toEqual(FROZEN_TOWN_STRUCTURES)
   })
 
   it('serves the real town under showcase', () => {

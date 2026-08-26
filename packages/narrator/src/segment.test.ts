@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { SimEvent } from '@sj/shared'
 import { DEFAULT_SEGMENT_CONFIG, eventAgentIds, eventLocation, segmentScenes } from './segment.js'
 
-const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({ seq, tick, type, payload })
+const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 
 describe('segmentScenes', () => {
   it('splits on silence gaps longer than silenceTicks', () => {
@@ -49,7 +54,9 @@ describe('segmentScenes', () => {
   })
 
   it('splits at the maxTicks cap in an unbroken run', () => {
-    const events = Array.from({ length: 251 }, (_, i) => ev(i + 1, i, 'agent_spoke', { agentId: 'a', text: 'x', x: 0, y: 0 }))
+    const events = Array.from({ length: 251 }, (_, i) =>
+      ev(i + 1, i, 'agent_spoke', { agentId: 'a', text: 'x', x: 0, y: 0 }),
+    )
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(2)
     expect(scenes[0].startTick).toBe(0)
@@ -73,7 +80,17 @@ describe('segmentScenes', () => {
     const events = [
       ev(1, 0, 'structure_completed', { id: 'house-1' }),
       ev(2, 1, 'crop_harvested', { cropId: 'crop-1' }),
-      ev(3, 2, 'structure_planned', { id: 'house-2', kind: 'house', x: 1, y: 1, w: 1, h: 1, maxHp: 10, flammable: true, builderId: 'omar' }),
+      ev(3, 2, 'structure_planned', {
+        id: 'house-2',
+        kind: 'house',
+        x: 1,
+        y: 1,
+        w: 1,
+        h: 1,
+        maxHp: 10,
+        flammable: true,
+        builderId: 'omar',
+      }),
       ev(4, 3, 'need_changed', { id: 'nadia', need: 'hunger', delta: -1 }),
     ]
     const scenes = segmentScenes(events)
@@ -84,16 +101,27 @@ describe('segmentScenes', () => {
 
 describe('extraction helpers', () => {
   it('eventAgentIds follows the per-type field map', () => {
-    expect(eventAgentIds(ev(1, 0, 'agent_spoke', { agentId: 'a', text: 't', x: 0, y: 0 }))).toEqual(['a'])
-    expect(eventAgentIds(ev(1, 0, 'agent_spawned', { id: 'a', name: 'A', x: 0, y: 0, ageDays: 1 }))).toEqual(['a'])
+    expect(eventAgentIds(ev(1, 0, 'agent_spoke', { agentId: 'a', text: 't', x: 0, y: 0 }))).toEqual(
+      ['a'],
+    )
+    expect(
+      eventAgentIds(ev(1, 0, 'agent_spawned', { id: 'a', name: 'A', x: 0, y: 0, ageDays: 1 })),
+    ).toEqual(['a'])
     expect(eventAgentIds(ev(1, 0, 'structure_completed', { id: 's1' }))).toEqual([])
-    expect(eventAgentIds(ev(1, 0, 'structure_planned', { id: 's1', builderId: 'b' }))).toEqual(['b'])
-    expect(eventAgentIds(ev(1, 0, 'item_moved', { id: 'i1', loc: { t: 'agent', id: 'a' } }))).toEqual([])
+    expect(eventAgentIds(ev(1, 0, 'structure_planned', { id: 's1', builderId: 'b' }))).toEqual([
+      'b',
+    ])
+    expect(
+      eventAgentIds(ev(1, 0, 'item_moved', { id: 'i1', loc: { t: 'agent', id: 'a' } })),
+    ).toEqual([])
   })
 
   it('eventLocation returns numeric x/y or null', () => {
     expect(eventLocation(ev(1, 0, 'agent_moved', { id: 'a', x: 5, y: 6 }))).toEqual({ x: 5, y: 6 })
-    expect(eventLocation(ev(1, 0, 'terrain_changed', { x: 2, y: 3, tile: 1 }))).toEqual({ x: 2, y: 3 })
+    expect(eventLocation(ev(1, 0, 'terrain_changed', { x: 2, y: 3, tile: 1 }))).toEqual({
+      x: 2,
+      y: 3,
+    })
     expect(eventLocation(ev(1, 0, 'structure_completed', { id: 's1' }))).toBeNull()
     expect(eventLocation(ev(1, 0, 'agent_died', { agentId: 'a', cause: 'age' }))).toBeNull()
   })

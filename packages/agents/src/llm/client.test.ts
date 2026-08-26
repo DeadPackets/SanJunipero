@@ -143,7 +143,11 @@ describe('LlmClient.object', () => {
     const client = new LlmClient({ model, db, caller: 'test', maxRetries: 2 })
     let caught: unknown
     try {
-      await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+      await client.object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      })
     } catch (err) {
       caught = err
     }
@@ -160,11 +164,13 @@ describe('LlmClient.object', () => {
   // hardcoded zeros, so ~10% of the mini-rehearsal's spend was invisible to every guard.
   it('★ books a paid-but-empty generation at what it cost, not at zero', async () => {
     const db = openDb()
-    const model = mockModel([{
-      json: { wrong: 'shape' },
-      servedModelId: MIND_MODEL,
-      usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
-    }])
+    const model = mockModel([
+      {
+        json: { wrong: 'shape' },
+        servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
+      },
+    ])
     const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
     await expect(
       client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA }),
@@ -213,7 +219,9 @@ describe('LlmClient.object', () => {
     ])
     const client = new LlmClient({ model, db, caller: 'narrator', maxRetries: 2 })
     const { value, usage } = await client.object({
-      system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA,
+      system: 's',
+      messages: [{ role: 'user', content: 'u' }],
+      schema: SCHEMA,
     })
 
     expect(value).toEqual({ mood: 'calm', count: 3 })
@@ -225,7 +233,10 @@ describe('LlmClient.object', () => {
     // The tokens were spent whether or not the shape was right, so they are reported.
     expect(all[0]!.input_tokens).toBe(1000)
     expect(usage.costUsd).toBeGreaterThan(0)
-    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{ kind: string; detail: string }>
+    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{
+      kind: string
+      detail: string
+    }>
     // `NoObjectGeneratedError` carries no `providerMetadata`, so a repaired call books at the
     // ceiling and says so rather than guessing a cheap rate.
     expect(alerts.map((a) => a.kind)).toEqual(['decode_repaired', 'llm_price_unpriced_route'])
@@ -293,7 +304,13 @@ describe('budget guard', () => {
     ])
     // expectedCallCostUsd 0 isolates the booked-spend cap: this budget is
     // smaller than one expected call, which T21's reservation refuses outright.
-    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 0.00005, expectedCallCostUsd: 0 })
+    const client = new LlmClient({
+      model,
+      db,
+      caller: 'test',
+      budgetUsd: 0.00005,
+      expectedCallCostUsd: 0,
+    })
     // first call: total spend is 0, allowed; costs (1000*0.14 + 1000*0.28)/1e6 = 0.00042 > cap
     await client.text({ messages: [{ role: 'user', content: 'u' }] })
     expect(client.totalCostUsd()).toBeGreaterThan(0.00005)
@@ -325,7 +342,11 @@ describe('served model attribution', () => {
   it('logs the model that actually answered, costed at the ceiling when unpriced', async () => {
     const db = openDb()
     const model = mockModel([
-      { text: 'a', usage: { inputTokens: 100, outputTokens: 10 }, servedModelId: 'deepseek/deepseek-chat' },
+      {
+        text: 'a',
+        usage: { inputTokens: 100, outputTokens: 10 },
+        servedModelId: 'deepseek/deepseek-chat',
+      },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
     await client.text({ messages: [{ role: 'user', content: 'u' }] })
@@ -341,13 +362,17 @@ describe('served model attribution', () => {
 // computes a second opinion; the two are compared every call.
 describe('price reconciliation', () => {
   const kinds = (db: Database.Database): string[] =>
-    (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map((r) => r.kind)
+    (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map(
+      (r) => r.kind,
+    )
 
-  it('books the provider\'s own number, not the table\'s, when the provider reports one', async () => {
+  it("books the provider's own number, not the table's, when the provider reports one", async () => {
     const db = openDb()
     const model = mockModel([
       {
-        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
         reportedCostUsd: 0.00099,
       },
@@ -366,7 +391,9 @@ describe('price reconciliation', () => {
     // Wafer's real price for these tokens is (1000*0.28 + 1000*0.56)/1e6 = $0.00084.
     const model = mockModel([
       {
-        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
         // ...but suppose the provider actually charges double what the table believes.
         reportedCostUsd: 0.00168,
@@ -375,9 +402,11 @@ describe('price reconciliation', () => {
     const client = new LlmClient({ model, db, caller: 'test' })
     await client.text({ messages: [{ role: 'user', content: 'u' }] })
     expect(kinds(db)).toContain('llm_price_divergence')
-    const detail = (db.prepare(
-      "SELECT detail FROM alerts WHERE kind = 'llm_price_divergence'",
-    ).get() as { detail: string }).detail
+    const detail = (
+      db.prepare("SELECT detail FROM alerts WHERE kind = 'llm_price_divergence'").get() as {
+        detail: string
+      }
+    ).detail
     expect(detail).toContain('Wafer')
     expect(detail).toContain('the pin is stale')
     // The bill wins: the ledger books what was charged, not what the table guessed.
@@ -389,7 +418,9 @@ describe('price reconciliation', () => {
     const db = openDb()
     const model = mockModel([
       {
-        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
         reportedCostUsd: (1000 * 0.28 + 1000 * 0.56) / 1e6,
       },
@@ -404,7 +435,9 @@ describe('price reconciliation', () => {
     const exact = (10 * 0.28 + 2 * 0.56) / 1e6
     const model = mockModel([
       {
-        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 10, outputTokens: 2 },
         // A tiny absolute wobble on a tiny call: a bare ratio would scream, the floor holds.
         reportedCostUsd: exact + 1e-6,
@@ -420,7 +453,9 @@ describe('price reconciliation', () => {
     const db = openDb()
     const model = mockModel([
       {
-        text: 'a', provider: 'SomeNewProvider', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'SomeNewProvider',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
       },
     ])
@@ -431,17 +466,21 @@ describe('price reconciliation', () => {
     // Strictly more than the pinned route would have charged: it can only over-report.
     expect(row.cost_usd).toBeGreaterThan((1000 * 0.28 + 1000 * 0.56) / 1e6)
     expect(row.reported_cost_usd).toBeNull()
-    const detail = (db.prepare(
-      "SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'",
-    ).get() as { detail: string }).detail
+    const detail = (
+      db.prepare("SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'").get() as {
+        detail: string
+      }
+    ).detail
     expect(detail).toContain('SomeNewProvider')
   })
 
-  it('takes the provider\'s number even for a route it cannot price', async () => {
+  it("takes the provider's number even for a route it cannot price", async () => {
     const db = openDb()
     const model = mockModel([
       {
-        text: 'a', provider: 'SomeNewProvider', servedModelId: MIND_MODEL,
+        text: 'a',
+        provider: 'SomeNewProvider',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
         reportedCostUsd: 0.00042,
       },
@@ -475,7 +514,11 @@ describe('alerts', () => {
 
 describe('pessimistic reservation (T21)', () => {
   // A model that will not answer until released, so every caller is in flight at once.
-  function gatedModel(): { model: MockLanguageModelV4; started: () => number; release: () => void } {
+  function gatedModel(): {
+    model: MockLanguageModelV4
+    started: () => number
+    release: () => void
+  } {
     let started = 0
     let open!: () => void
     const gate = new Promise<void>((resolve) => {
@@ -503,7 +546,13 @@ describe('pessimistic reservation (T21)', () => {
     const db = openDb()
     const { model, started, release } = gatedModel()
     // Room for two reservations of $0.005; the third would cross $0.011.
-    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 0.011, expectedCallCostUsd: 0.005 })
+    const client = new LlmClient({
+      model,
+      db,
+      caller: 'test',
+      budgetUsd: 0.011,
+      expectedCallCostUsd: 0.005,
+    })
 
     // All five reserve synchronously before any of them can answer.
     const calls = Array.from({ length: 5 }, () =>
@@ -516,7 +565,8 @@ describe('pessimistic reservation (T21)', () => {
     const rejected = settled.filter((s) => s.status === 'rejected')
     expect(settled.filter((s) => s.status === 'fulfilled')).toHaveLength(2)
     expect(rejected).toHaveLength(3)
-    for (const r of rejected) expect((r as PromiseRejectedResult).reason).toBeInstanceOf(BudgetExceededError)
+    for (const r of rejected)
+      expect((r as PromiseRejectedResult).reason).toBeInstanceOf(BudgetExceededError)
     expect(started()).toBe(2)
     expect(sumReserved(db, 'test')).toBe(0)
   })
@@ -525,9 +575,16 @@ describe('pessimistic reservation (T21)', () => {
     const db = openDb()
     const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
     const client = new LlmClient({
-      model, db, caller: 'test', budgetUsd: 1, expectedCallCostUsd: 0.005, maxRetries: 2,
+      model,
+      db,
+      caller: 'test',
+      budgetUsd: 1,
+      expectedCallCostUsd: 0.005,
+      maxRetries: 2,
     })
-    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow('scripted failure')
+    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow(
+      'scripted failure',
+    )
     expect(sumReserved(db, 'test')).toBe(0)
   })
 
@@ -601,7 +658,9 @@ describe('default OpenRouter path extraBody', () => {
       provider: { order: ['P'], allow_fallbacks: true },
       reasoning: { enabled: false },
     })
-    expect(defaultExtraBody(['x/y'], ['P'], true, { effort: 'low' }).reasoning).toEqual({ effort: 'low' })
+    expect(defaultExtraBody(['x/y'], ['P'], true, { effort: 'low' }).reasoning).toEqual({
+      effort: 'low',
+    })
     expect(defaultExtraBody()).not.toHaveProperty('reasoning')
   })
 })
@@ -610,7 +669,9 @@ describe('the back end that answered is written down (C11 R20)', () => {
   it('reads the provider off OpenRouter metadata, then off the raw body, then gives up', () => {
     expect(servedProvider(undefined, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
     expect(servedProvider({ body: { provider: 'Baidu' } }, undefined)).toBe('Baidu')
-    expect(servedProvider({ body: { provider: 'Baidu' } }, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
+    expect(
+      servedProvider({ body: { provider: 'Baidu' } }, { openrouter: { provider: 'Wafer' } }),
+    ).toBe('Wafer')
     expect(servedProvider({}, {})).toBeNull()
     expect(servedProvider({ body: { provider: '' } }, {})).toBeNull()
   })
@@ -618,15 +679,21 @@ describe('the back end that answered is written down (C11 R20)', () => {
   it('records it on the call, and records null for a call that never came back', async () => {
     const db = openDb()
     const model = mockModel([
-      { json: { mood: 'calm', count: 1 }, provider: 'Wafer', usage: { inputTokens: 10, outputTokens: 2 } },
+      {
+        json: { mood: 'calm', count: 1 },
+        provider: 'Wafer',
+        usage: { inputTokens: 10, outputTokens: 2 },
+      },
       { fail: true },
       { json: { mood: 'calm', count: 2 }, usage: { inputTokens: 10, outputTokens: 2 } },
     ])
     const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
     await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
     await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
-    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as
-      Array<{ provider: string | null; ok: number }>
+    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as Array<{
+      provider: string | null
+      ok: number
+    }>
     // A failure carries no answer, so it carries no back end to name it by.
     expect(logged).toEqual([
       { provider: 'Wafer', ok: 1 },
@@ -642,7 +709,9 @@ describe('a stalled request is bounded (T37b)', () => {
     const model = new MockLanguageModelV4({
       doGenerate: async ({ abortSignal }) => {
         await new Promise((_resolve, reject) => {
-          abortSignal?.addEventListener('abort', () => { reject(new Error('aborted')) })
+          abortSignal?.addEventListener('abort', () => {
+            reject(new Error('aborted'))
+          })
         })
         throw new Error('unreachable')
       },

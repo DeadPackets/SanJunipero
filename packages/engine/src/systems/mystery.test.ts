@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { MYSTERIES, MYSTERY_BY_KIND } from '../data/mysteries.js'
 import { composePerception } from '../perception.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
@@ -15,10 +21,18 @@ const CERTAIN: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 1 } 
 const NEVER: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 0 } })
 
 let seq = 1
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function world(config: SimConfig): WorldState {
-  const s = genesisState(config, Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0)))
+  const s = genesisState(
+    config,
+    Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0)),
+  )
   return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }), config)
 }
 
@@ -27,7 +41,11 @@ function tickAt(config: SimConfig, hour: number, minute = 0, seed = 'mystery-tes
   const tick = MINUTES_PER_DAY + hour * 60 + minute
   const advanced = fold({ ...world(config), tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   const result = createWorldTick(config, new RngStreams(seed))(advanced)
-  return { events: result.events.filter((e) => e.type === 'mystery_event'), state: result.state, before: advanced }
+  return {
+    events: result.events.filter((e) => e.type === 'mystery_event'),
+    state: result.state,
+    before: advanced,
+  }
 }
 
 describe('mystery events', () => {
@@ -87,8 +105,9 @@ describe('mystery events', () => {
   })
 
   it('the fold refuses a kind that is not in the table', () => {
-    expect(() => fold(world(CERTAIN), ev('mystery_event', { kind: 'the_answer' }), CERTAIN))
-      .toThrow(/unknown mystery/)
+    expect(() =>
+      fold(world(CERTAIN), ev('mystery_event', { kind: 'the_answer' }), CERTAIN),
+    ).toThrow(/unknown mystery/)
   })
 })
 
@@ -115,8 +134,9 @@ describe('perception: mysteries', () => {
 
   it('a located mystery is seen within sight and nowhere else', () => {
     const s = world(CERTAIN)
-    expect(composePerception(s, CERTAIN, 'a1', [LOCATED(6, 6)]).seen)
-      .toEqual([{ kind: 'mystery', mystery: 'stone_hums', prose: MYSTERY_BY_KIND.stone_hums!.prose }])
+    expect(composePerception(s, CERTAIN, 'a1', [LOCATED(6, 6)]).seen).toEqual([
+      { kind: 'mystery', mystery: 'stone_hums', prose: MYSTERY_BY_KIND.stone_hums!.prose },
+    ])
     expect(composePerception(s, CERTAIN, 'a1', [LOCATED(30, 30)]).seen).toEqual([])
   })
 
@@ -126,9 +146,21 @@ describe('perception: mysteries', () => {
 
   it('four walls hide a located mystery outside them', () => {
     let s = world(CERTAIN)
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
-    }), CERTAIN)
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 4,
+        y: 4,
+        w: 2,
+        h: 2,
+        maxHp: 20,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      CERTAIN,
+    )
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), CERTAIN)
     s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CERTAIN)
     expect(composePerception(s, CERTAIN, 'a1', [LOCATED(6, 6)]).seen).toEqual([])

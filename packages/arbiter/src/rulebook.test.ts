@@ -11,8 +11,18 @@ const boilSaltRecipe: Recipe = {
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
-    { weight: 1, success: true, label: 'The water boils away, leaving a crust of salt.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
-    { weight: 1, success: false, label: 'The pot cracks and the water is lost.', effects: [{ op: 'none' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'The water boils away, leaving a crust of salt.',
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+    },
+    {
+      weight: 1,
+      success: false,
+      label: 'The pot cracks and the water is lost.',
+      effects: [{ op: 'none' }],
+    },
   ],
   rngStream: 'craft',
   canon: ['fire'],

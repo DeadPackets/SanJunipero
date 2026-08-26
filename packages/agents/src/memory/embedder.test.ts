@@ -3,20 +3,18 @@ import { Embedder, cosine } from './embedder.js'
 import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
 
 describe('Embedder (real bge-small-en-v1.5)', () => {
-  it(
-    'embeds to a deterministic 384-dim unit vector with sane semantics',
-    { timeout: 300_000 },
-    async () => {
-      const e = await Embedder.create()
-      const v = await e.embed('fishing at the river fork')
-      expect(v.length).toBe(384)
-      expect(Math.hypot(...v)).toBeCloseTo(1, 3)
-      expect(await e.embed('fishing at the river fork')).toEqual(v) // deterministic
-      const near = cosine(v, await e.embed('catching fish by the water'))
-      const far = cosine(v, await e.embed('a funeral in deep winter snow'))
-      expect(near).toBeGreaterThan(far)
-    },
-  )
+  it('embeds to a deterministic 384-dim unit vector with sane semantics', {
+    timeout: 300_000,
+  }, async () => {
+    const e = await Embedder.create()
+    const v = await e.embed('fishing at the river fork')
+    expect(v.length).toBe(384)
+    expect(Math.hypot(...v)).toBeCloseTo(1, 3)
+    expect(await e.embed('fishing at the river fork')).toEqual(v) // deterministic
+    const near = cosine(v, await e.embed('catching fish by the water'))
+    const far = cosine(v, await e.embed('a funeral in deep winter snow'))
+    expect(near).toBeGreaterThan(far)
+  })
 })
 
 describe('FakeEmbedder', () => {

@@ -43,12 +43,17 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
 }
 
 // The click line: the same fact, said in full, for the popover.
-export function itemCropDetail(state: WorldState | null, kind: 'item' | 'crop', id: string): string | null {
+export function itemCropDetail(
+  state: WorldState | null,
+  kind: 'item' | 'crop',
+  id: string,
+): string | null {
   if (state === null) return null
   if (kind === 'item') {
     const it = state.items[id]
     if (it === undefined) return null
-    const owner = it.owner === undefined ? 'claimed by no one' : `owned by ${agentName(state, it.owner)}`
+    const owner =
+      it.owner === undefined ? 'claimed by no one' : `owned by ${agentName(state, it.owner)}`
     return `${it.kind} ×${it.qty}, ${owner}`
   }
   const c = state.crops[id]
@@ -60,7 +65,9 @@ export function itemCropDetail(state: WorldState | null, kind: 'item' | 'crop', 
 /** What Escape takes one step out of, in priority order, or `null` when it takes no step. Two
  *  window listeners cannot settle this between them, so the whole order lives here. */
 export function escapeStep(
-  insideId: string | null, dockOpen: boolean, onOnePerson: boolean,
+  insideId: string | null,
+  dockOpen: boolean,
+  onOnePerson: boolean,
 ): 'room' | 'dock' | 'roster' | null {
   if (insideId !== null) return 'room'
   if (dockOpen) return 'dock'
@@ -80,8 +87,15 @@ const TEXT_ENTRY_TAGS: ReadonlySet<string> = new Set(['INPUT', 'TEXTAREA', 'SELE
 // them, and any control that already consumed the press keeps it. Lens cycling is the fallback,
 // never the interception.
 export function lensKeyAllowed(
-  tagName: string, isContentEditable: boolean, inApplication: boolean, alreadyHandled = false,
+  tagName: string,
+  isContentEditable: boolean,
+  inApplication: boolean,
+  alreadyHandled = false,
 ): boolean {
-  return !alreadyHandled
-    && !TEXT_ENTRY_TAGS.has(tagName.toUpperCase()) && !isContentEditable && !inApplication
+  return (
+    !alreadyHandled &&
+    !TEXT_ENTRY_TAGS.has(tagName.toUpperCase()) &&
+    !isContentEditable &&
+    !inApplication
+  )
 }

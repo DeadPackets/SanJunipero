@@ -3,13 +3,27 @@ import { resolveAssetId } from './textures.js'
 
 // No engine mood stat: §23 bans one, so a face is inferred from the ticked body and the log.
 
-export const EXPRESSIONS =
-  ['neutral', 'happy', 'sad', 'angry', 'surprised', 'weary', 'asleep'] as const
+export const EXPRESSIONS = [
+  'neutral',
+  'happy',
+  'sad',
+  'angry',
+  'surprised',
+  'weary',
+  'asleep',
+] as const
 export type Expression = (typeof EXPRESSIONS)[number]
 
 /** First match wins, in this order. The array IS the priority — one table, not two. */
-export const MOOD_PRIORITY: readonly Expression[] =
-  ['asleep', 'angry', 'sad', 'surprised', 'weary', 'happy', 'neutral']
+export const MOOD_PRIORITY: readonly Expression[] = [
+  'asleep',
+  'angry',
+  'sad',
+  'surprised',
+  'weary',
+  'happy',
+  'neutral',
+]
 
 /** Two sim-hours: how far back a feeling reaches. */
 export const MOOD_WINDOW_TICKS = 120
@@ -40,7 +54,17 @@ const HAPPY_TYPES = new Set(['agent_born', 'item_given', 'milestone_reached'])
 
 const involves = (ev: SimEvent, id: string): boolean => {
   const p = ev.payload as Record<string, unknown>
-  for (const k of ['agentId', 'id', 'aId', 'bId', 'targetId', 'byId', 'owner', 'motherId', 'fatherId']) {
+  for (const k of [
+    'agentId',
+    'id',
+    'aId',
+    'bId',
+    'targetId',
+    'byId',
+    'owner',
+    'motherId',
+    'fatherId',
+  ]) {
     if (p?.[k] === id) return true
   }
   return false
@@ -57,10 +81,18 @@ export function moodOf(a: MoodView, recent: readonly SimEvent[], nowTick: number
   if (mine.some((ev) => ANGRY_TYPES.has(ev.type))) return 'angry'
   if (mine.some((ev) => SAD_TYPES.has(ev.type))) return 'sad'
   if (mine.some((ev) => SURPRISE_TYPES.has(ev.type))) return 'surprised'
-  if (a.needs.energy < MOOD_ENERGY_WEARY || a.ill || a.injuries.length > 0
-    || a.collapsedSinceTick !== null) return 'weary'
-  const comfortable = a.needs.hunger > MOOD_COMFORT && a.needs.energy > MOOD_COMFORT
-    && a.needs.warmth > MOOD_COMFORT && a.needs.social > MOOD_COMFORT
+  if (
+    a.needs.energy < MOOD_ENERGY_WEARY ||
+    a.ill ||
+    a.injuries.length > 0 ||
+    a.collapsedSinceTick !== null
+  )
+    return 'weary'
+  const comfortable =
+    a.needs.hunger > MOOD_COMFORT &&
+    a.needs.energy > MOOD_COMFORT &&
+    a.needs.warmth > MOOD_COMFORT &&
+    a.needs.social > MOOD_COMFORT
   if (comfortable && mine.some((ev) => HAPPY_TYPES.has(ev.type))) return 'happy'
   return 'neutral'
 }
@@ -68,7 +100,9 @@ export function moodOf(a: MoodView, recent: readonly SimEvent[], nowTick: number
 /** The expression, else the neutral face, else `null` — and `null` is a real answer the caller
  *  falls back from, never a broken image. */
 export function portraitUrl(
-  records: readonly AssetRecord[], agentId: string, e: Expression,
+  records: readonly AssetRecord[],
+  agentId: string,
+  e: Expression,
 ): string | null {
   for (const want of e === 'neutral' ? [e] : [e, 'neutral' as Expression]) {
     const id = resolveAssetId(records as AssetRecord[], 'portrait', portraitKind(agentId, want))

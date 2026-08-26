@@ -10,13 +10,21 @@ import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DAWN = 360 // hour 6, minute 0
 const WINTER = 273 * 1440 // first winter day
-const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, 'f': 3 }
+const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, f: 3 }
 
 let seq = 11000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function makeWorld(rows: string[] = ['.~', '..'], config = CFG): WorldState {
-  const s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+  const s = genesisState(
+    config,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
   return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
 }
 function atTick(s: WorldState, tick: number): WorldState {
@@ -25,7 +33,12 @@ function atTick(s: WorldState, tick: number): WorldState {
 function withWildlife(s: WorldState, wildlife: WorldState['wildlife']): WorldState {
   return { ...s, wildlife }
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, config = CFG, tick = s.tick): WorldState {
+function applyAll(
+  s: WorldState,
+  events: Array<{ type: string; payload: unknown }>,
+  config = CFG,
+  tick = s.tick,
+): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), config)
   return s
 }
@@ -72,9 +85,19 @@ describe('verb: fish', () => {
     expect(r.events).toContainEqual({ type: 'wildlife_changed', payload: { fish: 99 } })
     expect(r.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1', spoilage: { spawnDay: 0, days: 2 } },
+      payload: {
+        id: 'item_1',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+        owner: 'a1',
+        spoilage: { spawnDay: 0, days: 2 },
+      },
     })
-    expect(r.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'fishing', xp: 1 } })
+    expect(r.events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'fishing', xp: 1 },
+    })
     expect(r.state.wildlife.fish).toBe(99)
     expect(r.state.items.item_1!.kind).toBe('fish')
   })
@@ -133,9 +156,19 @@ describe('verb: forage', () => {
     const t = tickOnce(applyAll(s, r.events))
     expect(t.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1', spoilage: { spawnDay: 0, days: 3 } },
+      payload: {
+        id: 'item_1',
+        kind: 'berries',
+        qty: 2,
+        loc: { t: 'agent', id: 'a1' },
+        owner: 'a1',
+        spoilage: { spawnDay: 0, days: 3 },
+      },
     })
-    expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'foraging', xp: 1 } })
+    expect(t.events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'foraging', xp: 1 },
+    })
   })
 
   it('yields nothing in winter', () => {

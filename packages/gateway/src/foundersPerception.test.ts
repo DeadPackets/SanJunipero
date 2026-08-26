@@ -11,7 +11,14 @@ vi.mock('@sj/engine', async (importOriginal) => {
 })
 
 const {
-  EventStore, RngStreams, TickLoop, composePerception, fold, genesisState, makeFixtureMap, openDb,
+  EventStore,
+  RngStreams,
+  TickLoop,
+  composePerception,
+  fold,
+  genesisState,
+  makeFixtureMap,
+  openDb,
 } = await import('@sj/engine')
 const { SHOWCASE_CONFIG, devGenesisState, devTerrain } = await import('./devWorld.js')
 const { showcaseDeck } = await import('./showcaseMap.js')
@@ -26,18 +33,33 @@ function streamRun(): number {
   const structures = townStructuresFor('showcase', RINGS)
   let planned = 0
   const inner = makeFoundersOnTick(
-    SHOWCASE_CONFIG, new RngStreams('perception-lane'), () => loop.state, {
-      interiors: true, builders: true, structures, founders: foundersFor(structures),
-      holdings: true, lamps: LAMPS, deck: showcaseDeck(undefined, RINGS),
-    })
+    SHOWCASE_CONFIG,
+    new RngStreams('perception-lane'),
+    () => loop.state,
+    {
+      interiors: true,
+      builders: true,
+      structures,
+      founders: foundersFor(structures),
+      holdings: true,
+      lamps: LAMPS,
+      deck: showcaseDeck(undefined, RINGS),
+    },
+  )
   const loop: TickLoopType = new TickLoop({
     store: new EventStore(openDb(':memory:')),
     state: devGenesisState(SHOWCASE_CONFIG, devTerrain('showcase', RINGS), 'showcase', RINGS),
-    rng: new RngStreams('perception-lane-world'), config: SHOWCASE_CONFIG, snapshotEveryTicks: 720,
-    onTick: (ctx) => inner({
-      tick: ctx.tick,
-      emit: (type, payload) => { if (type === 'structure_planned') planned++; ctx.emit(type, payload) },
-    }),
+    rng: new RngStreams('perception-lane-world'),
+    config: SHOWCASE_CONFIG,
+    snapshotEveryTicks: 720,
+    onTick: (ctx) =>
+      inner({
+        tick: ctx.tick,
+        emit: (type, payload) => {
+          if (type === 'structure_planned') planned++
+          ctx.emit(type, payload)
+        },
+      }),
   })
   for (let t = 0; t < TICKS; t++) loop.step()
   return planned
@@ -47,7 +69,11 @@ function streamRun(): number {
 function patrolRun(): void {
   let state = genesisState(SHOWCASE_CONFIG, makeFixtureMap())
   const onTick = makeFoundersOnTick(
-    SHOWCASE_CONFIG, new RngStreams('perception-patrol'), () => state, { builders: true })
+    SHOWCASE_CONFIG,
+    new RngStreams('perception-patrol'),
+    () => state,
+    { builders: true },
+  )
   let seq = 0
   for (let tick = 1; tick <= TICKS; tick++) {
     const emitted: Array<{ type: string; payload: unknown }> = []

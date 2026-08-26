@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CHUNK_TILES, MINUTES_PER_DAY, SimConfigSchema, TOWN_RINGS_GENESIS, WORLD_MARGIN, chunkOf,
-  chunksTouched, edgesOwed, stateHash, worldSizeForRings, type SimConfig, type SimEvent,
+  CHUNK_TILES,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  TOWN_RINGS_GENESIS,
+  WORLD_MARGIN,
+  chunkOf,
+  chunksTouched,
+  edgesOwed,
+  stateHash,
+  worldSizeForRings,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { genesisTerrainAt } from '../genesis/world.js'
@@ -14,13 +24,14 @@ import { GROWABLE_FLOOR, authoredOrigin, builtBox, grownStrip, growthsSoFar } fr
 // A 32x32 world on a config whose world.size says 128 — the ordinary shape of a fixture, and
 // the case the plan's size-derived growth counter got wrong.
 const SIZE = 32
-const base = (over: Record<string, unknown> = {}): SimConfig => SimConfigSchema.parse({
-  weather: { hourlyChangeChance: 0 },
-  mystery: { chancePerDay: 0 },
-  // Nothing else may write terrain at midnight: the wood seeds itself there.
-  regrowth: { enabled: false },
-  ...over,
-})
+const base = (over: Record<string, unknown> = {}): SimConfig =>
+  SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+    // Nothing else may write terrain at midnight: the wood seeds itself there.
+    regrowth: { enabled: false },
+    ...over,
+  })
 const CFG = base()
 
 // The world the SYSTEM is measured in. A fixture below `GROWABLE_FLOOR` is a fixture and the
@@ -28,7 +39,12 @@ const CFG = base()
 const TOWN_SIZE = 128
 
 let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 const map = (n = SIZE): TileId[][] =>
   Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
@@ -36,14 +52,33 @@ function town(config = CFG, structures = 2, size = SIZE, at = { x: 10, y: 20 }):
   let s = genesisState(config, map(size))
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: 7300 }), config)
   for (let i = 0; i < structures; i++) {
-    s = fold(s, ev('structure_planned', {
-      id: `structure_${i + 1}`, kind: 'house', x: at.x + i * 3, y: at.y, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'a1',
-    }), config)
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: `structure_${i + 1}`,
+        kind: 'house',
+        x: at.x + i * 3,
+        y: at.y,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      config,
+    )
     s = fold(s, ev('structure_completed', { id: `structure_${i + 1}` }), config)
   }
-  s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'axe', qty: 1, loc: { t: 'tile', x: 7, y: 9 } }), config)
-  s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 3, y: 3, plantedDay: 0 }), config)
+  s = fold(
+    s,
+    ev('item_spawned', { id: 'item_1', kind: 'axe', qty: 1, loc: { t: 'tile', x: 7, y: 9 } }),
+    config,
+  )
+  s = fold(
+    s,
+    ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 3, y: 3, plantedDay: 0 }),
+    config,
+  )
   return s
 }
 
@@ -67,7 +102,10 @@ const grown = (r: { events: Array<{ type: string; payload: unknown }> }) =>
 describe('mapGrowthSystem', () => {
   // Two roofs at 10..14 x 9..10 in a 128-tile world: ten short to the north, nine to the west,
   // and a hundred clear on the other two.
-  const OWED = [{ edge: 'n', owed: 10 }, { edge: 'w', owed: 9 }]
+  const OWED = [
+    { edge: 'n', owed: 10 },
+    { edge: 'w', owed: 9 },
+  ]
 
   it('reads what it owes off the built set, and off nothing else', () => {
     const s = bigTown()
@@ -115,22 +153,40 @@ describe('mapGrowthSystem', () => {
       }
       s = r.state
     }
-    expect(steps).toEqual([{ edge: 'n', depth: 10 }, { edge: 'w', depth: 9 }])
+    expect(steps).toEqual([
+      { edge: 'n', depth: 10 },
+      { edge: 'w', depth: 9 },
+    ])
     expect(s.terrain).toHaveLength(TOWN_SIZE + 10)
     expect(s.terrain[0]).toHaveLength(TOWN_SIZE + 9)
-    expect(edgesOwed(builtBox(s)!, { w: s.terrain[0]!.length, h: s.terrain.length }, WORLD_MARGIN))
-      .toEqual([])
+    expect(
+      edgesOwed(builtBox(s)!, { w: s.terrain[0]!.length, h: s.terrain.length }, WORLD_MARGIN),
+    ).toEqual([])
   })
 
   // ★ NO CEILING. The old rule stopped at 192 tiles; this one is asked for a world an order of
   // magnitude past that and answers with the ground, because a clearance has no maximum.
   it('has no size it refuses to grow past', () => {
     const wide = 2048
-    let s = genesisState(CFG, Array.from({ length: wide }, () => Array.from({ length: wide }, (): TileId => 0)))
-    s = fold(s, ev('structure_planned', {
-      id: 'far', kind: 'house', x: wide - 4, y: wide - 4, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'a1',
-    }), CFG)
+    let s = genesisState(
+      CFG,
+      Array.from({ length: wide }, () => Array.from({ length: wide }, (): TileId => 0)),
+    )
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'far',
+        kind: 'house',
+        x: wide - 4,
+        y: wide - 4,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      CFG,
+    )
     s = fold(s, ev('structure_completed', { id: 'far' }), CFG)
     const r = tickAt(s, MIDNIGHT)
     expect(grown(r)[0]!.payload).toMatchObject({ edge: 'e', depth: 17 })
@@ -144,7 +200,10 @@ describe('mapGrowthSystem', () => {
   })
 
   it('carries the strip in the payload, sized to the edge it grew', () => {
-    const north = grown(tickAt(bigTown(), MIDNIGHT))[0]!.payload as { depth: number; tiles: number[][] }
+    const north = grown(tickAt(bigTown(), MIDNIGHT))[0]!.payload as {
+      depth: number
+      tiles: number[][]
+    }
     expect(north.depth).toBe(10)
     expect(north.tiles).toHaveLength(10)
     for (const row of north.tiles) expect(row).toHaveLength(TOWN_SIZE)
@@ -160,23 +219,29 @@ describe('mapGrowthSystem', () => {
     // Wide enough to see the difference: the channel at columns 48-50 runs at every row, so a
     // strip in the WRONG frame still finds a river. The frame only shows in the forest edge.
     const W = 100
-    const wide = genesisState(CFG, Array.from({ length: SIZE }, () =>
-      Array.from({ length: W }, (): TileId => 0)))
+    const wide = genesisState(
+      CFG,
+      Array.from({ length: SIZE }, () => Array.from({ length: W }, (): TileId => 0)),
+    )
     const edgeOf = (row: number[]): number => row.findIndex((t) => t === 3)
     const north = grownStrip(wide, 'n', 3)
     expect(north).toHaveLength(3)
     for (let y = 0; y < 3; y++) {
       const row = north[y]!
       // The river is there, in the three columns it has always run in.
-      expect([...row.keys()].filter((x) => row[x] === 2), `row ${y - 3}`).toEqual([48, 49, 50])
+      expect(
+        [...row.keys()].filter((x) => row[x] === 2),
+        `row ${y - 3}`,
+      ).toEqual([48, 49, 50])
       // Growing north moves the array's origin, so index 0 is authored row -3, not row 0.
       for (let x = 0; x < W; x++) expect(row[x], `${x},${y - 3}`).toBe(genesisTerrainAt(x, y - 3))
     }
     // And the wood really does come in at a different column in a row behind the origin than
     // in the row that shares its index — which is the whole of what the frame decides.
     expect(north.map(edgeOf)).toEqual([88, 90, 87])
-    expect([0, 1, 2].map((y) => edgeOf(Array.from({ length: W }, (_, x) => genesisTerrainAt(x, y)))))
-      .toEqual([90, 92, 94])
+    expect(
+      [0, 1, 2].map((y) => edgeOf(Array.from({ length: W }, (_, x) => genesisTerrainAt(x, y)))),
+    ).toEqual([90, 92, 94])
 
     const east = grownStrip(wide, 'e', 3)
     for (let y = 0; y < SIZE; y++)
@@ -186,16 +251,26 @@ describe('mapGrowthSystem', () => {
 
   it('tracks the authored frame across a shift, so a second strip continues the first', () => {
     const s = town()
-    const first = fold(s, ev('world_grown', { edge: 'n', depth: 3, tiles: grownStrip(s, 'n', 3) }), CFG)
+    const first = fold(
+      s,
+      ev('world_grown', { edge: 'n', depth: 3, tiles: grownStrip(s, 'n', 3) }),
+      CFG,
+    )
     expect(authoredOrigin(s)).toEqual({ x: 0, y: 0 })
     expect(authoredOrigin(first)).toEqual({ x: 0, y: -3 })
     // Every row of the grown world is the authored row it should be, old and new alike.
     for (let y = 0; y < first.terrain.length; y++)
       for (let x = 0; x < SIZE; x++)
         expect(first.terrain[y]![x], `${x},${y - 3}`).toBe(genesisTerrainAt(x, y - 3))
-    const second = fold(first, ev('world_grown', {
-      edge: 'n', depth: 2, tiles: grownStrip(first, 'n', 2),
-    }), CFG)
+    const second = fold(
+      first,
+      ev('world_grown', {
+        edge: 'n',
+        depth: 2,
+        tiles: grownStrip(first, 'n', 2),
+      }),
+      CFG,
+    )
     expect(authoredOrigin(second)).toEqual({ x: 0, y: -5 })
     for (let y = 0; y < second.terrain.length; y++)
       for (let x = 0; x < SIZE; x++)
@@ -205,10 +280,12 @@ describe('mapGrowthSystem', () => {
 
 describe('fold: world_grown', () => {
   const growTo = (edge: string, s = town()) => {
-    const w = s.terrain[0]!.length, h = s.terrain.length
-    const tiles = edge === 'n' || edge === 's'
-      ? Array.from({ length: 4 }, () => Array.from({ length: w }, () => 0))
-      : Array.from({ length: h }, () => Array.from({ length: 4 }, () => 0))
+    const w = s.terrain[0]!.length,
+      h = s.terrain.length
+    const tiles =
+      edge === 'n' || edge === 's'
+        ? Array.from({ length: 4 }, () => Array.from({ length: w }, () => 0))
+        : Array.from({ length: h }, () => Array.from({ length: 4 }, () => 0))
     return fold(s, ev('world_grown', { edge, depth: 4, tiles }), CFG)
   }
 
@@ -254,7 +331,16 @@ describe('fold: world_grown', () => {
   it('carries an in-flight walk with the ground it was walking on', () => {
     let s = town()
     const path = findPath(s, s.agents.a1!, { x: 25, y: 28 }, CFG)!
-    s = fold(s, ev('action_started', { agentId: 'a1', verb: 'walk', params: { x: 25, y: 28 }, duration: path.length }), CFG)
+    s = fold(
+      s,
+      ev('action_started', {
+        agentId: 'a1',
+        verb: 'walk',
+        params: { x: 25, y: 28 },
+        duration: path.length,
+      }),
+      CFG,
+    )
     const after = growTo('w', s)
     const act = after.agents.a1!.activity!
     expect(act.params).toEqual({ x: 29, y: 28 })
@@ -266,7 +352,9 @@ describe('fold: world_grown', () => {
 
   it('lays the rolled strip down where the payload says, and nowhere else', () => {
     const s = town()
-    const strip = Array.from({ length: 2 }, (_, r) => Array.from({ length: SIZE }, (): number => (r === 0 ? 3 : 4)))
+    const strip = Array.from({ length: 2 }, (_, r) =>
+      Array.from({ length: SIZE }, (): number => (r === 0 ? 3 : 4)),
+    )
     const after = fold(s, ev('world_grown', { edge: 'n', depth: 2, tiles: strip }), CFG)
     expect(after.terrain[0]!.every((t) => t === 3)).toBe(true)
     expect(after.terrain[1]!.every((t) => t === 4)).toBe(true)
@@ -276,15 +364,22 @@ describe('fold: world_grown', () => {
   it('refuses a strip that is not the size the edge needs', () => {
     const s = town()
     const short = [Array.from({ length: 5 }, () => 0)]
-    expect(() => fold(s, ev('world_grown', { edge: 'n', depth: 1, tiles: short }), CFG)).toThrow(/strip/i)
-    expect(() => fold(s, ev('world_grown', { edge: 'n', depth: 2, tiles: [] }), CFG)).toThrow(/strip/i)
+    expect(() => fold(s, ev('world_grown', { edge: 'n', depth: 1, tiles: short }), CFG)).toThrow(
+      /strip/i,
+    )
+    expect(() => fold(s, ev('world_grown', { edge: 'n', depth: 2, tiles: [] }), CFG)).toThrow(
+      /strip/i,
+    )
   })
 
   it('the new strip lands in exactly the chunks chunkOf names', () => {
     const after = growTo('e')
     const w = after.terrain[0]!.length
     const corners = [
-      { x: SIZE, y: 0 }, { x: w - 1, y: 0 }, { x: SIZE, y: SIZE - 1 }, { x: w - 1, y: SIZE - 1 },
+      { x: SIZE, y: 0 },
+      { x: w - 1, y: 0 },
+      { x: SIZE, y: SIZE - 1 },
+      { x: w - 1, y: SIZE - 1 },
     ]
     const touched = chunksTouched(corners)
     expect(touched).toContain(`${chunkOf(SIZE, 0).cx},0`)
@@ -294,7 +389,7 @@ describe('fold: world_grown', () => {
 })
 
 describe('world_grown: replay', () => {
-  it('folding the tick\'s own events over the input reproduces the state it returned', () => {
+  it("folding the tick's own events over the input reproduces the state it returned", () => {
     const s = bigTown()
     const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), CFG)
     const out = createWorldTick(CFG, new RngStreams('grow'))(advanced)
@@ -324,13 +419,25 @@ describe('growthsSoFar', () => {
   it('counts every growth on either axis, so the n-e-s-w cycle cannot lose its place', () => {
     const s = town()
     expect(growthsSoFar(s)).toBe(0)
-    const n = fold(s, ev('world_grown', {
-      edge: 'n', depth: 4, tiles: Array.from({ length: 4 }, () => Array.from({ length: SIZE }, () => 0)),
-    }), CFG)
+    const n = fold(
+      s,
+      ev('world_grown', {
+        edge: 'n',
+        depth: 4,
+        tiles: Array.from({ length: 4 }, () => Array.from({ length: SIZE }, () => 0)),
+      }),
+      CFG,
+    )
     expect(growthsSoFar(n)).toBe(1)
-    const ne = fold(n, ev('world_grown', {
-      edge: 'e', depth: 4, tiles: Array.from({ length: SIZE + 4 }, () => Array.from({ length: 4 }, () => 0)),
-    }), CFG)
+    const ne = fold(
+      n,
+      ev('world_grown', {
+        edge: 'e',
+        depth: 4,
+        tiles: Array.from({ length: SIZE + 4 }, () => Array.from({ length: 4 }, () => 0)),
+      }),
+      CFG,
+    )
     expect(growthsSoFar(ne)).toBe(2)
   })
 

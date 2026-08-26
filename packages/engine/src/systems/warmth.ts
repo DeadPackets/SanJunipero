@@ -54,7 +54,9 @@ export function besideAKeptFire(state: WorldState, config: SimConfig, agentId: s
 // Only ever raises the target: nothing here can make a body colder than the air it stands in.
 export function warmthTargetFor(state: WorldState, config: SimConfig, agentId: string): number {
   const fire = besideAKeptFire(state, config, agentId) ? config.warmth.fireWarmth : 0
-  return warmthTargetFromAir(state.weather.temperatureC + insulationOf(state, config, agentId) + fire)
+  return warmthTargetFromAir(
+    state.weather.temperatureC + insulationOf(state, config, agentId) + fire,
+  )
 }
 
 // Out in it, colder than the body can hold, and away from a kept fire.
@@ -63,7 +65,11 @@ export function isExposed(state: WorldState, config: SimConfig, agentId: string)
   const a = state.agents[agentId]
   if (a === undefined || !a.alive) return false
   if (a.insideId !== undefined) return false
-  if (ambientTempAt(state, config) + insulationOf(state, config, agentId) >= config.warmth.comfortBand) return false
+  if (
+    ambientTempAt(state, config) + insulationOf(state, config, agentId) >=
+    config.warmth.comfortBand
+  )
+    return false
   return !besideAKeptFire(state, config, agentId)
 }
 
@@ -86,6 +92,11 @@ export function warmthSystem(ctx: TickCtx): void {
     // exactly that tick — it is what the fold counts, and what names the death that follows.
     const cold = ctx.state().agents[id]!
     if (cold.needs.warmth > 0 || cold.asleep || cold.needs.energy <= 0) continue
-    ctx.emit('need_changed', { id, need: 'energy', delta: -awakeEnergyDecay(ctx.config, cold), reason: 'exposure' })
+    ctx.emit('need_changed', {
+      id,
+      need: 'energy',
+      delta: -awakeEnergyDecay(ctx.config, cold),
+      reason: 'exposure',
+    })
   }
 }

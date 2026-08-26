@@ -18,18 +18,24 @@ import { reportOnce } from './degraded.js'
 import { notFound, sendJson } from './http.js'
 
 export type GatewayOpts = {
-  dbPath: string; port?: number                 // default 8787
-  config?: SimConfig; terrain: TileId[][]
-  pollMs?: number                               // default 250
-  db?: Database.Database                        // in-process override (dev world); else opened readonly
-  agentDbDir?: string                           // per-agent memory DBs (`<id>.db`); absent → [] tab responses
-  narratorDbPath?: string                       // C7's narrator.db; absent or unwritten → typed empties
-  staticDir?: string                            // built @sj/web; absent → API/socket only (the dev split)
-  maxViewers?: number                           // default DEFAULT_MAX_VIEWERS
+  dbPath: string
+  port?: number // default 8787
+  config?: SimConfig
+  terrain: TileId[][]
+  pollMs?: number // default 250
+  db?: Database.Database // in-process override (dev world); else opened readonly
+  agentDbDir?: string // per-agent memory DBs (`<id>.db`); absent → [] tab responses
+  narratorDbPath?: string // C7's narrator.db; absent or unwritten → typed empties
+  staticDir?: string // built @sj/web; absent → API/socket only (the dev split)
+  maxViewers?: number // default DEFAULT_MAX_VIEWERS
 }
-export type Gateway = { port: number; close(): Promise<void>; pump(): void }  // pump exposed for tests
+export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
 
-export type RouteHandler = (req: IncomingMessage, res: ServerResponse, params: Record<string, string>) => void
+export type RouteHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  params: Record<string, string>,
+) => void
 export type Router = { route(method: string, pattern: string, fn: RouteHandler): void }
 
 const DEFAULT_PORT = 8787
@@ -69,7 +75,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   // ── HTTP route registry (Tasks 6–7 mount here) ──
   const routes: Array<{ method: string; segs: string[]; fn: RouteHandler }> = []
   const router: Router = {
-    route(method, pattern, fn) { routes.push({ method, segs: pattern.split('/').filter(Boolean), fn }) },
+    route(method, pattern, fn) {
+      routes.push({ method, segs: pattern.split('/').filter(Boolean), fn })
+    },
   }
 
   // lazy codex: the forge `assets` table may not exist yet on a bare world DB
@@ -92,7 +100,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }
   }
 
-  mountAssetRoutes(router, { getCodex, knowsAgent: (id) => mirror.state().agents[id] !== undefined })
+  mountAssetRoutes(router, {
+    getCodex,
+    knowsAgent: (id) => mirror.state().agents[id] !== undefined,
+  })
   mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
@@ -114,15 +125,26 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         // A malformed escape is not this route's path: `decodeURIComponent` throws, and unguarded
         // that throw is an uncaughtException in the listener that ticks the town.
         if (p.startsWith(':')) {
-          try { params[p.slice(1)] = decodeURIComponent(segs[i]!) } catch { ok = false; break }
-        } else if (p !== segs[i]) { ok = false; break }
+          try {
+            params[p.slice(1)] = decodeURIComponent(segs[i]!)
+          } catch {
+            ok = false
+            break
+          }
+        } else if (p !== segs[i]) {
+          ok = false
+          break
+        }
       }
       if (ok) {
         try {
           r.fn(req, res, params)
         } catch (e) {
-          reportOnce(`route.${r.method} ${r.segs.join('/')}`, () =>
-            `${r.method} /${r.segs.join('/')} threw — ${e instanceof Error ? e.message : String(e)}`)
+          reportOnce(
+            `route.${r.method} ${r.segs.join('/')}`,
+            () =>
+              `${r.method} /${r.segs.join('/')} threw — ${e instanceof Error ? e.message : String(e)}`,
+          )
           if (res.headersSent) res.destroy()
           else sendJson(res, { error: 'internal error' }, 500)
         }
@@ -141,7 +163,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let catchUpSeq = 0
   const snapshotJson = (): string => {
     if (snapJson === null) {
-      snapJson = JSON.stringify({ t: 'snapshot', tick: mirror.state().tick, seq: mirror.seq(), state: mirror.state(), config, laws: mirror.state().laws ?? {}, live: true })
+      snapJson = JSON.stringify({
+        t: 'snapshot',
+        tick: mirror.state().tick,
+        seq: mirror.seq(),
+        state: mirror.state(),
+        config,
+        laws: mirror.state().laws ?? {},
+        live: true,
+      })
     }
     return snapJson
   }
@@ -151,18 +181,23 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_CLIENT_FRAME })
   // An EventEmitter with no 'error' listener THROWS, and ws re-emits every failure of the http
   // server it is attached to — a busy port would take the whole process down.
-  wss.on('error', (e) => { if (listening) console.error(`gateway: socket server error — ${e.message}`) })
+  wss.on('error', (e) => {
+    if (listening) console.error(`gateway: socket server error — ${e.message}`)
+  })
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
     // `wss.clients` already holds the arriving socket, hence `>`. Counted here rather than off
     // the hub, which a socket joins only after a valid hello.
-    if (wss.clients.size > maxViewers) { sock.close(CLOSE_TOO_MANY); return }
+    if (wss.clients.size > maxViewers) {
+      sock.close(CLOSE_TOO_MANY)
+      return
+    }
     let greeted = false
     const helloTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       if (!greeted) sock.close(CLOSE_BAD_HELLO)
     }, HELLO_DEADLINE_MS)
-    let scrubAt = 0                       // last answered scrub, for coalescing
+    let scrubAt = 0 // last answered scrub, for coalescing
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -173,7 +208,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       try {
         state = mirror.stateAt(tick)
       } catch {
-        tick = mirror.state().tick   // clamp, never error the socket
+        tick = mirror.state().tick // clamp, never error the socket
         state = mirror.state()
       }
       sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
@@ -188,7 +223,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         return
       }
       if (!greeted) {
-        if (msg.t !== 'hello' || msg.v !== PROTOCOL_VERSION) { sock.close(CLOSE_BAD_HELLO); return }
+        if (msg.t !== 'hello' || msg.v !== PROTOCOL_VERSION) {
+          sock.close(CLOSE_BAD_HELLO)
+          return
+        }
         greeted = true
         removers.set(sock, hub.add(sock, snapshotJson))
         sock.send(snapshotJson())
@@ -205,7 +243,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
       if (msg.t === 'scrub') {
         const since = Date.now() - scrubAt
-        if (since >= SCRUB_MIN_MS) { answerScrub(msg); return }
+        if (since >= SCRUB_MIN_MS) {
+          answerScrub(msg)
+          return
+        }
         // Inside the window: keep only the newest ask, and answer that one when it opens.
         pendingScrub = { tick: msg.tick, reqId: msg.reqId }
         scrubTimer ??= setTimeout(() => {
@@ -242,7 +283,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     if (observerSeen) {
       for (const t of thoughtsSince(db, lastThoughtId)) {
         lastThoughtId = t.id
-        hub.broadcast(JSON.stringify({ t: 'thought', agentId: t.agentId, tick: t.tick, text: t.text }))
+        hub.broadcast(
+          JSON.stringify({ t: 'thought', agentId: t.agentId, tick: t.tick, text: t.text }),
+        )
       }
     }
     const cdx = getCodex()
@@ -279,16 +322,17 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   return {
     port,
     pump,
-    close: () => new Promise<void>((resolve) => {
-      clearInterval(timer)
-      for (const client of wss.clients) client.terminate()
-      wss.close(() => {
-        httpServer.close(() => {
-          if (ownsDb) db.close()
-          narratorDb?.close()
-          resolve()
+    close: () =>
+      new Promise<void>((resolve) => {
+        clearInterval(timer)
+        for (const client of wss.clients) client.terminate()
+        wss.close(() => {
+          httpServer.close(() => {
+            if (ownsDb) db.close()
+            narratorDb?.close()
+            resolve()
+          })
         })
-      })
-    }),
+      }),
   }
 }

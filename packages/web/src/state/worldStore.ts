@@ -1,4 +1,10 @@
-import { SimConfigSchema, type AssetRecord, type ServerMsg, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  SimConfigSchema,
+  type AssetRecord,
+  type ServerMsg,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { fold } from '@sj/engine/fold'
 import type { WorldState } from '@sj/engine/state'
 import { isNarratable } from '../ui/chronicleFormat.js'
@@ -52,7 +58,10 @@ export function createWorldStore(): WorldStore {
     for (const fn of subs) fn()
   }
   const notify = (): void => {
-    if (typeof requestAnimationFrame !== 'function') { flush(); return }
+    if (typeof requestAnimationFrame !== 'function') {
+      flush()
+      return
+    }
     if (pending) return
     pending = true
     requestAnimationFrame(flush)
@@ -61,7 +70,7 @@ export function createWorldStore(): WorldStore {
   return {
     getState: () => state,
     getMode: () => mode,
-    getTick: () => (mode.live ? state?.tick ?? 0 : mode.tick),
+    getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
     latestThought: (agentId) => latest.get(agentId) ?? null,
     thoughtsLog: () => thoughts,
     recentEvents: () => events,
@@ -93,7 +102,8 @@ export function createWorldStore(): WorldStore {
             // Only what the chronicle can narrate: unnarratable events would push a death out
             // of the ring. Every event still folds into state above and reaches `onEvents`.
             for (const ev of msg.events) if (isNarratable(ev)) events.push(ev)
-            if (events.length > RECENT_EVENTS_CAP) events.splice(0, events.length - RECENT_EVENTS_CAP)
+            if (events.length > RECENT_EVENTS_CAP)
+              events.splice(0, events.length - RECENT_EVENTS_CAP)
             for (const fn of eventSubs) fn(msg.events)
           }
           break
@@ -103,7 +113,8 @@ export function createWorldStore(): WorldStore {
           break
         case 'thought':
           thoughts.push({ agentId: msg.agentId, tick: msg.tick, text: msg.text })
-          if (thoughts.length > THOUGHT_LOG_CAP) thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
+          if (thoughts.length > THOUGHT_LOG_CAP)
+            thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
           latest.set(msg.agentId, { tick: msg.tick, text: msg.text })
           break
         case 'asset':
@@ -114,7 +125,13 @@ export function createWorldStore(): WorldStore {
       notify()
     },
 
-    subscribe(fn) { subs.add(fn); return () => subs.delete(fn) },
-    onEvents(fn) { eventSubs.add(fn); return () => eventSubs.delete(fn) },
+    subscribe(fn) {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
+    onEvents(fn) {
+      eventSubs.add(fn)
+      return () => eventSubs.delete(fn)
+    },
   }
 }

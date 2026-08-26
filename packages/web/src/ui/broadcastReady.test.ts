@@ -2,17 +2,37 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import {
-  MILESTONE_ICON, chronicleIcon, chronicleLine, type ChronicleLookup, type SimEvent,
+  MILESTONE_ICON,
+  chronicleIcon,
+  chronicleLine,
+  type ChronicleLookup,
+  type SimEvent,
 } from '@sj/shared'
 import { chronicleGlyph } from './importantFeed.js'
 import { MARK_GLYPH, marksFrom } from './timelineMarks.js'
 import { subjectFor } from './directorCut.js'
 import {
-  BROADCAST_WIDTHS, MACHINE_CHECKABLE, READINESS, STAGE_MIN_PX, TWITCH_SCALE, BADGE_WORD,
-  captionAtScale, captionFloorPx, captionMinPx, captionReads, captionShortfall, figuresAreLive,
-  kindWords, TWITCH_FRAME_H,
-  layoutOffenders, machineWordOffenders, readinessReport, tickBadgeState,
-  type Rails, type ReadinessLine, type StringSite,
+  BROADCAST_WIDTHS,
+  MACHINE_CHECKABLE,
+  READINESS,
+  STAGE_MIN_PX,
+  TWITCH_SCALE,
+  BADGE_WORD,
+  captionAtScale,
+  captionFloorPx,
+  captionMinPx,
+  captionReads,
+  captionShortfall,
+  figuresAreLive,
+  kindWords,
+  TWITCH_FRAME_H,
+  layoutOffenders,
+  machineWordOffenders,
+  readinessReport,
+  tickBadgeState,
+  type Rails,
+  type ReadinessLine,
+  type StringSite,
 } from './broadcastReady.js'
 import { describeEvent } from './chronicleFormat.js'
 import { chronicleLabel } from './importantFeed.js'
@@ -23,13 +43,19 @@ import { EMPTY_COPY } from './townStats.js'
 import { controlItems } from './controlBar.js'
 import { stateWord, conditionsOf, CONDITION_WORD } from './status.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 describe('the eight conditions, stated', () => {
   it('names all eight and marks which four a machine can check', () => {
     expect(READINESS).toHaveLength(8)
     for (const id of MACHINE_CHECKABLE) {
-      expect(READINESS.some((r) => r.startsWith(id)), id).toBe(true)
+      expect(
+        READINESS.some((r) => r.startsWith(id)),
+        id,
+      ).toBe(true)
     }
     expect(MACHINE_CHECKABLE).toHaveLength(4)
   })
@@ -52,17 +78,42 @@ describe('the eight conditions, stated', () => {
 // A town with every kind the engine can stand, including the two whose slugs have an
 // underscore in them — which is the whole point of the scan.
 const S = (id: string, kind: string, x: number, y: number, owner?: string) => ({
-  id, kind, x, y, w: 1, h: 1, stage: 'complete', owner, builtBy: null,
-  progressTicks: 0, hp: 10, integrity: 1,
+  id,
+  kind,
+  x,
+  y,
+  w: 1,
+  h: 1,
+  stage: 'complete',
+  owner,
+  builtBy: null,
+  progressTicks: 0,
+  hp: 10,
+  integrity: 1,
 })
 const A = (id: string, name: string, x: number, y: number) => ({
-  id, name, x, y, alive: true, insideId: null, asleep: false, ill: false, injuries: [],
-  collapsedSinceTick: null, activity: { verb: 'walk' }, lastSpokeTick: undefined,
-  needs: { hunger: 80, warmth: 80, energy: 80, social: 80 }, skills: {},
+  id,
+  name,
+  x,
+  y,
+  alive: true,
+  insideId: null,
+  asleep: false,
+  ill: false,
+  injuries: [],
+  collapsedSinceTick: null,
+  activity: { verb: 'walk' },
+  lastSpokeTick: undefined,
+  needs: { hunger: 80, warmth: 80, energy: 80, social: 80 },
+  skills: {},
 })
 const TOWN = {
   tick: 480,
-  terrain: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+  terrain: [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ],
   agents: {
     a1: A('a1', 'Amara', 1, 1),
     a2: A('a2', 'Yusuf', 2, 2),
@@ -75,11 +126,13 @@ const TOWN = {
     s_wagon: S('s_wagon', 'wagon', 1, 2),
     s_scaf: S('s_scaf', 'scaffolding', 2, 1),
   },
-  items: {}, crops: {}, weather: { kind: 'clear' },
+  items: {},
+  crops: {},
+  weather: { kind: 'clear' },
 } as unknown as WorldState
 
 const ev = (type: string, payload: Record<string, unknown>): SimEvent =>
-  ({ seq: 1, tick: 480, type, payload } as unknown as SimEvent)
+  ({ seq: 1, tick: 480, type, payload }) as unknown as SimEvent
 
 /** Every string a broadcast surface can put in front of a viewer, with where it came from. */
 export function broadcastStrings(state: WorldState): StringSite[] {
@@ -92,7 +145,13 @@ export function broadcastStrings(state: WorldState): StringSite[] {
   for (const id of Object.keys(state.structures)) {
     push('chronicle', describeEvent(ev('structure_completed', { id }), state))
     push('chronicle', describeEvent(ev('fire_ignited', { structureId: id }), state))
-    push('chronicle', describeEvent(ev('structure_planned', { builderId: 'a1', kind: state.structures[id]!.kind }), state))
+    push(
+      'chronicle',
+      describeEvent(
+        ev('structure_planned', { builderId: 'a1', kind: state.structures[id]!.kind }),
+        state,
+      ),
+    )
     push('importantFeed', chronicleLabel(ev('structure_completed', { id }), state))
     push('importantFeed', chronicleLabel(ev('fire_ignited', { structureId: id }), state))
     push('hover', hoverLabel(state, 'structure', id))
@@ -116,7 +175,15 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     push(`law ${path} unit`, copy.unit)
   }
   for (const [k, v] of Object.entries(EMPTY_COPY)) push(`empty ${k}`, v)
-  for (const item of controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true })) {
+  for (const item of controlItems({
+    lens: 'map',
+    live: true,
+    zoom: 1,
+    following: null,
+    insideId: null,
+    hudHidden: false,
+    townFits: true,
+  })) {
     push(`control ${item.id}`, item.label)
   }
   return out
@@ -124,20 +191,28 @@ export function broadcastStrings(state: WorldState): StringSite[] {
 
 describe('R4 · nothing on screen is a machine word, an id, or a number without a unit', () => {
   it('catches the shapes it is looking for', () => {
-    expect(machineWordOffenders([{ where: 'x', text: 'The fire_pit is finished.' }])).toHaveLength(1)
+    expect(machineWordOffenders([{ where: 'x', text: 'The fire_pit is finished.' }])).toHaveLength(
+      1,
+    )
     expect(machineWordOffenders([{ where: 'x', text: 'spoilage.days' }])).toHaveLength(1)
-    expect(machineWordOffenders([{ where: 'x', text: 'structure_house_14_13' }]).length).toBeGreaterThan(0)
-    expect(machineWordOffenders([{ where: 'x', text: 'It reached 4820 before dawn' }])).toHaveLength(1)
+    expect(
+      machineWordOffenders([{ where: 'x', text: 'structure_house_14_13' }]).length,
+    ).toBeGreaterThan(0)
+    expect(
+      machineWordOffenders([{ where: 'x', text: 'It reached 4820 before dawn' }]),
+    ).toHaveLength(1)
   })
 
   it('lets prose, times, counts and percentages through', () => {
-    expect(machineWordOffenders([
-      { where: 'x', text: 'The fire pit is finished.' },
-      { where: 'x', text: 'Day 4 19:31' },
-      { where: 'x', text: 'Food keeps for 3 days' },
-      { where: 'x', text: '82% of the harvest' },
-      { where: 'x', text: 'Amara is asleep in her own house' },
-    ])).toEqual([])
+    expect(
+      machineWordOffenders([
+        { where: 'x', text: 'The fire pit is finished.' },
+        { where: 'x', text: 'Day 4 19:31' },
+        { where: 'x', text: 'Food keeps for 3 days' },
+        { where: 'x', text: '82% of the harvest' },
+        { where: 'x', text: 'Amara is asleep in her own house' },
+      ]),
+    ).toEqual([])
   })
 
   it('finds a real corpus to check', () => {
@@ -159,10 +234,14 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
 
 /** Every caption a broadcast burns into the frame, and its source size in CSS px. */
 const CAPTIONS: ReadonlyArray<{ what: string; px: number }> = [
-  { what: 'speech bubble', px: 16 },          // FACE_INSTALL_PX
+  { what: 'speech bubble', px: 16 }, // FACE_INSTALL_PX
   { what: 'director subtitle', px: 0.95 * 16 },
-  { what: 'director speaker name', px: Number.parseFloat(
-    /\.subtitle-name\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(CSS)?.[1] ?? '0') * 16 },
+  {
+    what: 'director speaker name',
+    px:
+      Number.parseFloat(/\.subtitle-name\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(CSS)?.[1] ?? '0') *
+      16,
+  },
   { what: 'filmstrip title', px: 14 },
 ]
 
@@ -207,8 +286,8 @@ const rem = (v: string): number => Number.parseFloat(v) * (v.endsWith('rem') ? 1
 const RAILS: Rails = {
   panel: rem(/#panel-outlet\.open\s*\{[^}]*width:\s*([\d.]+rem)/.exec(CSS)?.[1] ?? '0'),
   stripCard: Number.parseFloat(/--strip-card:\s*(\d+)px/.exec(CSS)?.[1] ?? '0'),
-  controlItem: 44,          // the touch floor every control clears
-  controlCount: 11,         // the widest bar controlItems can produce
+  controlItem: 44, // the touch floor every control clears
+  controlCount: 11, // the widest bar controlItems can produce
 }
 
 describe('R7 · the three broadcast widths hold the layout', () => {
@@ -223,7 +302,8 @@ describe('R7 · the three broadcast widths hold the layout', () => {
 
   it('leaves a workable stage at every broadcast width, with the panel open', () => {
     expect(layoutOffenders(RAILS)).toEqual([])
-    for (const w of BROADCAST_WIDTHS) expect(w - RAILS.panel, `${w}`).toBeGreaterThanOrEqual(STAGE_MIN_PX)
+    for (const w of BROADCAST_WIDTHS)
+      expect(w - RAILS.panel, `${w}`).toBeGreaterThanOrEqual(STAGE_MIN_PX)
   })
 })
 
@@ -271,14 +351,16 @@ describe('R1 / R3 · what a machine can say about the two human lines', () => {
   })
 
   it('R3 · and the somebody it names is always somebody in the town', () => {
-    for (let tick = 0; tick < 200; tick += 7) expect(TOWN).toContain(subjectFor([], null, tick, TOWN))
+    for (let tick = 0; tick < 200; tick += 7)
+      expect(TOWN).toContain(subjectFor([], null, tick, TOWN))
   })
 
   it('R1 · the load-time TypeError is gone, and its guard lives with the scene', () => {
     // `scene.test.ts` owns the proof: a closed scene answers `setTicking` without touching
     // `app.ticker`, which Pixi nulls in destroy(). Named here so R1's row has its citation.
-    expect(readFileSync(new URL('../render/scene.ts', import.meta.url), 'utf8'))
-      .toContain('export function sceneClock')
+    expect(readFileSync(new URL('../render/scene.ts', import.meta.url), 'utf8')).toContain(
+      'export function sceneClock',
+    )
   })
 })
 
@@ -287,7 +369,8 @@ describe('R1 / R3 · what a machine can say about the two human lines', () => {
 const R5_EVENTS = ['agent_died', 'agent_born', 'structure_completed'] as const
 
 const R5_LOOK: ChronicleLookup = {
-  agentName: (id) => ({ a1: 'Amara', a2: 'Yusuf', a3: 'Mira' } as Record<string, string>)[id] ?? id,
+  agentName: (id) =>
+    (({ a1: 'Amara', a2: 'Yusuf', a3: 'Mira' }) as Record<string, string>)[id] ?? id,
   structureKind: () => 'storehouse',
   mysteryProse: () => null,
 }
@@ -303,11 +386,17 @@ describe('R5 · the three the town cannot say out loud', () => {
   const icons = R5_EVENTS.map((t) => chronicleIcon(t))
   const glyphs = icons.map((i) => JSON.stringify(chronicleGlyph(i).pixels))
   const lines = R5_EVENTS.map((t) => chronicleLine(ev(t, R5_PAYLOAD[t]!), R5_LOOK))
-  const marks = R5_EVENTS.map((t) =>
-    marksFrom({
-      chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
-      events: [{ tick: 100, type: t }],
-    })[0]!)
+  const marks = R5_EVENTS.map(
+    (t) =>
+      marksFrom({
+        chapters: [],
+        milestones: [],
+        moments: [],
+        changes: [],
+        discoveries: [],
+        events: [{ tick: 100, type: t }],
+      })[0]!,
+  )
 
   it('gives each of the three a glyph of its own, and a different SHAPE, not just a name', () => {
     expect(icons).toEqual(['cross', 'spark', 'house'])

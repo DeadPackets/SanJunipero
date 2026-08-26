@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { CHAR_TARGET_PX, HIT_AREA_H, HIT_AREA_W } from './charAnim.js'
 import {
-  BUILDING_UNIT_PX, HEAD_W, HIT_MIN_PX, HIT_TIGHTNESS_MAX, SHOULDER_W, STANCE_W, TORSO_TOP,
-  artPrismPolygon, bodyHitPolygon, extrudeDiamond, hitTightness, inflateToMin,
-  legacyFootprintPolygon, legacyHitRectPolygon, polygonArea, polygonBounds,
+  BUILDING_UNIT_PX,
+  HEAD_W,
+  HIT_MIN_PX,
+  HIT_TIGHTNESS_MAX,
+  SHOULDER_W,
+  STANCE_W,
+  TORSO_TOP,
+  artPrismPolygon,
+  bodyHitPolygon,
+  extrudeDiamond,
+  hitTightness,
+  inflateToMin,
+  legacyFootprintPolygon,
+  legacyHitRectPolygon,
+  polygonArea,
+  polygonBounds,
 } from './hitShapes.js'
 import { footprintDiamond } from './builtForm.js'
 import { CROWD_PITCH_PX } from './crowd.js'
@@ -15,8 +28,8 @@ import { ZOOM_MAX, ZOOM_MIN } from './scene.js'
 const FIGURE_H = 64
 const FIGURE_W = 32
 const SCALE = CHAR_TARGET_PX / FIGURE_H
-const DRAWN_H = FIGURE_H * SCALE      // 52 screen px
-const DRAWN_W = FIGURE_W * SCALE      // 26 screen px
+const DRAWN_H = FIGURE_H * SCALE // 52 screen px
+const DRAWN_W = FIGURE_W * SCALE // 26 screen px
 
 const pts = (poly: number[]): Array<[number, number]> =>
   Array.from({ length: poly.length / 2 }, (_, i) => [poly[i * 2]!, poly[i * 2 + 1]!])
@@ -27,8 +40,9 @@ function contains(poly: number[], px: number, py: number): boolean {
   const p = pts(poly)
   let inside = false
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-    const [xi, yi] = p[i]!, [xj, yj] = p[j]!
-    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
+    const [xi, yi] = p[i]!,
+      [xj, yj] = p[j]!
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
   }
   return inside
 }
@@ -44,7 +58,9 @@ describe('bodyHitPolygon — the shape of a person, not the box around them', ()
 
   it('is shoulder-wide at the torso and stance-wide at the feet', () => {
     const widthAt = (y: number): number => {
-      const xs = pts(world).filter(([, py]) => Math.abs(py - y) < 0.001).map(([x]) => x)
+      const xs = pts(world)
+        .filter(([, py]) => Math.abs(py - y) < 0.001)
+        .map(([x]) => x)
       return Math.max(...xs) - Math.min(...xs)
     }
     expect(widthAt(0)).toBe(STANCE_W)
@@ -86,7 +102,12 @@ describe('bodyHitPolygon — the shape of a person, not the box around them', ()
 describe('hitTightness — the number U9 is about', () => {
   it('THE DEFECT, measured: the landed 52 × 72 rectangle is 2.77× the silhouette', () => {
     expect([HIT_AREA_W, HIT_AREA_H]).toEqual([52, 72])
-    const landed = hitTightness(legacyHitRectPolygon(HIT_AREA_W, HIT_AREA_H, SCALE), FIGURE_W, FIGURE_H, SCALE)
+    const landed = hitTightness(
+      legacyHitRectPolygon(HIT_AREA_W, HIT_AREA_H, SCALE),
+      FIGURE_W,
+      FIGURE_H,
+      SCALE,
+    )
     expect(landed).toBeCloseTo(2.7692, 4)
     expect(landed).toBeGreaterThan(HIT_TIGHTNESS_MAX)
   })
@@ -99,9 +120,12 @@ describe('hitTightness — the number U9 is about', () => {
 
   it('does not change with the sprite scale, for the same drawn figure', () => {
     for (const s of [0.25, 0.5, 1, 2, 4]) {
-      const sheetH = DRAWN_H / s, sheetW = DRAWN_W / s
-      expect(hitTightness(bodyHitPolygon(sheetH, s), sheetW, sheetH, s), `scale ${s}`)
-        .toBeCloseTo(0.93479, 5)
+      const sheetH = DRAWN_H / s,
+        sheetW = DRAWN_W / s
+      expect(hitTightness(bodyHitPolygon(sheetH, s), sheetW, sheetH, s), `scale ${s}`).toBeCloseTo(
+        0.93479,
+        5,
+      )
     }
   })
 })
@@ -167,7 +191,8 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
     for (const art of [0.125, 0.25, 1]) {
       const raw = artPrismPolygon(1, 1, art)
       expect(inflateToMin(raw, HIT_MIN_PX, art * 0.25)).not.toEqual(raw)
-      for (const z of [0.5, 1, 2, 4]) expect(inflateToMin(raw, HIT_MIN_PX, art * z), `${z}×`).toEqual(raw)
+      for (const z of [0.5, 1, 2, 4])
+        expect(inflateToMin(raw, HIT_MIN_PX, art * z), `${z}×`).toEqual(raw)
     }
   })
 })
@@ -179,7 +204,14 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
 // its corners are void by construction and a test against it passes with the property broken.
 
 describe('★ a building is a volume, and the landed target was the ground under it', () => {
-  const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 4]]
+  const SHAPES: Array<[number, number]> = [
+    [1, 1],
+    [2, 2],
+    [1, 2],
+    [2, 1],
+    [3, 2],
+    [2, 4],
+  ]
 
   it('THE DEFECT: the flat footprint diamond and the drawn sprite barely touch', () => {
     // The art is fitted to a (w+h)·32 SQUARE whose lowest opaque row is the sprite's own anchor,
@@ -199,22 +231,32 @@ describe('★ a building is a volume, and the landed target was the ground under
       // the south vertex is the sprite's own feet point, which is the art's lowest row
       expect(b.cy + b.h / 2, `${w}x${h}`).toBe(0)
       // 0.75 of the box: an axis-aligned rect would claim the other quarter, all of it sky
-      expect(polygonArea(artPrismPolygon(w, h, 1)) / (side * side), `${w}x${h}`).toBeCloseTo(0.75, 9)
+      expect(polygonArea(artPrismPolygon(w, h, 1)) / (side * side), `${w}x${h}`).toBeCloseTo(
+        0.75,
+        9,
+      )
     }
   })
 
   it('contains the roof, the wall and the doorway — the places a viewer clicks', () => {
-    const p = artPrismPolygon(2, 2, 1)   // a 2×2 house: 128 × 128 drawn
-    expect(contains(p, 0, -120)).toBe(true)    // the ridge
-    expect(contains(p, -40, -70)).toBe(true)   // the left wall
-    expect(contains(p, 30, -70)).toBe(true)    // the right wall
-    expect(contains(p, 0, -20)).toBe(true)     // the doorway, bottom centre
-    expect(contains(p, 0, -1)).toBe(true)      // the ground contact
+    const p = artPrismPolygon(2, 2, 1) // a 2×2 house: 128 × 128 drawn
+    expect(contains(p, 0, -120)).toBe(true) // the ridge
+    expect(contains(p, -40, -70)).toBe(true) // the left wall
+    expect(contains(p, 30, -70)).toBe(true) // the right wall
+    expect(contains(p, 0, -20)).toBe(true) // the doorway, bottom centre
+    expect(contains(p, 0, -1)).toBe(true) // the ground contact
   })
 
   it('★ and it claims NOTHING outside the drawn cell — the corners stay empty sky', () => {
     const p = artPrismPolygon(2, 2, 1)
-    for (const [x, y] of [[-63, -2], [63, -2], [-70, -60], [70, -60], [0, 4], [0, -130]] as const) {
+    for (const [x, y] of [
+      [-63, -2],
+      [63, -2],
+      [-70, -60],
+      [70, -60],
+      [0, 4],
+      [0, -130],
+    ] as const) {
       expect(contains(p, x, y), `${x},${y}`).toBe(false)
     }
   })
@@ -229,11 +271,14 @@ describe('★ a building is a volume, and the landed target was the ground under
 
   it('extrudeDiamond gives the SIX-point silhouette of a solid, not a wireframe box', () => {
     // a 1×1 ground diamond raised 10 px: W, S, E, then back across the raised top
-    expect(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 10))
-      .toEqual([-16, 8, 0, 16, 16, 8, 16, -2, 0, -10, -16, -2])
+    expect(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 10)).toEqual([
+      -16, 8, 0, 16, 16, 8, 16, -2, 0, -10, -16, -2,
+    ])
     // a zero-height extrusion is the diamond's own outline, still six points
-    expect(polygonArea(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 0)))
-      .toBeCloseTo(polygonArea([0, 0, 16, 8, 0, 16, -16, 8]), 9)
+    expect(polygonArea(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 0))).toBeCloseTo(
+      polygonArea([0, 0, 16, 8, 0, 16, -16, 8]),
+      9,
+    )
   })
 
   it('the tightness is the number U9 ratified, measured against the DRAWN box', () => {
@@ -262,9 +307,9 @@ describe('★ the floor yields to the neighbour, because the neighbour is the ha
   it('★ THE RED: uncapped, five bodies at 14 px pitch become one 24 px target at 0.25', () => {
     const k = SCALE * 0.25
     const wide = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k), k)).w
-    const pitchOnScreen = CROWD_PITCH_PX * 0.25          // 3.5 screen px between shoulders
+    const pitchOnScreen = CROWD_PITCH_PX * 0.25 // 3.5 screen px between shoulders
     expect(wide).toBeGreaterThanOrEqual(HIT_MIN_PX)
-    expect(wide).toBeGreaterThan(pitchOnScreen * 4)      // one capsule swallows the whole rank
+    expect(wide).toBeGreaterThan(pitchOnScreen * 4) // one capsule swallows the whole rank
   })
 
   it('★ capped at the pitch, a ranked body keeps its OWN width at every stop', () => {
@@ -282,9 +327,11 @@ describe('★ the floor yields to the neighbour, because the neighbour is the ha
   })
 
   it('and the cap never SHRINKS a body that is already wider than the pitch', () => {
-    const k = SCALE * 4          // shoulders are 112 screen px at the closest stop
+    const k = SCALE * 4 // shoulders are 112 screen px at the closest stop
     const raw = polygonBounds(screen(local, k)).w
-    const capped = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k, CROWD_PITCH_PX * 4), k)).w
+    const capped = polygonBounds(
+      screen(inflateToMin(local, HIT_MIN_PX, k, CROWD_PITCH_PX * 4), k),
+    ).w
     expect(capped).toBe(raw)
     expect(raw).toBeCloseTo(SHOULDER_W * 4, 9)
   })

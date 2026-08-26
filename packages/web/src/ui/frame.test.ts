@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BAND_MIN_PX, LETTERBOX_FRACTION, STRIP_CARD_W, STRIP_GAP, frameLayout, straddlers, stripLayout,
+  BAND_MIN_PX,
+  LETTERBOX_FRACTION,
+  STRIP_CARD_W,
+  STRIP_GAP,
+  frameLayout,
+  straddlers,
+  stripLayout,
   type Frame,
 } from './frame.js'
 import { CONTROL_BAR_H } from './controlBar.js'
@@ -67,8 +73,10 @@ describe('straddlers — P19s mechanical guard on the band edges', () => {
   it('catches the moments rail as it was laid out before this task', () => {
     const railAsItWas = {
       id: 'moments-rail',
-      x: RAIL_INSET, y: RAIL_INSET,
-      w: 240, h: STAGE.h - 2 * RAIL_INSET,
+      x: RAIL_INSET,
+      y: RAIL_INSET,
+      w: 240,
+      h: STAGE.h - 2 * RAIL_INSET,
     }
     expect(straddlers([railAsItWas], l)).toEqual(['moments-rail'])
   })
@@ -81,7 +89,7 @@ describe('straddlers — P19s mechanical guard on the band edges', () => {
 
   it('names every straddler, in the order it was given them', () => {
     const boxes = [
-      { id: 'a', x: 0, y: l.picture.y - 4, w: 10, h: 40 },  // crosses the top edge
+      { id: 'a', x: 0, y: l.picture.y - 4, w: 10, h: 40 }, // crosses the top edge
       { id: 'ok', x: 0, y: l.picture.y + 4, w: 10, h: 10 },
       { id: 'b', x: 0, y: l.bandBottom.y - 4, w: 10, h: 40 }, // crosses the bottom edge
     ]

@@ -5,19 +5,52 @@ import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { ROAD_TILE_ID } from './tileset.js'
 import {
-  CALM_ROAD_KIND, MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, isRoadMass,
-  materialUv, resolveMaterial, roadArms, roadRibbonPolys, roadShoulderPolys, roadStripFrame,
-  LATTICE_PEAK_MAX, MATERIAL_ROTATIONS_DEG, OCTAVE_ALPHA, OCTAVE_SCALE, latticePeak,
-  materialMatrix, octaveComposite, octaveMatrix,
-  ROAD_GROUND_LUMA_DELTA_MIN, ROAD_SHOULDER, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT,
-  SHOULDER_T, luma, materialTone, roadReadsAt, roadShoulderBands,
+  CALM_ROAD_KIND,
+  MATERIAL_REPEAT_PX,
+  ROAD_UNDER,
+  groundArtSignature,
+  groundField,
+  isRoadMass,
+  materialUv,
+  resolveMaterial,
+  roadArms,
+  roadRibbonPolys,
+  roadShoulderPolys,
+  roadStripFrame,
+  LATTICE_PEAK_MAX,
+  MATERIAL_ROTATIONS_DEG,
+  OCTAVE_ALPHA,
+  OCTAVE_SCALE,
+  latticePeak,
+  materialMatrix,
+  octaveComposite,
+  octaveMatrix,
+  ROAD_GROUND_LUMA_DELTA_MIN,
+  ROAD_SHOULDER,
+  ROAD_SHOULDER_DARK,
+  ROAD_SHOULDER_LIGHT,
+  SHOULDER_T,
+  luma,
+  materialTone,
+  roadReadsAt,
+  roadShoulderBands,
 } from './groundField.js'
 
 const material = (kind: string, seq: number): AssetRecord => ({
-  id: `mat-${kind}`, seq, class: 'terrain', kind: materialKind(kind as 'grass'), status: 'ready',
-  desc: kind, meta: null, footprint: { w: 1, h: 1 },
-  widthPx: MATERIAL_REPEAT_PX, heightPx: MATERIAL_REPEAT_PX,
-  score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+  id: `mat-${kind}`,
+  seq,
+  class: 'terrain',
+  kind: materialKind(kind as 'grass'),
+  status: 'ready',
+  desc: kind,
+  meta: null,
+  footprint: { w: 1, h: 1 },
+  widthPx: MATERIAL_REPEAT_PX,
+  heightPx: MATERIAL_REPEAT_PX,
+  score: 10,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-17T00:00:00Z',
 })
 
 const field = (n: number, fill: TileId): TileId[][] =>
@@ -26,7 +59,8 @@ const field = (n: number, fill: TileId): TileId[][] =>
 describe('materialUv', () => {
   it('is a WORLD-space wrap, so the material flows across tile boundaries', () => {
     // two neighbouring tiles sample CONSECUTIVE material pixels, not the same pixel twice
-    const a = tileToScreen(4, 4), b = tileToScreen(5, 4)
+    const a = tileToScreen(4, 4),
+      b = tileToScreen(5, 4)
     expect(materialUv(a.sx, a.sy)).not.toEqual(materialUv(b.sx, b.sy))
     expect(materialUv(b.sx, b.sy).u - materialUv(a.sx, a.sy).u).toBe(TILE_W / 2)
   })
@@ -49,14 +83,14 @@ describe('groundField', () => {
     const f = groundField(field(16, 0), records)
     expect(f.layers).toHaveLength(1)
     expect(f.layers[0]!.kind).toBe('grass')
-    expect(f.layers[0]!.shapes).toHaveLength(256)     // shapes, not textures
+    expect(f.layers[0]!.shapes).toHaveLength(256) // shapes, not textures
     expect(f.layers[0]!.url).toBe('/assets/mat-grass.png')
   })
 
   it('carries no per-tile variant anywhere — the checkerboard had no other source', () => {
     const f = groundField(field(8, 0), records)
     const shapeKeys = Object.keys(f.layers[0]!.shapes[0]!)
-    expect(shapeKeys.sort()).toEqual(['roadKey', 'sx', 'sy'])   // no `variant`, no `tex`
+    expect(shapeKeys.sort()).toEqual(['roadKey', 'sx', 'sy']) // no `variant`, no `tex`
   })
 
   it('gives a road tile BOTH the ground under it and its own ribbon silhouette', () => {
@@ -65,9 +99,9 @@ describe('groundField', () => {
     const f = groundField(t, records)
     const grass = f.layers.find((l) => l.kind === ROAD_UNDER)!
     const road = f.layers.find((l) => l.kind === 'road')!
-    expect(grass.shapes).toHaveLength(25)              // the road tile's diamond too
+    expect(grass.shapes).toHaveLength(25) // the road tile's diamond too
     expect(road.shapes).toHaveLength(1)
-    expect(road.shapes[0]!.roadKey).toBe('cap-s')      // isolated road tile
+    expect(road.shapes[0]!.roadKey).toBe('cap-s') // isolated road tile
     expect(road.shapes[0]!.sx).toBe(tileToScreen(2, 2).sx)
   })
 
@@ -79,7 +113,7 @@ describe('groundField', () => {
   })
 
   it('falls back to a palette-true colour when a material is missing — art independence', () => {
-    const f = groundField(field(4, 2), [])             // water, empty codex
+    const f = groundField(field(4, 2), []) // water, empty codex
     expect(f.layers[0]!.url).toBeNull()
     expect(f.layers[0]!.fallback).toBe(0x7fb0c9)
   })
@@ -100,15 +134,20 @@ describe('resolveMaterial', () => {
   it('takes the newest ready material and never a flat tile record', () => {
     const flat: AssetRecord = { ...material('grass', 9), id: 'flat', kind: 'grass' }
     expect(resolveMaterial([flat], 'grass')).toBeNull()
-    expect(resolveMaterial([material('grass', 1), { ...material('grass', 5), id: 'newer' }], 'grass'))
-      .toBe('/assets/newer.png')
+    expect(
+      resolveMaterial([material('grass', 1), { ...material('grass', 5), id: 'newer' }], 'grass'),
+    ).toBe('/assets/newer.png')
   })
 })
 
 describe('roadStripFrame', () => {
   it('cuts each key out of the shipped 15-cell strip', () => {
-    expect(roadStripFrame('straight-ns', ROAD_AUTOTILE_KEYS))
-      .toEqual({ x: ROAD_AUTOTILE_KEYS.indexOf('straight-ns') * TILE_W, y: 0, w: TILE_W, h: TILE_H })
+    expect(roadStripFrame('straight-ns', ROAD_AUTOTILE_KEYS)).toEqual({
+      x: ROAD_AUTOTILE_KEYS.indexOf('straight-ns') * TILE_W,
+      y: 0,
+      w: TILE_W,
+      h: TILE_H,
+    })
   })
 })
 
@@ -163,10 +202,16 @@ describe('road silhouettes', () => {
       return Math.abs(a / 2)
     }
     const diamond = (TILE_W * TILE_H) / 2
-    const arms = roadRibbonPolys('straight-ns').slice(1).reduce((s2, p) => s2 + area(p), 0)
+    const arms = roadRibbonPolys('straight-ns')
+      .slice(1)
+      .reduce((s2, p) => s2 + area(p), 0)
     expect(arms).toBeCloseTo(diamond / 2, 5)
     // and a crossroads covers the whole tile
-    expect(roadRibbonPolys('cross').slice(1).reduce((s2, p) => s2 + area(p), 0)).toBeCloseTo(diamond, 5)
+    expect(
+      roadRibbonPolys('cross')
+        .slice(1)
+        .reduce((s2, p) => s2 + area(p), 0),
+    ).toBeCloseTo(diamond, 5)
   })
 
   it('is deterministic and carries no per-tile term', () => {
@@ -182,7 +227,8 @@ describe('road silhouettes', () => {
 function autocorr(series: number[], lag: number): number {
   const n = series.length - lag
   const mean = series.reduce((s2, v) => s2 + v, 0) / series.length
-  let num = 0, den = 0
+  let num = 0,
+    den = 0
   for (let i = 0; i < n; i++) num += (series[i]! - mean) * (series[i + lag]! - mean)
   for (const v of series) den += (v - mean) ** 2
   return den === 0 ? 1 : (num / den) * (series.length / n)
@@ -195,8 +241,11 @@ describe('the ground carries no tile-frequency pattern', () => {
   const continuous: number[] = []
   for (let u = 0; u < SPAN; u++) {
     const { u: mu } = materialUv(u, 0)
-    continuous.push(128 + 40 * Math.sin((2 * Math.PI * mu) / MATERIAL_REPEAT_PX)
-      + 12 * Math.sin((2 * Math.PI * mu) / 37))
+    continuous.push(
+      128 +
+        40 * Math.sin((2 * Math.PI * mu) / MATERIAL_REPEAT_PX) +
+        12 * Math.sin((2 * Math.PI * mu) / 37),
+    )
   }
 
   // THE DEFECT: one value per tile from a per-tile hash — exactly what the old ground did
@@ -225,14 +274,24 @@ describe('the ground carries no tile-frequency pattern', () => {
   })
 })
 
-
 // The ground bake tessellates every tile outline on the map, so a bake per asset message blocks
 // the main thread for as long as the ingest runs. Only terrain records may trigger one.
 describe('groundArtSignature', () => {
   const rec = (klass: string, kind: string, seq: number): AssetRecord => ({
-    id: `r${seq}`, seq, class: klass as 'terrain', kind, status: 'ready', desc: kind, meta: null,
-    footprint: { w: 1, h: 1 }, widthPx: 8, heightPx: 8,
-    score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+    id: `r${seq}`,
+    seq,
+    class: klass as 'terrain',
+    kind,
+    status: 'ready',
+    desc: kind,
+    meta: null,
+    footprint: { w: 1, h: 1 },
+    widthPx: 8,
+    heightPx: 8,
+    score: 10,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '2026-08-17T00:00:00Z',
   })
 
   it('moves when terrain art arrives', () => {
@@ -257,11 +316,12 @@ describe('groundArtSignature', () => {
   })
 
   it('is cheap and pure — it runs on every store notify', () => {
-    const many = Array.from({ length: 500 }, (_, i) => rec(i % 3 === 0 ? 'terrain' : 'item', `k${i}`, i + 1))
+    const many = Array.from({ length: 500 }, (_, i) =>
+      rec(i % 3 === 0 ? 'terrain' : 'item', `k${i}`, i + 1),
+    )
     expect(groundArtSignature(many)).toBe(groundArtSignature(many))
   })
 })
-
 
 // ── CONNECTIVITY ACCEPTANCE ─────────────────────────────────────────────────────────────
 // Adjacent quadrants share an edge mathematically, so a gap between them is a rasterisation
@@ -270,7 +330,9 @@ describe('groundArtSignature', () => {
 /** rasterise a road run into a boolean grid the way the baker fills it */
 function rasterRun(terrain: TileId[][]): { grid: boolean[][]; w: number; h: number; off: number } {
   const n = terrain.length
-  const w = 2 * n * (TILE_W / 2), h = 2 * n * (TILE_H / 2) + TILE_H, off = n * (TILE_W / 2)
+  const w = 2 * n * (TILE_W / 2),
+    h = 2 * n * (TILE_H / 2) + TILE_H,
+    off = n * (TILE_W / 2)
   const grid: boolean[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => false))
   const field = groundField(terrain, [])
   for (const l of field.layers) {
@@ -279,15 +341,31 @@ function rasterRun(terrain: TileId[][]): { grid: boolean[][]; w: number; h: numb
       if (shape.roadKey === null) continue
       for (const poly of roadRibbonPolys(shape.roadKey)) {
         const pts: number[] = []
-        for (let i = 0; i < poly.length; i += 2) pts.push(shape.sx + off + poly[i]!, shape.sy + poly[i + 1]!)
-        const xs = pts.filter((_, i) => i % 2 === 0), ys = pts.filter((_, i) => i % 2 === 1)
-        for (let y = Math.max(0, Math.floor(Math.min(...ys))); y <= Math.min(h - 1, Math.ceil(Math.max(...ys))); y++) {
-          for (let x = Math.max(0, Math.floor(Math.min(...xs))); x <= Math.min(w - 1, Math.ceil(Math.max(...xs))); x++) {
+        for (let i = 0; i < poly.length; i += 2)
+          pts.push(shape.sx + off + poly[i]!, shape.sy + poly[i + 1]!)
+        const xs = pts.filter((_, i) => i % 2 === 0),
+          ys = pts.filter((_, i) => i % 2 === 1)
+        for (
+          let y = Math.max(0, Math.floor(Math.min(...ys)));
+          y <= Math.min(h - 1, Math.ceil(Math.max(...ys)));
+          y++
+        ) {
+          for (
+            let x = Math.max(0, Math.floor(Math.min(...xs)));
+            x <= Math.min(w - 1, Math.ceil(Math.max(...xs)));
+            x++
+          ) {
             let inside = false
             for (let i = 0, j = pts.length / 2 - 1; i < pts.length / 2; j = i++) {
-              const xi = pts[i * 2]!, yi = pts[i * 2 + 1]!, xj = pts[j * 2]!, yj = pts[j * 2 + 1]!
-              if ((yi > y + 0.5) !== (yj > y + 0.5)
-                && x + 0.5 < ((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi) inside = !inside
+              const xi = pts[i * 2]!,
+                yi = pts[i * 2 + 1]!,
+                xj = pts[j * 2]!,
+                yj = pts[j * 2 + 1]!
+              if (
+                yi > y + 0.5 !== yj > y + 0.5 &&
+                x + 0.5 < ((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi
+              )
+                inside = !inside
             }
             if (inside) grid[y]![x] = true
           }
@@ -299,7 +377,11 @@ function rasterRun(terrain: TileId[][]): { grid: boolean[][]; w: number; h: numb
 }
 
 /** 4-way flood fill from the first filled pixel of `from`, does it reach `to`? */
-function reaches(r: ReturnType<typeof rasterRun>, from: [number, number], to: [number, number]): boolean {
+function reaches(
+  r: ReturnType<typeof rasterRun>,
+  from: [number, number],
+  to: [number, number],
+): boolean {
   const seen = Array.from({ length: r.h }, () => Array.from({ length: r.w }, () => false))
   const start = [Math.round(from[0]), Math.round(from[1])] as [number, number]
   if (!r.grid[start[1]]?.[start[0]]) return false
@@ -308,8 +390,14 @@ function reaches(r: ReturnType<typeof rasterRun>, from: [number, number], to: [n
   while (q.length > 0) {
     const [x, y] = q.pop()!
     if (Math.abs(x - to[0]) <= 1 && Math.abs(y - to[1]) <= 1) return true
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const nx = x + dx, ny = y + dy
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = x + dx,
+        ny = y + dy
       if (nx < 0 || ny < 0 || nx >= r.w || ny >= r.h) continue
       if (seen[ny]![nx] || !r.grid[ny]![nx]) continue
       seen[ny]![nx] = true
@@ -320,12 +408,16 @@ function reaches(r: ReturnType<typeof rasterRun>, from: [number, number], to: [n
 }
 
 const road = (n: number, cells: Array<[number, number]>): TileId[][] => {
-  const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0 as TileId))
+  const t: TileId[][] = Array.from({ length: n }, () =>
+    Array.from({ length: n }, () => 0 as TileId),
+  )
   for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
   return t
 }
-const centreOf = (r: { off: number }, x: number, y: number): [number, number] =>
-  [tileToScreen(x, y).sx + r.off, tileToScreen(x, y).sy + TILE_H / 2]
+const centreOf = (r: { off: number }, x: number, y: number): [number, number] => [
+  tileToScreen(x, y).sx + r.off,
+  tileToScreen(x, y).sy + TILE_H / 2,
+]
 
 describe('the rim only faces grass', () => {
   it('a straight run gets a rim on its two long sides and NOTHING at the joins', () => {
@@ -363,36 +455,62 @@ describe('the rim only faces grass', () => {
 
 describe('a road run is CONNECTED', () => {
   it('a straight 5-tile run: one end reaches the other', () => {
-    const t = road(9, [[4, 2], [4, 3], [4, 4], [4, 5], [4, 6]])
+    const t = road(9, [
+      [4, 2],
+      [4, 3],
+      [4, 4],
+      [4, 5],
+      [4, 6],
+    ])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 4, 2), centreOf(r, 4, 6))).toBe(true)
   })
 
   it('a straight 5-tile run the other way, too', () => {
-    const t = road(9, [[2, 4], [3, 4], [4, 4], [5, 4], [6, 4]])
+    const t = road(9, [
+      [2, 4],
+      [3, 4],
+      [4, 4],
+      [5, 4],
+      [6, 4],
+    ])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 2, 4), centreOf(r, 6, 4))).toBe(true)
   })
 
   it('an L-bend stays connected across the corner', () => {
-    const t = road(9, [[2, 4], [3, 4], [4, 4], [4, 5], [4, 6]])
+    const t = road(9, [
+      [2, 4],
+      [3, 4],
+      [4, 4],
+      [4, 5],
+      [4, 6],
+    ])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 2, 4), centreOf(r, 4, 6))).toBe(true)
   })
 
   it('and two runs that never touch are still SEPARATE — the test discriminates', () => {
-    const t = road(12, [[2, 2], [3, 2], [4, 2], [8, 8], [9, 8], [10, 8]])
+    const t = road(12, [
+      [2, 2],
+      [3, 2],
+      [4, 2],
+      [8, 8],
+      [9, 8],
+      [10, 8],
+    ])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 2, 2), centreOf(r, 10, 8))).toBe(false)
   })
 })
 
-
 // The plaza cobble reads as a noisy stone-string on a 16px ribbon, so thin runs draw from a
 // calmer material. "Belongs to a fully-road 2x2 block" is the simplest rule that separates them.
 describe('mass vs ribbon', () => {
   const grid = (n: number, cells: Array<[number, number]>): TileId[][] => {
-    const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0 as TileId))
+    const t: TileId[][] = Array.from({ length: n }, () =>
+      Array.from({ length: n }, () => 0 as TileId),
+    )
     for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
     return t
   }
@@ -404,20 +522,43 @@ describe('mass vs ribbon', () => {
 
   it('EVERY tile of a plaza is mass — edges and corners too', () => {
     const t = grid(12, block(3, 3, 5, 5))
-    for (let y = 3; y < 8; y++) for (let x = 3; x < 8; x++) {
-      expect(isRoadMass(t, x, y), `${x},${y}`).toBe(true)
-    }
+    for (let y = 3; y < 8; y++)
+      for (let x = 3; x < 8; x++) {
+        expect(isRoadMass(t, x, y), `${x},${y}`).toBe(true)
+      }
   })
 
   it('NO tile of a one-wide run is mass, in either direction', () => {
-    const ns = grid(12, [[5, 2], [5, 3], [5, 4], [5, 5], [5, 6]])
+    const ns = grid(12, [
+      [5, 2],
+      [5, 3],
+      [5, 4],
+      [5, 5],
+      [5, 6],
+    ])
     for (let y = 2; y <= 6; y++) expect(isRoadMass(ns, 5, y), `ns ${y}`).toBe(false)
-    const ew = grid(12, [[2, 5], [3, 5], [4, 5], [5, 5], [6, 5]])
+    const ew = grid(12, [
+      [2, 5],
+      [3, 5],
+      [4, 5],
+      [5, 5],
+      [6, 5],
+    ])
     for (let x = 2; x <= 6; x++) expect(isRoadMass(ew, x, 5), `ew ${x}`).toBe(false)
   })
 
   it('a crossroads of two thin runs is STILL a ribbon — each 2x2 holds a diagonal of grass', () => {
-    const t = grid(12, [[5, 3], [5, 4], [5, 5], [5, 6], [5, 7], [3, 5], [4, 5], [6, 5], [7, 5]])
+    const t = grid(12, [
+      [5, 3],
+      [5, 4],
+      [5, 5],
+      [5, 6],
+      [5, 7],
+      [3, 5],
+      [4, 5],
+      [6, 5],
+      [7, 5],
+    ])
     expect(roadArms('cross')).toEqual({ n: true, e: true, s: true, w: true })
     expect(isRoadMass(t, 5, 5)).toBe(false)
   })
@@ -430,34 +571,78 @@ describe('mass vs ribbon', () => {
   it('splits the field into a calm ribbon layer and a cobbled mass layer', () => {
     const t = grid(14, [...block(4, 4, 4, 4), [9, 5], [10, 5], [11, 5]])
     const records = [
-      { id: 'cob', seq: 1, class: 'terrain', kind: 'material:road', status: 'ready', desc: 'r',
-        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
-        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
-      { id: 'calm', seq: 2, class: 'terrain', kind: 'material:road-calm', status: 'ready', desc: 'c',
-        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
-        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
+      {
+        id: 'cob',
+        seq: 1,
+        class: 'terrain',
+        kind: 'material:road',
+        status: 'ready',
+        desc: 'r',
+        meta: null,
+        footprint: { w: 1, h: 1 },
+        widthPx: 256,
+        heightPx: 256,
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+        createdAt: 'x',
+      },
+      {
+        id: 'calm',
+        seq: 2,
+        class: 'terrain',
+        kind: 'material:road-calm',
+        status: 'ready',
+        desc: 'c',
+        meta: null,
+        footprint: { w: 1, h: 1 },
+        widthPx: 256,
+        heightPx: 256,
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+        createdAt: 'x',
+      },
     ] as unknown as AssetRecord[]
     const f = groundField(t, records)
     const calm = f.layers.find((l) => l.id === CALM_ROAD_KIND)!
     const cobble = f.layers.find((l) => l.id === 'road')!
     expect(calm.url).toBe('/assets/calm.png')
     expect(cobble.url).toBe('/assets/cob.png')
-    expect(cobble.shapes).toHaveLength(16)          // the 4x4 mass
-    expect(calm.shapes).toHaveLength(3)             // the thin spur
+    expect(cobble.shapes).toHaveLength(16) // the 4x4 mass
+    expect(calm.shapes).toHaveLength(3) // the thin spur
     // both are road, so both keep the rim rule and both draw over the ground
     expect(calm.kind).toBe('road')
     expect(f.layers.at(-1)!.kind).toBe('road')
   })
 
   it('falls back to the cobble material when no calm one has been generated', () => {
-    const t = grid(10, [[4, 4], [5, 4], [6, 4]])
+    const t = grid(10, [
+      [4, 4],
+      [5, 4],
+      [6, 4],
+    ])
     const records = [
-      { id: 'cob', seq: 1, class: 'terrain', kind: 'material:road', status: 'ready', desc: 'r',
-        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
-        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
+      {
+        id: 'cob',
+        seq: 1,
+        class: 'terrain',
+        kind: 'material:road',
+        status: 'ready',
+        desc: 'r',
+        meta: null,
+        footprint: { w: 1, h: 1 },
+        widthPx: 256,
+        heightPx: 256,
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+        createdAt: 'x',
+      },
     ] as unknown as AssetRecord[]
-    expect(groundField(t, records).layers.find((l) => l.id === CALM_ROAD_KIND)!.url)
-      .toBe('/assets/cob.png')
+    expect(groundField(t, records).layers.find((l) => l.id === CALM_ROAD_KIND)!.url).toBe(
+      '/assets/cob.png',
+    )
   })
 })
 
@@ -478,8 +663,11 @@ describe('luma', () => {
 describe('materialTone', () => {
   it('averages a buffer and caches per url', () => {
     const flat = (v: number): { data: Uint8ClampedArray; width: number; height: number } => ({
-      data: Uint8ClampedArray.from(Array.from({ length: 4 * 4 * 4 }, (_, i) => i % 4 === 3 ? 255 : v)),
-      width: 4, height: 4,
+      data: Uint8ClampedArray.from(
+        Array.from({ length: 4 * 4 * 4 }, (_, i) => (i % 4 === 3 ? 255 : v)),
+      ),
+      width: 4,
+      height: 4,
     })
     expect(materialTone('t://white', flat(255))).toBeCloseTo(1, 9)
     // the cache answers for the url, not for whatever buffer arrives second
@@ -496,8 +684,9 @@ describe('roadReadsAt — the complaint, measured', () => {
 
   it('FAILS for the one flat shoulder that shipped — it was the fainter of the two', () => {
     expect(roadReadsAt(luma(ROAD_SHOULDER), GRASS_TONE)).toBe(false)
-    expect(Math.abs(luma(ROAD_SHOULDER) - GRASS_TONE))
-      .toBeLessThan(Math.abs(ROAD_TONE - GRASS_TONE))
+    expect(Math.abs(luma(ROAD_SHOULDER) - GRASS_TONE)).toBeLessThan(
+      Math.abs(ROAD_TONE - GRASS_TONE),
+    )
   })
 
   it('PASSES for both new shoulder tones, so the ribbon carries an edge', () => {
@@ -518,7 +707,7 @@ describe('the two-tone rim', () => {
       expect(b.dark, key).toHaveLength(roadShoulderPolys(key).length)
       expect(b.light, key).toHaveLength(roadShoulderPolys(key).length)
     }
-    expect(roadShoulderBands('cross').dark).toHaveLength(0)   // every side is road
+    expect(roadShoulderBands('cross').dark).toHaveLength(0) // every side is road
     expect(roadShoulderBands('straight-ns').dark).toHaveLength(4)
     expect(roadShoulderBands('t-no-n').dark).toHaveLength(2)
   })
@@ -544,14 +733,16 @@ describe('the two-tone rim', () => {
     const interior = keys.filter((k) => k === 'straight-ew')
     expect(interior).toHaveLength(18)
     for (const k of interior) {
-      expect(roadShoulderBands(k!).dark).toHaveLength(4)   // two per arm, both long sides
+      expect(roadShoulderBands(k!).dark).toHaveLength(4) // two per arm, both long sides
       expect(roadShoulderBands(k!).light).toHaveLength(4)
     }
   })
 
   it('splits the rim across its depth, never past SHOULDER_T', () => {
     const depth = (polys: number[][]): number[] =>
-      polys.map((p) => Math.max(...Array.from({ length: p.length / 2 }, (_, i) => Math.abs(p[i * 2]!))))
+      polys.map((p) =>
+        Math.max(...Array.from({ length: p.length / 2 }, (_, i) => Math.abs(p[i * 2]!))),
+      )
     const b = roadShoulderBands('cap-n')
     const full = depth(roadShoulderPolys('cap-n'))
     for (const d of [...depth(b.dark), ...depth(b.light)])
@@ -571,13 +762,19 @@ const materialAt = (u: number, v: number): number => {
 }
 
 const bufferOf = (
-  w: number, h: number, sample: (x: number, y: number) => number,
+  w: number,
+  h: number,
+  sample: (x: number, y: number) => number,
 ): Uint8ClampedArray => {
   const d = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const v = sample(x, y), i = (y * w + x) * 4
-      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255
+      const v = sample(x, y),
+        i = (y * w + x) * 4
+      d[i] = v
+      d[i + 1] = v
+      d[i + 2] = v
+      d[i + 3] = 255
     }
   }
   return d
@@ -587,12 +784,14 @@ const bufferOf = (
 const sampleThrough = (m: Matrix, x: number, y: number): number => {
   const inv = m.clone().invert()
   const p = inv.apply({ x, y })
-  const wrap = (n: number): number => ((n % MATERIAL_REPEAT_PX) + MATERIAL_REPEAT_PX) % MATERIAL_REPEAT_PX
+  const wrap = (n: number): number =>
+    ((n % MATERIAL_REPEAT_PX) + MATERIAL_REPEAT_PX) % MATERIAL_REPEAT_PX
   return materialAt(wrap(p.x), wrap(p.y))
 }
 
 describe('latticePeak, calibrated before it is trusted', () => {
-  const W = 768, H = 96
+  const W = 768,
+    H = 96
 
   it('reads ~1.0 on a perfect 256px tiling', () => {
     const buf = bufferOf(W, H, (x, y) => materialAt(x % MATERIAL_REPEAT_PX, y % MATERIAL_REPEAT_PX))
@@ -602,7 +801,10 @@ describe('latticePeak, calibrated before it is trusted', () => {
   it('reads under 0.1 on white noise', () => {
     // the HIGH bits: an LCG's low bits have a short period, which this very detector caught
     let s = 1
-    const buf = bufferOf(W, H, () => { s = Math.imul(s, 1103515245) + 12345 >>> 0; return s >>> 24 })
+    const buf = bufferOf(W, H, () => {
+      s = (Math.imul(s, 1103515245) + 12345) >>> 0
+      return s >>> 24
+    })
     expect(latticePeak(buf, W, H, MATERIAL_REPEAT_PX)).toBeLessThan(0.1)
   })
 
@@ -614,22 +816,23 @@ describe('latticePeak, calibrated before it is trusted', () => {
 })
 
 describe('the ground stops repeating', () => {
-  const W = 768, H = 96
+  const W = 768,
+    H = 96
 
   it('THE COMPLAINT: an identity fill matrix lays a visible 256px lattice', () => {
     const buf = bufferOf(W, H, (x, y) => sampleThrough(new Matrix(), x, y))
     const peak = latticePeak(buf, W, H, MATERIAL_REPEAT_PX)
     expect(peak).toBeGreaterThan(LATTICE_PEAK_MAX)
-    expect(peak).toBeGreaterThan(0.95)     // it is an EXACT repeat, not merely a strong one
+    expect(peak).toBeGreaterThan(0.95) // it is an EXACT repeat, not merely a strong one
   })
 
   it('drops under the ceiling once the layer is rotated and an octave is laid over it', () => {
     const base = materialMatrix('grass', 0 as number)
     const oct = octaveMatrix('grass', 0 as number)
-    const rotated = materialMatrix('grass', 1)   // index 0 is the 0-degree member
-    const buf = bufferOf(W, H, (x, y) => octaveComposite(
-      sampleThrough(rotated, x, y), sampleThrough(octaveMatrix('grass', 1), x, y),
-    ))
+    const rotated = materialMatrix('grass', 1) // index 0 is the 0-degree member
+    const buf = bufferOf(W, H, (x, y) =>
+      octaveComposite(sampleThrough(rotated, x, y), sampleThrough(octaveMatrix('grass', 1), x, y)),
+    )
     expect(latticePeak(buf, W, H, MATERIAL_REPEAT_PX)).toBeLessThan(LATTICE_PEAK_MAX)
     expect(base).toBeInstanceOf(Matrix)
     expect(oct).toBeInstanceOf(Matrix)
@@ -638,23 +841,25 @@ describe('the ground stops repeating', () => {
 
 describe('materialMatrix', () => {
   it('is deterministic per layer, and two layers do not agree', () => {
-    expect(materialMatrix('grass', 0).toArray(false))
-      .toEqual(materialMatrix('grass', 0).toArray(false))
-    expect(materialMatrix('grass', 0).toArray(false))
-      .not.toEqual(materialMatrix('earth', 1).toArray(false))
+    expect(materialMatrix('grass', 0).toArray(false)).toEqual(
+      materialMatrix('grass', 0).toArray(false),
+    )
+    expect(materialMatrix('grass', 0).toArray(false)).not.toEqual(
+      materialMatrix('earth', 1).toArray(false),
+    )
   })
 
   it('draws its rotation from the bounded set, by index', () => {
     for (let i = 0; i < MATERIAL_ROTATIONS_DEG.length * 2; i++) {
       const deg = MATERIAL_ROTATIONS_DEG[i % MATERIAL_ROTATIONS_DEG.length]!
       const m = materialMatrix('grass', i)
-      expect(Math.atan2(m.b, m.a) * 180 / Math.PI).toBeCloseTo(deg, 9)
+      expect((Math.atan2(m.b, m.a) * 180) / Math.PI).toBeCloseTo(deg, 9)
     }
   })
 
   it('offsets a layer without scaling it — only WHERE the material is sampled moves', () => {
     const m = materialMatrix('grass', 1)
-    expect(Math.hypot(m.a, m.b)).toBeCloseTo(1, 9)   // a pure rotation, no zoom
+    expect(Math.hypot(m.a, m.b)).toBeCloseTo(1, 9) // a pure rotation, no zoom
   })
 })
 
@@ -667,10 +872,13 @@ describe('the octave pass', () => {
   })
 
   it('never pushes a pixel outside the material own tone range', () => {
-    let lo = Infinity, hi = -Infinity
+    let lo = Infinity,
+      hi = -Infinity
     for (let u = 0; u < MATERIAL_REPEAT_PX; u += 7)
       for (let v = 0; v < MATERIAL_REPEAT_PX; v += 7) {
-        const t = materialAt(u, v); lo = Math.min(lo, t); hi = Math.max(hi, t)
+        const t = materialAt(u, v)
+        lo = Math.min(lo, t)
+        hi = Math.max(hi, t)
       }
     const span = hi - lo
     for (let u = 0; u < MATERIAL_REPEAT_PX; u += 13)

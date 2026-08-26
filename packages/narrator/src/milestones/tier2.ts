@@ -37,7 +37,12 @@ function conversation(events: SimEvent[], config: SimConfig): Found | null {
       const dx = Number(p(a).x) - Number(p(b).x)
       const dy = Number(p(a).y) - Number(p(b).y)
       if (Math.hypot(dx, dy) > config.movement.earshotRadius) continue
-      return { kind: 'first_conversation', label: 'the first time two voices answered each other', ev: b, agentIds: [aId, bId].sort() }
+      return {
+        kind: 'first_conversation',
+        label: 'the first time two voices answered each other',
+        ev: b,
+        agentIds: [aId, bId].sort(),
+      }
     }
   }
   return null
@@ -54,16 +59,30 @@ function quarrelAndPeace(events: SimEvent[]): Found[] {
       if (hurt === null || by === null) continue
       if (quarrel === null) {
         quarrel = { pair: pairKeyOf(hurt, by), tick: ev.tick, ids: [hurt, by].sort() }
-        out.push({ kind: 'first_quarrel', label: 'the first blow struck in anger', ev, agentIds: quarrel.ids })
+        out.push({
+          kind: 'first_quarrel',
+          label: 'the first blow struck in anger',
+          ev,
+          agentIds: quarrel.ids,
+        })
       }
       continue
     }
     if (ev.type === 'agent_spoke' && quarrel !== null && ev.tick > quarrel.tick) {
       const who = str(p(ev).agentId)
-      if (who !== null && quarrel.ids.includes(who) && !out.some((f) => f.kind === 'first_reconciliation')) {
+      if (
+        who !== null &&
+        quarrel.ids.includes(who) &&
+        !out.some((f) => f.kind === 'first_reconciliation')
+      ) {
         const spokeFirst = out.find((f) => f.kind === 'first_quarrel')
         if (spokeFirst !== undefined && ev.tick - quarrel.tick > CONVERSATION_TICKS) {
-          out.push({ kind: 'first_reconciliation', label: 'the first peace made after a quarrel', ev, agentIds: quarrel.ids })
+          out.push({
+            kind: 'first_reconciliation',
+            label: 'the first peace made after a quarrel',
+            ev,
+            agentIds: quarrel.ids,
+          })
         }
       }
     }
@@ -83,7 +102,12 @@ function partnership(events: SimEvent[], config: SimConfig): Found | null {
     const n = (nights.get(key) ?? 0) + 1
     nights.set(key, n)
     if (n === config.reproduction.coSleepNightsToPartner) {
-      return { kind: 'first_partnership', label: 'the first two who chose each other', ev, agentIds: [a, b].sort() }
+      return {
+        kind: 'first_partnership',
+        label: 'the first two who chose each other',
+        ev,
+        agentIds: [a, b].sort(),
+      }
     }
   }
   return null
@@ -106,7 +130,12 @@ function affair(events: SimEvent[], ctx: Tier2Ctx): Found | null {
         const row = partnershipOf(state, who, third)
         if (row?.formedTick === null || row === undefined) continue
         if (row.dissolvedTick !== null) continue
-        return { kind: 'first_affair', label: 'the first night kept away from a partner', ev, agentIds: [a, b].sort() }
+        return {
+          kind: 'first_affair',
+          label: 'the first night kept away from a partner',
+          ev,
+          agentIds: [a, b].sort(),
+        }
       }
     }
   }
@@ -130,7 +159,8 @@ function breakup(events: SimEvent[], ctx: Tier2Ctx): Found | null {
       const since = row.dissolvedTick - windowTicks
       const spoke = events.some((ev) => {
         if (ev.tick < since || ev.tick > row.dissolvedTick!) return false
-        if (ev.type === 'co_slept') return pairKeyOf(String(p(ev).aId), String(p(ev).bId)) === pairKeyOf(a, b)
+        if (ev.type === 'co_slept')
+          return pairKeyOf(String(p(ev).aId), String(p(ev).bId)) === pairKeyOf(a, b)
         if (ev.type !== 'agent_spoke') return false
         const who = str(p(ev).agentId)
         if (who !== a && who !== b) return false
@@ -141,14 +171,23 @@ function breakup(events: SimEvent[], ctx: Tier2Ctx): Found | null {
       if (spoke) continue
       const last = events.filter((ev) => ev.tick <= row.dissolvedTick!).at(-1) ?? events.at(-1)
       if (last === undefined) continue
-      return { kind: 'first_breakup', label: 'the first parting', ev: last, agentIds: [a, b].sort() }
+      return {
+        kind: 'first_breakup',
+        label: 'the first parting',
+        ev: last,
+        agentIds: [a, b].sort(),
+      }
     }
   }
   return null
 }
 
 // A child with nobody left to raise it.
-function orphan(events: SimEvent[], parents: Map<string, string[]>, dead: Set<string>): Found | null {
+function orphan(
+  events: SimEvent[],
+  parents: Map<string, string[]>,
+  dead: Set<string>,
+): Found | null {
   for (const ev of events) {
     if (ev.type !== 'agent_died') continue
     const who = str(p(ev).agentId)
@@ -157,7 +196,12 @@ function orphan(events: SimEvent[], parents: Map<string, string[]>, dead: Set<st
     for (const [child, folk] of [...parents.entries()].sort()) {
       if (dead.has(child) || !folk.includes(who)) continue
       if (folk.every((f) => dead.has(f))) {
-        return { kind: 'first_orphan', label: 'the first child left with nobody', ev, agentIds: [child] }
+        return {
+          kind: 'first_orphan',
+          label: 'the first child left with nobody',
+          ev,
+          agentIds: [child],
+        }
       }
     }
   }
@@ -173,7 +217,12 @@ function grandparent(events: SimEvent[], parents: Map<string, string[]>): Found 
     for (const folk of parents.get(child) ?? []) {
       const grandfolk = parents.get(folk)
       if (grandfolk !== undefined && grandfolk.length > 0) {
-        return { kind: 'first_grandparent', label: 'the first to see a grandchild', ev, agentIds: grandfolk.slice().sort() }
+        return {
+          kind: 'first_grandparent',
+          label: 'the first to see a grandchild',
+          ev,
+          agentIds: grandfolk.slice().sort(),
+        }
       }
     }
   }
@@ -204,7 +253,12 @@ function apprentice(events: SimEvent[]): Found | null {
     const n = (gains.get(key) ?? 0) + 1
     gains.set(key, n)
     if (n >= MASTERY_GAINS) {
-      return { kind: 'first_apprentice', label: 'the first to master what they were taught', ev, agentIds: [who] }
+      return {
+        kind: 'first_apprentice',
+        label: 'the first to master what they were taught',
+        ev,
+        agentIds: [who],
+      }
     }
   }
   return null
@@ -220,7 +274,10 @@ function parentIndex(events: SimEvent[]): Map<string, string[]> {
     const mother = str(p(ev).motherId)
     const father = str(p(ev).fatherId)
     if (child === null) continue
-    parents.set(child, [mother, father].filter((x): x is string => x !== null))
+    parents.set(
+      child,
+      [mother, father].filter((x): x is string => x !== null),
+    )
   }
   return parents
 }
@@ -241,8 +298,13 @@ export function detectTier2(events: SimEvent[], ctx: Tier2Ctx): Milestone[] {
   for (const f of found) {
     if (f === null || ctx.seenKinds.has(f.kind) || out.some((m) => m.kind === f.kind)) continue
     out.push({
-      kind: f.kind, tier: 2, domain: 'social', label: f.label,
-      eventSeq: f.ev.seq, day: Math.floor(f.ev.tick / MINUTES_PER_DAY), tick: f.ev.tick,
+      kind: f.kind,
+      tier: 2,
+      domain: 'social',
+      label: f.label,
+      eventSeq: f.ev.seq,
+      day: Math.floor(f.ev.tick / MINUTES_PER_DAY),
+      tick: f.ev.tick,
       agentIds: f.agentIds,
     })
   }

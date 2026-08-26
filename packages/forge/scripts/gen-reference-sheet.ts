@@ -18,8 +18,16 @@ const subjects: [string, AssetClass][] = [
   ['a friendly adult villager in sage-green clothes', 'rig-part'],
 ]
 for (const [desc, klass] of subjects) {
-  const cands = await client.generateCandidates(buildAssetPrompt(desc, { w: 1, h: 1 }, klass), [], 3)
+  const cands = await client.generateCandidates(
+    buildAssetPrompt(desc, { w: 1, h: 1 }, klass),
+    [],
+    3,
+  )
   cands.forEach((c, i) => writeFileSync(`${OUT}/${klass}-${i}.png`, c.png))
-  console.log(`${klass}: ${cands.length} candidates, $${cands.reduce((s, c) => s + c.costUsd, 0).toFixed(3)}`)
+  console.log(
+    `${klass}: ${cands.length} candidates, $${cands.reduce((s, c) => s + c.costUsd, 0).toFixed(3)}`,
+  )
 }
-console.log('Curate: pick 3 (one per subject), copy to packages/forge/content/reference/ref-{1,2,3}.png')
+console.log(
+  'Curate: pick 3 (one per subject), copy to packages/forge/content/reference/ref-{1,2,3}.png',
+)

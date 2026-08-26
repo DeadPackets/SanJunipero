@@ -1,12 +1,23 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  KEY_BORDER, KEY_CHIP_H, KEY_GAP, KEY_MARGIN, KEY_MAX_W, KEY_PAD_Y, KEY_SUMMARY_W,
-  coverage, keyBox, nodesUnder,
+  KEY_BORDER,
+  KEY_CHIP_H,
+  KEY_GAP,
+  KEY_MARGIN,
+  KEY_MAX_W,
+  KEY_PAD_Y,
+  KEY_SUMMARY_W,
+  coverage,
+  keyBox,
+  nodesUnder,
 } from './legendKey.js'
 import { relationLegend } from './relationGraph.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 const LENS_SRC = readFileSync(new URL('./SocietyLens.tsx', import.meta.url), 'utf8')
 
 // A 1525 x 880 lens is the stage the batch-4 review looked at.

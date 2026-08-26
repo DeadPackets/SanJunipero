@@ -11,5 +11,9 @@ export const notFound = (res: ServerResponse): void => sendJson(res, { error: 'n
 /** One `events` row as the read paths take it. Deliberately NOT `EventEnvelope.parse`d:
  *  `worldMirror.ts` already validates what enters the world. */
 export type EventRow = { seq: number; tick: number; type: string; payload: string }
-export const toEvent = (r: EventRow): SimEvent =>
-  ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })
+export const toEvent = (r: EventRow): SimEvent => ({
+  seq: r.seq,
+  tick: r.tick,
+  type: r.type,
+  payload: JSON.parse(r.payload),
+})

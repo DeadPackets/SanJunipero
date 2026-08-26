@@ -2,8 +2,15 @@
 // Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
 import {
-  DAYS_PER_SEASON, MINUTES_PER_DAY, SimConfigSchema, dayPhaseFromTick, glowRadiusFor,
-  lightBandAt, litSourceWithin, type SimConfig, type SimEvent,
+  DAYS_PER_SEASON,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  dayPhaseFromTick,
+  glowRadiusFor,
+  lightBandAt,
+  litSourceWithin,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { FAUNA_YIELD } from './data/faunaDefs.js'
 import { fold } from './fold.js'
@@ -11,7 +18,14 @@ import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { ambientTempAt, insulationOf, isExposed } from './systems/warmth.js'
-import { fishCatchChance, huntChance, mealRestore, nutritionOf, workPenalty, type PendingEvent } from './verbs.js'
+import {
+  fishCatchChance,
+  huntChance,
+  mealRestore,
+  nutritionOf,
+  workPenalty,
+  type PendingEvent,
+} from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 
 const QUIET = {
@@ -22,15 +36,26 @@ const QUIET = {
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
 let seq = 720000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 const spawn = (s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState =>
   fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
 
 const give = (
-  s: WorldState, config: SimConfig, id: string, itemId: string, kind: string, qty = 1,
+  s: WorldState,
+  config: SimConfig,
+  id: string,
+  itemId: string,
+  kind: string,
+  qty = 1,
   extra: Record<string, unknown> = {},
 ): WorldState =>
   fold(s, ev('item_spawned', { id: itemId, kind, qty, loc: { t: 'agent', id }, ...extra }), config)
@@ -38,23 +63,43 @@ const give = (
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
 const raise = (s: WorldState, config: SimConfig, box: Box, flammable = true): WorldState => {
-  const planned = fold(s, ev('structure_planned', { ...box, maxHp: 50, flammable, builderId: 'script' }), config)
+  const planned = fold(
+    s,
+    ev('structure_planned', { ...box, maxHp: 50, flammable, builderId: 'script' }),
+    config,
+  )
   return fold(planned, ev('structure_completed', { id: box.id }), config)
 }
 
-function pass(s: WorldState, config: SimConfig, tick: number, seed = 'g11a-world'): {
-  state: WorldState; events: PendingEvent[]
+function pass(
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  seed = 'g11a-world',
+): {
+  state: WorldState
+  events: PendingEvent[]
 } {
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   return createWorldTick(config, new RngStreams(seed))(advanced)
 }
 
-const apply = (s: WorldState, config: SimConfig, events: PendingEvent[], tick: number): WorldState =>
-  events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
+const apply = (
+  s: WorldState,
+  config: SimConfig,
+  events: PendingEvent[],
+  tick: number,
+): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
 
 function doVerb(
-  s: WorldState, config: SimConfig, tick: number, agentId: string, verb: string,
-  params: Record<string, unknown> = {}, limit = 600, seed = 'g11a-world',
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown> = {},
+  limit = 600,
+  seed = 'g11a-world',
 ): { state: WorldState; events: PendingEvent[]; refusal: string | null; duration: number } {
   const at: WorldState = { ...s, tick }
   const started = submitIntent(at, config, agentId, verb, params)
@@ -106,7 +151,7 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
     const seedFor = (want: boolean): string => {
       for (let i = 0; i < 500; i++) {
         const seed = `hunt-${i}`
-        if ((new RngStreams(seed).get('fauna').next() < chance) === want) return seed
+        if (new RngStreams(seed).get('fauna').next() < chance === want) return seed
       }
       throw new Error('no seed')
     }
@@ -115,7 +160,8 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
     expect(kill.refusal).toBeNull()
     expect(kill.events.some((e) => e.type === 'fauna_killed')).toBe(true)
     expect(kill.state.fauna?.[DEER]).toBeUndefined() // a taken body leaves the world outright
-    const taken = kill.events.filter((e) => e.type === 'item_spawned')
+    const taken = kill.events
+      .filter((e) => e.type === 'item_spawned')
       .map((e) => e.payload as { kind: string; qty: number })
       .map((p) => ({ kind: p.kind, qty: p.qty }))
     expect(taken).toEqual(FAUNA_YIELD.deer.map((y) => ({ kind: y.kind, qty: y.qty })))
@@ -128,15 +174,25 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
   })
 
   it('bare hands cannot hunt, and a school is not something you run down', () => {
-    const unarmed = fold(meadow(), ev('item_qty_changed', { id: 'item_knife', delta: -1 }, 400), CFG)
-    expect(doVerb(unarmed, CFG, 401, 'hunter', 'hunt', { faunaId: DEER }).refusal)
-      .toBe('you have nothing to hunt with')
+    const unarmed = fold(
+      meadow(),
+      ev('item_qty_changed', { id: 'item_knife', delta: -1 }, 400),
+      CFG,
+    )
+    expect(doVerb(unarmed, CFG, 401, 'hunter', 'hunt', { faunaId: DEER }).refusal).toBe(
+      'you have nothing to hunt with',
+    )
     let school = genesisState(CFG, MAP())
-    school = fold(school, ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 12, y: 12, stock: 3 }), CFG)
+    school = fold(
+      school,
+      ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 12, y: 12, stock: 3 }),
+      CFG,
+    )
     school = spawn(school, CFG, 'hunter', 11, 12)
     school = give(school, CFG, 'hunter', 'item_knife', 'knife')
-    expect(doVerb({ ...school, tick: 400 }, CFG, 401, 'hunter', 'hunt', { faunaId: 'fauna_9' }).refusal)
-      .toBe('that is not something you can run down')
+    expect(
+      doVerb({ ...school, tick: 400 }, CFG, 401, 'hunter', 'hunt', { faunaId: 'fauna_9' }).refusal,
+    ).toBe('that is not something you can run down')
   })
 
   it('a school measurably raises the odds of a cast, by exactly the bonus', () => {
@@ -145,11 +201,22 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
     let bare = spawn(genesisState(CFG, terrain), CFG, 'anna', 13, 12)
     bare = { ...bare, tick: 400 }
     const plain = fishCatchChance(bare, CFG, 'anna', 14, 12)
-    const withSchool = fold(bare, ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 14, y: 12, stock: 3 }), CFG)
-    expect(fishCatchChance(withSchool, CFG, 'anna', 14, 12)).toBeCloseTo(plain * CFG.fauna.fishSchoolBonus, 12)
+    const withSchool = fold(
+      bare,
+      ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 14, y: 12, stock: 3 }),
+      CFG,
+    )
+    expect(fishCatchChance(withSchool, CFG, 'anna', 14, 12)).toBeCloseTo(
+      plain * CFG.fauna.fishSchoolBonus,
+      12,
+    )
 
     // Out of the school's reach it is a plain cast again.
-    const far = fold(bare, ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 14, y: 20, stock: 3 }), CFG)
+    const far = fold(
+      bare,
+      ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 14, y: 20, stock: 3 }),
+      CFG,
+    )
     expect(fishCatchChance(far, CFG, 'anna', 14, 12)).toBeCloseTo(plain, 12)
   })
 
@@ -177,17 +244,30 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
     expect(summer.deer!).toBeLessThanOrEqual(CFG.fauna.caps.deer)
     expect(summer.rabbit!).toBeLessThanOrEqual(CFG.fauna.caps.rabbit)
     // Half as many rolls at the same odds: fewer bodies, on the same seed and the same ground.
-    expect((winter.deer ?? 0) + (winter.rabbit ?? 0)).toBeLessThan((summer.deer ?? 0) + (summer.rabbit ?? 0))
+    expect((winter.deer ?? 0) + (winter.rabbit ?? 0)).toBeLessThan(
+      (summer.deer ?? 0) + (summer.rabbit ?? 0),
+    )
 
     // With the caps already met, the dawn puts back nothing at all.
     let full = genesisState(CFG, MAP())
     for (let i = 0; i < CFG.fauna.caps.deer; i++) {
-      full = fold(full, ev('fauna_spawned', { id: `fauna_${i + 1}`, kind: 'deer', x: 2 + i, y: 2 }), CFG)
+      full = fold(
+        full,
+        ev('fauna_spawned', { id: `fauna_${i + 1}`, kind: 'deer', x: 2 + i, y: 2 }),
+        CFG,
+      )
     }
     for (let i = 0; i < CFG.fauna.caps.rabbit; i++) {
-      full = fold(full, ev('fauna_spawned', {
-        id: `fauna_${CFG.fauna.caps.deer + i + 1}`, kind: 'rabbit', x: 2 + i, y: 4,
-      }), CFG)
+      full = fold(
+        full,
+        ev('fauna_spawned', {
+          id: `fauna_${CFG.fauna.caps.deer + i + 1}`,
+          kind: 'rabbit',
+          x: 2 + i,
+          y: 4,
+        }),
+        CFG,
+      )
     }
     const none = pass({ ...full, tick: summerDawn - 1 }, CFG, summerDawn, 'stocking')
     expect(none.events.filter((e) => e.type === 'fauna_spawned')).toEqual([])
@@ -201,8 +281,10 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
     for (let y = 0; y < 24; y++) terrain[y]![14] = 2
     let s = spawn(genesisState(OFF, terrain), OFF, 'anna', 13, 12)
     s = fold(s, ev('fauna_spawned', { id: 'fauna_9', kind: 'fish', x: 14, y: 12, stock: 3 }), OFF)
-    expect(fishCatchChance({ ...s, tick: 400 }, OFF, 'anna', 14, 12))
-      .toBeCloseTo(OFF.wildlife.fishCatchBase, 12)
+    expect(fishCatchChance({ ...s, tick: 400 }, OFF, 'anna', 14, 12)).toBeCloseTo(
+      OFF.wildlife.fishCatchBase,
+      12,
+    )
   })
 })
 
@@ -228,8 +310,16 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
   })
 
   // One body, one winter night, one set of protections. Returns what the night cost it.
-  function overnight(opts: { garment?: boolean; indoors?: boolean; hearth?: boolean; energy: number }): {
-    energyLeft: number; coldTicks: number; collapsed: boolean; alive: boolean
+  function overnight(opts: {
+    garment?: boolean
+    indoors?: boolean
+    hearth?: boolean
+    energy: number
+  }): {
+    energyLeft: number
+    coldTicks: number
+    collapsed: boolean
+    alive: boolean
   } {
     const start = WINTER_NIGHT
     let s = raise(genesisState(CFG, MAP()), CFG, HEARTH, false)
@@ -237,18 +327,35 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     s = spawn(s, CFG, 'body', opts.hearth === true ? 9 : 4, opts.hearth === true ? 8 : 4)
     if (opts.garment === true) {
       s = give(s, CFG, 'body', 'item_coat', 'garment')
-      s = fold(s, ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, start - 1), CFG)
+      s = fold(
+        s,
+        ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, start - 1),
+        CFG,
+      )
     }
     if (opts.indoors === true) {
       s = fold(s, ev('agent_moved', { id: 'body', x: 14, y: 16 }, start - 1), CFG)
       s = fold(s, ev('agent_entered', { agentId: 'body', structureId: HOUSE.id }, start - 1), CFG)
     }
     if (opts.hearth === true) {
-      s = fold(s, ev('structure_fueled', {
-        structureId: HEARTH.id, burnsUntilTick: start + NIGHT_TICKS + 1,
-      }, start - 1), CFG)
+      s = fold(
+        s,
+        ev(
+          'structure_fueled',
+          {
+            structureId: HEARTH.id,
+            burnsUntilTick: start + NIGHT_TICKS + 1,
+          },
+          start - 1,
+        ),
+        CFG,
+      )
     }
-    s = fold(s, ev('need_changed', { id: 'body', need: 'energy', delta: opts.energy - 100 }, start - 1), CFG)
+    s = fold(
+      s,
+      ev('need_changed', { id: 'body', need: 'energy', delta: opts.energy - 100 }, start - 1),
+      CFG,
+    )
     s = { ...s, tick: start - 1 }
     for (let t = start; t < start + NIGHT_TICKS; t++) s = pass(s, CFG, t).state
     const a = s.agents.body!
@@ -291,22 +398,33 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
       let s = spawn(genesisState(CFG, MAP()), CFG, 'body', 4, 4)
       if (garment) {
         s = give(s, CFG, 'body', 'item_coat', 'garment')
-        s = fold(s, ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, 0), CFG)
+        s = fold(
+          s,
+          ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, 0),
+          CFG,
+        )
       }
       return isExposed({ ...s, tick }, CFG, 'body')
     }
-    expect({ bare: at(WINTER_DAY, false), clothed: at(WINTER_DAY, true) })
-      .toEqual({ bare: true, clothed: false })
+    expect({ bare: at(WINTER_DAY, false), clothed: at(WINTER_DAY, true) }).toEqual({
+      bare: true,
+      clothed: false,
+    })
     for (const tick of [WINTER_DUSK, WINTER_NIGHT]) {
-      expect({ tick, bare: at(tick, false), clothed: at(tick, true) })
-        .toEqual({ tick, bare: true, clothed: true })
+      expect({ tick, bare: at(tick, false), clothed: at(tick, true) }).toEqual({
+        tick,
+        bare: true,
+        clothed: true,
+      })
     }
     // Where it does decide: an autumn dusk sits two degrees under the band, which is exactly
     // what a coat is worth.
     const AUTUMN_DUSK = 2 * DAYS_PER_SEASON * MINUTES_PER_DAY + 19 * 60
     expect(ambientTempAt({ ...genesisState(CFG, MAP()), tick: AUTUMN_DUSK }, CFG)).toBe(6)
-    expect({ bare: at(AUTUMN_DUSK, false), clothed: at(AUTUMN_DUSK, true) })
-      .toEqual({ bare: true, clothed: false })
+    expect({ bare: at(AUTUMN_DUSK, false), clothed: at(AUTUMN_DUSK, true) }).toEqual({
+      bare: true,
+      clothed: false,
+    })
   })
 
   it('the coat is what decides an autumn dusk: bare goes down, clothed walks home', () => {
@@ -317,11 +435,23 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
       let s = spawn(genesisState(CFG, MAP()), CFG, 'body', 4, 4)
       if (garment) {
         s = give(s, CFG, 'body', 'item_coat', 'garment')
-        s = fold(s, ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, 0), CFG)
+        s = fold(
+          s,
+          ev('item_equipped', { agentId: 'body', itemId: 'item_coat', slot: 'body' }, 0),
+          CFG,
+        )
       }
       // A body at the end of a working day: little energy, and no warmth left to spend.
-      s = fold(s, ev('need_changed', { id: 'body', need: 'energy', delta: -80 }, AUTUMN_DUSK - 1), CFG)
-      s = fold(s, ev('need_changed', { id: 'body', need: 'warmth', delta: -100 }, AUTUMN_DUSK - 1), CFG)
+      s = fold(
+        s,
+        ev('need_changed', { id: 'body', need: 'energy', delta: -80 }, AUTUMN_DUSK - 1),
+        CFG,
+      )
+      s = fold(
+        s,
+        ev('need_changed', { id: 'body', need: 'warmth', delta: -100 }, AUTUMN_DUSK - 1),
+        CFG,
+      )
       s = { ...s, tick: AUTUMN_DUSK - 1 }
       for (let t = AUTUMN_DUSK; t < AUTUMN_DUSK + DUSK_TICKS; t++) s = pass(s, CFG, t).state
       const a = s.agents.body!
@@ -352,7 +482,12 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     let s = spawn(genesisState(CFG, MAP()), CFG, 'wright', 4, 4)
     s = give(s, CFG, 'wright', 'item_stone', 'stone', 4)
     s = give(s, CFG, 'wright', 'item_torch', 'torch')
-    if (lit) s = fold(s, ev('item_lit', { itemId: 'item_torch', burnsUntilTick: NIGHT + 500 }, NIGHT - 1), CFG)
+    if (lit)
+      s = fold(
+        s,
+        ev('item_lit', { itemId: 'item_torch', burnsUntilTick: NIGHT + 500 }, NIGHT - 1),
+        CFG,
+      )
     return { ...s, tick: NIGHT - 1 }
   }
 
@@ -369,7 +504,9 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     expect(carried.refusal).toBeNull()
     expect(blind.duration).toBe(Math.ceil(CFG.roads.paveDurationTicks * CFG.light.nightWorkPenalty))
     expect(carried.duration).toBe(CFG.roads.paveDurationTicks)
-    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(CFG.light.nightWorkPenalty)
+    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(
+      CFG.light.nightWorkPenalty,
+    )
     expect(workPenalty({ ...nightWork(true), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(1)
     // Speech and walking cost the same at midnight as at noon: the night is a price change,
     // not a curfew.
@@ -380,7 +517,9 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     const s = nightWork(false)
     const struck = doVerb(s, CFG, NIGHT, 'wright', 'kindle', { itemId: 'item_torch' }, 4)
     expect(struck.refusal).toBeNull()
-    const lit = struck.events.find((e) => e.type === 'item_lit')!.payload as { burnsUntilTick: number }
+    const lit = struck.events.find((e) => e.type === 'item_lit')!.payload as {
+      burnsUntilTick: number
+    }
     const litAt = NIGHT + 1
     expect(lit.burnsUntilTick).toBe(litAt + CFG.light.torchBurnTicks)
     expect(glowRadiusFor(CFG, 'torch')).toBe(CFG.light.glowRadius.torch)
@@ -402,7 +541,11 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     let s = raise(genesisState(SURE, MAP()), SURE, SHED)
     s = spawn(s, SURE, 'wright', 5, 5)
     s = give(s, SURE, 'wright', 'item_torch', 'torch')
-    s = fold(s, ev('item_lit', { itemId: 'item_torch', burnsUntilTick: NIGHT + 500 }, NIGHT - 1), SURE)
+    s = fold(
+      s,
+      ev('item_lit', { itemId: 'item_torch', burnsUntilTick: NIGHT + 500 }, NIGHT - 1),
+      SURE,
+    )
     const out = pass({ ...s, tick: NIGHT - 1 }, SURE, NIGHT)
     const lit = out.events.find((e) => e.type === 'fire_ignited')
     expect(lit).toBeDefined()
@@ -439,21 +582,34 @@ describe('G11a-V1: three kinds at the table beat the same thing twice', () => {
 
     const varied = mealRestore(fed(['bread', 'fish']), CFG, 'diner', 'venison')
     expect(varied).toBeCloseTo(
-      CFG.needs.eatRestoreHunger * nutritionOf(CFG, 'venison') * (1 + 2 * CFG.foodVariety.bonusPerKind), 12)
+      CFG.needs.eatRestoreHunger *
+        nutritionOf(CFG, 'venison') *
+        (1 + 2 * CFG.foodVariety.bonusPerKind),
+      12,
+    )
     expect(varied).toBeGreaterThan(plain)
 
     // Six kinds would be worth 0.25 and the bonus stops at maxBonus.
-    const feast = mealRestore(fed(['bread', 'fish', 'berries', 'wheat', 'mushroom', 'stew']), CFG, 'diner', 'venison')
+    const feast = mealRestore(
+      fed(['bread', 'fish', 'berries', 'wheat', 'mushroom', 'stew']),
+      CFG,
+      'diner',
+      'venison',
+    )
     expect(feast).toBeCloseTo(
-      CFG.needs.eatRestoreHunger * nutritionOf(CFG, 'venison') * (1 + CFG.foodVariety.maxBonus), 12)
+      CFG.needs.eatRestoreHunger * nutritionOf(CFG, 'venison') * (1 + CFG.foodVariety.maxBonus),
+      12,
+    )
   })
 
   it('with the law off a meal is the flat restore it always was', () => {
     const OFF: SimConfig = SimConfigSchema.parse({ ...QUIET, foodVariety: { enabled: false } })
-    expect(mealRestore(fed(['bread', 'fish']), OFF, 'diner', 'venison')).toBe(OFF.needs.eatRestoreHunger)
+    expect(mealRestore(fed(['bread', 'fish']), OFF, 'diner', 'venison')).toBe(
+      OFF.needs.eatRestoreHunger,
+    )
   })
 
-  it('a real meal writes the kind into the window, and the window is the config\'s width', () => {
+  it("a real meal writes the kind into the window, and the window is the config's width", () => {
     let s = spawn(genesisState(CFG, MAP()), CFG, 'diner', 4, 4)
     s = give(s, CFG, 'diner', 'item_loaf', 'bread', 2)
     s = { ...s, tick: 400 }
@@ -469,17 +625,25 @@ describe('G11a-V2: a felled wood grows back, and a sapling is not timber yet', (
     const terrain = MAP()
     terrain[5]![5] = 3 // a standing tree, so the seed has somewhere to fall from
     let s = genesisState(CFG, terrain)
-    s = fold(s, ev('tile_changed', { x: 6, y: 5, from: 0, to: 9, reason: 'seeded' }, MINUTES_PER_DAY), CFG)
+    s = fold(
+      s,
+      ev('tile_changed', { x: 6, y: 5, from: 0, to: 9, reason: 'seeded' }, MINUTES_PER_DAY),
+      CFG,
+    )
     expect(s.saplings?.['6,5']).toBe(1)
 
     // Only the midnights matter, so only the midnights are run.
-    const NONE: SimConfig = SimConfigSchema.parse({ ...QUIET, regrowth: { saplingChancePerDay: 0 } })
+    const NONE: SimConfig = SimConfigSchema.parse({
+      ...QUIET,
+      regrowth: { saplingChancePerDay: 0 },
+    })
     let grewOn: number | null = null
     for (let day = 2; day <= 1 + CFG.regrowth.saplingDays + 1; day++) {
       const out = pass({ ...s, tick: day * MINUTES_PER_DAY - 1 }, NONE, day * MINUTES_PER_DAY)
       s = out.state
-      const grown = out.events.find((e) => e.type === 'tile_changed'
-        && (e.payload as { reason?: string }).reason === 'grown')
+      const grown = out.events.find(
+        (e) => e.type === 'tile_changed' && (e.payload as { reason?: string }).reason === 'grown',
+      )
       if (grown !== undefined && grewOn === null) grewOn = day
     }
     expect(grewOn).toBe(1 + CFG.regrowth.saplingDays)
@@ -490,14 +654,26 @@ describe('G11a-V2: a felled wood grows back, and a sapling is not timber yet', (
   it('an edge tile is seeded at the dial, and never when the law is off', () => {
     const terrain = MAP()
     terrain[5]![5] = 3
-    const SURE: SimConfig = SimConfigSchema.parse({ ...QUIET, regrowth: { saplingChancePerDay: 1 } })
-    const out = pass({ ...genesisState(SURE, terrain), tick: MINUTES_PER_DAY - 1 }, SURE, MINUTES_PER_DAY)
-    const seeded = out.events.filter((e) => e.type === 'tile_changed'
-      && (e.payload as { reason?: string }).reason === 'seeded')
+    const SURE: SimConfig = SimConfigSchema.parse({
+      ...QUIET,
+      regrowth: { saplingChancePerDay: 1 },
+    })
+    const out = pass(
+      { ...genesisState(SURE, terrain), tick: MINUTES_PER_DAY - 1 },
+      SURE,
+      MINUTES_PER_DAY,
+    )
+    const seeded = out.events.filter(
+      (e) => e.type === 'tile_changed' && (e.payload as { reason?: string }).reason === 'seeded',
+    )
     expect(seeded.length).toBe(4) // the four tiles orthogonally touching the tree
 
     const OFF: SimConfig = SimConfigSchema.parse({ ...QUIET, regrowth: { enabled: false } })
-    const none = pass({ ...genesisState(OFF, terrain), tick: MINUTES_PER_DAY - 1 }, OFF, MINUTES_PER_DAY)
+    const none = pass(
+      { ...genesisState(OFF, terrain), tick: MINUTES_PER_DAY - 1 },
+      OFF,
+      MINUTES_PER_DAY,
+    )
     expect(none.events.filter((e) => e.type === 'tile_changed')).toEqual([])
   })
 
@@ -515,7 +691,10 @@ describe('G11a-V2: a felled wood grows back, and a sapling is not timber yet', (
     const tree = doVerb(s, CFG, 601, 'axeman', 'chop', { x: 5, y: 6 }, 80)
     expect(tree.refusal).toBeNull()
     expect(tree.state.terrain[6]![5]).toBe(0)
-    const timber = tree.events.find((e) => e.type === 'item_spawned')!.payload as { kind: string; qty: number }
+    const timber = tree.events.find((e) => e.type === 'item_spawned')!.payload as {
+      kind: string
+      qty: number
+    }
     expect(timber.kind).toBe('wood')
     expect(timber.qty).toBeGreaterThan(0)
   })

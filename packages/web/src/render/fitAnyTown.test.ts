@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  FIT_MARGIN_PX, ZOOM_STOPS, drawnBoundsOf, fitStop, fitsAt, tooBigToFit,
-} from './camera.js'
+import { FIT_MARGIN_PX, ZOOM_STOPS, drawnBoundsOf, fitStop, fitsAt, tooBigToFit } from './camera.js'
 import { bigTown, bigTownScreenSize } from './bigTown.js'
 
 /** The audit's stage, less the 56 px the control bar takes off the bottom. */
@@ -19,7 +17,8 @@ describe('the stop ladder', () => {
   })
 
   it('is still strictly increasing, and still ends at 4', () => {
-    for (let i = 1; i < ZOOM_STOPS.length; i++) expect(ZOOM_STOPS[i]!).toBeGreaterThan(ZOOM_STOPS[i - 1]!)
+    for (let i = 1; i < ZOOM_STOPS.length; i++)
+      expect(ZOOM_STOPS[i]!).toBeGreaterThan(ZOOM_STOPS[i - 1]!)
     expect(ZOOM_STOPS.at(-1)).toBe(4)
   })
 })

@@ -4,15 +4,34 @@ import { leavesOf, recordSummary } from './discoveryModel.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
 export const D = (over: Partial<DiscoveryRecord> = {}): DiscoveryRecord => ({
-  seq: 1, tick: 17_280, recipeId: 'recipe:waterskin', name: 'stitch a waterskin',
-  kind: 'craft', byId: 'a1', by: 'Maret',
-  intent: 'i want to carry water in a stitched hide', makes: ['waterskin'], ...over,
+  seq: 1,
+  tick: 17_280,
+  recipeId: 'recipe:waterskin',
+  name: 'stitch a waterskin',
+  kind: 'craft',
+  byId: 'a1',
+  by: 'Maret',
+  intent: 'i want to carry water in a stitched hide',
+  makes: ['waterskin'],
+  ...over,
 })
-export const A = (kind: string, id = `asset_${kind}`): AssetRecord => ({
-  id, seq: 1, class: 'item', desc: kind, kind, meta: null, footprint: { w: 1, h: 1 },
-  widthPx: 64, heightPx: 64, status: 'ready', score: 8, attempts: 1, costUsd: 0,
-  createdAt: '2026-01-01',
-} as AssetRecord)
+export const A = (kind: string, id = `asset_${kind}`): AssetRecord =>
+  ({
+    id,
+    seq: 1,
+    class: 'item',
+    desc: kind,
+    kind,
+    meta: null,
+    footprint: { w: 1, h: 1 },
+    widthPx: 64,
+    heightPx: 64,
+    status: 'ready',
+    score: 8,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '2026-01-01',
+  }) as AssetRecord
 
 describe('the leaves of the record', () => {
   it('keeps the archive’s order and gives each leaf its moment and its heading', () => {
@@ -54,7 +73,9 @@ describe('the leaves of the record', () => {
 
   it('counts the minds, not the discoveries — one person who worked out three things', () => {
     const three = [D(), D({ seq: 2 }), D({ seq: 3 })]
-    expect(recordSummary(leavesOf(three, []), 1440)).toBe('In 1 day, one person worked out 3 things.')
+    expect(recordSummary(leavesOf(three, []), 1440)).toBe(
+      'In 1 day, one person worked out 3 things.',
+    )
   })
 
   it('says so plainly when the town has worked nothing out yet', () => {

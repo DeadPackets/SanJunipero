@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { PerceptionPacket } from './prompt/prose.js'
 import { quietMeadowPacket, conversationPacket } from './testutil/fixtures.js'
-import { decideWake, disarmBodyAlarm, rearmBodyAlarm, DEFAULT_MIND_CONFIG, type MindClock, type PlanState, type WakeReason } from './wake.js'
+import {
+  decideWake,
+  disarmBodyAlarm,
+  rearmBodyAlarm,
+  DEFAULT_MIND_CONFIG,
+  type MindClock,
+  type PlanState,
+  type WakeReason,
+} from './wake.js'
 
 const cfg = DEFAULT_MIND_CONFIG
 
@@ -13,7 +21,10 @@ function withNeeds(hunger: number, energy: number, warmth: number): PerceptionPa
   const self = quietMeadowPacket.self
   return {
     ...quietMeadowPacket,
-    self: { ...self, body: { ...self.body, needs: { ...self.body.needs, hunger, energy, warmth } } },
+    self: {
+      ...self,
+      body: { ...self.body, needs: { ...self.body.needs, hunger, energy, warmth } },
+    },
   }
 }
 
@@ -36,16 +47,38 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
 }
 
 describe('decideWake — one case per reason', () => {
-  const cases: Array<[string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null]> = [
-    ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
-    ['salient_perception (heard speech)', conversationPacket, clk(), 10, pln(), 'salient_perception'],
-    ['salient_perception (felt event only)', { ...quietMeadowPacket, feltEvents: ['rain_started'] }, clk(), 10, pln(), 'salient_perception'],
-    ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
-    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
-    ['conversation_beat', pkt(), clk({ lastTurnTick: 100, conversationUntilTick: 160 }), 102, pln(), 'conversation_beat'],
-    ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
-    ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
-  ]
+  const cases: Array<[string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null]> =
+    [
+      ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
+      [
+        'salient_perception (heard speech)',
+        conversationPacket,
+        clk(),
+        10,
+        pln(),
+        'salient_perception',
+      ],
+      [
+        'salient_perception (felt event only)',
+        { ...quietMeadowPacket, feltEvents: ['rain_started'] },
+        clk(),
+        10,
+        pln(),
+        'salient_perception',
+      ],
+      ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
+      ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
+      [
+        'conversation_beat',
+        pkt(),
+        clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
+        102,
+        pln(),
+        'conversation_beat',
+      ],
+      ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
+      ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
+    ]
   it.each(cases)('%s', (_name, packet, clock, tick, plan, expected) => {
     expect(decideWake(cfg, packet, clock, tick, plan)).toBe(expected)
   })
@@ -55,13 +88,21 @@ describe('decideWake — priority and floor', () => {
   it('prioritizes body_alarm over heard speech', () => {
     const packet = {
       ...conversationPacket,
-      self: { ...conversationPacket.self, body: { ...conversationPacket.self.body, needs: { ...conversationPacket.self.body.needs, hunger: 20 } } },
+      self: {
+        ...conversationPacket.self,
+        body: {
+          ...conversationPacket.self.body,
+          needs: { ...conversationPacket.self.body.needs, hunger: 20 },
+        },
+      },
     }
     expect(decideWake(cfg, packet, clk(), 10, pln())).toBe('body_alarm')
   })
 
   it('plan_blocked wakes immediately, ignoring the idle floor', () => {
-    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 0 }), 1, pln({ lastResult: 'blocked' }))).toBe('plan_blocked')
+    expect(
+      decideWake(cfg, pkt(), clk({ lastTurnTick: 0 }), 1, pln({ lastResult: 'blocked' })),
+    ).toBe('plan_blocked')
   })
 
   it('idle floor blocks plan_done and reconsider until idleGapTicks elapse', () => {
@@ -72,7 +113,15 @@ describe('decideWake — priority and floor', () => {
   it('idle floor does not apply inside an open conversation window', () => {
     // 5 ticks since the last turn: outside conversation the floor would block
     // plan_done (idleGapTicks = 20), but the window is still open.
-    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 100, conversationUntilTick: 160 }), 105, pln({ lastResult: 'done' }))).toBe('plan_done')
+    expect(
+      decideWake(
+        cfg,
+        pkt(),
+        clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
+        105,
+        pln({ lastResult: 'done' }),
+      ),
+    ).toBe('plan_done')
   })
 
   it('salient_perception fires when the visible-agent set changes', () => {
@@ -80,10 +129,22 @@ describe('decideWake — priority and floor', () => {
       ...quietMeadowPacket,
       visible: {
         ...quietMeadowPacket.visible,
-        agents: [{ id: 'nadia', name: 'Nadia', x: 16, y: 10, activityVerb: null, collapsed: false, asleep: false }],
+        agents: [
+          {
+            id: 'nadia',
+            name: 'Nadia',
+            x: 16,
+            y: 10,
+            activityVerb: null,
+            collapsed: false,
+            asleep: false,
+          },
+        ],
       },
     }
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln())).toBe('salient_perception')
+    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln())).toBe(
+      'salient_perception',
+    )
     expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 10, pln())).toBe(null)
   })
 })
@@ -116,7 +177,9 @@ describe('decideWake — asleep gate', () => {
   })
 
   it('wakes on you_were_attacked', () => {
-    expect(decideWake(cfg, asleep(['you_were_attacked']), clk(), 10, pln())).toBe('salient_perception')
+    expect(decideWake(cfg, asleep(['you_were_attacked']), clk(), 10, pln())).toBe(
+      'salient_perception',
+    )
   })
 
   it('wakes on fire-prefixed felt events', () => {
@@ -130,7 +193,13 @@ describe('decideWake — asleep gate', () => {
   it('wakes on body_alarm while asleep', () => {
     const packet = {
       ...asleep(),
-      self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 10 } } },
+      self: {
+        ...asleep().self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, energy: 10 },
+        },
+      },
     }
     expect(decideWake(cfg, packet, clk(), 10, pln())).toBe('body_alarm')
   })
@@ -140,7 +209,13 @@ describe('decideWake — asleep gate', () => {
     // one-shot armed flag must not silence the body forever.
     const packet = {
       ...asleepAtNight(),
-      self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 } } },
+      self: {
+        ...asleep().self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 },
+        },
+      },
     }
     const clock = clk({ alarmArmed: { hunger: false, energy: true, warmth: true } })
     expect(decideWake(cfg, packet, clock, 900, pln())).toBe('body_alarm')
@@ -149,7 +224,13 @@ describe('decideWake — asleep gate', () => {
   it('asleep wake reasons respect the wakeRetryAtTick backoff', () => {
     const hungry = {
       ...asleepAtNight(),
-      self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 } } },
+      self: {
+        ...asleep().self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 },
+        },
+      },
     }
     expect(decideWake(cfg, hungry, clk({ wakeRetryAtTick: 910 }), 900, pln())).toBe(null)
     expect(decideWake(cfg, hungry, clk({ wakeRetryAtTick: 910 }), 910, pln())).toBe('body_alarm')
@@ -197,9 +278,15 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
     ...quietMeadowPacket,
     self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, thirst } },
   })
-  const withAffliction = (kind: 'fatigue' | 'illness' | 'injury' | 'poison', severity: number): PerceptionPacket => ({
+  const withAffliction = (
+    kind: 'fatigue' | 'illness' | 'injury' | 'poison',
+    severity: number,
+  ): PerceptionPacket => ({
     ...quietMeadowPacket,
-    self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] } },
+    self: {
+      ...quietMeadowPacket.self,
+      body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] },
+    },
   })
   const sleeping = (packet: PerceptionPacket): PerceptionPacket => ({
     ...packet,
@@ -273,7 +360,9 @@ describe('decideWake — conversation cadence and reconsider', () => {
 
   it('reconsider fires once at the scheduled tick; caller clears it after acting', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 100 }), 100, pln())).toBe('reconsider')
-    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 100, reconsiderAtTick: null }), 130, pln())).toBe(null)
+    expect(
+      decideWake(cfg, pkt(), clk({ lastTurnTick: 100, reconsiderAtTick: null }), 130, pln()),
+    ).toBe(null)
   })
 })
 

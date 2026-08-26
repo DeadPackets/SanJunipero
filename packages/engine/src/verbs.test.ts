@@ -1,6 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
-  DAYS_PER_SEASON, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent,
+  DAYS_PER_SEASON,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { ITEM_CLASSES, stateHash } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -12,33 +17,95 @@ import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import {
-  fishCatchChance, huntChance, isFoodKind, isKindleable, isWearable, nutritionOf, registerVerb,
-  craftRoutes, SEED_RECIPES, unregisterVerb, VERBS, WEAPON_KINDS, weaponKindsFor, type VerbDef,
+  fishCatchChance,
+  huntChance,
+  isFoodKind,
+  isKindleable,
+  isWearable,
+  nutritionOf,
+  registerVerb,
+  craftRoutes,
+  SEED_RECIPES,
+  unregisterVerb,
+  VERBS,
+  WEAPON_KINDS,
+  weaponKindsFor,
+  type VerbDef,
 } from './verbs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
-const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
+const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick: 0,
+  type,
+  payload,
+})
 
 function makeWorld(rows: string[] = ['........', '........', '........', '........']): WorldState {
-  const s = genesisState(DEFAULT_CONFIG, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+  const s = genesisState(
+    DEFAULT_CONFIG,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
   return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
 }
 
 const testVerb: VerbDef = {
   kind: 'recipe:test',
-  validate() { return null },
-  duration() { return 1 },
-  onComplete() { return [] },
+  validate() {
+    return null
+  },
+  duration() {
+    return 1
+  },
+  onComplete() {
+    return []
+  },
 }
 
 const TIER1 = [
-  'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt', 'wear', 'doff', 'kindle', 'snuff', 'stoke', 'chop',
-  'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
+  'walk',
+  'sleep',
+  'wake',
+  'enter',
+  'exit',
+  'eat',
+  'tend',
+  'till',
+  'plant',
+  'harvest',
+  'fish',
+  'forage',
+  'build',
+  'craft',
+  'extinguish',
+  'drink',
+  'fill',
+  'dig_channel',
+  'douse',
+  'pave',
+  'hunt',
+  'wear',
+  'doff',
+  'kindle',
+  'snuff',
+  'stoke',
+  'chop',
+  'speak',
+  'give',
+  'take',
+  'stow',
+  'write',
+  'read',
+  'inscribe',
+  'teach',
+  'attack',
+  'experiment',
 ]
 
-afterEach(() => { unregisterVerb('recipe:test') })
+afterEach(() => {
+  unregisterVerb('recipe:test')
+})
 
 describe('verb registry seam', () => {
   it('registerVerb registers a codified recipe verb end-to-end', () => {
@@ -46,10 +113,11 @@ describe('verb registry seam', () => {
     registerVerb(testVerb)
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'recipe:test', {})
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.events).toContainEqual({
-      type: 'action_started',
-      payload: { agentId: 'a1', verb: 'recipe:test', params: {}, duration: 1 },
-    })
+    if (r.ok)
+      expect(r.events).toContainEqual({
+        type: 'action_started',
+        payload: { agentId: 'a1', verb: 'recipe:test', params: {}, duration: 1 },
+      })
   })
 
   it('registerVerb throws on a duplicate kind', () => {
@@ -60,7 +128,8 @@ describe('verb registry seam', () => {
     registerVerb(testVerb)
     unregisterVerb('recipe:test')
     expect(submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'recipe:test', {})).toEqual({
-      ok: false, reason: 'unknown verb: recipe:test',
+      ok: false,
+      reason: 'unknown verb: recipe:test',
     })
     expect(() => unregisterVerb('never_existed')).not.toThrow()
   })
@@ -85,16 +154,28 @@ describe('verb registry seam', () => {
 })
 
 describe('eat: a last-day meal and the pale mushroom', () => {
-  const cfg = (mortality: Record<string, unknown>): SimConfig => SimConfigSchema.parse({ mortality })
+  const cfg = (mortality: Record<string, unknown>): SimConfig =>
+    SimConfigSchema.parse({ mortality })
   const POISONS = cfg({ poisonChanceSpoiled: 1 })
   const SPARES = cfg({ poisonChanceSpoiled: 0 })
   const OFF = cfg({ enabled: false, poisonChanceSpoiled: 1 })
   const DAY = 1440
 
-  function holding(kind: string, spoilage?: { spawnDay: number; days: number }, day = 0): WorldState {
-    const s = fold(makeWorld(), ev(2, 'item_spawned', {
-      id: 'item_1', kind, qty: 1, loc: { t: 'agent', id: 'a1' }, ...(spoilage ? { spoilage } : {}),
-    }))
+  function holding(
+    kind: string,
+    spoilage?: { spawnDay: number; days: number },
+    day = 0,
+  ): WorldState {
+    const s = fold(
+      makeWorld(),
+      ev(2, 'item_spawned', {
+        id: 'item_1',
+        kind,
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+        ...(spoilage ? { spoilage } : {}),
+      }),
+    )
     return { ...s, tick: day * DAY }
   }
   const eaten = (s: WorldState, config: SimConfig, rng: RngStream) =>
@@ -103,20 +184,24 @@ describe('eat: a last-day meal and the pale mushroom', () => {
 
   it('draws its roll from the illness stream, and a pale mushroom is food you may eat', () => {
     expect(VERBS.eat!.rngStream).toBe('illness')
-    const r = submitIntent(holding('pale_mushroom'), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' })
+    const r = submitIntent(holding('pale_mushroom'), DEFAULT_CONFIG, 'a1', 'eat', {
+      itemId: 'item_1',
+    })
     expect(r.ok).toBe(true)
   })
 
   it('poisons on a pale mushroom when the roll goes against the eater, and still feeds them', () => {
     const out = eaten(holding('pale_mushroom'), POISONS, illness())
     expect(out[0]).toEqual({
-      type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'poison', severity: 1, itemId: 'item_1' },
+      type: 'agent_afflicted',
+      payload: { agentId: 'a1', kind: 'poison', severity: 1, itemId: 'item_1' },
     })
     // A pale mushroom is a poor meal as well as a gamble (per-kind nutrition).
     expect(out).toContainEqual({
       type: 'need_changed',
       payload: {
-        id: 'a1', need: 'hunger',
+        id: 'a1',
+        need: 'hunger',
         delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
       },
     })
@@ -141,7 +226,9 @@ describe('eat: a last-day meal and the pale mushroom', () => {
   it('never draws at all when the world has mortality switched off', () => {
     const rng = illness()
     const before = rng.state()
-    expect(eaten(holding('pale_mushroom'), OFF, rng).map((e) => e.type)).not.toContain('agent_afflicted')
+    expect(eaten(holding('pale_mushroom'), OFF, rng).map((e) => e.type)).not.toContain(
+      'agent_afflicted',
+    )
     expect(rng.state()).toEqual(before)
   })
 
@@ -151,11 +238,25 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     const at = (loc: unknown, kind = 'bread'): WorldState =>
       fold(makeWorld(), ev(2, 'item_spawned', { id: 'item_1', kind, qty: 1, loc }))
     const shelf = (): WorldState => {
-      const s = fold(at({ t: 'tile', x: 5, y: 5 }), ev(3, 'structure_planned', {
-        id: 'structure_1', kind: 'storehouse', x: 1, y: 0, w: 1, h: 1, maxHp: 30, flammable: true, builderId: 'a1',
-      }))
+      const s = fold(
+        at({ t: 'tile', x: 5, y: 5 }),
+        ev(3, 'structure_planned', {
+          id: 'structure_1',
+          kind: 'storehouse',
+          x: 1,
+          y: 0,
+          w: 1,
+          h: 1,
+          maxHp: 30,
+          flammable: true,
+          builderId: 'a1',
+        }),
+      )
       const done = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }))
-      return fold(done, ev(5, 'item_moved', { id: 'item_1', loc: { t: 'structure', id: 'structure_1' } }))
+      return fold(
+        done,
+        ev(5, 'item_moved', { id: 'item_1', loc: { t: 'structure', id: 'structure_1' } }),
+      )
     }
 
     it('a loaf at the feet is eaten without a turn spent picking it up', () => {
@@ -164,8 +265,14 @@ describe('eat: a last-day meal and the pale mushroom', () => {
       expect(r.ok).toBe(true)
       const out = VERBS.eat!.onComplete(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' }, illness())
       // The lifting comes first and is the same lifting `take` does, ownership and all.
-      expect(out[0]).toEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'agent', id: 'a1' } } })
-      expect(out).toContainEqual({ type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a1' } })
+      expect(out[0]).toEqual({
+        type: 'item_moved',
+        payload: { id: 'item_1', loc: { t: 'agent', id: 'a1' } },
+      })
+      expect(out).toContainEqual({
+        type: 'item_owner_changed',
+        payload: { id: 'item_1', owner: 'a1' },
+      })
       expect(out.map((e) => e.type)).toContain('need_changed')
     })
 
@@ -175,28 +282,42 @@ describe('eat: a last-day meal and the pale mushroom', () => {
 
     it('the meal still counts as its own kind, so the variety window sees it', () => {
       const s = at({ t: 'tile', x: 1, y: 0 }, 'fish')
-      expect(VERBS.eat!.results!(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' })).toEqual({ kind: 'fish' })
+      expect(VERBS.eat!.results!(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' })).toEqual({
+        kind: 'fish',
+      })
     })
 
     it('a loaf across the clearing is still a walk, and the refusal says so', () => {
-      expect(submitIntent(at({ t: 'tile', x: 5, y: 5 }), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }))
-        .toEqual({ ok: false, reason: 'not holding that — go and stand beside it first' })
+      expect(
+        submitIntent(at({ t: 'tile', x: 5, y: 5 }), DEFAULT_CONFIG, 'a1', 'eat', {
+          itemId: 'item_1',
+        }),
+      ).toEqual({ ok: false, reason: 'not holding that — go and stand beside it first' })
     })
 
     it('a loaf in another pair of hands is not within anybody else’s reach', () => {
-      const s = fold(at({ t: 'tile', x: 1, y: 0 }), ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }))
+      const s = fold(
+        at({ t: 'tile', x: 1, y: 0 }),
+        ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }),
+      )
       const held = fold(s, ev(4, 'item_moved', { id: 'item_1', loc: { t: 'agent', id: 'a2' } }))
-      expect(submitIntent(held, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }))
-        .toEqual({ ok: false, reason: 'someone is holding that' })
+      expect(submitIntent(held, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' })).toEqual({
+        ok: false,
+        reason: 'someone is holding that',
+      })
     })
 
     it('a mark for nothing that exists still says only that the hands are empty', () => {
-      expect(submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_nowhere' }))
-        .toEqual({ ok: false, reason: 'not holding that' })
+      expect(
+        submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_nowhere' }),
+      ).toEqual({ ok: false, reason: 'not holding that' })
     })
 
     it('taking somebody else’s supper off the ground is still seen', () => {
-      const s = fold(at({ t: 'tile', x: 1, y: 0 }), ev(3, 'item_owner_changed', { id: 'item_1', owner: 'a2' }))
+      const s = fold(
+        at({ t: 'tile', x: 1, y: 0 }),
+        ev(3, 'item_owner_changed', { id: 'item_1', owner: 'a2' }),
+      )
       const out = VERBS.eat!.onComplete(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' }, illness())
       expect(out.map((e) => e.type)).toContain('item_taken')
     })
@@ -208,30 +329,41 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     s = fold(s, ev(4, 'agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 3 }))
     s = fold(s, ev(5, 'agent_afflicted', { agentId: 'a1', kind: 'poison', severity: 1 }))
     expect(eaten(s, CFG, illness())).toContainEqual({
-      type: 'affliction_worsened', payload: { agentId: 'a1', kind: 'illness', severity: 3 - CFG.mortality.herbRelief },
+      type: 'affliction_worsened',
+      payload: { agentId: 'a1', kind: 'illness', severity: 3 - CFG.mortality.herbRelief },
     })
     let last = holding('herb')
     last = fold(last, ev(6, 'agent_afflicted', { agentId: 'a1', kind: 'poison', severity: 1 }))
     expect(eaten(last, CFG, illness())).toContainEqual({
-      type: 'affliction_recovered', payload: { agentId: 'a1', kind: 'poison' },
+      type: 'affliction_recovered',
+      payload: { agentId: 'a1', kind: 'poison' },
     })
   })
 
-  it('tells the eye a pale mushroom and nothing more: which ones kill is the town\'s to learn', () => {
-    const s = fold(makeWorld(), ev(3, 'item_spawned', {
-      id: 'item_1', kind: 'pale_mushroom', qty: 1, loc: { t: 'tile', x: 1, y: 1 },
-    }))
+  it("tells the eye a pale mushroom and nothing more: which ones kill is the town's to learn", () => {
+    const s = fold(
+      makeWorld(),
+      ev(3, 'item_spawned', {
+        id: 'item_1',
+        kind: 'pale_mushroom',
+        qty: 1,
+        loc: { t: 'tile', x: 1, y: 1 },
+      }),
+    )
     const seen = composePerception(s, DEFAULT_CONFIG, 'a1', []).visible.items
     expect(seen.find((i) => i.kind === 'pale_mushroom')).toBeDefined()
     expect(JSON.stringify(seen)).not.toMatch(/warn|danger|poison|deadly/i)
   })
 })
 
-describe('tend: an hour of another body\'s hands', () => {
+describe("tend: an hour of another body's hands", () => {
   const CFG = SimConfigSchema.parse({})
 
   function pair(): WorldState {
-    let s = genesisState(CFG, ['....', '....', '....', '....'].map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    let s = genesisState(
+      CFG,
+      ['....', '....', '....', '....'].map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    )
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
     s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }), CFG)
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, hp: 50 } } }
@@ -241,8 +373,9 @@ describe('tend: an hour of another body\'s hands', () => {
 
   it('takes three ticks, names the tender, and reads as a C9 log when it has to', () => {
     expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(3)
-    expect(complete(pair(), { targetId: 'a1' }))
-      .toEqual([{ type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } }])
+    expect(complete(pair(), { targetId: 'a1' })).toEqual([
+      { type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } },
+    ])
     // A recorded older log carries the target and nothing else, and still folds.
     const old = fold(pair(), ev(3, 'agent_tended', { agentId: 'a1' }), CFG)
     expect(old.agents.a1!.tendedTick).toBe(0)
@@ -250,9 +383,21 @@ describe('tend: an hour of another body\'s hands', () => {
 
   it('refuses across a wall, however close the two bodies stand', () => {
     let s = pair()
-    s = fold(s, ev(3, 'structure_planned', {
-      id: 'structure_1', kind: 'house', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a2',
-    }), CFG)
+    s = fold(
+      s,
+      ev(3, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 2,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a2',
+      }),
+      CFG,
+    )
     s = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }), CFG)
     s = fold(s, ev(5, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     const r = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1' })
@@ -261,9 +406,16 @@ describe('tend: an hour of another body\'s hands', () => {
   })
 
   it('an offered herb is consumed and gives double what eating it would', () => {
-    let s = fold(pair(), ev(3, 'item_spawned', {
-      id: 'item_1', kind: 'herb', qty: 1, loc: { t: 'agent', id: 'a2' },
-    }), CFG)
+    let s = fold(
+      pair(),
+      ev(3, 'item_spawned', {
+        id: 'item_1',
+        kind: 'herb',
+        qty: 1,
+        loc: { t: 'agent', id: 'a2' },
+      }),
+      CFG,
+    )
     s = fold(s, ev(4, 'agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 3 }), CFG)
     const out = complete(s, { targetId: 'a1', itemId: 'item_1' })
     expect(out).toEqual([
@@ -277,9 +429,16 @@ describe('tend: an hour of another body\'s hands', () => {
   })
 
   it('refuses to offer something that is not a remedy, or that the tender is not holding', () => {
-    const s = fold(pair(), ev(3, 'item_spawned', {
-      id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a2' },
-    }), CFG)
+    const s = fold(
+      pair(),
+      ev(3, 'item_spawned', {
+        id: 'item_1',
+        kind: 'wood',
+        qty: 1,
+        loc: { t: 'agent', id: 'a2' },
+      }),
+      CFG,
+    )
     const wood = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1', itemId: 'item_1' })
     expect(wood.ok).toBe(false)
     if (!wood.ok) expect(wood.reason).toBe('wood is not a remedy')
@@ -294,12 +453,22 @@ describe('verb: pave', () => {
   const OFF = SimConfigSchema.parse({ roads: { enabled: false } })
 
   function quarried(rows: string[] = ['..', '..'], qty = 1, config = CFG): WorldState {
-    let s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    let s = genesisState(
+      config,
+      rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    )
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
     if (qty === 0) return s
-    return fold(s, ev(2, 'item_spawned', {
-      id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' },
-    }), config)
+    return fold(
+      s,
+      ev(2, 'item_spawned', {
+        id: 'item_1',
+        kind: 'stone',
+        qty,
+        loc: { t: 'agent', id: 'a1' },
+      }),
+      config,
+    )
   }
   const laid = (s: WorldState, x: number, y: number, config = CFG) =>
     VERBS.pave!.onComplete(s, config, 'a1', { x, y }, new RngStreams('t').get('actions'))
@@ -310,7 +479,10 @@ describe('verb: pave', () => {
     expect(CFG.roads.paveDurationTicks).toBe(6)
     expect(laid(s, 1, 0)).toEqual([
       { type: 'item_qty_changed', payload: { id: 'item_1', delta: -CFG.roads.stonePerTile } },
-      { type: 'tile_changed', payload: { x: 1, y: 0, from: 0, to: 7, reason: 'paved', byId: 'a1' } },
+      {
+        type: 'tile_changed',
+        payload: { x: 1, y: 0, from: 0, to: 7, reason: 'paved', byId: 'a1' },
+      },
     ])
   })
 
@@ -329,8 +501,12 @@ describe('verb: pave', () => {
     const broke = submitIntent(quarried(['..', '..'], 0), CFG, 'a1', 'pave', { x: 1, y: 0 })
     expect(broke.ok).toBe(false)
     if (!broke.ok) expect(broke.reason).toMatch(/^not enough stone — /)
-    expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(false)
-    expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(false)
+    expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(
+      false,
+    )
+    expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(
+      false,
+    )
   })
 })
 
@@ -338,13 +514,28 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
   const CFG = SimConfigSchema.parse({})
 
   // A stream that hands back one number: a success is a fact of the test, not of a seed.
-  const roll = (v: number): RngStream => ({ next: () => v, int: (n: number) => Math.floor(v * n) }) as unknown as RngStream
+  const roll = (v: number): RngStream =>
+    ({ next: () => v, int: (n: number) => Math.floor(v * n) }) as unknown as RngStream
 
-  function stalked(kind: string, at: [number, number] = [1, 0], armed = true, rows = ['..', '..']): WorldState {
+  function stalked(
+    kind: string,
+    at: [number, number] = [1, 0],
+    armed = true,
+    rows = ['..', '..'],
+  ): WorldState {
     let s = makeWorld(rows)
     s = fold(s, ev(40, 'fauna_spawned', { id: 'fauna_1', kind, x: at[0], y: at[1] }), CFG)
     if (armed) {
-      s = fold(s, ev(41, 'item_spawned', { id: 'item_1', kind: 'knife', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+      s = fold(
+        s,
+        ev(41, 'item_spawned', {
+          id: 'item_1',
+          kind: 'knife',
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+        }),
+        CFG,
+      )
     }
     return s
   }
@@ -357,10 +548,19 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     expect(deer.map((e) => e.type)).toEqual(['fauna_killed', 'item_spawned', 'item_spawned'])
     expect(deer[0]!.payload).toEqual({ id: 'fauna_1', kind: 'deer', x: 1, y: 0, byId: 'a1' })
     expect(deer.slice(1).map((e) => e.payload)).toEqual([
-      { id: 'item_2', kind: 'venison', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1', spoilage: { spawnDay: 0, days: 4 } },
+      {
+        id: 'item_2',
+        kind: 'venison',
+        qty: 2,
+        loc: { t: 'agent', id: 'a1' },
+        owner: 'a1',
+        spoilage: { spawnDay: 0, days: 4 },
+      },
       { id: 'item_3', kind: 'hide', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
     ])
-    const rabbit = taken(stalked('rabbit'), 0).slice(1).map((e) => (e.payload as { kind: string }).kind)
+    const rabbit = taken(stalked('rabbit'), 0)
+      .slice(1)
+      .map((e) => (e.payload as { kind: string }).kind)
     expect(rabbit).toEqual(['rabbit_meat'])
   })
 
@@ -368,29 +568,43 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     let s = stalked('deer')
     for (const e of taken(s, 0)) s = fold(s, ev(50, e.type, e.payload), CFG)
     expect(s.fauna).toBeUndefined()
-    expect(Object.values(s.items).map((i) => i.kind).sort()).toEqual(['hide', 'knife', 'venison'])
+    expect(
+      Object.values(s.items)
+        .map((i) => i.kind)
+        .sort(),
+    ).toEqual(['hide', 'knife', 'venison'])
     expect(s.counters.nextEntityId).toBe(4)
   })
 
   it('a missed approach spends the animal, not the hunter: it bolts two tiles and drops nothing', () => {
     const missed = taken(stalked('deer', [1, 0], true, ['....', '....']), 0.99)
-    expect(missed).toEqual([{ type: 'fauna_moved', payload: { moves: [{ id: 'fauna_1', x: 3, y: 0 }] } }])
+    expect(missed).toEqual([
+      { type: 'fauna_moved', payload: { moves: [{ id: 'fauna_1', x: 3, y: 0 }] } },
+    ])
   })
 
   it('the odds are skill against the animal, and they cap at certainty', () => {
     const s = stalked('deer')
     expect(huntChance(s, CFG, 'a1', 'deer')).toBeCloseTo(1 / 4)
     expect(huntChance(s, CFG, 'a1', 'rabbit')).toBeCloseTo(1 / 3)
-    const skilled = fold(s, ev(60, 'skill_gained', { agentId: 'a1', track: 'foraging', xp: 900 }), CFG)
+    const skilled = fold(
+      s,
+      ev(60, 'skill_gained', { agentId: 'a1', track: 'foraging', xp: 900 }),
+      CFG,
+    )
     expect(huntChance(skilled, CFG, 'a1', 'deer')).toBe(1)
   })
 
   it('refuses bare hands, a body out of reach, a school, and a tile with nothing on it', () => {
-    const bare = submitIntent(stalked('deer', [1, 0], false), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    const bare = submitIntent(stalked('deer', [1, 0], false), CFG, 'a1', 'hunt', {
+      faunaId: 'fauna_1',
+    })
     expect(bare.ok).toBe(false)
     if (!bare.ok) expect(bare.reason).toBe('you have nothing to hunt with')
 
-    const far = submitIntent(stalked('deer', [2, 0], true, ['...', '...']), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    const far = submitIntent(stalked('deer', [2, 0], true, ['...', '...']), CFG, 'a1', 'hunt', {
+      faunaId: 'fauna_1',
+    })
     expect(far.ok).toBe(false)
     if (!far.ok) expect(far.reason).toBe('too far off to reach')
 
@@ -409,10 +623,28 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     const speared = (config: SimConfig): WorldState => {
       let s = makeWorld(['..', '..'])
       s = fold(s, ev(40, 'fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 1, y: 0 }), config)
-      return fold(s, ev(41, 'item_spawned', { id: 'item_1', kind: 'spear', qty: 1, loc: { t: 'agent', id: 'a1' } }), config)
+      return fold(
+        s,
+        ev(41, 'item_spawned', {
+          id: 'item_1',
+          kind: 'spear',
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+        }),
+        config,
+      )
     }
     const armed = SimConfigSchema.parse({
-      crafting: { recipes: { spear: { inputs: { wood: 2 }, output: { kind: 'spear', qty: 1 }, skill: 'carpentry', weaponKinds: ['spear'] } } },
+      crafting: {
+        recipes: {
+          spear: {
+            inputs: { wood: 2 },
+            output: { kind: 'spear', qty: 1 },
+            skill: 'carpentry',
+            weaponKinds: ['spear'],
+          },
+        },
+      },
     })
     expect(weaponKindsFor(armed)).toEqual(new Set(['knife', 'spear']))
     expect(submitIntent(speared(armed), armed, 'a1', 'hunt', { faunaId: 'fauna_1' }).ok).toBe(true)
@@ -439,7 +671,11 @@ describe('fish: a school is where the fish are', () => {
   function cast(stock: number | null, config = CFG): WorldState {
     const s = makeWorld(['.~', '.~'])
     if (stock === null) return s
-    return fold(s, ev(70, 'fauna_spawned', { id: 'fauna_1', kind: 'fish', x: 1, y: 0, stock }), config)
+    return fold(
+      s,
+      ev(70, 'fauna_spawned', { id: 'fauna_1', kind: 'fish', x: 1, y: 0, stock }),
+      config,
+    )
   }
 
   const roll = (v: number): RngStream => ({ next: () => v, int: () => 0 }) as unknown as RngStream
@@ -464,9 +700,15 @@ describe('fish: a school is where the fish are', () => {
   })
 
   it('takes one fish from the school per catch, and the school disbands on the last one', () => {
-    expect(catches(cast(3), 0)[0]).toEqual({ type: 'fauna_stock_changed', payload: { id: 'fauna_1', stock: 2 } })
+    expect(catches(cast(3), 0)[0]).toEqual({
+      type: 'fauna_stock_changed',
+      payload: { id: 'fauna_1', stock: 2 },
+    })
     const last = catches(cast(1), 0)
-    expect(last[0]).toEqual({ type: 'fauna_killed', payload: { id: 'fauna_1', kind: 'fish', x: 1, y: 0, byId: 'a1' } })
+    expect(last[0]).toEqual({
+      type: 'fauna_killed',
+      payload: { id: 'fauna_1', kind: 'fish', x: 1, y: 0, byId: 'a1' },
+    })
     let s = cast(1)
     for (const e of last) s = fold(s, ev(80, e.type, e.payload), CFG)
     expect(s.fauna).toBeUndefined()
@@ -483,15 +725,25 @@ describe('fish: a school is where the fish are', () => {
 
 // ------------------------------------------------- the clothing line, and one slot
 describe('wear and doff: one body slot, and a night you can survive', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
   const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
 
   const carrying = (kinds: string[], s = makeWorld()): WorldState => {
     let out = s
     kinds.forEach((kind, i) => {
-      out = fold(out, ev(300 + i, 'item_spawned', {
-        id: `item_${i + 1}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' },
-      }), CFG)
+      out = fold(
+        out,
+        ev(300 + i, 'item_spawned', {
+          id: `item_${i + 1}`,
+          kind,
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+        }),
+        CFG,
+      )
     })
     return out
   }
@@ -509,10 +761,20 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     const s = carrying(['garment'])
     const r = submitIntent(s, CFG, 'a1', 'wear', { itemId: 'item_1' })
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.events[0]).toEqual({
-      type: 'action_started', payload: { agentId: 'a1', verb: 'wear', params: { itemId: 'item_1' }, duration: 1 },
-    })
-    expect(VERBS.wear!.onComplete(s, CFG, 'a1', { itemId: 'item_1' }, new RngStreams('w').get('actions'))).toEqual([
+    if (r.ok)
+      expect(r.events[0]).toEqual({
+        type: 'action_started',
+        payload: { agentId: 'a1', verb: 'wear', params: { itemId: 'item_1' }, duration: 1 },
+      })
+    expect(
+      VERBS.wear!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { itemId: 'item_1' },
+        new RngStreams('w').get('actions'),
+      ),
+    ).toEqual([
       { type: 'item_equipped', payload: { agentId: 'a1', itemId: 'item_1', slot: 'body' } },
     ])
     expect(apply(s, 'wear', { itemId: 'item_1' }).agents.a1!.equipped).toEqual({ body: 'item_1' })
@@ -548,7 +810,11 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
 
   it('a garment leaving the hands leaves the slot too, however it goes', () => {
     const worn = apply(carrying(['garment']), 'wear', { itemId: 'item_1' })
-    const dropped = fold(worn, ev(500, 'item_moved', { id: 'item_1', loc: { t: 'tile', x: 3, y: 3 } }), CFG)
+    const dropped = fold(
+      worn,
+      ev(500, 'item_moved', { id: 'item_1', loc: { t: 'tile', x: 3, y: 3 } }),
+      CFG,
+    )
     expect(dropped.agents.a1!.equipped).toBeUndefined()
   })
 
@@ -564,10 +830,16 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
   })
 
   it('crafts cloth from two fiber and a garment from two cloth, on the tailoring track', () => {
-    expect(CFG.crafting.recipes.cloth)
-      .toEqual({ inputs: { fiber: 2 }, output: { kind: 'cloth', qty: 1 }, skill: 'tailoring' })
-    expect(CFG.crafting.recipes.garment)
-      .toEqual({ inputs: { cloth: 2 }, output: { kind: 'garment', qty: 1 }, skill: 'tailoring' })
+    expect(CFG.crafting.recipes.cloth).toEqual({
+      inputs: { fiber: 2 },
+      output: { kind: 'cloth', qty: 1 },
+      skill: 'tailoring',
+    })
+    expect(CFG.crafting.recipes.garment).toEqual({
+      inputs: { cloth: 2 },
+      output: { kind: 'garment', qty: 1 },
+      skill: 'tailoring',
+    })
     const spun = apply(carrying(['fiber', 'fiber']), 'craft', { recipe: 'cloth' })
     expect(Object.values(spun.items).map((i) => i.kind)).toEqual(['cloth'])
     const sewn = apply(carrying(['cloth', 'cloth']), 'craft', { recipe: 'garment' })
@@ -586,8 +858,14 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     expect(insulationOf(worn, CFG, 'a1')).toBe(CFG.warmth.insulation.garment)
     expect(isExposed(worn, CFG, 'a1')).toBe(false)
 
-    const onlooker = fold(worn, ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: 7300 }), CFG)
-    const seen = composePerception(onlooker, CFG, 'a2', []).visible.agents.find((a) => a.id === 'a1')
+    const onlooker = fold(
+      worn,
+      ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: 7300 }),
+      CFG,
+    )
+    const seen = composePerception(onlooker, CFG, 'a2', []).visible.agents.find(
+      (a) => a.id === 'a1',
+    )
     expect(seen!.worn).toBe('wrapped in a rough cloak')
     expect(seen!.worn).not.toMatch(/\d/)
   })
@@ -595,9 +873,14 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
 
 // ------------------------------------------ night work costs time, or it costs fuel
 describe('night work: the choice is fuel or time, and it is theirs', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
   const OFF = SimConfigSchema.parse({
-    weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, light: { enabled: false },
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+    light: { enabled: false },
   })
   const MIDNIGHT = 30
   const NOON = 12 * 60 + 30
@@ -606,21 +889,45 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
 
   // Wide enough for a house beside the builder, with stone and wood in hand for the other verbs.
   function site(tick: number, config = CFG): WorldState {
-    let s = genesisState(config, Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0)))
+    let s = genesisState(
+      config,
+      Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0)),
+    )
     s = { ...s, tick }
-    s = fold(s, ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
-    const kit: Array<[string, string]> = [['item_1', 'wood'], ['item_2', 'stone'], ['item_3', 'fiber']]
+    s = fold(
+      s,
+      ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      config,
+    )
+    const kit: Array<[string, string]> = [
+      ['item_1', 'wood'],
+      ['item_2', 'stone'],
+      ['item_3', 'fiber'],
+    ]
     kit.forEach(([id, kind], i) => {
-      s = fold(s, ev(710 + i, 'item_spawned', { id, kind, qty: 20, loc: { t: 'agent', id: 'a1' } }), config)
+      s = fold(
+        s,
+        ev(710 + i, 'item_spawned', { id, kind, qty: 20, loc: { t: 'agent', id: 'a1' } }),
+        config,
+      )
     })
     return s
   }
   const withTorch = (s: WorldState, x: number, y: number, config = CFG): WorldState => {
-    let out = fold(s, ev(730, 'item_spawned', { id: 'item_9', kind: 'torch', qty: 1, loc: { t: 'tile', x, y } }), config)
+    let out = fold(
+      s,
+      ev(730, 'item_spawned', { id: 'item_9', kind: 'torch', qty: 1, loc: { t: 'tile', x, y } }),
+      config,
+    )
     out = fold(out, ev(731, 'item_lit', { itemId: 'item_9', burnsUntilTick: s.tick + 500 }), config)
     return out
   }
-  const durationOf = (s: WorldState, verb: string, params: Record<string, unknown>, config = CFG): number => {
+  const durationOf = (
+    s: WorldState,
+    verb: string,
+    params: Record<string, unknown>,
+    config = CFG,
+  ): number => {
     const r = submitIntent(s, config, 'a1', verb, params)
     if (!r.ok) throw new Error(`${verb}: ${r.reason}`)
     const started = r.events.find((e) => e.type === 'action_started')!
@@ -628,22 +935,32 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   }
 
   it('a house raised in the dark takes half again as long, and one raised by a torch does not', () => {
-    expect(durationOf(site(MIDNIGHT), 'build', { kind: 'house', x: 2, y: 1 })).toBe(Math.ceil(HOUSE * PENALTY))
-    expect(durationOf(withTorch(site(MIDNIGHT), 1, 2), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
+    expect(durationOf(site(MIDNIGHT), 'build', { kind: 'house', x: 2, y: 1 })).toBe(
+      Math.ceil(HOUSE * PENALTY),
+    )
+    expect(
+      durationOf(withTorch(site(MIDNIGHT), 1, 2), 'build', { kind: 'house', x: 2, y: 1 }),
+    ).toBe(HOUSE)
     expect(durationOf(site(NOON), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
   })
 
   it('the torch has to be within workRadius: three tiles off is still fumbling', () => {
     expect(CFG.light.workRadius).toBe(2)
-    expect(durationOf(withTorch(site(MIDNIGHT), 3, 1), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
-    expect(durationOf(withTorch(site(MIDNIGHT), 4, 1), 'build', { kind: 'house', x: 2, y: 1 }))
-      .toBe(Math.ceil(HOUSE * PENALTY))
+    expect(
+      durationOf(withTorch(site(MIDNIGHT), 3, 1), 'build', { kind: 'house', x: 2, y: 1 }),
+    ).toBe(HOUSE)
+    expect(
+      durationOf(withTorch(site(MIDNIGHT), 4, 1), 'build', { kind: 'house', x: 2, y: 1 }),
+    ).toBe(Math.ceil(HOUSE * PENALTY))
   })
 
   it('slows exactly the five working verbs, and leaves everything else at its own pace', () => {
     const slowed: Array<[string, Record<string, unknown>]> = [
-      ['build', { kind: 'house', x: 2, y: 1 }], ['craft', { recipe: 'plank' }],
-      ['till', { x: 1, y: 2 }], ['pave', { x: 1, y: 2 }], ['dig_channel', { x: 1, y: 2 }],
+      ['build', { kind: 'house', x: 2, y: 1 }],
+      ['craft', { recipe: 'plank' }],
+      ['till', { x: 1, y: 2 }],
+      ['pave', { x: 1, y: 2 }],
+      ['dig_channel', { x: 1, y: 2 }],
     ]
     for (const [verb, params] of slowed) {
       // dig_channel needs water beside it, so it is measured on its own below.
@@ -653,8 +970,10 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
       expect([verb, dark]).toEqual([verb, Math.ceil(day * PENALTY)])
     }
     for (const [verb, params] of [['walk', { x: 4, y: 4 }]] as const) {
-      expect([verb, durationOf(site(MIDNIGHT), verb, params)])
-        .toEqual([verb, durationOf(site(NOON), verb, params)])
+      expect([verb, durationOf(site(MIDNIGHT), verb, params)]).toEqual([
+        verb,
+        durationOf(site(NOON), verb, params),
+      ])
     }
     // `speak` is off this list because it no longer has a duration to slow: the mouth is not
     // the hands, so a word takes no activity slot and no tick, in the dark or in the day.
@@ -667,14 +986,17 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   it('dig_channel is slowed too, beside the water it needs', () => {
     const wet = (tick: number): WorldState => {
       const s = site(tick)
-      const terrain = s.terrain.map((row, y) => row.map((t, x) => (x === 0 && y === 2 ? (2 as TileId) : t)))
+      const terrain = s.terrain.map((row, y) =>
+        row.map((t, x) => (x === 0 && y === 2 ? (2 as TileId) : t)),
+      )
       return { ...s, terrain }
     }
-    expect(durationOf(wet(MIDNIGHT), 'dig_channel', { x: 1, y: 2 }))
-      .toBe(Math.ceil(durationOf(wet(NOON), 'dig_channel', { x: 1, y: 2 }) * PENALTY))
+    expect(durationOf(wet(MIDNIGHT), 'dig_channel', { x: 1, y: 2 })).toBe(
+      Math.ceil(durationOf(wet(NOON), 'dig_channel', { x: 1, y: 2 }) * PENALTY),
+    )
   })
 
-  it('never refuses, and says so in the body\'s own words — only while the penalty is on', () => {
+  it("never refuses, and says so in the body's own words — only while the penalty is on", () => {
     const dark = site(MIDNIGHT)
     const r = submitIntent(dark, CFG, 'a1', 'build', { kind: 'house', x: 2, y: 1 })
     expect(r.ok).toBe(true)
@@ -696,9 +1018,14 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
 
 // --------------------------------- monotony is a cost, and a shared stew is a reason
 describe('food variety: the same meal twice is worth less than two meals', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
   const OFF = SimConfigSchema.parse({
-    weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, foodVariety: { enabled: false },
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+    foodVariety: { enabled: false },
   })
   const FULL = CFG.needs.eatRestoreHunger
   const NOON = 720
@@ -708,29 +1035,62 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
     let s = { ...makeWorld(), tick }
     kinds.forEach((kind) => {
       nextItem += 1
-      s = fold(s, ev(900 + nextItem, 'item_spawned', {
-        id: `food_${nextItem}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' },
-      }), config)
+      s = fold(
+        s,
+        ev(900 + nextItem, 'item_spawned', {
+          id: `food_${nextItem}`,
+          kind,
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+        }),
+        config,
+      )
     })
     return s
   }
   const heldIdOf = (s: WorldState, kind: string): string =>
-    Object.keys(s.items).sort().find((id) => s.items[id]!.kind === kind)!
+    Object.keys(s.items)
+      .sort()
+      .find((id) => s.items[id]!.kind === kind)!
 
   // The window is counted in days, so these events must carry the tick they happened on.
-  const at = (type: string, payload: unknown, tick: number): SimEvent =>
-    ({ seq: 9500 + (nextItem += 1), tick, type, payload })
+  const at = (type: string, payload: unknown, tick: number): SimEvent => ({
+    seq: 9500 + (nextItem += 1),
+    tick,
+    type,
+    payload,
+  })
 
   // One meal, the way the tick pipeline serves it: the eating is recorded, then the belly fills.
-  const eatOne = (s: WorldState, kind: string, config = CFG): { state: WorldState; restored: number } => {
+  const eatOne = (
+    s: WorldState,
+    kind: string,
+    config = CFG,
+  ): { state: WorldState; restored: number } => {
     const itemId = heldIdOf(s, kind)
     const def = VERBS.eat!
     const results = def.results?.(s, config, 'a1', { itemId })
-    let out = fold(s, at('action_completed', {
-      agentId: 'a1', verb: 'eat', ...(results ? { results } : {}),
-    }, s.tick), config)
+    let out = fold(
+      s,
+      at(
+        'action_completed',
+        {
+          agentId: 'a1',
+          verb: 'eat',
+          ...(results ? { results } : {}),
+        },
+        s.tick,
+      ),
+      config,
+    )
     let restored = 0
-    for (const e of def.onComplete(out, config, 'a1', { itemId }, new RngStreams('fv').get('illness'))) {
+    for (const e of def.onComplete(
+      out,
+      config,
+      'a1',
+      { itemId },
+      new RngStreams('fv').get('illness'),
+    )) {
       if (e.type === 'need_changed' && (e.payload as { need: string }).need === 'hunger') {
         restored = (e.payload as { delta: number }).delta
       }
@@ -785,7 +1145,7 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
     expect(nutritionOf(CFG, 'herb')).toBeLessThan(0.2)
     const herb = eatOne(larder(['herb']), 'herb').restored
     expect(herb).toBe(FULL * nutritionOf(CFG, 'herb'))
-    expect(herb).toBeLessThan(FULL * nutritionOf(CFG, 'bread') / 4)
+    expect(herb).toBeLessThan((FULL * nutritionOf(CFG, 'bread')) / 4)
   })
 
   it('prices the smaller catches below a full meal and a stew above one', () => {
@@ -799,27 +1159,68 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
 })
 
 describe('stew: the one recipe the world ships with', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
   const NOON = 720
 
-  function kitchen(opts: { fire?: 'lit' | 'cold'; water?: boolean; food?: string[] } = {}): WorldState {
-    let s: WorldState = { ...makeWorld(['........', '........', '........', '........']), tick: NOON }
+  function kitchen(
+    opts: { fire?: 'lit' | 'cold'; water?: boolean; food?: string[] } = {},
+  ): WorldState {
+    let s: WorldState = {
+      ...makeWorld(['........', '........', '........', '........']),
+      tick: NOON,
+    }
     const food = opts.food ?? ['venison', 'berries']
     food.forEach((kind, i) => {
-      s = fold(s, ev(1000 + i, 'item_spawned', { id: `food_${i}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+      s = fold(
+        s,
+        ev(1000 + i, 'item_spawned', {
+          id: `food_${i}`,
+          kind,
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+        }),
+        CFG,
+      )
     })
     if (opts.water !== false) {
-      s = fold(s, ev(1010, 'item_spawned', {
-        id: 'pot', kind: 'bucket', qty: 1, loc: { t: 'agent', id: 'a1' }, charges: 1,
-      }), CFG)
+      s = fold(
+        s,
+        ev(1010, 'item_spawned', {
+          id: 'pot',
+          kind: 'bucket',
+          qty: 1,
+          loc: { t: 'agent', id: 'a1' },
+          charges: 1,
+        }),
+        CFG,
+      )
     }
     if (opts.fire !== undefined) {
-      s = fold(s, ev(1020, 'structure_planned', {
-        id: 'structure_1', kind: 'fire_pit', x: 1, y: 0, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a1',
-      }), CFG)
+      s = fold(
+        s,
+        ev(1020, 'structure_planned', {
+          id: 'structure_1',
+          kind: 'fire_pit',
+          x: 1,
+          y: 0,
+          w: 1,
+          h: 1,
+          maxHp: 10,
+          flammable: false,
+          builderId: 'a1',
+        }),
+        CFG,
+      )
       s = fold(s, ev(1021, 'structure_completed', { id: 'structure_1' }), CFG)
       if (opts.fire === 'lit') {
-        s = fold(s, ev(1022, 'structure_fueled', { structureId: 'structure_1', burnsUntilTick: NOON + 100 }), CFG)
+        s = fold(
+          s,
+          ev(1022, 'structure_fueled', { structureId: 'structure_1', burnsUntilTick: NOON + 100 }),
+          CFG,
+        )
       }
     }
     return s
@@ -831,13 +1232,31 @@ describe('stew: the one recipe the world ships with', () => {
     expect(ITEM_CLASSES.any_vegetable).toContain('berries')
     const s = kitchen({ fire: 'lit' })
     expect(cook(s).ok).toBe(true)
-    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'stew' }, new RngStreams('st').get('actions'))
-    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'food_0', delta: -1 } })
-    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'food_1', delta: -1 } })
+    const events = VERBS.craft!.onComplete(
+      s,
+      CFG,
+      'a1',
+      { recipe: 'stew' },
+      new RngStreams('st').get('actions'),
+    )
+    expect(events).toContainEqual({
+      type: 'item_qty_changed',
+      payload: { id: 'food_0', delta: -1 },
+    })
+    expect(events).toContainEqual({
+      type: 'item_qty_changed',
+      payload: { id: 'food_1', delta: -1 },
+    })
     expect(events).toContainEqual({ type: 'item_filled', payload: { itemId: 'pot', charges: 0 } })
-    expect(events.some((e) => e.type === 'item_spawned'
-      && (e.payload as { kind: string }).kind === 'stew')).toBe(true)
-    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'cooking', xp: 1 } })
+    expect(
+      events.some(
+        (e) => e.type === 'item_spawned' && (e.payload as { kind: string }).kind === 'stew',
+      ),
+    ).toBe(true)
+    expect(events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'cooking', xp: 1 },
+    })
   })
 
   it('takes rabbit and a mushroom just as readily: the class is the ingredient', () => {
@@ -866,12 +1285,22 @@ describe('stew: the one recipe the world ships with', () => {
 })
 
 describe('the clothing line has two upstreams: the reed bed and the deer', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
 
   function holding(kind: string, qty: number): WorldState {
-    return fold(makeWorld(), ev(1000, 'item_spawned', {
-      id: 'stock', kind, qty, loc: { t: 'agent', id: 'a1' },
-    }), CFG)
+    return fold(
+      makeWorld(),
+      ev(1000, 'item_spawned', {
+        id: 'stock',
+        kind,
+        qty,
+        loc: { t: 'agent', id: 'a1' },
+      }),
+      CFG,
+    )
   }
   const make = (s: WorldState, recipe: string) => submitIntent(s, CFG, 'a1', 'craft', { recipe })
 
@@ -888,12 +1317,21 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
     expect(SEED_RECIPES.hide_garment!.output).toEqual({ kind: 'garment', qty: 1 })
     const s = holding('hide', 2)
     expect(make(s, 'hide_garment').ok).toBe(true)
-    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'hide_garment' }, new RngStreams('h').get('actions'))
+    const events = VERBS.craft!.onComplete(
+      s,
+      CFG,
+      'a1',
+      { recipe: 'hide_garment' },
+      new RngStreams('h').get('actions'),
+    )
     expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
     const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
     expect(made.kind).toBe('garment')
     expect(isWearable(CFG, made.kind)).toBe(true)
-    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+    expect(events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'tailoring', xp: 1 },
+    })
   })
 
   it('one hide is not a garment', () => {
@@ -905,19 +1343,37 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
   it('asking for the thing, not the road: two hides and "craft garment" makes one', () => {
     const s = holding('hide', 2)
     expect(make(s, 'garment').ok).toBe(true)
-    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'garment' }, new RngStreams('h').get('actions'))
+    const events = VERBS.craft!.onComplete(
+      s,
+      CFG,
+      'a1',
+      { recipe: 'garment' },
+      new RngStreams('h').get('actions'),
+    )
     expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
     const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
     expect(made.kind).toBe('garment')
-    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+    expect(events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'tailoring', xp: 1 },
+    })
   })
 
   it('the named row still goes first: cloth in hand weaves, it does not skin', () => {
     const s = holding('cloth', 2)
     expect(make(s, 'garment').ok).toBe(true)
-    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'garment' }, new RngStreams('h').get('actions'))
+    const events = VERBS.craft!.onComplete(
+      s,
+      CFG,
+      'a1',
+      { recipe: 'garment' },
+      new RngStreams('h').get('actions'),
+    )
     expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
-    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+    expect(events).toContainEqual({
+      type: 'skill_gained',
+      payload: { agentId: 'a1', track: 'tailoring', xp: 1 },
+    })
   })
 
   it('with nothing that will do it, the refusal is the one the named road gives', () => {
@@ -937,12 +1393,19 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
 })
 
 describe('a torch is a thing hands can make', () => {
-  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
 
   function bench(stock: Array<[string, number]>): WorldState {
     let s = makeWorld()
     stock.forEach(([kind, qty], i) => {
-      s = fold(s, ev(1100 + i, 'item_spawned', { id: `it_${i}`, kind, qty, loc: { t: 'agent', id: 'a1' } }), CFG)
+      s = fold(
+        s,
+        ev(1100 + i, 'item_spawned', { id: `it_${i}`, kind, qty, loc: { t: 'agent', id: 'a1' } }),
+        CFG,
+      )
     })
     return s
   }
@@ -951,9 +1414,18 @@ describe('a torch is a thing hands can make', () => {
   it('a stick and a handful of reed fiber, and the recipe is code not a dial', () => {
     expect(CFG.crafting.recipes.torch).toBeUndefined()
     expect(SEED_RECIPES.torch!.output).toEqual({ kind: 'torch', qty: 1 })
-    const s = bench([['wood', 1], ['fiber', 1]])
+    const s = bench([
+      ['wood', 1],
+      ['fiber', 1],
+    ])
     expect(make(s).ok).toBe(true)
-    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'torch' }, new RngStreams('t').get('actions'))
+    const events = VERBS.craft!.onComplete(
+      s,
+      CFG,
+      'a1',
+      { recipe: 'torch' },
+      new RngStreams('t').get('actions'),
+    )
     const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
     expect(made.kind).toBe('torch')
   })
@@ -962,10 +1434,18 @@ describe('a torch is a thing hands can make', () => {
     expect(isKindleable(CFG, 'torch')).toBe(true)
     // ★ AND THE THREE THINGS IN THE GLOW TABLE THAT ARE NOT IN A HAND STAY OUT. `hearth` is
     // there so the house that holds one can borrow its reach, and it is not a thing you carry.
-    for (const kind of ['hearth', 'fire_pit', 'house']) expect(isKindleable(CFG, kind), kind).toBe(false)
-    const lit = fold(bench([]), ev(1200, 'item_spawned', {
-      id: 'torch_1', kind: 'torch', qty: 1, loc: { t: 'agent', id: 'a1' },
-    }), CFG)
+    for (const kind of ['hearth', 'fire_pit', 'house'])
+      expect(isKindleable(CFG, kind), kind).toBe(false)
+    const lit = fold(
+      bench([]),
+      ev(1200, 'item_spawned', {
+        id: 'torch_1',
+        kind: 'torch',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+      }),
+      CFG,
+    )
     expect(submitIntent(lit, CFG, 'a1', 'kindle', { itemId: 'torch_1' }).ok).toBe(true)
   })
 

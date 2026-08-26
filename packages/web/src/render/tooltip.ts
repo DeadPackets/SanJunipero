@@ -4,7 +4,12 @@ import type { LayerSet } from './layers.js'
 import { createWorldLabel } from './worldLabel.js'
 // the tag's material is the SPEECH material, taken from its owner rather than through
 // bubbles.ts — bubbles.ts now needs `placeTag` from here, and an alias is not worth a cycle
-import { SPEECH_FILL as BUBBLE_FILL, SPEECH_INK as BUBBLE_INK, faceFor, worldTextScale } from './textFaces.js'
+import {
+  SPEECH_FILL as BUBBLE_FILL,
+  SPEECH_INK as BUBBLE_INK,
+  faceFor,
+  worldTextScale,
+} from './textFaces.js'
 
 export const TAG_FONT_PX = faceFor('label').size
 export const TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, TAG_FONT_PX + 2)
@@ -14,7 +19,9 @@ export const TAG_MAX_CHARS = 48
 
 /** Gap between the thing and its label; keep-out from the viewport edge; and how far a label
  *  moves to get clear of something already occupying its place. */
-export const TAG_GAP_PX = 6, EDGE_PAD_PX = 8, STACK_STEP_PX = 4
+export const TAG_GAP_PX = 6,
+  EDGE_PAD_PX = 8,
+  STACK_STEP_PX = 4
 export const MAX_STACK_STEPS = 3
 
 /** Where a label points. `sy` is the anchor's BASE and `topY` the top of what is DRAWN. */
@@ -25,22 +32,37 @@ export type Placed = { sx: number; sy: number; side: 'above' | 'below' | 'left' 
 const overlaps = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-const clamp = (v: number, lo: number, hi: number): number => (lo > hi ? lo : Math.min(Math.max(v, lo), hi))
+const clamp = (v: number, lo: number, hi: number): number =>
+  lo > hi ? lo : Math.min(Math.max(v, lo), hi)
 
 /** The one placement rule: above-centre, else below, else to a side, clamped into the view and
  *  stepped clear of anything already there. */
 export function placeTag(
-  a: Anchor, size: { w: number; h: number }, view: Rect, occupied: readonly Rect[] = [],
+  a: Anchor,
+  size: { w: number; h: number },
+  view: Rect,
+  occupied: readonly Rect[] = [],
 ): Placed {
   const fits = (r: Rect): boolean =>
-    r.x >= view.x + EDGE_PAD_PX && r.x + r.w <= view.x + view.w - EDGE_PAD_PX
-    && r.y >= view.y + EDGE_PAD_PX && r.y + r.h <= view.y + view.h - EDGE_PAD_PX
+    r.x >= view.x + EDGE_PAD_PX &&
+    r.x + r.w <= view.x + view.w - EDGE_PAD_PX &&
+    r.y >= view.y + EDGE_PAD_PX &&
+    r.y + r.h <= view.y + view.h - EDGE_PAD_PX
 
   const candidates: Array<{ side: Placed['side']; rect: Rect }> = [
-    { side: 'above', rect: { x: a.sx - size.w / 2, y: a.topY - TAG_GAP_PX - size.h, w: size.w, h: size.h } },
+    {
+      side: 'above',
+      rect: { x: a.sx - size.w / 2, y: a.topY - TAG_GAP_PX - size.h, w: size.w, h: size.h },
+    },
     { side: 'below', rect: { x: a.sx - size.w / 2, y: a.sy + TAG_GAP_PX, w: size.w, h: size.h } },
-    { side: 'right', rect: { x: a.sx + a.halfW + TAG_GAP_PX, y: a.sy - size.h / 2, w: size.w, h: size.h } },
-    { side: 'left', rect: { x: a.sx - a.halfW - TAG_GAP_PX - size.w, y: a.sy - size.h / 2, w: size.w, h: size.h } },
+    {
+      side: 'right',
+      rect: { x: a.sx + a.halfW + TAG_GAP_PX, y: a.sy - size.h / 2, w: size.w, h: size.h },
+    },
+    {
+      side: 'left',
+      rect: { x: a.sx - a.halfW - TAG_GAP_PX - size.w, y: a.sy - size.h / 2, w: size.w, h: size.h },
+    },
   ]
   const chosen = candidates.find((c) => fits(c.rect)) ?? candidates[0]!
   const rect = { ...chosen.rect }
@@ -55,7 +77,9 @@ export function placeTag(
   for (let step = 0; step < MAX_STACK_STEPS; step++) {
     const hit = occupied.filter((o) => overlaps(rect, o))
     if (hit.length === 0) break
-    const depth = Math.max(...hit.map((o) => (away > 0 ? o.y + o.h - rect.y : rect.y + rect.h - o.y)))
+    const depth = Math.max(
+      ...hit.map((o) => (away > 0 ? o.y + o.h - rect.y : rect.y + rect.h - o.y)),
+    )
     rect.y += away * (depth + STACK_STEP_PX)
     rect.y = clamp(rect.y, view.y + EDGE_PAD_PX, view.y + view.h - EDGE_PAD_PX - size.h)
   }
@@ -65,7 +89,8 @@ export function placeTag(
 /** The anchor for a sprite, from its DRAWN bounds — a sprite's `y` is already its base, so
  *  subtracting the full height gives the top rather than the middle. */
 export function anchorForSprite(
-  sprite: { x: number; y: number }, bounds: { width: number; height: number },
+  sprite: { x: number; y: number },
+  bounds: { width: number; height: number },
 ): Anchor {
   return { sx: sprite.x, sy: sprite.y, halfW: bounds.width / 2, topY: sprite.y - bounds.height }
 }
@@ -87,7 +112,12 @@ export type TooltipLayer = {
   destroy(): void
 }
 
-type Tag = { node: Container; slab: Graphics; label: ReturnType<typeof createWorldLabel>; box: Rect | null }
+type Tag = {
+  node: Container
+  slab: Graphics
+  label: ReturnType<typeof createWorldLabel>
+  box: Rect | null
+}
 
 function makeTag(parent: Container): Tag {
   const node = new Container()
@@ -95,7 +125,10 @@ function makeTag(parent: Container): Tag {
   node.eventMode = 'none' // a label must never eat the click on the thing it names
   const slab = new Graphics()
   const label = createWorldLabel('', {
-    fontFamily: faceFor('label').family, fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H,
+    fontFamily: faceFor('label').family,
+    fontSize: TAG_FONT_PX,
+    fill: BUBBLE_INK,
+    lineHeight: TAG_LINE_H,
   })
   label.anchor.set(0.5, 0)
   node.addChild(slab, label)
@@ -103,7 +136,11 @@ function makeTag(parent: Container): Tag {
   return { node, slab, label, box: null }
 }
 
-export function createTooltipLayer(layers: LayerSet, view: () => Rect, zoom: () => number = () => 1): TooltipLayer {
+export function createTooltipLayer(
+  layers: LayerSet,
+  view: () => Rect,
+  zoom: () => number = () => 1,
+): TooltipLayer {
   const tags = new Map<TagOwner, Tag>()
   let occupied: readonly Rect[] = []
 
@@ -129,8 +166,11 @@ export function createTooltipLayer(layers: LayerSet, view: () => Rect, zoom: () 
         t.label.text = next
         t.slab.clear()
         t.slab.roundRect(
-          -t.label.width / 2 - TAG_PAD_X, -TAG_PAD_Y,
-          t.label.width + TAG_PAD_X * 2, t.label.height + TAG_PAD_Y * 2, 2,
+          -t.label.width / 2 - TAG_PAD_X,
+          -TAG_PAD_Y,
+          t.label.width + TAG_PAD_X * 2,
+          t.label.height + TAG_PAD_Y * 2,
+          2,
         )
         t.slab.fill(BUBBLE_FILL)
         t.slab.stroke({ width: 1, color: BUBBLE_INK })
@@ -144,8 +184,13 @@ export function createTooltipLayer(layers: LayerSet, view: () => Rect, zoom: () 
         h: (t.label.height + TAG_PAD_Y * 2) * inv,
       }
       // every OTHER live tag is something this one must not land on
-      const taken = [...occupied, ...[...tags].filter(([o]) => o !== owner).map(([, x]) => x.box)
-        .filter((b): b is Rect => b !== null)]
+      const taken = [
+        ...occupied,
+        ...[...tags]
+          .filter(([o]) => o !== owner)
+          .map(([, x]) => x.box)
+          .filter((b): b is Rect => b !== null),
+      ]
       const at = placeTag(a, size, view(), taken)
       t.node.position.set(Math.round(at.sx), Math.round(at.sy + TAG_PAD_Y * inv))
       t.node.visible = true
@@ -166,7 +211,8 @@ export function createTooltipLayer(layers: LayerSet, view: () => Rect, zoom: () 
     setOccupied(boxes) {
       occupied = boxes
     },
-    boxes: () => [...tags].filter(([, t]) => t.box !== null).map(([owner, t]) => ({ owner, rect: t.box! })),
+    boxes: () =>
+      [...tags].filter(([, t]) => t.box !== null).map(([owner, t]) => ({ owner, rect: t.box! })),
     destroy() {
       for (const t of tags.values()) t.node.destroy({ children: true })
       tags.clear()

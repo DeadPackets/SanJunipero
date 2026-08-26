@@ -59,7 +59,8 @@ export function wallCourses(
   const out: WallCourse[] = []
   for (const wall of WALL_KINDS) {
     const tiles = wall === 'back-right' ? room.w : room.h
-    for (let at = 0; at < tiles; at += WALL_STRIP_TILES) out.push({ wall, piece: 'wall-plain', atTiles: at })
+    for (let at = 0; at < tiles; at += WALL_STRIP_TILES)
+      out.push({ wall, piece: 'wall-plain', atTiles: at })
   }
   // The door is on the near end of the long wall, where the exterior door is; every other bay
   // of that wall is glazed, which is a rule and not a coordinate — it holds for a longer room.
@@ -84,7 +85,10 @@ export function resolveInteriorPiece(records: readonly AssetRecord[], id: string
 }
 
 /** The url of an interior floor material in the codex, or `null`. */
-export function resolveInteriorMaterial(records: readonly AssetRecord[], id: string): string | null {
+export function resolveInteriorMaterial(
+  records: readonly AssetRecord[],
+  id: string,
+): string | null {
   return newestReady(records, materialKind(id))
 }
 
@@ -108,7 +112,8 @@ export function hasInteriorTileset(records: readonly AssetRecord[]): boolean {
 export type FloorRegion = { x0: number; y0: number; x1: number; y1: number }
 
 export function flagstoneRegions(
-  hearths: ReadonlyArray<{ x: number; y: number }>, room = ROOM_TILES,
+  hearths: ReadonlyArray<{ x: number; y: number }>,
+  room = ROOM_TILES,
 ): FloorRegion[] {
   const out: FloorRegion[] = [
     // the threshold, inside the near corner
@@ -116,8 +121,10 @@ export function flagstoneRegions(
   ]
   for (const h of hearths) {
     out.push({
-      x0: Math.max(0, h.x - 1), y0: Math.max(0, h.y - 1),
-      x1: Math.min(room.w, h.x + 2), y1: Math.min(room.h, h.y + 2),
+      x0: Math.max(0, h.x - 1),
+      y0: Math.max(0, h.y - 1),
+      x1: Math.min(room.w, h.x + 2),
+      y1: Math.min(room.h, h.y + 2),
     })
   }
   return out

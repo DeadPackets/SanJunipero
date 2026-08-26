@@ -50,7 +50,10 @@ export function humanizeIntent(verb: string, params: Record<string, unknown>): s
 }
 
 // The one call the supervisor makes once both halves exist.
-export function wireArbiter(runtime: { useArbiter(a: SeamArbiter): void }, arbiter: SeamArbiter): void {
+export function wireArbiter(
+  runtime: { useArbiter(a: SeamArbiter): void },
+  arbiter: SeamArbiter,
+): void {
   runtime.useArbiter(arbiter)
 }
 

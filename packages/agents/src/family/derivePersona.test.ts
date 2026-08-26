@@ -80,7 +80,9 @@ describe('derivePersona (T25)', () => {
     const { identity } = derivePersona(CHILD, [MOTHER, FATHER])
     const v = identity.voiceCard
     const registerFrom = v.register === MOTHER.identity.voiceCard.register ? 0 : 1
-    expect([MOTHER.identity.voiceCard.register, FATHER.identity.voiceCard.register]).toContain(v.register)
+    expect([MOTHER.identity.voiceCard.register, FATHER.identity.voiceCard.register]).toContain(
+      v.register,
+    )
     const rhythms = [MOTHER.identity.voiceCard.rhythm, FATHER.identity.voiceCard.rhythm]
     expect(v.rhythm).toBe(rhythms[1 - registerFrom])
   })

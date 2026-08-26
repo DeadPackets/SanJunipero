@@ -1,8 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, LIGHT_BANDS, UI_BOUNDARY_RATIO, WORLD_TEXT_PAIRS,
-  bandRatios, groundMarkOffenders, over, readableRatio, tintedBy, worldTextOffenders,
+  AA_RATIO,
+  LANDMARK_INK,
+  LANDMARK_PLATE,
+  LIGHT_BANDS,
+  UI_BOUNDARY_RATIO,
+  WORLD_TEXT_PAIRS,
+  bandRatios,
+  groundMarkOffenders,
+  over,
+  readableRatio,
+  tintedBy,
+  worldTextOffenders,
 } from './legibility.js'
 import { TILE_COLORS } from './ground.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
@@ -52,7 +62,10 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
 
   it('keeps speech and thought on different PAPER, both of which hold the ink after dark', () => {
     expect(SPEECH_FILL).not.toBe(THOUGHT_FILL)
-    for (const [ink, fill] of [[SPEECH_INK, SPEECH_FILL], [THOUGHT_INK, THOUGHT_FILL]] as const) {
+    for (const [ink, fill] of [
+      [SPEECH_INK, SPEECH_FILL],
+      [THOUGHT_INK, THOUGHT_FILL],
+    ] as const) {
       expect(bandRatios(ink, fill).night).toBeGreaterThanOrEqual(AA_RATIO)
     }
   })
@@ -70,7 +83,8 @@ const DOOR_GROUNDS = ([0, 1, 4, 5, 7, 8] as const).map((t) => TILE_COLORS[t])
 
 /** The retired sill's own colours. They live here because they measure a thing that is gone,
  *  and a constant exported from the product for a test to cite is a fact nothing enforces. */
-const RETIRED_RIM = 0x43394a, RETIRED_FILL = 0xf2c879
+const RETIRED_RIM = 0x43394a,
+  RETIRED_FILL = 0xf2c879
 
 describe('★ why "you can go in here" is not a mark on the ground', () => {
   it('reproduces what shipped: a 45 % rim fails the boundary floor on EVERY door ground', () => {
@@ -102,14 +116,17 @@ describe('★ why "you can go in here" is not a mark on the ground', () => {
   it('the honey fill was warmth and was never the affordance, at any alpha', () => {
     for (const a of [0.45, 0.85, 1]) {
       const grass = TILE_COLORS[0]
-      expect(readableRatio(over(RETIRED_FILL, grass, a), grass, LIGHT_BANDS.day))
-        .toBeLessThan(UI_BOUNDARY_RATIO)
+      expect(readableRatio(over(RETIRED_FILL, grass, a), grass, LIGHT_BANDS.day)).toBeLessThan(
+        UI_BOUNDARY_RATIO,
+      )
     }
   })
 
   it('★ AND THE MARK IS GONE: entities.ts paints nothing on a door tile', () => {
     const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
-    const code = src.split('\n').map((l) => l.trim())
+    const code = src
+      .split('\n')
+      .map((l) => l.trim())
       .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
       .join('\n')
     for (const gone of ['doorSillPolygon', 'DOOR_SILL', 'DOOR_LINTEL', 'DOOR_RIM', 'layoutDoor']) {

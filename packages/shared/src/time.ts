@@ -17,8 +17,14 @@ export function dayPhaseFromTick(tick: number): DayPhase {
 }
 
 export type SimTime = {
-  tick: number; year: number; season: Season; dayOfSeason: number
-  dayOfYear: number; hour: number; minute: number; isNight: boolean
+  tick: number
+  year: number
+  season: Season
+  dayOfSeason: number
+  dayOfYear: number
+  hour: number
+  minute: number
+  isNight: boolean
 }
 
 export function simTimeFromTick(tick: number): SimTime {

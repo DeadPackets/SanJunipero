@@ -20,23 +20,69 @@ function seedWorld(): EventStore {
     store.append(t, type, payload)
   }
   at(10, 'structure_planned', {
-    id: HOME, kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 40, flammable: true, builderId: FATHER, owner: FATHER,
+    id: HOME,
+    kind: 'house',
+    x: 4,
+    y: 4,
+    w: 2,
+    h: 2,
+    maxHp: 40,
+    flammable: true,
+    builderId: FATHER,
+    owner: FATHER,
   })
   at(20, 'structure_completed', { id: HOME })
-  at(25, 'structure_inscribed', { structureId: HOME, text: 'we raised this in the rain', agentId: MOTHER })
+  at(25, 'structure_inscribed', {
+    structureId: HOME,
+    text: 'we raised this in the rain',
+    agentId: MOTHER,
+  })
   at(30, 'agent_spoke', { agentId: MOTHER, text: 'The seed is in the ground.', x: 4, y: 5 })
   at(31, 'agent_spoke', { agentId: STRANGER, text: 'None of your business.', x: 20, y: 20 })
-  at(40, 'item_spawned', { id: 'item_3', kind: 'wheat', qty: 2, loc: { t: 'agent', id: MOTHER }, owner: MOTHER })
-  at(41, 'item_spawned', { id: 'item_4', kind: 'fish', qty: 1, loc: { t: 'agent', id: STRANGER }, owner: STRANGER })
+  at(40, 'item_spawned', {
+    id: 'item_3',
+    kind: 'wheat',
+    qty: 2,
+    loc: { t: 'agent', id: MOTHER },
+    owner: MOTHER,
+  })
+  at(41, 'item_spawned', {
+    id: 'item_4',
+    kind: 'fish',
+    qty: 1,
+    loc: { t: 'agent', id: STRANGER },
+    owner: STRANGER,
+  })
   at(50, 'item_moved', { id: 'item_3', loc: { t: 'structure', id: HOME } })
-  at(60, 'item_taken', { itemId: 'item_3', kind: 'wheat', takerId: STRANGER, ownerId: MOTHER, x: 4, y: 4 })
-  at(70, 'agent_born', { id: CHILD, name: 'Mira', sex: 'f', motherId: MOTHER, fatherId: FATHER, x: 4, y: 4 })
+  at(60, 'item_taken', {
+    itemId: 'item_3',
+    kind: 'wheat',
+    takerId: STRANGER,
+    ownerId: MOTHER,
+    x: 4,
+    y: 4,
+  })
+  at(70, 'agent_born', {
+    id: CHILD,
+    name: 'Mira',
+    sex: 'f',
+    motherId: MOTHER,
+    fatherId: FATHER,
+    x: 4,
+    y: 4,
+  })
   at(80, 'agent_spoke', { agentId: FATHER, text: 'She has her mother’s hands.', x: 4, y: 4 })
   void tick
   return store
 }
 
-const OPTS = { childId: CHILD, motherId: MOTHER, fatherId: FATHER, homeStructureId: HOME, upToTick: 100 }
+const OPTS = {
+  childId: CHILD,
+  motherId: MOTHER,
+  fatherId: FATHER,
+  homeStructureId: HOME,
+  upToTick: 100,
+}
 
 describe('buildHouseholdSeed (T25)', () => {
   it('every entry traces to a real event id in the log', () => {
@@ -83,7 +129,13 @@ describe('buildHouseholdSeed (T25)', () => {
     const parentDb = openAgentDb(':memory:')
     const parentMem = new MemoryStore(parentDb, MOTHER, await FakeEmbedder.create())
     const SECRET = 'I have never told anyone that I hid the last of the seed corn.'
-    await parentMem.insertMemory({ tick: 35, kind: 'journal', text: SECRET, importance: 9, tags: { people: [], place: 'house', objects: [], topics: [] } })
+    await parentMem.insertMemory({
+      tick: 35,
+      kind: 'journal',
+      text: SECRET,
+      importance: 9,
+      tags: { people: [], place: 'house', objects: [], topics: [] },
+    })
 
     const seed = buildHouseholdSeed(store, OPTS)
     for (const entry of seed) expect(entry.text).not.toContain('hid the last of the seed corn')

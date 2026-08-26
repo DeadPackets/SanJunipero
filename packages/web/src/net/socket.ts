@@ -2,7 +2,7 @@ import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
 export const LAST_SEEN_KEY = 'sj:lastSeenTick'
-export const GAP_TICKS = 1440              // more than a missed day → offer the digest
+export const GAP_TICKS = 1440 // more than a missed day → offer the digest
 export const BACKOFF_MIN_MS = 1_000
 export const BACKOFF_MAX_MS = 30_000
 
@@ -33,10 +33,16 @@ export function connectObservatory(opts: {
       const n = Math.floor(Number(v))
       // a corrupt stored value must never brick the hello (schema wants a nonnegative int)
       return Number.isFinite(n) && n >= 0 ? n : null
-    } catch { return null }
+    } catch {
+      return null
+    }
   }
   const writeLastSeen = (tick: number): void => {
-    try { localStorage.setItem(LAST_SEEN_KEY, String(tick)) } catch { /* private mode */ }
+    try {
+      localStorage.setItem(LAST_SEEN_KEY, String(tick))
+    } catch {
+      /* private mode */
+    }
   }
 
   const open = (): void => {
@@ -70,8 +76,15 @@ export function connectObservatory(opts: {
     if (sock !== null && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify(payload))
   }
   return {
-    scrub(tick) { send({ t: 'scrub', tick, reqId: ++reqId }) },
-    goLive() { send({ t: 'live' }) },
-    close() { closed = true; sock?.close() },
+    scrub(tick) {
+      send({ t: 'scrub', tick, reqId: ++reqId })
+    },
+    goLive() {
+      send({ t: 'live' })
+    },
+    close() {
+      closed = true
+      sock?.close()
+    },
   }
 }

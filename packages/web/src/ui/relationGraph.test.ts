@@ -7,18 +7,58 @@ import { BOND_LEVELS, BOND_TYPES, LEVEL_RANK, bondArc, type LineageLike } from '
 import { BondDetailPanel } from './BondDetailPanel.js'
 import { LegendChip } from './LegendChip.js'
 import {
-  ARC_COLOR, LENS_BACKGROUND, LEVEL_DISTANCE, NO_LINK_LEVEL, TYPE_STROKE,
-  relationLegend, toRelationGraph,
+  ARC_COLOR,
+  LENS_BACKGROUND,
+  LEVEL_DISTANCE,
+  NO_LINK_LEVEL,
+  TYPE_STROKE,
+  relationLegend,
+  toRelationGraph,
 } from './relationGraph.js'
 import type { PeopleIndex } from './bondsModel.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 const MASTER_PALETTE = [
-  '#FFF6E9', '#F6E8D5', '#E8D5BC', '#D4BC9E', '#B89D7E', '#F2C879', '#E0A95E', '#C68A48',
-  '#A66E38', '#7E512B', '#DCE8C8', '#B9D19A', '#93B573', '#6F9455', '#4F7040', '#F2C6C2',
-  '#E09E9B', '#C47876', '#9E5A5C', '#D6EAF2', '#A8CFE0', '#7FB0C9', '#5A8CAB', '#3E6786',
-  '#E9E2DA', '#CFC6BC', '#ABA198', '#857D75', '#5D5751', '#43394A', '#322B38', '#241F2B',
-  '#171420', '#F7A66B', '#E8785A', '#8A6FA8', '#F4E289', '#F5D3B3', '#D9A876', '#9C6B47',
+  '#FFF6E9',
+  '#F6E8D5',
+  '#E8D5BC',
+  '#D4BC9E',
+  '#B89D7E',
+  '#F2C879',
+  '#E0A95E',
+  '#C68A48',
+  '#A66E38',
+  '#7E512B',
+  '#DCE8C8',
+  '#B9D19A',
+  '#93B573',
+  '#6F9455',
+  '#4F7040',
+  '#F2C6C2',
+  '#E09E9B',
+  '#C47876',
+  '#9E5A5C',
+  '#D6EAF2',
+  '#A8CFE0',
+  '#7FB0C9',
+  '#5A8CAB',
+  '#3E6786',
+  '#E9E2DA',
+  '#CFC6BC',
+  '#ABA198',
+  '#857D75',
+  '#5D5751',
+  '#43394A',
+  '#322B38',
+  '#241F2B',
+  '#171420',
+  '#F7A66B',
+  '#E8785A',
+  '#8A6FA8',
+  '#F4E289',
+  '#F5D3B3',
+  '#D9A876',
+  '#9C6B47',
 ]
 
 // WCAG 2.x relative luminance, computed rather than a pasted number
@@ -59,7 +99,9 @@ describe('★ every living person is a node, always', () => {
   it('an unlinked person is still on the page beside a linked one', () => {
     const g = toRelationGraph(
       api([bond('amara', 'nadia', 'owe', [at(0, 'owe'), at(0, 'owe'), at(0, 'owe')])]),
-      NO_LINEAGE, PEOPLE, 0,
+      NO_LINEAGE,
+      PEOPLE,
+      0,
     )
     expect(g.nodes.length).toBe(4)
     expect(g.links.length).toBe(1)
@@ -68,7 +110,12 @@ describe('★ every living person is a node, always', () => {
 
   it('STRANGERS draw no line at all — a line would invent a relationship', () => {
     expect(NO_LINK_LEVEL).toBe('strangers')
-    const g = toRelationGraph(api([bond('amara', 'nadia', 'friend', [at(0, 'friend')])]), NO_LINEAGE, PEOPLE, 0)
+    const g = toRelationGraph(
+      api([bond('amara', 'nadia', 'friend', [at(0, 'friend')])]),
+      NO_LINEAGE,
+      PEOPLE,
+      0,
+    )
     expect(g.links).toEqual([])
     expect(g.nodes.length).toBe(4)
   })
@@ -99,8 +146,17 @@ describe('edge length carries the LEVEL', () => {
   it('is total over BOND_LEVELS, and every link takes its own level’s length', () => {
     for (const l of BOND_LEVELS) expect(LEVEL_DISTANCE[l], l).toBeGreaterThan(0)
     const g = toRelationGraph(
-      api([bond('amara', 'nadia', 'partner', Array.from({ length: 6 }, () => at(0, 'partner')))]),
-      NO_LINEAGE, PEOPLE, 0,
+      api([
+        bond(
+          'amara',
+          'nadia',
+          'partner',
+          Array.from({ length: 6 }, () => at(0, 'partner')),
+        ),
+      ]),
+      NO_LINEAGE,
+      PEOPLE,
+      0,
     )
     expect(g.links[0]!.level).toBe('close')
     expect(g.links[0]!.distance).toBe(LEVEL_DISTANCE.close)
@@ -131,7 +187,7 @@ describe('edge mark carries the TYPE, and colour is never the only signal', () =
 
 describe('edge colour carries the ARC, and clears the ground it is drawn on', () => {
   it('★ every arc colour is a palette member and clears 3:1 on the lens ground', () => {
-    expect(LENS_BACKGROUND).toBe('#322B38')     // --night
+    expect(LENS_BACKGROUND).toBe('#322B38') // --night
     for (const dir of ['warming', 'cooling', 'steady'] as const) {
       const hex = ARC_COLOR[dir]
       expect(MASTER_PALETTE, `${dir} ${hex}`).toContain(hex.toUpperCase())
@@ -152,8 +208,12 @@ describe('relationLegend explains all three axes without becoming a manual', () 
     for (const axis of ['level', 'type', 'arc'] as const) {
       expect(rows.filter((r) => r.axis === axis).length, axis).toBeGreaterThan(0)
     }
-    expect(rows.filter((r) => r.axis === 'level').map((r) => r.key).sort())
-      .toEqual([...BOND_LEVELS].sort())
+    expect(
+      rows
+        .filter((r) => r.axis === 'level')
+        .map((r) => r.key)
+        .sort(),
+    ).toEqual([...BOND_LEVELS].sort())
     // "no family tie" is the ABSENCE of a mark, so it is not a legend row
     expect(rows.filter((r) => r.axis === 'type').map((r) => r.key)).not.toContain('none')
   })
@@ -203,11 +263,17 @@ describe('BondDetailPanel — the arc, the evidence, and NO filled bar', () => {
   const history = [at(0, 'partner'), at(100, 'partner'), at(200, 'partner')]
   const b = bond('amara', 'nadia', 'partner', history, 200)
   const arc = bondArc(b, 200)
-  const html = renderToStaticMarkup(createElement(BondDetailPanel, {
-    bond: b, people: PEOPLE, type: 'partner' as const, level: 'friendly' as const,
-    arc, words: 'Amara and Nadia are partners, and they are friends.',
-    onClose: () => {},
-  }))
+  const html = renderToStaticMarkup(
+    createElement(BondDetailPanel, {
+      bond: b,
+      people: PEOPLE,
+      type: 'partner' as const,
+      level: 'friendly' as const,
+      arc,
+      words: 'Amara and Nadia are partners, and they are friends.',
+      onClose: () => {},
+    }),
+  )
 
   it('★ the strength bar is GONE — a relationship is not a meter with a leader', () => {
     expect(html).not.toContain('bond-bar')
@@ -237,11 +303,17 @@ describe('BondDetailPanel — the arc, the evidence, and NO filled bar', () => {
   })
 
   it('a pair with no partnership gets no evidence line at all', () => {
-    const plain = renderToStaticMarkup(createElement(BondDetailPanel, {
-      bond: bond('amara', 'yusuf', 'friend', [at(0, 'friend')]),
-      people: PEOPLE, type: 'none' as const, level: 'acquaintances' as const,
-      arc, words: 'Amara and Yusuf know each other a little.', onClose: () => {},
-    }))
+    const plain = renderToStaticMarkup(
+      createElement(BondDetailPanel, {
+        bond: bond('amara', 'yusuf', 'friend', [at(0, 'friend')]),
+        people: PEOPLE,
+        type: 'none' as const,
+        level: 'acquaintances' as const,
+        arc,
+        words: 'Amara and Yusuf know each other a little.',
+        onClose: () => {},
+      }),
+    )
     expect(plain).not.toContain('bond-evidence')
     expect(plain).not.toContain('bond-type')
   })

@@ -4,17 +4,40 @@ import type { WorldState } from './state.js'
 import { fold } from './fold.js'
 import type { RngStreams } from './rng.js'
 
-export type TickHandler = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
+export type TickHandler = (ctx: {
+  tick: number
+  emit: (type: string, payload: unknown) => void
+}) => void
 
 export class TickLoop {
-  #store: EventStore; #state: WorldState; #rng: RngStreams
-  #tick: number; #realMs: number; #speed: number; #snapEvery: number
-  #onTick: TickHandler; #timer: NodeJS.Timeout | null = null; #nextAt = 0
+  #store: EventStore
+  #state: WorldState
+  #rng: RngStreams
+  #tick: number
+  #realMs: number
+  #speed: number
+  #snapEvery: number
+  #onTick: TickHandler
+  #timer: NodeJS.Timeout | null = null
+  #nextAt = 0
   #config: SimConfig
   #onError?: (err: unknown) => void
 
-  constructor(opts: { store: EventStore; state: WorldState; rng: RngStreams; config?: SimConfig; startTick?: number; realMsPerTick?: number; speed?: number; snapshotEveryTicks?: number; onTick: TickHandler; onError?: (err: unknown) => void }) {
-    this.#store = opts.store; this.#state = opts.state; this.#rng = opts.rng
+  constructor(opts: {
+    store: EventStore
+    state: WorldState
+    rng: RngStreams
+    config?: SimConfig
+    startTick?: number
+    realMsPerTick?: number
+    speed?: number
+    snapshotEveryTicks?: number
+    onTick: TickHandler
+    onError?: (err: unknown) => void
+  }) {
+    this.#store = opts.store
+    this.#state = opts.state
+    this.#rng = opts.rng
     this.#config = opts.config ?? DEFAULT_CONFIG
     this.#tick = opts.startTick ?? opts.state.tick
     this.#realMs = opts.realMsPerTick ?? TICK_REAL_MS
@@ -24,8 +47,12 @@ export class TickLoop {
     this.#onError = opts.onError
   }
 
-  get state(): WorldState { return this.#state }
-  get tick(): number { return this.#tick }
+  get state(): WorldState {
+    return this.#state
+  }
+  get tick(): number {
+    return this.#tick
+  }
 
   step(): void {
     const prevTick = this.#tick
@@ -52,7 +79,12 @@ export class TickLoop {
       apply('tick_advanced', {})
       this.#onTick({ tick: this.#tick, emit: apply })
       if (this.#tick % this.#snapEvery === 0) {
-        this.#store.saveSnapshot(this.#tick, this.#store.lastSeq(), this.#state, this.#rng.snapshot())
+        this.#store.saveSnapshot(
+          this.#tick,
+          this.#store.lastSeq(),
+          this.#state,
+          this.#rng.snapshot(),
+        )
       }
       this.#store.saveRngState(this.#tick, this.#rng.snapshot())
     })
@@ -66,7 +98,10 @@ export class TickLoop {
         this.step()
       } catch (err) {
         this.#timer = null
-        if (this.#onError) { this.#onError(err); return }
+        if (this.#onError) {
+          this.#onError(err)
+          return
+        }
         throw err
       }
       this.#nextAt += this.#realMs / this.#speed
@@ -74,5 +109,10 @@ export class TickLoop {
     }
     this.#timer = setTimeout(run, this.#realMs / this.#speed)
   }
-  stop(): void { if (this.#timer) { clearTimeout(this.#timer); this.#timer = null } }
+  stop(): void {
+    if (this.#timer) {
+      clearTimeout(this.#timer)
+      this.#timer = null
+    }
+  }
 }

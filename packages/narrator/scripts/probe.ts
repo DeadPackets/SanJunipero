@@ -50,7 +50,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
     ],
     schema: ChapterSummaryProbe,
   })
-  if (value.title.length === 0 || value.text.length === 0) fail(`check1 empty prose: ${JSON.stringify(value)}`)
+  if (value.title.length === 0 || value.text.length === 0)
+    fail(`check1 empty prose: ${JSON.stringify(value)}`)
   if (!Array.isArray(value.citations) || value.citations.length === 0)
     fail(`check1 no citations: ${JSON.stringify(value)}`)
   if (!value.citations.every((c) => [1, 2, 3].includes(c)))
@@ -81,9 +82,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 {
   const total = llm.totalCostUsd()
   if (!(total > 0)) fail(`check3 totalCostUsd not > 0: ${total}`)
-  const row = db
-    .prepare("SELECT COUNT(*) AS n FROM llm_calls WHERE caller = 'narrator'")
-    .get() as { n: number }
+  const row = db.prepare("SELECT COUNT(*) AS n FROM llm_calls WHERE caller = 'narrator'").get() as {
+    n: number
+  }
   if (row.n < 2) fail(`check3 llm_calls rows for caller 'narrator' < 2: ${row.n}`)
   console.log(`CHECK 3 PASS: caller accounting, rows=${row.n}, totalCostUsd=$${total.toFixed(6)}`)
 }

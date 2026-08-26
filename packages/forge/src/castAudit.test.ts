@@ -2,68 +2,107 @@
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
-  CELL_V2, FEET_Y_V2, POSES_V2, FACINGS, anchorToCanvas, cellDistance, crossFacingDupeGate,
-  downscaleMajority, frameCoherenceGate, headRegionDiff, mirrorX, opaqueArea, opaqueBbox,
-  paletteJaccard, sleepGate,
+  CELL_V2,
+  FEET_Y_V2,
+  POSES_V2,
+  FACINGS,
+  anchorToCanvas,
+  cellDistance,
+  crossFacingDupeGate,
+  downscaleMajority,
+  frameCoherenceGate,
+  headRegionDiff,
+  mirrorX,
+  opaqueArea,
+  opaqueBbox,
+  paletteJaccard,
+  sleepGate,
 } from './sheet.js'
 import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
 import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
 
 const MAX_ART_H = FEET_Y_V2 + 1
-const CALIBRATED_MEDIAN = 0.310
+const CALIBRATED_MEDIAN = 0.31
 const AUTHORED = ['se', 'ne'] as const
 const WALK = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const
 
 function fitForGate(img: RawImage): RawImage {
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
-  return k === 1 ? img : downscaleMajority(img,
-    Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
-    Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))))
+  return k === 1
+    ? img
+    : downscaleMajority(
+        img,
+        Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
+        Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
+      )
 }
 const gateView = (img: RawImage): RawImage =>
   anchorToCanvas(fitForGate(img), CELL_V2, CELL_V2, FEET_Y_V2)
 
-const cropper = (c: CommittedCharacter, atlas: RawImage) => (name: string): RawImage => {
-  const r = c.manifest.cells[name]!
-  const out: RawImage = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
-  for (let y = 0; y < r.h; y++) {
-    const s = ((r.y + y) * atlas.width + r.x) * 4
-    out.data.set(atlas.data.subarray(s, s + r.w * 4), y * r.w * 4)
+const cropper =
+  (c: CommittedCharacter, atlas: RawImage) =>
+  (name: string): RawImage => {
+    const r = c.manifest.cells[name]!
+    const out: RawImage = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
+    for (let y = 0; y < r.h; y++) {
+      const s = ((r.y + y) * atlas.width + r.x) * 4
+      out.data.set(atlas.data.subarray(s, s + r.w * 4), y * r.w * 4)
+    }
+    return out
   }
-  return out
-}
 
 /** Every gate failure a character's committed cells produce, as stable keys. */
 function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   const crop = cropper(c, atlas)
   const view = new Map<string, RawImage>()
   const found: string[] = []
-  for (const f of FACINGS) for (const p of POSES_V2) {
-    const native = crop(`${p}-${f}`)
-    view.set(`${p}-${f}`, gateView(native))
-    for (const s of [...alphaBinaryGate(native).failures, ...paletteGate(native).failures,
-      ...soleSilhouetteGate(native).failures]) found.push(`${c.id} ${p}-${f} pixel: ${s}`)
-  }
+  for (const f of FACINGS)
+    for (const p of POSES_V2) {
+      const native = crop(`${p}-${f}`)
+      view.set(`${p}-${f}`, gateView(native))
+      for (const s of [
+        ...alphaBinaryGate(native).failures,
+        ...paletteGate(native).failures,
+        ...soleSilhouetteGate(native).failures,
+      ])
+        found.push(`${c.id} ${p}-${f} pixel: ${s}`)
+    }
   for (const f of AUTHORED) {
     const idle = view.get(`idle-${f}`)!
-    for (const x of frameCoherenceGate(f, idle, WALK.map((p) => ({ label: p, img: view.get(`${p}-${f}`)! }))))
+    for (const x of frameCoherenceGate(
+      f,
+      idle,
+      WALK.map((p) => ({ label: p, img: view.get(`${p}-${f}`)! })),
+    ))
       found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}`)
-    for (const x of strideGateV4(f, {
-      'idle': idle, 'contact-a': view.get(`contact-a-${f}`)!,
-      'passing': view.get(`passing-a-${f}`)!, 'contact-b': view.get(`contact-b-${f}`)!,
-    }, CALIBRATED_MEDIAN)) found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}~${x.b.split('/')[1]}`)
+    for (const x of strideGateV4(
+      f,
+      {
+        idle: idle,
+        'contact-a': view.get(`contact-a-${f}`)!,
+        passing: view.get(`passing-a-${f}`)!,
+        'contact-b': view.get(`contact-b-${f}`)!,
+      },
+      CALIBRATED_MEDIAN,
+    ))
+      found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}~${x.b.split('/')[1]}`)
     // ★ AND WHETHER A CONTACT FRAME IS A CONTACT POSE, which nothing has ever asked. On the
     // NATIVE cells: the whole separation is 0.19 wide and the gate canvas cannot hold it.
-    for (const x of stanceGate(f, crop(`idle-${f}`),
-      ['contact-a', 'contact-b'].map((p) => ({ label: p, img: crop(`${p}-${f}`) }))))
+    for (const x of stanceGate(
+      f,
+      crop(`idle-${f}`),
+      ['contact-a', 'contact-b'].map((p) => ({ label: p, img: crop(`${p}-${f}`) })),
+    ))
       found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}`)
   }
   // AUTHORED facings only: `sw`/`nw` are mirrors by construction, so judging them would fire
   // `mirror-dupe` by design and say nothing about the drawing.
   for (const p of ['idle', ...WALK]) {
     for (const x of crossFacingDupeGate(
-      AUTHORED.map((f) => ({ label: `${f}/${p}`, img: view.get(`${p}-${f}`)! })), CALIBRATED_MEDIAN))
+      AUTHORED.map((f) => ({ label: `${f}/${p}`, img: view.get(`${p}-${f}`)! })),
+      CALIBRATED_MEDIAN,
+    ))
       found.push(`${c.id} ${p} ${x.gate} ${x.a}~${x.b}`)
   }
   for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
@@ -85,19 +124,26 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
 const cast = listCommittedCast()
 
 describe('★ the committed cast against the gates as they now behave', () => {
-  it.each(cast.map((c) => [c.id, c] as const))('%s: nothing fails that is not written down', async (_id, c) => {
-    const found = failuresOf(c, await decodePng(c.atlas))
-    expect(found.filter((k) => KNOWN_GATE_DEBT[k] === undefined),
-      'a cast cell fails a gate and nobody wrote down why').toEqual([])
-  })
+  it.each(cast.map((c) => [c.id, c] as const))(
+    '%s: nothing fails that is not written down',
+    async (_id, c) => {
+      const found = failuresOf(c, await decodePng(c.atlas))
+      expect(
+        found.filter((k) => KNOWN_GATE_DEBT[k] === undefined),
+        'a cast cell fails a gate and nobody wrote down why',
+      ).toEqual([])
+    },
+  )
 
   // The other half of pinning: an entry that no longer fails must be DELETED, or the list
   // stops being a measurement and becomes folklore.
   it('★ the debt list has no fossils — every entry still fails today', async () => {
     const live = new Set<string>()
     for (const c of cast) for (const k of failuresOf(c, await decodePng(c.atlas))) live.add(k)
-    expect(Object.keys(KNOWN_GATE_DEBT).filter((k) => !live.has(k)),
-      'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
+    expect(
+      Object.keys(KNOWN_GATE_DEBT).filter((k) => !live.has(k)),
+      'this entry passes now — delete it from KNOWN_GATE_DEBT',
+    ).toEqual([])
   })
 
   it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
@@ -107,19 +153,28 @@ describe('★ the committed cast against the gates as they now behave', () => {
 
 // ★ THE REASON THE SWEEP JUDGES ONLY THE AUTHORED FACINGS, asserted rather than left in prose.
 describe('the derived facings are exact mirrors, and the gate now agrees across them', () => {
-  it.each(cast.map((c) => [c.id, c] as const))('%s: sw is flip(se) and nw is flip(ne), to the pixel', async (_id, c) => {
-    const crop = cropper(c, await decodePng(c.atlas))
-    for (const [authored, derived] of [['se', 'sw'], ['ne', 'nw']] as const) {
-      for (const p of ['idle', ...WALK]) {
-        const a = mirrorX(crop(`${p}-${authored}`)), b = crop(`${p}-${derived}`)
-        expect([a.width, a.height], `${p}-${derived} is not the size of flip(${p}-${authored})`)
-          .toEqual([b.width, b.height])
-        let diff = 0
-        for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) diff++
-        expect(diff, `${p}-${derived} is not an exact flip of ${p}-${authored}`).toBe(0)
+  it.each(cast.map((c) => [c.id, c] as const))(
+    '%s: sw is flip(se) and nw is flip(ne), to the pixel',
+    async (_id, c) => {
+      const crop = cropper(c, await decodePng(c.atlas))
+      for (const [authored, derived] of [
+        ['se', 'sw'],
+        ['ne', 'nw'],
+      ] as const) {
+        for (const p of ['idle', ...WALK]) {
+          const a = mirrorX(crop(`${p}-${authored}`)),
+            b = crop(`${p}-${derived}`)
+          expect(
+            [a.width, a.height],
+            `${p}-${derived} is not the size of flip(${p}-${authored})`,
+          ).toEqual([b.width, b.height])
+          let diff = 0
+          for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) diff++
+          expect(diff, `${p}-${derived} is not an exact flip of ${p}-${authored}`).toBe(0)
+        }
       }
-    }
-  })
+    },
+  )
 
   it('★ every measured value is identical on a facing and on its mirror', async () => {
     const disagreements: string[] = []
@@ -128,16 +183,24 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
       // every term of every frame, not only the ones over threshold: a verdict-level check
       // goes on passing while the numbers drift up to the bar, which is how this hid.
       const values = (f: string): string => {
-        const idle = gateView(crop(`idle-${f}`)), ia = opaqueArea(idle)
+        const idle = gateView(crop(`idle-${f}`)),
+          ia = opaqueArea(idle)
         return WALK.map((p) => {
           const x = gateView(crop(`${p}-${f}`))
-          return `${p} ${paletteJaccard(idle, x).toFixed(6)} ${(opaqueArea(x) / ia).toFixed(6)} `
-            + `${headRegionDiff(idle, x).toFixed(6)}`
+          return (
+            `${p} ${paletteJaccard(idle, x).toFixed(6)} ${(opaqueArea(x) / ia).toFixed(6)} ` +
+            `${headRegionDiff(idle, x).toFixed(6)}`
+          )
         }).join(' | ')
       }
-      for (const [authored, derived] of [['se', 'sw'], ['ne', 'nw']] as const)
+      for (const [authored, derived] of [
+        ['se', 'sw'],
+        ['ne', 'nw'],
+      ] as const)
         if (values(authored) !== values(derived))
-          disagreements.push(`${c.id}\n  ${authored} ${values(authored)}\n  ${derived} ${values(derived)}`)
+          disagreements.push(
+            `${c.id}\n  ${authored} ${values(authored)}\n  ${derived} ${values(derived)}`,
+          )
     }
     expect(disagreements, 'the gate answers differently on the same pixels flipped').toEqual([])
   })
@@ -154,8 +217,10 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
       odd++
       const lhs = anchorToCanvas(mirrorX(fitted), CELL_V2, CELL_V2, FEET_Y_V2)
       const rhs = mirrorX(anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2))
-      expect(Math.abs(opaqueBbox(lhs)!.x0 - opaqueBbox(rhs)!.x0),
-        'the anchor is off by more than one column').toBe(1)
+      expect(
+        Math.abs(opaqueBbox(lhs)!.x0 - opaqueBbox(rhs)!.x0),
+        'the anchor is off by more than one column',
+      ).toBe(1)
       // and the terms that do not care, do not care
       expect(opaqueArea(lhs)).toBe(opaqueArea(rhs))
       expect(paletteJaccard(lhs, rhs)).toBe(1)
@@ -165,7 +230,6 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
     expect(odd, 'no odd-width bbox in this sheet — the residual is unexercised').toBeGreaterThan(0)
   })
 })
-
 
 // ★ THE OTHER HALF OF "THE TWO GATES ASK THE SAME SET", stated as a number rather than left in
 // prose: every committed sleeper lies along the ground diagonal, head up-right.

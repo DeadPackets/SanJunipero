@@ -9,7 +9,10 @@ import { TILE_H, TILE_W } from './iso.js'
 export const INTERIOR_PX_SCALE = 4
 /** One interior tile, in interior pixels: `TOWN_TILE × INTERIOR_PX_SCALE`. This is the tile the
  *  forge already authors against — `assetResolution.INTERIOR_TILE`. */
-export const INTERIOR_TILE = { w: TILE_W * INTERIOR_PX_SCALE, h: TILE_H * INTERIOR_PX_SCALE } as const
+export const INTERIOR_TILE = {
+  w: TILE_W * INTERIOR_PX_SCALE,
+  h: TILE_H * INTERIOR_PX_SCALE,
+} as const
 
 /** `CITY_INTERIOR_SLOTS` is engine truth about where a bed goes, not a unit of floor. Giving
  *  each slot a 4 × 2 block leaves seven walkable tiles around a 1×1 furnishing. */
@@ -77,7 +80,11 @@ export type Size = { w: number; h: number }
 
 /** The origin tile of a template slot. Total over the 3×3 grid, and the inverse of nothing —
  *  a tile does not have to belong to a slot, which is the point. */
-export function slotToTile(slot: Slot, room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Tile {
+export function slotToTile(
+  slot: Slot,
+  room: Size = ROOM_TILES,
+  slots: Size = CITY_INTERIOR_SLOTS,
+): Tile {
   const per = tilesPerSlot(room, slots)
   return {
     x: slot.x * per.w + SLOT_ORIGIN_OFFSET.x,
@@ -91,12 +98,15 @@ export function slotToTile(slot: Slot, room: Size = ROOM_TILES, slots: Size = CI
  * across, where two pieces side by side already read as a pair, and two deep, where they do not.
  */
 export function seatInBlock(
-  slot: Slot, others: readonly Slot[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
+  slot: Slot,
+  others: readonly Slot[],
+  room: Size = ROOM_TILES,
+  slots: Size = CITY_INTERIOR_SLOTS,
 ): Tile {
   const base = slotToTile(slot, room, slots)
   const nearer = others.some((o) => o.x === slot.x && o.y === slot.y + 1)
   const further = others.some((o) => o.x === slot.x && o.y === slot.y - 1)
-  if (nearer === further) return base            // both sides, or neither: stay where you are
+  if (nearer === further) return base // both sides, or neither: stay where you are
   return { x: base.x, y: base.y + (nearer ? tilesPerSlot(room, slots).h - 1 : 0) }
 }
 
@@ -113,8 +123,10 @@ export type WallKind = (typeof WALL_KINDS)[number]
 
 /** `back-right` runs along +x from the room origin, so its inner face looks down the +y axis —
  *  SW on screen. `back-left` runs along +y and looks down +x — SE. */
-export const WALL_FACING = { 'back-left': 'se', 'back-right': 'sw' } as const satisfies
-  Record<WallKind, TownFacing>
+export const WALL_FACING = { 'back-left': 'se', 'back-right': 'sw' } as const satisfies Record<
+  WallKind,
+  TownFacing
+>
 
 /** The wall a tile is against, or `null` when it touches neither — a wall furnishing in a tile
  *  that touches no wall is a PLACEMENT ERROR and reads as one, not as art hanging in the air. */
@@ -125,8 +137,7 @@ export function wallOfTile(t: Tile): WallKind | null {
 }
 
 /** How far along its own wall a tile sits, in interior tiles from the room's far corner. */
-export const alongWall = (wall: WallKind, t: Tile): number =>
-  wall === 'back-right' ? t.x : t.y
+export const alongWall = (wall: WallKind, t: Tile): number => (wall === 'back-right' ? t.x : t.y)
 
 /** A `placement: 'wall'` piece either STANDS at the foot of its wall — masonry or joinery that
  *  reaches the ground — or HANGS on the face above it. `InteriorMeta` has no field for this. */
@@ -134,12 +145,16 @@ export const WALL_PIECES_THAT_STAND: ReadonlySet<string> = new Set(['hearth', 'd
 
 /** How far above the ground's near vertex each piece's own surface sits, measured off the
  *  shipped art: a body anchored at its feet would otherwise lie under a mattress, not on it. */
-export const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = { bed: 44, chair: 34, bench: 30 }
+export const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = {
+  bed: 44,
+  chair: 34,
+  bench: 30,
+}
 
 /** How far above the floor a body drawn INSIDE `kind` is lifted. 0 for anything else, so a
  *  body standing on the floor is untouched. */
 export const seatLiftPx = (kind: string | null): number =>
-  kind === null ? 0 : FURNISHING_SEAT_PX[kind] ?? 0
+  kind === null ? 0 : (FURNISHING_SEAT_PX[kind] ?? 0)
 
 // ── THE PIECES, AND THE MAP THEY MAKE ────────────────────────────────────────────────────
 
@@ -184,7 +199,9 @@ export type PieceInput = {
 /** The room the furnishings make. A wall piece is pushed onto the wall its slot touches and
  *  takes that wall's facing by construction, so the art and the surface cannot disagree. */
 export function roomMapOf(
-  inputs: readonly PieceInput[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
+  inputs: readonly PieceInput[],
+  room: Size = ROOM_TILES,
+  slots: Size = CITY_INTERIOR_SLOTS,
 ): RoomMap {
   const blocked = new Uint8Array(room.w * room.h)
   const pieces: MapPiece[] = []
@@ -192,7 +209,12 @@ export function roomMapOf(
   for (const [i, input] of inputs.entries()) {
     const size = input.size ?? { w: 1, h: 1 }
     const placement = input.placement ?? 'floor'
-    let tile = seatInBlock(input.slot, taken.filter((_, j) => j !== i), room, slots)
+    let tile = seatInBlock(
+      input.slot,
+      taken.filter((_, j) => j !== i),
+      room,
+      slots,
+    )
     let facing: TownFacing | null = null
     if (placement === 'wall') {
       // A slot column 0 is against the back-left wall, a slot row 0 against the back-right.
@@ -201,7 +223,14 @@ export function roomMapOf(
       tile = wall === 'back-left' ? { x: 0, y: tile.y } : { x: tile.x, y: 0 }
       facing = WALL_FACING[wall]
     }
-    const piece: MapPiece = { kind: input.kind, tile, size, placement, flat: input.flat === true, facing }
+    const piece: MapPiece = {
+      kind: input.kind,
+      tile,
+      size,
+      placement,
+      flat: input.flat === true,
+      facing,
+    }
     pieces.push(piece)
     if (piece.flat) continue
     for (const t of tilesOf(piece)) {
@@ -234,14 +263,19 @@ export function standingTiles(map: RoomMap, p: MapPiece): Tile[] {
       out.push(n)
     }
   }
-  return out.sort((a, b) => (a.y - b.y) || (a.x - b.x))
+  return out.sort((a, b) => a.y - b.y || a.x - b.x)
 }
 
 // ── WALKING IT ───────────────────────────────────────────────────────────────────────────
 
 /** Four-directional, in the engine's own neighbour order (`engine/path.ts`): a room path and a
  *  town path break their ties the same way, so a body does not walk by two different laws. */
-const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
+  [0, -1],
+  [-1, 0],
+  [1, 0],
+  [0, 1],
+]
 
 /** The tiles a body steps through from `from` to `to`, excluding the start; `null` when no walk
  *  exists. Uniform cost, so breadth-first, expanded in NEIGHBOURS order for determinism. */
@@ -262,7 +296,11 @@ export function interiorPath(map: RoomMap, from: Tile, to: Tile): Tile[] | null 
         prev.set(key(n), key(cur))
         if (n.x === to.x && n.y === to.y) {
           const path: Tile[] = []
-          for (let k: number | undefined = key(n); k !== undefined && k !== key(from); k = prev.get(k))
+          for (
+            let k: number | undefined = key(n);
+            k !== undefined && k !== key(from);
+            k = prev.get(k)
+          )
             path.push({ x: k % map.w, y: Math.floor(k / map.w) })
           return path.reverse()
         }
@@ -296,34 +334,53 @@ export type PieceAct = {
 
 export const INTERIOR_ACTS: readonly PieceAct[] = [
   {
-    kind: 'bed', verb: 'sleep', via: 'structure', approach: 'in',
+    kind: 'bed',
+    verb: 'sleep',
+    via: 'structure',
+    approach: 'in',
     what: 'walk to a tile beside it, lie in it and sleep; a partnered pair takes one cell each',
-    needs: 'sleep validates `sleepableKinds` on the HOUSE and nothing names the bed. It needs an '
-      + 'optional `{furnishingId}` so a sleeper is in a particular bed, and so a second sleeper '
-      + 'can be refused when the cells are taken.',
+    needs:
+      'sleep validates `sleepableKinds` on the HOUSE and nothing names the bed. It needs an ' +
+      'optional `{furnishingId}` so a sleeper is in a particular bed, and so a second sleeper ' +
+      'can be refused when the cells are taken.',
   },
   {
-    kind: 'hearth', verb: 'stoke', via: 'structure', approach: 'at',
+    kind: 'hearth',
+    verb: 'stoke',
+    via: 'structure',
+    approach: 'at',
     what: 'walk to a tile beside it and feed, light or put out the fire',
-    needs: 'stoke/extinguish take a `{structureId}` in `HEAT_SOURCE_KINDS` — the town fire pit. A '
-      + 'hearth is a furnishing, so no verb reaches it. It needs furnishings to be addressable '
-      + '(a `{structureId, furnishingId}` pair) and `house` hearths added to the heat sources.',
+    needs:
+      'stoke/extinguish take a `{structureId}` in `HEAT_SOURCE_KINDS` — the town fire pit. A ' +
+      'hearth is a furnishing, so no verb reaches it. It needs furnishings to be addressable ' +
+      '(a `{structureId, furnishingId}` pair) and `house` hearths added to the heat sources.',
   },
   {
-    kind: 'table', verb: 'stow', via: 'structure', approach: 'at',
+    kind: 'table',
+    verb: 'stow',
+    via: 'structure',
+    approach: 'at',
     what: 'walk to a tile beside it and put an item down, or take one back',
-    needs: 'stow moves an item to `{t:"structure"}` — into the HOUSE, not onto the table. An item '
-      + 'location of `{t:"furnishing", id}` would put the bowl on the table, and the room could '
-      + 'then draw what is standing on it.',
+    needs:
+      'stow moves an item to `{t:"structure"}` — into the HOUSE, not onto the table. An item ' +
+      'location of `{t:"furnishing", id}` would put the bowl on the table, and the room could ' +
+      'then draw what is standing on it.',
   },
   {
-    kind: 'chair', verb: null, via: 'none', approach: 'in',
+    kind: 'chair',
+    verb: null,
+    via: 'none',
+    approach: 'in',
     what: 'walk to a tile beside it and sit on it',
-    needs: 'a `sit` verb, and an agent field that says "seated at <furnishingId>", cleared by '
-      + 'walk/enter/exit — so the room can draw the body IN the chair instead of standing over it.',
+    needs:
+      'a `sit` verb, and an agent field that says "seated at <furnishingId>", cleared by ' +
+      'walk/enter/exit — so the room can draw the body IN the chair instead of standing over it.',
   },
   {
-    kind: 'rug', verb: null, via: 'none', approach: 'on',
+    kind: 'rug',
+    verb: null,
+    via: 'none',
+    approach: 'on',
     what: 'walk across it — the one piece that does not block its own tiles',
     needs: null,
   },

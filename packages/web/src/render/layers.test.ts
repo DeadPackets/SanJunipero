@@ -17,7 +17,12 @@ vi.mock('pixi.js', () => {
 
 const { Container: MockContainer } = await import('pixi.js')
 const {
-  LAYERS, SORTED_LAYER, Z_AUTHORISED, applyDepthOrder, createLayers, literalZIndexOffenders,
+  LAYERS,
+  SORTED_LAYER,
+  Z_AUTHORISED,
+  applyDepthOrder,
+  createLayers,
+  literalZIndexOffenders,
 } = await import('./layers.js')
 const { structureDepthBox } = await import('./depth.js')
 const { bigTown } = await import('./bigTown.js')
@@ -45,14 +50,23 @@ describe('createLayers', () => {
     const set = createLayers(world as never)
     expect(world.children).toHaveLength(8)
     expect(LAYERS).toEqual([
-      'ground', 'groundDecal', 'shadow', 'entities', 'overhead', 'worldText', 'bubbles', 'overlay',
+      'ground',
+      'groundDecal',
+      'shadow',
+      'entities',
+      'overhead',
+      'worldText',
+      'bubbles',
+      'overlay',
     ])
     expect(LAYERS.map((n) => set[n])).toEqual(world.children)
   })
 
   it('depth-sorts ONE layer and no other', () => {
     const set = createLayers(new MockContainer() as never)
-    const sorted = LAYERS.filter((n) => (set[n] as unknown as { sortableChildren: boolean }).sortableChildren)
+    const sorted = LAYERS.filter(
+      (n) => (set[n] as unknown as { sortableChildren: boolean }).sortableChildren,
+    )
     expect(sorted).toEqual([SORTED_LAYER])
     expect(SORTED_LAYER).toBe('entities')
   })
@@ -97,7 +111,7 @@ describe('applyDepthOrder culls to the viewport', () => {
 
   it('★ keeps the sorted set under DEPTH_BUDGET on a town that would blow past it', () => {
     const entries = bigTown(3).map((s) => ({ box: structureDepthBox(s.id, s), node: nodeFor() }))
-    expect(entries.length).toBeGreaterThan(256)      // the fallback would fire without a cull
+    expect(entries.length).toBeGreaterThan(256) // the fallback would fire without a cull
     const counts = applyDepthOrder(entries as never, VIEW)
     expect(counts.drawn).toBeLessThan(256)
     expect(counts.drawn + counts.culled).toBe(entries.length)
@@ -115,10 +129,10 @@ describe('applyDepthOrder culls to the viewport', () => {
     const all = bigTown(1).map((s) => ({ box: structureDepthBox(s.id, s), node: nodeFor() }))
     const view = { x: -200, y: 0, w: 800, h: 600 }
     applyDepthOrder(all as never, view)
-    const withCull = all.filter((e) => e.node.visible).map((e) => [e.box.id, e.node.zIndex] as const)
-    const only = all
+    const withCull = all
       .filter((e) => e.node.visible)
-      .map((e) => ({ box: e.box, node: nodeFor() }))
+      .map((e) => [e.box.id, e.node.zIndex] as const)
+    const only = all.filter((e) => e.node.visible).map((e) => ({ box: e.box, node: nodeFor() }))
     applyDepthOrder(only as never, { x: -1e6, y: -1e6, w: 2e6, h: 2e6 })
     expect(only.map((e, i) => [e.box.id, e.node.zIndex] as const)).toEqual(withCull)
   })
@@ -126,8 +140,9 @@ describe('applyDepthOrder culls to the viewport', () => {
 
 describe('literalZIndexOffenders', () => {
   it('finds an assignment in a file with no business making one', () => {
-    expect(literalZIndexOffenders([{ path: 'render/bubbles.ts', source: 'x\nnode.zIndex = 1e9\n' }]))
-      .toEqual(['render/bubbles.ts:2 — node.zIndex = 1e9'])
+    expect(
+      literalZIndexOffenders([{ path: 'render/bubbles.ts', source: 'x\nnode.zIndex = 1e9\n' }]),
+    ).toEqual(['render/bubbles.ts:2 — node.zIndex = 1e9'])
   })
 
   it('says nothing about the files that own a sort', () => {
@@ -137,12 +152,16 @@ describe('literalZIndexOffenders', () => {
   })
 
   it('is not fooled by a read, a comparison or a comment', () => {
-    const source = 'const a = s.zIndex\nif (a.zIndex === b.zIndex) f()\n// b.zIndex = 3 was the bug\n'
+    const source =
+      'const a = s.zIndex\nif (a.zIndex === b.zIndex) f()\n// b.zIndex = 3 was the bug\n'
     expect(literalZIndexOffenders([{ path: 'render/ambient.ts', source }])).toEqual([])
   })
 
   it('THE REAL SCAN: no module outside the layer authority writes a zIndex', () => {
     const offenders = literalZIndexOffenders(sourcesUnder(WEB_SRC))
-    expect(offenders, `magic depth numbers still in the wild:\n  ${offenders.join('\n  ')}`).toEqual([])
+    expect(
+      offenders,
+      `magic depth numbers still in the wild:\n  ${offenders.join('\n  ')}`,
+    ).toEqual([])
   })
 })

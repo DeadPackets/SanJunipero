@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { dayPhaseFromTick, FORBIDDEN_FRAMING, MINUTES_PER_DAY } from '@sj/shared'
 import { z } from 'zod'
 import * as engine from '@sj/engine'
-import { FALLBACK_TURN, IntentParamsSchema, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
+import {
+  FALLBACK_TURN,
+  IntentParamsSchema,
+  IntentSchema,
+  TurnSchema,
+  parseTurnWithRepair,
+  reconsiderTick,
+} from './turn.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',
@@ -37,7 +44,11 @@ describe('TurnSchema', () => {
   })
 
   it('accepts freeform action and defaults intent params', () => {
-    const t = TurnSchema.parse({ thought: 'hm', importance: 1, action: { freeform: 'whittle a spoon' } })
+    const t = TurnSchema.parse({
+      thought: 'hm',
+      importance: 1,
+      action: { freeform: 'whittle a spoon' },
+    })
     expect(t.action).toEqual({ freeform: 'whittle a spoon' })
     expect(IntentSchema.parse({ verb: 'sit' }).params).toEqual({})
   })
@@ -57,8 +68,13 @@ describe('TurnSchema', () => {
 
   it('a null optional field reads as absent, so nothing downstream acts on it', () => {
     const t = TurnSchema.parse({
-      thought: 'nothing to add', importance: 2,
-      speech: null, action: null, plan: null, journal: null, reconsider_at: null,
+      thought: 'nothing to add',
+      importance: 2,
+      speech: null,
+      action: null,
+      plan: null,
+      journal: null,
+      reconsider_at: null,
     })
     expect(t.speech ?? undefined).toBeUndefined()
     expect(t.action ?? undefined).toBeUndefined()
@@ -117,11 +133,16 @@ describe('IntentSchema.params emits a grammar a constrained decoder can compile'
   })
 
   it('keeps the params every real act passes', () => {
-    expect(IntentSchema.parse({ verb: 'walk', params: { x: 62, y: 70 } }).params).toEqual({ x: 62, y: 70 })
-    expect(IntentSchema.parse({ verb: 'give', params: { itemId: 'i1', targetId: 'omar' } }).params)
-      .toEqual({ itemId: 'i1', targetId: 'omar' })
-    expect(IntentSchema.parse({ verb: 'build', params: { kind: 'house', x: 1, y: 2 } }).params)
-      .toEqual({ kind: 'house', x: 1, y: 2 })
+    expect(IntentSchema.parse({ verb: 'walk', params: { x: 62, y: 70 } }).params).toEqual({
+      x: 62,
+      y: 70,
+    })
+    expect(
+      IntentSchema.parse({ verb: 'give', params: { itemId: 'i1', targetId: 'omar' } }).params,
+    ).toEqual({ itemId: 'i1', targetId: 'omar' })
+    expect(
+      IntentSchema.parse({ verb: 'build', params: { kind: 'house', x: 1, y: 2 } }).params,
+    ).toEqual({ kind: 'house', x: 1, y: 2 })
   })
 })
 
@@ -186,7 +207,9 @@ describe('reconsiderTick on an absolute day and phase', () => {
   it('rides the turn schema, and the model is shown the words it must answer with', () => {
     const t = TurnSchema.parse({ ...validTurn, reconsider_at: { day: 12, phase: 'dusk' } })
     expect(t.reconsider_at).toEqual({ day: 12, phase: 'dusk' })
-    expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12, phase: 'teatime' } }).success).toBe(false)
+    expect(
+      TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12, phase: 'teatime' } }).success,
+    ).toBe(false)
     expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12 } }).success).toBe(false)
     const desc = (TurnSchema.shape.reconsider_at as z.ZodType).description ?? ''
     for (const word of ['day', 'dusk', 'night']) expect(desc).toContain(word)
@@ -195,14 +218,20 @@ describe('reconsiderTick on an absolute day and phase', () => {
 
 describe('reconsiderTick', () => {
   it('returns today when the time is still ahead', () => {
-    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 10 * 60, '14:30')).toBe(MINUTES_PER_DAY * 3 + 14 * 60 + 30)
+    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 10 * 60, '14:30')).toBe(
+      MINUTES_PER_DAY * 3 + 14 * 60 + 30,
+    )
   })
 
   it('rolls to the same time next day when already past', () => {
-    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 15 * 60, '14:30')).toBe(MINUTES_PER_DAY * 4 + 14 * 60 + 30)
+    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 15 * 60, '14:30')).toBe(
+      MINUTES_PER_DAY * 4 + 14 * 60 + 30,
+    )
   })
 
   it('is strictly future when now equals the target', () => {
-    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 14 * 60 + 30, '14:30')).toBe(MINUTES_PER_DAY * 4 + 14 * 60 + 30)
+    expect(reconsiderTick(MINUTES_PER_DAY * 3 + 14 * 60 + 30, '14:30')).toBe(
+      MINUTES_PER_DAY * 4 + 14 * 60 + 30,
+    )
   })
 })

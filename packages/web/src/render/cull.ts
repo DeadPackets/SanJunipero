@@ -11,10 +11,19 @@ export const CULL_MARGIN_PX = 2 * BUILDING_PX_PER_TILE
 
 /** Does a painted screen rectangle reach the view, with the margin's slack? Chunk residency and the depth sort share it, so they cannot disagree by a pixel at the edge of the stage. */
 export function rectInView(
-  sx0: number, sy0: number, sx1: number, sy1: number, view: ViewRect, margin = CULL_MARGIN_PX,
+  sx0: number,
+  sy0: number,
+  sx1: number,
+  sy1: number,
+  view: ViewRect,
+  margin = CULL_MARGIN_PX,
 ): boolean {
-  return sx1 >= view.x - margin && sx0 <= view.x + view.w + margin
-    && sy1 >= view.y - margin && sy0 <= view.y + view.h + margin
+  return (
+    sx1 >= view.x - margin &&
+    sx0 <= view.x + view.w + margin &&
+    sy1 >= view.y - margin &&
+    sy0 <= view.y + view.h + margin
+  )
 }
 
 /** Does this drawable's painted rectangle reach the view, with the margin's slack? */
@@ -27,9 +36,12 @@ export type Culled<T> = { drawn: T[]; hidden: T[] }
 /** Split a frame's drawables into the ones worth sorting and drawing and the ones that are
  *  not. Arrival order survives inside each half, so the depth seed sees what it always saw. */
 export function cullByBox<T extends { box: DepthBox }>(
-  entries: readonly T[], view: ViewRect, margin = CULL_MARGIN_PX,
+  entries: readonly T[],
+  view: ViewRect,
+  margin = CULL_MARGIN_PX,
 ): Culled<T> {
-  const drawn: T[] = [], hidden: T[] = []
+  const drawn: T[] = [],
+    hidden: T[] = []
   for (const e of entries) (boxInView(e.box, view, margin) ? drawn : hidden).push(e)
   return { drawn, hidden }
 }

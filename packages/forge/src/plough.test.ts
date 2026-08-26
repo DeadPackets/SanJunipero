@@ -7,22 +7,34 @@ import { FURROW_PITCH_PX, ploughFurrows } from './plough.js'
 
 // Fold every pixel onto its phase of (x + 2y) mod pitch and ask how far the profile moves (the
 // ridge) against how far individual lines stray from it (one-off marks). A measurement, not a gate.
-function furrowPeriodicity(m: RawImage, pitch: number): { withinPitch: number; acrossPitch: number } {
+function furrowPeriodicity(
+  m: RawImage,
+  pitch: number,
+): { withinPitch: number; acrossPitch: number } {
   const lines = new Map<number, { s: number; n: number }>()
-  for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
-    const i = (y * m.width + x) * 4
-    const key = x + 2 * y
-    const e = lines.get(key) ?? { s: 0, n: 0 }
-    e.s += (m.data[i]! + m.data[i + 1]! + m.data[i + 2]!) / 3
-    e.n++
-    lines.set(key, e)
-  }
+  for (let y = 0; y < m.height; y++)
+    for (let x = 0; x < m.width; x++) {
+      const i = (y * m.width + x) * 4
+      const key = x + 2 * y
+      const e = lines.get(key) ?? { s: 0, n: 0 }
+      e.s += (m.data[i]! + m.data[i + 1]! + m.data[i + 2]!) / 3
+      e.n++
+      lines.set(key, e)
+    }
   const phase = Array.from({ length: pitch }, () => ({ s: 0, n: 0 }))
-  for (const [key, e] of lines) { const p = phase[key % pitch]!; p.s += e.s / e.n; p.n++ }
+  for (const [key, e] of lines) {
+    const p = phase[key % pitch]!
+    p.s += e.s / e.n
+    p.n++
+  }
   const mean = phase.map((p) => p.s / p.n)
   const withinPitch = Math.max(...mean) - Math.min(...mean)
-  let acrossPitch = 0, n = 0
-  for (const [key, e] of lines) { acrossPitch += Math.abs(e.s / e.n - mean[key % pitch]!); n++ }
+  let acrossPitch = 0,
+    n = 0
+  for (const [key, e] of lines) {
+    acrossPitch += Math.abs(e.s / e.n - mean[key % pitch]!)
+    n++
+  }
   return { withinPitch, acrossPitch: acrossPitch / n }
 }
 
@@ -33,7 +45,8 @@ describe('ploughFurrows', () => {
   it('RED-proves the rejected art: it has no furrow in it at all', async () => {
     // FROZEN, because the moment the content was fixed this test stopped being RED against it
     const rejected = await decodePng(
-      readFileSync(new URL('./fixtures/pixel-gates/rejected-farmland_0.png', import.meta.url)))
+      readFileSync(new URL('./fixtures/pixel-gates/rejected-farmland_0.png', import.meta.url)),
+    )
     const p = furrowPeriodicity(rejected, FURROW_PITCH_PX)
     // The rejected material self-tiles into rows of isometric cottages: whatever profile you fold
     // it onto, the lines stray from it by just as much — no repeating structure at this pitch.
@@ -65,7 +78,8 @@ describe('ploughFurrows', () => {
   })
 
   it('refuses a pitch that does not divide the material, because that is the seam', async () => {
-    await expect(async () => ploughFurrows(await material('terrain_earth_0'), { pitch: 7 }))
-      .rejects.toThrow(/pitch 7/)
+    await expect(async () =>
+      ploughFurrows(await material('terrain_earth_0'), { pitch: 7 }),
+    ).rejects.toThrow(/pitch 7/)
   })
 })

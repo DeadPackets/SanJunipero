@@ -123,9 +123,9 @@ export class RulingsStore {
       if (!ruling) continue
       let cos = cosineById.get(id)
       if (cos === undefined) {
-        const row = db
-          .prepare('SELECT embedding FROM rulings_vec WHERE rowid = ?')
-          .get(id) as { embedding: Uint8Array } | undefined
+        const row = db.prepare('SELECT embedding FROM rulings_vec WHERE rowid = ?').get(id) as
+          | { embedding: Uint8Array }
+          | undefined
         cos = row ? cosine(qvec, toF32(row.embedding)) : 0
       }
       results.push({ ruling, cosine: cos })

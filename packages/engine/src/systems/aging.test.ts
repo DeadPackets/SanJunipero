@@ -10,10 +10,18 @@ const CFG: SimConfig = SimConfigSchema.parse({})
 const MIDNIGHT = 1440 // day 1, hour 0, minute 0
 
 let seq = 7000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function makeWorld(ageDays: number): WorldState {
-  let s = genesisState(CFG, Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)))
+  let s = genesisState(
+    CFG,
+    Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)),
+  )
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays }), CFG)
   return s
 }
@@ -21,7 +29,11 @@ function tickTo(s: WorldState, tick: number, rng = new RngStreams('t')): WorldTi
   const wt = createWorldTick(CFG, rng)
   return wt(fold(s, ev('tick_advanced', {}, tick), CFG))
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, tick = s.tick): WorldState {
+function applyAll(
+  s: WorldState,
+  events: Array<{ type: string; payload: unknown }>,
+  tick = s.tick,
+): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), CFG)
   return s
 }
@@ -69,32 +81,64 @@ describe('worldTick: aging at midnight', () => {
 describe('worldTick: natural death', () => {
   // seed ag5294: first 'aging' draw ≈ 0.0024647
   it('a 70-year-old dies when chance = base + perYearOver×10 = 0.0025 beats the roll', () => {
-    const r = tickTo({ ...makeWorld(70 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag5294'))
-    expect(r.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'old_age' } })
+    const r = tickTo(
+      { ...makeWorld(70 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 },
+      MIDNIGHT,
+      new RngStreams('ag5294'),
+    )
+    expect(r.events).toContainEqual({
+      type: 'agent_died',
+      payload: { agentId: 'a1', cause: 'old_age' },
+    })
     expect(r.state.agents.a1!.alive).toBe(false)
   })
 
   it('a 69-year-old survives the same roll: chance = 0.0023 is under it', () => {
-    const r = tickTo({ ...makeWorld(69 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag5294'))
+    const r = tickTo(
+      { ...makeWorld(69 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 },
+      MIDNIGHT,
+      new RngStreams('ag5294'),
+    )
     expect(r.events.map((e) => e.type)).not.toContain('agent_died')
     expect(r.state.agents.a1!.alive).toBe(true)
   })
 
   // seed ag87: first 'aging' draw ≈ 0.000223, under the base chance itself
   it('a 60-year-old rolls at base chance; a 59-year-old never rolls', () => {
-    const elder = tickTo({ ...makeWorld(60 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag87'))
-    expect(elder.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'old_age' } })
-    const adult = tickTo({ ...makeWorld(59 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag87'))
+    const elder = tickTo(
+      { ...makeWorld(60 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 },
+      MIDNIGHT,
+      new RngStreams('ag87'),
+    )
+    expect(elder.events).toContainEqual({
+      type: 'agent_died',
+      payload: { agentId: 'a1', cause: 'old_age' },
+    })
+    const adult = tickTo(
+      { ...makeWorld(59 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 },
+      MIDNIGHT,
+      new RngStreams('ag87'),
+    )
     expect(adult.events.map((e) => e.type)).not.toContain('agent_died')
     expect(adult.state.agents.a1!.alive).toBe(true)
   })
 
   it('old-age death drops held items onto the death tile', () => {
     let s = makeWorld(70 * DAYS_PER_YEAR)
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a1' } }), CFG)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a1' } }),
+      CFG,
+    )
     const r = tickTo({ ...s, tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag5294'))
-    expect(r.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'old_age' } })
-    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'tile', x: 0, y: 0 } } })
+    expect(r.events).toContainEqual({
+      type: 'agent_died',
+      payload: { agentId: 'a1', cause: 'old_age' },
+    })
+    expect(r.events).toContainEqual({
+      type: 'item_moved',
+      payload: { id: 'item_1', loc: { t: 'tile', x: 0, y: 0 } },
+    })
     expect(r.state.items.item_1!.loc).toEqual({ t: 'tile', x: 0, y: 0 })
   })
 

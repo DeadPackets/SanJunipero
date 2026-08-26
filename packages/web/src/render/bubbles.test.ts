@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BUBBLE_FONT_PX, BUBBLE_MAX_PX, SPEECH_MAX_CHARS, SPEECH_MS_BASE, SPEECH_MS_PER_CHAR,
-  WRAP_CHARS, bubbleLife, placeBubbles, wrapBubble,
+  BUBBLE_FONT_PX,
+  BUBBLE_MAX_PX,
+  SPEECH_MAX_CHARS,
+  SPEECH_MS_BASE,
+  SPEECH_MS_PER_CHAR,
+  WRAP_CHARS,
+  bubbleLife,
+  placeBubbles,
+  wrapBubble,
 } from './bubbles.js'
 import { SCALLOP_COUNT, faceFor, scallopTrail, wrapCharsFor } from './textFaces.js'
 import type { Rect } from './tooltip.js'
@@ -53,7 +60,8 @@ describe('two speakers standing together do not composite into one pile', () => 
     const view = { x: 0, y: 0, w: 900, h: 700 }
     const size = { w: 180, h: 60 }
     const placed = placeBubbles(
-      [0, 1, 2].map((i) => ({ id: `b${i}`, sx: 450, sy: 350, size })), view,
+      [0, 1, 2].map((i) => ({ id: `b${i}`, sx: 450, sy: 350, size })),
+      view,
     )
     for (let i = 0; i < placed.length; i++) {
       for (let j = i + 1; j < placed.length; j++) {
@@ -81,7 +89,8 @@ describe('two speakers standing together do not composite into one pile', () => 
 
 describe('a thought points at its thinker whichever side it ended up on', () => {
   it('puts the trail on the edge facing the speaker, for all four sides', () => {
-    const w = 100, h = 40
+    const w = 100,
+      h = 40
     expect(scallopTrail('above', w, h).every((d) => d.cy > h)).toBe(true)
     expect(scallopTrail('below', w, h).every((d) => d.cy < 0)).toBe(true)
     expect(scallopTrail('left', w, h).every((d) => d.cx > w)).toBe(true)

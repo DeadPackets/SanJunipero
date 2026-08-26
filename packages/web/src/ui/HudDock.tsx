@@ -1,19 +1,30 @@
 import {
-  DOCKABLE, DOCKABLE_LABEL, HUD_PEEK_PX, HUD_TOGGLE_KEY, SLOTS_FOR, SLOT_LABEL,
-  hiddenCount, isFullyHidden, type HudEv, type HudLayout,
+  DOCKABLE,
+  DOCKABLE_LABEL,
+  HUD_PEEK_PX,
+  HUD_TOGGLE_KEY,
+  SLOTS_FOR,
+  SLOT_LABEL,
+  hiddenCount,
+  isFullyHidden,
+  type HudEv,
+  type HudLayout,
 } from './hudLayout.js'
 
 // Hiding is only safe if it is reversible without knowing a keyboard shortcut, so the grab
 // handle is a real button with a spoken label and is never itself hideable.
 
-export function HudDock(
-  { layout, open, onEvent, onOpen }: {
-    layout: HudLayout
-    open: boolean
-    onEvent: (ev: HudEv) => void
-    onOpen: (open: boolean) => void
-  },
-) {
+export function HudDock({
+  layout,
+  open,
+  onEvent,
+  onOpen,
+}: {
+  layout: HudLayout
+  open: boolean
+  onEvent: (ev: HudEv) => void
+  onOpen: (open: boolean) => void
+}) {
   const away = hiddenCount(layout)
   const all = isFullyHidden(layout)
   const handleLabel = open

@@ -8,10 +8,17 @@ const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent
 const agents = (
   list: Array<{ id: string; name?: string; alive?: boolean; insideId?: string }>,
 ): Record<string, { id: string; name: string; alive: boolean; insideId?: string }> =>
-  Object.fromEntries(list.map((a) => [a.id, {
-    id: a.id, name: a.name ?? a.id, alive: a.alive ?? true,
-    ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
-  }]))
+  Object.fromEntries(
+    list.map((a) => [
+      a.id,
+      {
+        id: a.id,
+        name: a.name ?? a.id,
+        alive: a.alive ?? true,
+        ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
+      },
+    ]),
+  )
 
 describe('parentEdges — the payload the gateway actually folds', () => {
   // THE INTERFACE CORRECTION: bonds.ts reads `{ id, motherId, fatherId }`, not `{ parents }`.
@@ -24,8 +31,9 @@ describe('parentEdges — the payload the gateway actually folds', () => {
   })
 
   it('a child with one known parent still gets an edge', () => {
-    expect(parentEdges([ev(1, 5, 'agent_born', { id: 'kid', motherId: 'amara' })]))
-      .toEqual([{ parentId: 'amara', childId: 'kid', tick: 5 }])
+    expect(parentEdges([ev(1, 5, 'agent_born', { id: 'kid', motherId: 'amara' })])).toEqual([
+      { parentId: 'amara', childId: 'kid', tick: 5 },
+    ])
   })
 
   it('ignores everything that is not a birth, and never repeats an edge', () => {

@@ -25,7 +25,12 @@ const FULL: RoomCard = {
 }
 
 const BARE: RoomCard = {
-  title: 'the storehouse', built: null, lives: [], holds: [], more: 0, present: [],
+  title: 'the storehouse',
+  built: null,
+  lives: [],
+  holds: [],
+  more: 0,
+  present: [],
   empty: 'No one is in just now.',
 }
 

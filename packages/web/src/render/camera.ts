@@ -67,8 +67,12 @@ export function zoomSettled(s: ZoomState, nowMs: number): boolean {
 export function zoomTo(prev: ZoomState, stop: ZoomStop, nowMs: number): ZoomState {
   const at = zoomScaleAt(prev, nowMs)
   return {
-    stop, from: at, startedMs: nowMs,
-    live: null, gestureFrom: at, lastWheelMs: prev.lastWheelMs,
+    stop,
+    from: at,
+    startedMs: nowMs,
+    live: null,
+    gestureFrom: at,
+    lastWheelMs: prev.lastWheelMs,
   }
 }
 
@@ -81,14 +85,17 @@ export function quantiseScale(v: number): number {
 
 /** One wheel event applied continuously; `pinch` is `e.ctrlKey`. Scale moves in LOG space, so the same push zooms by the same factor wherever the ladder's rungs happen to be. */
 export function zoomWheel(
-  prev: ZoomState, deltaY: number, nowMs: number, pinch = false,
+  prev: ZoomState,
+  deltaY: number,
+  nowMs: number,
+  pinch = false,
 ): ZoomState {
   if (deltaY === 0) return prev
   const fresh = prev.live === null || nowMs - prev.lastWheelMs > WHEEL_GESTURE_GAP_MS
   const base = fresh ? zoomScaleAt(prev, nowMs) : prev.live!
   const gestureFrom = fresh ? base : prev.gestureFrom
   const perOctave = pinch ? PINCH_PX_PER_OCTAVE : WHEEL_PX_PER_OCTAVE
-  const octaves = -deltaY / perOctave              // wheel up (negative deltaY) zooms in
+  const octaves = -deltaY / perOctave // wheel up (negative deltaY) zooms in
   return {
     ...prev,
     live: quantiseScale(base * Math.pow(2, octaves)),
@@ -114,8 +121,12 @@ export function zoomRelease(prev: ZoomState, nowMs: number, instant = false): Zo
     stop = stepStop(nearest, at > prev.gestureFrom ? 1 : -1)
   }
   return {
-    stop, from: at, startedMs: instant ? nowMs - ZOOM_SETTLE_MS : nowMs,
-    live: null, gestureFrom: stop, lastWheelMs: prev.lastWheelMs,
+    stop,
+    from: at,
+    startedMs: instant ? nowMs - ZOOM_SETTLE_MS : nowMs,
+    live: null,
+    gestureFrom: stop,
+    lastWheelMs: prev.lastWheelMs,
   }
 }
 
@@ -154,34 +165,49 @@ export function structureBoundsOf(
   list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
 ): CameraBounds {
   if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity
   for (const s of list) {
     for (const [x, y] of [
-      [s.x - 0.5, s.y - 0.5], [s.x + s.w - 0.5, s.y - 0.5],
-      [s.x + s.w - 0.5, s.y + s.h - 0.5], [s.x - 0.5, s.y + s.h - 0.5],
+      [s.x - 0.5, s.y - 0.5],
+      [s.x + s.w - 0.5, s.y - 0.5],
+      [s.x + s.w - 0.5, s.y + s.h - 0.5],
+      [s.x - 0.5, s.y + s.h - 0.5],
     ]) {
-      const sx = (x! - y!) * (TILE_W / 2), sy = (x! + y!) * (TILE_H / 2)
-      minX = Math.min(minX, sx); maxX = Math.max(maxX, sx)
-      minY = Math.min(minY, sy); maxY = Math.max(maxY, sy)
+      const sx = (x! - y!) * (TILE_W / 2),
+        sy = (x! + y!) * (TILE_H / 2)
+      minX = Math.min(minX, sx)
+      maxX = Math.max(maxX, sx)
+      minY = Math.min(minY, sy)
+      maxY = Math.max(maxY, sy)
     }
   }
   return { minX, maxX, minY, maxY }
 }
 
 /** A building sprite is drawn to a `(w + h) · 32 px` square anchored at its base diamond, so it overhangs its own ground upward and to each side; a fit that ignores that cuts the roofs off. */
-export const BUILDING_OVERHANG_PX_PER_TILE = 32   // textures.BUILDING_PX_PER_TILE
+export const BUILDING_OVERHANG_PX_PER_TILE = 32 // textures.BUILDING_PX_PER_TILE
 
 export function drawnBoundsOf(
   list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
 ): CameraBounds {
   if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity
   for (const s of list) {
-    const cx = s.x + s.w / 2 - 0.5, cy = s.y + s.h / 2 - 0.5
-    const gsx = (cx - cy) * (TILE_W / 2), gsy = (cx + cy) * (TILE_H / 2)
+    const cx = s.x + s.w / 2 - 0.5,
+      cy = s.y + s.h / 2 - 0.5
+    const gsx = (cx - cy) * (TILE_W / 2),
+      gsy = (cx + cy) * (TILE_H / 2)
     const side = (s.w + s.h) * BUILDING_OVERHANG_PX_PER_TILE
-    minX = Math.min(minX, gsx - side / 2); maxX = Math.max(maxX, gsx + side / 2)
-    minY = Math.min(minY, gsy - side); maxY = Math.max(maxY, gsy + ((s.w + s.h) * TILE_H) / 2)
+    minX = Math.min(minX, gsx - side / 2)
+    maxX = Math.max(maxX, gsx + side / 2)
+    minY = Math.min(minY, gsy - side)
+    maxY = Math.max(maxY, gsy + ((s.w + s.h) * TILE_H) / 2)
   }
   return { minX, maxX, minY, maxY }
 }
@@ -211,15 +237,17 @@ export function boundsCentre(b: CameraBounds): { sx: number; sy: number } {
 /** One axis of the clamp; `pos` is the world container's offset in screen px. A world SMALLER
  *  than the viewport at this scale is CENTRED rather than clamped. */
 function clampAxis(pos: number, scale: number, lo: number, hi: number, size: number): number {
-  const min = size - hi * scale       // the far edge may not come inside the viewport
-  const max = -lo * scale             // nor the near edge
+  const min = size - hi * scale // the far edge may not come inside the viewport
+  const max = -lo * scale // nor the near edge
   if (min > max) return (size - (lo + hi) * scale) / 2
   return Math.min(max, Math.max(min, pos))
 }
 
 /** Clamp a camera position so the world box always covers the viewport. */
 export function clampCamera(
-  pos: { x: number; y: number }, scale: number, bounds: CameraBounds,
+  pos: { x: number; y: number },
+  scale: number,
+  bounds: CameraBounds,
   screen: { w: number; h: number },
 ): { x: number; y: number } {
   const k = scale > 0 ? scale : 1
@@ -235,11 +263,16 @@ export const FIT_MARGIN_PX = 24
 /** Does the whole of `bounds` sit inside the stage at this scale, margin kept? The one
  *  predicate the fit and its refusal are both derived from, so they cannot disagree. */
 export function fitsAt(
-  bounds: CameraBounds, screen: { w: number; h: number }, scale: number,
+  bounds: CameraBounds,
+  screen: { w: number; h: number },
+  scale: number,
 ): boolean {
-  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
-  return w * scale <= Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
-    && h * scale <= Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
+  const w = bounds.maxX - bounds.minX,
+    h = bounds.maxY - bounds.minY
+  return (
+    w * scale <= Math.max(1, screen.w - 2 * FIT_MARGIN_PX) &&
+    h * scale <= Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
+  )
 }
 
 /** The largest stop at which `bounds` fits inside the stage with a margin — the overview
@@ -257,14 +290,18 @@ export function tooBigToFit(bounds: CameraBounds, screen: { w: number; h: number
 
 /** Sticky, not automatic: a resize never moves a camera the viewer steered, but one showing the whole town keeps showing the whole town. */
 export function resizeIntent(
-  fitted: boolean, box: CameraBounds, screen: { w: number; h: number },
+  fitted: boolean,
+  box: CameraBounds,
+  screen: { w: number; h: number },
 ): { kind: 'refit'; stop: ZoomStop } | { kind: 'clamp' } {
   return fitted ? { kind: 'refit', stop: fitStop(box, screen) } : { kind: 'clamp' }
 }
 
 /** The fraction of the stage AREA the settlement occupies AS DRAWN. */
 export function stageFill(
-  drawnBounds: CameraBounds, scale: number, screen: { w: number; h: number },
+  drawnBounds: CameraBounds,
+  scale: number,
+  screen: { w: number; h: number },
 ): number {
   const w = (drawnBounds.maxX - drawnBounds.minX) * scale
   const h = (drawnBounds.maxY - drawnBounds.minY) * scale
@@ -278,18 +315,19 @@ export function stageFill(
 /** How far short of the scale it wanted a fit can land, because the ladder has no rung there.
  *  Derived from the stops, so a new rung raises the floor by itself. */
 export const ZOOM_STOP_MAX_RATIO: number = ZOOM_STOPS.reduce<number>(
-  (worst, z, i) => (i === 0 ? worst : Math.max(worst, z / ZOOM_STOPS[i - 1]!)), 1)
+  (worst, z, i) => (i === 0 ? worst : Math.max(worst, z / ZOOM_STOPS[i - 1]!)),
+  1,
+)
 
 export function boxAspect(bounds: CameraBounds): number {
-  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
+  const w = bounds.maxX - bounds.minX,
+    h = bounds.maxY - bounds.minY
   return h <= 0 ? 0 : w / h
 }
 
 /** The most of the stage this box could ever cover, if the scale were free: it touches the
  *  binding side of the usable stage exactly, and the margin and its own aspect take the rest. */
-export function stageFillCeiling(
-  bounds: CameraBounds, screen: { w: number; h: number },
-): number {
+export function stageFillCeiling(bounds: CameraBounds, screen: { w: number; h: number }): number {
   const a = boxAspect(bounds)
   if (a <= 0 || screen.w <= 0 || screen.h <= 0) return 0
   const uw = Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
@@ -300,8 +338,6 @@ export function stageFillCeiling(
 
 /** The fill a fit is guaranteed to reach for THIS box on THIS stage: the ceiling, less the one
  *  rung the ladder may cost it. A first frame below this is a camera fault, not a town fault. */
-export function stageFillFloor(
-  bounds: CameraBounds, screen: { w: number; h: number },
-): number {
+export function stageFillFloor(bounds: CameraBounds, screen: { w: number; h: number }): number {
   return stageFillCeiling(bounds, screen) / (ZOOM_STOP_MAX_RATIO * ZOOM_STOP_MAX_RATIO)
 }

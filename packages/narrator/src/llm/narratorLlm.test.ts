@@ -26,7 +26,12 @@ const scripted = (value: unknown, captured: Captured[] = []): NarratorLlmClient 
   }) as unknown as NarratorLlmClient
 
 const digests: SceneDigest[] = [
-  { eventIds: [3, 7, 11], cast: ['omar', 'yusuf'], location: '3,4', typeCounts: { agent_spoke: 2, agent_injured: 1 } },
+  {
+    eventIds: [3, 7, 11],
+    cast: ['omar', 'yusuf'],
+    location: '3,4',
+    typeCounts: { agent_spoke: 2, agent_injured: 1 },
+  },
   { eventIds: [15, 21], cast: ['nadia'], location: null, typeCounts: { crop_harvested: 2 } },
 ]
 
@@ -42,7 +47,11 @@ const record: PublicRecord[] = [
 describe('makeNarratorLlm', () => {
   it('summarizeChapter sends every eventId and the citation instruction, returns the scripted summary', async () => {
     const captured: Captured[] = []
-    const canned = { title: 'The Argument by the Storehouse', text: 'Omar and Yusuf came to blows.', citations: [3, 7] }
+    const canned = {
+      title: 'The Argument by the Storehouse',
+      text: 'Omar and Yusuf came to blows.',
+      citations: [3, 7],
+    }
     const llm = makeNarratorLlm(scripted(canned, captured))
     const out = await llm.summarizeChapter(digests)
     expect(out).toEqual(canned)
@@ -53,14 +62,24 @@ describe('makeNarratorLlm', () => {
   })
 
   it('summarizeEra returns the scripted era object', async () => {
-    const canned = { title: 'The Week of the Quarrel', text: 'Seven days passed.', citations: [1, 3] }
+    const canned = {
+      title: 'The Week of the Quarrel',
+      text: 'Seven days passed.',
+      citations: [1, 3],
+    }
     const llm = makeNarratorLlm(scripted(canned))
     expect(await llm.summarizeEra(chapterDigests)).toEqual(canned)
   })
 
   it('newspaperCopy and biography return their scripted shapes', async () => {
-    const news = { headline: 'Quarrel at the Storehouse', body: 'Blows were exchanged.', citations: [3] }
-    expect(await makeNarratorLlm(scripted(news)).newspaperCopy(1, ['Omar struck Yusuf'])).toEqual(news)
+    const news = {
+      headline: 'Quarrel at the Storehouse',
+      body: 'Blows were exchanged.',
+      citations: [3],
+    }
+    expect(await makeNarratorLlm(scripted(news)).newspaperCopy(1, ['Omar struck Yusuf'])).toEqual(
+      news,
+    )
     const bio = { title: 'Omar of the Riverbend', body: 'A quarrelsome builder.' }
     expect(await makeNarratorLlm(scripted(bio)).biography('omar', 'Omar', record)).toEqual(bio)
   })
@@ -92,10 +111,32 @@ describe('makeNarratorLlm', () => {
   })
 
   it('schemas are strict with citation caps 40/60', () => {
-    expect(() => ChapterSummarySchema.parse({ title: 't', text: 'x', citations: [], extra: 1 })).toThrow()
-    expect(() => EraSummarySchema.parse({ title: 't', text: 'x', citations: [], extra: 1 })).toThrow()
-    expect(() => ChapterSummarySchema.parse({ title: 't', text: 'x', citations: Array.from({ length: 41 }, (_, i) => i) })).toThrow()
-    expect(() => EraSummarySchema.parse({ title: 't', text: 'x', citations: Array.from({ length: 61 }, (_, i) => i) })).toThrow()
-    expect(EraSummarySchema.parse({ title: 't', text: 'x', citations: Array.from({ length: 60 }, (_, i) => i) }).citations.length).toBe(60)
+    expect(() =>
+      ChapterSummarySchema.parse({ title: 't', text: 'x', citations: [], extra: 1 }),
+    ).toThrow()
+    expect(() =>
+      EraSummarySchema.parse({ title: 't', text: 'x', citations: [], extra: 1 }),
+    ).toThrow()
+    expect(() =>
+      ChapterSummarySchema.parse({
+        title: 't',
+        text: 'x',
+        citations: Array.from({ length: 41 }, (_, i) => i),
+      }),
+    ).toThrow()
+    expect(() =>
+      EraSummarySchema.parse({
+        title: 't',
+        text: 'x',
+        citations: Array.from({ length: 61 }, (_, i) => i),
+      }),
+    ).toThrow()
+    expect(
+      EraSummarySchema.parse({
+        title: 't',
+        text: 'x',
+        citations: Array.from({ length: 60 }, (_, i) => i),
+      }).citations.length,
+    ).toBe(60)
   })
 })

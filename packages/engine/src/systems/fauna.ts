@@ -21,7 +21,14 @@ export const FAUNA_SPAWN_CHANCE = 0.25
 
 // The eight ways out of a tile, in a fixed order so the roll means the same thing every run.
 const STEPS: ReadonlyArray<readonly [number, number]> = [
-  [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1],
+  [0, -1],
+  [1, -1],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1],
 ]
 
 const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
@@ -33,7 +40,12 @@ function habitable(state: WorldState, kind: FaunaKind, x: number, y: number): bo
 }
 
 // The nearest living body out in the open. A hunter indoors is a hunter nothing can smell.
-function nearestThreat(state: WorldState, x: number, y: number, radius: number): { x: number; y: number } | null {
+function nearestThreat(
+  state: WorldState,
+  x: number,
+  y: number,
+  radius: number,
+): { x: number; y: number } | null {
   let best: { x: number; y: number } | null = null
   let bestDist = Infinity
   for (const id of Object.keys(state.agents).sort()) {
@@ -50,7 +62,10 @@ function nearestThreat(state: WorldState, x: number, y: number, radius: number):
 // Away from the threat, twice as far as a wander — and if the far tile is no place for this
 // body, the near one; and if that is no place either, it stands its ground.
 export function fleeTo(
-  state: WorldState, kind: FaunaKind, from: { x: number; y: number }, threat: { x: number; y: number },
+  state: WorldState,
+  kind: FaunaKind,
+  from: { x: number; y: number },
+  threat: { x: number; y: number },
 ): { x: number; y: number } {
   const dx = Math.sign(from.x - threat.x)
   const dy = Math.sign(from.y - threat.y)
@@ -62,7 +77,10 @@ export function fleeTo(
 }
 
 function wanderTo(
-  state: WorldState, kind: FaunaKind, from: { x: number; y: number }, rng: RngStream,
+  state: WorldState,
+  kind: FaunaKind,
+  from: { x: number; y: number },
+  rng: RngStream,
 ): { x: number; y: number } {
   const [dx, dy] = STEPS[rng.int(STEPS.length)]!
   const to = { x: from.x + dx, y: from.y + dy }
@@ -82,7 +100,10 @@ export function faunaSystem(ctx: TickCtx): void {
       const f = ctx.state().fauna![id]!
       if (!f.alive) continue
       const threat = nearestThreat(ctx.state(), f.x, f.y, cfg.fleeRadius)
-      const to = threat === null ? wanderTo(ctx.state(), f.kind, f, rng) : fleeTo(ctx.state(), f.kind, f, threat)
+      const to =
+        threat === null
+          ? wanderTo(ctx.state(), f.kind, f, rng)
+          : fleeTo(ctx.state(), f.kind, f, threat)
       if (to.x === f.x && to.y === f.y) continue
       moves.push({ id, x: to.x, y: to.y })
     }
@@ -95,7 +116,9 @@ export function faunaSystem(ctx: TickCtx): void {
   const w = ctx.state().terrain[0]?.length ?? 0
   for (const kind of FAUNA_KINDS) {
     const cap = cfg.caps[kind]
-    const living = Object.values(ctx.state().fauna ?? {}).filter((f) => f.kind === kind && f.alive).length
+    const living = Object.values(ctx.state().fauna ?? {}).filter(
+      (f) => f.kind === kind && f.alive,
+    ).length
     // Winter halves the rolls, not their odds: half as many chances at the same ground.
     const slots = Math.max(0, cap - living)
     const rolls = winter ? Math.floor(slots / 2) : slots
@@ -105,7 +128,10 @@ export function faunaSystem(ctx: TickCtx): void {
       const y = rng.int(h)
       if (!habitable(ctx.state(), kind, x, y)) continue
       ctx.emit('fauna_spawned', {
-        id: mintId(ctx.state(), 'fauna'), kind, x, y,
+        id: mintId(ctx.state(), 'fauna'),
+        kind,
+        x,
+        y,
         ...(kind === 'fish' ? { stock: 1 } : {}),
       })
     }

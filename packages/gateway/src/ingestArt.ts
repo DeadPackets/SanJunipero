@@ -2,8 +2,12 @@
 // new record that wins by seq (the renderer's newest-ready law).
 import type Database from 'better-sqlite3'
 import {
-  AssetCodex, loadMaterialBook, registerCommittedBuildings, registerCommittedCast,
-  registerCommittedItems, registerGeneratedTerrain,
+  AssetCodex,
+  loadMaterialBook,
+  registerCommittedBuildings,
+  registerCommittedCast,
+  registerCommittedItems,
+  registerGeneratedTerrain,
 } from '@sj/forge'
 import { ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind } from '@sj/shared'
 
@@ -32,7 +36,9 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
   // independence the ground bake lives by, so a half-generated batch still wakes a whole map.
   const { records, report } = await registerGeneratedTerrain(codex, await loadMaterialBook())
   if (report.generated > 0) {
-    console.log(`dev world: ${report.generated} generated terrain tiles, ${report.painted} code-painted`)
+    console.log(
+      `dev world: ${report.generated} generated terrain tiles, ${report.painted} code-painted`,
+    )
   }
   return records.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
 }

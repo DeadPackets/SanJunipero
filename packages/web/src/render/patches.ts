@@ -33,10 +33,10 @@ function corners(x: number, y: number): { top: Pt; right: Pt; bottom: Pt; left: 
 // Clockwise, so every emitted edge keeps the patch on the same side. Chaining then closes into
 // loops without a winding test.
 const EDGES = [
-  { dx: 0, dy: -1, from: 'top', to: 'right' },      // NE
-  { dx: 1, dy: 0, from: 'right', to: 'bottom' },    // SE
-  { dx: 0, dy: 1, from: 'bottom', to: 'left' },     // SW
-  { dx: -1, dy: 0, from: 'left', to: 'top' },       // NW
+  { dx: 0, dy: -1, from: 'top', to: 'right' }, // NE
+  { dx: 1, dy: 0, from: 'right', to: 'bottom' }, // SE
+  { dx: 0, dy: 1, from: 'bottom', to: 'left' }, // SW
+  { dx: -1, dy: 0, from: 'left', to: 'top' }, // NW
 ] as const
 
 /** The outline of a set of tiles, as closed screen-space polylines with interior edges cut. */
@@ -73,7 +73,8 @@ export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
       poly.push(cur.from[0], cur.from[1])
       const here: Seg = cur
       const candidates: Seg[] = (out.get(keyOf(here.to[0], here.to[1])) ?? [])
-        .map((i) => segs[i]!).filter((s) => !s.used)
+        .map((i) => segs[i]!)
+        .filter((s) => !s.used)
       // at a pinch vertex, stay on the tile we arrived on so two patches never fuse
       cur = candidates.find((s) => s.tile === here.tile) ?? candidates[0]
     }
@@ -85,7 +86,8 @@ export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
 /** Parallel lines along a patch's longer axis, spaced one tile apart across its shorter one. */
 export function furrowLines(tiles: ReadonlyArray<Tile>): number[][] {
   if (tiles.length === 0) return []
-  const xs = tiles.map((t) => t.x), ys = tiles.map((t) => t.y)
+  const xs = tiles.map((t) => t.x),
+    ys = tiles.map((t) => t.y)
   const w = Math.max(...xs) - Math.min(...xs) + 1
   const h = Math.max(...ys) - Math.min(...ys) + 1
   const alongX = w >= h
@@ -108,8 +110,8 @@ export function furrowLines(tiles: ReadonlyArray<Tile>): number[][] {
   for (const k of [...rows.keys()].sort((a, b) => a - b)) {
     if (k % FURROW_SPACING_TILES !== 0) continue
     const line = rows.get(k)!
-    const lo = line.reduce((m, t) => (alongX ? t.x < m.x : t.y < m.y) ? t : m, line[0]!)
-    const hi = line.reduce((m, t) => (alongX ? t.x > m.x : t.y > m.y) ? t : m, line[0]!)
+    const lo = line.reduce((m, t) => ((alongX ? t.x < m.x : t.y < m.y) ? t : m), line[0]!)
+    const hi = line.reduce((m, t) => ((alongX ? t.x > m.x : t.y > m.y) ? t : m), line[0]!)
     out.push([...centre(lo), ...centre(hi)])
   }
   return out

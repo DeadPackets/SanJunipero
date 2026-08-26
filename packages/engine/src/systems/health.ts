@@ -9,7 +9,9 @@ function recoveryDelta(ctx: TickCtx, hunger: number, asleep: boolean, tended: bo
   if (!mortality.enabled) return base
   // A body with nothing in it does not mend itself; only another pair of hands can.
   if (!tended && hunger < mortality.fedThreshold) return 0
-  return base * (tended ? mortality.tendMultiplier : 1) * (asleep ? mortality.sleepRegenMultiplier : 1)
+  return (
+    base * (tended ? mortality.tendMultiplier : 1) * (asleep ? mortality.sleepRegenMultiplier : 1)
+  )
 }
 
 export function healthSystem(ctx: TickCtx): void {

@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MARK_COALESCE_TICKS, MARK_GLYPH, MARK_GLYPH_PALETTE, MARK_GLYPH_PX, MARK_KINDS,
-  MARK_MIN_WEIGHT, MARK_SLOTS, MARK_STRUCTURE_INKS, MARK_WEIGHT, MARK_WORDS,
-  coalesceMarks, marksFrom, type Mark, type MarkKind, type MarkSources,
+  MARK_COALESCE_TICKS,
+  MARK_GLYPH,
+  MARK_GLYPH_PALETTE,
+  MARK_GLYPH_PX,
+  MARK_KINDS,
+  MARK_MIN_WEIGHT,
+  MARK_SLOTS,
+  MARK_STRUCTURE_INKS,
+  MARK_WEIGHT,
+  MARK_WORDS,
+  coalesceMarks,
+  marksFrom,
+  type Mark,
+  type MarkKind,
+  type MarkSources,
 } from './timelineMarks.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
@@ -11,15 +23,18 @@ const DAY = 1440
 /** Five narrated days of a town that has actually lived — the shape /api/timeline/marks folds. */
 const MATURE = {
   chapters: [
-    { day: 0, title: 'The first morning' }, { day: 1, title: 'Rain on the new roof' },
-    { day: 2, title: 'A quarrel at the well' }, { day: 3, title: 'The storehouse fills' },
+    { day: 0, title: 'The first morning' },
+    { day: 1, title: 'Rain on the new roof' },
+    { day: 2, title: 'A quarrel at the well' },
+    { day: 3, title: 'The storehouse fills' },
   ],
   milestones: [
     { label: 'The first fire was lit', day: 0, tick: 380 },
     { label: 'The first harvest came in', day: 3, tick: 3 * DAY + 500 },
   ],
   moments: [
-    { day: 0, startTick: 360 }, { day: 4, startTick: 4 * DAY + 360 },
+    { day: 0, startTick: 360 },
+    { day: 4, startTick: 4 * DAY + 360 },
   ],
   changes: [{ tick: 2 * DAY + 100 }, { tick: 4 * DAY + 900 }],
   events: [
@@ -28,7 +43,7 @@ const MATURE = {
     { tick: 3 * DAY + 30, type: 'agent_died' },
     { tick: 4 * DAY + 200, type: 'agent_born' },
     { tick: 0, type: 'agent_spawned' },
-    { tick: 5 * DAY, type: 'agent_moved' },   // noise: nothing the town would remember
+    { tick: 5 * DAY, type: 'agent_moved' }, // noise: nothing the town would remember
   ],
   discoveries: [{ tick: 2 * DAY + 400, words: 'Maret worked out stitch a waterskin' }],
 }
@@ -45,7 +60,16 @@ describe('U14 — the marks come from the record, not from the ring', () => {
   })
 
   it('answers an unlived town with nothing rather than with invention', () => {
-    expect(marksFrom({ chapters: [], milestones: [], moments: [], changes: [], events: [], discoveries: [] })).toEqual([])
+    expect(
+      marksFrom({
+        chapters: [],
+        milestones: [],
+        moments: [],
+        changes: [],
+        events: [],
+        discoveries: [],
+      }),
+    ).toEqual([])
   })
 
   it('ignores an event the town would not remember', () => {
@@ -64,7 +88,8 @@ describe('U14 — the marks come from the record, not from the ring', () => {
   })
 
   it('comes back in tick order, whatever order the sources arrive in', () => {
-    for (let i = 1; i < marks.length; i++) expect(marks[i]!.tick).toBeGreaterThanOrEqual(marks[i - 1]!.tick)
+    for (let i = 1; i < marks.length; i++)
+      expect(marks[i]!.tick).toBeGreaterThanOrEqual(marks[i - 1]!.tick)
   })
 
   it('carries the weight its kind is worth, and never one below the floor', () => {
@@ -84,8 +109,18 @@ describe('P22.5 — a day somebody changed outranks a thing that merely happened
   })
 
   it('keeps the change when a change and a building land on the same pixel', () => {
-    const changed: Mark = { tick: 900, kind: 'changed', words: 'Someone changed', weight: MARK_WEIGHT.changed }
-    const built: Mark = { tick: 900, kind: 'built', words: 'A building was finished', weight: MARK_WEIGHT.built }
+    const changed: Mark = {
+      tick: 900,
+      kind: 'changed',
+      words: 'Someone changed',
+      weight: MARK_WEIGHT.changed,
+    }
+    const built: Mark = {
+      tick: 900,
+      kind: 'built',
+      words: 'A building was finished',
+      weight: MARK_WEIGHT.built,
+    }
     const out = coalesceMarks([built, changed], 1440)
     expect(out).toHaveLength(1)
     expect(out[0]!.kind).toBe('changed')
@@ -100,8 +135,12 @@ describe('P22.5 — a day somebody changed outranks a thing that merely happened
 })
 
 describe('coalesceMarks — a busy day is a mark, not a smear', () => {
-  const death = (tick: number): Mark =>
-    ({ tick, kind: 'death', words: 'Someone died', weight: MARK_WEIGHT.death })
+  const death = (tick: number): Mark => ({
+    tick,
+    kind: 'death',
+    words: 'Someone died',
+    weight: MARK_WEIGHT.death,
+  })
 
   // A day-long span is where MARK_COALESCE_TICKS is the whole rule: on a longer one the track
   // runs out of room first and the window widens, which the next case measures.
@@ -230,7 +269,11 @@ describe('what a mark says out loud', () => {
 
 describe('the ninth mark — a discovery', () => {
   const SOURCES: MarkSources = {
-    chapters: [], milestones: [], moments: [], changes: [], events: [],
+    chapters: [],
+    milestones: [],
+    moments: [],
+    changes: [],
+    events: [],
     discoveries: [{ tick: 40, words: 'Maret worked out stitch a waterskin' }],
   }
 
@@ -255,8 +298,10 @@ describe('the ninth mark — a discovery', () => {
 
   it('fits the 7×7 grid and paints only the palette', () => {
     for (const [x, y, fill] of MARK_GLYPH.discovery) {
-      expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThan(MARK_GLYPH_PX)
-      expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThan(MARK_GLYPH_PX)
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(x).toBeLessThan(MARK_GLYPH_PX)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y).toBeLessThan(MARK_GLYPH_PX)
       expect(MARK_GLYPH_PALETTE).toContain(fill)
     }
   })
@@ -271,7 +316,9 @@ describe('the ninth mark — a discovery', () => {
   it('reads as a mark, with the gateway’s own words', () => {
     const [mark] = marksFrom(SOURCES)
     expect(mark).toEqual({
-      tick: 40, kind: 'discovery', weight: 18,
+      tick: 40,
+      kind: 'discovery',
+      weight: 18,
       words: 'Maret worked out stitch a waterskin',
     })
   })
@@ -284,7 +331,10 @@ describe('the ninth mark — a discovery', () => {
   it('SURVIVES a crowded window — it is the mark a viewer wants to land on', () => {
     const crowded = marksFrom({
       ...SOURCES,
-      events: [{ tick: 41, type: 'agent_died' }, { tick: 42, type: 'structure_completed' }],
+      events: [
+        { tick: 41, type: 'agent_died' },
+        { tick: 42, type: 'structure_completed' },
+      ],
     })
     expect(crowded.map((m) => m.kind).sort()).toEqual(['built', 'death', 'discovery'])
     const kept = coalesceMarks(crowded, 5000)
@@ -293,7 +343,11 @@ describe('the ninth mark — a discovery', () => {
 
   it('a source with no discoveries changes nothing about the other eight', () => {
     const without = marksFrom({
-      chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
+      chapters: [],
+      milestones: [],
+      moments: [],
+      changes: [],
+      discoveries: [],
       events: [{ tick: 10, type: 'agent_died' }],
     })
     expect(without.map((m) => m.kind)).toEqual(['death'])

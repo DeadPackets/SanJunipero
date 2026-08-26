@@ -3,10 +3,20 @@ import type { RawImage } from './post/raw.js'
 // Authored 16×16 emote glyphs — deterministic pixel arrays, no generation involved.
 // Rendered by the engine as an overlay above a character's head.
 export const EMOTE_KINDS = [
-  'exclaim', 'question', 'heart', 'star', 'sleep', 'hunger',
-  'cold', 'rain', 'hurt', 'talk', 'idea', 'anger',
+  'exclaim',
+  'question',
+  'heart',
+  'star',
+  'sleep',
+  'hunger',
+  'cold',
+  'rain',
+  'hurt',
+  'talk',
+  'idea',
+  'anger',
 ] as const
-export type EmoteKind = typeof EMOTE_KINDS[number]
+export type EmoteKind = (typeof EMOTE_KINDS)[number]
 export const EMOTE_SIZE = 16
 
 // Warm-pastel palette, drawn from the Style Bible ramps.
@@ -258,10 +268,12 @@ const GLYPHS: Record<EmoteKind, string[]> = {
 export function renderEmote(kind: EmoteKind): RawImage {
   const rows = GLYPHS[kind]
   if (!rows) throw new Error(`unknown emote kind: ${kind}`)
-  if (rows.length !== EMOTE_SIZE) throw new Error(`${kind}: expected ${EMOTE_SIZE} rows, got ${rows.length}`)
+  if (rows.length !== EMOTE_SIZE)
+    throw new Error(`${kind}: expected ${EMOTE_SIZE} rows, got ${rows.length}`)
   const data = new Uint8ClampedArray(EMOTE_SIZE * EMOTE_SIZE * 4)
   rows.forEach((row, y) => {
-    if (row.length !== EMOTE_SIZE) throw new Error(`${kind}: row ${y} has ${row.length} chars, expected ${EMOTE_SIZE}`)
+    if (row.length !== EMOTE_SIZE)
+      throw new Error(`${kind}: row ${y} has ${row.length} chars, expected ${EMOTE_SIZE}`)
     for (let x = 0; x < EMOTE_SIZE; x++) {
       const ch = row[x]!
       if (ch === '.') continue

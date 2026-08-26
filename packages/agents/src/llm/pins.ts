@@ -32,7 +32,10 @@ export type PriceLookup = { prices: ModelPrices; source: PriceSource }
 
 // The provider row wins. Anything unattributed or unpriced resolves to the ceiling and reports
 // `ceiling`, so it can never silently book cheap.
-export function pricesFor(model: string | undefined, provider: string | null | undefined): PriceLookup {
+export function pricesFor(
+  model: string | undefined,
+  provider: string | null | undefined,
+): PriceLookup {
   const servedPinnedModel = model === undefined || model === MIND_MODEL
   if (servedPinnedModel && provider != null) {
     const row = PRICE_PER_M_BY_PROVIDER[provider]

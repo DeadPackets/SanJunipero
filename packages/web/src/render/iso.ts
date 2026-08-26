@@ -38,5 +38,5 @@ export function facingFrom(dx: number, dy: number): Facing | null {
   if (sx === 0 && sy === 0) return null
   if (sx === 0) return sy > 0 ? 'se' : 'ne'
   if (sy === 0) return sx > 0 ? 'se' : 'sw'
-  return sy > 0 ? (sx > 0 ? 'se' : 'sw') : (sx > 0 ? 'ne' : 'nw')
+  return sy > 0 ? (sx > 0 ? 'se' : 'sw') : sx > 0 ? 'ne' : 'nw'
 }

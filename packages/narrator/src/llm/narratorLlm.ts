@@ -48,7 +48,7 @@ export function makeNarratorLlm(client: NarratorLlmClient): NarratorLlm {
         system: NARRATOR_CANON,
         messages: user(
           `${NARRATOR_VOCABULARY_NOTES}\n` +
-            'Write this day\'s chapter of the chronicle from the scene digests below. ' +
+            "Write this day's chapter of the chronicle from the scene digests below. " +
             'Give it a title and a short narrative. ' +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +
             JSON.stringify(scenes),

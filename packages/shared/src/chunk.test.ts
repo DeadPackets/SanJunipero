@@ -17,11 +17,22 @@ describe('chunkOf', () => {
 
 describe('chunksTouched', () => {
   it('a 1x3 bridge spanning x 31 to 33 touches both chunks', () => {
-    expect(chunksTouched([{ x: 31, y: 0 }, { x: 32, y: 0 }, { x: 33, y: 0 }])).toEqual(['0,0', '1,0'])
+    expect(
+      chunksTouched([
+        { x: 31, y: 0 },
+        { x: 32, y: 0 },
+        { x: 33, y: 0 },
+      ]),
+    ).toEqual(['0,0', '1,0'])
   })
   it('dedupes and sorts', () => {
-    expect(chunksTouched([{ x: 40, y: 40 }, { x: 0, y: 0 }, { x: 41, y: 41 }]))
-      .toEqual(['0,0', '1,1'])
+    expect(
+      chunksTouched([
+        { x: 40, y: 40 },
+        { x: 0, y: 0 },
+        { x: 41, y: 41 },
+      ]),
+    ).toEqual(['0,0', '1,1'])
   })
   it('is empty for no coordinates', () => {
     expect(chunksTouched([])).toEqual([])

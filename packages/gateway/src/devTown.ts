@@ -1,4 +1,10 @@
-import { TOWN_RINGS_GENESIS, TOWN_SQUARE, makeCityTemplate, townOrigin, type CityStructure } from '@sj/shared'
+import {
+  TOWN_RINGS_GENESIS,
+  TOWN_SQUARE,
+  makeCityTemplate,
+  townOrigin,
+  type CityStructure,
+} from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import { SHOWCASE_ANCHOR, makeShowcaseMap } from './showcaseMap.js'
 
@@ -34,7 +40,8 @@ export function devStructureId(kind: string, x: number, y: number): string {
 /** The showcase town's square in world coordinates — a FUNCTION of the ring count, because the
  *  template's own corner walks one PITCH north-west per ring. */
 export function devTownSquare(
-  rings: number = TOWN_RINGS_GENESIS, anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
+  rings: number = TOWN_RINGS_GENESIS,
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
 ): { x: number; y: number } {
   return { x: anchor.x + townOrigin(rings), y: anchor.y + townOrigin(rings) }
 }
@@ -45,7 +52,8 @@ export function devTownSquare(
  * a square for a town three tiles west and ten north of the one that is drawn.
  */
 export function devWorldOrigin(
-  rings: number = TOWN_RINGS_GENESIS, anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
+  rings: number = TOWN_RINGS_GENESIS,
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
 ): { x: number; y: number } {
   const square = devTownSquare(rings, anchor)
   return { x: TOWN_SQUARE.x - square.x, y: TOWN_SQUARE.y - square.y }
@@ -54,16 +62,23 @@ export function devWorldOrigin(
 /** `rings` grows the LATTICE — blocks, streets and the ground the next ring needs. It does not
  *  stand more buildings: `cityStructures` is genesis's eleven at every ring count. */
 export function devTown(
-  anchor: { x: number; y: number } = SHOWCASE_ANCHOR, rings: number = TOWN_RINGS_GENESIS,
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
+  rings: number = TOWN_RINGS_GENESIS,
 ): DevTown {
   const template = makeCityTemplate(anchor, rings)
-  const { terrain } = makeShowcaseMap(anchor, rings)   // the SAME anchor and rings, so tiles and walls agree
+  const { terrain } = makeShowcaseMap(anchor, rings) // the SAME anchor and rings, so tiles and walls agree
   const structures = template.structures.map((s: CityStructure): DevStructure => {
-    const x = anchor.x + s.dx, y = anchor.y + s.dy
+    const x = anchor.x + s.dx,
+      y = anchor.y + s.dy
     return {
       id: devStructureId(s.kind, x, y),
-      kind: s.kind, x, y, w: s.w, h: s.h,
-      owner: s.owner, facing: s.facing,
+      kind: s.kind,
+      x,
+      y,
+      w: s.w,
+      h: s.h,
+      owner: s.owner,
+      facing: s.facing,
       flammable: s.kind !== 'standing_stone' && s.kind !== 'well',
     }
   })

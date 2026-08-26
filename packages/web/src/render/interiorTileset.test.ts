@@ -3,22 +3,45 @@ import { describe, expect, it } from 'vitest'
 import { interiorPieceKind, materialKind, type AssetRecord } from '@sj/shared'
 import { INTERIOR_TILE, ROOM_TILES, WALL_H_PX, roomMapOf } from './interiorMap.js'
 import {
-  FURNISHING_WALL_PIECE, WALL_SHEAR_X, WALL_SKEW_Y, WALL_STRIP_TILES, WALL_STRIP_W,
-  flagstoneRegions, hasInteriorTileset, resolveInteriorMaterial, resolveInteriorPiece,
-  wallCourses, wallStripAt, wallStripWidth, wallTransform,
+  FURNISHING_WALL_PIECE,
+  WALL_SHEAR_X,
+  WALL_SKEW_Y,
+  WALL_STRIP_TILES,
+  WALL_STRIP_W,
+  flagstoneRegions,
+  hasInteriorTileset,
+  resolveInteriorMaterial,
+  resolveInteriorPiece,
+  wallCourses,
+  wallStripAt,
+  wallStripWidth,
+  wallTransform,
 } from './interiorTileset.js'
 
 const rec = (kind: string, seq: number, over: Partial<AssetRecord> = {}): AssetRecord => ({
-  id: `asset_${kind}_${seq}`, seq, class: 'terrain', desc: kind, kind, meta: null,
-  footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 160, status: 'ready',
-  score: null, attempts: 1, costUsd: 0, createdAt: '2026-08-24T00:00:00.000Z', ...over,
+  id: `asset_${kind}_${seq}`,
+  seq,
+  class: 'terrain',
+  desc: kind,
+  kind,
+  meta: null,
+  footprint: { w: 1, h: 1 },
+  widthPx: 256,
+  heightPx: 160,
+  status: 'ready',
+  score: null,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-24T00:00:00.000Z',
+  ...over,
 })
 
 const FULL: AssetRecord[] = [
   rec(materialKind('interior-floor'), 1),
   rec(materialKind('interior-flagstone'), 2),
-  ...['wall-plain', 'wall-window', 'wall-door', 'wall-chimney', 'wall-dresser']
-    .map((id, i) => rec(interiorPieceKind(id), 3 + i)),
+  ...['wall-plain', 'wall-window', 'wall-door', 'wall-chimney', 'wall-dresser'].map((id, i) =>
+    rec(interiorPieceKind(id), 3 + i),
+  ),
 ]
 
 describe('interiorTileset — the shear that puts a flat elevation on a dimetric wall', () => {
@@ -30,7 +53,8 @@ describe('interiorTileset — the shear that puts a flat elevation on a dimetric
   })
 
   it('the two walls run opposite ways across the screen, and the left one is mirrored', () => {
-    const right = wallTransform('back-right'), left = wallTransform('back-left')
+    const right = wallTransform('back-right'),
+      left = wallTransform('back-left')
     expect(right.scaleX).toBeGreaterThan(0)
     expect(left.scaleX).toBeLessThan(0)
     expect(left.skewY).toBe(-right.skewY)
@@ -39,7 +63,7 @@ describe('interiorTileset — the shear that puts a flat elevation on a dimetric
     expect(left.scaleX * Math.sin(left.skewY)).toBeCloseTo(0.5, 12)
   })
 
-  it('a strip starts on its wall base and rises the wall\'s own authored height', () => {
+  it("a strip starts on its wall base and rises the wall's own authored height", () => {
     expect(wallStripAt('back-right', 0)).toEqual({ sx: 0, sy: -WALL_H_PX })
     expect(wallStripAt('back-left', 0)).toEqual({ sx: -0, sy: -WALL_H_PX })
     const four = wallStripAt('back-right', WALL_STRIP_TILES)
@@ -51,8 +75,8 @@ describe('interiorTileset — the shear that puts a flat elevation on a dimetric
 
   it('★ a strip that would overrun its wall is CROPPED, never squeezed', () => {
     expect(wallStripWidth('back-right', 0)).toBe(WALL_STRIP_W)
-    expect(wallStripWidth('back-right', 8)).toBe(WALL_STRIP_W)      // 12 tiles = three strips
-    expect(wallStripWidth('back-right', 12)).toBe(0)                // past the corner
+    expect(wallStripWidth('back-right', 8)).toBe(WALL_STRIP_W) // 12 tiles = three strips
+    expect(wallStripWidth('back-right', 12)).toBe(0) // past the corner
     // the short wall is 6 tiles: one whole strip and half of another
     expect(wallStripWidth('back-left', 0)).toBe(WALL_STRIP_W)
     expect(wallStripWidth('back-left', 4)).toBe(WALL_STRIP_W / 2)
@@ -73,8 +97,8 @@ describe('interiorTileset — what goes on the wall', () => {
     const plain = wallCourses([]).filter((c) => c.piece === 'wall-plain')
     const right = plain.filter((c) => c.wall === 'back-right').map((c) => c.atTiles)
     const left = plain.filter((c) => c.wall === 'back-left').map((c) => c.atTiles)
-    expect(right).toEqual([0, 4, 8])          // 12 tiles
-    expect(left).toEqual([0, 4])              // 6 tiles, the second one cropped
+    expect(right).toEqual([0, 4, 8]) // 12 tiles
+    expect(left).toEqual([0, 4]) // 6 tiles, the second one cropped
     // and between them they cover every tile of both walls
     expect(Math.max(...right) + WALL_STRIP_TILES).toBeGreaterThanOrEqual(ROOM_TILES.w)
     expect(Math.max(...left) + WALL_STRIP_TILES).toBeGreaterThanOrEqual(ROOM_TILES.h)
@@ -109,8 +133,12 @@ describe('interiorTileset — what goes on the wall', () => {
   it('a furnishing with no elevation of its own puts nothing on the wall', () => {
     expect(FURNISHING_WALL_PIECE['lantern']).toBeUndefined()
     const c = wallCourses([{ kind: 'lantern', wall: 'back-left', atTiles: 2 }])
-    expect(c.filter((x) => x.piece !== 'wall-plain').map((x) => x.piece).sort())
-      .toEqual(['wall-door', 'wall-window', 'wall-window'])
+    expect(
+      c
+        .filter((x) => x.piece !== 'wall-plain')
+        .map((x) => x.piece)
+        .sort(),
+    ).toEqual(['wall-door', 'wall-window', 'wall-window'])
   })
 })
 

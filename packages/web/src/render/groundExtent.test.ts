@@ -5,7 +5,12 @@ import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { groundOverhangTiles, rectOnGround, screenToTileF, type ScreenRect } from './ground.js'
 import {
-  CANOPY_PX, SHIMMER_MAX, SHIMMER_PX, TREES_MAX, decorationQuad, sampleDecorations,
+  CANOPY_PX,
+  SHIMMER_MAX,
+  SHIMMER_PX,
+  TREES_MAX,
+  decorationQuad,
+  sampleDecorations,
   type Decoration,
 } from './ambient.js'
 
@@ -13,7 +18,9 @@ import {
 // its tile's CENTRE, so it reaches 12 px above that tile's top vertex — over the neighbour
 // up-left, and on row 0 and column 0 there is no neighbour up-left, only the void.
 
-const GRASS: TileId = 0, WATER: TileId = 2, FOREST: TileId = 3
+const GRASS: TileId = 0,
+  WATER: TileId = 2,
+  FOREST: TileId = 3
 
 const grid = (w: number, h: number, fill: TileId): TileId[][] =>
   Array.from({ length: h }, () => Array.from({ length: w }, () => fill))
@@ -40,7 +47,9 @@ function sampleDecorationsPreFix(terrain: TileId[][]): Decoration[] {
 
 const GENESIS: TileId[][] = (() => {
   const { w, h } = DEFAULT_CONFIG.world.size
-  return Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => genesisTerrainAt(x, y)))
+  return Array.from({ length: h }, (_, y) =>
+    Array.from({ length: w }, (_, x) => genesisTerrainAt(x, y)),
+  )
 })()
 
 const offenders = (terrain: TileId[][], ds: readonly Decoration[]): Decoration[] =>
@@ -48,7 +57,8 @@ const offenders = (terrain: TileId[][], ds: readonly Decoration[]): Decoration[]
 
 /** The AABB of the painted field — what a cull-shaped test would ask about instead. */
 function fieldAabb(terrain: TileId[][]): ScreenRect {
-  const h = terrain.length, w = terrain[0]!.length
+  const h = terrain.length,
+    w = terrain[0]!.length
   return { x0: -h * (TILE_W / 2), y0: 0, x1: w * (TILE_W / 2), y1: (w + h) * (TILE_H / 2) }
 }
 const insideAabb = (b: ScreenRect, r: ScreenRect): boolean =>
@@ -57,17 +67,22 @@ const insideAabb = (b: ScreenRect, r: ScreenRect): boolean =>
 describe('the painted ground, as a predicate', () => {
   it('is the field geometry read back: a tile covers [x,x+1]x[y,y+1] from its TOP vertex', () => {
     const { sx, sy } = tileToScreen(3, 5)
-    expect(screenToTileF(sx, sy)).toEqual({ fx: 3, fy: 5 })                 // top vertex
-    expect(screenToTileF(sx + TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 4, fy: 5 })  // right
-    expect(screenToTileF(sx, sy + TILE_H)).toEqual({ fx: 4, fy: 6 })        // bottom
-    expect(screenToTileF(sx - TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 3, fy: 6 })  // left
+    expect(screenToTileF(sx, sy)).toEqual({ fx: 3, fy: 5 }) // top vertex
+    expect(screenToTileF(sx + TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 4, fy: 5 }) // right
+    expect(screenToTileF(sx, sy + TILE_H)).toEqual({ fx: 4, fy: 6 }) // bottom
+    expect(screenToTileF(sx - TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 3, fy: 6 }) // left
   })
 
   it('measures the overhang in tiles, signed, so a touch is 0 and not a pass by luck', () => {
     const t = grid(4, 4, GRASS)
     const top = tileToScreen(0, 0)
-    expect(groundOverhangTiles(t, { x0: top.sx, y0: top.sy, x1: top.sx, y1: top.sy })).toBeCloseTo(0, 12)
-    expect(groundOverhangTiles(t, { x0: top.sx, y0: top.sy - TILE_H, x1: top.sx, y1: top.sy })).toBe(1)
+    expect(groundOverhangTiles(t, { x0: top.sx, y0: top.sy, x1: top.sx, y1: top.sy })).toBeCloseTo(
+      0,
+      12,
+    )
+    expect(
+      groundOverhangTiles(t, { x0: top.sx, y0: top.sy - TILE_H, x1: top.sx, y1: top.sy }),
+    ).toBe(1)
     expect(rectOnGround(t, { x0: top.sx, y0: top.sy - 1, x1: top.sx, y1: top.sy })).toBe(false)
   })
 })
@@ -82,7 +97,7 @@ describe('★ nothing the decoration layer draws leaves the terrain extent', () 
     const all = grid(6, 6, FOREST)
     expect(offenders(all, sampleDecorations(all))).toEqual([])
     // and it did not answer by placing nothing: the interior is still decorated
-    expect(sampleDecorations(all).length).toBe(25)   // the 4x4 interior + ... see below
+    expect(sampleDecorations(all).length).toBe(25) // the 4x4 interior + ... see below
   })
 
   it('holds on water too — the shimmer is a quad like any other', () => {
@@ -99,7 +114,7 @@ describe('★ nothing the decoration layer draws leaves the terrain extent', () 
     expect(bad.every((d) => d.kind === 'tree')).toBe(true)
     expect(bad.every((d) => d.y === 0 || d.x === 0)).toBe(true)
     const worst = Math.max(...bad.map((d) => groundOverhangTiles(GENESIS, decorationQuad(d))))
-    expect(worst).toBeCloseTo(0.9375, 6)                       // 15 world px past the edge
+    expect(worst).toBeCloseTo(0.9375, 6) // 15 world px past the edge
     expect(worst * (TILE_W / 2)).toBeCloseTo(15, 6)
   })
 
@@ -107,8 +122,11 @@ describe('★ nothing the decoration layer draws leaves the terrain extent', () 
     const all = grid(6, 6, FOREST)
     const bad = offenders(all, sampleDecorationsPreFix(all))
     expect(bad.map((d) => `${d.x},${d.y}`).sort()).toEqual(
-      [...Array(6).keys()].flatMap((i) => [`${i},0`, `0,${i}`])
-        .filter((v, i, a) => a.indexOf(v) === i).sort())
+      [...Array(6).keys()]
+        .flatMap((i) => [`${i},0`, `0,${i}`])
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort(),
+    )
   })
 
   // ★ WHY THIS IS NOT ASKED OF THE CULL'S AABB, MEASURED RATHER THAN ARGUED.
@@ -116,9 +134,11 @@ describe('★ nothing the decoration layer draws leaves the terrain extent', () 
     const bad = offenders(GENESIS, sampleDecorationsPreFix(GENESIS))
     const box = fieldAabb(GENESIS)
     expect(bad.length).toBeGreaterThan(0)
-    expect(bad.filter((d) => !insideAabb(box, decorationQuad(d))),
-      'every quad that leaves the painted ground is still inside its bounding box — a diamond\'s '
-      + 'AABB has void in all four corners').toEqual([])
+    expect(
+      bad.filter((d) => !insideAabb(box, decorationQuad(d))),
+      "every quad that leaves the painted ground is still inside its bounding box — a diamond's " +
+        'AABB has void in all four corners',
+    ).toEqual([])
   })
 })
 
@@ -127,8 +147,10 @@ describe('the decoration quads are the ones the renderer paints', () => {
     const { sx, sy } = tileToScreen(4, 4)
     const q = decorationQuad({ kind: 'tree', x: 4, y: 4, sx, sy: sy + TILE_H / 2 })
     expect(q).toEqual({
-      x0: sx - CANOPY_PX.w / 2, x1: sx + CANOPY_PX.w / 2,
-      y0: sy + TILE_H / 2 - CANOPY_PX.h, y1: sy + TILE_H / 2,
+      x0: sx - CANOPY_PX.w / 2,
+      x1: sx + CANOPY_PX.w / 2,
+      y0: sy + TILE_H / 2 - CANOPY_PX.h,
+      y1: sy + TILE_H / 2,
     })
     expect(sy - q.y0).toBe(CANOPY_PX.h - TILE_H / 2)
   })

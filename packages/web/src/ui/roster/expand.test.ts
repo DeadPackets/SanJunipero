@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse, type SimEvent } from '@sj/shared'
+import {
+  bondFrom,
+  type Bond,
+  type BondAct,
+  type BondKind,
+  type BondsResponse,
+  type SimEvent,
+} from '@sj/shared'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { changeLog } from '../becoming.js'
 import { EMPTY_LINEAGE, type LineageLike } from '../bondModel2.js'
@@ -10,13 +17,21 @@ import { RosterPanelView } from '../RosterPanel.js'
 import { RosterExpanded } from './RosterExpanded.js'
 import { rosterRows2 } from './rosterRow.js'
 import {
-  ALWAYS_SHOWN, CLOSED, SECTION_EMPTY, SECTION_TITLE, SKILL_BANDS,
-  actsOf, becomingOf, expandReducer, skillBand,
-  type BecomingInput, type ExpandState,
+  ALWAYS_SHOWN,
+  CLOSED,
+  SECTION_EMPTY,
+  SECTION_TITLE,
+  SKILL_BANDS,
+  actsOf,
+  becomingOf,
+  expandReducer,
+  skillBand,
+  type BecomingInput,
+  type ExpandState,
 } from './expand.js'
 import type { TileId, WorldState } from '@sj/engine/state'
 
-const DAY = 1440   // MINUTES_PER_DAY — one tick is one sim-minute
+const DAY = 1440 // MINUTES_PER_DAY — one tick is one sim-minute
 const IDS = ['amara', 'nadia', 'yusuf']
 
 // AUDIT R3's six literals — the placeholders that described an empty person
@@ -29,10 +44,16 @@ const bond = (aId: string, bId: string, _kind: BondKind, acts: BondAct[], asOfTi
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
 const input = (over: Partial<BecomingInput> = {}): BecomingInput => ({
-  id: 'amara', name: 'Amara', nowTick: 0, skills: {}, acts: [],
-  bonds: null, lineage: EMPTY_LINEAGE,
+  id: 'amara',
+  name: 'Amara',
+  nowTick: 0,
+  skills: {},
+  acts: [],
+  bonds: null,
+  lineage: EMPTY_LINEAGE,
   people: { amara: 'Amara', nadia: 'Nadia', yusuf: 'Yusuf' },
-  changes: [], ...over,
+  changes: [],
+  ...over,
 })
 
 // ── THE REDUCER ────────────────────────────────────────────────────────────────────────────
@@ -73,22 +94,49 @@ describe('expanding never removes the way back, because the list never goes away
     tick: 0,
     terrain: Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId)),
     weather: { kind: 'sunny', temperatureC: 12 },
-    agents: Object.fromEntries(IDS.map((id, i) => [id, {
-      id, name: id[0]!.toUpperCase() + id.slice(1), x: i, y: 0, alive: true, asleep: false,
-      needs: { hunger: 80, energy: 80, warmth: 80, social: 80 }, hp: 100, injuries: [],
-      ill: false, ageDays: 30 * 364, skills: {}, activity: null,
-      collapsedSinceTick: null, zeroHungerSinceTick: null,
-    }])) as WorldState['agents'],
-    structures: {}, items: {}, crops: {},
-    wildlife: { fish: 1, deer: 1 }, counters: { nextEntityId: 1 },
+    agents: Object.fromEntries(
+      IDS.map((id, i) => [
+        id,
+        {
+          id,
+          name: id[0]!.toUpperCase() + id.slice(1),
+          x: i,
+          y: 0,
+          alive: true,
+          asleep: false,
+          needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
+          hp: 100,
+          injuries: [],
+          ill: false,
+          ageDays: 30 * 364,
+          skills: {},
+          activity: null,
+          collapsedSinceTick: null,
+          zeroHungerSinceTick: null,
+        },
+      ]),
+    ) as WorldState['agents'],
+    structures: {},
+    items: {},
+    crops: {},
+    wildlife: { fish: 1, deer: 1 },
+    counters: { nextEntityId: 1 },
   }
   const rows = rosterRows2(state, [], null, 0)
 
-  const render = (openId: string | null): string => renderToStaticMarkup(createElement(RosterPanelView, {
-    rows, gone: 0, sort: 'name' as const, openId,
-    becomingOf: (id: string) => becomingOf(input({ id, name: id })),
-    onSort: () => {}, onToggle: () => {}, onOpenFull: () => {},
-  }))
+  const render = (openId: string | null): string =>
+    renderToStaticMarkup(
+      createElement(RosterPanelView, {
+        rows,
+        gone: 0,
+        sort: 'name' as const,
+        openId,
+        becomingOf: (id: string) => becomingOf(input({ id, name: id })),
+        onSort: () => {},
+        onToggle: () => {},
+        onOpenFull: () => {},
+      }),
+    )
 
   it('★ EVERY reachable state still renders every row of the list', () => {
     for (const openId of [null, ...IDS]) {
@@ -142,7 +190,9 @@ describe('becomingOf on a day-0 person', () => {
     expect(b.good).toEqual([])
     expect(b.changed).toEqual([])
     expect(b.lived).toBe(SECTION_EMPTY.lived)
-    const html = renderToStaticMarkup(createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }))
+    const html = renderToStaticMarkup(
+      createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+    )
     for (const k of ALWAYS_SHOWN) {
       if (k === 'lived') continue
       expect(html, k).toContain(SECTION_EMPTY[k])
@@ -167,7 +217,9 @@ describe('becomingOf on a day-0 person', () => {
 
   it('`wants` is empty today and its section does not render AT ALL', () => {
     expect(b.wants).toEqual([])
-    const html = renderToStaticMarkup(createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }))
+    const html = renderToStaticMarkup(
+      createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+    )
     expect(html).not.toContain('data-section="wants"')
     expect(html).not.toContain(SECTION_TITLE.wants)
   })
@@ -179,20 +231,22 @@ describe('becomingOf on a person the run has made something of', () => {
     bond('amara', 'nadia', 'owe', [at(4 * DAY, 'owe'), at(5 * DAY, 'owe'), at(5 * DAY, 'friend')]),
     bond('amara', 'yusuf', 'friend', [at(5 * DAY, 'friend')]),
   ])
-  const b = becomingOf(input({
-    nowTick: 5 * DAY,
-    skills: { farming: 40, fishing: 2 },
-    acts: [
-      { tick: 1 * DAY, words: 'put a crop in the ground' },
-      { tick: 5 * DAY, words: 'brought a harvest in' },
-      { tick: 3 * DAY, words: 'finished a building' },
-    ],
-    bonds,
-    changes: changeLog([
-      { version: 1, day: 0, doc: 'a', edit: 'first written' },
-      { version: 2, day: 4, doc: 'b', edit: 'after the flood' },
-    ]),
-  }))
+  const b = becomingOf(
+    input({
+      nowTick: 5 * DAY,
+      skills: { farming: 40, fishing: 2 },
+      acts: [
+        { tick: 1 * DAY, words: 'put a crop in the ground' },
+        { tick: 5 * DAY, words: 'brought a harvest in' },
+        { tick: 3 * DAY, words: 'finished a building' },
+      ],
+      bonds,
+      changes: changeLog([
+        { version: 1, day: 0, doc: 'a', edit: 'first written' },
+        { version: 2, day: 4, doc: 'b', edit: 'after the flood' },
+      ]),
+    }),
+  )
 
   it('says how long they have lived here, in words rather than as a stat', () => {
     expect(b.lived).toBe('Five days in the town.')
@@ -245,7 +299,9 @@ describe('becomingOf on a person the run has made something of', () => {
   })
 
   it('is pure — the same input twice gives the same becoming', () => {
-    expect(becomingOf(input({ nowTick: 5 * DAY, bonds }))).toEqual(becomingOf(input({ nowTick: 5 * DAY, bonds })))
+    expect(becomingOf(input({ nowTick: 5 * DAY, bonds }))).toEqual(
+      becomingOf(input({ nowTick: 5 * DAY, bonds })),
+    )
   })
 })
 
@@ -273,8 +329,7 @@ describe('actsOf — what they DID, from the log and nowhere else', () => {
       { seq: 3, tick: 22, type: 'weather_changed', payload: { agentId: 'amara' } } as SimEvent,
     ]
     const acts = actsOf('amara', bonds, events)
-    expect(acts.map((a) => a.words).sort())
-      .toEqual(['brought a harvest in', 'gave something away'])
+    expect(acts.map((a) => a.words).sort()).toEqual(['brought a harvest in', 'gave something away'])
   })
 
   it('a person with no log has done nothing, which is not an error', () => {
@@ -283,11 +338,16 @@ describe('actsOf — what they DID, from the log and nowhere else', () => {
 })
 
 describe('the rendered expansion', () => {
-  const b = becomingOf(input({
-    nowTick: 2 * DAY, skills: { farming: 40 },
-    acts: [{ tick: DAY, words: 'finished a building' }],
-  }))
-  const html = renderToStaticMarkup(createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }))
+  const b = becomingOf(
+    input({
+      nowTick: 2 * DAY,
+      skills: { farming: 40 },
+      acts: [{ tick: DAY, words: 'finished a building' }],
+    }),
+  )
+  const html = renderToStaticMarkup(
+    createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+  )
 
   it('is a labelled group with a keyboard-reachable way into the whole page', () => {
     expect(html).toContain('aria-label="Who they have become"')

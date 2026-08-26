@@ -4,11 +4,11 @@ export type Tint = { r: number; g: number; b: number }
 
 // Spec §7 atmosphere: deep blue moonlit night, golden dawn, grey-green storm, snow-blued winter.
 export const TINTS: Record<'day' | 'night' | 'dawn' | 'storm' | 'winter', Tint> = {
-  day:    { r: 1.00, g: 1.00, b: 1.00 },
-  night:  { r: 0.45, g: 0.52, b: 0.95 },
-  dawn:   { r: 1.12, g: 0.94, b: 0.78 },
-  storm:  { r: 0.72, g: 0.82, b: 0.76 },
-  winter: { r: 0.86, g: 0.93, b: 1.10 },
+  day: { r: 1.0, g: 1.0, b: 1.0 },
+  night: { r: 0.45, g: 0.52, b: 0.95 },
+  dawn: { r: 1.12, g: 0.94, b: 0.78 },
+  storm: { r: 0.72, g: 0.82, b: 0.76 },
+  winter: { r: 0.86, g: 0.93, b: 1.1 },
 }
 
 export function applyTint(img: RawImage, t: Tint): RawImage {

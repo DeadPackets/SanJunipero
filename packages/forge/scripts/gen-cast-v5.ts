@@ -11,12 +11,24 @@ import { PALETTE_WORDS, SWATCH_CLAUSE } from '../src/library/plan.js'
 import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
-  CELL_V2, FEET_Y_V2, anchorToCanvas, cellDistance, downscaleMajority, opaqueBbox, sliceStrip,
+  CELL_V2,
+  FEET_Y_V2,
+  anchorToCanvas,
+  cellDistance,
+  downscaleMajority,
+  opaqueBbox,
+  sliceStrip,
   type GateFailure,
 } from '../src/sheet.js'
 import {
-  AUTHORED_FACINGS, coherenceGateV4, deriveSheet, sleepCoherenceGateV4, stanceGate, strideGateV4,
-  type AuthoredFacing, type StripPoseV4,
+  AUTHORED_FACINGS,
+  coherenceGateV4,
+  deriveSheet,
+  sleepCoherenceGateV4,
+  stanceGate,
+  strideGateV4,
+  type AuthoredFacing,
+  type StripPoseV4,
 } from '../src/mirror.js'
 import { processHiResCell } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
@@ -31,11 +43,19 @@ const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 const CAP = Number(process.env.CAST_CAP ?? '12.00')
 const DRY = process.env.CAST_DRY === '1'
-const REJECTED = new Set((process.env.CAST_REJECTED ?? '').split(',').map((s) => s.trim()).filter(Boolean))
-const FILTER = (process.env.CAST ?? CAST_V5.map((c) => c.id).join(',')).split(',').map((s) => s.trim())
+const REJECTED = new Set(
+  (process.env.CAST_REJECTED ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
+const FILTER = (process.env.CAST ?? CAST_V5.map((c) => c.id).join(','))
+  .split(',')
+  .map((s) => s.trim())
 // Omar first whatever the filter order says: his master is everyone else's proportion ref.
-const RUN = CAST_V5.filter((c) => FILTER.includes(c.id))
-  .sort((a, b) => Number(b.id === PROPORTION_ANCHOR_ID) - Number(a.id === PROPORTION_ANCHOR_ID))
+const RUN = CAST_V5.filter((c) => FILTER.includes(c.id)).sort(
+  (a, b) => Number(b.id === PROPORTION_ANCHOR_ID) - Number(a.id === PROPORTION_ANCHOR_ID),
+)
 if (RUN.length === 0) throw new Error(`CAST=${process.env.CAST} matches no cast member`)
 
 const S = scratch('ar')
@@ -48,16 +68,28 @@ const swatch = await paletteSwatchPng()
 
 class OutOfBudget extends Error {}
 
-async function generate(prompt: string, refs: Buffer[], size: string, reserve: number, assetId: string) {
-  if (budget.total + reserve > CAP) throw new OutOfBudget(
-    `reserve $${reserve.toFixed(3)} exceeds remaining cap ($${budget.total.toFixed(3)} of $${CAP})`)
+async function generate(
+  prompt: string,
+  refs: Buffer[],
+  size: string,
+  reserve: number,
+  assetId: string,
+) {
+  if (budget.total + reserve > CAP)
+    throw new OutOfBudget(
+      `reserve $${reserve.toFixed(3)} exceeds remaining cap ($${budget.total.toFixed(3)} of $${CAP})`,
+    )
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL, prompt, size, response_format: 'b64_json',
+      model: MODEL,
+      prompt,
+      size,
+      response_format: 'b64_json',
       input_references: refs.map((r) => ({
-        type: 'image_url', image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
       })),
       usage: { include: true },
     }),
@@ -68,17 +100,25 @@ async function generate(prompt: string, refs: Buffer[], size: string, reserve: n
   if (!b64) throw new Error(`${MODEL}: no b64_json`)
   const cost = json.usage?.cost ?? reserve
   budget.spend(cost)
-  ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost })  // $5 anomaly stop
+  ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost }) // $5 anomaly stop
   ledger.flush()
   return { raw: Buffer.from(b64, 'base64'), cost }
 }
 
 async function candidate(
-  dir: string, key: string, prompt: string, refs: Buffer[], size: string, reserve: number,
+  dir: string,
+  key: string,
+  prompt: string,
+  refs: Buffer[],
+  size: string,
+  reserve: number,
   assetId: string,
 ): Promise<Buffer> {
   const path = `${dir}/raws/${key}.png`
-  if (existsSync(path)) { console.log(`  ${key}: cached`); return readFileSync(path) }
+  if (existsSync(path)) {
+    console.log(`  ${key}: cached`)
+    return readFileSync(path)
+  }
   if (DRY) throw new OutOfBudget(`${key}: DRY`)
   const r = await generate(prompt, refs, size, reserve, assetId)
   writeFileSync(path, r.raw)
@@ -100,13 +140,18 @@ const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
 // From behind you cannot tell one foot from the other, so "the OTHER foot planted forward"
 // renders as a body standing still. The stride has to be stated as a geometry, not an identity.
 const STRIDE_CLAUSE =
-  ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the '
-  + 'shoulders, with clear background visible between the legs. This is the WIDEST frame of '
-  + 'the walk cycle. It is NOT a standing pose and the feet are NOT together.'
+  ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the ' +
+  'shoulders, with clear background visible between the legs. This is the WIDEST frame of ' +
+  'the walk cycle. It is NOT a standing pose and the feet are NOT together.'
 const POSE_V4: Record<WalkPose, string> = {
-  'contact-a': 'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward.' + STRIDE_CLAUSE,
-  'passing': 'walk cycle PASSING pose: legs close together, one foot lifted and passing under the body, the other leg planted straight, arms near the sides',
-  'contact-b': 'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward.' + STRIDE_CLAUSE,
+  'contact-a':
+    'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward.' +
+    STRIDE_CLAUSE,
+  passing:
+    'walk cycle PASSING pose: legs close together, one foot lifted and passing under the body, the other leg planted straight, arms near the sides',
+  'contact-b':
+    'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward.' +
+    STRIDE_CLAUSE,
 }
 
 /** PRESENT DAY. The same clause the dwellings carry, in the register a person needs. Without
@@ -121,59 +166,65 @@ const PERIOD = [
 ].join(' ')
 
 const NO_SCENERY =
-  'The ONLY content is the figure or figures on the flat magenta background: NO buildings, NO '
-  + 'houses, NO scenery, NO ground plane, NO path, NO furniture, NO shadow under the figures. '
-  + 'NO text, NO words, NO labels, NO captions anywhere.'
+  'The ONLY content is the figure or figures on the flat magenta background: NO buildings, NO ' +
+  'houses, NO scenery, NO ground plane, NO path, NO furniture, NO shadow under the figures. ' +
+  'NO text, NO words, NO labels, NO captions anywhere.'
 
 function masterPrompt(m: CastMember, proportionRef: boolean): string {
   // The proportion reference is load-bearing: generated without it, every founder came back at
   // FIVE heads tall beside a three-heads anchor. Words alone did not hold it; the picture does.
   const proportionClause = proportionRef
-    ? 'The SECOND reference image shows ANOTHER villager of this same game in the exact required '
-      + 'layout: LEFT figure is the front three-quarter view facing bottom-right, RIGHT figure is '
-      + 'the back three-quarter view facing top-right with NO face visible. Match that layout, the '
-      + 'CHIBI body proportions, the big round head, the chunky pixel size and the simplification '
-      + 'level EXACTLY. The head must be as large a fraction of the whole figure as it is in that '
-      + 'reference — the whole body is only about THREE head-heights tall, NOT five, NOT a '
-      + 'realistically proportioned adult. But do NOT copy that villager\'s costume, colours, hair '
-      + 'or identity, and do not draw that villager. '
+    ? 'The SECOND reference image shows ANOTHER villager of this same game in the exact required ' +
+      'layout: LEFT figure is the front three-quarter view facing bottom-right, RIGHT figure is ' +
+      'the back three-quarter view facing top-right with NO face visible. Match that layout, the ' +
+      'CHIBI body proportions, the big round head, the chunky pixel size and the simplification ' +
+      'level EXACTLY. The head must be as large a fraction of the whole figure as it is in that ' +
+      'reference — the whole body is only about THREE head-heights tall, NOT five, NOT a ' +
+      "realistically proportioned adult. But do NOT copy that villager's costume, colours, hair " +
+      'or identity, and do not draw that villager. '
     : ''
-  return `${STYLE_PROMPT} Exactly TWO figures of the SAME character side by side on the magenta `
-    + 'background, evenly spaced with a clear magenta gap between them, whole body and feet '
-    + `visible on both. LEFT figure: ${VIEW.se}. RIGHT figure: ${VIEW.ne}. `
-    + 'The two figures are identical in costume, colours and proportions — only the view changes. '
-    + proportionClause
-    + `${NO_SCENERY} `
-    + `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${SWATCH_CLAUSE} ${PALETTE_WORDS} ${BIG_PIXEL} `
-    + 'Each figure stands about three quarters of the frame height tall, with clear magenta '
-    + 'margin above and below; figures must NOT touch the edges of the image.'
+  return (
+    `${STYLE_PROMPT} Exactly TWO figures of the SAME character side by side on the magenta ` +
+    'background, evenly spaced with a clear magenta gap between them, whole body and feet ' +
+    `visible on both. LEFT figure: ${VIEW.se}. RIGHT figure: ${VIEW.ne}. ` +
+    'The two figures are identical in costume, colours and proportions — only the view changes. ' +
+    proportionClause +
+    `${NO_SCENERY} ` +
+    `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${SWATCH_CLAUSE} ${PALETTE_WORDS} ${BIG_PIXEL} ` +
+    'Each figure stands about three quarters of the frame height tall, with clear magenta ' +
+    'margin above and below; figures must NOT touch the edges of the image.'
+  )
 }
 
 function framePrompt(m: CastMember, f: AuthoredFacing, p: WalkPose): string {
-  return `${STYLE_PROMPT} A single character sprite, exactly ONE figure (count: 1 figure), whole `
-    + 'body and feet visible, centered on the magenta background. The figure is the '
-    + `${VIEW[f]} — exactly the same character, costume and colours as ${VIEW_REF}, with the `
-    + 'same chunky pixel look: the visible square pixels must be the SAME SIZE relative to the '
-    + 'body as in the reference figure. Draw EXACTLY ONE figure: the reference shows one figure '
-    + `and the answer must show one figure. Pose: ${POSE_V4[p]}. ${NO_SCENERY} `
-    + `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${BIG_PIXEL} `
-    + 'The figure stands about four fifths of the frame height tall, with clear magenta margin on '
-    + 'all sides; the figure must NOT touch the edges of the image.'
+  return (
+    `${STYLE_PROMPT} A single character sprite, exactly ONE figure (count: 1 figure), whole ` +
+    'body and feet visible, centered on the magenta background. The figure is the ' +
+    `${VIEW[f]} — exactly the same character, costume and colours as ${VIEW_REF}, with the ` +
+    'same chunky pixel look: the visible square pixels must be the SAME SIZE relative to the ' +
+    'body as in the reference figure. Draw EXACTLY ONE figure: the reference shows one figure ' +
+    `and the answer must show one figure. Pose: ${POSE_V4[p]}. ${NO_SCENERY} ` +
+    `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${BIG_PIXEL} ` +
+    'The figure stands about four fifths of the frame height tall, with clear magenta margin on ' +
+    'all sides; the figure must NOT touch the edges of the image.'
+  )
 }
 
 function sleepPrompt(m: CastMember): string {
-  return `${STYLE_PROMPT} A single character sprite, exactly ONE figure — exactly the same `
-    + 'character, costume and colours as the figure in the reference image, at the same chunky '
-    + 'pixel scale. The character is lying curled on their side fast asleep, seen from the same '
+  return (
+    `${STYLE_PROMPT} A single character sprite, exactly ONE figure — exactly the same ` +
+    'character, costume and colours as the figure in the reference image, at the same chunky ' +
+    'pixel scale. The character is lying curled on their side fast asleep, seen from the same ' +
     // "body fully horizontal" asked for a body flat across the SCREEN and got it on three of
     // the five. On a 2:1 dimetric ground the body runs along the ground diagonal.
-    + 'high three-quarter angle as the reference figures, the body lying ALONG THE GROUND going '
-    + 'away up to the right — head at the upper right, knees drawn up and both feet at the lower '
-    + 'left, NOT flat across the picture. Head resting on the ground in profile, cheek down, eyes '
-    + 'closed, relaxed peaceful face; arms tucked in front of the chest and NOT propping the head '
-    + 'up. Same outfit. Draw EXACTLY ONE figure. NO bed, NO pillow, NO props. '
-    + `${NO_SCENERY} `
-    + `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${BIG_PIXEL}`
+    'high three-quarter angle as the reference figures, the body lying ALONG THE GROUND going ' +
+    'away up to the right — head at the upper right, knees drawn up and both feet at the lower ' +
+    'left, NOT flat across the picture. Head resting on the ground in profile, cheek down, eyes ' +
+    'closed, relaxed peaceful face; arms tucked in front of the chest and NOT propping the head ' +
+    'up. Same outfit. Draw EXACTLY ONE figure. NO bed, NO pillow, NO props. ' +
+    `${NO_SCENERY} ` +
+    `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${BIG_PIXEL}`
+  )
 }
 
 // ── the pipeline ─────────────────────────────────────────────────────────────────────────────
@@ -183,14 +234,16 @@ function sleepPrompt(m: CastMember): string {
 const MAGENTA: readonly [number, number, number] = [255, 0, 255]
 function onMagenta(img: RawImage, pad = 0.18): RawImage {
   const m = Math.round(Math.max(img.width, img.height) * pad)
-  const width = img.width + m * 2, height = img.height + m * 2
+  const width = img.width + m * 2,
+    height = img.height + m * 2
   const data = new Uint8ClampedArray(width * height * 4)
   for (let i = 0; i < data.length; i += 4) data.set([...MAGENTA, 255], i)
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
-    const s = (y * img.width + x) * 4
-    if (img.data[s + 3] === 0) continue
-    data.set(img.data.subarray(s, s + 4), ((y + m) * width + x + m) * 4)
-  }
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++) {
+      const s = (y * img.width + x) * 4
+      if (img.data[s + 3] === 0) continue
+      data.set(img.data.subarray(s, s + 4), ((y + m) * width + x + m) * 4)
+    }
   return { width, height, data }
 }
 
@@ -199,7 +252,7 @@ function keyBg(img: RawImage): RawImage {
     const keyed = chromaKey(img, { tolerance })
     let clear = 0
     for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-    if (clear / (keyed.width * keyed.height) >= 0.10) return keyed
+    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
   }
   throw new Error('keyBg: <10% keyed even at tolerance 110')
 }
@@ -207,26 +260,39 @@ function keyBg(img: RawImage): RawImage {
 const MAX_ART_H = FEET_Y_V2 + 1
 function gateView(img: RawImage): RawImage {
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
-  const fitted = k === 1 ? img : downscaleMajority(img,
-    Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
-    Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))))
+  const fitted =
+    k === 1
+      ? img
+      : downscaleMajority(
+          img,
+          Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
+          Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
+        )
   return anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2)
 }
 
-const CALIBRATED_MEDIAN = 0.310
+const CALIBRATED_MEDIAN = 0.31
 
 // The ruling, and why it exists, live in `src/gate.ts` beside `refusalMessage`. This is the
 // cast generator's adapter onto it: a `GateFailure` rendered with its margin, because the
 // margin is what tells an operator a threshold from a bad drawing.
 const said = (x: GateFailure): string =>
-  `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
-  + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`
+  `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} ` +
+  `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`
 
-function refuseFailing(what: string, cands: readonly { key: string; failures: GateFailure[] }[]): void {
-  const msg = refusalMessage(what, cands.map((c) => ({ key: c.key, failures: c.failures.map(said) })))
+function refuseFailing(
+  what: string,
+  cands: readonly { key: string; failures: GateFailure[] }[],
+): void {
+  const msg = refusalMessage(
+    what,
+    cands.map((c) => ({ key: c.key, failures: c.failures.map(said) })),
+  )
   if (msg === '') return
-  throw new Error(`${msg}\n  Raise CAST_ATTEMPTS to draw more, CAST_REJECTED to refuse a `
-    + `candidate by eye, or change the threshold on purpose. Nothing is written for this character.`)
+  throw new Error(
+    `${msg}\n  Raise CAST_ATTEMPTS to draw more, CAST_REJECTED to refuse a ` +
+      `candidate by eye, or change the threshold on purpose. Nothing is written for this character.`,
+  )
 }
 
 /** How many candidates a cell may be drawn as before the run gives up. Documented in this
@@ -245,7 +311,10 @@ async function runCharacter(m: CastMember): Promise<void> {
   const assetId = `cast:${m.id}`
   const spentBefore = ledger.totalFor(assetId)
   const report: string[] = []
-  const push = (l: string) => { report.push(l); console.log(`  ${l}`) }
+  const push = (l: string) => {
+    report.push(l)
+    console.log(`  ${l}`)
+  }
   console.log(`\n== ${m.id} ==`)
 
   // master pair — the ONLY reference is the swatch, plus (for everyone but omar) omar's own
@@ -256,8 +325,19 @@ async function runCharacter(m: CastMember): Promise<void> {
   for (let i = 0; i < ATTEMPTS; i++) {
     if (i === ATTEMPTS - 1 && masters.some((x) => x.pitch >= MASTER_MIN_PITCH)) break
     const key = `master-${m.id}-c${i}`
-    if (REJECTED.has(key)) { push(`${key}: REFUSED BY EYE`); continue }
-    const raw = await candidate(DIR, key, masterPrompt(m, proportionRef !== null), refs, '1024x1024', 0.08, assetId)
+    if (REJECTED.has(key)) {
+      push(`${key}: REFUSED BY EYE`)
+      continue
+    }
+    const raw = await candidate(
+      DIR,
+      key,
+      masterPrompt(m, proportionRef !== null),
+      refs,
+      '1024x1024',
+      0.08,
+      assetId,
+    )
     try {
       const segs = sliceStrip(keyBg(await decodePng(raw)), 2)
       const { estimatePitch } = await import('../src/sheet.js')
@@ -267,14 +347,17 @@ async function runCharacter(m: CastMember): Promise<void> {
       const neHi = processHiResCell(segs[1]!, b.y1 - b.y0 + 1)
       const frontBack = cellDistance(gateView(seHi), gateView(neHi))
       const pitch = Math.min(...pitches)
-      push(`${key}: sliced OK, pitch=${pitches.map((p) => p.toFixed(2)).join('/')}, front-back=${frontBack.toFixed(3)}`)
+      push(
+        `${key}: sliced OK, pitch=${pitches.map((p) => p.toFixed(2)).join('/')}, front-back=${frontBack.toFixed(3)}`,
+      )
       masters.push({ key, raw, se: seHi, ne: neHi, pitch })
       if (pitch >= MASTER_MIN_PITCH) break
     } catch (e) {
       push(`${key}: process FAILED — ${String(e).slice(0, 200)}`)
     }
   }
-  if (masters.length === 0) throw new Error(`${m.id}: every master candidate failed to slice into two figures`)
+  if (masters.length === 0)
+    throw new Error(`${m.id}: every master candidate failed to slice into two figures`)
   masters.sort((a, b) => b.pitch - a.pitch)
   const master = masters[0]!
   push(`master chosen: ${master.key} (pitch ${master.pitch.toFixed(2)})`)
@@ -283,11 +366,15 @@ async function runCharacter(m: CastMember): Promise<void> {
   const idleHi: Record<AuthoredFacing, RawImage> = { se: master.se, ne: master.ne }
   const seB = opaqueBbox(master.se)!
   const TARGET_H = seB.y1 - seB.y0 + 1
-  const masterGate: Record<AuthoredFacing, RawImage> = { se: gateView(master.se), ne: gateView(master.ne) }
+  const masterGate: Record<AuthoredFacing, RawImage> = {
+    se: gateView(master.se),
+    ne: gateView(master.ne),
+  }
   // One figure per reference — see VIEW_REF. These are the master's own crops, so identity,
   // costume and pixel scale are the master's exactly.
   const soloRef: Record<AuthoredFacing, Buffer> = {
-    se: await encodePng(onMagenta(master.se)), ne: await encodePng(onMagenta(master.ne)),
+    se: await encodePng(onMagenta(master.se)),
+    ne: await encodePng(onMagenta(master.ne)),
   }
   push(`figureH=${TARGET_H}`)
 
@@ -296,7 +383,12 @@ async function runCharacter(m: CastMember): Promise<void> {
   function evalFrame(key: string, f: AuthoredFacing, p: WalkPose, raw: RawImage): FrameCand {
     const keyed = keyBg(raw)
     let two = false
-    try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
+    try {
+      sliceStrip(keyed, 2)
+      two = true
+    } catch {
+      /* one cluster — good */
+    }
     if (two) throw new Error('slices into 2 figure clusters — multi-figure frame')
     const hi = processHiResCell(keyed, TARGET_H)
     // `sliceStrip` catches a second FIGURE but not the model captioning its own work — a caption
@@ -309,30 +401,57 @@ async function runCharacter(m: CastMember): Promise<void> {
     const gate = gateView(hi)
     // `strideGateV4` measures frame-to-frame distance, not stance, so it cannot see a standing
     // figure dropped into a walk loop. A failure rather than a throw, so the margin is reported.
-    const stance = p === 'passing' ? []
-      : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
+    const stance =
+      p === 'passing'
+        ? []
+        : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
     return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
   }
-  const identityBroken = (c: FrameCand): boolean => c.failures.some((x) =>
-    (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR)
-    || (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)))
-  const bestOf = (cs: FrameCand[]): FrameCand | null => cs.reduce<FrameCand | null>((a, c) => {
-    if (!a) return c
-    if (identityBroken(a) !== identityBroken(c)) return identityBroken(a) ? c : a
-    return c.failures.length < a.failures.length ? c : a
-  }, null)
+  const identityBroken = (c: FrameCand): boolean =>
+    c.failures.some(
+      (x) =>
+        (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR) ||
+        (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)),
+    )
+  const bestOf = (cs: FrameCand[]): FrameCand | null =>
+    cs.reduce<FrameCand | null>((a, c) => {
+      if (!a) return c
+      if (identityBroken(a) !== identityBroken(c)) return identityBroken(a) ? c : a
+      return c.failures.length < a.failures.length ? c : a
+    }, null)
 
   async function genFrame(f: AuthoredFacing, p: WalkPose, i: number): Promise<FrameCand | null> {
     const key = `walk-${m.id}-${f}-${p}-c${i}`
-    if (REJECTED.has(key)) { push(`${key}: REFUSED BY EYE`); return null }
+    if (REJECTED.has(key)) {
+      push(`${key}: REFUSED BY EYE`)
+      return null
+    }
     let raw: Buffer
-    try { raw = await candidate(DIR, key, framePrompt(m, f, p), [soloRef[f]], '1024x1024', 0.08, assetId) }
-    catch (e) { if (e instanceof OutOfBudget) throw e; push(`${key}: generation FAILED — ${String(e).slice(0, 160)}`); return null }
+    try {
+      raw = await candidate(
+        DIR,
+        key,
+        framePrompt(m, f, p),
+        [soloRef[f]],
+        '1024x1024',
+        0.08,
+        assetId,
+      )
+    } catch (e) {
+      if (e instanceof OutOfBudget) throw e
+      push(`${key}: generation FAILED — ${String(e).slice(0, 160)}`)
+      return null
+    }
     try {
       const c = evalFrame(key, f, p, await decodePng(raw))
-      push(`${key}: ${c.failures.length === 0 ? 'PASS' : c.failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`)
+      push(
+        `${key}: ${c.failures.length === 0 ? 'PASS' : c.failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
+      )
       return c
-    } catch (e) { push(`${key}: process FAILED — ${String(e).slice(0, 160)}`); return null }
+    } catch (e) {
+      push(`${key}: process FAILED — ${String(e).slice(0, 160)}`)
+      return null
+    }
   }
 
   const chosen: Record<AuthoredFacing, Record<WalkPose, FrameCand>> = { se: {}, ne: {} } as never
@@ -347,22 +466,33 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       const best = bestOf(cands)
       if (!best) throw new Error(`${m.id} ${f}/${p}: every candidate failed processing`)
-      refuseFailing(`${m.id} ${f}/${p}`, cands.map((c) => ({ key: c.key, failures: c.failures })))
+      refuseFailing(
+        `${m.id} ${f}/${p}`,
+        cands.map((c) => ({ key: c.key, failures: c.failures })),
+      )
       chosen[f][p] = best
     }
     // The stride trio is binding, and there is no candidate to re-roll: the trio is a property of
     // three frames already chosen, so the failure is the character's.
-    const stride = strideGateV4(f, {
-      'idle': masterGate[f],
-      'contact-a': chosen[f]['contact-a'].gate,
-      'passing': chosen[f]['passing'].gate,
-      'contact-b': chosen[f]['contact-b'].gate,
-    }, CALIBRATED_MEDIAN)
-    for (const x of stride) push(`${f} stride: ${x.gate} ${x.a}~${x.b} ${x.value.toFixed(3)} < ${x.limit.toFixed(3)}`)
+    const stride = strideGateV4(
+      f,
+      {
+        idle: masterGate[f],
+        'contact-a': chosen[f]['contact-a'].gate,
+        passing: chosen[f]['passing'].gate,
+        'contact-b': chosen[f]['contact-b'].gate,
+      },
+      CALIBRATED_MEDIAN,
+    )
+    for (const x of stride)
+      push(`${f} stride: ${x.gate} ${x.a}~${x.b} ${x.value.toFixed(3)} < ${x.limit.toFixed(3)}`)
     push(`${f} trio ${stride.length === 0 ? 'PASS' : 'FAILED'}`)
-    refuseFailing(`${m.id} ${f}/stride-trio`, [{
-      key: `${f}: contact-a + passing + contact-b as chosen`, failures: stride,
-    }])
+    refuseFailing(`${m.id} ${f}/stride-trio`, [
+      {
+        key: `${f}: contact-a + passing + contact-b as chosen`,
+        failures: stride,
+      },
+    ])
   }
 
   // sleep
@@ -370,35 +500,67 @@ async function runCharacter(m: CastMember): Promise<void> {
   const sleeps: SleepCand[] = []
   for (let i = 0; i < ATTEMPTS; i++) {
     const key = `sleep-${m.id}-c${i}`
-    if (REJECTED.has(key)) { push(`${key}: REFUSED BY EYE`); continue }
+    if (REJECTED.has(key)) {
+      push(`${key}: REFUSED BY EYE`)
+      continue
+    }
     const raw = await candidate(DIR, key, sleepPrompt(m), [soloRef.se], '1024x1024', 0.08, assetId)
     try {
       const keyed = keyBg(await decodePng(raw))
       let two = false
-      try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
+      try {
+        sliceStrip(keyed, 2)
+        two = true
+      } catch {
+        /* one cluster — good */
+      }
       if (two) throw new Error('slices into 2 figure clusters')
       let hi = processHiResCell(keyed)
       const b = opaqueBbox(hi)!
       const bw = b.x1 - b.x0 + 1
       if (bw !== TARGET_H) {
         const k = TARGET_H / bw
-        hi = downscaleNearest(hi, Math.max(1, Math.round(hi.width * k)), Math.max(1, Math.round(hi.height * k)))
+        hi = downscaleNearest(
+          hi,
+          Math.max(1, Math.round(hi.width * k)),
+          Math.max(1, Math.round(hi.height * k)),
+        )
       }
       const failures = sleepCoherenceGateV4(masterGate.se, gateView(hi))
-      push(`${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`)
+      push(
+        `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
+      )
       sleeps.push({ key, hi, failures })
       if (failures.length === 0) break
-    } catch (e) { push(`${key}: process FAILED — ${String(e).slice(0, 160)}`) }
+    } catch (e) {
+      push(`${key}: process FAILED — ${String(e).slice(0, 160)}`)
+    }
   }
-  const sleep = sleeps.reduce<SleepCand | null>((a, c) => (!a || c.failures.length < a.failures.length ? c : a), null)
+  const sleep = sleeps.reduce<SleepCand | null>(
+    (a, c) => (!a || c.failures.length < a.failures.length ? c : a),
+    null,
+  )
   if (!sleep) throw new Error(`${m.id}: every sleep candidate failed processing`)
-  refuseFailing(`${m.id} sleep`, sleeps.map((c) => ({ key: c.key, failures: c.failures })))
+  refuseFailing(
+    `${m.id} sleep`,
+    sleeps.map((c) => ({ key: c.key, failures: c.failures })),
+  )
 
   // derivation (zero spend) → the 24-cell contract → ONE packed atlas, committed
   const cells = deriveSheet({
     strips: {
-      se: { 'idle': idleHi.se, 'contact-a': chosen.se['contact-a'].hi, 'passing': chosen.se['passing'].hi, 'contact-b': chosen.se['contact-b'].hi },
-      ne: { 'idle': idleHi.ne, 'contact-a': chosen.ne['contact-a'].hi, 'passing': chosen.ne['passing'].hi, 'contact-b': chosen.ne['contact-b'].hi },
+      se: {
+        idle: idleHi.se,
+        'contact-a': chosen.se['contact-a'].hi,
+        passing: chosen.se['passing'].hi,
+        'contact-b': chosen.se['contact-b'].hi,
+      },
+      ne: {
+        idle: idleHi.ne,
+        'contact-a': chosen.ne['contact-a'].hi,
+        passing: chosen.ne['passing'].hi,
+        'contact-b': chosen.ne['contact-b'].hi,
+      },
     },
     sleep: sleep.hi,
   })
@@ -407,10 +569,15 @@ async function runCharacter(m: CastMember): Promise<void> {
   const atlas = await encodePng(image)
 
   const bar = [...alphaBinaryGate(image).failures, ...paletteGate(image).failures]
-  push(`atlas ${image.width}x${image.height}: ${bar.length === 0 ? 'pixel bar clean' : bar.join('; ')}`)
+  push(
+    `atlas ${image.width}x${image.height}: ${bar.length === 0 ? 'pixel bar clean' : bar.join('; ')}`,
+  )
   // the same ruling: the packed atlas is measured here and was written whatever it said
-  if (bar.length > 0) throw new Error(`${m.id}: the packed atlas FAILS the pixel bar and may not `
-    + `be shipped.\n    ${bar.join('\n    ')}\n  Nothing is written for this character.`)
+  if (bar.length > 0)
+    throw new Error(
+      `${m.id}: the packed atlas FAILS the pixel bar and may not ` +
+        `be shipped.\n    ${bar.join('\n    ')}\n  Nothing is written for this character.`,
+    )
 
   const dir = join(CAST_CONTENT_DIR, m.id)
   mkdirSync(dir, { recursive: true })
@@ -419,19 +586,29 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   const spend = ledger.totalFor(assetId) - spentBefore
   writeFileSync(`${DIR}/report.txt`, report.join('\n'))
-  summary.push(`${m.id}: figureH ${TARGET_H}, atlas ${image.width}x${image.height}, ` +
-    `${bar.length === 0 ? 'bar clean' : `BAR ${bar.join('; ')}`}, $${spend.toFixed(4)}`)
+  summary.push(
+    `${m.id}: figureH ${TARGET_H}, atlas ${image.width}x${image.height}, ` +
+      `${bar.length === 0 ? 'bar clean' : `BAR ${bar.join('; ')}`}, $${spend.toFixed(4)}`,
+  )
 }
 
 for (const m of RUN) {
-  try { await runCharacter(m) } catch (e) {
-    if (e instanceof OutOfBudget) { summary.push(`${m.id}: STOPPED — ${String(e).slice(0, 120)}`); break }
+  try {
+    await runCharacter(m)
+  } catch (e) {
+    if (e instanceof OutOfBudget) {
+      summary.push(`${m.id}: STOPPED — ${String(e).slice(0, 120)}`)
+      break
+    }
     summary.push(`${m.id}: FAILED — ${String(e).slice(0, 240)}`)
     console.log(`\n${m.id}: FAILED — ${String(e).slice(0, 400)}`)
   }
 }
-const out = ['== cast recovery ==', ...summary,
-  `total this run: $${budget.total.toFixed(4)} of $${CAP} cap; ledger total $${ledger.total().toFixed(4)}`].join('\n')
+const out = [
+  '== cast recovery ==',
+  ...summary,
+  `total this run: $${budget.total.toFixed(4)} of $${CAP} cap; ledger total $${ledger.total().toFixed(4)}`,
+].join('\n')
 mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/cast.md`, out)
 console.log(`\n${out}`)

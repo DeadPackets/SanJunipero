@@ -11,10 +11,16 @@ export type ReflectionLlm = {
   summarizeScenes(
     dayMemories: MemoryRow[],
   ): Promise<Array<{ title: string; text: string; memoryIds: number[] }>>
-  summarizeDay(scenes: Array<{ title: string; text: string }>): Promise<{ title: string; text: string }>
+  summarizeDay(
+    scenes: Array<{ title: string; text: string }>,
+  ): Promise<{ title: string; text: string }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
-  proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown | null>
+  proposeEdit(
+    daySummary: string,
+    doc: PersonalityDoc,
+    dayMemories: MemoryRow[],
+  ): Promise<unknown | null>
 }
 
 export type ReflectionResult = {
@@ -43,9 +49,11 @@ function dayDigest(dayMemories: MemoryRow[]): string {
 // night. Anything else is a real fault and belongs to the caller's alert path.
 // Matched by name, not by class: an abort wrapped on its way up is the same stall.
 function isDegradable(err: unknown): boolean {
-  return err instanceof BudgetExceededError
-    || NoObjectGeneratedError.isInstance(err)
-    || (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'))
+  return (
+    err instanceof BudgetExceededError ||
+    NoObjectGeneratedError.isInstance(err) ||
+    (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'))
+  )
 }
 
 export async function runSleepReflection(deps: {
@@ -80,7 +88,13 @@ export async function runSleepReflection(deps: {
   const todayIds = new Set(dayMemories.map((m) => m.id))
   const insertedFacts = facts.filter((f) => todayIds.has(f.srcMemoryId))
   for (const f of insertedFacts) {
-    mem.insertFact({ day, subject: f.subject, predicate: f.predicate, object: f.object, srcMemoryId: f.srcMemoryId })
+    mem.insertFact({
+      day,
+      subject: f.subject,
+      predicate: f.predicate,
+      object: f.object,
+      srcMemoryId: f.srcMemoryId,
+    })
   }
   const factCount = insertedFacts.length
 
@@ -101,7 +115,9 @@ export async function runSleepReflection(deps: {
   }
 
   // 4. Day node with child scene ids — mechanical when the night went dark.
-  const daySummary = await step(() => llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text }))))
+  const daySummary = await step(() =>
+    llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text }))),
+  )
   mem.insertSummaryNode({
     level: 'day',
     day,
@@ -134,10 +150,22 @@ export async function runSleepReflection(deps: {
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
   if (degraded !== null) {
     alert?.('reflection_fallback', degraded)
-    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false, fallback: true }
+    return {
+      factCount,
+      sceneCount: scenes.length,
+      ledgersUpdated,
+      editApplied: false,
+      fallback: true,
+    }
   }
   if (proposal == null) {
-    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false, fallback: false }
+    return {
+      factCount,
+      sceneCount: scenes.length,
+      ledgersUpdated,
+      editApplied: false,
+      fallback: false,
+    }
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
@@ -150,14 +178,22 @@ export async function runSleepReflection(deps: {
       fallback: false,
     }
   }
-  return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: true, fallback: false }
+  return {
+    factCount,
+    sceneCount: scenes.length,
+    ledgersUpdated,
+    editApplied: true,
+    fallback: false,
+  }
 }
 
 // --- Real implementation: one structured-output call per method, z.strict() schemas. ---
 
 type LlmPrompt = { system: string; messages: LlmMessage[] }
 
-function compactMemories(memories: MemoryRow[]): Array<{ id: number; text: string; importance: number; tags: MemoryRow['tags'] }> {
+function compactMemories(
+  memories: MemoryRow[],
+): Array<{ id: number; text: string; importance: number; tags: MemoryRow['tags'] }> {
   return memories.map((m) => ({ id: m.id, text: m.text, importance: m.importance, tags: m.tags }))
 }
 
@@ -171,7 +207,12 @@ export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
       'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
       'Write down only what the memories actually show, never what you merely suspect.',
     ].join('\n'),
-    messages: [{ role: 'user', content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}` }],
+    messages: [
+      {
+        role: 'user',
+        content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}`,
+      },
+    ],
   }
 }
 
@@ -182,7 +223,12 @@ export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
       'Group the moments into a few natural scenes, each with a short title and a short telling of what happened.',
       'For each scene, list the memories it draws from.',
     ].join('\n'),
-    messages: [{ role: 'user', content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}` }],
+    messages: [
+      {
+        role: 'user',
+        content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}`,
+      },
+    ],
   }
 }
 
@@ -196,7 +242,11 @@ export function summarizeDayPrompt(scenes: Array<{ title: string; text: string }
   }
 }
 
-export function updateLedgerPrompt(personName: string, existing: string | null, relevant: MemoryRow[]): LlmPrompt {
+export function updateLedgerPrompt(
+  personName: string,
+  existing: string | null,
+  relevant: MemoryRow[],
+): LlmPrompt {
   return {
     system: [
       'Before sleep, you revisit your private note about one person.',
@@ -225,15 +275,21 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
     messages: [
       {
         role: 'user',
-        content: [`Your day:\n${daySummary}`, `You hold dear: ${doc.values.join(', ')}.`, `Your mood: ${doc.current.mood}.`].join(
-          '\n',
-        ),
+        content: [
+          `Your day:\n${daySummary}`,
+          `You hold dear: ${doc.values.join(', ')}.`,
+          `Your mood: ${doc.current.mood}.`,
+        ].join('\n'),
       },
     ],
   }
 }
 
-export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): LlmPrompt {
+export function proposeEditPrompt(
+  daySummary: string,
+  doc: PersonalityDoc,
+  dayMemories: MemoryRow[],
+): LlmPrompt {
   const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
   return {
     // `ProposeEditSchema` is sent on every call, so only what it cannot say stays: `evidence`
@@ -260,12 +316,23 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMe
 }
 
 const FACT_SCHEMA = z
-  .object({ subject: z.string().min(1), predicate: z.string().min(1), object: z.string().min(1), srcMemoryId: z.number().int() })
+  .object({
+    subject: z.string().min(1),
+    predicate: z.string().min(1),
+    object: z.string().min(1),
+    srcMemoryId: z.number().int(),
+  })
   .strict()
 // Ten, against a prose bound of eight: the prose is the real ask and the schema is only the
 // runaway stop, set loose enough that an honest answer is never rejected.
 const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA).max(10) }).strict()
-const SCENE_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1), memoryIds: z.array(z.number().int()) }).strict()
+const SCENE_SCHEMA = z
+  .object({
+    title: z.string().min(1),
+    text: z.string().min(1),
+    memoryIds: z.array(z.number().int()),
+  })
+  .strict()
 const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
 const DAY_SUMMARY_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1) }).strict()
 const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
@@ -279,32 +346,56 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   return {
     async extractFacts(dayMemories) {
       const p = extractFactsPrompt(dayMemories)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: FACTS_SCHEMA })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: FACTS_SCHEMA,
+      })
       return value.facts
     },
     async summarizeScenes(dayMemories) {
       const p = summarizeScenesPrompt(dayMemories)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: SCENES_SCHEMA })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: SCENES_SCHEMA,
+      })
       return value.scenes
     },
     async summarizeDay(scenes) {
       const p = summarizeDayPrompt(scenes)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: DAY_SUMMARY_SCHEMA })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: DAY_SUMMARY_SCHEMA,
+      })
       return value
     },
     async updateLedger(personName, existing, relevant) {
       const p = updateLedgerPrompt(personName, existing, relevant)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: LEDGER_SCHEMA })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: LEDGER_SCHEMA,
+      })
       return value.doc
     },
     async autobiographyParagraph(daySummary, doc) {
       const p = autobiographyPrompt(daySummary, doc)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: PARAGRAPH_SCHEMA })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: PARAGRAPH_SCHEMA,
+      })
       return value.paragraph
     },
     async proposeEdit(daySummary, doc, dayMemories) {
       const p = proposeEditPrompt(daySummary, doc, dayMemories)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: ProposeEditSchema })
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: ProposeEditSchema,
+      })
       return value.verdict === 'propose' ? value.edit : null
     },
   }

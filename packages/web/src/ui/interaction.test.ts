@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import {
-  CROP_STAGES, escapeStep, hoverLabel, itemCropDetail, lensFromKey, lensKeyAllowed,
+  CROP_STAGES,
+  escapeStep,
+  hoverLabel,
+  itemCropDetail,
+  lensFromKey,
+  lensKeyAllowed,
 } from './interaction.js'
 import { LENSES } from './route.js'
 
@@ -32,17 +37,44 @@ function fixture(): WorldState {
 
 function blankAgent(id: string, name: string): WorldState['agents'][string] {
   return {
-    id, name, x: 0, y: 0, alive: true, asleep: false,
+    id,
+    name,
+    x: 0,
+    y: 0,
+    alive: true,
+    asleep: false,
     needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-    hp: 10, injuries: [], ill: false, ageDays: 7300, skills: {}, activity: null,
-    collapsedSinceTick: null, zeroHungerSinceTick: null,
+    hp: 10,
+    injuries: [],
+    ill: false,
+    ageDays: 7300,
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
+    zeroHungerSinceTick: null,
   }
 }
 
-function structure(id: string, kind: string, builtBy: string | null): WorldState['structures'][string] {
+function structure(
+  id: string,
+  kind: string,
+  builtBy: string | null,
+): WorldState['structures'][string] {
   return {
-    id, kind, x: 0, y: 0, w: 2, h: 2, hp: 10, maxHp: 10, flammable: true,
-    stage: 'complete', progressTicks: 0, builtBy, burning: false, burnTicks: 0,
+    id,
+    kind,
+    x: 0,
+    y: 0,
+    w: 2,
+    h: 2,
+    hp: 10,
+    maxHp: 10,
+    flammable: true,
+    stage: 'complete',
+    progressTicks: 0,
+    builtBy,
+    burning: false,
+    burnTicks: 0,
   }
 }
 

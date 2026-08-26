@@ -1,6 +1,12 @@
 import {
-  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, materialKind, roadAutotileKind,
-  type AssetRecord, type Season, type TerrainTileKind,
+  ROAD_AUTOTILE_KEYS,
+  SEASONS,
+  TERRAIN_TILE_KINDS,
+  materialKind,
+  roadAutotileKind,
+  type AssetRecord,
+  type Season,
+  type TerrainTileKind,
 } from '@sj/shared'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -11,12 +17,24 @@ import { quantize } from './post/quantize.js'
 import { paletteRgb } from './palette.js'
 import { applyTint } from './tints.js'
 import {
-  SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, TERRAIN_VARIANTS, SHEET_KINDS,
+  SHEET_COLS,
+  SHEET_ROWS,
+  TERRAIN_TILE_H,
+  TERRAIN_TILE_W,
+  TERRAIN_VARIANTS,
+  SHEET_KINDS,
   paintTerrainTile,
 } from './terrainTiles.js'
 import {
-  CALM_ROAD_ID, CALM_ROAD_NAME, GROUND_VARIANTS, MATERIAL_PX, ROAD_MATERIAL_ID,
-  diamondFromMaterial, seasonTintFrom, stencilRoadTile, terrainAssetId,
+  CALM_ROAD_ID,
+  CALM_ROAD_NAME,
+  GROUND_VARIANTS,
+  MATERIAL_PX,
+  ROAD_MATERIAL_ID,
+  diamondFromMaterial,
+  seasonTintFrom,
+  stencilRoadTile,
+  terrainAssetId,
 } from './terrainGen.js'
 import { paintRoadAutotile } from './roadTiles.js'
 
@@ -30,26 +48,44 @@ export function materialFor(book: MaterialBook, assetId: string): RawImage | nul
 
 // The materials ship WITH the repo because the gateway registers them into the codex at boot —
 // the renderer reads the codex, not the manifest. A filename is the asset id with ':' as '_'.
-export const MATERIALS_DIR =
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets', 'materials')
+export const MATERIALS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'content',
+  'tilesets',
+  'materials',
+)
 
-export async function loadMaterialBook(dir: string = MATERIALS_DIR): Promise<Map<string, RawImage>> {
+export async function loadMaterialBook(
+  dir: string = MATERIALS_DIR,
+): Promise<Map<string, RawImage>> {
   const book = new Map<string, RawImage>()
-  if (!existsSync(dir)) return book        // no generated art yet — the painted tiles stand
+  if (!existsSync(dir)) return book // no generated art yet — the painted tiles stand
   for (const file of readdirSync(dir).sort()) {
     if (!file.endsWith('.png')) continue
-    book.set(file.replace(/\.png$/, '').replace(/_/g, ':'), await decodePng(readFileSync(join(dir, file))))
+    book.set(
+      file.replace(/\.png$/, '').replace(/_/g, ':'),
+      await decodePng(readFileSync(join(dir, file))),
+    )
   }
   return book
 }
 
 // VARIANT COHESION: the renderer picks a variant per tile by hash, so any difference in average
 // TONE renders as a harlequin checkerboard. Variants break REPETITION, they never add COLOUR.
-export const VARIANT_TONE_TOLERANCE = 4      // mean per-channel distance considered cohesive
+export const VARIANT_TONE_TOLERANCE = 4 // mean per-channel distance considered cohesive
 
 const meanRgb = (m: RawImage): [number, number, number] => {
-  let r = 0, g = 0, b = 0, n = 0
-  for (let i = 0; i < m.data.length; i += 4) { r += m.data[i]!; g += m.data[i + 1]!; b += m.data[i + 2]!; n++ }
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0
+  for (let i = 0; i < m.data.length; i += 4) {
+    r += m.data[i]!
+    g += m.data[i + 1]!
+    b += m.data[i + 2]!
+    n++
+  }
   return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
 }
 
@@ -57,7 +93,9 @@ export function variantSpread(variants: RawImage[]): number {
   if (variants.length < 2) return 0
   const means = variants.map(meanRgb)
   const kind = [0, 1, 2].map((k) => means.reduce((s2, m) => s2 + m[k]!, 0) / means.length)
-  return Math.max(...means.map((m) => [0, 1, 2].reduce((s2, k) => s2 + Math.abs(m[k]! - kind[k]!), 0) / 3))
+  return Math.max(
+    ...means.map((m) => [0, 1, 2].reduce((s2, k) => s2 + Math.abs(m[k]! - kind[k]!), 0) / 3),
+  )
 }
 
 export function cohereVariants(variants: RawImage[]): RawImage[] {
@@ -82,28 +120,53 @@ export function groundTile(book: MaterialBook, kind: TerrainTileKind, variant: n
 }
 
 export type TerrainIngestReport = {
-  registered: number; generated: number; painted: number
+  registered: number
+  generated: number
+  painted: number
   kinds: string[]
 }
 
 // Registers into EXACTLY the codex kinds the renderer already reads, so generated art hot-swaps
 // and the renderer contract does not move.
 export async function registerGeneratedTerrain(
-  codex: AssetCodex, book: MaterialBook,
+  codex: AssetCodex,
+  book: MaterialBook,
 ): Promise<{ records: AssetRecord[]; report: TerrainIngestReport }> {
   const records: AssetRecord[] = []
   const kinds: string[] = []
-  let generated = 0, painted = 0
+  let generated = 0,
+    painted = 0
 
-  const meta = (kind: TerrainTileKind, variant: number): string => JSON.stringify(
-    { version: 'v1-terrain-tile', kind, variant, wPx: TERRAIN_TILE_W, hPx: TERRAIN_TILE_H },
-  )
-  const put = async (kind: string, metaJson: string, img: RawImage, desc: string): Promise<void> => {
-    records.push(codex.register({
-      class: 'terrain', desc, kind, meta: metaJson, footprint: { w: 1, h: 1 },
-      png: await encodePng(img), widthPx: TERRAIN_TILE_W, heightPx: TERRAIN_TILE_H,
-      status: 'ready', score: 10, attempts: 1, costUsd: 0,
-    }))
+  const meta = (kind: TerrainTileKind, variant: number): string =>
+    JSON.stringify({
+      version: 'v1-terrain-tile',
+      kind,
+      variant,
+      wPx: TERRAIN_TILE_W,
+      hPx: TERRAIN_TILE_H,
+    })
+  const put = async (
+    kind: string,
+    metaJson: string,
+    img: RawImage,
+    desc: string,
+  ): Promise<void> => {
+    records.push(
+      codex.register({
+        class: 'terrain',
+        desc,
+        kind,
+        meta: metaJson,
+        footprint: { w: 1, h: 1 },
+        png: await encodePng(img),
+        widthPx: TERRAIN_TILE_W,
+        heightPx: TERRAIN_TILE_H,
+        status: 'ready',
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+      }),
+    )
     kinds.push(kind)
   }
 
@@ -113,13 +176,22 @@ export async function registerGeneratedTerrain(
     const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: 0 }))
     if (m === null) continue
     generated++
-    records.push(codex.register({
-      class: 'terrain', desc: `material: ${kind}`, kind: materialKind(kind),
-      meta: JSON.stringify({ version: 'v2-terrain-material', kind, wPx: m.width, hPx: m.height }),
-      footprint: { w: 1, h: 1 }, png: await encodePng(m),
-      widthPx: m.width, heightPx: m.height,
-      status: 'ready', score: 10, attempts: 1, costUsd: 0,
-    }))
+    records.push(
+      codex.register({
+        class: 'terrain',
+        desc: `material: ${kind}`,
+        kind: materialKind(kind),
+        meta: JSON.stringify({ version: 'v2-terrain-material', kind, wPx: m.width, hPx: m.height }),
+        footprint: { w: 1, h: 1 },
+        png: await encodePng(m),
+        widthPx: m.width,
+        heightPx: m.height,
+        status: 'ready',
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+      }),
+    )
     kinds.push(materialKind(kind))
   }
 
@@ -128,19 +200,34 @@ export async function registerGeneratedTerrain(
   const calm = materialFor(book, CALM_ROAD_ID)
   if (calm !== null) {
     generated++
-    records.push(codex.register({
-      class: 'terrain', desc: `material: ${CALM_ROAD_NAME}`, kind: materialKind(CALM_ROAD_NAME),
-      meta: JSON.stringify({ version: 'v2-terrain-material', kind: 'road', wPx: calm.width, hPx: calm.height }),
-      footprint: { w: 1, h: 1 }, png: await encodePng(calm),
-      widthPx: calm.width, heightPx: calm.height,
-      status: 'ready', score: 10, attempts: 1, costUsd: 0,
-    }))
+    records.push(
+      codex.register({
+        class: 'terrain',
+        desc: `material: ${CALM_ROAD_NAME}`,
+        kind: materialKind(CALM_ROAD_NAME),
+        meta: JSON.stringify({
+          version: 'v2-terrain-material',
+          kind: 'road',
+          wPx: calm.width,
+          hPx: calm.height,
+        }),
+        footprint: { w: 1, h: 1 },
+        png: await encodePng(calm),
+        widthPx: calm.width,
+        heightPx: calm.height,
+        status: 'ready',
+        score: 10,
+        attempts: 1,
+        costUsd: 0,
+      }),
+    )
     kinds.push(materialKind(CALM_ROAD_NAME))
   }
 
   for (const kind of TERRAIN_TILE_KINDS) {
     const made = Array.from({ length: GROUND_VARIANTS[kind] }, (_, v) =>
-      materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: v })))
+      materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: v })),
+    )
     const present = made.filter((m): m is RawImage => m !== null)
     const cohered = cohereVariants(present)
     let seen = -1
@@ -175,17 +262,19 @@ export async function registerGeneratedTerrain(
 // The tint is measured off the GENERATED seasonal materials rather than hand-guessed, then applied
 // to the generated ground and re-quantized so the sheet stays palette-true.
 export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
-  const width = SHEET_COLS * TERRAIN_TILE_W, height = SHEET_ROWS * TERRAIN_TILE_H
+  const width = SHEET_COLS * TERRAIN_TILE_W,
+    height = SHEET_ROWS * TERRAIN_TILE_H
   const sheet: RawImage = { width, height, data: new Uint8ClampedArray(width * height * 4) }
   const seasonMat = materialFor(book, terrainAssetId({ sort: 'season', season }))
   const summerMat = materialFor(book, terrainAssetId({ sort: 'season', season: 'summer' }))
-  const tint = seasonMat === null || summerMat === null ? null : seasonTintFrom(seasonMat, summerMat)
+  const tint =
+    seasonMat === null || summerMat === null ? null : seasonTintFrom(seasonMat, summerMat)
 
   SHEET_KINDS.forEach((kind, row) => {
     for (let col = 0; col < TERRAIN_VARIANTS; col++) {
       const tile = groundTile(book, kind, col)
       for (let y = 0; y < TERRAIN_TILE_H; y++) {
-        const src = (y * TERRAIN_TILE_W) * 4
+        const src = y * TERRAIN_TILE_W * 4
         sheet.data.set(
           tile.data.subarray(src, src + TERRAIN_TILE_W * 4),
           ((row * TERRAIN_TILE_H + y) * width + col * TERRAIN_TILE_W) * 4,
@@ -197,5 +286,8 @@ export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
 }
 
 export function seasonSheets(book: MaterialBook): Record<Season, RawImage> {
-  return Object.fromEntries(SEASONS.map((s) => [s, seasonSheetFrom(book, s)])) as Record<Season, RawImage>
+  return Object.fromEntries(SEASONS.map((s) => [s, seasonSheetFrom(book, s)])) as Record<
+    Season,
+    RawImage
+  >
 }

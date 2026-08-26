@@ -39,13 +39,15 @@ describe('★ every knob the docs promise reaches the container', () => {
     expect(knobs.length).toBeGreaterThan(6)
     expect(knobs).toContain('SJ_LIVE')
     expect(knobs).toContain('SJ_LAMPS')
-    expect(knobs).not.toContain('SJ_BUILDERS')   // `dev:world` only, per the table itself
+    expect(knobs).not.toContain('SJ_BUILDERS') // `dev:world` only, per the table itself
   })
 
   it('passes every documented SJ_* knob through compose.yaml', () => {
     const missing = documentedKnobs().filter((n) => !passedThrough(n))
-    expect(missing, `documented as a .env toggle, never passed to a container: ${missing.join(', ')}`)
-      .toEqual([])
+    expect(
+      missing,
+      `documented as a .env toggle, never passed to a container: ${missing.join(', ')}`,
+    ).toEqual([])
   })
 
   it('passes the live key too, which is what SJ_LIVE=1 spends', () => {

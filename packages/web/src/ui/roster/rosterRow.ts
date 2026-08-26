@@ -53,7 +53,10 @@ const ageWordsOf = (ageDays: number): RosterRow2['ageWords'] => {
  * substance is a LOWER BOUND on the panel's rather than a different number.
  */
 function substanceFor(
-  state: WorldState, agentId: string, bonds: BondsResponse | null, nowTick: number,
+  state: WorldState,
+  agentId: string,
+  bonds: BondsResponse | null,
+  nowTick: number,
 ): number {
   const a = state.agents[agentId]
   if (a === undefined) return 0
@@ -62,9 +65,11 @@ function substanceFor(
   return substanceOf({
     actsDone: skillXp + mine.reduce((n, b) => n + b.strength, 0),
     daysLived: tickToMoment(nowTick).day,
-    bondsAtOrAbove: mine.filter((b) =>
-      LEVEL_RANK.indexOf(bondLevel(bondWarmth(b, nowTick)))
-      >= LEVEL_RANK.indexOf(SUBSTANCE_BOND_LEVEL)).length,
+    bondsAtOrAbove: mine.filter(
+      (b) =>
+        LEVEL_RANK.indexOf(bondLevel(bondWarmth(b, nowTick))) >=
+        LEVEL_RANK.indexOf(SUBSTANCE_BOND_LEVEL),
+    ).length,
     skillBands: Object.keys(a.skills).length,
     personalityVersions: 0,
     changeDays: 0,
@@ -102,8 +107,13 @@ export function rosterRows2(
   for (const a of Object.values(state.agents)) {
     if (!a.alive) continue
     const view: MoodView = {
-      id: a.id, alive: a.alive, asleep: a.asleep, ill: a.ill, injuries: a.injuries,
-      needs: a.needs, collapsedSinceTick: a.collapsedSinceTick,
+      id: a.id,
+      alive: a.alive,
+      asleep: a.asleep,
+      ill: a.ill,
+      injuries: a.injuries,
+      needs: a.needs,
+      collapsedSinceTick: a.collapsedSinceTick,
     }
     const mood = moodOf(view, recent, nowTick)
     const url = portraitUrl(records, a.id, mood)
@@ -132,7 +142,9 @@ export type RosterSort = (typeof ROSTER_SORTS)[number]
 /** Short enough that three of them sit on one line above the roster — browser-caught: the
  *  longer phrasings wrapped every chip onto two lines and the header ate the first row. */
 export const ROSTER_SORT_WORD: Readonly<Record<RosterSort, string>> = {
-  name: 'By name', place: 'By place', active: 'By who is busy',
+  name: 'By name',
+  place: 'By place',
+  active: 'By who is busy',
 }
 
 const byName = (x: RosterRow2, y: RosterRow2): number =>
@@ -142,10 +154,12 @@ const byName = (x: RosterRow2, y: RosterRow2): number =>
 export function sortRoster(rows: readonly RosterRow2[], by: RosterSort): RosterRow2[] {
   const out = [...rows]
   if (by === 'place') {
-    out.sort((x, y) => (x.place.words < y.place.words ? -1 : x.place.words > y.place.words ? 1 : byName(x, y)))
+    out.sort((x, y) =>
+      x.place.words < y.place.words ? -1 : x.place.words > y.place.words ? 1 : byName(x, y),
+    )
   } else if (by === 'active') {
     const idle = (r: RosterRow2): number =>
-      (r.state === STATE_WORD.idle || r.state === STATE_WORD.asleep ? 1 : 0)
+      r.state === STATE_WORD.idle || r.state === STATE_WORD.asleep ? 1 : 0
     out.sort((x, y) => idle(x) - idle(y) || byName(x, y))
   } else {
     out.sort(byName)
@@ -157,14 +171,25 @@ export function sortRoster(rows: readonly RosterRow2[], by: RosterSort): RosterR
 
 export const MOOD_GLYPH_PX = 16
 
-const INK = '#43394A', HONEY = '#F2C879', SAGE = '#93B573', WATER = '#7FB0C9'
-const ROSE = '#C47876', EMBER = '#E8785A', STONE = '#ABA198'
+const INK = '#43394A',
+  HONEY = '#F2C879',
+  SAGE = '#93B573',
+  WATER = '#7FB0C9'
+const ROSE = '#C47876',
+  EMBER = '#E8785A',
+  STONE = '#ABA198'
 
 /** Every fill a mood glyph may use — all MASTER_PALETTE members, asserted as a set. */
 export const MOOD_GLYPH_PALETTE: readonly string[] = [INK, HONEY, SAGE, WATER, ROSE, EMBER, STONE]
 
 const KEY: Readonly<Record<string, string>> = {
-  i: INK, h: HONEY, g: SAGE, w: WATER, r: ROSE, e: EMBER, s: STONE,
+  i: INK,
+  h: HONEY,
+  g: SAGE,
+  w: WATER,
+  r: ROSE,
+  e: EMBER,
+  s: STONE,
 }
 
 export type MoodPixel = readonly [number, number, string]
@@ -174,7 +199,7 @@ export type MoodPixel = readonly [number, number, string]
 function art(...rows: string[]): MoodPixel[] {
   const out: MoodPixel[] = []
   rows.forEach((row, y) => {
-    [...row].forEach((ch, x) => {
+    ;[...row].forEach((ch, x) => {
       const fill = KEY[ch]
       if (fill !== undefined) out.push([x, y, fill] as const)
     })
@@ -320,6 +345,11 @@ export function moodGlyph(e: Expression): MoodPixel[] {
 /** What the icon is called out loud, describing the drawn FACE. None of these may be a synonym of a
  *  state word: `asleep: 'sleeping'` would put two words for one fact back in the row. */
 export const MOOD_WORD: Readonly<Record<Expression, string>> = {
-  neutral: 'settled', happy: 'in good spirits', sad: 'low', angry: 'angry',
-  surprised: 'startled', weary: 'worn down', asleep: 'eyes closed',
+  neutral: 'settled',
+  happy: 'in good spirits',
+  sad: 'low',
+  angry: 'angry',
+  surprised: 'startled',
+  weary: 'worn down',
+  asleep: 'eyes closed',
 }

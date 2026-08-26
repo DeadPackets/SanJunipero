@@ -4,12 +4,24 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
 import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
-import { heardProse, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket } from '../prompt/prose.js'
+import {
+  heardProse,
+  makeablesLine,
+  perceptionToProse,
+  standingWallsLine,
+  type PerceptionPacket,
+} from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { keywords, retrieveAmbient, type SceneCues } from '../memory/retrieve.js'
-import { isBlankAnswer, parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
+import {
+  isBlankAnswer,
+  parseTurnWithRepair,
+  reconsiderTick,
+  TurnSchema,
+  type Turn,
+} from '../turn.js'
 import {
   decideWake,
   disarmBodyAlarm,
@@ -22,7 +34,13 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
-import { buildAgentCtx, humanizeIntent, type Adjudicator, type Codifier, type SeamArbiter } from './arbiterSeam.js'
+import {
+  buildAgentCtx,
+  humanizeIntent,
+  type Adjudicator,
+  type Codifier,
+  type SeamArbiter,
+} from './arbiterSeam.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -74,7 +92,11 @@ const REFUSAL_MEMORY_SIZE = 16
 // Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
 // true copy, but importing @sj/arbiter back here is a package cycle.
 function sameIntent(text: string): string {
-  return text.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '')
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[.,!?;:]+$/, '')
 }
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
@@ -92,7 +114,9 @@ function nearestStructureKind(packet: PerceptionPacket): string | null {
 }
 
 function cuesFromPacket(packet: PerceptionPacket): SceneCues {
-  const people = [...new Set([...packet.visible.agents.map((a) => a.name), ...packet.heard.map((h) => h.name)])]
+  const people = [
+    ...new Set([...packet.visible.agents.map((a) => a.name), ...packet.heard.map((h) => h.name)]),
+  ]
   const heardText = packet.heard.map((h) => h.text).join(' ')
   return { people, place: nearestStructureKind(packet), topics: keywords(heardText) }
 }
@@ -214,7 +238,11 @@ export class AgentRuntime {
   // or every mind wakes with a fresh clock, a dropped plan and a turn count starting at zero.
   snapshot(): RuntimeSnapshot {
     return {
-      clock: { ...this.#clock, alarmArmed: { ...this.#clock.alarmArmed }, prevVisibleIds: [...this.#clock.prevVisibleIds] },
+      clock: {
+        ...this.#clock,
+        alarmArmed: { ...this.#clock.alarmArmed },
+        prevVisibleIds: [...this.#clock.prevVisibleIds],
+      },
       plan: { queue: this.#plan.queue.map((i) => ({ ...i })), lastResult: this.#plan.lastResult },
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
@@ -226,7 +254,11 @@ export class AgentRuntime {
 
   // Applied AFTER `start`, which is what clears these in the first place.
   restore(s: RuntimeSnapshot): void {
-    this.#clock = { ...s.clock, alarmArmed: { ...s.clock.alarmArmed }, prevVisibleIds: [...s.clock.prevVisibleIds] }
+    this.#clock = {
+      ...s.clock,
+      alarmArmed: { ...s.clock.alarmArmed },
+      prevVisibleIds: [...s.clock.prevVisibleIds],
+    }
     this.#plan = { queue: s.plan.queue.map((i) => ({ ...i })), lastResult: s.plan.lastResult }
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
@@ -301,7 +333,13 @@ export class AgentRuntime {
       this.#wakeOwed = false
       return
     }
-    if (this.#turnInFlight || this.#pendingIntent !== null || this.#pendingInFlight || this.#planHeadInFlight) return
+    if (
+      this.#turnInFlight ||
+      this.#pendingIntent !== null ||
+      this.#pendingInFlight ||
+      this.#planHeadInFlight
+    )
+      return
     this.#wakeOwed = false
     void this.#bridge.submit(this.#agentId, { verb: 'wake', params: {} })
   }
@@ -344,10 +382,14 @@ export class AgentRuntime {
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
         if (this.#reroutesUnknownVerb(res.reason)) {
-          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(this.#sink('adjudicate_crash'))
+          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(
+            this.#sink('adjudicate_crash'),
+          )
           return
         }
-        void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(this.#sink('memory_write_failed'))
+        void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(
+          this.#sink('memory_write_failed'),
+        )
       })
       .then(() => undefined)
   }
@@ -381,12 +423,16 @@ export class AgentRuntime {
     }
     let verdict
     try {
-      verdict = await this.#adjudicator!(description, buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought))
+      verdict = await this.#adjudicator!(
+        description,
+        buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought),
+      )
     } catch (err) {
       this.#llm.alert('adjudicate_failed', err instanceof Error ? err.message : String(err))
       return fallback()
     }
-    if (verdict.kind === 'map') return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
+    if (verdict.kind === 'map')
+      return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
     if (verdict.kind === 'impossible') {
       this.#rememberRefusal(description)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
@@ -426,10 +472,14 @@ export class AgentRuntime {
     this.#plan.queue = []
     this.#planHeadInFlight = false
     if (this.#reroutesUnknownVerb(res.reason)) {
-      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(this.#sink('adjudicate_crash'))
+      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
+        this.#sink('adjudicate_crash'),
+      )
       return
     }
-    void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(this.#sink('memory_write_failed'))
+    void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(
+      this.#sink('memory_write_failed'),
+    )
   }
 
   #handleNight(tick: number, packet: PerceptionPacket): void {
@@ -488,7 +538,9 @@ export class AgentRuntime {
       prose,
       makeablesLine(this.#bridge.makeables(), this.#bridge.groundForBuilding()),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
-    ].filter((p) => p.length > 0).join(' ')
+    ]
+      .filter((p) => p.length > 0)
+      .join(' ')
 
     // Retrieve BEFORE inserting this perception: a just-written row would win
     // recency and tag match, filling the scene with echoes of the present.
@@ -511,7 +563,10 @@ export class AgentRuntime {
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
       identity: this.#identity,
-      personality: { doc: this.#personality.current().doc, autobiography: this.#mem!.autobiography() },
+      personality: {
+        doc: this.#personality.current().doc,
+        autobiography: this.#mem!.autobiography(),
+      },
       scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
       dayLog: this.#dayLog,
       now: { prose: nowProse, heard },
@@ -552,7 +607,10 @@ export class AgentRuntime {
 
     this.#clock.lastTurnTick = tick
     await this.#applyTurn(turn, tick, day)
-    if ((turn.plan ?? undefined) === undefined && (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')) {
+    if (
+      (turn.plan ?? undefined) === undefined &&
+      (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')
+    ) {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
@@ -565,7 +623,9 @@ export class AgentRuntime {
   async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchema, system: assembled.system, messages: assembled.messages,
+        schema: TurnSchema,
+        system: assembled.system,
+        messages: assembled.messages,
       })
       return { raw: value, badText: '' }
     } catch (err) {
@@ -600,7 +660,13 @@ export class AgentRuntime {
     const mem = this.#mem!
     // Held for the god: the sentence that reached for whatever this turn is about to try.
     this.#lastThought = turn.thought
-    await mem.insertMemory({ tick, kind: 'thought', text: turn.thought, importance: turn.importance, tags: EMPTY_TAGS })
+    await mem.insertMemory({
+      tick,
+      kind: 'thought',
+      text: turn.thought,
+      importance: turn.importance,
+      tags: EMPTY_TAGS,
+    })
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 
     // A turn that speaks or acts directly preempts whatever plan was running.
@@ -617,11 +683,12 @@ export class AgentRuntime {
     if (turn.action) {
       // `experiment {description}` is the same door as freeform said the other
       // way round — CAPABILITIES offers both, so both reach the arbiter.
-      const attempt = 'freeform' in turn.action
-        ? turn.action.freeform
-        : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
-          ? turn.action.params.description
-          : null
+      const attempt =
+        'freeform' in turn.action
+          ? turn.action.freeform
+          : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
+            ? turn.action.params.description
+            : null
       if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
         await this.#adjudicateFreeform(attempt)
       } else {
@@ -642,7 +709,13 @@ export class AgentRuntime {
 
     if (turn.journal) {
       mem.insertJournal(tick, day, turn.journal)
-      await mem.insertMemory({ tick, kind: 'journal', text: turn.journal, importance: turn.importance, tags: EMPTY_TAGS })
+      await mem.insertMemory({
+        tick,
+        kind: 'journal',
+        text: turn.journal,
+        importance: turn.importance,
+        tags: EMPTY_TAGS,
+      })
       this.#clock.lastTurnTick = (this.#clock.lastTurnTick ?? tick) + this.#config.journalTicks
     }
 
@@ -666,7 +739,13 @@ export class AgentRuntime {
         alert: (kind, detail) => this.#llm.alert(kind, detail),
       })
       if (this.#dreamLlm !== null) {
-        const dream = await rollDream({ mem: this.#mem!, agentId: this.#agentId, day, llm: this.#dreamLlm, chance: this.#config.dreamChance })
+        const dream = await rollDream({
+          mem: this.#mem!,
+          agentId: this.#agentId,
+          day,
+          llm: this.#dreamLlm,
+          chance: this.#config.dreamChance,
+        })
         if (dream.dreamed) this.#pendingDreamMood = dream.mood
       }
     } catch (err) {
@@ -698,14 +777,19 @@ export class AgentRuntime {
   // Node's default terminates the process on a rejection nobody holds, and this file starts
   // four promises it does not await.
   #sink(kind: string): (err: unknown) => void {
-    return (err) => { this.#llm.alert(kind, err instanceof Error ? err.message : String(err)) }
+    return (err) => {
+      this.#llm.alert(kind, err instanceof Error ? err.message : String(err))
+    }
   }
 
   #doze(tick: number, cause?: unknown): void {
     this.#stats.dozes += 1
-    const why = cause === undefined
-      ? 'providers unavailable'
-      : (cause instanceof Error ? cause.message : String(cause))
+    const why =
+      cause === undefined
+        ? 'providers unavailable'
+        : cause instanceof Error
+          ? cause.message
+          : String(cause)
     this.#llm.alert('doze_off', `${why}; the mind dozes off mid-thought`)
     this.#clock.lastTurnTick = tick + this.#config.dozeTicks
     this.#clock.dozeUntilTick = tick + this.#config.dozeTicks

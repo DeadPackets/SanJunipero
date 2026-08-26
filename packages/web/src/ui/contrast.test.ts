@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 // ── WCAG 2.x relative luminance and contrast, on the sheet's own tokens ──────────────
 
@@ -76,13 +79,31 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 // Reducing contrast with `opacity` makes the ratio unknowable at authoring time. These are the
 // ink-on-paper sites; the dark grounds are below.
 const QUIET_SITES = [
-  '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
-  '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
-  '.feed-line .stamp', '.feed-empty', '.room-who', '.legend-chip.off', '.legend-stamp',
+  '.tick-badge.waking',
+  '.strip-weather',
+  '.strip-gone',
+  '.fps-overlay .fps-avg',
+  '.block h3',
+  '.thought-line',
+  '.tab-body .stamp',
+  '.veil-sub',
+  '.feed-line .stamp',
+  '.feed-empty',
+  '.room-who',
+  '.legend-chip.off',
+  '.legend-stamp',
   // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a
   // count that can only go up cannot express a relationship cooling.
-  '.bond-evidence', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
-  '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
+  '.bond-evidence',
+  '.bond-dates dt',
+  '.bond-history .stamp',
+  '.thumb-day',
+  '.thumb-cast',
+  '.digest-footer',
+  '.roster-gone',
+  '.laws-lede',
+  '.law-history',
+  '.law-edit input:disabled',
 ]
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
@@ -101,7 +122,9 @@ describe('--ink-quiet — the de-emphasis token', () => {
 
   it('clears AA on every paper the chrome uses', () => {
     for (const paper of PAPERS) {
-      expect(contrast(T['ink-quiet']!, T[paper]!), `ink-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
+      expect(contrast(T['ink-quiet']!, T[paper]!), `ink-quiet on ${paper}`).toBeGreaterThanOrEqual(
+        AA,
+      )
     }
   })
 
@@ -129,9 +152,14 @@ describe('--cream-quiet — the same de-emphasis, on the dark ground the town sp
   it('exists as a colour, clears AA on both dark grounds, and is visibly quieter than cream', () => {
     expect(T['cream-quiet']).toMatch(/^#[0-9A-Fa-f]{6}$/)
     for (const paper of DARK_PAPERS) {
-      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
-      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet vs cream on ${paper}`)
-        .toBeLessThan(contrast(T['cream']!, T[paper]!))
+      expect(
+        contrast(T['cream-quiet']!, T[paper]!),
+        `cream-quiet on ${paper}`,
+      ).toBeGreaterThanOrEqual(AA)
+      expect(
+        contrast(T['cream-quiet']!, T[paper]!),
+        `cream-quiet vs cream on ${paper}`,
+      ).toBeLessThan(contrast(T['cream']!, T[paper]!))
     }
   })
 
@@ -188,7 +216,10 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
     const colour = /repeating-linear-gradient\([^)]*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(colour, 'the rule paints no palette token').toBeDefined()
     for (const paper of ['parchment', 'cream'] as const) {
-      expect(contrast(T[colour!]!, T[paper]!), `.block h3::after on ${paper}`).toBeGreaterThanOrEqual(3)
+      expect(
+        contrast(T[colour!]!, T[paper]!),
+        `.block h3::after on ${paper}`,
+      ).toBeGreaterThanOrEqual(3)
     }
   })
 

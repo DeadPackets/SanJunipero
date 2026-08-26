@@ -10,27 +10,43 @@ import type { ConstructStore } from './constructStore.js'
 export const CONSTRUCT_TYPES = ['festival', 'faith', 'council', 'market', 'custom'] as const
 export type ConstructType = (typeof CONSTRUCT_TYPES)[number]
 
-export const ConstructSchema = z.object({
-  id: z.string().min(1),
-  type: z.enum(CONSTRUCT_TYPES),
-  name: z.string().min(1).nullable(),
-  nameProvenance: z.object({
-    eventSeq: z.number().int().nonnegative(), quote: z.string().min(1), byId: z.string().min(1),
-  }).strict().nullable(),
-  anchor: z.union([
-    z.object({ x: z.number().int(), y: z.number().int() }).strict(),
-    z.string().min(1),
-  ]).nullable(),
-  participants: z.array(z.string().min(1)),
-  firstTick: z.number().int().nonnegative(),
-  recurrences: z.array(z.object({
-    tick: z.number().int().nonnegative(), participants: z.array(z.string().min(1)),
-  }).strict()),
-}).strict()
+export const ConstructSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.enum(CONSTRUCT_TYPES),
+    name: z.string().min(1).nullable(),
+    nameProvenance: z
+      .object({
+        eventSeq: z.number().int().nonnegative(),
+        quote: z.string().min(1),
+        byId: z.string().min(1),
+      })
+      .strict()
+      .nullable(),
+    anchor: z
+      .union([z.object({ x: z.number().int(), y: z.number().int() }).strict(), z.string().min(1)])
+      .nullable(),
+    participants: z.array(z.string().min(1)),
+    firstTick: z.number().int().nonnegative(),
+    recurrences: z.array(
+      z
+        .object({
+          tick: z.number().int().nonnegative(),
+          participants: z.array(z.string().min(1)),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
 export type Construct = z.infer<typeof ConstructSchema>
 
 export type ConstructOpsType = 'construct_recognized' | 'construct_named' | 'construct_recurred'
-export type ConstructOpsEvent = { type: ConstructOpsType; constructId: string; tick: number; payload: unknown }
+export type ConstructOpsEvent = {
+  type: ConstructOpsType
+  constructId: string
+  tick: number
+  payload: unknown
+}
 
 // How near two bodies must be to be at the same thing. A module const, not a dial: G11b tunes
 // the world by its genesis, not by a config row nobody would ever turn.
@@ -46,7 +62,12 @@ export type Candidate = {
   gatherings: Gathering[]
   // Evidence, never a gate: recurrence at a place is what makes a candidate, and these are
   // what let a classifier tell a market from a council.
-  signals: { expressive: number; offerings: number; sharedTokens: string[]; deferredTo: string | null }
+  signals: {
+    expressive: number
+    offerings: number
+    sharedTokens: string[]
+    deferredTo: string | null
+  }
   name: CandidateName | null
 }
 
@@ -58,7 +79,8 @@ function presenceOf(ev: SimEvent): Presence | null {
   if (p === null) return null
   const id = ev.type === 'agent_moved' ? p.id : ev.type === 'item_taken' ? p.takerId : p.agentId
   if (typeof id !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') return null
-  if (!['agent_moved', 'agent_spoke', 'agent_expressed', 'item_taken'].includes(ev.type)) return null
+  if (!['agent_moved', 'agent_spoke', 'agent_expressed', 'item_taken'].includes(ev.type))
+    return null
   return { tick: ev.tick, agentId: id, x: p.x, y: p.y, ev }
 }
 
@@ -85,8 +107,34 @@ function clusterBy<T extends { x: number; y: number }>(items: T[]): T[][] {
 // Words worth noticing when two nights use the same ones. Common speech is filtered out so a
 // shared token means something the gathering actually shares.
 const STOPWORDS: ReadonlySet<string> = new Set([
-  'the', 'a', 'an', 'and', 'or', 'but', 'we', 'i', 'you', 'it', 'is', 'are', 'was', 'were', 'to',
-  'of', 'in', 'on', 'at', 'for', 'this', 'that', 'now', 'then', 'here', 'there', 'call', 'again',
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'but',
+  'we',
+  'i',
+  'you',
+  'it',
+  'is',
+  'are',
+  'was',
+  'were',
+  'to',
+  'of',
+  'in',
+  'on',
+  'at',
+  'for',
+  'this',
+  'that',
+  'now',
+  'then',
+  'here',
+  'there',
+  'call',
+  'again',
 ])
 
 // A name arrives only out of a mouth. These are the shapes a town uses to give one; the whole
@@ -102,11 +150,20 @@ function nameIn(ev: SimEvent): CandidateName | null {
   if (typeof p?.text !== 'string' || typeof p.agentId !== 'string') return null
   const source = { sourceKind: 'speech' as const, text: p.text, eventSeq: ev.seq, byId: p.agentId }
   for (const re of NAME_PATTERNS) {
-    const found = re.exec(p.text)?.[1]?.replace(/[.,!?;:]+$/, '').trim()
+    const found = re
+      .exec(p.text)?.[1]
+      ?.replace(/[.,!?;:]+$/, '')
+      .trim()
     if (found === undefined || found.length < 2) continue
     // Verbatim or nothing, through the one enforcement point of the naming law (G9).
     const quoted = assertQuotedName(found, [source])
-    if (quoted !== null) return { eventSeq: quoted.eventSeq, quote: quoted.quote, byId: quoted.byId, name: quoted.name }
+    if (quoted !== null)
+      return {
+        eventSeq: quoted.eventSeq,
+        quote: quoted.quote,
+        byId: quoted.byId,
+        name: quoted.name,
+      }
   }
   return null
 }
@@ -128,14 +185,25 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
     else list.push(pr)
   }
 
-  type Occasion = { tick: number; x: number; y: number; participants: string[]; presences: Presence[] }
+  type Occasion = {
+    tick: number
+    x: number
+    y: number
+    participants: string[]
+    presences: Presence[]
+  }
   const occasions: Occasion[] = []
   for (const day of [...byDay.keys()].sort((a, b) => a - b)) {
     for (const group of clusterBy(byDay.get(day)!)) {
       const participants = [...new Set(group.map((p) => p.agentId))].sort()
       if (participants.length < cfg.minParticipants) continue
       const at = centroid(group)
-      occasions.push({ tick: Math.min(...group.map((p) => p.tick)), ...at, participants, presences: group })
+      occasions.push({
+        tick: Math.min(...group.map((p) => p.tick)),
+        ...at,
+        participants,
+        presences: group,
+      })
     }
   }
 
@@ -179,7 +247,10 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
       signals: {
         expressive: presences.filter((p) => p.ev.type === 'agent_expressed').length,
         offerings: presences.filter((p) => p.ev.type === 'item_taken').length,
-        sharedTokens: [...tokens.entries()].filter(([, who]) => who.size > 1).map(([w]) => w).sort(),
+        sharedTokens: [...tokens.entries()]
+          .filter(([, who]) => who.size > 1)
+          .map(([w]) => w)
+          .sort(),
         deferredTo: loudest !== undefined && turns.size > 1 && loudest[1] > 1 ? loudest[0] : null,
       },
       name,
@@ -198,33 +269,41 @@ market — a recurring occasion of goods changing hands
 custom — a recurring occasion that is plainly none of the four above; use it freely, the list is not the world
 Answer for every key you are given and invent no keys. Name the kind only. Never a name for the thing itself: a name comes out of their own mouths or not at all.`
 
-const ClassificationSchema = z.object({
-  rulings: z.array(z.object({ key: z.string().min(1), type: z.string().min(1) }).strict()),
-}).strict()
+const ClassificationSchema = z
+  .object({
+    rulings: z.array(z.object({ key: z.string().min(1), type: z.string().min(1) }).strict()),
+  })
+  .strict()
 
 function renderCandidates(candidates: Candidate[]): string {
-  return candidates.map((c) => {
-    const s = c.signals
-    return [
-      `- ${c.key}`,
-      `  bodies: ${c.participants.length}`,
-      `  times they came back: ${c.gatherings.length}`,
-      `  acts done for their own sake: ${s.expressive}`,
-      `  things left or taken there: ${s.offerings}`,
-      `  words they share: ${s.sharedTokens.slice(0, 12).join(', ') || 'none'}`,
-      `  one voice answered more than the others: ${s.deferredTo === null ? 'no' : 'yes'}`,
-    ].join('\n')
-  }).join('\n')
+  return candidates
+    .map((c) => {
+      const s = c.signals
+      return [
+        `- ${c.key}`,
+        `  bodies: ${c.participants.length}`,
+        `  times they came back: ${c.gatherings.length}`,
+        `  acts done for their own sake: ${s.expressive}`,
+        `  things left or taken there: ${s.offerings}`,
+        `  words they share: ${s.sharedTokens.slice(0, 12).join(', ') || 'none'}`,
+        `  one voice answered more than the others: ${s.deferredTo === null ? 'no' : 'yes'}`,
+      ].join('\n')
+    })
+    .join('\n')
 }
 
 // One call for the whole pass, and none at all when there is nothing to classify. A type the
 // taxonomy does not have — or one the world has switched off — falls back to `custom`.
 export async function classifyCandidates(
-  candidates: Candidate[], llm: LlmClient, config: SimConfig,
+  candidates: Candidate[],
+  llm: LlmClient,
+  config: SimConfig,
 ): Promise<Map<string, ConstructType>> {
   const out = new Map<string, ConstructType>()
   if (candidates.length === 0) return out
-  const allowed = new Set(CONSTRUCT_TYPES.filter((t) => (config.constructs.types as Record<string, boolean>)[t]))
+  const allowed = new Set(
+    CONSTRUCT_TYPES.filter((t) => (config.constructs.types as Record<string, boolean>)[t]),
+  )
   const r = await llm.object({
     schema: ClassificationSchema,
     system: CONSTRUCT_TYPE_INSTRUCTION,
@@ -233,7 +312,8 @@ export async function classifyCandidates(
   const rulings = r.value.rulings
   for (const c of candidates) {
     const said = rulings.find((x) => x.key === c.key)?.type
-    const type = said !== undefined && allowed.has(said as ConstructType) ? said as ConstructType : 'custom'
+    const type =
+      said !== undefined && allowed.has(said as ConstructType) ? (said as ConstructType) : 'custom'
     if (allowed.has(type)) out.set(c.key, type)
   }
   return out
@@ -279,30 +359,37 @@ export async function runConstructPass(deps: ConstructPassDeps): Promise<Constru
       id: c.key,
       type: known?.type ?? type,
       name: c.name?.name ?? known?.name ?? null,
-      nameProvenance: c.name === null
-        ? known?.nameProvenance ?? null
-        : { eventSeq: c.name.eventSeq, quote: c.name.quote, byId: c.name.byId },
+      nameProvenance:
+        c.name === null
+          ? (known?.nameProvenance ?? null)
+          : { eventSeq: c.name.eventSeq, quote: c.name.quote, byId: c.name.byId },
       anchor: c.anchor,
       participants: c.participants,
       firstTick: c.firstTick,
-      recurrences: c.gatherings.slice(1).map((g) => ({ tick: g.tick, participants: g.participants })),
+      recurrences: c.gatherings
+        .slice(1)
+        .map((g) => ({ tick: g.tick, participants: g.participants })),
     }
     deps.store.upsert(row)
     if (known === null) {
       deps.store.record('construct_recognized', row.id, row.firstTick, {
-        type: row.type, anchor: row.anchor, participants: row.participants,
+        type: row.type,
+        anchor: row.anchor,
+        participants: row.participants,
       })
       for (const r of row.recurrences) {
         deps.store.record('construct_recurred', row.id, r.tick, { participants: r.participants })
       }
       if (row.nameProvenance !== null) {
         deps.store.record('construct_named', row.id, row.firstTick, {
-          name: row.name, provenance: row.nameProvenance,
+          name: row.name,
+          provenance: row.nameProvenance,
         })
       }
     } else if (known.nameProvenance === null && row.nameProvenance !== null) {
       deps.store.record('construct_named', row.id, row.firstTick, {
-        name: row.name, provenance: row.nameProvenance,
+        name: row.name,
+        provenance: row.nameProvenance,
       })
     }
     out.push(row)

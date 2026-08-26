@@ -5,7 +5,7 @@ describe('clock tint LUT', () => {
   it('pins the calibrated stops', () => {
     expect(CLOCK_STOPS[0]).toEqual({ minute: 0, tint: [0.45, 0.52, 0.95] })
     expect(CLOCK_STOPS.at(-1)).toEqual({ minute: 1440, tint: [0.45, 0.52, 0.95] })
-    expect(CLOCK_STOPS.map(s => s.minute)).toEqual([0, 300, 390, 480, 1050, 1140, 1230, 1440])
+    expect(CLOCK_STOPS.map((s) => s.minute)).toEqual([0, 300, 390, 480, 1050, 1140, 1230, 1440])
   })
 
   it('deep night at 04:00 packs to 0x7385F2', () => {

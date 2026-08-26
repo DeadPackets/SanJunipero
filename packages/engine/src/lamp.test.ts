@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
-  dayPhaseFromTick, glowRadiusFor, isDark, isHearthKind, lightBandAt, SimConfigSchema, T_PATH, T_ROAD,
-  type SimConfig, type SimEvent,
+  dayPhaseFromTick,
+  glowRadiusFor,
+  isDark,
+  isHearthKind,
+  lightBandAt,
+  SimConfigSchema,
+  T_PATH,
+  T_ROAD,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { makeGenesisWorld } from './genesis/world.js'
@@ -10,7 +18,14 @@ import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { ambientTempAt, isExposed } from './systems/warmth.js'
 import { claimInWorld, townSquareOf } from './town.js'
-import { buildIsPlotted, isKindleable, isPlottedKind, isStokeable, workPenalty, type PendingEvent } from './verbs.js'
+import {
+  buildIsPlotted,
+  isKindleable,
+  isPlottedKind,
+  isStokeable,
+  workPenalty,
+  type PendingEvent,
+} from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 
 // Before this the only fixed flames were the square's own fire pit and the hearths inside houses;
@@ -27,9 +42,15 @@ const NIGHT = 22 * 60
 const NOON = 12 * 60
 
 let seq = 810000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 const spawn = (s: WorldState, id: string, x: number, y: number): WorldState =>
   fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), CFG)
@@ -40,14 +61,22 @@ const give = (s: WorldState, id: string, itemId: string, kind: string, qty = 1):
 const apply = (s: WorldState, events: PendingEvent[], tick: number): WorldState =>
   events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), CFG), s)
 
-function pass(s: WorldState, tick: number, config = CFG): { state: WorldState; events: PendingEvent[] } {
+function pass(
+  s: WorldState,
+  tick: number,
+  config = CFG,
+): { state: WorldState; events: PendingEvent[] } {
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   return createWorldTick(config, new RngStreams('lamp'))(advanced)
 }
 
 function doVerb(
-  s: WorldState, tick: number, agentId: string, verb: string,
-  params: Record<string, unknown> = {}, limit = 400,
+  s: WorldState,
+  tick: number,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown> = {},
+  limit = 400,
 ): { state: WorldState; events: PendingEvent[]; refusal: string | null; duration: number } {
   const at: WorldState = { ...s, tick }
   const started = submitIntent(at, CFG, agentId, verb, params)
@@ -75,7 +104,8 @@ function wright(wood = 4): WorldState {
 function lampLit(at = { x: 5, y: 4 }): { state: WorldState; id: string; tick: number } {
   const raised = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', ...at })
   expect(raised.refusal).toBeNull()
-  const id = (raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }).id
+  const id = (raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string })
+    .id
   const tick = raised.state.tick
   const fed = doVerb(raised.state, tick, 'wright', 'stoke', { structureId: id })
   expect(fed.refusal).toBeNull()
@@ -88,13 +118,19 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     expect(r.refusal).toBeNull()
     // ★ 120 ticks against a house's 2 880, and a night is 720. This is the number that makes
     // the want answerable: the dark arrives at dusk and the lamp is lit before dawn.
-    expect(r.duration).toBe(Math.ceil(CFG.structures.recipes.lamp_post!.durationTicks * CFG.light.nightWorkPenalty))
+    expect(r.duration).toBe(
+      Math.ceil(CFG.structures.recipes.lamp_post!.durationTicks * CFG.light.nightWorkPenalty),
+    )
     expect(r.duration).toBeLessThan(720)
-    const planned = r.events.find((e) => e.type === 'structure_planned')!.payload as Record<string, unknown>
+    const planned = r.events.find((e) => e.type === 'structure_planned')!.payload as Record<
+      string,
+      unknown
+    >
     expect(planned).toMatchObject({ kind: 'lamp_post', x: 5, y: 4, w: 1, h: 1, flammable: false })
     expect(r.events.some((e) => e.type === 'structure_completed')).toBe(true)
     // Two wood gone, two left.
-    const wood = Object.values(r.state.items).filter((i) => i.kind === 'wood')
+    const wood = Object.values(r.state.items)
+      .filter((i) => i.kind === 'wood')
       .reduce((n, i) => n + i.qty, 0)
     expect(wood).toBe(2)
   })
@@ -103,7 +139,10 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
   // for every kind there. A siting rule can only be measured in a town, so this one is the valley.
   it('★ in a TOWN, a house takes the plot and a lamp still takes a coordinate', () => {
     const g = makeGenesisWorld(CFG)
-    const town = g.events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), genesisState(CFG, g.terrain))
+    const town = g.events.reduce(
+      (acc, e) => fold(acc, ev(e.type, e.payload), CFG),
+      genesisState(CFG, g.terrain),
+    )
     expect(townSquareOf(town)).not.toBeNull()
     expect(isPlottedKind(CFG, 'house')).toBe(true)
     expect(isPlottedKind(CFG, 'lamp_post')).toBe(false)
@@ -111,19 +150,29 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     expect(buildIsPlotted(town, CFG, 'lamp_post')).toBe(false)
 
     const door = claimInWorld(town, { along: 2, deep: 2 })!.door
-    let s = fold(town, ev('agent_spawned', { id: 'a', name: 'a', x: door.x, y: door.y, ageDays: 10000 }), CFG)
+    let s = fold(
+      town,
+      ev('agent_spawned', { id: 'a', name: 'a', x: door.x, y: door.y, ageDays: 10000 }),
+      CFG,
+    )
     s = give(s, 'a', 'wood_a', 'wood', 12)
     // The house is the town's to place, and says so.
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' }).ok).toBe(true)
-    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: door.x, y: door.y - 3 }).ok).toBe(false)
+    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: door.x, y: door.y - 3 }).ok).toBe(
+      false,
+    )
     // The lamp is the opposite, in the same town, in the same breath.
-    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'lamp_post' }))
-      .toEqual({ ok: false, reason: 'build needs {kind, x, y}' })
+    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'lamp_post' })).toEqual({
+      ok: false,
+      reason: 'build needs {kind, x, y}',
+    })
   })
 
   it('is refused without a coordinate even where there is no town at all', () => {
-    expect(submitIntent(wright(), CFG, 'wright', 'build', { kind: 'lamp_post' }))
-      .toEqual({ ok: false, reason: 'build needs {kind, x, y}' })
+    expect(submitIntent(wright(), CFG, 'wright', 'build', { kind: 'lamp_post' })).toEqual({
+      ok: false,
+      reason: 'build needs {kind, x, y}',
+    })
   })
 
   it('will not stand in the road, and the refusal says why', () => {
@@ -132,10 +181,15 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
       map[4]![5] = tile as TileId
       let s = spawn(genesisState(CFG, map), 'wright', 4, 4)
       s = give(s, 'wright', 'item_wood', 'wood', 4)
-      const r = submitIntent({ ...s, tick: NIGHT }, CFG, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 })
+      const r = submitIntent({ ...s, tick: NIGHT }, CFG, 'wright', 'build', {
+        kind: 'lamp_post',
+        x: 5,
+        y: 4,
+      })
       expect(r).toEqual({
         ok: false,
-        reason: 'that would stand in the way — the lamp post goes on the ground beside the way, not on it',
+        reason:
+          'that would stand in the way — the lamp post goes on the ground beside the way, not on it',
       })
     }
     // And the verge one tile over takes it, so the refusal is a redirection and not a wall.
@@ -143,14 +197,19 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     map[4]![5] = T_ROAD as TileId
     let s = spawn(genesisState(CFG, map), 'wright', 4, 4)
     s = give(s, 'wright', 'item_wood', 'wood', 4)
-    expect(submitIntent({ ...s, tick: NIGHT }, CFG, 'wright', 'build', { kind: 'lamp_post', x: 4, y: 5 }).ok).toBe(true)
+    expect(
+      submitIntent({ ...s, tick: NIGHT }, CFG, 'wright', 'build', { kind: 'lamp_post', x: 4, y: 5 })
+        .ok,
+    ).toBe(true)
   })
 })
 
 describe('★ the lamp answers the dark, and the dark it answers is the one that charges', () => {
   it('is dark beside an unfed post and not dark beside a fed one — same world, same tick', () => {
     const raised = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 })
-    const id = (raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }).id
+    const id = (
+      raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }
+    ).id
     const t = raised.state.tick
     // A post nobody has fed is a post. Every tile round it is dark.
     expect(isDark(raised.state, 5, 4, t, CFG)).toBe(true)
@@ -161,9 +220,9 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
     const f = fed.state.tick
     // ★ THE PAIR, AND IT IS WHY THIS TEST IS NOT VACUOUS: one instant, one world, a tile that
     // is lit and a tile that is not. A build that lit the whole map passes neither half.
-    expect(isDark(fed.state, 5, 4, f, CFG)).toBe(false)          // the post itself
-    expect(isDark(fed.state, 9, 4, f, CFG)).toBe(false)          // four tiles off — its reach
-    expect(isDark(fed.state, 10, 4, f, CFG)).toBe(true)          // five — past it
+    expect(isDark(fed.state, 5, 4, f, CFG)).toBe(false) // the post itself
+    expect(isDark(fed.state, 9, 4, f, CFG)).toBe(false) // four tiles off — its reach
+    expect(isDark(fed.state, 10, 4, f, CFG)).toBe(true) // five — past it
     expect(lightBandAt(fed.state, 5, 4, f, CFG)).toBe('bright')
     expect(lightBandAt(fed.state, 10, 4, f, CFG)).toBe('dark')
     expect(glowRadiusFor(CFG, 'lamp_post')).toBe(4)
@@ -171,7 +230,9 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
 
   it('★ buys back the night work penalty — the road the hazard never had', () => {
     const raised = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 })
-    const id = (raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }).id
+    const id = (
+      raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }
+    ).id
     // Unfed: the dark charges half again, exactly as it always has.
     expect(workPenalty(raised.state, CFG, 'wright', 'pave')).toBe(CFG.light.nightWorkPenalty)
     const fed = doVerb(raised.state, raised.state.tick, 'wright', 'stoke', { structureId: id })
@@ -191,7 +252,11 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
     expect(isDark(state, 5, 4, late, CFG)).toBe(false)
     // Now take the fuel away at that same tick and the street is dark again — the flame is what
     // is doing the work, not the hour.
-    const spent = fold(state, ev('structure_fueled', { structureId: id, burnsUntilTick: late - 1 }, late), CFG)
+    const spent = fold(
+      state,
+      ev('structure_fueled', { structureId: id, burnsUntilTick: late - 1 }, late),
+      CFG,
+    )
     expect(isDark(spent, 5, 4, late, CFG)).toBe(true)
     const again = doVerb(spent, late, 'wright', 'stoke', { structureId: id })
     expect(again.refusal).toBeNull()
@@ -200,10 +265,30 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
 
   it('throws nothing while it is still being raised', () => {
     let s = wright()
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_9', kind: 'lamp_post', x: 5, y: 4, w: 1, h: 1, maxHp: 15, flammable: false, builderId: 'wright',
-    }, NIGHT), CFG)
-    s = fold(s, ev('structure_fueled', { structureId: 'structure_9', burnsUntilTick: NIGHT + 999 }, NIGHT), CFG)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_9',
+          kind: 'lamp_post',
+          x: 5,
+          y: 4,
+          w: 1,
+          h: 1,
+          maxHp: 15,
+          flammable: false,
+          builderId: 'wright',
+        },
+        NIGHT,
+      ),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev('structure_fueled', { structureId: 'structure_9', burnsUntilTick: NIGHT + 999 }, NIGHT),
+      CFG,
+    )
     expect(isDark(s, 5, 4, NIGHT, CFG)).toBe(true)
   })
 })
@@ -220,15 +305,51 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
   it('is not a new fire: only a CARRIED flame rolls against a wall, and a post is not carried', () => {
     const SURE: SimConfig = SimConfigSchema.parse({ ...QUIET, light: { fireRiskPerTick: 1 } })
     let s = spawn(genesisState(SURE, MAP()), 'wright', 4, 4)
-    s = fold(s, ev('structure_planned', {
-      id: 'shed', kind: 'shed', x: 6, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
-    }, NIGHT - 1), SURE)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'shed',
+          kind: 'shed',
+          x: 6,
+          y: 4,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'script',
+        },
+        NIGHT - 1,
+      ),
+      SURE,
+    )
     s = fold(s, ev('structure_completed', { id: 'shed' }, NIGHT - 1), SURE)
-    s = fold(s, ev('structure_planned', {
-      id: 'lamp', kind: 'lamp_post', x: 5, y: 4, w: 1, h: 1, maxHp: 15, flammable: false, builderId: 'script',
-    }, NIGHT - 1), SURE)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'lamp',
+          kind: 'lamp_post',
+          x: 5,
+          y: 4,
+          w: 1,
+          h: 1,
+          maxHp: 15,
+          flammable: false,
+          builderId: 'script',
+        },
+        NIGHT - 1,
+      ),
+      SURE,
+    )
     s = fold(s, ev('structure_completed', { id: 'lamp' }, NIGHT - 1), SURE)
-    s = fold(s, ev('structure_fueled', { structureId: 'lamp', burnsUntilTick: NIGHT + 500 }, NIGHT - 1), SURE)
+    s = fold(
+      s,
+      ev('structure_fueled', { structureId: 'lamp', burnsUntilTick: NIGHT + 500 }, NIGHT - 1),
+      SURE,
+    )
     const out = pass({ ...s, tick: NIGHT - 1 }, NIGHT, SURE)
     // The lamp is alight, adjacent to a flammable shed, at a risk dial of ONE. Nothing ignites.
     expect(isDark(out.state, 5, 4, NIGHT, SURE)).toBe(false)
@@ -241,16 +362,20 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
     expect(isStokeable(CFG, 'lamp_post')).toBe(true)
     expect(isStokeable(CFG, 'hearth')).toBe(true)
     expect(isStokeable(CFG, 'fire_pit')).toBe(true)
-    expect(isStokeable(CFG, 'house')).toBe(true)      // it holds a hearth, and that is the fire
+    expect(isStokeable(CFG, 'house')).toBe(true) // it holds a hearth, and that is the fire
     // Asked of the WHOLE table and not a hand-list, so a kind that gains a hearth is read off its
     // row. lamp_post is the one stokeable kind with no hearth: a fire that holds nobody's cold off.
     for (const k of Object.keys(CFG.structures.recipes)) {
       expect(isStokeable(CFG, k), k).toBe(isHearthKind(CFG, k) || k === 'lamp_post')
     }
     // ★ VACUOUS GUARD: both sides of that line have names on them.
-    expect(Object.keys(CFG.structures.recipes).filter((k) => isStokeable(CFG, k)).sort())
-      .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'lamp_post'])
-    for (const k of ['well', 'grave', 'bridge', 'storehouse']) expect(isStokeable(CFG, k), k).toBe(false)
+    expect(
+      Object.keys(CFG.structures.recipes)
+        .filter((k) => isStokeable(CFG, k))
+        .sort(),
+    ).toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'lamp_post'])
+    for (const k of ['well', 'grave', 'bridge', 'storehouse'])
+      expect(isStokeable(CFG, k), k).toBe(false)
     expect(isStokeable(CFG, 'torch')).toBe(false)
     expect(isKindleable(CFG, 'lamp_post')).toBe(false)
     expect(isKindleable(CFG, 'torch')).toBe(true)
@@ -260,7 +385,7 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
   it('costs nothing at noon: a lamp is only worth raising because of the hour, not the law', () => {
     const { state, id } = lampLit()
     expect(isDark(state, 5, 4, NOON, CFG)).toBe(false)
-    expect(isDark(state, 40, 40, NOON, CFG)).toBe(false)   // and so is everywhere else
+    expect(isDark(state, 40, 40, NOON, CFG)).toBe(false) // and so is everywhere else
     expect(state.structures[id]!.kind).toBe('lamp_post')
   })
 })

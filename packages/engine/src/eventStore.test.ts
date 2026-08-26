@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 
-function store() { return new EventStore(openDb(':memory:')) }
+function store() {
+  return new EventStore(openDb(':memory:'))
+}
 
 describe('EventStore', () => {
   it('appends with monotonic seq starting at 1', () => {
@@ -13,7 +15,8 @@ describe('EventStore', () => {
   })
   it('readFrom returns events after the given seq, parsed', () => {
     const s = store()
-    s.append(0, 'a', { x: 1 }); s.append(1, 'b', [1, 2])
+    s.append(0, 'a', { x: 1 })
+    s.append(1, 'b', [1, 2])
     const evs = s.readFrom(1)
     expect(evs).toHaveLength(1)
     expect(evs[0]).toMatchObject({ seq: 2, tick: 1, type: 'b', payload: [1, 2] })
@@ -28,7 +31,8 @@ describe('EventStore', () => {
   })
   it('latestSnapshot returns the newest', () => {
     const s = store()
-    s.saveSnapshot(60, 0, { v: 1 }, {}); s.saveSnapshot(120, 0, { v: 2 }, {})
+    s.saveSnapshot(60, 0, { v: 1 }, {})
+    s.saveSnapshot(120, 0, { v: 2 }, {})
     expect((s.latestSnapshot()!.state as { v: number }).v).toBe(2)
   })
 })

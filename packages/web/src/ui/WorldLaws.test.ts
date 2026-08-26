@@ -38,11 +38,15 @@ describe('U17 — the panel a viewer reads before an operator does', () => {
 describe('the questions come in the order a person would ask them', () => {
   it('says whether children are born before it says how often, and how long after that', () => {
     const at = (t: string): number => visible.indexOf(t)
-    expect(at(LAW_COPY['reproduction.enabled']!.title))
-      .toBeLessThan(at(LAW_COPY['reproduction.gestationDays']!.title))
-    expect(at(LAW_COPY['reproduction.gestationDays']!.title))
-      .toBeLessThan(at(LAW_COPY['reproduction.conceptionChancePerNight']!.title))
-    expect(at(LAW_COPY['spoilage.enabled']!.title)).toBeLessThan(at(LAW_COPY['spoilage.days']!.title))
+    expect(at(LAW_COPY['reproduction.enabled']!.title)).toBeLessThan(
+      at(LAW_COPY['reproduction.gestationDays']!.title),
+    )
+    expect(at(LAW_COPY['reproduction.gestationDays']!.title)).toBeLessThan(
+      at(LAW_COPY['reproduction.conceptionChancePerNight']!.title),
+    )
+    expect(at(LAW_COPY['spoilage.enabled']!.title)).toBeLessThan(
+      at(LAW_COPY['spoilage.days']!.title),
+    )
   })
 })
 
@@ -52,8 +56,8 @@ describe('audit M2 — no JSON reaches a viewer', () => {
     for (const food of ['Fish', 'Berries', 'Venison', 'Bread', 'Wheat']) {
       expect(visible, food).toContain(food)
     }
-    expect(visible).toContain('2 days')     // fish
-    expect(visible).toContain('60 days')    // wheat
+    expect(visible).toContain('2 days') // fish
+    expect(visible).toContain('60 days') // wheat
   })
 
   it('prints a boolean law as an answer and a ratio in words', () => {

@@ -3,7 +3,11 @@ import Database from 'better-sqlite3'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import {
-  NARRATOR_VOCABULARY_NOTES, creditedCare, renderChapter, sceneDigests, verifyCitations,
+  NARRATOR_VOCABULARY_NOTES,
+  creditedCare,
+  renderChapter,
+  sceneDigests,
+  verifyCitations,
   witnessedAttackers,
 } from './chronicle.js'
 import type { SimEvent } from '@sj/shared'
@@ -16,13 +20,24 @@ const memStore = (): NarratorStore => {
 }
 
 const scenes: SceneSegment[] = [
-  { day: 1, startTick: 1440, endTick: 1450, eventIds: [1, 2, 3], cast: ['omar', 'yusuf'], location: '3,4' },
+  {
+    day: 1,
+    startTick: 1440,
+    endTick: 1450,
+    eventIds: [1, 2, 3],
+    cast: ['omar', 'yusuf'],
+    location: '3,4',
+  },
   { day: 1, startTick: 1500, endTick: 1510, eventIds: [4, 5], cast: ['nadia'], location: null },
 ]
 
 const llmWith = (citations: number[]): NarratorLlm =>
   ({
-    summarizeChapter: vi.fn(async () => ({ title: 'The Quarrel', text: 'Blows by the storehouse.', citations })),
+    summarizeChapter: vi.fn(async () => ({
+      title: 'The Quarrel',
+      text: 'Blows by the storehouse.',
+      citations,
+    })),
     summarizeEra: vi.fn(),
     newspaperCopy: vi.fn(),
     biography: vi.fn(),
@@ -30,7 +45,10 @@ const llmWith = (citations: number[]): NarratorLlm =>
 
 describe('verifyCitations', () => {
   it('splits citations into valid and dangling', () => {
-    expect(verifyCitations([1, 3, 99], new Set([1, 2, 3, 4, 5]))).toEqual({ ok: false, dangling: [99] })
+    expect(verifyCitations([1, 3, 99], new Set([1, 2, 3, 4, 5]))).toEqual({
+      ok: false,
+      dangling: [99],
+    })
     expect(verifyCitations([1, 3], new Set([1, 2, 3, 4, 5]))).toEqual({ ok: true, dangling: [] })
     expect(verifyCitations([], new Set([1]))).toEqual({ ok: true, dangling: [] })
   })
@@ -67,27 +85,43 @@ describe('sceneDigests', () => {
     const counter = (ids: number[]) => ({ agent_spoke: ids.length })
     const digests = sceneDigests(scenes, counter)
     expect(digests).toEqual([
-      { eventIds: [1, 2, 3], cast: ['omar', 'yusuf'], location: '3,4', typeCounts: { agent_spoke: 3 } },
+      {
+        eventIds: [1, 2, 3],
+        cast: ['omar', 'yusuf'],
+        location: '3,4',
+        typeCounts: { agent_spoke: 3 },
+      },
       { eventIds: [4, 5], cast: ['nadia'], location: null, typeCounts: { agent_spoke: 2 } },
     ])
   })
 })
 
 describe('the narrator vocabulary (§12)', () => {
-  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 100, type, payload })
+  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+    seq,
+    tick: 100,
+    type,
+    payload,
+  })
 
   it('credits care only where somebody actually sat down', () => {
-    expect(creditedCare([ev(1, 'agent_tended', { agentId: 'ada', tenderId: 'bex' })]))
-      .toEqual([{ patient: 'ada', tender: 'bex' }])
+    expect(creditedCare([ev(1, 'agent_tended', { agentId: 'ada', tenderId: 'bex' })])).toEqual([
+      { patient: 'ada', tender: 'bex' },
+    ])
     // A recovery on its own credits nobody: detect, never invent.
-    expect(creditedCare([ev(2, 'affliction_recovered', { agentId: 'ada', kind: 'illness' })])).toEqual([])
+    expect(
+      creditedCare([ev(2, 'affliction_recovered', { agentId: 'ada', kind: 'illness' })]),
+    ).toEqual([])
     expect(creditedCare([ev(3, 'agent_tended', { agentId: 'ada' })])).toEqual([])
   })
 
   it('names the hand a death was witnessed by, and never more than that', () => {
-    expect(witnessedAttackers([ev(4, 'agent_died', { agentId: 'ada', cause: 'slain', byId: 'cass' })]))
-      .toEqual([{ victim: 'ada', byId: 'cass' }])
-    expect(witnessedAttackers([ev(5, 'agent_died', { agentId: 'ada', cause: 'hunger' })])).toEqual([])
+    expect(
+      witnessedAttackers([ev(4, 'agent_died', { agentId: 'ada', cause: 'slain', byId: 'cass' })]),
+    ).toEqual([{ victim: 'ada', byId: 'cass' }])
+    expect(witnessedAttackers([ev(5, 'agent_died', { agentId: 'ada', cause: 'hunger' })])).toEqual(
+      [],
+    )
   })
 
   it('binds the chapter writer: no numbers for hurt, no titles, no verdicts, no explanations', () => {

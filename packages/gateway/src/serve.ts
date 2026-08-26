@@ -27,7 +27,8 @@ export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 const intEnv = (name: string, fallback: number, min: number): number => {
   const asked = Number(process.env[name] ?? fallback)
   if (Number.isInteger(asked) && asked >= min) return asked
-  if (process.env[name] !== undefined) console.log(`stream: ${name}=${process.env[name]} ignored; using ${fallback}`)
+  if (process.env[name] !== undefined)
+    console.log(`stream: ${name}=${process.env[name]} ignored; using ${fallback}`)
   return fallback
 }
 
@@ -51,21 +52,34 @@ export async function main(): Promise<void> {
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
-  const castFactory = (): Promise<LiveCast> => import('./liveWorld.js').then(({ createLiveCast }) =>
-    createLiveCast({
-      agentDbDir: mindsDir,
-      ...(process.env['SJ_MODELS_DIR'] === undefined ? {} : { modelsDir: process.env['SJ_MODELS_DIR'] }),
-      // The cap kills the process: a stream that stops thinking and keeps serving is a town of
-      // statues nobody would notice for hours.
-      onSpendStop: () => { void world?.stop().then(() => process.exit(1)) },
-      // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
-      // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
-      useArbiter: process.env['SJ_ARBITER'] !== '0',
-    }))
+  const castFactory = (): Promise<LiveCast> =>
+    import('./liveWorld.js').then(({ createLiveCast }) =>
+      createLiveCast({
+        agentDbDir: mindsDir,
+        ...(process.env['SJ_MODELS_DIR'] === undefined
+          ? {}
+          : { modelsDir: process.env['SJ_MODELS_DIR'] }),
+        // The cap kills the process: a stream that stops thinking and keeps serving is a town of
+        // statues nobody would notice for hours.
+        onSpendStop: () => {
+          void world?.stop().then(() => process.exit(1))
+        },
+        // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
+        // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
+        useArbiter: process.env['SJ_ARBITER'] !== '0',
+      }),
+    )
 
   try {
     world = await startDevWorld({
-      ingest: true, map, rings, interiors, port, fresh, builders: true, lamps,
+      ingest: true,
+      map,
+      rings,
+      interiors,
+      port,
+      fresh,
+      builders: true,
+      lamps,
       staticDir: CLIENT_DIST,
       // `agentDbDir` is what makes `SJ_FRESH=1` delete the minds in the same breath as the town;
       // without it a fresh boot is the one state worse than either a reset or a resume.
@@ -76,21 +90,29 @@ export async function main(): Promise<void> {
     // refusals are whole paragraphs written for an operator, so they are printed as written.
     const busy = (e as { code?: string }).code === 'EADDRINUSE'
     const text = e instanceof Error ? e.message : String(e)
-    console.error(busy
-      ? `stream: port ${port} is already in use — pick another with PORT=…`
-      : text.includes('\n') ? text : `stream: could not start — ${text}`)
+    console.error(
+      busy
+        ? `stream: port ${port} is already in use — pick another with PORT=…`
+        : text.includes('\n')
+          ? text
+          : `stream: could not start — ${text}`,
+    )
     process.exitCode = 1
     return
   }
   const running = world
-  console.log(running.resumedAtTick === null
-    ? 'stream: this is a new town — SJ_FRESH=1 starts another one over it'
-    : `stream: this is the town that was running, resumed at tick ${running.resumedAtTick}`)
+  console.log(
+    running.resumedAtTick === null
+      ? 'stream: this is a new town — SJ_FRESH=1 starts another one over it'
+      : `stream: this is the town that was running, resumed at tick ${running.resumedAtTick}`,
+  )
   // Said out loud in both directions, because "is anything actually thinking?" is the one
   // question a viewer cannot answer by looking.
-  console.log(running.live
-    ? `stream: the cast is LIVE MINDS — this costs money, and memory is kept in ${mindsDir}/`
-    : 'stream: the cast is SCRIPTED and free — SJ_LIVE=1 puts LLM minds behind these bodies')
+  console.log(
+    running.live
+      ? `stream: the cast is LIVE MINDS — this costs money, and memory is kept in ${mindsDir}/`
+      : 'stream: the cast is SCRIPTED and free — SJ_LIVE=1 puts LLM minds behind these bodies',
+  )
   console.log(`stream: the town is open at http://localhost:${running.gateway.port}/`)
 
   // A stream is a long-running process and a container stops it with a signal; without this the

@@ -5,12 +5,34 @@ import { describe, expect, it, vi } from 'vitest'
 
 const installs: Array<Record<string, unknown>> = []
 vi.mock('pixi.js', () => ({
-  BitmapFont: { install: (o: Record<string, unknown>) => { installs.push(o) } },
+  BitmapFont: {
+    install: (o: Record<string, unknown>) => {
+      installs.push(o)
+    },
+  },
 }))
 import {
-  BUBBLE_FRAME_PX, BUBBLE_SLICE, FACE_ADVANCE_EM, FACE_BODY, FACE_DESIGN_PX, FACE_INSTALL_PX,
-  FACE_PX, FACE_ROLES, FACE_SIZES, FACE_SOURCE, LOWERCASE_FACES, SPEECH_FILL, SPEECH_INK,
-  TAIL_PX, THOUGHT_FILL, THOUGHT_INK, faceFor, installFaces, nineSlice, tailPoly, worldTextScale,
+  BUBBLE_FRAME_PX,
+  BUBBLE_SLICE,
+  FACE_ADVANCE_EM,
+  FACE_BODY,
+  FACE_DESIGN_PX,
+  FACE_INSTALL_PX,
+  FACE_PX,
+  FACE_ROLES,
+  FACE_SIZES,
+  FACE_SOURCE,
+  LOWERCASE_FACES,
+  SPEECH_FILL,
+  SPEECH_INK,
+  TAIL_PX,
+  THOUGHT_FILL,
+  THOUGHT_INK,
+  faceFor,
+  installFaces,
+  nineSlice,
+  tailPoly,
+  worldTextScale,
   wrapCharsFor,
 } from './textFaces.js'
 import { ZOOM_STOPS } from './camera.js'
@@ -40,7 +62,9 @@ describe('U18 — the town speaks in its own typeface', () => {
   // worldLabel.ts is where the word would actually be.
   it('leaves no world label asking the browser for its default mono', () => {
     for (const f of [...CALL_SITES, './worldLabel.ts']) {
-      expect(src(f), `${f} still asks for monospace`).not.toMatch(/=\s*'monospace'|fontFamily:\s*'monospace'/)
+      expect(src(f), `${f} still asks for monospace`).not.toMatch(
+        /=\s*'monospace'|fontFamily:\s*'monospace'/,
+      )
     }
   })
 
@@ -134,13 +158,19 @@ describe('a bubble is a nine-slice, like every other slab in the product', () =>
   })
 
   it('tiles the destination exactly — no gap and no overlap', () => {
-    for (const [w, h] of [[64, 32], [20, 20], [300, 41], [21, 200]] as const) {
+    for (const [w, h] of [
+      [64, 32],
+      [20, 20],
+      [300, 41],
+      [21, 200],
+    ] as const) {
       const rects = nineSlice(w, h, 10)
       const area = rects.reduce((n, r) => n + r.dw * r.dh, 0)
       expect(area, `${w}x${h} area`).toBe(w * h)
       for (let i = 0; i < rects.length; i++) {
         for (let j = i + 1; j < rects.length; j++) {
-          const a = rects[i]!, b = rects[j]!
+          const a = rects[i]!,
+            b = rects[j]!
           const overlap =
             Math.max(0, Math.min(a.dx + a.dw, b.dx + b.dw) - Math.max(a.dx, b.dx)) *
             Math.max(0, Math.min(a.dy + a.dh, b.dy + b.dh) - Math.max(a.dy, b.dy))
@@ -151,18 +181,26 @@ describe('a bubble is a nine-slice, like every other slab in the product', () =>
   })
 
   it('never scales a corner, whatever the bubble grows to', () => {
-    for (const [w, h] of [[64, 32], [300, 41], [512, 300]] as const) {
+    for (const [w, h] of [
+      [64, 32],
+      [300, 41],
+      [512, 300],
+    ] as const) {
       const rects = nineSlice(w, h, 10)
       // A corner is a piece against both a vertical and a horizontal edge of the box.
-      const corners = rects.filter((r) =>
-        (r.dx === 0 || r.dx + r.dw === w) && (r.dy === 0 || r.dy + r.dh === h))
+      const corners = rects.filter(
+        (r) => (r.dx === 0 || r.dx + r.dw === w) && (r.dy === 0 || r.dy + r.dh === h),
+      )
       expect(corners, `${w}x${h}`).toHaveLength(4)
       for (const c of corners) {
         expect(c.dw, `${w}x${h} corner width`).toBe(c.sw)
         expect(c.dh, `${w}x${h} corner height`).toBe(c.sh)
       }
       // and the pieces that are NOT corners do stretch, or the frame would not fit the box
-      expect(rects.some((r) => r.dw !== r.sw || r.dh !== r.sh), `${w}x${h}`).toBe(true)
+      expect(
+        rects.some((r) => r.dw !== r.sw || r.dh !== r.sh),
+        `${w}x${h}`,
+      ).toBe(true)
     }
   })
 
@@ -210,7 +248,9 @@ describe('the tail points at the speaker', () => {
 describe('a thought is a different material, never a thinner one', () => {
   it('leaves no alpha on a bubble node', () => {
     // comments stripped: the source SAYS `alpha: 0.55` where it explains what it stopped doing
-    const text = src('./bubbles.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const text = src('./bubbles.ts')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
     expect(text).not.toMatch(/\.alpha\s*=/)
     expect(text).not.toMatch(/THOUGHT_ALPHA/)
     expect(text).not.toMatch(/alpha:\s*0\.\d/)
@@ -248,7 +288,8 @@ describe('a world label is the same size to the viewer at every zoom stop', () =
   // The counter-scale is also what makes the atlas crisp: one texel per screen pixel, at every
   // stop, instead of the 0.5x and 3x resampling the world scale was imposing on it.
   it('draws the atlas at one texel per screen pixel, never resampled', () => {
-    for (const zoom of ZOOM_STOPS) expect(worldTextScale(zoom) * zoom, `${zoom}x`).toBeCloseTo(1, 10)
+    for (const zoom of ZOOM_STOPS)
+      expect(worldTextScale(zoom) * zoom, `${zoom}x`).toBeCloseTo(1, 10)
   })
 
   it('never returns a scale of zero or a negative, whatever the camera reports', () => {
@@ -267,7 +308,9 @@ describe('a world label is the same size to the viewer at every zoom stop', () =
 describe('the letter after an f survives — no derived kerning on a ligature face', () => {
   it('installs both faces with kerning skipped', async () => {
     installs.length = 0
-    await installFaces({ fonts: { load: async () => [], ready: Promise.resolve() } as unknown as FontFaceSet })
+    await installFaces({
+      fonts: { load: async () => [], ready: Promise.resolve() } as unknown as FontFaceSet,
+    })
     expect(installs.length).toBe(2)
     for (const o of installs) expect(o['skipKerning'], String(o['name'])).toBe(true)
   })
@@ -286,7 +329,10 @@ describe('the structural guard batch 2 left, still green', () => {
     const out: string[] = []
     for (const name of readdirSync(dir).sort()) {
       const p = join(dir, name)
-      if (statSync(p).isDirectory()) { out.push(...sources(p)); continue }
+      if (statSync(p).isDirectory()) {
+        out.push(...sources(p))
+        continue
+      }
       if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
       out.push(p)
     }

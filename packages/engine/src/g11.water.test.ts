@@ -1,7 +1,13 @@
 // @slow — GATE G11a, the water and the ground: the bucket line, the channel, the crossing, and
 // the roads feet make. Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
-import { fertilityAt, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  fertilityAt,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { findPath, stepCostAt, terrainCostFor, BRIDGE_KIND } from './path.js'
@@ -20,40 +26,78 @@ const QUIET = {
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
 let seq = 710000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 function spawn(s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState {
   return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
 }
 
-function give(s: WorldState, config: SimConfig, id: string, itemId: string, kind: string, qty: number, extra: Record<string, unknown> = {}): WorldState {
-  return fold(s, ev('item_spawned', { id: itemId, kind, qty, loc: { t: 'agent', id }, ...extra }), config)
+function give(
+  s: WorldState,
+  config: SimConfig,
+  id: string,
+  itemId: string,
+  kind: string,
+  qty: number,
+  extra: Record<string, unknown> = {},
+): WorldState {
+  return fold(
+    s,
+    ev('item_spawned', { id: itemId, kind, qty, loc: { t: 'agent', id }, ...extra }),
+    config,
+  )
 }
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
 function raise(s: WorldState, config: SimConfig, box: Box, flammable = true): WorldState {
-  const planned = fold(s, ev('structure_planned', { ...box, maxHp: 50, flammable, builderId: 'script' }), config)
+  const planned = fold(
+    s,
+    ev('structure_planned', { ...box, maxHp: 50, flammable, builderId: 'script' }),
+    config,
+  )
   return fold(planned, ev('structure_completed', { id: box.id }), config)
 }
 
-function pass(s: WorldState, config: SimConfig, tick: number, seed = 'g11a-water'): {
-  state: WorldState; events: PendingEvent[]
+function pass(
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  seed = 'g11a-water',
+): {
+  state: WorldState
+  events: PendingEvent[]
 } {
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   return createWorldTick(config, new RngStreams(seed))(advanced)
 }
 
-const apply = (s: WorldState, config: SimConfig, events: PendingEvent[], tick: number): WorldState =>
-  events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
+const apply = (
+  s: WorldState,
+  config: SimConfig,
+  events: PendingEvent[],
+  tick: number,
+): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
 
 // Submit an intent and run the world until the body is idle again. Returns everything that
 // happened, so a row can name the event as well as the state it left behind.
 function doVerb(
-  s: WorldState, config: SimConfig, tick: number, agentId: string, verb: string,
-  params: Record<string, unknown> = {}, limit = 600, seed = 'g11a-water',
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown> = {},
+  limit = 600,
+  seed = 'g11a-water',
 ): { state: WorldState; events: PendingEvent[]; refusal: string | null } {
   // The clock the intent is judged against is the clock the world is on: the dark charges
   // half again for a build, and a fixture that submits at the wrong hour buys a different verb.
@@ -107,9 +151,13 @@ describe('G11a-W1: a bucket filled at the river puts out a fire', () => {
 
   it('an empty bucket is refused, and so is a fire nobody is standing near', () => {
     const s = town()
-    expect(doVerb(s, CFG, 101, 'hand', 'douse', { x: 6, y: 5 }).refusal).toBe('not close enough to the fire')
+    expect(doVerb(s, CFG, 101, 'hand', 'douse', { x: 6, y: 5 }).refusal).toBe(
+      'not close enough to the fire',
+    )
     const beside = fold(s, ev('agent_moved', { id: 'hand', x: 5, y: 5 }, 105), CFG)
-    expect(doVerb(beside, CFG, 106, 'hand', 'douse', { x: 6, y: 5 }).refusal).toBe('the bucket is empty')
+    expect(doVerb(beside, CFG, 106, 'hand', 'douse', { x: 6, y: 5 }).refusal).toBe(
+      'the bucket is empty',
+    )
   })
 })
 
@@ -123,7 +171,11 @@ describe('G11a-W2: water led to the field, and the harvest that says so', () => 
     terrain[10]![20] = 6 // farmland, well out of the river's reach
     terrain[10]![19] = 0
     let s = spawn(genesisState(CFG, terrain), CFG, 'farmer', 19, 10)
-    s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 20, y: 10, plantedDay: 0 }, 0), CFG)
+    s = fold(
+      s,
+      ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 20, y: 10, plantedDay: 0 }, 0),
+      CFG,
+    )
     s = fold(s, ev('crop_grew', { cropId: 'crop_1', stage: 3 }, 0), CFG)
     return { ...s, tick: 100 }
   }
@@ -131,7 +183,9 @@ describe('G11a-W2: water led to the field, and the harvest that says so', () => 
   it('dig_channel refuses ground no water reaches, and cuts where the river does', () => {
     const s = field()
     // Nothing feeds (19, 10): the river is eighteen tiles west.
-    expect(doVerb(s, CFG, 101, 'farmer', 'dig_channel', { x: 19, y: 10 }).refusal).toBe('no water reaches here')
+    expect(doVerb(s, CFG, 101, 'farmer', 'dig_channel', { x: 19, y: 10 }).refusal).toBe(
+      'no water reaches here',
+    )
 
     const bank = fold(s, ev('agent_moved', { id: 'farmer', x: 3, y: 10 }, 101), CFG)
     const cut = doVerb(bank, CFG, 102, 'farmer', 'dig_channel', { x: 3, y: 10 })
@@ -145,17 +199,24 @@ describe('G11a-W2: water led to the field, and the harvest that says so', () => 
     expect(dry).toBe(1)
     const dryYield = doVerb(s, CFG, 101, 'farmer', 'harvest', { cropId: 'crop_1' })
     expect(dryYield.refusal).toBeNull()
-    const dryGrain = dryYield.events.find((e) => e.type === 'item_spawned')!.payload as { qty: number }
+    const dryGrain = dryYield.events.find((e) => e.type === 'item_spawned')!.payload as {
+      qty: number
+    }
     expect(dryGrain.qty).toBe(Math.floor(CFG.crops.wheat!.yield * dry))
 
     // Now a channel one tile from the plot, and nothing else changed.
     const wet = field()
     wet.terrain[10]![19] = 10
     const raised = fertilityAt(wet.terrain, 20, 10, CFG)
-    expect(raised).toBeCloseTo(1 + CFG.fertility.waterBonus * (1 - 1 / (CFG.fertility.radius + 1)), 12)
+    expect(raised).toBeCloseTo(
+      1 + CFG.fertility.waterBonus * (1 - 1 / (CFG.fertility.radius + 1)),
+      12,
+    )
     expect(raised).toBeGreaterThan(dry)
     const wetYield = doVerb(wet, CFG, 101, 'farmer', 'harvest', { cropId: 'crop_1' })
-    const wetGrain = wetYield.events.find((e) => e.type === 'item_spawned')!.payload as { qty: number }
+    const wetGrain = wetYield.events.find((e) => e.type === 'item_spawned')!.payload as {
+      qty: number
+    }
     expect(wetGrain.qty).toBe(Math.floor(CFG.crops.wheat!.yield * raised))
     expect(wetGrain.qty).toBeGreaterThan(dryGrain.qty)
   })
@@ -174,7 +235,10 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
   // A river two tiles wide, so a six-plank deck can span it. Banks at x 9 and x 12.
   function banks(): WorldState {
     const terrain = MAP(24)
-    for (let y = 0; y < terrain.length; y++) { terrain[y]![10] = 2; terrain[y]![11] = 2 }
+    for (let y = 0; y < terrain.length; y++) {
+      terrain[y]![10] = 2
+      terrain[y]![11] = 2
+    }
     let s = spawn(genesisState(CFG, terrain), CFG, 'builder', 9, 5)
     s = give(s, CFG, 'builder', 'item_wood', 'wood', 6)
     return { ...s, tick: 100 }
@@ -185,7 +249,8 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
     expect(findPath(s, { x: 9, y: 5 }, { x: 13, y: 5 }, CFG)).toBeNull()
     // Walking to the far bank is refused for what it is: there is no way across yet.
     expect(submitIntent(s, CFG, 'builder', 'walk', { x: 13, y: 5 })).toEqual({
-      ok: false, reason: 'no path to that spot',
+      ok: false,
+      reason: 'no path to that spot',
     })
     // The near bank is still reachable, so it is the river and not the pathfinder.
     expect(findPath(s, { x: 9, y: 5 }, { x: 9, y: 12 }, CFG)).not.toBeNull()
@@ -195,8 +260,15 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
     const s = banks()
     // Started in daylight: the dark charges a build half again as much, and this row is
     // about the crossing and not about the hour.
-    const out = doVerb(s, CFG, 600, 'builder', 'build',
-      { kind: BRIDGE_KIND, x: 10, y: 5 }, CFG.structures.recipes.bridge!.durationTicks + 60)
+    const out = doVerb(
+      s,
+      CFG,
+      600,
+      'builder',
+      'build',
+      { kind: BRIDGE_KIND, x: 10, y: 5 },
+      CFG.structures.recipes.bridge!.durationTicks + 60,
+    )
     expect(out.refusal).toBeNull()
     const deck = Object.values(out.state.structures).find((x) => x.kind === BRIDGE_KIND)
     expect(deck).toBeDefined()
@@ -217,13 +289,15 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
   it('a deck over dry land, and one with a foot in open water, are both refused', () => {
     const s = banks()
     // Dry ground the builder is standing right beside, so the refusal is about the ground.
-    expect(doVerb(s, CFG, 600, 'builder', 'build', { kind: BRIDGE_KIND, x: 8, y: 5 }).refusal)
-      .toBe('a bridge belongs over water')
+    expect(doVerb(s, CFG, 600, 'builder', 'build', { kind: BRIDGE_KIND, x: 8, y: 5 }).refusal).toBe(
+      'a bridge belongs over water',
+    )
     // Three tiles of water and no bank at the far end: the wide crossing has nothing to rest on.
     const wide = banks()
     for (let y = 0; y < wide.terrain.length; y++) wide.terrain[y]![12] = 2
-    expect(doVerb(wide, CFG, 600, 'builder', 'build', { kind: BRIDGE_KIND, x: 10, y: 5 }).refusal)
-      .toBe('both ends must reach something solid')
+    expect(
+      doVerb(wide, CFG, 600, 'builder', 'build', { kind: BRIDGE_KIND, x: 10, y: 5 }).refusal,
+    ).toBe('both ends must reach something solid')
   })
 })
 
@@ -238,14 +312,19 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
     expect(out.refusal).toBeNull()
     expect(out.state.terrain[5]![6]).toBe(7)
     expect(out.state.items.item_stone!.qty).toBe(2 - CFG.roads.stonePerTile)
-    const laid = out.events.find((e) => e.type === 'tile_changed')!.payload as { reason: string; byId: string }
+    const laid = out.events.find((e) => e.type === 'tile_changed')!.payload as {
+      reason: string
+      byId: string
+    }
     expect(laid).toMatchObject({ reason: 'paved', byId: 'mason' })
 
     // Spend the last stone and the next stretch is refused for the reason it is.
     const spent = doVerb(out.state, CFG, 110, 'mason', 'pave', { x: 6, y: 6 })
     expect(spent.refusal).toBeNull()
     expect(spent.state.items.item_stone).toBeUndefined()
-    expect(doVerb(spent.state, CFG, 120, 'mason', 'pave', { x: 5, y: 6 }).refusal).toMatch(/^not enough stone — /)
+    expect(doVerb(spent.state, CFG, 120, 'mason', 'pave', { x: 5, y: 6 }).refusal).toMatch(
+      /^not enough stone — /,
+    )
   })
 
   it('grass costs more than a worn path, and a worn path more than a road', () => {
@@ -255,10 +334,20 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
 
     // Three corridors of the same length, walled off from each other. The road lane costs two
     // extra grass tiles at each end and is still cheapest, which holds only if tiles are priced.
-    const W = 42, H = 14
-    const terrain: TileId[][] = Array.from({ length: H }, () => Array.from({ length: W }, (): TileId => 2))
-    for (let y = 0; y < H; y++) { terrain[y]![0] = 0; terrain[y]![W - 1] = 0 }
-    for (let x = 1; x < W - 1; x++) { terrain[4]![x] = 0; terrain[6]![x] = 8; terrain[8]![x] = 7 }
+    const W = 42,
+      H = 14
+    const terrain: TileId[][] = Array.from({ length: H }, () =>
+      Array.from({ length: W }, (): TileId => 2),
+    )
+    for (let y = 0; y < H; y++) {
+      terrain[y]![0] = 0
+      terrain[y]![W - 1] = 0
+    }
+    for (let x = 1; x < W - 1; x++) {
+      terrain[4]![x] = 0
+      terrain[6]![x] = 8
+      terrain[8]![x] = 7
+    }
     const s = genesisState(CFG, terrain)
     const route = findPath(s, { x: 0, y: 6 }, { x: W - 1, y: 6 }, CFG)
     expect(route).not.toBeNull()
@@ -271,7 +360,10 @@ describe('G11a-W5: feet wear a trail, and grass takes it back', () => {
   // The threshold is dialled down to make a trail reachable inside a test; the number the world
   // ships with is asserted first, so the dial is visible and never a quiet weakening.
   const WEAR_AT = 4
-  const WORN: SimConfig = SimConfigSchema.parse({ ...QUIET, desirePaths: { wearThreshold: WEAR_AT } })
+  const WORN: SimConfig = SimConfigSchema.parse({
+    ...QUIET,
+    desirePaths: { wearThreshold: WEAR_AT },
+  })
   const MID = { x: 5, y: 7 }
 
   // A body walking a line, back and forth, `crossings` times over the middle tile.
@@ -326,8 +418,10 @@ describe('G11a-W5: feet wear a trail, and grass takes it back', () => {
       const out = pass(s, CFG, day * MINUTES_PER_DAY)
       s = out.state
       if (day === 1) expect(s.quietSince?.[key]).toBe(1)
-      const back = out.events.find((e) => e.type === 'tile_changed'
-        && (e.payload as { reason?: string }).reason === 'overgrown')
+      const back = out.events.find(
+        (e) =>
+          e.type === 'tile_changed' && (e.payload as { reason?: string }).reason === 'overgrown',
+      )
       if (back !== undefined && overgrewOn === null) overgrewOn = day
     }
     expect(overgrewOn).toBe(1 + days)

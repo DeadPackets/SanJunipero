@@ -5,7 +5,10 @@ import { isPassable, type Point } from './path.js'
 // The ring of tiles hugging a footprint, clockwise on screen from the south-east corner. Exported
 // because it is the codebase's one "nearest tile" tiebreak, and graves reuse it.
 export function perimeter(s: { x: number; y: number; w: number; h: number }): Point[] {
-  const x0 = s.x - 1, x1 = s.x + s.w, y0 = s.y - 1, y1 = s.y + s.h
+  const x0 = s.x - 1,
+    x1 = s.x + s.w,
+    y0 = s.y - 1,
+    y1 = s.y + s.h
   const ring: Point[] = []
   for (let x = x1; x >= x0; x--) ring.push({ x, y: y1 })
   for (let y = y1 - 1; y > y0; y--) ring.push({ x: x0, y })
@@ -39,7 +42,9 @@ export function insideOf(state: WorldState, agentId: string): string | null {
 }
 
 export function occupantsOf(state: WorldState, structureId: string): string[] {
-  return Object.keys(state.agents).sort().filter((id) => state.agents[id]!.insideId === structureId)
+  return Object.keys(state.agents)
+    .sort()
+    .filter((id) => state.agents[id]!.insideId === structureId)
 }
 
 // Two tiles of floor per body — physics, not ownership. In shared because the city template must

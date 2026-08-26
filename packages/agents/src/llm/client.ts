@@ -1,11 +1,29 @@
-import { generateText, NoObjectGeneratedError, Output, type LanguageModel, type LanguageModelUsage, type ModelMessage } from 'ai'
+import {
+  generateText,
+  NoObjectGeneratedError,
+  Output,
+  type LanguageModel,
+  type LanguageModelUsage,
+  type ModelMessage,
+} from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import type { z } from 'zod'
-import { insertAlert, insertLlmCall, makeBudgetGuard, sumCostUsd, type BudgetGuard } from './callLog.js'
 import {
-  FALLBACK_MODELS, MIND_MODEL, PROVIDER_ORDER,
-  pricesFor, reasoningFor, type PriceSource, type ReasoningSetting,
+  insertAlert,
+  insertLlmCall,
+  makeBudgetGuard,
+  sumCostUsd,
+  type BudgetGuard,
+} from './callLog.js'
+import {
+  FALLBACK_MODELS,
+  MIND_MODEL,
+  PROVIDER_ORDER,
+  pricesFor,
+  reasoningFor,
+  type PriceSource,
+  type ReasoningSetting,
 } from './pins.js'
 import { repairToSchema } from './repair.js'
 
@@ -62,7 +80,8 @@ export function defaultExtraBody(
 // Which back end answered. OpenRouter says so in its own metadata and again in the raw body;
 // neither is guaranteed, and a call nobody can attribute is recorded as one.
 export function servedProvider(response: unknown, meta: unknown): string | null {
-  const fromMeta = (meta as { openrouter?: { provider?: unknown } } | undefined)?.openrouter?.provider
+  const fromMeta = (meta as { openrouter?: { provider?: unknown } } | undefined)?.openrouter
+    ?.provider
   if (typeof fromMeta === 'string' && fromMeta.length > 0) return fromMeta
   const fromBody = (response as { body?: { provider?: unknown } } | undefined)?.body?.provider
   return typeof fromBody === 'string' && fromBody.length > 0 ? fromBody : null
@@ -71,7 +90,8 @@ export function servedProvider(response: unknown, meta: unknown): string | null 
 // What the bill says, reported under `usage.cost` once `usage: { include: true }` is set on
 // the request. The only number here that cannot go stale.
 export function reportedCostUsd(meta: unknown): number | null {
-  const cost = (meta as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter?.usage?.cost
+  const cost = (meta as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter
+    ?.usage?.cost
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : null
 }
 
@@ -157,7 +177,9 @@ export class LlmClient {
           output: Output.object({ schema: opts.schema }),
         })
         return {
-          usage: r.usage, value: r.output, servedModel: r.response.modelId,
+          usage: r.usage,
+          value: r.output,
+          servedModel: r.response.modelId,
           provider: servedProvider(r.response, r.providerMetadata),
           reportedCostUsd: reportedCostUsd(r.providerMetadata),
         }
@@ -192,7 +214,9 @@ export class LlmClient {
         abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
       })
       return {
-        usage: r.usage, value: r.text, servedModel: r.response.modelId,
+        usage: r.usage,
+        value: r.text,
+        servedModel: r.response.modelId,
         provider: servedProvider(r.response, r.providerMetadata),
         reportedCostUsd: reportedCostUsd(r.providerMetadata),
       }
@@ -234,7 +258,7 @@ export class LlmClient {
         'llm_price_divergence',
         `${provider ?? 'unattributed'} charged $${reported.toFixed(6)} for ${served} but the ` +
           `pinned table computed $${computed.costUsd.toFixed(6)} ` +
-          `(${(gap / scale * 100).toFixed(0)}% out, prices from ${computed.source}) — the pin is stale`,
+          `(${((gap / scale) * 100).toFixed(0)}% out, prices from ${computed.source}) — the pin is stale`,
       )
     }
     return reported
@@ -272,13 +296,25 @@ export class LlmClient {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const start = performance.now()
       try {
-        const { usage: raw, value, servedModel, provider, reportedCostUsd: reported } = await exec(model)
+        const {
+          usage: raw,
+          value,
+          servedModel,
+          provider,
+          reportedCostUsd: reported,
+        } = await exec(model)
         const served = servedModel ?? modelName
         const inputTokens = raw.inputTokens ?? 0
         const outputTokens = raw.outputTokens ?? 0
         const cacheReadTokens = raw.inputTokenDetails.cacheReadTokens ?? 0
         const reasoningTokens = raw.outputTokenDetails.reasoningTokens ?? 0
-        const computed = computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider)
+        const computed = computeCostUsd(
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          served,
+          provider,
+        )
         const costUsd = this.book(computed, reported ?? null, served, provider ?? null)
         insertLlmCall(this.db, {
           agentId: this.agentId,
@@ -319,7 +355,8 @@ export class LlmClient {
           outputTokens,
           cacheReadTokens,
           reasoningTokens: raw?.outputTokenDetails.reasoningTokens ?? 0,
-          costUsd: computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider).costUsd,
+          costUsd: computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider)
+            .costUsd,
           reportedCostUsd: null,
           latencyMs: performance.now() - start,
           ok: false,

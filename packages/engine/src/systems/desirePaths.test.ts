@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { stepCostAt, terrainCostFor } from '../path.js'
@@ -9,51 +15,79 @@ import { trafficKey } from './desirePaths.js'
 
 // Nothing else may speak at midnight: no weather turn, no rumour, no wider map.
 const CFG: SimConfig = SimConfigSchema.parse({
-  weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mapGrowth: { enabled: false },
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
 })
 const OFF: SimConfig = SimConfigSchema.parse({
-  weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mapGrowth: { enabled: false },
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
   desirePaths: { enabled: false },
 })
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, p: 8 }
 let seq = 21000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function meadow(rows: string[] = ['...', '...', '...'], config = CFG): WorldState {
-  return genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+  return genesisState(
+    config,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
 }
 
 function withWalker(s: WorldState, config = CFG): WorldState {
-  const spawned = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  const spawned = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+    config,
+  )
   const a1 = spawned.agents.a1!
   return {
     ...spawned,
-    agents: { a1: { ...a1, activity: { verb: 'walk', ticksRemaining: 999, params: { x: 1, y: 1 }, path: [[1, 1]] } } },
+    agents: {
+      a1: {
+        ...a1,
+        activity: { verb: 'walk', ticksRemaining: 999, params: { x: 1, y: 1 }, path: [[1, 1]] },
+      },
+    },
   }
 }
 
 function cross(s: WorldState, times: number, config = CFG): WorldState {
-  for (let i = 0; i < times; i++) s = fold(s, ev('agent_moved', { id: 'a1', x: 1, y: 1 }, s.tick), config)
+  for (let i = 0; i < times; i++)
+    s = fold(s, ev('agent_moved', { id: 'a1', x: 1, y: 1 }, s.tick), config)
   return s
 }
 
 // One midnight: the tick that rolls the day over, and the systems that answer to it.
 function midnight(s: WorldState, day: number, config = CFG): WorldTickResult {
   const eve = { ...s, tick: day * MINUTES_PER_DAY - 1 }
-  return createWorldTick(config, new RngStreams('t'))(fold(eve, ev('tick_advanced', {}, day * MINUTES_PER_DAY), config))
+  return createWorldTick(
+    config,
+    new RngStreams('t'),
+  )(fold(eve, ev('tick_advanced', {}, day * MINUTES_PER_DAY), config))
 }
 const tileEvents = (r: WorldTickResult) => r.events.filter((e) => e.type === 'tile_changed')
 
 describe('traffic: the walk itself is the record', () => {
-  it('counts a walker\'s steps, ignores a body that simply appears, and stays absent when the law is off', () => {
+  it("counts a walker's steps, ignores a body that simply appears, and stays absent when the law is off", () => {
     expect(cross(withWalker(meadow()), 3).traffic).toEqual({ [trafficKey(1, 1)]: 3 })
     const teleported = fold(
       fold(meadow(), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG),
-      ev('agent_moved', { id: 'a1', x: 1, y: 1 }), CFG,
+      ev('agent_moved', { id: 'a1', x: 1, y: 1 }),
+      CFG,
     )
     expect(teleported.traffic).toBeUndefined()
-    expect(cross(withWalker(meadow(['...', '...', '...'], OFF), OFF), 3, OFF).traffic).toBeUndefined()
+    expect(
+      cross(withWalker(meadow(['...', '...', '...'], OFF), OFF), 3, OFF).traffic,
+    ).toBeUndefined()
   })
 
   it('a fresh world carries no counter at all and hashes as a pre-C11 world does', () => {
@@ -61,9 +95,14 @@ describe('traffic: the walk itself is the record', () => {
     expect(fresh.traffic).toBeUndefined()
     expect(fresh.quietSince).toBeUndefined()
     expect('traffic' in fresh).toBe(false)
-    const spawned = fold(fresh, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
-    expect(stateHash(fold(spawned, ev('agent_moved', { id: 'a1', x: 1, y: 1 }), CFG)))
-      .toBe(stateHash({ ...spawned, agents: { a1: { ...spawned.agents.a1!, x: 1, y: 1 } } }))
+    const spawned = fold(
+      fresh,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+      CFG,
+    )
+    expect(stateHash(fold(spawned, ev('agent_moved', { id: 'a1', x: 1, y: 1 }), CFG))).toBe(
+      stateHash({ ...spawned, agents: { a1: { ...spawned.agents.a1!, x: 1, y: 1 } } }),
+    )
   })
 })
 
@@ -94,7 +133,9 @@ describe('desirePathsSystem: wear', () => {
     expect(after.traffic).toEqual({ [trafficKey(1, 1)]: 108 })
     expect(midnight(after, 2).state.traffic).toEqual({ [trafficKey(1, 1)]: 97 })
     // And a counter the fall takes to zero leaves the map, rather than being carried at zero.
-    expect(midnight({ ...after, traffic: { [trafficKey(1, 1)]: 1 } }, 2).state.traffic).toBeUndefined()
+    expect(
+      midnight({ ...after, traffic: { [trafficKey(1, 1)]: 1 } }, 2).state.traffic,
+    ).toBeUndefined()
   })
 })
 
@@ -103,7 +144,11 @@ describe('desirePathsSystem: overgrowth', () => {
   function quietPath(traffic: number): WorldState {
     return { ...meadow(['...', '.p.', '...']), traffic: { [QUIET_TILE]: traffic } }
   }
-  function run(s: WorldState, fromDay: number, toDay: number): { state: WorldState; events: WorldTickResult['events'] } {
+  function run(
+    s: WorldState,
+    fromDay: number,
+    toDay: number,
+  ): { state: WorldState; events: WorldTickResult['events'] } {
     const events: WorldTickResult['events'] = []
     for (let day = fromDay; day <= toDay; day++) {
       const r = midnight(s, day)
@@ -146,15 +191,31 @@ describe('desirePathsSystem: overgrowth', () => {
 
 describe('world_grown moves the counters with the ground', () => {
   it('translates both sparse maps when the origin shifts', () => {
-    const s = { ...meadow(['...', '.p.', '...']), traffic: { [trafficKey(1, 1)]: 10 }, quietSince: { [trafficKey(1, 1)]: 4 } }
-    const grown = fold(s, ev('world_grown', {
-      edge: 'w', depth: 2, tiles: Array.from({ length: 3 }, () => [0, 0]),
-    }), CFG)
+    const s = {
+      ...meadow(['...', '.p.', '...']),
+      traffic: { [trafficKey(1, 1)]: 10 },
+      quietSince: { [trafficKey(1, 1)]: 4 },
+    }
+    const grown = fold(
+      s,
+      ev('world_grown', {
+        edge: 'w',
+        depth: 2,
+        tiles: Array.from({ length: 3 }, () => [0, 0]),
+      }),
+      CFG,
+    )
     expect(grown.traffic).toEqual({ [trafficKey(3, 1)]: 10 })
     expect(grown.quietSince).toEqual({ [trafficKey(3, 1)]: 4 })
-    const south = fold(s, ev('world_grown', {
-      edge: 's', depth: 1, tiles: [[0, 0, 0]],
-    }), CFG)
+    const south = fold(
+      s,
+      ev('world_grown', {
+        edge: 's',
+        depth: 1,
+        tiles: [[0, 0, 0]],
+      }),
+      CFG,
+    )
     expect(south.traffic).toEqual({ [trafficKey(1, 1)]: 10 })
   })
 })

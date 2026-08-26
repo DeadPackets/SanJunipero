@@ -2,10 +2,24 @@ import { describe, it, expect } from 'vitest'
 import type { WorldState } from '@sj/engine'
 import { GAMIFICATION_BAN } from '../ui/townStats.js'
 import {
-  LANDMARK_INK, LANDMARK_LABEL_PX, LANDMARK_PAD_X, LANDMARK_PAD_Y, LANDMARK_PLATE,
-  LANDMARK_SHOW_BELOW_SCALE, LEGEND_INK_SHARE, SILHOUETTE_RANK,
-  TOWN_KINDS, landmarkAlpha, landmarkStyle, landmarksOf, leashOf, legendFits, placeLandmarks,
-  rectOfBounds, standingOf, type PlaceableMark,
+  LANDMARK_INK,
+  LANDMARK_LABEL_PX,
+  LANDMARK_PAD_X,
+  LANDMARK_PAD_Y,
+  LANDMARK_PLATE,
+  LANDMARK_SHOW_BELOW_SCALE,
+  LEGEND_INK_SHARE,
+  SILHOUETTE_RANK,
+  TOWN_KINDS,
+  landmarkAlpha,
+  landmarkStyle,
+  landmarksOf,
+  leashOf,
+  legendFits,
+  placeLandmarks,
+  rectOfBounds,
+  standingOf,
+  type PlaceableMark,
 } from './landmarks.js'
 import { AA_RATIO, bandRatios } from './legibility.js'
 import { ZOOM_STOPS, drawnBoundsOf } from './camera.js'
@@ -18,8 +32,15 @@ import type { Rect } from './tooltip.js'
 
 type S = { id: string; kind: string; x: number; y: number; w: number; h: number; stage: string }
 
-const stand = (id: string, kind: string, x: number, y: number, w = 1, h = 1): S =>
-  ({ id, kind, x, y, w, h, stage: 'complete' })
+const stand = (id: string, kind: string, x: number, y: number, w = 1, h = 1): S => ({
+  id,
+  kind,
+  x,
+  y,
+  w,
+  h,
+  stage: 'complete',
+})
 
 // The Task-59 town, in world coordinates at the showcase anchor {x:0,y:9}.
 const TOWN: S[] = [
@@ -41,9 +62,13 @@ const worldOf = (list: S[]): WorldState =>
 
 /** A placeable name whose subject is a small building standing where the name points. Every call
  *  site has to name a subject: a plate that does not know what it labels cannot be kept off it. */
-const mk = (
-  id: string, sx: number, sy: number, size: { w: number; h: number },
-): PlaceableMark => ({ id, sx, sy, size, of: [{ x: sx - 16, y: sy - 32, w: 32, h: 40 }] })
+const mk = (id: string, sx: number, sy: number, size: { w: number; h: number }): PlaceableMark => ({
+  id,
+  sx,
+  sy,
+  size,
+  of: [{ x: sx - 16, y: sy - 32, w: 32, h: 40 }],
+})
 
 const town = landmarksOf(worldOf(TOWN))
 
@@ -58,14 +83,21 @@ describe('landmarksOf', () => {
 
   it('anchors every district that has a building, and no district that does not', () => {
     const second = town.filter((l) => l.rank === 2)
-    expect(second.map((l) => l.name).sort())
-      .toEqual(['the fields', 'the houses', 'the landing', 'the square'])
+    expect(second.map((l) => l.name).sort()).toEqual([
+      'the fields',
+      'the houses',
+      'the landing',
+      'the square',
+    ])
     const noFarm = landmarksOf(worldOf(TOWN.filter((s) => s.kind !== 'shed')))
     expect(noFarm.some((l) => l.name === 'the fields')).toBe(false)
   })
 
   it('points out the notable single buildings', () => {
-    const third = town.filter((l) => l.rank === 3).map((l) => l.name).sort()
+    const third = town
+      .filter((l) => l.rank === 3)
+      .map((l) => l.name)
+      .sort()
     expect(third).toEqual(['the storehouse', 'the well'])
   })
 
@@ -74,7 +106,7 @@ describe('landmarksOf', () => {
   })
 
   it('ignores a building that is not finished', () => {
-    const half = TOWN.map((s) => s.kind === 'fire_pit' ? { ...s, stage: 'construction' } : s)
+    const half = TOWN.map((s) => (s.kind === 'fire_pit' ? { ...s, stage: 'construction' } : s))
     expect(landmarksOf(worldOf(half)).some((l) => l.rank === 1)).toBe(false)
   })
 
@@ -147,7 +179,8 @@ describe('two place names never land on each other', () => {
   it('separates the names that ask for the same point, and drops the ones with no room', () => {
     const size = { w: 120, h: 22 }
     const placed = placeLandmarks(
-      ['a', 'b', 'c', 'd'].map((id) => mk(id, 400, 300, size)), VIEW,
+      ['a', 'b', 'c', 'd'].map((id) => mk(id, 400, 300, size)),
+      VIEW,
     )
     expect(placed.length).toBeGreaterThanOrEqual(1)
     expect(placed.length, 'four captions for one building is not four captions').toBeLessThan(4)
@@ -161,8 +194,10 @@ describe('two place names never land on each other', () => {
   it('keeps every plate inside the view, wherever the landmark is', () => {
     const size = { w: 140, h: 22 }
     const marks = [
-      mk('nw', -50, -50, size), mk('ne', 900, 5, size),
-      mk('sw', 4, 700, size), mk('se', 1200, 900, size),
+      mk('nw', -50, -50, size),
+      mk('ne', 900, 5, size),
+      mk('sw', 4, 700, size),
+      mk('se', 1200, 900, size),
     ]
     for (const p of placeLandmarks(marks, VIEW)) {
       expect(p.rect.x, p.id).toBeGreaterThanOrEqual(VIEW.x)
@@ -173,10 +208,7 @@ describe('two place names never land on each other', () => {
   })
 
   it('is deterministic — two calls with the same marks agree', () => {
-    const marks = [
-      mk('a', 100, 100, { w: 90, h: 20 }),
-      mk('b', 108, 104, { w: 90, h: 20 }),
-    ]
+    const marks = [mk('a', 100, 100, { w: 90, h: 20 }), mk('b', 108, 104, { w: 90, h: 20 })]
     expect(placeLandmarks(marks, VIEW)).toEqual(placeLandmarks(marks, VIEW))
   })
 })
@@ -227,10 +259,13 @@ describe('placeLandmarks culls to the view', () => {
 
   it('an off-screen name never takes a placement slot from an on-screen one', () => {
     const alone = placeLandmarks([mk('a', 400, 300, size)], VIEW)
-    const crowded = placeLandmarks([
-      ...Array.from({ length: 50 }, (_, i) => mk(`off${i}`, 5000 + i, 5000, size)),
-      mk('a', 400, 300, size),
-    ], VIEW)
+    const crowded = placeLandmarks(
+      [
+        ...Array.from({ length: 50 }, (_, i) => mk(`off${i}`, 5000 + i, 5000, size)),
+        mk('a', 400, 300, size),
+      ],
+      VIEW,
+    )
     expect(crowded.find((o) => o.id === 'a')).toEqual(alone[0])
   })
 })
@@ -252,7 +287,8 @@ describe('★ the legend never covers the map it explains', () => {
   const templateTown = (rings: number): S[] => {
     const a = anchorFor(rings)
     return makeCityTemplate(a, rings).structures.map((s, i) =>
-      stand(`s${i}_${s.kind}`, s.kind, a.x + s.dx, a.y + s.dy, s.w, s.h))
+      stand(`s${i}_${s.kind}`, s.kind, a.x + s.dx, a.y + s.dy, s.w, s.h),
+    )
   }
 
   /** Every name the town derives, with the drawn box of what it names. `size` is in WORLD units,
@@ -265,7 +301,9 @@ describe('★ the legend never covers the map it explains', () => {
       const h = style.size + LANDMARK_PAD_Y * 2
       const b = drawnBoundsOf(m.of)
       return {
-        id: m.id, sx: (b.minX + b.maxX) / 2, sy: (b.minY + b.maxY) / 2,
+        id: m.id,
+        sx: (b.minX + b.maxX) / 2,
+        sy: (b.minY + b.maxY) / 2,
         size: { w: w / zoom, h: h / zoom },
         of: m.of.map((f) => rectOfBounds(drawnBoundsOf([f]))),
       }
@@ -321,8 +359,10 @@ describe('★ the legend never covers the map it explains', () => {
         const by = new Map(marks.map((m) => [m.id, m]))
         for (const p of placeLandmarks(marks, VIEW)) {
           const m = by.get(p.id)!
-          expect(overlaps(p.rect, leashOf(m.of, m.size)), `${what} at ${zoom}: ${p.id} walked off its place`)
-            .toBe(true)
+          expect(
+            overlaps(p.rect, leashOf(m.of, m.size)),
+            `${what} at ${zoom}: ${p.id} walked off its place`,
+          ).toBe(true)
         }
       }
     }
@@ -333,12 +373,15 @@ describe('★ the legend never covers the map it explains', () => {
     // The two pictures on file: 12.8 % of the settlement at 0.5, which two lanes approved,
     // and 51.2 % at 0.25, which two lanes photographed and called a defect.
     expect(legendFits(inkAt(town, 0.5), townAt(town, 0.5)), 'the approved 0.5 picture').toBe(true)
-    expect(legendFits(inkAt(town, 0.25), townAt(town, 0.25)), 'the covered 0.25 picture').toBe(false)
+    expect(legendFits(inkAt(town, 0.25), townAt(town, 0.25)), 'the covered 0.25 picture').toBe(
+      false,
+    )
   })
 
   it('★ it is the RATIO, not the stop: hold the legend, grow the town, the names come back', () => {
     const town = templateTown(1)
-    const ink = inkAt(town, 0.25), map = townAt(town, 0.25)
+    const ink = inkAt(town, 0.25),
+      map = townAt(town, 0.25)
     expect(legendFits(ink, map)).toBe(false)
     // The same legend over a settlement four times the drawn area — two rings of growth — at
     // the same stop. Nothing about the camera changed; the map got big enough to caption.
@@ -403,7 +446,8 @@ describe('a place name is never de-emphasised by transparency', () => {
 
   it('leaves no alpha on a landmark node', () => {
     const text = readFileSync(new URL('./landmarks.ts', import.meta.url), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
     expect(text).not.toMatch(/RANK_ALPHA/)
     // the LAYER still fades with the camera; nothing inside it has an opacity of its own
     expect([...text.matchAll(/\.alpha\s*=/g)]).toHaveLength(1)

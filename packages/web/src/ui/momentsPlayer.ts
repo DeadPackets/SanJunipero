@@ -1,5 +1,5 @@
 export const PLAY_SPEEDS = [1, 2, 4, 8] as const
-export type PlaySpeed = typeof PLAY_SPEEDS[number]
+export type PlaySpeed = (typeof PLAY_SPEEDS)[number]
 
 // At 1×, one sim minute every half second of real time — slow enough to read a street.
 export const MOMENT_STEP_MS = 500
@@ -19,7 +19,12 @@ export function idlePlayer(startTick: number, speed: PlaySpeed = 1): PlayerState
   return { status: 'idle', tick: startTick, speed, accMs: 0 }
 }
 
-export function tickPlayer(prev: PlayerState, deltaMs: number, startTick: number, endTick: number): PlayerState {
+export function tickPlayer(
+  prev: PlayerState,
+  deltaMs: number,
+  startTick: number,
+  endTick: number,
+): PlayerState {
   if (prev.status !== 'playing') return prev
   const acc = prev.accMs + Math.max(0, deltaMs)
   const steps = Math.floor(acc / MOMENT_STEP_MS)
@@ -31,7 +36,12 @@ export function tickPlayer(prev: PlayerState, deltaMs: number, startTick: number
   return { status: 'playing', tick, speed: prev.speed, accMs }
 }
 
-export function seekPlayer(prev: PlayerState, frac: number, startTick: number, endTick: number): PlayerState {
+export function seekPlayer(
+  prev: PlayerState,
+  frac: number,
+  startTick: number,
+  endTick: number,
+): PlayerState {
   const f = clamp(frac, 0, 1)
   return {
     status: prev.status,

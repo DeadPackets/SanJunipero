@@ -25,7 +25,7 @@ const judge: JudgeFn = makeVlmJudge({ apiKey: KEY, refSheets: [STYLE_ANCHOR] })
 const PROMPT =
   'High-detail character concept art in a warm storybook box-art style, full body, ' +
   'three-quarter view, soft painterly rendering with rich material detail. This image ' +
-  'establishes the character\'s costume, exact palette and accessories for a cozy ' +
+  "establishes the character's costume, exact palette and accessories for a cozy " +
   'pixel-art village game (warm cozy pastel: cream stone, honey wood, sage green, dusty rose). ' +
   `Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ` +
   'Plain soft warm background, single character only, no text, no logos.'
@@ -36,8 +36,16 @@ async function generate(): Promise<Buffer> {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL, prompt: PROMPT, size: '1024x1024', response_format: 'b64_json',
-      input_references: [{ type: 'image_url', image_url: { url: `data:image/png;base64,${STYLE_ANCHOR.toString('base64')}` } }],
+      model: MODEL,
+      prompt: PROMPT,
+      size: '1024x1024',
+      response_format: 'b64_json',
+      input_references: [
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${STYLE_ANCHOR.toString('base64')}` },
+        },
+      ],
       usage: { include: true },
     }),
   })
@@ -54,17 +62,31 @@ const report: string[] = ['== character concept candidates (HUMAN PICK REQUIRED)
 for (let i = 0; i < 2; i++) {
   const path = `${DURABLE}/concept-c${i}.png`
   let raw: Buffer
-  if (existsSync(path)) { raw = readFileSync(path); console.log(`concept-c${i}: reusing cached raw`) }
-  else {
-    try { raw = await generate() }
-    catch (e) { if (e instanceof BudgetExceededError) { report.push(`c${i}: SKIPPED (budget)`); break } throw e }
+  if (existsSync(path)) {
+    raw = readFileSync(path)
+    console.log(`concept-c${i}: reusing cached raw`)
+  } else {
+    try {
+      raw = await generate()
+    } catch (e) {
+      if (e instanceof BudgetExceededError) {
+        report.push(`c${i}: SKIPPED (budget)`)
+        break
+      }
+      throw e
+    }
     writeFileSync(path, raw)
     console.log(`concept-c${i}: generated, total spend $${budget.total.toFixed(3)}`)
   }
   const v = await judge(raw)
   report.push(`c${i}: score=${v.score} (comparative only — judge is pixel-art biased) — ${v.notes}`)
 }
-report.push('', 'pick one and pass it to the sprite/portrait scripts as: --concept ' + `${DURABLE}/concept-c<i>.png`,
-  '', `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`)
+report.push(
+  '',
+  'pick one and pass it to the sprite/portrait scripts as: --concept ' +
+    `${DURABLE}/concept-c<i>.png`,
+  '',
+  `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`,
+)
 writeFileSync(`${DURABLE}/report.txt`, report.join('\n'))
 console.log(report.join('\n'))

@@ -9,7 +9,11 @@ import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
 import {
-  validateBuildingAlignment, footprintDiamond, testGridRender, toTargetCell, SEAT_CRITERION_PROMPT,
+  validateBuildingAlignment,
+  footprintDiamond,
+  testGridRender,
+  toTargetCell,
+  SEAT_CRITERION_PROMPT,
 } from '../src/alignment.js'
 import { scratch } from './scratch.js'
 
@@ -22,19 +26,40 @@ const config = loadForgeConfig()
 const apiKey = process.env.OPENROUTER_API_KEY
 mkdirSync(join(C13, 'audit'), { recursive: true })
 
-type Manifest = { kind: string; footprint: { w: number; h: number }; cell: { w: number; h: number; feetX: number; feetY: number } }
+type Manifest = {
+  kind: string
+  footprint: { w: number; h: number }
+  cell: { w: number; h: number; feetX: number; feetY: number }
+}
 
-type Row = { id: string; ok: boolean; failures: string[]; measured: Record<string, number>; diamond: Record<string, number>; seat?: { score: number; evidence: string; pass: boolean } }
+type Row = {
+  id: string
+  ok: boolean
+  failures: string[]
+  measured: Record<string, number>
+  diamond: Record<string, number>
+  seat?: { score: number; evidence: string; pass: boolean }
+}
 
 const rows: Row[] = []
 for (const id of BUILDINGS) {
   const dir = join(C5, `building-${id}`)
-  const cellPath = join(dir, 'cell.png'), manPath = join(dir, 'manifest.json')
-  if (!existsSync(cellPath) || !existsSync(manPath)) { console.error(`MISSING ${id}`); process.exit(1) }
+  const cellPath = join(dir, 'cell.png'),
+    manPath = join(dir, 'manifest.json')
+  if (!existsSync(cellPath) || !existsSync(manPath)) {
+    console.error(`MISSING ${id}`)
+    process.exit(1)
+  }
   const man = JSON.parse(readFileSync(manPath, 'utf8')) as Manifest
   const { img, cell } = toTargetCell(await decodePng(readFileSync(cellPath)), man)
   const r = validateBuildingAlignment(img, man.footprint, config.alignment, cell)
-  rows.push({ id, ok: r.ok, failures: r.failures, measured: r.measured, diamond: footprintDiamond(man.footprint, cell) })
+  rows.push({
+    id,
+    ok: r.ok,
+    failures: r.failures,
+    measured: r.measured,
+    diamond: footprintDiamond(man.footprint, cell),
+  })
   console.log(`  ${r.ok ? 'PASS' : 'FAIL'} ${id.padEnd(16)} ${r.failures.join('; ')}`)
 }
 
@@ -50,11 +75,20 @@ if (apiKey) {
     const grid = testGridRender(img, man.footprint)
     writeFileSync(join(C13, 'audit', 'seat', `${row.id}.png`), await encodePng(grid))
     const { verdict, costUsd } = await judge({
-      assetId: `seat:${row.id}`, klass: 'building', sprite: grid, attempt: 1,
+      assetId: `seat:${row.id}`,
+      klass: 'building',
+      sprite: grid,
+      attempt: 1,
       commission: `${man.kind} on its footprint diamond. ${SEAT_CRITERION_PROMPT}`,
-      footprint: man.footprint, expectedFacing: 'door to the south-west',
+      footprint: man.footprint,
+      expectedFacing: 'door to the south-west',
     })
-    ledger.append({ assetId: `seat:${row.id}`, kind: 'vision_qa', model: verdict.model, usd: costUsd })
+    ledger.append({
+      assetId: `seat:${row.id}`,
+      kind: 'vision_qa',
+      model: verdict.model,
+      usd: costUsd,
+    })
     ledger.flush()
     row.seat = {
       score: verdict.criteria.alignment.score,
@@ -75,14 +109,29 @@ const md = [
   '',
   '| building | pixel | bottomY | nearVertexY | base x | diamond x | seat | failures |',
   '|---|---|---|---|---|---|---|---|',
-  ...rows.map(r => `| ${r.id} | ${r.ok ? 'PASS' : '**FAIL**'} | ${r.measured.bottomY} | ${r.diamond.nearVertexY} | ${r.measured.baseLeft}..${r.measured.baseRight} | ${r.diamond.leftX}..${r.diamond.rightX} | ${r.seat ? r.seat.score : '—'} | ${r.failures.join('; ') || '—'} |`),
+  ...rows.map(
+    (r) =>
+      `| ${r.id} | ${r.ok ? 'PASS' : '**FAIL**'} | ${r.measured.bottomY} | ${r.diamond.nearVertexY} | ${r.measured.baseLeft}..${r.measured.baseRight} | ${r.diamond.leftX}..${r.diamond.rightX} | ${r.seat ? r.seat.score : '—'} | ${r.failures.join('; ') || '—'} |`,
+  ),
   '',
-  ...(rows.some(r => r.seat) ? ['## Seat evidence', '', ...rows.filter(r => r.seat).map(r => `- \`${r.id}\` (${r.seat!.score}): ${r.seat!.evidence}`), ''] : []),
+  ...(rows.some((r) => r.seat)
+    ? [
+        '## Seat evidence',
+        '',
+        ...rows
+          .filter((r) => r.seat)
+          .map((r) => `- \`${r.id}\` (${r.seat!.score}): ${r.seat!.evidence}`),
+        '',
+      ]
+    : []),
 ].join('\n')
 
 writeFileSync(join(C13, 'audit', 'align-audit.md'), md)
 console.log(`\nwrote ${join(C13, 'audit', 'align-audit.md')}`)
 
-const failed = rows.filter(r => !r.ok)
-if (failed.length) { console.error(`\nCI GATE FAILED: ${failed.length}/${rows.length} buildings misaligned`); process.exit(1) }
+const failed = rows.filter((r) => !r.ok)
+if (failed.length) {
+  console.error(`\nCI GATE FAILED: ${failed.length}/${rows.length} buildings misaligned`)
+  process.exit(1)
+}
 console.log(`\nCI GATE PASSED: ${rows.length}/${rows.length} buildings aligned`)

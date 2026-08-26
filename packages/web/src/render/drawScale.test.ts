@@ -23,7 +23,9 @@ function forgeNumber(file: string, name: string): number {
   const src = readFileSync(resolve(FORGE, file), 'utf8')
   // `52 * BUILDING_ZOOM_STOP` is one of these: a literal 156 would satisfy the arithmetic while
   // losing the reason, so the reference is followed.
-  const m = new RegExp(`export const ${name}\\s*=\\s*([0-9]+)(?:\\s*\\*\\s*([A-Z_][0-9A-Z_]*))?`).exec(src)
+  const m = new RegExp(
+    `export const ${name}\\s*=\\s*([0-9]+)(?:\\s*\\*\\s*([A-Z_][0-9A-Z_]*))?`,
+  ).exec(src)
   expect(m, `${name} is no longer declared in forge/src/${file}`).not.toBeNull()
   const base = Number(m![1])
   if (m![2] === undefined) return base
@@ -61,19 +63,29 @@ type Row = { klass: string; authoredPx: number; drawnPx: number; where: string }
 function drawTable(): Row[] {
   const rows: Row[] = [
     {
-      klass: 'item, in the world', authoredPx: WORLD_SPRITE_PX, drawnPx: ITEM_PX,
+      klass: 'item, in the world',
+      authoredPx: WORLD_SPRITE_PX,
+      drawnPx: ITEM_PX,
       where: 'entities.ts ITEM_PX',
     },
     {
-      klass: 'item, inventory icon', authoredPx: ICON_PX, drawnPx: HOLD_ICON_CSS_PX,
+      klass: 'item, inventory icon',
+      authoredPx: ICON_PX,
+      drawnPx: HOLD_ICON_CSS_PX,
       where: 'chrome.css .hold-icon',
     },
     {
-      klass: 'cast cell', authoredPx: CHAR_FIGURE_PX, drawnPx: CHAR_TARGET_PX,
+      klass: 'cast cell',
+      authoredPx: CHAR_FIGURE_PX,
+      drawnPx: CHAR_TARGET_PX,
       where: 'charAnim.ts CHAR_TARGET_PX',
     },
   ]
-  for (const [w, h] of [[1, 1], [1, 2], [2, 2]] as const) {
+  for (const [w, h] of [
+    [1, 1],
+    [1, 2],
+    [2, 2],
+  ] as const) {
     rows.push({
       klass: `furnishing ${w}x${h}, in a room`,
       authoredPx: spanOn(w, h, INTERIOR_TILE.w),
@@ -96,7 +108,9 @@ function drawTable(): Row[] {
  *  the forge's numbers are. */
 const HOLD_ICON_CSS_PX = (() => {
   const css = readFileSync(
-    resolve(fileURLToPath(new URL('.', import.meta.url)), '../ui/chrome.css'), 'utf8')
+    resolve(fileURLToPath(new URL('.', import.meta.url)), '../ui/chrome.css'),
+    'utf8',
+  )
   const m = /\.hold-icon \{\s*flex: none; width: ([0-9]+)px; height: ([0-9]+)px;/.exec(css)
   if (m === null) throw new Error('.hold-icon no longer declares its own size in chrome.css')
   if (m[1] !== m[2]) throw new Error(`.hold-icon is not square: ${m[1]} x ${m[2]}`)
@@ -108,9 +122,11 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
     const rows = drawTable().map((r) => {
       const f = factorOf(r.authoredPx, r.drawnPx)
       const ok = isWholeDownscale(r.authoredPx, r.drawnPx) ? 'ok  ' : '★BAD'
-      return `${ok} ${r.klass.padEnd(26)} authored ${String(r.authoredPx).padStart(4)} px`
-        + ` -> drawn ${String(r.drawnPx).padStart(4)} px  = ${f.toFixed(3).padStart(7)}x`
-        + `   (${r.where})`
+      return (
+        `${ok} ${r.klass.padEnd(26)} authored ${String(r.authoredPx).padStart(4)} px` +
+        ` -> drawn ${String(r.drawnPx).padStart(4)} px  = ${f.toFixed(3).padStart(7)}x` +
+        `   (${r.where})`
+      )
     })
     // eslint-disable-next-line no-console
     console.log(`DRAW SCALE — authored size over world size\n${rows.join('\n')}`)
@@ -121,8 +137,8 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
     it(`${r.klass}: ${r.authoredPx} px authored, drawn at ${r.drawnPx} px`, () => {
       expect(
         isWholeDownscale(r.authoredPx, r.drawnPx),
-        `${r.where}: ${r.authoredPx} / ${r.drawnPx} = ${factorOf(r.authoredPx, r.drawnPx)}`
-        + ' — not a whole number, so the art is resampled onto a grid it was not drawn on',
+        `${r.where}: ${r.authoredPx} / ${r.drawnPx} = ${factorOf(r.authoredPx, r.drawnPx)}` +
+          ' — not a whole number, so the art is resampled onto a grid it was not drawn on',
       ).toBe(true)
     })
   }
@@ -152,7 +168,13 @@ describe('★ the room draws library art at NATIVE size — no upscale and no do
   })
 
   it('★ it is the SAME factor for every footprint — a bed and a bowl agree about the room', () => {
-    for (const [w, h] of [[1, 1], [1, 2], [2, 1], [2, 2], [3, 2]] as const) {
+    for (const [w, h] of [
+      [1, 1],
+      [1, 2],
+      [2, 1],
+      [2, 2],
+      [3, 2],
+    ] as const) {
       const authored = spanOn(w, h, INTERIOR_TILE.w)
       const ground = spanOn(w, h, INTERIOR_TILE.w)
       expect(authored / ground).toBe(furnishingDivisor())

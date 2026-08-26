@@ -3,14 +3,14 @@ import { cullByBox, type ViewRect } from './cull.js'
 import { depthOrder, type DepthBox } from './depth.js'
 
 export const LAYERS = [
-  'ground',        // the baked terrain field
-  'groundDecal',   // patch outlines, furrows, overlay tints, water shimmer, tree canopies
-  'shadow',        // every contact shadow, for every body and every structure
-  'entities',      // THE ONLY depth-sorted layer: bodies, structures, items, crops
-  'overhead',      // smoke, hearth glow, fire, birds — drawn over the thing they belong to
-  'worldText',     // name tags, hover tags, emotes, landmark labels
-  'bubbles',       // speech and thought
-  'overlay',       // selection rings and reading aids that answer to no pointer
+  'ground', // the baked terrain field
+  'groundDecal', // patch outlines, furrows, overlay tints, water shimmer, tree canopies
+  'shadow', // every contact shadow, for every body and every structure
+  'entities', // THE ONLY depth-sorted layer: bodies, structures, items, crops
+  'overhead', // smoke, hearth glow, fire, birds — drawn over the thing they belong to
+  'worldText', // name tags, hover tags, emotes, landmark labels
+  'bubbles', // speech and thought
+  'overlay', // selection rings and reading aids that answer to no pointer
 ] as const
 export type LayerName = (typeof LAYERS)[number]
 export type LayerSet = Readonly<Record<LayerName, Container>>
@@ -72,13 +72,15 @@ function authorised(path: string): boolean {
 
 /** Every line that assigns a zIndex from a file that has no business doing so, as
  *  `path:line — text`. A regression names its own call site. */
-export function literalZIndexOffenders(files: ReadonlyArray<{ path: string; source: string }>): string[] {
+export function literalZIndexOffenders(
+  files: ReadonlyArray<{ path: string; source: string }>,
+): string[] {
   const out: string[] = []
   for (const f of files) {
     if (authorised(f.path)) continue
     f.source.split('\n').forEach((line, i) => {
       const code = line.trim()
-      if (code.startsWith('//') || code.startsWith('*')) return   // a comment may say the old number
+      if (code.startsWith('//') || code.startsWith('*')) return // a comment may say the old number
       if (Z_ASSIGN.test(code)) out.push(`${f.path}:${i + 1} — ${code}`)
     })
   }

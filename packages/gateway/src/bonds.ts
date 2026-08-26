@@ -1,7 +1,13 @@
 import type Database from 'better-sqlite3'
 import {
-  bondId, foldBond,
-  type Bond, type BondFold, type BondKind, type BondsResponse, type SimConfig, type SimEvent,
+  bondId,
+  foldBond,
+  type Bond,
+  type BondFold,
+  type BondKind,
+  type BondsResponse,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
@@ -13,11 +19,20 @@ import { toEvent, type EventRow } from './http.js'
 // the viewer can name the six acts without reading the server.
 export { BOND_NOTES } from '@sj/shared'
 
-const VERB_BONDS: Readonly<Record<string, BondKind>> = { give: 'owe', teach: 'work', attack: 'rival' }
+const VERB_BONDS: Readonly<Record<string, BondKind>> = {
+  give: 'owe',
+  teach: 'work',
+  attack: 'rival',
+}
 
 /** The whole of what `buildBonds` folds; every other type falls through its chain untouched. */
-export const BOND_TYPES: readonly string[] =
-  ['agent_spoke', 'action_started', 'action_completed', 'co_slept', 'agent_born']
+export const BOND_TYPES: readonly string[] = [
+  'agent_spoke',
+  'action_started',
+  'action_completed',
+  'co_slept',
+  'agent_born',
+]
 
 export type BondsDeps = {
   db: Database.Database
@@ -29,14 +44,21 @@ export type BondsDeps = {
  * A bond is folded, not accumulated (`foldBond` in `@sj/shared`): what is kept per pair is a
  * 24-act window, six rollup rows and three scalars — a constant, whatever the town's age.
  */
-export function buildBonds(events: Iterable<SimEvent>, earshot: number, asOfTick: number): BondsResponse {
+export function buildBonds(
+  events: Iterable<SimEvent>,
+  earshot: number,
+  asOfTick: number,
+): BondsResponse {
   const drafts = new Map<string, BondFold>()
 
   const tie = (a: string, b: string, kind: BondKind, tick: number): void => {
     if (a === b) return
     const id = bondId(a, b)
     let fold = drafts.get(id)
-    if (fold === undefined) { fold = foldBond(a, b, asOfTick); drafts.set(id, fold) }
+    if (fold === undefined) {
+      fold = foldBond(a, b, asOfTick)
+      drafts.set(id, fold)
+    }
     fold.add(kind, tick)
   }
 
@@ -85,18 +107,20 @@ export function buildBonds(events: Iterable<SimEvent>, earshot: number, asOfTick
 export function mountBondsApi(router: Router, deps: BondsDeps): void {
   const selEvents = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events WHERE type IN (${BOND_TYPES.map(() => '?').join(', ')})
-     ORDER BY seq`)
+     ORDER BY seq`,
+  )
   // A filtered scan per generation; see seqCache.ts for why a public stream cannot pay one per viewer.
   const cache = makeSeqCache(() => deps.mirror.seq())
 
-  const bonds = (): BondsResponse => cache.value('bonds', () => {
-    // Streamed, so the rows and the parsed events are never both fully materialised: measured on
-    // this shape at 86.9 MB of retained log, see the fold note in `api.ts`.
-    const events = function* (): Generator<SimEvent> {
-      for (const r of selEvents.iterate(...BOND_TYPES) as Iterable<EventRow>) yield toEvent(r)
-    }
-    return buildBonds(events(), deps.config.movement.earshotRadius, deps.mirror.state().tick)
-  })
+  const bonds = (): BondsResponse =>
+    cache.value('bonds', () => {
+      // Streamed, so the rows and the parsed events are never both fully materialised: measured on
+      // this shape at 86.9 MB of retained log, see the fold note in `api.ts`.
+      const events = function* (): Generator<SimEvent> {
+        for (const r of selEvents.iterate(...BOND_TYPES) as Iterable<EventRow>) yield toEvent(r)
+      }
+      return buildBonds(events(), deps.config.movement.earshotRadius, deps.mirror.state().tick)
+    })
 
   router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', bonds)))
 
@@ -104,8 +128,13 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
    * How many bonds there are without sending the bonds: a `Bond` carries its whole `history`,
    * and the badge polls. The panel and the badge share one memoised build.
    */
-  router.route('GET', '/api/bonds/count', (_req, res) => sendPrebuilt(res, cache.json('bonds-count', () => {
-    const b = bonds()
-    return { count: b.bonds.length, asOfTick: b.asOfTick }
-  })))
+  router.route('GET', '/api/bonds/count', (_req, res) =>
+    sendPrebuilt(
+      res,
+      cache.json('bonds-count', () => {
+        const b = bonds()
+        return { count: b.bonds.length, asOfTick: b.asOfTick }
+      }),
+    ),
+  )
 }

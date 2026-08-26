@@ -13,14 +13,21 @@ import { createWorldTick } from './worldTick.js'
 // by a world law. Both must behave identically, which is what the effective config buys.
 
 const BASE = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
-const cfg = (over: Record<string, unknown> = {}): SimConfig => SimConfigSchema.parse({ ...BASE, ...over })
+const cfg = (over: Record<string, unknown> = {}): SimConfig =>
+  SimConfigSchema.parse({ ...BASE, ...over })
 const ON = cfg()
 const ACTIONS = RngStream.seed('offstate', 'actions')
 
 let seq = 60000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (): TileId[][] => Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+const MAP = (): TileId[][] =>
+  Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
 
 // Fold the law straight in: the same shape the tick-boundary drain produces.
 const legislate = (s: WorldState, path: string, value: unknown, config = ON): WorldState =>
@@ -35,15 +42,31 @@ describe('§19 off-state: reproduction.enabled', () => {
   // Two sleepers in one complete house: co_slept fires at every midnight when the flag is on.
   function couple(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
-    for (const [id, sex] of [['a1', 'f'], ['a2', 'm']] as const) {
+    for (const [id, sex] of [
+      ['a1', 'f'],
+      ['a2', 'm'],
+    ] as const) {
       s = fold(s, ev('agent_spawned', { id, name: id, x: 4, y: 6, ageDays: 30 * 364, sex }), config)
       s = fold(s, ev('agent_slept', { agentId: id }), config)
     }
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
-    }), config)
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 4,
+        y: 4,
+        w: 2,
+        h: 2,
+        maxHp: 20,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      config,
+    )
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), config)
-    for (const id of ['a1', 'a2']) s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }), config)
+    for (const id of ['a1', 'a2'])
+      s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }), config)
     return s
   }
 
@@ -73,7 +96,11 @@ describe('§19 off-state: aging.deathOfOldAgeEnabled', () => {
   // Certain death: an ancient body under a per-day chance of 1 dies at the next midnight.
   const CERTAIN = cfg({ aging: { naturalDeathBaseChancePerDay: 1 } })
   const ancient = (config: SimConfig): WorldState =>
-    fold(genesisState(config, MAP()), ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 90 * 364 }), config)
+    fold(
+      genesisState(config, MAP()),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 90 * 364 }),
+      config,
+    )
 
   const agesButLives = (state: WorldState, config: SimConfig): void => {
     const res = tickAt(state, MINUTES_PER_DAY, config)
@@ -83,7 +110,9 @@ describe('§19 off-state: aging.deathOfOldAgeEnabled', () => {
   }
 
   it('on, the old die', () => {
-    expect(tickAt(ancient(CERTAIN), MINUTES_PER_DAY, CERTAIN).events.map((e) => e.type)).toContain('agent_died')
+    expect(tickAt(ancient(CERTAIN), MINUTES_PER_DAY, CERTAIN).events.map((e) => e.type)).toContain(
+      'agent_died',
+    )
   })
 
   it('off in the base config, bodies still age and nobody dies of it', () => {
@@ -99,9 +128,17 @@ describe('§19 off-state: aging.deathOfOldAgeEnabled', () => {
 describe('§19 off-state: spoilage.enabled', () => {
   // A fish stamped on day 0 with a 2-day life is overdue from day 2 onward.
   const withFish = (config: SimConfig): WorldState =>
-    fold(genesisState(config, MAP()), ev('item_spawned', {
-      id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'tile', x: 2, y: 2 }, spoilage: { spawnDay: 0, days: 2 },
-    }), config)
+    fold(
+      genesisState(config, MAP()),
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'tile', x: 2, y: 2 },
+        spoilage: { spawnDay: 0, days: 2 },
+      }),
+      config,
+    )
 
   const liveThrough = (s: WorldState, days: number, config: SimConfig): WorldState => {
     let acc = s
@@ -145,7 +182,9 @@ describe('§19 off-state: mystery.enabled', () => {
   })
 
   it('off by law, the same', () => {
-    expect(fired(legislate(genesisState(CERTAIN, MAP()), 'mystery.enabled', false, CERTAIN), CERTAIN)).toBe(false)
+    expect(
+      fired(legislate(genesisState(CERTAIN, MAP()), 'mystery.enabled', false, CERTAIN), CERTAIN),
+    ).toBe(false)
   })
 })
 
@@ -155,16 +194,36 @@ describe('§19 off-state: occlusion.enabled', () => {
     let s = genesisState(config, MAP())
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }), config)
     s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 8, ageDays: 7300 }), config)
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
-    }), config)
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 4,
+        y: 4,
+        w: 2,
+        h: 2,
+        maxHp: 20,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      config,
+    )
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), config)
     return fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), config)
   }
-  const spoke = ev('agent_spoke', { agentId: 'a1', text: 'inside words', x: 4, y: 4, insideId: 'structure_1' })
+  const spoke = ev('agent_spoke', {
+    agentId: 'a1',
+    text: 'inside words',
+    x: 4,
+    y: 4,
+    insideId: 'structure_1',
+  })
 
   const hearsThroughTheWall = (s: WorldState, config: SimConfig): void => {
-    expect(composePerception(s, config, 'a2', [spoke]).heard.map((h) => h.text)).toEqual(['inside words'])
+    expect(composePerception(s, config, 'a2', [spoke]).heard.map((h) => h.text)).toEqual([
+      'inside words',
+    ])
     // The flag drops the wall, not the distance: out of earshot is still out of earshot.
     const far = { ...s, agents: { ...s.agents, a2: { ...s.agents.a2!, x: 4, y: 20 } } }
     expect(composePerception(far, config, 'a2', [spoke]).heard).toEqual([])
@@ -187,7 +246,9 @@ describe('§19 off-state: occlusion.enabled', () => {
     const s = legislate(acrossAWall(ON), 'occlusion.enabled', false)
     expect(s.agents.a1!.insideId).toBe('structure_1')
     expect(composePerception(s, ON, 'a1', []).visible.agents).toEqual([])
-    expect(composePerception(s, ON, 'a1', []).visible.structures.map((x) => x.id)).toEqual(['structure_1'])
+    expect(composePerception(s, ON, 'a1', []).visible.structures.map((x) => x.id)).toEqual([
+      'structure_1',
+    ])
     expect(composePerception(s, ON, 'a2', []).visible.agents).toEqual([])
   })
 })
@@ -197,13 +258,27 @@ describe('§19 off-state: ownership.enabled', () => {
     let s = genesisState(config, MAP())
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: 7300 }), config)
     s = fold(s, ev('agent_spawned', { id: 'a2', name: 'Omar', x: 3, y: 2, ageDays: 7300 }), config)
-    return fold(s, ev('item_spawned', {
-      id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'tile', x: 2, y: 2 }, owner: 'a1',
-    }), config)
+    return fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'bread',
+        qty: 1,
+        loc: { t: 'tile', x: 2, y: 2 },
+        owner: 'a1',
+      }),
+      config,
+    )
   }
   // The one caller of onComplete is actionsSystem, which passes ctx.config — the effective one.
   const taking = (s: WorldState, config: SimConfig): string[] =>
-    VERBS.take!.onComplete(s, effectiveConfig(config, s.laws), 'a2', { itemId: 'item_1' }, ACTIONS).map((e) => e.type)
+    VERBS.take!.onComplete(
+      s,
+      effectiveConfig(config, s.laws),
+      'a2',
+      { itemId: 'item_1' },
+      ACTIONS,
+    ).map((e) => e.type)
 
   const inert = (s: WorldState, config: SimConfig): void => {
     expect(taking(s, config)).toEqual(['item_moved'])
@@ -231,9 +306,21 @@ describe('§19 off-state: inscription.enabled', () => {
   function stone(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 6, y: 2, ageDays: 7300 }), config)
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'standing_stone', x: 4, y: 1, w: 2, h: 2, maxHp: 20, flammable: false, builderId: 'a1',
-    }), config)
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'structure_1',
+        kind: 'standing_stone',
+        x: 4,
+        y: 1,
+        w: 2,
+        h: 2,
+        maxHp: 20,
+        flammable: false,
+        builderId: 'a1',
+      }),
+      config,
+    )
     return fold(s, ev('structure_completed', { id: 'structure_1' }), config)
   }
   const params = { structureId: 'structure_1', text: 'we came from the river' }
@@ -249,8 +336,15 @@ describe('§19 off-state: inscription.enabled', () => {
   })
 
   it('off by law, the same', () => {
-    expect(submitIntent(legislate(stone(ON), 'inscription.enabled', false), ON, 'a1', 'inscribe', params))
-      .toMatchObject(refused)
+    expect(
+      submitIntent(
+        legislate(stone(ON), 'inscription.enabled', false),
+        ON,
+        'a1',
+        'inscribe',
+        params,
+      ),
+    ).toMatchObject(refused)
   })
 
   it('off, write and read on notes are untouched — those are C2 physics, not this flag', () => {
@@ -263,7 +357,17 @@ describe('§19: the effective config reaches the verb and perception seams', () 
   it('a law flip changes what submitIntent and composePerception do, with the base config unchanged', () => {
     let s = genesisState(ON, MAP())
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: 7300 }), ON)
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'tile', x: 2, y: 2 }, owner: 'a1' }), ON)
+    s = fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'bread',
+        qty: 1,
+        loc: { t: 'tile', x: 2, y: 2 },
+        owner: 'a1',
+      }),
+      ON,
+    )
     expect(composePerception(s, ON, 'a1', []).visible.items[0]!.ownerName).toBe('Rahel')
     const after = legislate(s, 'ownership.enabled', false)
     expect(composePerception(after, ON, 'a1', []).visible.items[0]!.ownerName).toBeUndefined()

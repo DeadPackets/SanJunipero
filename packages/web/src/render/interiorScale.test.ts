@@ -2,13 +2,28 @@ import { describe, expect, it } from 'vitest'
 import { INTERIOR_KINDS } from '@sj/shared'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import {
-  ADULT_HEIGHT_M, INTERIOR_BODY_PX, INTERIOR_PX_PER_M, INTERIOR_PX_SCALE, INTERIOR_TILE,
-  ROOM_TILES, WALL_H_PX, groundRunPx, interiorToScreen, seatLiftPx, slotToTile,
+  ADULT_HEIGHT_M,
+  INTERIOR_BODY_PX,
+  INTERIOR_PX_PER_M,
+  INTERIOR_PX_SCALE,
+  INTERIOR_TILE,
+  ROOM_TILES,
+  WALL_H_PX,
+  groundRunPx,
+  interiorToScreen,
+  seatLiftPx,
+  slotToTile,
 } from './interiorMap.js'
 import { ROOM_ZOOM, roomCropPx, roomZoomFor } from './roomShell.js'
 import {
-  BED_FOOTPRINT, FURNITURE_OCCUPANCY, interiorBodyScale, interiorPieces, roomFurnishings,
-  roomSizeOf, slotGridOf, type PlacedItem,
+  BED_FOOTPRINT,
+  FURNITURE_OCCUPANCY,
+  interiorBodyScale,
+  interiorPieces,
+  roomFurnishings,
+  roomSizeOf,
+  slotGridOf,
+  type PlacedItem,
 } from './interiors.js'
 
 // THE COMPOSITION GUARD — the laws a per-element test cannot see. The per-element laws were all
@@ -29,7 +44,7 @@ const bodyPx = (): number => INTERIOR_BODY_PX * ROOM_ZOOM
 const SHIPPED_BODY_PX = CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM
 
 describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length', () => {
-  it('★ YOU CAN STAND UP IN IT: a body is shorter than the room\'s own wall', () => {
+  it("★ YOU CAN STAND UP IN IT: a body is shorter than the room's own wall", () => {
     // The wall art is 160 px and is authored as a room: wainscot, dado rail, a door that reaches
     // the floor line, a mantel. A person fills between three fifths and four fifths of it.
     const ratio = bodyPx() / (WALL_H_PX * ROOM_ZOOM)
@@ -52,7 +67,7 @@ describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length
     expect(lying / bedRun).toBeGreaterThanOrEqual(0.6)
 
     // ★ ON THE SHIPPED PICTURE the sleeper was HALF AGAIN the length of the bed.
-    expect(SHIPPED_BODY_PX * LYING_OVER_STANDING / bedRun).toBeGreaterThan(1.4)
+    expect((SHIPPED_BODY_PX * LYING_OVER_STANDING) / bedRun).toBeGreaterThan(1.4)
   })
 
   it('★ NOR A DOLL: a body is taller than the floor tile it stands on is deep', () => {
@@ -77,7 +92,7 @@ describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length
   it('★ and it is a DOWNSCALE of the cast atlas, never an upscale', () => {
     // A body must not give back what the furniture composite won: the shipped atlas figure is
     // 954 px, so every scale here is far under 1 and the new one is further under than the old.
-    const FIGURE_H = 954              // cast/omar/manifest.json
+    const FIGURE_H = 954 // cast/omar/manifest.json
     const cell = CHAR_TARGET_PX / FIGURE_H
     expect(interiorBodyScale(cell)).toBeLessThan(1)
     expect(interiorBodyScale(cell)).toBeLessThan(cell * INTERIOR_PX_SCALE)
@@ -111,8 +126,9 @@ describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', (
         expect(tile.y, `${kind}/${f.kind} is inside the room`).toBeLessThan(room.h)
         // a 1x1 or 1x2 furnishing's sprite is (w+h)x64 px; nothing in the vocabulary is bigger
         // than the wall it stands against
-        expect(bodyPx(), `${kind}/${f.kind}: a body fits under the wall`)
-          .toBeLessThan(WALL_H_PX * ROOM_ZOOM)
+        expect(bodyPx(), `${kind}/${f.kind}: a body fits under the wall`).toBeLessThan(
+          WALL_H_PX * ROOM_ZOOM,
+        )
       }
     }
   })
@@ -123,20 +139,28 @@ describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', (
     for (const h of [400, 678, 734, 900, 1440, 2000]) expect(roomZoomFor(h)).toBe(ROOM_ZOOM)
     for (const k of [0.5, 1, 2, 3.7]) {
       expect((INTERIOR_BODY_PX * k) / (WALL_H_PX * k)).toBeCloseTo(INTERIOR_BODY_PX / WALL_H_PX, 10)
-      expect((INTERIOR_BODY_PX * k) / (groundRunPx(2) * k))
-        .toBeCloseTo(INTERIOR_BODY_PX / groundRunPx(2), 10)
+      expect((INTERIOR_BODY_PX * k) / (groundRunPx(2) * k)).toBeCloseTo(
+        INTERIOR_BODY_PX / groundRunPx(2),
+        10,
+      )
     }
   })
 })
 
 describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', () => {
-  const item = (kind: string, h: number): PlacedItem =>
-    ({ kind, tile: { x: 5, y: 2 }, meta: { slots: { w: 1, h }, placement: 'floor', interiorKinds: ['house'] } })
+  const item = (kind: string, h: number): PlacedItem => ({
+    kind,
+    tile: { x: 5, y: 2 },
+    meta: { slots: { w: 1, h }, placement: 'floor', interiorKinds: ['house'] },
+  })
 
   it('★ both halves are anchored on the WHOLE piece, not on their own half', () => {
     // `interiorPieces` pushes the front half's TILE half a footprint nearer the viewer so a body
     // sorts between the halves; spending that a SECOND time as a position tears the piece in two.
-    for (const [kind, h] of [['chair', 1], ['bed', 2]] as const) {
+    for (const [kind, h] of [
+      ['chair', 1],
+      ['bed', 2],
+    ] as const) {
       const pieces = interiorPieces([item(kind, h)], [])
       const back = pieces.find((p) => p.half === 'back')!
       const front = pieces.find((p) => p.half === 'front')!
@@ -160,12 +184,14 @@ describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', (
     for (const texH of [128, 192, 193, 96]) {
       const cut = Math.round(texH / 2)
       const foot = 0
-      const frontTop = foot - (texH - cut), frontBottom = foot
-      const backBottom = foot - (texH - cut), backTop = backBottom - cut
-      expect(backBottom).toBe(frontTop)                 // butt, not gap and not overlap
-      expect(backTop).toBe(foot - texH)                 // the top of the whole sprite
-      expect(frontBottom).toBe(foot)                    // the bottom of it
-      expect((frontBottom - frontTop) + (backBottom - backTop)).toBe(texH)
+      const frontTop = foot - (texH - cut),
+        frontBottom = foot
+      const backBottom = foot - (texH - cut),
+        backTop = backBottom - cut
+      expect(backBottom).toBe(frontTop) // butt, not gap and not overlap
+      expect(backTop).toBe(foot - texH) // the top of the whole sprite
+      expect(frontBottom).toBe(foot) // the bottom of it
+      expect(frontBottom - frontTop + (backBottom - backTop)).toBe(texH)
     }
   })
 })
@@ -190,8 +216,8 @@ describe('★ AND A BODY IN A BED IS ON THE MATTRESS', () => {
     // inside something you get INTO, where she lands almost entirely behind the bed's own front
     // half.
     const bedFootSy = interiorToScreen(9 + BED_FOOTPRINT.w / 2, 2 + BED_FOOTPRINT.h / 2).sy
-    const bedTexH = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)   // 192, authored
-    const blanket = bedFootSy - (bedTexH - Math.round(bedTexH / 2))   // top edge of the front half
+    const bedTexH = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2) // 192, authored
+    const blanket = bedFootSy - (bedTexH - Math.round(bedTexH / 2)) // top edge of the front half
     const lyingH = INTERIOR_BODY_PX * LYING_H_OVER_STANDING
     // she lies in the bed's FAR cell, feet-anchored, lifted onto the mattress
     const cell = interiorToScreen(9.5, 2.5).sy

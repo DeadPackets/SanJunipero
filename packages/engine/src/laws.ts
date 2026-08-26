@@ -86,7 +86,10 @@ export function effectiveConfig(base: SimConfig, laws?: Record<string, unknown>)
   for (const path of paths.sort()) withPath(out, path, laws[path])
   const derived = out as unknown as SimConfig
   let perBase = memo.get(laws)
-  if (perBase === undefined) { perBase = new WeakMap(); memo.set(laws, perBase) }
+  if (perBase === undefined) {
+    perBase = new WeakMap()
+    memo.set(laws, perBase)
+  }
   perBase.set(base, derived)
   return derived
 }

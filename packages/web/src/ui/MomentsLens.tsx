@@ -8,7 +8,12 @@ import { DirectorMode } from './DirectorMode.js'
 import { stripLayout } from './frame.js'
 import { thumbLabel, thumbMotif, thumbTitle } from './momentThumb.js'
 import {
-  idlePlayer, nextPlaySpeed, pausePlayer, playPlayer, seekPlayer, tickPlayer,
+  idlePlayer,
+  nextPlaySpeed,
+  pausePlayer,
+  playPlayer,
+  seekPlayer,
+  tickPlayer,
   type PlayerState,
 } from './momentsPlayer.js'
 import { EMPTY_COPY } from './townStats.js'
@@ -24,22 +29,72 @@ const clock = (tick: number): string => {
 // font. The town draws its own controls, in its own pixels.
 const CREAM = '#FFF6E9'
 const PLAY_PIXELS: ReadonlyArray<readonly [number, number]> = [
-  [2, 0], [2, 1], [3, 1], [2, 2], [3, 2], [4, 2], [2, 3], [3, 3], [4, 3], [5, 3],
-  [2, 4], [3, 4], [4, 4], [5, 4], [2, 5], [3, 5], [4, 5], [2, 6], [3, 6], [2, 7],
+  [2, 0],
+  [2, 1],
+  [3, 1],
+  [2, 2],
+  [3, 2],
+  [4, 2],
+  [2, 3],
+  [3, 3],
+  [4, 3],
+  [5, 3],
+  [2, 4],
+  [3, 4],
+  [4, 4],
+  [5, 4],
+  [2, 5],
+  [3, 5],
+  [4, 5],
+  [2, 6],
+  [3, 6],
+  [2, 7],
 ]
 const PAUSE_PIXELS: ReadonlyArray<readonly [number, number]> = [
-  [1, 0], [2, 0], [5, 0], [6, 0], [1, 1], [2, 1], [5, 1], [6, 1],
-  [1, 2], [2, 2], [5, 2], [6, 2], [1, 3], [2, 3], [5, 3], [6, 3],
-  [1, 4], [2, 4], [5, 4], [6, 4], [1, 5], [2, 5], [5, 5], [6, 5],
-  [1, 6], [2, 6], [5, 6], [6, 6], [1, 7], [2, 7], [5, 7], [6, 7],
+  [1, 0],
+  [2, 0],
+  [5, 0],
+  [6, 0],
+  [1, 1],
+  [2, 1],
+  [5, 1],
+  [6, 1],
+  [1, 2],
+  [2, 2],
+  [5, 2],
+  [6, 2],
+  [1, 3],
+  [2, 3],
+  [5, 3],
+  [6, 3],
+  [1, 4],
+  [2, 4],
+  [5, 4],
+  [6, 4],
+  [1, 5],
+  [2, 5],
+  [5, 5],
+  [6, 5],
+  [1, 6],
+  [2, 6],
+  [5, 6],
+  [6, 6],
+  [1, 7],
+  [2, 7],
+  [5, 7],
+  [6, 7],
 ]
 
 function TransportGlyph({ playing }: { playing: boolean }) {
   return (
     <svg
-      className="player-glyph" viewBox={`0 0 ${MOTIF_PX} ${MOTIF_PX}`}
-      width={MOTIF_PX * 2} height={MOTIF_PX * 2}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="player-glyph"
+      viewBox={`0 0 ${MOTIF_PX} ${MOTIF_PX}`}
+      width={MOTIF_PX * 2}
+      height={MOTIF_PX * 2}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {(playing ? PAUSE_PIXELS : PLAY_PIXELS).map(([x, y]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={CREAM} />
@@ -52,9 +107,13 @@ function Motif({ moment }: { moment: Moment }) {
   const motif = thumbMotif(moment)
   return (
     <svg
-      className="thumb-motif" viewBox={`0 0 ${MOTIF_PX} ${MOTIF_PX}`}
-      width={MOTIF_PX * 3} height={MOTIF_PX * 3}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="thumb-motif"
+      viewBox={`0 0 ${MOTIF_PX} ${MOTIF_PX}`}
+      width={MOTIF_PX * 3}
+      height={MOTIF_PX * 3}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {motif.pixels.map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -63,7 +122,12 @@ function Motif({ moment }: { moment: Moment }) {
   )
 }
 
-export function MomentCardView({ moment, people, open, onOpen }: {
+export function MomentCardView({
+  moment,
+  people,
+  open,
+  onOpen,
+}: {
   moment: Moment
   people: PeopleIndex
   open: boolean
@@ -97,7 +161,14 @@ export function MomentCardView({ moment, people, open, onOpen }: {
 /** The bottom band of the three-box stage frame (`frame.ts`). Pure by construction: the scroll
  *  offset comes from `stripLayout`, so where the strip has got to is a number a test can read. */
 export function MomentsFrameView({
-  moments, people, momentId, letterboxed, leaving, bandW, onOpen, children,
+  moments,
+  people,
+  momentId,
+  letterboxed,
+  leaving,
+  bandW,
+  onOpen,
+  children,
 }: {
   moments: Moment[] | null
   people: PeopleIndex
@@ -109,7 +180,11 @@ export function MomentsFrameView({
   children?: ReactNode
 }) {
   const days = moments ?? []
-  const { scrollX } = stripLayout(days.length, days.findIndex((m) => m.id === momentId), bandW)
+  const { scrollX } = stripLayout(
+    days.length,
+    days.findIndex((m) => m.id === momentId),
+    bandW,
+  )
 
   // The strip scrolls NATIVELY — which is how focus gets carried into view for free — and
   // `stripLayout` drives that scroll rather than replacing it, so opening a day still centres it.
@@ -128,7 +203,11 @@ export function MomentsFrameView({
           <ol ref={stripRef} className="strip-list" data-scroll-x={scrollX}>
             {days.map((m) => (
               <MomentCardView
-                key={m.id} moment={m} people={people} open={m.id === momentId} onOpen={onOpen}
+                key={m.id}
+                moment={m}
+                people={people}
+                open={m.id === momentId}
+                onOpen={onOpen}
               />
             ))}
           </ol>
@@ -139,7 +218,14 @@ export function MomentsFrameView({
   )
 }
 
-export function PlayerStripView({ moment, player, onToggle, onSeek, onSpeed, onLive }: {
+export function PlayerStripView({
+  moment,
+  player,
+  onToggle,
+  onSeek,
+  onSpeed,
+  onLive,
+}: {
   moment: Moment
   player: PlayerState
   onToggle: () => void
@@ -161,11 +247,15 @@ export function PlayerStripView({ moment, player, onToggle, onSeek, onSpeed, onL
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
-      e.key === 'ArrowLeft' ? -1 / span
-      : e.key === 'ArrowRight' ? 1 / span
-      : e.key === 'Home' ? -1
-      : e.key === 'End' ? 1
-      : null
+      e.key === 'ArrowLeft'
+        ? -1 / span
+        : e.key === 'ArrowRight'
+          ? 1 / span
+          : e.key === 'Home'
+            ? -1
+            : e.key === 'End'
+              ? 1
+              : null
     if (step === null) return
     e.preventDefault()
     onSeek(Math.abs(step) === 1 ? (step + 1) / 2 : frac + step)
@@ -203,15 +293,29 @@ export function PlayerStripView({ moment, player, onToggle, onSeek, onSpeed, onL
         <span className="player-head" style={{ left: `${frac * 100}%` }} />
       </div>
       <span className="player-clock">{clock(player.tick)}</span>
-      <button className="player-btn speed" aria-label={`Speed ${player.speed} times. Change speed.`} onClick={onSpeed}>
+      <button
+        className="player-btn speed"
+        aria-label={`Speed ${player.speed} times. Change speed.`}
+        onClick={onSpeed}
+      >
         {player.speed}×
       </button>
-      <button className="player-btn live" onClick={onLive}>LIVE</button>
+      <button className="player-btn live" onClick={onLive}>
+        LIVE
+      </button>
     </div>
   )
 }
 
-export function MomentsLens({ store, handle, scene, momentId, televised, leaving, onOpen }: {
+export function MomentsLens({
+  store,
+  handle,
+  scene,
+  momentId,
+  televised,
+  leaving,
+  onOpen,
+}: {
   store: WorldStore
   handle: ObservatoryHandle | null
   scene: Scene | null
@@ -235,8 +339,12 @@ export function MomentsLens({ store, handle, scene, momentId, televised, leaving
       .then((parsed) => {
         if (alive && parsed?.success === true) setMoments(parsed.data.moments)
       })
-      .catch(() => { /* the town is still watchable without its record */ })
-    return () => { alive = false }
+      .catch(() => {
+        /* the town is still watchable without its record */
+      })
+    return () => {
+      alive = false
+    }
   }, [])
 
   // ResizeObserver rather than a window listener: the stage narrows when a side panel opens
@@ -328,7 +436,11 @@ export function MomentsLens({ store, handle, scene, momentId, televised, leaving
             player={player}
             onToggle={() =>
               setPlayer((prev) =>
-                prev.status === 'playing' ? pausePlayer(prev) : playPlayer(prev, open.startTick, open.endTick))}
+                prev.status === 'playing'
+                  ? pausePlayer(prev)
+                  : playPlayer(prev, open.startTick, open.endTick),
+              )
+            }
             onSeek={seek}
             onSpeed={() => setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))}
             onLive={goLive}

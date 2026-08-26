@@ -1,5 +1,10 @@
 import { kindWords } from './broadcastReady.js'
-import { CHRONICLE_FALLBACK_ICON, chronicleLine, type ChronicleLookup, type SimEvent } from '@sj/shared'
+import {
+  CHRONICLE_FALLBACK_ICON,
+  chronicleLine,
+  type ChronicleLookup,
+  type SimEvent,
+} from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
 // Shares `chronicleLine` with the gateway, so a live event and a chronicle entry read as the same
@@ -18,23 +23,47 @@ export function chronicleLabel(ev: SimEvent, state: WorldState | null): string |
 
 // The same law the weather strip follows: palette hexes on an 8×8 grid, never an emoji, whose
 // shape and colour would belong to the reader's font rather than to the town.
-export type ChronicleGlyph = { label: string; pixels: ReadonlyArray<readonly [number, number, string]> }
+export type ChronicleGlyph = {
+  label: string
+  pixels: ReadonlyArray<readonly [number, number, string]>
+}
 
-const INK = '#43394A', EMBER = '#E8785A', HONEY = '#F2C879', SAGE = '#93B573'
-const ROSE = '#C47876', WATER = '#7FB0C9', STONE = '#ABA198', SAND = '#E8D5BC'
+const INK = '#43394A',
+  EMBER = '#E8785A',
+  HONEY = '#F2C879',
+  SAGE = '#93B573'
+const ROSE = '#C47876',
+  WATER = '#7FB0C9',
+  STONE = '#ABA198',
+  SAND = '#E8D5BC'
 
 // Every fill a glyph may use — all MASTER_PALETTE members, asserted as a set by the tests.
 export const GLYPH_PALETTE: readonly string[] = [INK, EMBER, HONEY, SAGE, ROSE, WATER, STONE, SAND]
 
 const px = (
-  fill: string, ...cells: ReadonlyArray<readonly [number, number]>
+  fill: string,
+  ...cells: ReadonlyArray<readonly [number, number]>
 ): Array<readonly [number, number, string]> => cells.map(([x, y]) => [x, y, fill] as const)
 
 export const CHRONICLE_GLYPH: Record<string, ChronicleGlyph> = {
   cross: {
     label: 'a death',
     pixels: [
-      ...px(INK, [3, 1], [4, 1], [3, 2], [4, 2], [3, 3], [4, 3], [3, 4], [4, 4], [3, 5], [4, 5], [3, 6], [4, 6]),
+      ...px(
+        INK,
+        [3, 1],
+        [4, 1],
+        [3, 2],
+        [4, 2],
+        [3, 3],
+        [4, 3],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [4, 5],
+        [3, 6],
+        [4, 6],
+      ),
       ...px(INK, [1, 3], [2, 3], [5, 3], [6, 3]),
     ],
   },
@@ -104,8 +133,23 @@ export const CHRONICLE_GLYPH: Record<string, ChronicleGlyph> = {
     label: 'a discovery',
     pixels: [
       // the ward, INK — the whole silhouette survives the warm pixel being removed
-      ...px(INK, [2, 1], [3, 1], [4, 1], [1, 2], [5, 2], [1, 3], [5, 3],
-        [2, 4], [3, 4], [4, 4], [3, 5], [3, 6], [4, 6], [3, 7]),
+      ...px(
+        INK,
+        [2, 1],
+        [3, 1],
+        [4, 1],
+        [1, 2],
+        [5, 2],
+        [1, 3],
+        [5, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [3, 6],
+        [4, 6],
+        [3, 7],
+      ),
       ...px(HONEY, [3, 2], [3, 3]),
     ],
   },

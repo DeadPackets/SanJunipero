@@ -31,8 +31,16 @@ export * from './forge.js'
 export * from './terrainManifest.js'
 export * from './emotes.js'
 export {
-  FACINGS, POSES_V2, WALK_POSES_V2, STRIP_POSES_V2, CELL_V2, FEET_Y_V2, SHEET_W_V2, SHEET_H_V2,
-  type Facing, type PoseV2,
+  FACINGS,
+  POSES_V2,
+  WALK_POSES_V2,
+  STRIP_POSES_V2,
+  CELL_V2,
+  FEET_Y_V2,
+  SHEET_W_V2,
+  SHEET_H_V2,
+  type Facing,
+  type PoseV2,
 } from './sheet.js'
 export { packCharacterAtlas } from './atlasV4.js'
 export { CELL_NAMES_V4, WALK_CYCLE_V4, WALK_FRAME_MS } from './mirror.js'

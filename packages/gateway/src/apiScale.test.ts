@@ -10,7 +10,9 @@ import { mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler, Router } from './server.js'
 
-const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 16 }, () =>
+  Array.from({ length: 16 }, () => 0 as TileId),
+)
 
 type EventRead = { via: 'all' | 'iterate'; rows: number }
 
@@ -36,7 +38,10 @@ function spyOnEventReads(db: Database.Database): EventRead[] {
       st.iterate = function* (...a: unknown[]): Iterable<unknown> {
         const read: EventRead = { via: 'iterate', rows: 0 }
         reads.push(read)
-        for (const row of realIterate(...a)) { read.rows++; yield row }
+        for (const row of realIterate(...a)) {
+          read.rows++
+          yield row
+        }
       }
       return st
     },
@@ -50,7 +55,11 @@ const collect = (): { router: Router; call: (key: string) => void } => {
   const routes = new Map<string, RouteHandler>()
   const res = { writeHead: () => {}, end: () => {} } as unknown as ServerResponse
   return {
-    router: { route: (m, p, fn) => { routes.set(`${m} ${p}`, fn) } },
+    router: {
+      route: (m, p, fn) => {
+        routes.set(`${m} ${p}`, fn)
+      },
+    },
     call: (key) => routes.get(key)!({ url: '/' } as IncomingMessage, res, {}),
   }
 }
@@ -58,11 +67,25 @@ const collect = (): { router: Router; call: (key: string) => void } => {
 /** One route's body from a freshly mounted api over `db`. */
 const bodyOf = (db: Database.Database, mirror: WorldMirror, path: string): string => {
   const routes = new Map<string, RouteHandler>()
-  mountDataApi({ route: (m, p, fn) => { routes.set(`${m} ${p}`, fn) } },
-    { db, mirror, config: DEFAULT_CONFIG })
+  mountDataApi(
+    {
+      route: (m, p, fn) => {
+        routes.set(`${m} ${p}`, fn)
+      },
+    },
+    { db, mirror, config: DEFAULT_CONFIG },
+  )
   let body = ''
-  routes.get(`GET ${path}`)!({ url: path } as IncomingMessage,
-    { writeHead: () => {}, end: (b: string) => { body = b } } as unknown as ServerResponse, {})
+  routes.get(`GET ${path}`)!(
+    { url: path } as IncomingMessage,
+    {
+      writeHead: () => {},
+      end: (b: string) => {
+        body = b
+      },
+    } as unknown as ServerResponse,
+    {},
+  )
   return body
 }
 
@@ -79,10 +102,13 @@ describe('★ the read API reads the tick, not the history', () => {
     const worldDb = openDb(dbPath)
     const store = new EventStore(worldDb)
     const loop = new TickLoop({
-      store, state: genesisState(DEFAULT_CONFIG, GRASS), rng: new RngStreams('scale'),
+      store,
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('scale'),
       snapshotEveryTicks: 1000,
       onTick: ({ tick, emit }) => {
-        if (tick === 1) emit('agent_spawned', { id: 'alice', name: 'Alice', x: 1, y: 1, ageDays: 7300 })
+        if (tick === 1)
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 1, y: 1, ageDays: 7300 })
         emit('agent_spoke', { agentId: 'alice', x: 1, y: 1, text: 'hello' })
       },
     })
@@ -112,8 +138,9 @@ describe('★ the read API reads the tick, not the history', () => {
     const secondRead = rowsRead(rows)
 
     expect(secondRead, 'a second generation must cost the tick, not the town').toBeLessThan(20)
-    expect(secondRead, 'and it must be exactly the events that tick appended')
-      .toBe(store.lastSeq() - total)
+    expect(secondRead, 'and it must be exactly the events that tick appended').toBe(
+      store.lastSeq() - total,
+    )
 
     // …and appending gives byte-identical answers to reading the whole log once
     const fresh = new Database(dbPath, { readonly: true })

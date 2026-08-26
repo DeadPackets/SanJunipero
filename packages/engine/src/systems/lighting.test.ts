@@ -8,8 +8,11 @@ import { VERBS } from '../verbs.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 
 const quiet = {
-  weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 },
-  mapGrowth: { enabled: false }, fauna: { enabled: false }, desirePaths: { enabled: false },
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
+  fauna: { enabled: false },
+  desirePaths: { enabled: false },
 }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, light: { enabled: false } })
@@ -17,29 +20,51 @@ const BURN = CFG.light.torchBurnTicks
 const FUEL = CFG.light.fuelBurnTicks
 
 let seq = 97000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
-const map = (): TileId[][] => Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
+const map = (): TileId[][] =>
+  Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
 
 function bodyAt(tick: number, config = CFG): WorldState {
   let s = genesisState(config, map())
   s = fold(s, ev('tick_advanced', {}, tick), config)
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick),
+    config,
+  )
 }
 const holding = (s: WorldState, id: string, kind: string, config = CFG): WorldState =>
   fold(s, ev('item_spawned', { id, kind, qty: 1, loc: { t: 'agent', id: 'a1' } }, s.tick), config)
 
-function apply(s: WorldState, verb: string, params: Record<string, unknown>, config = CFG): WorldState {
+function apply(
+  s: WorldState,
+  verb: string,
+  params: Record<string, unknown>,
+  config = CFG,
+): WorldState {
   const r = submitIntent(s, config, 'a1', verb, params)
   if (!r.ok) throw new Error(r.reason)
   const done = VERBS[verb]!.onComplete(s, config, 'a1', params, new RngStreams('li').get('actions'))
   let out = s
-  for (const e of [...r.events, { type: 'action_completed', payload: { agentId: 'a1', verb } }, ...done]) {
+  for (const e of [
+    ...r.events,
+    { type: 'action_completed', payload: { agentId: 'a1', verb } },
+    ...done,
+  ]) {
     out = fold(out, ev(e.type, e.payload, s.tick), config)
   }
   return out
 }
 function tickOnce(s: WorldState, config = CFG): WorldTickResult {
-  return createWorldTick(config, new RngStreams('li'))(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
+  return createWorldTick(
+    config,
+    new RngStreams('li'),
+  )(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 
 describe('kindle: a torch burns for exactly as long as it has fuel', () => {
@@ -68,7 +93,9 @@ describe('kindle: a torch burns for exactly as long as it has fuel', () => {
   })
 
   it('refuses what will not take a flame, what is already lit, and what is spent', () => {
-    const wood = submitIntent(holding(bodyAt(0), 'item_1', 'wood'), CFG, 'a1', 'kindle', { itemId: 'item_1' })
+    const wood = submitIntent(holding(bodyAt(0), 'item_1', 'wood'), CFG, 'a1', 'kindle', {
+      itemId: 'item_1',
+    })
     expect(wood.ok).toBe(false)
     if (!wood.ok) expect(wood.reason).toBe('that will not take a flame')
 
@@ -83,7 +110,9 @@ describe('kindle: a torch burns for exactly as long as it has fuel', () => {
     expect(dead.ok).toBe(false)
     if (!dead.ok) expect(dead.reason).toBe('it is burnt out')
 
-    const idle = submitIntent(holding(bodyAt(0), 'item_1', 'torch'), CFG, 'a1', 'snuff', { itemId: 'item_1' })
+    const idle = submitIntent(holding(bodyAt(0), 'item_1', 'torch'), CFG, 'a1', 'snuff', {
+      itemId: 'item_1',
+    })
     expect(idle.ok).toBe(false)
     if (!idle.ok) expect(idle.reason).toBe('it is not lit')
   })
@@ -92,9 +121,25 @@ describe('kindle: a torch burns for exactly as long as it has fuel', () => {
 describe('stoke: a fire is warm for as long as somebody feeds it', () => {
   const withPit = (config = CFG): WorldState => {
     let s = bodyAt(0, config)
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'fire_pit', x: 5, y: 4, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a1',
-    }, s.tick), config)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_1',
+          kind: 'fire_pit',
+          x: 5,
+          y: 4,
+          w: 1,
+          h: 1,
+          maxHp: 10,
+          flammable: false,
+          builderId: 'a1',
+        },
+        s.tick,
+      ),
+      config,
+    )
     return fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), config)
   }
 
@@ -118,9 +163,25 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     // This case used to be a house, and that was the defect: a house holds a hearth, so `stoke`
     // answered "there is no fire there to feed". A WELL is a building with no fire in it.
     let well = holding(bodyAt(0), 'item_1', 'wood')
-    well = fold(well, ev('structure_planned', {
-      id: 'structure_2', kind: 'well', x: 5, y: 4, w: 1, h: 1, maxHp: 30, flammable: false, builderId: 'a1',
-    }, well.tick), CFG)
+    well = fold(
+      well,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_2',
+          kind: 'well',
+          x: 5,
+          y: 4,
+          w: 1,
+          h: 1,
+          maxHp: 30,
+          flammable: false,
+          builderId: 'a1',
+        },
+        well.tick,
+      ),
+      CFG,
+    )
     well = fold(well, ev('structure_completed', { id: 'structure_2' }, well.tick), CFG)
     const wrong = submitIntent(well, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
     expect(wrong.ok).toBe(false)
@@ -131,9 +192,25 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
   // took a {structureId} and no structure was ever a hearth. A house holds exactly one.
   it('★ a house holds a fire, and the same wood feeds it', () => {
     let s = holding(bodyAt(0), 'item_1', 'wood')
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, s.tick), CFG)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_2',
+          kind: 'house',
+          x: 5,
+          y: 4,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'a1',
+        },
+        s.tick,
+      ),
+      CFG,
+    )
     s = fold(s, ev('structure_completed', { id: 'structure_2' }, s.tick), CFG)
     const fed = apply(s, 'stoke', { structureId: 'structure_2' })
     expect(fed.structures.structure_2!.fueledUntilTick).toBe(FUEL)
@@ -142,24 +219,66 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
 
   it('★ and a body standing INSIDE it is at that fire, wherever in the room it stands', () => {
     let s = holding(bodyAt(0), 'item_1', 'wood')
-    s = fold(s, ev('structure_planned', {
-      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, s.tick), CFG)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_2',
+          kind: 'house',
+          x: 5,
+          y: 4,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'a1',
+        },
+        s.tick,
+      ),
+      CFG,
+    )
     s = fold(s, ev('structure_completed', { id: 'structure_2' }, s.tick), CFG)
     // Standing far away and indoors: the reach that answers is the ROOM, not the footprint.
     s = fold(s, ev('agent_moved', { id: 'a1', x: 0, y: 0 }, s.tick), CFG)
     s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_2' }, s.tick), CFG)
-    expect(apply(s, 'stoke', { structureId: 'structure_2' }).structures.structure_2!.fueledUntilTick).toBe(FUEL)
+    expect(
+      apply(s, 'stoke', { structureId: 'structure_2' }).structures.structure_2!.fueledUntilTick,
+    ).toBe(FUEL)
 
     // ★ VACUOUS GUARD: a wall stops a pair of hands. Inside SOMEWHERE ELSE is not at this fire,
     // even standing on the very tile that would reach it from out under the sky.
-    let other = fold(s, ev('structure_planned', {
-      id: 'structure_3', kind: 'house', x: 8, y: 8, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, s.tick), CFG)
+    let other = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'structure_3',
+          kind: 'house',
+          x: 8,
+          y: 8,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'a1',
+        },
+        s.tick,
+      ),
+      CFG,
+    )
     other = fold(other, ev('structure_completed', { id: 'structure_3' }, other.tick), CFG)
-    other = fold(other, ev('agent_exited', { agentId: 'a1', structureId: 'structure_2' }, other.tick), CFG)
+    other = fold(
+      other,
+      ev('agent_exited', { agentId: 'a1', structureId: 'structure_2' }, other.tick),
+      CFG,
+    )
     other = fold(other, ev('agent_moved', { id: 'a1', x: 4, y: 4 }, other.tick), CFG)
-    other = fold(other, ev('agent_entered', { agentId: 'a1', structureId: 'structure_3' }, other.tick), CFG)
+    other = fold(
+      other,
+      ev('agent_entered', { agentId: 'a1', structureId: 'structure_3' }, other.tick),
+      CFG,
+    )
     const walled = submitIntent(other, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
     expect(walled.ok).toBe(false)
     if (!walled.ok) expect(walled.reason).toBe('not close enough to the fire')
@@ -168,18 +287,24 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
 
 describe('the lighting law', () => {
   it('does nothing at all when the world says light is off', () => {
-    const lit = apply(holding(bodyAt(0, OFF), 'item_1', 'torch', OFF), 'kindle', { itemId: 'item_1' }, OFF)
+    const lit = apply(
+      holding(bodyAt(0, OFF), 'item_1', 'torch', OFF),
+      'kindle',
+      { itemId: 'item_1' },
+      OFF,
+    )
     const out = tickOnce({ ...lit, tick: BURN + 10 }, OFF)
     expect(out.events.some((e) => e.type === 'item_burned_out')).toBe(false)
     expect(out.state.items.item_1).toBeDefined()
   })
 
-  it('folding the tick\'s own events reproduces the state it returned', () => {
+  it("folding the tick's own events reproduces the state it returned", () => {
     const lit = apply(holding(bodyAt(0), 'item_1', 'torch'), 'kindle', { itemId: 'item_1' })
     const start = { ...lit, tick: BURN }
     const out = tickOnce(start)
     let replayed = fold(start, ev('tick_advanced', {}, start.tick + 1), CFG)
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, start.tick + 1), CFG)
+    for (const e of out.events)
+      replayed = fold(replayed, ev(e.type, e.payload, start.tick + 1), CFG)
     expect(replayed.items).toEqual(out.state.items)
   })
 })

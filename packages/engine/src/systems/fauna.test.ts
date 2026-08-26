@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_SEASON, MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_SEASON,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import type { RngState, RngStreams } from '../rng.js'
@@ -8,7 +15,11 @@ import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { FAUNA_SPAWN_CHANCE } from './fauna.js'
 
 // Nothing else may speak at dawn or midnight: no weather turn, no rumour, no wider map.
-const QUIET = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mapGrowth: { enabled: false } }
+const QUIET = {
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
+}
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const OFF: SimConfig = SimConfigSchema.parse({ ...QUIET, fauna: { enabled: false } })
 
@@ -28,16 +39,26 @@ function forced(values: number[]): RngStreams {
 // grass, forest, water — the three habitats, and dirt for a tile nothing wants.
 const CHAR_TILE: Record<string, TileId> = { '.': 0, f: 3, w: 2, d: 1 }
 let seq = 31000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function world(rows: string[], config = CFG): WorldState {
-  return genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+  return genesisState(
+    config,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
 }
 
 const MEADOW = ['.........', '.........', '.........', '.........', '.........']
 
 function withFauna(
-  s: WorldState, scatter: Array<{ id: string; kind: string; x: number; y: number; stock?: number }>, config = CFG,
+  s: WorldState,
+  scatter: Array<{ id: string; kind: string; x: number; y: number; stock?: number }>,
+  config = CFG,
 ): WorldState {
   for (const f of scatter) s = fold(s, ev('fauna_spawned', f), config)
   return s
@@ -85,32 +106,49 @@ describe('fauna: absence is the default', () => {
 
 describe('fauna: the flee and the wander', () => {
   it('a deer three tiles from a body runs, and it runs two tiles', () => {
-    const s = withAgent(withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 5, y: 2 }]), 2, 2)
+    const s = withAgent(
+      withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 5, y: 2 }]),
+      2,
+      2,
+    )
     expect(CFG.fauna.fleeRadius).toBe(4)
     const out = beat(s, 4, forced([0]))
-    expect(typed(out, 'fauna_moved').map((e) => e.payload))
-      .toEqual([{ moves: [{ id: 'fauna_1', x: 7, y: 2 }] }])
+    expect(typed(out, 'fauna_moved').map((e) => e.payload)).toEqual([
+      { moves: [{ id: 'fauna_1', x: 7, y: 2 }] },
+    ])
     expect(out.state.fauna!.fauna_1).toMatchObject({ x: 7, y: 2 })
   })
 
   it('a deer five tiles away has not noticed, and wanders one tile on the roll it was given', () => {
-    const s = withAgent(withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 7, y: 2 }]), 2, 2)
+    const s = withAgent(
+      withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 7, y: 2 }]),
+      2,
+      2,
+    )
     // STEPS[4] is due south: roll 0.5 of eight directions.
     const out = beat(s, 4, forced([0.5]))
-    expect(typed(out, 'fauna_moved').map((e) => e.payload))
-      .toEqual([{ moves: [{ id: 'fauna_1', x: 7, y: 3 }] }])
+    expect(typed(out, 'fauna_moved').map((e) => e.payload)).toEqual([
+      { moves: [{ id: 'fauna_1', x: 7, y: 3 }] },
+    ])
   })
 
   it('a body will not wander off its own ground', () => {
     // Rabbit ground is grass and dirt; the forest row to the south is no place for it.
-    const s = withFauna(world(['...', '...', 'fff']), [{ id: 'fauna_1', kind: 'rabbit', x: 1, y: 1 }])
+    const s = withFauna(world(['...', '...', 'fff']), [
+      { id: 'fauna_1', kind: 'rabbit', x: 1, y: 1 },
+    ])
     expect(typed(beat(s, 4, forced([0.5])), 'fauna_moved')).toEqual([])
   })
 
   it('the payload alone reproduces the positions — the fold never touches the stream', () => {
-    const s = withAgent(withFauna(world(MEADOW), [
-      { id: 'fauna_1', kind: 'deer', x: 5, y: 2 }, { id: 'fauna_2', kind: 'rabbit', x: 6, y: 3 },
-    ]), 2, 2)
+    const s = withAgent(
+      withFauna(world(MEADOW), [
+        { id: 'fauna_1', kind: 'deer', x: 5, y: 2 },
+        { id: 'fauna_2', kind: 'rabbit', x: 6, y: 3 },
+      ]),
+      2,
+      2,
+    )
     const out = beat(s, 4, forced([0]))
     let replayed = { ...s, tick: 4 }
     for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 4), CFG)
@@ -118,10 +156,16 @@ describe('fauna: the flee and the wander', () => {
   })
 
   it('moves on the beat and on no tick between two beats', () => {
-    const s = withAgent(withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 5, y: 2 }]), 2, 2)
+    const s = withAgent(
+      withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'deer', x: 5, y: 2 }]),
+      2,
+      2,
+    )
     expect(CFG.fauna.movePeriodTicks).toBe(4)
-    for (const tick of [4, 8, 12]) expect(typed(beat(s, tick, forced([0])), 'fauna_moved')).toHaveLength(1)
-    for (const tick of [5, 6, 7]) expect(typed(beat(s, tick, forced([0])), 'fauna_moved')).toEqual([])
+    for (const tick of [4, 8, 12])
+      expect(typed(beat(s, tick, forced([0])), 'fauna_moved')).toHaveLength(1)
+    for (const tick of [5, 6, 7])
+      expect(typed(beat(s, tick, forced([0])), 'fauna_moved')).toEqual([])
   })
 })
 
@@ -142,7 +186,9 @@ describe('fauna: the dawn regen', () => {
 
   it('a school arrives as a school; a deer arrives alone', () => {
     const out = beat(world(['ww', 'ww']), DAWN, ALWAYS())
-    const born = typed(out, 'fauna_spawned').map((e) => e.payload as { kind: string; stock?: number })
+    const born = typed(out, 'fauna_spawned').map(
+      (e) => e.payload as { kind: string; stock?: number },
+    )
     expect(born.every((b) => b.kind === 'fish')).toBe(true)
     expect(born[0]).toMatchObject({ kind: 'fish', stock: 1 })
     expect(out.state.fauna!.fauna_1!.stock).toBe(1)
@@ -157,13 +203,16 @@ describe('fauna: the dawn regen', () => {
   })
 
   it('a roll above the chance puts nothing back', () => {
-    expect(typed(beat(world(MEADOW), DAWN, forced([FAUNA_SPAWN_CHANCE])), 'fauna_spawned')).toEqual([])
+    expect(typed(beat(world(MEADOW), DAWN, forced([FAUNA_SPAWN_CHANCE])), 'fauna_spawned')).toEqual(
+      [],
+    )
   })
 
   it('a rolled tile that is no habitat stays empty', () => {
     // All dirt: a deer has no ground here and a rabbit does.
-    const born = typed(beat(world(['dd', 'dd']), DAWN, forced([0])), 'fauna_spawned')
-      .map((e) => (e.payload as { kind: string }).kind)
+    const born = typed(beat(world(['dd', 'dd']), DAWN, forced([0])), 'fauna_spawned').map(
+      (e) => (e.payload as { kind: string }).kind,
+    )
     expect(born).not.toContain('deer')
     expect(born).toContain('rabbit')
   })
@@ -174,11 +223,15 @@ describe('fauna: what a body can see of it', () => {
 
   it('shows what is in sight, in id order, and nothing beyond it', () => {
     const far = CFG.movement.sightRadius + 1
-    const s = withAgent(withFauna(world(Array.from({ length: far + 2 }, () => '.'.repeat(far + 2))), [
-      { id: 'fauna_2', kind: 'rabbit', x: 1, y: 0 },
-      { id: 'fauna_1', kind: 'deer', x: 2, y: 0 },
-      { id: 'fauna_3', kind: 'rabbit', x: far, y: 0 },
-    ]), 0, 0)
+    const s = withAgent(
+      withFauna(world(Array.from({ length: far + 2 }, () => '.'.repeat(far + 2))), [
+        { id: 'fauna_2', kind: 'rabbit', x: 1, y: 0 },
+        { id: 'fauna_1', kind: 'deer', x: 2, y: 0 },
+        { id: 'fauna_3', kind: 'rabbit', x: far, y: 0 },
+      ]),
+      0,
+      0,
+    )
     expect(seen(s)).toEqual([
       { id: 'fauna_1', kind: 'deer', x: 2, y: 0 },
       { id: 'fauna_2', kind: 'rabbit', x: 1, y: 0 },
@@ -187,10 +240,30 @@ describe('fauna: what a body can see of it', () => {
 
   it('is empty in a world with no herd, and empty again behind four walls', () => {
     expect(seen(withAgent(world(MEADOW), 2, 2))).toEqual([])
-    const s = withAgent(withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'rabbit', x: 2, y: 3 }]), 2, 2)
-    const roofed = fold(fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'house', x: 1, y: 1, w: 3, h: 3, maxHp: 30, flammable: true, builderId: 'a1',
-    }), CFG), ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
+    const s = withAgent(
+      withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'rabbit', x: 2, y: 3 }]),
+      2,
+      2,
+    )
+    const roofed = fold(
+      fold(
+        s,
+        ev('structure_planned', {
+          id: 'structure_1',
+          kind: 'house',
+          x: 1,
+          y: 1,
+          w: 3,
+          h: 3,
+          maxHp: 30,
+          flammable: true,
+          builderId: 'a1',
+        }),
+        CFG,
+      ),
+      ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }),
+      CFG,
+    )
     expect(seen(roofed)).toEqual([])
   })
 })

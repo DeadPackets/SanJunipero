@@ -1,18 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import {
-  backToRoster, isSingleAgentView, navToLens, parseRoute, routeToPath, type Route,
+  backToRoster,
+  isSingleAgentView,
+  navToLens,
+  parseRoute,
+  routeToPath,
+  type Route,
 } from './route.js'
 
 describe('route', () => {
   it('parses a deep link with lens and agent', () => {
     expect(parseRoute('/moment/41/14:30', '?lens=inspector&agent=farmer')).toEqual({
-      lens: 'inspector', moment: { day: 41, time: '14:30' }, momentId: null, agentId: 'farmer', openId: null, broadcast: false,
+      lens: 'inspector',
+      moment: { day: 41, time: '14:30' },
+      momentId: null,
+      agentId: 'farmer',
+      openId: null,
+      broadcast: false,
     })
   })
 
   it('accepts the day-prefixed form', () => {
     expect(parseRoute('/moment/day41/14:30', '')).toEqual({
-      lens: 'map', moment: { day: 41, time: '14:30' }, momentId: null, agentId: null, openId: null, broadcast: false,
+      lens: 'map',
+      moment: { day: 41, time: '14:30' },
+      momentId: null,
+      agentId: null,
+      openId: null,
+      broadcast: false,
     })
   })
 
@@ -22,13 +37,25 @@ describe('route', () => {
   })
 
   it('defaults: root path, unknown lens', () => {
-    expect(parseRoute('/', '')).toEqual({ lens: 'map', moment: null, momentId: null, agentId: null, openId: null, broadcast: false })
+    expect(parseRoute('/', '')).toEqual({
+      lens: 'map',
+      moment: null,
+      momentId: null,
+      agentId: null,
+      openId: null,
+      broadcast: false,
+    })
     expect(parseRoute('/', '?lens=xray').lens).toBe('map')
   })
 
   it('parses a recorded day by its own id, and opens the lens that can play it', () => {
     expect(parseRoute('/moment/42', '')).toEqual({
-      lens: 'director', moment: null, momentId: 42, agentId: null, openId: null, broadcast: false,
+      lens: 'director',
+      moment: null,
+      momentId: 42,
+      agentId: null,
+      openId: null,
+      broadcast: false,
     })
     expect(parseRoute('/moment/42', '?lens=chronicle').lens).toBe('chronicle')
   })
@@ -49,11 +76,46 @@ describe('route', () => {
   it('routeToPath round-trips', () => {
     const routes: Route[] = [
       { lens: 'map', moment: null, momentId: null, agentId: null, openId: null, broadcast: false },
-      { lens: 'inspector', moment: { day: 41, time: '14:30' }, momentId: null, agentId: 'farmer', openId: null, broadcast: false },
-      { lens: 'director', moment: { day: 0, time: '00:05' }, momentId: null, agentId: null, openId: null, broadcast: false },
-      { lens: 'society', moment: null, momentId: null, agentId: 'fisher', openId: null, broadcast: false },
-      { lens: 'director', moment: null, momentId: 42, agentId: null, openId: null, broadcast: false },
-      { lens: 'chronicle', moment: null, momentId: 1, agentId: 'farmer', openId: null, broadcast: false },
+      {
+        lens: 'inspector',
+        moment: { day: 41, time: '14:30' },
+        momentId: null,
+        agentId: 'farmer',
+        openId: null,
+        broadcast: false,
+      },
+      {
+        lens: 'director',
+        moment: { day: 0, time: '00:05' },
+        momentId: null,
+        agentId: null,
+        openId: null,
+        broadcast: false,
+      },
+      {
+        lens: 'society',
+        moment: null,
+        momentId: null,
+        agentId: 'fisher',
+        openId: null,
+        broadcast: false,
+      },
+      {
+        lens: 'director',
+        moment: null,
+        momentId: 42,
+        agentId: null,
+        openId: null,
+        broadcast: false,
+      },
+      {
+        lens: 'chronicle',
+        moment: null,
+        momentId: 1,
+        agentId: 'farmer',
+        openId: null,
+        broadcast: false,
+      },
     ]
     for (const r of routes) {
       const full = routeToPath(r)
@@ -65,15 +127,29 @@ describe('route', () => {
   })
 
   it('lets the recorded day win when both are somehow set — one address, one meaning', () => {
-    expect(routeToPath({ lens: 'director', moment: { day: 3, time: '09:00' }, momentId: 8, agentId: null, openId: null, broadcast: false }))
-      .toBe('/moment/8?lens=director')
+    expect(
+      routeToPath({
+        lens: 'director',
+        moment: { day: 3, time: '09:00' },
+        momentId: 8,
+        agentId: null,
+        openId: null,
+        broadcast: false,
+      }),
+    ).toBe('/moment/8?lens=director')
   })
 })
 
-
 // USER BUG 2026-08-17: picking a townsperson to follow left no way back to the roster.
 describe('stepping back out of a single-character view', () => {
-  const roster: Route = { lens: 'inspector', moment: null, momentId: null, agentId: null, openId: null, broadcast: false }
+  const roster: Route = {
+    lens: 'inspector',
+    moment: null,
+    momentId: null,
+    agentId: null,
+    openId: null,
+    broadcast: false,
+  }
   const following: Route = { ...roster, agentId: 'amara', openId: null, broadcast: false }
 
   it('knows when it is showing one person rather than the roster', () => {
@@ -101,8 +177,12 @@ describe('stepping back out of a single-character view', () => {
 
   it('never disturbs another lens, or the moment a viewer is standing in', () => {
     const scrubbed: Route = {
-      lens: 'chronicle', moment: { day: 2, time: '11:15' }, momentId: null, agentId: 'amara',
-      openId: null, broadcast: false,
+      lens: 'chronicle',
+      moment: { day: 2, time: '11:15' },
+      momentId: null,
+      agentId: 'amara',
+      openId: null,
+      broadcast: false,
     }
     expect(backToRoster(scrubbed)).toBe(scrubbed)
     expect(navToLens(scrubbed, 'map')).toEqual({ ...scrubbed, lens: 'map' })

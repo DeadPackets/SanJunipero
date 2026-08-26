@@ -5,7 +5,10 @@ import { DEFAULT_CONFIG } from '@sj/shared'
 import { LAW_COPY, LAW_GROUPS, lawCopyFor, lawGroupOf } from './lawCopy.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 const PATHS = Object.keys(TOGGLABLE_PATHS)
 
 const ruleBody = (selector: string): string => {
@@ -18,7 +21,9 @@ const ruleBody = (selector: string): string => {
 }
 
 const valueAt = (path: string): unknown =>
-  path.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], DEFAULT_CONFIG)
+  path
+    .split('.')
+    .reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], DEFAULT_CONFIG)
 
 describe('U17 — a law is total over the engine, or a machine path reaches a screen', () => {
   it('has copy for every law the engine lets an operator touch', () => {

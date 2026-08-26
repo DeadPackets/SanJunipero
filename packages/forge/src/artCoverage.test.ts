@@ -7,7 +7,11 @@ import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { decodePng } from './post/raw.js'
 import {
-  alphaBinaryGate, classDensityGate, nativeDensityGate, paletteGate, soleSilhouetteGate,
+  alphaBinaryGate,
+  classDensityGate,
+  nativeDensityGate,
+  paletteGate,
+  soleSilhouetteGate,
   spriteDensity,
 } from './pixelGates.js'
 import { mirrorX } from './sheet.js'
@@ -15,11 +19,24 @@ import { mirrorFacingGate } from './structureArt.js'
 import { ICON_PX, TOWN_TILE, WORLD_SPRITE_PX } from './assetResolution.js'
 import { LIBRARY, LIBRARY_COUNTS } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
-import { ITEMS_CONTENT_DIR, listCommittedItems, registerCommittedItems } from './library/committed.js'
-import { CELL_NAMES_V4 } from './mirror.js'
-import { CAST_CONTENT_DIR, characterKind, listCommittedCast, registerCommittedCast } from './castArt.js'
 import {
-  castArtCoverage, coverageFailure, itemArtCoverage, requiredCastKinds, requiredItemKinds,
+  ITEMS_CONTENT_DIR,
+  listCommittedItems,
+  registerCommittedItems,
+} from './library/committed.js'
+import { CELL_NAMES_V4 } from './mirror.js'
+import {
+  CAST_CONTENT_DIR,
+  characterKind,
+  listCommittedCast,
+  registerCommittedCast,
+} from './castArt.js'
+import {
+  castArtCoverage,
+  coverageFailure,
+  itemArtCoverage,
+  requiredCastKinds,
+  requiredItemKinds,
 } from './artCoverage.js'
 
 // Reads the CODEX, not the renderer: `makePlaceholder` answers every class, so a gate that asks
@@ -32,7 +49,8 @@ function registeredKinds(klass: 'item' | 'rig-part'): string[] {
     const codex = new AssetCodex(db)
     registerCommittedItems(codex)
     registerCommittedCast(codex)
-    return codex.listSince(0)
+    return codex
+      .listSince(0)
       .filter((r) => r.status === 'ready' && r.class === klass && r.kind !== null)
       .map((r) => r.kind!)
   } finally {
@@ -42,10 +60,12 @@ function registeredKinds(klass: 'item' | 'rig-part'): string[] {
 
 describe('every item the catalog specifies has committed art, sprite and icon', () => {
   it('is measuring the library it thinks it is', () => {
-    expect(LIBRARY).toHaveLength(
-      Object.values(LIBRARY_COUNTS).reduce((s, n) => s + n, 0))
+    expect(LIBRARY).toHaveLength(Object.values(LIBRARY_COUNTS).reduce((s, n) => s + n, 0))
     for (const [category, n] of Object.entries(LIBRARY_COUNTS))
-      expect(LIBRARY.filter((e) => e.category === category), category).toHaveLength(n)
+      expect(
+        LIBRARY.filter((e) => e.category === category),
+        category,
+      ).toHaveLength(n)
     // 50 items is 100 codex records: the world sprite and the inventory icon are separate
     // rows and go missing separately.
     expect(requiredItemKinds()).toHaveLength(LIBRARY.length * 2)
@@ -84,7 +104,10 @@ describe('★ the committed-art ingest scans the codex once, not once per item',
 
       let scans = 0
       const real = codex.listSince.bind(codex)
-      codex.listSince = (since: number) => { scans++; return real(since) }
+      codex.listSince = (since: number) => {
+        scans++
+        return real(since)
+      }
 
       const again = [...registerCommittedItems(codex), ...registerCommittedCast(codex)]
       // the second boot registers nothing — otherwise a low scan count means nothing was checked
@@ -144,8 +167,9 @@ describe('the pre-recovery tree, as a fixture', () => {
     const c = itemArtCoverage([...requiredItemKinds(), 'lantern_OLD'])
     expect(c.missing).toEqual([])
     expect(c.orphans).toEqual(['lantern_OLD'])
-    expect(castArtCoverage([...requiredCastKinds(), 'character:ghost']).orphans)
-      .toEqual(['character:ghost'])
+    expect(castArtCoverage([...requiredCastKinds(), 'character:ghost']).orphans).toEqual([
+      'character:ghost',
+    ])
   })
 })
 
@@ -158,8 +182,11 @@ describe('nothing an art pipeline depends on is missing from the tree as shipped
 
   it('the committed content roots the boot reads are all present', () => {
     for (const [name, dir] of [
-      ['buildings', BUILDINGS_CONTENT_DIR], ['items', ITEMS_CONTENT_DIR], ['cast', CAST_CONTENT_DIR],
-    ] as const) expect(existsSync(dir), `content/${name} is not in the tree`).toBe(true)
+      ['buildings', BUILDINGS_CONTENT_DIR],
+      ['items', ITEMS_CONTENT_DIR],
+      ['cast', CAST_CONTENT_DIR],
+    ] as const)
+      expect(existsSync(dir), `content/${name} is not in the tree`).toBe(true)
   })
 })
 
@@ -184,32 +211,41 @@ describe('★ the committed buildings', () => {
   it('★ no SE cell is its SW cell mirrored — the gate that had no caller', async () => {
     const img = new Map<string, Awaited<ReturnType<typeof decodePng>>>()
     for (const b of buildings) img.set(b.dir, await decodePng(b.png))
-    const pairs = buildings.filter((b) => b.facing === 'se').map((b) => {
-      const sw = buildings.find((o) => o.kind === b.kind && o.facing !== b.facing)
-      expect(sw, `${b.kind}: an SE cell with no SW cell to turn from`).toBeDefined()
-      return { kind: b.kind, sw: img.get(sw!.dir)!, se: img.get(b.dir)! }
-    })
-    expect(pairs.length, 'no two-facing building to judge — the gate would be vacuous')
-      .toBeGreaterThanOrEqual(7)
+    const pairs = buildings
+      .filter((b) => b.facing === 'se')
+      .map((b) => {
+        const sw = buildings.find((o) => o.kind === b.kind && o.facing !== b.facing)
+        expect(sw, `${b.kind}: an SE cell with no SW cell to turn from`).toBeDefined()
+        return { kind: b.kind, sw: img.get(sw!.dir)!, se: img.get(b.dir)! }
+      })
+    expect(
+      pairs.length,
+      'no two-facing building to judge — the gate would be vacuous',
+    ).toBeGreaterThanOrEqual(7)
     const r = mirrorFacingGate(pairs)
     expect(r.failures.join('\n')).toBe('')
     // anti-vacuity: the gate must red on a cell that IS a mirror, or the line above proves
     // nothing about the gate
     const one = pairs[0]!
-    expect(mirrorFacingGate([{ kind: one.kind, sw: one.sw, se: mirrorX(one.sw) }]).failures)
-      .toHaveLength(1)
+    expect(
+      mirrorFacingGate([{ kind: one.kind, sw: one.sw, se: mirrorX(one.sw) }]).failures,
+    ).toHaveLength(1)
   })
 
   it('★ one density across the whole class — computed by three generators, read by none', async () => {
-    const members = await Promise.all(buildings.map(async (b) => {
-      const img = await decodePng(b.png)
-      return {
-        name: b.dir,
-        density: spriteDensity({
-          canvas: { w: img.width, h: img.height }, footprint: b.manifest.footprint, tile: TOWN_TILE,
-        }),
-      }
-    }))
+    const members = await Promise.all(
+      buildings.map(async (b) => {
+        const img = await decodePng(b.png)
+        return {
+          name: b.dir,
+          density: spriteDensity({
+            canvas: { w: img.width, h: img.height },
+            footprint: b.manifest.footprint,
+            tile: TOWN_TILE,
+          }),
+        }
+      }),
+    )
     const cls = classDensityGate(members)
     expect(cls.failures.join('; ')).toBe('')
     expect(cls.densities, 'the class drifted onto two densities').toHaveLength(1)
@@ -219,10 +255,14 @@ describe('★ the committed buildings', () => {
     const bad: string[] = []
     for (const b of buildings) {
       const img = await decodePng(b.png)
-      bad.push(...nativeDensityGate({
-        name: b.dir, canvas: { w: img.width, h: img.height },
-        footprint: b.manifest.footprint, tile: TOWN_TILE,
-      }).failures)
+      bad.push(
+        ...nativeDensityGate({
+          name: b.dir,
+          canvas: { w: img.width, h: img.height },
+          footprint: b.manifest.footprint,
+          tile: TOWN_TILE,
+        }).failures,
+      )
     }
     expect(bad).toEqual([])
   })
@@ -235,27 +275,31 @@ describe('the committed items', () => {
     expect(items.map((i) => i.kind).sort()).toEqual(LIBRARY.map((e) => e.kind).sort())
   })
 
-  it.each(items.map((i) => [i.kind, i] as const))('%s clears the pixel bar', async (_kind, item) => {
-    const sprite = await decodePng(item.sprite)
-    const icon = await decodePng(item.icon)
-    // the entry's OWN size: a 1x2 bed covers 192 px of the interior tile, a 1x1 chair 128
-    expect([sprite.width, sprite.height], 'the world sprite is the size its footprint covers')
-      .toEqual([item.entry.spritePx, item.entry.spritePx])
-    expect([icon.width, icon.height], 'the icon is the C-level icon').toEqual([ICON_PX, ICON_PX])
-    // INTEGER DOWNSCALE ONLY: the icon must be a whole divide of the sprite, or it came off
-    // a fractional resample and ships the mush this bar exists to keep out.
-    expect(item.entry.spritePx % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
-    for (const img of [sprite, icon]) {
-      expect(alphaBinaryGate(img).failures).toEqual([])
-      expect(paletteGate(img).failures).toEqual([])
-    }
-    // the renderer needs the manifest to parse, or the room draws the placeholder anyway
-    expect(parseLibraryItemManifest(JSON.stringify(item.manifest))).not.toBeNull()
-    expect(item.manifest.spritePx).toBe(item.entry.spritePx)
-    expect(item.manifest.iconPx).toBe(ICON_PX)
-    expect((item.manifest.interior !== undefined))
-      .toBe(item.entry.category === 'furniture')
-  })
+  it.each(items.map((i) => [i.kind, i] as const))(
+    '%s clears the pixel bar',
+    async (_kind, item) => {
+      const sprite = await decodePng(item.sprite)
+      const icon = await decodePng(item.icon)
+      // the entry's OWN size: a 1x2 bed covers 192 px of the interior tile, a 1x1 chair 128
+      expect(
+        [sprite.width, sprite.height],
+        'the world sprite is the size its footprint covers',
+      ).toEqual([item.entry.spritePx, item.entry.spritePx])
+      expect([icon.width, icon.height], 'the icon is the C-level icon').toEqual([ICON_PX, ICON_PX])
+      // INTEGER DOWNSCALE ONLY: the icon must be a whole divide of the sprite, or it came off
+      // a fractional resample and ships the mush this bar exists to keep out.
+      expect(item.entry.spritePx % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
+      for (const img of [sprite, icon]) {
+        expect(alphaBinaryGate(img).failures).toEqual([])
+        expect(paletteGate(img).failures).toEqual([])
+      }
+      // the renderer needs the manifest to parse, or the room draws the placeholder anyway
+      expect(parseLibraryItemManifest(JSON.stringify(item.manifest))).not.toBeNull()
+      expect(item.manifest.spritePx).toBe(item.entry.spritePx)
+      expect(item.manifest.iconPx).toBe(ICON_PX)
+      expect(item.manifest.interior !== undefined).toBe(item.entry.category === 'furniture')
+    },
+  )
 })
 
 describe('the committed cast', () => {
@@ -281,17 +325,20 @@ describe('the committed cast', () => {
     expect(paletteGate(atlas).failures).toEqual([])
   })
 
-  it.each(cast.map((c) => [c.id, c] as const))('%s draws one body per cell and nothing else', async (id, c) => {
-    const atlas = await decodePng(c.atlas)
-    const bad: string[] = []
-    for (const [name, r] of Object.entries(c.manifest.cells)) {
-      const cell = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
-      for (let y = 0; y < r.h; y++) {
-        const src = ((r.y + y) * atlas.width + r.x) * 4
-        cell.data.set(atlas.data.subarray(src, src + r.w * 4), y * r.w * 4)
+  it.each(cast.map((c) => [c.id, c] as const))(
+    '%s draws one body per cell and nothing else',
+    async (id, c) => {
+      const atlas = await decodePng(c.atlas)
+      const bad: string[] = []
+      for (const [name, r] of Object.entries(c.manifest.cells)) {
+        const cell = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
+        for (let y = 0; y < r.h; y++) {
+          const src = ((r.y + y) * atlas.width + r.x) * 4
+          cell.data.set(atlas.data.subarray(src, src + r.w * 4), y * r.w * 4)
+        }
+        for (const f of soleSilhouetteGate(cell).failures) bad.push(`${id}/${name}: ${f}`)
       }
-      for (const f of soleSilhouetteGate(cell).failures) bad.push(`${id}/${name}: ${f}`)
-    }
-    expect(bad).toEqual([])
-  })
+      expect(bad).toEqual([])
+    },
+  )
 })

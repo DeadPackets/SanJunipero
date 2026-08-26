@@ -32,8 +32,13 @@ export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
       if (seen.has(def.kind) || !def.match(ev, running)) continue
       seen.add(def.kind)
       out.push({
-        kind: def.kind, tier: def.tier, domain: def.domain, label: def.label,
-        eventSeq: ev.seq, day: Math.floor(ev.tick / MINUTES_PER_DAY), tick: ev.tick,
+        kind: def.kind,
+        tier: def.tier,
+        domain: def.domain,
+        label: def.label,
+        eventSeq: ev.seq,
+        day: Math.floor(ev.tick / MINUTES_PER_DAY),
+        tick: ev.tick,
         agentIds: def.agentIds?.(ev) ?? [],
       })
     }
@@ -45,8 +50,14 @@ export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
   if (ctx.rulebookCount >= 1 && !seen.has('first_law') && events.length > 0) {
     const ev = events[0]!
     out.push({
-      kind: law.kind, tier: law.tier, domain: law.domain, label: law.label,
-      eventSeq: ev.seq, day: Math.floor(ev.tick / MINUTES_PER_DAY), tick: ev.tick, agentIds: [],
+      kind: law.kind,
+      tier: law.tier,
+      domain: law.domain,
+      label: law.label,
+      eventSeq: ev.seq,
+      day: Math.floor(ev.tick / MINUTES_PER_DAY),
+      tick: ev.tick,
+      agentIds: [],
     })
   }
   return out

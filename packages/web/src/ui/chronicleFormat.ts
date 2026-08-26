@@ -6,11 +6,11 @@ import type { WorldState } from '@sj/engine/state'
 export function describeEvent(ev: SimEvent, state: WorldState | null): string | null {
   const p = ev.payload as Record<string, unknown>
   const name = (agentId: unknown): string =>
-    (typeof agentId === 'string' ? state?.agents[agentId]?.name ?? agentId : 'Someone')
+    typeof agentId === 'string' ? (state?.agents[agentId]?.name ?? agentId) : 'Someone'
   // R4: a kind is a slug in the engine and PROSE to a viewer. The chronicle read "The
   // fire_pit is finished." on screen until this went through kindWords.
   const structureKind = (id: unknown): string =>
-    kindWords(typeof id === 'string' ? state?.structures[id]?.kind ?? 'building' : 'building')
+    kindWords(typeof id === 'string' ? (state?.structures[id]?.kind ?? 'building') : 'building')
 
   switch (ev.type) {
     case 'agent_spoke':
@@ -42,7 +42,8 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'crop_planted':
       return `${kindWords(String(p.kind))} was planted.`
     case 'crop_harvested': {
-      const kind = typeof p.cropId === 'string' ? state?.crops[p.cropId]?.kind ?? 'harvest' : 'harvest'
+      const kind =
+        typeof p.cropId === 'string' ? (state?.crops[p.cropId]?.kind ?? 'harvest') : 'harvest'
       return `The ${kind} came in.`
     }
     case 'fire_ignited':

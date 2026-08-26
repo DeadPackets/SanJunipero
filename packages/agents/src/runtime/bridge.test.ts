@@ -11,7 +11,13 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { DISCOVERY_EVENT, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DISCOVERY_EVENT,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge } from './bridge.js'
 
@@ -19,12 +25,20 @@ const AGENT = 'tamar'
 
 function buildBridge(): { bridge: EngineBridge; step: () => void } {
   const config = SimConfigSchema.parse({})
-  const terrain: TileId[][] = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
+  const terrain: TileId[][] = Array.from({ length: 12 }, () =>
+    Array.from({ length: 12 }, (): TileId => 0),
+  )
   const db = openDb(':memory:')
   const store = new EventStore(db)
   const rng = new RngStreams('bridge-drain')
   let state = genesisState(config, terrain)
-  const ev = store.append(state.tick, 'agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 30 })
+  const ev = store.append(state.tick, 'agent_spawned', {
+    id: AGENT,
+    name: 'Tamar',
+    x: 3,
+    y: 3,
+    ageDays: 30,
+  })
   state = fold(state, ev, config)
 
   const worldTick = createWorldTick(config, rng)
@@ -38,19 +52,40 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
 }
 
 // A second town where things are owned, so the bridge's ownership mapping is observable.
-function ownedWorld(opts: { recentWindowTicks?: number } = {}): { bridge: EngineBridge; step: () => void } {
-  const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
-  const terrain: TileId[][] = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
+function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
+  bridge: EngineBridge
+  step: () => void
+} {
+  const config = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+  const terrain: TileId[][] = Array.from({ length: 12 }, () =>
+    Array.from({ length: 12 }, (): TileId => 0),
+  )
   const store = new EventStore(openDb(':memory:'))
   const rng = new RngStreams('bridge-ownership')
   let state = genesisState(config, terrain)
-  const put = (type: string, payload: unknown) => { state = fold(state, store.append(state.tick, type, payload), config) }
+  const put = (type: string, payload: unknown) => {
+    state = fold(state, store.append(state.tick, type, payload), config)
+  }
   put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 })
   put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: 7300 })
   put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: 7300 })
-  put('item_spawned', { id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'agent', id: AGENT }, owner: AGENT })
   put('item_spawned', {
-    id: 'item_2', kind: 'plank', qty: 1, loc: { t: 'tile', x: 5, y: 4 }, owner: 'bex', crafterMark: 'bex',
+    id: 'item_1',
+    kind: 'bread',
+    qty: 1,
+    loc: { t: 'agent', id: AGENT },
+    owner: AGENT,
+  })
+  put('item_spawned', {
+    id: 'item_2',
+    kind: 'plank',
+    qty: 1,
+    loc: { t: 'tile', x: 5, y: 4 },
+    owner: 'bex',
+    crafterMark: 'bex',
   })
 
   const worldTick = createWorldTick(config, rng)
@@ -61,14 +96,21 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): { bridge: Engine
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
     if (loop.tick === 1) {
       emit('item_moved', { id: 'item_2', loc: { t: 'agent', id: 'cass' } })
-      emit('item_taken', { itemId: 'item_2', kind: 'plank', takerId: 'cass', ownerId: 'bex', x: 5, y: 4 })
+      emit('item_taken', {
+        itemId: 'item_2',
+        kind: 'plank',
+        takerId: 'cass',
+        ownerId: 'bex',
+        x: 5,
+        y: 4,
+      })
     }
   })
   return { bridge, step: () => loop.step() }
 }
 
 describe('EngineBridge carries ownership through to the mind', () => {
-  it('names another\'s claim on a thing, and says nothing about your own', () => {
+  it("names another's claim on a thing, and says nothing about your own", () => {
     const { bridge } = ownedWorld()
     const packet = bridge.perception(AGENT)
     const mine = packet.self.inventory.find((i) => i.id === 'item_1')!
@@ -181,21 +223,55 @@ describe('EngineBridge.drain (T23)', () => {
 // had nothing, and the live run drank fifteen times and ate once.
 describe('nearestFood: the nearest thing worth walking to for a meal', () => {
   function larder(): EngineBridge {
-    const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
-    const terrain: TileId[][] = Array.from({ length: 40 }, () => Array.from({ length: 40 }, (): TileId => 0))
+    const config = SimConfigSchema.parse({
+      weather: { hourlyChangeChance: 0 },
+      mystery: { chancePerDay: 0 },
+    })
+    const terrain: TileId[][] = Array.from({ length: 40 }, () =>
+      Array.from({ length: 40 }, (): TileId => 0),
+    )
     const store = new EventStore(openDb(':memory:'))
     const rng = new RngStreams('bridge-larder')
     let state = genesisState(config, terrain)
-    const put = (type: string, payload: unknown) => { state = fold(state, store.append(state.tick, type, payload), config) }
+    const put = (type: string, payload: unknown) => {
+      state = fold(state, store.append(state.tick, type, payload), config)
+    }
     put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
     put('structure_planned', {
-      id: 'shed_1', kind: 'storehouse', x: 24, y: 20, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'g',
+      id: 'shed_1',
+      kind: 'storehouse',
+      x: 24,
+      y: 20,
+      w: 1,
+      h: 1,
+      maxHp: 20,
+      flammable: true,
+      builderId: 'g',
     })
     put('structure_completed', { id: 'shed_1' })
-    put('item_spawned', { id: 'loaf', kind: 'bread', qty: 1, loc: { t: 'structure', id: 'shed_1' } })
+    put('item_spawned', {
+      id: 'loaf',
+      kind: 'bread',
+      qty: 1,
+      loc: { t: 'structure', id: 'shed_1' },
+    })
     put('item_spawned', { id: 'plank', kind: 'plank', qty: 1, loc: { t: 'tile', x: 21, y: 20 } })
-    put('forageable_spawned', { id: 'bush', kind: 'berry_bush', x: 30, y: 20, stock: 6, fullStock: 6 })
-    put('forageable_spawned', { id: 'rocks', kind: 'stone_outcrop', x: 21, y: 21, stock: 6, fullStock: 6 })
+    put('forageable_spawned', {
+      id: 'bush',
+      kind: 'berry_bush',
+      x: 30,
+      y: 20,
+      stock: 6,
+      fullStock: 6,
+    })
+    put('forageable_spawned', {
+      id: 'rocks',
+      kind: 'stone_outcrop',
+      x: 21,
+      y: 21,
+      stock: 6,
+      fullStock: 6,
+    })
     const loop = new TickLoop({ store, state, rng, config, onTick: () => {} })
     return new EngineBridge({ loop, store, simConfig: config })
   }
@@ -223,17 +299,36 @@ describe('nearestFood: the nearest thing worth walking to for a meal', () => {
 // A bare world with no systems running, so the only thing in the log is what the bridge put
 // there. Same `let handler` wiring the harnesses above use — TickLoop takes onTick once.
 function announceHarness(): {
-  store: EventStore; loop: TickLoop; bridge: EngineBridge; config: SimConfig; terrain: TileId[][]
+  store: EventStore
+  loop: TickLoop
+  bridge: EngineBridge
+  config: SimConfig
+  terrain: TileId[][]
 } {
   const config = SimConfigSchema.parse({})
-  const terrain: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
+  const terrain: TileId[][] = Array.from({ length: 8 }, () =>
+    Array.from({ length: 8 }, (): TileId => 0),
+  )
   const store = new EventStore(openDb(':memory:'))
   let state = genesisState(config, terrain)
-  state = fold(state, store.append(state.tick, 'agent_spawned',
-    { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 }), config)
+  state = fold(
+    state,
+    store.append(state.tick, 'agent_spawned', {
+      id: AGENT,
+      name: 'Tamar',
+      x: 3,
+      y: 3,
+      ageDays: 7300,
+    }),
+    config,
+  )
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
-    store, state, rng: new RngStreams('bridge-announce'), config, onTick: (ctx) => handler(ctx),
+    store,
+    state,
+    rng: new RngStreams('bridge-announce'),
+    config,
+    onTick: (ctx) => handler(ctx),
   })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(() => {})
@@ -245,10 +340,14 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
   it('puts the announcement in the world log at the next tick', () => {
     const { store, loop, bridge } = announceHarness()
     bridge.announce(DISCOVERY_EVENT, {
-      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
-      byId: 'a1', intent: 'carry water in a hide', makes: ['waterskin'],
+      recipeId: 'recipe:waterskin',
+      name: 'stitch a waterskin',
+      kind: 'craft',
+      byId: 'a1',
+      intent: 'carry water in a hide',
+      makes: ['waterskin'],
     })
-    expect(typesOf(store)).not.toContain(DISCOVERY_EVENT)  // nothing before the tick
+    expect(typesOf(store)).not.toContain(DISCOVERY_EVENT) // nothing before the tick
     loop.step()
     expect(typesOf(store)).toContain(DISCOVERY_EVENT)
   })
@@ -256,9 +355,16 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
   it('drains ONCE — a second tick does not re-announce', () => {
     const { store, loop, bridge } = announceHarness()
     bridge.announce(DISCOVERY_EVENT, {
-      recipeId: 'recipe:a', name: 'a', kind: 'word', byId: 'a1', intent: 'a', makes: [],
+      recipeId: 'recipe:a',
+      name: 'a',
+      kind: 'word',
+      byId: 'a1',
+      intent: 'a',
+      makes: [],
     })
-    loop.step(); loop.step(); loop.step()
+    loop.step()
+    loop.step()
+    loop.step()
     expect(typesOf(store).filter((t) => t === DISCOVERY_EVENT)).toHaveLength(1)
   })
 
@@ -266,11 +372,17 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
     const { store, loop, bridge } = announceHarness()
     for (const n of ['first', 'second']) {
       bridge.announce(DISCOVERY_EVENT, {
-        recipeId: `express:${n}`, name: n, kind: 'word', byId: 'a1', intent: n, makes: [],
+        recipeId: `express:${n}`,
+        name: n,
+        kind: 'word',
+        byId: 'a1',
+        intent: n,
+        makes: [],
       })
     }
     loop.step()
-    const names = store.readFrom(0)
+    const names = store
+      .readFrom(0)
       .filter((e: SimEvent) => e.type === DISCOVERY_EVENT)
       .map((e: SimEvent) => (e.payload as { name: string }).name)
     expect(names).toEqual(['first', 'second'])
@@ -282,8 +394,12 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
     const { store, loop, bridge } = announceHarness()
     void bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
     bridge.announce(DISCOVERY_EVENT, {
-      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
-      byId: AGENT, intent: 'carry water in a hide', makes: ['waterskin'],
+      recipeId: 'recipe:waterskin',
+      name: 'stitch a waterskin',
+      kind: 'craft',
+      byId: AGENT,
+      intent: 'carry water in a hide',
+      makes: ['waterskin'],
     })
     loop.step()
     const log = store.readFrom(0)
@@ -297,8 +413,12 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
     const { store, loop, bridge, config, terrain } = announceHarness()
     const before = stateHash(loop.state)
     bridge.announce(DISCOVERY_EVENT, {
-      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
-      byId: 'a1', intent: 'carry water in a hide', makes: ['waterskin'],
+      recipeId: 'recipe:waterskin',
+      name: 'stitch a waterskin',
+      kind: 'craft',
+      byId: 'a1',
+      intent: 'carry water in a hide',
+      makes: ['waterskin'],
     })
     loop.step()
     expect(stateHash(replayFromGenesis(store, config, terrain))).toBe(stateHash(loop.state))

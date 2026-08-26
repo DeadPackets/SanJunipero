@@ -9,9 +9,14 @@ import { createWorldTick, type WorldTickResult } from './worldTick.js'
 
 const FAST: SimConfig = SimConfigSchema.parse({
   needs: {
-    hungerDecayPerTick: 5, energyDecayAwakePerTick: 4, energyRegenAsleepPerTick: 10,
-    socialDecayPerTick: 2, warmthEqualizeFactorPerTick: 0.5,
-    collapseThreshold: 5, deathAfterZeroHungerTicks: 3, eatRestoreHunger: 60,
+    hungerDecayPerTick: 5,
+    energyDecayAwakePerTick: 4,
+    energyRegenAsleepPerTick: 10,
+    socialDecayPerTick: 2,
+    warmthEqualizeFactorPerTick: 0.5,
+    collapseThreshold: 5,
+    deathAfterZeroHungerTicks: 3,
+    eatRestoreHunger: 60,
   },
   // Bare 8x4 worlds with no house: the bed law is not what these rows test.
   structures: { sleepIndoorsOnly: false },
@@ -19,16 +24,36 @@ const FAST: SimConfig = SimConfigSchema.parse({
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-function makeWorld(config = FAST, rows: string[] = ['........', '........', '........', '........']): WorldState {
-  const s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+function makeWorld(
+  config = FAST,
+  rows: string[] = ['........', '........', '........', '........'],
+): WorldState {
+  const s = genesisState(
+    config,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
   return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
 }
-function patchAgent(s: WorldState, id: string, patch: Partial<WorldState['agents'][string]>): WorldState {
+function patchAgent(
+  s: WorldState,
+  id: string,
+  patch: Partial<WorldState['agents'][string]>,
+): WorldState {
   return { ...s, agents: { ...s.agents, [id]: { ...s.agents[id]!, ...patch } } }
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, config = FAST, tick = s.tick): WorldState {
+function applyAll(
+  s: WorldState,
+  events: Array<{ type: string; payload: unknown }>,
+  config = FAST,
+  tick = s.tick,
+): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), config)
   return s
 }
@@ -51,18 +76,25 @@ describe('fold: sleep / collapse / death events', () => {
     let s = makeWorld()
     s = fold(s, ev('agent_collapsed', { agentId: 'a1' }, 42), FAST)
     expect(s.agents.a1!.collapsedSinceTick).toBe(42)
-    expect(() => fold(s, ev('agent_collapsed', { agentId: 'ghost' }), FAST)).toThrow(/unknown agent/i)
+    expect(() => fold(s, ev('agent_collapsed', { agentId: 'ghost' }), FAST)).toThrow(
+      /unknown agent/i,
+    )
   })
 
   it('agent_died: alive=false, activity cleared, body remains, no item spawned', () => {
     let s = makeWorld()
-    s = patchAgent(s, 'a1', { activity: { verb: 'idle', ticksRemaining: 3, params: {} }, asleep: true })
+    s = patchAgent(s, 'a1', {
+      activity: { verb: 'idle', ticksRemaining: 3, params: {} },
+      asleep: true,
+    })
     s = fold(s, ev('agent_died', { agentId: 'a1', cause: 'starvation' }), FAST)
     expect(s.agents.a1!.alive).toBe(false)
     expect(s.agents.a1!.activity).toBeNull()
     expect(s.agents.a1).toBeDefined()
     expect(Object.keys(s.items)).toHaveLength(0)
-    expect(() => fold(s, ev('agent_died', { agentId: 'ghost', cause: 'x' }), FAST)).toThrow(/unknown agent/i)
+    expect(() => fold(s, ev('agent_died', { agentId: 'ghost', cause: 'x' }), FAST)).toThrow(
+      /unknown agent/i,
+    )
   })
 
   it('need_changed tracks zeroHungerSinceTick: set when hunger hits 0, cleared when it rises', () => {
@@ -77,7 +109,10 @@ describe('fold: sleep / collapse / death events', () => {
 
   it('need_changed clears collapsedSinceTick only when hunger AND energy are back at threshold', () => {
     let s = makeWorld()
-    s = patchAgent(s, 'a1', { collapsedSinceTick: 3, needs: { hunger: 0, energy: 0, warmth: 50, social: 50 } })
+    s = patchAgent(s, 'a1', {
+      collapsedSinceTick: 3,
+      needs: { hunger: 0, energy: 0, warmth: 50, social: 50 },
+    })
     s = fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: 60 }, 5), FAST)
     expect(s.agents.a1!.collapsedSinceTick).toBe(3) // energy still below
     s = fold(s, ev('need_changed', { id: 'a1', need: 'energy', delta: 60 }, 6), FAST)
@@ -96,9 +131,17 @@ describe('verbs: sleep / wake / eat', () => {
     let s = makeWorld()
     expect(submitIntent(s, FAST, 'a1', 'eat', {}).ok).toBe(false)
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_9' }).ok).toBe(false)
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
+      FAST,
+    )
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_1' }).ok).toBe(false) // wood is not food
-    s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'berries', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }), FAST)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_2', kind: 'berries', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }),
+      FAST,
+    )
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(false) // not held
     s = fold(s, ev('item_moved', { id: 'item_2', loc: { t: 'agent', id: 'a1' } }), FAST)
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(true)
@@ -138,7 +181,10 @@ describe('worldTick: needs system', () => {
   })
 
   it('asleep: energy regens instead of decaying; hunger still decays', () => {
-    const s = patchAgent(makeWorld(), 'a1', { asleep: true, needs: { hunger: 50, energy: 40, warmth: 100, social: 100 } })
+    const s = patchAgent(makeWorld(), 'a1', {
+      asleep: true,
+      needs: { hunger: 50, energy: 40, warmth: 100, social: 100 },
+    })
     const r = tickOnce(s)
     expect(r.state.agents.a1!.needs.energy).toBe(50)
     expect(r.state.agents.a1!.needs.hunger).toBe(45)
@@ -169,14 +215,20 @@ describe('worldTick: sleep and eat flows', () => {
 
   it('eat restores eatRestoreHunger and consumes qty 1; item removed at qty 0', () => {
     let s = makeWorld()
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }),
+      FAST,
+    )
     s = patchAgent(s, 'a1', { needs: { hunger: 20, energy: 100, warmth: 100, social: 100 } })
     const r = submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t1 = tickOnce(s)
     // decay first (20−5), then eat completes: berries are half a meal, so +30.
-    expect(t1.state.agents.a1!.needs.hunger).toBe(15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'))
+    expect(t1.state.agents.a1!.needs.hunger).toBe(
+      15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'),
+    )
     expect(t1.state.items.item_1!.qty).toBe(1)
     expect(t1.state.agents.a1!.activity).toBeNull()
 
@@ -211,12 +263,17 @@ describe('worldTick: collapse', () => {
     s = applyAll(s, r.events)
     s = patchAgent(s, 'a1', { x: 2, y: 0 }) // already at destination, ticksRemaining still 2
     const t1 = tickOnce(s)
-    expect(t1.events).toContainEqual({ type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } })
+    expect(t1.events).toContainEqual({
+      type: 'action_interrupted',
+      payload: { agentId: 'a1', reason: 'blocked' },
+    })
     expect(t1.state.agents.a1!.activity).toBeNull()
   })
 
   it('needs decay and collapse see the same tick sequentially: decay below threshold collapses same tick', () => {
-    const s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 100, energy: 8, warmth: 100, social: 100 } })
+    const s = patchAgent(makeWorld(), 'a1', {
+      needs: { hunger: 100, energy: 8, warmth: 100, social: 100 },
+    })
     const t1 = tickOnce(s) // energy 8−4 = 4 < 5, folded before collapse system runs
     expect(t1.events.map((e) => e.type)).toContain('agent_collapsed')
   })
@@ -224,7 +281,9 @@ describe('worldTick: collapse', () => {
 
 describe('worldTick: collapse recovery through sleep', () => {
   it('a collapsed agent may sleep; energy regen clears the collapse and it can act again', () => {
-    let s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 100, energy: 4, warmth: 100, social: 100 } })
+    let s = patchAgent(makeWorld(), 'a1', {
+      needs: { hunger: 100, energy: 4, warmth: 100, social: 100 },
+    })
     let t = tickOnce(s) // energy 4−4 = 0 < 5: collapses
     expect(t.events.map((e) => e.type)).toContain('agent_collapsed')
     expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
@@ -243,7 +302,9 @@ describe('worldTick: collapse recovery through sleep', () => {
 
 describe('worldTick: death', () => {
   it('starvation death lands on the exact tick: zeroHungerSinceTick + deathAfterZeroHungerTicks + 1', () => {
-    let s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 10, energy: 100, warmth: 100, social: 100 } })
+    let s = patchAgent(makeWorld(), 'a1', {
+      needs: { hunger: 10, energy: 100, warmth: 100, social: 100 },
+    })
     const rng = new RngStreams('t')
     const deaths: number[] = []
     for (let t = 1; t <= 8; t++) {
@@ -259,25 +320,46 @@ describe('worldTick: death', () => {
 
   it('death drops every held item onto the death tile, before the death event', () => {
     let s = patchAgent(makeWorld(), 'a1', {
-      x: 3, y: 2,
-      needs: { hunger: 0, energy: 100, warmth: 100, social: 100 }, zeroHungerSinceTick: 0, collapsedSinceTick: 0,
+      x: 3,
+      y: 2,
+      needs: { hunger: 0, energy: 100, warmth: 100, social: 100 },
+      zeroHungerSinceTick: 0,
+      collapsedSinceTick: 0,
     })
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }), FAST)
-    s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }),
+      FAST,
+    )
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
+      FAST,
+    )
     s = { ...s, tick: 10 }
     const r = createWorldTick(FAST, new RngStreams('t'))(s)
     const types = r.events.map((e) => e.type)
     const diedAt = types.indexOf('agent_died')
     expect(diedAt).toBeGreaterThan(-1)
-    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'tile', x: 3, y: 2 } } })
-    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_2', loc: { t: 'tile', x: 3, y: 2 } } })
+    expect(r.events).toContainEqual({
+      type: 'item_moved',
+      payload: { id: 'item_1', loc: { t: 'tile', x: 3, y: 2 } },
+    })
+    expect(r.events).toContainEqual({
+      type: 'item_moved',
+      payload: { id: 'item_2', loc: { t: 'tile', x: 3, y: 2 } },
+    })
     expect(types.indexOf('item_moved')).toBeLessThan(diedAt)
     expect(r.state.items.item_1!.loc).toEqual({ t: 'tile', x: 3, y: 2 })
     expect(r.state.items.item_2!.loc).toEqual({ t: 'tile', x: 3, y: 2 })
   })
 
   it('agent_died carries the cause', () => {
-    let s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 0, energy: 100, warmth: 100, social: 100 }, zeroHungerSinceTick: 0, collapsedSinceTick: 0 })
+    let s = patchAgent(makeWorld(), 'a1', {
+      needs: { hunger: 0, energy: 100, warmth: 100, social: 100 },
+      zeroHungerSinceTick: 0,
+      collapsedSinceTick: 0,
+    })
     s = { ...s, tick: 10 }
     const r = createWorldTick(FAST, new RngStreams('t'))(s)
     const died = r.events.find((e) => e.type === 'agent_died')
@@ -288,7 +370,11 @@ describe('worldTick: death', () => {
 describe('worldTick: replay safety', () => {
   it('folding the returned events over the input state reproduces the returned state exactly', () => {
     let s = makeWorld()
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 1, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 1, loc: { t: 'agent', id: 'a1' } }),
+      FAST,
+    )
     const r = submitIntent(s, FAST, 'a1', 'walk', { x: 3, y: 2 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)

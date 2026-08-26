@@ -124,18 +124,42 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
   })
 
   it('5. framing: every persisted chapter/era/newspaper/biography/caption string is framing-free', async () => {
-    await narrateWeek({ store, llm: gateLlm([]), days: [chapter], validEventIds: EVENTFUL_DAY.map((e) => e.seq) })
+    await narrateWeek({
+      store,
+      llm: gateLlm([]),
+      days: [chapter],
+      validEventIds: EVENTFUL_DAY.map((e) => e.seq),
+    })
 
     const paper = renderNewspaper(0, chapter, heat, milestones, scenes)
-    store.insertPublication({ day: 0, kind: 'newspaper', title: paper.headline, body: paper.body, citations: paper.citations })
+    store.insertPublication({
+      day: 0,
+      kind: 'newspaper',
+      title: paper.headline,
+      body: paper.body,
+      citations: paper.citations,
+    })
 
     const world = openDb(':memory:')
     const ins = world.prepare('INSERT INTO events (seq, tick, type, payload) VALUES (?, ?, ?, ?)')
     for (const e of EVENTFUL_DAY) ins.run(e.seq, e.tick, e.type, JSON.stringify(e.payload))
-    await writeBiography({ store, llm: gateLlm([]), world, agentId: 'omar', name: 'Omar', throughDay: 0 })
+    await writeBiography({
+      store,
+      llm: gateLlm([]),
+      world,
+      agentId: 'omar',
+      name: 'Omar',
+      throughDay: 0,
+    })
 
     for (const c of timelapseCaptions(store.chaptersInRange(0, 3))) {
-      store.insertPublication({ day: c.day, kind: 'timelapse_caption', title: `Day ${c.day}`, body: c.caption, citations: [] })
+      store.insertPublication({
+        day: c.day,
+        kind: 'timelapse_caption',
+        title: `Day ${c.day}`,
+        body: c.caption,
+        citations: [],
+      })
     }
 
     const strings: string[] = []

@@ -35,7 +35,10 @@ const yearsOf = (a: AgentBody): number => Math.floor(a.ageDays / DAYS_PER_YEAR)
 
 // One f, one m, and the woman of childbearing age with no child already on the way.
 function motherAndFather(
-  state: WorldState, config: SimConfig, aId: string, bId: string,
+  state: WorldState,
+  config: SimConfig,
+  aId: string,
+  bId: string,
 ): { motherId: string; fatherId: string } | null {
   const a = state.agents[aId]
   const b = state.agents[bId]
@@ -59,7 +62,8 @@ export function reproductionSystem(ctx: TickCtx): void {
   for (const structureId of Object.keys(ctx.state().structures).sort()) {
     const s = ctx.state().structures[structureId]!
     if (s.stage !== 'complete' || !ctx.config.structures.privateKinds.includes(s.kind)) continue
-    const sleepers = Object.keys(ctx.state().agents).sort()
+    const sleepers = Object.keys(ctx.state().agents)
+      .sort()
       .filter((id) => {
         const a = ctx.state().agents[id]!
         return a.alive && a.asleep && a.insideId === structureId
@@ -78,7 +82,8 @@ export function reproductionSystem(ctx: TickCtx): void {
     if (!isPartnered(ctx.state(), aId, bId, ctx.config)) continue
     const pair = motherAndFather(ctx.state(), ctx.config, aId, bId)
     if (!pair) continue
-    if (ctx.rng.get('reproduction').next() >= ctx.config.reproduction.conceptionChancePerNight) continue
+    if (ctx.rng.get('reproduction').next() >= ctx.config.reproduction.conceptionChancePerNight)
+      continue
     ctx.emit('agent_conceived', { ...pair, day })
   }
 

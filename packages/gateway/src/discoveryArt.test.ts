@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
-import { artNeededFor, itemCommissionText, noDiscoveryArt, watchDiscoveryArt } from './discoveryArt.js'
+import {
+  artNeededFor,
+  itemCommissionText,
+  noDiscoveryArt,
+  watchDiscoveryArt,
+} from './discoveryArt.js'
 
 const stubCodex = (kinds: string[]) => ({
   listSince: (): AssetRecord[] =>
-    kinds.map((k, i) => ({ id: `asset_${k}`, seq: i + 1, kind: k } as unknown as AssetRecord)),
+    kinds.map((k, i) => ({ id: `asset_${k}`, seq: i + 1, kind: k }) as unknown as AssetRecord),
   onAssetReady: (_cb: (r: AssetRecord) => void): void => {},
 })
 
@@ -69,7 +74,12 @@ describe('the watcher', () => {
     let ready: ((r: AssetRecord) => void) | null = null
     const w = watchDiscoveryArt({
       forge: { commission },
-      codex: { listSince: () => [], onAssetReady: (cb) => { ready = cb } },
+      codex: {
+        listSince: () => [],
+        onAssetReady: (cb) => {
+          ready = cb
+        },
+      },
     })
     expect(ready).not.toBeNull()
     ready!({ id: 'asset_x', kind: 'waterskin' } as unknown as AssetRecord)
@@ -80,9 +90,14 @@ describe('the watcher', () => {
 
   it('RETURNS IMMEDIATELY — art never blocks a discovery', () => {
     let resolve = (): void => {}
-    const commission = vi.fn(() => new Promise<AssetRecord>((r) => {
-      resolve = () => { r({ id: 'a' } as unknown as AssetRecord) }
-    }))
+    const commission = vi.fn(
+      () =>
+        new Promise<AssetRecord>((r) => {
+          resolve = () => {
+            r({ id: 'a' } as unknown as AssetRecord)
+          }
+        }),
+    )
     const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]) })
     const before = Date.now()
     w.onDiscovery({ name: 'slow', makes: ['waterskin'] })
@@ -94,7 +109,9 @@ describe('the watcher', () => {
     const seen: string[] = []
     const commission = vi.fn().mockRejectedValue(new Error('provider down'))
     const w = watchDiscoveryArt({
-      forge: { commission }, codex: stubCodex([]), onError: (k) => seen.push(k),
+      forge: { commission },
+      codex: stubCodex([]),
+      onError: (k) => seen.push(k),
     })
     expect(() => w.onDiscovery({ name: 'x', makes: ['waterskin'] })).not.toThrow()
     await w.settle()
@@ -102,7 +119,8 @@ describe('the watcher', () => {
   })
 
   it('lets a later discovery try again for a kind whose commission failed', async () => {
-    const commission = vi.fn()
+    const commission = vi
+      .fn()
       .mockRejectedValueOnce(new Error('provider down'))
       .mockResolvedValueOnce({ id: 'a' })
     const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]), onError: () => {} })

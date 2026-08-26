@@ -15,7 +15,9 @@ const OUT = 'packages/forge/out/reference-candidates'
 mkdirSync(OUT, { recursive: true })
 
 // Raw PNG bytes; encoded exactly as imageClient does (base64 data URL in image_url wrapper).
-const refPng = readFileSync('/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/ref-sheet.png')
+const refPng = readFileSync(
+  '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/ref-sheet.png',
+)
 
 const desc =
   'a friendly adult villager in sage-green clothes, high visible detail: ' +
@@ -29,7 +31,10 @@ const prompt = buildAssetPrompt(desc, { w: 1, h: 1 }, 'rig-part')
 type Candidate = { png: Buffer; costUsd: number }
 
 class GenError extends Error {
-  constructor(public status: number, public detail: string) {
+  constructor(
+    public status: number,
+    public detail: string,
+  ) {
     super(`image generation failed (${MODEL}, HTTP ${status}): ${detail}`)
   }
 }
@@ -37,10 +42,14 @@ class GenError extends Error {
 async function generateOne(refs: Buffer[]): Promise<Candidate> {
   budget.spend(EST_IMAGE_USD) // reserve BEFORE firing; throws BudgetExceededError past cap
   const body: Record<string, unknown> = {
-    model: MODEL, prompt, aspect_ratio: '1:1', quality: 'medium', n: 1,
+    model: MODEL,
+    prompt,
+    aspect_ratio: '1:1',
+    quality: 'medium',
+    n: 1,
   }
   if (refs.length) {
-    body.input_references = refs.map(r => ({
+    body.input_references = refs.map((r) => ({
       type: 'image_url',
       image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
     }))
@@ -72,7 +81,10 @@ async function batch(refs: Buffer[]): Promise<{ candidates: Candidate[]; errors:
 
 let result = await batch([refPng])
 let fallback = false
-if (result.candidates.length === 0 && result.errors.some(e => e.status >= 400 && e.status < 500)) {
+if (
+  result.candidates.length === 0 &&
+  result.errors.some((e) => e.status >= 400 && e.status < 500)
+) {
   fallback = true
   result = await batch([])
 }
@@ -84,8 +96,12 @@ if (result.candidates.length === 0) {
 } else {
   result.candidates.forEach((c, i) => writeFileSync(`${OUT}/rig-part4-${i}.png`, c.png))
   console.log(`rig-part4: ${result.candidates.length} candidates (fallback=${fallback})`)
-  result.candidates.forEach((c, i) => console.log(`  rig-part4-${i}.png  model=${MODEL}  cost=$${c.costUsd.toFixed(4)}`))
+  result.candidates.forEach((c, i) =>
+    console.log(`  rig-part4-${i}.png  model=${MODEL}  cost=$${c.costUsd.toFixed(4)}`),
+  )
   const actual = result.candidates.reduce((s, c) => s + c.costUsd, 0)
-  console.log(`actual spend=$${actual.toFixed(4)}  budget.total=$${budget.total.toFixed(4)} (cap $1.5)`)
+  console.log(
+    `actual spend=$${actual.toFixed(4)}  budget.total=$${budget.total.toFixed(4)} (cap $1.5)`,
+  )
   if (fallback) console.log('FALLBACK: reference omitted after 4xx on the with-reference call')
 }

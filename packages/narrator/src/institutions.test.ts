@@ -6,12 +6,22 @@ import { DEFAULT_DETECT_CONFIG, detectInstitutions } from './institutions.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
-const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({ seq, tick, type, payload })
+const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 const act = (seq: number, tick: number, agentId: string, verb: string): SimEvent =>
   ev(seq, tick, 'action_completed', { agentId, verb })
 
 const scene = (day: number, eventIds: number[], cast: string[]): SceneSegment => ({
-  day, startTick: day * 1440, endTick: day * 1440 + 100, eventIds, cast, location: null,
+  day,
+  startTick: day * 1440,
+  endTick: day * 1440 + 100,
+  eventIds,
+  cast,
+  location: null,
 })
 
 // omar+yusuf co-appear in 4 scenes (>= groupMinCoScenes 3); nadia appears alone.
@@ -77,14 +87,22 @@ describe('detectInstitutions', () => {
   it('give is excluded from rules (a trade first, not a norm)', () => {
     const gives = [1, 2, 3, 4].map((n) => act(n, n, n % 2 ? 'omar' : 'yusuf', 'give'))
     const giveScenes = [scene(0, [1, 2, 3, 4], ['omar', 'yusuf'])]
-    expect(detectInstitutions(giveScenes, gives, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule')).toEqual([])
+    expect(
+      detectInstitutions(giveScenes, gives, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule'),
+    ).toEqual([])
   })
 
   it('uses real past tense in descriptions (no "teached"/"builded")', () => {
     const teachBuild: SimEvent[] = [
-      act(1, 0, 'omar', 'teach'), act(2, 1, 'omar', 'teach'), act(3, 2, 'omar', 'teach'),
-      act(4, 3, 'yusuf', 'build'), act(5, 4, 'yusuf', 'build'), act(6, 5, 'yusuf', 'build'),
-      act(7, 6, 'nadia', 'forage'), act(8, 7, 'nadia', 'forage'), act(9, 8, 'nadia', 'forage'),
+      act(1, 0, 'omar', 'teach'),
+      act(2, 1, 'omar', 'teach'),
+      act(3, 2, 'omar', 'teach'),
+      act(4, 3, 'yusuf', 'build'),
+      act(5, 4, 'yusuf', 'build'),
+      act(6, 5, 'yusuf', 'build'),
+      act(7, 6, 'nadia', 'forage'),
+      act(8, 7, 'nadia', 'forage'),
+      act(9, 8, 'nadia', 'forage'),
     ]
     const tbScenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8, 9], ['omar', 'yusuf', 'nadia'])]
     const roles = detectInstitutions(tbScenes, teachBuild).filter((i) => i.kind === 'role')
@@ -99,7 +117,10 @@ describe('detectInstitutions', () => {
     const db = new Database(':memory:')
     migrateNarratorTables(db)
     const store = new NarratorStore(db)
-    const mapped = out.map(({ foundingSceneIndex, ...rest }) => ({ ...rest, foundingSceneId: foundingSceneIndex + 1 }))
+    const mapped = out.map(({ foundingSceneIndex, ...rest }) => ({
+      ...rest,
+      foundingSceneId: foundingSceneIndex + 1,
+    }))
     for (const i of mapped) store.insertInstitution(i)
     const got = store.institutions()
     expect(got).toHaveLength(out.length)

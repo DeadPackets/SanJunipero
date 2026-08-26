@@ -17,7 +17,8 @@ export type Coverage = {
 function compare(required: readonly string[], registered: readonly string[]): Coverage {
   const have = new Set(registered)
   const want = new Set(required)
-  const missing: string[] = [], covered: string[] = []
+  const missing: string[] = [],
+    covered: string[] = []
   for (const k of [...want].sort()) (have.has(k) ? covered : missing).push(k)
   return { missing, orphans: [...have].filter((k) => !want.has(k)).sort(), covered }
 }
@@ -52,11 +53,15 @@ export function castArtCoverage(registered: readonly string[]): Coverage {
 
 export function coverageFailure(label: string, c: Coverage): string[] {
   const out: string[] = []
-  if (c.missing.length) out.push(
-    `${label}: ${c.missing.length} kind${c.missing.length === 1 ? '' : 's'} the world asks for ` +
-    `with no codex record —\n    ${c.missing.join('\n    ')}`)
-  if (c.orphans.length) out.push(
-    `${label}: ${c.orphans.length} record${c.orphans.length === 1 ? '' : 's'} registered under a ` +
-    `kind nothing asks for —\n    ${c.orphans.join('\n    ')}`)
+  if (c.missing.length)
+    out.push(
+      `${label}: ${c.missing.length} kind${c.missing.length === 1 ? '' : 's'} the world asks for ` +
+        `with no codex record —\n    ${c.missing.join('\n    ')}`,
+    )
+  if (c.orphans.length)
+    out.push(
+      `${label}: ${c.orphans.length} record${c.orphans.length === 1 ? '' : 's'} registered under a ` +
+        `kind nothing asks for —\n    ${c.orphans.join('\n    ')}`,
+    )
   return out
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { TERRAIN_TILE_KINDS, TerrainTileManifestSchema, parseTerrainTileManifest } from './terrain.js'
+import {
+  TERRAIN_TILE_KINDS,
+  TerrainTileManifestSchema,
+  parseTerrainTileManifest,
+} from './terrain.js'
 
 const good = { version: 'v1-terrain-tile', kind: 'grass', variant: 0, wPx: 32, hPx: 16 }
 
@@ -17,7 +21,16 @@ describe('TerrainTileManifestSchema', () => {
   })
 
   it('covers the eight terrain kinds including road', () => {
-    expect(TERRAIN_TILE_KINDS).toEqual(['grass', 'earth', 'water', 'forest', 'rock', 'sand', 'farmland', 'road'])
+    expect(TERRAIN_TILE_KINDS).toEqual([
+      'grass',
+      'earth',
+      'water',
+      'forest',
+      'rock',
+      'sand',
+      'farmland',
+      'road',
+    ])
   })
 })
 

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, stateHash, thirstDecayPerTick, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  SimConfigSchema,
+  stateHash,
+  thirstDecayPerTick,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { submitIntent } from '../intent.js'
@@ -13,7 +19,12 @@ const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, thirst: { enabled: fals
 const DECAY = thirstDecayPerTick(CFG)
 
 let seq = 93000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 // A pond at (4,4) and a dug channel at (6,6); everything else is grass.
 function map(): TileId[][] {
   const t = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
@@ -23,15 +34,26 @@ function map(): TileId[][] {
 }
 
 function body(config = CFG, x = 3, y = 4): WorldState {
-  return fold(genesisState(config, map()), ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }), config)
+  return fold(
+    genesisState(config, map()),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }),
+    config,
+  )
 }
 function tickOnce(s: WorldState, config = CFG): WorldTickResult {
-  return createWorldTick(config, new RngStreams('th'))(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
+  return createWorldTick(
+    config,
+    new RngStreams('th'),
+  )(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 const thirsts = (r: WorldTickResult) =>
-  r.events.filter((e) => e.type === 'thirst_changed').map((e) => (e.payload as { delta: number }).delta)
-const parch = (s: WorldState, thirst: number): WorldState =>
-  ({ ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, thirst } } })
+  r.events
+    .filter((e) => e.type === 'thirst_changed')
+    .map((e) => (e.payload as { delta: number }).delta)
+const parch = (s: WorldState, thirst: number): WorldState => ({
+  ...s,
+  agents: { ...s.agents, a1: { ...s.agents.a1!, thirst } },
+})
 
 describe('thirst: absent means full', () => {
   it('reads 100 off a body that has never been thirsty, and leaves its hash alone', () => {
@@ -59,11 +81,18 @@ describe('thirst: absent means full', () => {
   it('a dry body loses hp at the thirst rate and dies naming thirst', () => {
     const dry = parch(body(), 0)
     expect(tickOnce(dry).events).toContainEqual({
-      type: 'hp_changed', payload: { agentId: 'a1', delta: -CFG.mortality.thirstHpDrainPerTick },
+      type: 'hp_changed',
+      payload: { agentId: 'a1', delta: -CFG.mortality.thirstHpDrainPerTick },
     })
-    const nearly = fold(parch(body(), 0), ev('agent_harmed', { agentId: 'a1', amount: 99.9, source: 'accident' }), CFG)
-    expect(tickOnce(nearly).events.find((e) => e.type === 'agent_died')?.payload)
-      .toEqual({ agentId: 'a1', cause: 'thirst' })
+    const nearly = fold(
+      parch(body(), 0),
+      ev('agent_harmed', { agentId: 'a1', amount: 99.9, source: 'accident' }),
+      CFG,
+    )
+    expect(tickOnce(nearly).events.find((e) => e.type === 'agent_died')?.payload).toEqual({
+      agentId: 'a1',
+      cause: 'thirst',
+    })
   })
 
   it('leaves the dead alone', () => {
@@ -81,41 +110,77 @@ describe('drink: four ways to answer it', () => {
     return tickOnce(out)
   }
   const skin = (s: WorldState, charges: number) =>
-    fold(s, ev('item_spawned', { id: 'item_1', kind: 'waterskin', qty: 1, loc: { t: 'agent', id: 'a1' }, charges }), CFG)
+    fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'waterskin',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+        charges,
+      }),
+      CFG,
+    )
 
   it('is a Tier-1 verb that takes one tick', () => {
     const r = submitIntent(parch(body(), 10), CFG, 'a1', 'drink', {})
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.events[0]).toEqual({
-      type: 'action_started', payload: { agentId: 'a1', verb: 'drink', params: {}, duration: 1 },
-    })
+    if (r.ok)
+      expect(r.events[0]).toEqual({
+        type: 'action_started',
+        payload: { agentId: 'a1', verb: 'drink', params: {}, duration: 1 },
+      })
   })
 
   it('restores drinkRestore from a pond, from a dug channel, and from a well', () => {
     const pond = drank(parch(body(), 10))
-    expect(pond.events).toContainEqual({ type: 'agent_drank', payload: { agentId: 'a1', source: 'water_tile' } })
+    expect(pond.events).toContainEqual({
+      type: 'agent_drank',
+      payload: { agentId: 'a1', source: 'water_tile' },
+    })
     expect(pond.state.agents.a1!.thirst).toBe(10 + CFG.thirst.drinkRestore - DECAY)
 
     const channel = drank(parch(body(CFG, 5, 6), 10))
-    expect(channel.events).toContainEqual({ type: 'agent_drank', payload: { agentId: 'a1', source: 'water_tile' } })
+    expect(channel.events).toContainEqual({
+      type: 'agent_drank',
+      payload: { agentId: 'a1', source: 'water_tile' },
+    })
 
     let well = parch(body(CFG, 1, 1), 10)
-    well = fold(well, ev('structure_planned', {
-      id: 'structure_1', kind: 'well', x: 2, y: 1, w: 1, h: 1, maxHp: 30, flammable: false, builderId: 'a1',
-    }), CFG)
+    well = fold(
+      well,
+      ev('structure_planned', {
+        id: 'structure_1',
+        kind: 'well',
+        x: 2,
+        y: 1,
+        w: 1,
+        h: 1,
+        maxHp: 30,
+        flammable: false,
+        builderId: 'a1',
+      }),
+      CFG,
+    )
     well = fold(well, ev('structure_completed', { id: 'structure_1' }), CFG)
-    expect(drank(well).events).toContainEqual({ type: 'agent_drank', payload: { agentId: 'a1', source: 'well' } })
+    expect(drank(well).events).toContainEqual({
+      type: 'agent_drank',
+      payload: { agentId: 'a1', source: 'well' },
+    })
   })
 
   it('drains a charge out of a waterskin, and refuses one that is empty', () => {
     const r = drank(skin(parch(body(CFG, 1, 1), 10), 2), { itemId: 'item_1' })
     expect(r.events).toContainEqual({
-      type: 'agent_drank', payload: { agentId: 'a1', source: 'item', itemId: 'item_1' },
+      type: 'agent_drank',
+      payload: { agentId: 'a1', source: 'item', itemId: 'item_1' },
     })
     expect(r.state.items.item_1!.charges).toBe(1)
     expect(r.state.agents.a1!.thirst).toBe(10 + CFG.thirst.drinkRestore - DECAY)
 
-    const empty = submitIntent(skin(parch(body(CFG, 1, 1), 10), 0), CFG, 'a1', 'drink', { itemId: 'item_1' })
+    const empty = submitIntent(skin(parch(body(CFG, 1, 1), 10), 0), CFG, 'a1', 'drink', {
+      itemId: 'item_1',
+    })
     expect(empty.ok).toBe(false)
     if (!empty.ok) expect(empty.reason).toBe('the skin is empty')
   })
@@ -124,15 +189,22 @@ describe('drink: four ways to answer it', () => {
     const far = submitIntent(parch(body(CFG, 2, 4), 10), CFG, 'a1', 'drink', {})
     expect(far.ok).toBe(false)
     if (!far.ok) expect(far.reason).toBe('no water within reach')
-    const notAVessel = fold(parch(body(CFG, 1, 1), 10), ev('item_spawned', {
-      id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' },
-    }), CFG)
+    const notAVessel = fold(
+      parch(body(CFG, 1, 1), 10),
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'wood',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+      }),
+      CFG,
+    )
     const wrong = submitIntent(notAVessel, CFG, 'a1', 'drink', { itemId: 'item_1' })
     expect(wrong.ok).toBe(false)
     if (!wrong.ok) expect(wrong.reason).toBe('nothing to drink from')
   })
 
-  it('folding the tick\'s own events reproduces the state it returned', () => {
+  it("folding the tick's own events reproduces the state it returned", () => {
     const out = tickOnce(parch(body(), 10))
     let replayed = fold(parch(body(), 10), ev('tick_advanced', {}, 1), CFG)
     for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)

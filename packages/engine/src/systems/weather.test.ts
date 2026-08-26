@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SEASONS, SimConfigSchema, simTimeFromTick, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  SEASONS,
+  SimConfigSchema,
+  simTimeFromTick,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStream, RngStreams } from '../rng.js'
@@ -9,7 +15,12 @@ import { allowedKinds, rollWeatherKind, weatherTemperature } from './weather.js'
 const CFG: SimConfig = SimConfigSchema.parse({})
 
 let seq = 8000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function tickTo(s: WorldState, tick: number, rng: RngStreams): WorldTickResult {
   const wt = createWorldTick(CFG, rng)
@@ -87,7 +98,10 @@ describe('worldTick: weather', () => {
   it('emits on a temperature-only change at nightfall, carrying prevKind', () => {
     const s = { ...genesisState(CFG), tick: NIGHTFALL - 1 }
     const r = tickTo(s, NIGHTFALL, new RngStreams('w0'))
-    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'sunny', temperatureC: 8, prevKind: 'sunny' } })
+    expect(r.events).toContainEqual({
+      type: 'weather_changed',
+      payload: { kind: 'sunny', temperatureC: 8, prevKind: 'sunny' },
+    })
     expect(r.state.weather).toEqual({ kind: 'sunny', temperatureC: 8 })
   })
 
@@ -95,7 +109,10 @@ describe('worldTick: weather', () => {
     // change roll ≈ 0.1068 passes, pick int(4) = 2 → rain; 14 − 4 = 10°C
     const s = { ...genesisState(CFG), tick: NOON - 1 }
     const r = tickTo(s, NOON, new RngStreams('w11'))
-    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'rain', temperatureC: 10, prevKind: 'sunny' } })
+    expect(r.events).toContainEqual({
+      type: 'weather_changed',
+      payload: { kind: 'rain', temperatureC: 10, prevKind: 'sunny' },
+    })
     expect(r.state.weather).toEqual({ kind: 'rain', temperatureC: 10 })
   })
 })

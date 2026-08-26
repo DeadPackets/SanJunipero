@@ -5,13 +5,22 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { TimelineView } from './Timeline.js'
 import { RECENT_EVENTS_CAP } from '../state/worldStore.js'
 import {
-  MARK_GLYPH_PX, MARK_GLYPH_SCALE, MARK_HIT_PX, coalesceMarks, markLeft, marksFrom, tipSide,
+  MARK_GLYPH_PX,
+  MARK_GLYPH_SCALE,
+  MARK_HIT_PX,
+  coalesceMarks,
+  markLeft,
+  marksFrom,
+  tipSide,
   type Mark,
 } from './timelineMarks.js'
 import { BODY_MIN_PX, TEXT_MIN_PX } from '../textFloor.js'
 import { fontSizes } from './chromeType.test.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 const DAY = 1440
 
 const ruleBody = (selector: string): string => {
@@ -29,30 +38,42 @@ const px = (selector: string, prop: string): number => {
 }
 
 // Six narrated days of a town that has lived — what /api/timeline/marks folds.
-const MARKS: Mark[] = coalesceMarks(marksFrom({
-  chapters: [
-    { day: 0, title: 'The first morning' }, { day: 1, title: 'Rain on the new roof' },
-    { day: 2, title: 'A quarrel at the well' }, { day: 3, title: 'The storehouse fills' },
-  ],
-  milestones: [
-    { label: 'The first fire was lit', day: 0, tick: 380 },
-    { label: 'The first harvest came in', day: 3, tick: 3 * DAY + 500 },
-  ],
-  moments: [{ day: 5, startTick: 5 * DAY + 360 }],
-  changes: [{ tick: 2 * DAY + 100 }],
-  events: [
-    { tick: 1 * DAY + 620, type: 'structure_completed' },
-    { tick: 3 * DAY + 30, type: 'agent_died' },
-    { tick: 4 * DAY + 200, type: 'agent_born' },
-  ],
-  discoveries: [],
-}), 6 * DAY)
+const MARKS: Mark[] = coalesceMarks(
+  marksFrom({
+    chapters: [
+      { day: 0, title: 'The first morning' },
+      { day: 1, title: 'Rain on the new roof' },
+      { day: 2, title: 'A quarrel at the well' },
+      { day: 3, title: 'The storehouse fills' },
+    ],
+    milestones: [
+      { label: 'The first fire was lit', day: 0, tick: 380 },
+      { label: 'The first harvest came in', day: 3, tick: 3 * DAY + 500 },
+    ],
+    moments: [{ day: 5, startTick: 5 * DAY + 360 }],
+    changes: [{ tick: 2 * DAY + 100 }],
+    events: [
+      { tick: 1 * DAY + 620, type: 'structure_completed' },
+      { tick: 3 * DAY + 30, type: 'agent_died' },
+      { tick: 4 * DAY + 200, type: 'agent_born' },
+    ],
+    discoveries: [],
+  }),
+  6 * DAY,
+)
 
 const view = (over: Partial<Parameters<typeof TimelineView>[0]> = {}): string =>
-  renderToStaticMarkup(createElement(TimelineView, {
-    edge: 6 * DAY, viewTick: 3 * DAY, live: false, marks: MARKS,
-    onScrub: () => {}, onLive: () => {}, ...over,
-  }))
+  renderToStaticMarkup(
+    createElement(TimelineView, {
+      edge: 6 * DAY,
+      viewTick: 3 * DAY,
+      live: false,
+      marks: MARKS,
+      onScrub: () => {},
+      onLive: () => {},
+      ...over,
+    }),
+  )
 
 describe('U14 — the scrubber has somewhere to aim', () => {
   it('cannot get its marks from the ring, and the ring is why there were none', () => {
@@ -76,7 +97,7 @@ describe('U14 — the scrubber has somewhere to aim', () => {
   it('says nothing rather than inventing marks on a town with no record', () => {
     const html = view({ marks: [] })
     expect(html).not.toContain('class="mark ')
-    expect(html).toContain('timeline-track')          // the scrubber still works
+    expect(html).toContain('timeline-track') // the scrubber still works
   })
 
   it('places every mark inside the track, in proportion to when it happened', () => {
@@ -95,7 +116,7 @@ describe('U14 — the scrubber has somewhere to aim', () => {
     expect(markLeft(0, 6 * DAY)).toBe(`clamp(${half}px, 0%, calc(100% - ${half}px))`)
     expect(markLeft(6 * DAY, 6 * DAY)).toBe(`clamp(${half}px, 100%, calc(100% - ${half}px))`)
     expect(markLeft(3 * DAY, 6 * DAY)).toContain('50%')
-    expect(markLeft(10, 0)).toContain('0%')      // a town one tick old divides by nothing
+    expect(markLeft(10, 0)).toContain('0%') // a town one tick old divides by nothing
   })
 
   // WHAT THE BROWSER CAUGHT: "5 people arrived in the town", centred on the first mark, ran
@@ -126,7 +147,9 @@ describe('every mark is reachable, by pointer and by voice', () => {
   const html = view()
 
   it('is a button with a spoken label that says the day and what happened', () => {
-    expect(html).toMatch(/<button[^>]*class="mark chapter"[^>]*aria-label="Day 0[^"]*The first morning/)
+    expect(html).toMatch(
+      /<button[^>]*class="mark chapter"[^>]*aria-label="Day 0[^"]*The first morning/,
+    )
     expect(html).toMatch(/aria-label="[^"]*Go to this moment\."/)
   })
 
@@ -159,7 +182,7 @@ describe('the scrubber the marks sit on still behaves', () => {
   })
 
   it('still rules the days off', () => {
-    expect([...html.matchAll(/class="timeline-day"/g)].length).toBe(7)   // day 0 through day 6
+    expect([...html.matchAll(/class="timeline-day"/g)].length).toBe(7) // day 0 through day 6
   })
 
   it('takes a town one tick old without dividing by nothing', () => {

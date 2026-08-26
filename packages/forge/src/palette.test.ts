@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { MASTER_PALETTE, paletteRgb } from './palette.js'
 
 describe('master palette', () => {
-  it('has exactly 40 colors', () => { expect(MASTER_PALETTE).toHaveLength(40) })
+  it('has exactly 40 colors', () => {
+    expect(MASTER_PALETTE).toHaveLength(40)
+  })
   it('all entries are unique uppercase #RRGGBB', () => {
     for (const c of MASTER_PALETTE) expect(c).toMatch(/^#[0-9A-F]{6}$/)
     expect(new Set(MASTER_PALETTE).size).toBe(40)

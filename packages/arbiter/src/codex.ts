@@ -21,12 +21,16 @@ export class CodexStore {
   }
 
   known(): string[] {
-    const rows = this.db.prepare('SELECT id FROM codex WHERE known = 1 ORDER BY rowid').all() as Array<{ id: string }>
+    const rows = this.db
+      .prepare('SELECT id FROM codex WHERE known = 1 ORDER BY rowid')
+      .all() as Array<{ id: string }>
     return rows.map((r) => r.id)
   }
 
   knownEra(): Era {
-    const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as Array<{ era: string }>
+    const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as Array<{
+      era: string
+    }>
     let best: Era = 'handwork'
     let bestOrder = 0
     for (const row of rows) {
@@ -44,8 +48,8 @@ export class CodexStore {
   frontier(): string[] {
     const rows = this.db
       .prepare(
-        'SELECT c.id FROM codex c JOIN codex p ON p.id = c.prerequisite_id'
-          + ' WHERE c.known = 0 AND p.known = 1 ORDER BY c.id',
+        'SELECT c.id FROM codex c JOIN codex p ON p.id = c.prerequisite_id' +
+          ' WHERE c.known = 0 AND p.known = 1 ORDER BY c.id',
       )
       .all() as Array<{ id: string }>
     return rows.map((r) => r.id)

@@ -6,7 +6,11 @@ import { VERBS, workPenalty, type PendingEvent } from './verbs.js'
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
 export function submitIntent(
-  state: WorldState, baseConfig: SimConfig, agentId: string, verb: string, params: Record<string, unknown>,
+  state: WorldState,
+  baseConfig: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
 ): IntentResult {
   // Derived here, not at the call site: every verb is judged under the world's live laws.
   const config = effectiveConfig(baseConfig, state.laws)
@@ -15,7 +19,8 @@ export function submitIntent(
   if (!a.alive) return { ok: false, reason: 'the dead do not act' }
   // Sleep is allowed while collapsed: energy only regens asleep, so an
   // energy collapse would otherwise be unrecoverable.
-  if (a.collapsedSinceTick !== null && verb !== 'eat' && verb !== 'sleep') return { ok: false, reason: 'collapsed and unable to act' }
+  if (a.collapsedSinceTick !== null && verb !== 'eat' && verb !== 'sleep')
+    return { ok: false, reason: 'collapsed and unable to act' }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
   // A verb that declares `atOnce` does not use the hands: it never takes the activity slot and is

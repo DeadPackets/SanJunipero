@@ -38,7 +38,14 @@ describe('NarratorStore', () => {
   it('round-trips scenes with parsed eventIds/cast arrays', () => {
     const { store } = memStore()
     const scenes: SceneSegment[] = [
-      { day: 1, startTick: 1440, endTick: 1450, eventIds: [4, 5, 6], cast: ['omar', 'yusuf'], location: '3,4' },
+      {
+        day: 1,
+        startTick: 1440,
+        endTick: 1450,
+        eventIds: [4, 5, 6],
+        cast: ['omar', 'yusuf'],
+        location: '3,4',
+      },
       { day: 1, startTick: 1500, endTick: 1520, eventIds: [7, 8], cast: ['nadia'], location: null },
     ]
     const ids = store.insertScenes(scenes)
@@ -55,7 +62,14 @@ describe('NarratorStore', () => {
     const [sceneId] = store.insertScenes([
       { day: 1, startTick: 1440, endTick: 1450, eventIds: [1, 2], cast: [], location: null },
     ])
-    const s: HeatScores = { conflict: 1.5, novelty: 2, firsts: 3, stakes: 1, dramaticIrony: 0, total: 7.5 }
+    const s: HeatScores = {
+      conflict: 1.5,
+      novelty: 2,
+      firsts: 3,
+      stakes: 1,
+      dramaticIrony: 0,
+      total: 7.5,
+    }
     store.insertHeat(sceneId, s)
     const heats = store.heatsForDay(1)
     expect(heats).toHaveLength(1)
@@ -67,8 +81,14 @@ describe('NarratorStore', () => {
   it('milestones: kinds round-trip and duplicate kind throws', () => {
     const { store } = memStore()
     const m: Milestone = {
-      kind: 'first_trade', tier: 1, domain: 'engine', label: 'the first trade',
-      eventSeq: 9, day: 0, tick: 100, agentIds: ['omar'],
+      kind: 'first_trade',
+      tier: 1,
+      domain: 'engine',
+      label: 'the first trade',
+      eventSeq: 9,
+      day: 0,
+      tick: 100,
+      agentIds: ['omar'],
     }
     store.insertMilestone(m)
     expect(store.milestoneKinds()).toEqual(new Set(['first_trade']))
@@ -79,8 +99,12 @@ describe('NarratorStore', () => {
   it('institutions round-trip memberIds/sourceEventIds', () => {
     const { store } = memStore()
     const inst: Institution = {
-      kind: 'group', name: 'omar & yusuf', description: 'seen together often',
-      foundingSceneId: 1, memberIds: ['omar', 'yusuf'], sourceEventIds: [1, 2, 3],
+      kind: 'group',
+      name: 'omar & yusuf',
+      description: 'seen together often',
+      foundingSceneId: 1,
+      memberIds: ['omar', 'yusuf'],
+      sourceEventIds: [1, 2, 3],
     }
     const id = store.insertInstitution(inst)
     const got = store.institutions()
@@ -90,25 +114,67 @@ describe('NarratorStore', () => {
 
   it('chapters: insert, range query, day query', () => {
     const { store } = memStore()
-    const id = store.insertChapter({ day: 1, title: 'Day One', text: 'It began.', citations: [3, 7], sceneIds: [1] })
+    const id = store.insertChapter({
+      day: 1,
+      title: 'Day One',
+      text: 'It began.',
+      citations: [3, 7],
+      sceneIds: [1],
+    })
     const inRange = store.chaptersInRange(0, 2)
     expect(inRange).toHaveLength(1)
-    expect(inRange[0]).toEqual({ id, day: 1, title: 'Day One', text: 'It began.', citations: [3, 7], sceneIds: [1] })
+    expect(inRange[0]).toEqual({
+      id,
+      day: 1,
+      title: 'Day One',
+      text: 'It began.',
+      citations: [3, 7],
+      sceneIds: [1],
+    })
     expect(store.chaptersForDay(0)).toEqual([])
     expect(store.chaptersForDay(1)).toHaveLength(1)
   })
 
   it('eras: chapterIds parse back', () => {
     const { store } = memStore()
-    const id = store.insertEra({ startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.', citations: [1], chapterIds: [1, 2, 3] })
+    const id = store.insertEra({
+      startDay: 0,
+      endDay: 6,
+      title: 'The First Week',
+      text: 'Seven days.',
+      citations: [1],
+      chapterIds: [1, 2, 3],
+    })
     const eras = store.eras()
-    expect(eras).toEqual([{ id, startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.', citations: [1], chapterIds: [1, 2, 3] }])
+    expect(eras).toEqual([
+      {
+        id,
+        startDay: 0,
+        endDay: 6,
+        title: 'The First Week',
+        text: 'Seven days.',
+        citations: [1],
+        chapterIds: [1, 2, 3],
+      },
+    ])
   })
 
   it('publications: null citations survive and kind filter works', () => {
     const { store } = memStore()
-    store.insertPublication({ day: 1, kind: 'newspaper', title: 'The Junipero Times', body: 'News.', citations: [3] })
-    store.insertPublication({ day: 1, kind: 'biography', title: 'Omar', body: 'A life.', citations: null })
+    store.insertPublication({
+      day: 1,
+      kind: 'newspaper',
+      title: 'The Junipero Times',
+      body: 'News.',
+      citations: [3],
+    })
+    store.insertPublication({
+      day: 1,
+      kind: 'biography',
+      title: 'Omar',
+      body: 'A life.',
+      citations: null,
+    })
     const bios = store.publications('biography')
     expect(bios).toHaveLength(1)
     expect(bios[0].citations).toBeNull()

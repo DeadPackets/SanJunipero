@@ -31,7 +31,10 @@ export function balancedSpans(text: string): string[] {
       else if (ch === '"') inString = false
       continue
     }
-    if (ch === '"') { inString = true; continue }
+    if (ch === '"') {
+      inString = true
+      continue
+    }
     if (ch === '{' || ch === '[') {
       if (depth === 0) start = i
       depth += 1
@@ -40,7 +43,10 @@ export function balancedSpans(text: string): string[] {
     if (ch === '}' || ch === ']') {
       if (depth === 0) continue
       depth -= 1
-      if (depth === 0 && start !== -1) { spans.push(text.slice(start, i + 1)); start = -1 }
+      if (depth === 0 && start !== -1) {
+        spans.push(text.slice(start, i + 1))
+        start = -1
+      }
     }
   }
   return spans
@@ -61,7 +67,11 @@ export function dropTrailingCommas(text: string): string {
       else if (ch === '"') inString = false
       continue
     }
-    if (ch === '"') { inString = true; out += ch; continue }
+    if (ch === '"') {
+      inString = true
+      out += ch
+      continue
+    }
     if (ch === ',') {
       let j = i + 1
       while (j < text.length && /\s/.test(text[j]!)) j += 1
@@ -125,7 +135,10 @@ const quotedNumber = (v: unknown): number | undefined => {
 
 // The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
 // dropped and a quoted number is read as the number it spells. Nothing is supplied.
-function applySchemaIssues<T>(value: unknown, schema: z.ZodType<T>): { value: T; how: string } | undefined {
+function applySchemaIssues<T>(
+  value: unknown,
+  schema: z.ZodType<T>,
+): { value: T; how: string } | undefined {
   let current = structuredClone(value)
   const applied: string[] = []
   for (let round = 0; round < 4; round += 1) {
@@ -138,15 +151,23 @@ function applySchemaIssues<T>(value: unknown, schema: z.ZodType<T>): { value: T;
       if (issue.code === 'unrecognized_keys') {
         const holder = containerAt(current, issue.path)
         if (!isRecord(holder)) continue
-        for (const key of issue.keys) if (key in holder) { delete holder[key]; changed = true }
-        if (changed && !applied.includes('unknown-keys-dropped')) applied.push('unknown-keys-dropped')
+        for (const key of issue.keys)
+          if (key in holder) {
+            delete holder[key]
+            changed = true
+          }
+        if (changed && !applied.includes('unknown-keys-dropped'))
+          applied.push('unknown-keys-dropped')
       } else if (issue.code === 'invalid_type' && issue.expected === 'number') {
         const key = issue.path[issue.path.length - 1]
         const holder = containerAt(current, issue.path.slice(0, -1))
         if (key === undefined) continue
         const n = quotedNumber(
-          Array.isArray(holder) && typeof key === 'number' ? holder[key]
-            : isRecord(holder) ? holder[String(key)] : undefined,
+          Array.isArray(holder) && typeof key === 'number'
+            ? holder[key]
+            : isRecord(holder)
+              ? holder[String(key)]
+              : undefined,
         )
         if (n === undefined) continue
         if (Array.isArray(holder) && typeof key === 'number') holder[key] = n
@@ -162,7 +183,10 @@ function applySchemaIssues<T>(value: unknown, schema: z.ZodType<T>): { value: T;
 
 // The whole pass: reframe, then let the schema name what is left. Returns the repaired value
 // and the name of the repair that worked, or nothing at all.
-export function repairToSchema<T>(text: string, schema: z.ZodType<T>): { value: T; how: string } | undefined {
+export function repairToSchema<T>(
+  text: string,
+  schema: z.ZodType<T>,
+): { value: T; how: string } | undefined {
   const candidates = repairCandidates(text)
   for (const { value, how } of candidates) {
     const parsed = schema.safeParse(value)

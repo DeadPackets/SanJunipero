@@ -5,13 +5,19 @@ import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@s
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
-  HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
-  type HeatScores, type HeatWindow,
+  HEAT_HORIZON_TICKS,
+  HEAT_WINDOW_TICKS,
+  heatContext,
+  heatFromScores,
+  heatSince,
+  scoreEvent,
+  type HeatScores,
+  type HeatWindow,
 } from './heat.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
-export const TALK_WINDOW_TICKS = 20   // two spoke events this close, in earshot → one talk weight
+export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot → one talk weight
 export const TOP_MOMENTS = 5
 
 /**
@@ -26,8 +32,13 @@ export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
  * number: unclamped, `?toTick=1000000000` answers 4.75 MB to a 60-byte GET. Clamping into the
  * world that exists also collapses the cache key space — every over-long window is one window.
  */
-export function clampWindow(from: string | null, to: string | null, liveTick: number): {
-  fromTick: number; toTick: number
+export function clampWindow(
+  from: string | null,
+  to: string | null,
+  liveTick: number,
+): {
+  fromTick: number
+  toTick: number
 } {
   const pin = (raw: string | null, fallback: number): number => {
     const n = Number(raw ?? fallback)
@@ -50,8 +61,12 @@ export type DataApiDeps = {
 /** What the read path keeps once an event has been folded. Every field is a count of ANSWERS —
  *  links, drama windows, deaths, buildings — and none of them is a count of events. */
 export type Footprint = {
-  provenance: number; heat: number; links: number; spokes: number
-  started: number; deaths: number
+  provenance: number
+  heat: number
+  links: number
+  spokes: number
+  started: number
+  deaths: number
   /** The highest seq folded. Present so a guard can prove the fold really consumed the log. */
   seq: number
 }
@@ -60,11 +75,14 @@ type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 
 // "-ing" line for the digest: drop a trailing e (give→giving), else append
-const gerund = (verb: string): string => (verb.endsWith('e') ? `${verb.slice(0, -1)}ing` : `${verb}ing`)
+const gerund = (verb: string): string =>
+  verb.endsWith('e') ? `${verb.slice(0, -1)}ing` : `${verb}ing`
 
 export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
-  const selEventsAfter = deps.db.prepare('SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq')
+  const selEventsAfter = deps.db.prepare(
+    'SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq',
+  )
 
   /**
    * The event log is never retained — every event is folded ONCE into the aggregates below,
@@ -79,7 +97,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const planned = new Map<string, Planned>()
   const completedTick = new Map<string, number>()
   const heat: HeatScores = new Map()
-  const weights = new Map<string, number>()        // `${source}\n${target}\n${kind}` → weight
+  const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
   const deaths: Array<{ agentId: string; tick: number; cause: string }> = []
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
@@ -162,8 +180,13 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     }
   }
   deps.onFootprint?.(() => ({
-    provenance: planned.size + completedTick.size, heat: heat.size, links: weights.size,
-    spokes: spokes.length, started: started.size, deaths: deaths.length, seq: foldCursor,
+    provenance: planned.size + completedTick.size,
+    heat: heat.size,
+    links: weights.size,
+    spokes: spokes.length,
+    started: started.size,
+    deaths: deaths.length,
+    seq: foldCursor,
   }))
 
   /**
@@ -171,7 +194,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    * are re-scored from the log — at most 120 ticks, bounded however old the town is.
    */
   const selRange = deps.db.prepare(
-    'SELECT seq, tick, type, payload FROM events WHERE tick BETWEEN ? AND ? ORDER BY seq')
+    'SELECT seq, tick, type, payload FROM events WHERE tick BETWEEN ? AND ? ORDER BY seq',
+  )
   const heatOver = (fromTick: number, toTick: number): HeatWindow[] => {
     const lo = Math.floor(fromTick / HEAT_WINDOW_TICKS)
     const hi = Math.floor(toTick / HEAT_WINDOW_TICKS)
@@ -202,7 +226,10 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     if (!deps.agentDbDir || !AGENT_ID.test(agentId)) return []
     let adb: Database.Database | null = null
     try {
-      adb = new Database(join(deps.agentDbDir, `${agentId}.db`), { readonly: true, fileMustExist: true })
+      adb = new Database(join(deps.agentDbDir, `${agentId}.db`), {
+        readonly: true,
+        fileMustExist: true,
+      })
       return adb.prepare(sql).all(agentId) as T[]
     } catch {
       return []
@@ -215,27 +242,55 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     const id = params.id ?? ''
     // `agents['__proto__']` is truthy and answers a body of nulls; a slug never is.
     const a = AGENT_ID.test(id) ? deps.mirror.state().agents[id] : undefined
-    if (!a) { notFound(res); return }
+    if (!a) {
+      notFound(res)
+      return
+    }
     sendJson(res, {
-      id: a.id, name: a.name, alive: a.alive, asleep: a.asleep, x: a.x, y: a.y,
-      needs: a.needs, hp: a.hp, injuries: a.injuries, ill: a.ill, ageDays: a.ageDays,
-      skills: a.skills, activity: a.activity,
+      id: a.id,
+      name: a.name,
+      alive: a.alive,
+      asleep: a.asleep,
+      x: a.x,
+      y: a.y,
+      needs: a.needs,
+      hp: a.hp,
+      injuries: a.injuries,
+      ill: a.ill,
+      ageDays: a.ageDays,
+      skills: a.skills,
+      activity: a.activity,
     })
   })
 
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
-    sendJson(res, readAgentRows(params.id ?? '',
-      'SELECT tick, day, text FROM journal WHERE agent_id = ? ORDER BY id'))
+    sendJson(
+      res,
+      readAgentRows(
+        params.id ?? '',
+        'SELECT tick, day, text FROM journal WHERE agent_id = ? ORDER BY id',
+      ),
+    )
   })
 
   router.route('GET', '/api/agent/:id/ledgers', (_req, res, params) => {
-    sendJson(res, readAgentRows<{ personId: string; doc: string; updatedDay: number }>(params.id ?? '',
-      'SELECT person_id AS personId, doc, updated_day AS updatedDay FROM ledgers WHERE agent_id = ? ORDER BY person_id'))
+    sendJson(
+      res,
+      readAgentRows<{ personId: string; doc: string; updatedDay: number }>(
+        params.id ?? '',
+        'SELECT person_id AS personId, doc, updated_day AS updatedDay FROM ledgers WHERE agent_id = ? ORDER BY person_id',
+      ),
+    )
   })
 
   router.route('GET', '/api/agent/:id/personality', (_req, res, params) => {
-    sendJson(res, readAgentRows(params.id ?? '',
-      'SELECT version, day, doc, edit FROM personality_versions WHERE agent_id = ? ORDER BY version'))
+    sendJson(
+      res,
+      readAgentRows(
+        params.id ?? '',
+        'SELECT version, day, doc, edit FROM personality_versions WHERE agent_id = ? ORDER BY version',
+      ),
+    )
   })
 
   // The id is the caller's to choose, so this must stay an O(1) map lookup — a scan per request
@@ -244,28 +299,42 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     readFold()
     const id = params.id ?? ''
     const plan = planned.get(id)
-    if (!plan) { notFound(res); return }
+    if (!plan) {
+      notFound(res)
+      return
+    }
     sendJson(res, {
-      id, kind: plan.kind, plannedTick: plan.plannedTick, builderId: plan.builderId,
+      id,
+      kind: plan.kind,
+      plannedTick: plan.plannedTick,
+      builderId: plan.builderId,
       completedTick: completedTick.get(id) ?? null,
     })
   })
 
   router.route('GET', '/api/society', (_req, res) => {
     readFold()
-    sendPrebuilt(res, cache.json('society', () => {
-      const nodes = Object.values(deps.mirror.state().agents)
-        .sort((a, b) => (a.id < b.id ? -1 : 1))
-        .map(a => ({ id: a.id, name: a.name, alive: a.alive }))
-      const links = [...weights.entries()]
-        .map(([key, weight]) => {
-          const [source, target, kind] = key.split('\n') as [string, string, LinkKind]
-          return { source, target, kind, weight }
-        })
-        .sort((a, b) => b.weight - a.weight
-          || a.source.localeCompare(b.source) || a.target.localeCompare(b.target) || a.kind.localeCompare(b.kind))
-      return { nodes, links }
-    }))
+    sendPrebuilt(
+      res,
+      cache.json('society', () => {
+        const nodes = Object.values(deps.mirror.state().agents)
+          .sort((a, b) => (a.id < b.id ? -1 : 1))
+          .map((a) => ({ id: a.id, name: a.name, alive: a.alive }))
+        const links = [...weights.entries()]
+          .map(([key, weight]) => {
+            const [source, target, kind] = key.split('\n') as [string, string, LinkKind]
+            return { source, target, kind, weight }
+          })
+          .sort(
+            (a, b) =>
+              b.weight - a.weight ||
+              a.source.localeCompare(b.source) ||
+              a.target.localeCompare(b.target) ||
+              a.kind.localeCompare(b.kind),
+          )
+        return { nodes, links }
+      }),
+    )
   })
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
@@ -276,53 +345,82 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()
-    sendPrebuilt(res, cache.json('heat', () => {
-      const nowTick = deps.mirror.state().tick
-      // The windows `heatSince` would keep, picked out before they are built and sorted: it keeps
-      // `60w + 59 >= nowTick − HORIZON`, which is exactly `w >= floor((nowTick − HORIZON) / 60)`.
-      const floorW = Math.floor((nowTick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
-      const recent: HeatScores = new Map()
-      for (const [key, score] of heat) {
-        if (Number(key.slice(0, key.indexOf('\n'))) >= floorW) recent.set(key, score)
-      }
-      return heatSince(heatFromScores(recent), nowTick)
-    }))
+    sendPrebuilt(
+      res,
+      cache.json('heat', () => {
+        const nowTick = deps.mirror.state().tick
+        // The windows `heatSince` would keep, picked out before they are built and sorted: it keeps
+        // `60w + 59 >= nowTick − HORIZON`, which is exactly `w >= floor((nowTick − HORIZON) / 60)`.
+        const floorW = Math.floor((nowTick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
+        const recent: HeatScores = new Map()
+        for (const [key, score] of heat) {
+          if (Number(key.slice(0, key.indexOf('\n'))) >= floorW) recent.set(key, score)
+        }
+        return heatSince(heatFromScores(recent), nowTick)
+      }),
+    )
   })
 
   router.route('GET', '/api/digest', (req: IncomingMessage, res) => {
     readFold()
     const url = new URL(req.url ?? '/', 'http://localhost')
     const { fromTick, toTick } = clampWindow(
-      url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
-    sendPrebuilt(res, cache.json(`digest:${fromTick}:${toTick}`, () => {
-      const inWindow = (t: number): boolean => t >= fromTick && t <= toTick
+      url.searchParams.get('fromTick'),
+      url.searchParams.get('toTick'),
+      deps.mirror.state().tick,
+    )
+    sendPrebuilt(
+      res,
+      cache.json(`digest:${fromTick}:${toTick}`, () => {
+        const inWindow = (t: number): boolean => t >= fromTick && t <= toTick
 
-      const days: number[] = []
-      for (let d = Math.floor(fromTick / MINUTES_PER_DAY); d <= Math.floor(toTick / MINUTES_PER_DAY); d++) days.push(d)
+        const days: number[] = []
+        for (
+          let d = Math.floor(fromTick / MINUTES_PER_DAY);
+          d <= Math.floor(toTick / MINUTES_PER_DAY);
+          d++
+        )
+          days.push(d)
 
-      const state = deps.mirror.state()
-      const structuresCompleted = [...completedTick].filter(([, tick]) => inWindow(tick)).map(([id, tick]) => ({
-        id, kind: state.structures[id]?.kind ?? 'structure', tick,
-      }))
+        const state = deps.mirror.state()
+        const structuresCompleted = [...completedTick]
+          .filter(([, tick]) => inWindow(tick))
+          .map(([id, tick]) => ({
+            id,
+            kind: state.structures[id]?.kind ?? 'structure',
+            tick,
+          }))
 
-      const topMoments = heatOver(fromTick, toTick)
-        .sort((a: HeatWindow, b: HeatWindow) => b.score - a.score
-          || a.fromTick - b.fromTick || a.agentId.localeCompare(b.agentId))
-        .slice(0, TOP_MOMENTS)
-        .map(w => ({ tick: w.fromTick, agentId: w.agentId, score: w.score, moment: tickToMoment(w.fromTick) }))
+        const topMoments = heatOver(fromTick, toTick)
+          .sort(
+            (a: HeatWindow, b: HeatWindow) =>
+              b.score - a.score || a.fromTick - b.fromTick || a.agentId.localeCompare(b.agentId),
+          )
+          .slice(0, TOP_MOMENTS)
+          .map((w) => ({
+            tick: w.fromTick,
+            agentId: w.agentId,
+            score: w.score,
+            moment: tickToMoment(w.fromTick),
+          }))
 
-      const agentLines = Object.values(state.agents)
-        .filter(a => a.alive)
-        .sort((a, b) => (a.id < b.id ? -1 : 1))
-        .map(a => ({
-          agentId: a.id,
-          line: `${a.name} was last seen ${a.activity ? gerund(a.activity.verb) : 'resting'}`,
-        }))
+        const agentLines = Object.values(state.agents)
+          .filter((a) => a.alive)
+          .sort((a, b) => (a.id < b.id ? -1 : 1))
+          .map((a) => ({
+            agentId: a.id,
+            line: `${a.name} was last seen ${a.activity ? gerund(a.activity.verb) : 'resting'}`,
+          }))
 
-      return {
-        days, deaths: deaths.filter(d => inWindow(d.tick)), births: [],
-        structuresCompleted, topMoments, agentLines,
-      }
-    }))
+        return {
+          days,
+          deaths: deaths.filter((d) => inWindow(d.tick)),
+          births: [],
+          structuresCompleted,
+          topMoments,
+          agentLines,
+        }
+      }),
+    )
   })
 }

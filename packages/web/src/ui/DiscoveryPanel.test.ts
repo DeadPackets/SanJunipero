@@ -12,19 +12,26 @@ import { GAMIFICATION_BAN } from './townStats.js'
 const EMOJI = /\p{Extended_Pictographic}/u
 
 const renderPanel = (
-  rows: readonly DiscoveryRecord[], assets: readonly AssetRecord[] = [],
-): string => renderToStaticMarkup(createElement(DiscoveryRecordView, {
-  leaves: leavesOf(rows, assets), throughTick: 59_040, viewTick: null, onJump: () => {},
-}))
+  rows: readonly DiscoveryRecord[],
+  assets: readonly AssetRecord[] = [],
+): string =>
+  renderToStaticMarkup(
+    createElement(DiscoveryRecordView, {
+      leaves: leavesOf(rows, assets),
+      throughTick: 59_040,
+      viewTick: null,
+      onJump: () => {},
+    }),
+  )
 
 describe('the Discovery Record reads', () => {
   it('answers all four questions on the face of one leaf', () => {
     const html = renderPanel([D()])
-    expect(html).toContain('Maret')                              // who
-    expect(html).toContain('Day 12')                             // when
-    expect(html).toContain('carry water in a stitched hide')     // from what — the quote
-    expect(html).toContain('waterskin')                          // what it unlocked
-    expect(html).toContain('stitch a waterskin')                 // the town's name for it
+    expect(html).toContain('Maret') // who
+    expect(html).toContain('Day 12') // when
+    expect(html).toContain('carry water in a stitched hide') // from what — the quote
+    expect(html).toContain('waterskin') // what it unlocked
+    expect(html).toContain('stitch a waterskin') // the town's name for it
   })
 
   it('quotes the mind’s own words HERE and only here', () => {
@@ -33,8 +40,9 @@ describe('the Discovery Record reads', () => {
 
   it('says what a discovery unlocked, and says nothing when it unlocked no thing', () => {
     expect(renderPanel([D()])).toContain('anyone could make waterskin')
-    expect(renderPanel([D({ kind: 'word', name: 'dance', makes: [] })]))
-      .not.toContain('anyone could make')
+    expect(renderPanel([D({ kind: 'word', name: 'dance', makes: [] })])).not.toContain(
+      'anyone could make',
+    )
   })
 
   it('speaks a kind as PROSE, never as the engine’s slug', () => {
@@ -44,8 +52,9 @@ describe('the Discovery Record reads', () => {
   })
 
   it('holds the whole run in one line at the top', () => {
-    expect(renderPanel([D(), D({ seq: 2, byId: 'a2', by: 'Sena' })]))
-      .toContain('In 41 days, two people worked out 2 things.')
+    expect(renderPanel([D(), D({ seq: 2, byId: 'a2', by: 'Sena' })])).toContain(
+      'In 41 days, two people worked out 2 things.',
+    )
   })
 
   it('says the empty state in words, not with a blank panel', () => {
@@ -58,11 +67,16 @@ describe('the Discovery Record reads', () => {
     const html = renderPanel([D()])
     expect(html).toMatch(/<button[^>]+class="[^"]*discovery-leaf/)
     expect(html).toMatch(/aria-label="[^"]*Maret[^"]*"/)
-    expect(html).toContain('aria-label="Maret worked out stitch a waterskin, Day 12, 00:00. Go to this moment."')
+    expect(html).toContain(
+      'aria-label="Maret worked out stitch a waterskin, Day 12, 00:00. Go to this moment."',
+    )
   })
 
   it('grows one leaf per discovery, in the archive’s order', () => {
-    const html = renderPanel([D(), D({ seq: 2, tick: 20_000, name: 'dance', kind: 'word', makes: [] })])
+    const html = renderPanel([
+      D(),
+      D({ seq: 2, tick: 20_000, name: 'dance', kind: 'word', makes: [] }),
+    ])
     expect(html.match(/class="discovery-leaf"/g)).toHaveLength(2)
     expect(html.indexOf('stitch a waterskin')).toBeLessThan(html.indexOf('dance'))
   })
@@ -89,8 +103,10 @@ describe('the Discovery Record reads', () => {
 })
 
 describe('the Discovery Record clears AA in both bands', () => {
-  const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+  const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  )
   const T = tokens(CSS)
   const AA = 4.5
 
@@ -133,8 +149,13 @@ describe('the Discovery Record clears AA in both bands', () => {
   })
 
   it('NEVER thins a reading surface with opacity', () => {
-    for (const sel of ['.discovery-leaf p', '.discovery-quote', '.discovery-leaf h3',
-      '.discovery-summary', '.discovery-record']) {
+    for (const sel of [
+      '.discovery-leaf p',
+      '.discovery-quote',
+      '.discovery-leaf h3',
+      '.discovery-summary',
+      '.discovery-record',
+    ]) {
       expect(ruleBody(CSS, sel), sel).not.toMatch(/opacity:/)
     }
   })
@@ -157,10 +178,16 @@ describe('the Discovery Record clears AA in both bands', () => {
   // The panel was the one lens built in a second idiom: raw px, 1px hairlines and rounded
   // corners, on a sheet that everywhere else steps in rem behind a 2px ink ring at radius 0.
   it('is built in the sheet’s own system, not a second one', () => {
-    for (const sel of ['.discovery-record', '.discovery-summary', '.discovery-chain',
-      '.discovery-leaf', '.discovery-quote']) {
-      expect(ruleBody(CSS, sel), `${sel} still sets a raw px length`)
-        .not.toMatch(/(padding|margin|gap|border-radius):[^;]*\dpx/)
+    for (const sel of [
+      '.discovery-record',
+      '.discovery-summary',
+      '.discovery-chain',
+      '.discovery-leaf',
+      '.discovery-quote',
+    ]) {
+      expect(ruleBody(CSS, sel), `${sel} still sets a raw px length`).not.toMatch(
+        /(padding|margin|gap|border-radius):[^;]*\dpx/,
+      )
     }
     expect(ruleBody(CSS, '.discovery-leaf')).toMatch(/border:\s*2px solid var\(--ink\)/)
     expect(ruleBody(CSS, '.discovery-leaf')).toMatch(/border-radius:\s*0/)

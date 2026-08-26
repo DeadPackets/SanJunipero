@@ -11,14 +11,24 @@ export type CameraAction =
 // terrain to the left by pushing the world right), matching drag-pan direction.
 export function cameraActionFor(key: string): CameraAction | null {
   switch (key) {
-    case 'ArrowLeft': return { kind: 'pan', dx: PAN_STEP_PX, dy: 0 }
-    case 'ArrowRight': return { kind: 'pan', dx: -PAN_STEP_PX, dy: 0 }
-    case 'ArrowUp': return { kind: 'pan', dx: 0, dy: PAN_STEP_PX }
-    case 'ArrowDown': return { kind: 'pan', dx: 0, dy: -PAN_STEP_PX }
-    case '+': case '=': return { kind: 'zoom', dir: 1 }
-    case '-': case '_': return { kind: 'zoom', dir: -1 }
-    case 'Home': return { kind: 'center' }
-    default: return null
+    case 'ArrowLeft':
+      return { kind: 'pan', dx: PAN_STEP_PX, dy: 0 }
+    case 'ArrowRight':
+      return { kind: 'pan', dx: -PAN_STEP_PX, dy: 0 }
+    case 'ArrowUp':
+      return { kind: 'pan', dx: 0, dy: PAN_STEP_PX }
+    case 'ArrowDown':
+      return { kind: 'pan', dx: 0, dy: -PAN_STEP_PX }
+    case '+':
+    case '=':
+      return { kind: 'zoom', dir: 1 }
+    case '-':
+    case '_':
+      return { kind: 'zoom', dir: -1 }
+    case 'Home':
+      return { kind: 'center' }
+    default:
+      return null
   }
 }
 

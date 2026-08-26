@@ -9,26 +9,64 @@ import type { WorldState } from '@sj/engine/state'
 // package because `@sj/web` is DOM-typed and bundler-resolved: a gateway test cannot import it.
 
 import {
-  ZOOM_SETTLE_MS, ZOOM_STOPS, WHEEL_GESTURE_GAP_MS, fitStop, initialZoom, nearestStop, stageFill, stageFillFloor,
+  ZOOM_SETTLE_MS,
+  ZOOM_STOPS,
+  WHEEL_GESTURE_GAP_MS,
+  fitStop,
+  initialZoom,
+  nearestStop,
+  stageFill,
+  stageFillFloor,
   zoomRelease,
-  zoomScaleAt, zoomTo, zoomWheel,
+  zoomScaleAt,
+  zoomTo,
+  zoomWheel,
 } from './camera.js'
 import { landmarkAlpha, landmarksOf, placeLandmarks } from './landmarks.js'
-import { AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, WORLD_TEXT_PAIRS, bandRatios, worldTextOffenders } from './legibility.js'
-import { ROAD_GROUND_LUMA_DELTA_MIN, LATTICE_PEAK_MAX, latticePeak, luma, roadReadsAt } from './groundField.js'
+import {
+  AA_RATIO,
+  LANDMARK_INK,
+  LANDMARK_PLATE,
+  WORLD_TEXT_PAIRS,
+  bandRatios,
+  worldTextOffenders,
+} from './legibility.js'
+import {
+  ROAD_GROUND_LUMA_DELTA_MIN,
+  LATTICE_PEAK_MAX,
+  latticePeak,
+  luma,
+  roadReadsAt,
+} from './groundField.js'
 import { TILE_COLORS } from './ground.js'
 import { patchOutline } from './patches.js'
 import { FURNITURE_OCCUPANCY, INTERIOR_LAYOUTS, occupancyOf, roomFurnishings } from './interiors.js'
 import { ROOM_TILES, WALL_H_PX, wallPolys } from './roomShell.js'
 import {
-  OVERLAP_RANK, bodyDepthBox, depthOrder, structureDepthBox, tileDepthBox, type DepthBox,
+  OVERLAP_RANK,
+  bodyDepthBox,
+  depthOrder,
+  structureDepthBox,
+  tileDepthBox,
+  type DepthBox,
 } from './depth.js'
 import { doorTileOf, structureHitPoints } from './entities.js'
 import {
-  HIT_MIN_PX, HIT_TIGHTNESS_MAX, bodyHitPolygon, hitTightness, polygonBounds,
+  HIT_MIN_PX,
+  HIT_TIGHTNESS_MAX,
+  bodyHitPolygon,
+  hitTightness,
+  polygonBounds,
 } from './hitShapes.js'
 import { placeTag } from './tooltip.js'
-import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK, nineSlice, worldTextScale } from './textFaces.js'
+import {
+  SPEECH_FILL,
+  SPEECH_INK,
+  THOUGHT_FILL,
+  THOUGHT_INK,
+  nineSlice,
+  worldTextScale,
+} from './textFaces.js'
 import { literalZIndexOffenders, LAYERS, SORTED_LAYER } from './layers.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -39,7 +77,10 @@ function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
   const out: Array<{ path: string; source: string }> = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
-    if (statSync(p).isDirectory()) { out.push(...sources(p)); continue }
+    if (statSync(p).isDirectory()) {
+      out.push(...sources(p))
+      continue
+    }
     if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
     out.push({ path: p.slice(WEB_SRC.length + 1), source: readFileSync(p, 'utf8') })
   }
@@ -75,9 +116,20 @@ describe('U3 — "it just looks like chaos… no genuine structure"', () => {
 
   it('names a rank-1 centre a viewer can navigate by', () => {
     const state = {
-      structures: Object.fromEntries(TEMPLATE.structures.map((s, i) => [
-        `s${i}`, { id: `s${i}`, kind: s.kind, x: ANCHOR.x + s.dx, y: ANCHOR.y + s.dy, w: s.w, h: s.h, stage: 'complete' },
-      ])),
+      structures: Object.fromEntries(
+        TEMPLATE.structures.map((s, i) => [
+          `s${i}`,
+          {
+            id: `s${i}`,
+            kind: s.kind,
+            x: ANCHOR.x + s.dx,
+            y: ANCHOR.y + s.dy,
+            w: s.w,
+            h: s.h,
+            stage: 'complete',
+          },
+        ]),
+      ),
     } as unknown as WorldState
     const marks = landmarksOf(state)
     expect(marks.filter((m) => m.rank === 1)).toHaveLength(1)
@@ -104,7 +156,7 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
     }
   })
 
-  it('orders a sleeping body BETWEEN a bed\'s two halves', () => {
+  it("orders a sleeping body BETWEEN a bed's two halves", () => {
     const bed = INTERIOR_LAYOUTS.house.find((f) => f.kind === 'bed')!
     expect(occupancyOf(bed.kind)).toBe('in')
     expect(roomFurnishings('house').some((f) => f.kind === 'bed')).toBe(true)
@@ -113,8 +165,10 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
   // The polygon shell is still there as the art-independent fallback, which is why both halves
   // are asserted here.
   it('★ is a TILESET now, over a polygon that still stands when the codex is empty', () => {
-    expect(src('render/roomShell.ts')).toMatch(/Graphics|poly/)   // the fallback shell, kept
-    const anyInteriorTileset = sources().some((f) => /interior-tileset|interiorTileset/.test(f.source))
+    expect(src('render/roomShell.ts')).toMatch(/Graphics|poly/) // the fallback shell, kept
+    const anyInteriorTileset = sources().some((f) =>
+      /interior-tileset|interiorTileset/.test(f.source),
+    )
     expect(anyInteriorTileset, 'U4 needs a tileset, and this is it').toBe(true)
     // and it is drawn from the CODEX, not from a constant — art independence, same law as ground
     expect(src('render/interiorTileset.ts')).toContain('resolveInteriorPiece')
@@ -126,7 +180,9 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
 
 describe('U5 — "roads read ghost-faint at 1x"', () => {
   it('carries a hard edge against the ground it runs through', () => {
-    const dark = luma(0x9c6b47), light = luma(0xe8d5bc), grass = luma(TILE_COLORS[0]!)
+    const dark = luma(0x9c6b47),
+      light = luma(0xe8d5bc),
+      grass = luma(TILE_COLORS[0]!)
     expect(roadReadsAt(light, grass) || roadReadsAt(dark, grass)).toBe(true)
     expect(Math.abs(light - dark)).toBeGreaterThanOrEqual(ROAD_GROUND_LUMA_DELTA_MIN)
   })
@@ -139,14 +195,18 @@ describe('U5 — "roads read ghost-faint at 1x"', () => {
 // ── U6 · a ground with no visible repeat ──────────────────────────────────────────────────
 
 describe('U6 — "grass repeat is visible to the eye on a regular grid"', () => {
-  const W = 64, H = 64
+  const W = 64,
+    H = 64
   it('reads a field with no repeat as no lattice', () => {
     const noise = new Uint8ClampedArray(W * H * 4)
     let seed = 3
     for (let i = 0; i < W * H; i++) {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff
       const v = seed % 256
-      noise[i * 4] = v; noise[i * 4 + 1] = v; noise[i * 4 + 2] = v; noise[i * 4 + 3] = 255
+      noise[i * 4] = v
+      noise[i * 4 + 1] = v
+      noise[i * 4 + 2] = v
+      noise[i * 4 + 3] = 255
     }
     expect(latticePeak(noise, W, H, 16)).toBeLessThan(LATTICE_PEAK_MAX)
   })
@@ -155,9 +215,12 @@ describe('U6 — "grass repeat is visible to the eye on a regular grid"', () => 
     const grid = new Uint8ClampedArray(W * H * 4)
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const v = (x % 16 === 0 || y % 16 === 0) ? 255 : 0
+        const v = x % 16 === 0 || y % 16 === 0 ? 255 : 0
         const i = (y * W + x) * 4
-        grid[i] = v; grid[i + 1] = v; grid[i + 2] = v; grid[i + 3] = 255
+        grid[i] = v
+        grid[i + 1] = v
+        grid[i + 2] = v
+        grid[i + 3] = 255
       }
     }
     expect(latticePeak(grid, W, H, 16)).toBeGreaterThan(LATTICE_PEAK_MAX)
@@ -168,7 +231,12 @@ describe('U6 — "grass repeat is visible to the eye on a regular grid"', () => 
 
 describe('U7 — "farmland/plaza reads as an amorphous blob"', () => {
   it('gives a solid patch ONE outline and no interior segments', () => {
-    const tiles = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }]
+    const tiles = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ]
     const rings = patchOutline(tiles)
     expect(rings).toHaveLength(1)
     const ring = rings[0]!
@@ -180,9 +248,14 @@ describe('U7 — "farmland/plaza reads as an amorphous blob"', () => {
 
   it('finds a hole rather than smoothing it away, so the outline is not vacuous', () => {
     const donut = [
-      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 },
-      { x: 0, y: 1 }, { x: 2, y: 1 },
-      { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 },
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 0, y: 1 },
+      { x: 2, y: 1 },
+      { x: 0, y: 2 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
     ]
     expect(patchOutline(donut).length).toBeGreaterThan(1)
   })
@@ -190,8 +263,10 @@ describe('U7 — "farmland/plaza reads as an amorphous blob"', () => {
 
 // ── U8 · the layering, reviewed ───────────────────────────────────────────────────────────
 
-const townBoxes = (): DepthBox[] => TEMPLATE.structures.map((s, i) =>
-  structureDepthBox(`s${i}`, { x: ANCHOR.x + s.dx, y: ANCHOR.y + s.dy, w: s.w, h: s.h }))
+const townBoxes = (): DepthBox[] =>
+  TEMPLATE.structures.map((s, i) =>
+    structureDepthBox(`s${i}`, { x: ANCHOR.x + s.dx, y: ANCHOR.y + s.dy, w: s.w, h: s.h }),
+  )
 
 describe('U8 — "characters walk behind buildings and the layering makes no sense"', () => {
   it('puts a body standing in front of a door IN FRONT of the building, for all eleven', () => {
@@ -202,7 +277,8 @@ describe('U8 — "characters walk behind buildings and the layering makes no sen
       // the tile directly IN FRONT of the door — one step south of the frontage row
       const body = bodyDepthBox('body', d.x, d.y + 1)
       const order = depthOrder([structureDepthBox(`s${i}`, at), body])
-      if (order.indexOf('body') < order.indexOf(`s${i}`)) disagreements.push(`${s.kind} hides a body in its own doorway`)
+      if (order.indexOf('body') < order.indexOf(`s${i}`))
+        disagreements.push(`${s.kind} hides a body in its own doorway`)
     })
     expect(disagreements).toEqual([])
   })
@@ -228,7 +304,10 @@ describe('U8 — "characters walk behind buildings and the layering makes no sen
 
   it('does not throw on a pinwheel, and the overlap rank is the only cycle source', () => {
     const ring: DepthBox[] = [
-      tileDepthBox('a', 0, 0), tileDepthBox('b', 1, 0), tileDepthBox('c', 1, 1), tileDepthBox('d', 0, 1),
+      tileDepthBox('a', 0, 0),
+      tileDepthBox('b', 1, 0),
+      tileDepthBox('c', 1, 1),
+      tileDepthBox('d', 0, 1),
     ]
     expect(() => depthOrder(ring)).not.toThrow()
     expect(depthOrder(ring)).toHaveLength(4)
@@ -255,7 +334,12 @@ describe('U10 — "tooltips are out of place"', () => {
 
   it('keeps every one of forty sampled anchors inside the viewport', () => {
     for (let i = 0; i < 40; i++) {
-      const a = { sx: (i * 137) % 1400 - 60, sy: (i * 71) % 800 - 40, halfW: 20, topY: (i * 71) % 800 - 70 }
+      const a = {
+        sx: ((i * 137) % 1400) - 60,
+        sy: ((i * 71) % 800) - 40,
+        halfW: 20,
+        topY: ((i * 71) % 800) - 70,
+      }
       const at = placeTag(a, size, view)
       expect(at.sx - size.w / 2, `sample ${i}`).toBeGreaterThanOrEqual(view.x)
       expect(at.sx + size.w / 2, `sample ${i}`).toBeLessThanOrEqual(view.x + view.w)
@@ -271,9 +355,13 @@ describe('U10 — "tooltips are out of place"', () => {
     expect(Math.abs(second.sy - first.sy)).toBeGreaterThan(0)
   })
 
-  it('places the world\'s OWN words clear of each other too (carry-in A4.2)', () => {
+  it("places the world's OWN words clear of each other too (carry-in A4.2)", () => {
     const marks = [0, 1, 2, 3].map((i) => ({
-      id: `m${i}`, sx: 640, sy: 360, size, of: [{ x: 624, y: 328, w: 32, h: 40 }],
+      id: `m${i}`,
+      sx: 640,
+      sy: 360,
+      size,
+      of: [{ x: 624, y: 328, w: 32, h: 40 }],
     }))
     const placed = placeLandmarks(marks, view)
     for (let i = 0; i < placed.length; i++) {
@@ -309,23 +397,35 @@ describe('U11 — "door hotspots render as dark rectangular artifacts"', () => {
 // ── U18 · text boxes with a voice ─────────────────────────────────────────────────────────
 
 describe('U18 — "text boxes are not vibrant, not stylized, not clear enough"', () => {
-  it('asks no world-text module for the browser\'s default mono', () => {
-    for (const f of ['render/bubbles.ts', 'render/characters.ts', 'render/tooltip.ts', 'render/landmarks.ts', 'render/worldLabel.ts']) {
+  it("asks no world-text module for the browser's default mono", () => {
+    for (const f of [
+      'render/bubbles.ts',
+      'render/characters.ts',
+      'render/tooltip.ts',
+      'render/landmarks.ts',
+      'render/worldLabel.ts',
+    ]) {
       expect(src(f), f).not.toContain("fontFamily: 'monospace'")
       expect(src(f), f).not.toContain("'monospace'")
     }
   })
 
-  it('clears AA on every world-text pair IN BOTH LIGHT BANDS, which is the viewer\'s ratio', () => {
+  it("clears AA on every world-text pair IN BOTH LIGHT BANDS, which is the viewer's ratio", () => {
     expect(worldTextOffenders(WORLD_TEXT_PAIRS)).toEqual([])
-    for (const [ink, paper] of [[SPEECH_INK, SPEECH_FILL], [THOUGHT_INK, THOUGHT_FILL], [LANDMARK_INK, LANDMARK_PLATE]] as const) {
+    for (const [ink, paper] of [
+      [SPEECH_INK, SPEECH_FILL],
+      [THOUGHT_INK, THOUGHT_FILL],
+      [LANDMARK_INK, LANDMARK_PLATE],
+    ] as const) {
       expect(bandRatios(ink, paper).day).toBeGreaterThanOrEqual(AA_RATIO)
       expect(bandRatios(ink, paper).night).toBeGreaterThanOrEqual(AA_RATIO)
     }
   })
 
   it('de-emphasises a thought by MATERIAL, never by alpha', () => {
-    const text = src('render/bubbles.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const text = src('render/bubbles.ts')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
     expect(text).not.toMatch(/alpha:\s*0\.\d/)
     expect(THOUGHT_FILL).not.toBe(SPEECH_FILL)
   })
@@ -347,7 +447,10 @@ describe('U19 — "I zoom way too much by accident and I can\'t control my zoom 
   it('advances exactly one stop under thirty trackpad events', () => {
     let z = initialZoom(1)
     let now = 0
-    for (let i = 0; i < 30; i++) { now += 8; z = zoomWheel(z, -4, now) }
+    for (let i = 0; i < 30; i++) {
+      now += 8
+      z = zoomWheel(z, -4, now)
+    }
     expect(zoomRelease(z, now + WHEEL_GESTURE_GAP_MS + 1).stop).toBe(2)
   })
 
@@ -357,7 +460,7 @@ describe('U19 — "I zoom way too much by accident and I can\'t control my zoom 
     let seed = 7
     for (let i = 0; i < 500; i++) {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      now += (seed % 300)
+      now += seed % 300
       z = zoomWheel(z, ((seed >> 8) % 2 === 0 ? -1 : 1) * (20 + (seed % 200)), now)
       if (now - z.lastWheelMs > WHEEL_GESTURE_GAP_MS) z = zoomRelease(z, now)
       expect(ZOOM_STOPS as readonly number[]).toContain(z.stop)
@@ -367,7 +470,8 @@ describe('U19 — "I zoom way too much by accident and I can\'t control my zoom 
   })
 
   it('lands on a stop from any arbitrary scale, and eases rather than jumping', () => {
-    for (const s of [0.3, 0.9, 1.4, 2.6, 9]) expect(ZOOM_STOPS as readonly number[]).toContain(nearestStop(s))
+    for (const s of [0.3, 0.9, 1.4, 2.6, 9])
+      expect(ZOOM_STOPS as readonly number[]).toContain(nearestStop(s))
     const z = zoomTo(initialZoom(1), 3, 1000)
     expect(zoomScaleAt(z, 1000)).toBe(1)
     expect(zoomScaleAt(z, 1000 + ZOOM_SETTLE_MS / 2)).toBeGreaterThan(1)
@@ -375,7 +479,7 @@ describe('U19 — "I zoom way too much by accident and I can\'t control my zoom 
     expect(zoomScaleAt(z, 1000 + ZOOM_SETTLE_MS)).toBe(3)
   })
 
-  it('holds a world label at the reader\'s size at every stop', () => {
+  it("holds a world label at the reader's size at every stop", () => {
     for (const stop of ZOOM_STOPS) expect(worldTextScale(stop) * stop).toBeCloseTo(1, 9)
   })
 

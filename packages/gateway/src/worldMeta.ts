@@ -15,14 +15,16 @@ export function ensureWorldMetaTable(db: Database.Database): void {
 }
 
 export function readWorldMeta(db: Database.Database): WorldMeta | null {
-  const r = db.prepare('SELECT map, rings, seed FROM world_meta WHERE id = 1').get() as WorldMeta | undefined
+  const r = db.prepare('SELECT map, rings, seed FROM world_meta WHERE id = 1').get() as
+    | WorldMeta
+    | undefined
   return r ?? null
 }
 
 export function writeWorldMeta(db: Database.Database, meta: WorldMeta): void {
   db.prepare(
-    'INSERT INTO world_meta (id, map, rings, seed) VALUES (1, ?, ?, ?)'
-    + ' ON CONFLICT(id) DO UPDATE SET map=excluded.map, rings=excluded.rings, seed=excluded.seed',
+    'INSERT INTO world_meta (id, map, rings, seed) VALUES (1, ?, ?, ?)' +
+      ' ON CONFLICT(id) DO UPDATE SET map=excluded.map, rings=excluded.rings, seed=excluded.seed',
   ).run(meta.map, meta.rings, meta.seed)
 }
 
@@ -38,7 +40,7 @@ export function assertSameWorld(stored: WorldMeta, asked: WorldMeta): void {
   if (stored.seed !== asked.seed) differs.push(`seed ${stored.seed} → ${asked.seed}`)
   if (differs.length === 0) return
   throw new Error(
-    `world on disk is a different town than this boot asked for (${differs.join(', ')}); `
-    + `resume it as it is, or ${FRESH_HINT}`,
+    `world on disk is a different town than this boot asked for (${differs.join(', ')}); ` +
+      `resume it as it is, or ${FRESH_HINT}`,
   )
 }

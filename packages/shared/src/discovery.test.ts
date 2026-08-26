@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DISCOVERY_EVENT, DiscoveryRecordSchema, DiscoveryResponseSchema, discoveryHeadline,
+  DISCOVERY_EVENT,
+  DiscoveryRecordSchema,
+  DiscoveryResponseSchema,
+  discoveryHeadline,
 } from './discovery.js'
 
 const ROW = {
-  seq: 12, tick: 3600, recipeId: 'recipe:waterskin', name: 'stitch a waterskin',
-  kind: 'craft' as const, byId: 'a1', by: 'Maret',
-  intent: 'i want to try carrying water in a stitched hide', makes: ['waterskin'],
+  seq: 12,
+  tick: 3600,
+  recipeId: 'recipe:waterskin',
+  name: 'stitch a waterskin',
+  kind: 'craft' as const,
+  byId: 'a1',
+  by: 'Maret',
+  intent: 'i want to try carrying water in a stitched hide',
+  makes: ['waterskin'],
 }
 
 describe('the discovery record', () => {
@@ -26,7 +35,9 @@ describe('the discovery record', () => {
 
   it('lets a word carry no products, and a craft carry several', () => {
     expect(DiscoveryRecordSchema.parse({ ...ROW, kind: 'word', makes: [] }).makes).toEqual([])
-    expect(DiscoveryRecordSchema.parse({ ...ROW, makes: ['waterskin', 'cord'] }).makes).toHaveLength(2)
+    expect(
+      DiscoveryRecordSchema.parse({ ...ROW, makes: ['waterskin', 'cord'] }).makes,
+    ).toHaveLength(2)
   })
 
   it('wraps a list of rows', () => {

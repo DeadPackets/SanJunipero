@@ -10,7 +10,15 @@ import { isPassable, type Point } from '../path.js'
 // The wire type of `agent_died.cause` stays a free string so recorded logs still parse; emitters
 // are held to this list by the type. Array order is the last tiebreak in attribution.
 export const DEATH_CAUSES = [
-  'injury', 'poison', 'illness', 'fatigue', 'exposure', 'hunger', 'thirst', 'slain', 'old_age',
+  'injury',
+  'poison',
+  'illness',
+  'fatigue',
+  'exposure',
+  'hunger',
+  'thirst',
+  'slain',
+  'old_age',
 ] as const
 export type DeathCause = (typeof DEATH_CAUSES)[number]
 
@@ -44,7 +52,11 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
     })
   }
   if (a.needs.hunger <= 0) {
-    out.push({ cause: 'hunger', amount: mortality.hungerHpDrainPerTick, sinceTick: a.zeroHungerSinceTick ?? state.tick })
+    out.push({
+      cause: 'hunger',
+      amount: mortality.hungerHpDrainPerTick,
+      sinceTick: a.zeroHungerSinceTick ?? state.tick,
+    })
   }
   if (thirstOf(a) <= 0) {
     out.push({ cause: 'thirst', amount: mortality.thirstHpDrainPerTick, sinceTick: state.tick })
@@ -55,14 +67,21 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
 // The single attribution: biggest drain, then the oldest of them, then the order of
 // DEATH_CAUSES. A body worn down with nothing named on it died of the wounds it took.
 export function deathAttribution(
-  state: WorldState, config: SimConfig, agentId: string,
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
 ): { cause: DeathCause; byId?: string } {
   let best: Drain | undefined
   for (const d of drains(state, config, agentId)) {
-    if (best === undefined || d.amount > best.amount
-      || (d.amount === best.amount && d.sinceTick < best.sinceTick)
-      || (d.amount === best.amount && d.sinceTick === best.sinceTick
-        && DEATH_CAUSES.indexOf(d.cause) < DEATH_CAUSES.indexOf(best.cause))) best = d
+    if (
+      best === undefined ||
+      d.amount > best.amount ||
+      (d.amount === best.amount && d.sinceTick < best.sinceTick) ||
+      (d.amount === best.amount &&
+        d.sinceTick === best.sinceTick &&
+        DEATH_CAUSES.indexOf(d.cause) < DEATH_CAUSES.indexOf(best.cause))
+    )
+      best = d
   }
   if (best === undefined) return { cause: 'injury' }
   return { cause: best.cause, ...(best.byId === undefined ? {} : { byId: best.byId }) }
@@ -93,7 +112,13 @@ export function placeGrave(ctx: TickCtx, agentId: string): void {
   if (a === undefined) return
   const at = graveTile(ctx.state(), a.x, a.y)
   if (at === null) return
-  ctx.emit('grave_placed', { id: mintId(ctx.state(), 'structure'), agentId, name: a.name, x: at.x, y: at.y })
+  ctx.emit('grave_placed', {
+    id: mintId(ctx.state(), 'structure'),
+    agentId,
+    name: a.name,
+    x: at.x,
+    y: at.y,
+  })
 }
 
 // Called straight after every agent_collapsed, when the fold has already counted the rung. Cold
@@ -105,7 +130,11 @@ export function escalateFatigue(ctx: TickCtx, agentId: string): void {
   if (a === undefined || rung === undefined) return
   const has = a.afflictions?.some((x) => x.kind === 'fatigue') ?? false
   // Absolute, not incremental: a body that ate its way off the ladder comes back on at one.
-  ctx.emit(has ? 'affliction_worsened' : 'agent_afflicted', { agentId, kind: 'fatigue', severity: rung })
+  ctx.emit(has ? 'affliction_worsened' : 'agent_afflicted', {
+    agentId,
+    kind: 'fatigue',
+    severity: rung,
+  })
 }
 
 export function mortalitySystem(ctx: TickCtx): void {

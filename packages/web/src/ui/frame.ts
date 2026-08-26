@@ -31,14 +31,11 @@ export function frameLayout(stage: { w: number; h: number }, letterboxed: boolea
  * P19's guard: every box that CROSSES a band edge rather than sitting on one side of it. Touching
  * an edge is how a surface fills a band exactly, so only a strict crossing counts.
  */
-export function straddlers(
-  boxes: ReadonlyArray<{ id: string } & Frame>, l: FrameLayout,
-): string[] {
-  const edges = [l.picture.y, l.picture.y + l.picture.h]
-    .filter((e, i) => (i === 0 ? l.bandTop.h > 0 : l.bandBottom.h > 0))
-  return boxes
-    .filter((b) => edges.some((e) => b.y < e && b.y + b.h > e))
-    .map((b) => b.id)
+export function straddlers(boxes: ReadonlyArray<{ id: string } & Frame>, l: FrameLayout): string[] {
+  const edges = [l.picture.y, l.picture.y + l.picture.h].filter((e, i) =>
+    i === 0 ? l.bandTop.h > 0 : l.bandBottom.h > 0,
+  )
+  return boxes.filter((b) => edges.some((e) => b.y < e && b.y + b.h > e)).map((b) => b.id)
 }
 
 // ── the filmstrip ─────────────────────────────────────────────────────────────────────────
@@ -52,7 +49,9 @@ export const STRIP_GAP = 8
  * DOM half only applies the offsets, so the scroll position is testable without a layout engine.
  */
 export function stripLayout(
-  count: number, openIndex: number, bandW: number,
+  count: number,
+  openIndex: number,
+  bandW: number,
 ): { offsets: number[]; scrollX: number } {
   if (count <= 0) return { offsets: [], scrollX: 0 }
   const pitch = STRIP_CARD_W + STRIP_GAP

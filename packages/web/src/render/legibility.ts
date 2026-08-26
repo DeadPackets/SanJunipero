@@ -8,8 +8,8 @@ export const AA_RATIO = 4.5
 
 /** The two extremes of the day, read off the clock rather than copied from it. */
 export const LIGHT_BANDS = {
-  day: clockTint(720),    // 12:00 — identity, the material's own colour
-  night: clockTint(0),    // 00:00 — the deep-blue multiply
+  day: clockTint(720), // 12:00 — identity, the material's own colour
+  night: clockTint(0), // 00:00 — the deep-blue multiply
 } as const
 export type LightBand = keyof typeof LIGHT_BANDS
 
@@ -28,14 +28,17 @@ export function readableRatio(fg: number, bg: number, tint: number): number {
 }
 
 export function bandRatios(fg: number, bg: number): Record<LightBand, number> {
-  return { day: readableRatio(fg, bg, LIGHT_BANDS.day), night: readableRatio(fg, bg, LIGHT_BANDS.night) }
+  return {
+    day: readableRatio(fg, bg, LIGHT_BANDS.day),
+    night: readableRatio(fg, bg, LIGHT_BANDS.night),
+  }
 }
 
 /** The landmark pair lives here, not in landmarks.ts: the choice is a legibility decision and
  *  this module is the one that has to prove it. */
-export const LANDMARK_INK = 0x241f2b       // --deep:  15.02:1 day / 5.19:1 night
-export const LANDMARK_PLATE = 0xfff6e9     // --cream
-export const LANDMARK_EDGE = 0x241f2b      // the stepped ledge every slab in the town wears
+export const LANDMARK_INK = 0x241f2b // --deep:  15.02:1 day / 5.19:1 night
+export const LANDMARK_PLATE = 0xfff6e9 // --cream
+export const LANDMARK_EDGE = 0x241f2b // the stepped ledge every slab in the town wears
 
 export type WorldTextPair = { what: string; ink: number; paper: number }
 
@@ -81,13 +84,17 @@ export function over(fg: number, bg: number, alpha: number): number {
 
 /** `what — band ratio on tile` for every ground/band a mark fails on. Empty is the pass. */
 export function groundMarkOffenders(
-  what: string, colour: number, grounds: readonly number[], floor = UI_BOUNDARY_RATIO,
+  what: string,
+  colour: number,
+  grounds: readonly number[],
+  floor = UI_BOUNDARY_RATIO,
 ): string[] {
   const out: string[] = []
   for (const g of grounds) {
     for (const band of ['day', 'night'] as const) {
       const r = readableRatio(colour, g, LIGHT_BANDS[band])
-      if (r < floor) out.push(`${what} — ${band} ${r.toFixed(2)}:1 on #${g.toString(16).padStart(6, '0')}`)
+      if (r < floor)
+        out.push(`${what} — ${band} ${r.toFixed(2)}:1 on #${g.toString(16).padStart(6, '0')}`)
     }
   }
   return out

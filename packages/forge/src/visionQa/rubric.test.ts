@@ -3,8 +3,17 @@ import { MASTER_PALETTE } from '../palette.js'
 import type { RawImage } from '../post/raw.js'
 import { NA_CRITERIA_BY_CLASS, CRITERIA } from './verdict.js'
 import {
-  RUBRIC_VERSION, CANONICAL_PITCH, PITCH_TOLERANCE, CHECKER_PX, CARD_PAD, SWATCH_PX,
-  CHECKER_LIGHT, CHECKER_DARK, paletteCard, checkerCard, buildRubricPrompt,
+  RUBRIC_VERSION,
+  CANONICAL_PITCH,
+  PITCH_TOLERANCE,
+  CHECKER_PX,
+  CARD_PAD,
+  SWATCH_PX,
+  CHECKER_LIGHT,
+  CHECKER_DARK,
+  paletteCard,
+  checkerCard,
+  buildRubricPrompt,
 } from './rubric.js'
 
 function blank(w: number, h: number): RawImage {
@@ -25,7 +34,8 @@ function opaqueColors(img: RawImage): Set<string> {
 
 describe('palette card', () => {
   it('is deterministic and exactly sized', () => {
-    const a = paletteCard(), b = paletteCard()
+    const a = paletteCard(),
+      b = paletteCard()
     expect(a.width).toBe(8 * SWATCH_PX + 2 * CARD_PAD)
     expect(a.height).toBe(5 * SWATCH_PX + 2 * CARD_PAD)
     expect(Array.from(a.data)).toEqual(Array.from(b.data))
@@ -55,21 +65,42 @@ describe('checker card', () => {
 
   it('preserves an opaque input pixel exactly', () => {
     const s = blank(16, 16)
-    s.data.set([0xE8, 0x78, 0x5A, 255], 0)
+    s.data.set([0xe8, 0x78, 0x5a, 255], 0)
     const c = checkerCard(s)
     expect(hex(c, 16, 16)).toBe('#E8785A')
     expect(c.data[(16 * c.width + 16) * 4 + 3]).toBe(255)
   })
 })
 
-const BANNED = ['poison', 'poisonous', 'toxic', 'deadly', 'danger', 'dangerous',
-  'safe', 'edible', 'model', 'prompt', 'generated', 'sprite', 'pixel']
+const BANNED = [
+  'poison',
+  'poisonous',
+  'toxic',
+  'deadly',
+  'danger',
+  'dangerous',
+  'safe',
+  'edible',
+  'model',
+  'prompt',
+  'generated',
+  'sprite',
+  'pixel',
+]
 
 describe('rubric prompt', () => {
-  const base = { commission: 'a squat storehouse with a mossy plank roof', naFor: [] as readonly string[] }
+  const base = {
+    commission: 'a squat storehouse with a mossy plank roof',
+    naFor: [] as readonly string[],
+  }
 
   it('asks all seven criteria for a building and names its pitch target', () => {
-    const p = buildRubricPrompt({ klass: 'building', footprint: { w: 2, h: 2 }, expectedFacing: 'door-sw', ...base })
+    const p = buildRubricPrompt({
+      klass: 'building',
+      footprint: { w: 2, h: 2 },
+      expectedFacing: 'door-sw',
+      ...base,
+    })
     for (const c of CRITERIA) expect(p).toContain(c)
     expect(p).toContain('4.00')
     expect(p).toContain('±20%')
@@ -80,14 +111,19 @@ describe('rubric prompt', () => {
   })
 
   it('names the character pitch target', () => {
-    const p = buildRubricPrompt({ klass: 'character', ...base, naFor: NA_CRITERIA_BY_CLASS.character })
+    const p = buildRubricPrompt({
+      klass: 'character',
+      ...base,
+      naFor: NA_CRITERIA_BY_CLASS.character,
+    })
     expect(p).toContain('5.12')
     expect(CANONICAL_PITCH).toEqual({ character: 5.12, building: 4.0 })
   })
 
   it('drops the N/A criteria from the ask for an icon and says why', () => {
     const p = buildRubricPrompt({ klass: 'icon', ...base, naFor: NA_CRITERIA_BY_CLASS.icon })
-    for (const c of ['facing', 'alignment', 'proportion']) expect(p).not.toMatch(new RegExp(`\\d+\\. ${c}`))
+    for (const c of ['facing', 'alignment', 'proportion'])
+      expect(p).not.toMatch(new RegExp(`\\d+\\. ${c}`))
     for (const c of ['palette', 'singleFigure', 'transparency', 'density'])
       expect(p).toMatch(new RegExp(`\\d+\\. ${c}`))
     expect(p).toContain('Not judged for this class')

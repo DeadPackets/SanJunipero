@@ -11,9 +11,18 @@ import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 // Words that only belong to a town with no metal and no machine. A canon that names one
 // of these has slipped back a period; the whole lane exists to keep them out.
 const WRONG_CENTURY = [
-  /\bstone[- ]age\b/i, /\bneolithic\b/i, /\bflint\b/i, /\bthatch/i, /\bknapp/i,
-  /\bclay pots?\b/i, /\bstrike sparks?\b/i, /\bstone (?:implement|tool)s?\b/i,
-  /\bpottery\b/i, /\bcordage\b/i, /\bloincloth\b/i, /\bsinew\b/i,
+  /\bstone[- ]age\b/i,
+  /\bneolithic\b/i,
+  /\bflint\b/i,
+  /\bthatch/i,
+  /\bknapp/i,
+  /\bclay pots?\b/i,
+  /\bstrike sparks?\b/i,
+  /\bstone (?:implement|tool)s?\b/i,
+  /\bpottery\b/i,
+  /\bcordage\b/i,
+  /\bloincloth\b/i,
+  /\bsinew\b/i,
 ]
 
 describe('CANON — contemporary rural', () => {
@@ -75,8 +84,14 @@ describe('GENESIS_CODEX — what this town already practises, and what stands on
 
   it('practises eight crafts, every one of them a thing hands do here', () => {
     expect(known.map((e) => e.id)).toEqual([
-      'farming', 'fishing', 'foraging', 'carpentry',
-      'masonry', 'tailoring', 'cooking', 'machine_repair',
+      'farming',
+      'fishing',
+      'foraging',
+      'carpentry',
+      'masonry',
+      'tailoring',
+      'cooking',
+      'machine_repair',
     ])
   })
 
@@ -95,9 +110,13 @@ describe('GENESIS_CODEX — what this town already practises, and what stands on
   })
 
   it('reaches for arrangements between people, not only for crafts', () => {
-    expect(frontier.map((e) => e.id).sort()).toEqual(
-      ['bridging', 'common_store', 'food_preserving', 'memorial', 'work_rota'],
-    )
+    expect(frontier.map((e) => e.id).sort()).toEqual([
+      'bridging',
+      'common_store',
+      'food_preserving',
+      'memorial',
+      'work_rota',
+    ])
   })
 
   it('hangs every unearned rung on a craft the town actually practises', () => {

@@ -116,7 +116,12 @@ export function collectPublicRecord(
       `SELECT seq, tick, type, payload FROM events
        WHERE tick <= ? AND type IN (${PUBLIC_EVENT_TYPES.map(() => '?').join(',')}) ORDER BY seq`,
     )
-    .all(maxTick, ...PUBLIC_EVENT_TYPES) as Array<{ seq: number; tick: number; type: string; payload: string }>
+    .all(maxTick, ...PUBLIC_EVENT_TYPES) as Array<{
+    seq: number
+    tick: number
+    type: string
+    payload: string
+  }>
   const out: PublicRecord[] = []
   for (const r of rows) {
     const payload = JSON.parse(r.payload) as P
@@ -153,12 +158,20 @@ export async function writeBiography(deps: {
     let bio = await deps.llm.biography(deps.agentId, deps.name, record)
     if (framingViolated(bio)) bio = await deps.llm.biography(deps.agentId, deps.name, record)
     if (framingViolated(bio)) {
-      deps.alert?.(`framing_violation: biography of ${deps.agentId} broke the human framing law — not persisted`)
+      deps.alert?.(
+        `framing_violation: biography of ${deps.agentId} broke the human framing law — not persisted`,
+      )
       throw new Error(`framing_violation: biography of ${deps.agentId} rejected`)
     }
     title = bio.title
     body = bio.body
   }
-  const id = deps.store.insertPublication({ day: deps.throughDay, kind: 'biography', title, body, citations: null })
+  const id = deps.store.insertPublication({
+    day: deps.throughDay,
+    kind: 'biography',
+    title,
+    body,
+    citations: null,
+  })
   return { id, day: deps.throughDay, kind: 'biography', title, body, citations: null }
 }

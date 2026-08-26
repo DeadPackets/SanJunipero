@@ -16,12 +16,16 @@ export const PREFLIGHT_ROUNDS = 4
 
 // A founder of the shape the gate boots, so the system prefix is the real one and not a stub.
 export const PREFLIGHT_IDENTITY: IdentityCore = {
-  name: 'Hana', age: 33,
-  backstory: 'Keeps the eastern path clear and knows which of the bushes ripen first. Has lived beside this river since she could walk.',
+  name: 'Hana',
+  age: 33,
+  backstory:
+    'Keeps the eastern path clear and knows which of the bushes ripen first. Has lived beside this river since she could walk.',
   temperament: 'direct, warm, quick to move',
   voiceCard: {
-    register: 'plain and unhurried', rhythm: 'a line, then she is doing it',
-    tics: ['names the thing she means'], neverSays: ['grand words'],
+    register: 'plain and unhurried',
+    rhythm: 'a line, then she is doing it',
+    tics: ['names the thing she means'],
+    neverSays: ['grand words'],
     exampleLines: ['The water is right there.', 'I will go now.'],
     wordBudget: { typical: 13, burst: 24 },
   },
@@ -50,19 +54,19 @@ export function preflightPrompts(
   identity: IdentityCore = PREFLIGHT_IDENTITY,
   personality: PersonalityDoc = PREFLIGHT_PERSONALITY,
 ): AssembledPrompt[] {
-  return PREFLIGHT_SCENES.map((prose) => assemblePrompt({
-    rulesOfBeing: RULES_OF_BEING,
-    identity,
-    personality: { doc: personality, autobiography: [] },
-    scene: { ledgers: [], memories: [] },
-    dayLog: ['The morning is bright and the valley is awake.'],
-    now: { prose },
-  }))
+  return PREFLIGHT_SCENES.map((prose) =>
+    assemblePrompt({
+      rulesOfBeing: RULES_OF_BEING,
+      identity,
+      personality: { doc: personality, autobiography: [] },
+      scene: { ledgers: [], memories: [] },
+      dayLog: ['The morning is bright and the valley is awake.'],
+      now: { prose },
+    }),
+  )
 }
 
-export type PreflightAnswer =
-  | { ok: true; turn: Turn }
-  | { ok: false; error: string }
+export type PreflightAnswer = { ok: true; turn: Turn } | { ok: false; error: string }
 
 export type PreflightResult = {
   provider: string
@@ -103,9 +107,8 @@ export function scorePreflight(opts: {
   const speeches = opts.answers.filter((a) => a.ok && (a.turn.speech ?? null) !== null).length
   // Over several rounds the bar is "one round cleared it", never "three acts turned up
   // somewhere": a provider that emits one act per round has not cleared a 3-of-3 bar.
-  const passed = opts.roundsPassed === undefined
-    ? actions >= PREFLIGHT_BAR.action
-    : opts.roundsPassed > 0
+  const passed =
+    opts.roundsPassed === undefined ? actions >= PREFLIGHT_BAR.action : opts.roundsPassed > 0
   return {
     provider: opts.provider,
     hardAllowList: opts.hardAllowList,
@@ -117,8 +120,9 @@ export function scorePreflight(opts: {
     passed,
     roundsRun: opts.roundsRun ?? 1,
     roundsPassed: opts.roundsPassed ?? (passed ? 1 : 0),
-    speechAdvisory: `speech ${speeches}/${opts.answers.length} — ADVISORY, not gated`
-      + ' (it measures a mind\'s choice, not a provider\'s capability)',
+    speechAdvisory:
+      `speech ${speeches}/${opts.answers.length} — ADVISORY, not gated` +
+      " (it measures a mind's choice, not a provider's capability)",
     costUsd: opts.costUsd ?? 0,
     servedProviders: [...new Set(opts.servedProviders ?? [])].sort(),
     failures: opts.answers.flatMap((a) => (a.ok ? [] : [a.error])),
@@ -130,9 +134,9 @@ export function preflightRefusal(r: PreflightResult): string {
   return [
     `GATE REFUSED TO START: provider '${r.provider}' failed the turn pre-flight.`,
     `  model=${r.model} allowList=${r.hardAllowList} served=${r.servedProviders.join(',') || 'unattributed'}`,
-    `  action ${r.actions}/${r.calls} (need ${PREFLIGHT_BAR.action} in one round of ${PREFLIGHT_CALLS}),`
-    + ` answered ${r.answered}/${r.calls}`
-    + ` over ${r.roundsRun} round(s), ${r.roundsPassed} passed`,
+    `  action ${r.actions}/${r.calls} (need ${PREFLIGHT_BAR.action} in one round of ${PREFLIGHT_CALLS}),` +
+      ` answered ${r.answered}/${r.calls}` +
+      ` over ${r.roundsRun} round(s), ${r.roundsPassed} passed`,
     `  ${r.speechAdvisory}`,
     ...r.failures.map((f) => `  failed call: ${f}`),
     '  A provider that cannot emit an optional field cannot emit an act, and a town that',
@@ -143,7 +147,11 @@ export function preflightRefusal(r: PreflightResult): string {
 // The only part that spends. A call that throws is recorded as a failure rather than aborting:
 // failing outright and answering emptily are both disqualifying and both worth reporting.
 export type PreflightLlm = {
-  object<T>(opts: { system: string; messages: Array<{ role: 'user' | 'assistant'; content: string }>; schema: { _zod?: unknown } }): Promise<{ value: T }>
+  object<T>(opts: {
+    system: string
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>
+    schema: { _zod?: unknown }
+  }): Promise<{ value: T }>
 }
 
 export async function runPreflight(opts: {
@@ -168,32 +176,55 @@ export async function runPreflight(opts: {
   let roundsPassed = 0
   for (let round = 0; round < rounds; round++) {
     const answers: PreflightAnswer[] = []
-    const record = (a: PreflightAnswer): void => { answers.push(a); all.push(a); opts.onAnswer?.(a) }
+    const record = (a: PreflightAnswer): void => {
+      answers.push(a)
+      all.push(a)
+      opts.onAnswer?.(a)
+    }
     for (const prompt of preflightPrompts(opts.identity, opts.personality)) {
       try {
         const { value } = await opts.llm.object<Turn>({
-          system: prompt.system, messages: prompt.messages, schema: TurnSchema,
+          system: prompt.system,
+          messages: prompt.messages,
+          schema: TurnSchema,
         })
         const parsed = TurnSchema.safeParse(value)
-        record(parsed.success
-          ? { ok: true, turn: parsed.data }
-          : { ok: false, error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}` })
+        record(
+          parsed.success
+            ? { ok: true, turn: parsed.data }
+            : {
+                ok: false,
+                error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}`,
+              },
+        )
       } catch (err) {
         // The raw text a rejected generation carried. Without it "could not parse the response"
         // names a symptom and hides which field the schema refused.
-        const raw = NoObjectGeneratedError.isInstance(err) ? ` :: ${(err.text ?? '').slice(0, 400)}` : ''
+        const raw = NoObjectGeneratedError.isInstance(err)
+          ? ` :: ${(err.text ?? '').slice(0, 400)}`
+          : ''
         record({ ok: false, error: `${err instanceof Error ? err.message : String(err)}${raw}` })
       }
     }
     roundsRun += 1
     const thisRound = scorePreflight({
-      provider: opts.provider, hardAllowList: opts.hardAllowList, model: opts.model, answers,
+      provider: opts.provider,
+      hardAllowList: opts.hardAllowList,
+      model: opts.model,
+      answers,
     })
-    if (thisRound.passed) { roundsPassed += 1; break }
+    if (thisRound.passed) {
+      roundsPassed += 1
+      break
+    }
   }
   return scorePreflight({
-    provider: opts.provider, hardAllowList: opts.hardAllowList, model: opts.model,
-    answers: all, roundsRun, roundsPassed,
+    provider: opts.provider,
+    hardAllowList: opts.hardAllowList,
+    model: opts.model,
+    answers: all,
+    roundsRun,
+    roundsPassed,
     ...(opts.costUsd === undefined ? {} : { costUsd: opts.costUsd() }),
     ...(opts.servedProviders === undefined ? {} : { servedProviders: opts.servedProviders() }),
   })

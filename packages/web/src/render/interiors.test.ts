@@ -1,35 +1,99 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_FURNISHING_KINDS, DEFAULT_CONFIG, INTERIOR_KINDS, isBeddedKind, isHearthKind, roomCapacity,
-  type AssetRecord, type InteriorKind, type InteriorMeta, type LibraryItemManifest,
+  CITY_FURNISHING_KINDS,
+  DEFAULT_CONFIG,
+  INTERIOR_KINDS,
+  isBeddedKind,
+  isHearthKind,
+  roomCapacity,
+  type AssetRecord,
+  type InteriorKind,
+  type InteriorMeta,
+  type LibraryItemManifest,
 } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import {
-  INTERIOR_TILE, ROOM_TILES, WALL_FACING, interiorPath, interiorToScreen, isWalkable, roomMapOf,
-  roomTilesFor, slotToTile, standingTiles, walkableCount, wallOfTile, type RoomMap,
+  INTERIOR_TILE,
+  ROOM_TILES,
+  WALL_FACING,
+  interiorPath,
+  interiorToScreen,
+  isWalkable,
+  roomMapOf,
+  roomTilesFor,
+  slotToTile,
+  standingTiles,
+  walkableCount,
+  wallOfTile,
+  type RoomMap,
 } from './interiorMap.js'
 import { tileSpanCentre } from './roomShell.js'
 import {
-  BED_FOOTPRINT, CONTACT_SHADOW_ALPHA, FURNITURE_OCCUPANCY, INTERIOR_FADE_MS, INTERIOR_LAYOUTS,
-  LIBRARY_TILE_PX, advanceInterior, bedSlots, contactShadow, furnishingDivisor, furnishingScale,
+  BED_FOOTPRINT,
+  CONTACT_SHADOW_ALPHA,
+  FURNITURE_OCCUPANCY,
+  INTERIOR_FADE_MS,
+  INTERIOR_LAYOUTS,
+  LIBRARY_TILE_PX,
+  advanceInterior,
+  bedSlots,
+  contactShadow,
+  furnishingDivisor,
+  furnishingScale,
   interiorOf,
-  interiorOrder, interiorPieces, interiorTransition, isFlat, occupancyOf, roomFurnishings,
-  roomLights, roomPlan, roomSizeOf, slotGridOf, type InteriorPhase,
+  interiorOrder,
+  interiorPieces,
+  interiorTransition,
+  isFlat,
+  occupancyOf,
+  roomFurnishings,
+  roomLights,
+  roomPlan,
+  roomSizeOf,
+  slotGridOf,
+  type InteriorPhase,
 } from './interiors.js'
 
-function agent(id: string, over: Partial<WorldState['agents'][string]> = {}): WorldState['agents'][string] {
+function agent(
+  id: string,
+  over: Partial<WorldState['agents'][string]> = {},
+): WorldState['agents'][string] {
   return {
-    id, name: id, x: 0, y: 0, alive: true, asleep: false,
+    id,
+    name: id,
+    x: 0,
+    y: 0,
+    alive: true,
+    asleep: false,
     needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-    hp: 10, injuries: [], ill: false, ageDays: 7300, skills: {}, activity: null,
-    collapsedSinceTick: null, zeroHungerSinceTick: null, ...over,
+    hp: 10,
+    injuries: [],
+    ill: false,
+    ageDays: 7300,
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
+    zeroHungerSinceTick: null,
+    ...over,
   }
 }
 
 function structure(id: string, kind: string): WorldState['structures'][string] {
   return {
-    id, kind, x: 3, y: 4, w: 2, h: 2, hp: 10, maxHp: 10, flammable: true,
-    stage: 'complete', progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
+    id,
+    kind,
+    x: 3,
+    y: 4,
+    w: 2,
+    h: 2,
+    hp: 10,
+    maxHp: 10,
+    flammable: true,
+    stage: 'complete',
+    progressTicks: 0,
+    builtBy: null,
+    burning: false,
+    burnTicks: 0,
   }
 }
 
@@ -40,7 +104,7 @@ function fixture(): WorldState {
     agents: {
       amara: agent('amara', { insideId: 'house1', asleep: true }),
       yusuf: agent('yusuf', { insideId: 'house1' }),
-      nadia: agent('nadia'),                                  // outside
+      nadia: agent('nadia'), // outside
       omar: agent('omar', { insideId: 'store1' }),
     },
     structures: {
@@ -60,12 +124,27 @@ function fixture(): WorldState {
 }
 
 const libraryRecord = (kind: string, interior: LibraryItemManifest['interior']): AssetRecord => ({
-  id: `rec-${kind}`, seq: 1, class: 'item', kind, status: 'ready',
-  desc: kind, meta: JSON.stringify({
-    version: 'v1-library-item', kind, category: 'furniture', spritePx: 24, iconPx: 24, interior,
+  id: `rec-${kind}`,
+  seq: 1,
+  class: 'item',
+  kind,
+  status: 'ready',
+  desc: kind,
+  meta: JSON.stringify({
+    version: 'v1-library-item',
+    kind,
+    category: 'furniture',
+    spritePx: 24,
+    iconPx: 24,
+    interior,
   }),
-  footprint: { w: 1, h: 1 }, widthPx: 24, heightPx: 24,
-  score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+  footprint: { w: 1, h: 1 },
+  widthPx: 24,
+  heightPx: 24,
+  score: 10,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-17T00:00:00Z',
 })
 
 describe('interiorOf', () => {
@@ -80,7 +159,7 @@ describe('interiorOf', () => {
     const store = interiorOf(fixture(), 'store1')!
     expect(store.kind).toBe('storehouse')
     expect(store.occupants).toEqual(['omar'])
-    expect(store.items).toEqual(['i1', 'i2'])          // tile-held and carried items stay out
+    expect(store.items).toEqual(['i1', 'i2']) // tile-held and carried items stay out
   })
 
   it('is null for a structure with no interior, and for an unknown id', () => {
@@ -106,7 +185,7 @@ describe('interiorOf', () => {
 })
 
 describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
-  it('keeps the plan\'s three declared layouts intact', () => {
+  it("keeps the plan's three declared layouts intact", () => {
     expect(INTERIOR_LAYOUTS.house).toEqual([
       { kind: 'bed', slot: { x: 2, y: 1 } },
       { kind: 'hearth', slot: { x: 0, y: 2 } },
@@ -120,8 +199,13 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
   it('furnishes every interior kind from the C13 city template, resolving `tools`', () => {
     const house = roomFurnishings('house')
     expect(house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
-    expect(roomFurnishings('storehouse').map((f) => f.kind))
-      .toEqual(['shelf', 'shelf', 'crate', 'crate', 'barrel'])
+    expect(roomFurnishings('storehouse').map((f) => f.kind)).toEqual([
+      'shelf',
+      'shelf',
+      'crate',
+      'crate',
+      'barrel',
+    ])
     // The town plan no longer stands a shed, so the room falls back to INTERIOR_LAYOUTS. The
     // plan's `tools` is still the library's anvil — interiorMeta's declared alias.
     expect(roomFurnishings('shed').map((f) => f.kind)).toEqual(['anvil', 'crate'])
@@ -137,11 +221,20 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
 })
 
 describe('roomPlan', () => {
-  it('attaches the C13 library\'s meta.interior and sprite url to each furnishing', () => {
+  it("attaches the C13 library's meta.interior and sprite url to each furnishing", () => {
     const records = [
-      libraryRecord('bed', { slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'], isBed: true }),
+      libraryRecord('bed', {
+        slots: { w: 1, h: 2 },
+        placement: 'floor',
+        interiorKinds: ['house'],
+        isBed: true,
+      }),
       libraryRecord('hearth', {
-        slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house'], isHearth: true, providesLight: true,
+        slots: { w: 1, h: 1 },
+        placement: 'wall',
+        interiorKinds: ['house'],
+        isHearth: true,
+        providesLight: true,
       }),
     ]
     const plan = roomPlan('house', records)
@@ -188,11 +281,16 @@ describe('bedSlots', () => {
   })
 
   it('takes the bed footprint from the library record when the codex has one', () => {
-    const records = [libraryRecord('bed', {
-      slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], isBed: true,
-    })]
+    const records = [
+      libraryRecord('bed', {
+        slots: { w: 1, h: 1 },
+        placement: 'floor',
+        interiorKinds: ['house'],
+        isBed: true,
+      }),
+    ]
     const slots = bedSlots('house', ['a', 'b'], records)
-    expect(Object.keys(slots)).toEqual(['a'])         // a one-cell bed sleeps one
+    expect(Object.keys(slots)).toEqual(['a']) // a one-cell bed sleeps one
   })
 
   it('is pure — the same call twice returns the same mapping', () => {
@@ -214,7 +312,7 @@ describe('interiorTransition', () => {
   it('is time-gated: before the fade elapses the phase holds', () => {
     expect(interiorTransition('entering', true, INTERIOR_FADE_MS - 1, 0)).toBe('entering')
     expect(interiorTransition('exiting', false, INTERIOR_FADE_MS - 1, 0)).toBe('exiting')
-    expect(INTERIOR_FADE_MS).toBeGreaterThanOrEqual(150)   // UI mandate motion band
+    expect(INTERIOR_FADE_MS).toBeGreaterThanOrEqual(150) // UI mandate motion band
     expect(INTERIOR_FADE_MS).toBeLessThanOrEqual(300)
   })
 
@@ -230,9 +328,10 @@ describe('interiorTransition', () => {
 
   it('covers every phase from every phase without throwing', () => {
     const phases: InteriorPhase[] = ['town', 'entering', 'inside', 'exiting']
-    for (const p of phases) for (const entered of [true, false]) {
-      expect(phases).toContain(interiorTransition(p, entered, 1000, 0))
-    }
+    for (const p of phases)
+      for (const entered of [true, false]) {
+        expect(phases).toContain(interiorTransition(p, entered, 1000, 0))
+      }
   })
 })
 
@@ -241,7 +340,7 @@ describe('advanceInterior', () => {
     const a = advanceInterior({ phase: 'town', sinceMs: 0 }, true, 100)
     expect(a).toEqual({ phase: 'entering', sinceMs: 100 })
     const b = advanceInterior(a, true, 200)
-    expect(b).toEqual({ phase: 'entering', sinceMs: 100 })   // still fading, clock untouched
+    expect(b).toEqual({ phase: 'entering', sinceMs: 100 }) // still fading, clock untouched
     const c = advanceInterior(b, true, 100 + INTERIOR_FADE_MS)
     expect(c).toEqual({ phase: 'inside', sinceMs: 100 + INTERIOR_FADE_MS })
   })
@@ -255,14 +354,25 @@ describe('advanceInterior', () => {
 // ── furniture that touches the floor, and bodies that lie IN the bed ────────
 
 const im = (over: Partial<InteriorMeta> = {}): InteriorMeta => ({
-  slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], ...over,
+  slots: { w: 1, h: 1 },
+  placement: 'floor',
+  interiorKinds: ['house'],
+  ...over,
 })
 
 // The house, on the interior tile lattice — `slotToTile` is the boundary between what the
 // city template says (a 3x3 slot) and where the room actually puts it (a 12x6 tile map).
 const HOUSE_ITEMS = [
-  { kind: 'bed', tile: slotToTile({ x: 2, y: 1 }), meta: im({ slots: { w: 1, h: 2 }, isBed: true }) },
-  { kind: 'hearth', tile: slotToTile({ x: 0, y: 2 }), meta: im({ placement: 'wall', providesLight: true }) },
+  {
+    kind: 'bed',
+    tile: slotToTile({ x: 2, y: 1 }),
+    meta: im({ slots: { w: 1, h: 2 }, isBed: true }),
+  },
+  {
+    kind: 'hearth',
+    tile: slotToTile({ x: 0, y: 2 }),
+    meta: im({ placement: 'wall', providesLight: true }),
+  },
   { kind: 'table', tile: slotToTile({ x: 1, y: 2 }), meta: im() },
   { kind: 'chair', tile: slotToTile({ x: 1, y: 1 }), meta: im() },
   { kind: 'rug', tile: slotToTile({ x: 0, y: 0 }), meta: im({ slots: { w: 1, h: 2 } }) },
@@ -300,8 +410,8 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
     expect(ids).toContain(`${BED_ID}#back`)
     expect(ids).toContain(`${BED_ID}#front`)
     expect(ids).toContain(`${CHAIR_ID}#back`)
-    expect(ids).toContain(TABLE_ID)             // 'at' — one piece
-    expect(ids).toContain(RUG_ID)               // 'beside' — one piece
+    expect(ids).toContain(TABLE_ID) // 'at' — one piece
+    expect(ids).toContain(RUG_ID) // 'beside' — one piece
     expect(ids).not.toContain(`${TABLE_ID}#back`)
   })
 
@@ -313,8 +423,10 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
     const landed = [
       { id: 'bed', slot: { x: 2, y: 1 } },
       { id: 'amara', slot: { x: 2, y: 1 } },
-    ].sort((a, b) => landedZ(a.id, a.slot) - landedZ(b.id, b.slot)).map((e) => e.id)
-    expect(landed).toEqual(['bed', 'amara'])    // the body last — on top of the bed. RED.
+    ]
+      .sort((a, b) => landedZ(a.id, a.slot) - landedZ(b.id, b.slot))
+      .map((e) => e.id)
+    expect(landed).toEqual(['bed', 'amara']) // the body last — on top of the bed. RED.
   })
 
   it('sorts the sleeper AFTER the bed’s back half and BEFORE its front half', () => {
@@ -365,15 +477,23 @@ describe('furniture stands on its own ground', () => {
 
   it('THE DEFECT, AS A TEST: the landed foot is the FIRST cell’s centre, whatever the size', () => {
     const at = { x: 9, y: 2 }
-    for (const size of [{ w: 1, h: 1 }, { w: 1, h: 2 }, { w: 2, h: 2 }]) {
+    for (const size of [
+      { w: 1, h: 1 },
+      { w: 1, h: 2 },
+      { w: 2, h: 2 },
+    ]) {
       expect(landedFoot(at)).toEqual(tileSpanCentre(at, { w: 1, h: 1 }))
       // …so anything bigger than one tile stood off its own ground, and by how much:
       const off = tileSpanCentre(at, size)
       const d = Math.hypot(off.sx - landedFoot(at).sx, off.sy - landedFoot(at).sy)
-      expect(d, `${size.w}x${size.h}`).toBe(size.w === 1 && size.h === 1 ? 0 : Math.hypot(
-        ((size.w - 1) - (size.h - 1)) * (INTERIOR_TILE.w / 4),
-        ((size.w - 1) + (size.h - 1)) * (INTERIOR_TILE.h / 4),
-      ))
+      expect(d, `${size.w}x${size.h}`).toBe(
+        size.w === 1 && size.h === 1
+          ? 0
+          : Math.hypot(
+              (size.w - 1 - (size.h - 1)) * (INTERIOR_TILE.w / 4),
+              (size.w - 1 + (size.h - 1)) * (INTERIOR_TILE.h / 4),
+            ),
+      )
     }
     // the house's bed is 1x2: 32 px sideways and 16 down on the interior lattice
     const bed = tileSpanCentre(at, { w: 1, h: 2 })
@@ -382,7 +502,11 @@ describe('furniture stands on its own ground', () => {
   })
 
   it('a one-tile piece is unchanged, so nothing that was already right has moved', () => {
-    for (const t of [{ x: 0, y: 0 }, { x: 5, y: 4 }, { x: 9, y: 4 }]) {
+    for (const t of [
+      { x: 0, y: 0 },
+      { x: 5, y: 4 },
+      { x: 9, y: 4 },
+    ]) {
       expect(tileSpanCentre(t, { w: 1, h: 1 })).toEqual(landedFoot(t))
     }
   })
@@ -405,9 +529,9 @@ describe('furnishingScale — one room, one scale', () => {
   // bed's sprite covers its own ground and no more. The rest is in `interiorScale.test.ts`.
   it('puts a bed on exactly the ground a bed covers', () => {
     const bedSpanPx = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)
-    expect(bedSpanPx).toBe(192)                                      // what the library authors
-    expect(bedSpanPx * furnishingScale()).toBe(192)                  // and what reaches the glass
-    expect(24 / LIBRARY_TILE_PX).toBeLessThan(0.5)                   // the first mismatch: too small
+    expect(bedSpanPx).toBe(192) // what the library authors
+    expect(bedSpanPx * furnishingScale()).toBe(192) // and what reaches the glass
+    expect(24 / LIBRARY_TILE_PX).toBeLessThan(0.5) // the first mismatch: too small
   })
 
   it('never inflates anything', () => {
@@ -435,7 +559,7 @@ describe('contactShadow — nothing floats', () => {
   it('lifts by its own half-height, so its near edge lands on the object’s lowest pixel', () => {
     const s = contactShadow(40)
     expect(s.lift).toBe(s.ry)
-    expect(0 - s.lift + s.ry).toBe(0)   // the ellipse's bottom sits exactly on the anchor
+    expect(0 - s.lift + s.ry).toBe(0) // the ellipse's bottom sits exactly on the anchor
   })
 
   it('scales with the thing it sits under, and never inverts', () => {
@@ -453,36 +577,50 @@ describe('contactShadow — nothing floats', () => {
 // into is the room the engine says it is.
 describe('★ the cabin is a room, and it is the room the engine says it is', () => {
   const HEARTH = libraryRecord('hearth', {
-    slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house'],
-    isHearth: true, providesLight: true,
+    slots: { w: 1, h: 1 },
+    placement: 'wall',
+    interiorKinds: ['house'],
+    isHearth: true,
+    providesLight: true,
   })
   const BENCH = libraryRecord('bench', {
-    slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'],
+    slots: { w: 1, h: 2 },
+    placement: 'floor',
+    interiorKinds: ['house'],
   })
   const CRATE = libraryRecord('crate', {
-    slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse'],
+    slots: { w: 1, h: 1 },
+    placement: 'floor',
+    interiorKinds: ['storehouse'],
   })
   const RECORDS = [HEARTH, BENCH, CRATE]
 
   // The same assembly `interiorScene.layoutRoom` runs. Written out rather than imported because
   // the scene builds it inside a Pixi closure.
-  const mapFor = (kind: InteriorKind): RoomMap => roomMapOf(
-    roomPlan(kind, RECORDS).map((i) => ({
-      kind: i.kind, slot: i.slot, size: i.meta?.slots ?? { w: 1, h: 1 },
-      placement: i.meta?.placement ?? 'floor', flat: isFlat(i.kind),
-    })), roomSizeOf(kind), slotGridOf(kind),
-  )
+  const mapFor = (kind: InteriorKind): RoomMap =>
+    roomMapOf(
+      roomPlan(kind, RECORDS).map((i) => ({
+        kind: i.kind,
+        slot: i.slot,
+        size: i.meta?.slots ?? { w: 1, h: 1 },
+        placement: i.meta?.placement ?? 'floor',
+        flat: isFlat(i.kind),
+      })),
+      roomSizeOf(kind),
+      slotGridOf(kind),
+    )
 
   it('★ resolves an interior at all — before this it was null and the body vanished', () => {
     const state = {
-      ...fixture(), structures: { cabin1: structure('cabin1', 'cabin') },
+      ...fixture(),
+      structures: { cabin1: structure('cabin1', 'cabin') },
     } as unknown as WorldState
     const room = interiorOf(state, 'cabin1')
     expect(room).not.toBeNull()
     expect(room!.kind).toBe('cabin')
   })
 
-  it('★ holds one fire, on a wall, facing that wall\'s own face', () => {
+  it("★ holds one fire, on a wall, facing that wall's own face", () => {
     const map = mapFor('cabin')
     const fires = map.pieces.filter((p) => p.kind === 'hearth')
     expect(fires).toHaveLength(1)
@@ -536,7 +674,9 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     const map = mapFor('cabin')
     const fire = map.pieces.find((p) => p.kind === 'hearth')!
     const lightKinds = new Set(
-      roomPlan('cabin', RECORDS).filter((p) => p.meta?.providesLight === true).map((p) => p.kind),
+      roomPlan('cabin', RECORDS)
+        .filter((p) => p.meta?.providesLight === true)
+        .map((p) => p.kind),
     )
     expect(lightKinds.has('hearth')).toBe(true)
 
@@ -558,7 +698,7 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     // is priced on. A farmhouse drawn on a house's floor would put the picture at odds with it.
     for (const kind of INTERIOR_KINDS) {
       const plan = DEFAULT_CONFIG.structures.recipes[kind]
-      if (plan === undefined) continue                       // shed has no row; it keeps the default
+      if (plan === undefined) continue // shed has no row; it keeps the default
       expect(roomSizeOf(kind), kind).toEqual(roomTilesFor({ w: plan.w, h: plan.h }))
     }
     // the house's landed room is what FORCES the factor — it is derived, not chosen
@@ -577,7 +717,7 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     const kinds = mapFor('cabin').pieces.map((p) => p.kind)
     expect(kinds).toContain('hearth')
     expect(kinds).not.toContain('bed')
-    expect(bedSlots('cabin', ['amara'], RECORDS)).toEqual({})   // nowhere to lie down
+    expect(bedSlots('cabin', ['amara'], RECORDS)).toEqual({}) // nowhere to lie down
     expect(mapFor('house').pieces.map((p) => p.kind)).toContain('bed')
   })
 })
@@ -595,8 +735,7 @@ describe('★ a shared room and a private room, and the difference is the ladder
     const r = DEFAULT_CONFIG.structures.recipes[kind]!
     return { w: r.w, h: r.h }
   }
-  const isPrivate = (kind: string): boolean =>
-    DEFAULT_CONFIG.structures.privateKinds.includes(kind)
+  const isPrivate = (kind: string): boolean => DEFAULT_CONFIG.structures.privateKinds.includes(kind)
 
   it('★ one bed if the door is yours, one bed per body if it is not', () => {
     const bedded = INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))
@@ -633,7 +772,10 @@ describe('★ a shared room and a private room, and the difference is the ladder
 
   it('★ and every body the world lets sleep there has somewhere to lie', () => {
     const bedRecord = libraryRecord('bed', {
-      slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'], isBed: true,
+      slots: { w: 1, h: 2 },
+      placement: 'floor',
+      interiorKinds: ['house'],
+      isBed: true,
     })
     for (const kind of INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))) {
       const sleepers = Array.from({ length: roomCapacity(planOf(kind)) }, (_, i) => `s${i}`)

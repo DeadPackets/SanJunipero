@@ -5,8 +5,12 @@ import type { RawImage } from './post/raw.js'
 
 // distinct sizes per pose so rect math is actually exercised
 const SIZES: Record<string, { w: number; h: number }> = {
-  'idle': { w: 6, h: 12 }, 'contact-a': { w: 8, h: 11 }, 'passing-a': { w: 7, h: 11 },
-  'contact-b': { w: 8, h: 11 }, 'passing-b': { w: 7, h: 11 }, 'sleep': { w: 14, h: 7 },
+  idle: { w: 6, h: 12 },
+  'contact-a': { w: 8, h: 11 },
+  'passing-a': { w: 7, h: 11 },
+  'contact-b': { w: 8, h: 11 },
+  'passing-b': { w: 7, h: 11 },
+  sleep: { w: 14, h: 7 },
 }
 
 function solidCell(w: number, h: number, mark: number): RawImage {
@@ -41,7 +45,7 @@ describe('packCharacterAtlas', () => {
       expect({ w: c.w, h: c.h }).toEqual({ w: src.width, h: src.height })
       // every pixel of the placed rect carries the cell's marker byte
       const mark = src.data[0]!
-      const corner = ((c.y * image.width) + c.x) * 4
+      const corner = (c.y * image.width + c.x) * 4
       const last = ((c.y + c.h - 1) * image.width + c.x + c.w - 1) * 4
       expect(image.data[corner]).toBe(mark)
       expect(image.data[last]).toBe(mark)

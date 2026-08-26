@@ -52,12 +52,16 @@ describe('PersonalityStore versioning', () => {
     const { mem, store } = await makeStore()
     store.init(BASE_DOC, 0)
     const evidence = await insertMemory(mem, 1500) // day 1
-    const res = store.applyNightlyEdit(1, {
-      op: 'add',
-      field: 'beliefs',
-      text: 'the storehouse must be sealed before rain',
-      evidence: [evidence],
-    }, mem)
+    const res = store.applyNightlyEdit(
+      1,
+      {
+        op: 'add',
+        field: 'beliefs',
+        text: 'the storehouse must be sealed before rain',
+        evidence: [evidence],
+      },
+      mem,
+    )
     expect(res).toEqual({ ok: true, version: 2 })
 
     const cur = store.current()
@@ -73,7 +77,12 @@ describe('PersonalityStore versioning', () => {
     expect(hist[1]).toEqual({
       version: 2,
       day: 1,
-      edit: { op: 'add', field: 'beliefs', text: 'the storehouse must be sealed before rain', evidence: [evidence] },
+      edit: {
+        op: 'add',
+        field: 'beliefs',
+        text: 'the storehouse must be sealed before rain',
+        evidence: [evidence],
+      },
     })
   })
 
@@ -82,8 +91,12 @@ describe('PersonalityStore versioning', () => {
     store.init(BASE_DOC, 0)
     const e1 = await insertMemory(mem, 1500)
     const e2 = await insertMemory(mem, 1600)
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: 'a', evidence: [e1] }, mem)).toEqual({ ok: true, version: 2 })
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: 'b', evidence: [e2] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: 'a', evidence: [e1] }, mem),
+    ).toEqual({ ok: true, version: 2 })
+    expect(
+      store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: 'b', evidence: [e2] }, mem),
+    ).toEqual({
       ok: false,
       reason: 'edit_already_applied_today',
     })
@@ -93,7 +106,13 @@ describe('PersonalityStore versioning', () => {
     const { mem, store } = await makeStore()
     store.init(BASE_DOC, 0)
     const yesterday = await insertMemory(mem, 100) // day 0
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'values', text: 'x', evidence: [yesterday] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'add', field: 'values', text: 'x', evidence: [yesterday] },
+        mem,
+      ),
+    ).toEqual({
       ok: false,
       reason: 'evidence_not_from_today',
     })
@@ -102,7 +121,9 @@ describe('PersonalityStore versioning', () => {
   it('evidence id with no row -> evidence_missing', async () => {
     const { mem, store } = await makeStore()
     store.init(BASE_DOC, 0)
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'values', text: 'x', evidence: [9999] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(1, { op: 'add', field: 'values', text: 'x', evidence: [9999] }, mem),
+    ).toEqual({
       ok: false,
       reason: 'evidence_missing',
     })
@@ -112,8 +133,16 @@ describe('PersonalityStore versioning', () => {
     const { db, mem, store } = await makeStore('tamar')
     store.init(BASE_DOC, 0)
     const omarMem = new MemoryStore(db, 'omar', await FakeEmbedder.create())
-    const omarId = await omarMem.insertMemory({ tick: 1500, kind: 'thought', text: 'private', importance: 5, tags: TAGS })
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'values', text: 'x', evidence: [omarId] }, mem)).toEqual({
+    const omarId = await omarMem.insertMemory({
+      tick: 1500,
+      kind: 'thought',
+      text: 'private',
+      importance: 5,
+      tags: TAGS,
+    })
+    expect(
+      store.applyNightlyEdit(1, { op: 'add', field: 'values', text: 'x', evidence: [omarId] }, mem),
+    ).toEqual({
       ok: false,
       reason: 'evidence_missing',
     })
@@ -124,7 +153,11 @@ describe('PersonalityStore versioning', () => {
     store.init(BASE_DOC, 0)
     const e = await insertMemory(mem, 1500)
     expect(
-      store.applyNightlyEdit(1, { op: 'revise', field: 'temperament', index: 0, text: 'angry', evidence: [e] }, mem),
+      store.applyNightlyEdit(
+        1,
+        { op: 'revise', field: 'temperament', index: 0, text: 'angry', evidence: [e] },
+        mem,
+      ),
     ).toEqual({ ok: false, reason: 'invalid_edit_shape' })
   })
 
@@ -133,7 +166,9 @@ describe('PersonalityStore versioning', () => {
     store.init(BASE_DOC, 0)
     const e = await insertMemory(mem, 1500)
     const long = 'a'.repeat(201)
-    expect(store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: long, evidence: [e] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: long, evidence: [e] }, mem),
+    ).toEqual({
       ok: false,
       reason: 'invalid_edit_shape',
     })
@@ -144,7 +179,11 @@ describe('PersonalityStore versioning', () => {
     store.init(BASE_DOC, 0)
     const e = await insertMemory(mem, 1500)
     expect(
-      store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text: 'x', evidence: [e], sneak: 'in' }, mem),
+      store.applyNightlyEdit(
+        1,
+        { op: 'add', field: 'beliefs', text: 'x', evidence: [e], sneak: 'in' },
+        mem,
+      ),
     ).toEqual({ ok: false, reason: 'invalid_edit_shape' })
   })
 
@@ -163,11 +202,19 @@ describe('PersonalityStore versioning', () => {
     const { mem, store } = await makeStore()
     store.init({ ...BASE_DOC, values: ['loyalty', 'duty'], beliefs: ['rain is coming'] }, 0)
     const e1 = await insertMemory(mem, 1500) // day 1
-    expect(store.applyNightlyEdit(1, { op: 'revise', field: 'values', index: 1, text: 'honor', evidence: [e1] }, mem)).toEqual({ ok: true, version: 2 })
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'revise', field: 'values', index: 1, text: 'honor', evidence: [e1] },
+        mem,
+      ),
+    ).toEqual({ ok: true, version: 2 })
     expect(store.current().doc.values).toEqual(['loyalty', 'honor'])
 
     const e2 = await insertMemory(mem, 3000) // day 2
-    expect(store.applyNightlyEdit(2, { op: 'remove', field: 'beliefs', index: 0, evidence: [e2] }, mem)).toEqual({ ok: true, version: 3 })
+    expect(
+      store.applyNightlyEdit(2, { op: 'remove', field: 'beliefs', index: 0, evidence: [e2] }, mem),
+    ).toEqual({ ok: true, version: 3 })
     expect(store.current().doc.beliefs).toEqual([])
     expect(store.current().doc.temperament).toBe('calm')
   })
@@ -176,11 +223,19 @@ describe('PersonalityStore versioning', () => {
     const { mem, store } = await makeStore()
     store.init(BASE_DOC, 0) // values: ['loyalty'], beliefs: []
     const e = await insertMemory(mem, 1500)
-    expect(store.applyNightlyEdit(1, { op: 'revise', field: 'values', index: 5, text: 'x', evidence: [e] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'revise', field: 'values', index: 5, text: 'x', evidence: [e] },
+        mem,
+      ),
+    ).toEqual({
       ok: false,
       reason: 'index_out_of_range',
     })
-    expect(store.applyNightlyEdit(1, { op: 'remove', field: 'beliefs', index: 0, evidence: [e] }, mem)).toEqual({
+    expect(
+      store.applyNightlyEdit(1, { op: 'remove', field: 'beliefs', index: 0, evidence: [e] }, mem),
+    ).toEqual({
       ok: false,
       reason: 'index_out_of_range',
     })

@@ -50,7 +50,7 @@ const ALARM_NEEDS = ['hunger', 'energy', 'warmth', 'thirst'] as const
 type AlarmNeed = (typeof ALARM_NEEDS)[number]
 
 const levelOf = (body: AlarmBody, need: AlarmNeed): number =>
-  need === 'thirst' ? body.thirst ?? 100 : body.needs[need]
+  need === 'thirst' ? (body.thirst ?? 100) : body.needs[need]
 
 export type MindClock = {
   // `null` is a mind that has never taken a turn, and is not tick 0: a fresh town starts there,
@@ -118,7 +118,8 @@ export function decideWake(
 
   // plan_done: subject to the idle floor, but the floor only applies outside
   // an open conversation window.
-  if (plan.lastResult === 'done' && (inConversation || sinceLast >= cfg.idleGapTicks)) return 'plan_done'
+  if (plan.lastResult === 'done' && (inConversation || sinceLast >= cfg.idleGapTicks))
+    return 'plan_done'
 
   // conversation_beat: inside the window, its own tighter cadence.
   if (inConversation && sinceLast >= cfg.conversationGapTicks) return 'conversation_beat'
@@ -156,7 +157,8 @@ function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alar
 // affliction has no scale to oscillate on: getting worse is not a second bell.
 export function rearmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
   for (const need of ALARM_NEEDS) {
-    if (levelOf(body, need) >= cfg.bodyAlarm[need] + cfg.alarmHysteresis) clock.alarmArmed[need] = true
+    if (levelOf(body, need) >= cfg.bodyAlarm[need] + cfg.alarmHysteresis)
+      clock.alarmArmed[need] = true
   }
   const still = new Set(ringing(cfg, body))
   for (const key of Object.keys(clock.alarmArmed)) {

@@ -19,7 +19,8 @@ const band = (ageDays: number): RosterRow['band'] => {
 }
 
 export function rosterRows(
-  state: WorldState | null, nowTick?: number,
+  state: WorldState | null,
+  nowTick?: number,
 ): { alive: RosterRow[]; gone: number } {
   if (state === null) return { alive: [], gone: 0 }
   const alive: RosterRow[] = []
@@ -30,8 +31,11 @@ export function rosterRows(
       continue
     }
     alive.push({
-      id: a.id, name: a.name, band: band(a.ageDays),
-      state: stateWord(a, nowTick), conditions: conditionsOf(a),
+      id: a.id,
+      name: a.name,
+      band: band(a.ageDays),
+      state: stateWord(a, nowTick),
+      conditions: conditionsOf(a),
     })
   }
   alive.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : x.id < y.id ? -1 : 1))
@@ -40,7 +44,11 @@ export function rosterRows(
 
 export const BUST_FIGURE_SHARE = 0.45 // bust crop = head + shoulders ≈ top 45% of the chibi figure
 
-export type BustStyle = { backgroundImage: string; backgroundSize: string; backgroundPosition: string }
+export type BustStyle = {
+  backgroundImage: string
+  backgroundSize: string
+  backgroundPosition: string
+}
 
 // CSS sprite-crop of the v4 atlas idle cell around the head; null → pixel-token fallback
 export function bustStyle(records: AssetRecord[], agentId: string, px: number): BustStyle | null {

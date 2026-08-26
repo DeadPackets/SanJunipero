@@ -10,7 +10,13 @@ import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary, type Leaf } from './disc
  */
 
 /** The whole record, as a pure view. The panel below is the same thing with a fetch on it. */
-export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump, loading = false }: {
+export function DiscoveryRecordView({
+  leaves,
+  throughTick,
+  viewTick,
+  onJump,
+  loading = false,
+}: {
   leaves: readonly Leaf[]
   throughTick: number
   viewTick: number | null
@@ -23,7 +29,9 @@ export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump, loa
       <h2 className="px-title">What they made</h2>
       {loading && leaves.length === 0 ? (
         <div aria-busy="true">
-          {[0, 1, 2].map((i) => <div key={i} className="skeleton-row" />)}
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton-row" />
+          ))}
         </div>
       ) : (
         <p className="discovery-summary">{recordSummary(leaves, throughTick)}</p>
@@ -39,17 +47,22 @@ export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump, loa
                 aria-label={`${leaf.headline}, ${leaf.when}. Go to this moment.`}
                 onClick={() => onJump(leaf.record.tick)}
               >
-                {leaf.assetId === null
-                  ? <span className="discovery-art discovery-art-none" aria-hidden="true" />
-                  : (
-                    <img
-                      className="discovery-art" src={`/assets/${leaf.assetId}.png`} alt=""
-                      width={48} height={48}
-                    />
-                  )}
+                {leaf.assetId === null ? (
+                  <span className="discovery-art discovery-art-none" aria-hidden="true" />
+                ) : (
+                  <img
+                    className="discovery-art"
+                    src={`/assets/${leaf.assetId}.png`}
+                    alt=""
+                    width={48}
+                    height={48}
+                  />
+                )}
                 <span className="discovery-body">
                   <h3>{leaf.record.name}</h3>
-                  <p className="discovery-credit">{leaf.when} — {leaf.record.by} worked this out.</p>
+                  <p className="discovery-credit">
+                    {leaf.when} — {leaf.record.by} worked this out.
+                  </p>
                   <p className="discovery-quote">“{leaf.record.intent}”</p>
                   {leaf.record.makes.length > 0 && (
                     <p className="discovery-makes">
@@ -66,7 +79,10 @@ export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump, loa
   )
 }
 
-export function DiscoveryPanel({ store, onView }: {
+export function DiscoveryPanel({
+  store,
+  onView,
+}: {
   store: WorldStore
   onView: (tick: number | null) => void
 }) {
@@ -88,7 +104,9 @@ export function DiscoveryPanel({ store, onView }: {
           if (parsed?.success === true) setRecords(parsed.data.discoveries)
           setLoaded(true)
         })
-        .catch(() => { if (alive) setLoaded(true) })
+        .catch(() => {
+          if (alive) setLoaded(true)
+        })
     }
     load()
     const timer = setInterval(load, DISCOVERY_REFETCH_MS)

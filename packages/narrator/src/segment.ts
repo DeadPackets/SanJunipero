@@ -1,7 +1,11 @@
 import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import type { SceneSegment, SegmentConfig } from './types.js'
 
-export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = { silenceTicks: 20, maxTicks: 240, minEvents: 2 }
+export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = {
+  silenceTicks: 20,
+  maxTicks: 240,
+  minEvents: 2,
+}
 
 // Bare payload.id is an AGENT id only on these types; elsewhere it names a structure/item/crop.
 const ID_IS_AGENT = new Set(['agent_spawned', 'agent_moved', 'need_changed'])
@@ -22,7 +26,10 @@ export function eventLocation(ev: SimEvent): { x: number; y: number } | null {
   return typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : null
 }
 
-export function segmentScenes(events: SimEvent[], cfg: SegmentConfig = DEFAULT_SEGMENT_CONFIG): SceneSegment[] {
+export function segmentScenes(
+  events: SimEvent[],
+  cfg: SegmentConfig = DEFAULT_SEGMENT_CONFIG,
+): SceneSegment[] {
   const raw: SimEvent[][] = []
   let current: SimEvent[] = []
   for (const e of events) {

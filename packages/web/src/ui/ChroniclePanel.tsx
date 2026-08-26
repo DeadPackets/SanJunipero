@@ -11,7 +11,7 @@ export const CHRONICLE_REFETCH_MS = 20_000
 export const GLYPH_PX = 8
 
 export const CHRONICLE_VIEWS = ['important', 'everything'] as const
-export type ChronicleView = typeof CHRONICLE_VIEWS[number]
+export type ChronicleView = (typeof CHRONICLE_VIEWS)[number]
 // Observation, never achievement: "what mattered" is the editor's word, not the town's score.
 export const CHRONICLE_VIEW_LABEL: Record<ChronicleView, string> = {
   important: 'What mattered',
@@ -35,9 +35,13 @@ const stamp = (tick: number): string => {
 function Glyph({ icon }: { icon: string }) {
   return (
     <svg
-      className="feed-glyph" viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
-      width={GLYPH_PX * 2} height={GLYPH_PX * 2}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="feed-glyph"
+      viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
+      width={GLYPH_PX * 2}
+      height={GLYPH_PX * 2}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {chronicleGlyph(icon).pixels.map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -59,7 +63,13 @@ export function tabFromKey(key: string, from: ChronicleView): ChronicleView | nu
 
 /** A tablist with a ROVING TABINDEX: one tab stop for the pair, Left and Right walk it. Without
  *  the walk the inactive tab is out of the tab order and nothing else can reach it. */
-export function ChronicleViewTabs({ view, onView }: { view: ChronicleView; onView: (v: ChronicleView) => void }) {
+export function ChronicleViewTabs({
+  view,
+  onView,
+}: {
+  view: ChronicleView
+  onView: (v: ChronicleView) => void
+}) {
   const onKeyDown = (e: React.KeyboardEvent): void => {
     const next = tabFromKey(e.key, view)
     if (next === null) return
@@ -69,7 +79,9 @@ export function ChronicleViewTabs({ view, onView }: { view: ChronicleView; onVie
   }
   return (
     <div
-      className="feed-switch" role="tablist" aria-label="What the chronicle shows"
+      className="feed-switch"
+      role="tablist"
+      aria-label="What the chronicle shows"
       onKeyDown={onKeyDown}
     >
       {CHRONICLE_VIEWS.map((v) => (
@@ -92,7 +104,12 @@ export function ChronicleViewTabs({ view, onView }: { view: ChronicleView; onVie
 
 // Newest first, like the live feed beside it: the town's most recent turn is the one a
 // viewer arrives looking for.
-export function ImportantFeedView({ entries, viewTick, onJump, loading = false }: {
+export function ImportantFeedView({
+  entries,
+  viewTick,
+  onJump,
+  loading = false,
+}: {
   entries: ChronicleEntry[]
   viewTick: number | null
   onJump: (tick: number) => void
@@ -102,7 +119,9 @@ export function ImportantFeedView({ entries, viewTick, onJump, loading = false }
   if (entries.length === 0 && loading) {
     return (
       <ol className="feed important" aria-busy="true">
-        {[0, 1, 2, 3, 4].map((i) => <li key={i} className="skeleton-row" />)}
+        {[0, 1, 2, 3, 4].map((i) => (
+          <li key={i} className="skeleton-row" />
+        ))}
       </ol>
     )
   }
@@ -127,7 +146,10 @@ export function ImportantFeedView({ entries, viewTick, onJump, loading = false }
   )
 }
 
-export function EverythingFeedView({ lines, tick = 0 }: {
+export function EverythingFeedView({
+  lines,
+  tick = 0,
+}: {
   lines: Array<{ key: number; tick: number; kind: string; text: string }>
   tick?: number
 }) {
@@ -147,7 +169,11 @@ export function EverythingFeedView({ lines, tick = 0 }: {
   )
 }
 
-export function ChroniclePanel({ store, handle, onView }: {
+export function ChroniclePanel({
+  store,
+  handle,
+  onView,
+}: {
   store: WorldStore
   handle: ObservatoryHandle | null
   onView: (tick: number | null) => void
@@ -171,7 +197,9 @@ export function ChroniclePanel({ store, handle, onView }: {
           if (parsed?.success === true) setEntries(parsed.data.entries)
           setLoaded(true)
         })
-        .catch(() => { if (alive) setLoaded(true) })
+        .catch(() => {
+          if (alive) setLoaded(true)
+        })
     }
     load()
     const timer = setInterval(load, CHRONICLE_REFETCH_MS)
@@ -185,7 +213,8 @@ export function ChroniclePanel({ store, handle, onView }: {
   for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
     const ev = events[i]!
     const text = describeEvent(ev, state)
-    if (text !== null) lines.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
+    if (text !== null)
+      lines.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
   }
 
   const jump = (tick: number): void => {

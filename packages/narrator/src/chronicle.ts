@@ -37,7 +37,10 @@ export function witnessedAttackers(events: SimEvent[]): Array<{ victim: string; 
   return out
 }
 
-export function verifyCitations(citations: number[], valid: Set<number>): { ok: boolean; dangling: number[] } {
+export function verifyCitations(
+  citations: number[],
+  valid: Set<number>,
+): { ok: boolean; dangling: number[] } {
   const dangling = citations.filter((c) => !valid.has(c))
   return { ok: dangling.length === 0, dangling }
 }
@@ -69,10 +72,20 @@ export async function renderChapter(deps: {
   const summary = await llm.summarizeChapter(sceneDigests(scenes, deps.typeCounts ?? (() => ({}))))
   const valid = new Set(scenes.flatMap((s) => s.eventIds))
   const { ok, dangling } = verifyCitations(summary.citations, valid)
-  if (!ok) deps.alert?.(`dangling_citation: chapter for day ${day} cited unknown ledger numbers ${dangling.join(', ')}`)
+  if (!ok)
+    deps.alert?.(
+      `dangling_citation: chapter for day ${day} cited unknown ledger numbers ${dangling.join(', ')}`,
+    )
   let citations = summary.citations.filter((c) => valid.has(c))
-  if (citations.length === 0) citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
-  const id = store.insertChapter({ day, title: summary.title, text: summary.text, citations, sceneIds })
+  if (citations.length === 0)
+    citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
+  const id = store.insertChapter({
+    day,
+    title: summary.title,
+    text: summary.text,
+    citations,
+    sceneIds,
+  })
   return { id, day, title: summary.title, text: summary.text, citations, sceneIds }
 }
 
@@ -104,9 +117,19 @@ export async function renderEra(deps: {
   )
   const valid = new Set(deps.validEventIds)
   const { ok, dangling } = verifyCitations(summary.citations, valid)
-  if (!ok) deps.alert?.(`dangling_citation: era days ${startDay}-${endDay} cited unknown ledger numbers ${dangling.join(', ')}`)
+  if (!ok)
+    deps.alert?.(
+      `dangling_citation: era days ${startDay}-${endDay} cited unknown ledger numbers ${dangling.join(', ')}`,
+    )
   let citations = summary.citations.filter((c) => valid.has(c))
   if (citations.length === 0) citations = chapters[0]!.citations.slice(0, 1)
-  const id = store.insertEra({ startDay, endDay, title: summary.title, text: summary.text, citations, chapterIds })
+  const id = store.insertEra({
+    startDay,
+    endDay,
+    title: summary.title,
+    text: summary.text,
+    citations,
+    chapterIds,
+  })
   return { id, startDay, endDay, title: summary.title, text: summary.text, citations, chapterIds }
 }

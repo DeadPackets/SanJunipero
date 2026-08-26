@@ -21,18 +21,28 @@ export function readDiscoveries(
   for (const r of rows) {
     const p = JSON.parse(r.payload) as Record<string, unknown>
     const parsed = DiscoveryRecordSchema.safeParse({
-      seq: r.seq, tick: r.tick,
-      recipeId: p.recipeId, name: p.name, kind: p.kind, byId: p.byId,
-      by: nameOf(String(p.byId ?? '')), intent: p.intent, makes: p.makes,
+      seq: r.seq,
+      tick: r.tick,
+      recipeId: p.recipeId,
+      name: p.name,
+      kind: p.kind,
+      byId: p.byId,
+      by: nameOf(String(p.byId ?? '')),
+      intent: p.intent,
+      makes: p.makes,
     })
     // A row a future writer shaped differently is skipped, never a 500 — but it must say which
     // one, because silently short is how a schema drift stays invisible instead of degraded.
     if (parsed.success) out.push(parsed.data)
     else {
-      reportOnce('discoveries.schema', () =>
-        `a ${DISCOVERY_EVENT} row at seq ${r.seq} does not fit DiscoveryRecordSchema and is being`
-        + ` dropped from /api/discoveries — ${parsed.error.issues.map((i) =>
-          `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+      reportOnce(
+        'discoveries.schema',
+        () =>
+          `a ${DISCOVERY_EVENT} row at seq ${r.seq} does not fit DiscoveryRecordSchema and is being` +
+          ` dropped from /api/discoveries — ${parsed.error.issues
+            .map((i) => `${i.path.join('.')}: ${i.message}`)
+            .join('; ')}`,
+      )
     }
   }
   return out
@@ -41,8 +51,12 @@ export function readDiscoveries(
 export function mountDiscoveryApi(router: Router, deps: DiscoveryApiDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
   router.route('GET', '/api/discoveries', (_req: IncomingMessage, res: ServerResponse) =>
-    sendPrebuilt(res, cache.json('discoveries', () => {
-      const state = deps.mirror.state()
-      return { discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id) }
-    })))
+    sendPrebuilt(
+      res,
+      cache.json('discoveries', () => {
+        const state = deps.mirror.state()
+        return { discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id) }
+      }),
+    ),
+  )
 }

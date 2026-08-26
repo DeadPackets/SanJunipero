@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_CONFIG, MIN_SEP, PITCH, STREET, TOWN_SQUARE, T_GRASS, T_ROAD, WORLD_MARGIN,
-  blockGroundOf, centreOf, chronicleLine, dayPhaseFromTick, edgesOwed, type SimEvent, type TownClaim,
+  DEFAULT_CONFIG,
+  MIN_SEP,
+  PITCH,
+  STREET,
+  TOWN_SQUARE,
+  T_GRASS,
+  T_ROAD,
+  WORLD_MARGIN,
+  blockGroundOf,
+  centreOf,
+  chronicleLine,
+  dayPhaseFromTick,
+  edgesOwed,
+  type SimEvent,
+  type TownClaim,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
@@ -9,20 +22,35 @@ import { makeGenesisWorld, GENESIS_BUILDER_ID, GENESIS_FORD } from './genesis/wo
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import {
-  buildIsPlotted, buildSiteOf, groundForBuilding, handsOnSite, isAdjacentToRect, isPlottedKind,
-  stepBuild, workPenalty,
+  buildIsPlotted,
+  buildSiteOf,
+  groundForBuilding,
+  handsOnSite,
+  isAdjacentToRect,
+  isPlottedKind,
+  stepBuild,
+  workPenalty,
 } from './verbs.js'
-import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf, type TileChange } from './town.js'
+import {
+  claimInWorld,
+  layBlock,
+  standingRects,
+  townGroundBox,
+  townSquareOf,
+  type TileChange,
+} from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
 
 const CFG = DEFAULT_CONFIG
 const T_FOREST = 3
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent =>
-  ({ seq: ++seq, tick: 0, type, payload } as unknown as SimEvent)
+  ({ seq: ++seq, tick: 0, type, payload }) as unknown as SimEvent
 
-const apply = (s: WorldState, events: ReadonlyArray<{ type: string; payload: unknown }>): WorldState =>
-  events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), s)
+const apply = (
+  s: WorldState,
+  events: ReadonlyArray<{ type: string; payload: unknown }>,
+): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), s)
 
 function genesisTown(): WorldState {
   const g = makeGenesisWorld(CFG)
@@ -30,10 +58,18 @@ function genesisTown(): WorldState {
 }
 
 /** A body with wood in its hands, standing where it is told. */
-function withBuilder(s: WorldState, id: string, at: { x: number; y: number }, wood = 10): WorldState {
+function withBuilder(
+  s: WorldState,
+  id: string,
+  at: { x: number; y: number },
+  wood = 10,
+): WorldState {
   return apply(s, [
     { type: 'agent_spawned', payload: { id, name: id, x: at.x, y: at.y, ageDays: 10000 } },
-    { type: 'item_spawned', payload: { id: `wood_${id}`, kind: 'wood', qty: wood, loc: { t: 'agent', id } } },
+    {
+      type: 'item_spawned',
+      payload: { id: `wood_${id}`, kind: 'wood', qty: wood, loc: { t: 'agent', id } },
+    },
   ])
 }
 
@@ -42,8 +78,10 @@ const doorFor = (s: WorldState) => claimInWorld(s, { along: 2, deep: 2 })!.door
 
 /** The site as the engine reports it: the plot's rectangle, plus the facing when — and only
  *  when — the plot turned the building. Absent is `sw`. */
-const seatedAs = (claim: TownClaim): Record<string, unknown> =>
-  ({ ...claim.site, ...(claim.facing === 'sw' ? {} : { facing: claim.facing }) })
+const seatedAs = (claim: TownClaim): Record<string, unknown> => ({
+  ...claim.site,
+  ...(claim.facing === 'sw' ? {} : { facing: claim.facing }),
+})
 
 describe('★ how an agent builds: the plot, never the coordinate', () => {
   it('a house in a town takes {kind} and refuses a coordinate, in words', () => {
@@ -80,7 +118,12 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
     expect(r.ok).toBe(true)
     const planned = r.ok ? r.events.find((e) => e.type === 'structure_planned')! : null
     expect(planned!.payload).toMatchObject({
-      kind: 'house', x: claim.site.x, y: claim.site.y, w: claim.site.w, h: claim.site.h, builderId: 'a',
+      kind: 'house',
+      x: claim.site.x,
+      y: claim.site.y,
+      w: claim.site.w,
+      h: claim.site.h,
+      builderId: 'a',
     })
   })
 
@@ -118,7 +161,11 @@ describe('the one tile the prose names works for every roof a mind can raise', (
   it('accepts a house, a cottage and a farmhouse from the tile groundForBuilding gives', () => {
     const base = genesisTown()
     const told = groundForBuilding(base)!
-    for (const [kind, wood] of [['house', 10], ['cottage', 15], ['farmhouse', 20]] as const) {
+    for (const [kind, wood] of [
+      ['house', 10],
+      ['cottage', 15],
+      ['farmhouse', 20],
+    ] as const) {
       const s = withBuilder(base, `b_${kind}`, told, wood)
       const r = submitIntent(s, CFG, `b_${kind}`, 'build', { kind })
       expect(r.ok, `${kind}: ${r.ok ? '' : r.reason}`).toBe(true)
@@ -133,7 +180,10 @@ describe('the bridge is the one thing a builder still sites', () => {
     // of water west of it, which is the same span `g11-deepworld.ts` probes.
     const at = { x: GENESIS_FORD.x - 2, y: GENESIS_FORD.y0 }
     const s = apply(withBuilder(base, 'a', { x: at.x - 1, y: at.y }, 0), [
-      { type: 'item_spawned', payload: { id: 'wood_a', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'a' } } },
+      {
+        type: 'item_spawned',
+        payload: { id: 'wood_a', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'a' } },
+      },
     ])
     expect(isPlottedKind(CFG, 'bridge')).toBe(false)
     expect(buildIsPlotted(s, CFG, 'bridge')).toBe(false)
@@ -142,8 +192,10 @@ describe('the bridge is the one thing a builder still sites', () => {
     const planned = r.ok ? r.events.find((e) => e.type === 'structure_planned')! : null
     expect(planned!.payload).toMatchObject({ kind: 'bridge', x: at.x, y: at.y })
     // And it is still refused without a coordinate, because water is not a plot.
-    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'bridge' }))
-      .toEqual({ ok: false, reason: 'build needs {kind, x, y}' })
+    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'bridge' })).toEqual({
+      ok: false,
+      reason: 'build needs {kind, x, y}',
+    })
   })
 })
 
@@ -153,8 +205,10 @@ describe('a world with no town in it builds the way it always did', () => {
     expect(townSquareOf(s)).toBeNull()
     expect(buildIsPlotted(s, CFG, 'house')).toBe(false)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: 30, y: 20 }).ok).toBe(true)
-    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' }))
-      .toEqual({ ok: false, reason: 'build needs {kind, x, y}' })
+    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' })).toEqual({
+      ok: false,
+      reason: 'build needs {kind, x, y}',
+    })
   })
 })
 
@@ -167,7 +221,9 @@ describe('a build that stops halfway goes back to the same walls', () => {
     expect(first.ok).toBe(true)
     s = apply(s, first.ok ? first.events : [])
     // The wood is gone and a site stands on the plot.
-    expect(Object.values(s.items).filter((i) => i.kind === 'wood' && i.loc.t === 'agent')).toHaveLength(0)
+    expect(
+      Object.values(s.items).filter((i) => i.kind === 'wood' && i.loc.t === 'agent'),
+    ).toHaveLength(0)
     s = apply(s, [{ type: 'action_interrupted', payload: { agentId: 'a', reason: 'rest' } }])
     const again = submitIntent(s, CFG, 'a', 'build', { kind: 'house' })
     expect(again.ok, again.ok ? '' : again.reason).toBe(true)
@@ -192,11 +248,14 @@ describe('★ two bodies raise one building — the second pair of hands joins t
 
   // ★ THE WALLS THESE HANDS RAISED, and not the seven the founding valley now stands roofless
   // of its own accord. `builtBy` is the whole of the difference: genesis signs its own work.
-  const sitesIn = (s: WorldState) => Object.values(s.structures)
-    .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)
-  const woodOf = (s: WorldState, id: string) => Object.values(s.items)
-    .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
-    .reduce((n, i) => n + i.qty, 0)
+  const sitesIn = (s: WorldState) =>
+    Object.values(s.structures).filter(
+      (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+    )
+  const woodOf = (s: WorldState, id: string) =>
+    Object.values(s.items)
+      .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
+      .reduce((n, i) => n + i.qty, 0)
 
   /** Put a body's hands on a house, through the real verb, and keep the activity. */
   function raising(s: WorldState, id: string): WorldState {
@@ -232,11 +291,15 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     const { s } = aWallAndTwoBodies()
     const joined = raising(s, 'b')
     const site = sitesIn(joined)[0]!
-    expect(apply(joined, [...stepBuild(joined, CFG, 'a'), ...stepBuild(joined, CFG, 'b')])
-      .structures[site.id]!.progressTicks).toBe(site.progressTicks + 2)
+    expect(
+      apply(joined, [...stepBuild(joined, CFG, 'a'), ...stepBuild(joined, CFG, 'b')]).structures[
+        site.id
+      ]!.progressTicks,
+    ).toBe(site.progressTicks + 2)
     // One hand alone gives one, which is the number the other half of this claim rests on.
-    expect(apply(joined, stepBuild(joined, CFG, 'a'))
-      .structures[site.id]!.progressTicks).toBe(site.progressTicks + 1)
+    expect(apply(joined, stepBuild(joined, CFG, 'a')).structures[site.id]!.progressTicks).toBe(
+      site.progressTicks + 1,
+    )
   })
 
   it('★ THE JOINER PAYS NOTHING TWICE — no second pile, no second plot, no second plan', () => {
@@ -248,8 +311,9 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     const after = apply(s, events)
     expect(woodOf(after, 'b')).toBe(10)
     // The plot the town was keeping is still on offer to whoever comes next.
-    expect(claimInWorld(after, { along: 2, deep: 2 })!.site)
-      .toEqual(claimInWorld(s, { along: 2, deep: 2 })!.site)
+    expect(claimInWorld(after, { along: 2, deep: 2 })!.site).toEqual(
+      claimInWorld(s, { along: 2, deep: 2 })!.site,
+    )
   })
 
   it('★ five pairs of hands, one house — the number `minHands` was always counting', () => {
@@ -261,7 +325,10 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     expect(sitesIn(s)).toHaveLength(1)
     const site = sitesIn(s)[0]!
     const hands = ['h0', 'h1', 'h2', 'h3', 'h4']
-    const next = apply(s, hands.flatMap((id) => stepBuild(s, CFG, id)))
+    const next = apply(
+      s,
+      hands.flatMap((id) => stepBuild(s, CFG, id)),
+    )
     expect(next.structures[site.id]!.progressTicks).toBe(site.progressTicks + hands.length)
   })
 
@@ -284,9 +351,12 @@ describe('★ two bodies raise one building — the second pair of hands joins t
   it('★ finished walls are not a site: a body beside a standing house still gets its own ground', () => {
     // The valley's own houses stand roofless now, so this test puts a roof on one: the claim is
     // about a FINISHED building, and there has to be one for it to be about anything.
-    const roofless = Object.values(genesisTown().structures)
-      .find((x) => x.kind === 'house' && x.stage === 'construction')!
-    const base = apply(genesisTown(), [{ type: 'structure_completed', payload: { id: roofless.id } }])
+    const roofless = Object.values(genesisTown().structures).find(
+      (x) => x.kind === 'house' && x.stage === 'construction',
+    )!
+    const base = apply(genesisTown(), [
+      { type: 'structure_completed', payload: { id: roofless.id } },
+    ])
     const done = base.structures[roofless.id]!
     expect(done.stage).toBe('complete')
     const s = withBuilder(base, 'd', { x: done.x - 1, y: done.y - 1 })
@@ -369,7 +439,11 @@ describe('★ the town grows only where the lattice lets it', () => {
 
 describe('★ a block is laid out when its first building is raised', () => {
   /** Raise houses through the real verb until the claim crosses into ring `r`. */
-  function raiseUntilRing(r: number): { before: WorldState; after: WorldState; block: { i: number; j: number } } {
+  function raiseUntilRing(r: number): {
+    before: WorldState
+    after: WorldState
+    block: { i: number; j: number }
+  } {
     let s = genesisTown()
     for (let i = 0; i < 40; i++) {
       const claim = claimInWorld(s, { along: 2, deep: 2 })!
@@ -396,7 +470,9 @@ describe('★ a block is laid out when its first building is raised', () => {
     // NON-VACUITY: before the build this was the world's own untouched ground, not a street.
     expect(before.terrain[claim.door.y]![claim.door.x]).not.toBe(T_ROAD)
     const ground = blockGroundOf(TOWN_SQUARE, block)
-    expect(ground.paved.filter((t) => before.terrain[t.y]![t.x] !== T_ROAD).length).toBeGreaterThan(100)
+    expect(ground.paved.filter((t) => before.terrain[t.y]![t.x] !== T_ROAD).length).toBeGreaterThan(
+      100,
+    )
     // After: the block is open ground, its ring is paved, and the door opens onto the paving.
     for (const t of ground.cleared) expect(after.terrain[t.y]![t.x], `${t.x},${t.y}`).toBe(T_GRASS)
     for (const t of ground.paved) expect(after.terrain[t.y]![t.x], `${t.x},${t.y}`).toBe(T_ROAD)
@@ -410,16 +486,22 @@ describe('★ a block is laid out when its first building is raised', () => {
     const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 })
     expect(lay).not.toBe('off the map')
     const changes = lay as Array<{ from: number; reason: string }>
-    expect(changes.filter((c) => c.reason === 'levelled' && c.from === T_FOREST).length).toBeGreaterThan(200)
+    expect(
+      changes.filter((c) => c.reason === 'levelled' && c.from === T_FOREST).length,
+    ).toBeGreaterThan(200)
     expect(changes.filter((c) => c.reason === 'surfaced').length).toBeGreaterThan(100)
   })
 
-  it('★ lays a block in silence: the town levelling ground is nobody\'s deed', () => {
+  it("★ lays a block in silence: the town levelling ground is nobody's deed", () => {
     const s = genesisTown()
     const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 }) as TileChange[]
     // NON-VACUITY: one build intent moves hundreds of tiles, every one stamped with the builder.
     expect(lay.length).toBeGreaterThan(400)
-    const look = { agentName: () => 'Rahel', structureKind: () => 'house', mysteryProse: () => null }
+    const look = {
+      agentName: () => 'Rahel',
+      structureKind: () => 'house',
+      mysteryProse: () => null,
+    }
     const lines = lay
       .map((t, i) => chronicleLine(ev('tile_changed', { ...t, byId: 'a' }), look))
       .filter((l) => l !== null)
@@ -429,11 +511,22 @@ describe('★ a block is laid out when its first building is raised', () => {
   it('★ leaves worked ground alone: a tilled field survives the block being laid', () => {
     let s = genesisTown()
     const block = { i: 2, j: 0 }
-    const field = blockGroundOf(TOWN_SQUARE, block).cleared
-      .find((t) => s.terrain[t.y]![t.x] !== T_GRASS)!
-    s = apply(s, [{ type: 'tile_changed', payload: {
-      x: field.x, y: field.y, from: s.terrain[field.y]![field.x], to: 6, reason: 'tilled', byId: 'a',
-    } }])
+    const field = blockGroundOf(TOWN_SQUARE, block).cleared.find(
+      (t) => s.terrain[t.y]![t.x] !== T_GRASS,
+    )!
+    s = apply(s, [
+      {
+        type: 'tile_changed',
+        payload: {
+          x: field.x,
+          y: field.y,
+          from: s.terrain[field.y]![field.x],
+          to: 6,
+          reason: 'tilled',
+          byId: 'a',
+        },
+      },
+    ])
     // NON-VACUITY: the block is laid, and laid wide — this one tile is the exception, not a no-op.
     const lay = layBlock(s, TOWN_SQUARE, block) as TileChange[]
     expect(lay.length).toBeGreaterThan(400)
@@ -462,7 +555,8 @@ describe('★ a block is laid out when its first building is raised', () => {
     expect(layBlock(short, TOWN_SQUARE, claim.block)).toBe('off the map')
     const s = withBuilder(short, 'a', claim.door)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' })).toEqual({
-      ok: false, reason: 'the ground a house needs is past the edge of the known country',
+      ok: false,
+      reason: 'the ground a house needs is past the edge of the known country',
     })
     // The same claim, on the world that does reach that far, goes up.
     const ok = withBuilder(full, 'a', claim.door)
@@ -499,10 +593,19 @@ describe('★ help must help — what a second pair of hands buys the calendar',
   const NIGHT = 22 * 60
 
   const foldWith = (
-    s: WorldState, events: ReadonlyArray<{ type: string; payload: unknown }>, tick = 0,
+    s: WorldState,
+    events: ReadonlyArray<{ type: string; payload: unknown }>,
+    tick = 0,
   ): WorldState =>
-    events.reduce((acc, e) =>
-      fold(acc, { seq: ++seq, tick, type: e.type, payload: e.payload } as unknown as SimEvent, FAST), s)
+    events.reduce(
+      (acc, e) =>
+        fold(
+          acc,
+          { seq: ++seq, tick, type: e.type, payload: e.payload } as unknown as SimEvent,
+          FAST,
+        ),
+      s,
+    )
 
   const ringOf = (c: TownClaim) => [
     { x: c.site.x - 1, y: c.site.y - 1 },
@@ -523,10 +626,20 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     for (let i = 0; i < n; i++) {
       const id = `h${i}`
       ids.push(id)
-      s = foldWith(s, [
-        { type: 'agent_spawned', payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 } },
-        { type: 'item_spawned', payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } } },
-      ], atTick)
+      s = foldWith(
+        s,
+        [
+          {
+            type: 'agent_spawned',
+            payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 },
+          },
+          {
+            type: 'item_spawned',
+            payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } },
+          },
+        ],
+        atTick,
+      )
     }
     return { s, ids }
   }
@@ -552,14 +665,21 @@ describe('★ help must help — what a second pair of hands buys the calendar',
         s = foldWith(s, stepBuild(s, FAST, id), s.tick)
         const now = s.agents[id]!.activity
         if (!now || now.ticksRemaining > 0) continue
-        s = foldWith(s, [{ type: 'action_completed', payload: { agentId: id, verb: 'build' } }], s.tick)
+        s = foldWith(
+          s,
+          [{ type: 'action_completed', payload: { agentId: id, verb: 'build' } }],
+          s.tick,
+        )
         const resume = buildSiteOf(s, FAST, id, { kind: 'house' }).resume
-        if (resume) s = foldWith(s, [{ type: 'structure_completed', payload: { id: resume.id } }], s.tick)
+        if (resume)
+          s = foldWith(s, [{ type: 'structure_completed', payload: { id: resume.id } }], s.tick)
       }
       if (!worked) break
       ticks = t
     }
-    const roofs = Object.values(s.structures).filter((x) => x.kind === 'house' && x.stage === 'complete')
+    const roofs = Object.values(s.structures).filter(
+      (x) => x.kind === 'house' && x.stage === 'complete',
+    )
     return { s, ticks, bodyTicks, raised: roofs.at(-1)! }
   }
 
@@ -571,11 +691,19 @@ describe('★ help must help — what a second pair of hands buys the calendar',
   })
 
   it('★ TWO PAIRS OF HANDS RAISE IT IN HALF THE TIME, AND FIVE IN A FIFTH', () => {
-    for (const [hands, calendar] of [[2, HOUSE_TICKS / 2], [4, HOUSE_TICKS / 4], [5, HOUSE_TICKS / 5]] as const) {
+    for (const [hands, calendar] of [
+      [2, HOUSE_TICKS / 2],
+      [4, HOUSE_TICKS / 4],
+      [5, HOUSE_TICKS / 5],
+    ] as const) {
       const { s, ids } = crewOf(hands)
       const run = raise(s, ids)
-      expect(Object.values(run.s.structures)
-        .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID), `${hands}`).toEqual([])
+      expect(
+        Object.values(run.s.structures).filter(
+          (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+        ),
+        `${hands}`,
+      ).toEqual([])
       expect(run.ticks, `${hands} hands`).toBe(calendar)
     }
   })
@@ -589,7 +717,7 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     }
   })
 
-  it('★ the site\'s ledger stops at the work the building needs, however many hands', () => {
+  it("★ the site's ledger stops at the work the building needs, however many hands", () => {
     for (const hands of [1, 2, 4, 5]) {
       const { s, ids } = crewOf(hands)
       const pt = raise(s, ids).raised.progressTicks
@@ -601,7 +729,11 @@ describe('★ help must help — what a second pair of hands buys the calendar',
   })
 
   /** Put a crew on the town's NEXT free plot and start every one of them building. */
-  function alsoRaising(s0: WorldState, n: number, prefix: string): { s: WorldState; ids: string[] } {
+  function alsoRaising(
+    s0: WorldState,
+    n: number,
+    prefix: string,
+  ): { s: WorldState; ids: string[] } {
     let s = s0
     const claim = claimInWorld(s, { along: 2, deep: 2 })!
     const spots = [claim.door, ...ringOf(claim)]
@@ -609,10 +741,20 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     for (let i = 0; i < n; i++) {
       const id = `${prefix}${i}`
       ids.push(id)
-      s = foldWith(s, [
-        { type: 'agent_spawned', payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 } },
-        { type: 'item_spawned', payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } } },
-      ], s.tick)
+      s = foldWith(
+        s,
+        [
+          {
+            type: 'agent_spawned',
+            payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 },
+          },
+          {
+            type: 'item_spawned',
+            payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } },
+          },
+        ],
+        s.tick,
+      )
     }
     for (const id of ids) {
       const r = submitIntent(s, FAST, id, 'build', { kind: 'house' })
@@ -627,18 +769,24 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     // building" would make four hands of two and finish both houses twice as fast.
     const two = alsoRaising(crewOf(0).s, 2, 'h')
     const four = alsoRaising(two.s, 2, 'k')
-    const sites = Object.values(four.s.structures)
-      .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)
+    const sites = Object.values(four.s.structures).filter(
+      (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+    )
     expect(sites).toHaveLength(2)
     for (const site of sites) expect(handsOnSite(four.s, site.id), site.id).toBe(2)
   })
 
   it('a body that has died is not a pair of hands', () => {
     const { s, ids } = alsoRaising(crewOf(0).s, 2, 'h')
-    const site = Object.values(s.structures)
-      .find((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)!
+    const site = Object.values(s.structures).find(
+      (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+    )!
     expect(handsOnSite(s, site.id)).toBe(2)
-    const after = foldWith(s, [{ type: 'agent_died', payload: { agentId: ids[1]!, cause: 'hunger' } }], s.tick)
+    const after = foldWith(
+      s,
+      [{ type: 'agent_died', payload: { agentId: ids[1]!, cause: 'hunger' } }],
+      s.tick,
+    )
     expect(handsOnSite(after, site.id)).toBe(1)
   })
 
@@ -662,7 +810,11 @@ describe('★ help must help — what a second pair of hands buys the calendar',
       const r = submitIntent(s, FAST, 'h0', 'build', { kind: 'house' })
       let w = foldWith(s, r.ok ? r.events : [], NIGHT)
       for (let t = 0; t < HOUSE_TICKS + 20; t++) w = foldWith(w, stepBuild(w, FAST, 'h0'), NIGHT)
-      w = foldWith(w, [{ type: 'action_interrupted', payload: { agentId: 'h0', reason: 'rest' } }], NIGHT)
+      w = foldWith(
+        w,
+        [{ type: 'action_interrupted', payload: { agentId: 'h0', reason: 'rest' } }],
+        NIGHT,
+      )
       const site = Object.values(w.structures).find((x) => x.stage === 'construction')!
       expect(site.progressTicks).toBeLessThanOrEqual(HOUSE_TICKS)
       const again = submitIntent({ ...w, tick: NOON }, FAST, 'h0', 'build', { kind: 'house' })

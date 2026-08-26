@@ -14,7 +14,13 @@ const ZERO_USAGE = {
 }
 
 const BORN: AgentBornPayload = {
-  id: 'agent_7', name: 'Mira', sex: 'f', motherId: 'amara', fatherId: 'yusuf', x: 4, y: 4,
+  id: 'agent_7',
+  name: 'Mira',
+  sex: 'f',
+  motherId: 'amara',
+  fatherId: 'yusuf',
+  x: 4,
+  y: 4,
 }
 
 const MOTHER: ParentPersona = {
@@ -45,7 +51,9 @@ function answering(text: string): { model: MockLanguageModelV4; prompts: string[
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
       const parts = (options.prompt as Array<{ role: string; content: unknown }>).map((m) =>
-        Array.isArray(m.content) ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('') : String(m.content),
+        Array.isArray(m.content)
+          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          : String(m.content),
       )
       prompts.push(parts.join('\n'))
       return {
@@ -79,7 +87,9 @@ function client(db: Database.Database, model: MockLanguageModelV4, budgetUsd?: n
 }
 
 function rows(db: Database.Database) {
-  return db.prepare('SELECT agent_id, social_name, named_by, tick FROM social_names ORDER BY id').all()
+  return db
+    .prepare('SELECT agent_id, social_name, named_by, tick FROM social_names ORDER BY id')
+    .all()
 }
 
 describe('promptBirthLine (T25)', () => {
@@ -103,10 +113,16 @@ describe('captureSocialName (T25)', () => {
     const db = makeDb()
     const { model, prompts } = answering(JSON.stringify({ name: 'Little Bird' }))
 
-    const name = await captureSocialName(client(db, model), db, { born: BORN, motherPersona: MOTHER, tick: 4321 })
+    const name = await captureSocialName(client(db, model), db, {
+      born: BORN,
+      motherPersona: MOTHER,
+      tick: 4321,
+    })
 
     expect(name).toBe('Little Bird')
-    expect(rows(db)).toEqual([{ agent_id: 'agent_7', social_name: 'Little Bird', named_by: 'amara', tick: 4321 }])
+    expect(rows(db)).toEqual([
+      { agent_id: 'agent_7', social_name: 'Little Bird', named_by: 'amara', tick: 4321 },
+    ])
     // The registry name is still what the world rolled; the two simply differ.
     expect(name).not.toBe(BORN.name)
     expect(prompts.join('\n')).toContain('Mira')
@@ -117,7 +133,11 @@ describe('captureSocialName (T25)', () => {
     const db = makeDb()
     const { model, prompts } = answering(JSON.stringify({ name: 'Little Bird' }))
 
-    const name = await captureSocialName(client(db, model), db, { born: BORN, motherPersona: null, tick: 4321 })
+    const name = await captureSocialName(client(db, model), db, {
+      born: BORN,
+      motherPersona: null,
+      tick: 4321,
+    })
 
     expect(name).toBeNull()
     expect(rows(db)).toEqual([])
@@ -138,32 +158,56 @@ describe('captureSocialName (T25)', () => {
   it('an exhausted budget never costs the town a birth', async () => {
     const db = makeDb()
     const { model } = answering(JSON.stringify({ name: 'Little Bird' }))
-    const name = await captureSocialName(client(db, model, 0), db, { born: BORN, motherPersona: MOTHER, tick: 10 })
+    const name = await captureSocialName(client(db, model, 0), db, {
+      born: BORN,
+      motherPersona: MOTHER,
+      tick: 10,
+    })
     expect(name).toBeNull()
     expect(rows(db)).toEqual([])
   })
 
   it('a blank or absurdly long answer is no answer', async () => {
     const db = makeDb()
-    const blank = await captureSocialName(client(db, answering(JSON.stringify({ name: '   ' })).model), db, {
-      born: BORN, motherPersona: MOTHER, tick: 10,
-    })
+    const blank = await captureSocialName(
+      client(db, answering(JSON.stringify({ name: '   ' })).model),
+      db,
+      {
+        born: BORN,
+        motherPersona: MOTHER,
+        tick: 10,
+      },
+    )
     expect(blank).toBeNull()
 
-    const long = await captureSocialName(client(db, answering(JSON.stringify({ name: 'x'.repeat(200) })).model), db, {
-      born: BORN, motherPersona: MOTHER, tick: 10,
-    })
+    const long = await captureSocialName(
+      client(db, answering(JSON.stringify({ name: 'x'.repeat(200) })).model),
+      db,
+      {
+        born: BORN,
+        motherPersona: MOTHER,
+        tick: 10,
+      },
+    )
     expect(long).toBeNull()
     expect(rows(db)).toEqual([])
   })
 
   it('naming twice keeps both answers in the log, latest last', async () => {
     const db = makeDb()
-    await captureSocialName(client(db, answering(JSON.stringify({ name: 'Little Bird' })).model), db, {
-      born: BORN, motherPersona: MOTHER, tick: 10,
-    })
+    await captureSocialName(
+      client(db, answering(JSON.stringify({ name: 'Little Bird' })).model),
+      db,
+      {
+        born: BORN,
+        motherPersona: MOTHER,
+        tick: 10,
+      },
+    )
     await captureSocialName(client(db, answering(JSON.stringify({ name: 'Mira' })).model), db, {
-      born: BORN, motherPersona: MOTHER, tick: 99,
+      born: BORN,
+      motherPersona: MOTHER,
+      tick: 99,
     })
     expect(rows(db)).toHaveLength(2)
     expect(rows(db)[1]).toMatchObject({ social_name: 'Mira', tick: 99 })

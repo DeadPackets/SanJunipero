@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { MomentSchema, MomentsResponseSchema, type Moment } from './moments.js'
 
 const moment: Moment = {
-  id: 7, day: 2, startTick: 2880, endTick: 2940,
-  title: 'What the Fire Took', cast: ['alice', 'bob'], location: 'the plaza',
+  id: 7,
+  day: 2,
+  startTick: 2880,
+  endTick: 2940,
+  title: 'What the Fire Took',
+  cast: ['alice', 'bob'],
+  location: 'the plaza',
 }
 
 describe('MomentSchema', () => {

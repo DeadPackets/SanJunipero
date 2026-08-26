@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
-import { GLOW_BASE_ALPHA, GLOW_SWING, HEARTH_KINDS, SMOKE_COLOR, SMOKE_MAX_ALPHA } from './ambient.js'
+import {
+  GLOW_BASE_ALPHA,
+  GLOW_SWING,
+  HEARTH_KINDS,
+  SMOKE_COLOR,
+  SMOKE_MAX_ALPHA,
+} from './ambient.js'
 
 describe('HEARTH_KINDS', () => {
   it('is read off the C13 template, not hand-listed', () => {

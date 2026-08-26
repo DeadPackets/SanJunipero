@@ -7,7 +7,12 @@ import { STYLE_PROMPT } from '../src/styleBible.js'
 import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
-  estimatePitch, v7Chain, anchorToCanvas, opaqueBbox, upscaleNearest, paletteJaccard,
+  estimatePitch,
+  v7Chain,
+  anchorToCanvas,
+  opaqueBbox,
+  upscaleNearest,
+  paletteJaccard,
 } from '../src/sheet.js'
 import { CHAR_DESC, ASYMMETRY_CLAUSE } from './character.js'
 import { scratch } from './scratch.js'
@@ -39,7 +44,7 @@ const PORTRAIT_JACCARD_MIN = 0.75
 const PORTRAIT_BBOX_TOL = 0.12
 
 const EXPRESSIONS = ['happy', 'sad', 'angry', 'surprised', 'weary', 'asleep'] as const
-type Expression = typeof EXPRESSIONS[number]
+type Expression = (typeof EXPRESSIONS)[number]
 const EXPRESSION_CLAUSES: Record<Expression, string> = {
   happy: 'beaming with a warm open smile, bright eyes',
   sad: 'downcast eyes, drooping mouth, gently sorrowful',
@@ -51,7 +56,11 @@ const EXPRESSION_CLAUSES: Record<Expression, string> = {
 
 const SCORES_PATH = `${CACHE}/scores.json`
 const scores: Record<string, { score: number; notes: string }> = (() => {
-  try { return JSON.parse(readFileSync(SCORES_PATH, 'utf8')) } catch { return {} }
+  try {
+    return JSON.parse(readFileSync(SCORES_PATH, 'utf8'))
+  } catch {
+    return {}
+  }
 })()
 
 async function generate(prompt: string, refs: Buffer[]): Promise<Buffer> {
@@ -60,8 +69,14 @@ async function generate(prompt: string, refs: Buffer[]): Promise<Buffer> {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL, prompt, size: '512x512', response_format: 'b64_json',
-      input_references: refs.map(r => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${r.toString('base64')}` } })),
+      model: MODEL,
+      prompt,
+      size: '512x512',
+      response_format: 'b64_json',
+      input_references: refs.map((r) => ({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+      })),
       usage: { include: true },
     }),
   })
@@ -75,17 +90,26 @@ async function generate(prompt: string, refs: Buffer[]): Promise<Buffer> {
 }
 
 function portraitPrompt(expressionClause: string): string {
-  return `${STYLE_PROMPT} A large character portrait, bust framing (head and shoulders), the same single ` +
+  return (
+    `${STYLE_PROMPT} A large character portrait, bust framing (head and shoulders), the same single ` +
     `character, painted pixel-art style, facing slightly toward the viewer's left. Expression: ${expressionClause}. ` +
     `Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE}`
+  )
 }
 
 // Detect the magenta canvas before keying: portraits SHOULD generate on magenta, but
 // chromaKey only applies when the corners actually carry it.
 function keyIfMagenta(img: RawImage): RawImage {
-  const corners = [0, (img.width - 1) * 4, (img.height - 1) * img.width * 4, (img.width * img.height - 1) * 4]
-  const magenta = corners.filter(i => {
-    const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!
+  const corners = [
+    0,
+    (img.width - 1) * 4,
+    (img.height - 1) * img.width * 4,
+    (img.width * img.height - 1) * 4,
+  ]
+  const magenta = corners.filter((i) => {
+    const r = img.data[i]!,
+      g = img.data[i + 1]!,
+      b = img.data[i + 2]!
     return 255 - r <= 72 && g <= 72 && 255 - b <= 72
   }).length
   return magenta >= 3 ? chromaKey(img) : img
@@ -98,7 +122,11 @@ async function processPortrait(raw: Buffer): Promise<RawImage> {
   let art = v7Chain(keyed, estimatePitch(keyed)).out
   if (art.width > SHIP || art.height > SHIP) {
     const k = Math.min(SHIP / art.width, (SHIP - 1) / art.height)
-    art = downscaleNearest(art, Math.max(1, Math.floor(art.width * k)), Math.max(1, Math.floor(art.height * k)))
+    art = downscaleNearest(
+      art,
+      Math.max(1, Math.floor(art.width * k)),
+      Math.max(1, Math.floor(art.height * k)),
+    )
   }
   return anchorToCanvas(art, SHIP, SHIP, SHIP - 1)
 }
@@ -108,15 +136,21 @@ type Candidate = { key: string; raw: Buffer; score: number; notes: string; shipp
 async function candidate(key: string, prompt: string, refs: Buffer[]): Promise<Candidate | null> {
   const rawPath = `${CACHE}/${key}.png`
   let raw: Buffer
-  if (existsSync(rawPath)) { raw = readFileSync(rawPath); console.log(`  ${key}: reusing cached raw`) }
-  else {
+  if (existsSync(rawPath)) {
+    raw = readFileSync(rawPath)
+    console.log(`  ${key}: reusing cached raw`)
+  } else {
     raw = await generate(prompt, refs)
     writeFileSync(rawPath, raw)
     console.log(`  ${key}: generated, total spend $${budget.total.toFixed(3)}`)
   }
   let shipped: RawImage
-  try { shipped = await processPortrait(raw) }
-  catch (e) { console.log(`  ${key}: post-process failed: ${String(e)}`); return null }
+  try {
+    shipped = await processPortrait(raw)
+  } catch (e) {
+    console.log(`  ${key}: post-process failed: ${String(e)}`)
+    return null
+  }
   let v = scores[key]
   if (!v) {
     v = await judge(raw)
@@ -135,13 +169,28 @@ if (chosen === undefined) {
   const report: string[] = ['== portrait neutral candidates (HUMAN PICK REQUIRED) ==']
   for (let i = 0; i < 3; i++) {
     let c: Candidate | null
-    try { c = await candidate(`neutral-c${i}`, portraitPrompt('calm, friendly, neutral resting face'), baseRefs) }
-    catch (e) { if (e instanceof BudgetExceededError) { report.push(`c${i}: SKIPPED (budget)`); break } throw e }
+    try {
+      c = await candidate(
+        `neutral-c${i}`,
+        portraitPrompt('calm, friendly, neutral resting face'),
+        baseRefs,
+      )
+    } catch (e) {
+      if (e instanceof BudgetExceededError) {
+        report.push(`c${i}: SKIPPED (budget)`)
+        break
+      }
+      throw e
+    }
     report.push(c ? `c${i}: score=${c.score} — ${c.notes}` : `c${i}: post-process FAILED`)
   }
-  report.push('', 'inspect candidates/*.png (raw) and candidates/*-shipped.png (128×128),',
+  report.push(
+    '',
+    'inspect candidates/*.png (raw) and candidates/*-shipped.png (128×128),',
     'then rerun with PORTRAIT_NEUTRAL=<index> to generate the 6 expressions.',
-    '', `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`)
+    '',
+    `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`,
+  )
   writeFileSync(`${DURABLE}/neutral-report.txt`, report.join('\n'))
   console.log(report.join('\n'))
   process.exit(0)
@@ -151,7 +200,8 @@ if (chosen === undefined) {
 const neutralRaw = readFileSync(`${CACHE}/neutral-c${chosen}.png`)
 const neutral = await processPortrait(neutralRaw)
 const neutralBbox = opaqueBbox(neutral)!
-const nW = neutralBbox.x1 - neutralBbox.x0 + 1, nH = neutralBbox.y1 - neutralBbox.y0 + 1
+const nW = neutralBbox.x1 - neutralBbox.x0 + 1,
+  nH = neutralBbox.y1 - neutralBbox.y0 + 1
 writeFileSync(`${DURABLE}/final/neutral.png`, await encodePng(neutral))
 writeFileSync(`${DURABLE}/final/neutral-4x.png`, await encodePng(upscaleNearest(neutral, 4)))
 
@@ -161,12 +211,16 @@ const report: string[] = [`== portrait expressions (neutral=c${chosen}) ==`]
 function consistency(img: RawImage): string[] {
   const problems: string[] = []
   const jac = paletteJaccard(neutral, img)
-  if (jac < PORTRAIT_JACCARD_MIN) problems.push(`palette jaccard ${jac.toFixed(3)} < ${PORTRAIT_JACCARD_MIN}`)
+  if (jac < PORTRAIT_JACCARD_MIN)
+    problems.push(`palette jaccard ${jac.toFixed(3)} < ${PORTRAIT_JACCARD_MIN}`)
   const b = opaqueBbox(img)
   if (!b) return ['empty image']
-  const w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1
-  if (Math.abs(w / nW - 1) > PORTRAIT_BBOX_TOL) problems.push(`bbox width ${w} vs neutral ${nW} beyond ±${PORTRAIT_BBOX_TOL * 100}%`)
-  if (Math.abs(h / nH - 1) > PORTRAIT_BBOX_TOL) problems.push(`bbox height ${h} vs neutral ${nH} beyond ±${PORTRAIT_BBOX_TOL * 100}%`)
+  const w = b.x1 - b.x0 + 1,
+    h = b.y1 - b.y0 + 1
+  if (Math.abs(w / nW - 1) > PORTRAIT_BBOX_TOL)
+    problems.push(`bbox width ${w} vs neutral ${nW} beyond ±${PORTRAIT_BBOX_TOL * 100}%`)
+  if (Math.abs(h / nH - 1) > PORTRAIT_BBOX_TOL)
+    problems.push(`bbox height ${h} vs neutral ${nH} beyond ±${PORTRAIT_BBOX_TOL * 100}%`)
   return problems
 }
 
@@ -176,25 +230,45 @@ exprLoop: for (const expr of EXPRESSIONS) {
   let best: { c: Candidate; problems: string[] } | null = null
   for (let i = 0; i < 2; i++) {
     let c: Candidate | null
-    try { c = await candidate(`${expr}-c${i}`, portraitPrompt(EXPRESSION_CLAUSES[expr]), exprRefs) }
-    catch (e) {
-      if (e instanceof BudgetExceededError) { report.push(`${expr}: INCOMPLETE (budget)`); blocked = true; break exprLoop }
+    try {
+      c = await candidate(`${expr}-c${i}`, portraitPrompt(EXPRESSION_CLAUSES[expr]), exprRefs)
+    } catch (e) {
+      if (e instanceof BudgetExceededError) {
+        report.push(`${expr}: INCOMPLETE (budget)`)
+        blocked = true
+        break exprLoop
+      }
       throw e
     }
     if (!c) continue
     const problems = consistency(c.shipped)
-    report.push(`${expr}-c${i}: score=${c.score} ${problems.length === 0 ? 'consistency PASS' : `consistency FAIL: ${problems.join('; ')}`} — ${c.notes}`)
-    if (problems.length === 0 && (!best || best.problems.length > 0 || c.score > best.c.score)) best = { c, problems }
+    report.push(
+      `${expr}-c${i}: score=${c.score} ${problems.length === 0 ? 'consistency PASS' : `consistency FAIL: ${problems.join('; ')}`} — ${c.notes}`,
+    )
+    if (problems.length === 0 && (!best || best.problems.length > 0 || c.score > best.c.score))
+      best = { c, problems }
     else if (!best) best = { c, problems }
   }
-  if (!best) { report.push(`${expr}: every candidate failed post-processing`); blocked = true; continue }
+  if (!best) {
+    report.push(`${expr}: every candidate failed post-processing`)
+    blocked = true
+    continue
+  }
   if (best.problems.length > 0) blocked = true
   writeFileSync(`${DURABLE}/final/${expr}.png`, await encodePng(best.c.shipped))
-  writeFileSync(`${DURABLE}/final/${expr}-4x.png`, await encodePng(upscaleNearest(best.c.shipped, 4)))
+  writeFileSync(
+    `${DURABLE}/final/${expr}-4x.png`,
+    await encodePng(upscaleNearest(best.c.shipped, 4)),
+  )
 }
 
-report.push('', blocked ? '** BLOCKED: at least one expression failed its consistency gate — do not ship **' : 'all expressions PASS',
-  `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`)
+report.push(
+  '',
+  blocked
+    ? '** BLOCKED: at least one expression failed its consistency gate — do not ship **'
+    : 'all expressions PASS',
+  `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`,
+)
 writeFileSync(`${DURABLE}/expressions-report.txt`, report.join('\n'))
 console.log(report.join('\n'))
 if (blocked) process.exitCode = 1

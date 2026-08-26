@@ -8,9 +8,17 @@ import { GAMIFICATION_BAN } from './townStats.js'
 import { diffLines } from './diffLines.js'
 import { InspectorBodyView } from './InspectorPanel.js'
 import {
-  AUTHORED_IDENTITY_FIELDS, CHANGE_EMPTY, REMOVED_PLACEHOLDERS, SKILLS_EMPTY,
-  SUBSTANCE_FULL, SUBSTANCE_WEIGHTS, THOUGHT_EMPTY,
-  authoredIdentityOffenders, changeLog, substanceOf, type SubstanceInput,
+  AUTHORED_IDENTITY_FIELDS,
+  CHANGE_EMPTY,
+  REMOVED_PLACEHOLDERS,
+  SKILLS_EMPTY,
+  SUBSTANCE_FULL,
+  SUBSTANCE_WEIGHTS,
+  THOUGHT_EMPTY,
+  authoredIdentityOffenders,
+  changeLog,
+  substanceOf,
+  type SubstanceInput,
 } from './becoming.js'
 
 const WEB_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -20,7 +28,10 @@ function sourceFiles(): Array<{ path: string; source: string }> {
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name)
-      if (e.isDirectory()) { walk(p); continue }
+      if (e.isDirectory()) {
+        walk(p)
+        continue
+      }
       if (!/\.tsx?$/.test(e.name) || /\.test\.tsx?$/.test(e.name)) continue
       out.push({ path: relative(WEB_SRC, p), source: readFileSync(p, 'utf8') })
     }
@@ -30,7 +41,12 @@ function sourceFiles(): Array<{ path: string; source: string }> {
 }
 
 const ZERO: SubstanceInput = {
-  actsDone: 0, daysLived: 0, bondsAtOrAbove: 0, skillBands: 0, personalityVersions: 0, changeDays: 0,
+  actsDone: 0,
+  daysLived: 0,
+  bondsAtOrAbove: 0,
+  skillBands: 0,
+  personalityVersions: 0,
+  changeDays: 0,
 }
 
 /** mulberry32 — a seeded sample, so a random test that fails fails the same way twice */
@@ -47,7 +63,12 @@ function rng(seed: number): () => number {
 describe('substanceOf — a measure of becoming, not of being', () => {
   it('★ GENESIS FACTS CANNOT INFLATE IT: name, age and temperament are not even inputs', () => {
     expect(Object.keys(ZERO).sort()).toEqual([
-      'actsDone', 'bondsAtOrAbove', 'changeDays', 'daysLived', 'personalityVersions', 'skillBands',
+      'actsDone',
+      'bondsAtOrAbove',
+      'changeDays',
+      'daysLived',
+      'personalityVersions',
+      'skillBands',
     ])
     for (const k of Object.keys(ZERO)) {
       expect(k, k).not.toMatch(/^(name|age|sex|traits?|temperament|background|persona)$/i)
@@ -78,9 +99,12 @@ describe('substanceOf — a measure of becoming, not of being', () => {
     const r = rng(83)
     for (let i = 0; i < 1000; i++) {
       const v = substanceOf({
-        actsDone: Math.floor(r() * 500), daysLived: Math.floor(r() * 200),
-        bondsAtOrAbove: Math.floor(r() * 30), skillBands: Math.floor(r() * 20),
-        personalityVersions: Math.floor(r() * 40), changeDays: Math.floor(r() * 60),
+        actsDone: Math.floor(r() * 500),
+        daysLived: Math.floor(r() * 200),
+        bondsAtOrAbove: Math.floor(r() * 30),
+        skillBands: Math.floor(r() * 20),
+        personalityVersions: Math.floor(r() * 40),
+        changeDays: Math.floor(r() * 60),
       })
       expect(v).toBeGreaterThanOrEqual(0)
       expect(v).toBeLessThanOrEqual(1)
@@ -98,10 +122,16 @@ describe('substanceOf — a measure of becoming, not of being', () => {
 
   it('a negative or absurd input cannot push it out of range', () => {
     expect(substanceOf({ ...ZERO, actsDone: -50 })).toBe(0)
-    expect(substanceOf({
-      actsDone: 1e9, daysLived: 1e9, bondsAtOrAbove: 1e9,
-      skillBands: 1e9, personalityVersions: 1e9, changeDays: 1e9,
-    })).toBe(1)
+    expect(
+      substanceOf({
+        actsDone: 1e9,
+        daysLived: 1e9,
+        bondsAtOrAbove: 1e9,
+        skillBands: 1e9,
+        personalityVersions: 1e9,
+        changeDays: 1e9,
+      }),
+    ).toBe(1)
   })
 
   // P22.4: two people the run treated differently cannot measure the same
@@ -159,18 +189,28 @@ describe('authoredIdentityOffenders — no panel reads a handed-down identity', 
   })
 
   it('catches a read however it is spelled', () => {
-    expect(authoredIdentityOffenders([{ path: 'a.ts', source: 'const t = agent.traits' }])).toEqual(['a.ts'])
-    expect(authoredIdentityOffenders([{ path: 'b.ts', source: "const t = agent['backstory']" }])).toEqual(['b.ts'])
-    expect(authoredIdentityOffenders([{ path: 'c.ts', source: 'const { persona } = agent' }])).toEqual(['c.ts'])
-    expect(authoredIdentityOffenders([{ path: 'd.ts', source: 'a?.archetype ?? null' }])).toEqual(['d.ts'])
+    expect(authoredIdentityOffenders([{ path: 'a.ts', source: 'const t = agent.traits' }])).toEqual(
+      ['a.ts'],
+    )
+    expect(
+      authoredIdentityOffenders([{ path: 'b.ts', source: "const t = agent['backstory']" }]),
+    ).toEqual(['b.ts'])
+    expect(
+      authoredIdentityOffenders([{ path: 'c.ts', source: 'const { persona } = agent' }]),
+    ).toEqual(['c.ts'])
+    expect(authoredIdentityOffenders([{ path: 'd.ts', source: 'a?.archetype ?? null' }])).toEqual([
+      'd.ts',
+    ])
   })
 
   it('a CSS property is not an identity — the scan reads FIELDS, not style keys', () => {
-    expect(authoredIdentityOffenders([
-      { path: 'e.tsx', source: 'style={{ background: RED }}' },
-      { path: 'f.ts', source: 'const s = { backgroundImage: url, backgroundSize: px }' },
-      { path: 'g.ts', source: 'el.style.backgroundColor = c' },
-    ])).toEqual([])
+    expect(
+      authoredIdentityOffenders([
+        { path: 'e.tsx', source: 'style={{ background: RED }}' },
+        { path: 'f.ts', source: 'const s = { backgroundImage: url, backgroundSize: px }' },
+        { path: 'g.ts', source: 'el.style.backgroundColor = c' },
+      ]),
+    ).toEqual([])
   })
 
   it('names every field it is asked to ban', () => {
@@ -186,7 +226,10 @@ describe('the placeholders that presented emptiness as a personality are gone', 
     // code only — `becoming.ts` is the one module allowed to name what it deleted
     const all = sourceFiles()
       .filter((f) => !f.path.endsWith('becoming.ts'))
-      .map((f) => ({ path: f.path, source: f.source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ') }))
+      .map((f) => ({
+        path: f.path,
+        source: f.source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' '),
+      }))
     for (const gone of REMOVED_PLACEHOLDERS) {
       const guilty = all.filter((f) => f.source.includes(gone)).map((f) => f.path)
       expect(guilty, gone).toEqual([])
@@ -206,14 +249,29 @@ describe('the placeholders that presented emptiness as a personality are gone', 
 
 describe('the inspector on a day-0 person makes no claim the run has not earned', () => {
   const a = {
-    id: 'amara', name: 'Amara', ageDays: 35 * 364, alive: true, asleep: false, ill: false,
-    hp: 100, injuries: [], skills: {}, activity: null, collapsedSinceTick: null,
+    id: 'amara',
+    name: 'Amara',
+    ageDays: 35 * 364,
+    alive: true,
+    asleep: false,
+    ill: false,
+    hp: 100,
+    injuries: [],
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
     needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
   }
 
-  const html = renderToStaticMarkup(createElement(InspectorBodyView, {
-    agent: a, tick: 0, thought: null, carrying: [], changes: [],
-  }))
+  const html = renderToStaticMarkup(
+    createElement(InspectorBodyView, {
+      agent: a,
+      tick: 0,
+      thought: null,
+      carrying: [],
+      changes: [],
+    }),
+  )
 
   it('says the record is empty rather than describing an empty person', () => {
     expect(html).toContain(THOUGHT_EMPTY)
@@ -227,10 +285,15 @@ describe('the inspector on a day-0 person makes no claim the run has not earned'
   it('says what a person is doing exactly once on the panel', () => {
     const withHeader = `<span class="badge">${'Asleep'}</span>${html}`
     expect(withHeader.match(/Asleep/g)?.length).toBe(1)
-    const busy = renderToStaticMarkup(createElement(InspectorBodyView, {
-      agent: { ...a, activity: { verb: 'build', ticksRemaining: 12 } },
-      tick: 0, thought: null, carrying: [], changes: [],
-    }))
+    const busy = renderToStaticMarkup(
+      createElement(InspectorBodyView, {
+        agent: { ...a, activity: { verb: 'build', ticksRemaining: 12 } },
+        tick: 0,
+        thought: null,
+        carrying: [],
+        changes: [],
+      }),
+    )
     expect(busy).toContain('Building — 12 min to go')
     expect(busy.match(/Building/g)?.length).toBe(1)
   })
@@ -242,13 +305,18 @@ describe('the inspector on a day-0 person makes no claim the run has not earned'
   })
 
   it('leads with the LATEST document and the most recent edit once there is one', () => {
-    const rich = renderToStaticMarkup(createElement(InspectorBodyView, {
-      agent: a, tick: 4000, thought: null, carrying: [],
-      changes: changeLog([
-        { version: 1, day: 0, doc: 'first', edit: 'first written' },
-        { version: 2, day: 4, doc: 'second', edit: 'after the flood' },
-      ]),
-    }))
+    const rich = renderToStaticMarkup(
+      createElement(InspectorBodyView, {
+        agent: a,
+        tick: 4000,
+        thought: null,
+        carrying: [],
+        changes: changeLog([
+          { version: 1, day: 0, doc: 'first', edit: 'first written' },
+          { version: 2, day: 4, doc: 'second', edit: 'after the flood' },
+        ]),
+      }),
+    )
     expect(rich).toContain('after the flood')
     expect(rich).not.toContain(CHANGE_EMPTY)
     expect(rich.indexOf('after the flood')).toBeLessThan(rich.indexOf('first written'))

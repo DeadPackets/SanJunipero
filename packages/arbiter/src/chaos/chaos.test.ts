@@ -16,9 +16,27 @@ const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
 // The original engine verbs — a "physics verb" (a codified recipe:*) is NOT
 // one of these; the free-will intent must resolve into this Tier-1 set.
 const TIER1 = [
-  'walk', 'sleep', 'wake', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish',
-  'speak', 'give', 'take', 'write', 'read', 'teach', 'attack', 'experiment',
+  'walk',
+  'sleep',
+  'wake',
+  'eat',
+  'tend',
+  'till',
+  'plant',
+  'harvest',
+  'fish',
+  'forage',
+  'build',
+  'craft',
+  'extinguish',
+  'speak',
+  'give',
+  'take',
+  'write',
+  'read',
+  'teach',
+  'attack',
+  'experiment',
 ]
 
 // The exploit the scripted LLM tries to sneak past the gate: gunpowder is not
@@ -30,7 +48,12 @@ const EXPLOIT_RECIPE: Recipe = {
   costs: [],
   requires: [],
   outcomeTable: [
-    { weight: 1, success: true, label: 'A gun appears in your hands.', effects: [{ op: 'spawn_item', kind: 'gun', qty: 1, to: 'agent' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'A gun appears in your hands.',
+      effects: [{ op: 'spawn_item', kind: 'gun', qty: 1, to: 'agent' }],
+    },
   ],
   rngStream: 'recipe:gunpowder',
   canon: ['gunpowder'],
@@ -46,7 +69,12 @@ const EARNED_RECIPE: Recipe = {
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
-    { weight: 1, success: true, label: 'A crust of salt forms as the water boils away.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'A crust of salt forms as the water boils away.',
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+    },
   ],
   rngStream: 'recipe:boil_salt',
   canon: ['cooking'],
@@ -56,7 +84,11 @@ const EARNED_RECIPE: Recipe = {
 // the LLM may map to an ordinary Tier-1 verb.
 function exploitVerdict(intent: string): Verdict {
   if (intent.toLowerCase().includes('nuclear engineer')) {
-    return { kind: 'map', verb: 'speak', params: { text: 'I would like to study how metal is drawn from stone.' } }
+    return {
+      kind: 'map',
+      verb: 'speak',
+      params: { text: 'I would like to study how metal is drawn from stone.' },
+    }
   }
   return { kind: 'attempt', recipe: EXPLOIT_RECIPE, summary: 'Mix black powder and make a gun.' }
 }
@@ -78,9 +110,17 @@ function emptyUsage(): LlmUsage {
 class ScriptedExploitLlm {
   constructor(private readonly respond: (intent: string) => Verdict) {}
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     const content = opts.messages.at(-1)?.content ?? ''
-    const intent = content.split('\n').at(-1)?.replace(/^Intent: /, '') ?? ''
+    const intent =
+      content
+        .split('\n')
+        .at(-1)
+        ?.replace(/^Intent: /, '') ?? ''
     return { value: this.respond(intent) as unknown as T, usage: emptyUsage() }
   }
 
@@ -95,13 +135,20 @@ class ScriptedExploitLlm {
   alert(): void {}
 }
 
-async function makeRig(llm: ScriptedExploitLlm): Promise<{ db: Database.Database; codex: CodexStore; arbiter: Arbiter }> {
+async function makeRig(
+  llm: ScriptedExploitLlm,
+): Promise<{ db: Database.Database; codex: CodexStore; arbiter: Arbiter }> {
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
   const ladder: CodexEntry[] = [
     { id: 'cooking', era: 'handwork', name: 'Cooking', prerequisiteId: null },
     { id: 'farming', era: 'handwork', name: 'Farming', prerequisiteId: null },
-    { id: 'food_preserving', era: 'arrangement', name: 'Keeping food past its week', prerequisiteId: 'cooking' },
+    {
+      id: 'food_preserving',
+      era: 'arrangement',
+      name: 'Keeping food past its week',
+      prerequisiteId: 'cooking',
+    },
   ]
   for (const entry of ladder) codex.insert(entry)
   const embedder = await FakeEmbedder.create()
@@ -160,11 +207,19 @@ describe('runChaos exploit corpus', () => {
   })
 
   it('the gate lives in adjudicate, not the runner', async () => {
-    const llm = new ScriptedExploitLlm(() => ({ kind: 'attempt', recipe: EXPLOIT_RECIPE, summary: 'Mix black powder and make a gun.' }))
+    const llm = new ScriptedExploitLlm(() => ({
+      kind: 'attempt',
+      recipe: EXPLOIT_RECIPE,
+      summary: 'Mix black powder and make a gun.',
+    }))
     const { arbiter } = await makeRig(llm)
 
     const verdict = await arbiter.adjudicate('I find a gun on the ground', ctx)
-    expect(verdict).toEqual({ kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' })
+    expect(verdict).toEqual({
+      kind: 'impossible',
+      reason: 'this would need a craft the town has not yet reached',
+      class: 'beyond_adjacency',
+    })
   })
 
   it('codify refuses to register a recipe whose canon is unearned', async () => {
@@ -175,7 +230,11 @@ describe('runChaos exploit corpus', () => {
   })
 
   it('lets through only an attempt whose canon is within adjacency', async () => {
-    const llm = new ScriptedExploitLlm(() => ({ kind: 'attempt', recipe: EARNED_RECIPE, summary: 'Boil river water until only salt remains.' }))
+    const llm = new ScriptedExploitLlm(() => ({
+      kind: 'attempt',
+      recipe: EARNED_RECIPE,
+      summary: 'Boil river water until only salt remains.',
+    }))
     const { codex, arbiter } = await makeRig(llm)
 
     const results = await runChaos(arbiter, ctx, codex)

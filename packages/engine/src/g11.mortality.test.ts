@@ -2,8 +2,12 @@
 // the one night a fever crosses a room. Scripted actors only: no LLM, no network.
 import { describe, it, expect } from 'vitest'
 import {
-  DAYS_PER_YEAR, MINUTES_PER_DAY, SimConfigSchema, thirstDecayPerTick,
-  type SimConfig, type SimEvent,
+  DAYS_PER_YEAR,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  thirstDecayPerTick,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -29,22 +33,39 @@ const CFG: SimConfig = SimConfigSchema.parse({ ...QUIET, aging: { deathOfOldAgeE
 const CAUSES_SEEN = new Set<DeathCause>()
 
 let seq = 700000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 type Spawn = { id: string; x: number; y: number; ageDays?: number }
 
 function spawn(s: WorldState, config: SimConfig, a: Spawn): WorldState {
-  return fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: a.ageDays ?? 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: a.ageDays ?? 7300 }),
+    config,
+  )
 }
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
 function raise(s: WorldState, config: SimConfig, box: Box): WorldState {
-  const planned = fold(s, ev('structure_planned', {
-    ...box, maxHp: 50, flammable: true, builderId: 'script',
-  }), config)
+  const planned = fold(
+    s,
+    ev('structure_planned', {
+      ...box,
+      maxHp: 50,
+      flammable: true,
+      builderId: 'script',
+    }),
+    config,
+  )
   return fold(planned, ev('structure_completed', { id: box.id }), config)
 }
 
@@ -56,8 +77,14 @@ const indoors = (s: WorldState, config: SimConfig, id: string, box: Box): WorldS
 
 // One full world pass at a chosen tick — the real pipeline, so a row that passes here passes
 // in a running town.
-function pass(s: WorldState, config: SimConfig, tick: number, seed = 'g11a'): {
-  state: WorldState; events: PendingEvent[]
+function pass(
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  seed = 'g11a',
+): {
+  state: WorldState
+  events: PendingEvent[]
 } {
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   return createWorldTick(config, new RngStreams(seed))(advanced)
@@ -66,10 +93,17 @@ function pass(s: WorldState, config: SimConfig, tick: number, seed = 'g11a'): {
 // Run the world forward from `from` until `stop` says so or the window runs out. Returns every
 // event with the tick it landed on, which is what a "dies on schedule" row needs.
 function runUntil(
-  s: WorldState, config: SimConfig, from: number, limit: number,
+  s: WorldState,
+  config: SimConfig,
+  from: number,
+  limit: number,
   stop: (state: WorldState, events: PendingEvent[], tick: number) => boolean,
   seed = 'g11a',
-): { state: WorldState; log: Array<{ tick: number; type: string; payload: unknown }>; tick: number } {
+): {
+  state: WorldState
+  log: Array<{ tick: number; type: string; payload: unknown }>
+  tick: number
+} {
   let state = s
   const log: Array<{ tick: number; type: string; payload: unknown }> = []
   for (let tick = from; tick < from + limit; tick++) {
@@ -86,16 +120,26 @@ const died = (log: Array<{ tick: number; type: string; payload: unknown }>, id: 
 
 function noteCause(payload: unknown): void {
   const cause = (payload as { cause?: string }).cause
-  if (cause !== undefined && (DEATH_CAUSES as readonly string[]).includes(cause)) CAUSES_SEEN.add(cause as DeathCause)
+  if (cause !== undefined && (DEATH_CAUSES as readonly string[]).includes(cause))
+    CAUSES_SEEN.add(cause as DeathCause)
 }
 
-const apply = (s: WorldState, config: SimConfig, events: PendingEvent[], tick: number): WorldState =>
-  events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
+const apply = (
+  s: WorldState,
+  config: SimConfig,
+  events: PendingEvent[],
+  tick: number,
+): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
 
 // Submit an intent and let the world finish it. One-tick verbs are done in one pass.
 function act(
-  s: WorldState, config: SimConfig, tick: number, agentId: string, verb: string,
-  params: Record<string, unknown> = {}, seed = 'g11a',
+  s: WorldState,
+  config: SimConfig,
+  tick: number,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown> = {},
+  seed = 'g11a',
 ): { state: WorldState; events: PendingEvent[]; refusal: string | null } {
   const started = submitIntent(s, config, agentId, verb, params)
   if (!started.ok) return { state: s, events: [], refusal: started.reason }
@@ -121,7 +165,10 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
     const out = pass({ ...s, tick: START - 1 }, CFG, START)
     const billed = out.events.filter((e) => e.type === 'thirst_changed')
     expect(billed).toHaveLength(1)
-    expect((billed[0]!.payload as { delta: number }).delta).toBeCloseTo(-thirstDecayPerTick(CFG), 12)
+    expect((billed[0]!.payload as { delta: number }).delta).toBeCloseTo(
+      -thirstDecayPerTick(CFG),
+      12,
+    )
     expect(thirstOf(out.state.agents.dry!)).toBeCloseTo(100 - thirstDecayPerTick(CFG), 12)
   })
 
@@ -131,7 +178,10 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
     let hp = config.health.maxHp
     let rung = 0
     for (let tick = start; ; tick++) {
-      hp = Math.max(0, hp - (config.mortality.thirstHpDrainPerTick + config.mortality.drainPerTick.fatigue * rung))
+      hp = Math.max(
+        0,
+        hp - (config.mortality.thirstHpDrainPerTick + config.mortality.drainPerTick.fatigue * rung),
+      )
       if (hp <= config.health.deathHp) return tick
       if (rung === 0 && hp < config.health.collapseHp) rung = 1
     }
@@ -164,9 +214,21 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
 
     // A waterskin carried away from any water at all, and it spends a charge.
     let k = parched()
-    k = fold(k, ev('item_spawned', {
-      id: 'item_skin', kind: 'waterskin', qty: 1, loc: { t: 'agent', id: 'dry' }, charges: 2,
-    }, START - 1), CFG)
+    k = fold(
+      k,
+      ev(
+        'item_spawned',
+        {
+          id: 'item_skin',
+          kind: 'waterskin',
+          qty: 1,
+          loc: { t: 'agent', id: 'dry' },
+          charges: 2,
+        },
+        START - 1,
+      ),
+      CFG,
+    )
     out = act(k, CFG, START, 'dry', 'drink', { itemId: 'item_skin' })
     expect(out.refusal).toBeNull()
     expect(thirstOf(out.state.agents.dry!)).toBeGreaterThanOrEqual(CFG.thirst.drinkRestore)
@@ -185,12 +247,34 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
   function eater(): WorldState {
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'eater', x: 5, y: 5 })
     s = spawn(s, CFG, { id: 'healer', x: 6, y: 5 })
-    s = fold(s, ev('item_spawned', {
-      id: 'item_cap', kind: PALE_MUSHROOM, qty: 1, loc: { t: 'agent', id: 'eater' },
-    }, START - 1), CFG)
-    s = fold(s, ev('item_spawned', {
-      id: 'item_herb', kind: 'herb', qty: 1, loc: { t: 'agent', id: 'healer' },
-    }, START - 1), CFG)
+    s = fold(
+      s,
+      ev(
+        'item_spawned',
+        {
+          id: 'item_cap',
+          kind: PALE_MUSHROOM,
+          qty: 1,
+          loc: { t: 'agent', id: 'eater' },
+        },
+        START - 1,
+      ),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev(
+        'item_spawned',
+        {
+          id: 'item_herb',
+          kind: 'herb',
+          qty: 1,
+          loc: { t: 'agent', id: 'healer' },
+        },
+        START - 1,
+      ),
+      CFG,
+    )
     return { ...s, tick: START - 1 }
   }
 
@@ -199,7 +283,7 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
   const seedWhoseFirstIllnessDrawIsBelow = (dial: number, want: boolean): string => {
     for (let i = 0; i < 500; i++) {
       const seed = `poison-${i}`
-      if ((new RngStreams(seed).get('illness').next() < dial) === want) return seed
+      if (new RngStreams(seed).get('illness').next() < dial === want) return seed
     }
     throw new Error('no seed found')
   }
@@ -222,10 +306,24 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
     expect(poisoned.agents.eater!.afflictions).toHaveLength(1)
 
     // `tend` takes three ticks, so the intent is submitted and the world runs it out.
-    const started = submitIntent(poisoned, CFG, 'healer', 'tend', { targetId: 'eater', itemId: 'item_herb' })
+    const started = submitIntent(poisoned, CFG, 'healer', 'tend', {
+      targetId: 'eater',
+      itemId: 'item_herb',
+    })
     expect(started.ok).toBe(true)
-    const withIntent = apply(poisoned, CFG, (started as { events: PendingEvent[] }).events, START + 2)
-    const { state } = runUntil(withIntent, CFG, START + 3, 8, (st) => st.agents.healer!.activity === null)
+    const withIntent = apply(
+      poisoned,
+      CFG,
+      (started as { events: PendingEvent[] }).events,
+      START + 2,
+    )
+    const { state } = runUntil(
+      withIntent,
+      CFG,
+      START + 3,
+      8,
+      (st) => st.agents.healer!.activity === null,
+    )
     expect(state.agents.eater!.afflictions).toBeUndefined()
     expect(state.agents.eater!.tendedTick).toBeDefined()
     expect(state.items.item_herb).toBeUndefined() // the last leaf is spent, so the stack is gone
@@ -246,18 +344,26 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
 describe('G11a-M3: a fever that is never lifted worsens until it kills', () => {
   // Midnight is the illness turn; a dial of 1 makes every night a worse one.
   const HARSH: SimConfig = SimConfigSchema.parse({
-    ...QUIET, aging: { deathOfOldAgeEnabled: false }, illness: { dailyWorsenChance: 1 },
+    ...QUIET,
+    aging: { deathOfOldAgeEnabled: false },
+    illness: { dailyWorsenChance: 1 },
   })
 
   it('worsens at midnight and dies of the sickness', () => {
     // Seeded an hour before midnight, so the nightly turn lands while the body still has hp:
     // at severity 2 the drain finishes it before the next midnight comes round.
     let s = spawn(genesisState(HARSH, MAP()), HARSH, { id: 'ill', x: 5, y: 5 })
-    s = fold(s, ev('agent_afflicted', { agentId: 'ill', kind: 'illness', severity: 1 }, 1380), HARSH)
+    s = fold(
+      s,
+      ev('agent_afflicted', { agentId: 'ill', kind: 'illness', severity: 1 }, 1380),
+      HARSH,
+    )
     s = { ...s, tick: 1380 }
     const { state, log } = runUntil(s, HARSH, 1381, 40000, (st) => !st.agents.ill!.alive)
-    const worsened = log.filter((e) => e.type === 'affliction_worsened'
-      && (e.payload as { kind?: string }).kind === 'illness')
+    const worsened = log.filter(
+      (e) =>
+        e.type === 'affliction_worsened' && (e.payload as { kind?: string }).kind === 'illness',
+    )
     expect(worsened.length).toBeGreaterThanOrEqual(1)
     expect((worsened[0]!.payload as { severity: number }).severity).toBe(2)
     const death = died(log, 'ill')
@@ -317,17 +423,46 @@ describe('G11a-M4: a blow struck by a hand, a death that names the hand, and a t
 
     // Take the same two bodies indoors and the witness outside sees neither of them.
     let walled = raise(brawl(), CFG, { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
-    walled = indoors(walled, CFG, 'bruiser', { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
-    walled = indoors(walled, CFG, 'victim', { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
+    walled = indoors(walled, CFG, 'bruiser', {
+      id: 'structure_9',
+      kind: 'house',
+      x: 4,
+      y: 4,
+      w: 2,
+      h: 2,
+    })
+    walled = indoors(walled, CFG, 'victim', {
+      id: 'structure_9',
+      kind: 'house',
+      x: 4,
+      y: 4,
+      w: 2,
+      h: 2,
+    })
     expect(composePerception(walled, CFG, 'witness', []).visible.agents).toEqual([])
   })
 
   it('a stone is set on the tile the body fell on', () => {
     const seed = attackerWins()
-    const wounded = act(brawl(), CFG, START, 'bruiser', 'attack', { targetId: 'victim' }, seed).state
-    const { state, log } = runUntil(wounded, CFG, START + 2, 40000, (st) => !st.agents.victim!.alive)
-    const grave = log.find((e) => e.type === 'grave_placed'
-      && (e.payload as { agentId?: string }).agentId === 'victim')
+    const wounded = act(
+      brawl(),
+      CFG,
+      START,
+      'bruiser',
+      'attack',
+      { targetId: 'victim' },
+      seed,
+    ).state
+    const { state, log } = runUntil(
+      wounded,
+      CFG,
+      START + 2,
+      40000,
+      (st) => !st.agents.victim!.alive,
+    )
+    const grave = log.find(
+      (e) => e.type === 'grave_placed' && (e.payload as { agentId?: string }).agentId === 'victim',
+    )
     expect(grave).toBeDefined()
     const at = grave!.payload as { x: number; y: number; id: string }
     const body = state.agents.victim!
@@ -345,9 +480,9 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
     // thing that takes her: this row is about the falling, not the fasting.
     s = fold(s, ev('need_changed', { id: 'weary', need: 'energy', delta: -100 }, 1859), CFG)
     s = { ...s, tick: 1859 }
-    const { state, log } = runUntil(s, CFG, 1860, 40000, (st) => !st.agents.weary!.alive,
-      'ladder')
-    const rungs = log.filter((e) => e.type === 'agent_afflicted' || e.type === 'affliction_worsened')
+    const { state, log } = runUntil(s, CFG, 1860, 40000, (st) => !st.agents.weary!.alive, 'ladder')
+    const rungs = log
+      .filter((e) => e.type === 'agent_afflicted' || e.type === 'affliction_worsened')
       .filter((e) => (e.payload as { kind?: string }).kind === 'fatigue')
     expect(rungs.length).toBeGreaterThanOrEqual(1)
     const death = died(log, 'weary')
@@ -364,17 +499,32 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'cold', x: 5, y: 5 })
     // No warmth left to spend, a little energy still to lose — the cold only reaches the
     // energy bar once the warmth bar is empty, and only while there is energy to take.
-    s = fold(s, ev('need_changed', { id: 'cold', need: 'warmth', delta: -100 }, WINTER_TICK - 1), CFG)
-    s = fold(s, ev('need_changed', { id: 'cold', need: 'energy', delta: -80 }, WINTER_TICK - 1), CFG)
+    s = fold(
+      s,
+      ev('need_changed', { id: 'cold', need: 'warmth', delta: -100 }, WINTER_TICK - 1),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev('need_changed', { id: 'cold', need: 'energy', delta: -80 }, WINTER_TICK - 1),
+      CFG,
+    )
     s = fold(s, ev('hp_changed', { agentId: 'cold', delta: -80 }, WINTER_TICK - 1), CFG)
     s = { ...s, tick: WINTER_TICK - 1 }
     const first = pass(s, CFG, WINTER_TICK)
-    const chilled = first.events.filter((e) => e.type === 'need_changed'
-      && (e.payload as { reason?: string }).reason === 'exposure')
+    const chilled = first.events.filter(
+      (e) => e.type === 'need_changed' && (e.payload as { reason?: string }).reason === 'exposure',
+    )
     expect(chilled).toHaveLength(1)
     expect(first.state.agents.cold!.coldTicksSinceRecovery).toBe(1)
 
-    const { log } = runUntil(first.state, CFG, WINTER_TICK + 1, 40000, (st) => !st.agents.cold!.alive)
+    const { log } = runUntil(
+      first.state,
+      CFG,
+      WINTER_TICK + 1,
+      40000,
+      (st) => !st.agents.cold!.alive,
+    )
     const death = died(log, 'cold')
     expect(death).toBeDefined()
     noteCause(death!.payload)
@@ -409,9 +559,15 @@ describe('G11a-M6: the two clocks with no affliction behind them, and the one th
   it('an old body goes in its sleep, with a stone of its own', () => {
     // The one row that switches the old-age roll back on, at a dial that makes the night certain.
     const OLD: SimConfig = SimConfigSchema.parse({
-      ...QUIET, aging: { deathOfOldAgeEnabled: true, naturalDeathBaseChancePerDay: 1 },
+      ...QUIET,
+      aging: { deathOfOldAgeEnabled: true, naturalDeathBaseChancePerDay: 1 },
     })
-    let s = spawn(genesisState(OLD, MAP()), OLD, { id: 'elder', x: 5, y: 5, ageDays: 70 * DAYS_PER_YEAR })
+    let s = spawn(genesisState(OLD, MAP()), OLD, {
+      id: 'elder',
+      x: 5,
+      y: 5,
+      ageDays: 70 * DAYS_PER_YEAR,
+    })
     s = { ...s, tick: MINUTES_PER_DAY - 1 }
     const out = pass(s, OLD, MINUTES_PER_DAY)
     const death = out.events.find((e) => e.type === 'agent_died')
@@ -426,11 +582,13 @@ describe('G11a-M6: the two clocks with no affliction behind them, and the one th
 
 describe('G11a-M7: a fever crosses a room, respects the radius, and stops at a wall', () => {
   const SURE: SimConfig = SimConfigSchema.parse({
-    ...QUIET, aging: { deathOfOldAgeEnabled: false },
+    ...QUIET,
+    aging: { deathOfOldAgeEnabled: false },
     illness: { dailyWorsenChance: 0, contagionChance: 1 },
   })
   const OFF: SimConfig = SimConfigSchema.parse({
-    ...QUIET, aging: { deathOfOldAgeEnabled: false },
+    ...QUIET,
+    aging: { deathOfOldAgeEnabled: false },
     illness: { dailyWorsenChance: 0, contagionEnabled: false },
   })
   const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 }
@@ -446,12 +604,18 @@ describe('G11a-M7: a fever crosses a room, respects the radius, and stops at a w
     s = spawn(s, config, { id: 'far', x: 10 + radius + 1, y: 10 })
     // Severity 2, not 1: with the worsen dial pinned off a first-rung fever simply lifts at
     // midnight, and a carrier who recovers before the turn is no carrier at all.
-    s = fold(s, ev('agent_afflicted', { agentId: 'carrier', kind: 'illness', severity: 2 }, 60), config)
+    s = fold(
+      s,
+      ev('agent_afflicted', { agentId: 'carrier', kind: 'illness', severity: 2 }, 60),
+      config,
+    )
     return { ...s, tick: MINUTES_PER_DAY - 1 }
   }
 
-  const sickIds = (s: WorldState): string[] => Object.keys(s.agents).sort()
-    .filter((id) => s.agents[id]!.afflictions?.some((x) => x.kind === 'illness') === true)
+  const sickIds = (s: WorldState): string[] =>
+    Object.keys(s.agents)
+      .sort()
+      .filter((id) => s.agents[id]!.afflictions?.some((x) => x.kind === 'illness') === true)
 
   it('outdoors it reaches exactly as far as the radius says and no further', () => {
     const out = pass(ward(SURE), SURE, MINUTES_PER_DAY)
@@ -465,7 +629,11 @@ describe('G11a-M7: a fever crosses a room, respects the radius, and stops at a w
     s = indoors(s, SURE, 'carrier', HOUSE)
     s = indoors(s, SURE, 'roommate', HOUSE)
     const door = doorTile(s, s.structures[HOUSE.id]!)!
-    s = fold(s, ev('agent_moved', { id: 'near', x: door.x + 1, y: door.y }, MINUTES_PER_DAY - 1), SURE)
+    s = fold(
+      s,
+      ev('agent_moved', { id: 'near', x: door.x + 1, y: door.y }, MINUTES_PER_DAY - 1),
+      SURE,
+    )
     const out = pass(s, SURE, MINUTES_PER_DAY)
     expect(sickIds(out.state)).toEqual(['carrier', 'roommate'])
     expect(out.state.agents.near!.afflictions).toBeUndefined()

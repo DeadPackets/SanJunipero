@@ -14,7 +14,5 @@ export function chunksTouched(coords: ReadonlyArray<{ x: number; y: number }>): 
     const c = chunkOf(x, y)
     seen.set(`${c.cx},${c.cy}`, c)
   }
-  return [...seen.entries()]
-    .sort(([, a], [, b]) => (a.cx - b.cx) || (a.cy - b.cy))
-    .map(([k]) => k)
+  return [...seen.entries()].sort(([, a], [, b]) => a.cx - b.cx || a.cy - b.cy).map(([k]) => k)
 }

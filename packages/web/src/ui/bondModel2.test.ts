@@ -1,11 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { bondFrom, warmthOf, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
+import {
+  bondFrom,
+  warmthOf,
+  type Bond,
+  type BondAct,
+  type BondKind,
+  type BondsResponse,
+} from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
-  ACT_OF_BOND_KIND, BOND_LEVELS, BOND_LEVEL_WORD, BOND_TYPES, BOND_TYPE_WORD, BOND_VALENCE,
-  EMPTY_LINEAGE, LEVEL_RANK, LEVEL_THRESHOLDS, SPOUSE_NIGHTS, WARMTH_HALF_LIFE_TICKS,
-  bondArc, bondLevel, bondTypeOf, partnerEvidence, relationLine,
-  type BondLevel, type LineageLike,
+  ACT_OF_BOND_KIND,
+  BOND_LEVELS,
+  BOND_LEVEL_WORD,
+  BOND_TYPES,
+  BOND_TYPE_WORD,
+  BOND_VALENCE,
+  EMPTY_LINEAGE,
+  LEVEL_RANK,
+  LEVEL_THRESHOLDS,
+  SPOUSE_NIGHTS,
+  WARMTH_HALF_LIFE_TICKS,
+  bondArc,
+  bondLevel,
+  bondTypeOf,
+  partnerEvidence,
+  relationLine,
+  type BondLevel,
+  type LineageLike,
 } from './bondModel2.js'
 
 /** one half-life, which is TWO sim-days — see the constant's own note */
@@ -76,20 +97,26 @@ describe('every level is reachable, one history each', () => {
 // ── P3: THIS IS NOT A SCORE, AND THE PROOF IS THAT IT GOES DOWN ───────────────────────────
 describe('a friendship is losable and hatred is earnable', () => {
   it('a close pair who fight enough end up in hatred, by way of strained', () => {
-    const warm = Array.from({ length: 6 }, () => at(0, 'partner'))   // warmth 24 → close
+    const warm = Array.from({ length: 6 }, () => at(0, 'partner')) // warmth 24 → close
     expect(bondLevel(bondWarmth(warm, 0))).toBe('close')
 
     const levels = [0, 1, 2, 3, 4, 5].map((fights) =>
-      bondLevel(bondWarmth([...warm, ...Array.from({ length: fights }, () => at(0, 'rival'))], 0)))
+      bondLevel(bondWarmth([...warm, ...Array.from({ length: fights }, () => at(0, 'rival'))], 0)),
+    )
 
     expect(levels).toEqual([
-      'close', 'friendly', 'acquaintances', 'strangers', 'strained', 'hatred',
+      'close',
+      'friendly',
+      'acquaintances',
+      'strangers',
+      'strained',
+      'hatred',
     ])
     expect(LEVEL_RANK.indexOf(levels[5]!)).toBeLessThan(LEVEL_RANK.indexOf(levels[0]!))
   })
 
   it('a friendship nobody keeps up cools on its own — the level WENT DOWN', () => {
-    const h = Array.from({ length: 5 }, () => at(0, 'owe'))          // warmth 15 → friendly
+    const h = Array.from({ length: 5 }, () => at(0, 'owe')) // warmth 15 → friendly
     expect(bondLevel(bondWarmth(h, 0))).toBe('friendly')
     const after = bondLevel(bondWarmth(h, 2 * HALF))
     expect(after).toBe('acquaintances')
@@ -119,7 +146,12 @@ describe('a friendship is losable and hatred is earnable', () => {
 
 // ── TYPE ───────────────────────────────────────────────────────────────────────────────────
 describe('bondTypeOf — the same edge read from two ends', () => {
-  const fam = lineage([['amara', 'kid'], ['yusuf', 'kid'], ['amara', 'sib'], ['yusuf', 'sib']])
+  const fam = lineage([
+    ['amara', 'kid'],
+    ['yusuf', 'kid'],
+    ['amara', 'sib'],
+    ['yusuf', 'sib'],
+  ])
 
   it('is parent from one side and child from the other', () => {
     expect(bondTypeOf('amara', 'kid', fam, api([]))).toBe('parent')
@@ -128,12 +160,19 @@ describe('bondTypeOf — the same edge read from two ends', () => {
 
   it('two people who share at least one parent are siblings', () => {
     expect(bondTypeOf('kid', 'sib', fam, api([]))).toBe('sibling')
-    const half = lineage([['amara', 'kid'], ['amara', 'sib'], ['zed', 'sib']])
+    const half = lineage([
+      ['amara', 'kid'],
+      ['amara', 'sib'],
+      ['zed', 'sib'],
+    ])
     expect(bondTypeOf('kid', 'sib', half, api([]))).toBe('sibling')
   })
 
   it('cousins are not siblings, and neither are two people with no parents recorded', () => {
-    const cousins = lineage([['amara', 'kid'], ['yusuf2', 'cuz']])
+    const cousins = lineage([
+      ['amara', 'kid'],
+      ['yusuf2', 'cuz'],
+    ])
     expect(bondTypeOf('kid', 'cuz', cousins, api([]))).toBe('none')
     expect(bondTypeOf('a', 'b', EMPTY_LINEAGE, api([]))).toBe('none')
   })
@@ -163,7 +202,9 @@ describe('partnerEvidence — shown, never asserted', () => {
   it('names the day once there have been enough nights, and says "lately" before', () => {
     const long = partnerEvidence(bond('a', 'b', nights(SPOUSE_NIGHTS, 5 * DAY)))!
     expect(long).toMatch(/since Day \d+/)
-    expect(partnerEvidence(bond('a', 'b', nights(SPOUSE_NIGHTS - 1)))).toBe('They have shared a roof lately.')
+    expect(partnerEvidence(bond('a', 'b', nights(SPOUSE_NIGHTS - 1)))).toBe(
+      'They have shared a roof lately.',
+    )
   })
 
   it('never says a word the world did not record', () => {
@@ -195,7 +236,10 @@ describe('bondArc — which way it is going', () => {
     const h = Array.from({ length: 6 }, () => at(0, 'partner'))
     const arc = bondArc(bond('a', 'b', h, 2 * DAY), 2 * DAY)
     expect(arc).toEqual({
-      from: 'friendly', to: 'acquaintances', direction: 'cooling', sinceDay: 0,
+      from: 'friendly',
+      to: 'acquaintances',
+      direction: 'cooling',
+      sinceDay: 0,
     })
     expect(LEVEL_RANK.indexOf(arc.to)).toBeLessThan(LEVEL_RANK.indexOf(arc.from))
   })
@@ -218,7 +262,7 @@ describe('relationLine is total over BondType × BondLevel', () => {
         n += 1
         expect(line.length, `${type}/${level}`).toBeGreaterThan(10)
         expect(line, `${type}/${level}`).not.toMatch(GAMIFICATION_BAN)
-        expect(line, `${type}/${level}`).not.toMatch(/\d/)     // steady: no day, so no digit
+        expect(line, `${type}/${level}`).not.toMatch(/\d/) // steady: no day, so no digit
         expect(line, `${type}/${level}`).not.toMatch(/_/)
         expect(line).toContain('Amara')
         expect(line).toContain('Yusuf')
@@ -229,16 +273,24 @@ describe('relationLine is total over BondType × BondLevel', () => {
   })
 
   it('names the type first when there is one, and only the pair when there is not', () => {
-    expect(relationLine('sibling', 'close', STEADY, ['Amara', 'Yusuf']))
-      .toBe('Amara and Yusuf are siblings, and they are close.')
-    expect(relationLine('none', 'strangers', STEADY, ['Amara', 'Yusuf']))
-      .toBe('Amara and Yusuf are strangers to each other.')
-    expect(relationLine('parent', 'friendly', STEADY, ['Amara', 'Kid']))
-      .toBe('Amara is Kid’s parent, and they are friends.')
+    expect(relationLine('sibling', 'close', STEADY, ['Amara', 'Yusuf'])).toBe(
+      'Amara and Yusuf are siblings, and they are close.',
+    )
+    expect(relationLine('none', 'strangers', STEADY, ['Amara', 'Yusuf'])).toBe(
+      'Amara and Yusuf are strangers to each other.',
+    )
+    expect(relationLine('parent', 'friendly', STEADY, ['Amara', 'Kid'])).toBe(
+      'Amara is Kid’s parent, and they are friends.',
+    )
   })
 
   it('adds the arc only when it moved, and the day is the only number in the line', () => {
-    const warming = { from: 'strangers', to: 'friendly', direction: 'warming', sinceDay: 4 } as const
+    const warming = {
+      from: 'strangers',
+      to: 'friendly',
+      direction: 'warming',
+      sinceDay: 4,
+    } as const
     const line = relationLine('none', 'friendly', warming, ['Amara', 'Yusuf'])
     expect(line).toContain('Warming since Day 4.')
     expect(line.match(/\d+/g)).toEqual(['4'])

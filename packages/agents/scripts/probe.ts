@@ -10,11 +10,19 @@ let spentUsd = 0
 // charged double, so its own $5 cap was a $10 cap.
 function book(usage: any, label: string) {
   const cin = usage?.inputTokenDetails?.cacheReadTokens ?? 0
-  const cost = ((usage.inputTokens - cin) * PRICE_PER_M.input
-    + cin * PRICE_PER_M.cacheRead + usage.outputTokens * PRICE_PER_M.output) / 1e6
+  const cost =
+    ((usage.inputTokens - cin) * PRICE_PER_M.input +
+      cin * PRICE_PER_M.cacheRead +
+      usage.outputTokens * PRICE_PER_M.output) /
+    1e6
   spentUsd += cost
-  console.log(`[${label}] in=${usage.inputTokens} out=${usage.outputTokens} cacheRead=${cin} cost=$${cost.toFixed(6)} total=$${spentUsd.toFixed(4)}`)
-  if (spentUsd > CAP_USD) { console.error('BUDGET CAP EXCEEDED'); process.exit(1) }
+  console.log(
+    `[${label}] in=${usage.inputTokens} out=${usage.outputTokens} cacheRead=${cin} cost=$${cost.toFixed(6)} total=$${spentUsd.toFixed(4)}`,
+  )
+  if (spentUsd > CAP_USD) {
+    console.error('BUDGET CAP EXCEEDED')
+    process.exit(1)
+  }
   return cin
 }
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
@@ -32,8 +40,12 @@ function providerOf(result: { providerMetadata?: Record<string, any> }): string 
 
 // ---- Check 1: basic call ----
 {
-  const r = await generateText({ model: openrouter(MODEL), prompt: 'Reply with the single word: meadow' })
-  if (!r.text.toLowerCase().includes('meadow')) fail(`check1 text does not contain 'meadow': ${r.text}`)
+  const r = await generateText({
+    model: openrouter(MODEL),
+    prompt: 'Reply with the single word: meadow',
+  })
+  if (!r.text.toLowerCase().includes('meadow'))
+    fail(`check1 text does not contain 'meadow': ${r.text}`)
   book(r.usage, 'basic')
   console.log('CHECK 1 PASS: basic call, text =', JSON.stringify(r.text))
 }
@@ -42,12 +54,15 @@ function providerOf(result: { providerMetadata?: Record<string, any> }): string 
 {
   const r = await generateText({
     model: openrouter(MODEL),
-    output: Output.object({ schema: z.object({ mood: z.string(), count: z.number().int() }).strict() }),
+    output: Output.object({
+      schema: z.object({ mood: z.string(), count: z.number().int() }).strict(),
+    }),
     prompt: 'A farmer counted 3 sheep and felt calm. Fill the fields.',
   })
   const obj = r.output
   if (obj.count !== 3) fail(`check2 count !== 3: ${JSON.stringify(obj)}`)
-  if (typeof obj.mood !== 'string' || obj.mood.length === 0) fail(`check2 mood empty: ${JSON.stringify(obj)}`)
+  if (typeof obj.mood !== 'string' || obj.mood.length === 0)
+    fail(`check2 mood empty: ${JSON.stringify(obj)}`)
   book(r.usage, 'structured')
   const aiTest = await import('ai/test')
   const mockName = Object.keys(aiTest).find((k) => k === 'MockLanguageModelV4') ?? 'NOT FOUND'
@@ -84,7 +99,9 @@ let observedProvider = 'unknown'
   }
   if (cin <= 0) fail('check3 cacheReadTokens still 0 after retry')
   observedProvider = providerOf(r2)
-  console.log(`CHECK 3 PASS: cacheReadTokens=${cin}; provider(call1)=${p1} provider(call2)=${observedProvider}`)
+  console.log(
+    `CHECK 3 PASS: cacheReadTokens=${cin}; provider(call1)=${p1} provider(call2)=${observedProvider}`,
+  )
 }
 
 // ---- Check 4: fallback + pinning mechanics ----

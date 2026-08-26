@@ -7,8 +7,17 @@ export type Point = { x: number; y: number }
 // A channel is impassable but drinkable; a sapling walks like the grass it grew from.
 export function terrainCostFor(config: SimConfig): Record<TileId, number> {
   return {
-    0: 1, 1: 1, 2: Infinity, 3: 2, 4: 3, 5: 1.2, 6: 1,
-    7: config.pathing.roadCost, 8: config.desirePaths.pathCost, 9: 1, 10: Infinity,
+    0: 1,
+    1: 1,
+    2: Infinity,
+    3: 2,
+    4: 3,
+    5: 1.2,
+    6: 1,
+    7: config.pathing.roadCost,
+    8: config.desirePaths.pathCost,
+    9: 1,
+    10: Infinity,
   }
 }
 
@@ -28,7 +37,12 @@ export function bridgeAt(state: WorldState, x: number, y: number): boolean {
 
 // The same two questions about structures, answered from one walk of them instead of one walk
 // per tile — what a search that expands thousands of tiles over an unchanging world can do.
-export type PathCtx = { decks: Set<number>; blocked: Set<number>; cost: Record<TileId, number>; width: number }
+export type PathCtx = {
+  decks: Set<number>
+  blocked: Set<number>
+  cost: Record<TileId, number>
+  width: number
+}
 
 function pathCtx(state: WorldState, config: SimConfig): PathCtx {
   const width = state.terrain[0]!.length
@@ -69,21 +83,43 @@ export function isPassable(state: WorldState, x: number, y: number, ctx?: PathCt
 
 // The single place that prices a step. Terrain is what the map says; a bridge deck is
 // what the town built over it, and it walks like the road it is.
-export function stepCostAt(state: WorldState, x: number, y: number, config: SimConfig, ctx?: PathCtx): number {
+export function stepCostAt(
+  state: WorldState,
+  x: number,
+  y: number,
+  config: SimConfig,
+  ctx?: PathCtx,
+): number {
   if (onDeck(state, x, y, ctx)) return config.pathing.roadCost
   return (ctx?.cost ?? terrainCostFor(config))[state.terrain[y]![x]!]!
 }
 
 // Neighbor order + comparator prefer lower y then lower x: deterministic ties under a Manhattan heuristic.
 // Movement is 4-directional so a path can't cut corners; canStep enforces that invariant for any step.
-const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [
+  [0, -1],
+  [-1, 0],
+  [1, 0],
+  [0, 1],
+]
 
 // Legal when the destination is passable and a diagonal step doesn't squeeze between two impassable tiles.
 export function canStep(
-  state: WorldState, x: number, y: number, dx: number, dy: number, ctx?: PathCtx,
+  state: WorldState,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  ctx?: PathCtx,
 ): boolean {
   if (!isPassable(state, x + dx, y + dy, ctx)) return false
-  if (dx !== 0 && dy !== 0 && !isPassable(state, x + dx, y, ctx) && !isPassable(state, x, y + dy, ctx)) return false
+  if (
+    dx !== 0 &&
+    dy !== 0 &&
+    !isPassable(state, x + dx, y, ctx) &&
+    !isPassable(state, x, y + dy, ctx)
+  )
+    return false
   return true
 }
 
@@ -109,7 +145,12 @@ function closerToGoal(a: Node, b: Node): boolean {
 // the answer is kept against the identity of that world and the config it was judged under.
 const memo = new WeakMap<WorldState, { config: SimConfig; key: string; found: PathSearch | null }>()
 
-export function searchPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): PathSearch | null {
+export function searchPath(
+  state: WorldState,
+  from: Point,
+  to: Point,
+  config: SimConfig = DEFAULT_CONFIG,
+): PathSearch | null {
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
   const key = `${from.x},${from.y}|${to.x},${to.y}`
   const hit = memo.get(state)
@@ -119,7 +160,12 @@ export function searchPath(state: WorldState, from: Point, to: Point, config: Si
   return found
 }
 
-function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig): PathSearch | null {
+function runSearch(
+  state: WorldState,
+  from: Point,
+  to: Point,
+  config: SimConfig,
+): PathSearch | null {
   const ctx = pathCtx(state, config)
   if (!isPassable(state, to.x, to.y, ctx)) return null
   const width = ctx.width
@@ -129,7 +175,14 @@ function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig)
   const h = (x: number, y: number) => (Math.abs(x - to.x) + Math.abs(y - to.y)) * minCost
   const key = (x: number, y: number) => y * width + x
   const best = new Map<number, Node>()
-  const start: Node = { x: from.x, y: from.y, g: 0, h: h(from.x, from.y), f: h(from.x, from.y), parent: null }
+  const start: Node = {
+    x: from.x,
+    y: from.y,
+    g: 0,
+    h: h(from.x, from.y),
+    f: h(from.x, from.y),
+    parent: null,
+  }
   best.set(key(from.x, from.y), start)
   const open: Node[] = [start]
   const closed = new Set<number>()
@@ -140,7 +193,8 @@ function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig)
   while (open.length > 0) {
     let mi = 0
     for (let i = 1; i < open.length; i++) {
-      const a = open[i]!, b = open[mi]!
+      const a = open[i]!,
+        b = open[mi]!
       if (a.f < b.f || (a.f === b.f && (a.y < b.y || (a.y === b.y && a.x < b.x)))) mi = i
     }
     const cur = open.splice(mi, 1)[0]!
@@ -149,7 +203,8 @@ function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig)
     closed.add(ck)
     if (cur.x === to.x && cur.y === to.y) return { path: pathTo(cur), capped: false }
     for (const [dx, dy] of NEIGHBORS) {
-      const nx = cur.x + dx, ny = cur.y + dy
+      const nx = cur.x + dx,
+        ny = cur.y + dy
       if (!canStep(state, cur.x, cur.y, dx, dy, ctx) || closed.has(key(nx, ny))) continue
       const g = cur.g + stepCostAt(state, nx, ny, config, ctx)
       const known = best.get(key(nx, ny))
@@ -169,6 +224,11 @@ function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig)
   return null
 }
 
-export function findPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): Array<[number, number]> | null {
+export function findPath(
+  state: WorldState,
+  from: Point,
+  to: Point,
+  config: SimConfig = DEFAULT_CONFIG,
+): Array<[number, number]> | null {
   return searchPath(state, from, to, config)?.path ?? null
 }

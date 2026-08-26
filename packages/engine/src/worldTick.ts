@@ -9,7 +9,12 @@ import { warmthSystem } from './systems/warmth.js'
 import { lightingSystem } from './systems/lighting.js'
 import { regrowthSystem } from './systems/regrowth.js'
 import { healthSystem } from './systems/health.js'
-import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
+import {
+  deathAttribution,
+  escalateFatigue,
+  mortalitySystem,
+  placeGrave,
+} from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
 import { desirePathsSystem } from './systems/desirePaths.js'
 import { thirstSystem } from './systems/thirst.js'
@@ -40,7 +45,9 @@ function actionsSystem(ctx: TickCtx): void {
     if (!a.alive || !a.activity) continue
     if (a.activity.verb === 'walk') {
       const path = a.activity.path
-      const tilesLeft = path ? path.length - (path.findIndex(([x, y]) => x === a.x && y === a.y) + 1) : 0
+      const tilesLeft = path
+        ? path.length - (path.findIndex(([x, y]) => x === a.x && y === a.y) + 1)
+        : 0
       if (tilesLeft <= 0) {
         ctx.emit('action_interrupted', { agentId: id, reason: 'blocked' })
         continue
@@ -57,8 +64,16 @@ function actionsSystem(ctx: TickCtx): void {
     const results = def?.results?.(ctx.state(), ctx.config, id, act.params)
     ctx.emit('action_completed', { agentId: id, verb: act.verb, ...(results ? { results } : {}) })
     if (!def) continue
-    for (const e of def.onComplete(ctx.state(), ctx.config, id, act.params, ctx.rng.get(def.rngStream ?? 'actions'))) ctx.emit(e.type, e.payload)
-    if (def.skill) ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })
+    for (const e of def.onComplete(
+      ctx.state(),
+      ctx.config,
+      id,
+      act.params,
+      ctx.rng.get(def.rngStream ?? 'actions'),
+    ))
+      ctx.emit(e.type, e.payload)
+    if (def.skill)
+      ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })
   }
 }
 
@@ -79,14 +94,17 @@ function collapseDeathSystem(ctx: TickCtx): void {
   for (const id of Object.keys(ctx.state().agents).sort()) {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
-    const down = a.needs.hunger < collapseThreshold || a.needs.energy < collapseThreshold || a.hp < collapseHp
+    const down =
+      a.needs.hunger < collapseThreshold || a.needs.energy < collapseThreshold || a.hp < collapseHp
     const fell = down && a.collapsedSinceTick === null
     if (fell) {
       if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'collapsed' })
       ctx.emit('agent_collapsed', { agentId: id })
     }
     const b = ctx.state().agents[id]!
-    const starved = b.zeroHungerSinceTick !== null && ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
+    const starved =
+      b.zeroHungerSinceTick !== null &&
+      ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
     if (starved || b.hp <= deathHp) {
       // Attribution reads the living body: after agent_died there is nothing left to ask.
       const { cause, byId } = starved
@@ -106,23 +124,44 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // mapGrowth runs before anything that reads a coordinate this tick: after it, every stored
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
-  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem, lightingSystem,
-  needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem,
-  desirePathsSystem, regrowthSystem,
-  reproductionSystem, agingSystem, actionsSystem,
+  weatherSystem,
+  mysterySystem,
+  mapGrowthSystem,
+  fireSystem,
+  cropsSystem,
+  wildlifeSystem,
+  faunaSystem,
+  forageSystem,
+  spoilageSystem,
+  lightingSystem,
+  needsSystem,
+  warmthSystem,
+  thirstSystem,
+  healthSystem,
+  mortalitySystem,
+  illnessSystem,
+  desirePathsSystem,
+  regrowthSystem,
+  reproductionSystem,
+  agingSystem,
+  actionsSystem,
   collapseDeathSystem,
 ]
 
 // Each emit folds immediately, so every system is generated against the already-folded state.
 // ctx.config is a getter: a law flipped at this boundary is true for every system that runs after.
 export function createWorldTick(
-  config: SimConfig, rng: RngStreams, laws?: LawQueue,
+  config: SimConfig,
+  rng: RngStreams,
+  laws?: LawQueue,
 ): (state: WorldState) => WorldTickResult {
   return (initial) => {
     let state = initial
     const events: PendingEvent[] = []
     const ctx: TickCtx = {
-      get config() { return effectiveConfig(config, state.laws) },
+      get config() {
+        return effectiveConfig(config, state.laws)
+      },
       rng,
       state: () => state,
       emit: (type, payload) => {

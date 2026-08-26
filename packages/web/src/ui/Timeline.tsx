@@ -3,8 +3,15 @@ import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
 import {
-  MARK_GLYPH, MARK_GLYPH_PX, MARK_GLYPH_SCALE, coalesceMarks, markLeft, marksFrom, tipSide,
-  type Mark, type MarkSources,
+  MARK_GLYPH,
+  MARK_GLYPH_PX,
+  MARK_GLYPH_SCALE,
+  coalesceMarks,
+  markLeft,
+  marksFrom,
+  tipSide,
+  type Mark,
+  type MarkSources,
 } from './timelineMarks.js'
 
 export const KEY_STEP_TICKS = 10
@@ -15,15 +22,24 @@ export const KEY_PAGE_TICKS = MINUTES_PER_DAY
 export const MARKS_REFETCH_MS = 30_000
 
 const EMPTY_SOURCES: MarkSources = {
-  chapters: [], milestones: [], moments: [], changes: [], events: [], discoveries: [],
+  chapters: [],
+  milestones: [],
+  moments: [],
+  changes: [],
+  events: [],
+  discoveries: [],
 }
 
 function MarkGlyph({ mark }: { mark: Mark }) {
   return (
     <svg
-      className="mark-glyph" viewBox={`0 0 ${MARK_GLYPH_PX} ${MARK_GLYPH_PX}`}
-      width={MARK_GLYPH_PX * MARK_GLYPH_SCALE} height={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="mark-glyph"
+      viewBox={`0 0 ${MARK_GLYPH_PX} ${MARK_GLYPH_PX}`}
+      width={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
+      height={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {MARK_GLYPH[mark.kind].map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -32,7 +48,14 @@ function MarkGlyph({ mark }: { mark: Mark }) {
   )
 }
 
-export function TimelineView({ edge, viewTick, live, marks, onScrub, onLive }: {
+export function TimelineView({
+  edge,
+  viewTick,
+  live,
+  marks,
+  onScrub,
+  onLive,
+}: {
   edge: number
   viewTick: number
   live: boolean
@@ -54,11 +77,15 @@ export function TimelineView({ edge, viewTick, live, marks, onScrub, onLive }: {
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
-      e.key === 'ArrowLeft' ? -KEY_STEP_TICKS
-      : e.key === 'ArrowRight' ? KEY_STEP_TICKS
-      : e.key === 'PageDown' ? -KEY_PAGE_TICKS
-      : e.key === 'PageUp' ? KEY_PAGE_TICKS
-      : null
+      e.key === 'ArrowLeft'
+        ? -KEY_STEP_TICKS
+        : e.key === 'ArrowRight'
+          ? KEY_STEP_TICKS
+          : e.key === 'PageDown'
+            ? -KEY_PAGE_TICKS
+            : e.key === 'PageUp'
+              ? KEY_PAGE_TICKS
+              : null
     if (step !== null) {
       e.preventDefault()
       onScrub(viewTick + step)
@@ -89,7 +116,9 @@ export function TimelineView({ edge, viewTick, live, marks, onScrub, onLive }: {
                 onClick={() => onScrub(mk.tick)}
               >
                 <MarkGlyph mark={mk} />
-                <span className="mark-tip" data-side={tipSide(mk.tick, span)}>{mk.words}</span>
+                <span className="mark-tip" data-side={tipSide(mk.tick, span)}>
+                  {mk.words}
+                </span>
               </button>
             )
           })}
@@ -114,21 +143,33 @@ export function TimelineView({ edge, viewTick, live, marks, onScrub, onLive }: {
           }}
         >
           {gridDays.map((d) => (
-            <span key={d} className="timeline-day" style={{ left: `${(d * MINUTES_PER_DAY * 100) / span}%` }}>
+            <span
+              key={d}
+              className="timeline-day"
+              style={{ left: `${(d * MINUTES_PER_DAY * 100) / span}%` }}
+            >
               <em>Day {d}</em>
             </span>
           ))}
           <span className="playhead" style={{ left: `${frac * 100}%` }} />
         </div>
       </div>
-      <button className={live ? 'live-pill live' : 'live-pill'} onClick={onLive} aria-pressed={live}>
+      <button
+        className={live ? 'live-pill live' : 'live-pill'}
+        onClick={onLive}
+        aria-pressed={live}
+      >
         {live ? 'LIVE' : 'Return to now'}
       </button>
     </div>
   )
 }
 
-export function Timeline({ store, handle, onView }: {
+export function Timeline({
+  store,
+  handle,
+  onView,
+}: {
   store: WorldStore
   handle: ObservatoryHandle | null
   onView: (tick: number | null) => void // null = went live; updates the address bar
@@ -136,7 +177,7 @@ export function Timeline({ store, handle, onView }: {
   const liveEdgeRef = useRef(0)
   const liveTick = useSyncExternalStore(store.subscribe, () => {
     const s = store.getState()
-    return store.getMode().live ? s?.tick ?? 0 : Math.max(s?.tick ?? 0, liveEdgeRef.current)
+    return store.getMode().live ? (s?.tick ?? 0) : Math.max(s?.tick ?? 0, liveEdgeRef.current)
   })
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
   if (mode.live) liveEdgeRef.current = Math.max(liveEdgeRef.current, liveTick)
@@ -146,16 +187,21 @@ export function Timeline({ store, handle, onView }: {
     let alive = true
     const load = (): void => {
       void fetch('/api/timeline/marks')
-        .then(async (r) => (r.ok ? (await r.json()) as Partial<MarkSources> : null))
+        .then(async (r) => (r.ok ? ((await r.json()) as Partial<MarkSources>) : null))
         .then((body) => {
           if (!alive || body === null) return
           setSources({
-            chapters: body.chapters ?? [], milestones: body.milestones ?? [],
-            moments: body.moments ?? [], changes: body.changes ?? [], events: body.events ?? [],
+            chapters: body.chapters ?? [],
+            milestones: body.milestones ?? [],
+            moments: body.moments ?? [],
+            changes: body.changes ?? [],
+            events: body.events ?? [],
             discoveries: body.discoveries ?? [],
           })
         })
-        .catch(() => { /* the scrubber still scrubs without its marks */ })
+        .catch(() => {
+          /* the scrubber still scrubs without its marks */
+        })
     }
     load()
     const timer = setInterval(load, MARKS_REFETCH_MS)
@@ -181,8 +227,12 @@ export function Timeline({ store, handle, onView }: {
 
   return (
     <TimelineView
-      edge={edge} viewTick={viewTick} live={mode.live} marks={marks}
-      onScrub={scrubTo} onLive={goLive}
+      edge={edge}
+      viewTick={viewTick}
+      live={mode.live}
+      marks={marks}
+      onScrub={scrubTo}
+      onLive={goLive}
     />
   )
 }

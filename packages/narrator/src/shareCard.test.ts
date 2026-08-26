@@ -6,7 +6,12 @@ import { renderShareCard } from './shareCard.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 describe('renderShareCard', () => {
-  const svg = renderShareCard({ day: 3, title: 'The First Trade', subtitle: 'Omar gives Yusuf a pot.', heat: 7.5 })
+  const svg = renderShareCard({
+    day: 3,
+    title: 'The First Trade',
+    subtitle: 'Omar gives Yusuf a pot.',
+    heat: 7.5,
+  })
 
   it('renders a self-contained 1080x565 SVG with day, title, subtitle', () => {
     expect(svg.startsWith('<svg')).toBe(true)
@@ -28,7 +33,14 @@ describe('renderShareCard', () => {
 
   it('is framing-free, deterministic, and escapes markup in inputs', () => {
     expect(FORBIDDEN_FRAMING.test(svg)).toBe(false)
-    expect(renderShareCard({ day: 3, title: 'The First Trade', subtitle: 'Omar gives Yusuf a pot.', heat: 7.5 })).toBe(svg)
+    expect(
+      renderShareCard({
+        day: 3,
+        title: 'The First Trade',
+        subtitle: 'Omar gives Yusuf a pot.',
+        heat: 7.5,
+      }),
+    ).toBe(svg)
     const sneaky = renderShareCard({ day: 1, title: '<script>"x"&', subtitle: 's', heat: 1 })
     expect(sneaky).not.toContain('<script>')
     expect(sneaky).toContain('&lt;script&gt;')
@@ -38,7 +50,13 @@ describe('renderShareCard', () => {
     const db = new Database(':memory:')
     migrateNarratorTables(db)
     const store = new NarratorStore(db)
-    store.insertPublication({ day: 3, kind: 'share_card', title: 'The First Trade', body: svg, citations: null })
+    store.insertPublication({
+      day: 3,
+      kind: 'share_card',
+      title: 'The First Trade',
+      body: svg,
+      citations: null,
+    })
     const rows = store.publications('share_card')
     expect(rows.length).toBe(1)
     expect(rows[0]!.body).toBe(svg)

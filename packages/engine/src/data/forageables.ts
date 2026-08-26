@@ -2,7 +2,12 @@
 // zero. Coordinates are absolute on the 128x128 genesis map.
 
 export const FORAGEABLE_KINDS = [
-  'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
+  'berry_bush',
+  'mushroom_patch',
+  'pale_mushroom_patch',
+  'herb_patch',
+  'clay_deposit',
+  'stone_outcrop',
   'reed_bed',
 ] as const
 export type ForageableKind = (typeof FORAGEABLE_KINDS)[number]
@@ -43,14 +48,37 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
 
 // How a node reads from across the clearing. Never a count — a picker sees abundance or
 // bareness, and the difference between the two mushrooms is not one of them.
-export const FORAGEABLE_PROSE: Readonly<Record<ForageableKind, { standing: string; bare: string }>> = {
-  berry_bush: { standing: 'berry bushes heavy with fruit', bare: 'the berry bushes are picked bare' },
-  mushroom_patch: { standing: 'mushrooms pushing up through the leaf litter', bare: 'the mushroom ground is turned over and empty' },
-  pale_mushroom_patch: { standing: 'pale mushrooms standing in the shade', bare: 'the pale ground is turned over and empty' },
-  herb_patch: { standing: 'a spread of low green herbs', bare: 'the herbs have been cut back to the root' },
-  clay_deposit: { standing: 'grey clay showing where the bank has slumped', bare: 'the clay is dug out to the gravel' },
-  stone_outcrop: { standing: 'loose stone lying at the foot of the rock', bare: 'the loose stone has all been carried off' },
-  reed_bed: { standing: 'tall reeds standing thick in the shallows', bare: 'the reeds are cut down to the waterline' },
+export const FORAGEABLE_PROSE: Readonly<
+  Record<ForageableKind, { standing: string; bare: string }>
+> = {
+  berry_bush: {
+    standing: 'berry bushes heavy with fruit',
+    bare: 'the berry bushes are picked bare',
+  },
+  mushroom_patch: {
+    standing: 'mushrooms pushing up through the leaf litter',
+    bare: 'the mushroom ground is turned over and empty',
+  },
+  pale_mushroom_patch: {
+    standing: 'pale mushrooms standing in the shade',
+    bare: 'the pale ground is turned over and empty',
+  },
+  herb_patch: {
+    standing: 'a spread of low green herbs',
+    bare: 'the herbs have been cut back to the root',
+  },
+  clay_deposit: {
+    standing: 'grey clay showing where the bank has slumped',
+    bare: 'the clay is dug out to the gravel',
+  },
+  stone_outcrop: {
+    standing: 'loose stone lying at the foot of the rock',
+    bare: 'the loose stone has all been carried off',
+  },
+  reed_bed: {
+    standing: 'tall reeds standing thick in the shallows',
+    bare: 'the reeds are cut down to the waterline',
+  },
 }
 
 // What a node yields when it is worked.

@@ -14,7 +14,9 @@ mkdirSync(OUT, { recursive: true })
 
 // imageClient.generateCandidates expects raw PNG bytes; it base64-encodes each ref
 // into a data:image/png;base64 URL inside {type:'image_url', image_url:{url}} itself.
-const refPng = readFileSync('/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/ref-sheet.png')
+const refPng = readFileSync(
+  '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/ref-sheet.png',
+)
 
 const desc =
   'a friendly adult villager in sage-green clothes, high visible detail: ' +
@@ -27,5 +29,7 @@ const prompt = buildAssetPrompt(desc, { w: 1, h: 1 }, 'rig-part')
 const cands = await client.generateCandidates(prompt, [refPng], 3)
 cands.forEach((c, i) => writeFileSync(`${OUT}/rig-part3-${i}.png`, c.png))
 console.log(`rig-part3: ${cands.length} candidates`)
-cands.forEach((c, i) => console.log(`  rig-part3-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`))
+cands.forEach((c, i) =>
+  console.log(`  rig-part3-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`),
+)
 console.log(`total spend=$${budget.total.toFixed(4)} (cap $1)`)

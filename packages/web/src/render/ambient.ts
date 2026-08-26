@@ -14,25 +14,27 @@ import { isGrave, toneReducer } from './tone.js'
 export const SMOKE_PUFFS = 3
 export const SMOKE_RISE_PX = 14
 export const SMOKE_LOOP_MS = 2400
-export const SMOKE_PUFF_R = 3          // a round puff, not an 8x8 card
+export const SMOKE_PUFF_R = 3 // a round puff, not an 8x8 card
 export const SMOKE_MAX_ALPHA = 0.42
-export const SMOKE_COLOR = 0xcfc6bc    // warm grey, MASTER_PALETTE — cream read as white glass
+export const SMOKE_COLOR = 0xcfc6bc // warm grey, MASTER_PALETTE — cream read as white glass
 
 // Smoke and a lit window both answer one question: does this kind have a hearth? The city
 // template names the furnished kinds, and a fire pit is an open fire whether or not it is.
 export const HEARTH_KINDS: ReadonlySet<string> = new Set([
-  ...cityStructures().filter((c) => c.furnishings.some((f) => f.kind === CITY_HEARTH_KIND)).map((c) => c.kind),
+  ...cityStructures()
+    .filter((c) => c.furnishings.some((f) => f.kind === CITY_HEARTH_KIND))
+    .map((c) => c.kind),
   'fire_pit',
 ])
 export const SHIMMER_MAX = 60
 export const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
 export const TREE_SKEW = 0.06
-export const GLOW_R = 4                 // a round pool of light, not a 6x6 card
+export const GLOW_R = 4 // a round pool of light, not a 6x6 card
 export const GLOW_COLOR = 0xf4e289
 // additive blending drives a honey square to near-white; this is the ceiling that keeps it
 // reading as lamplight rather than as a pale rectangle stuck to the wall
-export const GLOW_BASE_ALPHA = 0.30
+export const GLOW_BASE_ALPHA = 0.3
 export const GLOW_SWING = 0.12
 export const GLOW_HZ = 0.4
 export const BOUNCE_MS = 260
@@ -57,22 +59,42 @@ export const SHIMMER_PX = { w: 2, h: 2 } as const
 // codex the art coverage gate measures.
 export const CANOPY_TRUNK = 0x7e512b
 export const CANOPY_BODY = 0x6f9455
-export const CANOPY_LIT = 0x93b573    // lit from the upper left, like everything else
+export const CANOPY_LIT = 0x93b573 // lit from the upper left, like everything else
 export const CANOPY_SHADE = 0x4f7040
 
 /** Half-width of the canopy per row, top to bottom: a round crown over a two-pixel trunk. */
 const CANOPY_ROWS: readonly number[] = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 2]
 
 /** The tree, as flat blocks with hard edges — one row of the crown at a time. */
-export function canopyBlocks(): Array<{ x: number; y: number; w: number; h: number; color: number }> {
+export function canopyBlocks(): Array<{
+  x: number
+  y: number
+  w: number
+  h: number
+  color: number
+}> {
   const out: Array<{ x: number; y: number; w: number; h: number; color: number }> = []
   const mid = CANOPY_PX.w / 2
   for (const [y, half] of CANOPY_ROWS.entries()) {
     out.push({ x: mid - half, y, w: half * 2, h: 1, color: CANOPY_BODY })
-    if (y >= 1 && y <= 6) out.push({ x: mid - half, y, w: Math.min(3, half), h: 1, color: CANOPY_LIT })
-    if (y >= 7) out.push({ x: mid + half - Math.min(3, half), y, w: Math.min(3, half), h: 1, color: CANOPY_SHADE })
+    if (y >= 1 && y <= 6)
+      out.push({ x: mid - half, y, w: Math.min(3, half), h: 1, color: CANOPY_LIT })
+    if (y >= 7)
+      out.push({
+        x: mid + half - Math.min(3, half),
+        y,
+        w: Math.min(3, half),
+        h: 1,
+        color: CANOPY_SHADE,
+      })
   }
-  out.push({ x: mid - 1, y: CANOPY_ROWS.length, w: 2, h: CANOPY_PX.h - CANOPY_ROWS.length, color: CANOPY_TRUNK })
+  out.push({
+    x: mid - 1,
+    y: CANOPY_ROWS.length,
+    w: 2,
+    h: CANOPY_PX.h - CANOPY_ROWS.length,
+    color: CANOPY_TRUNK,
+  })
   return out
 }
 
@@ -97,7 +119,8 @@ export function sampleDecorations(terrain: TileId[][]): Decoration[] {
     out.push(d)
     return true
   }
-  let trees = 0, shimmers = 0
+  let trees = 0,
+    shimmers = 0
   for (let y = 0; y < terrain.length && shimmers < SHIMMER_MAX; y++)
     for (let x = 0; x < terrain[y]!.length && shimmers < SHIMMER_MAX; x++)
       if (terrain[y]![x] === WATER && place('shimmer', x, y)) shimmers++
@@ -107,7 +130,11 @@ export function sampleDecorations(terrain: TileId[][]): Decoration[] {
   return out
 }
 
-export type AmbientDirector = { tick(dtMs: number): void; setTone(grave: boolean): void; destroy(): void }
+export type AmbientDirector = {
+  tick(dtMs: number): void
+  setTone(grave: boolean): void
+  destroy(): void
+}
 
 export function createAmbient(
   scene: Scene,
@@ -157,7 +184,11 @@ export function createAmbient(
     for (const ev of evts) {
       if (ev.type === 'structure_completed' || ev.type === 'item_spawned') {
         const p = ev.payload as { id: string }
-        bounces.push({ kind: ev.type === 'structure_completed' ? 'structure' : 'item', id: p.id, at: t })
+        bounces.push({
+          kind: ev.type === 'structure_completed' ? 'structure' : 'item',
+          id: p.id,
+          at: t,
+        })
       }
     }
   })
@@ -193,7 +224,11 @@ export function createAmbient(
 
   // ── birds: a 3-sprite V gliding the sky band (viewer-side random — presentation only) ──
   const birdV = new Container()
-  for (const [bx, by] of [[0, 0], [-6, 4], [6, 4]] as const) {
+  for (const [bx, by] of [
+    [0, 0],
+    [-6, 4],
+    [6, 4],
+  ] as const) {
     const b = new Sprite(birdTex)
     b.position.set(bx, by)
     birdV.addChild(b)
@@ -266,7 +301,8 @@ export function createAmbient(
       if (glow !== undefined) {
         glow.position.set(anchor.sx, anchor.sy - 2) // the door face — "deep blue night, warm window glow"
         glow.visible = hasFire && night
-        glow.alpha = GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
+        glow.alpha =
+          GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
       }
       if (s.burning && !fires.has(s.id)) {
         const f = new Sprite(fireTex)
@@ -283,7 +319,8 @@ export function createAmbient(
           fires.delete(s.id)
         } else {
           fire.position.set(anchor.sx, anchor.sy - 8)
-          if (!grave) fire.alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
+          if (!grave)
+            fire.alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
         }
       }
     }
@@ -298,7 +335,9 @@ export function createAmbient(
     }
 
     // water shimmer + swaying trees
-    for (const sh of shimmers) sh.sprite.alpha = 0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
+    for (const sh of shimmers)
+      sh.sprite.alpha =
+        0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
     for (const tr of trees) tr.sprite.skew.x = TREE_SKEW * Math.sin(t / 1000 + tr.phase)
 
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
@@ -330,11 +369,18 @@ export function createAmbient(
       for (const a of Object.values(state.agents)) {
         const sprite = layers.chars.getSprite(a.id)
         if (sprite === null) continue
-        const working = a.alive && a.activity !== null && (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
+        const working =
+          a.alive &&
+          a.activity !== null &&
+          (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
         const baseY = sprite.scale.x // uniform base — the character layer re-asserts x each frame (v2 and v4 scales differ)
-        sprite.scale.y = working && !grave
-          ? baseY * (1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000))))
-          : working ? sprite.scale.y : baseY
+        sprite.scale.y =
+          working && !grave
+            ? baseY *
+              (1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000))))
+            : working
+              ? sprite.scale.y
+              : baseY
       }
     }
 
@@ -373,7 +419,8 @@ export function createAmbient(
       for (const tr of trees) tr.sprite.destroy()
       birdV.destroy({ children: true })
       under.destroy({ children: true })
-      for (const tex of [puffTex, shimmerTex, glowTex, birdTex, canopyTex, fireTex]) tex.destroy(true)
+      for (const tex of [puffTex, shimmerTex, glowTex, birdTex, canopyTex, fireTex])
+        tex.destroy(true)
     },
   }
 }

@@ -4,8 +4,13 @@ import { MOTIFS, THUMB_CAST_MAX, thumbLabel, thumbMotif, thumbTitle } from './mo
 import { GLYPH_PALETTE } from './importantFeed.js'
 
 const moment = (over: Partial<Moment> = {}): Moment => ({
-  id: 1, day: 3, startTick: 4320, endTick: 4380,
-  title: 'What the Fire Took', cast: ['alice', 'bob'], location: 'the plaza',
+  id: 1,
+  day: 3,
+  startTick: 4320,
+  endTick: 4380,
+  title: 'What the Fire Took',
+  cast: ['alice', 'bob'],
+  location: 'the plaza',
   ...over,
 })
 
@@ -17,7 +22,11 @@ const people = {
 
 describe('thumbLabel', () => {
   it('names who was there, by their names', () => {
-    expect(thumbLabel(moment(), people)).toEqual({ day: 3, cast: 'Rahel, Tomas', location: 'the plaza' })
+    expect(thumbLabel(moment(), people)).toEqual({
+      day: 3,
+      cast: 'Rahel, Tomas',
+      location: 'the plaza',
+    })
   })
 
   it('names at most two, and says how many more were there', () => {

@@ -2,14 +2,27 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BODY_MIN_PX, TEXT_MIN_PX } from '../textFloor.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 // Prose surfaces: containers whose text is sentences, plus the prose-only classes inside them.
 // Chips, stamps, counts, pills and pixel-face labels sit on TEXT_MIN_PX, not on this list.
 const PROSE = [
-  '.inspector-panel', '.chronicle-panel', '.roster-panel', '.laws-panel', '.laws-dashboard',
-  '.bond-detail', '.provenance-pop', '.room-who', '.thumb-title', '.need-label',
-  '.law-history', '.veil-sub', '.tab-body article h4',
+  '.inspector-panel',
+  '.chronicle-panel',
+  '.roster-panel',
+  '.laws-panel',
+  '.laws-dashboard',
+  '.bond-detail',
+  '.provenance-pop',
+  '.room-who',
+  '.thumb-title',
+  '.need-label',
+  '.law-history',
+  '.veil-sub',
+  '.tab-body article h4',
 ]
 
 type Decl = { selectors: string; px: number; raw: string }
@@ -19,8 +32,8 @@ export function fontSizes(css: string): Decl[] {
   const out: Decl[] = []
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const raw =
-      /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim()
-      ?? /(?:^|;)\s*font:\s*([\d.]+(?:rem|px))/.exec(body ?? '')?.[1]?.trim()
+      /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim() ??
+      /(?:^|;)\s*font:\s*([\d.]+(?:rem|px))/.exec(body ?? '')?.[1]?.trim()
     if (raw === undefined) continue
     const num = Number.parseFloat(raw)
     const px = raw.endsWith('rem') ? num * 16 : raw.endsWith('px') ? num : Number.NaN
@@ -63,7 +76,6 @@ describe('B4 (partial) — the chrome type floors', () => {
     }
   })
 })
-
 
 // The sheet styles no bare `h2` outside `.digest-modal`, so an unclassed one is the browser's
 // system-ui bold at 21px — and RosterPanel's own skeleton used `.px-title`, so the heading

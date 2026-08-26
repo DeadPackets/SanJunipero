@@ -3,7 +3,14 @@ import Database from 'better-sqlite3'
 import { SimConfigSchema, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import { ChapterRenderError, MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
+import {
+  ChapterRenderError,
+  MARKER_HEAT_THRESHOLD,
+  narrateDay,
+  narrateWeek,
+  renderDigest,
+  timelineMarkers,
+} from './narrate.js'
 import type { ChapterRow, NarratorLlm } from './types.js'
 import type { LlmClient, LlmUsage } from '@sj/agents'
 
@@ -13,7 +20,12 @@ const memStore = (): NarratorStore => {
   return new NarratorStore(db)
 }
 
-const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({ seq, tick, type, payload })
+const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 
 // Inline equivalent of Task 15's eventful-day fixture (gate task excluded from this
 // session): idle scene, argument scene, first-trade scene — day 1.
@@ -36,8 +48,16 @@ const DAY1: SimEvent[] = [
 
 const scriptedLlm = (citations: number[] = [4, 9999]): NarratorLlm =>
   ({
-    summarizeChapter: vi.fn(async () => ({ title: 'The Wall Quarrel', text: 'Omar and Yusuf quarrelled over a wall.', citations })),
-    summarizeEra: vi.fn(async () => ({ title: 'The First Week', text: 'A week of walls and words.', citations: [] })),
+    summarizeChapter: vi.fn(async () => ({
+      title: 'The Wall Quarrel',
+      text: 'Omar and Yusuf quarrelled over a wall.',
+      citations,
+    })),
+    summarizeEra: vi.fn(async () => ({
+      title: 'The First Week',
+      text: 'A week of walls and words.',
+      citations: [],
+    })),
     newspaperCopy: vi.fn(),
     biography: vi.fn(),
   }) as unknown as NarratorLlm
@@ -47,8 +67,12 @@ describe('narrateDay', () => {
     const store = memStore()
     const alert = vi.fn()
     const { chapter, heat, milestones } = await narrateDay({
-      store, llm: scriptedLlm(), events: DAY1, rulebookCount: 0,
-      privateCounts: { thoughts: 2, journals: 1 }, alert,
+      store,
+      llm: scriptedLlm(),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 2, journals: 1 },
+      alert,
     })
     const seqs = new Set(DAY1.map((e) => e.seq))
     expect(chapter.citations.length).toBeGreaterThan(0)
@@ -68,8 +92,20 @@ describe('narrateDay', () => {
 
   it('is idempotent: a second call for the same day adds no second chapter row', async () => {
     const store = memStore()
-    await narrateDay({ store, llm: scriptedLlm(), events: DAY1, rulebookCount: 0, privateCounts: { thoughts: 0, journals: 0 } })
-    const again = await narrateDay({ store, llm: scriptedLlm(), events: DAY1, rulebookCount: 0, privateCounts: { thoughts: 0, journals: 0 } })
+    await narrateDay({
+      store,
+      llm: scriptedLlm(),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    const again = await narrateDay({
+      store,
+      llm: scriptedLlm(),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
     expect(store.chaptersForDay(1).length).toBe(1)
     expect(store.scenesForDay(1).length).toBe(3)
     expect(again.chapter.day).toBe(1)
@@ -78,7 +114,9 @@ describe('narrateDay', () => {
   it('maps institution founding scenes through store ids, skips unmappable (-1), on week boundaries', async () => {
     const store = memStore()
     // Offset seed: a pre-existing scene row so store ids != index + 1 (R2c).
-    store.insertScenes([{ day: 999, startTick: 0, endTick: 1, eventIds: [900], cast: [], location: null }])
+    store.insertScenes([
+      { day: 999, startTick: 0, endTick: 1, eventIds: [900], cast: [], location: null },
+    ])
     const alert = vi.fn()
     // Day 7 (week boundary): omar's first tend sits alone -> dropped scene -> -1;
     // yusuf's fishing founds inside a surviving scene.
@@ -92,8 +130,12 @@ describe('narrateDay', () => {
       ev(7, 10162, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
     ]
     const { chapter } = await narrateDay({
-      store, llm: scriptedLlm([2]), events: DAY7, rulebookCount: 0,
-      privateCounts: { thoughts: 0, journals: 0 }, alert,
+      store,
+      llm: scriptedLlm([2]),
+      events: DAY7,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      alert,
     })
     expect(chapter.sceneIds).toEqual([2, 3]) // offset by the seeded row
     const institutions = store.institutions()
@@ -105,7 +147,13 @@ describe('narrateDay', () => {
 
   it('skips institution detection off week boundaries', async () => {
     const store = memStore()
-    await narrateDay({ store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0, privateCounts: { thoughts: 0, journals: 0 } })
+    await narrateDay({
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
     expect(store.institutions().length).toBe(0) // day 1 is not a week boundary
   })
 })
@@ -114,7 +162,9 @@ describe('narrateDay', () => {
 describe('narrateDay: a chronicle that will not render does not take the semantic pass with it', () => {
   const throwingLlm = (): NarratorLlm =>
     ({
-      summarizeChapter: vi.fn(async () => { throw new Error('response did not match schema') }),
+      summarizeChapter: vi.fn(async () => {
+        throw new Error('response did not match schema')
+      }),
       summarizeEra: vi.fn(),
       newspaperCopy: vi.fn(),
       biography: vi.fn(),
@@ -129,21 +179,39 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
       value: { hits: [] },
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 } satisfies LlmUsage,
     }))
-    const llm = { object: objectCalls, text: vi.fn(), totalCostUsd: () => 0, alert: vi.fn() } as unknown as LlmClient
+    const llm = {
+      object: objectCalls,
+      text: vi.fn(),
+      totalCostUsd: () => 0,
+      alert: vi.fn(),
+    } as unknown as LlmClient
     return { db, store: new NarratorStore(db), llm, objectCalls }
   }
 
   const records = [
-    { sourceKind: 'speech' as const, agentId: 'omar', day: 1, tick: 1480, text: 'The wall is mine.', eventSeq: 4 },
+    {
+      sourceKind: 'speech' as const,
+      agentId: 'omar',
+      day: 1,
+      tick: 1480,
+      text: 'The wall is mine.',
+      eventSeq: 4,
+    },
   ]
 
   it('runs the pass and reports it, then rethrows the render failure as a ChapterRenderError', async () => {
     const { db, store, llm, objectCalls } = semanticRig()
     const caught = await narrateDay({
-      store, llm: throwingLlm(), events: DAY1, rulebookCount: 0,
+      store,
+      llm: throwingLlm(),
+      events: DAY1,
+      rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
       semantic: { db, llm, records },
-    }).then(() => null, (err: unknown) => err)
+    }).then(
+      () => null,
+      (err: unknown) => err,
+    )
 
     expect(objectCalls).toHaveBeenCalledTimes(1)
     expect(caught).toBeInstanceOf(ChapterRenderError)
@@ -154,7 +222,10 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
   it('says the pass ran on a night that rendered, so a caller can count the nights it did not', async () => {
     const { db, store, llm } = semanticRig()
     const out = await narrateDay({
-      store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0,
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
       semantic: { db, llm, records },
     })
@@ -164,7 +235,10 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
   it('says the pass did not run when no transcript was handed to it', async () => {
     const store = memStore()
     const out = await narrateDay({
-      store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0,
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
     })
     expect(out.semanticRan).toBe(false)
@@ -175,7 +249,11 @@ describe('timelineMarkers', () => {
   it('emits one marker per milestone plus one per hot scene', async () => {
     const store = memStore()
     const { heat, milestones } = await narrateDay({
-      store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0, privateCounts: { thoughts: 2, journals: 1 },
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 2, journals: 1 },
     })
     const scenes = store.scenesForDay(1)
     const markers = timelineMarkers({ milestones, scenes, heats: heat })
@@ -194,7 +272,12 @@ describe('timelineMarkers', () => {
 describe('renderDigest', () => {
   it('renders a while-you-were-away headline with one bullet per missed day', () => {
     const chapters: ChapterRow[] = [1, 2, 3].map((day) => ({
-      id: day, day, title: `Chapter of day ${day}`, text: 'x', citations: [day], sceneIds: [],
+      id: day,
+      day,
+      title: `Chapter of day ${day}`,
+      text: 'x',
+      citations: [day],
+      sceneIds: [],
     }))
     const digest = renderDigest(0, 3, chapters)
     expect(digest.headline).toMatch(/while you were away/i)
@@ -205,7 +288,12 @@ describe('renderDigest', () => {
 
   it('excludes chapters outside (lastSeenDay, currentDay]', () => {
     const chapters: ChapterRow[] = [1, 2, 3, 4].map((day) => ({
-      id: day, day, title: `Day ${day}`, text: 'x', citations: [], sceneIds: [],
+      id: day,
+      day,
+      title: `Day ${day}`,
+      text: 'x',
+      citations: [],
+      sceneIds: [],
     }))
     const digest = renderDigest(1, 3, chapters)
     const bullets = digest.body.split('\n').filter((l) => l.startsWith('- '))
@@ -220,7 +308,12 @@ describe('narrateWeek', () => {
       const c = { day, title: `Day ${day}`, text: 'x', citations: [day + 1], sceneIds: [] }
       return { id: store.insertChapter(c), ...c }
     })
-    const era = await narrateWeek({ store, llm: scriptedLlm(), days: chapters, validEventIds: [1, 2, 3, 4, 5, 6, 7] })
+    const era = await narrateWeek({
+      store,
+      llm: scriptedLlm(),
+      days: chapters,
+      validEventIds: [1, 2, 3, 4, 5, 6, 7],
+    })
     expect(era.chapterIds.length).toBe(7)
     expect(era.startDay).toBe(0)
     expect(era.endDay).toBe(6)
@@ -237,13 +330,21 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
 
   const worldWith = (kind: string) => ({
     config: SimConfigSchema.parse({}),
-    state: { agents: {}, structures: { structure_9: { id: 'structure_9', kind } }, pairNights: {} } as never,
+    state: {
+      agents: {},
+      structures: { structure_9: { id: 'structure_9', kind } },
+      pairNights: {},
+    } as never,
   })
 
   it('names the house from the world in reach, though the plan was three days ago', async () => {
     const { milestones } = await narrateDay({
-      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
-      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('house'),
+      store: memStore(),
+      llm: scriptedLlm([1]),
+      events: FINISH,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      world: worldWith('house'),
     })
     expect(milestones.map((m) => m.kind)).toContain('first_house')
     expect(milestones.map((m) => m.kind)).not.toContain('first_bridge')
@@ -251,15 +352,22 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
 
   it('and the crossing likewise', async () => {
     const { milestones } = await narrateDay({
-      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
-      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('bridge'),
+      store: memStore(),
+      llm: scriptedLlm([1]),
+      events: FINISH,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      world: worldWith('bridge'),
     })
     expect(milestones.map((m) => m.kind)).toContain('first_bridge')
   })
 
   it('with no world in reach the day still narrates, and claims no kind it cannot know', async () => {
     const { milestones } = await narrateDay({
-      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
+      store: memStore(),
+      llm: scriptedLlm([1]),
+      events: FINISH,
+      rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
     })
     expect(milestones.map((m) => m.kind)).toContain('first_structure')

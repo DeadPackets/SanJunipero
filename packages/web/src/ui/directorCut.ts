@@ -5,7 +5,11 @@ export const RECENT_TICKS = 120
 export const STICKY_FACTOR = 1.25
 
 // hottest window overlapping [nowTick−120, nowTick]; sticky toward the current agent
-export function pickCut(heat: HeatWindow[], currentAgent: string | null, nowTick: number): string | null {
+export function pickCut(
+  heat: HeatWindow[],
+  currentAgent: string | null,
+  nowTick: number,
+): string | null {
   const recent = heat.filter((w) => w.toTick >= nowTick - RECENT_TICKS && w.fromTick <= nowTick)
   if (recent.length === 0) return null
 
@@ -45,7 +49,10 @@ export function quietSubject(people: readonly string[], nowTick: number): string
 
 /** Who the camera is on: the hottest agent, or — when the town is quiet — one of its people. */
 export function subjectFor(
-  heat: HeatWindow[], currentAgent: string | null, nowTick: number, people: readonly string[],
+  heat: HeatWindow[],
+  currentAgent: string | null,
+  nowTick: number,
+  people: readonly string[],
 ): string | null {
   return pickCut(heat, currentAgent, nowTick) ?? quietSubject(people, nowTick)
 }

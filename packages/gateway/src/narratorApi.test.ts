@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import {
-  CHRONICLE_ICONS, DEFAULT_CONFIG, MINUTES_PER_DAY, MomentsResponseSchema, type ChronicleEntry,
+  CHRONICLE_ICONS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  MomentsResponseSchema,
+  type ChronicleEntry,
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { CHRONICLE_MAX, NARRATOR_READ_TABLES } from './narratorApi.js'
@@ -29,7 +33,9 @@ function openNarratorFixtureDb(path: string): Database.Database {
   return db
 }
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
+  Array.from({ length: 24 }, () => 0 as TileId),
+)
 
 function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Database {
   const db = openDb(dbPath)
@@ -47,7 +53,15 @@ function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Databas
       if (tick === 5) emit('agent_spoke', { agentId: 'alice', text: 'Morning.', x: 0, y: 0 })
       if (tick === 10) {
         emit('structure_planned', {
-          id: 's1', kind: 'house', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'bob',
+          id: 's1',
+          kind: 'house',
+          x: 2,
+          y: 2,
+          w: 1,
+          h: 1,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'bob',
         })
       }
       if (tick === 20) emit('structure_completed', { id: 's1' })
@@ -58,14 +72,22 @@ function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Databas
       if (!withDiscoveries) return
       if (tick === 40) {
         emit('discovery_made', {
-          recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
-          byId: 'alice', intent: 'i want to carry water in a stitched hide', makes: ['waterskin'],
+          recipeId: 'recipe:waterskin',
+          name: 'stitch a waterskin',
+          kind: 'craft',
+          byId: 'alice',
+          intent: 'i want to carry water in a stitched hide',
+          makes: ['waterskin'],
         })
       }
       if (tick === 90) {
         emit('discovery_made', {
-          recipeId: 'express:dance', name: 'dance', kind: 'word',
-          byId: 'bob', intent: 'i want to dance by the fire', makes: [],
+          recipeId: 'express:dance',
+          name: 'dance',
+          kind: 'word',
+          byId: 'bob',
+          intent: 'i want to dance by the fire',
+          makes: [],
         })
       }
     },
@@ -85,21 +107,35 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
     const narratorPath = join(dir, 'narrator.db')
     const ndb = openNarratorFixtureDb(narratorPath)
-    ndb.prepare('INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)')
+    ndb
+      .prepare(
+        'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
+      )
       .run(0, 'The First Morning', 'They woke.', '[]', '[]')
-    ndb.prepare('INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)')
+    ndb
+      .prepare(
+        'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
+      )
       .run(1, 'What the Fire Took', 'It burned.', '[]', '[]')
-    ndb.prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
+    ndb
+      .prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
       .run('first_death', 'The first death', 9000, 0, 50)
     const scene = ndb.prepare(
       'INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)',
     )
     scene.run(0, 10, 60, '[1,2]', '["alice","bob"]', 'the plaza')
     scene.run(1, 1440, 1500, '[3]', '["cara"]', null)
-    scene.run(2, 2880, 2900, '[]', '[]', 'the riverbank')   // a day with no chapter written
+    scene.run(2, 2880, 2900, '[]', '[]', 'the riverbank') // a day with no chapter written
     ndb.close()
 
-    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, narratorDbPath: narratorPath })
+    gw = await createGateway({
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      narratorDbPath: narratorPath,
+    })
     base = `http://127.0.0.1:${gw.port}`
   })
   afterAll(async () => {
@@ -131,7 +167,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
   it('answers the ledger length without sending the ledger', async () => {
     const res = await fetch(`${base}/api/chronicle/count`)
     expect(res.status).toBe(200)
-    const body = await res.json() as { count: number; latestSeq: number; latestTick: number }
+    const body = (await res.json()) as { count: number; latestSeq: number; latestTick: number }
     const entries = await chronicle()
     expect(body.count).toBe(entries.length)
     expect(body.latestSeq).toBe(entries[entries.length - 1]!.seq)
@@ -179,14 +215,23 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('never lets the everyday through — no speech, no plans, no moves', async () => {
     const types = new Set((await chronicle()).map((e) => e.type))
-    for (const noise of ['agent_spoke', 'structure_planned', 'agent_moved', 'tick_advanced', 'agent_spawned']) {
+    for (const noise of [
+      'agent_spoke',
+      'structure_planned',
+      'agent_moved',
+      'tick_advanced',
+      'agent_spawned',
+    ]) {
       expect(types.has(noise), noise).toBe(false)
     }
   })
 
   it('narrows to a tick window when asked', async () => {
-    expect((await chronicle('?fromTick=30&toTick=45')).map((e) => e.type))
-      .toEqual(['co_slept', 'fire_ignited', 'discovery_made'])
+    expect((await chronicle('?fromTick=30&toTick=45')).map((e) => e.type)).toEqual([
+      'co_slept',
+      'fire_ignited',
+      'discovery_made',
+    ])
     expect(await chronicle('?fromTick=1000&toTick=2000')).toEqual([])
   })
 
@@ -207,12 +252,33 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
     expect(body.moments).toEqual([
       {
-        id: 1, day: 0, startTick: 10, endTick: 60,
-        title: 'The First Morning', cast: ['alice', 'bob'], location: 'the plaza',
+        id: 1,
+        day: 0,
+        startTick: 10,
+        endTick: 60,
+        title: 'The First Morning',
+        cast: ['alice', 'bob'],
+        location: 'the plaza',
       },
-      { id: 2, day: 1, startTick: 1440, endTick: 1500, title: 'What the Fire Took', cast: ['cara'], location: null },
+      {
+        id: 2,
+        day: 1,
+        startTick: 1440,
+        endTick: 1500,
+        title: 'What the Fire Took',
+        cast: ['cara'],
+        location: null,
+      },
       // no chapter for day 2 — the day still exists, it just has no name yet
-      { id: 3, day: 2, startTick: 2880, endTick: 2900, title: 'Day 2', cast: [], location: 'the riverbank' },
+      {
+        id: 3,
+        day: 2,
+        startTick: 2880,
+        endTick: 2900,
+        title: 'Day 2',
+        cast: [],
+        location: 'the riverbank',
+      },
     ])
   })
 
@@ -221,7 +287,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
   it('hands the timeline every source a mark can come from', async () => {
     const res = await fetch(`${base}/api/timeline/marks`)
     expect(res.status).toBe(200)
-    const body = await res.json() as {
+    const body = (await res.json()) as {
       throughTick: number
       chapters: Array<{ day: number; title: string }>
       milestones: Array<{ label: string; day: number; tick: number }>
@@ -230,22 +296,41 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       events: Array<{ tick: number; type: string }>
     }
     expect(body.throughTick).toBeGreaterThanOrEqual(60)
-    expect(body.chapters).toEqual([{ day: 0, title: 'The First Morning' }, { day: 1, title: 'What the Fire Took' }])
+    expect(body.chapters).toEqual([
+      { day: 0, title: 'The First Morning' },
+      { day: 1, title: 'What the Fire Took' },
+    ])
     expect(body.milestones).toEqual([{ label: 'The first death', day: 0, tick: 50 }])
-    expect(body.moments).toEqual([{ day: 0, startTick: 10 }, { day: 1, startTick: 1440 }, { day: 2, startTick: 2880 }])
-    expect(body.changes).toEqual([])   // no agent memory dir on this world
+    expect(body.moments).toEqual([
+      { day: 0, startTick: 10 },
+      { day: 1, startTick: 1440 },
+      { day: 2, startTick: 2880 },
+    ])
+    expect(body.changes).toEqual([]) // no agent memory dir on this world
   })
 
   it('sends only the events the town would remember, and nothing else', async () => {
-    const body = await (await fetch(`${base}/api/timeline/marks`)).json() as
-      { events: Array<{ tick: number; type: string }> }
+    const body = (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
+      events: Array<{ tick: number; type: string }>
+    }
     expect(body.events).toEqual([
-      { tick: 1, type: 'agent_spawned' }, { tick: 1, type: 'agent_spawned' },
-      { tick: 1, type: 'agent_spawned' }, { tick: 20, type: 'structure_completed' },
+      { tick: 1, type: 'agent_spawned' },
+      { tick: 1, type: 'agent_spawned' },
+      { tick: 1, type: 'agent_spawned' },
+      { tick: 20, type: 'structure_completed' },
       { tick: 50, type: 'agent_died' },
     ])
-    for (const noise of ['agent_spoke', 'agent_moved', 'structure_planned', 'co_slept', 'fire_ignited']) {
-      expect(body.events.some((e) => e.type === noise), noise).toBe(false)
+    for (const noise of [
+      'agent_spoke',
+      'agent_moved',
+      'structure_planned',
+      'co_slept',
+      'fire_ignited',
+    ]) {
+      expect(
+        body.events.some((e) => e.type === noise),
+        noise,
+      ).toBe(false)
     }
   })
 })
@@ -260,7 +345,12 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     const db = scriptedWorld(dbPath, false)
     // narratorDbPath points at a file that was never written — the ordinary early-town case
     gw = await createGateway({
-      dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, narratorDbPath: join(dir, 'absent.db'),
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      narratorDbPath: join(dir, 'absent.db'),
     })
     base = `http://127.0.0.1:${gw.port}`
   })
@@ -283,7 +373,7 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
   it('answers the marks endpoint with 200 and typed empties, never a 500', async () => {
     const res = await fetch(`${base}/api/timeline/marks`)
     expect(res.status).toBe(200)
-    const body = await res.json() as Record<string, unknown>
+    const body = (await res.json()) as Record<string, unknown>
     expect(body['chapters']).toEqual([])
     expect(body['milestones']).toEqual([])
     expect(body['moments']).toEqual([])
@@ -296,7 +386,11 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     const res = await fetch(`${base}/api/chronicle`)
     const entries = ((await res.json()) as { entries: ChronicleEntry[] }).entries
     expect(entries.map((e) => e.type)).toEqual([
-      'structure_completed', 'co_slept', 'fire_ignited', 'agent_died', 'mystery_event',
+      'structure_completed',
+      'co_slept',
+      'fire_ignited',
+      'agent_died',
+      'mystery_event',
     ])
   })
 })
@@ -304,7 +398,8 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
 describe('the one-way glass the gateway reads through', () => {
   it('selects only columns the narrator schema actually declares', () => {
     const schema = readFileSync(
-      fileURLToPath(new URL('../../narrator/src/schema.ts', import.meta.url)), 'utf8',
+      fileURLToPath(new URL('../../narrator/src/schema.ts', import.meta.url)),
+      'utf8',
     )
     for (const [table, columns] of Object.entries(NARRATOR_READ_TABLES)) {
       expect(schema, table).toContain(`CREATE TABLE IF NOT EXISTS ${table}`)
@@ -322,25 +417,33 @@ describe('the scrub bar can aim at a discovery', () => {
   beforeAll(async () => {
     const dbPath = join(dir, 'world.db')
     gw = await createGateway({
-      dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db: scriptedWorld(dbPath),
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db: scriptedWorld(dbPath),
     })
     base = `http://127.0.0.1:${gw.port}`
     const barePath = join(bareDir, 'world.db')
     bareGw = await createGateway({
-      dbPath: barePath, port: 0, terrain: GRASS, pollMs: 3_600_000,
+      dbPath: barePath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
       db: scriptedWorld(barePath, false),
     })
     bareBase = `http://127.0.0.1:${bareGw.port}`
   })
   afterAll(async () => {
-    await gw.close(); await bareGw.close()
+    await gw.close()
+    await bareGw.close()
     rmSync(dir, { recursive: true, force: true })
     rmSync(bareDir, { recursive: true, force: true })
   })
 
   it('ships discoveries as their own source, with words already in them', async () => {
     const res = await fetch(`${base}/api/timeline/marks`)
-    const body = await res.json() as { discoveries?: Array<{ tick: number; words: string }> }
+    const body = (await res.json()) as { discoveries?: Array<{ tick: number; words: string }> }
     expect(body.discoveries).toBeDefined()
     expect(body.discoveries).toEqual([
       { tick: 40, words: 'Alice worked out stitch a waterskin' },
@@ -349,15 +452,17 @@ describe('the scrub bar can aim at a discovery', () => {
   })
 
   it('keeps the five event marks it already had, unchanged', async () => {
-    const body = await (await fetch(`${base}/api/timeline/marks`)).json() as
-      { events: Array<{ type: string }> }
+    const body = (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
+      events: Array<{ type: string }>
+    }
     expect(body.events.length).toBeGreaterThan(0)
     expect(new Set(body.events.map((e) => e.type))).not.toContain('discovery_made')
   })
 
   it('is a typed empty on a world that invented nothing, never absent', async () => {
-    const body = await (await fetch(`${bareBase}/api/timeline/marks`)).json() as
-      { discoveries: unknown }
+    const body = (await (await fetch(`${bareBase}/api/timeline/marks`)).json()) as {
+      discoveries: unknown
+    }
     expect(body.discoveries).toEqual([])
   })
 })
@@ -370,8 +475,11 @@ describe('the days a personality moved', () => {
   let loop: TickLoop
 
   const changes = async (): Promise<Array<{ tick: number }>> =>
-    (await (await fetch(`${base}/api/timeline/marks`)).json() as
-      { changes: Array<{ tick: number }> }).changes
+    (
+      (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
+        changes: Array<{ tick: number }>
+      }
+    ).changes
 
   beforeAll(async () => {
     mkdirSync(agentDbDir)
@@ -379,17 +487,23 @@ describe('the days a personality moved', () => {
     adb.exec(`CREATE TABLE personality_versions (
       agent_id TEXT NOT NULL, version INTEGER NOT NULL, day INTEGER NOT NULL,
       doc TEXT NOT NULL, edit TEXT, PRIMARY KEY (agent_id, version));`)
-    adb.prepare('INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)')
+    adb
+      .prepare(
+        'INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)',
+      )
       .run('alice', 2, 3, 'wary of fire', 'grew wary of fire')
     adb.close()
 
     const dbPath = join(dir, 'world.db')
     const db = openDb(dbPath)
     loop = new TickLoop({
-      store: new EventStore(db), state: genesisState(DEFAULT_CONFIG, GRASS),
-      rng: new RngStreams('marks-memo'), snapshotEveryTicks: 500,
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('marks-memo'),
+      snapshotEveryTicks: 500,
       onTick: ({ tick, emit }) => {
-        if (tick === 1) emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+        if (tick === 1)
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
         else emit('agent_moved', { id: 'alice', x: tick % 8, y: 0 })
       },
     })
@@ -456,14 +570,18 @@ describe('a town with more history than a viewer can read', () => {
   /** Every open panel refetches this every 20 s; unbounded it is the whole town history per
    *  viewer per poll, and an unbounded list of rows at the other end. */
   it('★ sends the newest page, while the badge still counts the whole record', async () => {
-    const entries = ((await (await fetch(`${base}/api/chronicle`)).json()) as
-      { entries: ChronicleEntry[] }).entries
+    const entries = (
+      (await (await fetch(`${base}/api/chronicle`)).json()) as { entries: ChronicleEntry[] }
+    ).entries
     expect(entries.length).toBe(CHRONICLE_MAX)
 
-    const count = await (await fetch(`${base}/api/chronicle/count`)).json() as
-      { count: number; latestSeq: number }
-    expect(count.count, 'the badge counts what the panel does not send')
-      .toBeGreaterThan(CHRONICLE_MAX)
+    const count = (await (await fetch(`${base}/api/chronicle/count`)).json()) as {
+      count: number
+      latestSeq: number
+    }
+    expect(count.count, 'the badge counts what the panel does not send').toBeGreaterThan(
+      CHRONICLE_MAX,
+    )
     // the page kept is the newest one, not the first N of a town nobody is watching any more
     expect(entries[entries.length - 1]!.seq).toBe(count.latestSeq)
   })

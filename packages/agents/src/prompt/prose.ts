@@ -1,5 +1,10 @@
 import {
-  dayPhaseFromTick, DAYS_PER_SEASON, inputName, MINUTES_PER_DAY, sanitizeSpokenText, type SimTime,
+  dayPhaseFromTick,
+  DAYS_PER_SEASON,
+  inputName,
+  MINUTES_PER_DAY,
+  sanitizeSpokenText,
+  type SimTime,
 } from '@sj/shared'
 import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
 
@@ -17,7 +22,10 @@ export type PerceptionItem = {
   // Present only on the last day a thing can still be eaten. The engine has composed it since
   // spoilage landed; `reconcile` dropped it, so no mind was ever told its fish was going over.
   spoiling?: true
-  loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
+  loc:
+    | { t: 'tile'; x: number; y: number }
+    | { t: 'agent'; id: string }
+    | { t: 'structure'; id: string }
 }
 
 // Things this agent watched happen: a taking that was not theirs, or one of the
@@ -137,10 +145,12 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   storm_started: 'A storm breaks overhead; wind and rain lash down.',
   snow_started: 'Snow begins to fall.',
   you_were_attacked: 'Pain. Someone has struck you!',
-  you_collapsed: 'Your legs give under you and the ground comes up; you cannot get back on your feet.',
+  you_collapsed:
+    'Your legs give under you and the ground comes up; you cannot get back on your feet.',
   you_died: 'Everything goes far away and very quiet, and then there is nothing left to feel.',
   you_fell_ill: 'A sickness settles into you; your skin burns, your limbs turn heavy.',
-  you_were_infected: 'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
+  you_were_infected:
+    'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
   you_recovered: 'The sickness lifts. Your head clears and your strength begins to come back.',
   you_were_tended: 'Someone has cared for your hurts; the pain eases under their hands.',
   fire_ignited: 'Smoke stings your nose. Something nearby is burning.',
@@ -148,7 +158,9 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   fire_extinguished: 'The smoke thins and the air clears.',
   // The engine's table is the single copy of this prose; a mystery must read as
   // itself and never as the generic "something changed nearby" fallback.
-  ...Object.fromEntries(MYSTERIES.filter((m) => m.scope === 'global').map((m) => [m.kind, m.prose])),
+  ...Object.fromEntries(
+    MYSTERIES.filter((m) => m.scope === 'global').map((m) => [m.kind, m.prose]),
+  ),
 }
 
 const UNKNOWN_FELT_PROSE = 'You sense something change nearby.'
@@ -199,7 +211,9 @@ function temperatureLine(temperatureC: number): string {
 // night is a clear night, never a sunlit day.
 function weatherLine(weather: { kind: string; temperatureC: number }, isNight: boolean): string {
   const table = isNight ? NIGHT_WEATHER_KIND_PROSE : WEATHER_KIND_PROSE
-  const kind = table[weather.kind] ?? (isNight ? `The night sky is ${weather.kind}.` : `The sky is ${weather.kind}.`)
+  const kind =
+    table[weather.kind] ??
+    (isNight ? `The night sky is ${weather.kind}.` : `The sky is ${weather.kind}.`)
   return `${kind} ${temperatureLine(weather.temperatureC)}`
 }
 
@@ -271,11 +285,14 @@ function claimPhrase(i: PerceptionItem): string {
 // What a thing costs, in the words a refusal already uses for it. `inputName` turns the two
 // canon classes into plain words; the singular is only ever needed by "vegetables".
 function costPhrase(inputs: Record<string, number>): string {
-  return Object.keys(inputs).sort().map((k) => {
-    const qty = inputs[k]!
-    const word = inputName(k)
-    return `${qty} ${qty === 1 ? word.replace(/s$/, '') : word}`
-  }).join(' and ')
+  return Object.keys(inputs)
+    .sort()
+    .map((k) => {
+      const qty = inputs[k]!
+      const word = inputName(k)
+      return `${qty} ${qty === 1 ? word.replace(/s$/, '') : word}`
+    })
+    .join(' and ')
 }
 
 function roadPhrase(r: MakeableRoad): string {
@@ -288,8 +305,14 @@ function roadPhrase(r: MakeableRoad): string {
 // How far up in words, not a tick count: "still being built" reads the same one hour short as
 // four days short.
 const HOW_FAR = [
-  'barely begun', 'a little way up', 'a quarter of the way up', 'a third of the way up',
-  'half up', 'well past half', 'three quarters up', 'nearly done',
+  'barely begun',
+  'a little way up',
+  'a quarter of the way up',
+  'a third of the way up',
+  'half up',
+  'well past half',
+  'three quarters up',
+  'nearly done',
 ]
 
 export function howFarUp(raised?: { done: number; needs: number }): string {
@@ -301,28 +324,40 @@ export function howFarUp(raised?: { done: number; needs: number }): string {
 
 // Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it.
 /** The other place work can go: where walls already stand, and how far up. */
-export function standingWallsLine(w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null): string {
+export function standingWallsLine(
+  w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null,
+): string {
   if (w === undefined || w === null) return ''
-  return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${w.kind.replace(/_/g, ' ')}, ${
-    howFarUp({ done: w.done, needs: w.needs }).replace(/^its walls are /, '')}.`
+  return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${w.kind.replace(/_/g, ' ')}, ${howFarUp(
+    { done: w.done, needs: w.needs },
+  ).replace(/^its walls are /, '')}.`
 }
 
-export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string {
+export function makeablesLine(
+  m: Makeables,
+  groundForBuilding?: { x: number; y: number } | null,
+): string {
   const parts: string[] = []
   if (m.builds.length > 0) {
-    parts.push(`What your hands know how to raise, given the stuff and a spot to put it: ${
-      m.builds.map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`).join(', ')
-    }.`)
+    parts.push(
+      `What your hands know how to raise, given the stuff and a spot to put it: ${m.builds
+        .map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`)
+        .join(', ')}.`,
+    )
     // "to begin a new one", never "to raise one": this ground is where a roof starts, and walls
     // that already stand are raised where they stand.
     if (groundForBuilding !== undefined && groundForBuilding !== null) {
-      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to begin a new one.`)
+      parts.push(
+        `The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to begin a new one.`,
+      )
     }
   }
   if (m.crafts.length > 0) {
-    parts.push(`What they know how to shape: ${
-      m.crafts.map((c) => `${c.name.replace(/_/g, ' ')} (${c.roads.map(roadPhrase).join(', or ')})`).join(', ')
-    }.`)
+    parts.push(
+      `What they know how to shape: ${m.crafts
+        .map((c) => `${c.name.replace(/_/g, ' ')} (${c.roads.map(roadPhrase).join(', or ')})`)
+        .join(', ')}.`,
+    )
   }
   return parts.join(' ')
 }
@@ -332,7 +367,9 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
 function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
   if (s.hearth === undefined) return ''
   if (isTheRoomYouAreIn) {
-    return s.hearth === 'lit' ? ' A fire is burning in the hearth here.' : ' The hearth here is cold.'
+    return s.hearth === 'lit'
+      ? ' A fire is burning in the hearth here.'
+      : ' The hearth here is cold.'
   }
   return s.hearth === 'lit' ? ' Firelight moves inside it.' : ''
 }
@@ -357,17 +394,24 @@ export function heardProse(packet: PerceptionPacket): string {
   return packet.heard.map((h) => heardLine(h.name, h.text)).join('\n')
 }
 
-export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void, world?: ProseWorld): string {
+export function perceptionToProse(
+  packet: PerceptionPacket,
+  alert?: (detail: string) => void,
+  world?: ProseWorld,
+): string {
   const lines: string[] = []
   const { x, y } = packet.self
 
   lines.push(calendarLine(packet.time))
   const inside = packet.self.inside
   const where = inside === undefined ? '' : ` inside the ${inside.kind} (${inside.id})`
-  lines.push(`You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'}${where} at (${x}, ${y}).`)
+  lines.push(
+    `You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'}${where} at (${x}, ${y}).`,
+  )
   // Said out loud because a body that cannot tell it is under a roof walks into the wall
   // twice a turn: fifty-nine of the live run's refusals were this one silence (R21).
-  if (inside !== undefined) lines.push('Four walls are around you; step out under the sky before you can go anywhere else.')
+  if (inside !== undefined)
+    lines.push('Four walls are around you; step out under the sky before you can go anywhere else.')
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
 
@@ -375,9 +419,11 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   // again: one founder said she was leaving for the berries in forty-four turns (R21).
   if (packet.self.activity !== null && !packet.self.asleep) {
     const toward = packet.self.activityToward
-    lines.push(toward === undefined
-      ? `Your hands are already busy; you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
-      : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`)
+    lines.push(
+      toward === undefined
+        ? `Your hands are already busy; you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
+        : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`,
+    )
   }
 
   const { hunger, energy, warmth, social } = packet.self.body.needs
@@ -393,22 +439,27 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (warmth < 30) lines.push('You shiver against the cold.')
   // Where the cold is, and what stands between: the pair is the whole of what there is to learn.
   if (packet.cold !== undefined) {
-    lines.push('biting' in packet.cold
-      ? 'The cold is getting into you out here.'
-      : COLD_KEPT_OFF[packet.cold.keptOffBy])
+    lines.push(
+      'biting' in packet.cold
+        ? 'The cold is getting into you out here.'
+        : COLD_KEPT_OFF[packet.cold.keptOffBy],
+    )
   }
   if (social < 30) lines.push('Loneliness settles over you.')
   if (packet.self.body.hp < 30) lines.push('Your body aches with its hurts.')
   if (packet.self.body.ill) lines.push('A fever grips you; you feel weak.')
   for (const a of packet.self.body.afflictions ?? []) {
     const prose = AFFLICTION_PROSE[a.kind]
-    if (prose !== undefined) lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
+    if (prose !== undefined)
+      lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
   }
 
   // Said whenever the body is dry, and never as a refusal.
   if (thirst < 30) {
     if (world?.waterAtHand?.() === true) {
-      lines.push('Water lies within reach of your hands. You could drink here, or fill what you carry.')
+      lines.push(
+        'Water lies within reach of your hands. You could drink here, or fill what you carry.',
+      )
     } else {
       const w = world?.nearestWater?.(x, y) ?? null
       if (w !== null) lines.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
@@ -418,9 +469,10 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   // The road thirst has had, given to the need that never had one. Hands first, then the
   // nearest thing worth walking to — and never as a refusal.
   if (hunger < 30) {
-    const food = world?.isEdible === undefined
-      ? undefined
-      : packet.self.inventory.find((i) => world.isEdible!(i.kind))
+    const food =
+      world?.isEdible === undefined
+        ? undefined
+        : packet.self.inventory.find((i) => world.isEdible!(i.kind))
     if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}). You could eat it now.`)
     else {
       const f = world?.nearestFood?.(x, y) ?? null
@@ -433,7 +485,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   // What the dark is doing where the body stands. Silent in plain daylight.
   if (packet.light === 'dark') lines.push('The night is close around you.')
   else if (packet.light === 'dim') lines.push('The last of the light is going out of the day.')
-  else if (packet.light === 'bright' && packet.time.isNight) lines.push('A fire throws a circle of light around you.')
+  else if (packet.light === 'bright' && packet.time.isNight)
+    lines.push('A fire throws a circle of light around you.')
 
   // The physics, said plainly. What it is worth building here is not the ground's to say.
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')
@@ -456,30 +509,41 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.visible.structures) {
-    const state = s.burning ? ', and it is burning'
-      : s.stage === 'construction' ? `, and ${howFarUp(s.raised)}` : ''
+    const state = s.burning
+      ? ', and it is burning'
+      : s.stage === 'construction'
+        ? `, and ${howFarUp(s.raised)}`
+        : ''
     // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
     // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'
     if (s.id === inside?.id) {
-      approach = s.door === undefined
-        ? 'this is the roof you are under.'
-        : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
+      approach =
+        s.door === undefined
+          ? 'this is the roof you are under.'
+          : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
     } else if (s.door !== undefined) {
       // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
       // room that is full now from a wall with no way through it ever — and can come back.
-      approach = s.full === true
-        ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
-        : `its doorway is at (${s.door.x}, ${s.door.y}); stand there and you can go in.`
+      approach =
+        s.full === true
+          ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
+          : `its doorway is at (${s.door.x}, ${s.door.y}); stand there and you can go in.`
     } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)
-      approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
+      approach =
+        t === null
+          ? 'no open ground lies beside it.'
+          : `you could stand beside it at (${t.x}, ${t.y}).`
     }
     // Said at the wall instead of at the refusal: how far up the walls are never said that
     // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
-    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
-      approach}${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`)
+    lines.push(
+      `A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
+        approach
+      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`,
+    )
   }
 
   for (const i of packet.visible.items) {
@@ -488,7 +552,9 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const c of packet.visible.crops) {
-    lines.push(`You can see ${c.kind} (${c.id}) at (${c.x}, ${c.y})${c.withered ? ', withered' : ''}.`)
+    lines.push(
+      `You can see ${c.kind} (${c.id}) at (${c.x}, ${c.y})${c.withered ? ', withered' : ''}.`,
+    )
   }
 
   // Named, so a mind can point at one: `hunt` wants a faunaId and `forage` a nodeId, and
@@ -506,9 +572,14 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.seen) {
-    if (s.kind === 'item_taken') lines.push(`You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.`)
+    if (s.kind === 'item_taken')
+      lines.push(`You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.`)
     else if (s.kind === 'expression') {
-      lines.push(s.sense === 'sound' ? `You hear ${s.actorName} ${s.verb}.` : `You watch ${s.actorName} ${s.verb}.`)
+      lines.push(
+        s.sense === 'sound'
+          ? `You hear ${s.actorName} ${s.verb}.`
+          : `You watch ${s.actorName} ${s.verb}.`,
+      )
     } else lines.push(s.prose)
   }
 

@@ -1,12 +1,25 @@
 import {
-  isBeddedKind, isHearthKind, isRoofedKind, lightBandAt, simTimeFromTick, visionRadiusAt,
-  type SimConfig, type SimEvent, type SimTime,
+  isBeddedKind,
+  isHearthKind,
+  isRoofedKind,
+  lightBandAt,
+  simTimeFromTick,
+  visionRadiusAt,
+  type SimConfig,
+  type SimEvent,
+  type SimTime,
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
-import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
+import {
+  thirstOf,
+  type AfflictionKind,
+  type Item,
+  type Structure,
+  type WorldState,
+} from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
 import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
@@ -19,17 +32,20 @@ export type SelfBody = {
   hp: number
   injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean
-  thirst: number   // always a number here: absence is a storage fact, not something a body feels
+  thirst: number // always a number here: absence is a storage fact, not something a body feels
   // A body knows what ails it and how badly. It does not know the tick it fell ill.
   afflictions: Array<{ kind: AfflictionKind; severity: number }>
 }
 
 export type PerceivedAgent = {
-  id: string; name: string; x: number; y: number
+  id: string
+  name: string
+  x: number
+  y: number
   activityVerb: string | null
   collapsed: boolean
   asleep: boolean
-  ageBand: AgeBand   // a face carries no birthday, but it does carry this much
+  ageBand: AgeBand // a face carries no birthday, but it does carry this much
   // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
   // town that has sewn nothing reads exactly as it always did, and never a number.
   worn?: string
@@ -64,11 +80,16 @@ const GAUNT_HUNGER = 5
 
 // One phrase, worst thing first: an affliction outranks a wound, and a wound outranks an
 // empty belly. Absent when there is nothing to see.
-export function conditionProse(state: WorldState, config: SimConfig, agentId: string): string | undefined {
+export function conditionProse(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+): string | undefined {
   const a = state.agents[agentId]
   if (a === undefined || !a.alive) return undefined
-  const worst = [...(a.afflictions ?? [])].sort((p, q) =>
-    q.severity - p.severity || (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0))[0]
+  const worst = [...(a.afflictions ?? [])].sort(
+    (p, q) => q.severity - p.severity || (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0),
+  )[0]
   if (worst !== undefined) return CONDITION_PROSE[worst.kind]
   if (a.ill) return CONDITION_PROSE.illness
   if (a.hp < config.health.maxHp * HURT_SHARE) return 'badly hurt'
@@ -79,8 +100,14 @@ export function conditionProse(state: WorldState, config: SimConfig, agentId: st
 // Both fields absent on a blank wall. `door` is the tile `enter` measures against — absent on a
 // kind with no way in, on a building still going up, and on one nothing passable rings.
 export type PerceivedStructure = {
-  id: string; kind: string; x: number; y: number; w: number; h: number
-  burning: boolean; stage: 'construction' | 'complete'
+  id: string
+  kind: string
+  x: number
+  y: number
+  w: number
+  h: number
+  burning: boolean
+  stage: 'construction' | 'complete'
   hasInscription?: true
   inscription?: { text: string; by: string }
   door?: { x: number; y: number }
@@ -105,11 +132,25 @@ export type OwnerNames = { ownerName?: string; crafterMarkName?: string }
 // Absent unless the thing is on its last day, so a packet full of fresh food reads as it always did.
 export type Turning = { spoiling?: true }
 
-export type PerceivedItem = { id: string; kind: string; qty: number; x: number; y: number } & OwnerNames & Turning
+export type PerceivedItem = {
+  id: string
+  kind: string
+  qty: number
+  x: number
+  y: number
+} & OwnerNames &
+  Turning
 
 export type InventoryItem = Item & OwnerNames & Turning
 
-export type PerceivedCrop = { id: string; kind: string; x: number; y: number; stage: number; withered: boolean }
+export type PerceivedCrop = {
+  id: string
+  kind: string
+  x: number
+  y: number
+  stage: number
+  withered: boolean
+}
 
 // A shape at a distance: what kind of animal and where. Never how many are in the school.
 export type PerceivedFauna = { id: string; kind: string; x: number; y: number }
@@ -174,7 +215,12 @@ export type PerceptionPacket = {
 // changed — and this only says so out loud.
 const TRAVELLED_TILES: ReadonlySet<number> = new Set([7, 8])
 
-function groundUnderfoot(state: WorldState, config: SimConfig, x: number, y: number): PerceivedGround | undefined {
+function groundUnderfoot(
+  state: WorldState,
+  config: SimConfig,
+  x: number,
+  y: number,
+): PerceivedGround | undefined {
   if (!config.roads.enabled) return undefined
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -185,16 +231,20 @@ function groundUnderfoot(state: WorldState, config: SimConfig, x: number, y: num
   return undefined
 }
 
-const dist = (x1: number, y1: number, x2: number, y2: number): number => Math.hypot(x2 - x1, y2 - y1)
+const dist = (x1: number, y1: number, x2: number, y2: number): number =>
+  Math.hypot(x2 - x1, y2 - y1)
 
-const byId = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+const byId = (a: { id: string }, b: { id: string }): number =>
+  a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 
 // Precipitation kinds are "felt" as a start tag; sun and cloud pass silently.
 const PRECIPITATION: Record<string, true> = { rain: true, storm: true, snow: true }
 
-const isTileItem = (i: Item): i is Item & { loc: { t: 'tile'; x: number; y: number } } => i.loc.t === 'tile'
+const isTileItem = (i: Item): i is Item & { loc: { t: 'tile'; x: number; y: number } } =>
+  i.loc.t === 'tile'
 
-const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: string } } => i.loc.t === 'structure'
+const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: string } } =>
+  i.loc.t === 'structure'
 
 // Events that happen *to* one agent, and the tag each becomes.
 const SELF_EVENT_TAG: Record<string, string> = {
@@ -241,14 +291,20 @@ const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
 
 // A wall stops sound: speech carries iff both share an interior, both are outdoors within
 // earshot, or the one outdoors is standing in the other's doorway.
-export function hears(state: WorldState, baseConfig: SimConfig, speakerEv: SimEvent, hearerId: string): boolean {
+export function hears(
+  state: WorldState,
+  baseConfig: SimConfig,
+  speakerEv: SimEvent,
+  hearerId: string,
+): boolean {
   const config = effectiveConfig(baseConfig, state.laws)
   const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
 
   // Occlusion off drops the wall, not the distance: plain earshot, as it was before.
-  if (!config.occlusion.enabled) return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
+  if (!config.occlusion.enabled)
+    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
 
   const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
   const hearerInside = hearer.insideId ?? null
@@ -286,25 +342,34 @@ export function composePerception(
 
   // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
   const nameOf = (id: string): string => state.agents[id]?.name ?? id
-  const ownerNames = (i: Item): OwnerNames => config.ownership.enabled
-    ? {
-        ...(i.owner === undefined ? {} : { ownerName: nameOf(i.owner) }),
-        ...(i.crafterMark === undefined ? {} : { crafterMarkName: nameOf(i.crafterMark) }),
-      }
-    : {}
+  const ownerNames = (i: Item): OwnerNames =>
+    config.ownership.enabled
+      ? {
+          ...(i.owner === undefined ? {} : { ownerName: nameOf(i.owner) }),
+          ...(i.crafterMark === undefined ? {} : { crafterMarkName: nameOf(i.crafterMark) }),
+        }
+      : {}
 
   const turning = (i: Item): Turning => (isSpoiling(state, i, config) ? { spoiling: true } : {})
 
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
     // Four walls outrank the light, and inside them the darkness still costs distance.
-    .filter(a => a.id !== agentId && a.alive && withinSight(a.x, a.y)
-      && (indoors === null ? a.insideId === undefined : a.insideId === indoors))
+    .filter(
+      (a) =>
+        a.id !== agentId &&
+        a.alive &&
+        withinSight(a.x, a.y) &&
+        (indoors === null ? a.insideId === undefined : a.insideId === indoors),
+    )
     .sort(byId)
-    .map(a => {
+    .map((a) => {
       const worn = wornProse(state, a.id)
       const condition = conditionProse(state, config, a.id)
       return {
-        id: a.id, name: a.name, x: a.x, y: a.y,
+        id: a.id,
+        name: a.name,
+        x: a.x,
+        y: a.y,
         activityVerb: a.activity?.verb ?? null,
         collapsed: a.collapsedSinceTick !== null,
         asleep: a.asleep,
@@ -322,7 +387,14 @@ export function composePerception(
     return withinSight(nx, ny)
   }
 
-  const carved = (s: { id: string; x: number; y: number; w: number; h: number; inscription?: { text: string; by: string } }) => {
+  const carved = (s: {
+    id: string
+    x: number
+    y: number
+    w: number
+    h: number
+    inscription?: { text: string; by: string }
+  }) => {
     if (s.inscription === undefined) return {}
     const readable = indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors
     return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
@@ -334,7 +406,10 @@ export function composePerception(
     if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) return {}
     const door = doorTile(state, s)
     if (door === null) return {}
-    return { door: { x: door.x, y: door.y }, ...(roomIsFull(state, s) ? { full: true as const } : {}) }
+    return {
+      door: { x: door.x, y: door.y },
+      ...(roomIsFull(state, s) ? { full: true as const } : {}),
+    }
   }
 
   // Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
@@ -358,58 +433,101 @@ export function composePerception(
     s.stage === 'complete' && isBeddedKind(config, s.kind) ? { bed: true as const } : {}
 
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
-    .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
+    .filter((s) => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
-    .map(s => ({
-      id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s), ...wayIn(s), ...howFarUp(s), ...theHearth(s), ...theBed(s),
+    .map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      burning: s.burning,
+      stage: s.stage,
+      ...carved(s),
+      ...wayIn(s),
+      ...howFarUp(s),
+      ...theHearth(s),
+      ...theBed(s),
     }))
 
-  const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)
-    .filter(isTileItem)
-    .filter(i => withinSight(i.loc.x, i.loc.y))
-    .sort(byId)
-    .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y, ...ownerNames(i), ...turning(i) }))
+  const tileItems: PerceivedItem[] =
+    indoors !== null
+      ? []
+      : Object.values(state.items)
+          .filter(isTileItem)
+          .filter((i) => withinSight(i.loc.x, i.loc.y))
+          .sort(byId)
+          .map((i) => ({
+            id: i.id,
+            kind: i.kind,
+            qty: i.qty,
+            x: i.loc.x,
+            y: i.loc.y,
+            ...ownerNames(i),
+            ...turning(i),
+          }))
 
   const structureItems: PerceivedItem[] = Object.values(state.items)
     .filter(isStructureItem)
-    .filter(i => {
+    .filter((i) => {
       const s = state.structures[i.loc.id]
       if (s === undefined) return false
       // Indoors you handle only this room's shelves; outdoors the doorway peek still works.
       return indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors
     })
     .sort(byId)
-    .map(i => {
+    .map((i) => {
       const s = state.structures[i.loc.id]!
       return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...ownerNames(i), ...turning(i) }
     })
 
   const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
 
-  const visibleCrops: PerceivedCrop[] = indoors !== null ? [] : Object.values(state.crops)
-    .filter(c => withinSight(c.x, c.y))
-    .sort(byId)
-    .map(c => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
+  const visibleCrops: PerceivedCrop[] =
+    indoors !== null
+      ? []
+      : Object.values(state.crops)
+          .filter((c) => withinSight(c.x, c.y))
+          .sort(byId)
+          .map((c) => ({
+            id: c.id,
+            kind: c.kind,
+            x: c.x,
+            y: c.y,
+            stage: c.stage,
+            withered: c.withered,
+          }))
 
   // Four walls hide the herd as completely as they hide everything else outdoors.
-  const visibleFauna: PerceivedFauna[] = indoors !== null ? [] : Object.keys(state.fauna ?? {}).sort()
-    .map((id) => ({ id, ...state.fauna![id]! }))
-    .filter((f) => f.alive && withinSight(f.x, f.y))
-    .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
+  const visibleFauna: PerceivedFauna[] =
+    indoors !== null
+      ? []
+      : Object.keys(state.fauna ?? {})
+          .sort()
+          .map((id) => ({ id, ...state.fauna![id]! }))
+          .filter((f) => f.alive && withinSight(f.x, f.y))
+          .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
 
-  const visibleForageables: PerceivedForageable[] = indoors !== null ? [] : Object.keys(state.forageables ?? {}).sort()
-    .map((id) => ({ id, ...state.forageables![id]! }))
-    .filter((f) => withinSight(f.x, f.y))
-    .map((f) => ({
-      id: f.id, kind: f.kind, x: f.x, y: f.y,
-      prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
-    }))
+  const visibleForageables: PerceivedForageable[] =
+    indoors !== null
+      ? []
+      : Object.keys(state.forageables ?? {})
+          .sort()
+          .map((id) => ({ id, ...state.forageables![id]! }))
+          .filter((f) => withinSight(f.x, f.y))
+          .map((f) => ({
+            id: f.id,
+            kind: f.kind,
+            x: f.x,
+            y: f.y,
+            prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
+          }))
 
   const inventory: InventoryItem[] = Object.values(state.items)
-    .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
+    .filter((i) => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
-    .map(i => ({ ...i, ...ownerNames(i), ...turning(i) }))
+    .map((i) => ({ ...i, ...ownerNames(i), ...turning(i) }))
 
   const heard: HeardSpeech[] = []
   for (const ev of recentEvents) {
@@ -420,7 +538,12 @@ export function composePerception(
     if (!hears(state, config, ev, agentId)) continue
     const distance = dist(self.x, self.y, p.x, p.y)
     const speakerId = String(p.agentId)
-    heard.push({ speakerId, name: state.agents[speakerId]?.name ?? speakerId, text: p.text, distance })
+    heard.push({
+      speakerId,
+      name: state.agents[speakerId]?.name ?? speakerId,
+      text: p.text,
+      distance,
+    })
   }
 
   // A taking is witnessed by whoever could see the spot — the same horizon that
@@ -429,14 +552,30 @@ export function composePerception(
   if (config.ownership.enabled) {
     for (const ev of recentEvents) {
       if (ev.type !== 'item_taken') continue
-      const p = ev.payload as { takerId?: unknown; ownerId?: unknown; kind?: unknown; x?: unknown; y?: unknown }
-      if (typeof p.takerId !== 'string' || typeof p.ownerId !== 'string' || typeof p.kind !== 'string') continue
+      const p = ev.payload as {
+        takerId?: unknown
+        ownerId?: unknown
+        kind?: unknown
+        x?: unknown
+        y?: unknown
+      }
+      if (
+        typeof p.takerId !== 'string' ||
+        typeof p.ownerId !== 'string' ||
+        typeof p.kind !== 'string'
+      )
+        continue
       if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
       if (p.takerId === agentId) continue
       const takerInside = state.agents[p.takerId]?.insideId ?? null
       const sameSide = indoors === null ? takerInside === null : takerInside === indoors
       if (!sameSide || !withinSight(p.x, p.y)) continue
-      seen.push({ kind: 'item_taken', takerName: nameOf(p.takerId), ownerName: nameOf(p.ownerId), itemKind: p.kind })
+      seen.push({
+        kind: 'item_taken',
+        takerName: nameOf(p.takerId),
+        ownerName: nameOf(p.ownerId),
+        itemKind: p.kind,
+      })
     }
   }
 
@@ -444,15 +583,23 @@ export function composePerception(
   // carried by the voice, so it goes as far as speech goes and the dark does not touch it.
   for (const ev of recentEvents) {
     if (ev.type !== 'agent_expressed') continue
-    const p = ev.payload as { agentId?: unknown; verb?: unknown; x?: unknown; y?: unknown; sense?: unknown }
+    const p = ev.payload as {
+      agentId?: unknown
+      verb?: unknown
+      x?: unknown
+      y?: unknown
+      sense?: unknown
+    }
     if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
     if (p.agentId === agentId) continue
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
     const actorInside = state.agents[p.agentId]?.insideId ?? null
-    const reaches = sense === 'sound'
-      ? hears(state, config, ev, agentId)
-      : (indoors === null ? actorInside === null : actorInside === indoors) && withinSight(p.x, p.y)
+    const reaches =
+      sense === 'sound'
+        ? hears(state, config, ev, agentId)
+        : (indoors === null ? actorInside === null : actorInside === indoors) &&
+          withinSight(p.x, p.y)
     if (!reaches) continue
     seen.push({ kind: 'expression', actorName: nameOf(p.agentId), verb: p.verb, sense })
   }
@@ -470,18 +617,21 @@ export function composePerception(
   }
 
   const feltEvents = recentEvents
-    .map(ev => (ev.type === 'mystery_event' ? globalMysteryTag(self.asleep, ev) : feltTagFor(agentId, ev)))
+    .map((ev) =>
+      ev.type === 'mystery_event' ? globalMysteryTag(self.asleep, ev) : feltTagFor(agentId, ev),
+    )
     .filter((t): t is string => t !== null)
 
   const ground = groundUnderfoot(state, config, self.x, self.y)
-  const fumbling = self.activity !== null
-    && workPenalty(state, config, agentId, self.activity.verb) !== 1
+  const fumbling =
+    self.activity !== null && workPenalty(state, config, agentId, self.activity.verb) !== 1
 
   const roof = indoors === null ? undefined : state.structures[indoors]
   const walkTo = self.activity?.verb === 'walk' ? self.activity.params : undefined
-  const toward = typeof walkTo?.x === 'number' && typeof walkTo.y === 'number'
-    ? { x: walkTo.x, y: walkTo.y }
-    : undefined
+  const toward =
+    typeof walkTo?.x === 'number' && typeof walkTo.y === 'number'
+      ? { x: walkTo.x, y: walkTo.y }
+      : undefined
 
   return {
     time: simTimeFromTick(state.tick),
@@ -507,8 +657,12 @@ export function composePerception(
     ...(fumbling ? { fumbling: true as const } : {}),
     ...(walkIsCapped(state, agentId) ? { wayUnclear: true as const } : {}),
     visible: {
-      agents: visibleAgents, structures: visibleStructures, items: visibleItems,
-      crops: visibleCrops, fauna: visibleFauna, forageables: visibleForageables,
+      agents: visibleAgents,
+      structures: visibleStructures,
+      items: visibleItems,
+      crops: visibleCrops,
+      fauna: visibleFauna,
+      forageables: visibleForageables,
     },
     heard,
     seen,

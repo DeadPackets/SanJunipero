@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, FORBIDDEN_FRAMING, MINUTES_PER_DAY, simTimeFromTick, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  FORBIDDEN_FRAMING,
+  MINUTES_PER_DAY,
+  simTimeFromTick,
+  type SimEvent,
+} from '@sj/shared'
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, perceptionToProse } from './prose.js'
@@ -75,8 +81,18 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
 // a verb `hunt` can only ask for by an id no mind was ever given.
 describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
   const C11_VERBS = [
-    'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt',
-    'wear', 'doff', 'kindle', 'snuff', 'stoke', 'chop',
+    'drink',
+    'fill',
+    'dig_channel',
+    'douse',
+    'pave',
+    'hunt',
+    'wear',
+    'doff',
+    'kindle',
+    'snuff',
+    'stoke',
+    'chop',
   ]
 
   it.each(C11_VERBS)('names %s with the word the registry answers to', (verb) => {
@@ -103,25 +119,44 @@ describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
 // each half of what it claims is run through `submitIntent` on a real world.
 describe('★ block 1 tells the truth about sleep', () => {
   const CFG = DEFAULT_CONFIG
-  const ev = (seq: number, type: string, payload: unknown): SimEvent =>
-    ({ seq, tick: 0, type, payload })
+  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+    seq,
+    tick: 0,
+    type,
+    payload,
+  })
   const sleepLine = CAPABILITIES.split('\n').find((l) => l.startsWith('sleep: '))!
 
   /** One roofed building at (2,1), one body, and a way to put it inside or leave it out. */
   function body(opts: { indoors: boolean; energy?: number }): WorldState {
     const rows = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
     let s = genesisState(CFG, rows)
-    s = fold(s, ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'b',
-    }), CFG)
+    s = fold(
+      s,
+      ev(1, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 1,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'b',
+      }),
+      CFG,
+    )
     s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }), CFG)
     s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }), CFG)
     if (opts.indoors) {
       s = fold(s, ev(4, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     }
     if (opts.energy !== undefined) {
-      s = fold(s, ev(5, 'need_changed', { id: 'a1', need: 'energy', delta: opts.energy - 100 }), CFG)
+      s = fold(
+        s,
+        ev(5, 'need_changed', { id: 'a1', need: 'energy', delta: opts.energy - 100 }),
+        CFG,
+      )
     }
     return s
   }
@@ -162,7 +197,8 @@ describe('the shared calendar', () => {
 
   it('reaches every turn through the moment prose, ahead of everything else in it', () => {
     const prose = perceptionToProse({
-      ...quietMeadowPacket, time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
+      ...quietMeadowPacket,
+      time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
     })
     expect(prose.startsWith('It is day 12, dusk, early spring.')).toBe(true)
     const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
@@ -173,7 +209,9 @@ describe('the shared calendar', () => {
     for (const tick of [0, 11 * MINUTES_PER_DAY + 19 * 60, 350 * MINUTES_PER_DAY + 3 * 60]) {
       const line = at(tick)
       expect(line).not.toMatch(FORBIDDEN_FRAMING)
-      expect(line).not.toMatch(/\b(festival|faith|council|market|milestone|tier|construct|should|gather)\b/i)
+      expect(line).not.toMatch(
+        /\b(festival|faith|council|market|milestone|tier|construct|should|gather)\b/i,
+      )
     }
   })
 })
@@ -201,7 +239,9 @@ describe('word budgets', () => {
         },
       }),
     )
-    expect(a.system).toContain('You usually say about 10 words at a time; when truly moved, up to 40.')
+    expect(a.system).toContain(
+      'You usually say about 10 words at a time; when truly moved, up to 40.',
+    )
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 

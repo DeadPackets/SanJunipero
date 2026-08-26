@@ -11,7 +11,8 @@ const CHAR = process.env.EDIT_CHAR
 const SRC = process.env.EDIT_SRC
 const OUT = process.env.EDIT_OUT
 const NOTE = process.env.EDIT_NOTE
-if (!CHAR || !SRC || !OUT || !NOTE) throw new Error('EDIT_CHAR, EDIT_SRC, EDIT_OUT, EDIT_NOTE all required')
+if (!CHAR || !SRC || !OUT || !NOTE)
+  throw new Error('EDIT_CHAR, EDIT_SRC, EDIT_OUT, EDIT_NOTE all required')
 const CAP = Number(process.env.EDIT_CAP ?? '0.2')
 const budget = new BudgetGuard(CAP)
 
@@ -20,7 +21,10 @@ const RAWS = `${SCRATCH}/production/${CHAR}/raws`
 const srcPath = `${RAWS}/${SRC}.png`
 const outPath = `${RAWS}/${OUT}.png`
 if (!existsSync(srcPath)) throw new Error(`source raw missing: ${srcPath}`)
-if (existsSync(outPath)) { console.log(`${OUT}: already cached — nothing to do`); process.exit(0) }
+if (existsSync(outPath)) {
+  console.log(`${OUT}: already cached — nothing to do`)
+  process.exit(0)
+}
 
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
 const srcRaw = readFileSync(srcPath)
@@ -36,14 +40,20 @@ const res = await fetch('https://openrouter.ai/api/v1/images/generations', {
   method: 'POST',
   headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    model: 'google/gemini-3.1-flash-image', prompt, size: '1024x1024', response_format: 'b64_json',
-    input_references: [STYLE_ANCHOR, srcRaw].map(r => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${r.toString('base64')}` } })),
+    model: 'google/gemini-3.1-flash-image',
+    prompt,
+    size: '1024x1024',
+    response_format: 'b64_json',
+    input_references: [STYLE_ANCHOR, srcRaw].map((r) => ({
+      type: 'image_url',
+      image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+    })),
     usage: { include: true },
   }),
 })
 if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
 const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-const images = (json.data ?? []).filter(d => d.b64_json)
+const images = (json.data ?? []).filter((d) => d.b64_json)
 const b64 = images[images.length - 1]?.b64_json
 if (!b64) throw new Error('no b64_json in data[]')
 budget.spend(json.usage?.cost ?? 0.08)

@@ -11,7 +11,8 @@ import { ROAD_TILE_ID, resolveTerrainTile, roadNeighborsAt } from './tileset.js'
 /** The continuous inverse of `tileToScreen`. `screenToTile` rounds to a tile; this does not,
  *  because a quad's corner lands between tiles and the rounding is what hides an overhang. */
 export function screenToTileF(sx: number, sy: number): { fx: number; fy: number } {
-  const a = sx / (TILE_W / 2), b = sy / (TILE_H / 2)
+  const a = sx / (TILE_W / 2),
+    b = sy / (TILE_H / 2)
   return { fx: (a + b) / 2, fy: (b - a) / 2 }
 }
 
@@ -19,11 +20,18 @@ export type ScreenRect = { x0: number; y0: number; x1: number; y1: number }
 
 /** How far a screen rectangle reaches past the painted ground, in TILES; `<= 0` is inside. Every corner is tested: a diamond's edge is diagonal, so the first to leave is not the nearest. */
 export function groundOverhangTiles(
-  terrain: { length: number; [i: number]: { length: number } }, r: ScreenRect,
+  terrain: { length: number; [i: number]: { length: number } },
+  r: ScreenRect,
 ): number {
-  const h = terrain.length, w = h === 0 ? 0 : terrain[0]!.length
+  const h = terrain.length,
+    w = h === 0 ? 0 : terrain[0]!.length
   let worst = -Infinity
-  for (const [px, py] of [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]] as const) {
+  for (const [px, py] of [
+    [r.x0, r.y0],
+    [r.x1, r.y0],
+    [r.x0, r.y1],
+    [r.x1, r.y1],
+  ] as const) {
     const { fx, fy } = screenToTileF(px, py)
     worst = Math.max(worst, -fx, fx - w, -fy, fy - h)
   }
@@ -32,7 +40,8 @@ export function groundOverhangTiles(
 
 /** Nothing the renderer draws may leave the terrain extent. */
 export const rectOnGround = (
-  terrain: { length: number; [i: number]: { length: number } }, r: ScreenRect,
+  terrain: { length: number; [i: number]: { length: number } },
+  r: ScreenRect,
 ): boolean => groundOverhangTiles(terrain, r) <= 0
 
 // master-palette hexes — the placeholder terrain IS palette-true
@@ -82,7 +91,8 @@ export const GRASS_TILE_ID = 0
 export type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
 
 export type TilePlan = TileLayer & {
-  sx: number; sy: number
+  sx: number
+  sy: number
   shade: boolean
   /** the C13 strip is a ribbon on transparency — `tex` covers only part of the diamond */
   overlay: boolean
@@ -109,7 +119,12 @@ export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePl
         base = { tex: under.manifest, url: under.url, fallback: TILE_COLORS[GRASS_TILE_ID] }
       }
       cells.push({
-        sx, sy, tex: manifest, url, overlay, base,
+        sx,
+        sy,
+        tex: manifest,
+        url,
+        overlay,
+        base,
         fallback: TILE_COLORS[id] ?? GROUND_FALLBACK_COLOR,
         shade: (x + y) % 2 === 1,
       })

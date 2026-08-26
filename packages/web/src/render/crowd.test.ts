@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CROWD_DEPTH_PX, CROWD_PITCH_PX, CROWD_SETTLE_MS, CROWD_SPAN_PX,
-  crowdOffset, crowdOffsets, screenToWorldOffset,
+  CROWD_DEPTH_PX,
+  CROWD_PITCH_PX,
+  CROWD_SETTLE_MS,
+  CROWD_SPAN_PX,
+  crowdOffset,
+  crowdOffsets,
+  screenToWorldOffset,
 } from './crowd.js'
 import { tileToScreen } from './iso.js'
 import { BODY_SPRITE_W, bodyDepthBox, depthOrder, depthSeed, geometricEdge } from './depth.js'
@@ -79,7 +84,12 @@ describe('★ four people on one tile are four people', () => {
   })
 
   it('screenToWorldOffset inverts the projection exactly', () => {
-    for (const [sx, sy] of [[14, 4], [-31, -7], [0, 0], [72, -13]] as const) {
+    for (const [sx, sy] of [
+      [14, 4],
+      [-31, -7],
+      [0, 0],
+      [72, -13],
+    ] as const) {
       const o = screenToWorldOffset(sx, sy)
       const back = tileToScreen(o.dx, o.dy)
       expect(round(back.sx)).toBe(sx)
@@ -136,10 +146,12 @@ describe('who takes a slot', () => {
   })
 
   it('two bodies on tiles that merely touch are two crowds of one, i.e. none', () => {
-    expect(crowdOffsets([
-      { id: 'a', x: 40, y: 40, settled: true },
-      { id: 'b', x: 41, y: 40, settled: true },
-    ]).size).toBe(0)
+    expect(
+      crowdOffsets([
+        { id: 'a', x: 40, y: 40, settled: true },
+        { id: 'b', x: 41, y: 40, settled: true },
+      ]).size,
+    ).toBe(0)
   })
 })
 
@@ -159,7 +171,7 @@ describe('the rank keeps the frame honest', () => {
     const renamed = ['e', 'd', 'c', 'b', 'a']
 
     expect(slotOrder(names, false)).toEqual([0, 1, 2, 3, 4])
-    expect(slotOrder(renamed, false)).toEqual([4, 3, 2, 1, 0])   // the defect, stated
+    expect(slotOrder(renamed, false)).toEqual([4, 3, 2, 1, 0]) // the defect, stated
 
     expect(slotOrder(names, true)).toEqual(slotOrder(renamed, true))
   })
@@ -185,7 +197,7 @@ describe('the rank keeps the frame honest', () => {
       const bySeed = [...boxes].sort((p, q) => depthSeed(p) - depthSeed(q)).map((b) => b.id)
       if (n <= 5) expect(depthOrder(boxes)).toEqual(bySeed)
     }
-    expect(ruled).toBeGreaterThan(0)   // the larger ranks are not vacuous
+    expect(ruled).toBeGreaterThan(0) // the larger ranks are not vacuous
   })
 
   it('the settle glide is the product’s `move`, and inside the band', () => {

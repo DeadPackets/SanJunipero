@@ -20,7 +20,12 @@ export function fromSaplingKey(key: string): { x: number; y: number } {
   return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
 }
 
-const ORTHOGONAL: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+const ORTHOGONAL: ReadonlyArray<readonly [number, number]> = [
+  [0, -1],
+  [-1, 0],
+  [1, 0],
+  [0, 1],
+]
 
 // Seed fall is a thing that happens between touching tiles, not across a corner.
 export function beside(state: WorldState, x: number, y: number, tile: TileId): boolean {

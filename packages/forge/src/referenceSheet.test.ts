@@ -5,7 +5,12 @@ import { decodePng } from './post/raw.js'
 import { paletteGate } from './pixelGates.js'
 import { MASTER_PALETTE } from './palette.js'
 import { REFERENCE_CONTENT_DIR, listCommittedBuildings } from './buildingArt.js'
-import { loadReferenceSheet, paletteSwatchPng, REF_SWATCH_COLS, REF_SWATCH_PX } from './referenceSheet.js'
+import {
+  loadReferenceSheet,
+  paletteSwatchPng,
+  REF_SWATCH_COLS,
+  REF_SWATCH_PX,
+} from './referenceSheet.js'
 
 // The reference this repo actually ships must resolve. A fixture written into a temp dir proves
 // only that the loader can read files that exist somewhere.
@@ -40,9 +45,15 @@ describe('loadReferenceSheet', () => {
     const refs = await loadReferenceSheet()
     expect(refs[0]!.equals(await paletteSwatchPng()), 'the only reference is the swatch').toBe(true)
     const anchor = readFileSync(join(REFERENCE_CONTENT_DIR, 'style-anchor.png'))
-    expect(refs.some((r) => r.equals(anchor)), 'the anchor is committed but never attached').toBe(false)
+    expect(
+      refs.some((r) => r.equals(anchor)),
+      'the anchor is committed but never attached',
+    ).toBe(false)
     // and nor is any of the art this project has since authored
     for (const b of listCommittedBuildings())
-      expect(refs.some((r) => r.equals(b.png)), b.dir).toBe(false)
+      expect(
+        refs.some((r) => r.equals(b.png)),
+        b.dir,
+      ).toBe(false)
   })
 })

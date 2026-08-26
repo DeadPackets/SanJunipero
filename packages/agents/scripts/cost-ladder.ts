@@ -8,8 +8,16 @@ import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
-  createWorldTick, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
-  TickLoop, type LawQueue, type TickHandler, type WorldState,
+  createWorldTick,
+  EventStore,
+  fold,
+  genesisState,
+  makeGenesisWorld,
+  RngStreams,
+  TickLoop,
+  type LawQueue,
+  type TickHandler,
+  type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 // Cross-package by relative path: @sj/gateway depends on @sj/agents, so a package-level
@@ -58,7 +66,10 @@ const REFL_REASONING = reasoningFromEnv('LADDER_REFL')
 const config: SimConfig = DEFAULT_CONFIG
 const MINDS = FOUNDER_MINDS
 
-function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
+function buildWorld(store: EventStore): {
+  state: WorldState
+  doors: Array<{ x: number; y: number }>
+} {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const doors: Array<{ x: number; y: number }> = []
@@ -88,27 +99,70 @@ async function main(): Promise<void> {
   let { state, doors } = buildWorld(store)
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
-    state = fold(state, store.append(state.tick, 'agent_spawned',
-      { id: m.id, name: m.identity.name, x: at.x, y: at.y, sex: m.sex, ageDays: m.ageDays }), config)
-    state = fold(state, store.append(state.tick, 'item_spawned',
-      { id: `wood_${m.id}`, kind: 'wood', qty: WOOD_IN_HAND, loc: { t: 'agent', id: m.id }, owner: m.id }), config)
-    state = fold(state, store.append(state.tick, 'item_spawned',
-      { id: `bread_${m.id}`, kind: 'bread', qty: 4, loc: { t: 'agent', id: m.id }, owner: m.id }), config)
+    state = fold(
+      state,
+      store.append(state.tick, 'agent_spawned', {
+        id: m.id,
+        name: m.identity.name,
+        x: at.x,
+        y: at.y,
+        sex: m.sex,
+        ageDays: m.ageDays,
+      }),
+      config,
+    )
+    state = fold(
+      state,
+      store.append(state.tick, 'item_spawned', {
+        id: `wood_${m.id}`,
+        kind: 'wood',
+        qty: WOOD_IN_HAND,
+        loc: { t: 'agent', id: m.id },
+        owner: m.id,
+      }),
+      config,
+    )
+    state = fold(
+      state,
+      store.append(state.tick, 'item_spawned', {
+        id: `bread_${m.id}`,
+        kind: 'bread',
+        qty: 4,
+        loc: { t: 'agent', id: m.id },
+        owner: m.id,
+      }),
+      config,
+    )
   })
 
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
-    store, state, rng, config, startTick: START_TICK, realMsPerTick: 0, onTick: (c) => handler(c),
+    store,
+    state,
+    rng,
+    config,
+    startTick: START_TICK,
+    realMsPerTick: 0,
+    onTick: (c) => handler(c),
   })
 
   const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
   const accepted: Array<{ tick: number; id: string; verb: string }> = []
   const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
   class Watched extends EngineBridge {
-    override submit(agentId: string, intent: Intent, cb?: (r: SubmitResult) => void): Promise<SubmitResult> {
-      attempts.push({ tick: loop.tick, id: agentId, verb: intent.verb, params: JSON.stringify(intent.params) })
+    override submit(
+      agentId: string,
+      intent: Intent,
+      cb?: (r: SubmitResult) => void,
+    ): Promise<SubmitResult> {
+      attempts.push({
+        tick: loop.tick,
+        id: agentId,
+        verb: intent.verb,
+        params: JSON.stringify(intent.params),
+      })
       return super.submit(agentId, intent, (r) => {
         if (r.ok) accepted.push({ tick: loop.tick, id: agentId, verb: intent.verb })
         else refusals.push({ tick: loop.tick, id: agentId, verb: intent.verb, reason: r.reason })
@@ -121,7 +175,9 @@ async function main(): Promise<void> {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 
-  const embedder = await Embedder.create(fileURLToPath(new URL('../../../data/models/', import.meta.url)))
+  const embedder = await Embedder.create(
+    fileURLToPath(new URL('../../../data/models/', import.meta.url)),
+  )
   const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
@@ -129,13 +185,25 @@ async function main(): Promise<void> {
     personality.init(spec.personality, Math.floor(loop.tick / MINUTES_PER_DAY))
     const runtime = new AgentRuntime({
       db,
-      llm: new LlmClient({ db, caller: 'turn', agentId: spec.id, budgetUsd: CAP_USD, reasoning: TURN_REASONING }),
+      llm: new LlmClient({
+        db,
+        caller: 'turn',
+        agentId: spec.id,
+        budgetUsd: CAP_USD,
+        reasoning: TURN_REASONING,
+      }),
       embedder,
       identity: spec.identity,
       personality,
       bridge,
       reflectionLlm: makeReflectionLlm(
-        new LlmClient({ db, caller: 'reflection', agentId: spec.id, budgetUsd: CAP_USD, reasoning: REFL_REASONING }),
+        new LlmClient({
+          db,
+          caller: 'reflection',
+          agentId: spec.id,
+          budgetUsd: CAP_USD,
+          reasoning: REFL_REASONING,
+        }),
       ),
       onThought: (t) => thoughts.push(t),
     })
@@ -150,9 +218,10 @@ async function main(): Promise<void> {
   while (loop.tick < end) {
     const at = Date.now()
     loop.step()
-    warmthAt.set(loop.tick, Object.fromEntries(
-      MINDS.map((m) => [m.id, loop.state.agents[m.id]?.needs.warmth ?? 100]),
-    ))
+    warmthAt.set(
+      loop.tick,
+      Object.fromEntries(MINDS.map((m) => [m.id, loop.state.agents[m.id]?.needs.warmth ?? 100])),
+    )
     await new Promise<void>((r) => setTimeout(r, Math.max(0, REAL_MS_PER_TICK - (Date.now() - at))))
   }
   for (const r of runtimes) r.stop()
@@ -173,30 +242,46 @@ async function main(): Promise<void> {
   }).length
 
   // 2. made light — any act aimed at the dark, of any kind.
-  const lightActs = attempts.filter((a) =>
-    a.verb === 'stoke' || a.verb === 'kindle'
-    || (a.verb === 'build' && a.params.includes('lamp_post'))
-    || (a.verb === 'craft' && a.params.includes('torch'))).length
+  const lightActs = attempts.filter(
+    (a) =>
+      a.verb === 'stoke' ||
+      a.verb === 'kindle' ||
+      (a.verb === 'build' && a.params.includes('lamp_post')) ||
+      (a.verb === 'craft' && a.params.includes('torch')),
+  ).length
 
   // 3. recovered from a refusal — same mind, same verb, accepted inside half a sim-hour.
   const recovered = refusals.filter((r) =>
-    accepted.some((a) => a.id === r.id && a.verb === r.verb
-      && a.tick > r.tick && a.tick - r.tick <= RECOVERY_WINDOW_TICKS)).length
+    accepted.some(
+      (a) =>
+        a.id === r.id &&
+        a.verb === r.verb &&
+        a.tick > r.tick &&
+        a.tick - r.tick <= RECOVERY_WINDOW_TICKS,
+    ),
+  ).length
 
   // 4. ties — the gateway's own derivation, not a proxy.
   const bonds = buildBonds(events, config.movement.earshotRadius, loop.tick).bonds.length
 
   // 6. voice — the two numbers the `dashes` lane moved.
-  const said = [...thoughts.map((t) => t.text),
-    ...events.filter((e) => e.type === 'agent_spoke').map((e) => String((e.payload as { text?: string }).text ?? ''))]
+  const said = [
+    ...thoughts.map((t) => t.text),
+    ...events
+      .filter((e) => e.type === 'agent_spoke')
+      .map((e) => String((e.payload as { text?: string }).text ?? '')),
+  ]
   const emDashLines = said.filter((s) => s.includes('—')).length
-  const openers = said.map((s) => s.trim().toLowerCase().split(/\s+/).slice(0, 3).join(' ')).filter((s) => s.length > 0)
+  const openers = said
+    .map((s) => s.trim().toLowerCase().split(/\s+/).slice(0, 3).join(' '))
+    .filter((s) => s.length > 0)
   const openerCounts = new Map<string, number>()
   for (const o of openers) openerCounts.set(o, (openerCounts.get(o) ?? 0) + 1)
   const topOpener = [...openerCounts.entries()].sort((a, b) => b[1] - a[1])[0]
 
   // ---- the bill, and the cheapest early warning there is ----
-  const byCaller = db.prepare(`
+  const byCaller = db
+    .prepare(`
     SELECT caller,
            COUNT(*) AS calls,
            SUM(ok) AS okCalls,
@@ -206,20 +291,38 @@ async function main(): Promise<void> {
            COALESCE(SUM(cache_read_tokens),0) AS cacheTok,
            COALESCE(SUM(cost_usd),0) AS cost
     FROM llm_calls GROUP BY caller
-  `).all() as Array<{ caller: string; calls: number; okCalls: number; inTok: number; outTok: number; reasonTok: number; cacheTok: number; cost: number }>
-  const repairs = db.prepare(
-    "SELECT COUNT(*) AS n FROM alerts WHERE kind = 'decode_repaired'").get() as { n: number }
+  `)
+    .all() as Array<{
+    caller: string
+    calls: number
+    okCalls: number
+    inTok: number
+    outTok: number
+    reasonTok: number
+    cacheTok: number
+    cost: number
+  }>
+  const repairs = db
+    .prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'decode_repaired'")
+    .get() as { n: number }
   const totalOk = byCaller.reduce((s, r) => s + r.okCalls, 0)
   const simHours = TOTAL_TICKS / 60
 
   const report = {
     label: LABEL,
-    turnReasoning: TURN_REASONING, reflectionReasoning: REFL_REASONING,
-    ticks: TOTAL_TICKS, startTick: START_TICK, simHours,
-    season: ['spring', 'summer', 'autumn', 'winter'][Math.floor((Math.floor(START_TICK / MINUTES_PER_DAY) % 364) / 91)],
-    warmthAtEnd: Object.fromEntries(MINDS.map((m) =>
-      [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))])),
-    seed: 'cost-ladder', cast: MINDS.map((m) => m.id),
+    turnReasoning: TURN_REASONING,
+    reflectionReasoning: REFL_REASONING,
+    ticks: TOTAL_TICKS,
+    startTick: START_TICK,
+    simHours,
+    season: ['spring', 'summer', 'autumn', 'winter'][
+      Math.floor((Math.floor(START_TICK / MINUTES_PER_DAY) % 364) / 91)
+    ],
+    warmthAtEnd: Object.fromEntries(
+      MINDS.map((m) => [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]),
+    ),
+    seed: 'cost-ladder',
+    cast: MINDS.map((m) => m.id),
 
     // ---- the bill ----
     byCaller: byCaller.map((r) => ({
@@ -234,15 +337,25 @@ async function main(): Promise<void> {
 
     // ---- the measure ----
     quality: {
-      enteredWarm, lightActs, recovered, bonds,
+      enteredWarm,
+      lightActs,
+      recovered,
+      bonds,
       completed: completed.length,
       planned: planned.length,
       refusals: refusals.length,
-      recoveryPct: refusals.length === 0 ? null : Number(((100 * recovered) / refusals.length).toFixed(1)),
+      recoveryPct:
+        refusals.length === 0 ? null : Number(((100 * recovered) / refusals.length).toFixed(1)),
       thoughts: thoughts.length,
       spoke: said.length - thoughts.length,
       emDashPct: said.length === 0 ? 0 : Number(((100 * emDashLines) / said.length).toFixed(1)),
-      topOpener: topOpener ? { words: topOpener[0], n: topOpener[1], pct: Number(((100 * topOpener[1]) / openers.length).toFixed(1)) } : null,
+      topOpener: topOpener
+        ? {
+            words: topOpener[0],
+            n: topOpener[1],
+            pct: Number(((100 * topOpener[1]) / openers.length).toFixed(1)),
+          }
+        : null,
       // ★ THE CHEAPEST EARLY WARNING. `repair.ts` exists because minds sometimes hand back a
       // turn the schema rejects; the rate it fires at is the first thing to move if a rung has
       // made them worse at answering, and it moves before any behaviour does.
@@ -251,14 +364,20 @@ async function main(): Promise<void> {
       hardFailures: byCaller.reduce((s, r) => s + (r.calls - r.okCalls), 0),
     },
     intents: attempts.length,
-    refusalsByReason: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
-      acc[r.reason] = (acc[r.reason] ?? 0) + 1
-      return acc
-    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8),
+    refusalsByReason: Object.entries(
+      refusals.reduce<Record<string, number>>((acc, r) => {
+        acc[r.reason] = (acc[r.reason] ?? 0) + 1
+        return acc
+      }, {}),
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8),
   }
   writeFileSync(path.join(DATA_DIR, `${LABEL}.json`), JSON.stringify(report, null, 2))
-  writeFileSync(path.join(DATA_DIR, `${LABEL}-thoughts.md`),
-    thoughts.map((t) => `- t=${t.tick} **${t.agentId}**: ${t.text}`).join('\n'))
+  writeFileSync(
+    path.join(DATA_DIR, `${LABEL}-thoughts.md`),
+    thoughts.map((t) => `- t=${t.tick} **${t.agentId}**: ${t.text}`).join('\n'),
+  )
   console.log(JSON.stringify(report, null, 2))
 }
 

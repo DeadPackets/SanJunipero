@@ -7,8 +7,13 @@ export type FaunaKind = (typeof FAUNA_KINDS)[number]
 export type FaunaScatter = { kind: FaunaKind; x: number; y: number; stock?: number }
 
 // What a body leaves behind. A hide is a material, not a meal, so it carries no spoilage row.
-export const FAUNA_YIELD: Readonly<Record<FaunaKind, ReadonlyArray<{ kind: string; qty: number }>>> = {
-  deer: [{ kind: 'venison', qty: 2 }, { kind: 'hide', qty: 1 }],
+export const FAUNA_YIELD: Readonly<
+  Record<FaunaKind, ReadonlyArray<{ kind: string; qty: number }>>
+> = {
+  deer: [
+    { kind: 'venison', qty: 2 },
+    { kind: 'hide', qty: 1 },
+  ],
   rabbit: [{ kind: 'rabbit_meat', qty: 1 }],
   fish: [{ kind: 'fish', qty: 1 }],
 }

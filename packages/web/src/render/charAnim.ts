@@ -5,7 +5,14 @@ import { FACINGS, facingFrom, type Facing } from './iso.js'
 // Character standard v2 sheet layout (forge style bible) — the atlas is the runtime truth.
 // The column order IS the facing roster; `iso.FACINGS` is the one copy of it (see iso.ts).
 export const SHEET_COLS: readonly Facing[] = FACINGS
-export const SHEET_ROWS = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b', 'sleep'] as const
+export const SHEET_ROWS = [
+  'idle',
+  'contact-a',
+  'passing-a',
+  'contact-b',
+  'passing-b',
+  'sleep',
+] as const
 export const CELL = 96
 export const FEET_Y = 88
 export const WALK_FPS = 8
@@ -20,7 +27,12 @@ export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
 /** @deprecated superseded by hitShapes.bodyHitPolygon. Kept for the landed tests. */
 export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
-  return { x: -HIT_AREA_W / 2 / scale, y: -HIT_AREA_H / scale, w: HIT_AREA_W / scale, h: HIT_AREA_H / scale }
+  return {
+    x: -HIT_AREA_W / 2 / scale,
+    y: -HIT_AREA_H / scale,
+    w: HIT_AREA_W / scale,
+    h: HIT_AREA_H / scale,
+  }
 }
 export const NAME_TAG_ABOVE_HEAD_PX = 8
 export const NAME_TAG_MAX_CHARS = 16
@@ -58,7 +70,7 @@ export type Gait = {
 export function gaitOf(agentId: string): Gait {
   const h = hash32(agentId)
   const phase = (h & 0xffff) / 0x10000
-  const stride = 1 + (((h >>> 16) & 0xffff) / 0x10000 * 2 - 1) * GAIT_STRIDE_SPREAD
+  const stride = 1 + ((((h >>> 16) & 0xffff) / 0x10000) * 2 - 1) * GAIT_STRIDE_SPREAD
   return { phase, stride }
 }
 
@@ -69,10 +81,13 @@ export type CharPose = { row: SheetRow; facing: Facing; bobY: number }
 export function cellRowLadder(row: SheetRow): readonly SheetRow[] {
   const i = (WALK_LOOP as readonly string[]).indexOf(row)
   // the walk loop backwards from the frame before this one — the last frame that was drawn
-  const back: SheetRow[] = i < 0 ? [...WALK_LOOP]
-    : WALK_LOOP.map((_, k) => WALK_LOOP[(i - 1 - k + 2 * WALK_LOOP.length) % WALK_LOOP.length]!)
+  const back: SheetRow[] =
+    i < 0
+      ? [...WALK_LOOP]
+      : WALK_LOOP.map((_, k) => WALK_LOOP[(i - 1 - k + 2 * WALK_LOOP.length) % WALK_LOOP.length]!)
   // a lying body is the worst stand-in for a standing one, so `sleep` is always last
-  const order: SheetRow[] = row === 'sleep' ? [row, 'idle', ...back] : [row, ...back, 'idle', 'sleep']
+  const order: SheetRow[] =
+    row === 'sleep' ? [row, 'idle', ...back] : [row, ...back, 'idle', 'sleep']
   return [...new Set(order)]
 }
 
@@ -150,9 +165,8 @@ export function observeTick(prev: TickClock, nowMs: number, ticks = 1): TickCloc
   if (!(per > 0) || per < TICK_PERIOD_MIN_MS || per > TICK_PERIOD_MAX_MS) {
     return { ...prev, lastArrivalMs: nowMs }
   }
-  const periodMs = prev.samples === 0
-    ? per
-    : prev.periodMs + (per - prev.periodMs) * TICK_PERIOD_SMOOTHING
+  const periodMs =
+    prev.samples === 0 ? per : prev.periodMs + (per - prev.periodMs) * TICK_PERIOD_SMOOTHING
   return { periodMs, lastArrivalMs: nowMs, samples: prev.samples + 1 }
 }
 
@@ -171,7 +185,9 @@ export const WALK_LEAD_TICKS = 1
 
 /** Appends one tile of walk. The cap bounds the debt: the tail may sit at most one leg plus one tick of buffer ahead of now, so a body behind the record catches up rather than teleports. */
 export function scheduleLeg(
-  path: readonly Waypoint[], x: number, y: number,
+  path: readonly Waypoint[],
+  x: number,
+  y: number,
   opts: { nowMs: number; legMs: number; leadMs: number },
 ): Waypoint[] {
   const { nowMs, legMs, leadMs } = opts
@@ -195,7 +211,10 @@ export type Waypoint = { x: number; y: number; atMs: number }
 
 // The body steps through each waypoint tile — never a straight line to the final destination —
 // so a corner leg cannot sweep across a building's drawn volume. path[0] is the anchor.
-export function interpolatePos(path: ReadonlyArray<Waypoint>, nowMs: number): { x: number; y: number } {
+export function interpolatePos(
+  path: ReadonlyArray<Waypoint>,
+  nowMs: number,
+): { x: number; y: number } {
   if (path.length === 0) return { x: 0, y: 0 }
   const first = path[0]!
   if (nowMs <= first.atMs) return { x: first.x, y: first.y }
@@ -231,8 +250,20 @@ export function legFacing(path: ReadonlyArray<Waypoint>): Facing | null {
   return facingFrom(path[1]!.x - path[0]!.x, path[1]!.y - path[0]!.y)
 }
 
-export const EMOTE_KINDS = ['exclaim', 'question', 'heart', 'star', 'sleep', 'hunger',
-  'cold', 'rain', 'hurt', 'talk', 'idea', 'anger'] as const // mirrors /assets/emotes.json order
+export const EMOTE_KINDS = [
+  'exclaim',
+  'question',
+  'heart',
+  'star',
+  'sleep',
+  'hunger',
+  'cold',
+  'rain',
+  'hurt',
+  'talk',
+  'idea',
+  'anger',
+] as const // mirrors /assets/emotes.json order
 export type EmoteKind = (typeof EMOTE_KINDS)[number]
 
 export const NEED_EMOTE_BELOW = 30
@@ -247,6 +278,13 @@ export function emoteFor(a: AgentBody, recent: SimEvent[]): EmoteKind | null {
   if (a.needs.hunger < NEED_EMOTE_BELOW) return 'hunger'
   if (a.needs.warmth < NEED_EMOTE_BELOW) return 'cold'
   if (mine('agent_spoke')) return 'talk'
-  if (recent.some((ev) => ev.type === 'weather_changed' && ['rain', 'storm'].includes((ev.payload as { kind: string }).kind))) return 'rain'
+  if (
+    recent.some(
+      (ev) =>
+        ev.type === 'weather_changed' &&
+        ['rain', 'storm'].includes((ev.payload as { kind: string }).kind),
+    )
+  )
+    return 'rain'
   return null
 }

@@ -11,12 +11,38 @@ import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { faceFor, worldTextScale } from './textFaces.js'
-import { CROWD_PITCH_PX, CROWD_SETTLE_MS, NO_OFFSET, crowdOffsets, type CrowdOffset } from './crowd.js'
 import {
-  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, cellRowLadder, charPose, emoteFor, gaitOf,
-  initialTickClock, interpolatePos, legFacing, nameTagText, observeTick, prunePath, scheduleLeg,
-  strideFrameMs, ticksPerTileOf, type Gait, type TickClock, type Waypoint,
+  CROWD_PITCH_PX,
+  CROWD_SETTLE_MS,
+  NO_OFFSET,
+  crowdOffsets,
+  type CrowdOffset,
+} from './crowd.js'
+import {
+  CELL,
+  CHAR_TARGET_PX,
+  EMOTE_KINDS,
+  FEET_Y,
+  NAME_TAG_ABOVE_HEAD_PX,
+  SHEET_COLS,
+  SHEET_ROWS,
+  WALK_LEAD_TICKS,
+  cellRowLadder,
+  charPose,
+  emoteFor,
+  gaitOf,
+  initialTickClock,
+  interpolatePos,
+  legFacing,
+  nameTagText,
+  observeTick,
+  prunePath,
+  scheduleLeg,
+  strideFrameMs,
+  ticksPerTileOf,
+  type Gait,
+  type TickClock,
+  type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
@@ -92,16 +118,28 @@ function sliceV2(sheet: Texture, row: (typeof SHEET_ROWS)[number], facing: Facin
   return cached(sheet, `${row}:${facing}`, () => {
     const col = SHEET_COLS.indexOf(facing)
     const rowIdx = SHEET_ROWS.indexOf(row)
-    return new Texture({ source: sheet.source, frame: new Rectangle(col * CELL, rowIdx * CELL, CELL, CELL) })
+    return new Texture({
+      source: sheet.source,
+      frame: new Rectangle(col * CELL, rowIdx * CELL, CELL, CELL),
+    })
   })
 }
 
 // v4 hi-res atlas: manifest rects are the only slicing truth (no lattice)
-function sliceV4(atlas: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing): Texture | null {
+function sliceV4(
+  atlas: Texture,
+  art: CharArt,
+  row: (typeof SHEET_ROWS)[number],
+  facing: Facing,
+): Texture | null {
   const cell = art.manifest?.cells[`${row}-${facing}`]
   if (cell === undefined) return null
-  return cached(atlas, `${row}-${facing}`, () =>
-    new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }))
+  return cached(
+    atlas,
+    `${row}-${facing}`,
+    () =>
+      new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }),
+  )
 }
 
 // Who belongs on the TOWN map. The dead leave it, and so does anyone who has gone indoors — an
@@ -111,7 +149,9 @@ export function rendersOnMap(a: { alive: boolean; insideId?: string }): boolean 
 }
 
 export type CharacterCell = {
-  texture: Texture; anchor: { x: number; y: number }; scale: number
+  texture: Texture
+  anchor: { x: number; y: number }
+  scale: number
   /** the sheet's own figure height, so a caller sizing anything off the art has one source */
   figureH: number
 }
@@ -119,12 +159,17 @@ export type CharacterCell = {
 // One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint. The map
 // layer and the interior sub-scene share it so they cannot disagree about feet or facing.
 export function characterCell(
-  sheet: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing,
+  sheet: Texture,
+  art: CharArt,
+  row: (typeof SHEET_ROWS)[number],
+  facing: Facing,
 ): CharacterCell | null {
   if (art.manifest === null) {
     return {
-      texture: sliceV2(sheet, row, facing), anchor: { x: 0.5, y: FEET_Y / CELL },
-      scale: CHAR_TARGET_PX / 64, figureH: 64,
+      texture: sliceV2(sheet, row, facing),
+      anchor: { x: 0.5, y: FEET_Y / CELL },
+      scale: CHAR_TARGET_PX / 64,
+      figureH: 64,
     }
   }
   // A missing cell degrades inside its own facing — never across one, and never by leaving the
@@ -165,7 +210,8 @@ export function createCharacterLayer(
     const art = characterArt(store.assetRecords(), agentId)
     const sheet: Sheet = { art, texture: null }
     sheets.set(agentId, sheet)
-    const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
+    const p =
+      swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
     void p.then((t) => {
       if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
       sheet.texture = t
@@ -198,7 +244,9 @@ export function createCharacterLayer(
     e.figureH = figureH
     e.ranked = ranked
     e.hit.points = inflateToMin(
-      bodyHitPolygon(figureH, scale), HIT_MIN_PX, scale * hitZoom,
+      bodyHitPolygon(figureH, scale),
+      HIT_MIN_PX,
+      scale * hitZoom,
       ranked ? CROWD_PITCH_PX * hitZoom : Infinity,
     )
   }
@@ -209,7 +257,8 @@ export function createCharacterLayer(
     if (zoom === hitZoom) return
     hitZoom = zoom
     for (const e of entries.values()) {
-      const scale = e.hitScale, figureH = e.figureH
+      const scale = e.hitScale,
+        figureH = e.figureH
       e.hitScale = 0
       setHitScale(e, scale, figureH)
     }
@@ -239,13 +288,19 @@ export function createCharacterLayer(
     nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
     const nameTagLabel = createWorldLabel('', {
-      fontFamily: faceFor('name').family, fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a,
+      fontFamily: faceFor('name').family,
+      fontSize: CHAR_TAG_FONT_PX,
+      fill: 0x43394a,
       lineHeight: CHAR_TAG_LINE_H,
     })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)
-    sprite.on('pointerover', () => { nameTag.visible = true })
-    sprite.on('pointerout', () => { nameTag.visible = false })
+    sprite.on('pointerover', () => {
+      nameTag.visible = true
+    })
+    sprite.on('pointerout', () => {
+      nameTag.visible = false
+    })
     // each companion to the layer it belongs in: a contact shadow under every body, the
     // emote and the tag over every body. None of them competes with the depth sort any more.
     scene.layers.shadow.addChild(shadow)
@@ -253,11 +308,26 @@ export function createCharacterLayer(
     scene.layers.worldText.addChild(emote, nameTag)
     const now = performance.now()
     e = {
-      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
+      sprite,
+      shadow,
+      emote,
+      nameTag,
+      nameTagBg,
+      nameTagLabel,
+      hit,
+      figureH: 0,
+      hitScale: 0,
       ranked: false,
-      emoteUntil: 0, facing: 'sw', gait: gaitOf(agentId), legMs: clock.periodMs,
-      path: [{ x, y, atMs: now }], depth: { box: bodyDepthBox(agentId, x, y), node: sprite },
-      crowd: NO_OFFSET, crowdFrom: NO_OFFSET, crowdTo: NO_OFFSET, crowdSinceMs: now,
+      emoteUntil: 0,
+      facing: 'sw',
+      gait: gaitOf(agentId),
+      legMs: clock.periodMs,
+      path: [{ x, y, atMs: now }],
+      depth: { box: bodyDepthBox(agentId, x, y), node: sprite },
+      crowd: NO_OFFSET,
+      crowdFrom: NO_OFFSET,
+      crowdTo: NO_OFFSET,
+      crowdSinceMs: now,
     }
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
@@ -293,7 +363,9 @@ export function createCharacterLayer(
       const perTile = ticksPerTileOf(state.agents[p.id]?.needs ?? {}, cfg)
       e.legMs = clock.periodMs * perTile
       e.path = scheduleLeg(e.path, p.x, p.y, {
-        nowMs: now, legMs: e.legMs, leadMs: clock.periodMs * WALK_LEAD_TICKS,
+        nowMs: now,
+        legMs: e.legMs,
+        leadMs: clock.periodMs * WALK_LEAD_TICKS,
       })
     }
     // emote triggers ride the same delta batches (one batch per tick)
@@ -302,7 +374,10 @@ export function createCharacterLayer(
       if (a === undefined) continue
       const kind = emoteFor(a, evts)
       if (kind !== null && emoteAtlas !== null) {
-        e.emote.texture = new Texture({ source: emoteAtlas.source, frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX) })
+        e.emote.texture = new Texture({
+          source: emoteAtlas.source,
+          frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+        })
         e.emoteUntil = now + EMOTE_MS
       }
     }
@@ -319,7 +394,8 @@ export function createCharacterLayer(
       for (const agentId of entries.keys()) {
         const prev = sheets.get(agentId)
         const next = characterArt(store.assetRecords(), agentId)
-        if (prev === undefined || prev.art.url !== next.url) loadSheet(agentId, prev?.art.url ?? null)
+        if (prev === undefined || prev.art.url !== next.url)
+          loadSheet(agentId, prev?.art.url ?? null)
       }
     }
     const live = new Set<string>()
@@ -327,7 +403,10 @@ export function createCharacterLayer(
     // who else is there and every position must settle before any of them is drawn.
     const standing: Array<{ id: string; x: number; y: number; settled: boolean }> = []
     const drawing: Array<{
-      a: { id: string; name: string }; e: CharEntry; pos: { x: number; y: number }; bobY: number
+      a: { id: string; name: string }
+      e: CharEntry
+      pos: { x: number; y: number }
+      bobY: number
     }> = []
     for (const a of Object.values(state.agents)) {
       if (!rendersOnMap(a)) continue
@@ -345,7 +424,13 @@ export function createCharacterLayer(
       if (walking) e.facing = legFacing(e.path) ?? e.facing
       const sheet = sheets.get(a.id)
       const pose = charPose(
-        { asleep: a.asleep, collapsed: a.collapsedSinceTick !== null, walking, facing: e.facing, nowMs },
+        {
+          asleep: a.asleep,
+          collapsed: a.collapsedSinceTick !== null,
+          walking,
+          facing: e.facing,
+          nowMs,
+        },
         strideFrameMs(e.legMs, e.gait.stride),
         { phase: e.gait.phase, bob: scene.wantsMotion() },
       )
@@ -379,10 +464,13 @@ export function createCharacterLayer(
       const t = scene.wantsMotion()
         ? Math.min(1, Math.max(0, (nowMs - e.crowdSinceMs) / CROWD_SETTLE_MS))
         : 1
-      e.crowd = t >= 1 ? e.crowdTo : {
-        dx: e.crowdFrom.dx + (e.crowdTo.dx - e.crowdFrom.dx) * t,
-        dy: e.crowdFrom.dy + (e.crowdTo.dy - e.crowdFrom.dy) * t,
-      }
+      e.crowd =
+        t >= 1
+          ? e.crowdTo
+          : {
+              dx: e.crowdFrom.dx + (e.crowdTo.dx - e.crowdFrom.dx) * t,
+              dy: e.crowdFrom.dy + (e.crowdTo.dy - e.crowdFrom.dy) * t,
+            }
       const px = pos.x + e.crowd.dx
       const py = pos.y + e.crowd.dy
       const { sx, sy } = tileToScreen(px, py)
@@ -395,7 +483,13 @@ export function createCharacterLayer(
       if (e.nameTagLabel.text !== tag) {
         e.nameTagLabel.text = tag
         e.nameTagBg.clear()
-        e.nameTagBg.roundRect(-e.nameTagLabel.width / 2 - 4, -e.nameTagLabel.height - 4, e.nameTagLabel.width + 8, e.nameTagLabel.height + 8, 2)
+        e.nameTagBg.roundRect(
+          -e.nameTagLabel.width / 2 - 4,
+          -e.nameTagLabel.height - 4,
+          e.nameTagLabel.width + 8,
+          e.nameTagLabel.height + 8,
+          2,
+        )
         e.nameTagBg.fill(0xfff6e9)
       }
       // ONE placement rule for every label in the product: above the DRAWN figure,
@@ -410,8 +504,11 @@ export function createCharacterLayer(
           h: (e.nameTagLabel.height + TAG_PAD_Y * 2) * inv,
         }
         const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
-        const at = placeTag(anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
-          size, scene.viewRect())
+        const at = placeTag(
+          anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
+          size,
+          scene.viewRect(),
+        )
         e.nameTag.position.set(Math.round(at.sx), Math.round(at.sy + size.h))
       }
     }

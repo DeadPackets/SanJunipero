@@ -2,8 +2,13 @@
 // w/h — structure_planned has to carry it, and a renderer holding one structure needs it.
 import { describe, expect, it } from 'vitest'
 import {
-  SimConfigSchema, T_ROAD, doorFrontOf, grammarOf,
-  type SimConfig, type TownClaim, type TownFacing,
+  SimConfigSchema,
+  T_ROAD,
+  doorFrontOf,
+  grammarOf,
+  type SimConfig,
+  type TownClaim,
+  type TownFacing,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type Structure, type WorldState } from './state.js'
@@ -24,14 +29,23 @@ function world(): WorldState {
   const { terrain, events } = makeGenesisWorld(CFG)
   let s = apply(genesisState(CFG, terrain), events)
   const sq = townSquareOf(s)!
-  s = apply(s, [{ type: 'agent_spawned', payload: { id: BUILDER, name: 'B', x: sq.x, y: sq.y, ageDays: 7300 } }])
-  return apply(s, [{ type: 'item_spawned', payload: { id: 'item_wood_b1', kind: 'wood', qty: 9999, loc: { t: 'agent', id: BUILDER } } }])
+  s = apply(s, [
+    { type: 'agent_spawned', payload: { id: BUILDER, name: 'B', x: sq.x, y: sq.y, ageDays: 7300 } },
+  ])
+  return apply(s, [
+    {
+      type: 'item_spawned',
+      payload: { id: 'item_wood_b1', kind: 'wood', qty: 9999, loc: { t: 'agent', id: BUILDER } },
+    },
+  ])
 }
 
 /** onStart sets the hands going and only a TickLoop puts them down; these helpers fold events by
  *  hand, so the body is set idle between builds. Nothing about WHERE a house goes reads the activity. */
-const idle = (s: WorldState): WorldState =>
-  ({ ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, activity: null } } })
+const idle = (s: WorldState): WorldState => ({
+  ...s,
+  agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, activity: null } },
+})
 
 /** Raise houses until the NEXT claim faces `want`, and hand back the world just before it. */
 function raiseUntilFacing(want: TownFacing): { state: WorldState; claim: TownClaim } | null {
@@ -103,27 +117,45 @@ describe('★ an agent-built house knows which way it faces', () => {
     const found = raiseUntilFacing('sw')
     expect(found, 'the town never seated a house sw').not.toBeNull()
     const { state: s, claim } = found!
-    const at = { ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } } }
+    const at = {
+      ...s,
+      agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } },
+    }
     const r = submitIntent(at, CFG, BUILDER, 'build', { kind: 'house' })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
-    const planned = (r as { events: Array<{ type: string; payload: Record<string, unknown> }> })
-      .events.find((e) => e.type === 'structure_planned')!
-    expect(Object.keys(planned.payload), 'a facing was written for a house that is not turned')
-      .not.toContain('facing')
-    expect(apply(at, (r as { events: Array<{ type: string; payload: unknown }> }).events)
-      .structures[String(planned.payload['id'])]!.facing).toBeUndefined()
+    const planned = (
+      r as { events: Array<{ type: string; payload: Record<string, unknown> }> }
+    ).events.find((e) => e.type === 'structure_planned')!
+    expect(
+      Object.keys(planned.payload),
+      'a facing was written for a house that is not turned',
+    ).not.toContain('facing')
+    expect(
+      apply(at, (r as { events: Array<{ type: string; payload: unknown }> }).events).structures[
+        String(planned.payload['id'])
+      ]!.facing,
+    ).toBeUndefined()
   })
 
   it('★ and NE and NW stay unrepresentable — the schema knows two facings and no more', () => {
     const s = world()
     const claim = claimInWorld(s, { along: 2, deep: 2 })!
-    const at = { ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } } }
+    const at = {
+      ...s,
+      agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } },
+    }
     const r = submitIntent(at, CFG, BUILDER, 'build', { kind: 'house' })
-    const planned = (r as { events: Array<{ type: string; payload: Record<string, unknown> }> })
-      .events.find((e) => e.type === 'structure_planned')!
+    const planned = (
+      r as { events: Array<{ type: string; payload: Record<string, unknown> }> }
+    ).events.find((e) => e.type === 'structure_planned')!
     for (const bad of ['ne', 'nw', 'north', '']) {
-      expect(() => apply(at, [{ type: 'structure_planned', payload: { ...planned.payload, id: 'x', facing: bad } }]),
-        `${bad} was accepted as a facing`).toThrow()
+      expect(
+        () =>
+          apply(at, [
+            { type: 'structure_planned', payload: { ...planned.payload, id: 'x', facing: bad } },
+          ]),
+        `${bad} was accepted as a facing`,
+      ).toThrow()
     }
   })
 })

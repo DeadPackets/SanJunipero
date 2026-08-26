@@ -2,8 +2,20 @@
 // houses until the town crosses into ring 2. Scripted policies only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
-  MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, doorFrontOf, freePlots,
-  grammarOf, latticeFloor, place, plotExtent, ringsStanding, stateHash, townSpacing, type SimConfig,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  TOWN_SQUARE,
+  T_ROAD,
+  doorFrontOf,
+  freePlots,
+  grammarOf,
+  latticeFloor,
+  place,
+  plotExtent,
+  ringsStanding,
+  stateHash,
+  townSpacing,
+  type SimConfig,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -25,8 +37,15 @@ const CFG: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
   aging: { deathOfOldAgeEnabled: false },
   construction: { houseTicks: HOUSE_TICKS },
-  structures: { recipes: { ...SimConfigSchema.parse({}).structures.recipes,
-    house: { ...SimConfigSchema.parse({}).structures.recipes['house']!, durationTicks: HOUSE_TICKS } } },
+  structures: {
+    recipes: {
+      ...SimConfigSchema.parse({}).structures.recipes,
+      house: {
+        ...SimConfigSchema.parse({}).structures.recipes['house']!,
+        durationTicks: HOUSE_TICKS,
+      },
+    },
+  },
 })
 
 const MASONS = 6
@@ -34,7 +53,13 @@ const DAYS = 3
 const UPKEEP_EVERY = 240
 const WET: ReadonlySet<number> = new Set([2, 10])
 
-type Run = { loop: TickLoop; store: EventStore; genesisTerrain: TileId[][]; growths: number; refusals: number }
+type Run = {
+  loop: TickLoop
+  store: EventStore
+  genesisTerrain: TileId[][]
+  growths: number
+  refusals: number
+}
 
 /** Six masons who want roofs and nothing else. None ever names a coordinate: the two-step below
  *  is what a mind reads out of the perception line and, failing that, out of the refusal. */
@@ -46,13 +71,23 @@ function runTown(seed = 'claim-seam'): Run {
   const ids = Array.from({ length: MASONS }, (_, i) => `mason_${i}`)
   let refusals = 0
   const loop: TickLoop = new TickLoop({
-    store, state: genesisState(CFG, terrain), rng, config: CFG, snapshotEveryTicks: 720,
+    store,
+    state: genesisState(CFG, terrain),
+    rng,
+    config: CFG,
+    snapshotEveryTicks: 720,
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
         for (const e of genesis) emit(e.type, e.payload)
-        ids.forEach((id, i) => emit('agent_spawned', {
-          id, name: id, x: TOWN_SQUARE.x + i + 1, y: TOWN_SQUARE.y + 1, ageDays: 7300,
-        }))
+        ids.forEach((id, i) =>
+          emit('agent_spawned', {
+            id,
+            name: id,
+            x: TOWN_SQUARE.x + i + 1,
+            y: TOWN_SQUARE.y + 1,
+            ageDays: 7300,
+          }),
+        )
       }
       // Fixture upkeep, said out loud: this proof is about the lattice and not the economy, so the
       // masons are fed on a fixed clock. Every building still goes through `build`.
@@ -74,11 +109,20 @@ function runTown(seed = 'claim-seam'): Run {
         const wood = Object.values(loop.state.items)
           .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
           .reduce((s, i) => s + i.qty, 0)
-        if (wood < 10) emit('item_spawned', { id: `wood_${id}_${tick}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } })
+        if (wood < 10)
+          emit('item_spawned', {
+            id: `wood_${id}_${tick}`,
+            kind: 'wood',
+            qty: 10,
+            loc: { t: 'agent', id },
+          })
         if (claim === null) continue
         if (isAdjacentToRect(a.x, a.y, claim.site)) {
           const b = submitIntent(loop.state, CFG, id, 'build', { kind: 'house' })
-          if (!b.ok) { refusals++; continue }
+          if (!b.ok) {
+            refusals++
+            continue
+          }
           for (const e of b.events) emit(e.type, e.payload)
           claim = claimInWorld(loop.state, { along: 2, deep: 2 })
           continue
@@ -91,7 +135,10 @@ function runTown(seed = 'claim-seam'): Run {
   })
   for (let i = 0; i < DAYS * MINUTES_PER_DAY; i++) loop.step()
   return {
-    loop, store, genesisTerrain: terrain, refusals,
+    loop,
+    store,
+    genesisTerrain: terrain,
+    refusals,
     growths: store.readFrom(0).filter((e) => e.type === 'world_grown').length,
   }
 }
@@ -101,7 +148,8 @@ function plotOf(state: WorldState, s: Structure) {
   const g = grammarOf(TOWN_SQUARE, s)
   for (const plot of freePlots(6, townGroundOf(state, TOWN_SQUARE))) {
     const e = plotExtent(plot)
-    if (e.dx <= g.dx && g.dx + s.w <= e.dx + e.w && e.dy <= g.dy && g.dy + s.h <= e.dy + e.h) return plot
+    if (e.dx <= g.dx && g.dx + s.w <= e.dx + e.w && e.dy <= g.dy && g.dy + s.h <= e.dy + e.h)
+      return plot
   }
   return null
 }
@@ -111,15 +159,20 @@ const ringOf = (s: { x: number; y: number }): number => {
   return Math.max(Math.abs(Math.floor(g.dx / 19)), Math.abs(Math.floor(g.dy / 19)))
 }
 
-const massOf = (s: { x: number; y: number; w: number; h: number }) =>
-  ({ dx: s.x, dy: s.y, w: s.w, h: s.h })
+const massOf = (s: { x: number; y: number; w: number; h: number }) => ({
+  dx: s.x,
+  dy: s.y,
+  w: s.w,
+  h: s.h,
+})
 
 /** What decides which set a building falls in is BEING ON A PLOT. The proxy this used to use —
  *  bigger than 1x1 — agrees here and not in farBank.test.ts, where a 2x1 deck stands on water. */
-const spacingOf = (state: WorldState, all: readonly Structure[]) => townSpacing(
-  all.filter((s) => plotOf(state, s) !== null).map(massOf),
-  all.filter((s) => plotOf(state, s) === null).map(massOf),
-)
+const spacingOf = (state: WorldState, all: readonly Structure[]) =>
+  townSpacing(
+    all.filter((s) => plotOf(state, s) !== null).map(massOf),
+    all.filter((s) => plotOf(state, s) === null).map(massOf),
+  )
 
 describe('★ agents build until the town reaches ring 2, and everything in it is still right', () => {
   const run = runTown()
@@ -130,14 +183,18 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
 
   it('the town crossed into ring 2, and it was agents that took it there', () => {
     // eslint-disable-next-line no-console
-    console.log(`[claim-seam] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons: ${built.length} agent builds`
-      + ` (ring 1: ${built.filter((s) => ringOf(s) === 1).length}, ring 2: ${built.filter((s) => ringOf(s) === 2).length}),`
-      + ` ${all.length} standing, world ${size.w}x${size.h}, ${run.growths} growths,`
-      + ` lattice floor ${spacingOf(state, all).latticeFloor.toFixed(4)} px`
-      + ` / whole town ${spacingOf(state, all).wholeTown.toFixed(4)} px`)
+    console.log(
+      `[claim-seam] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons: ${built.length} agent builds` +
+        ` (ring 1: ${built.filter((s) => ringOf(s) === 1).length}, ring 2: ${built.filter((s) => ringOf(s) === 2).length}),` +
+        ` ${all.length} standing, world ${size.w}x${size.h}, ${run.growths} growths,` +
+        ` lattice floor ${spacingOf(state, all).latticeFloor.toFixed(4)} px` +
+        ` / whole town ${spacingOf(state, all).wholeTown.toFixed(4)} px`,
+    )
     expect(built.length).toBeGreaterThanOrEqual(20)
     expect(built.filter((s) => ringOf(s) === 2).length).toBeGreaterThanOrEqual(5)
-    expect(ringsStanding(TOWN_SQUARE, standingRects(state), townGroundOf(state, TOWN_SQUARE))).toBe(2)
+    expect(ringsStanding(TOWN_SQUARE, standingRects(state), townGroundOf(state, TOWN_SQUARE))).toBe(
+      2,
+    )
     for (const s of built) expect(s.kind).toBe('house')
   })
 
@@ -160,21 +217,31 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
           tiles++
         }
       const plot = plotOf(state, s)
-      if (plot === null) { offPlot++; continue }
+      if (plot === null) {
+        offPlot++
+        continue
+      }
       // ROAD-FRONTED: the door opens onto paving that is actually laid in the world's terrain,
       // not onto a road the template drew on paper.
       const along = plot.face === 'sw' ? s.w : s.h
       const deep = plot.face === 'sw' ? s.h : s.w
       const front = doorFrontOf(place(plot, s.kind, along, deep, null))
       const at = { x: TOWN_SQUARE.x + front.dx, y: TOWN_SQUARE.y + front.dy }
-      expect(state.terrain[at.y]?.[at.x], `${s.kind} at ${s.x},${s.y} fronts ${at.x},${at.y}`).toBe(T_ROAD)
+      expect(state.terrain[at.y]?.[at.x], `${s.kind} at ${s.x},${s.y} fronts ${at.x},${at.y}`).toBe(
+        T_ROAD,
+      )
     }
     expect(all.length).toBe(built.length + 11)
     expect(tiles).toBeGreaterThan(4 * built.length)
     // The two off-plot ones are the well and the fire pit. They stand in the square, and block
     // (0,0) is never platted — so they have no plot and no frontage, by construction.
     expect(offPlot).toBe(2)
-    expect(all.filter((s) => plotOf(state, s) === null).map((s) => s.kind).sort()).toEqual(['fire_pit', 'well'])
+    expect(
+      all
+        .filter((s) => plotOf(state, s) === null)
+        .map((s) => s.kind)
+        .sort(),
+    ).toEqual(['fire_pit', 'well'])
   })
 
   // 86.1626 px is the exhaustive floor over 2 496 pairings of buildings ON PLOTS. The whole-town

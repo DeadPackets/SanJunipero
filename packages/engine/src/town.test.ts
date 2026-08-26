@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_ANCHOR_DEFAULT, CITY_GROUND, DEFAULT_CONFIG, GENESIS_WANTED, TOWN_SQUARE, blockIsPlattable,
-  cityPlacements, freePlots, place, placedTiles, plazaOf, townOrigin, worldOf, T_ROAD,
+  CITY_ANCHOR_DEFAULT,
+  CITY_GROUND,
+  DEFAULT_CONFIG,
+  GENESIS_WANTED,
+  TOWN_SQUARE,
+  blockIsPlattable,
+  cityPlacements,
+  freePlots,
+  place,
+  placedTiles,
+  plazaOf,
+  townOrigin,
+  worldOf,
+  T_ROAD,
 } from '@sj/shared'
 import { claimInWorld, standingRects, townGroundBox, townGroundOf, townSquareOf } from './town.js'
 import { makeGenesisWorld } from './genesis/world.js'
@@ -13,7 +25,8 @@ function genesisWorld(): WorldState {
   const { terrain, events } = makeGenesisWorld(DEFAULT_CONFIG)
   let state = genesisState(DEFAULT_CONFIG, terrain)
   let seq = 0
-  for (const e of events) state = fold(state, { seq: ++seq, tick: 0, type: e.type, payload: e.payload }, DEFAULT_CONFIG)
+  for (const e of events)
+    state = fold(state, { seq: ++seq, tick: 0, type: e.type, payload: e.payload }, DEFAULT_CONFIG)
   return state
 }
 
@@ -31,8 +44,11 @@ describe('★ where the town is, in a world that moves under it', () => {
 
   it('★ every genesis building stands exactly where the grammar plotted it', () => {
     const standing = standingRects(genesisWorld())
-    const plotted = cityPlacements()
-      .map((s) => ({ ...worldOf(TOWN_SQUARE, { dx: s.dx, dy: s.dy }), w: s.w, h: s.h }))
+    const plotted = cityPlacements().map((s) => ({
+      ...worldOf(TOWN_SQUARE, { dx: s.dx, dy: s.dy }),
+      w: s.w,
+      h: s.h,
+    }))
     // The nine buildings, plus the well and the fire pit, which are not on plots.
     expect(standing).toHaveLength(GENESIS_WANTED.length + 2)
     for (const p of plotted) expect(standing, `${p.x},${p.y}`).toContainEqual(p)
@@ -48,7 +64,10 @@ describe('★ where the town is, in a world that moves under it', () => {
   })
 
   it('a world big enough to hold the square but that never paved it is still no town', () => {
-    const big = genesisState(DEFAULT_CONFIG, Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0 as const)))
+    const big = genesisState(
+      DEFAULT_CONFIG,
+      Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0 as const)),
+    )
     expect(big.terrain[TOWN_SQUARE.y]![TOWN_SQUARE.x]).toBe(0)
     expect(townSquareOf(big)).toBeNull()
   })
@@ -56,27 +75,37 @@ describe('★ where the town is, in a world that moves under it', () => {
   // The test used to be "the tile at TOWN_SQUARE is paved", which is satisfiable without this
   // world's town being centred there: the dev world answered confidently about a town that is not.
   it('★ A ROAD THROUGH THE SQUARE IS NOT A TOWN — one paved tile, and a whole paved crossing', () => {
-    const blank = (): number[][] => Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0))
+    const blank = (): number[][] =>
+      Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0))
 
     const oneTile = blank()
     oneTile[TOWN_SQUARE.y]![TOWN_SQUARE.x] = T_ROAD
-    expect(townSquareOf(genesisState(DEFAULT_CONFIG, oneTile as never)),
-      'one paved tile passed for a town').toBeNull()
+    expect(
+      townSquareOf(genesisState(DEFAULT_CONFIG, oneTile as never)),
+      'one paved tile passed for a town',
+    ).toBeNull()
 
     // A crossroads: two full roads meeting on the square. Every check that reads a line
     // through it passes; it is still not a plaza.
     const cross = blank()
-    for (let i = 0; i < 128; i++) { cross[TOWN_SQUARE.y]![i] = T_ROAD; cross[i]![TOWN_SQUARE.x] = T_ROAD }
-    expect(townSquareOf(genesisState(DEFAULT_CONFIG, cross as never)),
-      'a crossroads passed for a town').toBeNull()
+    for (let i = 0; i < 128; i++) {
+      cross[TOWN_SQUARE.y]![i] = T_ROAD
+      cross[i]![TOWN_SQUARE.x] = T_ROAD
+    }
+    expect(
+      townSquareOf(genesisState(DEFAULT_CONFIG, cross as never)),
+      'a crossroads passed for a town',
+    ).toBeNull()
 
     // ★ AND THE SHIFT THAT CAUSED IT: the genesis plaza, moved by ONE tile. Every question
     // about a single tile still answers yes; the plaza is no longer centred where it says.
     const shifted = genesisWorld()
     const rows = shifted.terrain.map((r) => [...r])
     rows.unshift(rows.pop()!)
-    expect(townSquareOf({ ...shifted, terrain: rows as never }),
-      'the plaza shifted a row and the engine did not notice').toBeNull()
+    expect(
+      townSquareOf({ ...shifted, terrain: rows as never }),
+      'the plaza shifted a row and the engine did not notice',
+    ).toBeNull()
 
     // and the unshifted world it was cut from still answers, so this is not vacuous either
     expect(townSquareOf(shifted)).toEqual({ x: TOWN_SQUARE.x, y: TOWN_SQUARE.y })
@@ -85,15 +114,26 @@ describe('★ where the town is, in a world that moves under it', () => {
   it('the square walks with the array when the world grows west', () => {
     const state = genesisWorld()
     const depth = 19
-    const strip = Array.from({ length: state.terrain.length }, () => Array.from({ length: depth }, () => 0))
-    const grown = fold(state, {
-      seq: 9999, tick: 1440, type: 'world_grown', payload: { edge: 'w', depth, tiles: strip },
-    }, DEFAULT_CONFIG)
+    const strip = Array.from({ length: state.terrain.length }, () =>
+      Array.from({ length: depth }, () => 0),
+    )
+    const grown = fold(
+      state,
+      {
+        seq: 9999,
+        tick: 1440,
+        type: 'world_grown',
+        payload: { edge: 'w', depth, tiles: strip },
+      },
+      DEFAULT_CONFIG,
+    )
     expect(grown.origin).toEqual({ x: -depth, y: 0 })
     expect(townSquareOf(grown)).toEqual({ x: TOWN_SQUARE.x + depth, y: TOWN_SQUARE.y })
     // And every building moved with it, so the claim asks the same question of the same town.
-    expect(claimInWorld(grown, { along: 2, deep: 2 })!.site)
-      .toEqual({ ...claimInWorld(state, { along: 2, deep: 2 })!.site, x: claimInWorld(state, { along: 2, deep: 2 })!.site.x + depth })
+    expect(claimInWorld(grown, { along: 2, deep: 2 })!.site).toEqual({
+      ...claimInWorld(state, { along: 2, deep: 2 })!.site,
+      x: claimInWorld(state, { along: 2, deep: 2 })!.site.x + depth,
+    })
   })
 
   it('the claim reads the world, so the tenth building goes where the ninth did not', () => {
@@ -102,8 +142,12 @@ describe('★ where the town is, in a world that moves under it', () => {
     expect(first.rings).toBe(1)
     const standing = standingRects(state)
     for (const s of standing)
-      expect(first.site.x < s.x + s.w && s.x < first.site.x + first.site.w
-        && first.site.y < s.y + s.h && s.y < first.site.y + first.site.h).toBe(false)
+      expect(
+        first.site.x < s.x + s.w &&
+          s.x < first.site.x + first.site.w &&
+          first.site.y < s.y + s.h &&
+          s.y < first.site.y + first.site.h,
+      ).toBe(false)
   })
 
   it('the town ground box reaches past the roofs, and it is what the world owes clearance to', () => {

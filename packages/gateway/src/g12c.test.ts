@@ -52,12 +52,14 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
     expect(new Set(homes).size, 'two founders share a roof').toBe(5)
   })
 
-  it('puts each owner\'s door on their OWN house, never on a shared one', () => {
+  it("puts each owner's door on their OWN house, never on a shared one", () => {
     const t = makeCityTemplate({ x: 0, y: 9 })
-    const doors = t.structures.filter((s) => s.kind === 'house').map((s) => {
-      const d = doorTile(s)
-      return `${d.dx},${d.dy}`
-    })
+    const doors = t.structures
+      .filter((s) => s.kind === 'house')
+      .map((s) => {
+        const d = doorTile(s)
+        return `${d.dx},${d.dy}`
+      })
     expect(new Set(doors).size).toBe(doors.length)
   })
 
@@ -69,7 +71,10 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
   // The full five-distinct-`insideId` simulation is in `founders.test.ts`; this asserts the
   // ownership law that test depends on rather than reproducing it.
   it('has the engine half written down, with its citation', () => {
-    const delta = readFileSync(join(REPO, 'docs', 'superpowers', 'plans', 'c8-delta-from-c12.md'), 'utf8')
+    const delta = readFileSync(
+      join(REPO, 'docs', 'superpowers', 'plans', 'c8-delta-from-c12.md'),
+      'utf8',
+    )
     expect(delta).toMatch(/U25/)
   })
 })

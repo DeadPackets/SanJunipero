@@ -28,9 +28,20 @@ describe('groundPlan', () => {
 // `straight-ns` tile is a hole — so it is an OVERLAY and the plan carries the ground under it.
 
 const record = (kind: string, meta: string | null, seq: number): AssetRecord => ({
-  id: `rec-${kind}`, seq, class: 'terrain', kind, status: 'ready', desc: kind, meta,
-  footprint: { w: 1, h: 1 }, widthPx: 32, heightPx: 16,
-  score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+  id: `rec-${kind}`,
+  seq,
+  class: 'terrain',
+  kind,
+  status: 'ready',
+  desc: kind,
+  meta,
+  footprint: { w: 1, h: 1 },
+  widthPx: 32,
+  heightPx: 16,
+  score: 10,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-17T00:00:00Z',
 })
 
 const manifest = (kind: string, variant: number): string =>
@@ -53,7 +64,9 @@ function codexWithStrip(): AssetRecord[] {
 
 // a 3-tile straight north-south road down the middle of a grass field
 function roadStrip(): TileId[][] {
-  const g: TileId[][] = Array.from({ length: 5 }, () => Array.from({ length: 3 }, () => 0 as TileId))
+  const g: TileId[][] = Array.from({ length: 5 }, () =>
+    Array.from({ length: 3 }, () => 0 as TileId),
+  )
   for (let y = 1; y <= 3; y++) g[y]![1] = ROAD_TILE_ID
   return g
 }
@@ -73,7 +86,9 @@ describe('tilesetPlan over a 3-tile straight road', () => {
 
   it('resolves the middle of the run to the straight-ns strip cell, not a flat variant', () => {
     const mid = at(1, 2)
-    expect(mid.url).toBe(`/assets/${roadAutotileKind('straight-ns')}.png`.replace('/assets/', '/assets/rec-'))
+    expect(mid.url).toBe(
+      `/assets/${roadAutotileKind('straight-ns')}.png`.replace('/assets/', '/assets/rec-'),
+    )
     expect(mid.overlay).toBe(true)
   })
 
@@ -91,11 +106,13 @@ describe('tilesetPlan over a 3-tile straight road', () => {
   it('never gives a road cell a dark fill on any layer', () => {
     const dark = (c: number): boolean => {
       const [r, g, b] = [(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff]
-      return r * 0.299 + g * 0.587 + b * 0.114 < 96      // the 0x322B38 stage is ~52
+      return r * 0.299 + g * 0.587 + b * 0.114 < 96 // the 0x322B38 stage is ~52
     }
     for (const cell of roadCells) {
       expect(dark(cell.fallback), `road fallback #${cell.fallback.toString(16)}`).toBe(false)
-      expect(dark(cell.base!.fallback), `base fallback #${cell.base!.fallback.toString(16)}`).toBe(false)
+      expect(dark(cell.base!.fallback), `base fallback #${cell.base!.fallback.toString(16)}`).toBe(
+        false,
+      )
     }
   })
 

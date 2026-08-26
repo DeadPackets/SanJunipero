@@ -4,15 +4,27 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import {
-  BondsResponseSchema, DEFAULT_CONFIG, MomentsResponseSchema, ROAD_AUTOTILE_KEYS,
-  TERRAIN_TILE_KINDS, momentToTick, parseTerrainTileManifest, roadAutotileKind, tickToMoment,
+  BondsResponseSchema,
+  DEFAULT_CONFIG,
+  MomentsResponseSchema,
+  ROAD_AUTOTILE_KEYS,
+  TERRAIN_TILE_KINDS,
+  momentToTick,
+  parseTerrainTileManifest,
+  roadAutotileKind,
+  tickToMoment,
   type ChronicleEntry,
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import {
-  PLAZA_TILE, ROAD_TILE, makeShowcaseMap, roadReach, showcaseDoorTile, showcaseTerrain,
+  PLAZA_TILE,
+  ROAD_TILE,
+  makeShowcaseMap,
+  roadReach,
+  showcaseDoorTile,
+  showcaseTerrain,
 } from './showcaseMap.js'
 import { ingestTerrainArt } from './ingestArt.js'
 import { WorldMirror } from './worldMirror.js'
@@ -20,7 +32,9 @@ import { WorldMirror } from './worldMirror.js'
 // The renderer-side half lives in packages/web/src/render/g10.test.ts: the web package is
 // DOM-typed and bundler-resolved, so a gateway test cannot import from it without breaking `tsc -b`.
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
+  Array.from({ length: 24 }, () => 0 as TileId),
+)
 
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
@@ -55,11 +69,25 @@ function scriptedWorld(dbPath: string): Database.Database {
       }
       if (tick === 4) {
         emit('structure_planned', {
-          id: 'house1', kind: 'house', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'yusuf',
+          id: 'house1',
+          kind: 'house',
+          x: 2,
+          y: 2,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'yusuf',
         })
       }
       if (tick === 8) emit('structure_completed', { id: 'house1' })
-      if (tick === 12) emit('item_spawned', { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'house1' } })
+      if (tick === 12)
+        emit('item_spawned', {
+          id: 'i1',
+          kind: 'bread',
+          qty: 2,
+          loc: { t: 'structure', id: 'house1' },
+        })
       if (tick === 16) emit('agent_entered', { agentId: 'amara', structureId: 'house1' })
       if (tick === 17) emit('agent_entered', { agentId: 'yusuf', structureId: 'house1' })
       if (tick === 20) emit('agent_slept', { agentId: 'amara' })
@@ -74,7 +102,7 @@ function scriptedWorld(dbPath: string): Database.Database {
 describe('GATE G10 — automated half, gateway side', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-g10-'))
   let gw: Gateway
-  let bare: Gateway            // the same world with no narrator.db behind it
+  let bare: Gateway // the same world with no narrator.db behind it
   let base: string
   let bareBase: string
 
@@ -84,23 +112,39 @@ describe('GATE G10 — automated half, gateway side', () => {
 
     const narratorPath = join(dir, 'narrator.db')
     const ndb = openNarratorFixtureDb(narratorPath)
-    ndb.prepare('INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)')
+    ndb
+      .prepare(
+        'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
+      )
       .run(0, 'The First Morning', 'They woke.', '[]', '[]')
-    ndb.prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
+    ndb
+      .prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
       .run('first_death', 'The first death', 9000, 0, 30)
-    ndb.prepare('INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)')
+    ndb
+      .prepare(
+        'INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)',
+      )
       .run(0, 8, 30, '[1,2]', '["amara","yusuf"]', 'the house')
     ndb.close()
 
     gw = await createGateway({
-      dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, narratorDbPath: narratorPath,
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      narratorDbPath: narratorPath,
     })
     base = `http://127.0.0.1:${gw.port}`
 
     const bareDbPath = join(dir, 'bare.db')
     const bareDb = scriptedWorld(bareDbPath)
     bare = await createGateway({
-      dbPath: bareDbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db: bareDb,
+      dbPath: bareDbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db: bareDb,
       narratorDbPath: join(dir, 'no-such-narrator.db'),
     })
     bareBase = `http://127.0.0.1:${bare.port}`
@@ -119,11 +163,16 @@ describe('GATE G10 — automated half, gateway side', () => {
       const reach = roadReach(map)
       expect(reach.size).toBeGreaterThan(0)
       const roads = map.terrain.flat().filter((t) => t === ROAD_TILE).length
-      expect(reach.size).toBe(roads)                        // every road tile, one lattice
+      expect(reach.size).toBe(roads) // every road tile, one lattice
       for (const s of map.structures) {
         const d = showcaseDoorTile(s)
-        const touchesRoad = [[0, -1], [1, 0], [0, 1], [-1, 0], [0, 0]]
-          .some(([dx, dy]) => map.terrain[d.y + dy!]?.[d.x + dx!] === ROAD_TILE)
+        const touchesRoad = [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0],
+          [0, 0],
+        ].some(([dx, dy]) => map.terrain[d.y + dy!]?.[d.x + dx!] === ROAD_TILE)
         expect(touchesRoad, `${s.kind} at ${d.x},${d.y} has no road at its door`).toBe(true)
       }
     })
@@ -140,7 +189,9 @@ describe('GATE G10 — automated half, gateway side', () => {
           if (r.kind!.startsWith('road:')) continue
           expect(parseTerrainTileManifest(r.meta)).not.toBeNull()
         }
-      } finally { fdb.close() }
+      } finally {
+        fdb.close()
+      }
     })
 
     it('serves those records to a viewer, so the ground can stop being flat', async () => {
@@ -154,23 +205,34 @@ describe('GATE G10 — automated half, gateway side', () => {
         expect(materials).toHaveLength(TERRAIN_TILE_KINDS.length + 1)
         expect(materials.map((r) => r.kind)).toContain('material:road-calm')
         expect(ready).toHaveLength(
-          TERRAIN_TILE_KINDS.length + 1 + TERRAIN_TILE_KINDS.length * 4 + ROAD_AUTOTILE_KEYS.length)
-      } finally { fdb.close() }
+          TERRAIN_TILE_KINDS.length + 1 + TERRAIN_TILE_KINDS.length * 4 + ROAD_AUTOTILE_KEYS.length,
+        )
+      } finally {
+        fdb.close()
+      }
     })
   })
 
   // ── 2. determinism ──────────────────────────────────────────────────────────────────
   describe('2. determinism', () => {
     it('paints byte-identical tiles across two fresh codexes', async () => {
-      const a = openForgeDb(':memory:'), b = openForgeDb(':memory:')
+      const a = openForgeDb(':memory:'),
+        b = openForgeDb(':memory:')
       try {
-        const ca = new AssetCodex(a), cb = new AssetCodex(b)
-        const ra = await registerTerrainTiles(ca), rb = await registerTerrainTiles(cb)
+        const ca = new AssetCodex(a),
+          cb = new AssetCodex(b)
+        const ra = await registerTerrainTiles(ca),
+          rb = await registerTerrainTiles(cb)
         expect(ra.map((r) => r.kind)).toEqual(rb.map((r) => r.kind))
         for (let i = 0; i < ra.length; i++) {
-          expect(ca.get(ra[i]!.id)!.png.equals(cb.get(rb[i]!.id)!.png), ra[i]!.kind ?? '?').toBe(true)
+          expect(ca.get(ra[i]!.id)!.png.equals(cb.get(rb[i]!.id)!.png), ra[i]!.kind ?? '?').toBe(
+            true,
+          )
         }
-      } finally { a.close(); b.close() }
+      } finally {
+        a.close()
+        b.close()
+      }
     })
 
     it('builds the same showcase town twice', () => {
@@ -198,7 +260,12 @@ describe('GATE G10 — automated half, gateway side', () => {
 
     it('remembers only what a town would, in the order it happened', async () => {
       const { entries } = await get<{ entries: ChronicleEntry[] }>('/api/chronicle')
-      expect(entries.map((e) => e.type)).toEqual(['structure_completed', 'co_slept', 'agent_died', 'first'])
+      expect(entries.map((e) => e.type)).toEqual([
+        'structure_completed',
+        'co_slept',
+        'agent_died',
+        'first',
+      ])
       const ticks = entries.map((e) => e.tick)
       expect([...ticks].sort((p, q) => p - q)).toEqual(ticks)
       for (const e of entries) expect(e.label.length).toBeGreaterThan(0)
@@ -209,14 +276,19 @@ describe('GATE G10 — automated half, gateway side', () => {
       const partners = body.bonds.filter((b) => b.kind === 'partner')
       expect(partners).toHaveLength(1)
       expect([partners[0]!.aId, partners[0]!.bId].sort()).toEqual(['amara', 'yusuf'])
-      expect(body.bonds.every((b) => b.aId < b.bId)).toBe(true)   // one bond per pair, ordered
+      expect(body.bonds.every((b) => b.aId < b.bId)).toBe(true) // one bond per pair, ordered
       expect(body.asOfTick).toBeGreaterThan(0)
     })
 
-    it('turns the narrator\'s recorded scene into an openable moment', async () => {
+    it("turns the narrator's recorded scene into an openable moment", async () => {
       const body = MomentsResponseSchema.parse(await get('/api/moments'))
       expect(body.moments).toHaveLength(1)
-      expect(body.moments[0]).toMatchObject({ day: 0, startTick: 8, endTick: 30, location: 'the house' })
+      expect(body.moments[0]).toMatchObject({
+        day: 0,
+        startTick: 8,
+        endTick: 30,
+        location: 'the house',
+      })
       expect(body.moments[0]!.cast).toEqual(['amara', 'yusuf'])
     })
 
@@ -243,7 +315,9 @@ describe('GATE G10 — automated half, gateway side', () => {
         expect(state.items['i1']!.loc).toEqual({ t: 'structure', id: 'house1' })
         // this is the fixture the web-side g10 file re-asserts interiorOf/bedSlots against
         expect(state.agents['amara']!.asleep).toBe(true)
-      } finally { db.close() }
+      } finally {
+        db.close()
+      }
     })
 
     it('leaves the plaza standing — the showcase map is genesis input, not a runtime edit', () => {

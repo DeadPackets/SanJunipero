@@ -6,14 +6,40 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type Database from 'better-sqlite3'
 import {
-  applyLaw, buildFootprint, BRIDGE_KIND, createWorldTick, doorTile, EventStore, findPath, fold,
-  genesisState, GENESIS_FORD, isPassable, makeGenesisWorld, replayFromGenesis, replayLatest,
-  RngStreams, submitIntent, TickLoop, TOGGLABLE_PATHS, thirstOf, WATER_TILES,
-  type LawQueue, type TickHandler, type TileId, type WorldState,
+  applyLaw,
+  buildFootprint,
+  BRIDGE_KIND,
+  createWorldTick,
+  doorTile,
+  EventStore,
+  findPath,
+  fold,
+  genesisState,
+  GENESIS_FORD,
+  isPassable,
+  makeGenesisWorld,
+  replayFromGenesis,
+  replayLatest,
+  RngStreams,
+  submitIntent,
+  TickLoop,
+  TOGGLABLE_PATHS,
+  thirstOf,
+  WATER_TILES,
+  type LawQueue,
+  type TickHandler,
+  type TileId,
+  type WorldState,
 } from '@sj/engine'
 import {
-  chronicleLine, DEFAULT_CONFIG, DISCOVERY_EVENT, MINUTES_PER_DAY, stateHash, WORLD_MARGIN,
-  type SimConfig, type SimEvent,
+  chronicleLine,
+  DEFAULT_CONFIG,
+  DISCOVERY_EVENT,
+  MINUTES_PER_DAY,
+  stateHash,
+  WORLD_MARGIN,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 // Cross-package by relative path on purpose: @sj/arbiter and @sj/narrator both depend on
 // @sj/agents, so a package-level dependency here would close a cycle.
@@ -35,7 +61,12 @@ import { NarratorStore } from '../../narrator/src/store.js'
 import type { TranscriptRecord } from '../../narrator/src/semanticFirsts.js'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
-import { buildAgentCtx, wireArbiter, type Adjudicator, type Codifier } from '../src/runtime/arbiterSeam.js'
+import {
+  buildAgentCtx,
+  wireArbiter,
+  type Adjudicator,
+  type Codifier,
+} from '../src/runtime/arbiterSeam.js'
 import { openAgentDb } from '../src/memory/schema.js'
 import { PersonalityStore, type PersonalityDoc } from '../src/personality.js'
 import { insertAlert, migrateLlmTables } from '../src/llm/callLog.js'
@@ -46,13 +77,28 @@ import { makeReflectionLlm } from '../src/reflection.js'
 import { MIND_MODEL } from '../src/llm/pins.js'
 import type { IdentityCore } from '../src/prompt/assemble.js'
 import {
-  FullNeedTally, G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median,
-  semanticPassErrorCount, survivalTax, type G11Discretion, type G11Report,
+  FullNeedTally,
+  G11ReportSchema,
+  checkG11Report,
+  chronicleViolations,
+  classifyVerb,
+  median,
+  semanticPassErrorCount,
+  survivalTax,
+  type G11Discretion,
+  type G11Report,
 } from '../src/live/g11report.js'
 import {
-  G11_CHECKPOINT_VERSION, checkpointRefusal, fingerprintMismatch, migrateCheckpointTable,
-  readCheckpoint, restoreSnapshot, writeCheckpoint,
-  type G11Checkpoint, type G11Fingerprint, type G11Sidecar,
+  G11_CHECKPOINT_VERSION,
+  checkpointRefusal,
+  fingerprintMismatch,
+  migrateCheckpointTable,
+  readCheckpoint,
+  restoreSnapshot,
+  writeCheckpoint,
+  type G11Checkpoint,
+  type G11Fingerprint,
+  type G11Sidecar,
 } from '../src/live/g11checkpoint.js'
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 import type { DiscoveryCredit } from '@sj/shared'
@@ -111,8 +157,17 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 // chronicle LINE and drops half of what the milestone detectors match on.
 const SEMANTIC_RECORD_CAP = 300
 const NARRATOR_NOISE: ReadonlySet<string> = new Set([
-  'tick_advanced', 'need_changed', 'thirst_changed', 'hp_changed', 'agent_moved', 'agent_aged',
-  'action_progressed', 'structure_progressed', 'fauna_moved', 'traffic_decayed', 'skill_gained',
+  'tick_advanced',
+  'need_changed',
+  'thirst_changed',
+  'hp_changed',
+  'agent_moved',
+  'agent_aged',
+  'action_progressed',
+  'structure_progressed',
+  'fauna_moved',
+  'traffic_decayed',
+  'skill_gained',
 ])
 
 const NO_USAGE = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
@@ -120,9 +175,14 @@ const NO_USAGE = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd:
 // A model that never leaves the process. It answers each schema with the smallest value that
 // parses, which is all the wiring needs to be exercised; nothing it returns is evidence.
 class DryLlm {
-  constructor(private readonly db: Database.Database, private readonly agentId: string | null) {}
+  constructor(
+    private readonly db: Database.Database,
+    private readonly agentId: string | null,
+  ) {}
 
-  async object<T>(opts: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }): Promise<{ value: T; usage: typeof NO_USAGE }> {
+  async object<T>(opts: {
+    schema: { safeParse(v: unknown): { success: boolean; data?: T } }
+  }): Promise<{ value: T; usage: typeof NO_USAGE }> {
     for (const candidate of dryAnswers()) {
       const parsed = opts.schema.safeParse(candidate)
       if (parsed.success) return { value: parsed.data as T, usage: NO_USAGE }
@@ -134,8 +194,12 @@ class DryLlm {
     return { text: 'the day passes', usage: NO_USAGE }
   }
 
-  totalCostUsd(): number { return 0 }
-  alert(kind: string, detail: string): void { insertAlert(this.db, { agentId: this.agentId, kind, detail }) }
+  totalCostUsd(): number {
+    return 0
+  }
+  alert(kind: string, detail: string): void {
+    insertAlert(this.db, { agentId: this.agentId, kind, detail })
+  }
 }
 
 // The canned answers, in the order they are tried. Each is the smallest object that satisfies
@@ -155,7 +219,14 @@ const dryAnswers = (): unknown[] => {
     { title: 'A day', text: 'The day passed.', citations: [] },
     { hits: [] },
     { rulings: [] },
-    { word: 'hum', sense: 'sound', durationTicks: 5, energyCost: 1, targeted: false, emote: 'hums a little' },
+    {
+      word: 'hum',
+      sense: 'sound',
+      durationTicks: 5,
+      energyCost: 1,
+      targeted: false,
+      emote: 'hums a little',
+    },
     { kind: 'impossible', reason: 'not in a dry run', class: 'physically_impossible' },
     {},
   ]
@@ -164,99 +235,204 @@ const dryAnswers = (): unknown[] => {
 function makeClient(db: Database.Database, caller: string, agentId?: string): LlmClient {
   if (DRY_RUN) return new DryLlm(db, agentId ?? null) as unknown as LlmClient
   return new LlmClient({
-    db, caller, ...(agentId === undefined ? {} : { agentId }),
-    providerOrder: PROVIDER_ORDER, allowProviderFallbacks: !HARD_PROVIDER_ALLOW_LIST,
+    db,
+    caller,
+    ...(agentId === undefined ? {} : { agentId }),
+    providerOrder: PROVIDER_ORDER,
+    allowProviderFallbacks: !HARD_PROVIDER_ALLOW_LIST,
   })
 }
 
 // ---------------------------------------------------------------- the minds ---
 
-type Mind = { id: string; identity: IdentityCore; personality: PersonalityDoc; ageDays: number; sex: 'f' | 'm' }
+type Mind = {
+  id: string
+  identity: IdentityCore
+  personality: PersonalityDoc
+  ageDays: number
+  sex: 'f' | 'm'
+}
 
 const voice = (
-  register: string, rhythm: string, tics: string[], neverSays: string[],
-  exampleLines: string[], typical: number, burst: number,
-): IdentityCore['voiceCard'] => ({ register, rhythm, tics, neverSays, exampleLines, wordBudget: { typical, burst } })
+  register: string,
+  rhythm: string,
+  tics: string[],
+  neverSays: string[],
+  exampleLines: string[],
+  typical: number,
+  burst: number,
+): IdentityCore['voiceCard'] => ({
+  register,
+  rhythm,
+  tics,
+  neverSays,
+  exampleLines,
+  wordBudget: { typical, burst },
+})
 
 const MINDS: Mind[] = [
   {
-    id: 'amara', sex: 'f', ageDays: 34 * 364,
+    id: 'amara',
+    sex: 'f',
+    ageDays: 34 * 364,
     identity: {
-      name: 'Amara', age: 34,
-      backstory: 'Keeps the storehouse tally in her head and has never once been wrong about it. Came to this valley first and put the well where the well is.',
+      name: 'Amara',
+      age: 34,
+      backstory:
+        'Keeps the storehouse tally in her head and has never once been wrong about it. Came to this valley first and put the well where the well is.',
       temperament: 'steady, exacting, slow to warm',
-      voiceCard: voice('plain and precise, names the thing', 'short, then done', ['counts aloud'], ['flattery'],
-        ['The store holds four days.', 'Put it back where it was.'], 12, 22),
+      voiceCard: voice(
+        'plain and precise, names the thing',
+        'short, then done',
+        ['counts aloud'],
+        ['flattery'],
+        ['The store holds four days.', 'Put it back where it was.'],
+        12,
+        22,
+      ),
     },
     personality: {
       temperament: 'steady, exacting, slow to warm',
       values: ['a full store', 'water within reach'],
       beliefs: ['what is counted keeps'],
-      current: { mood: 'dry-mouthed and watchful', worries: ['your throat is parched and there is a well in the middle of town'], goals: ['drink — the well is a short walk and you can drink straight from it', 'see what is in the storehouse'] },
+      current: {
+        mood: 'dry-mouthed and watchful',
+        worries: ['your throat is parched and there is a well in the middle of town'],
+        goals: [
+          'drink — the well is a short walk and you can drink straight from it',
+          'see what is in the storehouse',
+        ],
+      },
     },
   },
   {
-    id: 'yusuf', sex: 'm', ageDays: 41 * 364,
+    id: 'yusuf',
+    sex: 'm',
+    ageDays: 41 * 364,
     identity: {
-      name: 'Yusuf', age: 41,
-      backstory: 'A carpenter with a grudge against the river, which took his first bridge. He has been eyeing the narrows north of town since the spring.',
+      name: 'Yusuf',
+      age: 41,
+      backstory:
+        'A carpenter with a grudge against the river, which took his first bridge. He has been eyeing the narrows north of town since the spring.',
       temperament: 'stubborn, generous with his hands, quiet about it',
-      voiceCard: voice('warm and practical', 'two sentences, then work', ['agrees in one word'], ['long speeches'],
-        ['I will cut it today.', 'The narrows will take a deck.'], 14, 26),
+      voiceCard: voice(
+        'warm and practical',
+        'two sentences, then work',
+        ['agrees in one word'],
+        ['long speeches'],
+        ['I will cut it today.', 'The narrows will take a deck.'],
+        14,
+        26,
+      ),
     },
     personality: {
       temperament: 'stubborn, generous with his hands, quiet about it',
       values: ['good joinery', 'a crossing'],
       beliefs: ['a river you cannot cross is a wall'],
-      current: { mood: 'set on it', worries: ['the far bank is a day away'], goals: ['walk north and look at the narrows', 'cut timber for a deck'] },
+      current: {
+        mood: 'set on it',
+        worries: ['the far bank is a day away'],
+        goals: ['walk north and look at the narrows', 'cut timber for a deck'],
+      },
     },
   },
   {
-    id: 'nadia', sex: 'f', ageDays: 29 * 364,
+    id: 'nadia',
+    sex: 'f',
+    ageDays: 29 * 364,
     identity: {
-      name: 'Nadia', age: 29,
-      backstory: 'Walks the whole valley most days and knows where the berries are before anyone else does. Hates a muddy track.',
+      name: 'Nadia',
+      age: 29,
+      backstory:
+        'Walks the whole valley most days and knows where the berries are before anyone else does. Hates a muddy track.',
       temperament: 'restless, cheerful, impatient',
-      voiceCard: voice('bright and quick', 'runs on when she is pleased', ['calls the path "the way"'], ['self-pity'],
-        ['The bushes are heavy out east.', 'This way is all mud again.'], 22, 36),
+      voiceCard: voice(
+        'bright and quick',
+        'runs on when she is pleased',
+        ['calls the path "the way"'],
+        ['self-pity'],
+        ['The bushes are heavy out east.', 'This way is all mud again.'],
+        22,
+        36,
+      ),
     },
     personality: {
       temperament: 'restless, cheerful, impatient',
       values: ['nothing wasted', 'a dry way home'],
       beliefs: ['feet make the road'],
-      current: { mood: 'in a hurry and hungry', worries: ['the berries will go over and there is nothing in your hands'], goals: ['gather from a berry bush', 'eat what you gather, and take a handful back'] },
+      current: {
+        mood: 'in a hurry and hungry',
+        worries: ['the berries will go over and there is nothing in your hands'],
+        goals: ['gather from a berry bush', 'eat what you gather, and take a handful back'],
+      },
     },
   },
   {
-    id: 'omar', sex: 'm', ageDays: 46 * 364,
+    id: 'omar',
+    sex: 'm',
+    ageDays: 46 * 364,
     identity: {
-      name: 'Omar', age: 46,
-      backstory: 'The nearest thing this town has to a healer. Keeps herbs in his hut and has sat up with more sick people than he can name.',
+      name: 'Omar',
+      age: 46,
+      backstory:
+        'The nearest thing this town has to a healer. Keeps herbs in his hut and has sat up with more sick people than he can name.',
       temperament: 'gentle, unhurried, hard to alarm',
-      voiceCard: voice('low and calm', 'pauses before he answers', ['settles a person before he begins'], ['alarm'],
-        ['Sit down. Let me look at it.', 'It will pass, or it will not.'], 16, 28),
+      voiceCard: voice(
+        'low and calm',
+        'pauses before he answers',
+        ['settles a person before he begins'],
+        ['alarm'],
+        ['Sit down. Let me look at it.', 'It will pass, or it will not.'],
+        16,
+        28,
+      ),
     },
     personality: {
       temperament: 'gentle, unhurried, hard to alarm',
       values: ['sitting with the sick', 'a herb within reach'],
       beliefs: ['a fever answers to a hand more than to a remedy'],
-      current: { mood: 'attentive', worries: ['somebody is ill and nobody has said so'], goals: ['look in on the others and tend anyone who is unwell', 'at dusk you bow your head over the sick, the way you were taught — it costs nothing and changes nothing'] },
+      current: {
+        mood: 'attentive',
+        worries: ['somebody is ill and nobody has said so'],
+        goals: [
+          'look in on the others and tend anyone who is unwell',
+          'at dusk you bow your head over the sick, the way you were taught — it costs nothing and changes nothing',
+        ],
+      },
     },
   },
   {
-    id: 'salma', sex: 'f', ageDays: 26 * 364,
+    id: 'salma',
+    sex: 'f',
+    ageDays: 26 * 364,
     identity: {
-      name: 'Salma', age: 26,
-      backstory: 'Sings at her work, which the others have stopped remarking on. She woke this morning with a fever she has told nobody about.',
+      name: 'Salma',
+      age: 26,
+      backstory:
+        'Sings at her work, which the others have stopped remarking on. She woke this morning with a fever she has told nobody about.',
       temperament: 'private, wry, does not complain',
-      voiceCard: voice('dry and glancing', 'a line, then a shrug', ['understates'], ['complaint'],
-        ['It is nothing.', 'I have had worse.'], 11, 20),
+      voiceCard: voice(
+        'dry and glancing',
+        'a line, then a shrug',
+        ['understates'],
+        ['complaint'],
+        ['It is nothing.', 'I have had worse.'],
+        11,
+        20,
+      ),
     },
     personality: {
       temperament: 'private, wry, does not complain',
       values: ['carrying your own weight'],
       beliefs: ['a thing named is a thing made worse'],
-      current: { mood: 'hot and shivering', worries: ['you are ill and you do not want to be a burden'], goals: ['sing over your work — not talking, singing, the way you always have', 'keep at your work'] },
+      current: {
+        mood: 'hot and shivering',
+        worries: ['you are ill and you do not want to be a burden'],
+        goals: [
+          'sing over your work — not talking, singing, the way you always have',
+          'keep at your work',
+        ],
+      },
     },
   },
 ]
@@ -277,7 +453,9 @@ class WatchedBridge extends EngineBridge {
   readonly accepted: Array<{ tick: number; agentId: string; verb: string }> = []
   #tick: () => number = () => 0
 
-  watchTicks(tick: () => number): void { this.#tick = tick }
+  watchTicks(tick: () => number): void {
+    this.#tick = tick
+  }
 
   // A resumed run keeps the refusals and the accepted acts it already made. They are the
   // transcript's two halves and neither is in the event log.
@@ -286,21 +464,32 @@ class WatchedBridge extends EngineBridge {
     this.accepted.push(...sidecar.accepted)
   }
 
-  override submit(agentId: string, intent: Intent, onResult?: (r: SubmitResult) => void): Promise<SubmitResult> {
+  override submit(
+    agentId: string,
+    intent: Intent,
+    onResult?: (r: SubmitResult) => void,
+  ): Promise<SubmitResult> {
     return super.submit(agentId, intent, (r) => {
       if (r.ok) this.accepted.push({ tick: this.#tick(), agentId, verb: intent.verb })
-      else this.rejections.push({ tick: this.#tick(), agentId, verb: intent.verb, reason: r.reason })
+      else
+        this.rejections.push({ tick: this.#tick(), agentId, verb: intent.verb, reason: r.reason })
       onResult?.(r)
     })
   }
 }
 
 const qInt = (db: Database.Database, sql: string, ...p: unknown[]): number =>
-  Number(db.prepare(sql).pluck().get(...p))
+  Number(
+    db
+      .prepare(sql)
+      .pluck()
+      .get(...p),
+  )
 const qRows = <T>(db: Database.Database, sql: string, ...p: unknown[]): T[] =>
   db.prepare(sql).all(...p) as T[]
 
-const payloadOf = (e: SimEvent): Record<string, unknown> => (e.payload ?? {}) as Record<string, unknown>
+const payloadOf = (e: SimEvent): Record<string, unknown> =>
+  (e.payload ?? {}) as Record<string, unknown>
 
 // The sha is part of the fingerprint so a resume cannot score a repaired run on broken evidence.
 // The run rewrites its own artifacts under data/, so `-uno` and that exclusion let it resume.
@@ -309,10 +498,14 @@ function gitSha(): string {
     const at = fileURLToPath(new URL('../../../', import.meta.url))
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: at, encoding: 'utf8' }).trim()
     const dirty = execFileSync(
-      'git', ['status', '--porcelain', '-uno', '--', '.', ':(exclude)packages/agents/data'],
-      { cwd: at, encoding: 'utf8' }).trim()
+      'git',
+      ['status', '--porcelain', '-uno', '--', '.', ':(exclude)packages/agents/data'],
+      { cwd: at, encoding: 'utf8' },
+    ).trim()
     return dirty.length === 0 ? head : `${head}-dirty:${hashOf(dirty)}`
-  } catch { return 'unknown' }
+  } catch {
+    return 'unknown'
+  }
 }
 const hashOf = (s: string): string => {
   let h = 0
@@ -371,13 +564,18 @@ async function main(): Promise<void> {
       process.exit(4)
     }
     const reasons = fingerprintMismatch(saved.fingerprint, fingerprint)
-    if (reasons.length > 0) { console.error(checkpointRefusal(reasons)); process.exit(4) }
+    if (reasons.length > 0) {
+      console.error(checkpointRefusal(reasons))
+      process.exit(4)
+    }
     // The dry run's canned answers cycle off a counter, so a resumed dry run has to pick the
     // cycle up where it left it or it is not the same run. This is what makes the resumed-run
     // -equals-continuous-run proof mechanical rather than a claim.
     dryTurn = saved.sidecar.dryTurn
-    console.log(`[g11] resuming from tick ${saved.sidecar.tick},`
-      + ` day ${saved.sidecar.lastDayClosed} closed, resume #${saved.sidecar.resumes.length + 1}`)
+    console.log(
+      `[g11] resuming from tick ${saved.sidecar.tick},` +
+        ` day ${saved.sidecar.lastDayClosed} closed, resume #${saved.sidecar.resumes.length + 1}`,
+    )
   } else {
     seedCodex(db)
   }
@@ -387,20 +585,28 @@ async function main(): Promise<void> {
   // could not; the gate does not start again without asking first.
   const preflightLlm = makeClient(db, 'preflight')
   const preflight = await runPreflight({
-    llm: preflightLlm, provider: PROVIDER_ORDER.join(','),
-    hardAllowList: HARD_PROVIDER_ALLOW_LIST, model: MIND_MODEL,
-    identity: MINDS[0]!.identity, personality: MINDS[0]!.personality,
+    llm: preflightLlm,
+    provider: PROVIDER_ORDER.join(','),
+    hardAllowList: HARD_PROVIDER_ALLOW_LIST,
+    model: MIND_MODEL,
+    identity: MINDS[0]!.identity,
+    personality: MINDS[0]!.personality,
     rounds: PREFLIGHT_ROUNDS,
-    costUsd: () => qInt(db, `SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls WHERE caller = 'preflight'`),
-    servedProviders: () => qRows<{ provider: string }>(
-      db, `SELECT DISTINCT provider FROM llm_calls WHERE caller = 'preflight' AND provider IS NOT NULL`)
-      .map((r) => r.provider),
+    costUsd: () =>
+      qInt(db, `SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls WHERE caller = 'preflight'`),
+    servedProviders: () =>
+      qRows<{ provider: string }>(
+        db,
+        `SELECT DISTINCT provider FROM llm_calls WHERE caller = 'preflight' AND provider IS NOT NULL`,
+      ).map((r) => r.provider),
   })
-  console.log(`[g11] pre-flight: action ${preflight.actions}/${preflight.calls}`
-    + ` over ${preflight.roundsRun} round(s), ${preflight.roundsPassed} passed;`
-    + ` ${preflight.speechAdvisory};`
-    + ` served ${preflight.servedProviders.join(',') || 'unattributed'},`
-    + ` $${preflight.costUsd.toFixed(6)}`)
+  console.log(
+    `[g11] pre-flight: action ${preflight.actions}/${preflight.calls}` +
+      ` over ${preflight.roundsRun} round(s), ${preflight.roundsPassed} passed;` +
+      ` ${preflight.speechAdvisory};` +
+      ` served ${preflight.servedProviders.join(',') || 'unattributed'},` +
+      ` $${preflight.costUsd.toFixed(6)}`,
+  )
   if (!preflight.passed) {
     console.error(preflightRefusal(preflight))
     process.exit(3)
@@ -422,16 +628,20 @@ async function main(): Promise<void> {
     rng = recovered.rng
     const hash = stateHash(state)
     if (hash !== saved.sidecar.stateHash) {
-      console.error(checkpointRefusal([
-        `the world replayed out of this snapshot hashes ${hash},`
-        + ` and the checkpoint recorded ${saved.sidecar.stateHash}`,
-      ]))
+      console.error(
+        checkpointRefusal([
+          `the world replayed out of this snapshot hashes ${hash},` +
+            ` and the checkpoint recorded ${saved.sidecar.stateHash}`,
+        ]),
+      )
       process.exit(4)
     }
     if (state.tick !== saved.sidecar.tick) {
-      console.error(checkpointRefusal([
-        `the snapshot's event log ends at tick ${state.tick}, and the checkpoint says ${saved.sidecar.tick}`,
-      ]))
+      console.error(
+        checkpointRefusal([
+          `the snapshot's event log ends at tick ${state.tick}, and the checkpoint says ${saved.sidecar.tick}`,
+        ]),
+      )
       process.exit(4)
     }
   } else {
@@ -442,11 +652,20 @@ async function main(): Promise<void> {
 
     // The five founders, each at their own doorway.
     for (const m of MINDS) {
-      const home = Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === m.id)
+      const home = Object.values(state.structures).find(
+        (s) => s.kind === 'house' && s.owner === m.id,
+      )
       if (home === undefined) throw new Error(`genesis: no house owned by ${m.id}`)
       const door = doorTile(state, home)
       if (door === null) throw new Error(`genesis: no doorway on ${m.id}'s house`)
-      emit('agent_spawned', { id: m.id, name: m.identity.name, x: door.x, y: door.y, sex: m.sex, ageDays: m.ageDays })
+      emit('agent_spawned', {
+        id: m.id,
+        name: m.identity.name,
+        x: door.x,
+        y: door.y,
+        sex: m.sex,
+        ageDays: m.ageDays,
+      })
     }
     // The staged affliction: one founder wakes on day zero with a fever nobody has been told
     // about. Recovery or death both pass the criterion; silence does not.
@@ -463,7 +682,11 @@ async function main(): Promise<void> {
   const tickMs: number[] = saved?.sidecar.tickMs ?? []
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
-    store, state, rng, config, startTick: saved?.sidecar.tick ?? START_TICK,
+    store,
+    state,
+    rng,
+    config,
+    startTick: saved?.sidecar.tick ?? START_TICK,
     realMsPerTick: REAL_MS_PER_TICK,
     onTick: (ctx) => handler(ctx),
   })
@@ -478,14 +701,16 @@ async function main(): Promise<void> {
 
   // --- the minds ---
   const embedder = await Embedder.create(MODELS_DIR)
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = saved?.sidecar.thoughts ?? []
+  const thoughts: Array<{ tick: number; agentId: string; text: string }> =
+    saved?.sidecar.thoughts ?? []
   const runtimes = new Map<string, AgentRuntime>()
   let seam: { adjudicate: Adjudicator; codify: Codifier } | null = null
 
   // A resumed mind keeps its clock, half-run plan and counts: a fresh clock would restart turn
   // counting at zero, and criterion 8 gates on `reflectionsStarted` matching the resolved half.
   const restoring = new Map(
-    (saved?.sidecar.minds ?? []).map((m) => [m.agentId, m.snapshot] as const))
+    (saved?.sidecar.minds ?? []).map((m) => [m.agentId, m.snapshot] as const),
+  )
 
   function boot(spec: Mind): void {
     const personality = new PersonalityStore(db, spec.id)
@@ -494,7 +719,13 @@ async function main(): Promise<void> {
     const turnLlm = makeClient(db, 'turn', spec.id)
     const reflectionLlm = makeReflectionLlm(makeClient(db, 'reflection', spec.id))
     const runtime = new AgentRuntime({
-      db, llm: turnLlm, embedder, identity: spec.identity, personality, bridge, reflectionLlm,
+      db,
+      llm: turnLlm,
+      embedder,
+      identity: spec.identity,
+      personality,
+      bridge,
+      reflectionLlm,
       onThought: (t) => thoughts.push(t),
     })
     runtime.start(spec.id)
@@ -510,9 +741,31 @@ async function main(): Promise<void> {
   // caller passes `deps.vocabulary`, and only this runner can.
   const VOCABULARY = {
     itemKinds: [
-      'wood', 'stone', 'rope', 'cloth', 'fiber', 'hide', 'clay', 'axe', 'hoe', 'knife',
-      'seed_pouch', 'waterskin', 'bucket', 'torch', 'garment', 'plank', 'bread', 'wheat',
-      'fish', 'venison', 'rabbit_meat', 'berries', 'mushroom', 'herb', 'stew',
+      'wood',
+      'stone',
+      'rope',
+      'cloth',
+      'fiber',
+      'hide',
+      'clay',
+      'axe',
+      'hoe',
+      'knife',
+      'seed_pouch',
+      'waterskin',
+      'bucket',
+      'torch',
+      'garment',
+      'plank',
+      'bread',
+      'wheat',
+      'fish',
+      'venison',
+      'rabbit_meat',
+      'berries',
+      'mushroom',
+      'herb',
+      'stew',
     ],
     structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
   }
@@ -523,25 +776,41 @@ async function main(): Promise<void> {
   const discoveryArt = noDiscoveryArt()
 
   const arbiter = makeArbiter({
-    db, llm: arbiterLlm, embedder, tick: () => loop.tick, vocabulary: VOCABULARY,
+    db,
+    llm: arbiterLlm,
+    embedder,
+    tick: () => loop.tick,
+    vocabulary: VOCABULARY,
     // THE SEAM. A codification is a world fact, so it goes into the world's log; and if it
     // names a thing nobody has drawn, the forge is asked for a picture. Neither can fail the
     // codification, which has already happened by the time this runs.
     onCodified: (d: Codified) => {
       bridge.announce(DISCOVERY_EVENT, {
-        recipeId: d.recipeId, name: d.name, kind: d.kind,
-        byId: d.credit.agentId, intent: d.credit.intent, makes: d.makes,
+        recipeId: d.recipeId,
+        name: d.name,
+        kind: d.kind,
+        byId: d.credit.agentId,
+        intent: d.credit.intent,
+        makes: d.makes,
       })
       discoveryArt.onDiscovery({ name: d.name, makes: d.makes })
     },
   })
-  const adjudications: Array<{ tick: number; agentId: string; intent: string; kind: string; verb: string | null }>
-    = saved?.sidecar.adjudications ?? []
+  const adjudications: Array<{
+    tick: number
+    agentId: string
+    intent: string
+    kind: string
+    verb: string | null
+  }> = saved?.sidecar.adjudications ?? []
   const watched = {
     adjudicate: async (intent: string, ctx: Parameters<typeof arbiter.adjudicate>[1]) => {
       const verdict = await arbiter.adjudicate(intent, ctx)
       adjudications.push({
-        tick: loop.tick, agentId: ctx.agentId, intent, kind: verdict.kind,
+        tick: loop.tick,
+        agentId: ctx.agentId,
+        intent,
+        kind: verdict.kind,
         verb: verdict.kind === 'map' ? verdict.verb : null,
       })
       return verdict
@@ -575,14 +844,22 @@ async function main(): Promise<void> {
     const spoken: TranscriptRecord[] = allEvents
       .filter((e) => e.type === 'agent_spoke' && Math.floor(e.tick / MINUTES_PER_DAY) === day)
       .map((e) => ({
-        sourceKind: 'speech' as const, agentId: String(payloadOf(e).agentId), day, tick: e.tick,
-        text: String(payloadOf(e).text), eventSeq: e.seq,
+        sourceKind: 'speech' as const,
+        agentId: String(payloadOf(e).agentId),
+        day,
+        tick: e.tick,
+        text: String(payloadOf(e).text),
+        eventSeq: e.seq,
       }))
     const thought: TranscriptRecord[] = thoughts
       .filter((t) => Math.floor(t.tick / MINUTES_PER_DAY) === day)
       .map((t, i) => ({
-        sourceKind: 'thought' as const, agentId: t.agentId, day, tick: t.tick,
-        text: t.text, memoryRef: `thought:${day}:${i}`,
+        sourceKind: 'thought' as const,
+        agentId: t.agentId,
+        day,
+        tick: t.tick,
+        text: t.text,
+        memoryRef: `thought:${day}:${i}`,
       }))
     // Bounded, so one very loud day cannot build an unbounded prompt: the most recent words
     // are the ones a first is most likely to be in, and the cap is never reached live.
@@ -600,29 +877,44 @@ async function main(): Promise<void> {
     // 1 — the recognizer's daily pass (batch-7 ruling 1).
     try {
       await runConstructPass({
-        events: allEvents, baseConfig: config, store: constructStore, llm: constructLlm,
+        events: allEvents,
+        baseConfig: config,
+        store: constructStore,
+        llm: constructLlm,
         laws: loop.state.laws,
       })
-    } catch (err) { constructErrors += 1; console.error(`[g11] construct pass day ${day}:`, err) }
+    } catch (err) {
+      constructErrors += 1
+      console.error(`[g11] construct pass day ${day}:`, err)
+    }
 
     // 2 — the chronicle, with BOTH seams: the world (so tier 2 can read relationships) and
     // the nightly semantic pass (so tier 2.5 runs at all).
     if (dayEvents.length > 0) {
       const records = transcriptFor(day, allEvents)
-      console.log(`[g11] closing day ${day}: ${dayEvents.length} events to narrate, ${records.length} records to read`)
+      console.log(
+        `[g11] closing day ${day}: ${dayEvents.length} events to narrate, ${records.length} records to read`,
+      )
       // Whether the pass was reached, read off the night itself rather than assumed from the
       // absence of a throw: a chronicle that will not render no longer takes the pass with it,
       // and a ChapterRenderError carries what the night still managed (C11 batch 16).
       let reachedThePass = false
       try {
         const out = await narrateDay({
-          store: narratorStore, llm: narratorLlm, events: dayEvents,
+          store: narratorStore,
+          llm: narratorLlm,
+          events: dayEvents,
           rulebookCount: qInt(db, 'SELECT COUNT(*) FROM rulebook'),
-          privateCounts: { thoughts: thoughts.filter((t) => Math.floor(t.tick / MINUTES_PER_DAY) === day).length, journals: 0 },
+          privateCounts: {
+            thoughts: thoughts.filter((t) => Math.floor(t.tick / MINUTES_PER_DAY) === day).length,
+            journals: 0,
+          },
           world: { config, state: loop.state },
-          ...(records.length === 0 ? {} : {
-            semantic: { db, llm: semanticLlm, records },
-          }),
+          ...(records.length === 0
+            ? {}
+            : {
+                semantic: { db, llm: semanticLlm, records },
+              }),
         })
         reachedThePass = out.semanticRan
         for (const m of out.milestones) if (m.tier === 2.5) semanticHits.push(m.kind)
@@ -647,11 +939,13 @@ async function main(): Promise<void> {
   }
 
   // --- the run ---
-  const spendProjections: Array<{ tick: number; usdPerSimDay: number }> = saved?.sidecar.spendProjections ?? []
+  const spendProjections: Array<{ tick: number; usdPerSimDay: number }> =
+    saved?.sidecar.spendProjections ?? []
   const FULL_NEED_SAMPLE_TICKS = 10
-  const fullNeed = saved === null
-    ? new FullNeedTally(FULL_NEED_SAMPLE_TICKS)
-    : FullNeedTally.restore(FULL_NEED_SAMPLE_TICKS, saved.sidecar.fullNeed)
+  const fullNeed =
+    saved === null
+      ? new FullNeedTally(FULL_NEED_SAMPLE_TICKS)
+      : FullNeedTally.restore(FULL_NEED_SAMPLE_TICKS, saved.sidecar.fullNeed)
   let lastDayClosed = saved?.sidecar.lastDayClosed ?? Math.floor(START_TICK / MINUTES_PER_DAY)
   let tripwireHit = false
   const totalSpend = (): number => qInt(db, 'SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls')
@@ -664,14 +958,19 @@ async function main(): Promise<void> {
     checkpointEveryTicks: CHECKPOINT_TICKS,
   })
 
-  console.log(`[g11] model=${MIND_MODEL} provider=${PROVIDER_ORDER.join(',')}`
-    + ` allowList=${HARD_PROVIDER_ALLOW_LIST} ticks=${TOTAL_TICKS}`
-    + ` pace=${REAL_MS_PER_TICK}ms minds=${MINDS.length} (no cap; tripwire $${TRIPWIRE_USD_PER_MIND_SIM_HOUR}/mind/sim-hour)`)
+  console.log(
+    `[g11] model=${MIND_MODEL} provider=${PROVIDER_ORDER.join(',')}` +
+      ` allowList=${HARD_PROVIDER_ALLOW_LIST} ticks=${TOTAL_TICKS}` +
+      ` pace=${REAL_MS_PER_TICK}ms minds=${MINDS.length} (no cap; tripwire $${TRIPWIRE_USD_PER_MIND_SIM_HOUR}/mind/sim-hour)`,
+  )
   const startWall = Date.now()
 
   // The cheap word, and a SECOND body using it for nothing (criterion 9). It costs one arbiter
   // call, so it is resolved once and reused rather than re-asked by every partial report.
-  let reuse: { reusedBy: string | null; reuseArbiterCalls: number } = { reusedBy: null, reuseArbiterCalls: 0 }
+  let reuse: { reusedBy: string | null; reuseArbiterCalls: number } = {
+    reusedBy: null,
+    reuseArbiterCalls: 0,
+  }
   let reuseResolved = false
 
   // The rollback point. It is written into the live database and the whole database is copied
@@ -685,12 +984,20 @@ async function main(): Promise<void> {
         tick: loop.tick,
         lastDayClosed,
         stateHash: stateHash(loop.state),
-        thoughts, adjudications,
-        rejections: bridge.rejections, accepted: bridge.accepted,
-        tickMs, spendProjections,
+        thoughts,
+        adjudications,
+        rejections: bridge.rejections,
+        accepted: bridge.accepted,
+        tickMs,
+        spendProjections,
         fullNeed: fullNeed.entries(),
-        nightsRun, semanticRan, semanticErrors, semanticSkippedNights, narrateErrors,
-        constructErrors, semanticHits,
+        nightsRun,
+        semanticRan,
+        semanticErrors,
+        semanticSkippedNights,
+        narrateErrors,
+        constructErrors,
+        semanticHits,
         minds: [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
         dryTurn,
         resumes,
@@ -710,7 +1017,9 @@ async function main(): Promise<void> {
       // The one operator flip: the wear threshold, dropped so a trail can form inside a
       // two-day window. It is a whitelisted law, it lands as `config_changed`, and it replays.
       applyLaw(lawQueue, 'desirePaths.wearThreshold', WEAR_THRESHOLD)
-      console.log(`[g11] tick ${loop.tick}: operator sets desirePaths.wearThreshold = ${WEAR_THRESHOLD}`)
+      console.log(
+        `[g11] tick ${loop.tick}: operator sets desirePaths.wearThreshold = ${WEAR_THRESHOLD}`,
+      )
     }
 
     if (loop.tick % FULL_NEED_SAMPLE_TICKS === 0) {
@@ -719,9 +1028,13 @@ async function main(): Promise<void> {
         const a = loop.state.agents[id]!
         if (!a.alive) continue
         const floor = config.needs.debuffThreshold
-        const full = a.needs.hunger >= floor && a.needs.energy >= floor
-          && a.needs.warmth >= floor && a.needs.social >= floor && thirstOf(a) >= floor
-          && (a.afflictions?.length ?? 0) === 0
+        const full =
+          a.needs.hunger >= floor &&
+          a.needs.energy >= floor &&
+          a.needs.warmth >= floor &&
+          a.needs.social >= floor &&
+          thirstOf(a) >= floor &&
+          (a.afflictions?.length ?? 0) === 0
         if (full) fullNeed.sample(id, sampleDay)
       }
     }
@@ -733,7 +1046,9 @@ async function main(): Promise<void> {
       const perMindSimHour = p.usdPerSimDay / MINDS.length / 24
       if (perMindSimHour > TRIPWIRE_USD_PER_MIND_SIM_HOUR) {
         tripwireHit = true
-        console.error(`STOP: $${perMindSimHour.toFixed(2)}/mind/sim-hour past the $${TRIPWIRE_USD_PER_MIND_SIM_HOUR} tripwire`)
+        console.error(
+          `STOP: $${perMindSimHour.toFixed(2)}/mind/sim-hour past the $${TRIPWIRE_USD_PER_MIND_SIM_HOUR} tripwire`,
+        )
         break
       }
     }
@@ -753,7 +1068,9 @@ async function main(): Promise<void> {
     if (loop.tick % 240 === 0) {
       const mins = ((Date.now() - startWall) / 60_000).toFixed(1)
       const turns = [...runtimes.values()].reduce((s, r) => s + r.stats().turns, 0)
-      console.log(`[g11] tick ${loop.tick}/${lastTick} (${mins} min, turns=${turns}, $${totalSpend().toFixed(4)})`)
+      console.log(
+        `[g11] tick ${loop.tick}/${lastTick} (${mins} min, turns=${turns}, $${totalSpend().toFixed(4)})`,
+      )
     }
     await sleep(Math.max(0, REAL_MS_PER_TICK - (Date.now() - stepStart)))
   }
@@ -767,7 +1084,11 @@ async function main(): Promise<void> {
 
   // Let a reflection begun near the end finish, then let everything settle.
   const reflectionDeadline = Date.now() + 300_000
-  while ([...runtimes.values()].some((r) => r.reflectionInFlight()) && Date.now() < reflectionDeadline) await sleep(2000)
+  while (
+    [...runtimes.values()].some((r) => r.reflectionInFlight()) &&
+    Date.now() < reflectionDeadline
+  )
+    await sleep(2000)
   let lastLlmId = qInt(db, 'SELECT COALESCE(MAX(id), 0) FROM llm_calls')
   const settleDeadline = Date.now() + 60_000
   while (Date.now() < settleDeadline) {
@@ -795,432 +1116,620 @@ async function main(): Promise<void> {
   async function resolveReuse(): Promise<void> {
     if (reuseResolved) return
     reuseResolved = true
-    const first = adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
+    const first =
+      adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
     if (first === null) return
-    const other = MINDS.map((m) => m.id)
-      .find((id) => id !== first.agentId && loop.state.agents[id]?.alive === true)
+    const other = MINDS.map((m) => m.id).find(
+      (id) => id !== first.agentId && loop.state.agents[id]?.alive === true,
+    )
     if (other === undefined) return
     const before = qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`)
     let reusedBy: string | null = null
     try {
       const again = await arbiter.adjudicate(first.intent, buildAgentCtx(bridge, other))
       if (again.kind === 'map' && again.verb === first.verb) reusedBy = other
-    } catch (err) { console.error('[g11] the reuse adjudication threw:', err) }
-    reuse = { reusedBy, reuseArbiterCalls: qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`) - before }
+    } catch (err) {
+      console.error('[g11] the reuse adjudication threw:', err)
+    }
+    reuse = {
+      reusedBy,
+      reuseArbiterCalls:
+        qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`) - before,
+    }
   }
 
   function writePartial(why: string): void {
     try {
       const r = buildReport({ partial: true, drainedIntents: 0, drainedAgainCount: 0 })
       writeFileSync(PARTIAL_REPORT_PATH, JSON.stringify(r, null, 2))
-      writeFileSync(PARTIAL_TRANSCRIPT_PATH,
-        transcript(r, thoughts, store.readFrom(0), adjudications, bridge.rejections))
+      writeFileSync(
+        PARTIAL_TRANSCRIPT_PATH,
+        transcript(r, thoughts, store.readFrom(0), adjudications, bridge.rejections),
+      )
       const checks = checkG11Report(r)
       const passing = Object.values(checks).filter((d) => d === null).length
-      console.log(`[g11] partial report at tick ${loop.tick} (${why}): ${passing}/${Object.keys(checks).length}`
-        + ` — ${Object.entries(checks).filter(([, d]) => d !== null).map(([k]) => k).join(', ') || 'all pass'}`)
-    } catch (err) { console.error('[g11] the partial report writer threw:', err) }
+      console.log(
+        `[g11] partial report at tick ${loop.tick} (${why}): ${passing}/${Object.keys(checks).length}` +
+          ` — ${
+            Object.entries(checks)
+              .filter(([, d]) => d !== null)
+              .map(([k]) => k)
+              .join(', ') || 'all pass'
+          }`,
+      )
+    } catch (err) {
+      console.error('[g11] the partial report writer threw:', err)
+    }
   }
 
   function buildReport(opts: {
-    partial: boolean; drainedIntents: number; drainedAgainCount: number
+    partial: boolean
+    drainedIntents: number
+    drainedAgainCount: number
   }): G11Report {
-  const allEvents = store.readFrom(0)
-  const finalState: WorldState = loop.state
-  const simDays = TOTAL_TICKS / MINUTES_PER_DAY
+    const allEvents = store.readFrom(0)
+    const finalState: WorldState = loop.state
+    const simDays = TOTAL_TICKS / MINUTES_PER_DAY
 
-  const expressiveVerbs = [...new Set(adjudications
-    .filter((a) => a.verb !== null && a.verb.startsWith('express:'))
-    .map((a) => a.verb!))]
-  const firstExpressive = adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
-  const { reusedBy, reuseArbiterCalls } = reuse
+    const expressiveVerbs = [
+      ...new Set(
+        adjudications
+          .filter((a) => a.verb !== null && a.verb.startsWith('express:'))
+          .map((a) => a.verb!),
+      ),
+    ]
+    const firstExpressive =
+      adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
+    const { reusedBy, reuseArbiterCalls } = reuse
 
-  // --- the chronicle, over every C11 event that fired ---
-  const C11_TYPES = new Set([
-    'agent_afflicted', 'affliction_worsened', 'affliction_recovered', 'agent_tended', 'agent_died',
-    'grave_placed', 'thirst_changed', 'agent_drank', 'hp_changed', 'tile_changed', 'world_grown',
-    'fauna_spawned', 'fauna_moved', 'fauna_killed', 'fauna_stock_changed', 'forageable_spawned',
-    'forageable_stock_changed', 'forageable_depleted', 'forageable_regrown', 'traffic_decayed',
-    'item_lit', 'item_snuffed', 'item_burned_out', 'structure_fueled', 'item_equipped',
-    'item_unequipped', 'item_filled', 'agent_expressed', 'fire_extinguished',
-  ])
-  const look = {
-    agentName: (id: string) => finalState.agents[id]?.name ?? id,
-    structureKind: (id: string) => finalState.structures[id]?.kind ?? 'building',
-    mysteryProse: () => null,
-  }
-  const c11Events = allEvents.filter((e) => C11_TYPES.has(e.type))
-  const lines = c11Events.map((e) => chronicleLine(e, look)).filter((l): l is string => l !== null)
-  const violations = chronicleViolations(lines)
-
-  // --- feet, and the trail they wore ---
-  const trafficValues = Object.values(finalState.traffic ?? {})
-  const tilesWorn = allEvents.filter((e) => e.type === 'tile_changed'
-    && payloadOf(e).reason === 'worn').length
-
-  // --- the three named world assertions ---
-  // Each is asked of a FRESH body dropped into a copy of the town the run left standing: a
-  // founder who has been on her feet for two days answers about her own legs, not the river.
-  const PROBE = 'probe_walker'
-  const probeWorld = (at: { x: number; y: number }, extra: Array<[string, unknown]> = []): WorldState => {
-    let s: WorldState = { ...finalState }
-    const put = (type: string, payload: unknown): void => {
-      s = fold(s, { seq: -1, tick: s.tick, type, payload }, config)
-    }
-    put('agent_spawned', { id: PROBE, name: 'probe', x: at.x, y: at.y, ageDays: 7300 })
-    for (const [type, payload] of extra) put(type, payload)
-    return s
-  }
-
-  // The deck spans the water, not the sand: at a ford row the water is x 48-49 and the spit at
-  // x 50 is the bank. A run in which the map grew has moved every genesis coordinate.
-  const shift = allEvents.filter((e) => e.type === 'world_grown').reduce((acc, e) => {
-    const p = payloadOf(e) as { edge?: string; depth?: number }
-    return {
-      dx: acc.dx + (p.edge === 'w' ? p.depth ?? 0 : 0),
-      dy: acc.dy + (p.edge === 'n' ? p.depth ?? 0 : 0),
-    }
-  }, { dx: 0, dy: 0 })
-  const spit = { x: GENESIS_FORD.x + shift.dx, y: GENESIS_FORD.y0 + shift.dy }
-  const fordAt = { x: spit.x - 2, y: spit.y }
-  if (shift.dx !== 0 || shift.dy !== 0) {
-    console.log(`[g11] the world grew: the ford has moved by (${shift.dx}, ${shift.dy}) to (${fordAt.x}, ${fordAt.y})`)
-  }
-  const fordProbe = (() => {
-    const stood = probeWorld({ x: spit.x, y: fordAt.y }, [
-      ['item_spawned', { id: 'probe_wood', kind: 'wood', qty: 20, loc: { t: 'agent', id: PROBE } }],
+    // --- the chronicle, over every C11 event that fired ---
+    const C11_TYPES = new Set([
+      'agent_afflicted',
+      'affliction_worsened',
+      'affliction_recovered',
+      'agent_tended',
+      'agent_died',
+      'grave_placed',
+      'thirst_changed',
+      'agent_drank',
+      'hp_changed',
+      'tile_changed',
+      'world_grown',
+      'fauna_spawned',
+      'fauna_moved',
+      'fauna_killed',
+      'fauna_stock_changed',
+      'forageable_spawned',
+      'forageable_stock_changed',
+      'forageable_depleted',
+      'forageable_regrown',
+      'traffic_decayed',
+      'item_lit',
+      'item_snuffed',
+      'item_burned_out',
+      'structure_fueled',
+      'item_equipped',
+      'item_unequipped',
+      'item_filled',
+      'agent_expressed',
+      'fire_extinguished',
     ])
-    const foot = buildFootprint(stood, config, PROBE, { kind: BRIDGE_KIND, ...fordAt })
-    return { ...fordAt, buildable: foot.refusal === null, refusal: foot.refusal }
-  })()
-
-  const farBank = (() => {
-    // The town stands east of the river, so the far bank is the west one — a bridge away, and
-    // the legs are asked for it anyway (batch-6 ruling 1: stopping at the shore is correct
-    // physics, not a path bug).
-    const y = fordAt.y
-    const s = probeWorld({ x: spit.x, y })
-    const asked = submitIntent(s, config, PROBE, 'walk', { x: fordAt.x - 6, y })
-    let edge: { x: number; y: number } | null = null
-    for (let x = spit.x; x >= fordAt.x - 6; x--) {
-      if (!isPassable(s, x, y)) break
-      if (findPath(s, s.agents[PROBE]!, { x, y }, config) === null) break
-      edge = { x, y }
+    const look = {
+      agentName: (id: string) => finalState.agents[id]?.name ?? id,
+      structureKind: (id: string) => finalState.structures[id]?.kind ?? 'building',
+      mysteryProse: () => null,
     }
-    const nextIsWater = edge !== null && WATER_TILES.has(s.terrain[edge.y]?.[edge.x - 1] ?? 0)
-    return { refused: !asked.ok, reason: asked.ok ? null : asked.reason, stoppedAtWaterEdge: nextIsWater }
-  })()
+    const c11Events = allEvents.filter((e) => C11_TYPES.has(e.type))
+    const lines = c11Events
+      .map((e) => chronicleLine(e, look))
+      .filter((l): l is string => l !== null)
+    const violations = chronicleViolations(lines)
 
-  // The winter ladder, probed on the town the run actually left standing (batch-5 ruling 1):
-  // three fresh bodies, one deep-winter night, and the cold ticks each of them was billed.
-  const clothedSurvive = (() => {
-    const NIGHT = 3 * 91 * MINUTES_PER_DAY + 22 * 60
-    const home = Object.values(finalState.structures).find((x) => x.kind === 'house')
-    const fire = Object.values(finalState.structures).find((x) => x.kind === 'fire_pit')
-    if (home === undefined || fire === undefined) return false
-    const door = doorTile(finalState, home)
-    if (door === null) return false
-    let s: WorldState = { ...finalState, tick: NIGHT - 1 }
-    const put = (type: string, payload: unknown): void => {
-      s = fold(s, { seq: -1, tick: NIGHT - 1, type, payload }, config)
-    }
-    put('agent_spawned', { id: 'probe_bare', name: 'probe_bare', x: door.x + 3, y: door.y + 3, ageDays: 7300 })
-    put('agent_spawned', { id: 'probe_inside', name: 'probe_inside', x: door.x, y: door.y, ageDays: 7300 })
-    put('agent_spawned', { id: 'probe_hearth', name: 'probe_hearth', x: fire.x + 1, y: fire.y, ageDays: 7300 })
-    put('agent_entered', { agentId: 'probe_inside', structureId: home.id })
-    put('structure_fueled', { structureId: fire.id, burnsUntilTick: NIGHT + 8 * 60 + 1 })
-    for (const id of ['probe_bare', 'probe_inside', 'probe_hearth']) {
-      put('item_spawned', { id: `probe_coat_${id}`, kind: 'garment', qty: 1, loc: { t: 'agent', id } })
-      put('item_equipped', { agentId: id, itemId: `probe_coat_${id}`, slot: 'body' })
-      put('agent_slept', { agentId: id })
-    }
-    const probeTick = createWorldTick(config, new RngStreams('g11-ladder'))
-    for (let t = NIGHT; t < NIGHT + 8 * 60; t++) {
-      s = probeTick(fold({ ...s, tick: t - 1 }, { seq: -1, tick: t, type: 'tick_advanced', payload: {} }, config)).state
-    }
-    const cold = (id: string): number => s.agents[id]?.coldTicksSinceRecovery ?? 0
-    const alive = (id: string): boolean => s.agents[id]?.alive === true
-    console.log(`[g11] winter ladder: bare cold=${cold('probe_bare')} warmth=${s.agents.probe_bare!.needs.warmth.toFixed(1)};`
-      + ` inside cold=${cold('probe_inside')} warmth=${s.agents.probe_inside!.needs.warmth.toFixed(1)};`
-      + ` hearth cold=${cold('probe_hearth')} warmth=${s.agents.probe_hearth!.needs.warmth.toFixed(1)}`)
-    // Four walls and a fed fire are each an answer to the cold; bare ground is not.
-    return alive('probe_inside') && alive('probe_hearth') && alive('probe_bare')
-      && cold('probe_inside') === 0 && cold('probe_hearth') === 0
-      && s.agents.probe_bare!.needs.warmth < s.agents.probe_inside!.needs.warmth
-  })()
+    // --- feet, and the trail they wore ---
+    const trafficValues = Object.values(finalState.traffic ?? {})
+    const tilesWorn = allEvents.filter(
+      (e) => e.type === 'tile_changed' && payloadOf(e).reason === 'worn',
+    ).length
 
-  // --- the measurements (batch-3 r5, batch-4 r5), taken on a GROWN map ---
-  const grown = (() => {
-    const w = finalState.terrain[0]!.length
-    // WORLD_MARGIN, not `mapGrowth.step`: the ceiling and the pace it was guessed against were
-    // deleted when growth became a clearance, and this line kept compiling only because
-    // `packages/agents/scripts` was never typechecked. One block pitch is the derived unit.
-    const strip = Array.from({ length: WORLD_MARGIN }, () =>
-      Array.from({ length: w }, (): TileId => 0))
-    return fold(finalState, {
-      seq: -1, tick: finalState.tick, type: 'world_grown',
-      payload: { edge: 'n', depth: WORLD_MARGIN, tiles: strip },
-    }, config)
-  })()
-  const snapshotBytes = JSON.stringify(grown).length
-  const foldStart = performance.now()
-  const replayed = replayFromGenesis(store, config, terrain)
-  const foldMs = performance.now() - foldStart
-  const replayHashMatches = stateHash(replayed) === stateHash(finalState)
+    // --- the three named world assertions ---
+    // Each is asked of a FRESH body dropped into a copy of the town the run left standing: a
+    // founder who has been on her feet for two days answers about her own legs, not the river.
+    const PROBE = 'probe_walker'
+    const probeWorld = (
+      at: { x: number; y: number },
+      extra: Array<[string, unknown]> = [],
+    ): WorldState => {
+      let s: WorldState = { ...finalState }
+      const put = (type: string, payload: unknown): void => {
+        s = fold(s, { seq: -1, tick: s.tick, type, payload }, config)
+      }
+      put('agent_spawned', { id: PROBE, name: 'probe', x: at.x, y: at.y, ageDays: 7300 })
+      for (const [type, payload] of extra) put(type, payload)
+      return s
+    }
 
-  // --- discretionary time, per mind per sim-day (controller ruling 2026-08-17) ---
-  const started = allEvents.filter((e) => e.type === 'action_started')
-  const completed = allEvents.filter((e) => e.type === 'action_completed')
-  const discretion: G11Discretion[] = []
-  const days = [...new Set(allEvents.map((e) => Math.floor(e.tick / MINUTES_PER_DAY)))].sort((a, b) => a - b)
-  for (const m of MINDS) {
-    for (const day of days) {
-      const mine = started.filter((e) => payloadOf(e).agentId === m.id && Math.floor(e.tick / MINUTES_PER_DAY) === day)
-      if (mine.length === 0) continue
-      const bucket = { survival: 0, production: 0, social: 0, other: 0 }
-      for (const e of mine) bucket[classifyVerb(String(payloadOf(e).verb))] += 1
-      discretion.push({
-        agentId: m.id, day, turns: mine.length, ...bucket,
-        mealsEaten: completed.filter((e) => payloadOf(e).agentId === m.id
-          && payloadOf(e).verb === 'eat' && Math.floor(e.tick / MINUTES_PER_DAY) === day).length,
-        fullNeedTicks: fullNeed.ticksOn(m.id, day),
+    // The deck spans the water, not the sand: at a ford row the water is x 48-49 and the spit at
+    // x 50 is the bank. A run in which the map grew has moved every genesis coordinate.
+    const shift = allEvents
+      .filter((e) => e.type === 'world_grown')
+      .reduce(
+        (acc, e) => {
+          const p = payloadOf(e) as { edge?: string; depth?: number }
+          return {
+            dx: acc.dx + (p.edge === 'w' ? (p.depth ?? 0) : 0),
+            dy: acc.dy + (p.edge === 'n' ? (p.depth ?? 0) : 0),
+          }
+        },
+        { dx: 0, dy: 0 },
+      )
+    const spit = { x: GENESIS_FORD.x + shift.dx, y: GENESIS_FORD.y0 + shift.dy }
+    const fordAt = { x: spit.x - 2, y: spit.y }
+    if (shift.dx !== 0 || shift.dy !== 0) {
+      console.log(
+        `[g11] the world grew: the ford has moved by (${shift.dx}, ${shift.dy}) to (${fordAt.x}, ${fordAt.y})`,
+      )
+    }
+    const fordProbe = (() => {
+      const stood = probeWorld({ x: spit.x, y: fordAt.y }, [
+        [
+          'item_spawned',
+          { id: 'probe_wood', kind: 'wood', qty: 20, loc: { t: 'agent', id: PROBE } },
+        ],
+      ])
+      const foot = buildFootprint(stood, config, PROBE, { kind: BRIDGE_KIND, ...fordAt })
+      return { ...fordAt, buildable: foot.refusal === null, refusal: foot.refusal }
+    })()
+
+    const farBank = (() => {
+      // The town stands east of the river, so the far bank is the west one — a bridge away, and
+      // the legs are asked for it anyway (batch-6 ruling 1: stopping at the shore is correct
+      // physics, not a path bug).
+      const y = fordAt.y
+      const s = probeWorld({ x: spit.x, y })
+      const asked = submitIntent(s, config, PROBE, 'walk', { x: fordAt.x - 6, y })
+      let edge: { x: number; y: number } | null = null
+      for (let x = spit.x; x >= fordAt.x - 6; x--) {
+        if (!isPassable(s, x, y)) break
+        if (findPath(s, s.agents[PROBE]!, { x, y }, config) === null) break
+        edge = { x, y }
+      }
+      const nextIsWater = edge !== null && WATER_TILES.has(s.terrain[edge.y]?.[edge.x - 1] ?? 0)
+      return {
+        refused: !asked.ok,
+        reason: asked.ok ? null : asked.reason,
+        stoppedAtWaterEdge: nextIsWater,
+      }
+    })()
+
+    // The winter ladder, probed on the town the run actually left standing (batch-5 ruling 1):
+    // three fresh bodies, one deep-winter night, and the cold ticks each of them was billed.
+    const clothedSurvive = (() => {
+      const NIGHT = 3 * 91 * MINUTES_PER_DAY + 22 * 60
+      const home = Object.values(finalState.structures).find((x) => x.kind === 'house')
+      const fire = Object.values(finalState.structures).find((x) => x.kind === 'fire_pit')
+      if (home === undefined || fire === undefined) return false
+      const door = doorTile(finalState, home)
+      if (door === null) return false
+      let s: WorldState = { ...finalState, tick: NIGHT - 1 }
+      const put = (type: string, payload: unknown): void => {
+        s = fold(s, { seq: -1, tick: NIGHT - 1, type, payload }, config)
+      }
+      put('agent_spawned', {
+        id: 'probe_bare',
+        name: 'probe_bare',
+        x: door.x + 3,
+        y: door.y + 3,
+        ageDays: 7300,
       })
-    }
-  }
-  // What a body actually has to eat in a day to stay level, from the world's own numbers.
-  const mealsNeeded = (config.needs.hungerDecayPerTick * MINUTES_PER_DAY) / config.needs.eatRestoreHunger
+      put('agent_spawned', {
+        id: 'probe_inside',
+        name: 'probe_inside',
+        x: door.x,
+        y: door.y,
+        ageDays: 7300,
+      })
+      put('agent_spawned', {
+        id: 'probe_hearth',
+        name: 'probe_hearth',
+        x: fire.x + 1,
+        y: fire.y,
+        ageDays: 7300,
+      })
+      put('agent_entered', { agentId: 'probe_inside', structureId: home.id })
+      put('structure_fueled', { structureId: fire.id, burnsUntilTick: NIGHT + 8 * 60 + 1 })
+      for (const id of ['probe_bare', 'probe_inside', 'probe_hearth']) {
+        put('item_spawned', {
+          id: `probe_coat_${id}`,
+          kind: 'garment',
+          qty: 1,
+          loc: { t: 'agent', id },
+        })
+        put('item_equipped', { agentId: id, itemId: `probe_coat_${id}`, slot: 'body' })
+        put('agent_slept', { agentId: id })
+      }
+      const probeTick = createWorldTick(config, new RngStreams('g11-ladder'))
+      for (let t = NIGHT; t < NIGHT + 8 * 60; t++) {
+        s = probeTick(
+          fold(
+            { ...s, tick: t - 1 },
+            { seq: -1, tick: t, type: 'tick_advanced', payload: {} },
+            config,
+          ),
+        ).state
+      }
+      const cold = (id: string): number => s.agents[id]?.coldTicksSinceRecovery ?? 0
+      const alive = (id: string): boolean => s.agents[id]?.alive === true
+      console.log(
+        `[g11] winter ladder: bare cold=${cold('probe_bare')} warmth=${s.agents.probe_bare!.needs.warmth.toFixed(1)};` +
+          ` inside cold=${cold('probe_inside')} warmth=${s.agents.probe_inside!.needs.warmth.toFixed(1)};` +
+          ` hearth cold=${cold('probe_hearth')} warmth=${s.agents.probe_hearth!.needs.warmth.toFixed(1)}`,
+      )
+      // Four walls and a fed fire are each an answer to the cold; bare ground is not.
+      return (
+        alive('probe_inside') &&
+        alive('probe_hearth') &&
+        alive('probe_bare') &&
+        cold('probe_inside') === 0 &&
+        cold('probe_hearth') === 0 &&
+        s.agents.probe_bare!.needs.warmth < s.agents.probe_inside!.needs.warmth
+      )
+    })()
 
-  // --- what a gather produced, and whether any of it was ever eaten ---
-  // §18 asks for a forage, hunt or fish "yielding food that gets eaten", which is one fact
-  // and not two counts: the item a gather spawned has to be the item somebody swallowed.
-  const gathered = (() => {
-    const GATHER_VERBS = new Set(['forage', 'fish', 'hunt', 'harvest'])
-    const fromGathering = new Set<string>()
-    let acts = 0
-    for (let i = 0; i < allEvents.length; i++) {
-      const e = allEvents[i]!
-      if (e.type !== 'action_completed' || !GATHER_VERBS.has(String(payloadOf(e).verb))) continue
-      acts += 1
-      // The spawns a gather emits land straight after its own completion, on the same tick.
-      for (let j = i + 1; j < allEvents.length && allEvents[j]!.tick === e.tick; j++) {
-        if (allEvents[j]!.type === 'item_spawned') fromGathering.add(String(payloadOf(allEvents[j]!).id))
+    // --- the measurements (batch-3 r5, batch-4 r5), taken on a GROWN map ---
+    const grown = (() => {
+      const w = finalState.terrain[0]!.length
+      // WORLD_MARGIN, not `mapGrowth.step`: the ceiling and the pace it was guessed against were
+      // deleted when growth became a clearance, and this line kept compiling only because
+      // `packages/agents/scripts` was never typechecked. One block pitch is the derived unit.
+      const strip = Array.from({ length: WORLD_MARGIN }, () =>
+        Array.from({ length: w }, (): TileId => 0),
+      )
+      return fold(
+        finalState,
+        {
+          seq: -1,
+          tick: finalState.tick,
+          type: 'world_grown',
+          payload: { edge: 'n', depth: WORLD_MARGIN, tiles: strip },
+        },
+        config,
+      )
+    })()
+    const snapshotBytes = JSON.stringify(grown).length
+    const foldStart = performance.now()
+    const replayed = replayFromGenesis(store, config, terrain)
+    const foldMs = performance.now() - foldStart
+    const replayHashMatches = stateHash(replayed) === stateHash(finalState)
+
+    // --- discretionary time, per mind per sim-day (controller ruling 2026-08-17) ---
+    const started = allEvents.filter((e) => e.type === 'action_started')
+    const completed = allEvents.filter((e) => e.type === 'action_completed')
+    const discretion: G11Discretion[] = []
+    const days = [...new Set(allEvents.map((e) => Math.floor(e.tick / MINUTES_PER_DAY)))].sort(
+      (a, b) => a - b,
+    )
+    for (const m of MINDS) {
+      for (const day of days) {
+        const mine = started.filter(
+          (e) => payloadOf(e).agentId === m.id && Math.floor(e.tick / MINUTES_PER_DAY) === day,
+        )
+        if (mine.length === 0) continue
+        const bucket = { survival: 0, production: 0, social: 0, other: 0 }
+        for (const e of mine) bucket[classifyVerb(String(payloadOf(e).verb))] += 1
+        discretion.push({
+          agentId: m.id,
+          day,
+          turns: mine.length,
+          ...bucket,
+          mealsEaten: completed.filter(
+            (e) =>
+              payloadOf(e).agentId === m.id &&
+              payloadOf(e).verb === 'eat' &&
+              Math.floor(e.tick / MINUTES_PER_DAY) === day,
+          ).length,
+          fullNeedTicks: fullNeed.ticksOn(m.id, day),
+        })
       }
     }
-    const eaten = allEvents.filter((e) => e.type === 'action_completed' && payloadOf(e).verb === 'eat')
+    // What a body actually has to eat in a day to stay level, from the world's own numbers.
+    const mealsNeeded =
+      (config.needs.hungerDecayPerTick * MINUTES_PER_DAY) / config.needs.eatRestoreHunger
+
+    // --- what a gather produced, and whether any of it was ever eaten ---
+    // §18 asks for a forage, hunt or fish "yielding food that gets eaten", which is one fact
+    // and not two counts: the item a gather spawned has to be the item somebody swallowed.
+    const gathered = (() => {
+      const GATHER_VERBS = new Set(['forage', 'fish', 'hunt', 'harvest'])
+      const fromGathering = new Set<string>()
+      let acts = 0
+      for (let i = 0; i < allEvents.length; i++) {
+        const e = allEvents[i]!
+        if (e.type !== 'action_completed' || !GATHER_VERBS.has(String(payloadOf(e).verb))) continue
+        acts += 1
+        // The spawns a gather emits land straight after its own completion, on the same tick.
+        for (let j = i + 1; j < allEvents.length && allEvents[j]!.tick === e.tick; j++) {
+          if (allEvents[j]!.type === 'item_spawned')
+            fromGathering.add(String(payloadOf(allEvents[j]!).id))
+        }
+      }
+      const eaten = allEvents
+        .filter((e) => e.type === 'action_completed' && payloadOf(e).verb === 'eat')
+        .filter((e) => {
+          const before = allEvents.filter((x) => x.type === 'item_qty_changed' && x.tick === e.tick)
+          return before.some((x) => fromGathering.has(String(payloadOf(x).id)))
+        }).length
+      return { acts, eaten }
+    })()
+
+    // A visible response is a hand, a thing put into her hands, or her name in somebody's mouth:
+    // recovery and death both pass, silence does not. The window is the stretch she was ill for.
+    const illFrom = 0
+    const illTo =
+      allEvents.find((e) => e.type === 'affliction_recovered' && payloadOf(e).agentId === SICK_ONE)
+        ?.tick ??
+      allEvents.find((e) => e.type === 'agent_died' && payloadOf(e).agentId === SICK_ONE)?.tick ??
+      Infinity
+    const sickName = MINDS.find((m) => m.id === SICK_ONE)!.identity.name
+    const stagedResponses = allEvents
+      .filter((e) => e.tick >= illFrom && e.tick <= illTo)
       .filter((e) => {
-        const before = allEvents.filter((x) => x.type === 'item_qty_changed' && x.tick === e.tick)
-        return before.some((x) => fromGathering.has(String(payloadOf(x).id)))
-      }).length
-    return { acts, eaten }
-  })()
+        const p = payloadOf(e)
+        if (e.type === 'agent_tended' && p.agentId === SICK_ONE) return true
+        if (e.type === 'item_moved') {
+          const loc = p.loc as { t?: string; id?: string } | undefined
+          return loc?.t === 'agent' && loc.id === SICK_ONE
+        }
+        if (e.type === 'agent_spoke' && p.agentId !== SICK_ONE) {
+          return typeof p.text === 'string' && p.text.includes(sickName)
+        }
+        return false
+      })
+      .map((e) => `${e.type} at tick ${e.tick}`)
+    const sick = finalState.agents[SICK_ONE]
+    const stagedResolved =
+      sick === undefined || !sick.alive
+        ? ('died' as const)
+        : (sick.afflictions?.some((x) => x.kind === 'illness') ?? false)
+          ? ('standing' as const)
+          : ('recovered' as const)
 
-  // A visible response is a hand, a thing put into her hands, or her name in somebody's mouth:
-  // recovery and death both pass, silence does not. The window is the stretch she was ill for.
-  const illFrom = 0
-  const illTo = allEvents.find((e) => e.type === 'affliction_recovered' && payloadOf(e).agentId === SICK_ONE)?.tick
-    ?? allEvents.find((e) => e.type === 'agent_died' && payloadOf(e).agentId === SICK_ONE)?.tick
-    ?? Infinity
-  const sickName = MINDS.find((m) => m.id === SICK_ONE)!.identity.name
-  const stagedResponses = allEvents
-    .filter((e) => e.tick >= illFrom && e.tick <= illTo)
-    .filter((e) => {
-      const p = payloadOf(e)
-      if (e.type === 'agent_tended' && p.agentId === SICK_ONE) return true
-      if (e.type === 'item_moved') {
-        const loc = p.loc as { t?: string; id?: string } | undefined
-        return loc?.t === 'agent' && loc.id === SICK_ONE
-      }
-      if (e.type === 'agent_spoke' && p.agentId !== SICK_ONE) {
-        return typeof p.text === 'string' && p.text.includes(sickName)
-      }
-      return false
-    })
-    .map((e) => `${e.type} at tick ${e.tick}`)
-  const sick = finalState.agents[SICK_ONE]
-  const stagedResolved = sick === undefined || !sick.alive
-    ? 'died' as const
-    : (sick.afflictions?.some((x) => x.kind === 'illness') ?? false) ? 'standing' as const : 'recovered' as const
+    // --- perception in the dark, read out of the run's own memory rows ---
+    // The sentence `perceptionToProse` writes when `packet.light` reads 'dark' — the words a
+    // mind actually saw, not the band name, which never reaches a prompt (G10).
+    const DARK_LINE = 'The night is close around you'
+    const darkPerceptions = qInt(
+      db,
+      `SELECT COUNT(*) FROM memories WHERE kind = 'perception' AND text LIKE ?`,
+      `%${DARK_LINE}%`,
+    )
+    const darkExcerpt =
+      qRows<{ text: string }>(
+        db,
+        `SELECT text FROM memories WHERE kind = 'perception' AND text LIKE ? LIMIT 1`,
+        `%${DARK_LINE}%`,
+      )[0]?.text ?? null
 
-  // --- perception in the dark, read out of the run's own memory rows ---
-  // The sentence `perceptionToProse` writes when `packet.light` reads 'dark' — the words a
-  // mind actually saw, not the band name, which never reaches a prompt (G10).
-  const DARK_LINE = 'The night is close around you'
-  const darkPerceptions = qInt(
-    db, `SELECT COUNT(*) FROM memories WHERE kind = 'perception' AND text LIKE ?`, `%${DARK_LINE}%`)
-  const darkExcerpt = qRows<{ text: string }>(
-    db, `SELECT text FROM memories WHERE kind = 'perception' AND text LIKE ? LIMIT 1`, `%${DARK_LINE}%`)[0]?.text ?? null
+    // --- the recognizer's own rows, and the naming law over them ---
+    const constructRows = constructStore.all()
+    const namingLawHolds = constructRows.every(
+      (c) =>
+        c.name === null || (c.nameProvenance !== null && c.nameProvenance.quote.includes(c.name)),
+    )
+    const viewerCopy = constructRows.map((c) =>
+      c.name === null ? UNNAMED_CONSTRUCT_COPY : `they call it ${c.name}`,
+    )
 
-  // --- the recognizer's own rows, and the naming law over them ---
-  const constructRows = constructStore.all()
-  const namingLawHolds = constructRows.every((c) =>
-    c.name === null || (c.nameProvenance !== null && c.nameProvenance.quote.includes(c.name)))
-  const viewerCopy = constructRows.map((c) =>
-    c.name === null ? UNNAMED_CONSTRUCT_COPY : `they call it ${c.name}`)
+    const deadRows = reportDeadCalls(db)
+    const providerRows = reportProviders(db)
+    const deadCalls = deadRows.reduce(
+      (acc, r) => ({
+        calls: acc.calls + r.calls,
+        emptyOutput: acc.emptyOutput + r.emptyOutput,
+        unparseable: acc.unparseable + r.unparseable,
+        otherFailures: acc.otherFailures + r.otherFailures,
+      }),
+      { calls: 0, emptyOutput: 0, unparseable: 0, otherFailures: 0 },
+    )
 
-  const deadRows = reportDeadCalls(db)
-  const providerRows = reportProviders(db)
-  const deadCalls = deadRows.reduce((acc, r) => ({
-    calls: acc.calls + r.calls, emptyOutput: acc.emptyOutput + r.emptyOutput,
-    unparseable: acc.unparseable + r.unparseable, otherFailures: acc.otherFailures + r.otherFailures,
-  }), { calls: 0, emptyOutput: 0, unparseable: 0, otherFailures: 0 })
+    const tokens = qRows<{ i: number; o: number; c: number }>(
+      db,
+      'SELECT COALESCE(SUM(input_tokens),0) i, COALESCE(SUM(output_tokens),0) o, COALESCE(SUM(cache_read_tokens),0) c FROM llm_calls',
+    )[0] ?? { i: 0, o: 0, c: 0 }
 
-  const tokens = qRows<{ i: number; o: number; c: number }>(
-    db, 'SELECT COALESCE(SUM(input_tokens),0) i, COALESCE(SUM(output_tokens),0) o, COALESCE(SUM(cache_read_tokens),0) c FROM llm_calls')[0]
-    ?? { i: 0, o: 0, c: 0 }
-
-  const spent = totalSpend()
-  const built: G11Report = {
-    generatedAt: new Date().toISOString(),
-    partial: opts.partial,
-    model: MIND_MODEL,
-    totalTicks: TOTAL_TICKS,
-    realMsPerTick: REAL_MS_PER_TICK,
-    startTick: START_TICK,
-    resume: resumeBlock(),
-    preflight,
-    opsPlane: {
-      runConstructPass: 'wired',
-      narrateDayWorldSeam: 'wired',
-      narrateDaySemanticSeam: semanticRan ? 'wired' : 'refused',
-      arbiterVocabulary: 'wired',
-      reportDeadCalls: 'wired',
-    },
-    measurements: {
-      mapWidth: grown.terrain[0]!.length,
-      mapHeight: grown.terrain.length,
-      growths: grown.growths ?? 0,
-      trafficKeys: Object.keys(grown.traffic ?? {}).length,
-      faunaCount: Object.keys(grown.fauna ?? {}).length,
-      forageableCount: Object.keys(grown.forageables ?? {}).length,
-      snapshotBytes,
-      foldMsFromGenesis: Number(foldMs.toFixed(2)),
-      foldEvents: allEvents.length,
-      medianTickMs: Number(median(tickMs).toFixed(4)),
-      p99TickMs: Number(([...tickMs].sort((a, b) => a - b)[Math.floor(tickMs.length * 0.99)] ?? 0).toFixed(4)),
-    },
-    spend: {
-      totalCostUsd: spent,
-      llmCallCount: qInt(db, 'SELECT COUNT(*) FROM llm_calls'),
-      costByCaller: Object.fromEntries(qRows<{ caller: string; total: number }>(
-        db, 'SELECT caller, COALESCE(SUM(cost_usd),0) AS total FROM llm_calls GROUP BY caller')
-        .map((r) => [r.caller, r.total])),
-      inputTokens: tokens.i,
-      outputTokens: tokens.o,
-      cacheReadTokens: tokens.c,
-      cacheReadShare: tokens.i === 0 ? 0 : tokens.c / tokens.i,
-      costPerMindPerSimDay: spent / MINDS.length / simDays,
-      requestedProviderOrder: PROVIDER_ORDER,
-      hardProviderAllowList: HARD_PROVIDER_ALLOW_LIST,
-      providerMix: providerRows,
-    },
-    excerpts: {
-      darkPerception: darkExcerpt,
-      chronicleLine: lines[0] ?? null,
-      constructName: constructRows.find((c) => c.name !== null)?.name ?? null,
-      tendedProse: lines.find((l) => / cared for /.test(l)) ?? null,
-    },
-    evidence: {
-      ticksRun: loop.tick - START_TICK,
-      crashAlerts: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind IN ('turn_crash', 'reflection_failed')`),
-      drainedIntents: opts.drainedIntents,
-      drainedAgainCount: opts.drainedAgainCount,
-      minds: [...runtimes.entries()].map(([agentId, r]) => ({
-        agentId, turns: r.stats().turns, reflections: r.stats().reflections,
-      })),
-      overBudgetTicks: tickMs.filter((ms) => ms > TICK_BUDGET_MS).length,
-      unpromptedDrinks: allEvents.filter((e) => e.type === 'agent_drank').length,
-      foodGathered: gathered.acts,
-      gatheredFoodEaten: gathered.eaten,
-      stagedAfflictionAgentId: SICK_ONE,
-      stagedAfflictionResponses: stagedResponses,
-      stagedAfflictionResolved: stagedResolved,
-      c11EventTypes: [...new Set(c11Events.map((e) => e.type))].sort(),
-      chronicleLines: lines.length,
-      chronicleViolations: violations,
-      wearThreshold: WEAR_THRESHOLD,
-      maxTileTraffic: trafficValues.length === 0 ? 0 : Math.max(...trafficValues),
-      tilesWorn,
-      worldLawPaths: Object.keys(TOGGLABLE_PATHS).filter((p) => p.endsWith('.enabled')),
-      lawFlips: allEvents.filter((e) => e.type === 'config_changed')
-        .map((e) => ({ tick: e.tick, path: String(payloadOf(e).path), value: payloadOf(e).value })),
-      lawHistoryEntries: allEvents.filter((e) => e.type === 'config_changed').length,
-      replayHashMatches,
-      reflectionsStarted: [...runtimes.values()].reduce((s, r) => s + r.stats().reflections, 0),
-      reflectionsResolved: qInt(
-        db, `SELECT COUNT(*) FROM (SELECT DISTINCT agent_id, day FROM summary_nodes WHERE level = 'day')`),
-      deadCalls,
-      deadCallAlertRows: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind = 'llm_dead_calls'`),
-      constructs: {
-        expressiveVerbs,
-        firstExpressiveBy: firstExpressive?.agentId ?? null,
-        reusedBy,
-        reuseArbiterCalls,
-        passRan: nightsRun.length >= 1,
-        passErrors: constructErrors,
-        recognized: constructRows.length,
-        named: constructRows.filter((c) => c.name !== null).length,
-        namingLawHolds,
-        viewerCopy,
+    const spent = totalSpend()
+    const built: G11Report = {
+      generatedAt: new Date().toISOString(),
+      partial: opts.partial,
+      model: MIND_MODEL,
+      totalTicks: TOTAL_TICKS,
+      realMsPerTick: REAL_MS_PER_TICK,
+      startTick: START_TICK,
+      resume: resumeBlock(),
+      preflight,
+      opsPlane: {
+        runConstructPass: 'wired',
+        narrateDayWorldSeam: 'wired',
+        narrateDaySemanticSeam: semanticRan ? 'wired' : 'refused',
+        arbiterVocabulary: 'wired',
+        reportDeadCalls: 'wired',
       },
-      tier1Milestones: narratorStore.milestones().filter((m) => m.tier === 1).map((m) => m.kind),
-      darkPerceptions,
-      semanticPassRan: semanticRan,
-      semanticHits,
-      semanticPassErrors: semanticPassErrorCount({ narrateErrors, semanticErrors }),
-      semanticUnreadableNights: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind = 'semantic_firsts_unreadable'`),
-      semanticSkippedNights,
-      fordBridge: fordProbe,
-      farBankWalk: farBank,
-      clothedSurviveLadder: clothedSurvive,
-      discretion,
-      mealsNeededPerMindPerDay: Number(mealsNeeded.toFixed(3)),
-      fullNeedMoments: fullNeed.totalTicks(),
-      socialSurvivalActs: {
-        tends: allEvents.filter((e) => e.type === 'agent_tended' && payloadOf(e).tenderId !== undefined).length,
-        gives: completed.filter((e) => payloadOf(e).verb === 'give').length,
-        jointBuilds: (() => {
-          const byStructure = new Map<string, Set<string>>()
-          for (const e of allEvents.filter((x) => x.type === 'structure_progressed')) {
-            const id = String(payloadOf(e).id)
-            byStructure.set(id, byStructure.get(id) ?? new Set())
-          }
-          for (const e of started.filter((x) => payloadOf(x).verb === 'build')) {
-            const p = payloadOf(e).params as { x?: number; y?: number } | undefined
-            const at = Object.values(finalState.structures).find((s) => s.x === p?.x && s.y === p?.y)
-            if (at !== undefined) byStructure.get(at.id)?.add(String(payloadOf(e).agentId))
-          }
-          return [...byStructure.values()].filter((who) => who.size > 1).length
-        })(),
-        sharedFireMeals: completed.filter((e) => {
-          if (payloadOf(e).verb !== 'eat') return false
-          const who = String(payloadOf(e).agentId)
-          const me = finalState.agents[who]
-          if (me === undefined) return false
-          return completed.some((o) => o !== e && payloadOf(o).verb === 'eat'
-            && Math.abs(o.tick - e.tick) <= 30 && payloadOf(o).agentId !== who)
-        }).length,
+      measurements: {
+        mapWidth: grown.terrain[0]!.length,
+        mapHeight: grown.terrain.length,
+        growths: grown.growths ?? 0,
+        trafficKeys: Object.keys(grown.traffic ?? {}).length,
+        faunaCount: Object.keys(grown.fauna ?? {}).length,
+        forageableCount: Object.keys(grown.forageables ?? {}).length,
+        snapshotBytes,
+        foldMsFromGenesis: Number(foldMs.toFixed(2)),
+        foldEvents: allEvents.length,
+        medianTickMs: Number(median(tickMs).toFixed(4)),
+        p99TickMs: Number(
+          ([...tickMs].sort((a, b) => a - b)[Math.floor(tickMs.length * 0.99)] ?? 0).toFixed(4),
+        ),
       },
-    },
-  }
-  return G11ReportSchema.parse(built)
+      spend: {
+        totalCostUsd: spent,
+        llmCallCount: qInt(db, 'SELECT COUNT(*) FROM llm_calls'),
+        costByCaller: Object.fromEntries(
+          qRows<{ caller: string; total: number }>(
+            db,
+            'SELECT caller, COALESCE(SUM(cost_usd),0) AS total FROM llm_calls GROUP BY caller',
+          ).map((r) => [r.caller, r.total]),
+        ),
+        inputTokens: tokens.i,
+        outputTokens: tokens.o,
+        cacheReadTokens: tokens.c,
+        cacheReadShare: tokens.i === 0 ? 0 : tokens.c / tokens.i,
+        costPerMindPerSimDay: spent / MINDS.length / simDays,
+        requestedProviderOrder: PROVIDER_ORDER,
+        hardProviderAllowList: HARD_PROVIDER_ALLOW_LIST,
+        providerMix: providerRows,
+      },
+      excerpts: {
+        darkPerception: darkExcerpt,
+        chronicleLine: lines[0] ?? null,
+        constructName: constructRows.find((c) => c.name !== null)?.name ?? null,
+        tendedProse: lines.find((l) => / cared for /.test(l)) ?? null,
+      },
+      evidence: {
+        ticksRun: loop.tick - START_TICK,
+        crashAlerts: qInt(
+          db,
+          `SELECT COUNT(*) FROM alerts WHERE kind IN ('turn_crash', 'reflection_failed')`,
+        ),
+        drainedIntents: opts.drainedIntents,
+        drainedAgainCount: opts.drainedAgainCount,
+        minds: [...runtimes.entries()].map(([agentId, r]) => ({
+          agentId,
+          turns: r.stats().turns,
+          reflections: r.stats().reflections,
+        })),
+        overBudgetTicks: tickMs.filter((ms) => ms > TICK_BUDGET_MS).length,
+        unpromptedDrinks: allEvents.filter((e) => e.type === 'agent_drank').length,
+        foodGathered: gathered.acts,
+        gatheredFoodEaten: gathered.eaten,
+        stagedAfflictionAgentId: SICK_ONE,
+        stagedAfflictionResponses: stagedResponses,
+        stagedAfflictionResolved: stagedResolved,
+        c11EventTypes: [...new Set(c11Events.map((e) => e.type))].sort(),
+        chronicleLines: lines.length,
+        chronicleViolations: violations,
+        wearThreshold: WEAR_THRESHOLD,
+        maxTileTraffic: trafficValues.length === 0 ? 0 : Math.max(...trafficValues),
+        tilesWorn,
+        worldLawPaths: Object.keys(TOGGLABLE_PATHS).filter((p) => p.endsWith('.enabled')),
+        lawFlips: allEvents
+          .filter((e) => e.type === 'config_changed')
+          .map((e) => ({
+            tick: e.tick,
+            path: String(payloadOf(e).path),
+            value: payloadOf(e).value,
+          })),
+        lawHistoryEntries: allEvents.filter((e) => e.type === 'config_changed').length,
+        replayHashMatches,
+        reflectionsStarted: [...runtimes.values()].reduce((s, r) => s + r.stats().reflections, 0),
+        reflectionsResolved: qInt(
+          db,
+          `SELECT COUNT(*) FROM (SELECT DISTINCT agent_id, day FROM summary_nodes WHERE level = 'day')`,
+        ),
+        deadCalls,
+        deadCallAlertRows: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind = 'llm_dead_calls'`),
+        constructs: {
+          expressiveVerbs,
+          firstExpressiveBy: firstExpressive?.agentId ?? null,
+          reusedBy,
+          reuseArbiterCalls,
+          passRan: nightsRun.length >= 1,
+          passErrors: constructErrors,
+          recognized: constructRows.length,
+          named: constructRows.filter((c) => c.name !== null).length,
+          namingLawHolds,
+          viewerCopy,
+        },
+        tier1Milestones: narratorStore
+          .milestones()
+          .filter((m) => m.tier === 1)
+          .map((m) => m.kind),
+        darkPerceptions,
+        semanticPassRan: semanticRan,
+        semanticHits,
+        semanticPassErrors: semanticPassErrorCount({ narrateErrors, semanticErrors }),
+        semanticUnreadableNights: qInt(
+          db,
+          `SELECT COUNT(*) FROM alerts WHERE kind = 'semantic_firsts_unreadable'`,
+        ),
+        semanticSkippedNights,
+        fordBridge: fordProbe,
+        farBankWalk: farBank,
+        clothedSurviveLadder: clothedSurvive,
+        discretion,
+        mealsNeededPerMindPerDay: Number(mealsNeeded.toFixed(3)),
+        fullNeedMoments: fullNeed.totalTicks(),
+        socialSurvivalActs: {
+          tends: allEvents.filter(
+            (e) => e.type === 'agent_tended' && payloadOf(e).tenderId !== undefined,
+          ).length,
+          gives: completed.filter((e) => payloadOf(e).verb === 'give').length,
+          jointBuilds: (() => {
+            const byStructure = new Map<string, Set<string>>()
+            for (const e of allEvents.filter((x) => x.type === 'structure_progressed')) {
+              const id = String(payloadOf(e).id)
+              byStructure.set(id, byStructure.get(id) ?? new Set())
+            }
+            for (const e of started.filter((x) => payloadOf(x).verb === 'build')) {
+              const p = payloadOf(e).params as { x?: number; y?: number } | undefined
+              const at = Object.values(finalState.structures).find(
+                (s) => s.x === p?.x && s.y === p?.y,
+              )
+              if (at !== undefined) byStructure.get(at.id)?.add(String(payloadOf(e).agentId))
+            }
+            return [...byStructure.values()].filter((who) => who.size > 1).length
+          })(),
+          sharedFireMeals: completed.filter((e) => {
+            if (payloadOf(e).verb !== 'eat') return false
+            const who = String(payloadOf(e).agentId)
+            const me = finalState.agents[who]
+            if (me === undefined) return false
+            return completed.some(
+              (o) =>
+                o !== e &&
+                payloadOf(o).verb === 'eat' &&
+                Math.abs(o.tick - e.tick) <= 30 &&
+                payloadOf(o).agentId !== who,
+            )
+          }).length,
+        },
+      },
+    }
+    return G11ReportSchema.parse(built)
   }
 
   const report = buildReport({ partial: false, drainedIntents, drainedAgainCount })
   writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2))
-  writeFileSync(TRANSCRIPT_PATH,
-    transcript(report, thoughts, store.readFrom(0), adjudications, bridge.rejections))
+  writeFileSync(
+    TRANSCRIPT_PATH,
+    transcript(report, thoughts, store.readFrom(0), adjudications, bridge.rejections),
+  )
 
   console.log('\n=== GATE G11b report ===')
   console.log(JSON.stringify(report, null, 2))
-  console.log(`\n  TOTAL: $${report.spend.totalCostUsd.toFixed(6)} over ${report.spend.llmCallCount} calls`
-    + ` = $${report.spend.costPerMindPerSimDay.toFixed(4)}/mind/sim-day,`
-    + ` cache-read share ${(report.spend.cacheReadShare * 100).toFixed(1)}%`)
-  console.log(`  survival tax: ${(survivalTax(report.evidence.discretion) * 100).toFixed(1)}% of turns`)
+  console.log(
+    `\n  TOTAL: $${report.spend.totalCostUsd.toFixed(6)} over ${report.spend.llmCallCount} calls` +
+      ` = $${report.spend.costPerMindPerSimDay.toFixed(4)}/mind/sim-day,` +
+      ` cache-read share ${(report.spend.cacheReadShare * 100).toFixed(1)}%`,
+  )
+  console.log(
+    `  survival tax: ${(survivalTax(report.evidence.discretion) * 100).toFixed(1)}% of turns`,
+  )
 
   if (DRY_RUN) {
     const paid = qInt(db, 'SELECT COUNT(*) FROM llm_calls')
     console.log(`\n[g11] DRY RUN: ${paid} live calls were made (must be 0)`)
-    if (paid !== 0) { console.error('DRY RUN SPENT MONEY'); process.exit(1) }
+    if (paid !== 0) {
+      console.error('DRY RUN SPENT MONEY')
+      process.exit(1)
+    }
     console.log('[g11] dry run complete: the wiring runs end to end for nothing.')
     return
   }
@@ -1246,8 +1755,8 @@ function transcript(
   return [
     `# GATE G11b — the deep world, ${(report.totalTicks / MINUTES_PER_DAY).toFixed(0)} sim-days`,
     '',
-    `Model ${report.model}; ${report.totalTicks} ticks at ${report.realMsPerTick} ms;`
-    + ` $${report.spend.totalCostUsd.toFixed(6)} over ${report.spend.llmCallCount} calls.`,
+    `Model ${report.model}; ${report.totalTicks} ticks at ${report.realMsPerTick} ms;` +
+      ` $${report.spend.totalCostUsd.toFixed(6)} over ${report.spend.llmCallCount} calls.`,
     '',
     '## Thoughts',
     '',

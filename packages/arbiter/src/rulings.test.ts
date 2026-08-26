@@ -10,7 +10,21 @@ const DIM = 384
 
 // The shared FakeEmbedder is sha256-based, so a rephrase can never clear the cosine bar. This
 // bag-of-words one gives token-overlap similarity, exercising KNN → cosine with no live model.
-const STOPWORDS = new Set(['a', 'an', 'the', 'for', 'by', 'to', 'of', 'i', 'try', 'want', 'attempt', 'and', 'with'])
+const STOPWORDS = new Set([
+  'a',
+  'an',
+  'the',
+  'for',
+  'by',
+  'to',
+  'of',
+  'i',
+  'try',
+  'want',
+  'attempt',
+  'and',
+  'with',
+])
 
 function unitVec(bytes: Uint8Array): Float32Array {
   const v = new Float32Array(DIM)
@@ -96,9 +110,9 @@ function copperVerdict(): Verdict {
   }
 }
 
-async function makeStore(
-  embedder: { embed(t: string): Promise<Float32Array> },
-): Promise<{ db: Database.Database; store: RulingsStore }> {
+async function makeStore(embedder: {
+  embed(t: string): Promise<Float32Array>
+}): Promise<{ db: Database.Database; store: RulingsStore }> {
   const db = openArbiterDb(':memory:')
   return { db, store: new RulingsStore(db, embedder) }
 }

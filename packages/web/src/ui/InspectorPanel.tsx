@@ -6,7 +6,12 @@ import { resolveAssetId } from '../render/textures.js'
 import { bustStyle } from './rosterModel.js'
 import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from './status.js'
 import {
-  CHANGE_EMPTY, SKILLS_EMPTY, THOUGHT_EMPTY, changeLog, hasChanged, type ChangeEntry,
+  CHANGE_EMPTY,
+  SKILLS_EMPTY,
+  THOUGHT_EMPTY,
+  changeLog,
+  hasChanged,
+  type ChangeEntry,
 } from './becoming.js'
 
 export const TAB_CACHE_MS = 30_000
@@ -19,12 +24,20 @@ type LedgerRow = { personId: string; doc: string; updatedDay: number }
 type JournalRow = { tick: number; day: number; text: string }
 type PersonalityRow = { version: number; day: number; doc: string; edit: string }
 
-const ENDPOINT: Record<Tab, string> = { ledger: 'ledgers', journal: 'journal', personality: 'personality' }
+const ENDPOINT: Record<Tab, string> = {
+  ledger: 'ledgers',
+  journal: 'journal',
+  personality: 'personality',
+}
 
 const cache = new Map<string, { at: number; rows: unknown[] }>()
 /** A read that failed is NOT an empty record: caching it turns one 500 into 30 seconds of
  *  "Nothing written yet." about a person. Only an answer is cached. */
-export async function fetchTab<T>(agentId: string, tab: Tab, fetchFn: typeof fetch = fetch): Promise<T[]> {
+export async function fetchTab<T>(
+  agentId: string,
+  tab: Tab,
+  fetchFn: typeof fetch = fetch,
+): Promise<T[]> {
   const key = `${agentId}:${tab}`
   const hit = cache.get(key)
   if (hit !== undefined && performance.now() - hit.at < TAB_CACHE_MS) return hit.rows as T[]
@@ -60,7 +73,9 @@ function NeedBar({ label, value }: { label: string; value: number }) {
 function TabSkeleton() {
   return (
     <div aria-busy="true">
-      {[0, 1, 2].map((i) => <div key={i} className="skeleton-row" />)}
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="skeleton-row" />
+      ))}
     </div>
   )
 }
@@ -72,15 +87,19 @@ export type InspectorAgent = AgentView & { skills: Record<string, number> } & {
 
 /** What a run has made of this person. Every section is sourced to something the run recorded,
  *  and where the record is empty it says the RECORD is empty. */
-export function InspectorBodyView(
-  { agent, tick, thought, carrying, changes }: {
-    agent: InspectorAgent
-    tick: number
-    thought: { text: string } | null
-    carrying: ReadonlyArray<{ id: string; kind: string; qty: number }>
-    changes: readonly ChangeEntry[]
-  },
-) {
+export function InspectorBodyView({
+  agent,
+  tick,
+  thought,
+  carrying,
+  changes,
+}: {
+  agent: InspectorAgent
+  tick: number
+  thought: { text: string } | null
+  carrying: ReadonlyArray<{ id: string; kind: string; qty: number }>
+  changes: readonly ChangeEntry[]
+}) {
   const moved = hasChanged(changes)
   return (
     <>
@@ -115,15 +134,31 @@ export function InspectorBodyView(
 
       <section className="block">
         <h3>Carrying</h3>
-        {carrying.length === 0 ? <p>Empty hands.</p> : (
-          <ul>{carrying.map((it) => <li key={it.id}>{it.kind} × {it.qty}</li>)}</ul>
+        {carrying.length === 0 ? (
+          <p>Empty hands.</p>
+        ) : (
+          <ul>
+            {carrying.map((it) => (
+              <li key={it.id}>
+                {it.kind} × {it.qty}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
       <section className="block">
         <h3>Skills</h3>
-        {Object.keys(agent.skills).length === 0 ? <p>{SKILLS_EMPTY}</p> : (
-          <ul>{Object.entries(agent.skills).map(([track, xp]) => <li key={track}>{track} — level {level(xp)}</li>)}</ul>
+        {Object.keys(agent.skills).length === 0 ? (
+          <p>{SKILLS_EMPTY}</p>
+        ) : (
+          <ul>
+            {Object.entries(agent.skills).map(([track, xp]) => (
+              <li key={track}>
+                {track} — level {level(xp)}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
@@ -132,22 +167,27 @@ export function InspectorBodyView(
           nothing yet and is told so, rather than handed v1 as a character sheet. */}
       <section className="block">
         <h3>How they have changed</h3>
-        {!moved ? <p className="doc">{CHANGE_EMPTY}</p> : changes.map((e) => (
-          <article key={e.version} className="change-entry">
-            <p className="change-head">
-              <span className="stamp">Day {e.day}</span> {e.edit}
-            </p>
-            {e.diff.length > 0 && (
-              <pre className="diff">
-                {e.diff.map((l, i) => (
-                  <div key={i} className={`diff-line ${l.kind}`}>
-                    {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}{l.text}
-                  </div>
-                ))}
-              </pre>
-            )}
-          </article>
-        ))}
+        {!moved ? (
+          <p className="doc">{CHANGE_EMPTY}</p>
+        ) : (
+          changes.map((e) => (
+            <article key={e.version} className="change-entry">
+              <p className="change-head">
+                <span className="stamp">Day {e.day}</span> {e.edit}
+              </p>
+              {e.diff.length > 0 && (
+                <pre className="diff">
+                  {e.diff.map((l, i) => (
+                    <div key={i} className={`diff-line ${l.kind}`}>
+                      {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}
+                      {l.text}
+                    </div>
+                  ))}
+                </pre>
+              )}
+            </article>
+          ))
+        )}
       </section>
     </>
   )
@@ -163,10 +203,17 @@ export function BackToRoster({ onBack }: { onBack: () => void }) {
   )
 }
 
-export function InspectorPanel(
-  { store, agentId, scene, onBack }:
-  { store: WorldStore; agentId: string; scene: Scene | null; onBack?: () => void },
-) {
+export function InspectorPanel({
+  store,
+  agentId,
+  scene,
+  onBack,
+}: {
+  store: WorldStore
+  agentId: string
+  scene: Scene | null
+  onBack?: () => void
+}) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const [tab, setTab] = useState<Tab>('ledger')
@@ -176,10 +223,13 @@ export function InspectorPanel(
   const [follow, setFollow] = useState(false)
 
   useEffect(() => {
-    if (tab === 'ledger' && ledger === null) void fetchTab<LedgerRow>(agentId, 'ledger').then(setLedger)
-    if (tab === 'journal' && journal === null) void fetchTab<JournalRow>(agentId, 'journal').then(setJournal)
+    if (tab === 'ledger' && ledger === null)
+      void fetchTab<LedgerRow>(agentId, 'ledger').then(setLedger)
+    if (tab === 'journal' && journal === null)
+      void fetchTab<JournalRow>(agentId, 'journal').then(setJournal)
     // no longer behind a tab: what changed about a person is the panel's own subject now
-    if (personality === null) void fetchTab<PersonalityRow>(agentId, 'personality').then(setPersonality)
+    if (personality === null)
+      void fetchTab<PersonalityRow>(agentId, 'personality').then(setPersonality)
   }, [tab, agentId, ledger, journal, personality])
 
   useEffect(() => {
@@ -222,7 +272,9 @@ export function InspectorPanel(
   }
 
   const thought = store.latestThought(agentId)
-  const carrying = Object.values(state!.items).filter((it) => it.loc.t === 'agent' && it.loc.id === agentId)
+  const carrying = Object.values(state!.items).filter(
+    (it) => it.loc.t === 'agent' && it.loc.id === agentId,
+  )
   const records = store.assetRecords()
   const portraitId = resolveAssetId(records, 'portrait', agentId)
   // no painted portrait yet → the v4 sprite bust stands in (smooth hi-res crop, not pixelated)
@@ -235,7 +287,10 @@ export function InspectorPanel(
         {portraitId !== null ? (
           <img className="portrait" src={`/assets/${portraitId}.png`} alt="" />
         ) : bust !== null ? (
-          <div className="portrait" style={{ ...bust, backgroundRepeat: 'no-repeat', imageRendering: 'auto' }} />
+          <div
+            className="portrait"
+            style={{ ...bust, backgroundRepeat: 'no-repeat', imageRendering: 'auto' }}
+          />
         ) : (
           <div className="portrait silhouette" />
         )}
@@ -248,7 +303,9 @@ export function InspectorPanel(
             <span className="badge">{ageBand(a.ageDays)}</span>
             <span className="badge">{stateWord(a, tick)}</span>
             {conditionsOf(a).map((c) => (
-              <span key={c} className={c === 'unwell' ? 'badge ill' : 'badge'}>{CONDITION_WORD[c]}</span>
+              <span key={c} className={c === 'unwell' ? 'badge ill' : 'badge'}>
+                {CONDITION_WORD[c]}
+              </span>
             ))}
           </div>
         </div>
@@ -279,19 +336,33 @@ export function InspectorPanel(
 
       {tab === 'ledger' && (
         <section className="block tab-body">
-          {ledger === null ? <TabSkeleton /> : ledger.length === 0 ? <p>{EMPTY_COPY}</p> : ledger.map((row) => (
-            <article key={row.personId}>
-              <h4>{row.personId}</h4>
-              <p className="doc">{row.doc}</p>
-            </article>
-          ))}
+          {ledger === null ? (
+            <TabSkeleton />
+          ) : ledger.length === 0 ? (
+            <p>{EMPTY_COPY}</p>
+          ) : (
+            ledger.map((row) => (
+              <article key={row.personId}>
+                <h4>{row.personId}</h4>
+                <p className="doc">{row.doc}</p>
+              </article>
+            ))
+          )}
         </section>
       )}
       {tab === 'journal' && (
         <section className="block tab-body">
-          {journal === null ? <TabSkeleton /> : journal.length === 0 ? <p>{EMPTY_COPY}</p> : journal.map((row, i) => (
-            <p key={i} className="doc"><span className="stamp">Day {row.day}</span> {row.text}</p>
-          ))}
+          {journal === null ? (
+            <TabSkeleton />
+          ) : journal.length === 0 ? (
+            <p>{EMPTY_COPY}</p>
+          ) : (
+            journal.map((row, i) => (
+              <p key={i} className="doc">
+                <span className="stamp">Day {row.day}</span> {row.text}
+              </p>
+            ))
+          )}
         </section>
       )}
     </div>

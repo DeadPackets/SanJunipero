@@ -7,7 +7,12 @@ import WebSocket from 'ws'
 import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
 import {
-  DEV_MAP_DEFAULT, DEV_MAP_HUMAN, SHOWCASE_CONFIG, THOUGHT_LINES, devTerrain, startDevWorld,
+  DEV_MAP_DEFAULT,
+  DEV_MAP_HUMAN,
+  SHOWCASE_CONFIG,
+  THOUGHT_LINES,
+  devTerrain,
+  startDevWorld,
 } from './devWorld.js'
 import { townStructuresFor } from './founders.js'
 
@@ -56,8 +61,10 @@ describe('★ the fixture world must be asked for by name, never received by sil
     const cli = CLI.indexOf('import.meta.url === pathToFileURL')
     const announce = CLI.indexOf('`dev world: map=${map} rings=')
     expect(announce, 'no boot line naming the map').toBeGreaterThan(0)
-    expect(announce, 'the boot line is inside the CLI block, so a library caller never sees it')
-      .toBeLessThan(cli)
+    expect(
+      announce,
+      'the boot line is inside the CLI block, so a library caller never sees it',
+    ).toBeLessThan(cli)
     expect(CLI).toContain('THE FROZEN G6 TEST FIXTURE, not the product town')
   })
 
@@ -66,8 +73,10 @@ describe('★ the fixture world must be asked for by name, never received by sil
     const product = townStructuresFor('showcase').map((s) => s.kind)
     // the four kinds the art ingest reports NO ART for
     const noArt = ['wagon', 'shed', 'scaffolding', 'standing_stone']
-    expect(fixture.filter((k) => noArt.includes(k)).length,
-      'the fixture is meant to be the one full of placeholders').toBeGreaterThanOrEqual(4)
+    expect(
+      fixture.filter((k) => noArt.includes(k)).length,
+      'the fixture is meant to be the one full of placeholders',
+    ).toBeGreaterThanOrEqual(4)
     expect(product.filter((k) => noArt.includes(k))).toEqual([])
     expect(product.length).toBeGreaterThan(fixture.length)
   })
@@ -86,7 +95,10 @@ describe('dev world server', () => {
       const sock = new WebSocket(`ws://127.0.0.1:${dw.gateway.port}/ws`)
       const frames: string[] = []
       sock.on('message', (d) => frames.push(d.toString()))
-      await new Promise((resolve, reject) => { sock.on('open', resolve); sock.on('error', reject) })
+      await new Promise((resolve, reject) => {
+        sock.on('open', resolve)
+        sock.on('error', reject)
+      })
       sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
 
       await until(() => frames.length >= 1)
@@ -100,14 +112,26 @@ describe('dev world server', () => {
       // the five founders by name, the six approved buildings complete on day 0
       expect(Object.keys(state.agents).sort()).toEqual(['amara', 'nadia', 'omar', 'salma', 'yusuf'])
       expect(state.agents['omar']?.name).toBe('Omar')
-      const kinds = Object.values(state.structures).map((s) => s.kind).sort()
-      expect(kinds).toEqual(['house', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
+      const kinds = Object.values(state.structures)
+        .map((s) => s.kind)
+        .sort()
+      expect(kinds).toEqual([
+        'house',
+        'scaffolding',
+        'shed',
+        'standing_stone',
+        'storehouse',
+        'wagon',
+      ])
       for (const s of Object.values(state.structures)) expect(s.stage).toBe('complete')
 
       await until(() => dw.loop.state.tick >= 40)
       const parsed = (): ServerMsg[] => frames.map((f) => ServerMsg.parse(JSON.parse(f)))
-      await until(() => parsed().filter((m) => m.t === 'tick').length >= 2
-        && parsed().some((m) => m.t === 'thought'))
+      await until(
+        () =>
+          parsed().filter((m) => m.t === 'tick').length >= 2 &&
+          parsed().some((m) => m.t === 'thought'),
+      )
 
       const ticks = parsed().filter((m) => m.t === 'tick')
       expect(ticks.length).toBeGreaterThanOrEqual(2)
@@ -115,7 +139,8 @@ describe('dev world server', () => {
 
       const thought = parsed().find((m) => m.t === 'thought')!
       expect(thought.t === 'thought' && Object.values(THOUGHT_LINES)).toContain(
-        thought.t === 'thought' ? thought.text : '')
+        thought.t === 'thought' ? thought.text : '',
+      )
 
       sock.close()
     } finally {

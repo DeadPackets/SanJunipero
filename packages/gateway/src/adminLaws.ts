@@ -40,14 +40,18 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
   // Binding is the operator's job; this is the second lock — a listener started on 0.0.0.0
   // still refuses every request that did not arrive on the configured address.
   const wrongInterface = (req: IncomingMessage): boolean =>
-    host !== '0.0.0.0' && host !== '::' && (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
+    host !== '0.0.0.0' &&
+    host !== '::' &&
+    (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (url.pathname !== ADMIN_LAWS_PATH) return send(res, 404, { error: 'not found' })
     if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
-    if (req.headers.authorization !== `Bearer ${opts.token}`) return send(res, 401, { error: 'unauthorized' })
-    if (wrongInterface(req)) return send(res, 403, { error: `the law channel answers on ${host} only` })
+    if (req.headers.authorization !== `Bearer ${opts.token}`)
+      return send(res, 401, { error: 'unauthorized' })
+    if (wrongInterface(req))
+      return send(res, 403, { error: `the law channel answers on ${host} only` })
 
     void readBody(req).then((text) => {
       if (text === null) return send(res, 400, { error: 'body unreadable' })
@@ -58,7 +62,8 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
         return send(res, 400, { error: 'expected {path, value}' })
       }
       const schema = TOGGLABLE_PATHS[parsed.path]
-      if (schema === undefined) return send(res, 400, { error: `${parsed.path} is not a world law` })
+      if (schema === undefined)
+        return send(res, 400, { error: `${parsed.path} is not a world law` })
       // The fold THROWS on a value its schema rejects, so a cheerful 202 here
       // would take the world down at the next tick boundary. Refuse it now.
       const value = schema.safeParse(parsed.value)

@@ -17,12 +17,15 @@ describe('genesisState', () => {
       counters: { nextEntityId: 1 },
     })
     expect(s.terrain).toHaveLength(32)
-    expect(s.terrain.every(row => row.length === 32 && row.every(t => t === 0))).toBe(true)
+    expect(s.terrain.every((row) => row.length === 32 && row.every((t) => t === 0))).toBe(true)
     expect(s.wildlife).toEqual({ fish: 100, deer: 20 })
     expect(s.weather.temperatureC).toBe(14)
   })
   it('uses a provided terrain grid as-is', () => {
-    const terrain: TileId[][] = [[2, 3], [0, 4]]
+    const terrain: TileId[][] = [
+      [2, 3],
+      [0, 4],
+    ]
     const s = genesisState(DEFAULT_CONFIG, terrain)
     expect(s.terrain).toBe(terrain)
   })

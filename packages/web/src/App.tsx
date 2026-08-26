@@ -3,7 +3,13 @@ import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
 import {
-  backToRoster, isSingleAgentView, navToLens, parseRoute, routeToPath, type Lens, type Route,
+  backToRoster,
+  isSingleAgentView,
+  navToLens,
+  parseRoute,
+  routeToPath,
+  type Lens,
+  type Route,
 } from './ui/route.js'
 import { escapeStep, lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
@@ -24,7 +30,13 @@ import { ControlBar } from './ui/ControlBarView.js'
 import { controlItems, type ControlAction } from './ui/controlBar.js'
 import { HudDock } from './ui/HudDock.js'
 import {
-  DEFAULT_HUD, HUD_TOGGLE_KEY, hudReducer, hudToggle, loadHud, saveHud, type HudEv,
+  DEFAULT_HUD,
+  HUD_TOGGLE_KEY,
+  hudReducer,
+  hudToggle,
+  loadHud,
+  saveHud,
+  type HudEv,
 } from './ui/hudLayout.js'
 import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
 import { BADGE_WORD, tickBadgeState } from './ui/broadcastReady.js'
@@ -89,7 +101,11 @@ export function App() {
   // WHERE THE CHROME SITS. Slot-based, persisted per viewer, and never able to hide its own
   // way back — HudDock is not itself a Dockable.
   const [hud, setHud] = useState(() => {
-    try { return loadHud(localStorage) } catch { return DEFAULT_HUD }
+    try {
+      return loadHud(localStorage)
+    } catch {
+      return DEFAULT_HUD
+    }
   })
   const [dockOpen, setDockOpen] = useState(false)
   // The outgoing view leaves before the incoming arrives, never both at once, so the panel body
@@ -104,14 +120,23 @@ export function App() {
   const applyHud = (ev: HudEv): void => {
     setHud((prev) => {
       const next = hudReducer(prev, ev)
-      try { saveHud(localStorage, next) } catch { /* private mode */ }
+      try {
+        saveHud(localStorage, next)
+      } catch {
+        /* private mode */
+      }
       return next
     })
   }
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const handle = connectObservatory({ url: `${proto}://${location.host}/ws`, store, onGap: setGapTicks, onStatus: setLink })
+    const handle = connectObservatory({
+      url: `${proto}://${location.host}/ws`,
+      store,
+      onGap: setGapTicks,
+      onStatus: setLink,
+    })
     sockRef.current = handle
     setHandle(handle)
 
@@ -127,7 +152,10 @@ export function App() {
 
     const onPop = (): void => setRoute(parseRoute(location.pathname, location.search))
     window.addEventListener('popstate', onPop)
-    return () => { handle.close(); window.removeEventListener('popstate', onPop) }
+    return () => {
+      handle.close()
+      window.removeEventListener('popstate', onPop)
+    }
   }, [store])
 
   // every viewed moment is shareable: scrubs rewrite the address bar in place
@@ -162,7 +190,9 @@ export function App() {
   // Opening a roster row is a state of the LIST, not a navigation: the list never unmounts, so
   // there is no back to get wrong. It is still shareable, as `?open=`.
   const toggleRow = (agentId: string): void => {
-    const nextState = expandReducer({ openId: route.openId }, { kind: 'toggle', id: agentId }, [agentId])
+    const nextState = expandReducer({ openId: route.openId }, { kind: 'toggle', id: agentId }, [
+      agentId,
+    ])
     const next: Route = { ...route, openId: nextState.openId }
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
@@ -207,9 +237,15 @@ export function App() {
       if (e.altKey || e.ctrlKey || e.metaKey) return
       const t = e.target as HTMLElement | null
       const inApplication = t?.closest?.('[role="application"]') != null
-      if (!lensKeyAllowed(
-        t?.tagName ?? '', t?.isContentEditable ?? false, inApplication, e.defaultPrevented,
-      )) return
+      if (
+        !lensKeyAllowed(
+          t?.tagName ?? '',
+          t?.isContentEditable ?? false,
+          inApplication,
+          e.defaultPrevented,
+        )
+      )
+        return
       const next = lensFromKey(e.key, route.lens)
       if (next === null) return
       e.preventDefault()
@@ -238,7 +274,9 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    setLensScene((p) => sceneReducer(p, { kind: 'go', name: 'lens', to: route.lens, atMs: performance.now() }))
+    setLensScene((p) =>
+      sceneReducer(p, { kind: 'go', name: 'lens', to: route.lens, atMs: performance.now() }),
+    )
   }, [route.lens])
 
   // `sceneReducer` returns the same object when nothing changed, so React bails out and this
@@ -268,13 +306,27 @@ export function App() {
   // ONE place where a control becomes a thing that happens. The bar has no logic of its own.
   const onControl = (a: ControlAction): void => {
     switch (a.kind) {
-      case 'lens': nav(a.lens); return
-      case 'zoom': scene?.setZoom(stepZoom(scene.getZoomStop(), a.dir)); return
-      case 'fit': scene?.fitToTown(); return
-      case 'live': sockRef.current?.goLive(); return
-      case 'follow': scene?.setFollow(null); return
-      case 'exit-interior': scene?.interior?.setActive(null); return
-      case 'hud': applyHud({ kind: a.op === 'hide' ? 'hide-all' : 'show-all' }); return
+      case 'lens':
+        nav(a.lens)
+        return
+      case 'zoom':
+        scene?.setZoom(stepZoom(scene.getZoomStop(), a.dir))
+        return
+      case 'fit':
+        scene?.fitToTown()
+        return
+      case 'live':
+        sockRef.current?.goLive()
+        return
+      case 'follow':
+        scene?.setFollow(null)
+        return
+      case 'exit-interior':
+        scene?.interior?.setActive(null)
+        return
+      case 'hud':
+        applyHud({ kind: a.op === 'hide' ? 'hide-all' : 'show-all' })
+        return
     }
   }
 
@@ -314,7 +366,9 @@ export function App() {
         <h1 className="px-title">San Junipero</h1>
         <LensTabs store={store} lens={route.lens} onNav={nav} />
         {link === 'reconnecting' && (
-          <div className="link-pill" role="status">Reaching the town…</div>
+          <div className="link-pill" role="status">
+            Reaching the town…
+          </div>
         )}
         <TickBadge store={store} link={link} />
       </header>
@@ -326,47 +380,55 @@ export function App() {
           className={shownLens === 'society' ? 'stage-hidden' : undefined}
         >
           <div className="stage-cell">
-          <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
-          <StageVeil store={store} />
-          <InteriorBar
-            store={store}
-            structureId={insideId}
-            onBack={() => scene?.interior?.setActive(null)}
-          />
-          <ScrubBanner store={store} />
-          {/* The map leaves whenever another surface owns the stage, and whenever the viewer
+            <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
+            <StageVeil store={store} />
+            <InteriorBar
+              store={store}
+              structureId={insideId}
+              onBack={() => scene?.interior?.setActive(null)}
+            />
+            <ScrubBanner store={store} />
+            {/* The map leaves whenever another surface owns the stage, and whenever the viewer
               is standing inside a room. One predicate decides it, so the composition cannot be
               settled by z-index luck — see minimap.ts. */}
-          {minimapShown(shownLens, insideId, hud.minimap === 'hidden') && (
-            <Minimap scene={scene} store={store} focusAgentId={route.agentId} />
-          )}
-          {hud.fps !== 'hidden' && <FpsOverlay />}
-          {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
-            <Timeline store={store} handle={handle} onView={onView} />
-          )}
-          {shownLens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {(shownLens === 'director' || directorLeaving) && (
-            <MomentsLens
-              store={store}
-              handle={handle}
-              scene={scene}
-              momentId={route.momentId}
-              televised={televised}
-              leaving={shownLens !== 'director'}
-              onOpen={openMoment}
-            />
-          )}
+            {minimapShown(shownLens, insideId, hud.minimap === 'hidden') && (
+              <Minimap scene={scene} store={store} focusAgentId={route.agentId} />
+            )}
+            {hud.fps !== 'hidden' && <FpsOverlay />}
+            {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
+              <Timeline store={store} handle={handle} onView={onView} />
+            )}
+            {shownLens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
+            {(shownLens === 'director' || directorLeaving) && (
+              <MomentsLens
+                store={store}
+                handle={handle}
+                scene={scene}
+                momentId={route.momentId}
+                televised={televised}
+                leaving={shownLens !== 'director'}
+                onOpen={openMoment}
+              />
+            )}
           </div>
           <HudDock
             layout={hud}
             open={dockOpen}
-            onEvent={(ev) => { applyHud(ev); if (ev.kind !== 'dock') setDockOpen(false) }}
+            onEvent={(ev) => {
+              applyHud(ev)
+              if (ev.kind !== 'dock') setDockOpen(false)
+            }}
             onOpen={setDockOpen}
           />
           {!hudHidden && (
             <ControlBar
               items={controlItems({
-                lens: route.lens, live, zoom: zoomStop, following: null, insideId, hudHidden,
+                lens: route.lens,
+                live,
+                zoom: zoomStop,
+                following: null,
+                insideId,
+                hudHidden,
                 townFits,
               })}
               onAction={onControl}
@@ -375,15 +437,34 @@ export function App() {
         </main>
         <aside
           id="panel-outlet"
-          className={shownLens === 'inspector' || shownLens === 'chronicle' || shownLens === 'discoveries' || shownLens === 'laws' ? 'open' : undefined}
+          className={
+            shownLens === 'inspector' ||
+            shownLens === 'chronicle' ||
+            shownLens === 'discoveries' ||
+            shownLens === 'laws'
+              ? 'open'
+              : undefined
+          }
         >
           {shownLens === 'inspector' && route.agentId !== null && (
-            <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
+            <InspectorPanel
+              store={store}
+              agentId={route.agentId}
+              scene={scene}
+              onBack={showRoster}
+            />
           )}
           {shownLens === 'inspector' && route.agentId === null && (
-            <RosterPanel store={store} openId={route.openId} onToggle={toggleRow} onOpenFull={pickAgent} />
+            <RosterPanel
+              store={store}
+              openId={route.openId}
+              onToggle={toggleRow}
+              onOpenFull={pickAgent}
+            />
           )}
-          {shownLens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
+          {shownLens === 'chronicle' && (
+            <ChroniclePanel store={store} handle={handle} onView={onView} />
+          )}
           {shownLens === 'discoveries' && <DiscoveryPanel store={store} onView={onView} />}
           {shownLens === 'laws' && (
             <>
@@ -409,7 +490,11 @@ export function App() {
   )
 
   function dismissDigest(): void {
-    try { localStorage.setItem(LAST_SEEN_KEY, String(store.getTick())) } catch { /* private mode */ }
+    try {
+      localStorage.setItem(LAST_SEEN_KEY, String(store.getTick()))
+    } catch {
+      /* private mode */
+    }
     setGapTicks(null)
   }
 }

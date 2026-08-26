@@ -33,7 +33,9 @@ export function watchDiscoveryArt(deps: {
   // ready callback keeps it current, including for art this watcher did not ask for.
   const known = new Set<string>()
   for (const rec of deps.codex.listSince(0)) if (rec.kind !== null) known.add(rec.kind)
-  deps.codex.onAssetReady((rec) => { if (rec.kind !== null) known.add(rec.kind) })
+  deps.codex.onAssetReady((rec) => {
+    if (rec.kind !== null) known.add(rec.kind)
+  })
 
   const inFlight = new Set<Promise<unknown>>()
 
@@ -52,7 +54,9 @@ export function watchDiscoveryArt(deps: {
             known.delete(kind)
             deps.onError?.(kind, err)
           })
-          .finally(() => { inFlight.delete(p) })
+          .finally(() => {
+            inFlight.delete(p)
+          })
         inFlight.add(p)
       }
     },
@@ -65,7 +69,11 @@ export function watchDiscoveryArt(deps: {
 /** A watcher that draws nothing: a run with no image budget must still record every discovery. */
 export function noDiscoveryArt(): DiscoveryArtWatcher {
   return {
-    onDiscovery() { /* the record is already in the world log; a picture is not owed */ },
-    async settle() { /* nothing was ever in flight */ },
+    onDiscovery() {
+      /* the record is already in the world log; a picture is not owed */
+    },
+    async settle() {
+      /* nothing was ever in flight */
+    },
   }
 }

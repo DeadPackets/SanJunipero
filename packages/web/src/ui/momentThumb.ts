@@ -22,11 +22,17 @@ export function thumbTitle(m: Moment): string {
 
 export type Motif = { name: string; pixels: ReadonlyArray<readonly [number, number, string]> }
 
-const INK = '#43394A', EMBER = '#E8785A', HONEY = '#F2C879', SAGE = '#93B573'
-const WATER = '#7FB0C9', STONE = '#ABA198', SAND = '#E8D5BC'
+const INK = '#43394A',
+  EMBER = '#E8785A',
+  HONEY = '#F2C879',
+  SAGE = '#93B573'
+const WATER = '#7FB0C9',
+  STONE = '#ABA198',
+  SAND = '#E8D5BC'
 
 const px = (
-  fill: string, ...cells: ReadonlyArray<readonly [number, number]>
+  fill: string,
+  ...cells: ReadonlyArray<readonly [number, number]>
 ): Array<readonly [number, number, string]> => cells.map(([x, y]) => [x, y, fill] as const)
 
 export const MOTIFS: readonly Motif[] = [

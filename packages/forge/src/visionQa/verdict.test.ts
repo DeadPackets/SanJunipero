@@ -1,20 +1,33 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CRITERIA, HARD_FAIL_CRITERIA, VisionCriteriaSchema, VisionVerdictSchema,
-  NA_CRITERIA_BY_CLASS, NA_CRITERION, criterionOf, deriveOverall, type VisionCriteria,
+  CRITERIA,
+  HARD_FAIL_CRITERIA,
+  VisionCriteriaSchema,
+  VisionVerdictSchema,
+  NA_CRITERIA_BY_CLASS,
+  NA_CRITERION,
+  criterionOf,
+  deriveOverall,
+  type VisionCriteria,
 } from './verdict.js'
 
-function crit(score = 10, pass = true) { return { pass, score, evidence: 'looks right' } }
+function crit(score = 10, pass = true) {
+  return { pass, score, evidence: 'looks right' }
+}
 function all(score = 10): VisionCriteria {
-  return Object.fromEntries(CRITERIA.map(k => [k, crit(score)])) as VisionCriteria
+  return Object.fromEntries(CRITERIA.map((k) => [k, crit(score)])) as VisionCriteria
 }
 const OPTS = { minScore: 7, attempt: 1, maxRetries: 3 }
 
 describe('vision verdict schema', () => {
   it('round-trips a full valid verdict deep-equal', () => {
     const v = {
-      assetId: 'asset_1', model: 'google/gemini-3.7-flash', rubricVersion: 'v1',
-      criteria: all(9), overall: 'pass' as const, feedback: '',
+      assetId: 'asset_1',
+      model: 'google/gemini-3.7-flash',
+      rubricVersion: 'v1',
+      criteria: all(9),
+      overall: 'pass' as const,
+      feedback: '',
     }
     const parsed = VisionVerdictSchema.parse(v)
     expect(parsed).toEqual(v)
@@ -24,12 +37,23 @@ describe('vision verdict schema', () => {
   it('rejects an extra key, a score above 10, and empty evidence', () => {
     expect(() => VisionCriteriaSchema.parse({ ...all(), extra: crit() })).toThrow()
     expect(() => VisionCriteriaSchema.parse({ ...all(), palette: crit(11) })).toThrow()
-    expect(() => VisionCriteriaSchema.parse({ ...all(), palette: { pass: true, score: 8, evidence: '' } })).toThrow()
+    expect(() =>
+      VisionCriteriaSchema.parse({ ...all(), palette: { pass: true, score: 8, evidence: '' } }),
+    ).toThrow()
     expect(() => VisionCriteriaSchema.parse({ ...all(), palette: undefined })).toThrow()
   })
 
   it('declares seven criteria with the two binary hard fails', () => {
-    expect(CRITERIA).toEqual(['palette', 'singleFigure', 'transparency', 'proportion', 'facing', 'density', 'alignment', 'tiling'])
+    expect(CRITERIA).toEqual([
+      'palette',
+      'singleFigure',
+      'transparency',
+      'proportion',
+      'facing',
+      'density',
+      'alignment',
+      'tiling',
+    ])
     expect(HARD_FAIL_CRITERIA).toEqual(['singleFigure', 'transparency'])
     for (const na of Object.values(NA_CRITERIA_BY_CLASS))
       for (const k of na) expect(CRITERIA).toContain(k)
@@ -62,7 +86,10 @@ describe('deriveOverall', () => {
     const c = { ...all(10), facing: { pass: false, score: 0, evidence: 'backwards' } }
     expect(deriveOverall(c, OPTS)).toBe('retry')
     expect(deriveOverall(c, { ...OPTS, naFor: ['facing'] })).toBe('pass')
-    const t = { ...all(10), singleFigure: { pass: false, score: 0, evidence: 'terrain has no figure' } }
+    const t = {
+      ...all(10),
+      singleFigure: { pass: false, score: 0, evidence: 'terrain has no figure' },
+    }
     expect(deriveOverall(t, { ...OPTS, naFor: NA_CRITERIA_BY_CLASS.terrain })).toBe('pass')
   })
 
@@ -72,14 +99,22 @@ describe('deriveOverall', () => {
   })
 
   it('NA_CRITERION names the class and always passes', () => {
-    expect(NA_CRITERION('icon')).toEqual({ pass: true, score: 10, evidence: 'not applicable for class icon' })
+    expect(NA_CRITERION('icon')).toEqual({
+      pass: true,
+      score: 10,
+      evidence: 'not applicable for class icon',
+    })
   })
 })
 
 describe('criterionOf', () => {
   const v = {
-    assetId: 'library:axe', model: 'm', rubricVersion: 'v1',
-    criteria: all(8), overall: 'pass' as const, feedback: '',
+    assetId: 'library:axe',
+    model: 'm',
+    rubricVersion: 'v1',
+    criteria: all(8),
+    overall: 'pass' as const,
+    feedback: '',
   }
 
   it('reads a criterion the verdict carries', () => {

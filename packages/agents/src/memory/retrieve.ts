@@ -42,9 +42,36 @@ const VEC_POOL = 50
 const MAX_TAG_MATCH = 3
 
 const STOPWORDS = new Set<string>([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for',
-  'from', 'had', 'has', 'have', 'he', 'her', 'his', 'i', 'in', 'is',
-  'it', 'its', 'of', 'on', 'or', 'that', 'the', 'they', 'to', 'was',
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'but',
+  'by',
+  'for',
+  'from',
+  'had',
+  'has',
+  'have',
+  'he',
+  'her',
+  'his',
+  'i',
+  'in',
+  'is',
+  'it',
+  'its',
+  'of',
+  'on',
+  'or',
+  'that',
+  'the',
+  'they',
+  'to',
+  'was',
 ])
 
 export function keywords(text: string, max = 6): string[] {
@@ -161,11 +188,7 @@ async function retrieve(
 
     const parts = { tag, bm25, cosine: cos, recency, importance }
     const score =
-      w.tag * tag +
-      w.bm25 * bm25 +
-      w.cosine * cos +
-      w.recency * recency +
-      w.importance * importance
+      w.tag * tag + w.bm25 * bm25 + w.cosine * cos + w.recency * recency + w.importance * importance
     return { ...row, score, parts }
   })
 

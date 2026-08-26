@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MOMENT_STEP_MS, PLAY_SPEEDS, idlePlayer, nextPlaySpeed, pausePlayer, playPlayer,
-  seekPlayer, tickPlayer, type PlaySpeed, type PlayerState,
+  MOMENT_STEP_MS,
+  PLAY_SPEEDS,
+  idlePlayer,
+  nextPlaySpeed,
+  pausePlayer,
+  playPlayer,
+  seekPlayer,
+  tickPlayer,
+  type PlaySpeed,
+  type PlayerState,
 } from './momentsPlayer.js'
 
 const START = 100
 const END = 140
 
-const playing = (over: Partial<PlayerState> = {}): PlayerState =>
-  ({ status: 'playing', tick: START, speed: 1, accMs: 0, ...over })
+const playing = (over: Partial<PlayerState> = {}): PlayerState => ({
+  status: 'playing',
+  tick: START,
+  speed: 1,
+  accMs: 0,
+  ...over,
+})
 
 // Feed the machine a stream of frames and report where it landed. This is the whole of the
 // player's clock: nothing inside it reads a wall clock, so the same frames always land here.
@@ -94,8 +107,9 @@ describe('seekPlayer', () => {
   })
 
   it('leaves a paused player paused', () => {
-    expect(seekPlayer({ status: 'paused', tick: START, speed: 2, accMs: 0 }, 0.5, START, END).status)
-      .toBe('paused')
+    expect(
+      seekPlayer({ status: 'paused', tick: START, speed: 2, accMs: 0 }, 0.5, START, END).status,
+    ).toBe('paused')
   })
 })
 
@@ -112,7 +126,9 @@ describe('the player’s controls', () => {
   })
 
   it('restarts from the top when the moment has run out', () => {
-    expect(playPlayer({ status: 'idle', tick: END, speed: 1, accMs: 0 }, START, END).tick).toBe(START)
+    expect(playPlayer({ status: 'idle', tick: END, speed: 1, accMs: 0 }, START, END).tick).toBe(
+      START,
+    )
   })
 
   it('cycles the speed through every rate and back to the first', () => {

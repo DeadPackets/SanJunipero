@@ -9,15 +9,22 @@ import { describe, expect, it } from 'vitest'
 // reports a leak only once something imports the file, which is already too late.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const WEB = resolve(HERE, '..')                 // packages/web
-const PACKAGES = resolve(WEB, '..')             // packages
+const WEB = resolve(HERE, '..') // packages/web
+const PACKAGES = resolve(WEB, '..') // packages
 const ENTRY = join(HERE, 'main.tsx')
 
 // Everything a browser may legitimately be handed. Adding to this list is the decision;
 // `node:crypto` is here because vite.config.ts aliases it onto src/shims/nodeCrypto.ts.
 export const BROWSER_SAFE_IMPORTS: readonly string[] = [
-  'react', 'react-dom/client', 'react-force-graph-2d', 'pixi.js', 'zod', 'node:crypto',
-  '@fontsource/press-start-2p', '@fontsource/silkscreen', '@fontsource/silkscreen/700.css',
+  'react',
+  'react-dom/client',
+  'react-force-graph-2d',
+  'pixi.js',
+  'zod',
+  'node:crypto',
+  '@fontsource/press-start-2p',
+  '@fontsource/silkscreen',
+  '@fontsource/silkscreen/700.css',
 ]
 
 // The three the controller's blank page actually died on, named so a regression reads plainly.
@@ -44,7 +51,13 @@ function specifiersOf(file: string): string[] {
 function resolveRelative(spec: string, fromFile: string): string | null {
   const base = resolve(dirname(fromFile), spec)
   const stem = base.replace(/\.js$/, '')
-  for (const c of [`${stem}.ts`, `${stem}.tsx`, base, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+  for (const c of [
+    `${stem}.ts`,
+    `${stem}.tsx`,
+    base,
+    join(base, 'index.ts'),
+    join(base, 'index.tsx'),
+  ]) {
     if (existsSync(c) && !c.endsWith('/')) return c
   }
   return null
@@ -58,7 +71,9 @@ function resolveWorkspace(spec: string): string | null {
   const pkgDir = join(PACKAGES, m[1]!)
   const pkgJson = join(pkgDir, 'package.json')
   if (!existsSync(pkgJson)) return null
-  const exports = (JSON.parse(readFileSync(pkgJson, 'utf8')) as { exports?: Record<string, string> }).exports ?? {}
+  const exports =
+    (JSON.parse(readFileSync(pkgJson, 'utf8')) as { exports?: Record<string, string> }).exports ??
+    {}
   const target = exports[m[2] === undefined ? '.' : `.${m[2]}`]
   return target === undefined ? null : join(pkgDir, target)
 }
@@ -67,7 +82,7 @@ export type GraphWalk = { files: string[]; externals: Map<string, string[]> }
 
 export function walkBrowserGraph(entries: string | readonly string[]): GraphWalk {
   const files: string[] = []
-  const externals = new Map<string, string[]>()   // specifier → the files that asked for it
+  const externals = new Map<string, string[]>() // specifier → the files that asked for it
   const seen = new Set<string>()
   const queue = typeof entries === 'string' ? [entries] : [...entries]
   while (queue.length > 0) {
@@ -81,7 +96,8 @@ export function walkBrowserGraph(entries: string | readonly string[]): GraphWalk
         queue.push(next)
         continue
       }
-      if (spec.startsWith('@sj/')) throw new Error(`${file}: '${spec}' resolves to no exported file`)
+      if (spec.startsWith('@sj/'))
+        throw new Error(`${file}: '${spec}' resolves to no exported file`)
       externals.set(spec, [...(externals.get(spec) ?? []), file])
     }
   }
@@ -169,8 +185,9 @@ describe('the browser graph', () => {
 
   it('counts a dynamic import as a wire crossing too', () => {
     expect(specifiersOfSource("const m = await import('@sj/engine')")).toEqual(['@sj/engine'])
-    expect(specifiersOfSource("import x from 'a'\nexport * from 'b'\nimport 'c'"))
-      .toEqual(expect.arrayContaining(['a', 'b', 'c']))
+    expect(specifiersOfSource("import x from 'a'\nexport * from 'b'\nimport 'c'")).toEqual(
+      expect.arrayContaining(['a', 'b', 'c']),
+    )
   })
 
   it('keeps the one aliased builtin actually aliased', () => {
@@ -189,16 +206,23 @@ export function bareReexports(source: string): string[] {
   const imported = new Set<string>()
   for (const [, names] of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g)) {
     for (const raw of (names ?? '').split(',')) {
-      const n = raw.trim().split(/\s+as\s+/).pop()?.trim()
+      const n = raw
+        .trim()
+        .split(/\s+as\s+/)
+        .pop()
+        ?.trim()
       if (n !== undefined && n.length > 0) imported.add(n)
     }
   }
   const out: string[] = []
   if (imported.size === 0) return out
   for (const m of src.matchAll(/(?:^|\n)\s*export\s*\{([^}]*)\}\s*(from\s*['"][^'"]+['"])?/g)) {
-    if (m[2] !== undefined) continue            // `export { … } from '…'` names its source
+    if (m[2] !== undefined) continue // `export { … } from '…'` names its source
     for (const raw of (m[1] ?? '').split(',')) {
-      const n = raw.trim().split(/\s+as\s+/)[0]?.trim()
+      const n = raw
+        .trim()
+        .split(/\s+as\s+/)[0]
+        ?.trim()
       if (n !== undefined && imported.has(n)) out.push(n)
     }
   }
@@ -208,7 +232,8 @@ export function bareReexports(source: string): string[] {
 /** The same sweep over every bundlable source, as `path — name`. */
 export function reexportsWithoutSource(files: readonly string[]): string[] {
   return files.flatMap((f) =>
-    bareReexports(readFileSync(f, 'utf8')).map((n) => `${f.slice(WEB.length + 1)} — ${n}`))
+    bareReexports(readFileSync(f, 'utf8')).map((n) => `${f.slice(WEB.length + 1)} — ${n}`),
+  )
 }
 
 describe('a re-export names its source', () => {

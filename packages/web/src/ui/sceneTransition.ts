@@ -47,7 +47,9 @@ export function sceneReducer(prev: SceneState, ev: SceneEvent): SceneState {
 /** The outgoing scene's opacity and the incoming one's, at this instant. Under reduced motion the
  *  STATE MACHINE IS IDENTICAL and only the curve becomes a step, so nothing can desynchronise. */
 export function sceneAlpha(
-  s: SceneState, nowMs: number, reducedMotion = false,
+  s: SceneState,
+  nowMs: number,
+  reducedMotion = false,
 ): { out: number; in: number } {
   if (s.phase === 'idle') return { out: 0, in: 1 }
   const elapsed = nowMs - s.startedMs
@@ -85,7 +87,8 @@ export function sceneMotion(name: SceneName, grave: boolean): Motion {
 export function crossTint(fromRgb: number, toRgb: number, t: number): number {
   const k = Math.min(1, Math.max(0, t))
   const ch = (shift: number): number => {
-    const a = (fromRgb >> shift) & 0xff, b = (toRgb >> shift) & 0xff
+    const a = (fromRgb >> shift) & 0xff,
+      b = (toRgb >> shift) & 0xff
     return Math.round(a + (b - a) * k)
   }
   return (ch(16) << 16) | (ch(8) << 8) | ch(0)

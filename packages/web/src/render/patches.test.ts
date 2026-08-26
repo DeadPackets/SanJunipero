@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import {
-  FURROW_SPACING_TILES, HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline,
+  FURROW_SPACING_TILES,
+  HEADLAND_COLOR,
+  KERB_COLOR,
+  furrowLines,
+  patchOutline,
 } from './patches.js'
 
 // The forge's 40-colour master palette (packages/forge/src/palette.ts), restated because
 // @sj/web cannot import forge — it pulls in sharp and better-sqlite3.
 const MASTER_PALETTE = [
-  0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e,
-  0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38, 0x7e512b,
-  0xdce8c8, 0xb9d19a, 0x93b573, 0x6f9455, 0x4f7040,
-  0xf2c6c2, 0xe09e9b, 0xc47876, 0x9e5a5c,
-  0xd6eaf2, 0xa8cfe0, 0x7fb0c9, 0x5a8cab, 0x3e6786,
-  0xe9e2da, 0xcfc6bc, 0xaba198, 0x857d75, 0x5d5751,
-  0x43394a, 0x322b38, 0x241f2b, 0x171420,
-  0xf7a66b, 0xe8785a, 0x8a6fa8, 0xf4e289,
-  0xf5d3b3, 0xd9a876, 0x9c6b47,
+  0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e, 0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38,
+  0x7e512b, 0xdce8c8, 0xb9d19a, 0x93b573, 0x6f9455, 0x4f7040, 0xf2c6c2, 0xe09e9b, 0xc47876,
+  0x9e5a5c, 0xd6eaf2, 0xa8cfe0, 0x7fb0c9, 0x5a8cab, 0x3e6786, 0xe9e2da, 0xcfc6bc, 0xaba198,
+  0x857d75, 0x5d5751, 0x43394a, 0x322b38, 0x241f2b, 0x171420, 0xf7a66b, 0xe8785a, 0x8a6fa8,
+  0xf4e289, 0xf5d3b3, 0xd9a876, 0x9c6b47,
 ]
 
 const rect = (w: number, h: number, ox = 0, oy = 0): Array<{ x: number; y: number }> => {
@@ -25,7 +25,7 @@ const rect = (w: number, h: number, ox = 0, oy = 0): Array<{ x: number; y: numbe
 }
 
 // A deterministic shuffle, so "order-independent" is tested rather than asserted.
-const shuffled = <T,>(list: T[]): T[] => {
+const shuffled = <T>(list: T[]): T[] => {
   const a = [...list]
   let s = 7
   for (let i = a.length - 1; i > 0; i--) {
@@ -59,14 +59,21 @@ describe('patchOutline', () => {
   })
 
   it('keeps two diagonally touching tiles as TWO outlines, not a figure of eight', () => {
-    const out = patchOutline([{ x: 0, y: 0 }, { x: 1, y: 1 }])
+    const out = patchOutline([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+    ])
     expect(out).toHaveLength(2)
     for (const o of out) expect(pointsIn(o)).toBe(4)
   })
 
   it('traces the concave corner of an L', () => {
     // three tiles: (0,0) (1,0) (0,1) — one reflex corner
-    const out = patchOutline([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }])
+    const out = patchOutline([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+    ])
     expect(out).toHaveLength(1)
     // 3 tiles x 4 edges = 12, less 2 shared edges counted twice = 8 boundary edges
     expect(pointsIn(out[0]!)).toBe(8)

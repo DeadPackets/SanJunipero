@@ -18,8 +18,8 @@ const AGENT = 'tamar'
 
 function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
   const config = SimConfigSchema.parse({})
-  const terrain: TileId[][] = opts.terrain
-    ?? Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+  const terrain: TileId[][] =
+    opts.terrain ?? Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
   const db = openDb(':memory:')
   const store = new EventStore(db)
   const rng = new RngStreams('arbiter-seam-test')
@@ -33,7 +33,15 @@ function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
   emit('skill_gained', { agentId: AGENT, track: 'carpentry', xp: 5 })
   if (opts.well === true) {
     emit('structure_planned', {
-      id: 'structure_1', kind: 'well', x: 9, y: 4, w: 1, h: 1, maxHp: 40, flammable: false, builderId: AGENT,
+      id: 'structure_1',
+      kind: 'well',
+      x: 9,
+      y: 4,
+      w: 1,
+      h: 1,
+      maxHp: 40,
+      flammable: false,
+      builderId: AGENT,
     })
     emit('structure_completed', { id: 'structure_1' })
   }
@@ -71,9 +79,11 @@ describe('buildAgentCtx', () => {
   })
 
   it('names the ground within sight, in the words a recipe may ask for', () => {
-    const rows: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
-    rows[4]![9] = 2   // water, two steps east
-    rows[4]![10] = 7  // a road: the town has no recipe word for it, so it is not offered
+    const rows: TileId[][] = Array.from({ length: 24 }, () =>
+      Array.from({ length: 24 }, (): TileId => 0),
+    )
+    rows[4]![9] = 2 // water, two steps east
+    rows[4]![10] = 7 // a road: the town has no recipe word for it, so it is not offered
     rows[20]![20] = 5 // sand, far out of sight
     const { bridge } = world({ terrain: rows })
     expect(buildAgentCtx(bridge, AGENT).visible.ground).toEqual(['grass', 'water'])
@@ -104,7 +114,11 @@ describe('humanizeIntent', () => {
 describe('wireArbiter', () => {
   it('hands the runtime both halves of the arbiter in one call', () => {
     const arbiter: SeamArbiter = {
-      adjudicate: async () => ({ kind: 'impossible', reason: 'no', class: 'physically_impossible' }),
+      adjudicate: async () => ({
+        kind: 'impossible',
+        reason: 'no',
+        class: 'physically_impossible',
+      }),
       codify: () => ({ ruleId: 1, verb: 'recipe:x' }),
     }
     const wired: SeamArbiter[] = []

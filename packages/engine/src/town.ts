@@ -1,7 +1,21 @@
 import {
-  CITY_GROUND, T_GRASS, T_ROAD, TOWN_SQUARE, blockGroundOf, claimTownPlot, firePitAt,
-  plazaOf, ringsStanding, townBoxOf, wellAt,
-  type Ground, type TownClaim, type Walk, type WorldBox, type WorldRect, type WorldXY,
+  CITY_GROUND,
+  T_GRASS,
+  T_ROAD,
+  TOWN_SQUARE,
+  blockGroundOf,
+  claimTownPlot,
+  firePitAt,
+  plazaOf,
+  ringsStanding,
+  townBoxOf,
+  wellAt,
+  type Ground,
+  type TownClaim,
+  type Walk,
+  type WorldBox,
+  type WorldRect,
+  type WorldXY,
 } from '@sj/shared'
 import { bridgeAt } from './path.js'
 import { authoredOrigin, type WorldState } from './state.js'
@@ -12,7 +26,9 @@ import { authoredOrigin, type WorldState } from './state.js'
 /** TOWN_SQUARE is the plaza's north-west corner, not its middle. Ring-independent by construction:
  *  every offset is a difference of two plazaOf(rings) points. 254 of 256 — well and pit stand bare. */
 const PLAZA_PAVED: ReadonlyArray<{ dx: number; dy: number }> = (() => {
-  const r = plazaOf(), w = wellAt(), f = firePitAt()
+  const r = plazaOf(),
+    w = wellAt(),
+    f = firePitAt()
   const skip = new Set([`${w.dx - r.dx0},${w.dy - r.dy0}`, `${f.dx - r.dx0},${f.dy - r.dy0}`])
   const out: { dx: number; dy: number }[] = []
   for (let dy = r.dy0; dy <= r.dy1; dy++) {
@@ -38,12 +54,13 @@ export function townSquareOf(state: WorldState): WorldXY | null {
 /** Everything standing, as bare rectangles — the only thing a claim may read besides the square.
  *  Sorted by id so two worlds holding the same buildings ask in the same order. */
 export function standingRects(state: WorldState): WorldRect[] {
-  return Object.keys(state.structures).sort()
+  return Object.keys(state.structures)
+    .sort()
     .map((id) => state.structures[id]!)
     .map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h }))
 }
 
-const WET: ReadonlySet<number> = new Set([2, 10])  // open water and a dug channel
+const WET: ReadonlySet<number> = new Set([2, 10]) // open water and a dug channel
 
 /** Unions the grammar's channel with the world's water: the fork reaches the lattice at ring 3,
  *  where blocks (0,-3) and (1,-3) would stand in it. Off-array reads DRY — absent is not wet. */
@@ -61,7 +78,8 @@ export function townGroundOf(state: WorldState, square: WorldXY): Ground {
  *  A tile the array does not hold is NOT walkable — the opposite of townGroundOf, where absent is dry. */
 export function townWalkOf(state: WorldState, square: WorldXY): Walk {
   return (dx, dy) => {
-    const x = square.x + dx, y = square.y + dy
+    const x = square.x + dx,
+      y = square.y + dy
     const tile = state.terrain[y]?.[x]
     if (tile === undefined) return false
     return !WET.has(tile) || bridgeAt(state, x, y)
@@ -70,32 +88,52 @@ export function townWalkOf(state: WorldState, square: WorldXY): Walk {
 
 /** The plot the next building of this mass takes, in array coordinates. `null` when this world
  *  has no town, or when the town has nowhere for a thing that size. */
-export function claimInWorld(state: WorldState, need: { along: number; deep: number }): TownClaim | null {
+export function claimInWorld(
+  state: WorldState,
+  need: { along: number; deep: number },
+): TownClaim | null {
   const square = townSquareOf(state)
-  return square === null ? null : claimTownPlot({
-    square, standing: standingRects(state), need,
-    ground: townGroundOf(state, square), walk: townWalkOf(state, square),
-  })
+  return square === null
+    ? null
+    : claimTownPlot({
+        square,
+        standing: standingRects(state),
+        need,
+        ground: townGroundOf(state, square),
+        walk: townWalkOf(state, square),
+      })
 }
 
 /** How many rings of the town are standing, and the ground it has laid to hold them. `null`
  *  for a world with no town — which owes nothing, because there is no town to owe it to. */
 export function townGroundBox(state: WorldState): WorldBox | null {
   const square = townSquareOf(state)
-  return square === null ? null
+  return square === null
+    ? null
     : townBoxOf(square, ringsStanding(square, standingRects(state), townGroundOf(state, square)))
 }
 
-export type TileChange = { x: number; y: number; from: number; to: number; reason: 'levelled' | 'surfaced' }
+export type TileChange = {
+  x: number
+  y: number
+  from: number
+  to: number
+  reason: 'levelled' | 'surfaced'
+}
 
 /** Returns only the tiles that differ, so a block whose streets a neighbour paved costs nothing.
  *  'off the map' is the loud answer: the world widens at midnight and the build succeeds next morning. */
 export function layBlock(
-  state: WorldState, square: WorldXY, block: { i: number; j: number },
+  state: WorldState,
+  square: WorldXY,
+  block: { i: number; j: number },
 ): TileChange[] | 'off the map' {
   const { cleared, paved } = blockGroundOf(square, block, townGroundOf(state, square))
   const out: TileChange[] = []
-  for (const [tiles, to, reason] of [[cleared, T_GRASS, 'levelled'], [paved, T_ROAD, 'surfaced']] as const) {
+  for (const [tiles, to, reason] of [
+    [cleared, T_GRASS, 'levelled'],
+    [paved, T_ROAD, 'surfaced'],
+  ] as const) {
     for (const t of tiles) {
       const from = state.terrain[t.y]?.[t.x]
       if (from === undefined) return 'off the map'

@@ -7,13 +7,14 @@ import { makeVisionJudge, EST_COST_PER_VISION_CALL, type VisionGenerateFn } from
 
 function art(w = 16, h = 16): RawImage {
   const img = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
-  img.data.set([0xE8, 0x78, 0x5A, 255], 0)
+  img.data.set([0xe8, 0x78, 0x5a, 255], 0)
   return img
 }
 function scored(score: number, extra: Record<string, unknown> = {}) {
   return (keys: readonly string[]) => ({
-    ...Object.fromEntries(keys.map(k => [k, { pass: true, score, evidence: 'seen' }])),
-    feedback: 'warm the roof', ...extra,
+    ...Object.fromEntries(keys.map((k) => [k, { pass: true, score, evidence: 'seen' }])),
+    feedback: 'warm the roof',
+    ...extra,
   })
 }
 
@@ -23,14 +24,19 @@ function spy(reply: (keys: readonly string[]) => unknown, providerMetadata?: unk
   const calls: Call[] = []
   const gen: VisionGenerateFn = async (a: any) => {
     calls.push(a)
-    const keys = Object.keys(a.schema.shape).filter(k => k !== 'feedback')
+    const keys = Object.keys(a.schema.shape).filter((k) => k !== 'feedback')
     return { object: reply(keys), providerMetadata } as any
   }
   return { calls, gen }
 }
 
 const REFS = [Buffer.from('anchor-png'), Buffer.from('second-ref')]
-const ARGS = { assetId: 'asset_1', klass: 'building', sprite: art(), commission: 'a squat storehouse' }
+const ARGS = {
+  assetId: 'asset_1',
+  klass: 'building',
+  sprite: art(),
+  commission: 'a squat storehouse',
+}
 
 describe('vision judge', () => {
   it('sends rubric text, then refs in order, then the palette card, then the checker card', async () => {
@@ -55,11 +61,19 @@ describe('vision judge', () => {
 
     const b = spy(scored(9))
     const cfg = ForgeConfigSchema.parse({ visionQa: { model: 'from/config' } })
-    const vb = await makeVisionJudge({ apiKey: 'k', refs: [], config: cfg, generateFn: b.gen })(ARGS)
+    const vb = await makeVisionJudge({ apiKey: 'k', refs: [], config: cfg, generateFn: b.gen })(
+      ARGS,
+    )
     expect(vb.verdict.model).toBe('from/config')
 
     const c = spy(scored(9))
-    const vc = await makeVisionJudge({ apiKey: 'k', refs: [], config: cfg, model: 'explicit/win', generateFn: c.gen })(ARGS)
+    const vc = await makeVisionJudge({
+      apiKey: 'k',
+      refs: [],
+      config: cfg,
+      model: 'explicit/win',
+      generateFn: c.gen,
+    })(ARGS)
     expect(vc.verdict.model).toBe('explicit/win')
   })
 
@@ -73,28 +87,37 @@ describe('vision judge', () => {
   })
 
   it('throws when the reply is missing a criterion', async () => {
-    const { gen } = spy(keys => scored(9)(keys.filter(k => k !== 'palette')))
-    await expect(makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })(ARGS)).rejects.toThrow()
+    const { gen } = spy((keys) => scored(9)(keys.filter((k) => k !== 'palette')))
+    await expect(
+      makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })(ARGS),
+    ).rejects.toThrow()
   })
 
   it('ignores an overall supplied by the reply and uses the derived value', async () => {
-    const { gen } = spy(keys => ({ ...scored(4)(keys), overall: 'pass' }))
+    const { gen } = spy((keys) => ({ ...scored(4)(keys), overall: 'pass' }))
     const { verdict } = await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })(ARGS)
     expect(verdict.overall).toBe('retry')
   })
 
   it('derives blocked once the attempt passes the retry budget', async () => {
     const { gen } = spy(scored(4))
-    const { verdict } = await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })({ ...ARGS, attempt: 4 })
+    const { verdict } = await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })({
+      ...ARGS,
+      attempt: 4,
+    })
     expect(verdict.overall).toBe('blocked')
   })
 
   it('never asks an icon for facing, alignment or proportion, and fills them by code', async () => {
     const { calls, gen } = spy(scored(9))
-    const { verdict } = await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })({ ...ARGS, klass: 'icon' })
+    const { verdict } = await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })({
+      ...ARGS,
+      klass: 'icon',
+    })
     const asked = Object.keys(calls[0]!.schema.shape)
     for (const k of ['facing', 'alignment', 'proportion']) expect(asked).not.toContain(k)
-    for (const k of ['palette', 'singleFigure', 'transparency', 'density']) expect(asked).toContain(k)
+    for (const k of ['palette', 'singleFigure', 'transparency', 'density'])
+      expect(asked).toContain(k)
     expect(asked).toContain('feedback')
     for (const k of ['facing', 'alignment', 'proportion'] as const)
       expect(verdict.criteria[k]).toEqual(NA_CRITERION('icon'))
@@ -103,9 +126,12 @@ describe('vision judge', () => {
 
   it('costs the estimate without reported usage and the reported figure with it', async () => {
     const a = spy(scored(9))
-    expect((await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: a.gen })(ARGS)).costUsd)
-      .toBe(EST_COST_PER_VISION_CALL)
+    expect(
+      (await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: a.gen })(ARGS)).costUsd,
+    ).toBe(EST_COST_PER_VISION_CALL)
     const b = spy(scored(9), { openrouter: { usage: { cost: 0.0091 } } })
-    expect((await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: b.gen })(ARGS)).costUsd).toBe(0.0091)
+    expect(
+      (await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: b.gen })(ARGS)).costUsd,
+    ).toBe(0.0091)
   })
 })

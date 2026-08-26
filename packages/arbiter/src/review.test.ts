@@ -17,18 +17,37 @@ const boilSaltRecipe: Recipe = {
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
-    { weight: 1, success: true, label: 'The water boils away, leaving a crust of salt.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
-    { weight: 1, success: false, label: 'The pot cracks and the water is lost.', effects: [{ op: 'none' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'The water boils away, leaving a crust of salt.',
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+    },
+    {
+      weight: 1,
+      success: false,
+      label: 'The pot cracks and the water is lost.',
+      effects: [{ op: 'none' }],
+    },
   ],
   rngStream: 'craft',
   canon: ['fire'],
 }
 
 let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function agentState(): WorldState {
-  return fold(genesisState(CFG), ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: 7300 }), CFG)
+  return fold(
+    genesisState(CFG),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: 7300 }),
+    CFG,
+  )
 }
 
 function makeReview() {
@@ -49,14 +68,30 @@ describe('ReviewStore', () => {
     review.queue(ruleId, 'recipe:boil_salt', 200)
     const rows = review.pending()
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ ruleId, recipeId: 'recipe:boil_salt', status: 'pending', reason: null, tick: 200 })
+    expect(rows[0]).toMatchObject({
+      ruleId,
+      recipeId: 'recipe:boil_salt',
+      status: 'pending',
+      reason: null,
+      tick: 200,
+    })
   })
 
   it('codify auto-queues a pending review for every codified rule', () => {
     const { review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(
+      boilSaltRecipe,
+      { agentId: 'a1', intent: 'i try to boil the river water down' },
+      { rulebook, review, codex, tick: 200 },
+    )
     expect(review.pending()).toEqual([
-      expect.objectContaining({ ruleId, recipeId: 'recipe:boil_salt', status: 'pending', reason: null, tick: 200 }),
+      expect.objectContaining({
+        ruleId,
+        recipeId: 'recipe:boil_salt',
+        status: 'pending',
+        reason: null,
+        tick: 200,
+      }),
     ])
   })
 
@@ -66,16 +101,24 @@ describe('ReviewStore', () => {
     review.queue(ruleId, 'recipe:boil_salt', 200)
     review.approve(ruleId)
     expect(review.pending()).toEqual([])
-    const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as ReviewStatusRow
+    const row = db
+      .prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?')
+      .get(ruleId) as ReviewStatusRow
     expect(row.status).toBe('approved')
   })
 
   it('revert tombstones the rulebook, unregisters the verb, and marks the row reverted', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(
+      boilSaltRecipe,
+      { agentId: 'a1', intent: 'i try to boil the river water down' },
+      { rulebook, review, codex, tick: 200 },
+    )
     review.revert(ruleId, 'physics wrong', 500)
 
-    const row = db.prepare('SELECT status, reason FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as ReviewStatusRow
+    const row = db
+      .prepare('SELECT status, reason FROM ruling_reviews WHERE rule_id = ?')
+      .get(ruleId) as ReviewStatusRow
     expect(row).toEqual({ status: 'reverted', reason: 'physics wrong' })
 
     const rb = rulebook.byId('recipe:boil_salt')
@@ -88,26 +131,37 @@ describe('ReviewStore', () => {
 
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(
+      boilSaltRecipe,
+      { agentId: 'a1', intent: 'i try to boil the river water down' },
+      { rulebook, review, codex, tick: 200 },
+    )
     review.approve(ruleId)
     review.revert(ruleId, 'physics wrong', 500)
 
     review.queue(ruleId, 'recipe:boil_salt', 600)
     expect(review.pending()).toHaveLength(1) // idempotent re-queue: no duplicate pending
     review.revert(ruleId, 'physics wrong', 700)
-    const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as Array<{ status: string }>
+    const rows = db
+      .prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?')
+      .all(ruleId) as Array<{ status: string }>
     expect(rows).toEqual([{ status: 'reverted' }])
     expect(review.pending()).toEqual([])
   })
 
-
   it('approve throws on a tombstoned rule', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(
+      boilSaltRecipe,
+      { agentId: 'a1', intent: 'i try to boil the river water down' },
+      { rulebook, review, codex, tick: 200 },
+    )
     review.revert(ruleId, 'physics wrong', 500)
     review.queue(ruleId, 'recipe:boil_salt', 600) // re-queue a reverted rule
     expect(() => review.approve(ruleId)).toThrow(/reverted/)
-    const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as { status: string }
+    const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as {
+      status: string
+    }
     expect(row.status).toBe('pending') // disposition unchanged
   })
 
@@ -116,8 +170,9 @@ describe('ReviewStore', () => {
     const ruleId = rulebook.insert(boilSaltRecipe, 200) // bypass codify: no auto-queue
     review.revertByRecipe('recipe:boil_salt', 'physics wrong', 500)
     expect(review.pending()).toEqual([])
-    const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as Array<{ status: string }>
+    const rows = db
+      .prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?')
+      .all(ruleId) as Array<{ status: string }>
     expect(rows).toEqual([{ status: 'reverted' }])
   })
-
 })

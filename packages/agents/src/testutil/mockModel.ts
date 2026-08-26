@@ -34,11 +34,18 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
         content: [{ type: 'text' as const, text: scripted.text ?? JSON.stringify(scripted.json) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: {
-          inputTokens: { total: inputTokens, noCache: inputTokens - cacheRead, cacheRead, cacheWrite: undefined },
+          inputTokens: {
+            total: inputTokens,
+            noCache: inputTokens - cacheRead,
+            cacheRead,
+            cacheWrite: undefined,
+          },
           outputTokens: { total: outputTokens, text: outputTokens - reasoning, reasoning },
         },
         warnings: [],
-        ...(scripted.servedModelId === undefined ? {} : { response: { modelId: scripted.servedModelId } }),
+        ...(scripted.servedModelId === undefined
+          ? {}
+          : { response: { modelId: scripted.servedModelId } }),
         ...(scripted.provider === undefined && scripted.reportedCostUsd === undefined
           ? {}
           : {

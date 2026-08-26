@@ -25,16 +25,20 @@ describe('C11 finding 1 — the energy budget spends more than a day holds', () 
     // Seven hours does not: 6.7 of sleep buys the 89 back, and every hour awake past sixteen
     // costs 5.6 more. An elder pays 1.2x and runs out after 14.9 hours.
     expect(100 / (C.needs.energyRegenAsleepPerTick * 60)).toBeCloseTo(6.67, 2)
-    expect(100 / (C.needs.energyDecayAwakePerTick * C.aging.elderEnergyDecayMultiplier * 60))
-      .toBeCloseTo(14.93, 2)
+    expect(
+      100 / (C.needs.energyDecayAwakePerTick * C.aging.elderEnergyDecayMultiplier * 60),
+    ).toBeCloseTo(14.93, 2)
   })
 
   it('nothing code-side can close it: every term is a frozen dial', () => {
     // The four numbers the shortfall is made of, and all four live in the frozen schema.
     for (const n of [
-      C.needs.energyDecayAwakePerTick, C.needs.energyRegenAsleepPerTick,
-      C.aging.elderEnergyDecayMultiplier, C.needs.collapseThreshold,
-    ]) expect(typeof n).toBe('number')
+      C.needs.energyDecayAwakePerTick,
+      C.needs.energyRegenAsleepPerTick,
+      C.aging.elderEnergyDecayMultiplier,
+      C.needs.collapseThreshold,
+    ])
+      expect(typeof n).toBe('number')
     expect(C.needs.collapseThreshold).toBe(5)
     expect(C.needs.debuffThreshold).toBe(30)
   })
@@ -44,7 +48,8 @@ describe('C11 finding 2 — the garment decides a winter hour, and only the mild
   // isExposed is a threshold on `ambient + insulation >= comfortBand`. At 2 the only band a coat
   // decided was an autumn dusk, so the clothing line was decorative in the season it exists for.
   const flips = (ambient: number): boolean =>
-    (ambient >= C.warmth.comfortBand) !== (ambient + C.warmth.insulation.garment >= C.warmth.comfortBand)
+    ambient >= C.warmth.comfortBand !==
+    ambient + C.warmth.insulation.garment >= C.warmth.comfortBand
 
   it('the coat is worth the gap the finding measured: twelve, not two', () => {
     expect(C.warmth.comfortBand).toBe(8)
@@ -65,7 +70,9 @@ describe('C11 finding 2 — the garment decides a winter hour, and only the mild
 
   it('and no further: dusk, night and any weather in winter still want a roof or a fire', () => {
     for (const phase of ['dusk', 'night'] as const) {
-      expect(C.warmth.ambient.winter[phase] + C.warmth.insulation.garment).toBeLessThan(C.warmth.comfortBand)
+      expect(C.warmth.ambient.winter[phase] + C.warmth.insulation.garment).toBeLessThan(
+        C.warmth.comfortBand,
+      )
     }
     // Twelve is the LEAST that reaches winter at all, and it reaches no hour past the mildest:
     // eleven decides nothing there, and thirteen decides nothing more.
@@ -80,8 +87,10 @@ describe('C11 finding 2 — the garment decides a winter hour, and only the mild
 describe('C11 finding 3 — an untended wound is a clock, and the clock now waits to be noticed', () => {
   // A wound has to outlast the walk of whoever might tend it, or the designed social overlap —
   // one body sees another is hurt and crosses the town — cannot physically happen.
-  const hpAfterBlow = (kind: 'minor' | 'serious' | 'grave'): number => C.health.maxHp - C.health.injuryDamage[kind]
-  const drainPerDay = (severity: number): number => perDay(C.mortality.drainPerTick.injury * severity)
+  const hpAfterBlow = (kind: 'minor' | 'serious' | 'grave'): number =>
+    C.health.maxHp - C.health.injuryDamage[kind]
+  const drainPerDay = (severity: number): number =>
+    perDay(C.mortality.drainPerTick.injury * severity)
   // The best case a body can give itself: fed, and asleep when the dawn payment lands.
   const selfHealPerDay = C.health.recoveryHpPerDay * C.mortality.sleepRegenMultiplier
   const daysToDeath = (kind: 'minor' | 'serious' | 'grave', severity: number): number =>
@@ -105,7 +114,7 @@ describe('C11 finding 3 — an untended wound is a clock, and the clock now wait
     // Hunger should cost a wounded body its recovery, and this drain still leaves a reachable window.
     expect(C.mortality.fedThreshold).toBe(40)
     expect(hpAfterBlow('minor') / drainPerDay(1)).toBeCloseTo(2.5, 2)
-    expect(hpAfterBlow('grave') / drainPerDay(3) * 24).toBeGreaterThan(8)
+    expect((hpAfterBlow('grave') / drainPerDay(3)) * 24).toBeGreaterThan(8)
   })
 
   it('a herb in somebody else’s hand is still the only answer to the worst of them', () => {

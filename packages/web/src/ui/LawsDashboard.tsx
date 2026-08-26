@@ -18,7 +18,12 @@ function nextValue(row: EditRow, raw: string): unknown {
 
 // Operator-only. Renders nothing at all without a token, so a viewer who wanders
 // onto the route sees no control surface to guess at.
-export function LawsDashboard({ store, token, endpoint = DEFAULT_ADMIN_ENDPOINT, fetchFn }: LawsDashboardProps) {
+export function LawsDashboard({
+  store,
+  token,
+  endpoint = DEFAULT_ADMIN_ENDPOINT,
+  fetchFn,
+}: LawsDashboardProps) {
   useSyncExternalStore(store.subscribe, store.getTick)
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
@@ -29,7 +34,12 @@ export function LawsDashboard({ store, token, endpoint = DEFAULT_ADMIN_ENDPOINT,
   async function submit(row: EditRow, raw: string): Promise<void> {
     setPending(row.path)
     setNotice(null)
-    const r = await postLaw(fetchFn ?? fetch, { endpoint, token: token!, path: row.path, value: nextValue(row, raw) })
+    const r = await postLaw(fetchFn ?? fetch, {
+      endpoint,
+      token: token!,
+      path: row.path,
+      value: nextValue(row, raw),
+    })
     setPending(null)
     // Never write the new value here: the panel moves when the delta lands.
     setNotice(r.ok ? `${row.path} — asked; it lands at the next tick.` : r.message)
@@ -68,7 +78,9 @@ export function LawsDashboard({ store, token, endpoint = DEFAULT_ADMIN_ENDPOINT,
                 onBlur={(e) => void submit(row, e.target.value)}
               />
             )}
-            {!row.editable && row.kind === 'other' && <span className="badge">set it from the channel</span>}
+            {!row.editable && row.kind === 'other' && (
+              <span className="badge">set it from the channel</span>
+            )}
           </li>
         ))}
       </ul>

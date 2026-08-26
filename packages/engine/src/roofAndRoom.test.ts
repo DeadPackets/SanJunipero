@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  DEFAULT_CONFIG, isBeddedKind, isHearthKind, isRoofedKind, MINUTES_PER_DAY,
-  type SimConfig, type SimEvent,
+  DEFAULT_CONFIG,
+  isBeddedKind,
+  isHearthKind,
+  isRoofedKind,
+  MINUTES_PER_DAY,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -16,20 +21,39 @@ import { FOUNDER_IDS } from '@sj/shared'
 // were buildings nobody could get into, and `enter` had no cap, so one roof sheltered the town.
 
 const CFG: SimConfig = DEFAULT_CONFIG
-const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
+const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick: 0,
+  type,
+  payload,
+})
 const OPEN = Array.from({ length: 10 }, () => '..........')
 
 function world(): WorldState {
-  return genesisState(CFG, OPEN.map((row) => [...row].map(() => 0 as TileId)))
+  return genesisState(
+    CFG,
+    OPEN.map((row) => [...row].map(() => 0 as TileId)),
+  )
 }
 
 /** A completed building of `kind` at (2,1), sized off its own recipe row. */
 function withBuilding(s: WorldState, kind: string, id = 'structure_1'): WorldState {
   const row = CFG.structures.recipes[kind]
   const { w, h } = row ?? { w: 2, h: 2 }
-  let out = fold(s, ev(1, 'structure_planned', {
-    id, kind, x: 2, y: 1, w, h, maxHp: row?.maxHp ?? 50, flammable: true, builderId: 'genesis',
-  }))
+  let out = fold(
+    s,
+    ev(1, 'structure_planned', {
+      id,
+      kind,
+      x: 2,
+      y: 1,
+      w,
+      h,
+      maxHp: row?.maxHp ?? 50,
+      flammable: true,
+      builderId: 'genesis',
+    }),
+  )
   out = fold(out, ev(2, 'structure_completed', { id }))
   return out
 }
@@ -74,9 +98,11 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
   // The whole point of a property over a roster: ask the world, not a list somebody kept.
   it('is asked of the kind, and the town template has no kind it cannot answer for', () => {
     const g = makeGenesisWorld(CFG)
-    const kinds = new Set(g.events
-      .filter((e) => e.type === 'structure_planned')
-      .map((e) => String((e.payload as { kind: string }).kind)))
+    const kinds = new Set(
+      g.events
+        .filter((e) => e.type === 'structure_planned')
+        .map((e) => String((e.payload as { kind: string }).kind)),
+    )
     expect(kinds.size).toBeGreaterThan(4)
     // Every dwelling the valley stands up is one a body can get under.
     for (const k of ['cabin', 'cottage', 'farmhouse', 'house', 'storehouse']) {
@@ -89,14 +115,27 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
   // A refusal must still be possible, or the test above passes on a world where `enter` never
   // refuses anything.
   it('still refuses an unfinished building and one out of reach', () => {
-    let site = fold(world(), ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'cottage', x: 2, y: 1, w: 3, h: 2, maxHp: 60, flammable: true, builderId: 'g',
-    }))
+    let site = fold(
+      world(),
+      ev(1, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'cottage',
+        x: 2,
+        y: 1,
+        w: 3,
+        h: 2,
+        maxHp: 60,
+        flammable: true,
+        builderId: 'g',
+      }),
+    )
     site = fold(site, ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 3, y: 3, ageDays: 7300 }))
     expect(enter(site, 'a1')).toMatchObject({ ok: false, reason: 'it is not finished' })
 
-    const far = fold(withBuilding(world(), 'cottage'), ev(10,
-      'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: 7300 }))
+    const far = fold(
+      withBuilding(world(), 'cottage'),
+      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: 7300 }),
+    )
     expect(enter(far, 'a1')).toMatchObject({ ok: false, reason: 'not close enough to the door' })
   })
 })
@@ -114,9 +153,8 @@ describe('★ a dearer dwelling is never a worse one', () => {
   const slotsOf = (k: string) => roomCapacity({ w: r[k]!.w, h: r[k]!.h })
   /** What one night of fire costs each body under this roof. A night is 720 ticks and an armful
    *  buys `fuelBurnTicks` of them, and the whole room drinks the one fire. */
-  const woodPerBodyNight = (k: string) => isHearthKind(CFG, k)
-    ? (MINUTES_PER_DAY / 2) / CFG.light.fuelBurnTicks / slotsOf(k)
-    : Infinity
+  const woodPerBodyNight = (k: string) =>
+    isHearthKind(CFG, k) ? MINUTES_PER_DAY / 2 / CFG.light.fuelBurnTicks / slotsOf(k) : Infinity
 
   it('is asked of every dwelling a pair of hands can raise, and there are three', () => {
     expect(buildableDwellings).toEqual(['cottage', 'farmhouse', 'house'])
@@ -127,10 +165,14 @@ describe('★ a dearer dwelling is never a worse one', () => {
       for (const cheap of buildableDwellings) {
         if (woodOf(dear) <= woodOf(cheap)) continue
         expect(slotsOf(dear), `${dear} over ${cheap}: floor`).toBeGreaterThan(slotsOf(cheap))
-        expect(woodPerBodyNight(dear), `${dear} over ${cheap}: fuel`).toBeLessThan(woodPerBodyNight(cheap))
+        expect(woodPerBodyNight(dear), `${dear} over ${cheap}: fuel`).toBeLessThan(
+          woodPerBodyNight(cheap),
+        )
         // And it gives nothing back: whatever the cheaper roof holds, the dearer one holds too.
-        if (isHearthKind(CFG, cheap)) expect(isHearthKind(CFG, dear), `${dear} lost the fire`).toBe(true)
-        if (isBeddedKind(CFG, cheap)) expect(isBeddedKind(CFG, dear), `${dear} lost the bed`).toBe(true)
+        if (isHearthKind(CFG, cheap))
+          expect(isHearthKind(CFG, dear), `${dear} lost the fire`).toBe(true)
+        if (isBeddedKind(CFG, cheap))
+          expect(isBeddedKind(CFG, dear), `${dear} lost the bed`).toBe(true)
       }
     }
   })
@@ -163,10 +205,10 @@ describe('★ a dearer dwelling is never a worse one', () => {
 
 describe('★ a room holds only so many bodies, and floor area is why', () => {
   it('is two tiles of floor a body, from the footprint and nothing else', () => {
-    expect(roomCapacity({ w: 2, h: 2 })).toBe(2)   // house, cabin, storehouse
-    expect(roomCapacity({ w: 3, h: 2 })).toBe(3)   // cottage
-    expect(roomCapacity({ w: 4, h: 2 })).toBe(4)   // farmhouse
-    expect(roomCapacity({ w: 1, h: 1 })).toBe(1)   // never zero: a hut holds its one body
+    expect(roomCapacity({ w: 2, h: 2 })).toBe(2) // house, cabin, storehouse
+    expect(roomCapacity({ w: 3, h: 2 })).toBe(3) // cottage
+    expect(roomCapacity({ w: 4, h: 2 })).toBe(4) // farmhouse
+    expect(roomCapacity({ w: 1, h: 1 })).toBe(1) // never zero: a hut holds its one body
   })
 
   it('fills a house at two and turns the third away', () => {
@@ -179,7 +221,8 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     expect(occupantsOf(s, 'structure_1')).toEqual(['a1', 'a2'])
     expect(roomIsFull(s, s.structures.structure_1!)).toBe(true)
     expect(enter(s, 'a3')).toMatchObject({
-      ok: false, reason: 'there is no floor left in there — 2 bodies fill it',
+      ok: false,
+      reason: 'there is no floor left in there — 2 bodies fill it',
     })
   })
 
@@ -192,7 +235,8 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
       big = fold(big, ev(30, 'agent_entered', { agentId: id, structureId: 'structure_1' }))
     }
     expect(enter(big, 'a5')).toMatchObject({
-      ok: false, reason: 'there is no floor left in there — 4 bodies fill it',
+      ok: false,
+      reason: 'there is no floor left in there — 4 bodies fill it',
     })
   })
 
@@ -220,17 +264,29 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
   // ★ PHYSICS, NOT OWNERSHIP. Ownership is a concept the town has to invent; gating the door on
   // it would hand it over. The owner gets no key and no priority — only floor decides.
   it('never asks whose the building is', () => {
-    let s = fold(world(), ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'owner', owner: 'owner',
-    }))
+    let s = fold(
+      world(),
+      ev(1, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 1,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'owner',
+        owner: 'owner',
+      }),
+    )
     s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }))
     for (const id of ['owner', 'stranger1', 'stranger2']) s = withAgentAtDoor(s, id)
     // Two strangers walk into somebody else's house, and it is theirs while they stand in it.
     s = fold(s, ev(20, 'agent_entered', { agentId: 'stranger1', structureId: 'structure_1' }))
     s = fold(s, ev(21, 'agent_entered', { agentId: 'stranger2', structureId: 'structure_1' }))
     expect(enter(s, 'owner')).toMatchObject({
-      ok: false, reason: 'there is no floor left in there — 2 bodies fill it',
+      ok: false,
+      reason: 'there is no floor left in there — 2 bodies fill it',
     })
     // And with room in it, a stranger is let in exactly as the owner would be.
     s = fold(s, ev(22, 'agent_exited', { agentId: 'stranger1', structureId: 'structure_1' }))
@@ -294,8 +350,17 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     let seq = 0
     for (const e of g.events) s = fold(s, ev(++seq, e.type, e.payload), CFG)
     for (let i = 0; i < bodies; i++) {
-      s = fold(s, ev(++seq + 1000, 'agent_spawned',
-        { id: `b${i}`, name: `b${i}`, x: 60 + i, y: 90, ageDays: 7300 }), CFG)
+      s = fold(
+        s,
+        ev(++seq + 1000, 'agent_spawned', {
+          id: `b${i}`,
+          name: `b${i}`,
+          x: 60 + i,
+          y: 90,
+          ageDays: 7300,
+        }),
+        CFG,
+      )
     }
     return s
   }
@@ -305,15 +370,35 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     s = withAgentAtDoor(s, 'a1')
     expect(shelterLedger(s, CFG)).toEqual({ roofs: 1, slots: 2, bodies: 1, per: 2 })
     // A well is finished and roofless; a half-raised house has a roof nowhere yet.
-    s = fold(s, ev(39, 'structure_planned', {
-      id: 'structure_2', kind: 'well', x: 7, y: 1, w: 1, h: 1,
-      maxHp: 30, flammable: false, builderId: 'a1',
-    }))
+    s = fold(
+      s,
+      ev(39, 'structure_planned', {
+        id: 'structure_2',
+        kind: 'well',
+        x: 7,
+        y: 1,
+        w: 1,
+        h: 1,
+        maxHp: 30,
+        flammable: false,
+        builderId: 'a1',
+      }),
+    )
     s = fold(s, ev(39, 'structure_completed', { id: 'structure_2' }))
-    s = fold(s, ev(40, 'structure_planned', {
-      id: 'structure_3', kind: 'house', x: 6, y: 6, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'a1',
-    }))
+    s = fold(
+      s,
+      ev(40, 'structure_planned', {
+        id: 'structure_3',
+        kind: 'house',
+        x: 6,
+        y: 6,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+    )
     expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
   })
 
@@ -322,7 +407,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
   it('★ puts the founding valley below 1.0, which sound it never was', () => {
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
     expect(led.bodies).toBe(5)
-    expect(led.roofs).toBe(2)                 // the storehouse and the cabin
+    expect(led.roofs).toBe(2) // the storehouse and the cabin
     expect(led.slots).toBe(4)
     expect(led.per).toBe(0.8)
     expect(led.per, 'the founding cannot host the want it means to measure').toBeLessThan(1)
@@ -331,7 +416,10 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     let sound = genesisTown(FOUNDER_IDS.length)
     for (const st of Object.values(sound.structures)) {
       if (st.stage !== 'construction') continue
-      sound = fold(sound, ev(500 + Number(st.id.split('_')[1]), 'structure_completed', { id: st.id }))
+      sound = fold(
+        sound,
+        ev(500 + Number(st.id.split('_')[1]), 'structure_completed', { id: st.id }),
+      )
     }
     const before = shelterLedger(sound, CFG)
     expect(before).toMatchObject({ roofs: 9, slots: 21, bodies: 5 })
@@ -351,7 +439,9 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     }
     for (const kind of ['cabin', 'storehouse']) {
       const row = CFG.structures.recipes[kind]!
-      expect(row.w * row.h, kind).toBe(CFG.structures.recipes['house']!.w * CFG.structures.recipes['house']!.h)
+      expect(row.w * row.h, kind).toBe(
+        CFG.structures.recipes['house']!.w * CFG.structures.recipes['house']!.h,
+      )
       expect(buildableRecipe(CFG, kind), `${kind} became a second name for a house`).toBeNull()
     }
   })

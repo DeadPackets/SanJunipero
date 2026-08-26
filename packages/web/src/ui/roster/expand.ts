@@ -1,8 +1,17 @@
 import { tickToMoment, type BondsResponse, type SimEvent } from '@sj/shared'
 import type { ChangeEntry } from '../becoming.js'
 import {
-  BOND_LEVEL_WORD, LEVEL_RANK, bondArc, bondLevel, bondTypeOf, bondWarmth, partnerEvidence,
-  relationLine, type BondLevel, type BondType, type LineageLike,
+  BOND_LEVEL_WORD,
+  LEVEL_RANK,
+  bondArc,
+  bondLevel,
+  bondTypeOf,
+  bondWarmth,
+  partnerEvidence,
+  relationLine,
+  type BondLevel,
+  type BondType,
+  type LineageLike,
 } from '../bondModel2.js'
 
 // Expansion is a state of the LIST, not a route: the list never unmounts, so there is no "back"
@@ -20,10 +29,13 @@ export const CLOSED: ExpandState = { openId: null }
 /** One row open at a time. An id the list does not hold is ignored, rather than opening a
  *  state shaped like nothing. */
 export function expandReducer(
-  prev: ExpandState, ev: ExpandEv, ids: readonly string[],
+  prev: ExpandState,
+  ev: ExpandEv,
+  ids: readonly string[],
 ): ExpandState {
   switch (ev.kind) {
-    case 'close': return prev.openId === null ? prev : CLOSED
+    case 'close':
+      return prev.openId === null ? prev : CLOSED
     case 'toggle': {
       if (!ids.includes(ev.id)) return prev
       return prev.openId === ev.id ? CLOSED : { openId: ev.id }
@@ -67,14 +79,28 @@ export const SECTION_EMPTY: Readonly<Record<keyof Becoming, string>> = {
 }
 
 export const SECTION_TITLE: Readonly<Record<keyof Becoming, string>> = {
-  lived: 'So far', done: 'What they have done', knows: 'Who they know',
-  good: 'What they are good at', wants: 'What they seem to want',
+  lived: 'So far',
+  done: 'What they have done',
+  knows: 'Who they know',
+  good: 'What they are good at',
+  wants: 'What they seem to want',
   changed: 'The days they became different',
 }
 
 const SMALL = [
-  'No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
-  'Eleven', 'Twelve',
+  'No',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
 ] as const
 
 const inWords = (n: number): string => SMALL[n] ?? String(n)
@@ -96,8 +122,11 @@ export function skillBand(xp: number): string {
 /** The bond log and the live feed are both dated records of things that HAPPENED. Nothing here is
  *  inferred from who somebody is. */
 const ACT_WORDS: Readonly<Record<string, string>> = {
-  spoke: 'talked with someone', teach: 'taught someone something',
-  give: 'gave something away', co_slept: 'shared a roof', attack: 'came to blows',
+  spoke: 'talked with someone',
+  teach: 'taught someone something',
+  give: 'gave something away',
+  co_slept: 'shared a roof',
+  attack: 'came to blows',
   born: 'became a parent',
 }
 
@@ -110,7 +139,9 @@ const FEED_WORDS: Readonly<Record<string, string>> = {
 }
 
 export function actsOf(
-  agentId: string, bonds: BondsResponse | null, events: readonly SimEvent[],
+  agentId: string,
+  bonds: BondsResponse | null,
+  events: readonly SimEvent[],
 ): Array<{ tick: number; words: string }> {
   const out: Array<{ tick: number; words: string }> = []
   for (const b of bonds?.bonds ?? []) {
@@ -119,7 +150,10 @@ export function actsOf(
     // happened. Both fold to one row per day per act, so nothing is duplicated.
     const ticks: Array<{ tick: number; kind: string }> = [
       ...b.recent,
-      ...b.acts.flatMap((a) => [{ tick: a.firstTick, kind: a.kind }, { tick: a.lastTick, kind: a.kind }]),
+      ...b.acts.flatMap((a) => [
+        { tick: a.firstTick, kind: a.kind },
+        { tick: a.lastTick, kind: a.kind },
+      ]),
     ]
     for (const h of ticks) {
       const words = ACT_WORDS[h.kind] ?? ACT_WORDS[BOND_ACT[h.kind] ?? ''] ?? null
@@ -133,7 +167,8 @@ export function actsOf(
     const words = FEED_WORDS[ev.type]
     if (words === undefined) continue
     const p = ev.payload as Record<string, unknown>
-    if (p?.['agentId'] !== agentId && p?.['builderId'] !== agentId && p?.['id'] !== agentId) continue
+    if (p?.['agentId'] !== agentId && p?.['builderId'] !== agentId && p?.['id'] !== agentId)
+      continue
     out.push({ tick: ev.tick, words })
   }
   return out
@@ -141,7 +176,12 @@ export function actsOf(
 
 /** the endpoint records a BondKind; the acts above are named the way the plan names them */
 const BOND_ACT: Readonly<Record<string, string>> = {
-  friend: 'spoke', work: 'teach', owe: 'give', partner: 'co_slept', kin: 'born', rival: 'attack',
+  friend: 'spoke',
+  work: 'teach',
+  owe: 'give',
+  partner: 'co_slept',
+  kin: 'born',
+  rival: 'attack',
 }
 
 export type BecomingInput = {
@@ -180,11 +220,19 @@ export function becomingOf(input: BecomingInput): Becoming {
     const arc = bondArc(b, input.nowTick)
     const evidence = type === 'partner' ? partnerEvidence(b) : null
     const line = relationLine(type, level, arc, [input.name, name])
-    knows.push({ id: otherId, name, level, type, words: evidence === null ? line : `${line} ${evidence}` })
+    knows.push({
+      id: otherId,
+      name,
+      level,
+      type,
+      words: evidence === null ? line : `${line} ${evidence}`,
+    })
   }
   // warmest first, then by name — a reading order, never a ranking
-  knows.sort((x, y) =>
-    LEVEL_RANK.indexOf(y.level) - LEVEL_RANK.indexOf(x.level) || (x.name < y.name ? -1 : 1))
+  knows.sort(
+    (x, y) =>
+      LEVEL_RANK.indexOf(y.level) - LEVEL_RANK.indexOf(x.level) || (x.name < y.name ? -1 : 1),
+  )
 
   const good = Object.entries(input.skills)
     .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
@@ -197,17 +245,25 @@ export function becomingOf(input: BecomingInput): Becoming {
   return {
     // WHAT THE BROWSER CAUGHT: "One days in the town." — the one arithmetic sentence in the
     // whole panel, and it could not count to one.
-    lived: days === 0 ? SECTION_EMPTY.lived
-      : `${inWords(days)} ${days === 1 ? 'day' : 'days'} in the town.`,
+    lived:
+      days === 0
+        ? SECTION_EMPTY.lived
+        : `${inWords(days)} ${days === 1 ? 'day' : 'days'} in the town.`,
     done,
     knows,
     good,
-    wants: [],          // the society lane's, and an empty section renders nothing at all
+    wants: [], // the society lane's, and an empty section renders nothing at all
     changed,
   }
 }
 
 /** Which sections have something to say. `wants` is never shown while it is empty (P22.2). */
-export const ALWAYS_SHOWN: ReadonlyArray<keyof Becoming> = ['lived', 'done', 'knows', 'good', 'changed']
+export const ALWAYS_SHOWN: ReadonlyArray<keyof Becoming> = [
+  'lived',
+  'done',
+  'knows',
+  'good',
+  'changed',
+]
 
 export const BOND_LEVEL_LABEL = BOND_LEVEL_WORD

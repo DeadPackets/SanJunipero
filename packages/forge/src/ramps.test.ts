@@ -41,7 +41,7 @@ describe('derivedPalette', () => {
     for (const m of master) expect(d).toContainEqual(m)
     expect(d.length).toBeGreaterThan(master.length)
     // every derived tone lies on a segment between two adjacent members of one ramp
-    for (const c of d) expect(onARamp(c), `#${c.map(v => v.toString(16)).join('')}`).toBe(true)
+    for (const c of d) expect(onARamp(c), `#${c.map((v) => v.toString(16)).join('')}`).toBe(true)
   })
 
   it('holds no duplicates, so the count is the real width of the palette', () => {
@@ -50,9 +50,9 @@ describe('derivedPalette', () => {
   })
 
   it('refuses to call an arbitrary colour derived', () => {
-    expect(onARamp([0, 255, 0])).toBe(false)      // pure green is nowhere on this palette
-    expect(onARamp([255, 0, 255])).toBe(false)    // the chroma key itself
-    expect(onARamp(paletteRgb()[0]!)).toBe(true)  // a master member is trivially on its ramp
+    expect(onARamp([0, 255, 0])).toBe(false) // pure green is nowhere on this palette
+    expect(onARamp([255, 0, 255])).toBe(false) // the chroma key itself
+    expect(onARamp(paletteRgb()[0]!)).toBe(true) // a master member is trivially on its ramp
   })
 
   it('widens with the step count and stays inside the ramps', () => {
@@ -79,7 +79,9 @@ describe('the portrait, re-quantized under derived ramps', () => {
   })
 
   it('is a WIDER gate, not an open one: the raw generation still fails it', async () => {
-    expect(paletteGate(await fixture('raw-crop-offpalette.png'), { palette: derivedPalette() }).ok).toBe(false)
+    expect(
+      paletteGate(await fixture('raw-crop-offpalette.png'), { palette: derivedPalette() }).ok,
+    ).toBe(false)
   })
 
   it('publishes the step count it used, so the width is on the record', () => {

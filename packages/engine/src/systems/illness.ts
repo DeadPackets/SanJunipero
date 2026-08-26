@@ -13,7 +13,8 @@ const hasIllness = (state: WorldState, id: string): boolean =>
 // A wall holds the air the way it holds sound: co-occupants share it whatever the distance,
 // bodies in the open share it inside the radius, and across a threshold nobody does.
 function breathesTheSameAir(state: WorldState, aId: string, bId: string, radius: number): boolean {
-  const a = state.agents[aId]!, b = state.agents[bId]!
+  const a = state.agents[aId]!,
+    b = state.agents[bId]!
   if (a.insideId !== undefined || b.insideId !== undefined) return a.insideId === b.insideId
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= radius
 }
@@ -42,7 +43,10 @@ export function illnessSystem(ctx: TickCtx): void {
   const time = simTimeFromTick(ctx.state().tick)
   if (time.hour === 6 && time.minute === 0) septicWounds(ctx)
   if (time.hour !== 0 || time.minute !== 0) return
-  const living = () => Object.keys(ctx.state().agents).sort().filter((id) => ctx.state().agents[id]!.alive)
+  const living = () =>
+    Object.keys(ctx.state().agents)
+      .sort()
+      .filter((id) => ctx.state().agents[id]!.alive)
 
   for (const id of living()) {
     const ill = ctx.state().agents[id]!.afflictions?.find((x) => x.kind === 'illness')

@@ -7,18 +7,54 @@ import { FORBIDDEN_FRAMING } from '@sj/shared'
 import type { ChapterRow, HeatScores, Milestone, SceneSegment } from './types.js'
 
 const chapter: ChapterRow = {
-  id: 1, day: 1, title: 'The Argument by the Storehouse',
-  text: 'Omar and Yusuf came to blows.', citations: [1, 3], sceneIds: [1, 2],
+  id: 1,
+  day: 1,
+  title: 'The Argument by the Storehouse',
+  text: 'Omar and Yusuf came to blows.',
+  citations: [1, 3],
+  sceneIds: [1, 2],
 }
-const heat = (total: number): HeatScores => ({ conflict: 0, novelty: 0, firsts: 0, stakes: 0, dramaticIrony: 0, total })
+const heat = (total: number): HeatScores => ({
+  conflict: 0,
+  novelty: 0,
+  firsts: 0,
+  stakes: 0,
+  dramaticIrony: 0,
+  total,
+})
 const heats = [heat(7.5), heat(1)]
 const scenes: SceneSegment[] = [
-  { day: 1, startTick: 1480, endTick: 1490, eventIds: [1, 2, 3], cast: ['omar', 'yusuf'], location: '3,4' },
+  {
+    day: 1,
+    startTick: 1480,
+    endTick: 1490,
+    eventIds: [1, 2, 3],
+    cast: ['omar', 'yusuf'],
+    location: '3,4',
+  },
   { day: 1, startTick: 1520, endTick: 1521, eventIds: [4, 5], cast: ['nadia'], location: null },
 ]
 const milestones: Milestone[] = [
-  { kind: 'first_speech', tier: 1, domain: 'engine', label: 'the first word spoken', eventSeq: 1, day: 1, tick: 1480, agentIds: ['omar'] },
-  { kind: 'first_trade', tier: 1, domain: 'engine', label: 'the first trade', eventSeq: 9, day: 2, tick: 2900, agentIds: ['yusuf'] },
+  {
+    kind: 'first_speech',
+    tier: 1,
+    domain: 'engine',
+    label: 'the first word spoken',
+    eventSeq: 1,
+    day: 1,
+    tick: 1480,
+    agentIds: ['omar'],
+  },
+  {
+    kind: 'first_trade',
+    tier: 1,
+    domain: 'engine',
+    label: 'the first trade',
+    eventSeq: 9,
+    day: 2,
+    tick: 2900,
+    agentIds: ['yusuf'],
+  },
 ]
 
 describe('renderNewspaper', () => {
@@ -44,7 +80,13 @@ describe('renderNewspaper', () => {
     const db = new Database(':memory:')
     migrateNarratorTables(db)
     const store = new NarratorStore(db)
-    store.insertPublication({ day: 1, kind: 'newspaper', title: paper.headline, body: paper.body, citations: paper.citations })
+    store.insertPublication({
+      day: 1,
+      kind: 'newspaper',
+      title: paper.headline,
+      body: paper.body,
+      citations: paper.citations,
+    })
     const rows = store.publications('newspaper')
     expect(rows.length).toBe(1)
     expect(rows[0]!.kind).toBe('newspaper')

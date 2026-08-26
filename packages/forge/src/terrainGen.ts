@@ -1,6 +1,12 @@
 import {
-  MATERIAL_KIND_PREFIX, ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, materialKind,
-  type RoadAutotileKey, type Season, type TerrainTileKind,
+  MATERIAL_KIND_PREFIX,
+  ROAD_AUTOTILE_KEYS,
+  SEASONS,
+  TERRAIN_TILE_KINDS,
+  materialKind,
+  type RoadAutotileKey,
+  type Season,
+  type TerrainTileKind,
 } from '@sj/shared'
 import { paletteRgb } from './palette.js'
 import { downscaleNearest, type RawImage } from './post/raw.js'
@@ -15,7 +21,8 @@ export const CANDIDATE_MARGIN = 0.08
 
 export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): RawImage {
   const cut = Math.round(Math.min(img.width, img.height) * margin)
-  const w = img.width - 2 * cut, h = img.height - 2 * cut
+  const w = img.width - 2 * cut,
+    h = img.height - 2 * cut
   if (w <= 0 || h <= 0) return img
   const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
   for (let y = 0; y < h; y++) {
@@ -42,7 +49,8 @@ export const TILING_CRITERION_PROMPT =
   'grid. Judge the repeat, not the beauty of the material.'
 
 export function terrainBoilerplate(): string {
-  return 'A seamless, edge-wrapping, top-down ground material tile for a cozy pixel-art town. ' +
+  return (
+    'A seamless, edge-wrapping, top-down ground material tile for a cozy pixel-art town. ' +
     'Flat overhead view of the ground itself — no objects, no horizon, no shadows cast from ' +
     'outside the tile, no vignette, no border, no frame. Even lighting across the whole square ' +
     'so it can repeat without a visible seam. Hard pixel clusters, no gradients, no blur. ' +
@@ -60,23 +68,34 @@ export function terrainBoilerplate(): string {
     'The grain itself must still be clearly readable: chunky clusters three or four pixels ' +
     'across in three or four distinct tones of the same colour family, evenly spread. Not a ' +
     'smooth wash, not single-pixel noise — visible texture with no landmarks in it.'
+  )
 }
 
 // Every line describes a UNIFORM MATERIAL. Variety between tiles is the renderer's job; variety
 // inside one tile is what makes a repeat visible.
 export const TERRAIN_COMMISSIONS: Record<string, string> = {
-  'grass:0': 'Close-cropped sage meadow grass: short blade clusters in three clear tones of green, evenly spread over the whole square, plainly visible texture with no bare patches.',
-  'grass:1': 'Meadow grass one shade deeper and slightly coarser than the last: the same even all-over blade grain, a little more contrast between blades, still one uniform tone.',
-  'grass:2': 'Dry sun-bleached grass going to straw: uniform pale sage-and-wheat grain, evenly mixed at fine scale, no bare patches and no clumps.',
-  'grass:3': 'Damp mossy grass, the darkest of the four: uniform deep sage grain with an even fine mottle, no patches.',
-  'earth:0': 'Bare turned earth: uniform warm honey-brown, fine even crumb grain at a small scale, no large clods and no stones.',
-  'water:0': 'Calm shallow water seen from directly above: soft blue-grey with clearly drawn short ripple strokes in three tones of blue, evenly spread over the whole square, no shoreline, no reflections.',
-  'forest:0': 'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
-  'rock:0': 'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
-  'sand:0': 'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
+  'grass:0':
+    'Close-cropped sage meadow grass: short blade clusters in three clear tones of green, evenly spread over the whole square, plainly visible texture with no bare patches.',
+  'grass:1':
+    'Meadow grass one shade deeper and slightly coarser than the last: the same even all-over blade grain, a little more contrast between blades, still one uniform tone.',
+  'grass:2':
+    'Dry sun-bleached grass going to straw: uniform pale sage-and-wheat grain, evenly mixed at fine scale, no bare patches and no clumps.',
+  'grass:3':
+    'Damp mossy grass, the darkest of the four: uniform deep sage grain with an even fine mottle, no patches.',
+  'earth:0':
+    'Bare turned earth: uniform warm honey-brown, fine even crumb grain at a small scale, no large clods and no stones.',
+  'water:0':
+    'Calm shallow water seen from directly above: soft blue-grey with clearly drawn short ripple strokes in three tones of blue, evenly spread over the whole square, no shoreline, no reflections.',
+  'forest:0':
+    'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
+  'rock:0':
+    'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
+  'sand:0':
+    'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
   // The first farmland came back as the style-anchor COTTAGE, and every mechanical gate passed it
   // because a cottage wraps as well as soil. The commission names the furrow as the only structure.
-  'farmland:0': 'Ploughed soil seen from directly above: rich damp brown, covered corner to corner with straight parallel furrow ridges at a small even pitch, every ridge the same width and the same length as every other, running in ONE direction across the whole square. The furrows are the only structure in the picture. No building, no roof, no wall, no window, no door, no fence, no crop, no plant, no path, no headland, no field boundary, no bare patch.',
+  'farmland:0':
+    'Ploughed soil seen from directly above: rich damp brown, covered corner to corner with straight parallel furrow ridges at a small even pitch, every ridge the same width and the same length as every other, running in ONE direction across the whole square. The furrows are the only structure in the picture. No building, no roof, no wall, no window, no door, no fence, no crop, no plant, no path, no headland, no field boundary, no bare patch.',
 }
 
 export const SEASON_COMMISSIONS: Record<Season, string> = {
@@ -123,7 +142,14 @@ export function terrainAssetId(i: IdInput): string {
 // No per-tile variants: they existed to break up a repeating tile stamp, and a continuous
 // world-space field has no tile stamp to break up.
 export const GROUND_VARIANTS: Record<TerrainTileKind, number> = {
-  grass: 1, earth: 1, water: 1, forest: 1, rock: 1, sand: 1, farmland: 1, road: 1,
+  grass: 1,
+  earth: 1,
+  water: 1,
+  forest: 1,
+  rock: 1,
+  sand: 1,
+  farmland: 1,
+  road: 1,
 }
 
 // `materialKind` lives in @sj/shared beside the tile kinds — the forge writes that codex
@@ -137,25 +163,39 @@ export function planTerrainProgram(): TerrainItem[] {
   const out: TerrainItem[] = []
   for (const kind of TERRAIN_TILE_KINDS) {
     for (let variant = 0; variant < GROUND_VARIANTS[kind]; variant++) {
-      const commission = kind === 'road'
-        ? ROAD_COMMISSION
-        : TERRAIN_COMMISSIONS[`${kind}:${variant}`] ?? TERRAIN_COMMISSIONS[`${kind}:0`]!
-      out.push({ sort: 'ground', kind, variant, assetId: terrainAssetId({ sort: 'ground', kind, variant }), commission })
+      const commission =
+        kind === 'road'
+          ? ROAD_COMMISSION
+          : (TERRAIN_COMMISSIONS[`${kind}:${variant}`] ?? TERRAIN_COMMISSIONS[`${kind}:0`]!)
+      out.push({
+        sort: 'ground',
+        kind,
+        variant,
+        assetId: terrainAssetId({ sort: 'ground', kind, variant }),
+        commission,
+      })
     }
   }
   out.push({
-    sort: 'material', name: CALM_ROAD_NAME, assetId: CALM_ROAD_ID,
+    sort: 'material',
+    name: CALM_ROAD_NAME,
+    assetId: CALM_ROAD_ID,
     commission: CALM_ROAD_COMMISSION,
   })
   for (const roadKey of ROAD_AUTOTILE_KEYS) {
     out.push({
-      sort: 'road', roadKey, assetId: terrainAssetId({ sort: 'road', roadKey }),
-      commission: ROAD_COMMISSION, generateFrom: ROAD_MATERIAL_ID,
+      sort: 'road',
+      roadKey,
+      assetId: terrainAssetId({ sort: 'road', roadKey }),
+      commission: ROAD_COMMISSION,
+      generateFrom: ROAD_MATERIAL_ID,
     })
   }
   for (const season of SEASONS) {
     out.push({
-      sort: 'season', season, assetId: terrainAssetId({ sort: 'season', season }),
+      sort: 'season',
+      season,
+      assetId: terrainAssetId({ sort: 'season', season }),
       commission: `Uniform meadow ground ${SEASON_COMMISSIONS[season]}. Even fine grain all over, no landmarks.`,
     })
   }
@@ -174,19 +214,28 @@ export function toMaterialGrid(img: RawImage, px: number = MATERIAL_PX): RawImag
     for (let x = 0; x < px; x++) {
       const x0 = Math.floor((x * img.width) / px)
       const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * img.width) / px))
-      let r = 0, g = 0, b = 0, n = 0
+      let r = 0,
+        g = 0,
+        b = 0,
+        n = 0
       for (let sy = y0; sy < y1 && sy < img.height; sy++) {
         for (let sx = x0; sx < x1 && sx < img.width; sx++) {
           const i = (sy * img.width + sx) * 4
-          r += img.data[i]!; g += img.data[i + 1]!; b += img.data[i + 2]!; n++
+          r += img.data[i]!
+          g += img.data[i + 1]!
+          b += img.data[i + 2]!
+          n++
         }
       }
       const d = (y * px + x) * 4
-      out.data.set(n === 0 ? [0, 0, 0, 255] : [Math.round(r / n), Math.round(g / n), Math.round(b / n), 255], d)
+      out.data.set(
+        n === 0 ? [0, 0, 0, 255] : [Math.round(r / n), Math.round(g / n), Math.round(b / n), 255],
+        d,
+      )
     }
   }
   const q = quantize(out, paletteRgb())
-  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255   // ground is never see-through
+  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255 // ground is never see-through
   return q
 }
 
@@ -195,18 +244,32 @@ export function materialFromCandidate(raw: RawImage, px: number = MATERIAL_PX): 
 }
 
 export type SeamReport = {
-  horizontalDelta: number; verticalDelta: number
-  worstAxis: 'horizontal' | 'vertical'; pass: boolean; note: string
+  horizontalDelta: number
+  verticalDelta: number
+  worstAxis: 'horizontal' | 'vertical'
+  pass: boolean
+  note: string
 }
 
 // mean colour of an edge strip: `axis` picks the column band or the row band
-function stripMean(img: RawImage, axis: 'x' | 'y', from: number, width: number): [number, number, number] {
-  let r = 0, g = 0, b = 0, n = 0
+function stripMean(
+  img: RawImage,
+  axis: 'x' | 'y',
+  from: number,
+  width: number,
+): [number, number, number] {
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0
   const outer = axis === 'x' ? img.height : img.width
   for (let o = 0; o < outer; o++) {
     for (let d = from; d < from + width; d++) {
       const i = (axis === 'x' ? o * img.width + d : d * img.width + o) * 4
-      r += img.data[i]!; g += img.data[i + 1]!; b += img.data[i + 2]!; n++
+      r += img.data[i]!
+      g += img.data[i + 1]!
+      b += img.data[i + 2]!
+      n++
     }
   }
   return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
@@ -220,9 +283,13 @@ const toneDelta = (a: [number, number, number], b: [number, number, number]): nu
 export function seamReport(m: RawImage): SeamReport {
   const strip = Math.max(1, Math.min(SEAM_STRIP_PX, Math.floor(Math.min(m.width, m.height) / 2)))
   const horizontalDelta = toneDelta(
-    stripMean(m, 'x', 0, strip), stripMean(m, 'x', m.width - strip, strip))
+    stripMean(m, 'x', 0, strip),
+    stripMean(m, 'x', m.width - strip, strip),
+  )
   const verticalDelta = toneDelta(
-    stripMean(m, 'y', 0, strip), stripMean(m, 'y', m.height - strip, strip))
+    stripMean(m, 'y', 0, strip),
+    stripMean(m, 'y', m.height - strip, strip),
+  )
   const worstAxis = horizontalDelta >= verticalDelta ? 'horizontal' : 'vertical'
   const pass = horizontalDelta <= SEAM_TOLERANCE && verticalDelta <= SEAM_TOLERANCE
   const note = pass
@@ -235,27 +302,35 @@ export function seamReport(m: RawImage): SeamReport {
 
 // A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the wrap, so
 // `seamReport` reads 0.0 and the material renders as a grid of framed cards.
-export const BORDER_TOLERANCE = 18      // mean per-channel distance, ~one palette step
+export const BORDER_TOLERANCE = 18 // mean per-channel distance, ~one palette step
 export const BORDER_RING_PX = 2
 
 export type BorderReport = { ringDelta: number; framed: boolean; note: string }
 
 export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): BorderReport {
-  let ringSum = [0, 0, 0], ringN = 0, midSum = [0, 0, 0], midN = 0
+  let ringSum = [0, 0, 0],
+    ringN = 0,
+    midSum = [0, 0, 0],
+    midN = 0
   for (let y = 0; y < m.height; y++) {
     for (let x = 0; x < m.width; x++) {
       const i = (y * m.width + x) * 4
       const onRing = x < ring || y < ring || x >= m.width - ring || y >= m.height - ring
       const t = onRing ? ringSum : midSum
-      t[0] += m.data[i]!; t[1] += m.data[i + 1]!; t[2] += m.data[i + 2]!
-      if (onRing) ringN++; else midN++
+      t[0] += m.data[i]!
+      t[1] += m.data[i + 1]!
+      t[2] += m.data[i + 2]!
+      if (onRing) ringN++
+      else midN++
     }
   }
   if (ringN === 0 || midN === 0) return { ringDelta: 0, framed: false, note: 'no ring to measure' }
-  const ringDelta = [0, 1, 2].reduce((s2, k) => s2 + Math.abs(ringSum[k]! / ringN - midSum[k]! / midN), 0) / 3
+  const ringDelta =
+    [0, 1, 2].reduce((s2, k) => s2 + Math.abs(ringSum[k]! / ringN - midSum[k]! / midN), 0) / 3
   const framed = ringDelta > BORDER_TOLERANCE
   return {
-    ringDelta, framed,
+    ringDelta,
+    framed,
     note: framed
       ? `the outer edge is drawn as a border or frame (edge differs from the middle by ${ringDelta.toFixed(1)}); remove it — the texture must run right off all four sides with no outline, no rim and no darker margin`
       : `no frame (edge matches the middle within ${ringDelta.toFixed(1)})`,
@@ -297,10 +372,14 @@ function bandDelta(m: RawImage, axis: 'col' | 'row', a: number, b: number): numb
 export function bestRollOffsets(m: RawImage): { ox: number; oy: number } {
   const pick = (axis: 'col' | 'row', span: number): number => {
     const margin = Math.max(8, span >> 3)
-    let best = span >> 1, bestDelta = Infinity
+    let best = span >> 1,
+      bestDelta = Infinity
     for (let k = margin; k < span - margin; k++) {
       const d = bandDelta(m, axis, k - 1, k)
-      if (d < bestDelta) { bestDelta = d; best = k }
+      if (d < bestDelta) {
+        bestDelta = d
+        best = k
+      }
     }
     return best
   }
@@ -308,19 +387,24 @@ export function bestRollOffsets(m: RawImage): { ox: number; oy: number } {
 }
 
 export function seamlessMaterial(m: RawImage): RawImage {
-  const w = m.width, h = m.height
+  const w = m.width,
+    h = m.height
   const { ox, oy } = bestRollOffsets(m)
   const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
   const ramp = (d: number, half: number): number => {
     const t = Math.min(1, d / half)
     return t * t * (3 - 2 * t)
   }
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const a = Math.min(ramp(Math.min(x + 1, w - x), w >> 1), ramp(Math.min(y + 1, h - y), h >> 1))
-    const i = wrapIndex(m, x, y), j = wrapIndex(m, x + ox, y + oy), o = (y * w + x) * 4
-    for (let k = 0; k < 3; k++) out.data[o + k] = Math.round(m.data[i + k]! * a + m.data[j + k]! * (1 - a))
-    out.data[o + 3] = 255
-  }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const a = Math.min(ramp(Math.min(x + 1, w - x), w >> 1), ramp(Math.min(y + 1, h - y), h >> 1))
+      const i = wrapIndex(m, x, y),
+        j = wrapIndex(m, x + ox, y + oy),
+        o = (y * w + x) * 4
+      for (let k = 0; k < 3; k++)
+        out.data[o + k] = Math.round(m.data[i + k]! * a + m.data[j + k]! * (1 - a))
+      out.data[o + 3] = 255
+    }
   const q = quantize(out, paletteRgb())
   for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255
   return q
@@ -364,17 +448,26 @@ export function noRosePalette(): ReturnType<typeof paletteRgb> {
 }
 
 export function materialMean(m: RawImage): [number, number, number] {
-  let r = 0, g = 0, b = 0, n = 0
-  for (let i = 0; i < m.data.length; i += 4) { r += m.data[i]!; g += m.data[i + 1]!; b += m.data[i + 2]!; n++ }
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0
+  for (let i = 0; i < m.data.length; i += 4) {
+    r += m.data[i]!
+    g += m.data[i + 1]!
+    b += m.data[i + 2]!
+    n++
+  }
   return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
 }
 
 export function materialContrast(m: RawImage): number {
   const mean = materialMean(m)
   const mid = (mean[0] + mean[1] + mean[2]) / 3
-  let sd = 0, n = 0
+  let sd = 0,
+    n = 0
   for (let i = 0; i < m.data.length; i += 4) {
-    sd += (((m.data[i]! + m.data[i + 1]! + m.data[i + 2]!) / 3) - mid) ** 2
+    sd += ((m.data[i]! + m.data[i + 1]! + m.data[i + 2]!) / 3 - mid) ** 2
     n++
   }
   return n === 0 ? 0 : Math.sqrt(sd / n)
@@ -392,11 +485,12 @@ export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
   if (grade.targetMean !== undefined) {
     const now = materialMean(out)
     for (let i = 0; i < out.data.length; i += 4) {
-      for (let c = 0; c < 3; c++) out.data[i + c] = out.data[i + c]! + (grade.targetMean[c]! - now[c]!)
+      for (let c = 0; c < 3; c++)
+        out.data[i + c] = out.data[i + c]! + (grade.targetMean[c]! - now[c]!)
     }
   }
-  const palette = grade.coolOnly === true ? coolPalette()
-    : grade.noRose === true ? noRosePalette() : paletteRgb()
+  const palette =
+    grade.coolOnly === true ? coolPalette() : grade.noRose === true ? noRosePalette() : paletteRgb()
   return quantize(out, palette)
 }
 
@@ -412,12 +506,13 @@ export const MATERIAL_GRADES: Record<string, Grade> = {
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a
 // recurring blob is the only thing that can stand out.
 export function selfTile3x3(m: RawImage): RawImage {
-  const w = m.width * 3, h = m.height * 3
+  const w = m.width * 3,
+    h = m.height * 3
   const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
   for (let ty = 0; ty < 3; ty++) {
     for (let tx = 0; tx < 3; tx++) {
       for (let y = 0; y < m.height; y++) {
-        const src = (y * m.width) * 4
+        const src = y * m.width * 4
         out.data.set(
           m.data.subarray(src, src + m.width * 4),
           ((ty * m.height + y) * w + tx * m.width) * 4,
@@ -431,11 +526,13 @@ export function selfTile3x3(m: RawImage): RawImage {
 // Cut the dimetric top face out of the material. The diamond is the SAME mask the code-painted
 // tiles used, so alignment is unchanged and every downstream consumer keeps working.
 export function diamondFromMaterial(m: RawImage): RawImage {
-  const src = m.width === TERRAIN_TILE_W && m.height === TERRAIN_TILE_H
-    ? m
-    : downscaleNearest(m, TERRAIN_TILE_W, TERRAIN_TILE_H)
+  const src =
+    m.width === TERRAIN_TILE_W && m.height === TERRAIN_TILE_H
+      ? m
+      : downscaleNearest(m, TERRAIN_TILE_W, TERRAIN_TILE_H)
   const out: RawImage = {
-    width: TERRAIN_TILE_W, height: TERRAIN_TILE_H,
+    width: TERRAIN_TILE_W,
+    height: TERRAIN_TILE_H,
     data: new Uint8ClampedArray(TERRAIN_TILE_W * TERRAIN_TILE_H * 4),
   }
   for (let y = 0; y < TERRAIN_TILE_H; y++) {
@@ -459,7 +556,8 @@ export function stencilRoadTile(material: RawImage, key: RoadAutotileKey): RawIm
   const stencil = paintRoadAutotile(key)
   const surface = diamondFromMaterial(material)
   const out: RawImage = {
-    width: TERRAIN_TILE_W, height: TERRAIN_TILE_H,
+    width: TERRAIN_TILE_W,
+    height: TERRAIN_TILE_H,
     data: new Uint8ClampedArray(TERRAIN_TILE_W * TERRAIN_TILE_H * 4),
   }
   for (let i = 0; i < out.data.length; i += 4) {
@@ -471,10 +569,17 @@ export function stencilRoadTile(material: RawImage, key: RoadAutotileKey): RawIm
 
 // Seasonal grading taken from GENERATED art: the per-channel ratio between a season's own
 // material and the summer one.
-export function seasonTintFrom(seasonMat: RawImage, summerMat: RawImage): { r: number; g: number; b: number } {
+export function seasonTintFrom(
+  seasonMat: RawImage,
+  summerMat: RawImage,
+): { r: number; g: number; b: number } {
   const mean = (m: RawImage, k: number): number => {
-    let s = 0, n = 0
-    for (let i = 0; i < m.data.length; i += 4) { s += m.data[i + k]!; n++ }
+    let s = 0,
+      n = 0
+    for (let i = 0; i < m.data.length; i += 4) {
+      s += m.data[i + k]!
+      n++
+    }
     return n === 0 ? 1 : Math.max(1, s / n)
   }
   const ratio = (k: number): number =>

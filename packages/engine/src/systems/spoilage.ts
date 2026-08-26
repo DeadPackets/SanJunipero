@@ -8,7 +8,11 @@ const dayOf = (tick: number): number => Math.floor(tick / MINUTES_PER_DAY)
 
 // A shelf life rides the item from the moment it is made or found. Kinds the
 // table does not name never spoil, so wood and notes carry no key at all.
-export function spoilageFor(state: WorldState, kind: string, config: SimConfig): { spoilage?: Spoilage } {
+export function spoilageFor(
+  state: WorldState,
+  kind: string,
+  config: SimConfig,
+): { spoilage?: Spoilage } {
   if (!config.spoilage.enabled) return {}
   const days = config.spoilage.days[kind]
   return days === undefined ? {} : { spoilage: { spawnDay: dayOf(state.tick), days } }
@@ -20,7 +24,10 @@ export function spoilDeadline(state: WorldState, item: Item, config: SimConfig):
   if (!item.spoilage) return null
   const kind = item.loc.t === 'structure' ? state.structures[item.loc.id]?.kind : undefined
   const preserved = kind !== undefined && config.spoilage.preservingKinds.includes(kind)
-  return item.spoilage.spawnDay + item.spoilage.days * (preserved ? config.spoilage.storehouseMultiplier : 1)
+  return (
+    item.spoilage.spawnDay +
+    item.spoilage.days * (preserved ? config.spoilage.storehouseMultiplier : 1)
+  )
 }
 
 // The last day you can still eat it — deep-world's poison window reads this.

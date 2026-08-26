@@ -24,7 +24,10 @@ describe('★ chrome.css survives the merge trains intact', () => {
   it('opens each section exactly once', () => {
     const seen = new Map<string, number>()
     for (const b of BANNERS) seen.set(b, (seen.get(b) ?? 0) + 1)
-    expect([...seen].filter(([, n]) => n > 1), 'a section banner appears twice').toEqual([])
+    expect(
+      [...seen].filter(([, n]) => n > 1),
+      'a section banner appears twice',
+    ).toEqual([])
   })
 
   // 22 base + 1 the Discovery Record + 1 the little map. A dropped block takes its banner with
@@ -47,8 +50,10 @@ describe('★ chrome.css survives the merge trains intact', () => {
 
   it('is brace-balanced and carries no conflict marker', () => {
     expect(CSS.match(/{/g) ?? []).toHaveLength((CSS.match(/}/g) ?? []).length)
-    expect(LINES.filter((l) => /^(<{7}|={7}|>{7}|\|{7})/.test(l)), 'conflict marker in the sheet')
-      .toHaveLength(0)
+    expect(
+      LINES.filter((l) => /^(<{7}|={7}|>{7}|\|{7})/.test(l)),
+      'conflict marker in the sheet',
+    ).toHaveLength(0)
   })
 })
 
@@ -75,17 +80,21 @@ describe('★ the control bar keeps every control at every stage width', () => {
 
   it('wraps instead of cutting: a bar too narrow grows a row, it never loses a button', () => {
     expect(barRule, '.control-bar is not a top-level rule in the sheet').not.toBe('')
-    expect(barRule, 'the bar must wrap; overflow is not a way to reach a control')
-      .toMatch(/flex-wrap:\s*wrap/)
+    expect(barRule, 'the bar must wrap; overflow is not a way to reach a control').toMatch(
+      /flex-wrap:\s*wrap/,
+    )
     // a group that cannot wrap cuts its own buttons out of a bar that can
     expect(topRule('.ctl-group'), '.ctl-group must wrap too').toMatch(/flex-wrap:\s*wrap/)
   })
 
   it('★ asks about the BAR, not the window — the panel is what narrows it', () => {
-    expect(barRule, 'the bar must be a size container for @container to have anything to ask')
-      .toMatch(/container-type:\s*inline-size/)
-    expect(BARE, 'the label rule must be a container query')
-      .toMatch(/@container control-bar \(max-width: 1500px\)/)
+    expect(
+      barRule,
+      'the bar must be a size container for @container to have anything to ask',
+    ).toMatch(/container-type:\s*inline-size/)
+    expect(BARE, 'the label rule must be a container query').toMatch(
+      /@container control-bar \(max-width: 1500px\)/,
+    )
     // and the viewport query it replaced must not come back beside it: two rules keyed to two
     // different widths is how the bar came to have full labels in 1072 px of room.
     const viewportLabelRules = BARE.split(/@media[^{]*\(max-width[^{]*\{/)
@@ -119,13 +128,17 @@ describe('★ the control bar keeps every control at every stage width', () => {
   })
 
   it('leaves the bar clear of the dock handle pinned to the same corner', () => {
-    expect(barRule, 'a control under the 44px handle is as unreachable as one past the edge')
-      .toMatch(/padding:\s*0\.3rem 52px 0\.3rem 0\.8rem/)
+    expect(
+      barRule,
+      'a control under the 44px handle is as unreachable as one past the edge',
+    ).toMatch(/padding:\s*0\.3rem 52px 0\.3rem 0\.8rem/)
     // 52 is the handle's own 44 plus the sheet's 8px of air
     expect(topRule('.hud-handle')).toMatch(/width:\s*44px/)
   })
 
   it('does NOT wrap when the bar is docked to an edge — that makes a second column', () => {
-    expect(BARE).toMatch(/data-dock-controls="right"\] \.control-bar \{[\s\S]{0,400}?flex-wrap:\s*nowrap/)
+    expect(BARE).toMatch(
+      /data-dock-controls="right"\] \.control-bar \{[\s\S]{0,400}?flex-wrap:\s*nowrap/,
+    )
   })
 })

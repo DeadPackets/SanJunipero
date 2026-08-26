@@ -1,29 +1,52 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_CONFIG, flamesAt, isDark, lightBandAt, type LitWorld, type SimConfig,
+  DEFAULT_CONFIG,
+  flamesAt,
+  isDark,
+  lightBandAt,
+  type LitWorld,
+  type SimConfig,
 } from '@sj/shared'
 import { FIRE_COLOR, SMOKE_COLOR } from './ambient.js'
 import { CLOCK_STOPS } from './tints.js'
 import { TILE_H, TILE_W } from './iso.js'
 import {
-  POOL_COLOR, POOL_DUSK_SCALE, POOL_MAX_ALPHA, POOL_SWING,
-  poolCentre, poolRadiusPx, poolStrengthAt,
+  POOL_COLOR,
+  POOL_DUSK_SCALE,
+  POOL_MAX_ALPHA,
+  POOL_SWING,
+  poolCentre,
+  poolRadiusPx,
+  poolStrengthAt,
 } from './lightPools.js'
 
 const CFG: SimConfig = DEFAULT_CONFIG
-const NOON = 12 * 60, DUSK = 19 * 60 + 30, MIDNIGHT = 0
+const NOON = 12 * 60,
+  DUSK = 19 * 60 + 30,
+  MIDNIGHT = 0
 
-const world = (over: Partial<LitWorld> = {}): LitWorld => ({ agents: {}, items: {}, structures: {}, ...over })
-
-const lamp = (x: number, y: number, fueledUntilTick?: number): LitWorld => world({
-  structures: {
-    lamp_1: {
-      kind: 'lamp_post', x, y, w: 1, h: 1, stage: 'complete',
-      ...(fueledUntilTick === undefined ? {} : { fueledUntilTick }),
-    },
-  },
+const world = (over: Partial<LitWorld> = {}): LitWorld => ({
+  agents: {},
+  items: {},
+  structures: {},
+  ...over,
 })
+
+const lamp = (x: number, y: number, fueledUntilTick?: number): LitWorld =>
+  world({
+    structures: {
+      lamp_1: {
+        kind: 'lamp_post',
+        x,
+        y,
+        w: 1,
+        h: 1,
+        stage: 'complete',
+        ...(fueledUntilTick === undefined ? {} : { fueledUntilTick }),
+      },
+    },
+  })
 
 // One source, two consumers: before it, the render darkened the screen with a clock tint that
 // knew nothing about fire while `isDark` walked the flames.
@@ -56,7 +79,7 @@ describe('the picture and the query cannot disagree about what is alight', () =>
     expect(lightBandAt(world(), 0, 0, DUSK, CFG)).toBe('dim')
     expect(poolStrengthAt(DUSK)).toBe(POOL_DUSK_SCALE)
     expect(lightBandAt(world(), 0, 0, NOON, CFG)).toBe('bright')
-    expect(poolStrengthAt(NOON)).toBe(0)   // the day needs no help
+    expect(poolStrengthAt(NOON)).toBe(0) // the day needs no help
     expect(POOL_DUSK_SCALE).toBeGreaterThan(0)
     expect(POOL_DUSK_SCALE).toBeLessThan(1)
   })
@@ -68,8 +91,8 @@ describe('the pool is a pool of light and not a pale plate', () => {
   })
 
   it('is the same warm token the fire already uses, never cream', () => {
-    expect(POOL_COLOR).toBe(FIRE_COLOR)        // one warm-light token in the render, not two
-    expect(POOL_COLOR).not.toBe(SMOKE_COLOR)   // cream read as white glass; that is the round-3 defect
+    expect(POOL_COLOR).toBe(FIRE_COLOR) // one warm-light token in the render, not two
+    expect(POOL_COLOR).not.toBe(SMOKE_COLOR) // cream read as white glass; that is the round-3 defect
   })
 
   // `atmosphere.ts` multiplies the whole stage by the clock tint, and at deep night that tint
@@ -83,30 +106,37 @@ describe('the pool is a pool of light and not a pale plate', () => {
       (rgb & 0xff) * NIGHT_TINT[2],
     ]
     const [r, , b] = after(POOL_COLOR)
-    expect(r - b, 'the pool reads cold at midnight — a lamp that reads cold is not relief')
-      .toBeGreaterThan(0)
+    expect(
+      r - b,
+      'the pool reads cold at midnight — a lamp that reads cold is not relief',
+    ).toBeGreaterThan(0)
     // and the colour it replaced is the counter-example that makes this test mean something
     const [hr, , hb] = after(0xf2c879)
     expect(hr - hb).toBeLessThan(0)
   })
 
-  it('covers the flame\'s own reach on the iso ground, wide as it is tall by the tile ratio', () => {
+  it("covers the flame's own reach on the iso ground, wide as it is tall by the tile ratio", () => {
     // `sx = (dx-dy)*16, sy = (dx+dy)*8`, so a chebyshev square is a diamond twice as wide as
     // it is tall. A pool that ignored that would be a circle on a dimetric floor.
     for (const r of [3, 4, 5]) {
       const { rx, ry } = poolRadiusPx(r)
       expect(rx / ry).toBe(TILE_W / TILE_H)
-      expect(rx).toBeGreaterThan(r * TILE_W)      // reaches past the last lit tile's centre
+      expect(rx).toBeGreaterThan(r * TILE_W) // reaches past the last lit tile's centre
     }
-    expect(poolRadiusPx(CFG.light.glowRadius.lamp_post)).toEqual({ rx: 4.5 * TILE_W, ry: 4.5 * TILE_H })
+    expect(poolRadiusPx(CFG.light.glowRadius.lamp_post)).toEqual({
+      rx: 4.5 * TILE_W,
+      ry: 4.5 * TILE_H,
+    })
   })
 
   it('pools from the middle of a long footprint, not from its anchor corner', () => {
-    expect(poolCentre({ id: 'a', source: 'structure', x: 10, y: 10, w: 1, h: 1, radius: 4 }))
-      .toEqual({ sx: 0, sy: 10 * TILE_H })
+    expect(
+      poolCentre({ id: 'a', source: 'structure', x: 10, y: 10, w: 1, h: 1, radius: 4 }),
+    ).toEqual({ sx: 0, sy: 10 * TILE_H })
     // a 3x1 hearth pools from (11,10), one tile along, exactly where `distanceToFlame` measures
-    expect(poolCentre({ id: 'b', source: 'structure', x: 10, y: 10, w: 3, h: 1, radius: 3 }))
-      .toEqual({ sx: TILE_W / 2, sy: 10.5 * TILE_H })
+    expect(
+      poolCentre({ id: 'b', source: 'structure', x: 10, y: 10, w: 3, h: 1, radius: 3 }),
+    ).toEqual({ sx: TILE_W / 2, sy: 10.5 * TILE_H })
   })
 })
 
@@ -114,8 +144,11 @@ describe('what this pass must not have broken', () => {
   const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
   // The guard below first read the whole file and tripped on its own explanation of why it does
   // not touch the bake, so everything asserted as ABSENT reads comment-stripped source.
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-    .filter((l) => !l.trim().startsWith('//')).join('\n')
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n')
 
   it('★ does not touch the ground bake: it draws on groundDecal, never on `ground`', () => {
     // The bake is chunked and `MAX_TEXTURE_SIZE` 2048 is crossed between ring one and ring two.
@@ -126,7 +159,7 @@ describe('what this pass must not have broken', () => {
     expect(code).not.toMatch(/bake|chunk/i)
   })
 
-  it('★ writes no zIndex and joins no sorted layer, so the painter\'s order is untouched', () => {
+  it("★ writes no zIndex and joins no sorted layer, so the painter's order is untouched", () => {
     expect(code).not.toMatch(/\.zIndex\s*=(?!=)/)
     expect(code).not.toContain('sortableChildren')
     expect(code).not.toContain('layers.entities')
@@ -150,7 +183,7 @@ describe('what this pass must not have broken', () => {
   // Pixi's `GCSystem` unloads any resource with `autoGarbageCollect` that goes untouched for
   // `maxUnusedTime`, and an unloaded source is a null one that takes the whole stage down. A
   // source-text guard is weak, so these say exactly which line they stand on.
-  it('★ pins BOTH the texture and the sprites against pixi\'s GC', () => {
+  it("★ pins BOTH the texture and the sprites against pixi's GC", () => {
     // Two resources, two defaults, one crash: `TextureSource` and `ViewContainer` are both
     // GC-managed, and a pool at `visible = false` through a day is untouched on both counts.
     expect(src).toContain('tex.source.autoGarbageCollect = false')
@@ -165,9 +198,9 @@ describe('what this pass must not have broken', () => {
     // Every destroy on a SPRITE must spare the shared texture. `root` and the throwaway Graphics
     // own nothing shared, so they are named exemptions rather than a blanket skip.
     for (const m of code.match(/(\w+)\.destroy\(([^)]*)\)/g) ?? []) {
-      if (m.startsWith('root.destroy') || m.startsWith('g.destroy') || m.startsWith('tex.destroy')) continue
-      expect(m, `${m} could destroy the texture every sprite shares`)
-        .toContain('texture: false')
+      if (m.startsWith('root.destroy') || m.startsWith('g.destroy') || m.startsWith('tex.destroy'))
+        continue
+      expect(m, `${m} could destroy the texture every sprite shares`).toContain('texture: false')
     }
   })
 })

@@ -33,7 +33,12 @@ const tamarPersonality: PersonalityDoc = {
 export const quietMeadowPacket: PerceptionPacket = {
   time: simTimeFromTick(10 * 60),
   self: {
-    body: { needs: { hunger: 62, energy: 78, warmth: 71, social: 55 }, hp: 100, injuries: [], ill: false },
+    body: {
+      needs: { hunger: 62, energy: 78, warmth: 71, social: 55 },
+      hp: 100,
+      injuries: [],
+      ill: false,
+    },
     x: 12,
     y: 9,
     asleep: false,
@@ -51,7 +56,12 @@ export const quietMeadowPacket: PerceptionPacket = {
 export const conversationPacket: PerceptionPacket = {
   time: simTimeFromTick(14 * 60),
   self: {
-    body: { needs: { hunger: 48, energy: 60, warmth: 66, social: 40 }, hp: 100, injuries: [], ill: false },
+    body: {
+      needs: { hunger: 48, energy: 60, warmth: 66, social: 40 },
+      hp: 100,
+      injuries: [],
+      ill: false,
+    },
     x: 15,
     y: 10,
     asleep: false,
@@ -61,7 +71,17 @@ export const conversationPacket: PerceptionPacket = {
   },
   weather: { kind: 'cloudy', temperatureC: 14 },
   visible: {
-    agents: [{ id: 'nadia', name: 'Nadia', x: 16, y: 10, activityVerb: null, collapsed: false, asleep: false }],
+    agents: [
+      {
+        id: 'nadia',
+        name: 'Nadia',
+        x: 16,
+        y: 10,
+        activityVerb: null,
+        collapsed: false,
+        asleep: false,
+      },
+    ],
     structures: [],
     items: [],
     crops: [],
@@ -71,7 +91,12 @@ export const conversationPacket: PerceptionPacket = {
   feltEvents: ['rain_started'],
 }
 
-function makeMemory(id: number, text: string, importance: number, people: string[] = []): ScoredMemory {
+function makeMemory(
+  id: number,
+  text: string,
+  importance: number,
+  people: string[] = [],
+): ScoredMemory {
   return {
     id,
     agentId: 'tamar',
@@ -102,7 +127,10 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
     identity: tamarIdentity,
     personality: {
       doc: tamarPersonality,
-      autobiography: ['I left the mill after the flood and found the valley.', 'I have kept bees since my first spring here.'],
+      autobiography: [
+        'I left the mill after the flood and found the valley.',
+        'I have kept bees since my first spring here.',
+      ],
     },
     scene: {
       ledgers: [{ name: 'Nadia', doc: 'The basket weaver; she shares her bread with me. [mem#2]' }],

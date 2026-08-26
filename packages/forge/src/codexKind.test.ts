@@ -50,7 +50,10 @@ describe('codex kind column migration', () => {
     raw.close()
 
     const db = openForgeDb(path)
-    const rows = db.prepare('SELECT id, kind FROM assets ORDER BY seq').all() as Array<{ id: string; kind: string | null }>
+    const rows = db.prepare('SELECT id, kind FROM assets ORDER BY seq').all() as Array<{
+      id: string
+      kind: string | null
+    }>
     expect(rows).toEqual([
       { id: 'a1', kind: 'hut' },
       { id: 'a2', kind: null },
@@ -63,12 +66,25 @@ describe('codex kind column migration', () => {
     const db1 = openForgeDb(path)
     const codex1 = new AssetCodex(db1)
     // a post-migration row with a colon in desc but NO kind must stay null — backfill is migration-only
-    const rec = codex1.register({ class: 'building', desc: 'barn: wide roof', footprint: { w: 1, h: 1 }, png, widthPx: 8, heightPx: 8, status: 'ready', score: 8, attempts: 1, costUsd: 0 })
+    const rec = codex1.register({
+      class: 'building',
+      desc: 'barn: wide roof',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 8,
+      heightPx: 8,
+      status: 'ready',
+      score: 8,
+      attempts: 1,
+      costUsd: 0,
+    })
     expect(rec.kind).toBeNull()
     db1.close()
 
     const db2 = openForgeDb(path)
-    const kind = (db2.prepare('SELECT kind FROM assets WHERE id = ?').get(rec.id) as { kind: string | null }).kind
+    const kind = (
+      db2.prepare('SELECT kind FROM assets WHERE id = ?').get(rec.id) as { kind: string | null }
+    ).kind
     expect(kind).toBeNull()
     db2.close()
   })
@@ -80,11 +96,40 @@ describe('codex kind column migration', () => {
     db0.close()
     const db = openForgeDb(path) // reopen migrates
     const codex = new AssetCodex(db)
-    const meta = JSON.stringify({ version: 'v4-hires-building', kind: 'shed', footprint: { w: 1, h: 1 }, cell: { w: 10, h: 12, feetX: 5, feetY: 11 } })
-    const rec = codex.register({ class: 'building', desc: 'shed: tool shed', kind: 'shed', meta, footprint: { w: 1, h: 1 }, png, widthPx: 8, heightPx: 8, status: 'ready', score: 8, attempts: 1, costUsd: 0 })
+    const meta = JSON.stringify({
+      version: 'v4-hires-building',
+      kind: 'shed',
+      footprint: { w: 1, h: 1 },
+      cell: { w: 10, h: 12, feetX: 5, feetY: 11 },
+    })
+    const rec = codex.register({
+      class: 'building',
+      desc: 'shed: tool shed',
+      kind: 'shed',
+      meta,
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 8,
+      heightPx: 8,
+      status: 'ready',
+      score: 8,
+      attempts: 1,
+      costUsd: 0,
+    })
     expect(rec.meta).toBe(meta)
     expect(codex.get(rec.id)?.record.meta).toBe(meta)
-    const plain = codex.register({ class: 'building', desc: 'barn: plain', footprint: { w: 1, h: 1 }, png, widthPx: 8, heightPx: 8, status: 'ready', score: 8, attempts: 1, costUsd: 0 })
+    const plain = codex.register({
+      class: 'building',
+      desc: 'barn: plain',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 8,
+      heightPx: 8,
+      status: 'ready',
+      score: 8,
+      attempts: 1,
+      costUsd: 0,
+    })
     expect(plain.meta).toBeNull()
     db.close()
   })
@@ -92,7 +137,19 @@ describe('codex kind column migration', () => {
   it('register accepts an optional kind and round-trips it through records', () => {
     const db = openForgeDb(tempDb())
     const codex = new AssetCodex(db)
-    const rec = codex.register({ class: 'building', desc: 'hut: timber dwelling', kind: 'hut', footprint: { w: 2, h: 2 }, png, widthPx: 64, heightPx: 64, status: 'ready', score: 9, attempts: 1, costUsd: 0 })
+    const rec = codex.register({
+      class: 'building',
+      desc: 'hut: timber dwelling',
+      kind: 'hut',
+      footprint: { w: 2, h: 2 },
+      png,
+      widthPx: 64,
+      heightPx: 64,
+      status: 'ready',
+      score: 9,
+      attempts: 1,
+      costUsd: 0,
+    })
     expect(rec.kind).toBe('hut')
     expect(codex.get(rec.id)?.record.kind).toBe('hut')
     expect(codex.listSince(0).at(-1)?.kind).toBe('hut')

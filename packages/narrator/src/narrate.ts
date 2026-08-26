@@ -3,7 +3,11 @@ import type { WorldState } from '@sj/engine'
 import { renderChapter, renderEra } from './chronicle.js'
 import { detectFirsts } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
-import { detectSemanticFirsts, type SemanticPassDeps, type TranscriptRecord } from './semanticFirsts.js'
+import {
+  detectSemanticFirsts,
+  type SemanticPassDeps,
+  type TranscriptRecord,
+} from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
@@ -29,7 +33,9 @@ export class ChapterRenderError extends Error {
     readonly renderCause: unknown,
     readonly night: { semanticRan: boolean; milestones: Milestone[] },
   ) {
-    super(renderCause instanceof Error ? renderCause.message : String(renderCause), { cause: renderCause })
+    super(renderCause instanceof Error ? renderCause.message : String(renderCause), {
+      cause: renderCause,
+    })
     this.name = 'ChapterRenderError'
   }
 }
@@ -86,7 +92,12 @@ export async function narrateDay(deps: {
   // The tier-2.5 pass, run after the chapter is written. Absent, the night has no semantic
   // firsts and costs nothing — the detector is never called speculatively.
   semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
-}): Promise<{ chapter: ChapterRow; heat: HeatScores[]; milestones: Milestone[]; semanticRan: boolean }> {
+}): Promise<{
+  chapter: ChapterRow
+  heat: HeatScores[]
+  milestones: Milestone[]
+  semanticRan: boolean
+}> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
   const day = Math.floor(events[0]!.tick / MINUTES_PER_DAY)
@@ -111,13 +122,14 @@ export async function narrateDay(deps: {
     rulebookCount: deps.rulebookCount,
     ...(structures === undefined ? {} : { structureKind: (id: string) => structures[id]?.kind }),
   })
-  const tier2 = deps.world === undefined
-    ? []
-    : detectTier2(events, {
-        seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
-        config: deps.world.config,
-        state: deps.world.state,
-      })
+  const tier2 =
+    deps.world === undefined
+      ? []
+      : detectTier2(events, {
+          seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
+          config: deps.world.config,
+          state: deps.world.state,
+        })
   const milestones = [...tier1, ...tier2]
   const privateThoughts = deps.privateCounts.thoughts + deps.privateCounts.journals
 
@@ -155,7 +167,14 @@ export async function narrateDay(deps: {
   let chapter: ChapterRow | undefined
   let renderFailure: unknown
   try {
-    chapter = await renderChapter({ store, llm: deps.llm, day, scenes, typeCounts, alert: deps.alert })
+    chapter = await renderChapter({
+      store,
+      llm: deps.llm,
+      day,
+      scenes,
+      typeCounts,
+      alert: deps.alert,
+    })
     chapter.sceneIds.forEach((sceneId, i) => store.insertHeat(sceneId, heats[i]!))
   } catch (err) {
     renderFailure = err
@@ -171,7 +190,8 @@ export async function narrateDay(deps: {
     milestones.push(...semantic)
   }
 
-  if (renderFailure !== undefined) throw new ChapterRenderError(renderFailure, { semanticRan, milestones })
+  if (renderFailure !== undefined)
+    throw new ChapterRenderError(renderFailure, { semanticRan, milestones })
   const rendered = chapter!
 
   if (day % 7 === 0) {
@@ -179,7 +199,9 @@ export async function narrateDay(deps: {
       const { foundingSceneIndex, ...rest } = inst
       const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
       if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
-        deps.alert?.(`unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`)
+        deps.alert?.(
+          `unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`,
+        )
         continue
       }
       store.insertInstitution({ ...rest, foundingSceneId })
