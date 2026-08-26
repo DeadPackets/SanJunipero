@@ -1,0 +1,109 @@
+# The gate: the suite, both typechecks, and the viewer build. Spec §11 asks for the golden-replay
+# test in CI; it is not a separate job because `replayFromGenesis` is asserted from inside the
+# ordinary suite (packages/engine/src/farBank.test.ts, g11.test.ts, buildSeam.test.ts), so running
+# the suite runs it. A separate job would run the same assertions twice and drift.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  # A branch that gets three pushes in a minute should test the last one, not all three. The
+  # suite is the long pole here and queued duplicates are what make a slow CI a bypassed CI.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # ★ CI MUST NOT BE ABLE TO SPEND. No OPENROUTER_API_KEY and no IMAGE_PROVIDER_KEY are set
+  # anywhere in this file, and that is the control: `LlmClient` and `liveWorld` read the key from
+  # the environment, so with none present there is no path from a green build to a bill. Do not
+  # add either as a repository secret to "make a test pass" — a test that needs a live provider
+  # does not belong in the gate.
+  CI: "true"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    # The suite is ~2 min on a quiet machine and the cap below deliberately runs it slower than
+    # that. 30 leaves room for a cold pnpm store and a bad runner without ever hanging an hour.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      # better-sqlite3 and sharp resolve prebuilds for linux/x64; this stays a download, not a
+      # node-gyp compile, which is why no build-essential step is needed here.
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      # ★ FIRST, BECAUSE IT IS THE FAST FAILURE. Both halves: `tsc -b` over the eight packages and
+      # `tsc -p packages/agents/tsconfig.scripts.json`, which is a separate project and has been
+      # broken on its own before. `pnpm typecheck` runs the pair.
+      - name: typecheck
+        run: pnpm typecheck
+
+      # ★ THE 404 THIS CATCHES IS THE ONE THAT HAS BITTEN TWICE. `@sj/web` emits to `client/`
+      # (vite.config.ts `build.assetsDir`) and the gateway serves that directory by the name in
+      # `CLIENT_ASSET_DIR`. If the two drift, the built viewer 404s on its own scripts and the
+      # page is blank with a green suite. Building here proves the build; the assertion below
+      # proves the two names still agree.
+      - name: build the viewer
+        run: pnpm --filter @sj/web build
+
+      - name: the built client is where the server looks for it
+        run: |
+          test -f packages/web/dist/index.html
+          test -d packages/web/dist/client
+          grep -q '/client/' packages/web/dist/index.html
+
+      # ★ THE TIMEOUTS, AND WHY THESE NUMBERS.
+      #
+      # The suite is load-sensitive rather than slow. Measured on the development machine: the
+      # whole suite is 123 s wall, but `bonds.test.ts`'s linearity assertion came out at a ratio
+      # of 10.13 against a `< 10` bound under a parallel run and at 352 ms — comfortably inside
+      # it — with the machine quiet. `g2.test.ts`, `devBridge.test.ts`, the lamplighter test and
+      # the two town-determinism twins have all timed out under load while passing standalone in
+      # a tenth of their budget. A green build has to mean the code is right, not that the runner
+      # was idle, so both dimensions are addressed and they need different instruments:
+      #
+      #   --testTimeout=30000   6x vitest's 5 s default. Fixes the TIMEOUT-shaped flakes, where a
+      #   --hookTimeout=30000   test is correct and merely descheduled. Costs nothing on a green
+      #                         run — a passing test does not consume its budget.
+      #
+      #   --maxWorkers=2        Fixes what a timeout CANNOT. `bonds.test.ts` asserts a RATIO of
+      #                         two measured durations; no timeout raise helps it, because under
+      #                         contention both numbers move and the ratio is what breaks. A
+      #                         GitHub runner has 4 vCPU, so capping at 2 leaves half the box idle
+      #                         and keeps a timing assertion measuring the code instead of its
+      #                         neighbours. This trades wall-clock for a signal worth reading.
+      #
+      # If this step starts flaking anyway, raise `--testTimeout` first and lower `--maxWorkers`
+      # to 1. Do not add `--retry`: a retried flake is a flake nobody fixes.
+      #
+      # ★ `pnpm exec vitest run`, NOT `pnpm test -- …`, AND THE DIFFERENCE IS THE WHOLE STEP.
+      # `pnpm test -- --testTimeout=1 <one-file>` was measured here running all 337 files and
+      # 5 199 tests with the default 5 s timeout: pnpm silently DROPS everything after `--`, so
+      # both the flag and the file filter vanish. Written that way this step would have run in
+      # precisely the flaky configuration it exists to avoid while looking configured. The same
+      # arguments through `pnpm exec` ran 1 file and failed 2 tests on the 1 ms budget, which is
+      # the flag landing.
+      - name: test
+        run: pnpm exec vitest run --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
+
+      # The Dockerfile is part of the deliverable now, so a change that breaks the image should
+      # fail here and not on the box. Build only — nothing is pushed to any registry, and there
+      # are no registry credentials in this workflow.
+      - name: the image still builds
+        run: docker build -t san-junipero:ci .
+
+      - name: the deployment files are valid
+        run: docker compose config --quiet

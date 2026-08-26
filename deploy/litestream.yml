@@ -1,0 +1,94 @@
+# Continuous backup of the town to S3. Litestream tails each SQLite WAL and ships it, so the
+# recovery point is seconds rather than the last time somebody remembered to copy a file.
+#
+# ★ WAL IS A REQUIREMENT AND IT IS ALREADY MET. Litestream can only replicate a database in WAL
+# mode. `openDb` in packages/engine/src/db.ts runs `pragma journal_mode = WAL` on every open, and
+# every database below goes through it — the world through `openDb` directly, each mind through
+# `openAgentDb`, which wraps it. Nothing here has to set it and nothing may unset it.
+#
+# ★ WHY EACH FILE IS NAMED INSTEAD OF GLOBBED. Litestream's `dbs[].path` takes one literal path;
+# it has no wildcard. `data/minds/*.db` therefore CANNOT be expressed, and every mind is listed by
+# name. The five below are the founders (`FOUNDER_MINDS` in packages/agents/src/live/founderMinds.ts).
+# ★ A CHILD BORN IN PLAY GETS A MIND DB THAT IS NOT IN THIS FILE AND IS THEREFORE NOT BACKED UP.
+# Add a block for it, or accept that a restore returns the founders and not the generation after
+# them. This is the one gap in the backup story and it is written here rather than discovered.
+#
+# ★ ALL OF THIS IS MOOT UNLESS SJ_LIVE=1. A scripted town has no minds: `serve.ts` passes
+# `agentDbDir` only on the live path, so the default deployment has exactly one file to replicate,
+# `dev-world.db`, and the mind blocks below simply find nothing. Litestream skips a database that
+# does not exist yet and picks it up when it appears, so the same config is correct for both modes.
+
+dbs:
+  # THE WORLD. Buildings, people, the event log, the tick counter, and — because `openForgeDb`
+  # is handed this same path — the forge's asset and job tables. Losing this loses the town.
+  - path: /data/dev-world.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/dev-world
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+
+  # THE CALL LEDGER. Not the world, but the $5 anomaly stop is read off it and the cap is per
+  # TOWN, not per process — restoring a world without its ledger hands the new box a fresh $5 to
+  # spend. Back it up with the world or the stop is not the stop you think it is.
+  - path: /data/minds/_ops.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/_ops
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+
+  # THE MINDS. Memories, journals and the half-run plan each person was in the middle of.
+  # ★ These are the files whose loss does NOT announce itself as an error — see the note in
+  # deploy/README.md. Restore them together with the world or not at all.
+  - path: /data/minds/amara.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/amara
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+  - path: /data/minds/yusuf.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/yusuf
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+  - path: /data/minds/nadia.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/nadia
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+  - path: /data/minds/omar.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/omar
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
+  - path: /data/minds/salma.db
+    replicas:
+      - type: s3
+        bucket: $LITESTREAM_BUCKET
+        path: san-junipero/minds/salma
+        region: $LITESTREAM_REGION
+        endpoint: $LITESTREAM_ENDPOINT
+        retention: 168h
+        snapshot-interval: 6h
