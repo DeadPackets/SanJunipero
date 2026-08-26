@@ -15,7 +15,6 @@ export type MindConfig = {
   journalTicks: number
   dozeTicks: number
   wakeRetryTicks: number
-  dayLogTokenBudget: number
   dreamChance: number
   ambientK: number
 }
@@ -32,7 +31,6 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   journalTicks: 10,
   dozeTicks: 60,
   wakeRetryTicks: 25,
-  dayLogTokenBudget: 6000,
   dreamChance: 0.35,
   ambientK: 8,
 }
