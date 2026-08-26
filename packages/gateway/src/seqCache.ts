@@ -1,59 +1,21 @@
 import type { ServerResponse } from 'node:http'
 
-/**
- * ★ ONE WORLD, MANY STRANGERS — THE READ API COSTED FOR A CROWD.
- *
- * Every whole-history endpoint (`/api/society`, `/api/bonds`, `/api/heat`, `/api/digest`,
- * `/api/chronicle`, `/api/discoveries`, `/api/timeline/marks`) answers by reading the ENTIRE
- * event log and running `JSON.parse` on every row, synchronously, on the same thread that folds
- * the world. Written for a dev session that meant one viewer, that is correct and cheap.
- * Published to the internet it is an amplifier: a 60-byte GET buys a full scan of the town's
- * whole history, so fifty viewers cost fifty scans and one stranger in a `while true` loop
- * stalls the tick loop for everybody else.
- *
- * The answer only changes when the world does. `WorldMirror.seq()` is exactly that clock, so
- * one scan per generation is enough and every asker after the first is handed a string already
- * built. This is the difference between a demo and a stream.
- *
- * Keys are bounded, because the key includes the query string and a stranger picks that.
- */
+/** One scan per `WorldMirror` generation: otherwise a 60-byte GET buys a full log scan, and
+ *  fifty viewers cost fifty scans on the tick thread. Keys are bounded because the key includes
+ *  the query string and a stranger picks that. */
 export const MAX_KEYS = 32
 
-/**
- * ★ AND A KEY CAP IS NOT A MEMORY CAP.
- *
- * The comment above promised bounded memory and the code bounded the number of KEYS, so the real
- * ceiling was 32 × the largest body — and the largest body was `/api/bonds` at **83 704 521 B**,
- * which made the honest reading of "bounded" about 2.7 GB. Bonds now has a ceiling of its own,
- * but a key cap over unbounded bodies is not a cap and the next big route would inherit the same
- * lie.
- *
- * 4 MiB, because the four whole-history routes come to about 100 KB together on a twelve-agent
- * town and 4 MiB is two orders of headroom over that — large enough that no real viewer ever
- * meets it, small enough to be a number rather than "whatever the biggest answer happens to be".
- *
- * A single body larger than the whole budget is still admitted, after everything else has been
- * dropped for it. Refusing it would mean rebuilding it on every request, which is exactly the
- * amplification this cache exists to stop.
- *
- * ★ AND IT IS A BUDGET PER MOUNTED ROUTER, NOT PER PROCESS. Five routers build one cache each —
- * `api.ts`, `narratorApi.ts`, `bonds.ts`, `discoveries.ts`, `lineage.ts` — so the honest process
- * ceiling is 5 × MAX_BYTES over 5 × MAX_KEYS. The isolation is the point rather than an
- * oversight: `values` is one map with one eviction, so a single shared instance would let a
- * stranger walking `?fromTick=` windows on `/api/chronicle` churn out the `bonds` memo and buy
- * the most expensive build in the gateway on the next `/api/bonds`.
- */
+/** Bounded by BYTES, not key count — 4 MiB against ~100 KB of real bodies, since a key cap over
+ *  unbounded bodies is not a cap. A single body over the whole budget is still admitted, because
+ *  refusing it means rebuilding it per request. The budget is per mounted router and deliberately
+ *  not shared, so one route's churn cannot evict another's memo. */
 export const MAX_BYTES = 4 * 1024 * 1024
 
 export type SeqCache = {
   /** The body for `key` in this generation, built at most once. */
   json(key: string, build: () => unknown): string
-  /**
-   * The intermediate VALUE for `key` in this generation, built at most once — for work two
-   * routes share. `/api/chronicle` and `/api/chronicle/count` are the same scan and the same
-   * formatting; only the shape sent differs, and a badge asking for a number must not pay for
-   * the ledger twice.
-   */
+  /** The intermediate VALUE for `key` in this generation, built at most once — for work two
+   *  routes share, such as `/api/chronicle` and `/api/chronicle/count`. */
   value<T>(key: string, build: () => T): T
   /** Testing seam: how many bodies are held right now. */
   size(): number
@@ -100,9 +62,8 @@ export function makeSeqCache(
       fresh()
       if (values.has(key)) return values.get(key) as T
       const v = build()
-      // Intermediates are objects, not strings, so their bytes cannot be measured without
-      // serialising them — which is the work this map exists to avoid. Keys only, and the two
-      // callers of `value` share one key each.
+      // Intermediates are objects, so their bytes cannot be measured without serialising them —
+      // the work this map exists to avoid. Keys only.
       if (values.size >= maxKeys) values.delete(values.keys().next().value as string)
       values.set(key, v)
       return v

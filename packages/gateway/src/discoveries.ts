@@ -8,9 +8,8 @@ import { reportOnce } from './degraded.js'
 
 export type DiscoveryApiDeps = { db: Database.Database; mirror: WorldMirror }
 
-// The world's own log IS the archive: append-only, ordered, and physically unable to lose a
-// row when a rule is later reverted. Nothing here reaches the ops plane, by construction —
-// this file names none of its tables and this package does not depend on it.
+// The world's own log IS the archive: append-only, ordered, and unable to lose a row when a
+// rule is later reverted. Nothing here reaches the ops plane, by construction.
 export function readDiscoveries(
   db: Database.Database,
   nameOf: (agentId: string) => string,
@@ -26,9 +25,8 @@ export function readDiscoveries(
       recipeId: p.recipeId, name: p.name, kind: p.kind, byId: p.byId,
       by: nameOf(String(p.byId ?? '')), intent: p.intent, makes: p.makes,
     })
-    // A row a future writer shaped differently is skipped, never a 500: the observatory is a
-    // window, and a window does not break because one pane is unfinished. It does say which
-    // pane — silently short is how a schema drift stays invisible instead of degraded.
+    // A row a future writer shaped differently is skipped, never a 500 — but it must say which
+    // one, because silently short is how a schema drift stays invisible instead of degraded.
     if (parsed.success) out.push(parsed.data)
     else {
       reportOnce('discoveries.schema', () =>

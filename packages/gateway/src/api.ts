@@ -15,31 +15,16 @@ export const TALK_WINDOW_TICKS = 20   // two spoke events this close, in earshot
 export const TOP_MOMENTS = 5
 
 /**
- * ★ AN AGENT ID IS A SLUG, AND THE ROUTER HANDS IT OVER DECODED.
- *
- * `server.ts` splits the path on `/` and THEN calls `decodeURIComponent` on each segment, so a
- * `%2f` a stranger writes becomes a path separator only after routing has finished. Given a
- * world started with `agentDbDir`, `GET /api/agent/..%2f..%2fsecret/journal` reached
- * `join(agentDbDir, '../../secret.db')` — an arbitrary file on the host, opened as SQLite and
- * read out to the internet whenever it happened to carry a `journal`, `ledgers` or
- * `personality_versions` table.
- *
- * Refusing the SHAPE beats sanitising the path: every id this world mints is a slug, and
- * nothing that is not one has an answer worth giving.
+ * `server.ts` decodes each path segment AFTER splitting on `/`, so a `%2f` a stranger writes
+ * becomes a path separator only once routing has finished. Refusing the SHAPE — every id this
+ * world mints is a slug — beats sanitising the path.
  */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
 /**
- * ★ `?toTick=` DROVE AN UNBOUNDED LOOP, AND IT IS THE STRANGER'S NUMBER.
- *
- * `/api/digest` builds one entry per day between `fromTick` and `toTick` and neither was
- * checked against the world. Measured on a live town: `?toTick=1000000000` answered **4.75 MB**
- * to a 60-byte GET — 694 444 day numbers for a world seven days old, an amplification of about
- * 79 000×. Another three zeroes is the process's memory.
- *
- * Clamping into the world that exists is also the only honest answer: a town at tick 10 000 has
- * nothing to say about tick 10 000 000, so asking for it means asking for today. As a side
- * effect the cache key space collapses — every over-long window is now the same window.
+ * `/api/digest` builds one entry per day between the two ticks, and both are the stranger's
+ * number: unclamped, `?toTick=1000000000` answers 4.75 MB to a 60-byte GET. Clamping into the
+ * world that exists also collapses the cache key space — every over-long window is one window.
  */
 export function clampWindow(from: string | null, to: string | null, liveTick: number): {
   fromTick: number; toTick: number
@@ -82,36 +67,11 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const selEventsAfter = deps.db.prepare('SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq')
 
   /**
-   * ★ THE RESPONSE CACHE IS NOT ENOUGH ON ITS OWN, BECAUSE `/api/digest` LETS THE STRANGER PICK
-   * ITS KEY. `?toTick=` varies freely, so a caller who never repeats a query string misses
-   * `seqCache` every time by construction. Measured on a 182 701-event world: eight concurrent
-   * cache-missing requests fell to 13/s at a 510 ms median AND stretched the town's own 2500 ms
-   * tick to 2923-2991 ms — the world visibly ran slow for every other viewer.
-   *
-   * An earlier lane fixed the CPU by memoising the parsed log and appending to it per
-   * generation. That made the reads 338× faster and left a `SimEvent[]` that never shrinks.
-   *
-   * ★ AND A RETAINED LOG IS A LEAK WITH A VIEWER ATTACHED. Measured on this machine against a
-   * real founders town, over `/api/society` — the first endpoint to touch the array:
-   *
-   *   |  events | retained |
-   *   |---:|---:|
-   *   |  49 649 |  7.2 MB |
-   *   | 139 337 | 20.3 MB |
-   *   | 183 622 | 28.7 MB |
-   *   | 255 809 | 52.8 MB |
-   *   | 346 069 | 86.9 MB |
-   *
-   * Strictly linear in EVENTS, with no ceiling of any kind — 151 B/event early and 396 B/event
-   * marginal once `fauna_moved` (640 B payloads) dominates. Days are not the axis: this town
-   * goes quiet on day 3, and one that stays as busy as its own founding days (34.5 events/tick)
-   * passes 387 MB at sim-day 31 and 750 MB at day 100. A stream is watched for weeks.
-   *
-   * ★ SO THE LOG IS NOT KEPT. Every event is folded ONCE, into the aggregates the four routes
-   * below actually answer from, and then dropped. What is retained is a count of ANSWERS —
-   * one entry per talking pair, per 60-tick drama window, per death, per building — never a
-   * count of events. `footprint()` is that in numbers, and `apiFootprint.test.ts` ticks a world
-   * four times deeper and holds it to a ceiling.
+   * The event log is never retained — every event is folded ONCE into the aggregates below,
+   * because a kept log grows strictly linearly with events (151 B/event early, 396 B/event
+   * marginal; 28.7 MB at 183k events, no ceiling) and a stream is watched for weeks.
+   * `?toTick=` is caller-chosen, so `seqCache` misses by construction on a caller who never
+   * repeats a query string.
    */
   type Planned = { kind: string; builderId: string; plannedTick: number }
   type Spoke = { agentId: string; tick: number; x: number; y: number }
@@ -205,15 +165,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   }))
 
   /**
-   * ★ HEAT OVER A WINDOW THE VIEWER PICKED, WITHOUT KEEPING THE LOG.
-   *
-   * `/api/digest` is "what did I miss" — `fromTick = tick − missedTicks` — so its ends land
-   * anywhere, and a 60-tick drama window the range only half covers must score only the half.
-   * Rounding to whole windows would report drama from before the viewer left.
-   *
-   * Whole windows come from the running map. The at most TWO windows the range cuts are
-   * re-scored from the log, which is at most 120 ticks and hits `idx_events_tick` — bounded
-   * however old the town is.
+   * Whole windows come from the running map; the at most TWO windows a viewer-picked range cuts
+   * are re-scored from the log — at most 120 ticks, bounded however old the town is.
    */
   const selRange = deps.db.prepare(
     'SELECT seq, tick, type, payload FROM events WHERE tick BETWEEN ? AND ? ORDER BY seq')
@@ -283,9 +236,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
       'SELECT version, day, doc, edit FROM personality_versions WHERE agent_id = ? ORDER BY version'))
   })
 
-  // ★ AND THIS ONE WAS NOT BEHIND THE CACHE AT ALL. It walked the whole memo per request with
-  // the id chosen by the caller, so a stranger in a loop bought a full history scan every time.
-  // A map keyed by the id makes it the O(1) lookup it always described itself as.
+  // The id is the caller's to choose, so this must stay an O(1) map lookup — a scan per request
+  // is a full history walk a stranger can loop.
   router.route('GET', '/api/structure/:id/provenance', (_req, res, params) => {
     readFold()
     const id = params.id ?? ''
@@ -317,12 +269,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
   /**
-   * ★ THE HORIZON IS THE CEILING — see `HEAT_HORIZON_TICKS`.
-   *
-   * The running map stays whole, because `/api/digest` answers "what did I miss" over a window
-   * the viewer picks and must be exact however far back it reaches. What is SENT is the last
-   * sim-day of it, which is a body bounded by the population rather than by the town's age, and
-   * twelve times more than `pickCut` looks at.
+   * The running map stays whole — `/api/digest` must be exact however far back the viewer
+   * reaches — but what is SENT is the last sim-day, bounded by population not by the town's age.
    */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()

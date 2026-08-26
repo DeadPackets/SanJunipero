@@ -52,17 +52,8 @@ describe('heat stub', () => {
     ])
   })
 
-  /**
-   * ★ WHOSE DRAMA A FIRE IS — the ruling, as five cases.
-   *
-   * All five of these weights used to score NOTHING: the scorer wanted `payload.agentId` and
-   * none of these payloads has one, so the whole of the town's fire and harvest drama was
-   * computed and dropped on every event while `HEAT_WEIGHTS` read as if fire were the
-   * second-loudest thing after a death. The ruling and its reasons are on `scoreEvent`.
-   *
-   * MUTATION-PROVED: put the `payload.agentId ?? payload.builderId ?? null` scorer back and all
-   * five expectations below go to `[]`.
-   */
+  /** MUTATION-PROVED: put the `payload.agentId ?? payload.builderId ?? null` scorer back and all
+   *  five expectations below go to `[]`. */
   describe('★ the five weights that used to score nothing', () => {
     it('a fire is scored to the person who raised the place it is burning', () => {
       expect(score([
@@ -113,13 +104,8 @@ describe('heat stub', () => {
     })
   })
 
-  /**
-   * ★ THE ACTOR IS A ONE-EVENT MEMORY, AND IT MUST NOT LEAK PAST THE VERB'S OWN RESULTS.
-   *
-   * Nothing is emitted between `action_completed` and the first of its verb's results, so the
-   * memory is exact — but a walk that completes and a harvest three events later belong to two
-   * different people, and attributing the second to the first would be worse than not scoring it.
-   */
+  /** Nothing is emitted between `action_completed` and its verb's first result, so the one-event
+   *  memory is exact — but it must not survive past those results. */
   it('the actor does not survive an event that is not its verb’s result', () => {
     expect(score([
       ev(1, 5, 'action_completed', { agentId: 'ana', verb: 'walk' }),

@@ -2,30 +2,10 @@
 // approved building set. Deterministic (no Math.random) — same laws as the engine's
 // scripted module: policies are pure functions of perception, timeline is tick-keyed.
 //
-// ★ SCRIPTED, NOT EMERGENT — and the line matters enough to draw it here rather than leave it
-// to be inferred. Everything these five decide is written below in plain `if`s: where to walk,
-// when to go to bed, what to raise. They are demonstration puppets. Whether a MIND chooses any
-// of it is C8's rehearsal to answer, and nothing measured in this file is evidence about that.
-// What IS real is the seam underneath — every decision here goes through `submitIntent` and
-// the engine's own verbs under the engine's own refusals, so a thing that works for a puppet
-// works for a mind, and a thing that is refused here is refused there.
-//
-// ★ AND HOW A TIRED BODY DECIDES, BECAUSE IT USED TO GET THIS WRONG AND THE WHOLE CAST WENT
-// DOWN IN THE STREET. Two rules, both of them the live mind runtime's, restated for a puppet:
-//
-//   A. A BODY DECIDES ONLY WHEN ITS HANDS ARE FREE. `agentRuntime.#submitPendingIfIdle` holds a
-//      mind's intent until `self.activity` is null and the turn prose tells it so in words
-//      ("your hands are already busy … it will finish before anything else can begin"). This
-//      script re-decided and re-SUBMITTED every tick instead, and `submitIntent` refuses every
-//      intent while an activity is running. So the decision to rest was made, refused
-//      `already busy with walk`, and thrown on the floor — measured at 166 consecutive times
-//      per founder on the first night, until the collapse itself broke the lock.
-//   B. A JOURNEY IS COSTED BEFORE IT IS BEGUN, and a body that can no longer afford to walk
-//      anywhere lies down where it is. Nothing priced a walk before, so a founder set out on a
-//      342-tick leg with 30 energy in the legs and fell over 200 ticks short of the door.
-//
-// Neither is a dial. `walkEnergyCost` is the world's own path, the world's own tiles-per-tick
-// and the world's own decay, multiplied.
+// A body decides only when its hands are free — `submitIntent` refuses every intent while
+// `activity` is set, so re-deciding each tick throws the decision away.
+// A journey is costed before it is begun (`walkEnergyCost`); a body that cannot afford to walk
+// anywhere lies down where it is.
 import { doorFrontTile, T_PATH, T_ROAD, type SimConfig } from '@sj/shared'
 import {
   BRIDGE_KIND, awakeEnergyDecay, bridgeAt, buildSiteOf, buildTicks, claimInWorld,
@@ -72,37 +52,19 @@ const SCRIPTED_STRUCTURES: readonly DevStructure[] = TOWN_STRUCTURES.map((s) => 
   ...s, owner: null, facing: 'sw' as const, flammable: s.kind !== 'standing_stone',
 }))
 
-/** 'scripted' keeps the frozen G6 fixture set; 'showcase' serves the town the roads were drawn
- *  for. `rings` only means anything to the showcase — the scripted fixture is frozen by the
- *  gate hashes and has no grammar to grow. */
+/** 'scripted' keeps the frozen fixture set; 'showcase' serves the town the roads were drawn
+ *  for. `rings` only means anything to the showcase — the fixture has no grammar to grow. */
 export function townStructuresFor(map: DevMapKind, rings?: number): readonly DevStructure[] {
   return map === 'showcase' ? devTown(undefined, rings).structures : SCRIPTED_STRUCTURES
 }
 
 // ── WHAT THE BUILDINGS HOLD ────────────────────────────────────────────────────────────────
-//
-// The dev world stored ZERO items in ANY structure, so the room card's holdings grid, its
-// icons, its cap and its "and N more" line had never once rendered against data. This is a
-// demo town's larder — DEV FIXTURE DATA (P20), like the founders themselves — and it is off
-// unless asked for, so every landed gate folds exactly the world it always did.
 
 export type DevHolding = { id: string; kind: string; qty: number; structureId: string; owner: string | null }
 
 /**
- * Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
- * can actually see.
- *
- * ★ `wood`, NOT `timber` — AND THIS IS WHY A LIVE TOWN COULD NOT BUILD. These rows were chosen
- * for the art library, which draws a stack of planks under the name `timber`. Nothing in the
- * world eats `timber`: a house is `{ wood: 10 }`, a bridge `{ wood: 6 }`, a plank `{ wood: 1 }`.
- * So the town's whole building material was a kind with no recipe behind it, and a mind that
- * reasoned its way to needing walls could carry fifteen of it to a plot and be refused.
- * `genesis/world.ts` wrote this rule down for its own storehouse and the showcase town — the one
- * the stream actually serves — never followed it.
- *
- * 30 is three houses at the recipe's ten, plus the shed's four. At `DEV_HOUSE_TICKS` that is
- * about half an hour of watchable building, and then the store is out and the forest has to
- * start mattering. It is a founding store, not a supply: nothing refills it.
+ * Past the card's eight-row cap on purpose, so the "and N more" line is a thing a viewer can
+ * see. `wood`, NOT `timber` — nothing in the world eats `timber`; a house is `{ wood: 10 }`.
  */
 const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['wood', 30], ['stone', 11],
@@ -112,35 +74,21 @@ const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['wood', 4],
 ]
 /**
- * A home holds a household's things, not a warehouse's — four kinds and few of each.
- *
- * ★ AND WOOD IS ONE OF THEM, BECAUSE THE STOREHOUSE'S WOOD IS INVISIBLE IN PRACTICE.
- * `composePerception` shows a building's shelves only to somebody INSIDE it or standing against
- * its wall — `indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors`. Every
- * founder spawns at their own door and goes in at their own door, so nobody is ever adjacent to
- * the public store and thirty planks might as well not be there. The bread on a household shelf
- * is the one road live minds have actually been observed to walk; the wood goes on the same shelf.
- *
- * ★ AND THE QUANTITY IS A HOUSE, BECAUSE ANYTHING LESS IS NOT A BUILDING. A house is `{ wood: 10 }`;
- * four buys a lamp post and a lit hearth and no roof at all. Eleven buildings already stand here on
- * tick 0, so the only thing a founding day can mean in this town is **the ability to add one more**
- * — and a household that cannot afford a single wall has not been given that. It is a founding
- * store and nothing refills it: spend it and the forest has to start mattering.
+ * `composePerception` shows a building's shelves only to somebody inside it or standing against
+ * its wall, so the public store's wood might as well not be there. Ten wood is one house.
  */
 const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['bread', 2], ['waterskin', 1], ['herb_bundle', 3], ['wood', 10],
 ]
 
-/** A refuge holds fuel and a blanket, and nothing that belongs to anybody. The cabin became an
- *  enterable room when it got its interior, and the guard below asks every room to hold
- *  something so none reads as empty by accident. */
+/** A refuge holds fuel and a blanket. The guard below asks every room to hold something, so
+ *  none reads as empty by accident. */
 const CABIN_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['wood', 6], ['cloth', 2],
 ]
 
-/** A household's larder rather than one family's: the same three kinds a house holds, in the
- *  quantities three or four people get through — and a house's worth of wood, on the same
- *  reasoning as HOUSE_STOCK above: a dwelling that cannot afford one wall is not a founding. */
+/** A household's larder rather than one family's, plus a house's worth of wood on the same
+ *  reasoning as HOUSE_STOCK. */
 const SHARED_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['bread', 6], ['waterskin', 3], ['herb_bundle', 5], ['wood', 10],
 ]
@@ -151,9 +99,8 @@ const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]
 }
 
 /**
- * Pure and deterministic: same structures in, byte-equal holdings out. Ids carry the kind
- * rather than a number, because `fold` advances the world's entity counter off any id that
- * ends in one and a fixture must never move the counter a minted id reads.
+ * Pure and deterministic. Ids carry the kind rather than a number, because `fold` advances the
+ * world's entity counter off any id that ends in one.
  */
 export function devHoldings(structures: readonly DevStructure[]): DevHolding[] {
   const out: DevHolding[] = []
@@ -168,15 +115,11 @@ export function devHoldings(structures: readonly DevStructure[]): DevHolding[] {
 // The one dwelling in the fixture town — where a tired founder goes when interiors are on.
 export const FOUNDERS_HOME_ID = 'structure_house'
 // How tired you have to be to want your own bed. WHEN to set out is a different question and
-// the walk answers it — see `homeIntent`. The old note here said "measured over 5500 dev ticks,
-// no founder ever sleeps or collapses out of doors", and it was true of the 64×64 FIXTURE it
-// was taken on. On the showcase town all five were on the ground by Day 0 17:02.
+// the walk answers it — see `homeIntent`.
 export const GO_HOME_BELOW = 25
 export const LEAVE_HOME_ABOVE = 80
-// RE-MEASURED (showcase, rings=3, 4320 ticks, interiors on): the five first go indoors at ticks
-// 814 / 827 / 853 / 866 / 970 and make 21 indoor trips over three sim days. Zero collapses,
-// zero afflictions, zero deaths, every one of them on 100 hp at the end. Start just under the
-// earliest of those and the walk home is the first thing a viewer sees.
+// Just under the earliest tick the five first go indoors (814 on the showcase at rings=3), so
+// the walk home is the first thing a viewer sees.
 export const DEV_FAST_FORWARD_FOR_INTERIORS = 810
 
 export const NEED_TOPUP_BELOW = 40
@@ -191,15 +134,9 @@ const SLEEP: Intent = { verb: 'sleep', params: {} }
 export const PATROL_SLEEP_BELOW = 20
 
 /**
- * ★ WHAT A WALK COSTS THIS BODY, out of the world's own numbers and nothing else: the real
- * path the legs would take, the tiles-per-tick the world charges, and `awakeEnergyDecay`.
- * `null` when there is no path at all.
- *
- * ★ PRICED AT THE TIRED RATE, ALWAYS, and this is the part that is easy to get wrong.
- * `ticksPerTile` DOUBLES the moment any need drops under `debuffThreshold`, so a body fresh
- * enough to set out is charged single rate for a journey it will finish at double — which
- * under-prices exactly the journeys that matter, the long ones taken late. Both of the config's
- * own two numbers exist; the walk is quoted at the worse of them.
+ * What a walk costs this body; `null` when there is no path. Priced at the TIRED rate always —
+ * `ticksPerTile` doubles once a need drops under `debuffThreshold`, which would otherwise
+ * under-price exactly the journeys that matter, the long ones taken late.
  */
 export function walkEnergyCost(
   state: WorldState, config: SimConfig, agentId: string, to: { x: number; y: number },
@@ -225,9 +162,8 @@ export function arrivesStanding(
   return a.needs.energy - cost > config.needs.collapseThreshold
 }
 
-/** What `ticks` of standing up and working costs a body. The same law as `walkEnergyCost`,
- *  asked of work rather than of walking: a house is 240 ticks of swinging a hammer and the
- *  body is charged for every one of them. */
+/** What `ticks` of standing up and working costs a body — the same law as `walkEnergyCost`,
+ *  asked of work rather than of walking. */
 export function workEnergyCost(state: WorldState, config: SimConfig, agentId: string, ticks: number): number | null {
   const a = state.agents[agentId]
   return a === undefined ? null : ticks * awakeEnergyDecay(config, a)
@@ -235,32 +171,16 @@ export function workEnergyCost(state: WorldState, config: SimConfig, agentId: st
 
 // ── THE MASON ──────────────────────────────────────────────────────────────────────────────
 //
-// ★ WHAT IS SCRIPTED HERE, AND WHAT IS EMPHATICALLY NOT.
-//
-// SCRIPTED: the DECISION to build. A founder with hands free and energy to spare raises a
-// house, every time, because a demonstration surface has to demonstrate. Whether a MIND would
-// choose to build is the open question C8's rehearsal exists to answer, and nothing this
-// policy does is evidence about it. Do not quote a house count from the dev world as emergence.
-//
-// NOT SCRIPTED, and the whole reason this exists: WHERE the house goes. Nobody in this file
-// names a coordinate for a roof and nobody CAN — in a town, `build` validates against
-// `PlottedBuildParams`, a strict Zod object of `{ kind }` with no x and no y in it, and the
-// site is `claimInWorld`'s answer: a function of the square, everything standing and the
-// recipe's mass, and of nothing the asker said. This is the identical seam `townGrowth.test.ts`
-// and `farBank.test.ts` prove on engine fixtures, reached for the first time from the running
-// app. The claim seam made naming a coordinate unrepresentable; this does not smuggle one back.
-//
-// The only thing the policy computes is where to STAND: `claim.door`, the tile on the street
-// the new frontage will face, which is the tile the builder has to be on to begin.
+// Nobody here names a coordinate for a roof and nobody CAN: in a town `build` validates against
+// `PlottedBuildParams`, a strict `{ kind }` with no x and no y, and the site is `claimInWorld`'s
+// answer. The only thing the policy computes is where to STAND — `claim.door`.
 
 /** The one thing the dev masons raise. A dwelling, so the town it grows is a town of homes. */
 export const MASON_KIND = 'house'
 /** The mass of it. `claimInWorld` answers for a rectangle, not for a kind. */
 const MASON_NEED = { along: 2, deep: 2 }
-/** SCRIPTED SUPPLY, said out loud — the same device as the need top-ups above and the same
- *  device the two engine proofs use. This is a demo town with no economy in it, so a mason out
- *  of timber is handed more. It changes how OFTEN a house goes up and nothing whatever about
- *  WHERE: the site is settled before `footprintRefusal` ever looks at materials. */
+/** Scripted supply: a demo town with no economy, so a mason out of wood is handed more. It
+ *  changes how OFTEN a house goes up, never WHERE — the site is settled first. */
 export const MASON_WOOD_KIND = 'wood'
 
 export function heldWood(state: WorldState, agentId: string): number {
@@ -282,20 +202,15 @@ export function masonErrandCost(
 }
 
 /** Stand at the ground the town keeps, then raise a roof on it. `null` when the town has
- *  nowhere left for a house of this mass, or when this body cannot pay for the errand.
- *
- *  `lendHands` OFF is the landed policy exactly. It is off by default because of what the run
- *  measures, not because of what it shows: see `jointBuild` on `FoundersOpts`. */
+ *  nowhere left, or when this body cannot pay for the errand. `lendHands` is off by default —
+ *  see `jointBuild` on `FoundersOpts`. */
 export function masonIntent(
   state: WorldState, config: SimConfig, agentId: string, lendHands = false,
 ): Intent | null {
   const a = state.agents[agentId]
   if (a === undefined || a.insideId !== undefined) return null
-  // ★ HANDS ALREADY AT SOMEBODY'S WALLS LEND THEM, AND THIS IS NOT A COORDINATE EITHER.
-  // Two masons sent to the same plot arrive a few ticks apart; the loser used to be told the
-  // ground was taken and walk to the next plot, so a town of five raised five houses one pair
-  // of hands at a time. The ENGINE decides which walls — `buildSiteOf` answers `resume` from
-  // where this body is standing — and the ask is still `{kind}` with no x and no y in it.
+  // The ENGINE decides which walls — `buildSiteOf` answers `resume` from where this body is
+  // standing — and the ask is still `{kind}` with no x and no y in it.
   const join = lendHands ? buildSiteOf(state, config, agentId, { kind: MASON_KIND }).resume : null
   if (join !== null) {
     // Only the work that is LEFT: a joiner has no walk to pay for and no fresh house to raise.
@@ -307,12 +222,8 @@ export function masonIntent(
   const claim = claimInWorld(state, MASON_NEED)
   if (claim === null) return null
   const errand = masonErrandCost(state, config, agentId, claim)
-  // ★ AND THE RESERVE FOR WORK IS BEDTIME, NOT THE FLOOR. Going home is the last thing a body
-  // does, so `arrivesStanding` rightly measures it against the collapse threshold. Taking on a
-  // day's work is a CHOICE, and a body does not choose an errand it will finish face-down.
-  // Measured with the floor as the bar: four masons finished a roof, walked home on the last of
-  // it, and went down on the tick they lay in their own bed at energy 4.9. Arriving home merely
-  // ready for bed is the same sentence the rest of this policy already speaks.
+  // The reserve for taking on WORK is bedtime, not the collapse floor: a body does not choose
+  // an errand it will finish face-down.
   if (errand === null || a.needs.energy - errand <= GO_HOME_BELOW) return null
   return isAdjacentToRect(a.x, a.y, claim.site)
     ? { verb: 'build', params: { kind: MASON_KIND } }   // ★ {kind} ONLY. No x. No y.
@@ -321,18 +232,8 @@ export function masonIntent(
 
 // ── THE BRIDGEWRIGHT ───────────────────────────────────────────────────────────────────────
 //
-// ★ THIS ONE IS HANDED ITS COORDINATE, AND THAT IS THE HONEST DESCRIPTION OF IT.
-//
 // A bridge is the one kind the verb still takes an x and a y for, because the WATER decides
-// where a deck can stand and no town can claim a plot on it (`isPlottedKind`). And far-bank's
-// C-1 stands untouched: nothing gives a MIND a reason to bridge while the near bank has room
-// for hundreds. So this is a demonstration puppet walking to a crossing somebody else found —
-// exactly what `farBank.test.ts` does with `DECK`, said out loud in the same words.
-//
-// What is NOT scripted is whether the crossing is real. The site comes from `showcaseDeck`,
-// which is derived from the ford the map lays, and `devBridge.test.ts` asks the ENGINE — every
-// water tile in the channel, through `buildSiteOf` — which sites it accepts. Take the ford
-// away and the sweep finds nothing, the walk finds no path to the spit, and no deck stands.
+// where a deck can stand and no town can claim a plot on it (`isPlottedKind`).
 
 /** The first founder is the wright: with the same cast in the same order, deterministically. */
 export const bridgewrightOf = (cast: readonly FounderDef[]): string | null => cast[0]?.id ?? null
@@ -358,34 +259,21 @@ export function bridgewrightIntent(
 
 // ── THE LAMPLIGHTER ────────────────────────────────────────────────────────────────────────
 //
-// ★ ANOTHER DEMONSTRATION PUPPET, AND THE SAME HONEST LABEL THE BRIDGEWRIGHT WEARS. Nothing
-// here is evidence that a MIND wants a lit street; it is evidence that the seam works, because
-// every step of it goes through `submitIntent` under the engine's own refusals. It exists
-// because a viewer opening the stream at midnight should see the thing the town can now do.
-//
-// What it does NOT do is choose the ground for you: `lamp_post` is `sited`, so the sites come
-// off the town's own street ring — the door tiles of the buildings already standing, stepped
-// one tile off the way, because a post in the road would close the road.
+// `lamp_post` is `sited`, so the sites come off the town's own street ring — the door tiles of
+// the buildings already standing, stepped one tile off the way: a post in the road closes it.
 
 export const LAMP_KIND = 'lamp_post'
 
 export type LampSite = { x: number; y: number; stand: { x: number; y: number } }
 
 /** How far off a door the search will walk to find ground that is not the way itself. Three
- *  tiles, because the grammar's streets are two wide with a shoulder and a lamp beyond that is
- *  not a street lamp any more. */
+ *  tiles: the grammar's streets are two wide with a shoulder. */
 export const LAMP_VERGE_REACH = 3
 
 /**
- * Where a town's lamps go: the nearest patch of NOT-STREET beside each building's own door,
- * nearest the square first, so a town of any size lights its centre before its edges.
- *
- * ★ IT HAS TO SEARCH, and that surprised this lane. The obvious rule — one step off the door —
- * returned NOTHING on the showcase town: the grammar paves a wide street ring, so all four
- * neighbours of every door tile are more road. `roadBlockRefusal` would have refused every one
- * of them, correctly, and a lamplighter that walks to a refused site all night is arm B in a
- * new costume. So the site is the first passable non-street tile within `LAMP_VERGE_REACH`,
- * and `stand` is where a body puts its feet to raise it. Pure and deterministic.
+ * The first passable non-street tile within `LAMP_VERGE_REACH` of each door, nearest the square
+ * first. One step off the door finds nothing — the grammar paves a wide street ring, so all
+ * four neighbours of a door tile are more road, and `roadBlockRefusal` would refuse each one.
  */
 export function lampSites(state: WorldState, want: number): LampSite[] {
   const square = townSquareOf(state)
@@ -442,11 +330,8 @@ export function lamplighterIntent(
   const standing = new Map(Object.values(state.structures)
     .filter((s) => s.kind === LAMP_KIND).map((s) => [`${s.x},${s.y}`, s]))
 
-  // ★ FEEDING COMES FIRST, AND IT WALKS THE LAMPS THAT EXIST — never the sites. A dark lamp is
-  // worse than a missing one, because it looks like a lamp. The first version of this loop read
-  // the site list instead, and `lampSites` is recomputed each tick against the buildings
-  // standing NOW: the masons raise houses, the sites move, and every post the lamplighter had
-  // already raised fell off the list it was being fed from. Six lamps stood all night, unlit.
+  // Feeding walks the lamps that EXIST, never the sites: `lampSites` is recomputed each tick
+  // against the buildings standing NOW, so a raised post falls off the site list as the town grows.
   for (const s of [...standing.values()].sort((p, q) => p.id.localeCompare(q.id))) {
     if (s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? -1) >= state.tick + config.light.fuelBurnTicks / 4) continue
@@ -459,9 +344,8 @@ export function lamplighterIntent(
       ? { verb: 'walk', params: { x: stand.x, y: stand.y } }
       : null
   }
-  // ★ AND THE COUNT IS A CEILING, NOT A TARGET. `lampSites` is recomputed every tick against
-  // the buildings standing NOW, and the masons keep raising more — so a lamplighter that only
-  // asked "is this site free" would light a growing town forever, one post per new door.
+  // The count is a ceiling, not a target: asking only "is this site free" would light a growing
+  // town for ever, one post per new door.
   if (standing.size >= want) return null
   for (const site of sites) {
     if (standing.has(`${site.x},${site.y}`)) continue
@@ -474,8 +358,8 @@ export function lamplighterIntent(
   return null
 }
 
-// patrol like the G2 idler: ping-pong between two fixed waypoints, sleep when spent — and
-// never set out on a leg the legs cannot pay for (rule B in the header).
+// Ping-pong between two fixed waypoints, sleep when spent — and never set out on a leg the
+// legs cannot pay for (rule B in the header).
 function makePatrolPolicy(f: FounderDef) {
   const [a, b] = f.patrol
   return (state: WorldState, config: SimConfig, p: PerceptionPacket): Intent | null => {
@@ -500,37 +384,23 @@ export type FoundersOpts = {
   /** dev/demo only: the buildings start with something in them, so the room card's holdings
    *  grid renders against data. OFF by default — every existing gate folds what it always did. */
   holdings?: boolean
-  /** dev/demo only: the founders raise houses on plots the town claims for them, through the
-   *  real `build` verb with `{kind}` and no coordinate. OFF by default — every existing gate
-   *  folds exactly the events it always did, and the frozen fixture has no lattice to build on. */
+  /** dev/demo only: the founders raise houses on claimed plots through the real `build` verb
+   *  with `{kind}` and no coordinate. OFF by default — the frozen fixture has no lattice. */
   builders?: boolean
   /** dev/demo only: the crossing one founder lays a deck over before it joins the masons.
-   *  ABSENT by default — a world with no ford has nowhere to put one, and every existing gate
-   *  folds exactly the events it always did. */
+   *  ABSENT by default — a world with no ford has nowhere to put one. */
   deck?: { x: number; y: number; w: number; h: number }
-  /** dev/demo only: a mason who finds itself beside somebody's half-raised walls lends a hand
-   *  instead of walking to the next plot.
-   *
-   *  ★ OFF BY DEFAULT, AND THE REASON IS A NUMBER, NOT A TASTE. It works — five pairs of hands
-   *  on one house, measured — but a building completes off the BUILDER's activity clock and
-   *  not off the site's `progressTicks`, so the extra hands buy no calendar time at all. Over
-   *  4 320 showcase ticks: 29 roofs at 293 body-ticks each with it off, 16 at 591 with it on.
-   *  The world can count hands now; it still cannot spend them. */
+  /** dev/demo only: a mason beside somebody's half-raised walls lends a hand instead of walking
+   *  to the next plot. OFF for a measured reason: a building completes off the BUILDER's
+   *  activity clock, not the site's `progressTicks`, so extra hands buy no calendar time. */
   jointBuild?: boolean
   /** dev/demo only: one founder raises lamp posts along the street and keeps them fed.
    *  ABSENT by default — every existing gate folds exactly the events it always did. */
   lamps?: number
   /**
-   * ★ THE BODIES ARE NOT DRIVEN FROM THIS FILE. The town is still raised on tick 1 and the
-   * world systems still run, but every DECISION below that line is skipped: no patrol, no
-   * mason, no bridgewright, no lamplighter, no walk home — and no scripted need top-up either.
-   *
-   * That last one is the part worth arguing. The top-ups exist because a puppet cannot feed
-   * itself; a mind can, and a town that quietly refills five stomachs is a town whose hunger
-   * means nothing. If a live cast starves, that is the finding, not a bug in this file.
-   *
-   * OFF by default, so every landed gate folds exactly the world it always did. Set by
-   * `startDevWorld` when — and only when — a live cast is attached.
+   * The bodies are not driven from this file: the town is still raised and the world systems
+   * still run, but every decision below is skipped — the need top-ups included, because a town
+   * that quietly refills five stomachs is a town whose hunger means nothing.
    */
   minds?: boolean
 }
@@ -544,9 +414,8 @@ export function homeOf(state: WorldState, agentId: string): Structure | null {
   return null
 }
 
-/** The tile you stand on to draw water: the town's public well, the one thing every ring count
- *  puts in the middle of the paved square. `null` on a town that has no well — the frozen
- *  fixture, which keeps its own waypoints untouched. */
+/** The tile you stand on to draw water: the town's public well. `null` on a town that has no
+ *  well — the frozen fixture, which keeps its own waypoints untouched. */
 function wellsideTile(structures: readonly DevStructure[]): { x: number; y: number } | null {
   const well = structures.find((s) => s.kind === 'well')
   if (well === undefined) return null
@@ -566,19 +435,14 @@ export function foundersFor(structures: readonly DevStructure[]): readonly Found
     const home = byOwner.get(f.id)
     if (home === undefined) return f
     // The tile the door opens onto, on the face the building presents — the same tile engine
-    // `doorTile` picks, because both now answer "the street this building fronts". Computing
-    // the south-centre by hand was right only while every building faced one way.
+    // `doorTile` picks. A hand-computed south-centre is wrong once buildings turn.
     const d = doorFrontTile({
       kind: home.kind, dx: home.x, dy: home.y, w: home.w, h: home.h,
       facing: home.facing, owner: null, furnishings: [],
     })
     const spawn = { x: d.dx, y: d.dy }
-    // ★ BOTH ENDS OF THE PATROL MOVE INTO THIS TOWN, OR NEITHER MOVES. This used to relocate
-    // the spawn into the showcase town and leave the far waypoint at its 64×64 FIXTURE
-    // coordinate — omar walking to (20, 23), which on a 152×152 map is 162 tiles away across
-    // ground he has nothing to do with. MEASURED, door to waypoint: 118/124/156/162/171 tiles
-    // against 14/18/53/54/58 on the fixture the numbers were written for. That length is what
-    // made a leg outlast the legs. A townsperson's errand is the well and back — 18 to 39.
+    // Both ends of the patrol move into this town or neither does: a spawn relocated while the
+    // far waypoint keeps its fixture coordinate makes a leg that outlasts the legs.
     return { ...f, spawn, patrol: [spawn, wellside ?? f.patrol[1]] as FounderDef['patrol'] }
   })
 }
@@ -599,19 +463,15 @@ export function homeIntent(state: WorldState, config: SimConfig, agentId: string
   if (Math.abs(a.x - door.x) <= 1 && Math.abs(a.y - door.y) <= 1) {
     return a.needs.energy < GO_HOME_BELOW ? { verb: 'enter', params: { structureId: home.id } } : null
   }
-  // ★ WHEN TO TURN FOR HOME IS THE JOURNEY'S QUESTION, NOT A NUMBER'S. `GO_HOME_BELOW` says how
-  // tired you have to be to want your own bed; the walk says how early you have to leave to get
-  // there. Asking only the first sent a founder home from the far side of town with 24 energy
-  // and a 31-energy walk in front of them, which is a decision to fall over in the street.
+  // When to turn for home is the journey's question, not a number's: `GO_HOME_BELOW` says how
+  // tired you have to be to want your own bed; the walk says how early you have to leave.
   const cost = walkEnergyCost(state, config, agentId, door)
   if (cost === null) return a.needs.energy < GO_HOME_BELOW ? SLEEP : null
   if (a.needs.energy - cost >= GO_HOME_BELOW) return null   // slack left in the day; carry on
   return a.needs.energy - cost > config.needs.collapseThreshold
     ? { verb: 'walk', params: { x: door.x, y: door.y } }
-    // ★ THE DEADLOCK BREAKER. Too late to walk anywhere: this body's night is wherever it is
-    // standing. Without this line `homeIntent` answered a collapsed body with a WALK for ever —
-    // and `submitIntent` refuses every verb but eat and sleep to a body on the ground, so
-    // nothing ever offered the one verb that could have got it up again.
+    // The deadlock breaker: too late to walk anywhere. `submitIntent` refuses every verb but
+    // eat and sleep to a body on the ground, so a WALK here would never get it up again.
     : SLEEP
 }
 
@@ -636,9 +496,8 @@ export function makeFoundersOnTick(
           id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, maxHp: 20,
           flammable: s.flammable, builderId: 'script',
           ...(s.owner === null ? {} : { owner: s.owner }),
-          // The template already decided this; dropping it made the drawn face of half the
-          // town disagree with the plot it sits on. Absent is `sw`, so the frozen fixture —
-          // every one of whose six buildings faces sw — folds the payload it always folded.
+          // Absent is `sw`, so the frozen fixture — all six of whose buildings face sw — folds
+          // the payload it always folded.
           ...(s.facing === 'sw' ? {} : { facing: s.facing }),
         })
         emit('structure_completed', { id: s.id })
@@ -683,15 +542,12 @@ export function makeFoundersOnTick(
       const state = getState()
       const a = state.agents[f.id]
       if (!a || !a.alive) continue
-      // ★ RULE A: DECIDE ONLY WHEN THE HANDS ARE FREE. `submitIntent` refuses everything while
-      // an activity runs, so a decision taken here used to be a decision discarded. Skipping is
-      // event-identical to submitting-and-being-refused — a refusal emits nothing — which is
-      // why every landed gate folds exactly the world it always did.
+      // Rule A: decide only when the hands are free. `submitIntent` refuses everything while an
+      // activity runs, so a decision taken here would be a decision discarded.
       if (a.activity) continue
       const packet = composePerception(state, config, f.id, [])
-      // The order of a day: rest first, then the crossing, then work, then walk the town. Home
-      // comes before either because a body that is spent has no business starting anything, and
-      // the deck comes before the houses because until it stands half the town is unreachable.
+      // Home comes first because a spent body has no business starting anything; the deck comes
+      // before the houses because until it stands half the town is unreachable.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
         ?? (f.id === wright ? bridgewrightIntent(state, config, f.id, opts.deck!) : null)
         ?? (f.id === lighter ? lamplighterIntent(state, config, f.id, opts.lamps!) : null)

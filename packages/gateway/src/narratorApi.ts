@@ -16,10 +16,8 @@ import { sendJson, toEvent } from './http.js'
 import { clampWindow } from './api.js'
 import { reportOnce } from './degraded.js'
 
-// The narrator's tables are read through plain SELECTs rather than @sj/narrator, which drags
-// @sj/agents (onnxruntime, transformers) behind it — the same call api.ts makes for agent
-// memory. This map is the whole of the read surface, and a test walks it against the real
-// narrator schema so a renamed column fails here instead of in production.
+// Plain SELECTs rather than @sj/narrator, which drags @sj/agents (onnxruntime, transformers)
+// behind it. A test walks this map against the real narrator schema.
 export const NARRATOR_READ_TABLES: Readonly<Record<string, readonly string[]>> = {
   chapters: ['day', 'title'],
   milestones: ['kind', 'label', 'day', 'tick'],
@@ -33,19 +31,16 @@ export type NarratorApiDeps = {
   agentDbDir?: string                       // agent memory, for the days a personality moved
 }
 
-/** U14 — the five things the world's own log records that the town would remember. Anything
- *  else is the everyday, and a scrub bar covered in the everyday points nowhere. */
+/** The five things the world's own log records that the town would remember. Anything else is
+ *  the everyday, and a scrub bar covered in the everyday points nowhere. */
 export const MARK_EVENT_TYPES: readonly string[] = [
   'agent_died', 'agent_born', 'agent_spawned', 'agent_injured', 'structure_completed',
 ]
 
 // A narrator.db that exists but predates a table still answers [] — the observatory is a
 // window, and a window never errors because the room behind it is unfinished.
-/**
- * A town whose narrator has never run has nothing to read, and that is not an error — but a
- * narrator whose TABLE has been renamed is a different fact wearing the same empty answer.
- * Neither 500s; the second one says so once. See `degraded.ts`.
- */
+/** A renamed narrator TABLE is a different fact wearing the same empty answer; it says so once
+ *  rather than 500ing. See `degraded.ts`. */
 function readOrEmpty<T>(db: Database.Database | null, sql: string): T[] {
   if (db === null) return []
   try {
@@ -72,17 +67,15 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     const state = deps.mirror.state()
     return {
       agentName: (id) => state.agents[id]?.name ?? id,
-      // R4: a kind is a slug in the engine and PROSE to a viewer. `kindWords` in
-      // web/ui/broadcastReady.ts owns this rule; the gateway cannot import the web bundle,
-      // so the one line is repeated here rather than the rule being forgotten.
+      // A kind is a slug in the engine and PROSE to a viewer. `kindWords` in
+      // web/ui/broadcastReady.ts owns this rule; the gateway cannot import the web bundle.
       structureKind: (id) => (state.structures[id]?.kind ?? 'building').replace(/_/g, ' '),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
     }
   }
 
-  // Clamped into the world for the same reason `/api/digest` is: an unbounded window is a
-  // window on nothing, and a free key is a cache a stranger can miss on purpose. The clamped
-  // pair is also the memo key, so every over-long window collapses onto the same entry.
+  // Clamped because a free key is a cache a stranger can miss on purpose. The clamped pair is
+  // also the memo key, so every over-long window collapses onto the same entry.
   const windowOf = (url: URL): { fromTick: number; toTick: number } => clampWindow(
     url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
 
@@ -120,17 +113,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       ({ entries: chronicleEntries(fromTick, toTick) })))
   })
 
-  /**
-   * ★ HOW LONG THE LEDGER IS, WITHOUT SENDING THE LEDGER.
-   *
-   * The viewer's chronicle badge fetched every entry to display one number — the whole feed
-   * over the wire and through `JSON.parse` on every poll, for two integers' worth of answer.
-   * That is the same read amplification as everything else on this surface, just paid by the
-   * browser instead of the tick thread.
-   *
-   * It costs the server nothing extra: `chronicleEntries` is memoised per world generation, so
-   * the badge and the panel share one scan when both ask in the same tick.
-   */
+  /** How long the ledger is, without sending the ledger. It costs nothing extra:
+   *  `chronicleEntries` is memoised per generation, so the badge and the panel share one scan. */
   router.route('GET', '/api/chronicle/count', (req: IncomingMessage, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const { fromTick, toTick } = windowOf(url)
@@ -177,10 +161,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     sendJson(res, { moments })
   })
 
-  // THE MARKS ON THE SCRUB BAR (U14). This hands over the SOURCES, not the marks: the rule
-  // that turns them into marks — the weighting, the coalescing, the words — is one function in
-  // the viewer (`ui/timelineMarks.ts`), and a second copy of it here is a second copy to keep
-  // right. Plain SELECTs, typed-empty when a source is absent, never a 500.
+  // The SOURCES, not the marks: the rule that turns them into marks lives in the viewer's
+  // `ui/timelineMarks.ts`, and a second copy here is a second copy to keep right.
   const selMarkEvents = deps.db.prepare(
     `SELECT tick, type FROM events WHERE type IN (${MARK_EVENT_TYPES.map(() => '?').join(', ')})
      ORDER BY tick, seq`,

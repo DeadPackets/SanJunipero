@@ -106,9 +106,8 @@ describe('createLawsAdmin (T25b)', () => {
   })
 
   it('a request arriving on an address the channel was not meant for is refused', async () => {
-    // Configured for an address this box does not answer on, then reached over
-    // loopback: a listener accidentally bound to 0.0.0.0 must not silently
-    // become the town's public control panel.
+    // Configured for an address this box does not answer on, then reached over loopback: a
+    // listener bound to 0.0.0.0 must not become the town's public control panel.
     const { port, submitted } = await admin('10.255.255.1')
     const r = await post(port, { path: 'mystery.enabled', value: false })
     expect(r.status).toBe(403)

@@ -1,6 +1,6 @@
 import type { SimEvent } from '@sj/shared'
 
-// Deterministic drama scorer — C7 replaces this reader, the /api/heat shape stays.
+// Deterministic drama scorer.
 export const HEAT_WINDOW_TICKS = 60
 export const HEAT_WEIGHTS: Record<string, number> = {
   agent_died: 20, fire_ignited: 12, fire_spread: 10, agent_injured: 8,
@@ -9,22 +9,8 @@ export const HEAT_WEIGHTS: Record<string, number> = {
 
 export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
 
-/**
- * ★ `/api/heat` HAD NO HORIZON, AND ITS ONE CALLER READS THE LAST TWO MINUTES.
- *
- * The body was **356 797 B** at sim-day 20 of a loud town and grew without limit —
- * ~36 KB per sim-day, forever — and `DirectorMode.tsx` polls it every **5 s**. The previous
- * lane's aggregate cut a year of streaming from ~2.7 GB to ~13 MB and said plainly that the
- * residual was the contract, not slack. This is the contract.
- *
- * `directorCut.pickCut` keeps only the windows overlapping `[nowTick − 120, nowTick]` and throws
- * the rest away. Everything older than that was being built, cached, serialised and sent so it
- * could be discarded by the only thing that reads it.
- *
- * One sim-day rather than the 120 ticks the caller uses: `/api/heat` is a public contract and a
- * legible unit survives a second reader better than a number tuned to the first. The ceiling is
- * 24 windows × the living population — at fifteen people, about 25 KB, at any age of town.
- */
+/** One sim-day, not the 120 ticks the only caller reads: `/api/heat` is a public contract and a
+ *  legible unit survives a second reader better than a number tuned to the first. */
 export const HEAT_HORIZON_TICKS = 1440
 
 /** The windows inside the horizon, newest end anchored at `nowTick`. */
@@ -40,48 +26,9 @@ export const heatKey = (tick: number, agentId: string): string =>
   `${Math.floor(tick / HEAT_WINDOW_TICKS)}\n${agentId}`
 
 /**
- * ★ WHOSE DRAMA A FIRE IS.
- *
- * Five of the nine weights used to score nothing at all. `scoreEvent` needed `payload.agentId`,
- * and `fire_ignited` `{structureId, cause}`, `fire_spread` `{fromId, toId}`,
- * `structure_completed` `{id}`, `crop_harvested` `{cropId}` and `item_moved` `{id, loc}` carry
- * no agent — so the whole of the town's fire and harvest drama was computed and dropped on
- * every event, while the table above read as if fire were the second-loudest thing after a
- * death. (The old `payload.builderId` fallback was dead for the same reason: `structure_planned`
- * is the only payload in the engine carrying one, and it is not weighted. It is gone.)
- *
- * ★ THE RULING: DRAMA BELONGS TO A PERSON, BECAUSE THE CAMERA DOES.
- *
- * `/api/heat` is keyed by agent because `directorCut.pickCut` turns it into the one question the
- * broadcast asks — who is the camera on. "The whole town" is not an answer a camera can take: a
- * synthetic subject would come back through `subjectFor` as an id no agent has, and the frame
- * would follow nobody. So an event either names a person or scores nothing, and the work is in
- * naming one HONESTLY from the log alone.
- *
- * Three resolvers, all deterministic, all bounded, none of them reading world state:
- *
- *  1. `payload.agentId` — the event names them.
- *  2. **The actor whose verb produced it.** `worldTick` emits `action_completed {agentId, verb}`
- *     and then, with nothing in between, the verb's own `onComplete` events. So a
- *     `crop_harvested` is always the row after its harvester's completion, and that adjacency is
- *     a fact about the emitter rather than a guess. One event of memory reads it.
- *  3. **The builder on the structure's plan.** `structure_planned {id, kind, builderId}` is a
- *     record the read path already keeps, one per structure.
- *
- * Per event, and each is a judgement:
- *
- *  · `fire_ignited` → the builder of `structureId`. Nobody lights these — lightning, or a
- *    carried flame — so there is no actor to find. The person the town has on record for that
- *    building is the one who raised it, and cutting to them while it burns is the right frame.
- *  · `fire_spread` → the builder of `toId` ONLY. The fire reaching somewhere new is the new
- *    place's moment; wherever it came from was already scored when it caught. Scoring both ends
- *    would let one fire pay the same person again at every link of the chain.
- *  · `structure_completed` → the plan's builder, else the actor in flight. A scripted completion
- *    with no actor still has a plan.
- *  · `crop_harvested` → the actor in flight. It is the harvest verb's own result.
- *  · `item_moved` → the agent in `loc` when the item moved into somebody's hands. A fire
- *    scattering goods onto tiles names nobody and gets nothing — the fire was already scored 12,
- *    and a burning storehouse must not out-score a death by counting its contents.
+ * An event either names a person or scores nothing — `/api/heat` is the camera's subject, and a
+ * camera cannot follow "the town". `fire_spread` scores the destination ONLY, so one fire cannot
+ * pay the same person again at every link of the chain.
  */
 export type HeatContext = {
   /** Who raised a structure, for the events that name a place and no person. */

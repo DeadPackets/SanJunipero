@@ -41,18 +41,9 @@ const countEvents = (dbPath: string, type: string): number => {
   } finally { db.close() }
 }
 
-/**
- * ★ A CRASH WAS A FRESH DAY 0, AND THAT IS NOT A WORLD.
- *
- * `startDevWorld` deleted the world db on every boot, so `pnpm stream` twice — or one
- * `docker restart`, or one SIGKILL — threw away every building the town had ever raised. The
- * event log held all of it and nothing read it back.
- *
- * Removing the delete ALONE is strictly worse than the wipe: the loop was built from
- * `genesisState` unconditionally, so boot 2 would open a db holding 10 000 ticks and start
- * appending a SECOND town's events at tick 1 into the same table. These tests pin both halves
- * together.
- */
+/** Removing the world-db delete ALONE is strictly worse than the wipe: the loop was built from
+ *  `genesisState` unconditionally, so boot 2 would append a SECOND town's events at tick 1 into a
+ *  db already holding 10 000 ticks. These tests pin both halves together. */
 describe('★ the town survives a restart', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-persist-'))
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -102,8 +93,7 @@ describe('★ the town survives a restart', () => {
 
     const second = await runTo(dbPath, first.tick + 3)
     // A cursor left at seq 0 re-scans the whole log on the first resumed tick and publishes
-    // thoughts stamped with HISTORIC ticks — the tell is the tick, not the count, because the
-    // verb de-dup map replays the same handful of changes.
+    // thoughts stamped with HISTORIC ticks — the tell is the tick, not the count.
     const added = readThoughts().filter((t) => !before.some((b) => b.id === t.id))
     for (const t of added) expect(t.tick, `a thought re-published from history at tick ${t.tick}`)
       .toBeGreaterThan(second.resumedAtTick!)
@@ -120,14 +110,9 @@ describe('★ the town survives a restart', () => {
   }, 90_000)
 })
 
-/**
- * ★ A RING CHANGE ON A RESUMED TOWN IS SILENT, AND IT RENDERS ONE MAP WHILE SIMULATING ANOTHER.
- *
- * `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map — but the
- * gateway used to be handed `devTerrain(map, rings)` computed fresh from the environment. Boot a
- * `SJ_RINGS=3` town back up with `SJ_RINGS=1` and the viewer scrubs against a 76-tile map while
- * the world ticks a 152-tile one, with no error anywhere.
- */
+/** `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map while the
+ *  gateway is handed one recomputed from the environment: one map scrubbed, another simulated,
+ *  with no error anywhere. */
 describe('★ a resumed world refuses a boot that is not the same world', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-identity-'))
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -170,13 +155,8 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
   }, 60_000)
 })
 
-/**
- * ★ WORLD AND MIND MUST BE THROWN AWAY AS ONE UNIT, OR THE TOWN GETS AMNESIA BACKWARDS.
- *
- * Agent memory lives in separate `<id>.db` files that the world-db delete never touched. Once
- * live minds are wired to the gateway, a `fresh` boot would give you the worst of both: the
- * buildings gone, the day counter back to 0, and every mind still remembering all of it.
- */
+/** Agent memory lives in separate `<id>.db` files the world-db delete never touched, so a `fresh`
+ *  boot gives the worst of both: the buildings gone and every mind still remembering. */
 describe('★ fresh means fresh for the minds too', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-minds-'))
   afterAll(() => rmSync(dir, { recursive: true, force: true }))

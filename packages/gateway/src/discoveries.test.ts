@@ -87,11 +87,8 @@ describe('the archive — every discovery, in order, with its credit', () => {
   })
 
   it('SURVIVES A REVERT — the archive reads the log, and the log has no revert path', async () => {
-    // A revert is an UPDATE on `rulebook`, in the ARBITER's database. This package has no
-    // dependency on @sj/arbiter and must not grow one — that is the §2 seam, and importing it
-    // here to stage the revert would put the ops plane one line from the viewer's wire. So the
-    // property is proved from this side instead: the only way a record could be lost is a
-    // DELETE on the world log, and there is no writer that could issue one.
+    // This package has no dependency on @sj/arbiter and must not grow one, so the property is
+    // proved from this side: a record could only be lost to a DELETE no writer can issue.
     const world = new Database(dbPath, { readonly: true, fileMustExist: true })
     try {
       expect(() => world.prepare('DELETE FROM events WHERE type = ?').run('discovery_made'))
@@ -138,15 +135,8 @@ describe('the archive — every discovery, in order, with its credit', () => {
 })
 
 /**
- * ★ A READER THAT DROPS A ROW AND COUNTS NOTHING IS A SCHEMA DRIFT NOBODY CAN SEE.
- *
- * `readDiscoveries` skips any row that fails `DiscoveryRecordSchema`, and it is RIGHT to: the
- * observatory is a window and a window does not break because one pane is unfinished. What it
- * did not do was say so — a writer that changes a discovery payload made the archive quietly
- * short, with a 200 and a well-formed body over the top of it.
- *
- * MUTATION-PROVED: taking the `reportOnce` call out of the `else` leaves `degradations()` empty
- * while the body is still one entry short.
+ * `readDiscoveries` skips any row that fails `DiscoveryRecordSchema` and is right to, but a
+ * silent skip is a schema drift nobody can see: a 200 and a well-formed body, one entry short.
  */
 describe('★ a dropped discovery row is said out loud, once', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-drift-'))

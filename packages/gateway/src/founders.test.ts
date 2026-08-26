@@ -48,10 +48,8 @@ describe('homeIntent', () => {
     expect(homeIntent(spend(base, 'omar', 90), SHOWCASE_CONFIG, 'omar')).toBeNull()
   })
 
-  // Energy 10 used to stand here. It is now a body that CANNOT reach this door — 54 tiles at
-  // the tired rate costs 10.04 — and the rule below says such a body lies down where it is.
-  // The property this test is for is "a tired founder heads for the one dwelling", so it is
-  // asked of a founder who can still get there.
+  // A body that cannot reach this door lies down where it is instead — a different property, so
+  // this one is asked of a founder who can still get there.
   it('walks a spent founder to the door of the one dwelling', () => {
     const s = putAt(spend(base, 'omar', 20), 'omar', 6, 32)
     expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
@@ -73,12 +71,8 @@ describe('homeIntent', () => {
   })
 })
 
-// ★ THE RESERVE IS THE JOURNEY, NOT A NUMBER — the rule the first night turned on.
-//
-// `GO_HOME_BELOW` says how tired you must be to want your own bed. It never said how EARLY you
-// have to leave to reach it, so a founder with 24 energy set out on a walk that cost 31 and
-// fell over 200 ticks short of the door. Both halves are asserted here, on the same body and
-// the same house, separated only by how far away it is standing.
+// `GO_HOME_BELOW` says how tired you must be to want your own bed, never how EARLY you have to
+// leave to reach it. Both halves are asserted on the same body, separated only by distance.
 describe('a founder leaves for home while the legs can still pay for the walk', () => {
   const base = townAtTick1()
   const door = doorTile(base, base.structures[FOUNDERS_HOME_ID]!)!
@@ -110,9 +104,8 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
   })
 
   it('★ AND LIES DOWN WHERE IT IS when the walk home is no longer affordable at all', () => {
-    // The deadlock merge train 3 photographed: `homeIntent` answered a body on the ground with
-    // a WALK for ever, and `submitIntent` refuses every verb but eat and sleep to a collapsed
-    // body — so nothing ever offered the one verb that could have got it up again.
+    // `submitIntent` refuses every verb but eat and sleep to a collapsed body, so a WALK here
+    // would leave it on the ground for ever.
     const stranded = at(6, 32, SHOWCASE_CONFIG.needs.collapseThreshold + 1)
     expect(arrivesStanding(stranded, SHOWCASE_CONFIG, 'omar', door)).toBe(false)
     expect(homeIntent(stranded, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
@@ -168,10 +161,8 @@ describe('makeFoundersOnTick interiors switch', () => {
     expect(verbsStarted(true)).toContain('enter')
   })
 
-  // ★ THE PATROL COSTS ITS OWN LEG TOO, and this is the arm with no `homeIntent` behind it to
-  // catch a body that overreaches. On the showcase town the leg is the well and back — 18 to 39
-  // tiles — so the check never bites there and would be inert if this were the only world. It
-  // is asked here on the FIXTURE waypoints, which are the long ones the defect was made of.
+  // The patrol arm has no `homeIntent` behind it to catch a body that overreaches. Asked on the
+  // FIXTURE waypoints, because the showcase's well-and-back leg is too short to bite.
   it('★ will not set out on a leg the legs cannot pay for — it lies down instead', () => {
     const HERE = { x: 5, y: 5 }, YONDER = { x: 58, y: 60 }   // opposite corners of the fixture
     const far = FOUNDERS.map((f) => ({ ...f, patrol: [HERE, YONDER] as FounderDef['patrol'] }))
@@ -247,9 +238,8 @@ describe('U25 — the humans were all sleeping inside one house', () => {
     )
     let seq = 1000
     for (let tick = 2; tick <= 400; tick++) {
-      // Tired enough that home is the only errand, rested enough that home is still reachable
-      // — a body that cannot pay for the walk now lies down where it is instead, which is a
-      // different property and is proved above.
+      // Tired enough that home is the only errand, rested enough that home is still reachable:
+      // a body that cannot pay for the walk lies down instead, which is proved above.
       for (const id of FOUNDER_IDS) state = spend(state, id, GO_HOME_BELOW - 5)
       const evs: Array<{ type: string; payload: unknown }> = []
       onTick({ tick, emit: (type, payload) => evs.push({ type, payload }) })
@@ -316,9 +306,6 @@ describe('foundersFor', () => {
 
 describe('the interiors demo window', () => {
   it('starts before the first measured trip indoors, not after it', () => {
-    // re-measured after the first-night fix: first entries at ticks 814/827/853/866/970.
-    // 1200 lands after them, which is why the controller watched from Day 0 20:00 to Day 1
-    // 03:12 and saw nobody go in.
     expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeLessThan(814)
     expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeGreaterThan(600)   // not a whole day of waiting
   })
@@ -329,9 +316,6 @@ describe('the interiors demo window', () => {
   })
 })
 
-// ★ THE HOLDINGS GRID HAD NEVER BEEN SEEN (batch 3 concern 2, controller ruling R4.1). The dev
-// world stored ZERO items in ANY structure, so `roomCard.holds`, its icons, its cap and its
-// "and N more" line were proven by unit test only and had never once rendered against data.
 describe('the storerooms hold something', () => {
   /** the web card's cap — packages/web/src/ui/interiorModel.ts ROOM_HOLDS_MAX */
   const ROOM_HOLDS_MAX = 8
@@ -385,21 +369,14 @@ describe('the storerooms hold something', () => {
   it('every kind it seeds is one the library can draw an icon for', () => {
     for (const h of devHoldings(townStructuresFor('showcase'))) {
       // `wood` is the one kind the world consumes that the art library has not drawn under that
-      // name — its planks are catalogued as `timber`. Stocking a shelf with a kind no recipe
-      // eats is the worse of the two failures, so this rule yields to that one. Named in the
-      // report for the forge lane: the catalog wants a `wood` entry, or the render an alias.
+      // name — its planks are catalogued as `timber`. This rule yields to the recipe's.
       if (h.kind === MASON_WOOD_KIND) continue
       expect(libraryEntry(h.kind), h.kind).not.toBeNull()
     }
   })
 
-  // ★ A TOWN THAT CANNOT BUILD. The shelves held `timber`, and NO recipe in the world consumes
-  // `timber` — a house is `{ wood: 10 }`, a bridge `{ wood: 6 }`, a plank `{ wood: 1 }`. So a
-  // live mind could walk into the storehouse, see fifteen of something wooden, carry it to a
-  // plot and be refused for having no wood. `genesis/world.ts` had already written the rule
-  // down — "`wood`, not 'timber': these are the kinds the build and craft recipes actually
-  // consume" — and the showcase fixture, which is the town the stream actually serves, did not
-  // follow it. A drive with no road, in the one place a viewer would watch for it.
+  // No recipe in the world consumes `timber` — a house is `{ wood: 10 }` — so a mind could carry
+  // fifteen of something wooden to a plot and be refused for having no wood.
   it('★ stocks the kind a house is actually built from, not a synonym for it', () => {
     const houseCost = SHOWCASE_CONFIG.structures.recipes[MASON_KIND]!.inputs[MASON_WOOD_KIND]!
     const stocked = devHoldings(townStructuresFor('showcase'))
@@ -409,11 +386,8 @@ describe('the storerooms hold something', () => {
     expect(stocked, 'not even one house worth').toBeGreaterThanOrEqual(houseCost)
   })
 
-  // ★ AND IT HAS TO BE SOMEWHERE SOMEBODY LOOKS. `composePerception` shows a building's shelves
-  // only to a mind INSIDE it or standing against its wall. Every founder spawns on their own
-  // doorstep and goes in at that door, so nothing in the public storehouse is ever perceived by
-  // anybody — measured on a live run: five enter, five sleep, three take, and not one founder
-  // within reach of the store. Wood correctly named and still on no road.
+  // `composePerception` shows a building's shelves only to a mind INSIDE it or against its wall,
+  // and every founder spawns and enters at their own door — so the public store is never seen.
   it('★ puts the wood where a founder will actually see it — their own shelf', () => {
     const structures = townStructuresFor('showcase')
     const holdings = devHoldings(structures)
@@ -436,8 +410,7 @@ describe('the storerooms hold something', () => {
       for (const k of Object.keys(r.inputs)) consumable.add(k)
     }
     // A shelf may hold food, tools and cloth that no RECIPE eats — those have their own verbs.
-    // What it may not hold is a building material that is not one: a stack of planks under a
-    // name the mason's recipe has never heard of.
+    // What it may not hold is a building material under a name no recipe has heard of.
     expect(consumable.has('timber'), 'no recipe consumes `timber`').toBe(false)
     const kinds = new Set(devHoldings(townStructuresFor('showcase')).map((h) => h.kind))
     expect(kinds.has('timber'), 'the town stocks a material nothing can build with').toBe(false)

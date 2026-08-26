@@ -14,23 +14,9 @@ import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler, Router } from './server.js'
 
 /**
- * ★ A STREAM IS WATCHED FOR WEEKS, AND THE READ PATH HELD EVERY EVENT THE TOWN EVER EMITTED.
- *
- * `api.ts` memoised the parsed log in a `SimEvent[]` and appended to it forever. Measured on
- * this machine against a real founders town it retained 7.2 MB at 49 649 events and 86.9 MB at
- * 346 069 — strictly linear, no ceiling. A town as loud as the one below reached 47.8 MB by
- * sim-day 20. `pnpm stream` left running is not a demo; it is that curve with a viewer on it.
- *
- * ★ WHY THIS TEST TICKS TWICE INSTEAD OF ONCE. A single deep world and a ceiling would pass on
- * a fixed overhead as easily as on a bound. Growth is the property, so the measurement is the
- * SECOND tranche: three times as many events as the first, and the heap must barely move.
- *
- * ★ AND WHY IT ALSO CHECKS THE ANSWERS. "The read path grew by 0 MB" is satisfiable by a read
- * path that answers `[]`, which is exactly the vacuous guard this project keeps finding. The
- * bodies must be large, the links and drama windows must be there, and the fold must have
- * consumed every row — or a bound over nothing would pass.
- *
- * MUTATION-PROVED: restoring the retained `SimEvent[]` fails this at 22.7 MB against 6 MB.
+ * Growth is the property, so the measurement is the SECOND tranche: three times the events of
+ * the first, and the heap must barely move. The bodies are checked too — "grew by 0 MB" is
+ * satisfiable by a read path that answers `[]`.
  */
 const GRASS: TileId[][] = Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0 as TileId))
 const AGENTS = 12
@@ -61,9 +47,8 @@ describe('★ the read path holds answers, not the log', () => {
     const dbPath = join(dir, 'loud.db')
     const worldDb = openDb(dbPath)
     const store = new EventStore(worldDb)
-    // Deterministic, and deliberately LOUD: the founders showcase falls silent on sim-day 3 and
-    // exercises neither the talk links nor the drama windows, which are the two aggregates that
-    // could still grow. A quiet world would pass this test without proving anything.
+    // Deliberately LOUD: talk links and drama windows are the two aggregates that could still
+    // grow, and a quiet world would pass this test without proving anything.
     let s = 123456789
     const rnd = (): number => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648
     const loop = new TickLoop({
@@ -145,16 +130,9 @@ describe('★ the read path holds answers, not the log', () => {
     expect(bodies.get('GET /api/digest')!.length).toBeGreaterThan(500)
 
     /**
-     * ★ AND THE HEAT BODY HAS A HORIZON — see `HEAT_HORIZON_TICKS`.
-     *
      * The running map is the whole town's drama, because `/api/digest` must be exact over a
-     * window the viewer picks. What is SENT is the last sim-day of it, so the body is bounded by
-     * the population and not by the age: 188 335 B unbounded at 16 000 ticks against 18 051 B
-     * windowed, and the windowed number does not move as the town ages. `DirectorMode` polls this every 5 s and
-     * `pickCut` throws away everything older than 120 ticks.
-     *
-     * MUTATION-PROVED: dropping `heatSince` from the route sends 3 204 windows instead of 300,
-     * and 188 335 B instead of 18 051 — at 16 000 ticks, and the gap grows for ever.
+     * window the viewer picks. What is SENT is the last sim-day, so the body is bounded by the
+     * population and not by the town's age.
      */
     const oldest = Math.min(...heat.map((w) => w.fromTick))
     const live = mirror.state().tick

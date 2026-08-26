@@ -22,9 +22,8 @@ const FROZEN_TOWN_STRUCTURES = [
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
 ]
 
-// EARTH is the template's bank tile; a structure may stand on cleared earth or on grass, and
-// on nothing else. Imported by value rather than by name because showcaseMap exports the ids
-// it rasterises, not the template's own T_ constants.
+// EARTH is the template's bank tile; a structure may stand on cleared earth or on grass, and on
+// nothing else. By value, because showcaseMap exports the ids it rasterises, not the T_ names.
 const EARTH_TILE = 1
 
 const town = devTown()

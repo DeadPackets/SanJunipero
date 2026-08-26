@@ -83,15 +83,7 @@ describe('SocketHub', () => {
   })
 })
 
-/**
- * ★ THE ONE HEALTH SIGNAL THAT MATTERS, AND NOBODY WAS EVER TOLD.
- *
- * The hub decides a viewer is 1 MiB behind, marks it `lagging` and silently drops its deltas
- * until it drains. `laggingCount()` reported exactly that and had **no non-test caller** — it
- * was computed for nobody on a surface handed to strangers.
- *
- * MUTATION-PROVED: deleting either `#say` call leaves this at 0 lines and 1 line respectively.
- */
+/** MUTATION-PROVED: deleting either `#say` call leaves this at 0 lines and 1 line respectively. */
 describe('★ the stream says when a viewer falls behind', () => {
   it('reports the transition, both ways, with the count — and only on the transition', () => {
     const lines: string[] = []

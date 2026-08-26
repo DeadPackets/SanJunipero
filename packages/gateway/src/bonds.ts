@@ -9,10 +9,8 @@ import { TALK_WINDOW_TICKS } from './api.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { toEvent, type EventRow } from './http.js'
 
-// What the town did, read as what the town became. Each rule is one observable act; the
-// SEMANTICS (trust, debt, grudge, love from the ledgers) stay C9 T11/T12's job — when they
-// land this reader swaps and BondSchema does not move. `BOND_NOTES` moved to `@sj/shared` so
-// the viewer can name the six acts without reading the server — see the Bonds empty state.
+// Each rule here is one observable act, not a semantic. `BOND_NOTES` lives in `@sj/shared` so
+// the viewer can name the six acts without reading the server.
 export { BOND_NOTES } from '@sj/shared'
 
 const VERB_BONDS: Readonly<Record<string, BondKind>> = { give: 'owe', teach: 'work', attack: 'rival' }
@@ -28,12 +26,8 @@ export type BondsDeps = {
 }
 
 /**
- * ★ A BOND IS FOLDED, NOT ACCUMULATED — see `foldBond` in `@sj/shared`.
- *
- * The draft used to be the whole `BondEvent[]`, so the answer was the size of the town's whole
- * history: 83 704 521 B at sim-day 20 of a talkative town, and the panel asked for it every
- * 30 s per viewer. What is kept per pair is now a 24-act window, six rollup rows and three
- * scalars — a constant, whatever the town's age.
+ * A bond is folded, not accumulated (`foldBond` in `@sj/shared`): what is kept per pair is a
+ * 24-act window, six rollup rows and three scalars — a constant, whatever the town's age.
  */
 export function buildBonds(events: Iterable<SimEvent>, earshot: number, asOfTick: number): BondsResponse {
   const drafts = new Map<string, BondFold>()
@@ -46,11 +40,9 @@ export function buildBonds(events: Iterable<SimEvent>, earshot: number, asOfTick
     fold.add(kind, tick)
   }
 
-  // ★ EVERY SPOKE AGAINST EVERY EARLIER SPOKE IS O(n²), AND IT IS THE ONE ENDPOINT A BADGE
-  // POLLS. Measured at sim-day 20 of a talkative town: `/api/bonds` took 38.4 s on the tick
-  // thread. A spoke older than the talk window is skipped by the next line, so it can pair with
-  // nothing ever again — dropping it is the same answer in bounded time. `api.ts` does the same
-  // to the same array for the same reason.
+  // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than
+  // the talk window can pair with nothing ever again, so dropping it is the same answer in
+  // bounded time.
   let spokes: Array<{ agentId: string; tick: number; x: number; y: number }> = []
   const started = new Map<string, Record<string, unknown>>() // `${agentId}\n${verb}` → params
 
@@ -109,14 +101,8 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
   router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', bonds)))
 
   /**
-   * ★ HOW MANY BONDS THERE ARE, WITHOUT SENDING THE BONDS.
-   *
-   * The lens badge showed one number and fetched every bond to measure the array. A `Bond`
-   * carries its whole `history`, so this is not a small feed: measured at sim-day 20 of a
-   * talkative town, `/api/bonds` answered **83.7 MB**, and the badge asked for it every 60 s
-   * per viewer. `/api/chronicle/count` learned this lesson first.
-   *
-   * It costs the server nothing extra — the panel and the badge share one memoised build.
+   * How many bonds there are without sending the bonds: a `Bond` carries its whole `history`,
+   * and the badge polls. The panel and the badge share one memoised build.
    */
   router.route('GET', '/api/bonds/count', (_req, res) => sendPrebuilt(res, cache.json('bonds-count', () => {
     const b = bonds()

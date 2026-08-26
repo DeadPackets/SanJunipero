@@ -9,35 +9,7 @@ import {
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { buildBonds } from './bonds.js'
 
-/**
- * ★ `/api/bonds` WAS THE LARGEST UNBOUNDED THING ON THE SERVED SURFACE.
- *
- * Every `Bond` carried every act that ever formed it. Measured on this machine against the loud
- * town below, one `/api/bonds` body:
- *
- *   | sim-day | events  | before        | after    |
- *   |--------:|--------:|--------------:|---------:|
- *   |       5 |  84 206 |  19 925 075 B | 69 048 B |
- *   |      10 | 168 401 |  40 198 599 B | 70 951 B |
- *   |      20 | 336 790 |  80 948 509 B | 71 023 B |
- *   |      40 | 673 568 | 162 435 950 B | 71 025 B |
- *
- * Strictly linear in events before, and FLAT after: 69 048 → 71 025 while the log grows 8×.
- * The panel polls this every 30 s, per viewer, on a stream given to strangers.
- *
- * ★ WHY TWO TRANCHES AND NOT ONE DEEP WORLD. A ceiling on a single measurement passes on a fixed
- * overhead exactly as well as on a bound. GROWTH is the property, so what is asserted is the
- * SECOND tranche: three times the events, and the body must barely move.
- *
- * ★ AND WHY IT ALSO CHECKS THE ANSWER. "The body did not grow" is satisfiable by a body that
- * says `{bonds: []}` — the vacuous guard this project has found twenty times over. So the town
- * must be fully tied, the rollup must account for six figures of acts the window cannot hold,
- * and the totals must agree with `strength`.
- *
- * MUTATION-PROVED. Removing the window's bound in `foldBond` — 821 450 acts on 66 ties:
- *   clean:  79 333 more events grew the bonds body by     3 035 B (67 942 → 70 977)
- *   mutant: 79 333 more events grew the bonds body by 21 875 140 B (3 028 266 → 24 903 406)
- */
+/** Every bond's act list is capped — the served surface must not grow with the log. */
 const GRASS: TileId[][] = Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0 as TileId))
 const AGENTS = 12
 const PAIRS = (AGENTS * (AGENTS - 1)) / 2

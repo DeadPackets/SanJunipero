@@ -1,17 +1,8 @@
 import type Database from 'better-sqlite3'
 
-/**
- * ★ WHO THIS TOWN IS, SO A RESUME CANNOT QUIETLY BOOT A DIFFERENT ONE.
- *
- * `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map whatever
- * the environment says. That is the trap: bring a `SJ_RINGS=3` town back up with `SJ_RINGS=1`
- * and the world simulates 152 tiles while everything derived from the environment — the
- * platted structures, the scrub fallback terrain — is drawn for 76. Nothing errors. The viewer
- * and the world are simply looking at different maps.
- *
- * One row, three fields, compared on every resume. Divergence is the only way resume can hurt
- * someone, and it is the only thing this table exists to stop.
- */
+/** `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map while
+ *  everything derived from the environment is drawn for another one — and nothing errors. One
+ *  row, three fields, compared on every resume. */
 export type WorldMeta = { map: string; rings: number; seed: string }
 
 export function ensureWorldMetaTable(db: Database.Database): void {
@@ -38,10 +29,8 @@ export function writeWorldMeta(db: Database.Database, meta: WorldMeta): void {
 /** The one instruction that gets an operator past a refused boot. */
 export const FRESH_HINT = 'start a new town instead with SJ_FRESH=1'
 
-/**
- * Throws when the town on disk is not the town this boot was asked for. Names both sides,
- * because "map mismatch" without the two values is a bug report the operator has to write.
- */
+/** Throws when the town on disk is not the town this boot asked for. Names both sides, because
+ *  "map mismatch" without the two values is a bug report the operator has to write. */
 export function assertSameWorld(stored: WorldMeta, asked: WorldMeta): void {
   const differs: string[] = []
   if (stored.map !== asked.map) differs.push(`map ${stored.map} → ${asked.map}`)

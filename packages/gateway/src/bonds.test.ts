@@ -137,16 +137,8 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
   })
 
   /**
-   * ★ HOW MANY BONDS, WITHOUT SENDING THE BONDS. The feed used to carry every act that ever
-   * formed a tie — 83.7 MB at sim-day 20 of a talkative town — and the lens badge fetched all of
-   * it every 60 s to display one number. The feed has a ceiling now; the badge still may not
-   * pay for it.
-   */
-  /**
-   * ★ THE ROUTE READS FIVE TYPES, AND THAT IS THE SAME ANSWER AS THE WHOLE LOG. `buildBonds`
-   * folds exactly `BOND_TYPES`; every other row fell through its chain, so the SELECT may drop
-   * them — `fauna_moved` alone carries 640 B payloads and dominates a real log. This is the
-   * "same answer" half of that claim, against the mounted route rather than a fixture.
+   * `buildBonds` folds exactly `BOND_TYPES`; every other row falls through its chain, so the
+   * SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log.
    */
   it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
     const rows = db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq').all() as
@@ -167,12 +159,8 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
 })
 
 /**
- * ★ EVERY SPOKE AGAINST EVERY EARLIER SPOKE WAS O(n²), ON THE THREAD THAT TICKS THE TOWN.
- *
- * A spoke older than `TALK_WINDOW_TICKS` is skipped by the earshot loop, so it can pair with
- * nothing ever again — but it stayed in the array and was walked once per later spoke. Measured
- * at sim-day 20 of a talkative town: 38.4 s for one `/api/bonds`. Dropping the stale ones is the
- * same answer in bounded time, and this proves the "same answer" half.
+ * A spoke older than `TALK_WINDOW_TICKS` can pair with nothing ever again, so dropping it is
+ * the same answer in bounded time; this proves the "same answer" half.
  */
 describe('★ the talk window is a window, not the whole log', () => {
   const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent =>

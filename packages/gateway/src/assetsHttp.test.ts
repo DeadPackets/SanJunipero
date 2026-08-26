@@ -34,8 +34,7 @@ describe('asset http routes', () => {
   let base: string
 
   // The character route only draws people the world HAS — an id nobody answers to is a sharp
-  // png encode a stranger picked the key for (see assetsHttp.ts). So the fixture town is
-  // populated by the four it is about to ask for sheets of.
+  // png encode a stranger picked the key for (see assetsHttp.ts).
   const CAST = ['farmer', 'idler', 'weaver', 'mason'] as const
 
   beforeAll(async () => {

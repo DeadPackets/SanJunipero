@@ -45,15 +45,10 @@ export const MAX_CLIENT_FRAME = 4096
 export const DEFAULT_MAX_VIEWERS = 500
 
 /**
- * ★ SCRUB IS THE ONE EXPENSIVE THING A STRANGER CAN ASK FOR, AND IT WAS FREE AND UNLIMITED.
- *
- * A 40-byte `scrub` frame makes the gateway load a snapshot, `JSON.parse` it, fold every event
- * up to the asked tick and `JSON.stringify` the whole world back out — ~120 KB of work per
- * request, on the thread that ticks the town. Nothing rate-limited it, so one socket in a loop
- * was a denial of service against every other viewer.
- *
- * Coalescing rather than rejecting is also what the scrub BAR wants: a drag fires continuously
- * and only the position the finger stopped at is worth answering.
+ * A 40-byte `scrub` frame makes the gateway load a snapshot, fold every event to the asked tick
+ * and stringify the whole world back out — ~120 KB of work on the thread that ticks the town.
+ * Coalesced rather than rejected: a drag fires continuously and only the position the finger
+ * stopped at is worth answering.
  */
 export const SCRUB_MIN_MS = 100
 
@@ -122,11 +117,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── snapshot string, cached per pump generation ──
   let snapJson: string | null = null
-  // Asset catch-up frames, built once for the process and topped up at hello time. Per
-  // CONNECTION this was one `AssetRecordSchema.parse` and one `JSON.stringify` per row, on the
-  // tick thread; a reconnect storm against a 166-record library is ~83k of each. Topped up from
-  // the codex's own seq rather than the pump's, because `codex.register` fires in-process and a
-  // hello landing between two pumps must still see the sheet registered a millisecond ago.
+  // Asset catch-up frames, built once for the process. Topped up from the codex's own seq rather
+  // than the pump's: a hello landing between two pumps must still see a just-registered sheet.
   const catchUp: string[] = []
   let catchUpSeq = 0
   const snapshotJson = (): string => {
@@ -140,9 +132,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let listening = false
   const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_CLIENT_FRAME })
   // An EventEmitter with no 'error' listener THROWS, and ws re-emits every failure of the http
-  // server it is attached to. A busy port took the whole process down with an unhandled
-  // EADDRINUSE trace even though `httpServer.once('error')` below already reports it, and any
-  // socket-layer error would do the same to a stream that had been up for a week.
+  // server it is attached to — a busy port would take the whole process down.
   wss.on('error', (e) => { if (listening) console.error(`gateway: socket server error — ${e.message}`) })
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
@@ -241,18 +231,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   }
   const timer = setInterval(pump, opts.pollMs ?? DEFAULT_POLL_MS)
 
-  /**
-   * ★ A GATEWAY THAT CANNOT TAKE ITS PORT USED TO LEAVE ITS PUMP RUNNING FOR EVER.
-   *
-   * The poll timer, the socket server and the http server are all built above, and `close()` —
-   * the only thing that clears them — is on the object this function never gets to return. So
-   * an `EADDRINUSE` left a `setInterval` polling a `WorldMirror` every 250 ms in a process that
-   * had already given up, and the caller's `db.close()` then turned that into an UNCAUGHT
-   * `TypeError: The database connection is not open` out of a timer nobody owns.
-   *
-   * Found by the live seam: `startDevWorld` learned to close the world db on a failed boot, and
-   * the orphan pump started shouting about it. It was always leaking; it was just quiet.
-   */
+  /** The poll timer, the socket server and the http server are all built above, and `close()` —
+   *  the only thing that clears them — is on the object a failed listen never returns. */
   let port: number
   try {
     port = await new Promise<number>((resolve, reject) => {

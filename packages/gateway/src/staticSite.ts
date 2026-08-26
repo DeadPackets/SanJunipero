@@ -2,13 +2,8 @@ import { createReadStream, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-// Serving the built client from the world's own origin is what makes the stream one
-// address instead of two terminals and a proxy.
-//
-// ★ THE BUILT CLIENT MAY NOT LIVE UNDER /assets. `/assets/:file` is the codex PNG route and it
-// answers 404 to anything that is not a png, so a bundle emitted to vite's default
-// `assets/` directory 404s on every one of its own scripts. `@sj/web` emits to `client/`
-// instead (vite.config.ts `build.assetsDir`), and this constant is the other half of that pact.
+// `/assets/:file` is the codex PNG route and 404s anything that is not a png, so the built client
+// may not live under /assets. `@sj/web` emits to `client/` (vite.config.ts `build.assetsDir`).
 export const CLIENT_ASSET_DIR = 'client'
 
 const TYPES: Readonly<Record<string, string>> = {
@@ -22,12 +17,8 @@ const OCTET = 'application/octet-stream'
 
 const typeOf = (path: string): string => TYPES[path.slice(path.lastIndexOf('.') + 1).toLowerCase()] ?? OCTET
 
-/**
- * The file a URL path names inside `root`, or null if it names nothing or names its way out.
- *
- * Traversal is refused on the RESOLVED path rather than by pattern, because `%2e%2e%2f`,
- * `..%5c` and a symlink all arrive here as different strings and leave as the same directory.
- */
+/** The file a URL path names inside `root`, or null. Traversal is refused on the RESOLVED path
+ *  rather than by pattern: `%2e%2e%2f`, `..%5c` and a symlink arrive as three different strings. */
 export function resolveInRoot(root: string, urlPath: string): string | null {
   let decoded: string
   try {
@@ -44,13 +35,8 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
 
 export type StaticSite = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean
 
-/**
- * A handler for everything the route table did not claim. Returns false when the request was
- * not ours, so the caller still answers its own 404.
- *
- * The client is a single-page app: an unknown path that is plainly not an API call is the
- * viewer deep-linking, and it gets `index.html` rather than a 404 they cannot read.
- */
+/** A handler for everything the route table did not claim; returns false when the request was not
+ *  ours. The client is a single-page app, so an unknown non-API path gets `index.html`. */
 export function makeStaticSite(root: string): StaticSite {
   const indexPath = join(resolve(root), 'index.html')
 

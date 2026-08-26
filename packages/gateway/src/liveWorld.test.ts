@@ -1,7 +1,5 @@
-// ★ THE SEAM, ASSERTED THE ONLY WAY IT CAN HONESTLY BE ASSERTED: every row here must FAIL
-// against a scripted cast. A test that passes whether or not a mind is behind the body is the
-// vacuous guard this project keeps finding, and the whole point of this file is the one thing
-// a scripted founder can never do — say a sentence a model wrote.
+// Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
+// behind the body proves nothing about the seam.
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -57,12 +55,8 @@ const TWO: MindSpec[] = [
   },
 ]
 
-/**
- * A model that never leaves the process, in the shape `g11-deepworld.ts`'s own dry client
- * takes: it answers each schema with the first canned value that parses. `LlmClient`'s real
- * cost accounting is covered by `agents/src/llm/client.test.ts`; what these rows need is a
- * mind that decides, for nothing.
- */
+/** A model that never leaves the process: it answers each schema with the first canned value that
+ *  parses. `LlmClient`'s real cost accounting is covered by `agents/src/llm/client.test.ts`. */
 function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): LlmClient {
   const canned = [turn, { facts: [] }, { scenes: [] }, { summary: '' }, { edits: [] }, {}]
   return {
@@ -79,25 +73,20 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
   } as unknown as LlmClient
 }
 
-// The tile the SCRIPTED patrol walks to on this same map, so the act a mind chooses here is
-// one the world is known to accept — and so `action_started walk` actually fires, which is
-// what makes the canned-thought row below capable of failing.
+// The tile the SCRIPTED patrol walks to on this same map, so the act a mind chooses here is one
+// the world is known to accept — and so `action_started walk` actually fires.
 const WELLSIDE = foundersFor(townStructuresFor('showcase')).find((f) => f.id === 'amara')!.patrol[1]
 
-// ★ THE ACT THE ENGINE HAS NO VERB FOR. `VERBS` has no `smoke_fish`, so the world refuses this
-// with `unknown verb:` and the runtime re-offers it to the arbiter as freeform words. That
-// refusal is the doorway to spec §4 and there is no other way in.
+// `VERBS` has no `smoke_fish`, so the world refuses this with `unknown verb:` and the runtime
+// re-offers it to the arbiter as freeform words. That refusal is the only doorway to spec §4.
 const INVENTED_VERB = 'smoke_fish'
 const INVENTING_TURN = {
   thought: THOUGHT, importance: 7,
   action: { verb: INVENTED_VERB, params: { over: 'green wood' } },
 }
 
-// What the arbiter answers with. `canon: ['food_preserving']` is an UNEARNED rung whose
-// prerequisite (`cooking`) the genesis codex knows, so `withinAdjacency` lets it through — the
-// one step out the canon is built to allow. `requires`/`costs` are empty on purpose: this row
-// is about the seam, and a recipe that needed a fish in hand would be refused for the
-// inventory rather than exercised for the wiring.
+// `canon: ['food_preserving']` is an UNEARNED rung whose prerequisite (`cooking`) the genesis
+// codex knows, so `withinAdjacency` lets it through. `requires`/`costs` are empty on purpose.
 const SMOKE_RECIPE = {
   id: 'recipe:smoke_fish',
   name: 'Smoke Fish Over Green Wood',
@@ -164,9 +153,8 @@ async function liveWorld(opts: {
   const agentDbDir = join(opts.dir, 'minds')
   let seen: ReturnType<typeof openAgentDb> | null = null
   let cast: LiveCast | null = null
-  // ★ THROUGH THE FACTORY, exactly as `serve.ts` does it. Built out here instead, the cast
-  // would already hold the per-mind files open when `fresh` deleted them — which is what the
-  // first live boot did, unlinking the very ledger the spend cap reads.
+  // Through the factory, exactly as `serve.ts` does it: built out here the cast would already
+  // hold the per-mind files open when `fresh` deleted them.
   const world = await startDevWorld({
     dbPath: join(opts.dir, 'world.db'), port: 0, map: 'showcase', realMsPerTick: 10_000_000,
     agentDbDir, ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
@@ -200,9 +188,8 @@ async function liveWorld(opts: {
   return { world, cast: cast!, opsDb: seen! }
 }
 
-/** Take WHOLE ticks — `world.tick()`, not `loop.step()` — and let every promise a turn started
- *  settle before the next one. The observer scan runs inside a whole tick and not inside a
- *  step, which is exactly where the canned thought lines are published from. */
+/** Take WHOLE ticks — `world.tick()`, not `loop.step()`. The observer scan runs inside a whole
+ *  tick, which is where the canned thought lines are published from. */
 async function run(world: DevWorld, ticks: number): Promise<void> {
   for (let i = 0; i < ticks; i++) {
     world.tick()
@@ -310,9 +297,8 @@ describe('★ the money, inside the served world', () => {
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
 
-  // ★ THE RATE TRIPWIRE. The total cap is 94 hours of streaming at the measured rate — it stops
-  // a lane's mistake and cannot stop a leak on a process meant to run for weeks. This row spends
-  // FAR UNDER the cap and fast, which is the exact shape the cap is blind to.
+  // The total cap stops a lane's mistake and cannot stop a leak on a process meant to run for
+  // weeks. This row spends FAR UNDER the cap and fast, the exact shape the cap is blind to.
   it('★ stops a town burning too fast even though it is nowhere near its cap', async () => {
     const stops: Array<{ spent: number; cap: number }> = []
     const dir = tmp()
@@ -349,9 +335,8 @@ describe('★ the money, inside the served world', () => {
       dir, spendCapUsd: 5, rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
-    // The seam lane's worst measured 15 minutes: the nightly reflection burst, $0.0154 for five
-    // minds. Two minds' share of that is $0.0062 — this row bills DOUBLE it and still must not
-    // fire, or the ceiling has no headroom and the stream would kill itself every night.
+    // The worst measured 15 minutes is the nightly reflection burst, $0.0154 for five minds; two
+    // minds' share is $0.0062, and this row bills DOUBLE it and still must not fire.
     opsDb.prepare(
       `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
@@ -498,10 +483,6 @@ describe('★ a mind\'s memory across a resume', () => {
   })
 })
 
-// ★ BOTH OF THESE ARE REGRESSIONS FROM THE FIRST REAL LIVE BOOT, NOT IMAGINED CASES. That boot
-// printed "the world db was deleted along with 3 agent memory db(s)" — the three were the call
-// ledger and its WAL, unlinked out from under the open handle — and then hung for ever on a
-// taken port with five minds still booted and nothing holding a reference to stop them.
 describe('★ what the first live boot broke', () => {
   it('the fresh wipe runs BEFORE the cast opens anything, so the ledger is still on disk', async () => {
     const dir = tmp()
@@ -544,20 +525,16 @@ describe('★ what the first live boot broke', () => {
     }
     expect(stopped, 'five minds were left holding databases and the process never exited').toBe(1)
 
-    // ★ AND NOTHING IS STILL POLLING. `createGateway` builds its pump timer BEFORE it listens,
-    // and `close()` — the only thing that clears it — is on the object a failed listen never
-    // returns. The orphan fired every 250 ms against a db the caller had closed and threw an
-    // UNCAUGHT `The database connection is not open`. Vitest reports that as an unhandled
-    // error rather than a failure, so this waits past two poll intervals for it.
+    // `createGateway` builds its pump timer BEFORE it listens, and `close()` is on the object a
+    // failed listen never returns. Vitest reports the orphan's throw as an unhandled error rather
+    // than a failure, so this waits past two poll intervals for it.
     await new Promise((r) => setTimeout(r, 600))
   }, 30_000)
 })
 
 describe('★ closing the town without closing a database under a mind', () => {
-  // `runSleepReflection` writes its facts and scene summaries AFTER the model answers. Close
-  // the mind's db while one is in flight and better-sqlite3 throws "The database connection is
-  // not open" out of a promise nobody awaits — a stream that dies on SIGTERM instead of
-  // shutting down. `stop` waits for the night, but only for as long as a container will let it.
+  // `runSleepReflection` writes its facts AFTER the model answers, so closing the mind's db
+  // mid-flight throws out of a promise nobody awaits — a stream that dies on SIGTERM.
   it('waits while a reflection is still in flight', async () => {
     let busy = true
     setTimeout(() => { busy = false }, 120)
@@ -575,13 +552,8 @@ describe('★ closing the town without closing a database under a mind', () => {
 })
 
 /**
- * ★ SPEC §4 — THE GOD LAYER, IN THE TOWN A PERSON CAN WATCH.
- *
- * Every row here asserts the ROUND TRIP and not the call. "The arbiter was invoked" is the
- * vacuous version of this test: it would pass on a wire that dropped the verdict on the floor.
- * What has to be true is that a mind's novel intent reached the god AND came back as something
- * the world or the mind can perceive — an event in the log, a verb the engine did not have at
- * boot, a line in the mind's own memory.
+ * Every row here asserts the ROUND TRIP and not the call: a mind's novel intent reached the god
+ * AND came back as something the world or the mind can perceive.
  */
 describe('★ a mind attempts what the engine has no verb for, and a god rules on it', () => {
   const rulebookOf = (dir: string): Array<{ recipe_id: string; verb: string }> => {
@@ -616,9 +588,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(discoveries.map((p) => p['name'])).toContain(SMOKE_RECIPE.name)
     const mine = discoveries.find((p) => p['name'] === SMOKE_RECIPE.name)!
     expect(mine['byId']).toBe('amara')
-    // ★ Credited to the words the mind actually used — and they are now WORDS. `humanizeIntent`
-    // takes the underscore out of the coined verb, so the discovery the chronicle renders reads
-    // `smoke fish green wood` and not the identifier our schema made of it.
+    // `humanizeIntent` takes the underscore out of the coined verb, so the chronicle renders
+    // `smoke fish green wood` and not the identifier the schema made of it.
     expect(String(mine['intent'])).toContain(INVENTED_VERB.replace(/_/g, ' '))
     expect(String(mine['intent'])).not.toContain(INVENTED_VERB)
 
@@ -652,9 +623,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // The failure was recorded where an operator looks...
     const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
     expect(alerts.length).toBeGreaterThan(0)
-    // ...and the intent still reached the world as `experiment`, whose own refusal is what the
-    // mind ends up holding. `experiment` never starts an activity — `validate()` always
-    // declines (engine `verbs.ts`) — so the perceivable outcome is a memory, not an event.
+    // ...and the intent still reached the world as `experiment`, which never starts an activity
+    // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
     expect(memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')))
       .toBe(true)
     // A god that fell over must not have minted law on the way down.
@@ -662,10 +632,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
   }, 30_000)
 
   it('★ THE TOWN DOES NOT FORGET ITS OWN LAWS ACROSS A RESTART', async () => {
-    // A rulebook is durable but the engine's `VERBS` registry is in-memory, so a restart is
-    // the moment a codified verb can silently stop existing while its ruling stays on disk —
-    // a town whose laws are written down and no longer enforced. `makeArbiter` re-registers
-    // every active row at construction; this is the row that proves it still does.
+    // A rulebook is durable but the engine's `VERBS` registry is in-memory, so a restart is when
+    // a codified verb can silently stop existing while its ruling stays on disk.
     const dir = tmp()
     const first = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
     await run(first.world, 8)
@@ -673,9 +641,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(rulebookOf(dir).map((r) => r.recipe_id)).toContain(SMOKE_RECIPE.id)
     await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
 
-    // ★ THE MUTATION IS THE TEST. `VERBS` is module state and the first boot already put the
-    // verb there, so leaving it registered would let this pass on a purely in-memory arbiter.
-    // Tearing it out first is what makes the second boot have to earn it back off disk.
+    // `VERBS` is module state and the first boot already put the verb there, so leaving it
+    // registered would let this pass on a purely in-memory arbiter.
     unregisterVerb(SMOKE_RECIPE.id)
     expect(VERBS[SMOKE_RECIPE.id]).toBeUndefined()
 
@@ -709,10 +676,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(existsSync(join(dir, 'minds', '_arbiter.db'))).toBe(false)
     expect(eventsOf(dir, 'discovery_made')).toHaveLength(0)
 
-    // ★ AND HERE IS WHAT THE TOWN IS LIKE WITHOUT A GOD, which is the argument for the default.
-    // With no adjudicator wired `#reroutesUnknownVerb` declines to re-route at all, so the
-    // mind is handed the ENGINE'S OWN ERROR STRING as a memory it will read back next turn.
-    // That is the state this lane replaced, recorded rather than described.
+    // With no adjudicator wired `#reroutesUnknownVerb` declines to re-route at all, so the mind
+    // is handed the ENGINE'S OWN ERROR STRING as a memory it will read back next turn.
     expect(memoriesOf(dir, 'amara').some((t) => t.includes(`unknown verb: ${INVENTED_VERB}`)))
       .toBe(true)
   }, 30_000)
@@ -723,11 +688,8 @@ describe('★ the default stays scripted and free', () => {
   const src = (name: string): string => readFileSync(join(here, name), 'utf8')
 
   it('nothing on the scripted path can reach an LLM: no static @sj/agents import', () => {
-    // The claim `serve.ts` makes in its own header — that `pnpm stream` loads no onnxruntime
-    // and spends $0.00 — is only true while this holds. A static import anywhere on the
-    // scripted path would load the whole mind stack for a world that never uses it.
-    // The prose in `devWorld.ts` NAMES the package while arguing why it must not import it,
-    // so this reads the import statements and not the file.
+    // The prose in `devWorld.ts` NAMES the package while arguing why it must not import it, so
+    // this reads the import statements and not the file.
     const imports = (name: string): string[] =>
       src(name).split('\n').filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
     for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts']) {
@@ -738,9 +700,8 @@ describe('★ the default stays scripted and free', () => {
   })
 
   it('and the arbiter is inside the same quarantine, not beside it', () => {
-    // `@sj/arbiter` depends on `@sj/agents`, so a static import of it anywhere on the scripted
-    // path drags the whole mind stack in exactly as directly as importing `@sj/agents` would.
-    // The guard above would not have caught that: it names one package.
+    // `@sj/arbiter` depends on `@sj/agents`, so a static import of it drags the whole mind stack
+    // in just as directly. The guard above names one package and would not have caught that.
     const imports = (name: string): string[] =>
       src(name).split('\n').filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
     for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {

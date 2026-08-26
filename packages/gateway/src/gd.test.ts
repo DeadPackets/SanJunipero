@@ -1,11 +1,3 @@
-/**
- * GATE G-D — a discovery made by a mind is credited, recorded, replayed, served, marked,
- * read, and drawn, and none of the four pins moved.
- *
- * Rows 8 and 9 exist because this project has shipped an assertion over an empty set: row 8
- * proves the archive under test is NOT empty, and row 7 proves the filter that keeps a
- * malformed row out is the thing doing the keeping.
- */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
@@ -17,12 +9,8 @@ import {
   EventStore, RngStreams, TickLoop, genesisState, openDb, replayFromGenesis,
   type TileId,
 } from '@sj/engine'
-// NO CROSS-PACKAGE IMPORTS. The gateway's tsconfig references shared, engine and forge, and a
-// gate must not widen the build graph to prove something — `packages/web` is a DOM/bundler
-// project and `packages/agents` is not a gateway dependency. Their halves are read as SOURCE
-// instead, the way g12c.test.ts already reaches across packages by file. The runtime property
-// row 1 asserts — that the event folds to nothing and replays exactly — needs no bridge, and
-// the bridge's own announce/drain behaviour is proved in agents/src/runtime/bridge.test.ts.
+// NO CROSS-PACKAGE IMPORTS: `packages/web` is a DOM/bundler project and `packages/agents` is not
+// a gateway dependency, so their halves are read as SOURCE instead.
 import { artNeededFor } from './discoveryArt.js'
 import { readDiscoveries } from './discoveries.js'
 
