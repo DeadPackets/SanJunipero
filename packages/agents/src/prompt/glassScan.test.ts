@@ -76,10 +76,8 @@ describe('the prompt surfaces are clean', () => {
 })
 
 describe('★ an ordinary English word must never kill a mind\'s day', () => {
-  // G9b, two sim-days: ten consecutive `turn_crash`es, one mind, every one of them
-  // `one-way glass leak in assemblePrompt: milestone`, ending at the day roll. The word
-  // was in no store and nothing authored — the compaction summariser wrote it into that
-  // mind's own append-only day log, and every remaining turn of the day threw pre-flight.
+  // A mind's own day log carries ordinary English back into the prompt, so an ordinary word in
+  // the enforced set crashes every remaining turn of its day.
   const ordinaryPhrases: Record<string, string> = {
     milestone: 'Your mind wanders back over the day: finishing the roof felt like a milestone.',
     milestones: 'Your mind wanders back over the day: the milestones of a long summer.',
@@ -110,10 +108,8 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
   })
 
   it('★ every word assembly still enforces mid-run is a key no person writes', () => {
-    // The class fix, stated as the rule rather than as an exception roster: a term is
-    // refused mid-run only if it is unspellable as ordinary English — an ops key with an
-    // underscore (`god_afterlife`, `first_bridge`) or an ops phrase (`semantic first`).
-    // Hand an ordinary word back into the enforced set and this reds on that word.
+    // The rule, not an exception roster: refused mid-run only if it is unspellable as ordinary
+    // English — an underscored ops key, or a two-word ops phrase.
     expect(MID_RUN_ENFORCED.length).toBeGreaterThan(0)
     for (const term of MID_RUN_ENFORCED) {
       expect(/[_ ]/.test(term), `${term} is ordinary English and must not crash a live town`).toBe(true)
@@ -142,11 +138,8 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
 })
 
 describe('★ a ruling is our machinery writing into a mind, not a person speaking', () => {
-  // `refusalMemoryText` writes an arbiter's `impossible.reason` verbatim into a mind's memory,
-  // and the next prompt reads it back. It is the one mind-facing string in the system authored
-  // in the voice of something that knows the rules, which is exactly where our vocabulary
-  // leaks. Mid-run enforcement spares the five ambiguous words to keep a live town from dying
-  // over something one of its PEOPLE said; there is no person to protect in a ruling.
+  // `refusalMemoryText` writes an `impossible.reason` verbatim into the next prompt, and there
+  // is no person to protect in a ruling, so the full roster applies here and not mid-run.
   it('catches all five words the town is being watched to reach on its own', () => {
     for (const word of ['festival', 'faith', 'council', 'market', 'custom']) {
       expect(scanRulingForGlassLeak(`the ${word} has no place for this`), word).toContain(word)
@@ -160,9 +153,7 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
   })
 
   it('catches a directive — a refusal that hands over the next step', () => {
-    // A refusal answers what was asked. One that also says what to do next has given the mind
-    // a path it did not reach on its own. `CRAFT_HINT` is the single sanctioned door and it is
-    // authored, rendered at prose time, and never written back into a stored ruling.
+    // `CRAFT_HINT` is the single sanctioned door, and it is never written back into a ruling.
     for (const line of [
       'you should ask someone who knows the craft',
       'you must gather stone before this can begin',
@@ -176,9 +167,7 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
   })
 
   it('★ and it is not vacuous: an honest refusal passes untouched', () => {
-    // Every reason the arbiter can actually return today, plus the two strings the intents lane
-    // added. If the guard reddens any of these it is banning the arbiter from refusing at all,
-    // which is worse than the leak.
+    // If the guard reddens any of these it is banning the arbiter from refusing at all.
     for (const reason of [
       'nothing in the town lends itself to this',
       'no clear way to do this presents itself',
@@ -195,18 +184,15 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
 
   // ★ THE FOURTH SHAPE — a refusal that names the missing thing has handed over the answer.
   it('★ catches a refusal that names the solution as an absence', () => {
-    // The exact sentence the brief names as the thing that must never be written, plus the
-    // shapes around it. None of these contains an ops word or a `you should`, which is why the
-    // scan as it stood waved every one of them through.
+    // None of these contains an ops word or a `you should`, which is why a narrower scan
+    // waved them all through.
     for (const line of [
       'you cannot smoke fish without a rack',
       'this will not hold unless you have a length of cord',
       'nothing comes of it until you find a sharper stone',
       'the fire will not take for lack of dry wood',
       'there is no edge to cut it with',
-      // ★ VERBATIM FROM A LIVE RULING, intents lane A/B run. `without one` is the same
-      // conditional as `without a rack` and the first draft of this pattern missed it by a
-      // word. A leak found in the wild outranks a leak I invented.
+      // Verbatim from a live ruling: `without one` is the same conditional as `without a rack`.
       'The town lacks a marker, and the action cannot even be started without one.',
     ]) {
       expect(scanRulingForGlassLeak(line), line).not.toEqual([])
@@ -214,14 +200,8 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
   })
 
   it('★ and the fourth shape is not vacuous: a bare ABSENCE is a fact, not a recipe', () => {
-    // ★ THE LINE IS THE CONDITIONAL, NOT THE NOUN, and a red test is what found it. The first
-    // draft of the pattern also caught `you have no` and immediately reddened a shipped arbiter
-    // fixture — `You have no reeds here.` on an `insufficient_materials` verdict. That sentence
-    // states a fact the mind's own perception block already lists verbatim, and it connects
-    // that fact to no method. `without a rack` is the other thing: smoking REQUIRES a rack, a
-    // recipe fragment in a refusal.
-    //
-    // If this row ever reds, the guard has started refusing the arbiter the right to refuse.
+    // The line is the conditional, not the noun: `You have no reeds here.` states a fact and
+    // connects it to no method, where `without a rack` says smoking REQUIRES one.
     for (const line of [
       'this would need a craft the town has not yet reached',
       'there is no ground here to build on',
@@ -235,10 +215,8 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
   })
 
   it('★ and it does not ban a verb the mind was already taught by name', () => {
-    // `CAPABILITIES` teaches `build`, `enter` and `craft` to every mind in block 1, by name.
-    // A refusal using one reveals nothing a mind does not already hold, and forbidding them
-    // would leave the arbiter no vocabulary to answer in. The DIRECTIVE is the leak, not the
-    // verb: the first line here stays clean and the second does not.
+    // Block 1 teaches these verbs to every mind by name, so the directive is the leak and never
+    // the verb; forbidding them would leave the arbiter no vocabulary to refuse in.
     expect(scanRulingForGlassLeak('there is no ground here to build on')).toEqual([])
     expect(scanRulingForGlassLeak('you should build it by the river')).not.toEqual([])
     for (const verb of ['build', 'enter', 'craft', 'stoke', 'inscribe']) {

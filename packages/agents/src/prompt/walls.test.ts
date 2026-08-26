@@ -8,18 +8,9 @@ import {
   howFarUp, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket,
 } from './prose.js'
 
-// ★ R3 — TIME-COST, AND IT WAS NEVER THE PRICE.
-//
-// A house is 2 880 ticks and a night is 720, so the motive probe reported that no mind can
-// answer tonight's cold by building. That reading is wrong about this engine. HANDS ARE THE
-// RATE: `stepBuild` adds one to the walls for every hand on the site, and `buildSeam.test.ts`
-// pins two pairs raising a house in half the time and five in a fifth. Five founders raise one
-// house in 576 ticks — inside one 720-tick night, with two hours to spare.
-//
-// What stopped them was not the price. It was that a half-raised wall was invisible as a place
-// work could go: the packet said `stage: 'construction'` and the prose said "still being built",
-// which reads the same one hour short as it does four days short. Arm C's five minds started
-// TEN separate houses across three nights and finished none of them.
+// Hands are the rate — `stepBuild` adds one to the walls per hand on the site — so a house is
+// a night's work for five. What stopped them was that "still being built" reads the same one
+// hour short as four days short, and a half-raised wall was invisible as a place work can go.
 
 const CFG = DEFAULT_CONFIG
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -92,8 +83,7 @@ describe('★ the packet carries how far up the walls are', () => {
     expect(seen(siteWorld(9000)).raised).toEqual({ done: 2880, needs: 2880 })
   })
 
-  // ★ NOT A MADE-UP FIXTURE: the founding valley itself, seen by a founder at their own door.
-  // Seven of its dwellings stand roofless, and every one of them says how far up it is; the two
+  // The founding valley itself: the roofless dwellings say how far up they are, and the two
   // roofs that held say nothing, because a standing building is not a site.
   it('reads the founding valley: walls on the roofless, silence on the sound', () => {
     const g = makeGenesisWorld(CFG)
@@ -203,14 +193,8 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 })
 
 // ------------------------------------------- R3's remainder: the OTHER place work can go ---
-//
-// `groundForBuilding` names the town's next FREE plot. Before anybody starts, that is the same
-// plot for everyone and masons converge on it; the moment one body plants walls there it stops
-// being free, so everyone who asks next is sent somewhere else. Same rule, opposite behaviour
-// either side of the first wall — and free ground was the ONLY answer the world ever gave to
-// "where does work go". Measured, in one mind's own words, twelve ticks apart:
-//   t=1315 yusuf: "That house is barely started — I'll stand beside it..."
-//   t=1327 yusuf: "The town keeps ground at (81,68) ... I'll build it there tonight."
+// `groundForBuilding` names the town's next FREE plot, which is the same plot for everyone
+// until one body plants walls on it — so free ground alone cannot answer "where does work go".
 
 describe('* walls already standing are a place the world can name', () => {
   const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0 as TileId))
