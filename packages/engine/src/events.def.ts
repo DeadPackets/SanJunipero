@@ -212,7 +212,7 @@ export const TileChanged = z.object({
   x: z.number(), y: z.number(),
   from: z.number().int().min(0).max(10),
   to: z.number().int().min(0).max(10),
-  reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled', 'cleared']),
+  reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled', 'cleared', 'levelled', 'surfaced']),
   byId: z.string().optional(),
 }).strict()
 // The border strip is rolled from the `worldgen` stream at emission and travels in the
