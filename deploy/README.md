@@ -62,6 +62,28 @@ host — nothing in this repository provisions anything or spends anything on yo
 
 That is the whole deployment. The steps below are for running it, not standing it up.
 
+## What `.env` can set
+
+Every name below is enumerated in `compose.yaml`, and a test fails the build if one of them is
+documented here and not passed through. Leave a knob out of `.env` and the container never sees
+it at all, so the code's own default stands — an empty value is not the same as an absent one.
+
+| In `.env` | Default | What it does |
+|---|---|---|
+| `SJ_SITE_ADDRESS` | `:80` | The Caddy hostname. A real name gets a real certificate. |
+| `SJ_RINGS` | `1` | How far the town is platted. **Cannot change on a town that already exists.** |
+| `SJ_INTERIORS` | `0` | `1` lets people go indoors and sleep. |
+| `SJ_MAP` | `showcase` | `scripted` serves the frozen test fixture instead of the product town. |
+| `SJ_LAMPS` | `8` | Street lamps the lamplighter raises. `0` leaves the streets dark. |
+| `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
+| `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
+| `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |
+| `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
+| `SJ_MODELS_DIR` | baked into the image | Where the memory embedder's model is cached. |
+| `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |
+
+`SJ_FRESH` is deliberately NOT in that list — see below.
+
 ## Reading the boot
 
 Three lines decide whether the thing that came back is the thing you had. Grep for them.
@@ -112,12 +134,14 @@ writes more, and restore.
 
 ## ★ The reset is deliberate and cannot be left lying around
 
-`SJ_FRESH` is hard-coded to `"0"` in `compose.yaml` rather than written as `${SJ_FRESH:-0}`.
-That is not a style choice. Compose auto-loads `.env` and layers the shell on top, so as a
-substitution one `SJ_FRESH=1` left behind after a deliberate reset would delete the world on
-**every restart from then on**, silently, with a new day 0 as the only sign.
+`SJ_FRESH` is hard-coded to `0` in `compose.yaml` — never `${SJ_FRESH:-0}`, and never a bare
+`- SJ_FRESH` pass-through like the knobs in the table above. That is not a style choice. Compose
+auto-loads `.env` and layers the shell on top, so either of those forms would let one
+`SJ_FRESH=1` left behind after a deliberate reset delete the world on **every restart from then
+on**, silently, with a new day 0 as the only sign.
 
-Verified: with `SJ_FRESH=1` sitting in `.env`, the town still resumed at tick 590.
+Verified: with `SJ_FRESH=1` sitting in `.env`, the town still resumed at tick 590, and
+`docker compose config` still reports `SJ_FRESH: "0"`.
 
 To actually reset, type it into one run:
 
