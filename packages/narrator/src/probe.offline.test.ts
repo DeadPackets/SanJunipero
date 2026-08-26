@@ -11,8 +11,6 @@ describe('Task 1 offline part — probe mechanics pinned without a live call', (
     expect(NARRATOR_CANON.startsWith('You are the omniscient historian of San Junipero')).toBe(true)
     // Long enough that a provider-side prefix cache has something to hold.
     expect(NARRATOR_CANON.length).toBeGreaterThan(1000)
-    // Diegetic: the operator-facing prefix may name prompts/models (it instructs
-    // the model not to) but must never mention AI or assistants.
     expect(/\b(AI|assistant|chatbot)\b/i.test(NARRATOR_CANON)).toBe(false)
   })
 
