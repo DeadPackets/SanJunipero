@@ -52,7 +52,13 @@ export type Flame = {
   x: number; y: number; w: number; h: number; radius: number
 }
 
+// Keyed on the identity of the world, which the fold replaces on every event — so a state that
+// is still the state it was answers "what is alight" once, however many tiles ask.
+const memo = new WeakMap<LitWorld, { tick: number; config: SimConfig; flames: Flame[] }>()
+
 export function flamesAt(state: LitWorld, tick: number, config: SimConfig): Flame[] {
+  const hit = memo.get(state)
+  if (hit !== undefined && hit.tick === tick && hit.config === config) return hit.flames
   const out: Flame[] = []
   for (const id of Object.keys(state.items).sort()) {
     const item = state.items[id]!
@@ -68,6 +74,7 @@ export function flamesAt(state: LitWorld, tick: number, config: SimConfig): Flam
     if (s.fueledUntilTick === undefined || s.fueledUntilTick < tick) continue
     out.push({ id, source: 'structure', x: s.x, y: s.y, w: s.w, h: s.h, radius })
   }
+  memo.set(state, { tick, config, flames: out })
   return out
 }
 
