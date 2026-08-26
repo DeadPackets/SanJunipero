@@ -51,5 +51,8 @@
         "src/**/*.{ts,tsx}"
       ]
     }
+  },
+  "rules": {
+    "duplicates": "warn"
   }
 }
