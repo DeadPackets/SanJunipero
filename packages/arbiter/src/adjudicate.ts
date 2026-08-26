@@ -29,11 +29,42 @@ const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically
 // many total tries before the diegetic fallback below.
 const MAX_LLM_ATTEMPTS = 2
 
-// Returned — never recorded — when every try was invalid, so a bad run can
-// never become immutable precedent.
-const FALLBACK_IMPOSSIBLE: Verdict = {
+// ★ THE CONTENTLESS REFUSAL, AND WHERE THE GLASS LINE IS DRAWN.
+//
+// Returned — never recorded — when every try was invalid, so a bad run can never become
+// immutable precedent. The live proof caught what that costs: Amara reached the same idea three
+// times in 34 ticks, because `no clear way to do this presents itself` told her nothing she
+// could act on. Every novel intent therefore cost up to 3x, in money and in her own attention.
+//
+// The trap is that this string is MIND-FACING — `refusalMemoryText` writes it verbatim into a
+// memory the next prompt reads back — so the glass forbids naming the fix. The line this lane
+// draws, and argues for:
+//
+//   A REFUSAL MAY NAME THE ATTEMPT AND THE MIND'S OWN HISTORY. IT MAY NEVER NAME THE ACT THAT
+//   WOULD HAVE WORKED.
+//
+//   safe and useless   "no clear way to do this presents itself" — true, and unactionable
+//   safe and learnable "it will not come together as it stands" — says the attempt was
+//                      understood and did not hold, so trying the identical thing again is
+//                      not new information. Names nothing absent and no next step.
+//   NOT ALLOWED        "you cannot smoke fish without a rack" — hands over the solution and
+//                      poisons every emergence measurement C8 exists to take.
+//
+// ★ THE CLASS STAYS `physically_impossible`, AND THAT IS A DELIBERATE NON-CHANGE. The honest
+// cause here is "no method could be formed", and there is no class for it — but
+// `ImpossibleClassSchema` is the MODEL'S answer space, handed to it as structured output, so a
+// fifth option called `no_method_found` is an easy out the model can take on any hard intent.
+// Buying an accurate label for our own fallback by widening the model's choices is a bad trade.
+// The class is inert either way: the fallback is returned and never recorded, so
+// `CONTEXT_INDEPENDENT_IMPOSSIBLE` never reads it, and the only live consumer is `CRAFT_HINT`.
+//
+// ★ IT DOES NOT EARN `CRAFT_HINT`. "Perhaps someone nearby knows the craft" asserts that
+// somebody knows — a fact we do not have when the god could not form an answer at all. A door
+// that may open onto nothing is a path invented for the mind, which is the thing this comment
+// is about.
+export const FALLBACK_IMPOSSIBLE: Verdict = {
   kind: 'impossible',
-  reason: 'no clear way to do this presents itself',
+  reason: 'you turn it over and it will not come together as it stands',
   class: 'physically_impossible',
 }
 
@@ -78,6 +109,8 @@ export type AgentCtx = {
     structures: Array<{ kind: string; x: number; y: number }>
     ground: string[]
   }
+  // The asker's own sentence behind the ask. Threaded to the prompt, never to a precedent key.
+  saying?: string
 }
 
 // What a codification just minted. Fired once, on the first insert, from BOTH paths — the

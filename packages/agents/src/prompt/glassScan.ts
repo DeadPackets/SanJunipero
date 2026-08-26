@@ -121,11 +121,50 @@ export function scanPromptForGlassLeak(prompt: string): string[] {
 const RULING_DIRECTIVE =
   /\byou (should|must|ought to|need to|could try|may want|will need)\b|\bgo (inside|and)\b|\binstead,? (you|try)\b/i
 
-/** Every ops word and every directive in text a mind will be handed. Empty is the only answer. */
+// ★ THE FOURTH SHAPE — NAMING THE MISSING THING, added by the intents lane with the wider
+// refusal text it had to write.
+//
+// A directive says what to do next. This says the same thing one step back, and the old scan
+// waved it through: *"you cannot smoke fish without a rack"* contains no ops word, no `you
+// should`, and hands over the entire answer. So does *"you have no rack"*. The blocker named is
+// the solution stated as an absence, and a mind reads it as a shopping list.
+//
+// ★ THE LINE IS THE CONDITIONAL, NOT THE NOUN — and this took a red test to find.
+//
+// The first draft of this pattern also caught `you have no` and immediately reddened a shipped
+// arbiter fixture: *"You have no reeds here."* on an `insufficient_materials` verdict. Reading
+// it settled the rule, so it is written down rather than re-derived:
+//
+//   "You have no reeds here."               a fact about the world. The mind's own perception
+//                                           block already lists what it carries, verbatim. It
+//                                           connects that fact to no method, so it is not a
+//                                           recipe and it is ALLOWED.
+//   "you cannot smoke fish without a rack"  a CONDITIONAL — smoking requires a rack. That is a
+//                                           recipe fragment in a refusal, and it is the leak.
+//
+// So the shapes banned here all encode "X requires Y": `without a`, `unless you have`, `until
+// you have`, `for lack of`. A bare statement of absence is not one of them.
+//
+// ★ WHAT THIS STILL CANNOT DO, and it is the honest limit of a static scan: it cannot tell a
+// material the town already has a word for from an object the refusal has just invented. That
+// distinction needs `deps.vocabulary`, which lives in the arbiter and not in this package.
+// Pricing it: pass the vocabulary into a second scanner at the `reasonTainted` call site and
+// let a conditional naming a KNOWN material through, ~1h. Until then the conditional itself is
+// refused whatever it names, which errs toward the canned line and loses only words.
+//
+// A hit SWAPS the reason for `CLEAN_IMPOSSIBLE_REASON` rather than retrying, which is what
+// makes that error bearable: the verdict survives, only the words are lost.
+const RULING_NAMES_THE_MISSING_THING =
+  /\b(without (a|an|any|the|one)\b|unless you (have|hold|find)\b|until you (have|hold|find)\b|for lack of\b|there is no \w+ to \w+ (it|this|them) with\b)/i
+
+/** Every ops word, directive and named-absence in text a mind will be handed. Empty is the only
+ *  acceptable answer. */
 export function scanRulingForGlassLeak(text: string): string[] {
   const out = scan(text, ALL_PATTERNS)
-  const directive = RULING_DIRECTIVE.exec(text)
-  if (directive !== null) out.push(directive[0].toLowerCase())
+  for (const re of [RULING_DIRECTIVE, RULING_NAMES_THE_MISSING_THING]) {
+    const hit = re.exec(text)
+    if (hit !== null) out.push(hit[0].toLowerCase().trim())
+  }
   return out
 }
 
