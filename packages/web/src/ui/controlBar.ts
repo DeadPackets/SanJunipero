@@ -1,6 +1,6 @@
 import type { ZoomStop } from '../render/camera.js'
 import { ZOOM_STOPS, stepStop } from '../render/camera.js'
-import { LENSES, type Lens } from './route.js'
+import { LENSES, LENS_LABELS, type Lens } from './route.js'
 
 // The bar's contents are DERIVED from what the viewer can currently do, so it can never advertise
 // a control that does nothing, and a refusal is SHOWN rather than merely implied.
@@ -34,11 +34,6 @@ export type ControlCtx = {
   townFits: boolean
 }
 
-/** The town's own word for each lens, so the bar and the top nav name one thing once. */
-export const LENS_LABEL: Readonly<Record<Lens, string>> = {
-  map: 'The town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
-  society: 'Bonds', director: 'Moments', laws: 'World laws',
-}
 export const LENS_GLYPH: Readonly<Record<Lens, string>> = {
   map: 'tile', inspector: 'folk', chronicle: 'scroll', discoveries: 'find',
   society: 'bond', director: 'reel', laws: 'book',
@@ -87,7 +82,7 @@ export function controlItems(ctx: ControlCtx): ControlItem[] {
     out.push({
       id: `lens-${lens}`,
       group: 'lens',
-      label: LENS_LABEL[lens],
+      label: LENS_LABELS[lens],
       glyph: LENS_GLYPH[lens],
       state: ctx.lens === lens ? 'on' : 'off',
     })

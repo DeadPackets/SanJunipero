@@ -3,6 +3,14 @@ import { BROADCAST_PARAM, broadcastFromSearch } from './broadcast.js'
 
 export const LENSES = ['map', 'inspector', 'chronicle', 'discoveries', 'society', 'director', 'laws'] as const
 export type Lens = typeof LENSES[number]
+
+/** THE ONE TABLE. The top nav and the control bar name one thing once — they used to keep a
+ *  table each, and the two had already drifted ("Town"/"The town", "World Laws"/"World laws").
+ *  Chrome copy speaks about townsfolk, never machinery (spec §5). */
+export const LENS_LABELS: Readonly<Record<Lens, string>> = {
+  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
+  society: 'Bonds', director: 'Moments', laws: 'World Laws',
+}
 export type Route = {
   lens: Lens
   moment: { day: number; time: string } | null

@@ -215,14 +215,10 @@ body {
 /* the sky word is the one thing that may be clipped on a narrow window; the day and the
    count never are, and nothing may push the page into a horizontal scroll */
 .strip-weather { overflow: hidden; text-overflow: ellipsis; }
-.strip-clock, .strip-people { flex: none; }
+.strip-people { flex: none; }
 .strip-glyph { display: block; flex: none; image-rendering: pixelated; }
 .strip-num i { font-style: normal; font-variant-numeric: tabular-nums; color: var(--deep); }
-.strip-rule {
-  width: 2px; height: 12px; flex: none;
-  background: repeating-linear-gradient(180deg, var(--stone) 0 2px, transparent 2px 4px);
-}
-.strip-weather { text-transform: uppercase; color: var(--ink-quiet); }
+.strip-weather { text-transform: uppercase; color: var(--ink-quiet); letter-spacing: 0.06em; }
 .strip-people { margin-left: auto; }
 .strip-gone { margin-left: 0.4rem; color: var(--ink-quiet); }
 
