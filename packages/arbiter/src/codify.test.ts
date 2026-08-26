@@ -358,8 +358,6 @@ describe('codify reports the mint — once, and only for a new one', () => {
       rulebook: new RulebookStore(db), review: new ReviewStore(db), codex, tick: 5, ...extra,
     }
   }
-  // A fresh id and a name that carries its words: the sanity gate refuses an id whose
-  // words are nowhere in the name, and VERBS is a global registry across this file.
   // A fresh id per test: VERBS is a global registry, and the sanity gate refuses an id whose
   // words are nowhere in the name.
   let n = 0
