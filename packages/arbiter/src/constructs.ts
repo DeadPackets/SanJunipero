@@ -339,7 +339,7 @@ export type ConstructPassDeps = {
   baseConfig: SimConfig
   store: ConstructStore
   llm: LlmClient
-  laws?: Record<string, unknown>
+  laws?: Record<string, unknown> | undefined
 }
 
 // The daily pass: heuristics, then one classification call, then the registry. Idempotent —

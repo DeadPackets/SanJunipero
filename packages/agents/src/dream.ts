@@ -49,7 +49,7 @@ function shuffle<T>(items: T[], stream: RngStream): T[] {
   const out = [...items]
   for (let i = out.length - 1; i > 0; i -= 1) {
     const j = stream.int(i + 1)
-    ;[out[i], out[j]] = [out[j], out[i]]
+    ;[out[i], out[j]] = [out[j]!, out[i]!]
   }
   return out
 }
@@ -67,7 +67,7 @@ function unionTags(fragments: MemoryRow[]): MemoryTags {
   }
   return {
     people: [...people],
-    place: places.size === 1 ? [...places][0] : null,
+    place: places.size === 1 ? [...places][0]! : null,
     objects: [...objects],
     topics: [...topics],
   }

@@ -2,7 +2,7 @@
 // so this posts the image body directly. On a 4xx with the reference it retries once without it.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { buildAssetPrompt } from '../src/styleBible.js'
-import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
+import { BudgetGuard } from '../src/budget.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')

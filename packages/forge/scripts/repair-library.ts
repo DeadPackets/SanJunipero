@@ -4,7 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng } from '../src/post/raw.js'
 import { openForgeDb } from '../src/db.js'
 import { AssetCodex } from '../src/codex.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'

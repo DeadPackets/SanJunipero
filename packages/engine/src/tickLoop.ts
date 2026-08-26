@@ -21,7 +21,7 @@ export class TickLoop {
   #timer: NodeJS.Timeout | null = null
   #nextAt = 0
   #config: SimConfig
-  #onError?: (err: unknown) => void
+  #onError: ((err: unknown) => void) | undefined
 
   constructor(opts: {
     store: EventStore

@@ -70,12 +70,12 @@ describe('NarratorStore', () => {
       dramaticIrony: 0,
       total: 7.5,
     }
-    store.insertHeat(sceneId, s)
+    store.insertHeat(sceneId!, s)
     const heats = store.heatsForDay(1)
     expect(heats).toHaveLength(1)
-    expect(heats[0].sceneId).toBe(sceneId)
-    expect(heats[0].s.total).toBe(7.5)
-    expect(heats[0].s).toEqual(s)
+    expect(heats[0]!.sceneId).toBe(sceneId)
+    expect(heats[0]!.s.total).toBe(7.5)
+    expect(heats[0]!.s).toEqual(s)
   })
 
   it('milestones: kinds round-trip and duplicate kind throws', () => {
@@ -109,7 +109,7 @@ describe('NarratorStore', () => {
     const id = store.insertInstitution(inst)
     const got = store.institutions()
     expect(got).toEqual([{ id, ...inst }])
-    expect(got[0].memberIds).toEqual(['omar', 'yusuf'])
+    expect(got[0]!.memberIds).toEqual(['omar', 'yusuf'])
   })
 
   it('chapters: insert, range query, day query', () => {
@@ -177,10 +177,10 @@ describe('NarratorStore', () => {
     })
     const bios = store.publications('biography')
     expect(bios).toHaveLength(1)
-    expect(bios[0].citations).toBeNull()
-    expect(bios[0].kind).toBe('biography')
+    expect(bios[0]!.citations).toBeNull()
+    expect(bios[0]!.kind).toBe('biography')
     const all = store.publications()
     expect(all).toHaveLength(2)
-    expect(all[0].citations).toEqual([3])
+    expect(all[0]!.citations).toEqual([3])
   })
 })

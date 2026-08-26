@@ -1,7 +1,7 @@
 import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
+import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { bodyDepthBox } from './depth.js'
 import { facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
@@ -144,7 +144,7 @@ function sliceV4(
 
 // Who belongs on the TOWN map. The dead leave it, and so does anyone who has gone indoors — an
 // occupant carries an `insideId` and the interior sub-scene draws them there instead.
-export function rendersOnMap(a: { alive: boolean; insideId?: string }): boolean {
+export function rendersOnMap(a: { alive: boolean; insideId?: string | undefined }): boolean {
   return a.alive && a.insideId === undefined
 }
 

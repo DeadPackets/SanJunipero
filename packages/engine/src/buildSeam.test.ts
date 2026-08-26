@@ -503,7 +503,7 @@ describe('★ a block is laid out when its first building is raised', () => {
       mysteryProse: () => null,
     }
     const lines = lay
-      .map((t, i) => chronicleLine(ev('tile_changed', { ...t, byId: 'a' }), look))
+      .map((t) => chronicleLine(ev('tile_changed', { ...t, byId: 'a' }), look))
       .filter((l) => l !== null)
     expect(lines).toEqual([])
   })

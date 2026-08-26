@@ -123,9 +123,9 @@ describe('downscaleMajority', () => {
   // Was "first-seen scan order", which is the property that made the whole thing
   // orientation-dependent: reversing the block reversed the answer.
   it('breaks frequency ties the same way whichever end of the block it reads from', () => {
-    const src = img(2, 2, (x, y) => (y === 0 ? BLUE : RED)) // 2 blue then 2 red
+    const src = img(2, 2, (_x, y) => (y === 0 ? BLUE : RED)) // 2 blue then 2 red
     expect([...downscaleMajority(src, 1, 1).data]).toEqual(BLUE)
-    const reversed = img(2, 2, (x, y) => (y === 0 ? RED : BLUE))
+    const reversed = img(2, 2, (_x, y) => (y === 0 ? RED : BLUE))
     expect([...downscaleMajority(reversed, 1, 1).data]).toEqual(BLUE)
   })
   it('preserves quadrant colors on a clean 2x downscale', () => {

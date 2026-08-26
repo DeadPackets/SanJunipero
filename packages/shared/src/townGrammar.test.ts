@@ -19,7 +19,6 @@ import {
   DRY_GROUND,
   blockRect,
   blockTiles,
-  frontageTiles,
   blockIsPlattable,
   plotsOf,
   place,

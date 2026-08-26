@@ -53,7 +53,7 @@ export type DataApiDeps = {
   db: Database.Database
   mirror: WorldMirror
   config: SimConfig
-  agentDbDir?: string
+  agentDbDir?: string | undefined
   /** Testing seam only: how many records the read path is holding right now. See `readFold`. */
   onFootprint?: (f: () => Footprint) => void
 }

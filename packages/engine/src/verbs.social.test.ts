@@ -56,9 +56,6 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
   const wt = createWorldTick(config, rng)
   return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
-function atTick(s: WorldState, tick: number): WorldState {
-  return { ...s, tick }
-}
 
 describe('verb: speak', () => {
   // ★ THE MOUTH IS NOT THE HANDS. A word lands the moment it is said: no `action_started`, no
@@ -358,7 +355,7 @@ describe('verb: teach', () => {
     const s = makeWorld()
     const low = patchAgent(s, 'a1', { skills: { farming: 75 } })
     expect(
-      VERBS.teach.onComplete(
+      VERBS.teach!.onComplete(
         low,
         CFG,
         'a1',
@@ -368,7 +365,7 @@ describe('verb: teach', () => {
     ).toEqual([{ type: 'skill_gained', payload: { agentId: 'a2', track: 'farming', xp: 7.5 } }])
     const high = patchAgent(s, 'a1', { skills: { farming: 1000 } })
     expect(
-      VERBS.teach.onComplete(
+      VERBS.teach!.onComplete(
         high,
         CFG,
         'a1',
@@ -433,7 +430,13 @@ describe('verb onComplete re-checks (stale target)', () => {
     let s = makeWorld()
     s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c1').get('combat'),
+      ),
     ).toEqual([])
   })
 
@@ -441,7 +444,13 @@ describe('verb onComplete re-checks (stale target)', () => {
     let s = makeWorld()
     s = patchAgent(s, 'a2', { x: 5, y: 5 })
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c1').get('combat'),
+      ),
     ).toEqual([])
   })
 
@@ -454,7 +463,7 @@ describe('verb onComplete re-checks (stale target)', () => {
     )
     s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
     expect(
-      VERBS.give.onComplete(
+      VERBS.give!.onComplete(
         s,
         CFG,
         'a1',
@@ -469,7 +478,7 @@ describe('verb onComplete re-checks (stale target)', () => {
     let dead = makeWorld()
     dead = fold(dead, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
     expect(
-      VERBS.tend.onComplete(
+      VERBS.tend!.onComplete(
         dead,
         CFG,
         'a1',
@@ -479,7 +488,13 @@ describe('verb onComplete re-checks (stale target)', () => {
     ).toEqual([])
     const far = patchAgent(makeWorld(), 'a2', { x: 5, y: 5 })
     expect(
-      VERBS.tend.onComplete(far, CFG, 'a1', { targetId: 'a2' }, new RngStreams('t').get('actions')),
+      VERBS.tend!.onComplete(
+        far,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('t').get('actions'),
+      ),
     ).toEqual([])
   })
 
@@ -487,7 +502,7 @@ describe('verb onComplete re-checks (stale target)', () => {
     let s = patchAgent(makeWorld(), 'a1', { skills: { farming: 300 } })
     s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
     expect(
-      VERBS.teach.onComplete(
+      VERBS.teach!.onComplete(
         s,
         CFG,
         'a1',
@@ -496,7 +511,7 @@ describe('verb onComplete re-checks (stale target)', () => {
       ),
     ).toEqual([])
     expect(
-      VERBS.teach.onComplete(
+      VERBS.teach!.onComplete(
         s,
         CFG,
         'a1',
@@ -533,7 +548,13 @@ describe('verb: attack', () => {
   it('seeded outcome runs both directions: attacker wins (c1) and loses (c6)', () => {
     const s = makeWorld()
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c1').get('combat'),
+      ),
     ).toEqual([
       {
         type: 'agent_harmed',
@@ -551,7 +572,13 @@ describe('verb: attack', () => {
       },
     ])
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c6').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c6').get('combat'),
+      ),
     ).toEqual([
       {
         type: 'agent_harmed',
@@ -573,7 +600,13 @@ describe('verb: attack', () => {
   it('injury tier by margin: minor (c2) vs serious (c3) vs grave (c1)', () => {
     const s = makeWorld()
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c2').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c2').get('combat'),
+      ),
     ).toEqual([
       {
         type: 'agent_harmed',
@@ -591,7 +624,13 @@ describe('verb: attack', () => {
       },
     ])
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c3').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('c3').get('combat'),
+      ),
     ).toEqual([
       {
         type: 'agent_harmed',
@@ -615,7 +654,13 @@ describe('verb: attack', () => {
     s = patchAgent(s, 'a1', { hp: 10, needs: { ...s.agents.a1!.needs, energy: 10 } })
     // seed w3: raw rollA 0.9315 > raw rollB 0.1737, but weight 0.1 drops scoreA below scoreB
     expect(
-      VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('w3').get('combat')),
+      VERBS.attack!.onComplete(
+        s,
+        CFG,
+        'a1',
+        { targetId: 'a2' },
+        new RngStreams('w3').get('combat'),
+      ),
     ).toEqual([
       {
         type: 'agent_harmed',
@@ -636,7 +681,7 @@ describe('verb: attack', () => {
 
   it('never instant death: a grave hit damages but does not kill a full-health target', () => {
     const s = makeWorld()
-    const events = VERBS.attack.onComplete(
+    const events = VERBS.attack!.onComplete(
       s,
       CFG,
       'a1',
@@ -699,7 +744,7 @@ describe('eat rulings (Task 12)', () => {
     )
     // item leaves the agent before completion
     const gone = fold(s, ev('item_moved', { id: 'item_1', loc: { t: 'agent', id: 'a2' } }), CFG)
-    const events = VERBS.eat.onComplete(
+    const events = VERBS.eat!.onComplete(
       gone,
       CFG,
       'a1',

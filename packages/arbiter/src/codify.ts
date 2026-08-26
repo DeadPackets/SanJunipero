@@ -25,7 +25,7 @@ function anyStructureNear(
   agentId: string,
   pred: (s: Structure) => boolean,
 ): boolean {
-  const a = state.agents[agentId]
+  const a = state.agents[agentId]!
   for (const id of Object.keys(state.structures)) {
     const s = state.structures[id]!
     const overlaps =
@@ -36,7 +36,7 @@ function anyStructureNear(
 }
 
 function anyAdjacentTile(state: WorldState, agentId: string, tile: string): boolean {
-  const a = state.agents[agentId]
+  const a = state.agents[agentId]!
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue
@@ -186,8 +186,10 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
         ...wearTools(state, config, agentId, recipe),
       ]
     },
-    skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,
-    rngStream: recipe.rngStream,
+    ...(recipe.skillCheck === undefined
+      ? {}
+      : { skill: { track: recipe.skillCheck.track, xp: 10 } }),
+    ...(recipe.rngStream === undefined ? {} : { rngStream: recipe.rngStream }),
   }
 }
 

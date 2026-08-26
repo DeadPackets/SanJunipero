@@ -74,7 +74,12 @@ export function criterionOf(v: VisionVerdict, c: Criterion): VisionCriterion | u
 
 export function deriveOverall(
   c: VisionCriteria,
-  o: { minScore: number; attempt: number; maxRetries: number; naFor?: readonly string[] },
+  o: {
+    minScore: number
+    attempt: number
+    maxRetries: number
+    naFor?: readonly string[] | undefined
+  },
 ): 'pass' | 'retry' | 'blocked' {
   const skip = new Set(o.naFor ?? [])
   const live = CRITERIA.filter((k) => !skip.has(k))

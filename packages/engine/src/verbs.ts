@@ -1461,7 +1461,7 @@ export function buildSiteOf(
   state: WorldState,
   config: SimConfig,
   agentId: string,
-  params: { kind: string; x?: number; y?: number },
+  params: { kind: string; x?: number | undefined; y?: number | undefined },
 ): BuildSiteAnswer {
   const key = `${agentId}|${params.kind}|${params.x ?? ''}|${params.y ?? ''}`
   const hit = siteMemo.get(state)
@@ -1482,7 +1482,7 @@ function computeBuildSite(
   state: WorldState,
   config: SimConfig,
   agentId: string,
-  params: { kind: string; x?: number; y?: number },
+  params: { kind: string; x?: number | undefined; y?: number | undefined },
 ): BuildSiteAnswer {
   const recipe = buildableRecipe(config, params.kind)!
   if (!buildIsPlotted(state, config, params.kind)) {

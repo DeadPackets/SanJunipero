@@ -159,12 +159,12 @@ export async function runPreflight(opts: {
   provider: string
   hardAllowList: boolean
   model: string
-  identity?: IdentityCore
-  personality?: PersonalityDoc
+  identity?: IdentityCore | undefined
+  personality?: PersonalityDoc | undefined
   // How many times the three scenes are asked before the provider is refused. The gate asks
   // for PREFLIGHT_ROUNDS; the default of one keeps a bare call to this a single probe.
-  rounds?: number
-  costUsd?: () => number
+  rounds?: number | undefined
+  costUsd?: (() => number) | undefined
   servedProviders?: () => string[]
   // A probe that discards its answers cannot be audited: a back end can clear the bar with
   // three-word turns, and only the turns themselves say so.

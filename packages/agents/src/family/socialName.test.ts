@@ -83,7 +83,14 @@ function makeDb(): Database.Database {
 }
 
 function client(db: Database.Database, model: MockLanguageModelV4, budgetUsd?: number): LlmClient {
-  return new LlmClient({ model, db, caller: 'naming', agentId: 'amara', maxRetries: 0, budgetUsd })
+  return new LlmClient({
+    model,
+    db,
+    caller: 'naming',
+    agentId: 'amara',
+    maxRetries: 0,
+    ...(budgetUsd === undefined ? {} : { budgetUsd }),
+  })
 }
 
 function rows(db: Database.Database) {

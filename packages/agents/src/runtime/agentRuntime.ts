@@ -192,11 +192,11 @@ export class AgentRuntime {
     identity: IdentityCore
     personality: PersonalityStore
     bridge: EngineBridge
-    config?: Partial<MindConfig>
-    reflectionLlm?: ReflectionLlm
-    dreamLlm?: DreamLlm
-    onThought?: (t: { tick: number; agentId: string; text: string }) => void
-    adjudicator?: Adjudicator
+    config?: Partial<MindConfig> | undefined
+    reflectionLlm?: ReflectionLlm | undefined
+    dreamLlm?: DreamLlm | undefined
+    onThought?: ((t: { tick: number; agentId: string; text: string }) => void) | undefined
+    adjudicator?: Adjudicator | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm

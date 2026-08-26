@@ -18,7 +18,6 @@ import {
   STRIDE_MIN_RATIO,
   CONTACT_PASSING_MIN_RATIO,
   STANCE_MIN_RATIO,
-  type Facing,
   type PoseV2,
   type GateFailure,
 } from './sheet.js'

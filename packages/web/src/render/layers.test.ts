@@ -134,7 +134,7 @@ describe('applyDepthOrder culls to the viewport', () => {
       .map((e) => [e.box.id, e.node.zIndex] as const)
     const only = all.filter((e) => e.node.visible).map((e) => ({ box: e.box, node: nodeFor() }))
     applyDepthOrder(only as never, { x: -1e6, y: -1e6, w: 2e6, h: 2e6 })
-    expect(only.map((e, i) => [e.box.id, e.node.zIndex] as const)).toEqual(withCull)
+    expect(only.map((e) => [e.box.id, e.node.zIndex] as const)).toEqual(withCull)
   })
 })
 

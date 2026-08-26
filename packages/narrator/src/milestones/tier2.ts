@@ -18,7 +18,7 @@ export type Tier2Ctx = {
   config: SimConfig
   // The engine's own relationship rows. Absent for a pass with no world in reach, and the
   // three detectors that need one simply do not run.
-  state?: WorldState
+  state?: WorldState | undefined
 }
 
 type Found = { kind: string; label: string; ev: SimEvent; agentIds: string[] }

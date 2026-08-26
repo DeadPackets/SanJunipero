@@ -7,7 +7,7 @@ export { easeOutCubic } from '../render/camera.js'
  *  surfaces doing the same thing move the same way. */
 export const MOTIONS = ['tap', 'reveal', 'enter', 'move', 'scene', 'ambient'] as const
 export type MotionName = (typeof MOTIONS)[number]
-export type Motion = { ms: number; ease: string; stagger?: number }
+export type Motion = { ms: number; ease: string; stagger?: number | undefined }
 
 export const MOTION: Readonly<Record<MotionName, Motion>> = {
   tap: { ms: 90, ease: 'cubic-bezier(0.3, 0, 0.2, 1)' }, // a press answering

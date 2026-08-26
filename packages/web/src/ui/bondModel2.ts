@@ -1,10 +1,6 @@
 import {
   BOND_ACT_OF_KIND,
-  BOND_LEVELS,
-  BOND_VALENCE,
   LEVEL_RANK,
-  LEVEL_THRESHOLDS,
-  WARMTH_HALF_LIFE_TICKS,
   bondActCount,
   bondLevel,
   bondRollup,

@@ -17,7 +17,7 @@ export type AdjudicationBlocks = {
     }
     // The asker's own sentence, verbatim. Fenced exactly like the intent, because it is the
     // same class of string: agent-authored text going into a prompt.
-    saying?: string
+    saying?: string | undefined
   }
   precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
   // The words for stuff. Every material and building the recipe may name has to be on the

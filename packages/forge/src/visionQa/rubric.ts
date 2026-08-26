@@ -94,7 +94,10 @@ export function checkerCard(art: RawImage): RawImage {
   return img
 }
 
-function criterionAsk(k: Criterion, a: { klass: string; expectedFacing?: string }): string {
+function criterionAsk(
+  k: Criterion,
+  a: { klass: string; expectedFacing?: string | undefined },
+): string {
   const pitch = CANONICAL_PITCH[a.klass as keyof typeof CANONICAL_PITCH]
   switch (k) {
     case 'palette':
@@ -130,9 +133,9 @@ const NA_REASON: Record<string, string> = {
 export function buildRubricPrompt(args: {
   klass: string
   commission: string
-  footprint?: Footprint
-  expectedFacing?: string
-  naFor?: readonly string[]
+  footprint?: Footprint | undefined
+  expectedFacing?: string | undefined
+  naFor?: readonly string[] | undefined
 }): string {
   const na = new Set(args.naFor ?? [])
   const live = CRITERIA.filter((c) => !na.has(c))

@@ -11,7 +11,7 @@ import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } f
 import { HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS } from './heat.js'
 import { mountDataApi, type Footprint } from './api.js'
 import { WorldMirror } from './worldMirror.js'
-import type { RouteHandler, Router } from './server.js'
+import type { RouteHandler } from './server.js'
 
 /**
  * Growth is the property, so the measurement is the SECOND tranche: three times the events of

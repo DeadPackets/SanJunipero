@@ -100,7 +100,7 @@ export type InteriorIngestEntry = { kind: string; action: 'registered' | 'unchan
  *  nothing, and re-authored art gets a new record that wins by seq. */
 export function registerCommittedInteriors(
   codex: AssetCodex,
-  opts: { root?: string } = {},
+  opts: { root?: string | undefined } = {},
 ): InteriorIngestEntry[] {
   const latest = new Map<string, AssetRecord>()
   for (const r of codex.listSince(0)) {

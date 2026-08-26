@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'

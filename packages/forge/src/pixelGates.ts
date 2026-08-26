@@ -92,7 +92,7 @@ export function pixelGridGate(img: RawImage, artPx: number): GateResult & { badB
 // sampled by the renderer. Every shipped sprite, tile and portrait is opaque or clear.
 export function alphaBinaryGate(
   img: RawImage,
-  opts: { allowSoftAlpha?: boolean } = {},
+  opts: { allowSoftAlpha?: boolean | undefined } = {},
 ): GateResult & { softPixels: number } {
   let softPixels = 0
   for (let i = 3; i < img.data.length; i += 4) {

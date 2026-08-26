@@ -29,7 +29,6 @@ import {
   CALM_ROAD_ID,
   CALM_ROAD_NAME,
   GROUND_VARIANTS,
-  MATERIAL_PX,
   ROAD_MATERIAL_ID,
   diamondFromMaterial,
   seasonTintFrom,

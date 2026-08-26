@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js'
-import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
+import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import type { LayerSet } from './layers.js'
 import { createWorldLabel } from './worldLabel.js'
 // the tag's material is the SPEECH material, taken from its owner rather than through

@@ -41,7 +41,7 @@ export type LlmMessage = { role: 'user' | 'assistant'; content: string }
 type ExecResult<T> = {
   usage: LanguageModelUsage
   value: T
-  servedModel?: string
+  servedModel?: string | undefined
   provider?: string | null
   // What OpenRouter says it actually charged, when it says so at all.
   reportedCostUsd?: number | null
@@ -172,7 +172,7 @@ export class LlmClient {
           system: opts.system,
           messages: toModelMessages(opts.messages),
           maxRetries: 0,
-          maxOutputTokens: this.maxOutputTokens,
+          ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
           abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
           output: Output.object({ schema: opts.schema }),
         })
@@ -207,10 +207,10 @@ export class LlmClient {
     const { value, usage } = await this.invoke(async (model) => {
       const r = await generateText({
         model,
-        system: opts.system,
+        ...(opts.system === undefined ? {} : { system: opts.system }),
         messages: toModelMessages(opts.messages),
         maxRetries: 0,
-        maxOutputTokens: this.maxOutputTokens,
+        ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
         abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
       })
       return {
@@ -372,7 +372,8 @@ export class LlmClient {
 
   private resolveModel(): LanguageModel {
     if (this.model !== undefined) return this.model
-    const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })
+    const key = process.env.OPENROUTER_API_KEY
+    const openrouter = createOpenRouter(key === undefined ? {} : { apiKey: key })
     this.model = openrouter(MIND_MODEL, {
       // Without this OpenRouter omits `usage.cost` and the ledger has no second opinion.
       usage: { include: true },

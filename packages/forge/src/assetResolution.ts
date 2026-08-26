@@ -51,7 +51,7 @@ const spanPx = (fp: Footprint, tile: { w: number }): number => (fp.w + fp.h) * (
 
 export type SizedClass = 'item' | 'building'
 
-export function nativeSizeFor(klass: SizedClass, fp: Footprint): Size {
+export function nativeSizeFor(_klass: SizedClass, fp: Footprint): Size {
   // Both classes are sized off the 128x64 tile: items because that is the interior tile,
   // buildings because the town's 32x16 tile must still read at the 4x zoom stop.
   const clamped = Math.min(spanPx(fp, INTERIOR_TILE), C_LEVEL.maxNativePx)

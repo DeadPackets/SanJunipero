@@ -346,10 +346,9 @@ describe('gestation and birth', () => {
 
   it('keeps a birth outdoors outdoors', () => {
     const outside = carrying(0)
-    const s = {
-      ...outside,
-      agents: { ...outside.agents, a1: { ...outside.agents.a1!, insideId: undefined, x: 9, y: 9 } },
-    }
+    const a1 = { ...outside.agents.a1!, x: 9, y: 9 }
+    delete a1.insideId
+    const s = { ...outside, agents: { ...outside.agents, a1 } }
     const child = Object.values(midnight(s, TERM, CFG, 'r5').state.agents).find(
       (a) => a.id !== 'a1' && a.id !== 'a2',
     )!

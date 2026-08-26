@@ -30,7 +30,7 @@ describe('assemblePrompt stability gradient', () => {
         .map((m) => m.content)
         .join('')
     expect(prefixA).toBe(prefixB)
-    expect(a.messages[2].content).not.toBe(b.messages[2].content)
+    expect(a.messages[2]!.content).not.toBe(b.messages[2]!.content)
 
     const sa = fullSerialization({ ...base, now: { prose: 'The sun stands high.' } })
     const sb = fullSerialization({ ...base, now: { prose: 'Dusk settles over the valley.' } })
@@ -41,8 +41,8 @@ describe('assemblePrompt stability gradient', () => {
 
   it('orders messages stable→volatile: append-only dayLog before the per-turn scene (finding 9)', () => {
     const a = assemblePrompt(fixtureBlocks())
-    expect(a.messages[0].content).toContain('Woke with the light.')
-    expect(a.messages[1].content).toContain('What you remember:')
+    expect(a.messages[0]!.content).toContain('Woke with the light.')
+    expect(a.messages[1]!.content).toContain('What you remember:')
   })
 
   it('an appended dayLog entry only extends message 0; the scene bytes stand', () => {
@@ -54,7 +54,7 @@ describe('assemblePrompt stability gradient', () => {
     })
 
     expect(after.system).toBe(before.system)
-    expect(after.messages[0].content.startsWith(before.messages[0].content)).toBe(true)
+    expect(after.messages[0]!.content.startsWith(before.messages[0]!.content)).toBe(true)
     expect(after.messages[1]).toEqual(before.messages[1])
   })
 
@@ -63,7 +63,7 @@ describe('assemblePrompt stability gradient', () => {
     const before = assemblePrompt(base)
     const changed = assemblePrompt({
       ...base,
-      scene: { ...base.scene, memories: [...base.scene.memories, base.scene.memories[0]] },
+      scene: { ...base.scene, memories: [...base.scene.memories, base.scene.memories[0]!] },
     })
 
     expect(changed.system).toBe(before.system)
@@ -196,10 +196,10 @@ describe('perceptionToProse', () => {
 
     const a = assemblePrompt(fixtureBlocks({ now: { prose, heard: heardProse(packet) } }))
     expect(a.messages).toHaveLength(4)
-    expect(a.messages[2].content).toBe(prose)
-    expect(a.messages[3].content).toContain('You hear Bex say:')
+    expect(a.messages[2]!.content).toBe(prose)
+    expect(a.messages[3]!.content).toContain('You hear Bex say:')
     // One utterance is one line, and `sanitizeSpokenText` leaves a speaker no newline to write.
-    expect(a.messages[3].content.split('\n')).toHaveLength(1)
+    expect(a.messages[3]!.content.split('\n')).toHaveLength(1)
   })
 
   it('★ and nothing heard adds no message at all', () => {
@@ -764,7 +764,7 @@ describe('ambient budget', () => {
   it('renders 8 fixture memories into block 4 at or under 700 est tokens', () => {
     const blocks = fixtureBlocks()
     const a = assemblePrompt(blocks)
-    const sceneTokens = Math.ceil(a.messages[1].content.length / 4)
+    const sceneTokens = Math.ceil(a.messages[1]!.content.length / 4)
     expect(blocks.scene.memories.length).toBe(8)
     expect(sceneTokens).toBeLessThanOrEqual(700)
   })

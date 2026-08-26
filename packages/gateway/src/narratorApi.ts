@@ -35,7 +35,7 @@ export type NarratorApiDeps = {
   db: Database.Database // the world DB — events are the town's own record
   mirror: WorldMirror
   narratorDb: Database.Database | null // absent until C7 narrates a day
-  agentDbDir?: string // agent memory, for the days a personality moved
+  agentDbDir?: string | undefined // agent memory, for the days a personality moved
 }
 
 /** How many entries `/api/chronicle` sends. Every open panel refetches the feed on a 20 s timer,

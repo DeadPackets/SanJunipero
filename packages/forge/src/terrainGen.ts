@@ -308,9 +308,9 @@ export const BORDER_RING_PX = 2
 export type BorderReport = { ringDelta: number; framed: boolean; note: string }
 
 export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): BorderReport {
-  let ringSum = [0, 0, 0],
+  let ringSum: [number, number, number] = [0, 0, 0],
     ringN = 0,
-    midSum = [0, 0, 0],
+    midSum: [number, number, number] = [0, 0, 0],
     midN = 0
   for (let y = 0; y < m.height; y++) {
     for (let x = 0; x < m.width; x++) {

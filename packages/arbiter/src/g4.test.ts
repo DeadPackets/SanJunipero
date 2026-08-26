@@ -2,23 +2,14 @@
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
+import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import {
-  DEFAULT_CONFIG,
-  MINUTES_PER_DAY,
-  stateHash,
-  type SimConfig,
-  type SimEvent,
-} from '@sj/shared'
-import {
-  EventStore,
   RngStream,
   RngStreams,
-  TickLoop,
   VERBS,
   createWorldTick,
   fold,
   genesisState,
-  openDb,
   submitIntent,
   type WorldState,
 } from '@sj/engine'

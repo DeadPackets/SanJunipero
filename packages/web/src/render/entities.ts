@@ -5,19 +5,12 @@ import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox } from './depth.js'
-import { TILE_H, depthKey, tileToScreen } from './iso.js'
+import { depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
-import {
-  BUILDING_PX_PER_TILE,
-  TextureBook,
-  buildingArt,
-  fadeArtIn,
-  textureUrlFor,
-  type BuildingArt,
-} from './textures.js'
+import { TextureBook, buildingArt, fadeArtIn, textureUrlFor, type BuildingArt } from './textures.js'
 
 export { BUILDING_PX_PER_TILE } from './textures.js'
 

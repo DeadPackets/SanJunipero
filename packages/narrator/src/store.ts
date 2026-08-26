@@ -149,7 +149,11 @@ export class NarratorStore {
       ...(r.construct_id === null ? {} : { constructId: r.construct_id }),
       ...(r.name_provenance === null
         ? {}
-        : { nameProvenance: JSON.parse(r.name_provenance) as Milestone['nameProvenance'] }),
+        : {
+            nameProvenance: JSON.parse(r.name_provenance) as NonNullable<
+              Milestone['nameProvenance']
+            >,
+          }),
     }))
   }
 

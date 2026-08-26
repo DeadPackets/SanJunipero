@@ -1,6 +1,5 @@
 import {
   parseTerrainTileManifest,
-  roadAutotile,
   roadAutotileKind,
   type AssetRecord,
   type RoadAutotileKey,

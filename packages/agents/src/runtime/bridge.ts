@@ -36,7 +36,7 @@ export type SubmitResult = { ok: true } | { ok: false; reason: string }
 type QueuedSubmit = {
   agentId: string
   intent: Intent
-  onResult?: (result: SubmitResult) => void
+  onResult: ((result: SubmitResult) => void) | undefined
   resolve: (result: SubmitResult) => void
 }
 

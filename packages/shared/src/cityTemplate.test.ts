@@ -41,7 +41,6 @@ import {
   cityBlocks,
   genesisEmptyPlots,
   plattedPlots,
-  doorTile,
   doorFrontTile,
   structureTiles,
   FOUNDER_IDS,

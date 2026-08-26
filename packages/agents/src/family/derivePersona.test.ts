@@ -110,10 +110,11 @@ describe('derivePersona (T25)', () => {
     const { identity } = derivePersona(CHILD, [MOTHER, FATHER])
     expect(identity.voiceCard.wordBudget).toEqual({ typical: 21, burst: 44 })
 
-    const plain = (p: ParentPersona): ParentPersona => ({
-      ...p,
-      identity: { ...p.identity, voiceCard: { ...p.identity.voiceCard, wordBudget: undefined } },
-    })
+    const plain = (p: ParentPersona): ParentPersona => {
+      const voiceCard = { ...p.identity.voiceCard }
+      delete voiceCard.wordBudget
+      return { ...p, identity: { ...p.identity, voiceCard } }
+    }
     const budgetless = derivePersona(CHILD, [plain(MOTHER), plain(FATHER)])
     expect('wordBudget' in budgetless.identity.voiceCard).toBe(false)
   })

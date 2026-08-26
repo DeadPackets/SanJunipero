@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
-import { roomCard, roomWord, type Provenance, type RoomCard } from './interiorModel.js'
+import { roomCard, type Provenance, type RoomCard } from './interiorModel.js'
 
 export { roomWord as interiorRoomWord } from './interiorModel.js'
 

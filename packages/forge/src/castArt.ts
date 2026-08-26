@@ -60,7 +60,7 @@ export type CastIngestEntry = { kind: string; action: 'registered' | 'unchanged'
 /** Idempotent on the same law the committed buildings register by. */
 export function registerCommittedCast(
   codex: AssetCodex,
-  opts: { root?: string } = {},
+  opts: { root?: string | undefined } = {},
 ): CastIngestEntry[] {
   const out: CastIngestEntry[] = []
   // One scan for the whole ingest, written in seq order so the last ready record still wins.

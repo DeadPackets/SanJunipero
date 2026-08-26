@@ -17,7 +17,7 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
-import { ambientTempAt, insulationOf, isExposed } from './systems/warmth.js'
+import { ambientTempAt, isExposed } from './systems/warmth.js'
 import {
   fishCatchChance,
   huntChance,

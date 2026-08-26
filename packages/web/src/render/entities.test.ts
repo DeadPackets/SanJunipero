@@ -92,7 +92,7 @@ import {
   type AssetRecord,
   type SimConfig,
 } from '@sj/shared'
-import { depthKey, tileToScreen } from './iso.js'
+import { tileToScreen } from './iso.js'
 import { Container as MockContainer } from 'pixi.js'
 import {
   BUILDING_PX_PER_TILE,
@@ -107,7 +107,6 @@ import {
   pipsFilled,
   structureHitPoints,
   structureHoverText,
-  structureZIndex,
   syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'

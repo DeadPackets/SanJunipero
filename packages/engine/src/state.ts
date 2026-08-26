@@ -179,7 +179,7 @@ export type WorldState = {
   growths?: number
   // Where the array's (0, 0) stands in the AUTHORED frame. Growing north or west moves it, south
   // or east never does; absent while the frames agree, so such a world hashes exactly as it did.
-  origin?: { x: number; y: number }
+  origin?: { x: number; y: number } | undefined
   // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
   // nothing. Absent until the first step anybody takes.
   traffic?: Record<string, number>
@@ -214,7 +214,7 @@ export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldStat
 
 /** Where the array's (0, 0) stands in the frame genesisTerrainAt is written in. Homed beside the
  *  field rather than in mapGrowth, because the town has to ask it too. */
-export function authoredOrigin(state: { origin?: { x: number; y: number } }): {
+export function authoredOrigin(state: { origin?: { x: number; y: number } | undefined }): {
   x: number
   y: number
 } {

@@ -29,11 +29,7 @@ import {
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
-import {
-  EXPRESSIVE_INSTRUCTION,
-  ExpressiveRulingSchema,
-  type ExpressiveRuling,
-} from './expressive.js'
+import { EXPRESSIVE_INSTRUCTION, type ExpressiveRuling } from './expressive.js'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 import { openArbiterDb } from './schema.js'
 import type { Verdict } from './verdict.js'

@@ -350,7 +350,7 @@ export async function startDevWorld(
       terrain,
       config,
       db,
-      narratorDbPath: opts.narratorDbPath,
+      ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
       ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
       ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
     })

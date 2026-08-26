@@ -20,7 +20,6 @@ import {
 } from '../src/sheet.js'
 import {
   AUTHORED_FACINGS,
-  STRIP_POSES_V4,
   WALK_CYCLE_V4,
   WALK_FRAME_MS,
   deriveSheet,
@@ -30,12 +29,7 @@ import {
   type AuthoredFacing,
   type StripPoseV4,
 } from '../src/mirror.js'
-import {
-  processHiResCell,
-  normalizeFigureHeight,
-  cellAnchor,
-  buildManifestV4,
-} from '../src/hires.js'
+import { processHiResCell, cellAnchor, buildManifestV4 } from '../src/hires.js'
 import { refusalMessage } from '../src/gate.js'
 import { CHAR_DESC_V4, FEATURE_CAP_V4, BIG_PIXEL } from './character.js'
 import { scratch } from './scratch.js'

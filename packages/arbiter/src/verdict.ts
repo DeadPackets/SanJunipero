@@ -114,8 +114,8 @@ export function rollOutcomeTable(
   const total = weights.reduce((a, b) => a + b, 0)
   let roll = rng.next() * total
   for (let i = 0; i < table.length; i++) {
-    roll -= weights[i]
-    if (roll <= 0) return table[i]
+    roll -= weights[i]!
+    if (roll <= 0) return table[i]!
   }
-  return table[table.length - 1]
+  return table[table.length - 1]!
 }

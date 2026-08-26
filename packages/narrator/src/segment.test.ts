@@ -20,11 +20,11 @@ describe('segmentScenes', () => {
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(2)
-    expect(scenes[0].eventIds).toEqual([1, 2, 3])
-    expect(scenes[1].eventIds).toEqual([4, 5])
-    expect(scenes[0].startTick).toBe(0)
-    expect(scenes[0].endTick).toBe(2)
-    expect(scenes[0].day).toBe(0)
+    expect(scenes[0]!.eventIds).toEqual([1, 2, 3])
+    expect(scenes[1]!.eventIds).toEqual([4, 5])
+    expect(scenes[0]!.startTick).toBe(0)
+    expect(scenes[0]!.endTick).toBe(2)
+    expect(scenes[0]!.day).toBe(0)
   })
 
   it('drops scenes below minEvents', () => {
@@ -35,7 +35,7 @@ describe('segmentScenes', () => {
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(1)
-    expect(scenes[0].eventIds).toEqual([2, 3])
+    expect(scenes[0]!.eventIds).toEqual([2, 3])
   })
 
   it('day rollover always ends a scene even without silence', () => {
@@ -47,10 +47,10 @@ describe('segmentScenes', () => {
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(2)
-    expect(scenes[0].eventIds).toEqual([1, 2])
-    expect(scenes[0].day).toBe(0)
-    expect(scenes[1].eventIds).toEqual([3, 4])
-    expect(scenes[1].day).toBe(1)
+    expect(scenes[0]!.eventIds).toEqual([1, 2])
+    expect(scenes[0]!.day).toBe(0)
+    expect(scenes[1]!.eventIds).toEqual([3, 4])
+    expect(scenes[1]!.day).toBe(1)
   })
 
   it('splits at the maxTicks cap in an unbroken run', () => {
@@ -59,10 +59,10 @@ describe('segmentScenes', () => {
     )
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(2)
-    expect(scenes[0].startTick).toBe(0)
-    expect(scenes[0].endTick).toBe(DEFAULT_SEGMENT_CONFIG.maxTicks)
-    expect(scenes[1].startTick).toBe(DEFAULT_SEGMENT_CONFIG.maxTicks + 1)
-    expect(scenes[0].eventIds.length + scenes[1].eventIds.length).toBe(251)
+    expect(scenes[0]!.startTick).toBe(0)
+    expect(scenes[0]!.endTick).toBe(DEFAULT_SEGMENT_CONFIG.maxTicks)
+    expect(scenes[1]!.startTick).toBe(DEFAULT_SEGMENT_CONFIG.maxTicks + 1)
+    expect(scenes[0]!.eventIds.length + scenes[1]!.eventIds.length).toBe(251)
   })
 
   it('harvests cast per event type and takes the LAST location-bearing event', () => {
@@ -72,8 +72,8 @@ describe('segmentScenes', () => {
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(1)
-    expect(scenes[0].cast).toEqual(['omar', 'yusuf'])
-    expect(scenes[0].location).toBe('5,6')
+    expect(scenes[0]!.cast).toEqual(['omar', 'yusuf'])
+    expect(scenes[0]!.location).toBe('5,6')
   })
 
   it('bare id on structure/item/crop events never enters the cast', () => {
@@ -95,7 +95,7 @@ describe('segmentScenes', () => {
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(1)
-    expect(scenes[0].cast).toEqual(['omar', 'nadia'])
+    expect(scenes[0]!.cast).toEqual(['omar', 'nadia'])
   })
 })
 

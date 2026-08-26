@@ -14,7 +14,7 @@ import {
   type TickHandler,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
 
@@ -22,10 +22,6 @@ import { perceptionToProse, type PerceptionPacket } from './prose.js'
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
 
 const CFG = DEFAULT_CONFIG
-
-let seq = 0
-const ev = (type: string, payload: unknown): SimEvent =>
-  ({ seq: ++seq, tick: 0, type, payload }) as unknown as SimEvent
 
 const WORLD = {
   isWalkable: () => true,

@@ -17,8 +17,8 @@ export type VisionGateArgs = {
   judge: VisionJudgeFn
   ledger: SpendLedger
   config: ForgeConfig
-  footprint?: Footprint
-  expectedFacing?: string
+  footprint?: Footprint | undefined
+  expectedFacing?: string | undefined
 }
 
 export type VisionGateResult = {

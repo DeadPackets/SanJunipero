@@ -186,7 +186,7 @@ async function generatedGlyphs(): Promise<{ imgs: RawImage[] }> {
     console.log(`generated raw cached at ${GEN_RAW_PATH} (no spend)`)
   } else {
     const client = makeImageClient({ apiKey: KEY!, budget: new BudgetGuard(1.0) })
-    const [cand] = await client.generateCandidates(GEN_PROMPT, [], 1)
+    const cand = (await client.generateCandidates(GEN_PROMPT, [], 1))[0]!
     raw = cand.png
     costUsd = cand.costUsd
     writeFileSync(GEN_RAW_PATH, raw)

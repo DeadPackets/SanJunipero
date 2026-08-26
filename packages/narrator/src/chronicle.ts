@@ -64,8 +64,8 @@ export async function renderChapter(deps: {
   llm: NarratorLlm
   day: number
   scenes: SceneSegment[]
-  typeCounts?: (ids: number[]) => Record<string, number>
-  alert?: (d: string) => void
+  typeCounts?: ((ids: number[]) => Record<string, number>) | undefined
+  alert?: ((d: string) => void) | undefined
 }): Promise<ChapterRow> {
   const { store, llm, day, scenes } = deps
   const sceneIds = store.insertScenes(scenes)
@@ -98,7 +98,7 @@ export async function renderEra(deps: {
   endDay: number
   chapters: ChapterRow[]
   validEventIds: number[]
-  alert?: (d: string) => void
+  alert?: ((d: string) => void) | undefined
 }): Promise<EraRow> {
   const { store, startDay, endDay, chapters } = deps
   const existing = store.eras().find((e) => e.startDay === startDay)

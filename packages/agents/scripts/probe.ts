@@ -34,7 +34,7 @@ function fail(msg: string): never {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function providerOf(result: { providerMetadata?: Record<string, any> }): string {
+function providerOf(result: { providerMetadata?: Record<string, any> | undefined }): string {
   return String(result.providerMetadata?.openrouter?.provider ?? 'unknown')
 }
 

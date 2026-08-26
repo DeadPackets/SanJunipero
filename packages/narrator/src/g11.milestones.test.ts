@@ -19,12 +19,7 @@ import { DEATH_CAUSE_LABELS, TIER1_DEFS } from './milestones/tier1.js'
 import { detectTier2 } from './milestones/tier2.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import {
-  DEFAULT_SEMANTIC_CONFIG,
-  SEMANTIC_CONCEPTS,
-  SEMANTIC_INSTRUCTION,
-  detectSemanticFirsts,
-} from './semanticFirsts.js'
+import { SEMANTIC_CONCEPTS, SEMANTIC_INSTRUCTION, detectSemanticFirsts } from './semanticFirsts.js'
 import { AUTHORED_DAY, DAY, GOOD_VERDICT, GOD_QUOTE } from './fixtures/transcripts.js'
 
 let seq = 1
@@ -219,7 +214,7 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
   // the verb actually produces rather than a hand-written one.
   it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
     const s = pairWorld({})
-    const blow = VERBS.attack.onComplete(
+    const blow = VERBS.attack!.onComplete(
       s,
       DEFAULT_CONFIG,
       'ada',

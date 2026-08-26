@@ -1,8 +1,6 @@
 // @slow — the deterministic half of the living-world gate. Scripted actors only. Partnership
 // runs on the REAL coSleepNightsToPartner: 3; only gestation and the conception roll are forced.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import {
   DAYS_PER_YEAR,
   MINUTES_PER_DAY,

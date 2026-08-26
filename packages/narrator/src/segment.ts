@@ -34,8 +34,8 @@ export function segmentScenes(
   let current: SimEvent[] = []
   for (const e of events) {
     if (current.length > 0) {
-      const last = current[current.length - 1]
-      const start = current[0]
+      const last = current[current.length - 1]!
+      const start = current[0]!
       const boundary =
         e.tick - last.tick > cfg.silenceTicks ||
         e.tick - start.tick > cfg.maxTicks ||
@@ -60,9 +60,9 @@ export function segmentScenes(
         if (l !== null) loc = l
       }
       return {
-        day: Math.floor(evs[0].tick / MINUTES_PER_DAY),
-        startTick: evs[0].tick,
-        endTick: evs[evs.length - 1].tick,
+        day: Math.floor(evs[0]!.tick / MINUTES_PER_DAY),
+        startTick: evs[0]!.tick,
+        endTick: evs[evs.length - 1]!.tick,
         eventIds: evs.map((e) => e.seq),
         cast,
         location: loc === null ? null : `${loc.x},${loc.y}`,

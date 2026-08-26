@@ -13,7 +13,6 @@ import { alphaBinaryGate, nativeDensityGate, paletteGate } from './pixelGates.js
 import { TOWN_TILE } from './assetResolution.js'
 import { buildingCellPx } from './reCell.js'
 import {
-  STRUCTURE_FACINGS,
   facingKind,
   listCommittedBuildings,
   registerCommittedBuildings,

@@ -6,8 +6,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { DISCOVERY_EVENT, MINUTES_PER_DAY, type SimConfig } from '@sj/shared'
-import type { EventStore, TickHandler, TickLoop } from '@sj/engine'
+import { DISCOVERY_EVENT, MINUTES_PER_DAY } from '@sj/shared'
+import type { TickHandler } from '@sj/engine'
 import {
   Embedder,
   EngineBridge,

@@ -11,7 +11,7 @@ import {
 } from '@sj/shared'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { changeLog } from '../becoming.js'
-import { EMPTY_LINEAGE, type LineageLike } from '../bondModel2.js'
+import { EMPTY_LINEAGE } from '../bondModel2.js'
 import { parseRoute, routeToPath } from '../route.js'
 import { RosterPanelView } from '../RosterPanel.js'
 import { RosterExpanded } from './RosterExpanded.js'

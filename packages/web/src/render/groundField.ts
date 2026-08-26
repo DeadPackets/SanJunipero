@@ -2,7 +2,6 @@ import {
   TERRAIN_TILE_KINDS,
   materialKind,
   roadAutotile,
-  roadAutotileKind,
   type AssetRecord,
   type RoadAutotileKey,
   type TerrainTileKind,

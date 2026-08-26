@@ -22,7 +22,6 @@ import {
 } from '../src/sheet.js'
 import {
   AUTHORED_FACINGS,
-  STRIP_POSES_V4,
   WALK_CYCLE_V4,
   WALK_FRAME_MS,
   deriveSheet,

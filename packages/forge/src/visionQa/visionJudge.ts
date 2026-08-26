@@ -31,8 +31,8 @@ export type VisionJudgeArgs = {
   klass: string
   sprite: RawImage
   commission: string
-  footprint?: Footprint
-  expectedFacing?: string
+  footprint?: Footprint | undefined
+  expectedFacing?: string | undefined
   attempt?: number // ruling R-1: the gate passes the real attempt so the recorded overall is true
 }
 export type VisionJudgeFn = (

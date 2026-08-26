@@ -32,7 +32,7 @@ export function frameLayout(stage: { w: number; h: number }, letterboxed: boolea
  * an edge is how a surface fills a band exactly, so only a strict crossing counts.
  */
 export function straddlers(boxes: ReadonlyArray<{ id: string } & Frame>, l: FrameLayout): string[] {
-  const edges = [l.picture.y, l.picture.y + l.picture.h].filter((e, i) =>
+  const edges = [l.picture.y, l.picture.y + l.picture.h].filter((_e, i) =>
     i === 0 ? l.bandTop.h > 0 : l.bandBottom.h > 0,
   )
   return boxes.filter((b) => edges.some((e) => b.y < e && b.y + b.h > e)).map((b) => b.id)

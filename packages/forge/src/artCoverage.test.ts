@@ -16,7 +16,7 @@ import {
 } from './pixelGates.js'
 import { mirrorX } from './sheet.js'
 import { mirrorFacingGate } from './structureArt.js'
-import { ICON_PX, TOWN_TILE, WORLD_SPRITE_PX } from './assetResolution.js'
+import { ICON_PX, TOWN_TILE } from './assetResolution.js'
 import { LIBRARY, LIBRARY_COUNTS } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
 import {
