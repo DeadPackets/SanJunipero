@@ -14,6 +14,7 @@ import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
+import { notFound } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -116,8 +117,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (ok) { r.fn(req, res, params); return }
     }
     if (site !== null && site(req, res, url.pathname)) return
-    res.writeHead(404, { 'content-type': 'application/json' })
-    res.end('{"error":"not found"}')
+    notFound(res)
   })
 
   // ── snapshot string, cached per pump generation ──

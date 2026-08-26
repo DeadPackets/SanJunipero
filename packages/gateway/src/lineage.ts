@@ -3,6 +3,7 @@ import type { SimEvent } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { toEvent, type EventRow } from './http.js'
 
 // WHO CAME FROM WHOM (v1 task 23, the reader half — the prerequisite task 84 needs).
 //
@@ -85,8 +86,7 @@ export function mountLineageApi(router: Router, deps: LineageDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
   router.route('GET', '/api/lineage', (_req, res) => sendPrebuilt(res, cache.json('lineage', () => {
     try {
-      const events = (selBirths.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
-        .map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
+      const events = (selBirths.all() as EventRow[]).map(toEvent)
       return buildLineage(events, deps.mirror.state().agents)
     } catch {
       return EMPTY_LINEAGE   // a town with no ancestry is not an error

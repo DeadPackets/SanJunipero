@@ -7,6 +7,7 @@ import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { TALK_WINDOW_TICKS } from './api.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { toEvent, type EventRow } from './http.js'
 
 // What the town did, read as what the town became. Each rule is one observable act; the
 // SEMANTICS (trust, debt, grudge, love from the ledgers) stay C9 T11/T12's job — when they
@@ -100,10 +101,7 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
     // Streamed, so the rows and the parsed events are never both fully materialised: measured on
     // this shape at 86.9 MB of retained log, see the fold note in `api.ts`.
     const events = function* (): Generator<SimEvent> {
-      for (const r of selEvents.iterate(...BOND_TYPES) as Iterable<
-        { seq: number; tick: number; type: string; payload: string }>) {
-        yield { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent
-      }
+      for (const r of selEvents.iterate(...BOND_TYPES) as Iterable<EventRow>) yield toEvent(r)
     }
     return buildBonds(events(), deps.config.movement.earshotRadius, deps.mirror.state().tick)
   })

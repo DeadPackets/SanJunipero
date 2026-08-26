@@ -5,6 +5,7 @@ import {
   encodePng, makePlaceholder, paletteRgb, renderEmote, type Facing, type RawImage, type Rgb,
 } from '@sj/forge'
 import type { Router } from './server.js'
+import { notFound } from './http.js'
 
 export const PLACEHOLDER_PX: Record<AssetClass, { w: number; h: number }> = {
   building: { w: 64, h: 64 }, item: { w: 24, h: 24 }, crop: { w: 32, h: 32 },
@@ -75,11 +76,6 @@ export function buildEmoteAtlas(): RawImage {
       atlas.data.set(glyph.data.subarray(y * EMOTE_SIZE * 4, (y + 1) * EMOTE_SIZE * 4), (y * width + i * EMOTE_SIZE) * 4)
   })
   return atlas
-}
-
-const notFound = (res: ServerResponse): void => {
-  res.writeHead(404, { 'content-type': 'application/json' })
-  res.end('{"error":"not found"}')
 }
 
 const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {

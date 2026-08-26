@@ -1,16 +1,18 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import Database from 'better-sqlite3'
 import {
-  CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, chronicleIcon, chronicleLine, discoveryHeadline,
-  type ChronicleEntry, type ChronicleLookup, type Moment, type SimEvent,
+  CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, MINUTES_PER_DAY, chronicleIcon, chronicleLine,
+  discoveryHeadline,
+  type ChronicleEntry, type ChronicleLookup, type Moment,
 } from '@sj/shared'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { sendJson, toEvent } from './http.js'
 import { clampWindow } from './api.js'
 import { reportOnce } from './degraded.js'
 
@@ -36,13 +38,6 @@ export type NarratorApiDeps = {
 export const MARK_EVENT_TYPES: readonly string[] = [
   'agent_died', 'agent_born', 'agent_spawned', 'agent_injured', 'structure_completed',
 ]
-
-const MINUTES_PER_DAY = 1440
-
-const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
-}
 
 // A narrator.db that exists but predates a table still answers [] — the observatory is a
 // window, and a window never errors because the room behind it is unfinished.
@@ -99,8 +94,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       }>
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
-        const ev: SimEvent = { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }
-        const label = chronicleLine(ev, look)
+        const label = chronicleLine(toEvent(r), look)
         if (label === null) continue // a weighted type the formatter has no words for yet
         entries.push({ seq: r.seq, tick: r.tick, type: r.type, icon: chronicleIcon(r.type), label })
       }

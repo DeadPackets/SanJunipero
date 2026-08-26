@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@sj/shared'
 import type { Router } from './server.js'
@@ -9,6 +9,7 @@ import {
   type HeatScores, type HeatWindow,
 } from './heatStub.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
 export const TALK_WINDOW_TICKS = 20   // two spoke events this close, in earshot → one talk weight
 export const TOP_MOMENTS = 5
@@ -73,12 +74,6 @@ export type Footprint = {
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 
-const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
-}
-const notFound = (res: ServerResponse): void => sendJson(res, { error: 'not found' }, 404)
-
 // "-ing" line for the digest: drop a trailing e (give→giving), else append
 const gerund = (verb: string): string => (verb.endsWith('e') ? `${verb.slice(0, -1)}ing` : `${verb}ing`)
 
@@ -118,7 +113,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    * count of events. `footprint()` is that in numbers, and `apiFootprint.test.ts` ticks a world
    * four times deeper and holds it to a ceiling.
    */
-  type EventRow = { seq: number; tick: number; type: string; payload: string }
   type Planned = { kind: string; builderId: string; plannedTick: number }
   type Spoke = { agentId: string; tick: number; x: number; y: number }
 
@@ -201,7 +195,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     if (gen === foldGen) return
     foldGen = gen
     for (const r of selEventsAfter.all(foldCursor) as EventRow[]) {
-      foldOne({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent)
+      foldOne(toEvent(r))
       foldCursor = r.seq
     }
   }
@@ -242,7 +236,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
       const to = Math.min(toTick, (w + 1) * HEAT_WINDOW_TICKS - 1)
       if (from > to) continue
       for (const r of selRange.all(from, to) as EventRow[]) {
-        scoreEvent(scores, { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent, ctx)
+        scoreEvent(scores, toEvent(r), ctx)
       }
     }
     return heatFromScores(scores)
