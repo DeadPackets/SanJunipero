@@ -34,8 +34,12 @@ export type Router = { route(method: string, pattern: string, fn: RouteHandler):
 
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
-const CLOSE_BAD_HELLO = 4400
+export const CLOSE_BAD_HELLO = 4400
 export const CLOSE_TOO_MANY = 4429
+
+/** How long a socket may hold a seat without greeting. A viewer sends `hello` on open, so this
+ *  is only ever reached by a socket that has nothing to say. */
+export const HELLO_DEADLINE_MS = 5_000
 
 /** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
  *  defaults to a 100 MB frame, which is 100 MB a stranger can make the server buffer. */
@@ -151,8 +155,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
-    if (hub.size() >= maxViewers) { sock.close(CLOSE_TOO_MANY); return }
+    // `wss.clients` already holds the arriving socket, hence `>`. Counted here rather than off
+    // the hub, which a socket joins only after a valid hello.
+    if (wss.clients.size > maxViewers) { sock.close(CLOSE_TOO_MANY); return }
     let greeted = false
+    const helloTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
+      if (!greeted) sock.close(CLOSE_BAD_HELLO)
+    }, HELLO_DEADLINE_MS)
     let scrubAt = 0                       // last answered scrub, for coalescing
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
@@ -210,6 +219,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
     })
     sock.on('close', () => {
+      clearTimeout(helloTimer)
       if (scrubTimer !== null) clearTimeout(scrubTimer)
       removers.get(sock)?.()
       removers.delete(sock)

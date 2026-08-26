@@ -9,7 +9,9 @@ import WebSocket from 'ws'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
-import { createGateway, CLOSE_TOO_MANY, SCRUB_MIN_MS, type Gateway } from './server.js'
+import {
+  createGateway, CLOSE_BAD_HELLO, CLOSE_TOO_MANY, HELLO_DEADLINE_MS, SCRUB_MIN_MS, type Gateway,
+} from './server.js'
 import { AGENT_ID } from './api.js'
 import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
@@ -56,6 +58,13 @@ const connect = (port: number): Promise<WebSocket> => new Promise((resolve, reje
   const s = new WebSocket(`ws://127.0.0.1:${port}/ws`)
   s.on('open', () => resolve(s))
   s.on('error', reject)
+})
+
+/** The close code, or 'open' if the socket is still up after `ms` — so "was not closed" is an
+ *  assertion rather than a timeout. */
+const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> => new Promise((resolve) => {
+  const t = setTimeout(() => resolve('open'), ms)
+  s.on('close', (code) => { clearTimeout(t); resolve(code) })
 })
 
 describe('the public surface a stranger reaches', () => {
@@ -148,6 +157,31 @@ describe('the public surface a stranger reaches', () => {
       expect((await r.text()).length).toBeLessThan(4096)
     }
   })
+
+  /** The cap used to be read off the hub, which a socket joins only after a valid `hello` — so
+   *  a stranger who opens sockets and says nothing was never counted and never timed out. */
+  it('★ counts sockets, not greetings, toward the viewer cap', async () => {
+    const gw = await gwPromise
+    const silent = await Promise.all([connect(gw.port), connect(gw.port), connect(gw.port)])
+    for (const s of silent) open.push(s)
+    // `wss.clients` already holds the arriving socket: counted with `>=` the cap would serve
+    // maxViewers − 1, and the third honest viewer would be the one turned away.
+    expect(await Promise.all(silent.map((s) => closeCode(s, 300)))).toEqual(['open', 'open', 'open'])
+
+    const extra = new WebSocket(`ws://127.0.0.1:${gw.port}/ws`)
+    open.push(extra)
+    expect(await closeCode(extra)).toBe(CLOSE_TOO_MANY)
+
+    for (const s of silent) s.close()
+    await wait(120)
+  })
+
+  it('★ closes a socket that opens and never says hello', async () => {
+    const gw = await gwPromise
+    const mute = await connect(gw.port); open.push(mute)
+    expect(await closeCode(mute, HELLO_DEADLINE_MS * 2)).toBe(CLOSE_BAD_HELLO)
+    await wait(120)
+  }, HELLO_DEADLINE_MS * 3)
 
   it('turns the extra viewer away instead of degrading for the others', async () => {
     const gw = await gwPromise
