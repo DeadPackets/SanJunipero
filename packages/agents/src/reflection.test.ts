@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
@@ -8,6 +9,11 @@ import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
   makeReflectionLlm,
+  extractFactsPrompt,
+  summarizeScenesPrompt,
+  summarizeDayPrompt,
+  updateLedgerPrompt,
+  autobiographyPrompt,
   proposeEditPrompt,
   ProposeEditSchema,
   FALLBACK_AUTOBIOGRAPHY,
@@ -17,6 +23,7 @@ import {
 } from './reflection.js'
 import { BudgetExceededError } from './llm/client.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
 import type { LlmClient, LlmMessage } from './llm/client.js'
 
 const AGENT = 'tamar'
@@ -414,17 +421,76 @@ describe('makeReflectionLlm prompts', () => {
       expect(c.system).toMatch(/\byou\b/i)
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
       expect(c.messages.map((m) => m.content).join('\n')).not.toMatch(FORBIDDEN_FRAMING)
+      // Reflection is the most expensive prompt in the system per call and the last one still
+      // demonstrating the separator it forbids elsewhere. `rulesOfBeing.test.ts` holds this over
+      // SPEECH_RULES and `assemble.test.ts` over the perception; neither reaches these six.
+      expect(c.system, 'a reflection prompt spends an em dash a mind will imitate')
+        .not.toContain('—')
     }
   })
-  it("proposeEdit prompt carries today's memory ids and the edit shape", () => {
+  // ★ SIX AUTHORED SURFACES EVERY MIND READS EVERY NIGHT, AND NOTHING HELD THEM TO THE GLASS.
+  // `founderMinds.test.ts` scans the persona cards and `assemblePrompt` scans the turn; neither
+  // reaches these. That gap is why this test exists BEFORE the prose is rewritten: a shorter
+  // reflection prompt must not buy its brevity by turning a question into an instruction.
+  it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
+    const authored = [
+      extractFactsPrompt(memories).system,
+      summarizeScenesPrompt(memories).system,
+      summarizeDayPrompt([{ title: 'Trade', text: 'The day was full of deals.' }]).system,
+      updateLedgerPrompt('Nadia', null, memories).system,
+      autobiographyPrompt('The day was full of deals.', doc).system,
+      proposeEditPrompt('The day was full of deals.', doc, memories).system,
+    ]
+    for (const text of authored) {
+      expect(scanPromptForGlassLeak(text), text.slice(0, 48)).toEqual([])
+      expect(scanForLayoutLeak(text), text.slice(0, 48)).toEqual([])
+      // The turn is where a mind decides what to do. A night prompt that reaches across and
+      // tells it what to do next has stopped being reflection.
+      for (const hint of ['you should', 'you must build', 'go inside', 'raise a', 'be sure to']) {
+        expect(text.toLowerCase(), `${text.slice(0, 48)} hints "${hint}"`).not.toContain(hint)
+      }
+    }
+  })
+
+  it("proposeEdit prompt carries today's memory ids and what the schema cannot say", () => {
     const p = proposeEditPrompt('The day was full of deals.', doc, memories)
     const text = p.system + '\n' + p.messages.map((m) => m.content).join('\n')
     expect(text).toContain(`[${memories[0]!.id}]`)
     expect(text).toContain(`[${memories[1]!.id}]`)
-    for (const kw of ['`verdict`', '`no_proposal`', '`propose`', '`edit`', '`op`', '`field`', '`text`', '`index`', '`evidence`', 'add', 'remove', 'revise', 'values', 'beliefs', 'collapse', 'hunger', 'conflict']) {
+    // What `ProposeEditSchema` cannot carry: what `evidence` refers to, that only one change is
+    // on the table, that temperament is not, and the kinds of day that earn a change at all.
+    for (const kw of ['`evidence`', 'one thing', 'temperament', 'collapse', 'hunger', 'conflict']) {
       expect(text).toContain(kw)
     }
     expect(text).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  // ★ THE PROSE THAT WENT IS THE PROSE THE SCHEMA ALREADY ENFORCES. This is the assertion that
+  // stops it coming back: every field name and enum below reaches the provider as JSON schema
+  // on the same call, so spelling them again in English bought nothing and made this the
+  // longest of the six prompts by 2.5x.
+  it('proposeEdit no longer restates its own schema in prose', () => {
+    const system = proposeEditPrompt('The day was full of deals.', doc, memories).system
+    for (const spelledTwice of ['`verdict`', '`no_proposal`', '`op`', '`field`', '`index`', 'counting from 0']) {
+      expect(system, `proposeEdit spells ${spelledTwice} that ProposeEditSchema already enforces`)
+        .not.toContain(spelledTwice)
+    }
+    // Every one of them still reaches the model, because the schema is what carries them.
+    const shape = JSON.stringify(z.toJSONSchema(ProposeEditSchema))
+    for (const fromSchema of ['verdict', 'no_proposal', 'propose', 'op', 'field', 'index', 'evidence']) {
+      expect(shape, `${fromSchema} is not in the schema either`).toContain(fromSchema)
+    }
+    // The longest of the six is no longer this one.
+    const others = [
+      extractFactsPrompt(memories).system,
+      summarizeScenesPrompt(memories).system,
+      summarizeDayPrompt([{ title: 'Trade', text: 'x' }]).system,
+      updateLedgerPrompt('Nadia', null, memories).system,
+      autobiographyPrompt('x', doc).system,
+    ]
+    const words = (s: string): number => s.split(/\s+/).length
+    expect(words(system), 'proposeEdit is still 2.5x the next longest')
+      .toBeLessThan(2 * Math.max(...others.map(words)))
   })
 
   it('propose verdict schema accepts no_proposal and shaped edits, rejects temperament', () => {

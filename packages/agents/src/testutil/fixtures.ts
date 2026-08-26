@@ -13,7 +13,7 @@ export const tamarIdentity: IdentityCore = {
   voiceCard: {
     register: 'low and unhurried',
     rhythm: 'short sentences, long pauses',
-    tics: ['well, then', 'as the river runs'],
+    tics: ['takes a beat before she answers', 'reaches for the river to explain a thing'],
     neverSays: ['I give up', 'hurry along now'],
     exampleLines: ['The grain can wait a little longer.', 'I will mend it before dark.'],
   },

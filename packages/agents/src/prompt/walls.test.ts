@@ -180,7 +180,7 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
   } as unknown as PerceptionPacket, undefined, { isWalkable: () => true })
 
   it('names the doorway either way — a full room is not a wall', () => {
-    expect(seeing({})).toContain('its doorway is at (2, 3) — stand there and you can go in.')
+    expect(seeing({})).toContain('its doorway is at (2, 3); stand there and you can go in.')
     expect(seeing({ full: true })).toContain('its doorway is at (2, 3), and there is no floor left in it.')
   })
 
@@ -239,7 +239,7 @@ describe('* walls already standing are a place the world can name', () => {
     ])
     const w = unfinishedWork(s, CFG, { x: 1, y: 1 })!
     expect(w.id).toBe('structure_2')
-    expect(standingWallsLine(w)).toBe('Walls already stand at (2, 4) - a house, half up.'.replace(' - ', ' — '))
+    expect(standingWallsLine(w)).toBe('Walls already stand at (2, 4): a house, half up.')
   })
 
   it('is silent when the town has nothing half-raised in it', () => {

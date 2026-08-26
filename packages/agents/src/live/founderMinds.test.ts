@@ -78,6 +78,42 @@ describe('★ the streamed cast and the one-way glass', () => {
     }
   })
 
+  // ★ A TIC IS A HABIT, NOT A GREETING — AND THE CARD IS WHERE IT BECOMES ONE.
+  //
+  // Omar spent 63% of his spoken lines on "Now then" across 6 867 measured lines, and Yusuf 18.6%
+  // on "Aye". They were the only two minds in the corpus with a stock opener, and the only two
+  // whose card both NAMED words to say and DEMONSTRATED them in opening position. Amara's
+  // "counts aloud", Nadia's `calls the path "the way"` and Salma's "understates" are behaviours,
+  // or a word placed mid-sentence, and none of them produced an opener at all. No shared forbid
+  // beat the card: the voice lane's clause moved Omar 41.1% -> 34.3% over twenty live runs.
+  //
+  // So the bound goes where the grant is. `derivePersona.ts:81` samples tics into children
+  // without copying anything written beside them, which is the second reason this cannot be a
+  // sentence in a shared block.
+  it('no card demonstrates its own tic in opening position', () => {
+    for (const mind of FOUNDER_MINDS) {
+      for (const tic of mind.identity.voiceCard.tics) {
+        for (const quoted of tic.match(/"([^"]+)"/g) ?? []) {
+          const words = quoted.slice(1, -1).toLowerCase()
+          for (const line of mind.identity.voiceCard.exampleLines) {
+            expect(line.toLowerCase().replace(/[^a-z' ]/g, ''),
+              `${mind.id}'s card demonstrates ${quoted} as an opener`).not.toMatch(
+              new RegExp(`^${words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
+          }
+        }
+      }
+    }
+  })
+
+  it('and no card opens two example lines the same way', () => {
+    for (const mind of FOUNDER_MINDS) {
+      const openers = mind.identity.voiceCard.exampleLines
+        .map((l) => l.toLowerCase().replace(/[^a-z' ]/g, '').split(' ').slice(0, 2).join(' '))
+      expect(new Set(openers).size, `${mind.id} repeats an opener on its own card`)
+        .toBe(openers.length)
+    }
+  })
+
   it('the cast is the five bodies the town spawns, by id', () => {
     // A mind whose id is not a body in the world gets no perception and never takes a turn;
     // a body with no mind stands still for ever. The two lists are one list or they are broken.
