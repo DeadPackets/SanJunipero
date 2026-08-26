@@ -89,7 +89,6 @@ export type Item = {
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 
-
 export type Crop = { id: string; kind: string; x: number; y: number; plantedDay: number; stage: number; withered: boolean }
 
 // A body with no mind. `stock` is the size of a fish school and is absent on anything that

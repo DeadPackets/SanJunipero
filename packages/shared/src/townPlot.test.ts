@@ -267,7 +267,6 @@ describe('the masses the town actually builds', () => {
   })
 })
 
-
 // The first plot ring 2 offers is block (-2,0), across the channel. The channel the grammar knows
 // is three columns wide at every dy — a wall, not an obstacle — measured by the first test here.
 const CHANNEL = [-17, -16, -15] as const

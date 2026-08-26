@@ -367,7 +367,6 @@ describe('★ the town grows only where the lattice lets it', () => {
   })
 })
 
-
 describe('★ a block is laid out when its first building is raised', () => {
   /** Raise houses through the real verb until the claim crosses into ring `r`. */
   function raiseUntilRing(r: number): { before: WorldState; after: WorldState; block: { i: number; j: number } } {
