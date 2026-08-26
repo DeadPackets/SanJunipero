@@ -3,45 +3,8 @@ import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { IntentSchema } from '../turn.js'
 
-// A resumable gate.
-//
-// A 4-sim-day G11b is ~60 minutes of wall clock, ~35 of it inside four day-closes, and
-// `g11-deepworld.ts` builds the world from genesis every time. C11 batch 13's run reached tick
-// 5520 of 6180 — 93% — was reaped inside the last day-close before the report writer ran, and
-// could not be continued: the score and the $0.68 went with the process. That will recur on
-// every 4-day gate until an interrupted run can pick itself up.
-//
-// The checkpoint is a ROLLBACK POINT, not a bookmark. Everything the run holds lives in one of
-// two places — the SQLite database, or a handful of in-memory accumulators — so a checkpoint
-// is an atomic snapshot of the database with those accumulators written INSIDE it. Resuming
-// copies that snapshot back over the live database and picks the accumulators out of it, which
-// discards the un-checkpointed tail rather than trying to reconcile it. That is the whole
-// reason for the design: a half-recorded day, an orphan thought or an adjudication whose event
-// is gone would each be a criterion computed on data a continuous run never had.
-//
-// TWO PROPERTIES IT HAS TO HOLD, and how each is held:
-//
-// 1. A RESUMED RUN SCORES WHAT A CONTINUOUS RUN WOULD. Every input to `checkG11Report` is
-//    either read out of the database — restored whole, to one consistent moment — or restored
-//    from the sidecar below and appended to. No counter is reset by a resume, no window is
-//    counted twice (the tail is discarded), and none is skipped (the loop restarts at exactly
-//    the checkpoint's tick, and `lastDayClosed` comes back with it, so the days that follow are
-//    closed and the ones before are not re-closed). What is NOT restored is each mind's turn
-//    clock and plan queue, which are rebuilt fresh: that changes when a mind next thinks, which
-//    is a trajectory difference an LLM run has anyway, and it changes no criterion's arithmetic.
-//
-// 2. A CHECKPOINT CANNOT LAUNDER A FAILURE INTO A PASS. Four rules, all enforced here:
-//    - `fingerprintMismatch` refuses a resume across a different commit, a different config
-//      hash, a different tick budget, a different model or provider routing, a different set
-//      of minds, or a dry run resumed as a live one. You cannot fix what failed and then score
-//      the whole run as though it had always worked.
-//    - `writeCheckpoint` refuses to move the checkpoint BACKWARDS. There is exactly one
-//      checkpoint and it only ever advances, so no earlier point can be picked to re-roll a
-//      day that went badly.
-//    - the replayed world state must hash to the value the checkpoint recorded, or the resume
-//      is refused outright.
-//    - every resume appends to `resumes`, which rides in the report. A run that was resumed
-//      says so, with the tick it was resumed from, every time.
+// A rollback point, not a bookmark: an atomic VACUUM INTO with the accumulators written inside,
+// so a resume drops the tail. Four rules bar laundering: fingerprint, forward-only, hash, resumes.
 
 // 2: the sidecar gained `semanticSkippedNights`. A version-1 checkpoint carries no count of
 // the nights it lost, so it cannot be resumed into a run that reports one.

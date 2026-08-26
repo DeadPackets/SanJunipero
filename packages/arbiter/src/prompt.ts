@@ -2,8 +2,8 @@ import type { LlmMessage } from '@sj/agents'
 
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
-  // The codex adjacency frontier — the unearned rungs `withinAdjacency` accepts.
-  // Without it the arbiter judges "beyond adjacency" blind (C9 batch-10, ruling 1).
+  // The codex adjacency frontier — the unearned rungs `withinAdjacency` accepts. Without it
+  // the arbiter judges "beyond adjacency" blind.
   frontier: string[]
   agent: {
     name: string
@@ -22,7 +22,7 @@ export type AdjudicationBlocks = {
   }
   precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
   // The words for stuff. Every material and building the recipe may name has to be on the
-  // page, or the ruling is thrown away unread (canon-vocabulary law, c8d267b precedent).
+  // page, or the ruling is thrown away unread.
   materials?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
   intent: string
 }
@@ -33,9 +33,8 @@ export type AssembledAdjudicationPrompt = {
   estTokens: number
 }
 
-// Operator-facing instruction appended after the canon block. The canon +
-// instruction prefix is byte-stable across every adjudication, so the
-// provider's prefix cache stays warm.
+// Operator-facing instruction appended after the canon block. Canon + instruction is
+// byte-stable across every adjudication, so the provider's prefix cache stays warm.
 export const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
 "map" only if the town already performs this exact action as a routine;
 "attempt" if the action is new but the agent can physically try it with the town's fire, current, wood, fiber, stone, the stock and scrap its sheds already hold, and the river — whether it succeeds is decided later, never by you;
@@ -62,17 +61,9 @@ function fenceIntent(intent: string): string {
   return fence('Intent', intent)
 }
 
-// ★ WHY THE MIND'S OWN SENTENCE IS ON THE PAGE.
-//
-// A flattened act says WHAT; a thought says WHY, and why is what decides whether a first step
-// exists. The arbiter lane's probe proved the gap on the real model: `smoke_fish over green
-// wood` came back `{"kind":"map","verb":"go"}`, and the same idea written as a sentence came
-// back `attempt`, within adjacency, one field short of codifying food preservation.
-//
-// It goes BELOW the intent and inside the same fence for the same reason the intent is fenced:
-// it is agent-authored text, it is the second untrusted string this prompt carries, and the
-// standing instruction about `<<< >>>` already tells the model to read what is inside as
-// evidence and never as instruction.
+// A flattened act says what; the thought says why, and why is what decides whether a first
+// step exists. It goes below the intent and inside the same `<<< >>>` fence — it is the second
+// untrusted string this prompt carries.
 function fenceSaying(saying: string | undefined): string | null {
   if (saying === undefined || saying.trim().length === 0) return null
   return fence('In their own words, the thought behind it', saying)
