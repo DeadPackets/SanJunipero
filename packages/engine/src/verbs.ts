@@ -1204,12 +1204,13 @@ export function buildSiteOf(
   const square = townSquareOf(state)!
   const mine = siteToRaise(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const site = mine !== null
-    ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
-    : claim === null ? null : { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
-  if (site === null || claim === null) {
-    return { site, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
+  const raising = mine === null
+    ? null
+    : { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
+  if (claim === null) {
+    return { site: raising, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
   }
+  const site = raising ?? { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
   // ★ AND THE GROUND IT STANDS ON HAS TO EXIST. The town lays the block the first time
   // somebody builds on it; if the array does not reach that far yet the answer says so out
   // loud, because a plot silently withheld for want of a bigger world is the ring-1 clamp all
