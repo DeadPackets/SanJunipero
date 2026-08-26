@@ -1,4 +1,4 @@
 { "extends": "../../tsconfig.base.json",
   "compilerOptions": { "noEmit": true, "composite": false, "incremental": false, "types": ["node"] },
-  "include": ["scripts", "src", "../shared/src", "../engine/src", "../arbiter/src", "../gateway/src", "../forge/src", "../narrator/src"],
+  "include": ["scripts"],
   "exclude": ["**/*.test.ts", "**/*.livetest.ts"] }
