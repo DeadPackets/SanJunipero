@@ -375,15 +375,12 @@ export function MomentsLens({
   }, [state])
 
   const open = moments?.find((m) => m.id === momentId) ?? null
-  const player = useMemo(
-    () => (playerOf.id === open?.id ? playerOf.state : idlePlayer(open?.startTick ?? 0)),
-    [playerOf, open],
-  )
+  const openId = open?.id ?? null
+  const playerFor = (p: { id: number | null; state: PlayerState }): PlayerState =>
+    p.id === openId ? p.state : idlePlayer(open?.startTick ?? 0)
+  const player = playerFor(playerOf)
   const setPlayer = (step: (prev: PlayerState) => PlayerState): void => {
-    setPlayerOf((prev) => {
-      const base = prev.id === (open?.id ?? null) ? prev.state : idlePlayer(open?.startTick ?? 0)
-      return { id: open?.id ?? null, state: step(base) }
-    })
+    setPlayerOf((prev) => ({ id: openId, state: step(playerFor(prev)) }))
   }
 
   // Opening a day parks the view at its first minute; a cold /moment/<id> load lands here too,

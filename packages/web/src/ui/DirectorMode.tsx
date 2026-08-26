@@ -26,14 +26,6 @@ export function DirectorMode({
   const lastCutRef = useRef(0)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
-  // read inside the poll, never subscribed to — the town changing must not restart the timer
-  const livingRef = useRef<string[]>([])
-  useEffect(() => {
-    livingRef.current = Object.values(state?.agents ?? {})
-      .filter((a) => a.alive)
-      .map((a) => a.id)
-      .sort()
-  }, [state])
 
   // heat poll → sticky cut, never faster than CUT_MIN_MS
   useEffect(() => {
@@ -47,7 +39,12 @@ export function DirectorMode({
         .then(async (r) => (r.ok ? ((await r.json()) as HeatWindow[]) : []))
         .then((heat) => {
           if (!alive) return
-          const next = subjectFor(heat, followedRef.current, store.getTick(), livingRef.current)
+          // read here, never subscribed to — the town changing must not restart the timer
+          const living = Object.values(store.getState()?.agents ?? {})
+            .filter((a) => a.alive)
+            .map((a) => a.id)
+            .sort()
+          const next = subjectFor(heat, followedRef.current, store.getTick(), living)
           const now = performance.now()
           if (
             next !== null &&
