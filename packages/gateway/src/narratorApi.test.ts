@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleEntry } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { NARRATOR_READ_TABLES, createGateway, type Gateway } from './index.js'
+import { NARRATOR_READ_TABLES } from './narratorApi.js'
+import { createGateway, type Gateway } from './server.js'
 
 // The DDL below is copied from packages/narrator/src/schema.ts — importing @sj/narrator would
 // drag @sj/agents (onnxruntime, transformers) in. The last test fails if those columns move.

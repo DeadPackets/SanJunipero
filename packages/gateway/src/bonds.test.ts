@@ -7,7 +7,7 @@ import {
   type Bond, type BondsResponse, type SimEvent,
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { createGateway, type Gateway } from './index.js'
+import { createGateway, type Gateway } from './server.js'
 import { BOND_TYPES, buildBonds } from './bonds.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
