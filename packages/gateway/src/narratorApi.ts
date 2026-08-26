@@ -59,8 +59,8 @@ function readOrEmpty<T>(db: Database.Database | null, sql: string): T[] {
 }
 
 export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
-  // `/api/chronicle` scans the weighted log and `/api/timeline/marks` opens EVERY agent memory
-  // db from disk — both per request, both on the tick thread. See seqCache.ts.
+  // `/api/chronicle` scans the weighted log per request, on the tick thread. See seqCache.ts.
+  // The agent-db sweep behind `/api/timeline/marks` is memoised on the DAY instead — see below.
   const cache = makeSeqCache(() => deps.mirror.seq())
   const placeholders = CHRONICLE_TYPES.map(() => '?').join(', ')
   const selWeighted = deps.db.prepare(
@@ -175,7 +175,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
 
   /** The days a personality document actually MOVED. Version 1 is the document arriving, not
    *  a change, so it is excluded — otherwise everybody "changed" on the day they were written. */
-  const changeDays = (): Array<{ tick: number }> => {
+  const sweepChangeDays = (): Array<{ tick: number }> => {
     if (deps.agentDbDir === undefined) return []
     let files: string[]
     try {
@@ -197,6 +197,19 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       }
     }
     return [...new Set(ticks)].sort((a, b) => a - b).map((tick) => ({ tick }))
+  }
+
+  // Keyed on the world DAY, not `mirror.seq()`: the seq moves every pump, so a seq-keyed memo
+  // reopens every agent db per poll. The mark is day-granular, so a day is what it may lag by.
+  let sweptDay = -1
+  let sweptChanges: Array<{ tick: number }> = []
+  const changeDays = (): Array<{ tick: number }> => {
+    const day = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
+    if (day !== sweptDay) {
+      sweptDay = day
+      sweptChanges = sweepChangeDays()
+    }
+    return sweptChanges
   }
 
   router.route('GET', '/api/timeline/marks', (_req, res) => {

@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleEntry } from '@sj/shared'
+import {
+  CHRONICLE_ICONS, DEFAULT_CONFIG, MINUTES_PER_DAY, MomentsResponseSchema, type ChronicleEntry,
+} from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { CHRONICLE_MAX, NARRATOR_READ_TABLES } from './narratorApi.js'
 import { createGateway, type Gateway } from './server.js'
@@ -357,6 +359,67 @@ describe('the scrub bar can aim at a discovery', () => {
     const body = await (await fetch(`${bareBase}/api/timeline/marks`)).json() as
       { discoveries: unknown }
     expect(body.discoveries).toEqual([])
+  })
+})
+
+describe('the days a personality moved', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-marks-'))
+  const agentDbDir = join(dir, 'minds')
+  let gw: Gateway
+  let base: string
+  let loop: TickLoop
+
+  const changes = async (): Promise<Array<{ tick: number }>> =>
+    (await (await fetch(`${base}/api/timeline/marks`)).json() as
+      { changes: Array<{ tick: number }> }).changes
+
+  beforeAll(async () => {
+    mkdirSync(agentDbDir)
+    const adb = new Database(join(agentDbDir, 'alice.db'))
+    adb.exec(`CREATE TABLE personality_versions (
+      agent_id TEXT NOT NULL, version INTEGER NOT NULL, day INTEGER NOT NULL,
+      doc TEXT NOT NULL, edit TEXT, PRIMARY KEY (agent_id, version));`)
+    adb.prepare('INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)')
+      .run('alice', 2, 3, 'wary of fire', 'grew wary of fire')
+    adb.close()
+
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    loop = new TickLoop({
+      store: new EventStore(db), state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('marks-memo'), snapshotEveryTicks: 500,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+        else emit('agent_moved', { id: 'alice', x: tick % 8, y: 0 })
+      },
+    })
+    loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, agentDbDir })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** The memo is keyed on `mirror.seq()`, which moves every pump — so a 30 s-per-viewer poll
+   *  reopens every agent memory db from disk, on the tick thread, essentially every time. */
+  it('★ does not re-open every agent memory db when only the tick moved', async () => {
+    expect(await changes()).toEqual([{ tick: 3 * MINUTES_PER_DAY }])
+
+    // The sweep's only source, taken away: a re-swept answer is [], a held one is unchanged.
+    rmSync(join(agentDbDir, 'alice.db'))
+    loop.step()
+    gw.pump()
+    expect(await changes()).toEqual([{ tick: 3 * MINUTES_PER_DAY }])
+  })
+
+  /** A day is the resolution the mark itself reports, so a day is what it may lag by — and it
+   *  must actually lag by no more, or the memo is a cache that never refreshes. */
+  it('re-reads them once the world reaches a new day', async () => {
+    for (let i = 0; i < MINUTES_PER_DAY; i++) loop.step()
+    gw.pump()
+    expect(await changes()).toEqual([])
   })
 })
 
