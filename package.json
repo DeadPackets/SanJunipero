@@ -8,7 +8,7 @@
   "scripts": {
     "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/gateway serve",
     "test": "vitest run",
-    "typecheck": "tsc -b packages/shared packages/engine packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && tsc -p packages/agents/tsconfig.scripts.json && tsc -p packages/forge/tsconfig.scripts.json",
+    "typecheck": "tsc -b packages/shared packages/engine packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && tsc -p packages/agents/tsconfig.scripts.json && tsc -p packages/forge/tsconfig.scripts.json && tsc -p packages/gateway/tsconfig.scripts.json",
     "lint": "eslint .",
     "format": "biome format --write .",
     "format:check": "biome format .",
