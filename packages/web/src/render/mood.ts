@@ -65,7 +65,7 @@ const involves = (ev: SimEvent, id: string): boolean => {
     'motherId',
     'fatherId',
   ]) {
-    if (p?.[k] === id) return true
+    if (p[k] === id) return true
   }
   return false
 }

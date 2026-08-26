@@ -1,8 +1,8 @@
 import type { SimEvent } from '@sj/shared'
 
 // THE Style Bible rule, mechanized: grave scenes still the renderer.
-export const GRAVE_EVENTS = ['agent_died'] as const
-export const GRAVE_AFTERMATH = ['agent_injured'] as const // violence aftermath
+const GRAVE_EVENTS = ['agent_died'] as const
+const GRAVE_AFTERMATH = ['agent_injured'] as const // violence aftermath
 export const GRAVE_HOLD_TICKS = 60 // one sim-hour of stillness after a death — (controller ruling) confirmed
 export const AFTERMATH_HOLD_TICKS = 15 // a beat after violence — (controller ruling) confirmed
 

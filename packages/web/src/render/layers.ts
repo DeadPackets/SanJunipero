@@ -59,7 +59,7 @@ export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect):
 // ── P16's mechanical guard ───────────────────────────────────────────────────────────────
 
 /** An assignment, not a read and not a comparison — `=` but never `==`. */
-export const Z_ASSIGN = /\.zIndex\s*=(?!=)/
+const Z_ASSIGN = /\.zIndex\s*=(?!=)/
 
 /** The only two files allowed to write a zIndex: `layers.ts` owns the town stack, and
  *  `interiorScene.ts` owns a separate scene graph that never competes with it. */

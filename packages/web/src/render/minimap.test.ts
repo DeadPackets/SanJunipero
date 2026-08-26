@@ -219,7 +219,10 @@ describe('the picture keeps the features that make a town legible', () => {
     let painted = 0,
       clear = 0
     for (let my = 0; my < f.h; my++) {
-      for (let mx = 0; mx < f.w; mx++) rgbaAt(px, f, mx, my) === -1 ? clear++ : painted++
+      for (let mx = 0; mx < f.w; mx++) {
+        if (rgbaAt(px, f, mx, my) === -1) clear++
+        else painted++
+      }
     }
     // the world is a diamond inside a rectangle, so both must be true at once
     expect(painted).toBeGreaterThan(f.w * f.h * 0.3)

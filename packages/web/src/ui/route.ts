@@ -98,7 +98,7 @@ export function routeToPath(r: Route): string {
 
 // ── stepping back out of a single-character view ────────────────────────────────────────
 
-export const ROSTER_LENS: Lens = 'inspector'
+const ROSTER_LENS: Lens = 'inspector'
 
 export function isSingleAgentView(r: Route): boolean {
   return r.lens === ROSTER_LENS && r.agentId !== null

@@ -4,7 +4,7 @@ import type { Lens } from '../ui/route.js'
 import type { CameraBounds } from './camera.js'
 import type { ViewRect } from './cull.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
-import { GROUND_FALLBACK_COLOR, TILE_COLORS } from './ground.js'
+import { GROUND_FALLBACK_COLOR, TILE_COLORS, tileColor } from './ground.js'
 import { tileKind } from './tileset.js'
 
 // Three laws: no fixed map size anywhere — the WIDGET is fixed and a bigger town changes only
@@ -109,13 +109,7 @@ export function minimapPixels(
       const mx = Math.floor(p.mx),
         my = Math.floor(p.my)
       if (mx < 0 || my < 0 || mx >= f.w || my >= f.h) continue
-      put(
-        px,
-        rank,
-        my * f.w + mx,
-        TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR,
-        RANK.get(tileKind(id)) ?? WEAKEST,
-      )
+      put(px, rank, my * f.w + mx, tileColor(id), RANK.get(tileKind(id)) ?? WEAKEST)
     }
   }
 
@@ -127,13 +121,7 @@ export function minimapPixels(
       const t = screenToTile(p.sx, p.sy)
       const id = terrain[t.y]?.[t.x]
       if (id === undefined) continue
-      put(
-        px,
-        rank,
-        i,
-        TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR,
-        RANK.get(tileKind(id)) ?? WEAKEST,
-      )
+      put(px, rank, i, tileColor(id), RANK.get(tileKind(id)) ?? WEAKEST)
     }
   }
 

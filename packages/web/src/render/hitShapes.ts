@@ -7,10 +7,10 @@ export const STANCE_W = 20,
   SHOULDER_W = 28,
   HEAD_W = 18
 /** Screen px up from the feet where the stance has widened into the torso. */
-export const FOOT_H = 8
+const FOOT_H = 8
 /** Fractions of the DRAWN figure height. */
-export const TORSO_TOP = 0.66,
-  HEAD_TOP = 0.94
+export const TORSO_TOP = 0.66
+const HEAD_TOP = 0.94
 
 /** The minimum any pointer target may be, in SCREEN px, at any zoom. */
 export const HIT_MIN_PX = 24
@@ -133,10 +133,6 @@ export function artPrismPolygon(w: number, h: number, scale: number): number[] {
   const base = [0, -halfH * 2, halfW, -halfH, 0, 0, -halfW, -halfH]
   return extrudeDiamond(base, side - halfH * 2).map((v) => v / k)
 }
-
-/** How tall a drawn building stands above its feet, in local screen px. The number the prism
- *  and `structureDepthBox`'s screen AABB both mean by "a building is this tall". */
-export const artPrismHeightPx = (w: number, h: number): number => (w + h) * BUILDING_UNIT_PX
 
 /** Priority when two hit-testable things genuinely overlap. Lower wins. A body beats a
  *  building because a person is the smaller, more specific claim on the pointer. */

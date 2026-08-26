@@ -12,7 +12,7 @@ export const FLING_SAMPLE_MS = 80
 export const FLING_MIN_PX_PER_MS = 0.15
 
 /** Speed halves this often. */
-export const FLING_HALF_LIFE_MS = 120
+const FLING_HALF_LIFE_MS = 120
 
 /** A throw is over once it is moving less than a pixel a frame at 60 fps. */
 export const FLING_STOP_PX_PER_MS = 0.05
@@ -21,7 +21,7 @@ export const FLING_STOP_PX_PER_MS = 0.05
  *  produces — but no arithmetic here may leave a camera drifting forever. */
 export const FLING_MAX_MS = 700
 
-export type DragSample = { x: number; y: number; t: number }
+type DragSample = { x: number; y: number; t: number }
 
 /** What one drag has done so far: whether it has left the slop, and the tail it may be thrown
  *  from. Only the tail is kept, so a gesture of any length costs the same. */
@@ -44,7 +44,7 @@ export function trackDrag(prev: DragTrack | null, x: number, y: number, t: numbe
 
 /** A drag, not a pick. The one question `pointertap` and the fling both ask. */
 export function isDrag(track: DragTrack | null): boolean {
-  return track !== null && track.moved
+  return track?.moved === true
 }
 
 /** A throw in flight: the speed it was let go at, decayed, and how long it has been going. */

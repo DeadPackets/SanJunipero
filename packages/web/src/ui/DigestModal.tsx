@@ -40,11 +40,15 @@ export function DigestModal({
       .then((d) => {
         setDigest(d)
       })
-      .catch(() => {})
+      .catch(() => {
+        /* the modal says what it can; a missing digest is not worth an error */
+      })
     void fetch('/api/chapters')
       .then(async (r) => (r.ok ? ((await r.json()) as Chapter[]) : []))
       .then(setChapters)
-      .catch(() => {})
+      .catch(() => {
+        /* chapters are a nicety on top of the digest */
+      })
   }, [store, missedTicks])
 
   useEffect(() => {

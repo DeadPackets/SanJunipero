@@ -38,7 +38,11 @@ export function bitmapFontInstalled(family: string): boolean {
 /** Last resort: takes every call a label takes, draws nothing, and cannot throw. */
 class VoidLabel extends Container {
   text = ''
-  readonly anchor = { set: (): void => {} }
+  readonly anchor = {
+    set: (): void => {
+      /* a void label has nothing to anchor */
+    },
+  }
 }
 
 export function createWorldLabel(text: string, style: WorldLabelStyle): WorldLabel {

@@ -40,7 +40,7 @@ export const CHUNK_RETAIN = 8
 /** A shape is assigned to every chunk its paint can reach. Half a tile of slack over the
  *  diamond covers the road shoulders, the kerb stroke and the bleed; over-assigning costs one
  *  clipped polygon and under-assigning costs a hole, so the slack is deliberately generous. */
-export const SHAPE_PAD_PX = TILE_W / 2
+const SHAPE_PAD_PX = TILE_W / 2
 
 export type ChunkKey = string
 
@@ -141,7 +141,7 @@ export const wholeMapTextureBytes = (fieldW: number, fieldH: number): number =>
   fieldW * fieldH * CHUNK_BYTES_PER_PX
 
 /** The seam law, property 1, as a predicate over one scale. */
-export const chunkBoundaryIsWhole = (scale: number): boolean =>
+const chunkBoundaryIsWhole = (scale: number): boolean =>
   Number.isInteger(CHUNK_PX_W * scale) && Number.isInteger(CHUNK_PX_H * scale)
 
 /** Every rest stop, so adding a stop the chunk grid cannot land on turns the law red. */
@@ -182,7 +182,7 @@ function chunkKeysForBox(
 }
 
 /** The painted box of one tile's mask shape, in bake space, with the slack. */
-export function shapeBox(
+function shapeBox(
   grid: ChunkGrid,
   sx: number,
   sy: number,
@@ -222,7 +222,7 @@ export function bucketLayers(
 }
 
 /** A stroke is 1 px wide and centred on its path; two pixels of slack covers it either side. */
-export const POLY_PAD_PX = 2
+const POLY_PAD_PX = 2
 
 /** The kerb, headland and furrow polylines, cut the same way: assigned WHOLE to every chunk their bounding box reaches, never split, so a crossing outline stays one continuous stroke. */
 export function bucketPolys(
@@ -261,7 +261,7 @@ export function bucketPolys(
 
 // ── residency ─────────────────────────────────────────────────────────────────────────────
 
-export type ResidencyStep = {
+type ResidencyStep = {
   /** chunks to bake now — they are on screen and no texture exists for them */
   bake: ChunkRect[]
   /** chunks whose textures must be destroyed now */

@@ -167,7 +167,7 @@ export function actsOf(
     const words = FEED_WORDS[ev.type]
     if (words === undefined) continue
     const p = ev.payload as Record<string, unknown>
-    if (p?.agentId !== agentId && p?.builderId !== agentId && p?.id !== agentId) continue
+    if (p.agentId !== agentId && p.builderId !== agentId && p.id !== agentId) continue
     out.push({ tick: ev.tick, words })
   }
   return out

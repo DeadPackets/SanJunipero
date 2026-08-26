@@ -51,7 +51,7 @@ export const FACE_ADVANCE_EM: Readonly<Record<string, number>> = {
   [FACE_BODY]: 1,
   [FACE_PX]: 0.65,
 }
-export const WRAP_MIN_CHARS = 8
+const WRAP_MIN_CHARS = 8
 
 export function wrapCharsFor(family: string, size: number, maxPx: number): number {
   const advance = (FACE_ADVANCE_EM[family] ?? 1) * size
@@ -69,9 +69,6 @@ const CHARS: (string | string[])[] = [
 ]
 
 let installed = false
-export function facesInstalled(): boolean {
-  return installed
-}
 
 /** Awaited before the scene is built. Resolves even when the webfonts do not, so a font that
  *  fails to load leaves canvas glyphs rather than blanking the dialogue. */
@@ -179,7 +176,7 @@ export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
 /** The cloud edge on a thought: a different SHAPE, which is the channel alpha was misusing. */
-export const THOUGHT_SCALLOP_R = 3
+const THOUGHT_SCALLOP_R = 3
 export const SCALLOP_COUNT = 3
 
 /** The three shrinking dots that trail from a thought toward its thinker, pointing the same

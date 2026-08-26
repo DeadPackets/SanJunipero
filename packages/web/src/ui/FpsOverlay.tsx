@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-export const FPS_WINDOW_MS = 60_000
-export const FPS_SAMPLE_MS = 500
+const FPS_WINDOW_MS = 60_000
+const FPS_SAMPLE_MS = 500
 
 // The town's own health meter — ships in every build, toggled with `f`.
 export function FpsOverlay() {

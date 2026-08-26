@@ -15,11 +15,13 @@ vi.mock('pixi.js', () => {
     eventMode = ''
     position = new Point()
     scale = new Point()
+    // a bare container measures nothing; `Text` overrides both with its own box
+    protected box = { w: 0, h: 0 }
     get width(): number {
-      return 0
+      return this.box.w
     }
     get height(): number {
-      return 0
+      return this.box.h
     }
     addChild(...cs: Container[]): void {
       this.children.push(...cs)

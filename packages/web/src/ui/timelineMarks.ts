@@ -48,7 +48,7 @@ export const MARK_HIT_PX = 26
 
 /** A mark at tick 0 is centred on the track's first pixel, so half of it drew outside the slab.
  *  Clamped, the extremes stay whole and every mark between them keeps its true position. */
-export function markPercent(tick: number, span: number): number {
+function markPercent(tick: number, span: number): number {
   return span <= 0 ? 0 : Math.min(100, Math.max(0, (tick * 100) / span))
 }
 
@@ -59,7 +59,7 @@ export function markLeft(tick: number, span: number): string {
 
 /** WHAT THE BROWSER CAUGHT, TWICE: a tip centred on the first mark ran off the left of the
  *  viewport and lost its first three words. A tip hangs from whichever side keeps it whole. */
-export const TIP_EDGE_PERCENT = 18
+const TIP_EDGE_PERCENT = 18
 export type TipSide = 'start' | 'center' | 'end'
 export function tipSide(tick: number, span: number): TipSide {
   const pct = markPercent(tick, span)
@@ -100,10 +100,11 @@ const KEY: Readonly<Record<string, string>> = {
 function art(...rows: string[]): MarkPixel[] {
   const out: MarkPixel[] = []
   rows.forEach((row, y) => {
-    ;[...row].forEach((ch, x) => {
-      const fill = KEY[ch]
+    // by code unit, not code point: x is the column in a fixed-width ASCII grid
+    for (let x = 0; x < row.length; x++) {
+      const fill = KEY[row.charAt(x)]
       if (fill !== undefined) out.push([x, y, fill] as const)
-    })
+    }
   })
   return out
 }

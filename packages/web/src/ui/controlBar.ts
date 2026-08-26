@@ -6,7 +6,7 @@ import { LENSES, LENS_LABELS, type Lens } from './route.js'
 // a control that does nothing, and a refusal is SHOWN rather than merely implied.
 
 export const CONTROL_GROUPS = ['time', 'camera', 'lens', 'view'] as const
-export type ControlGroup = (typeof CONTROL_GROUPS)[number]
+type ControlGroup = (typeof CONTROL_GROUPS)[number]
 
 export type ControlItem = {
   id: string
@@ -34,7 +34,7 @@ export type ControlCtx = {
   townFits: boolean
 }
 
-export const LENS_GLYPH: Readonly<Record<Lens, string>> = {
+const LENS_GLYPH: Readonly<Record<Lens, string>> = {
   map: 'tile',
   inspector: 'folk',
   chronicle: 'scroll',
@@ -180,10 +180,11 @@ export type GlyphPixel = readonly [number, number, string]
 function art(...rows: string[]): GlyphPixel[] {
   const out: GlyphPixel[] = []
   rows.forEach((row, y) => {
-    ;[...row].forEach((ch, x) => {
-      const fill = KEY[ch]
+    // by code unit, not code point: x is the column in a fixed-width ASCII grid
+    for (let x = 0; x < row.length; x++) {
+      const fill = KEY[row.charAt(x)]
       if (fill !== undefined) out.push([x, y, fill] as const)
-    })
+    }
   })
   return out
 }

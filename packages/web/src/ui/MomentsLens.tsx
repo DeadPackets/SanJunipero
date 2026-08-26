@@ -18,7 +18,7 @@ import {
 } from './momentsPlayer.js'
 import { EMPTY_COPY } from './townStats.js'
 
-export const MOTIF_PX = 8
+const MOTIF_PX = 8
 
 const clock = (tick: number): string => {
   const m = tickToMoment(tick)
@@ -134,7 +134,7 @@ export function MomentCardView({
   onOpen: (id: number) => void
 }) {
   const label = thumbLabel(moment, people)
-  const where = label.location === null ? 'somewhere in the town' : label.location
+  const where = label.location ?? 'somewhere in the town'
   return (
     <li>
       <button
@@ -285,7 +285,7 @@ export function PlayerStripView({
         aria-valuetext={clock(player.tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
@@ -330,7 +330,12 @@ export function MomentsLens({
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const [moments, setMoments] = useState<Moment[] | null>(null)
-  const [player, setPlayer] = useState<PlayerState>(() => idlePlayer(0))
+  // The player belongs to the day it plays: opening another one is a new player, never this
+  // one carried across, so nothing has to be reset after the fact.
+  const [playerOf, setPlayerOf] = useState<{ id: number | null; state: PlayerState }>(() => ({
+    id: null,
+    state: idlePlayer(0),
+  }))
   const rootRef = useRef<HTMLDivElement>(null)
   const [bandW, setBandW] = useState(0)
 
@@ -370,12 +375,18 @@ export function MomentsLens({
   }, [state])
 
   const open = moments?.find((m) => m.id === momentId) ?? null
+  const openId = open?.id ?? null
+  const playerFor = (p: { id: number | null; state: PlayerState }): PlayerState =>
+    p.id === openId ? p.state : idlePlayer(open?.startTick ?? 0)
+  const player = playerFor(playerOf)
+  const setPlayer = (step: (prev: PlayerState) => PlayerState): void => {
+    setPlayerOf((prev) => ({ id: openId, state: step(playerFor(prev)) }))
+  }
 
   // Opening a day parks the view at its first minute; a cold /moment/<id> load lands here too,
   // as soon as the list arrives.
   useEffect(() => {
     if (open === null) return
-    setPlayer(idlePlayer(open.startTick))
     handle?.scrub(open.startTick)
   }, [open, handle])
 
@@ -417,7 +428,7 @@ export function MomentsLens({
 
   const goLive = (): void => {
     scrubbedRef.current = null
-    setPlayer(idlePlayer(0))
+    setPlayerOf({ id: null, state: idlePlayer(0) })
     handle?.goLive()
     onOpen(null)
   }

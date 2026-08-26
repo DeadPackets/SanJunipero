@@ -9,37 +9,42 @@ import { fold } from '@sj/engine/fold'
 import type { WorldState } from '@sj/engine/state'
 import { isNarratable } from '../ui/chronicleFormat.js'
 
-export const THOUGHT_LOG_CAP = 200
+const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
 export const RECENT_EVENTS_CAP = 400
 
-export type ViewMode = { live: true } | { live: false; tick: number }
-export type Thought = { agentId: string; tick: number; text: string }
+type ViewMode = { live: true } | { live: false; tick: number }
+type Thought = { agentId: string; tick: number; text: string }
 // Law flips are kept whole, outside the capped delta ring: a town's legal history
 // is short and must not scroll away behind four hundred footsteps.
-export type LawChange = { tick: number; path: string; value: unknown }
+type LawChange = { tick: number; path: string; value: unknown }
 
+// Declared as properties, not methods: every reader hands `store.getState` to
+// `useSyncExternalStore` unbound, and the store is closures with no `this`.
 export type WorldStore = {
-  getState(): WorldState | null
-  getMode(): ViewMode
-  getTick(): number
-  latestThought(agentId: string): { tick: number; text: string } | null
-  thoughtsLog(): Thought[]
-  recentEvents(): SimEvent[]
-  assetsSeq(): number
-  assetRecords(): AssetRecord[]
-  getConfig(): SimConfig | null
-  getLaws(): Record<string, unknown>
-  lawHistory(): LawChange[]
-  applyServer(msg: ServerMsg): void
-  subscribe(fn: () => void): () => void
-  onEvents(fn: (evts: SimEvent[]) => void): () => void
+  getState: () => WorldState | null
+  getMode: () => ViewMode
+  getTick: () => number
+  /** the furthest tick the LIVE town has reached — scrubbing back must not walk it in */
+  liveEdge: () => number
+  latestThought: (agentId: string) => { tick: number; text: string } | null
+  thoughtsLog: () => Thought[]
+  recentEvents: () => SimEvent[]
+  assetsSeq: () => number
+  assetRecords: () => AssetRecord[]
+  getConfig: () => SimConfig | null
+  getLaws: () => Record<string, unknown>
+  lawHistory: () => LawChange[]
+  applyServer: (msg: ServerMsg) => void
+  subscribe: (fn: () => void) => () => void
+  onEvents: (fn: (evts: SimEvent[]) => void) => () => void
 }
 
 export function createWorldStore(): WorldStore {
   let state: WorldState | null = null
   let config: SimConfig | null = null // arrives inside the snapshot message — never assumed
   let mode: ViewMode = { live: true }
+  let liveEdge = 0
   let assetsSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
@@ -71,6 +76,7 @@ export function createWorldStore(): WorldStore {
     getState: () => state,
     getMode: () => mode,
     getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
+    liveEdge: () => liveEdge,
     latestThought: (agentId) => latest.get(agentId) ?? null,
     thoughtsLog: () => thoughts,
     recentEvents: () => events,
@@ -122,6 +128,7 @@ export function createWorldStore(): WorldStore {
           assetsSeq += 1
           break
       }
+      if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)
       notify()
     },
 

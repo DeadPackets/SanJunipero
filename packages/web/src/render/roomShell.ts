@@ -13,7 +13,7 @@ import {
 // Geometry for a room's floor and its two visible walls, in interior pixels on the 128×64
 // interior tile `interiorMap.ts` owns. Pure functions, so every number here measures offline.
 
-export { ROOM_TILES, WALL_H_PX, WALL_KINDS, type WallKind } from './interiorMap.js'
+export { ROOM_TILES, WALL_H_PX, type WallKind } from './interiorMap.js'
 
 /** The room's size, in interior tiles. */
 export type RoomSize = { w: number; h: number }
@@ -27,26 +27,26 @@ export const ROOM_MARGIN_Y = 8
 
 /** A course of the wall's own material, every 32 interior px of height — the grain that stops
  *  a wall reading as a flat trapezoid. */
-export const WALL_COURSE_PX = 32
+const WALL_COURSE_PX = 32
 /** The board at the foot of a wall, where it meets the floor. */
-export const SKIRTING_PX = 18
+const SKIRTING_PX = 18
 /** Where a wall piece hangs when the codex has no wall ELEVATION art for it: up the wall,
  *  clear of the skirting. The art path never uses this — an elevation piece IS the wall. */
 export const WALL_MOUNT_H_PX = 96
 /** Floor boards run one interior tile apart, along the room's +x axis. */
-export const FLOOR_BOARD_TILES = 1
+const FLOOR_BOARD_TILES = 1
 
 export const DOORWAY_POOL_ALPHA = 0.18
 export const HEARTH_POOL_ALPHA = 0.26
-export const DOORWAY_POOL_R_TILES = 2.2
-export const HEARTH_POOL_R_TILES = 1.8
+const DOORWAY_POOL_R_TILES = 2.2
+const HEARTH_POOL_R_TILES = 1.8
 
 /** The threshold plate, in interior tiles across. Matched to the exterior door sill so
  *  entering and leaving are visibly the same place. */
-export const THRESHOLD_TILES = 1.6
+const THRESHOLD_TILES = 1.6
 
 /** How deep the walls' shade falls across the row of floor nearest them. */
-export const FAR_ROW_SHADE_ALPHA = 0.22
+const FAR_ROW_SHADE_ALPHA = 0.22
 
 /** Every colour the shell paints, all MASTER_PALETTE members. This is the art-independent
  *  room: with an interior tileset the walls and floor come from it and only the light is code. */
@@ -191,7 +191,7 @@ export function thresholdPoly(room: RoomSize = ROOM_TILES): number[] {
 /** How far a joist reaches either side of its own centre line, in interior tiles. */
 export const BEAM_HALF_TILES = 0.22
 /** The shadow a joist lays on the floor. Ink, barely — a beam is a darkening, not a stripe. */
-export const BEAM_ALPHA = 0.13
+const BEAM_ALPHA = 0.13
 
 /** One quad per ceiling joist, in room space, running the full depth of the floor. */
 export function ceilingBeams(bayTiles: number, room: RoomSize = ROOM_TILES): number[][] {
@@ -273,6 +273,7 @@ export function roomBox(
 }
 
 /** Always `ROOM_ZOOM`; still a function of the stage so the scene asks rather than inlines it. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- the stage height is the question the scene asks; the answer is a constant today.
 export function roomZoomFor(_screenH: number): number {
   return ROOM_ZOOM
 }
@@ -483,7 +484,7 @@ export function drawFloorTop(g: ShellPainter, room: RoomSize = ROOM_TILES): void
 
 /** A far-row shade, kept from the landed room: the floor darkens toward the back wall so the
  *  plane reads as receding rather than as a card seen face-on. */
-export function farRowShade(room: RoomSize = ROOM_TILES, row: number): number[] {
+function farRowShade(room: RoomSize = ROOM_TILES, row: number): number[] {
   const corners = [
     interiorToScreen(0, row),
     interiorToScreen(room.w, row),

@@ -1,8 +1,6 @@
 import { FLING_MAX_MS } from '../render/fling.js'
 import { TICK_PERIOD_MAX_MS, WALK_LEAD_TICKS } from '../render/charAnim.js'
 
-export { easeOutCubic } from '../render/camera.js'
-
 /** One vocabulary of motion, spoken by both runtimes: a motion is named by WHAT IT IS, so two
  *  surfaces doing the same thing move the same way. */
 export const MOTIONS = ['tap', 'reveal', 'enter', 'move', 'scene', 'ambient'] as const

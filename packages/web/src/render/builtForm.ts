@@ -21,12 +21,12 @@ export const BUILT_FORM_RAMPS = {
   timber: { top: 0xe0a95e, right: 0xa66e38, left: 0x7e512b, plinth: 0x5d5751 },
   clay: { top: 0xf5d3b3, right: 0xd9a876, left: 0x9c6b47, plinth: 0x5d5751 },
 } as const
-export type RampName = keyof typeof BUILT_FORM_RAMPS
+type RampName = keyof typeof BUILT_FORM_RAMPS
 const RAMP_NAMES = Object.keys(BUILT_FORM_RAMPS) as RampName[]
 
 /** What a kind is made of. Anything unnamed is hashed onto a ramp, so an unknown kind is
  *  still consistent with itself across frames and across sessions. */
-export const BUILT_FORM_MATERIALS: Readonly<Record<string, RampName>> = {
+const BUILT_FORM_MATERIALS: Readonly<Record<string, RampName>> = {
   well: 'stone',
   fire_pit: 'stone',
   standing_stone: 'stone',
@@ -81,9 +81,9 @@ export const BUILT_FORM_DEFAULT_HEIGHT_TILES = 0.9
  *  as a flat sticker lying on the grass. */
 export const BUILT_FORM_INSET_TILES = 0.18
 /** The accent is a small inset on the top face — a mouth, an ember bed, a step. */
-export const BUILT_FORM_ACCENT_INSET_TILES = 0.34
+const BUILT_FORM_ACCENT_INSET_TILES = 0.34
 
-export type BuiltFace = { poly: number[]; color: number }
+type BuiltFace = { poly: number[]; color: number }
 export type BuiltForm = {
   kind: string
   heightPx: number

@@ -45,11 +45,8 @@ export function Minimap({
   const fitRef = useRef<MinimapFit | null>(null)
   const groundRef = useRef<ImageData | null>(null)
   const dotsRef = useRef<MapOp[]>([])
-  const sceneRef = useRef<Scene | null>(scene)
-  sceneRef.current = scene
   const focusRef = useRef(focusAgentId)
-  focusRef.current = focusAgentId
-  const paintRef = useRef<() => void>(() => {})
+  const paintRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (scene === null) return
@@ -126,18 +123,19 @@ export function Minimap({
       offEvents()
       offStore()
       offCamera()
-      paintRef.current = () => {}
+      paintRef.current = null
     }
   }, [scene, store])
 
   // The subject changed without the world changing: redraw her dot, do not rebuild the ground.
   useEffect(() => {
+    focusRef.current = focusAgentId
     const s = store.getState(),
       f = fitRef.current
     if (s === null || f === null) return
     const people = Object.values(s.agents) as MapPerson[]
     dotsRef.current = dotOps(peopleDots(people, f, focusAgentId), f)
-    paintRef.current()
+    paintRef.current?.()
   }, [focusAgentId, store])
 
   /** Where on the map a pointer is, in the canvas's own pixels whatever the display scale. */
@@ -155,7 +153,7 @@ export function Minimap({
   /** Press or sweep: both are one call to the guarded mover, never a write of our own. */
   const travel = (e: React.PointerEvent): void => {
     const f = fitRef.current,
-      s = sceneRef.current
+      s = scene
     const p = at(e)
     if (f === null || s === null || p === null) return
     const t = travelTargetAt(p.mx, p.my, f)
@@ -173,7 +171,7 @@ export function Minimap({
   }
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
-    const s = sceneRef.current
+    const s = scene
     if (s === null) return
     const action = minimapActionFor(e.key)
     if (action === null) return

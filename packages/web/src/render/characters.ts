@@ -253,7 +253,7 @@ export function createCharacterLayer(
   // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
   // fires on a camera stop, not on a frame.
   const recutOnZoom = (): void => {
-    const zoom = scene.getZoom?.() ?? 1
+    const zoom = scene.getZoom()
     if (zoom === hitZoom) return
     hitZoom = zoom
     for (const e of entries.values()) {
@@ -396,8 +396,7 @@ export function createCharacterLayer(
       for (const agentId of entries.keys()) {
         const prev = sheets.get(agentId)
         const next = characterArt(store.assetRecords(), agentId)
-        if (prev === undefined || prev.art.url !== next.url)
-          loadSheet(agentId, prev?.art.url ?? null)
+        if (prev?.art.url !== next.url) loadSheet(agentId, prev?.art.url ?? null)
       }
     }
     const live = new Set<string>()

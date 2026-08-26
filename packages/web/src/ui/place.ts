@@ -11,8 +11,8 @@ export const AT_RADIUS_TILES = 2
 /** Typographic apostrophe — the chrome sets prose, not code (the landed `OWNS` const). */
 const OWNS = '’s'
 
-export const NOWHERE = 'out past the edge of town'
-export const RIVER_BANK = 'on the river bank'
+const NOWHERE = 'out past the edge of town'
+const RIVER_BANK = 'on the river bank'
 
 /** The town's word for each ground, or `null` where the ground has no name worth saying. A
  *  `Record`, so a wider `TileId` union is a compile error here rather than a silent gap. */

@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 
-export const VEIL_EXIT_MS = 260
+const VEIL_EXIT_MS = 260
 
 // Cold-boot veil only: once a snapshot has ever landed, the world on screen is fact
 // and link trouble speaks through the topbar pill instead.

@@ -322,7 +322,11 @@ describe('the drain produces the order the sort-and-shift queue produced', () =>
       ready.sort((p, q) => p - q)
       const i = ready.shift()!
       out.push(seeded[i]!.id)
-      for (const j of after[i]!) if (--indeg[j]! === 0) ready.push(j)
+      for (const j of after[i]!) {
+        const left = indeg[j]! - 1
+        indeg[j] = left
+        if (left === 0) ready.push(j)
+      }
     }
     if (out.length < n) for (let i = 0; i < n; i++) if (indeg[i]! > 0) out.push(seeded[i]!.id)
     return out

@@ -64,9 +64,7 @@ vi.mock('pixi.js', () => {
       return this
     }
   }
-  class Texture {
-    static EMPTY = new Texture()
-  }
+  const Texture = { EMPTY: {} }
   class Polygon {
     points: number[]
     constructor(points: number[] = []) {

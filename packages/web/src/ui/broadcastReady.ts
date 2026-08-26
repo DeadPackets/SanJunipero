@@ -67,9 +67,9 @@ export function kindWords(kind: string): string {
 
 /** "1080p" is 1920 x 1080 and the mobile player is 480 CSS px WIDE, so the scale is 480/1920 =
  *  0.25, not the 480/1080 the plan used. */
-export const TWITCH_SOURCE_W = 1920,
+const TWITCH_SOURCE_W = 1920,
   TWITCH_SOURCE_H = 1080
-export const TWITCH_PLAYER_W = 480
+const TWITCH_PLAYER_W = 480
 export const TWITCH_SCALE = TWITCH_PLAYER_W / TWITCH_SOURCE_W
 /** The frame, at that scale, in the viewer's pixels: 480 x 270. */
 export const TWITCH_FRAME_H = Math.round(TWITCH_SOURCE_H * TWITCH_SCALE)
@@ -77,7 +77,7 @@ export const TWITCH_FRAME_H = Math.round(TWITCH_SOURCE_H * TWITCH_SCALE)
  * Subtitle guidance (EBU-TT / BBC family) puts a caption's type at no less than 2% of frame height
  * — 5.4px at 480x270. A fraction of the FRAME, because that is what holds when a stream is re-encoded.
  */
-export const CAPTION_MIN_FRACTION = 0.02
+const CAPTION_MIN_FRACTION = 0.02
 export const captionMinPx = (frameH = TWITCH_FRAME_H): number => frameH * CAPTION_MIN_FRACTION
 
 export const captionAtScale = (px: number, scale = TWITCH_SCALE): number => px * scale
@@ -112,7 +112,7 @@ export type Rails = { panel: number; stripCard: number; controlItem: number; con
  *  scroll: horizontal scrolling is the specific thing R7 forbids. */
 export const STAGE_MIN_PX = 640
 
-export function stageWidthAt(width: number, rails: Rails): number {
+function stageWidthAt(width: number, rails: Rails): number {
   return width - rails.panel
 }
 

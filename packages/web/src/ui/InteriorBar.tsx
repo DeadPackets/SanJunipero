@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { roomCard, type Provenance, type RoomCard } from './interiorModel.js'
 
-export { roomWord as interiorRoomWord } from './interiorModel.js'
-
 export function RoomCardView({
   card,
   onBack,
@@ -75,16 +73,16 @@ export function RoomCardView({
 
 /** The provenance endpoint, as a hook. A room the gateway has forgotten is `null`, which the
  *  card renders by omitting the line rather than by printing a blank. */
-export function useProvenance(structureId: string | null): Provenance | null {
-  const [prov, setProv] = useState<Provenance | null>(null)
+function useProvenance(structureId: string | null): Provenance | null {
+  // held WITH the room it describes, so a new room reads as "nothing yet" in the same render
+  const [got, setGot] = useState<{ id: string; prov: Provenance | null } | null>(null)
   useEffect(() => {
-    setProv(null)
     if (structureId === null) return
     let live = true
     void fetch(`/api/structure/${encodeURIComponent(structureId)}/provenance`)
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => {
-        if (live) setProv(p as Provenance | null)
+        if (live) setGot({ id: structureId, prov: p as Provenance | null })
       })
       .catch(() => {
         /* a room with no recorded beginning still opens */
@@ -93,7 +91,7 @@ export function useProvenance(structureId: string | null): Provenance | null {
       live = false
     }
   }, [structureId])
-  return prov
+  return got?.id === structureId ? got.prov : null
 }
 
 // Escape leaves the room, so the interior is never a place a keyboard can walk into and not out

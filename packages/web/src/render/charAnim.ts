@@ -15,7 +15,7 @@ export const SHEET_ROWS = [
 ] as const
 export const CELL = 96
 export const FEET_Y = 88
-export const WALK_FPS = 8
+const WALK_FPS = 8
 export const WALK_LOOP = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // v2, 8fps
 export const BOB_PX = 1 // passing frames render 1px lower — render-time only, never baked
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
@@ -25,7 +25,8 @@ export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/f
 // before-state.
 export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
-/** @deprecated superseded by hitShapes.bodyHitPolygon. Kept for the landed tests. */
+/** NOT the click target — hitShapes.bodyHitPolygon is. Kept as the before-state the landed
+ *  tests measure against. */
 export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
   return {
     x: -HIT_AREA_W / 2 / scale,
@@ -144,11 +145,11 @@ export function strideFrameMs(msPerTile: number, strideScale = 1): number {
  *  only tick rate anything in this repo writes down. It is replaced by the first measurement. */
 export const TICK_PERIOD_SEED_MS = TICK_REAL_MS
 /** A period outside this is a pause, a resume, a scrub or a stall — not the world's cadence. */
-export const TICK_PERIOD_MIN_MS = 60
+const TICK_PERIOD_MIN_MS = 60
 export const TICK_PERIOD_MAX_MS = 6000
 /** Weight on a new sample. Low enough that one late batch does not become the walk's speed,
  *  high enough that a world that changes rate is followed within a second. */
-export const TICK_PERIOD_SMOOTHING = 0.25
+const TICK_PERIOD_SMOOTHING = 0.25
 
 export type TickClock = { periodMs: number; lastArrivalMs: number; samples: number }
 
@@ -263,7 +264,7 @@ export const EMOTE_KINDS = [
 ] as const // mirrors /assets/emotes.json order
 export type EmoteKind = (typeof EMOTE_KINDS)[number]
 
-export const NEED_EMOTE_BELOW = 30
+const NEED_EMOTE_BELOW = 30
 
 export function emoteFor(a: AgentBody, recent: SimEvent[]): EmoteKind | null {
   if (!a.alive) return null // the renderer's tone handling owns death

@@ -12,14 +12,16 @@ const spawn: SimEvent = {
   payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: 7300 },
 }
 
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+
 function makeSnapshot() {
   const state = fold(genesisState(DEFAULT_CONFIG, GRASS), spawn, DEFAULT_CONFIG)
   return {
     t: 'snapshot' as const,
     tick: state.tick,
     seq: 1,
-    state: JSON.parse(JSON.stringify(state)),
-    config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)),
+    state: clone(state),
+    config: clone(DEFAULT_CONFIG),
     laws: {},
     live: true,
   }
@@ -53,7 +55,7 @@ describe('worldStore', () => {
 
     const bad = {
       ...makeSnapshot(),
-      config: { ...JSON.parse(JSON.stringify(DEFAULT_CONFIG)), mystery: 1 },
+      config: { ...clone(DEFAULT_CONFIG), mystery: 1 },
     }
     expect(() => {
       store.applyServer(bad)
@@ -74,7 +76,7 @@ describe('worldStore', () => {
     }
     store.applyServer({ t: 'tick', tick: 2, events: [adv, ev] })
     const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
-    expect(stateHash(store.getState())).toBe(stateHash(JSON.parse(JSON.stringify(reference))))
+    expect(stateHash(store.getState())).toBe(stateHash(clone(reference)))
     expect(store.getTick()).toBe(2)
   })
 

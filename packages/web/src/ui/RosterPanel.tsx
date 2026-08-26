@@ -15,8 +15,8 @@ import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
 import { changeLog, type PersonalityRow } from './becoming.js'
 import { EMPTY_COPY } from './townStats.js'
 
-export const BUST_PX = 48
-export const BONDS_REFETCH_MS = 30_000
+const BONDS_REFETCH_MS = 30_000
+const NO_CHANGES: PersonalityRow[] = []
 
 /** The panel with the store taken out of it, so a test can render the markup without a fake
  *  store and without a DOM (the `StatusStripView` precedent). */
@@ -112,7 +112,9 @@ export function RosterPanel({
   const [sort, setSort] = useState<RosterSort>('name')
   const [bonds, setBonds] = useState<BondsResponse | null>(null)
   const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
-  const [changes, setChanges] = useState<PersonalityRow[]>([])
+  // held WITH the row it belongs to, so a newly opened row reads as empty in the same render
+  const [changesOf, setChangesOf] = useState<{ id: string; rows: PersonalityRow[] } | null>(null)
+  const changes = changesOf?.id === openId ? changesOf.rows : NO_CHANGES
 
   // Who came from whom. A childless town answers with a typed empty, so this never fails.
   useEffect(() => {
@@ -128,18 +130,15 @@ export function RosterPanel({
 
   // Only the open row's document, and only while it is open — a roster does not fetch five.
   useEffect(() => {
-    if (openId === null) {
-      setChanges([])
-      return
-    }
+    if (openId === null) return
     let alive = true
     void fetch(`/api/agent/${encodeURIComponent(openId)}/personality`)
       .then(async (r) => (r.ok ? ((await r.json()) as PersonalityRow[]) : []))
       .then((rows) => {
-        if (alive) setChanges(Array.isArray(rows) ? rows : [])
+        if (alive) setChangesOf({ id: openId, rows: Array.isArray(rows) ? rows : [] })
       })
       .catch(() => {
-        if (alive) setChanges([])
+        if (alive) setChangesOf({ id: openId, rows: [] })
       })
     return () => {
       alive = false

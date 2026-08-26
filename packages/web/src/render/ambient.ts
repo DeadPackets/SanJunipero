@@ -11,10 +11,10 @@ import type { CharacterLayer } from './characters.js'
 import { entitySpriteOf } from './entities.js'
 import { isGrave, toneReducer } from './tone.js'
 
-export const SMOKE_PUFFS = 3
-export const SMOKE_RISE_PX = 14
-export const SMOKE_LOOP_MS = 2400
-export const SMOKE_PUFF_R = 3 // a round puff, not an 8x8 card
+const SMOKE_PUFFS = 3
+const SMOKE_RISE_PX = 14
+const SMOKE_LOOP_MS = 2400
+const SMOKE_PUFF_R = 3 // a round puff, not an 8x8 card
 export const SMOKE_MAX_ALPHA = 0.42
 export const SMOKE_COLOR = 0xcfc6bc // warm grey, MASTER_PALETTE — cream read as white glass
 
@@ -27,26 +27,26 @@ export const HEARTH_KINDS: ReadonlySet<string> = new Set([
   'fire_pit',
 ])
 export const SHIMMER_MAX = 60
-export const SHIMMER_HZ = 0.5
+const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
-export const TREE_SKEW = 0.06
-export const GLOW_R = 4 // a round pool of light, not a 6x6 card
-export const GLOW_COLOR = 0xf4e289
+const TREE_SKEW = 0.06
+const GLOW_R = 4 // a round pool of light, not a 6x6 card
+const GLOW_COLOR = 0xf4e289
 // additive blending drives a honey square to near-white; this is the ceiling that keeps it
 // reading as lamplight rather than as a pale rectangle stuck to the wall
 export const GLOW_BASE_ALPHA = 0.3
 export const GLOW_SWING = 0.12
-export const GLOW_HZ = 0.4
-export const BOUNCE_MS = 260
-export const BOUNCE_SCALE = 1.18
-export const SQUASH_Y = 0.92
-export const SQUASH_HZ = 0.3
-export const SQUASH_VERBS = ['build', 'till', 'harvest', 'fish'] as const
-export const BIRD_MIN_S = 20
-export const BIRD_MAX_S = 45
+const GLOW_HZ = 0.4
+const BOUNCE_MS = 260
+const BOUNCE_SCALE = 1.18
+const SQUASH_Y = 0.92
+const SQUASH_HZ = 0.3
+const SQUASH_VERBS = ['build', 'till', 'harvest', 'fish'] as const
+const BIRD_MIN_S = 20
+const BIRD_MAX_S = 45
 export const FIRE_COLOR = 0xf7a66b
-export const FIRE_HZ = 7
-export const FIRE_FROZEN_ALPHA = 0.6
+const FIRE_HZ = 7
+const FIRE_FROZEN_ALPHA = 0.6
 
 const WATER: TileId = 2
 const FOREST: TileId = 3
@@ -57,16 +57,16 @@ export const SHIMMER_PX = { w: 2, h: 2 } as const
 
 // Painted in code, not commissioned: scenery is not a structure kind, so it sits outside the
 // codex the art coverage gate measures.
-export const CANOPY_TRUNK = 0x7e512b
-export const CANOPY_BODY = 0x6f9455
-export const CANOPY_LIT = 0x93b573 // lit from the upper left, like everything else
-export const CANOPY_SHADE = 0x4f7040
+const CANOPY_TRUNK = 0x7e512b
+const CANOPY_BODY = 0x6f9455
+const CANOPY_LIT = 0x93b573 // lit from the upper left, like everything else
+const CANOPY_SHADE = 0x4f7040
 
 /** Half-width of the canopy per row, top to bottom: a round crown over a two-pixel trunk. */
 const CANOPY_ROWS: readonly number[] = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 2]
 
 /** The tree, as flat blocks with hard edges — one row of the crown at a time. */
-export function canopyBlocks(): {
+function canopyBlocks(): {
   x: number
   y: number
   w: number

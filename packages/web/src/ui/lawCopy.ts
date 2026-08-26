@@ -7,7 +7,7 @@ import { TOGGLABLE_PATHS } from '@sj/engine/laws'
  * may not fall through to `JSON.stringify`: `spoilage.days` is an object and rendered as one blob.
  */
 
-export type LawRow = { label: string; value: string }
+type LawRow = { label: string; value: string }
 
 export type LawCopy = {
   title: string

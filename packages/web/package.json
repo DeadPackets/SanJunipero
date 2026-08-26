@@ -16,8 +16,7 @@
     "pixi.js": "^8.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-force-graph-2d": "^1.25.0",
-    "zod": "^4.4.0"
+    "react-force-graph-2d": "^1.25.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

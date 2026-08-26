@@ -143,7 +143,7 @@ export function resolveMaterial(records: AssetRecord[], kind: string): string | 
 }
 
 /** One tile's contribution to a mask: the diamond it covers, or a road silhouette. */
-export type MaskShape = { sx: number; sy: number; roadKey: RoadAutotileKey | null }
+type MaskShape = { sx: number; sy: number; roadKey: RoadAutotileKey | null }
 
 export type FieldLayer = {
   /** identity — two layers can share a `kind` and draw from different materials */
@@ -285,8 +285,8 @@ export function roadStripFrame(
 // A key contributes only its outline: a stub at the tile centre plus one arm per direction the
 // road continues in, read from the key NAME — an isolated tile and a south stub share `cap-s`.
 
-export const ARM_HALF_W = 5 / 32 // half-width of an arm, in tile-space units
-export const ARM_DIRS = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const
+const ARM_HALF_W = 5 / 32 // half-width of an arm, in tile-space units
+const ARM_DIRS = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const
 export type ArmDir = keyof typeof ARM_DIRS
 
 export function roadArms(key: RoadAutotileKey): Record<ArmDir, boolean> {
@@ -333,7 +333,7 @@ export const ROAD_SHOULDER_DARK = 0x9c6b47
 export const ROAD_SHOULDER_LIGHT = 0xe8d5bc
 
 /** How much of the rim's depth the dark half takes, measured from the road side. */
-export const SHOULDER_SPLIT = 0.55
+const SHOULDER_SPLIT = 0.55
 
 export function roadReadsAt(roadTone: number, groundTone: number): boolean {
   return Math.abs(roadTone - groundTone) >= ROAD_GROUND_LUMA_DELTA_MIN
@@ -475,5 +475,3 @@ export function roadRibbonPolys(key: RoadAutotileKey): number[][] {
   }
   return polys
 }
-
-export { roadAutotileKind } from '@sj/shared'

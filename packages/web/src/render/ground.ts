@@ -59,16 +59,6 @@ export const TILE_COLORS: Record<TileId, number> = {
   10: 0x8fbfd6 /* channel */,
 }
 
-// shade tiles draw one ramp step darker for subtle checker texture
-export const SHADE_MULT = 0.85
-
-export function shadeColor(color: number): number {
-  const r = Math.round(((color >> 16) & 0xff) * SHADE_MULT)
-  const g = Math.round(((color >> 8) & 0xff) * SHADE_MULT)
-  const b = Math.round((color & 0xff) * SHADE_MULT)
-  return (r << 16) | (g << 8) | b
-}
-
 export type GroundCell = { sx: number; sy: number; color: number; shade: boolean }
 
 export function groundPlan(terrain: TileId[][]): GroundCell[] {
@@ -86,9 +76,16 @@ export function groundPlan(terrain: TileId[][]): GroundCell[] {
 export const GROUND_FALLBACK_COLOR = 0x93b573
 export const GRASS_TILE_ID = 0
 
+const COLOR_BY_ID: Partial<Record<number, number>> = TILE_COLORS
+/** The palette colour for any id a terrain array carries — grass for one this build has no
+ *  entry for. `TILE_COLORS` itself is total over `TileId` and needs no fallback. */
+export function tileColor(id: number): number {
+  return COLOR_BY_ID[id] ?? GROUND_FALLBACK_COLOR
+}
+
 // One plan entry per tile: a codex texture url when terrain art exists, otherwise the C6
 // flat palette-true diamond. Art independence — an empty record set renders exactly as C6 did.
-export type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
+type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
 
 export type TilePlan = TileLayer & {
   sx: number
@@ -125,7 +122,7 @@ export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePl
         url,
         overlay,
         base,
-        fallback: TILE_COLORS[id] ?? GROUND_FALLBACK_COLOR,
+        fallback: TILE_COLORS[id],
         shade: (x + y) % 2 === 1,
       })
     }

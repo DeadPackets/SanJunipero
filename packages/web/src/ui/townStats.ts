@@ -4,7 +4,7 @@ import { LENSES, type Lens } from './route.js'
 
 export type TownStats = { day: number; time: string; weather: string; alive: number; total: number }
 
-export const WEATHER_UNKNOWN = '—'
+const WEATHER_UNKNOWN = '—'
 
 export function townStats(state: WorldState | null, tick: number): TownStats {
   const m = tickToMoment(tick)

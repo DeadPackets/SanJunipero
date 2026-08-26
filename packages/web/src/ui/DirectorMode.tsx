@@ -19,23 +19,18 @@ export function DirectorMode({
   autoCut: boolean
   leaving?: boolean
 }) {
-  const [followed, setFollowed] = useState<string | null>(null)
+  const [cut, setCut] = useState<string | null>(null)
+  // no subject at all while the town is not being televised
+  const followed = autoCut ? cut : null
   const followedRef = useRef<string | null>(null)
   const lastCutRef = useRef(0)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
-  // read inside the poll, never subscribed to — the town changing must not restart the timer
-  const livingRef = useRef<string[]>([])
-  livingRef.current = Object.values(state?.agents ?? {})
-    .filter((a) => a.alive)
-    .map((a) => a.id)
-    .sort()
 
   // heat poll → sticky cut, never faster than CUT_MIN_MS
   useEffect(() => {
     if (!autoCut) {
       followedRef.current = null
-      setFollowed(null)
       return
     }
     let alive = true
@@ -44,7 +39,12 @@ export function DirectorMode({
         .then(async (r) => (r.ok ? ((await r.json()) as HeatWindow[]) : []))
         .then((heat) => {
           if (!alive) return
-          const next = subjectFor(heat, followedRef.current, store.getTick(), livingRef.current)
+          // read here, never subscribed to — the town changing must not restart the timer
+          const living = Object.values(store.getState()?.agents ?? {})
+            .filter((a) => a.alive)
+            .map((a) => a.id)
+            .sort()
+          const next = subjectFor(heat, followedRef.current, store.getTick(), living)
           const now = performance.now()
           if (
             next !== null &&
@@ -53,14 +53,16 @@ export function DirectorMode({
           ) {
             followedRef.current = next
             lastCutRef.current = now
-            setFollowed(next)
+            setCut(next)
           } else if (followedRef.current === null && next !== null) {
             followedRef.current = next
             lastCutRef.current = now
-            setFollowed(next)
+            setCut(next)
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          /* the cut keeps its subject whether or not the heat window arrives */
+        })
     }
     poll()
     const timer = setInterval(poll, HEAT_POLL_MS)

@@ -4,9 +4,9 @@ import { TILE_H, TILE_W } from './iso.js'
 // pitch. A measuring instrument for the camera and the cull; nothing but tests imports it.
 
 /** 18 tiles of block and one of road between them, the pitch the ring grammar plats on. */
-export const BLOCK_PITCH = 19
+const BLOCK_PITCH = 19
 /** The plot side inside one block; the remaining tile of the pitch is the street. */
-export const BLOCK_SIDE = BLOCK_PITCH - 1
+const BLOCK_SIDE = BLOCK_PITCH - 1
 
 export type FixtureStructure = {
   id: string
@@ -68,12 +68,12 @@ export function bigTown(rings: number): FixtureStructure[] {
 // and structures cannot drift apart because both shift `bigTownTileExtent(rings)` by the same `lo`.
 
 export const ROAD = 7,
-  WATER = 2,
-  GRASS = 0
+  WATER = 2
+const GRASS = 0
 
 /** One tile of the pitch is street; the channel is ONE tile wide on purpose — the thinnest
  *  feature the grammar produces, and the thing a map that point-samples loses first. */
-export const CHANNEL_X = 2
+const CHANNEL_X = 2
 
 export function bigTownSide(rings: number): number {
   const e = bigTownTileExtent(rings)
@@ -105,7 +105,7 @@ export function bigTownPlaced(rings: number): FixtureStructure[] {
 }
 
 /** The tile box the ring grammar plats into at this ring count, streets included. */
-export function bigTownTileExtent(rings: number): {
+function bigTownTileExtent(rings: number): {
   x0: number
   y0: number
   x1: number

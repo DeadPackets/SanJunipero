@@ -2,9 +2,9 @@ import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
 export const LAST_SEEN_KEY = 'sj:lastSeenTick'
-export const GAP_TICKS = 1440 // more than a missed day → offer the digest
-export const BACKOFF_MIN_MS = 1_000
-export const BACKOFF_MAX_MS = 30_000
+const GAP_TICKS = 1440 // more than a missed day → offer the digest
+const BACKOFF_MIN_MS = 1_000
+const BACKOFF_MAX_MS = 30_000
 
 export type ObservatoryHandle = { scrub(tick: number): void; goLive(): void; close(): void }
 export type LinkStatus = 'connecting' | 'online' | 'reconnecting'

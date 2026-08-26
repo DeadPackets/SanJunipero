@@ -9,11 +9,7 @@ import {
 } from '@sj/shared'
 
 // (controller ruling) resolution runs on the codex kind column, never on desc parsing
-export function resolveAsset(
-  records: AssetRecord[],
-  klass: AssetClass,
-  kind: string,
-): AssetRecord | null {
+function resolveAsset(records: AssetRecord[], klass: AssetClass, kind: string): AssetRecord | null {
   let best: AssetRecord | null = null
   for (const r of records) {
     if (r.status !== 'ready' || r.class !== klass || r.kind !== kind) continue
@@ -31,7 +27,7 @@ export function resolveAssetId(
 }
 
 // character sheets live in the codex as class rig-part, kind character:<agentId>
-export const CHARACTER_CLASS: AssetClass = 'rig-part'
+const CHARACTER_CLASS: AssetClass = 'rig-part'
 
 export type CharacterArt = {
   url: string
@@ -137,7 +133,7 @@ export class TextureBook {
 // ── NOTHING POPS IN ───────────────────────────────────────────────────
 
 /** The motion a swapped-in texture arrives on. */
-export const ART_FADE: MotionName = 'reveal'
+const ART_FADE: MotionName = 'reveal'
 
 /** Fades a node from nothing to itself over `ART_FADE`. Node-safe: with no rAF (a test, a
  *  worker) the art simply arrives, which is the old behaviour and never a hole. */
