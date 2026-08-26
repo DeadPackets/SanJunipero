@@ -93,6 +93,20 @@ describe('the public surface a stranger reaches', () => {
     expect(leak).not.toContain('THE PRIVATE THING')
   })
 
+  it('★ survives a malformed percent-escape in a routed segment', async () => {
+    const gw = await gwPromise
+    const base = `http://127.0.0.1:${gw.port}`
+    // `decodeURIComponent('%')` throws URIError, and the router decodes inside the createServer
+    // listener — unguarded this is an uncaughtException that takes the whole stream down.
+    for (const path of ['/assets/%', '/api/agent/%/profile', '/assets/character/%ZZ.png']) {
+      const r = await fetch(`${base}${path}`)
+      expect(r.status, path).toBe(404)
+      await r.text()
+    }
+    // The town is still serving, which is the whole point.
+    expect((await fetch(`${base}/api/agent/walker/profile`)).status).toBe(200)
+  })
+
   it('answers nothing for __proto__, which is a truthy agent that does not exist', async () => {
     const gw = await gwPromise
     const r = await fetch(`http://127.0.0.1:${gw.port}/api/agent/__proto__/profile`)
@@ -173,6 +187,36 @@ describe('the public surface a stranger reaches', () => {
     expect(scrubbed.length).toBeLessThan(10)
     // The last ask is the one a dragging finger stopped on, so it must be the one answered.
     expect(scrubbed.at(-1)?.reqId).toBe(59)
+  })
+})
+
+describe('a route handler that throws', () => {
+  const open: Gateway[] = []
+  const brokenDir = mkdtempSync(join(tmpdir(), 'sj-broken-'))
+  afterAll(async () => {
+    for (const gw of open) await gw.close()
+    rmSync(brokenDir, { recursive: true, force: true })
+  })
+
+  it('★ answers 500 without a stack, and the next request still lands', async () => {
+    const dbPath = join(brokenDir, 'broken.db')
+    openForgeDb(dbPath).close()
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 4; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const base = `http://127.0.0.1:${gw.port}`
+    expect((await fetch(`${base}/api/chapters`)).status).toBe(200)
+
+    // The world db changing under a mounted read path: the prepared SELECT now throws when it
+    // runs, straight out of the handler and into the listener that ticks the town.
+    db.exec('DROP TABLE events')
+    const r = await fetch(`${base}/api/chronicle`)
+    expect(r.status).toBe(500)
+    const body = await r.text()
+    expect(body).not.toContain('at ')
+    expect(body).not.toContain('.ts:')
+    expect((await fetch(`${base}/api/chapters`)).status).toBe(200)
   })
 })
 

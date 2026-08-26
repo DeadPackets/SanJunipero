@@ -14,7 +14,8 @@ import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
-import { notFound } from './http.js'
+import { reportOnce } from './degraded.js'
+import { notFound, sendJson } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -106,10 +107,23 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       let ok = true
       for (let i = 0; i < r.segs.length; i++) {
         const p = r.segs[i]!
-        if (p.startsWith(':')) params[p.slice(1)] = decodeURIComponent(segs[i]!)
-        else if (p !== segs[i]) { ok = false; break }
+        // A malformed escape is not this route's path: `decodeURIComponent` throws, and unguarded
+        // that throw is an uncaughtException in the listener that ticks the town.
+        if (p.startsWith(':')) {
+          try { params[p.slice(1)] = decodeURIComponent(segs[i]!) } catch { ok = false; break }
+        } else if (p !== segs[i]) { ok = false; break }
       }
-      if (ok) { r.fn(req, res, params); return }
+      if (ok) {
+        try {
+          r.fn(req, res, params)
+        } catch (e) {
+          reportOnce(`route.${r.method} ${r.segs.join('/')}`, () =>
+            `${r.method} /${r.segs.join('/')} threw — ${e instanceof Error ? e.message : String(e)}`)
+          if (res.headersSent) res.destroy()
+          else sendJson(res, { error: 'internal error' }, 500)
+        }
+        return
+      }
     }
     if (site !== null && site(req, res, url.pathname)) return
     notFound(res)
