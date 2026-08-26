@@ -1725,7 +1725,6 @@ export const WriteParams = z.object({ itemId: z.string().optional(), text: z.str
 export const ReadParams = z.object({ itemId: z.string() }).strict()
 export const TeachParams = z.object({ targetId: z.string(), track: z.string() }).strict()
 export const AttackParams = z.object({ targetId: z.string() }).strict()
-export const ExperimentParams = z.object({ description: z.string() }).strict()
 
 // One function under two names, so the word a busy body says and the word an idle one says are
 // composed in exactly one place (G4).

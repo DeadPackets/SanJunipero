@@ -41,8 +41,6 @@ export const MIN_SEP = 72
 
 export const TOWN_FACINGS = ['sw', 'se'] as const
 export type TownFacing = (typeof TOWN_FACINGS)[number]
-export const isTownFacing = (s: string): s is TownFacing =>
-  (TOWN_FACINGS as readonly string[]).includes(s)
 
 // ---------------------------------------------------------------- the projection
 
