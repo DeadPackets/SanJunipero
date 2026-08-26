@@ -56,11 +56,8 @@ const ADMIN_PORT = Number(process.env.G9_ADMIN_PORT ?? 8791)
 // The town wakes at seven, not at midnight: a world that opens in the dark
 // spends its first hours deciding where to lie down.
 const START_TICK = 7 * 60
-// ★ A STAGED TICK IS A FRACTION OF THE RUN, MEASURED FROM WHERE THE RUN STARTS. These are
-// compared against `loop.tick`, which begins at START_TICK — so without the offset they are a
-// fraction of the run measured from midnight, and any run shorter than ~1 050 ticks skips both
-// operator actions ENTIRELY. Found by running it: a 240-tick slice reported `adminStatus=null`
-// and `forcedAlert=false`, which reads as a broken admin channel rather than one never called.
+// Staged ticks are compared against `loop.tick`, which begins at START_TICK — without the
+// offset any run shorter than ~1050 ticks skips both operator actions entirely.
 const stagedTick = (fraction: number, cap: number): number =>
   START_TICK + Math.min(cap, Math.floor(TOTAL_TICKS * fraction))
 const FLIP_TICK = stagedTick(0.62, 1800)

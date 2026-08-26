@@ -1,8 +1,5 @@
-// C7 Task 1 — $5-capped live-API probe: narrator call mechanics.
-// Run: OPENROUTER_API_KEY=… pnpm --filter @sj/narrator probe
-// Proves (1) ChapterSummary-shaped structured output with numeric citations through
-// LlmClient.object, (2) prefix cache on the byte-stable NARRATOR_CANON, (3) caller
-// accounting under caller 'narrator'. Hard cap $5.00 — expected spend < $0.05.
+// LIVE — narrator call mechanics: structured ChapterSummary output, prefix cache on the
+// byte-stable NARRATOR_CANON, caller accounting. Hard cap $5.00, expected spend < $0.05.
 import { openDb } from '@sj/engine'
 import { LlmClient, migrateLlmTables, type LlmUsage } from '@sj/agents'
 import { z } from 'zod'

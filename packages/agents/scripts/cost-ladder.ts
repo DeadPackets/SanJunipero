@@ -27,15 +27,8 @@ import { makeReflectionLlm } from '../src/reflection.js'
 
 const LABEL = process.env.LADDER_LABEL ?? 'ladder'
 const TOTAL_TICKS = Number(process.env.LADDER_TICKS ?? 420)
-// ★ A WINTER NIGHT, BECAUSE THE FIRST CONTROL ARM MEASURED NOTHING.
-//
-// Run on the default day 0 the arm came back `enteredWarm 0, lightActs 0, completed 0` — not
-// because the minds failed, but because day 0 is SPRING (`SEASONS[floor(dayOfYear/91)]`) and
-// spring night sits at ambient 9. Nobody drops under the shiver line, so three of the six
-// behaviours cannot fire in the control and a measure that cannot fire cannot detect a
-// regression. Winter night is ambient -12: the cold is real, the dark is real, and all six are
-// live. Day 273 is the first winter day; 20:00 is where night-probe starts, an hour before the
-// deep dark, so a mind meets the night rather than waking in it.
+// Day 0 is SPRING (ambient 9) and nobody drops under the shiver line, so three of the six
+// behaviours cannot fire. Day 273 20:00 is the first winter night, an hour before the deep dark.
 const WINTER_NIGHT = 273 * MINUTES_PER_DAY + 20 * 60
 const START_TICK = Number(process.env.LADDER_START_TICK ?? WINTER_NIGHT)
 const CAP_USD = Number(process.env.LADDER_CAP ?? 3.0)

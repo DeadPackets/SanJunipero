@@ -1,11 +1,5 @@
-// GATE G11b — the live half of the deep-world gate (addendum §18).
-// Five minds on the 128x128 genesis town, two sim-days, a real arbiter with a real materials
-// table, a real construct pass, a real chronicle and a real nightly semantic pass. Everything
-// the report claims is read back out of the run's own tables and event log.
-//
-// The ops plane is WIRED HERE OR THE GATE RUNS DARK (batch-7 concern 1, batch-8 concern 1):
-// runConstructPass, narrateDay's world and semantic seams, the arbiter's `vocabulary` table
-// and reportDeadCalls each have exactly one live caller, and it is this file.
+// The live half of the deep-world gate: five minds on the 128x128 genesis town for two
+// sim-days, with every claim read back out of the run's own tables and event log.
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -63,12 +57,8 @@ import {
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 import type { DiscoveryCredit } from '@sj/shared'
 
-// The user has ratified Baidu Qianfan as the v1 provider (cleanup/c8-cost-plan.md L1).
-// OpenRouter's `provider.order` is a PREFERENCE, not an allow-list: `defaultExtraBody` sends
-// allow_fallbacks:true and the client exposes no way to turn it off. Recorded as a C8 item in
-// the report rather than assumed away.
-// `G11_PROVIDER` lets the gate be run twice against the same world with only the routing
-// changed, which is the only way to tell a provider's answer rate from a town's behaviour.
+// OpenRouter's `provider.order` is a PREFERENCE: `defaultExtraBody` sends allow_fallbacks:true
+// and the client exposes no way to turn it off. `G11_PROVIDER` varies routing over one world.
 const PROVIDER_ORDER = (process.env.G11_PROVIDER ?? 'Baidu').split(',').filter((x) => x.length > 0)
 // C11 R20 made this real: false leaves OpenRouter free to fall through to whatever answers,
 // true turns `G11_PROVIDER` into an allow-list. Default stays false so this run is routed
@@ -119,11 +109,8 @@ const MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.ur
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-// The per-tick bookkeeping a day produces tens of thousands of, and which no scene, heat score
-// or milestone reads. `narrateDay` segments and digests whatever it is handed, so a caller that
-// hands it the raw stream builds a prompt out of every need a body felt all day. This is the
-// caller's filter and it is deliberately NOT `NOT_CHRONICLED` — that set says which events get
-// a chronicle LINE, and it drops half of what the milestone detectors match on.
+// The caller's filter, deliberately NOT `NOT_CHRONICLED` — that set says which events get a
+// chronicle LINE and drops half of what the milestone detectors match on.
 const SEMANTIC_RECORD_CAP = 300
 const NARRATOR_NOISE: ReadonlySet<string> = new Set([
   'tick_advanced', 'need_changed', 'thirst_changed', 'hp_changed', 'agent_moved', 'agent_aged',
@@ -317,13 +304,8 @@ const qRows = <T>(db: Database.Database, sql: string, ...p: unknown[]): T[] =>
 
 const payloadOf = (e: SimEvent): Record<string, unknown> => (e.payload ?? {}) as Record<string, unknown>
 
-// The commit this run's code is at, and whether the tree it was run from was clean. A resume
-// across a code change would score a repaired run on the broken one's evidence, so the sha is
-// part of the fingerprint and a dirty tree is a different fingerprint every time it changes.
-//
-// `-uno` and the excluded data directory are not laxity: the run REWRITES its own artifacts in
-// `packages/agents/data` as it goes, so counting those would give the same run a different
-// fingerprint before and after its first day-close and no run could ever resume itself.
+// The sha is part of the fingerprint so a resume cannot score a repaired run on broken evidence.
+// The run rewrites its own artifacts under data/, so `-uno` and that exclusion let it resume.
 function gitSha(): string {
   try {
     const at = fileURLToPath(new URL('../../../', import.meta.url))
@@ -814,10 +796,8 @@ async function main(): Promise<void> {
   }
 
   // ------------------------------------------------------- the report writer ---
-  // Callable at any moment, and called at every day-close and again the instant the tick loop
-  // ends. It reads the run out of the event store, the database and the accumulators above —
-  // never out of a variable only the end of the run would have — so a partial written at 93%
-  // is the same arithmetic as the final one on the same evidence.
+  // Reads the run out of the event store and the accumulators, never out of an end-of-run
+  // variable, so a partial written at 93% is the same arithmetic as the final one.
   async function resolveReuse(): Promise<void> {
     if (reuseResolved) return
     reuseResolved = true
@@ -898,12 +878,8 @@ async function main(): Promise<void> {
     return s
   }
 
-  // The spit narrows the channel to two tiles: at a ford row the water is x 48 and 49 and the
-  // spit at x 50 is the bank on the town's side. The deck spans the water, not the sand.
-  //
-  // A run in which the map grew has moved every coordinate the genesis constants name — the
-  // fold shifts the world when it widens north or west — so the ford is wherever the growths
-  // put it. Run 4 of this gate failed C and D for exactly this and nothing else.
+  // The deck spans the water, not the sand: at a ford row the water is x 48-49 and the spit at
+  // x 50 is the bank. A run in which the map grew has moved every genesis coordinate.
   const shift = allEvents.filter((e) => e.type === 'world_grown').reduce((acc, e) => {
     const p = payloadOf(e) as { edge?: string; depth?: number }
     return {

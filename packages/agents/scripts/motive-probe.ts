@@ -1,10 +1,8 @@
 // MOTIVE PROBE — not a gate. One question, asked of real minds: with a cold night coming, no
 // roof within reach and the wood already in hand, does anybody raise one?
 //
-// Two arms over the identical world and the identical seed. The ONLY difference is whether
-// the packet carries the `cold` field this lane added — arm A strips it back off at the seam,
-// so arm A is exactly what `645a8d9` gave a mind and arm B is exactly what it gives now.
-// Nothing in either arm tells a mind to build.
+// Two arms over the identical world and seed; the ONLY difference is whether the packet
+// carries the `cold` field. Nothing in either arm tells a mind to build.
 //
 //   MOTIVE_ARM=a|b  MOTIVE_TICKS=360  MOTIVE_LABEL=run1
 import { fileURLToPath } from 'node:url'
