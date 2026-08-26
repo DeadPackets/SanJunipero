@@ -1,11 +1,36 @@
 # One shared world, many viewers. There is deliberately no `scale:` here — a second replica is
 # a SECOND TOWN, not more capacity for this one, because each container ticks its own world from
 # its own sqlite file. Serving more viewers means a bigger box or a CDN, never another replica.
+#
+# ★ THE VOLUME LAYOUT, WHICH IS THE ONE THING HERE THAT CAN SILENTLY DESTROY A TOWN.
+#
+# Every database the stream writes is under ONE directory, and `town-data` covers all of it:
+#
+#   /app/packages/gateway/data/dev-world.db   the world + the forge's asset/job tables
+#   /app/packages/gateway/data/minds/*.db     one per mind: memories, journal, half-run plan
+#   /app/packages/gateway/data/minds/_ops.db  the call ledger the $5 anomaly stop is read off
+#
+# Those paths are relative in the code (`DEV_DB_PATH = 'data/dev-world.db'`, `STREAM_MINDS_DIR =
+# 'data/minds'`) and resolve against the working directory, which `pnpm --filter @sj/gateway serve`
+# sets to /app/packages/gateway. One mount at `data` is therefore complete — but only because it
+# is the PARENT. A mount aimed at the world db alone would not be.
+#
+# ★ WHY A PARTIAL MOUNT IS WORSE THAN NO MOUNT. Cover the world and miss `minds/` and the town
+# comes back at tick N looking perfectly healthy with every person blank. `liveWorld.ts` REFUSES
+# the mirror image of this — a new world whose minds still remember an older one throws
+# `amnesiaRefusal` and the boot dies — but the case here is only announced, on one stdout line:
+#   "this town is N ticks old and every mind behind it is new"
+# It will not error, it will not restart-loop, and nothing in the viewer shows it. That line is
+# how a person notices, which is why the logging block below is not decoration.
 services:
   town:
     build: .
+    # ★ LOOPBACK ONLY, NOT 0.0.0.0. Caddy is the only thing that should answer the internet; the
+    # app port stays reachable on the box (`curl localhost:8080`, or an ssh -L tunnel) so an
+    # operator can tell "the town is down" apart from "TLS is down" without turning the plain-HTTP
+    # origin into a way to skip the certificate.
     ports:
-      - "${PORT:-8080}:8080"
+      - "127.0.0.1:${PORT:-8080}:8080"
     environment:
       # How far the town is platted. Ring 3 is a 152-tile square and is the case the chunked
       # ground was written for; ring 1 is the 76-tile showcase.
@@ -15,17 +40,38 @@ services:
       # for a new town with SJ_FRESH=1.
       SJ_RINGS: "${SJ_RINGS:-1}"
       SJ_INTERIORS: "${SJ_INTERIORS:-0}"
-      # ★ 1 THROWS THE TOWN AWAY AND STARTS A NEW DAY 0. Leave it 0 and `restart` below brings
-      # back the town that was running, at the tick it stopped on.
-      SJ_FRESH: "${SJ_FRESH:-0}"
+      # ★ THIS IS NOT `${SJ_FRESH:-0}`, AND THE DIFFERENCE IS A TOWN.
+      # `docker compose` auto-loads a `.env` file from this directory and exports the shell's
+      # environment on top of it. Written as a substitution, one `SJ_FRESH=1` left behind in
+      # `.env` after a deliberate reset deletes the world on EVERY restart from then on, silently
+      # and forever, and the only sign is a new day 0. Hard-coding 0 makes a reset something you
+      # have to type on purpose and cannot leave lying around. A value set here WINS over the
+      # shell and over `.env`, so a reset has to be passed explicitly to one run:
+      #     docker compose run --rm -e SJ_FRESH=1 town   # one reset, no residue
+      SJ_FRESH: "0"
+      # Where the stderr line about lagging viewers and the resume/fresh lines go. Unbuffered so
+      # a crash cannot eat the last thing the process said.
+      NODE_OPTIONS: "--enable-source-maps"
     volumes:
-      # ★ THIS IS WHAT KEEPS THE TOWN. The world db lives here, `startDevWorld` resumes from it
-      # instead of deleting it, and `restart` below therefore brings back the same town — same
-      # buildings, same people, same day — rather than a new one at day 0.
+      # ★ THIS IS WHAT KEEPS THE TOWN — the whole `data` directory, not the world file inside it.
+      # See the header: the world db, every mind and the call ledger all live under here, so this
+      # one mount is the difference between a stream and a demo on a loop.
       # `docker compose down -v` is the deliberate way to end a town.
       - town-data:/app/packages/gateway/data
     restart: unless-stopped
     stop_grace_period: 20s
+    # ★ THE ONLY HEALTH SIGNAL THIS PROJECT HAS IS A LOG LINE. `SocketHub` writes to stderr when a
+    # viewer crosses 1 MiB behind and starts having its deltas dropped; nothing else reports it and
+    # there is no metrics endpoint. Rotation is set so a month of streaming cannot fill the disk
+    # and take the town down by a route nobody was watching.
+    #   docker compose logs -f town                 follow everything
+    #   docker compose logs town | grep viewers     the lagging transitions
+    #   docker compose logs town | grep 'this town' resume / fresh / blank-minds
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       # `/api/timeline/marks` answers only once the world mirror has folded a state, so it
       # reports the WORLD being up rather than the port being open.
@@ -34,6 +80,90 @@ services:
       timeout: 5s
       start_period: 120s
       retries: 3
+    # ★ SIZED AROUND ONE STRUCTURE THAT IS NEVER EVICTED. `assetsHttp`'s `encoded` Map holds every
+    # PNG it has ever built for the life of the process — placeholders, the emote atlas, and one
+    # 384x576 character sheet per agent. It is BOUNDED (a stranger cannot add keys: the id must
+    # name somebody the world has), but it never shrinks, so it is a floor that only rises with
+    # the population. Assumed: a few MB of sheets for a town of tens, ~150 MB of node heap and
+    # loaded art on top. 1 GB is roughly 4x that, which leaves room for the population to grow
+    # before anybody has to think about it again. Raise it, do not remove it — no limit means the
+    # OOM killer takes the whole box instead of the one container.
+    mem_limit: 1g
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - town
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      # A hostname here turns on real TLS; `:80` keeps it plain HTTP for a local run. See
+      # deploy/Caddyfile — this is the only knob.
+      SJ_SITE_ADDRESS: "${SJ_SITE_ADDRESS:-:80}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # ★ CERTIFICATES LIVE HERE AND MUST SURVIVE A RESTART. Let's Encrypt rate-limits issuance
+      # (5 per hostname per week); without this volume every `docker compose up` asks for a new
+      # certificate and the fifth one in a week is refused, leaving the site with no TLS at all.
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ★ OPT-IN, BEHIND A PROFILE, SO A BOX WITHOUT S3 CREDENTIALS STILL COMES UP. Without the
+  # profile this container would fail on a missing bucket and restart forever, and a restart-loop
+  # beside a healthy town is exactly the kind of noise that teaches people to ignore the logs.
+  #   docker compose --profile backup up -d     with continuous backup
+  #   docker compose up -d                      without
+  litestream:
+    profiles: ["backup"]
+    image: litestream/litestream:0.3.13
+    depends_on:
+      - town
+    # ★ THE CREDENTIAL CHECK IS HERE AND NOT IN THE `environment:` BLOCK BELOW, AND THAT IS A BUG
+    # THAT WAS MEASURED RATHER THAN AVOIDED. Written the obvious way, as `${LITESTREAM_BUCKET:?...}`,
+    # compose refuses to parse the whole file when the variable is unset — INCLUDING for
+    # `docker compose up` with no `--profile backup`, because interpolation runs over every service
+    # before profiles are applied. The required-variable form would therefore have broken the
+    # primary path to protect the optional one. Verified: `docker compose config` failed on all
+    # three. The check runs inside the container instead, where it can only stop this service.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$$LITESTREAM_BUCKET" ] || [ -z "$$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$$LITESTREAM_SECRET_ACCESS_KEY" ]; then
+          echo "litestream: NOT BACKING ANYTHING UP — no S3 credentials." >&2
+          echo "            Set LITESTREAM_BUCKET, LITESTREAM_ACCESS_KEY_ID and" >&2
+          echo "            LITESTREAM_SECRET_ACCESS_KEY in .env — see deploy/.env.example." >&2
+          exit 1
+        fi
+        exec litestream replicate -config /etc/litestream.yml
+    environment:
+      # Never written into this file or the image — see deploy/.env.example.
+      LITESTREAM_ACCESS_KEY_ID: "${LITESTREAM_ACCESS_KEY_ID:-}"
+      LITESTREAM_SECRET_ACCESS_KEY: "${LITESTREAM_SECRET_ACCESS_KEY:-}"
+      LITESTREAM_BUCKET: "${LITESTREAM_BUCKET:-}"
+      LITESTREAM_REGION: "${LITESTREAM_REGION:-us-east-1}"
+      LITESTREAM_ENDPOINT: "${LITESTREAM_ENDPOINT:-}"
+    volumes:
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+      # ★ THE SAME VOLUME THE TOWN WRITES, AND IT IS NOT READ-ONLY ON PURPOSE. Litestream keeps a
+      # shadow WAL in a `.<name>-litestream` directory beside each database; mounted `:ro` it
+      # cannot create one and replicates nothing while looking like it is running.
+      - town-data:/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   town-data:
+  caddy-data:
+  caddy-config:

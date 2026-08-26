@@ -1,0 +1,40 @@
+# TLS and nothing else. Caddy terminates HTTPS and hands every request to the one process that
+# already serves the world, the socket and the built viewer from a single origin. It is NOT a
+# second application layer: no routing, no rewriting, no caching, no load balancing. Adding any
+# of those would split the origin that `serve.ts` exists to keep whole.
+#
+# ★ SJ_SITE_ADDRESS IS THE ONE KNOB, AND ITS SHAPE DECIDES WHETHER THERE IS TLS AT ALL.
+#   town.example.com   → Caddy gets a real certificate from Let's Encrypt and redirects :80
+#   :80                → plain HTTP, no certificate, no ACME. The only way to run this locally,
+#                        because ACME cannot issue for `localhost` and would fail the boot.
+# A hostname needs public DNS pointing at this box and ports 80 and 443 reachable, or the ACME
+# challenge fails and Caddy serves nothing.
+{$SJ_SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# ★ THE WEBSOCKET IS THE STREAM. `reverse_proxy` upgrades it natively — there is no extra
+	# directive to add and adding one breaks it. `flush_interval -1` disables response buffering,
+	# which matters because a buffered proxy holds world deltas until its buffer fills and turns
+	# a live town into a stuttering one.
+	reverse_proxy town:8080 {
+		flush_interval -1
+	}
+
+	header {
+		# The stream is handed to strangers. These four cost a real viewer nothing.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Caddy's version is not a fact a stranger needs.
+		-Server
+	}
+
+	# ★ NO Content-Security-Policy HERE, AND THAT IS DELIBERATE RATHER THAN FORGOTTEN. The viewer
+	# is React + Pixi and was never audited for inline styles or worker/WASM origins, so a CSP
+	# written blind is a good chance of a blank page nobody can debug over TLS. The candidate to
+	# try, one directive at a time with the browser console open, is:
+	#   Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:;
+	#     style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; worker-src 'self' blob:"
+	# Turn it on only after watching the town render with it in report-only mode first.
+}
