@@ -6,12 +6,8 @@ import { doorTile, makeCityTemplate } from '@sj/shared'
 import { devTown } from './devTown.js'
 import { FOUNDERS, foundersFor, townStructuresFor } from './founders.js'
 
-// GATE G12c — THE TOWN, U25, AND THE READ-ONLY PROOF. The other two files are:
-//   packages/web/src/render/g12c.test.ts   — the canvas (U3–U11, U18, U19)
-//   packages/web/src/ui/g12c.test.ts       — the chrome (U12–U17, U20–U24, P22)
-//
-// This half lives in the gateway for the D-41 reason: `@sj/web` is private, DOM-typed and
-// bundler-resolved, so a gateway test cannot import its modules without breaking `tsc -b`.
+// This half lives in the gateway because `@sj/web` is private, DOM-typed and bundler-resolved,
+// so a gateway test cannot import its modules without breaking `tsc -b`.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '..', '..', '..')
@@ -70,18 +66,10 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
     expect(new Set(FOUNDERS.map((f) => f.id)).size).toBe(5)
   })
 
-  // The full five-distinct-`insideId` simulation is `founders.test.ts`'s
-  // "puts five tired founders under five different roofs" — it drives 400 ticks of the real
-  // onTick with every founder kept spent. This gate asserts the OWNERSHIP LAW that test
-  // depends on, and names the engine half's citation rather than reproducing it.
+  // The full five-distinct-`insideId` simulation is in `founders.test.ts`; this asserts the
+  // ownership law that test depends on rather than reproducing it.
   it('has the engine half written down, with its citation', () => {
     const delta = readFileSync(join(REPO, 'docs', 'superpowers', 'plans', 'c8-delta-from-c12.md'), 'utf8')
     expect(delta).toMatch(/U25/)
   })
 })
-
-// THE READ-ONLY PROOF IS GONE. It re-derived four pin literals out of four other files by
-// regex and froze `golden.test.ts` against the merge base. The project no longer claims that
-// two live runs produce identical bytes, so there is nothing left for it to guard — and the
-// census it enforced was itself the reason a pin could not be moved without visiting seven
-// files. U3 and U25 above are the town tests; they never touched a pin and they stay.

@@ -1,8 +1,5 @@
-// Asset v3 phase 2c (USER RULING): character cells are stored at NATIVE model
-// resolution — chroma-keyed, alpha-trimmed with a small uniform margin, palette-
-// quantized, height-normalized to the master's figure height. The webview scales
-// down at render time using the per-cell manifest anchors (feet = bottom-center
-// of the opaque bbox).
+// Character cells are stored at NATIVE model resolution — chroma-keyed, alpha-trimmed, palette-
+// quantized, height-normalized; the webview scales down through the per-cell manifest anchors.
 import type { RawImage } from './post/raw.js'
 import { downscaleNearest } from './post/raw.js'
 import { quantize } from './post/quantize.js'
@@ -64,10 +61,8 @@ export function buildManifestV4(cells: Map<string, RawImage>, figureH: number): 
   return { version: 'v4-hires', figureH, cells: anchors }
 }
 
-// The hi-res cell chain on a chroma-keyed figure: relative despeckle (background
-// noise islands would inflate the bbox and skew trim + height normalization) →
-// trim → magenta-fringe sweep → palette quantize (nearest scaling later preserves
-// quantized colors exactly) → optional height normalization.
+// Despeckle first: background noise islands would inflate the bbox and skew trim and height
+// normalization. Quantize before scaling — nearest preserves quantized colours exactly.
 export function processHiResCell(keyed: RawImage, targetFigureH?: number): RawImage {
   const cleaned = despeckle(keyed, Math.max(3, Math.ceil(opaqueArea(keyed) * 0.01)))
   const q = quantize(sweepMagenta(trimToFigure(cleaned)))

@@ -1,35 +1,15 @@
-// ★ THE STREAM. One process, one port, one address: the world ticks here, the socket serves it
-// here, and the built viewer is handed to a browser from the same origin here. Everything before
-// this file was a localhost dev split — a gateway on 8787 and a vite server on 5173 proxying to
-// it — which is two terminals and cannot be given to a stranger.
-//
-// This is deliberately NOT a second copy of the world: it is `startDevWorld` with the built
-// client bolted to the same http server, so the town a viewer watches over the internet is
-// byte-for-byte the town a lane watches on localhost.
+// One process, one port: the world ticks, the socket serves and the built viewer is handed to a
+// browser from the same origin.
 //
 //   pnpm stream                 RESUME the town that was running (a new one if there is none)
 //   SJ_FRESH=1 pnpm stream      throw that town away and start a new day 0
 //   PORT=9000 SJ_RINGS=3 …      pick the port and how far the town is platted
 //   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
-//   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money. See below.
+//   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money.
 //   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
 //
-// ★ RESUME IS THE DEFAULT, AND THAT IS THE WHOLE POINT OF THIS FILE EXISTING. A stream is
-// watched because day 12 follows days 1 to 11. Until now `startDevWorld` deleted the world db
-// on boot, so every deploy, every crash and every `docker restart` was a new town at day 0 —
-// a demo on a loop. The event log held all of it; nothing read it back.
-//
-// ★ WHAT THIS DOES NOT DO BY DEFAULT: spend money. The founders are a SCRIPTED cast
-// (`founders.ts`) unless `SJ_LIVE=1` is asked for by name, and the cost of the scripted world
-// is $0.00/hour. That default is load-bearing: a person running `pnpm stream` by reflex must
-// not start billing a card, so the live path is not even IMPORTED unless it is selected —
-// `liveWorld.ts` arrives through a dynamic `import()` below and nothing else in this package
-// references it.
-//
-// ★ AND WITH `SJ_LIVE=1` THE BODIES ARE DEEPSEEK MINDS. Same town, same port, same viewer,
-// same event log — the only difference is who decides. It carries a $5 anomaly stop that kills
-// this process rather than quietly serving a town of statues, and it keeps per-mind memory in
-// `packages/gateway/data/minds/`, which `SJ_FRESH=1` throws away together with the world.
+// Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
+// (dynamic import below).
 import { existsSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { TOWN_RINGS_GENESIS } from '@sj/shared'
@@ -62,13 +42,10 @@ export async function main(): Promise<void> {
   const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : 'showcase'
   const interiors = process.env['SJ_INTERIORS'] === '1'
   const fresh = process.env['SJ_FRESH'] === '1'
-  // The streets, lit. A viewer who opens the stream at midnight should see what the town can
-  // now do; `SJ_LAMPS=0` turns it off, and any other integer sets how many.
   const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
 
-  // ★ THE ONE SWITCH THAT COSTS MONEY, AND IT IS OFF UNLESS TYPED. The import itself is behind
-  // the flag: `@sj/agents` pulls in onnxruntime and a 128 MB sentence-transformer, and a
-  // scripted stream should pay for neither.
+  // The import itself is behind the flag: `@sj/agents` pulls in onnxruntime and a 128 MB
+  // sentence-transformer, and a scripted stream should pay for neither.
   const live = process.env['SJ_LIVE'] === '1'
   const mindsDir = process.env['SJ_MINDS_DIR'] ?? STREAM_MINDS_DIR
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
@@ -78,15 +55,11 @@ export async function main(): Promise<void> {
     createLiveCast({
       agentDbDir: mindsDir,
       ...(process.env['SJ_MODELS_DIR'] === undefined ? {} : { modelsDir: process.env['SJ_MODELS_DIR'] }),
-      // ★ THE CAP KILLS THE PROCESS. A stream that stops thinking and keeps serving is a town
-      // of statues nobody would notice for hours; a stream that dies leaves a resumable town
-      // on disk and a message in the log an operator cannot miss.
+      // The cap kills the process: a stream that stops thinking and keeps serving is a town of
+      // statues nobody would notice for hours.
       onSpendStop: () => { void world?.stop().then(() => process.exit(1)) },
-      // ★ THE GOD LAYER IS ON INSIDE A LIVE RUN, and it is opt-OUT rather than opt-in. A
-      // person who typed SJ_LIVE=1 asked for minds that decide, and a mind that can only pick
-      // from a fixed verb list is the demo, not the product (spec §4). It bills the same
-      // ledger and dies on the same $5 stop, and it only ever fires on an act the engine has
-      // no verb for — a per-novelty call, not a per-turn one.
+      // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
+      // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
       useArbiter: process.env['SJ_ARBITER'] !== '0',
     }))
 
@@ -94,15 +67,13 @@ export async function main(): Promise<void> {
     world = await startDevWorld({
       ingest: true, map, rings, interiors, port, fresh, builders: true, lamps,
       staticDir: CLIENT_DIST,
-      // ★ THE MINDS ARE WIPED WITH THE WORLD, OR NOT AT ALL. `agentDbDir` is what makes
-      // `SJ_FRESH=1` delete them in the same breath as the town; without it a fresh boot is
-      // the one state worse than either a reset or a resume.
+      // `agentDbDir` is what makes `SJ_FRESH=1` delete the minds in the same breath as the town;
+      // without it a fresh boot is the one state worse than either a reset or a resume.
       ...(live ? { cast: castFactory, agentDbDir: mindsDir } : {}),
     })
   } catch (e) {
-    // A taken port is the single most common way this command fails, and a raw EADDRINUSE
-    // stack says nothing an operator can act on. The pre-flight and amnesia refusals are whole
-    // paragraphs written for an operator, so they are printed as they were written.
+    // A raw EADDRINUSE stack says nothing an operator can act on. The pre-flight and amnesia
+    // refusals are whole paragraphs written for an operator, so they are printed as written.
     const busy = (e as { code?: string }).code === 'EADDRINUSE'
     const text = e instanceof Error ? e.message : String(e)
     console.error(busy
@@ -116,7 +87,7 @@ export async function main(): Promise<void> {
     ? 'stream: this is a new town — SJ_FRESH=1 starts another one over it'
     : `stream: this is the town that was running, resumed at tick ${running.resumedAtTick}`)
   // Said out loud in both directions, because "is anything actually thinking?" is the one
-  // question a viewer cannot answer by looking, and three lanes have guessed at it.
+  // question a viewer cannot answer by looking.
   console.log(running.live
     ? `stream: the cast is LIVE MINDS — this costs money, and memory is kept in ${mindsDir}/`
     : 'stream: the cast is SCRIPTED and free — SJ_LIVE=1 puts LLM minds behind these bodies')

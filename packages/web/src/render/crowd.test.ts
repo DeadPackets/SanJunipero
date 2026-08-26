@@ -145,10 +145,8 @@ describe('who takes a slot', () => {
 
 describe('the rank keeps the frame honest', () => {
   it('★ STACKED, the paint order is the NAMES; ranked, it is the ground', () => {
-    // The claim the whole arrangement rests on. Five identical boxes tie in `depthSeed`, so
-    // `depthOrder` falls through to the id tie-break: rename the same five people and the
-    // painter's order over the SLOTS turns over. Give each slot its own ground and the order
-    // stops caring what anybody is called.
+    // Five identical boxes tie in `depthSeed`, so `depthOrder` falls through to the id
+    // tie-break; giving each slot its own ground stops the order caring what anybody is called.
     const slotOrder = (ids: string[], rank: boolean): number[] => {
       const boxes = ids.map((id, i) => {
         const o = rank ? crowdOffset(i, ids.length) : { dx: 0, dy: 0 }
@@ -167,14 +165,8 @@ describe('the rank keeps the frame honest', () => {
   })
 
   it('★ and every ranked pair geometry has an opinion about is painted the way it says', () => {
-    // TWO THINGS ARE TRUE HERE AND ONLY ONE OF THEM IS OBVIOUS.
-    //
     // `inFrontOf` asks whether a box is past the other's FAR EDGE, so it needs a whole tile of
-    // separation and a rank never has one: for two, three, four and five bodies `geometricEdge`
-    // returns null for every pair and the whole rank is settled by `depthSeed` — which is the
-    // ground, and which the alternating step keeps distinct. From six up the ends of the rank
-    // clear each other and real edges appear. Both regimes are exercised, and every ruling
-    // geometry does make is obeyed.
+    // separation: under six bodies every pair returns null and `depthSeed` settles the rank.
     let ruled = 0
     for (const n of [2, 3, 4, 5, 6, 8, 12]) {
       const boxes = Array.from({ length: n }, (_, i) => {

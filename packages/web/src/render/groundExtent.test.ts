@@ -9,25 +9,16 @@ import {
   type Decoration,
 } from './ambient.js'
 
-// ★ NOTHING THE RENDERER DRAWS LEAVES THE TERRAIN EXTENT.
-//
-// A human brought the composed world up and found a row of flat untextured rectangles standing
-// on the void past the bottom-right edge of the stage. 4 286 green tests had not seen them,
-// because no test had ever asked whether a thing the renderer draws is on the ground.
-//
-// They are the ambient layer's tree canopies. A canopy is 20 px tall and stands on its tile's
-// CENTRE, so it reaches 12 px above that tile's top vertex — over the neighbour up-left. On row
-// 0 and column 0 there is no neighbour up-left, only the void.
+// Nothing the renderer draws may leave the terrain extent. A canopy is 20 px tall and stands on
+// its tile's CENTRE, so it reaches 12 px above that tile's top vertex — over the neighbour
+// up-left, and on row 0 and column 0 there is no neighbour up-left, only the void.
 
 const GRASS: TileId = 0, WATER: TileId = 2, FOREST: TileId = 3
 
 const grid = (w: number, h: number, fill: TileId): TileId[][] =>
   Array.from({ length: h }, () => Array.from({ length: w }, () => fill))
 
-/** ★ THE PRE-FIX SAMPLER, FROZEN. Byte-for-byte what `sampleTerrain` did before the ground law:
- *  scan in row order, cap, place. No question asked about the ground. Kept as data so the
- *  defect can be re-measured forever without breaking the shipped code to see it — the same
- *  technique the rejected-farmland fixture and the pre-task-1 codex fixture use. */
+/** The superseded sampler, frozen: scan in row order, cap, place, with no question asked about the ground — kept as data so the defect can be re-measured without breaking the shipped code. */
 function sampleDecorationsPreFix(terrain: TileId[][]): Decoration[] {
   const out: Decoration[] = []
   for (let y = 0, n = 0; y < terrain.length && n < SHIMMER_MAX; y++)

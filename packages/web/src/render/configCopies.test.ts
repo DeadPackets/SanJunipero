@@ -1,19 +1,7 @@
-// ★ EVERY RENDERER CONSTANT THAT IS A COPY OF A CONFIG FIELD, AND WHETHER IT STILL AGREES.
-//
-// `BUILD_TICKS_FULL = 2880` was a transcription of `DEFAULT_CONFIG.construction.houseTicks`,
-// and it had ALREADY GONE STALE: the dev world raises a house in 240 ticks, so
-// `floor((240 / 2880) x 4)` is zero at completion and every house in the demo would have stood
-// under scaffolding with not one progress pip lit. Nothing would have failed. It was found by
-// somebody going and looking at a house going up.
-//
-// This is the sweep for the rest of them, landed as a guard instead of run once. MEASURED over
-// 97 source files under `packages/web/src`: comparing VALUES alone is useless — 145 constants
-// happen to equal some leaf of `DEFAULT_CONFIG`, because 1, 2, 4 and 8 are everywhere. What is
-// meaningful is a constant that DECLARES itself a copy, and there are exactly TWO.
-//
-// ★ AND A CORRECTED NUMBER IS NOT THE FIX. This test derives: it reads the config path out of
-// the constant's own doc comment and resolves it at runtime, so the day the field moves the
-// copy goes red instead of going quietly wrong.
+// Comparing VALUES alone is useless — 145 constants under `packages/web/src` happen to equal
+// some config leaf, because 1, 2, 4 and 8 are everywhere. What is meaningful is a constant that
+// DECLARES itself a copy, so the config path is read out of its own doc comment and resolved at
+// runtime rather than transcribed.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -88,9 +76,7 @@ describe('★ a renderer constant that copies a config field still equals it', (
     expect(EARSHOT_TILES).toBe(DEFAULT_CONFIG.movement.earshotRadius)
   })
 
-  // ★ AND NEITHER IS THE AUTHORITY. Both are fallbacks for the frames before the snapshot's
-  // config has arrived; the live figure comes off the snapshot the viewer already holds. That
-  // is the actual fix — a copy that only ever answers when there is nothing better.
+  // Both are fallbacks for the frames before the snapshot's config has arrived.
   it('★ and each one is a FALLBACK, with the world’s own figure taking precedence', () => {
     for (const [file, fn] of [
       ['render/entities.ts', 'pipsFilled'], ['ui/roster/rosterRow.ts', 'companyOf'],

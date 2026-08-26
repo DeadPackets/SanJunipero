@@ -32,13 +32,6 @@ describe('pickCut', () => {
 })
 
 // ── ★ A BROADCAST ALWAYS HAS A SUBJECT ────────────────────────────────────────────────────
-//
-// WHAT THE BROWSER CAUGHT, in the broadcast frame at `?broadcast=1`: the picture was a 3x
-// crop of empty grass with no caption, for as long as the town stayed quiet — and the dev
-// town stays quiet for days. `/api/heat` is legitimately `[]`: over 592 ticks it recorded 0
-// `agent_spoke`, 0 deaths, 0 fires, and its eleven `structure_completed` events carry a
-// `builderId` of `script`, so nothing in the town has ever scored. R1's first clause is "no
-// empty frame", and holding the camera is only the right answer when a person is steering it.
 
 describe('the televised town always has somebody in front of the camera', () => {
   const TOWN = ['amara', 'omar', 'salma', 'yusuf']

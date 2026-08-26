@@ -1,29 +1,6 @@
-// @slow — ★ THE PROOF THAT THE TOWN SURVIVES ITS FIRST NIGHT, AND THAT SOMEBODY SLEEPS INDOORS.
+// @slow — the town survives its first night and somebody sleeps indoors.
 //
-// Merge train 3 ran the product — `map=showcase`, `rings=3` — and found all five founders
-// `COLLAPSED · WORN OUT` on the road by Day 0 23:19, bodies drawn prone in the street. Three
-// integration trains in a row then failed to see an interior, and the reason turned out to be
-// the same one: they go down before they reach their door, so `enter` never fires.
-//
-// ★ THE MECHANISM, MEASURED, BECAUSE FIVE AT ONCE IS NEVER FIVE DECISIONS.
-//
-//   1. Nothing differentiates the five. All spawn at tick 1 with energy 100 and burn
-//      `energyDecayAwakePerTick` (0.093) every waking tick. 100 down to `collapseThreshold`
-//      (5) is ceil(95 / 0.093) = 1022 ticks, and tick 1022 IS Day 0 17:02. The time on the
-//      clock is not a coincidence; it is that division rendered as hours and minutes.
-//   2. The body's own alarm could not be heard. The patrol policy asks to sleep at energy 20 —
-//      tick 861 — but `submitIntent` refuses EVERY intent while `activity` is set, and on the
-//      showcase map a patrol leg measured 118 to 342 ticks. From 861 to 1022 the request was
-//      refused `already busy with walk` 166 consecutive times and thrown away each time. The
-//      only thing that ever freed the lock was the collapse itself.
-//   3. With interiors ON it was worse and permanent: `homeIntent` answered a body already on
-//      the ground with a WALK, `submitIntent` refuses every verb but eat and sleep to a
-//      collapsed body, and nothing ever offered `sleep`. Energy 0, hp draining, prone until
-//      the world was closed.
-//
-// None of that is a difficulty setting. It is a scripted policy committing a body to journeys
-// it cannot pay for, and having no answer for a body that can no longer walk. Both are fixed
-// where they broke — see the header of `founders.ts`.
+// The two rules that keep this green are in the header of `founders.ts`.
 //
 // This is the dev world a viewer actually boots, minus the HTTP: same config, same terrain,
 // same structures, same `makeFoundersOnTick`. Scripted policies only. No LLM, no network, $0.
@@ -102,16 +79,13 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
 
   it('★ and nobody is ever narrated as ill, because nobody is ever ill', () => {
     // `escalateFatigue` mints `agent_afflicted{kind:"fatigue"}` after every collapse, and the
-    // chronicle used to render EVERY non-poison affliction as "has fallen ill". Ten exhaustion
-    // events read as an epidemic. Both halves are asserted: no affliction is minted at all,
-    // and the sentence for the one that would be does not say illness.
+    // chronicle renders a non-poison affliction as illness. Both halves are asserted.
     expect(of(run, 'agent_afflicted').map((e) => `${who(e)}:${String(e.payload['kind'])}`)).toEqual([])
   })
 
   it('★ and the whole run replays from genesis, event for event, to the same hash', () => {
-    // `replayFromGenesis` rebuilds from a BARE `genesisState`, which is a world that has not
-    // said where its array stands. The dev world's genesis has, so the replay starts from the
-    // same one it did — still every event of the run folded from nothing, which is the claim.
+    // A BARE `genesisState` has not said where its array stands, so the replay starts from the
+    // dev world's genesis — still every event of the run folded from nothing, which is the claim.
     const from = devGenesisState(SHOWCASE_CONFIG, run.terrain, 'showcase', RINGS)
     const replayed = run.store.readFrom(0).reduce((s, ev) => fold(s, ev, SHOWCASE_CONFIG), from)
     expect(stateHash(replayed)).toBe(stateHash(run.state))

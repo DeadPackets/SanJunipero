@@ -27,10 +27,9 @@ describe('the two light bands the town is actually read in', () => {
   })
 })
 
-// ★ THE NIGHT TINT IS A MULTIPLY OVER THE WHOLE STAGE, WORLD TEXT INCLUDED. A ratio quoted for
-// the MATERIAL is not the ratio the viewer gets after dark, and the difference is the whole
-// gap between "AA" and "unreadable". The ceiling under the deep-night tint is 6.37:1 — black
-// on white — so there is not much room, and every pair below has to be chosen inside it.
+// The night tint is a MULTIPLY over the whole stage, world text included, so a ratio quoted for
+// the material is not the ratio a viewer gets after dark. The ceiling under it is 6.37:1 — black
+// on white — so every pair below has to be chosen inside that.
 describe('every word the world says clears AA in BOTH bands, not just in daylight', () => {
   it('names the pairs it is checking, so a new world surface cannot skip the law', () => {
     expect(WORLD_TEXT_PAIRS.length).toBeGreaterThanOrEqual(3)
@@ -61,30 +60,16 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
 
 // ── ★ THE DOOR SILL WAS A MARK WITH NO PAPER, AND NOW IT IS NOT DRAWN AT ALL ──────────────
 //
-// `web-polish` measured this mark honestly and improved it as far as a ground mark can go: a
-// dimmed rim fails 1.4.11 on every ground it can be laid on, an opaque one fails after dark,
-// and NO single colour clears both bands — so the sill was given the stepped ledge, whose
-// contrast is with itself. Every one of those numbers still holds and they are kept below.
-//
-// ★ WHAT CHANGED IS THE QUESTION. The user retired the affordance itself: *"the 'click to
-// inspect or enter building' squares [must] be retired and instead replaced with accurate
-// hitboxes of the actual structures themselves."* A honey slab lying on the grass is not the
-// door of a house that is drawn standing up out of the grass — and in the running product it
-// does not even land under the drawn door, because the art's lowest row sits at the sprite's
-// own anchor while the sill is cut from the true ground plan below it. The building's own
-// doorway is the mark; the hover tag says what a click will do.
-//
-// So the measurements below are the standing reason nobody may put a mark back on the GROUND,
-// and the last case is the guard that nobody has.
+// A dimmed rim fails 1.4.11 on every ground it can be laid on, an opaque one fails after dark,
+// and NO single colour clears both bands. The measurements below are the standing reason nobody
+// may put a mark back on the GROUND, and the last case is the guard that nobody has.
 
-/** The tile tones the block lattice can plat under a doorway: grass, the bare earth and rock
- *  of a yard, sand, the road strip and the path the feet made. Water, forest, farmland and
- *  the channel are not door ground and are not held to this. */
+/** The tile tones the block lattice can plat under a doorway. Water, forest, farmland and the
+ *  channel are not door ground and are not held to this. */
 const DOOR_GROUNDS = ([0, 1, 4, 5, 7, 8] as const).map((t) => TILE_COLORS[t])
 
-/** The retired sill's own colours — `--ink` and `--honey`, what `DOOR_LINTEL` and `DOOR_SILL`
- *  were. They live here because they are a measurement of a thing that is gone, and a constant
- *  exported from the product for a test to cite is a fact nothing enforces. */
+/** The retired sill's own colours. They live here because they measure a thing that is gone,
+ *  and a constant exported from the product for a test to cite is a fact nothing enforces. */
 const RETIRED_RIM = 0x43394a, RETIRED_FILL = 0xf2c879
 
 describe('★ why "you can go in here" is not a mark on the ground', () => {
@@ -103,9 +88,8 @@ describe('★ why "you can go in here" is not a mark on the ground', () => {
   })
 
   it('★★ THE DUAL-BAND SET FOR A GROUND-DEPENDENT MARK IS EMPTY, at any colour', () => {
-    // Every colour a lane might reach for, over the six grounds, in both bands. Not one of
-    // them clears — the dark ones die at night, the light ones die on sand. A mark whose
-    // legibility is a function of the ground cannot be an affordance on ground this varied.
+    // Every colour a lane might reach for, over the six grounds, in both bands. Not one clears:
+    // the dark ones die at night, the light ones die on sand.
     const candidates = [0x43394a, 0x241f2b, 0xfff6e9, 0xf8dca2, 0xffffff, 0xf2c879, 0x000000]
     for (const c of candidates) {
       expect(

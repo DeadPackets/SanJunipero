@@ -33,9 +33,8 @@ import {
   easePan, roomFocusOf, roomPanTo,
 } from './roomShell.js'
 
-// Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
-// The shell's own tones live in roomShell.ts; these are the names the rest of the app already
-// imports, kept pointing at one source so a colour cannot be defined twice.
+// Palette-true: the room is cut from the same warm paper the chrome is. The shell's own tones
+// live in roomShell.ts; these names point at that one source so a colour is never defined twice.
 export const INTERIOR_FLOOR = ROOM_SHELL_PAINT.floor
 export const INTERIOR_FLOOR_SHADE = ROOM_SHELL_PAINT.wallLit
 export const INTERIOR_RIM = ROOM_SHELL_INK
@@ -61,8 +60,7 @@ export const WALL_PIECE_Z = -1
 // whatever else is furnished. Deterministic, so two viewers see the same room.
 const AWAKE_PREFERENCE = ['hearth', 'table', 'bench', 'chair', 'anvil', 'shelf'] as const
 /** Where a body goes when the room furnishes it nowhere to be: just inside the threshold. A
- *  function of the room now that rooms differ in size — the near corner of a farmhouse is not
- *  the near corner of a house. */
+ *  function of the room, since the near corner of a farmhouse is not a house's. */
 const spareTile = (room: { w: number; h: number }): Tile => ({ x: room.w - 1, y: room.h - 1 })
 /** How long a body takes to cross one interior tile. A step, not a glide. */
 export const WALK_MS_PER_TILE = 420
@@ -78,17 +76,15 @@ export type InteriorScene = {
   destroy(): void
 }
 
-// The plan passed a CharacterLayer here; the room draws its occupants from `characterArt`
-// and the map layer's own `characterCell` slicer, so a second layer handle would be a
-// parameter that does nothing. The town keeps living, dimmed, behind the veil.
+// The town keeps living, dimmed, behind the veil; the room draws its own occupants from
+// `characterArt` and the map layer's `characterCell` slicer.
 export function createInteriorScene(
   scene: Scene, store: WorldStore, book: TextureBook,
 ): InteriorScene {
   const app = scene.app
 
-  // ★ THE ROOM'S SIZE IS THE BUILDING'S NOW, so it is state and not a module constant. It is
-  // set from the kind the moment a room is planned; `ROOM_TILES` is the house's, and the house
-  // is only one of six. Everything that draws a plane reads this.
+  // The room's size is the building's, so it is state and not a module constant: `ROOM_TILES` is
+  // the house's, and the house is only one of six. Everything that draws a plane reads this.
   let roomTiles: { w: number; h: number } = ROOM_TILES
   let roomSlots: { w: number; h: number } = CITY_INTERIOR_SLOTS
 
@@ -101,8 +97,7 @@ export function createInteriorScene(
   room.eventMode = 'none'          // the room is a view; the chrome bar owns the way out
   room.sortableChildren = true
   // A room is a box, and nothing drawn inside it belongs outside it. One mask settles that for
-  // every prop: a hearth's glow is a child of its sprite and grew with the furniture scale
-  // until it was painting a pale disc across the town.
+  // every prop, including a hearth glow that is a child of its own sprite.
   const roomMask = new Graphics()
   roomMask.poly(roomMaskPoly(roomTiles, WALL_H_PX))
   roomMask.fill(0xffffff)
@@ -112,9 +107,8 @@ export function createInteriorScene(
   app.stage.addChild(root)
 
   // Three planes, behind everything that stands in the room. The walls sort behind the floor
-  // because a dimetric camera sees the two far faces of the box and nothing else. The light
-  // is its own node because it is MASKED to the floor: the doorway pool is centred on the
-  // near vertex, so unmasked it paints a pale ellipse across the town behind the room.
+  // because a dimetric camera sees the two far faces of the box and nothing else; the light is
+  // MASKED to the floor, or the doorway pool paints a pale ellipse across the town behind it.
   const walls = new Graphics()
   walls.zIndex = -4
   const floorArt = new Graphics()      // the continuous material, when the codex has one
@@ -135,9 +129,8 @@ export function createInteriorScene(
   floorLight.mask = floorMask
   const floorTop = new Graphics()
   floorTop.zIndex = -2
-  // ONE shadow plane, under everything that stands in the room — the same arrangement the
-  // town's eight-layer contract uses. Nothing floats, and a shadow can never sort in front of
-  // the body it belongs to because it is not in the sort at all.
+  // ONE shadow plane, under everything that stands in the room: a shadow can never sort in front
+  // of the body it belongs to, because it is not in the sort at all.
   const shadows = new Graphics()
   shadows.zIndex = -1.5
   room.addChild(walls, wallArt, floorArt, floorStone, floor, floorMask, floorLight, floorTop, shadows)
@@ -162,13 +155,9 @@ export function createInteriorScene(
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
   const changeCbs: Array<(id: string | null) => void> = []
 
-  // ★★ THE ROOM CAMERA. A farmhouse's box is 1 920 × 1 120 and there is no integer scene zoom
-  // below 1, so on any laptop part of it is off the glass and cannot be zoomed back on. What is
-  // left to choose is WHICH part, and `roomPanTo` clamps that choice to `roomCrop` — a room
-  // that fits gets a range of zero and never moves a pixel from where it is drawn today.
-  //
-  // It is set from the room's own life, one frame behind `layoutRoom`, because a camera that
-  // follows nobody is a camera the viewer has to drive.
+  // THE ROOM CAMERA. A farmhouse's box is 1 920 × 1 120 and there is no integer scene zoom below
+  // 1, so part of it is off the glass and cannot be zoomed back on; what is left to choose is
+  // WHICH part. Set from the room's own life, one frame behind `layoutRoom`.
   let camFocus: { sx: number; sy: number } | null = null
   let camX = 0
   let camY = 0
@@ -183,18 +172,16 @@ export function createInteriorScene(
 
   const notify = (): void => { for (const cb of changeCbs) cb(activeId) }
 
-  // ART INDEPENDENCE, the interior's half. The floor takes a continuous material the moment
-  // the codex holds one and reads as a palette-true plane until then — the same hot-swap law
-  // the outdoor ground answers to, and the same reason a missing texture is never a hole.
+  // Art independence, the interior's half: the floor takes a continuous material the moment the
+  // codex holds one and reads as a palette-true plane until then.
   const pools = (m: RoomMap): ReturnType<typeof floorPools> =>
     floorPools(m.pieces.map((p) => ({ tile: p.tile, light: lightKinds.has(p.kind) })), roomTiles)
 
   let floorMaterial: string | null = null
   let stoneMaterial: string | null = null
 
-  /** The flagstone patches, drawn over the boards: a hearth stands on stone, and so does the
-   *  ground just inside a door. Nothing here exists without the art, so nothing here is a hole
-   *  when the codex is empty. */
+  /** The flagstone patches, drawn over the boards. Nothing here exists without the art, so
+   *  nothing here is a hole when the codex is empty. */
   function paintStone(m: RoomMap, records: AssetRecord[]): void {
     const url = resolveInteriorMaterial(records, 'interior-flagstone')
     stoneMaterial = url
@@ -237,13 +224,9 @@ export function createInteriorScene(
   }
 
   /**
-   * ★ THE WALLS, FROM ART. Every wall is laid plain end to end first so there is never a gap,
-   * then each feature is drawn over it: the window and the door the room must have, and the
-   * chimney breast that IS the hearth. A strip is authored square-on and sheared onto its own
-   * wall plane, so the art is never stretched along the wall — see `interiorTileset.ts`.
-   *
-   * When the codex holds no tileset this draws nothing and the code-painted shell stands,
-   * which is the same art-independence law the ground answers to.
+   * Every wall is laid plain end to end first so there is never a gap, then each feature is
+   * drawn over it. When the codex holds no tileset this draws nothing and the code-painted shell
+   * stands — the same art-independence law the ground answers to.
    */
   function paintWalls(m: RoomMap, records: AssetRecord[]): void {
     wallArt.removeChildren().forEach((c) => c.destroy())
@@ -329,12 +312,9 @@ export function createInteriorScene(
     placement: onWall(i) ? 'wall' : 'floor', flat: isFlat(i.kind),
   })), roomTiles, roomSlots)
 
-  /**
-   * A furnishing a body lies IN is drawn as TWO sprites cut from ONE texture, split at its
-   * own mid-line, so the body can go between them. Everything else is one sprite. The two
-   * halves reassemble exactly: each keeps a bottom anchor, and the back half is lifted by the
-   * front half's own height.
-   */
+  /** A furnishing a body lies IN is drawn as TWO sprites cut from ONE texture, split at its own
+   *  mid-line, so the body can go between them. Each keeps a bottom anchor and the back half is
+   *  lifted by the front half's own height, which is what reassembles them exactly. */
   function applyHalf(sprite: Sprite, t: Texture, half: 'back' | 'front' | null): void {
     if (half === null) {
       sprite.texture = t
@@ -350,23 +330,17 @@ export function createInteriorScene(
   }
 
   /**
-   * ★ A WALL FURNISHING IS DRAWN ONCE, AND THE WALL DECIDES WHICH WAY IT FACES (task 84 §2).
-   *
-   * The landed room hung EVERY `placement: 'wall'` piece at eye height, on a wall chosen by
-   * `slot.x > slot.y`, with nothing anywhere saying which way the piece then faced. That is
-   * what put a fireplace halfway up a wall, and it is the same defect the mock showed as two
-   * fireplaces in one corner. Now: the wall is the one the piece's TILE is actually against,
-   * its facing is that wall's own (`WALL_FACING`, and the type has no third member), and a
-   * piece that reaches the ground STANDS at the foot of its wall instead of hanging over it.
+   * A wall furnishing is drawn once, and the wall decides which way it faces: the wall is the
+   * one the piece's TILE is against, the facing is that wall's own (`WALL_FACING`), and a piece
+   * that reaches the ground STANDS at the foot of its wall instead of hanging over it.
    */
   function placeFurniture(m: RoomMap, items: RoomItem[], asElevation: ReadonlySet<string>): void {
     const onFloor: Array<{ piece: MapPiece; item: RoomItem }> = []
     m.pieces.forEach((piece, i) => {
       const item = items[i]
       if (item === undefined) return
-      // ★ ONCE, AND ONLY ONCE. When the tileset holds an elevation for this kind, the wall IS
-      // the furnishing — the chimney breast is the hearth — so no object is drawn as well. That
-      // duplicate is what the mock showed as two fireplaces in one corner.
+      // When the tileset holds an elevation for this kind, the wall IS the furnishing — the
+      // chimney breast is the hearth — so no object is drawn as well.
       if (asElevation.has(piece.kind)) return   // the wall is the furnishing; its LIGHT is drawn below
       if (piece.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(piece.kind)) {
         onFloor.push({ piece, item })
@@ -390,10 +364,8 @@ export function createInteriorScene(
       addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
     }
 
-    // ★ AND THE FIRES THE WALL DREW. A hearth the tileset draws as a chimney breast has no
-    // sprite of its own, and the glow was a child of that sprite — so the one fire in the
-    // founding valley reached the screen as a cold fireplace. The light list is derived from
-    // what the room CONTAINS, never from how a piece happens to be drawn.
+    // A hearth the tileset draws as a chimney breast has no sprite of its own to hang a glow on,
+    // so the light list is derived from what the room CONTAINS, never from how it is drawn.
     for (const light of roomLights(m.pieces, lightKinds)) {
       if (!asElevation.has(light.kind)) continue        // its own sprite already wears the glow
       const at = wallMount(light.tile)
@@ -427,19 +399,13 @@ export function createInteriorScene(
     // its texture, which is the near vertex of the ground it stands on.
     sprite.anchor.set(0.5, isFlat(item.kind) ? 0.5 : 1)
     sprite.eventMode = 'none'
-    // ★ NATIVE. `furnishingScale()` is 1 under Option C: the art is authored at exactly the
-    // span its footprint covers on the 128×64 interior tile and the scene zoom is 1, so
-    // nothing in this room is resampled on its way to the glass. It used to be 0.5 against a
-    // zoom of 4 — a composite of 2, i.e. every 128 px sprite pixel-doubled by the camera.
+    // `furnishingScale()` is 1 under Option C: the art is authored at exactly the span its
+    // footprint covers and the scene zoom is 1, so nothing in this room is resampled.
     sprite.scale.set(furnishingScale())
     sprite.position.set(sx, sy)
     sprite.zIndex = z
-    // ★ THE ROOM AND ITS FURNITURE ARRIVE IN THE SAME FRAME. `book.get(...).then(...)` alone
-    // could not do that: the plan is built inside the frame that first paints the room, and a
-    // `.then` — even on a texture already in the book — runs on a microtask, i.e. after that
-    // frame is on the glass. Every room's first painted frame was therefore an empty room, and
-    // a viewer sampling the screen at intervals sees "the walls, and then the furniture".
-    // `peek` closes it for a warm book; a cold one still takes the round trip and the fade.
+    // `book.get(...).then(...)` runs on a microtask — after the frame that first paints the room
+    // — so a warm book is asked with `peek` and the furniture arrives in that same frame.
     const url = item.url ?? PLACEHOLDER_URL
     const inHand = book.peek(url)
     if (inHand !== null) applyHalf(sprite, inHand, half)   // native px; the room's zoom is 1
@@ -486,15 +452,9 @@ export function createInteriorScene(
     return sheet
   }
 
-  /**
-   * ★ A BODY WALKS TO WHERE IT IS GOING, AND WALKS ROUND WHAT IS IN THE WAY.
-   *
-   * The engine has NO interior position — an agent indoors carries `insideId` and nothing else
-   * — so where a body stands in the room is the renderer's own truth, and this is not invented
-   * world behaviour: the room says which tile a body belongs on, and this is how it gets
-   * there. `interiorPath` is the four-neighbour law the town walks by, run over the room's
-   * blocked tiles, so a body crosses AROUND the table instead of through it.
-   */
+  /** The engine has no interior position, so where a body stands in the room is the renderer's
+   *  own truth. `interiorPath` is the four-neighbour law the town walks by, run over the room's
+   *  blocked tiles, so a body crosses AROUND the table instead of through it. */
   function retarget(id: string, goal: Tile, m: RoomMap): void {
     const w = walking.get(id)
     if (w === undefined) {
@@ -592,9 +552,8 @@ export function createInteriorScene(
         if (cell !== null) {
           sprite.texture = cell.texture
           sprite.anchor.set(cell.anchor.x, cell.anchor.y)
-          // ★ THE ROOM'S OWN SCALE, NOT THE TOWN'S. This was `cell.scale × INTERIOR_PX_SCALE`,
-          // which carries a body across on the PIXEL factor and leaves the WORLD factor behind
-          // — and a room whose tile is a metre then shows a person taller than its own wall.
+          // The ROOM's scale, not the town's: `cell.scale × INTERIOR_PX_SCALE` carries a body
+          // across on the PIXEL factor and leaves the WORLD factor behind.
           sprite.scale.set(interiorBodyScale(cell.scale))
         }
       }
@@ -623,9 +582,8 @@ export function createInteriorScene(
         node.position.set(foot.sx, foot.sy - lift)
         bodyPts.push({ id: p.id, sx: foot.sx, sy: foot.sy - lift })
       }
-      // A split furnishing casts ONE shadow, under its front half, not two; a flat one casts
-      // none, because it IS on the floor — and neither does a body that is off the floor, in a
-      // bed. A contact shadow says "this thing touches the ground here", and it does not.
+      // A split furnishing casts ONE shadow, under its front half. A flat one casts none because
+      // it IS on the floor, and neither does a body that is off the floor, in a bed.
       if (p.half === 'back' || node.texture.width <= 1 || lift > 0) continue
       if (p.kind === 'furniture' && isFlat(p.id.slice(0, p.id.indexOf(':')))) continue
       const s = contactShadow(node.texture.width * node.scale.x)
@@ -645,10 +603,8 @@ export function createInteriorScene(
       walking.delete(id)
     }
 
-    // ★ AND WHERE IT RESTS WHEN THE ROOM IS EMPTY: the first perch, which `AWAKE_PREFERENCE`
-    // makes the hearth wherever there is one. An empty farmhouse crops as hard as a full one,
-    // so a camera that only follows bodies would leave the fire off the left edge of a room
-    // nobody is in — which is what the browser showed.
+    // Where the camera rests when the room is empty: the first perch, which `AWAKE_PREFERENCE`
+    // makes the hearth. An empty farmhouse crops as hard as a full one.
     const rest = perches[0] === undefined ? null : tileCentreScreen(perches[0].x, perches[0].y)
     camFocus = roomFocusOf(bodyPts, followedId, rest)
   }
@@ -659,11 +615,8 @@ export function createInteriorScene(
       && tile.y >= piece.tile.y && tile.y < piece.tile.y + piece.size.h
   }
 
-  // ★ A CARD APPEARING IS NOT GOING INSIDE. The veil used to rise over a town that never
-  // moved, so entering a room read as a panel opening. The camera pushes in to the door tile
-  // while the veil rises, and leaving puts it back on the exact point it left — `centerOnScreen`
-  // rather than `centerOn`, because a whole-tile restore lands somewhere the viewer did not
-  // leave from.
+  // The camera pushes in to the door tile while the veil rises, and leaving restores the exact
+  // point with `centerOnScreen` — a whole-tile `centerOn` lands somewhere the viewer never left.
   const PUSH_IN_STOP: ZoomStop = 3
   let beforePush: { sx: number; sy: number; stop: ZoomStop } | null = null
 
@@ -728,16 +681,12 @@ export function createInteriorScene(
     veil.clear()
     veil.rect(0, 0, app.screen.width, app.screen.height)
     veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })
-    // ★ NEVER A BARE CONSTANT. Option C has one integer scene zoom and it is 1: the interior
-    // tile is authored at the size it reaches the glass, so every other factor resamples pixel
-    // art. `roomZoomFor` is still asked, because the day the room has a second answer this is
-    // where it arrives.
+    // Option C has one integer scene zoom and it is 1: the interior tile is authored at the size
+    // it reaches the glass, so every other factor resamples pixel art.
     const zoom = roomZoomFor(app.screen.height)
     room.scale.set(zoom)
-    // ★★ THE CAMERA INSIDE THE ROOM. The origin below is where a room that FITS goes, and it is
-    // unchanged. `roomPanTo` adds nothing to it unless `roomCrop` is non-zero — a 12 × 6 room on
-    // a stage that holds it gets a travel range of [0, 0] and cannot drift by construction, so
-    // this is a camera that only exists when there is something off the glass to reach.
+    // `roomPanTo` adds nothing to the origin unless `roomCrop` is non-zero: a room the stage
+    // holds gets a travel range of [0, 0] and cannot drift by construction.
     const target = roomPanTo(
       camFocus, app.screen.width, app.screen.height, zoom, roomTiles, WALL_H_PX,
     )

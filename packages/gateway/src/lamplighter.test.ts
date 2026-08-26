@@ -1,10 +1,5 @@
-// @slow — THE PROOF THAT SOMETHING IN THE RUNNING APP CAN LIGHT A STREET.
-//
-// A scripted lamplighter, declared as one in `founders.ts`, exactly as the mason and the
-// bridgewright are. It is NOT evidence that a mind wants a lit street — that is C8's to answer.
-// It is evidence that the seam works end to end in the app a viewer actually opens: the same
-// `build` verb, the same `stoke` verb, the same refusals, and `isDark` telling the truth about
-// the result. No LLM, no network, $0.
+// @slow — the showcase town lights its own streets through the real build and stoke verbs. A
+// scripted lamplighter, not evidence that a mind wants a lit street. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
 import { dayPhaseFromTick, isDark, lightBandAt, T_PATH, T_ROAD } from '@sj/shared'
 import {
@@ -46,9 +41,8 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
   it('raises lamp posts through the real build verb, up to the count it was asked for', () => {
     const standing = lampsIn(lit)
     expect(standing.length, 'no lamp was ever raised').toBeGreaterThan(0)
-    // ★ A CEILING, NOT A TARGET. The masons keep raising houses, every new door offers a new
-    // site, and a lamplighter that only asked "is this site free" would light a growing town
-    // forever. Without the `standing.size >= want` line this run stands ten.
+    // A ceiling, not a target: a lamplighter that only asked "is this site free" would light a
+    // growing town for ever. Without the `standing.size >= want` line this run stands ten.
     expect(standing.length).toBeLessThanOrEqual(LAMPS)
     for (const l of standing) expect([l.kind, l.w, l.h]).toEqual(['lamp_post', 1, 1])
     // and it built on ground the town actually offered: every post is within a verge's reach
@@ -79,9 +73,8 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
     expect(burning.length, 'lamps stand but nobody fed one').toBeGreaterThan(0)
     const MIDNIGHT = lit.tick     // day 1, 00:00 — deep night by `dayPhaseFromTick`
     expect(dayPhaseFromTick(MIDNIGHT)).toBe('night')
-    // ★ THE PAIR, AND WHY THIS IS NOT VACUOUS: one world, one instant, tiles that are lit and
-    // tiles that are not. A town where everything was always bright fails the second half, and
-    // a town where nothing ever lit fails the first.
+    // Not vacuous: one world, one instant. A town that was always bright fails the second half,
+    // and a town where nothing ever lit fails the first.
     for (const l of burning) {
       expect([l.x, l.y, isDark(lit, l.x, l.y, MIDNIGHT, CFG)]).toEqual([l.x, l.y, false])
       expect(lightBandAt(lit, l.x, l.y, MIDNIGHT, CFG)).toBe('bright')

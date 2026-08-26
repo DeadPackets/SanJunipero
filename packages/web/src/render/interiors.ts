@@ -11,8 +11,8 @@ import {
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
-// The vocabulary is @sj/shared's (C13 interiorMeta.ts) — one source, so a kind added there
-// cannot go missing here. Re-exported because Task 11 and the gate read it off this module.
+// The vocabulary is @sj/shared's — one source, so a kind added there cannot go missing here.
+// Re-exported because the gate reads it off this module.
 export { INTERIOR_KINDS } from '@sj/shared'
 export type { InteriorKind }
 
@@ -21,8 +21,8 @@ export type { InteriorKind }
 export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools' | 'bench'
 export type Furnishing = { kind: FurnishingKind; slot: { x: number; y: number } }
 
-// The C10 plan's declared minimum room. It is the floor the renderer can always draw, and
-// the contract the gate re-asserts; roomFurnishings() serves the richer C13 set on top.
+// The declared minimum room: the floor the renderer can always draw, and the contract the gate
+// re-asserts. `roomFurnishings()` serves the richer set on top.
 export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
   house: [
     { kind: 'bed', slot: { x: 2, y: 1 } },
@@ -57,13 +57,8 @@ export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
   ],
 }
 
-/**
- * ★ THE ROOM'S OWN SIZE, off the building's plan. A cottage is 3×2 outside and a farmhouse 4×2,
- * and the world says they sleep three and four — so drawing all three dwellings on a house's
- * floor would put the picture at odds with `roomCapacity`, which is the arithmetic the whole
- * dwelling ladder is priced on. `interiorMap.roomTilesFor` owns the factor and it is forced by
- * the house's landed 12×6.
- */
+/** The room's own size, off the building's plan. Drawing every dwelling on a house's floor
+ *  would put the picture at odds with `roomCapacity`; `roomTilesFor` owns the factor. */
 export function roomSizeOf(kind: InteriorKind): { w: number; h: number } {
   const plan = DEFAULT_CONFIG.structures.recipes[kind]
   return roomTilesFor(plan === undefined ? { w: 2, h: 2 } : { w: plan.w, h: plan.h })
@@ -104,9 +99,8 @@ function libraryRecord(records: AssetRecord[], kind: string): AssetRecord | null
   return best
 }
 
-// The room as the renderer needs it: the city template's slot, the C13 library's placement
-// facts (wall vs floor, footprint, isBed/isHearth/providesLight) and the sprite to draw.
-// A furnishing with no codex record still lays out — art independence, same law as the ground.
+// The room as the renderer needs it: the template's slot, the library's placement facts and the
+// sprite to draw. A furnishing with no codex record still lays out — art independence.
 export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[] {
   return roomFurnishings(kind).map((f) => {
     const rec = libraryRecord(records, f.kind)
@@ -119,23 +113,9 @@ export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[]
   })
 }
 
-/**
- * ★ EVERY FIRE THE ROOM OWES, WHICHEVER WAY ITS FURNISHING IS DRAWN — found by eye, in the
- * running app, on the one fire this lane exists to make visible.
- *
- * THE DEFECT: the room's glow was a child of the furnishing's own SPRITE, and `placeFurniture`
- * returns early for any kind the wall draws as an elevation — *"the chimney breast IS the
- * hearth, so no object is drawn as well"*, which is right. But the hearth is the only elevated
- * kind that provides light, so `providesLight` was computed and then **discarded for exactly the
- * hearths that reach the screen**. Measure-then-ignore, and its consequence was the founding
- * valley's only indoor fire reading as a cold, sooty fireplace.
- *
- * It could not be fixed in the art: `wall-chimney` is authored as *"a warm-grey stone chimney
- * breast … with a mantel and soot above the opening"* — a chimney, correctly, and no fire.
- *
- * So the list of the room's lights is derived from what the room CONTAINS, and never from how
- * any of it happens to be drawn. That is the whole property, and it is what the test pins.
- */
+/** The room's lights are derived from what the room CONTAINS and never from how any of it is
+ *  drawn: the hearth reaches the screen as a wall elevation, so there is no object sprite to
+ *  hang a glow on. */
 export type RoomLight = { id: string; kind: string; tile: { x: number; y: number } }
 
 export function roomLights(
@@ -157,8 +137,8 @@ export type Interior = {
 const isInteriorKind = (kind: string): kind is InteriorKind =>
   (INTERIOR_KINDS as readonly string[]).includes(kind)
 
-// Occupancy is engine truth: C9's `insideId`. The viewer camera never writes it. Ids are
-// sorted so two browsers watching the same tick lay the same room out (G10 parity).
+// Occupancy is engine truth: `insideId`, which the viewer camera never writes. Ids are sorted
+// so two browsers watching the same tick lay the same room out.
 export function interiorOf(state: WorldState, structureId: string): Interior | null {
   const structure = state.structures[structureId]
   if (structure === undefined || !isInteriorKind(structure.kind)) return null
@@ -173,9 +153,8 @@ export function interiorOf(state: WorldState, structureId: string): Interior | n
   return { structure, kind: structure.kind, occupants, items }
 }
 
-// The C13 library's bed is one interior tile wide and two deep; a partnered pair (C9 §3
-// co_slept) takes one cell each, and the third sleeper gets no cell rather than lying on
-// someone. The cells are INTERIOR TILES: `slotToTile` puts the template's slot on the map.
+// The library's bed is one interior tile wide and two deep; a partnered pair takes one cell
+// each and a third sleeper gets none rather than lying on someone. The cells are INTERIOR TILES.
 export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
 function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number; y: number }> {
@@ -208,20 +187,11 @@ export function bedSlots(
   return out
 }
 
-// ── FURNITURE THAT TOUCHES THE FLOOR, AND BODIES THAT LIE *IN* THE BED (U4, task 67) ─────
+// ── FURNITURE THAT TOUCHES THE FLOOR, AND BODIES THAT LIE *IN* THE BED ───────────────────
 //
-// THE DEFECT: the room sorted furniture at `slot.x + slot.y` and bodies at the same `+ 0.5`,
-// so a sleeping body ALWAYS drew in front of the bed it was lying in, and two furnishings on
-// one diagonal tied and settled by arrival order. Nothing cast a shadow, so every object
-// floated, and every sprite was offset by exactly one tile whatever its footprint — which
-// stood a two-slot bed half outside its own ground.
-//
-// The interior now answers to the SAME depth authority as the town (depth.ts). A slot is a
-// box in slot space; a body in a bed is a box INSIDE the bed's box, which the geometric rule
-// reads as "neither in front" — so the tie is broken by an explicit rule instead of by +0.5:
-// an 'in' furnishing is drawn as TWO pieces split at its own mid-line, and the body goes
-// between them. That is the only honest way to put a body inside a bed in a painter's
-// renderer.
+// The interior answers to the SAME depth authority as the town (depth.ts). A body in a bed is a
+// box INSIDE the bed's box, which the geometric rule reads as "neither in front", so an 'in'
+// furnishing is drawn as TWO pieces split at its own mid-line and the body goes between them.
 
 /** 'in' (a bed, a chair) draws the body BETWEEN the furniture's back and front halves;
  *  'at' (a table, an anvil) draws the body behind it; 'beside' is plain depth order. */
@@ -239,15 +209,9 @@ export function occupancyOf(kind: string): OccupancyMode {
   return FURNITURE_OCCUPANCY[kind] ?? 'beside'
 }
 
-/** Contact shadow: an ellipse under every object, sized from what is drawn, so nothing
- *  floats. Half as tall as it is wide — the ground plane's own ratio.
- *
- *  `lift` is how far ABOVE a bottom-anchored sprite's own anchor the ellipse's centre goes.
- *  An iso object's lowest drawn pixel is the NEAR VERTEX of the ground it stands on, not the
- *  centre of it, so an ellipse centred on the anchor hangs out below the object and reads as
- *  the object levitating over its own shadow — which is what the browser showed. Lifting by
- *  `ry` puts the ellipse's near edge on that lowest pixel, where it belongs. A body is
- *  anchored at its FEET, which already is the ground centre, so a body takes no lift. */
+/** Contact shadow: an ellipse under every object, sized from what is drawn, half as tall as it
+ *  is wide — the ground plane's own ratio. `lift` exists because an iso object's lowest drawn
+ *  pixel is the NEAR VERTEX of its ground, not the centre; a body's feet already are that. */
 export const CONTACT_SHADOW_ALPHA = 0.22
 export const CONTACT_SHADOW_SHARE = 0.42
 export function contactShadow(
@@ -263,22 +227,9 @@ export function contactShadow(
 export type Tile = { x: number; y: number }
 export type TileSize = { w: number; h: number }
 
-/**
- * WHAT THE BROWSER CAUGHT: the room drew library furniture at NATIVE size while a body drew at
- * `CHAR_TARGET_PX`. A sleeper was three times the length of the bed he was in, and three 24 px
- * objects rattled around a 192 px floor — which is a large part of what "way too under
- * detailed" is looking at. The fix at the time was a DIVISOR of 2 against a scene zoom of 4:
- * a composite of 2.0, i.e. every 128 px sprite pixel-DOUBLED on its way to the glass.
- *
- * ★ OPTION C RETIRES THE DIVISOR, AND THAT IS THE POINT OF OPTION C. The room's unit is now
- * the 128×64 INTERIOR tile the library already authors against, drawn at a scene zoom of 1.
- * A footprint of `(w, h)` interior tiles covers `(w + h) × 64` px of ground and the art for it
- * is authored at exactly `(w + h) × 64` px (`forge/assetResolution.nativeSizeFor`), so the
- * factor is 1 for every footprint and NOTHING is resampled anywhere in the room. It is derived,
- * not chosen: `LIBRARY_TILE_PX / INTERIOR_TILE.w`. `drawScale.test.ts` proves it over five
- * footprints.
- */
-/** The tile the library authors against — `assetResolution.INTERIOR_TILE.w`. */
+/** The tile the library authors against — `assetResolution.INTERIOR_TILE.w`. Its art covers
+ *  exactly the span its footprint takes on that tile and the scene zoom is 1, so the factor is
+ *  1 for every footprint and nothing in the room is resampled. */
 export const LIBRARY_TILE_PX = 128
 export function furnishingDivisor(): number {
   return Math.max(1, Math.round(LIBRARY_TILE_PX / INTERIOR_TILE.w))
@@ -288,28 +239,17 @@ export function furnishingScale(): number {
 }
 
 /**
- * ★ AND THE SAME QUESTION FOR A BODY, WHICH IS WHERE OPTION C BROKE.
- *
- * `characterCell` hands back `CHAR_TARGET_PX / figureH` — the town's own scale. The room used
- * that `× INTERIOR_PX_SCALE`, and the browser showed a person a third taller than the wall he
- * stood against, longer than the bed he slept in, towering over a table.
- *
- * ★ `INTERIOR_PX_SCALE` IS THE PIXEL FACTOR AND IT IS NOT THE WORLD FACTOR. Furniture is
- * authored against a tile that means a METRE; the town's tile means a corner of a plot. A body
- * carried across on the pixel factor alone keeps a ratio that belongs to the other scale. The
- * room asks for the height the ROOM says a person is (`interiorMap.INTERIOR_BODY_PX`), and the
- * factor between the two scales is the factor between the two heights and nothing else.
- *
- * This is a DOWNSCALE of the cast atlas (a 954 px figure to 109 px, from 208), so it takes the
- * room further from resampled-up art rather than nearer to it.
+ * `INTERIOR_PX_SCALE` is the PIXEL factor and it is not the WORLD factor: furniture is authored
+ * against a tile that means a METRE, where a town tile means a corner of a plot. So the room
+ * asks for the height the ROOM says a person is, and the factor between the two scales is the
+ * factor between the two heights and nothing else.
  */
 export function interiorBodyScale(townCellScale: number): number {
   return townCellScale * (INTERIOR_BODY_PX / CHAR_TARGET_PX)
 }
 
-/** Furnishings that LIE on the floor rather than stand on it. A flat piece is anchored at the
- *  CENTRE of its own ground and casts no contact shadow. Hung from its bottom edge, a rug in
- *  the far corner slot floated up the back wall — which is also what the browser showed. */
+/** Furnishings that LIE on the floor rather than stand on it: anchored at the CENTRE of their
+ *  own ground and casting no contact shadow, or a rug floats up the back wall. */
 export const FLAT_FURNISHINGS: ReadonlySet<string> = new Set(['rug'])
 export const isFlat = (kind: string): boolean => FLAT_FURNISHINGS.has(kind)
 
@@ -322,15 +262,10 @@ export type RoomPiece = {
   /** which half of an 'in' furnishing this is; `null` for anything drawn whole */
   half: 'back' | 'front' | null
   /**
-   * ★ THE GROUND THE SPRITE IS ANCHORED ON — and for a split piece it is the WHOLE piece's.
-   *
-   * `tile`/`size` are the DEPTH box: the front half's tile is pushed half a footprint nearer
-   * the viewer so a body sorts BETWEEN the halves. That is a depth fact, and the renderer was
-   * spending it a second time as a POSITION. The browser showed the result — a chair whose
-   * back floated a tile clear of its own seat, with the cushion drawn twice, in every room.
-   * Both halves are cut from ONE texture, so both stand where that texture stands; `applyHalf`
-   * lifts the back one by the front one's own pixel height, which is the only offset that puts
-   * the upper frame back exactly where it was cut from.
+   * The ground the sprite is anchored on — and for a split piece it is the WHOLE piece's.
+   * `tile`/`size` are the DEPTH box, with the front half pushed half a footprint nearer, and
+   * spending that a second time as a POSITION tears the piece in two. Both halves are cut from
+   * ONE texture, so both stand where that texture stands.
    */
   anchor: { tile: Tile; size: TileSize }
 }
@@ -344,13 +279,8 @@ export const ROOM_SPRITE_RISE_TILES = 3
 export type PlacedItem = { kind: string; tile: Tile; meta: InteriorMeta | null }
 export type PlacedBody = { id: string; tile: Tile; inside: string | null }
 
-/**
- * Where a body actually stands, given what it is doing.
- *
- * You lie IN a bed, so the body keeps the bed cell it was given. You stand AT a table — never
- * inside it — so the body takes the slot BEHIND the furnishing, and the depth then falls out
- * of the geometry instead of out of a special case. Anything else stands where it stands.
- */
+/** Where a body actually stands, given what it is doing. You lie IN a bed and keep its cell;
+ *  you stand AT a table, so the body takes the slot BEHIND it and depth falls out of geometry. */
 export function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): Tile {
   if (mode !== 'at' || at === null) return own
   return { x: at.x, y: Math.max(0, at.y - 1) }
@@ -416,12 +346,11 @@ export function interiorOrder(pieces: readonly RoomPiece[]): string[] {
 
 export type InteriorPhase = 'town' | 'entering' | 'inside' | 'exiting'
 /** The room's fade IS a scene change, so it takes the scene vocabulary's length rather than a
- *  number of its own — one motion table, both runtimes (Task 90/91). */
+ *  number of its own — one motion table, both runtimes. */
 export const INTERIOR_FADE_MS = SCENE_TOTAL_MS
 
-// Pure: the caller owns the clock. `sinceMs` is when `prev` began — advanceInterior keeps it
-// for a caller that would rather not. A viewer who turns around mid-fade reverses; the fade
-// never finishes a move that was abandoned.
+// Pure: the caller owns the clock. A viewer who turns around mid-fade reverses; the fade never
+// finishes a move that was abandoned.
 export function interiorTransition(
   prev: InteriorPhase, entered: boolean, nowMs: number, sinceMs = 0,
 ): InteriorPhase {

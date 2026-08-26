@@ -17,10 +17,8 @@ import {
 import { ingestTerrainArt } from './ingestArt.js'
 import { WorldMirror } from './worldMirror.js'
 
-// GATE G10 — the automated half, gateway side. The renderer-side half of the same gate lives
-// in packages/web/src/render/g10.test.ts: the web package is DOM-typed and bundler-resolved,
-// so a gateway test cannot import `tilesetPlan` or `interiorOf` without breaking `tsc -b`.
-// Both files carry the gate's number so the pair is greppable.
+// The renderer-side half lives in packages/web/src/render/g10.test.ts: the web package is
+// DOM-typed and bundler-resolved, so a gateway test cannot import from it without breaking `tsc -b`.
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
 
@@ -136,7 +134,7 @@ describe('GATE G10 — automated half, gateway side', () => {
         const recs = await registerTerrainTiles(new AssetCodex(fdb))
         const kinds = new Set(recs.filter((r) => r.status === 'ready').map((r) => r.kind))
         for (const k of TERRAIN_TILE_KINDS) expect(kinds).toContain(k)
-        // the C13 strip: every junction shape a road lattice can ask for
+        // every junction shape a road lattice can ask for
         for (const key of ROAD_AUTOTILE_KEYS) expect(kinds).toContain(roadAutotileKind(key))
         for (const r of recs) {
           if (r.kind!.startsWith('road:')) continue
@@ -150,9 +148,8 @@ describe('GATE G10 — automated half, gateway side', () => {
       try {
         await ingestTerrainArt(fdb)
         const ready = new AssetCodex(fdb).listSince(0).filter((r) => r.class === 'terrain')
-        // TERRAIN V2: one CONTINUOUS material per ground (what the bake samples in world
-        // space) on top of the flat per-tile fallback set and the road strip
-        // one material per ground, PLUS the calm ribbon surface (TERRAIN V2.1)
+        // one continuous material per ground — what the bake samples in world space — plus the
+        // calm ribbon surface, on top of the flat per-tile fallback set and the road strip
         const materials = ready.filter((r) => r.kind!.startsWith('material:'))
         expect(materials).toHaveLength(TERRAIN_TILE_KINDS.length + 1)
         expect(materials.map((r) => r.kind)).toContain('material:road-calm')

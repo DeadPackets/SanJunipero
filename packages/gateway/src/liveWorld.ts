@@ -1,35 +1,7 @@
-// ★ THE SEAM. THE TWO HALVES OF THE FOUNDING SENTENCE, IN ONE PROCESS.
-//
-// The project's founding sentence is "a simulation that can be live-streamed and watched by
-// anyone around the world, of LLM agents interacting with the world around them." Both halves
-// have been shipped for weeks and neither has ever run inside the other:
-//
-//   a world served to strangers    serve.ts -> startDevWorld -> createGateway
-//   LLM minds living in a world    packages/agents/scripts/g11-deepworld.ts, a 1300-line script
-//
-// Everything anybody has ever watched in a browser on this project has been `founders.ts` —
-// puppets whose every decision is a plain `if`. This file is the join.
-//
-// ★ WHY IT LIVES IN THE GATEWAY, WHICH IS THE ONE DECISION HERE WORTH ARGUING.
-//
-// A composition root must sit above everything it composes, and the dependency graph leaves
-// exactly one candidate:
-//
-//   @sj/arbiter -> @sj/agents        so the assembly may NOT live in @sj/agents
-//   @sj/narrator -> @sj/agents       (an arbiter or a narrator around the minds closes a cycle)
-//   @sj/agents   -/-> @sj/gateway    so the assembly may NOT live below the gateway either
-//   @sj/gateway  -> everything       and nothing depends on @sj/gateway
-//
-// `g11-deepworld.ts` reaches into `../../arbiter/src/…` and `../../narrator/src/…` by relative
-// path precisely because it is a script and scripts are outside the graph. That is not a seam,
-// it is a hole in the wall, and building the served world the same way would put the hole in
-// shipped code. The mind-side wiring that IS package-legal — a bridge, N runtimes, their
-// clients — was extracted to `@sj/agents`' `bootMinds`; what is left here is everything that
-// needs to know about a world AND about a mind at the same time, which is this file's whole job.
-//
-// ★ AND IT COSTS THE SCRIPTED WORLD NOTHING. Nothing in `devWorld.ts` imports this module;
-// `serve.ts` reaches it through a dynamic `import()` behind `SJ_LIVE=1`. A person running
-// `pnpm stream` by reflex loads no onnxruntime, opens no model, makes no call and spends $0.00.
+// SJ_LIVE=1 reaches minds only through a dynamic import — a static @sj/agents import here breaks
+// the scripted path (enforced by test).
+// The assembly lives in the gateway because @sj/arbiter and @sj/narrator both depend on
+// @sj/agents; wiring minds any lower closes a dependency cycle.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,76 +14,34 @@ import {
   FOUNDER_MINDS, type BootedMinds, type MindConfig, type MindSpec, type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
-// ★ AND THE GOD LAYER, which is legal here for exactly the reason the header gives above:
-// `@sj/arbiter -> @sj/agents`, so an arbiter around the minds can only be assembled somewhere
-// above both, and this is the only file that is. `serve.ts` reaches this module through a
-// dynamic `import()` behind `SJ_LIVE=1`, so these imports cost the scripted stream nothing —
-// the same quarantine `@sj/agents` already sits inside, and `liveWorld.test.ts` asserts it for
-// both packages now.
 import {
   CodexStore, GENESIS_CODEX, makeArbiter, openArbiterDb, type Codified, type Recipe,
 } from '@sj/arbiter'
 import type { LiveCast } from './devWorld.js'
 import { publishThought } from './observer.js'
 
-/**
- * ★ THE ANOMALY STOP, AND IT IS A PRODUCT SURFACE NOW, NOT A LANE COST.
- *
- * Every previous live run in this repo was a lane spending a lane's money for twenty minutes
- * with somebody watching the console. A stream is a process a person starts and walks away
- * from, and `SJ_LIVE=1` left up overnight bills a real card. So the cap does not live in the
- * script that starts it — it lives in the served world, it is checked on the world's own clock,
- * and reaching it KILLS THE PROCESS. A stream that quietly stops thinking and keeps serving a
- * town of statues is the failure mode that would cost the most to discover.
- */
+/** Dollars. Reaching it KILLS THE PROCESS: a stream that quietly stops thinking and keeps serving
+ *  a town of statues is the failure mode that would cost the most to discover. */
 export const LIVE_SPEND_STOP_USD = 5
 /** How often the ledger is read, in world ticks. At the dev world's 2.5 s tick this is every
  *  25 s of wall clock — far tighter than one turn, so nothing can outrun it. */
 export const LIVE_SPEND_CHECK_TICKS = 10
 /** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
 export const LIVE_RUNTIME_SAVE_TICKS = 48
-/** How long a shutdown waits for a night's reflection to land before closing the db under it.
- *  A container gives about ten seconds before SIGKILL; losing the night is survivable and
- *  hanging the shutdown is not. */
+/** A container gives about ten seconds before SIGKILL; losing a night's reflection is survivable
+ *  and hanging the shutdown is not. */
 export const REFLECTION_SETTLE_MS = 5_000
-/**
- * ★ The mind dials whose meaning is REAL seconds, restated for this world's 2 500 ms tick.
- *
- * Nearly every number in `DEFAULT_MIND_CONFIG` is denominated in sim-minutes — one tick is one
- * sim-minute — so it says the same thing about a person at any tick rate and must NOT be scaled.
- * `dozeTicks` is the exception: `#doze()` is a retry backoff against an HTTP provider, and a 429
- * does not know what a sim-hour is. 60 ticks held 15 real seconds at the 250 ms tick it was tuned
- * on; here it would silence a mind for 150 seconds of stream over one transient failure.
- */
+/** `dozeTicks` is the one `MIND_CONFIG` dial denominated in real seconds — it is an HTTP retry
+ *  backoff — so it is the only one this world's 2 500 ms tick may rescale. */
 export const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
-/**
- * ★ THE TOWN'S LAWS, AND WHY THEY ARE NOT IN THE WORLD DB.
- *
- * Rulings, the rulebook, the codex and the construct registry go here. Three reasons, and the
- * first is a law somebody already wrote down: `arbiter/src/schema.ts` says of the construct
- * tables "these tables live in the arbiter's database, never in the world's". The gateway
- * SERVES the world db to strangers, so putting an ops-plane table in it is a one-way-glass
- * breach through the API rather than through a prompt.
- *
- * Second, the world db is an event log replayed on resume. Rulings are not events and cannot
- * be replayed; they need a table that simply persists. It also needs `sqlite-vec` for
- * `rulings_vec`, which `openArbiterDb` loads and `openDb` alone does not.
- *
- * Third — and this is the one that decides the directory — a town's laws must reset when the
- * town does. `agentDbDir` is what `SJ_FRESH=1` wipes in the same breath as the world; a new
- * day 0 that kept yesterday's rulebook is the same class of state `amnesiaRefusal` already
- * refuses for memories. The leading underscore keeps it out of the `<mindId>.db` namespace the
- * amnesia guard walks, exactly like `_ops.db`.
- */
+/** Rulings and the codex, never in the world db: the gateway serves that one to strangers. In
+ *  `agentDbDir` so `SJ_FRESH=1` resets the town's laws with the town, underscore-prefixed to stay
+ *  out of the `<mindId>.db` namespace the amnesia guard walks. */
 export const LIVE_ARBITER_DB = '_arbiter.db'
-/**
- * The words the town has for stuff. Rendered into the adjudication prompt AND enforced against
- * the answer, so a ruling can never mint a recipe out of a material nobody has a word for.
- * Same table `g11-deepworld.ts` proved the sanity gate against; a stream with no table gets
- * only the checks that need no table, which is how a live run once denied its own well.
- */
+/** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
+ *  mint a recipe out of a material nobody has a word for. */
 export const STREAM_VOCABULARY = {
   itemKinds: [
     'wood', 'stone', 'rope', 'cloth', 'fiber', 'hide', 'clay', 'axe', 'hoe', 'knife',
@@ -144,41 +74,19 @@ export type LiveCastOpts = {
    *  burned a lane before. Off only for a test, which spends nothing to preflight. */
   preflight?: boolean
   modelsDir?: string
-  /** Adjudication and codification, pre-built. Only a test passes this: a real stream lets
-   *  `createLiveCast` build the real one below, because the real one needs the bridge and the
-   *  tick, which do not exist until `attach`. */
+  /** Only a test passes this: the real one needs the bridge and the tick, which do not exist
+   *  until `attach`. */
   arbiter?: SeamArbiter
   /**
-   * ★ ON BY DEFAULT INSIDE `SJ_LIVE=1`, and the argument is the call path.
-   *
-   * Spec §4 is an entire section of the product, and what makes this a simulation rather than
-   * five minds picking from a fixed list is that a mind can attempt something the engine has
-   * no verb for. A live stream with the god dark ships the demo, not the product.
-   *
-   * The cost objection does not survive the call path: the arbiter fires only when the world
-   * has ALREADY refused an intent with `unknown verb:` (`agentRuntime.ts` `#reroutesUnknownVerb`,
-   * once per turn), so it is a per-NOVELTY call and not a per-turn one — and stages 1 and 2 of
-   * `adjudicate` resolve a repeat with zero LLM calls, so the second mind to try the same thing
-   * costs nothing at all.
-   *
-   * `SJ_ARBITER=0` sets this false. It exists as the operator's kill switch if a ruling ever
-   * starts leaking, and as the control arm for measuring what the god costs.
+   * On by default: the arbiter fires only once the world has already refused an intent with
+   * `unknown verb:`, so it is a per-NOVELTY call and not a per-turn one. `SJ_ARBITER=0` is off.
    */
   useArbiter?: boolean
   log?: (line: string) => void
 }
 
-/**
- * ★ THE STATE THE PERSISTENCE LANE SAID WOULD BE INVISIBLE UNTIL IT WAS CATASTROPHIC.
- *
- * Agent memory is not in the world db. A world at day 0 whose minds still remember the town
- * that stood yesterday is strictly worse than either a clean reset or a clean resume — the
- * buildings gone, the day counter back to 0, and five people who remember all of it. There is
- * no reading under which that is the right state, so it is refused rather than served.
- *
- * `startDevWorld`'s `fresh` already deletes world and minds as one unit, so the only ways into
- * this state are a hand-deleted world db and a hand-copied mind. Both deserve a sentence.
- */
+/** A new town whose minds remember an older one is refused rather than served: it is strictly
+ *  worse than either a clean reset or a clean resume. */
 export function amnesiaRefusal(remembering: ReadonlyArray<{ id: string; memories: number }>): string {
   const who = remembering.map((r) => `${r.id} (${r.memories})`).join(', ')
   return [
@@ -189,10 +97,8 @@ export function amnesiaRefusal(remembering: ReadonlyArray<{ id: string; memories
   ].join('\n')
 }
 
-/**
- * Wait for something to stop being busy, but never for longer than `deadlineMs`. Returns
- * whether it settled, so a caller can say which of the two happened rather than guess.
- */
+/** Wait for something to stop being busy, but never for longer than `deadlineMs`. Returns whether
+ *  it settled. */
 export async function settle(
   busy: () => boolean, deadlineMs: number, pollMs = 200,
 ): Promise<boolean> {
@@ -205,36 +111,14 @@ export async function settle(
 }
 
 /**
- * ★ THE RATE TRIPWIRE — the guard the `$5` cap cannot be.
- *
- * The seam lane's **$0.053/hour** was booked at half price — `pins.ts` counted one side of the
- * call until the `price` lane fixed it — so the true rate is **$0.106/hour** and the total cap is
- * **~45 hours of streaming**, not 94. Either way it stops a lane's mistake and cannot stop a runaway
- * on a process meant to run for weeks: a regression has to be ~45x the normal rate before the cap
- * lands inside an hour. A total is the wrong instrument for a leak — you need the FLOW.
- *
- * PER MIND, deliberately. The bill scales with the cast and not with the world, so a total ceiling
- * would false-fire the day somebody streams ten people. The arithmetic behind the number:
- *
- * | | $/mind/sim-day |
- * |---|---|
- * | measured, five minds over 1 252 ticks, as booked | **0.0106** |
- * | the same figure at the honest price the `price` lane now books | **0.0212** |
- * | the same run's worst 15 minutes — the nightly reflection burst, 34% of a day's spend in 90 s | ~0.0308 |
- * | **this ceiling** | **0.21** — 9.9x the true rate, 6.8x the worst measured window |
- *
- * ★ RAISED 0.10 → 0.21 BY THE INTENTS LANE, on the `price` lane's finding that the booked rate
- * is half the real one. At 0.10 the ceiling sat 4.7x over a correctly-counted normal run instead
- * of the 9.4x it was designed for, and the arbiter lane's eager harness tripped it on a run that
- * was doing nothing wrong. The multiple is what the number means; the multiple is preserved.
- *
- * So it survives the reflection burst, a doubled prompt and a doubled cast, and it kills a 10x
- * regression inside one 15-minute window instead of two days from now. One sim-day is one real
- * hour at this tick, so `usdPerSimDay` and $/real-hour are the same number.
+ * A per-call cap cannot see a slow leak; this bounds spend per unit time.
+ * PER MIND, because the bill scales with the cast and not with the world — a total ceiling would
+ * false-fire the day somebody streams ten people.
+ * 0.21 is 9.9x the measured 0.0212 $/mind/sim-day and 6.8x the worst measured 15-minute window.
  */
 export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
- *  that a runaway dies in minutes. `checkSpend`'s own default, and g11 uses the same 15. */
+ *  that a runaway dies in minutes. */
 export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 
 export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
@@ -256,18 +140,8 @@ export function spendStopMessage(spent: number, cap: number): string {
   ].join('\n')
 }
 
-/**
- * ★ THE CAP IS PER TOWN, NOT PER PROCESS, AND THAT HAS TO BE SAID OUT LOUD RATHER THAN MET.
- *
- * The call ledger lives in `agentDbDir` and resumes with the town, so a town that has already
- * spent its cap over twenty boots is a town that has spent its cap. That is the right reading
- * for an ANOMALY STOP — the point is to bound total exposure, not to reset it every time
- * somebody restarts — but it means a resumed boot can be over the line before its first tick.
- *
- * Without this it would still stop: the tick watchdog fires within ten ticks, and before that
- * `LlmClient`'s own `budgetUsd` would throw `BudgetExceededError` out of the pre-flight. Both
- * are twenty-five confusing seconds and a stack trace. This is one sentence, before anything.
- */
+/** The cap is per TOWN, not per process — the ledger resumes with the town, so a resumed boot can
+ *  be over the line before its first tick, and is told so in one sentence rather than a trace. */
 export function capReachedRefusal(spent: number, cap: number, agentDbDir: string): string {
   return [
     `stream: could not start — this town has already spent $${spent.toFixed(4)} of its`
@@ -286,14 +160,8 @@ export function ledgerTotalUsd(db: Database.Database): number {
   return row.total
 }
 
-/**
- * ★ WHAT THE PRE-FLIGHT COST, AND ONLY WHAT THE PRE-FLIGHT COST.
- *
- * The ledger is resumed with the town, so on the second boot `ledgerTotalUsd` is the whole
- * history — the first RESUMED live boot printed `pre-flight … $0.047463` for twelve calls that
- * had cost about a tenth of a cent, which is a number an operator would act on. The ledger has
- * a `caller` column for exactly this reason and g11 scopes its own query the same way.
- */
+/** Scoped to THIS boot's pre-flight rows: the ledger resumes with the town, so the whole sum
+ *  would be the town's entire history rather than what the pre-flight cost. */
 export function preflightCostUsd(db: Database.Database, since: number): number {
   const row = db.prepare(
     "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = 'preflight' AND ts >= ?",
@@ -301,10 +169,8 @@ export function preflightCostUsd(db: Database.Database, since: number): number {
   return row.total
 }
 
-// Where a mind's clock and half-run plan are kept between processes. Its own database, keyed
-// by the world tick it was taken at: a snapshot from AHEAD of the world is a snapshot of a tick
-// SQLite rolled back, and putting it back would give a mind a plan for a moment that never
-// happened. See `restorableSnapshot`.
+// A mind's clock and half-run plan between processes, keyed by the world tick it was taken at:
+// a snapshot from AHEAD of the world is one of a tick SQLite rolled back.
 function ensureRuntimeTable(db: Database.Database): void {
   db.exec(`CREATE TABLE IF NOT EXISTS mind_runtime (
     agent_id TEXT PRIMARY KEY, tick INTEGER NOT NULL, snapshot TEXT NOT NULL
@@ -324,18 +190,9 @@ const countMemories = (db: Database.Database): number => {
   } catch { return 0 }
 }
 
-/**
- * Build a cast of minds for `startDevWorld`. Async because two things have to happen before a
- * single body moves and both of them can refuse the whole run:
- *
- *   1. the embedder loads (128 MB of ONNX off local disk, ~1 s, no network)
- *   2. the provider pre-flight runs — three calls on the REAL turn schema. G11b once spent 38
- *      minutes and $0.76 discovering its provider could not emit an action field at all.
- *
- * Everything that needs the world — the bridge, the minds, the amnesia guard, the thought
- * channel — happens in `attach`, because a bridge needs the loop and the loop needs the handler
- * the bridge returns.
- */
+/** Build a cast of minds for `startDevWorld`. Async because the embedder load and the provider
+ *  pre-flight both run first and either can refuse the whole run; everything that needs the world
+ *  happens in `attach`, because a bridge needs the loop and the loop needs the bridge's handler. */
 export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const log = opts.log ?? ((line: string) => console.log(line))
   const minds = opts.minds ?? FOUNDER_MINDS
@@ -358,9 +215,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       ? opts.makeClient(opsDb, caller, agentId)
       : new LlmClient({
         db: opsDb, caller, ...(agentId === undefined ? {} : { agentId }),
-        // The per-caller backstop. The global cap is the tick watchdog below; this one stops a
-        // single caller running away between two reads of the ledger, which the watchdog
-        // cannot see. `sumCostUsd` is per caller, so five minds share one 'turn' budget.
+        // The per-caller backstop: it stops one caller running away between two reads of the
+        // ledger, which the tick watchdog below cannot see.
         budgetUsd: cap,
       })
 
@@ -403,10 +259,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     ? openArbiterDb(join(opts.agentDbDir, LIVE_ARBITER_DB))
     : null
   if (arbiterDb !== null) {
-    // Seeded once per town, not once per boot: the codex is what the town knows and what it
-    // has earned since, and re-seeding a resumed town would throw a UNIQUE constraint on the
-    // first genesis row anyway. Emptiness is the test because it is the only state that can
-    // mean "this town has never had a codex".
+    // Seeded once per TOWN, not once per boot. Emptiness is the test because it is the only
+    // state that can mean "this town has never had a codex".
     const codex = new CodexStore(arbiterDb)
     if (codex.known().length === 0) for (const entry of GENESIS_CODEX) codex.insert(entry)
   }
@@ -446,25 +300,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (snap !== null) restoring.set(m.id, snap)
       }
 
-      // ── ★ THE GOD LAYER, ASSEMBLED. Spec §4, in the town a person can watch. ──
-      //
       // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
-      // `onCodified` needs the bridge, and neither exists until a loop does.
-      //
-      // ★ THE ARBITER BILLS THE OPS LEDGER, NOT ITS OWN DATABASE. `makeClient` points at
-      // `opsDb`, which is what `ledgerTotalUsd` reads every ten ticks for the $5 stop and the
-      // rate ceiling. An arbiter billing its own db would spend OUTSIDE the anomaly stop —
-      // the exact failure the stop exists to prevent, and it would be invisible.
+      // `onCodified` needs the bridge, and neither exists until a loop does. `makeClient` points
+      // at `opsDb`: an arbiter billing its own db would spend outside the anomaly stop.
       const arbiter: SeamArbiter | undefined = opts.arbiter ?? (arbiterDb === null
         ? undefined
         : (() => {
             const built = makeArbiter({
               db: arbiterDb, llm: makeClient('arbiter'), embedder,
               tick: () => loop.state.tick, vocabulary: STREAM_VOCABULARY,
-              // A codification is a world fact, so it goes in the world's log — where the
-              // chronicle already renders `discovery_made` for the viewer. The arbiter owns no
-              // world and cannot do this itself; it has already minted the verb by the time
-              // this runs, so nothing here can fail the codification.
+              // A codification is a world fact, so it goes in the world's log. The verb is
+              // already minted by the time this runs, so nothing here can fail it.
               onCodified: (d: Codified) => {
                 bridge?.announce(DISCOVERY_EVENT, {
                   recipeId: d.recipeId, name: d.name, kind: d.kind,
@@ -486,9 +332,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
         ...(arbiter === undefined ? {} : { arbiter }),
-        // ★ WHAT THE BUBBLE OVER A HEAD SAYS IS NOW WHAT THE MIND ACTUALLY THOUGHT. The same
-        // table, the same socket frame, the same viewer — and the string is no longer one of
-        // ten canned lines keyed by verb.
         onThought: (t) => { if (!stopped) publishThought(db, t) },
       })
       saveRuntime = (tick: number): void => {
@@ -502,9 +345,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       log(`stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, cap $${cap.toFixed(2)},`
         + ` memory in ${opts.agentDbDir}`)
-      // Said out loud in both directions. "Can a mind here do something the engine has no verb
-      // for?" is the one question a viewer cannot answer by watching, and it is the difference
-      // between the product and a demo.
       log(arbiter === undefined
         ? 'stream: the arbiter is OFF — an invented act falls back to experiment and the world answers it'
         : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`)
@@ -536,13 +376,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
     async stop(): Promise<void> {
       stopMinds()
-      // ★ A NIGHT HALF-REFLECTED IS PAID FOR AND THEN THROWN AWAY, AND IT TAKES THE PROCESS
-      // WITH IT. `runSleepReflection` writes its facts and its scene summaries AFTER the model
-      // answers; close the mind's database while one is in flight and better-sqlite3 throws
-      // "The database connection is not open" out of a promise nobody is awaiting. `stop` is
-      // wired to SIGTERM, and a container gives about ten seconds before SIGKILL, so this
-      // waits a bounded five and then closes anyway — losing the night is survivable, hanging
-      // the shutdown is not.
+      // Closing a mind's db while `runSleepReflection` is in flight throws out of a promise
+      // nobody awaits, so this waits a bounded five seconds and then closes anyway.
       const settled = await settle(() => booted?.reflecting() === true, REFLECTION_SETTLE_MS)
       if (!settled) log('stream: a night was still being reflected on when the town closed')
       // The last plan each mind was halfway through, written at the tick it stopped rather

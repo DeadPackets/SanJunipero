@@ -1,13 +1,5 @@
-// ★ WHERE THE CAST'S ART LIVES. Third and last root to be moved out of the scratchpad.
-//
-// `class rig-part: 0 records` — measured on this tip. The five founders' 24-cell sheets were
-// generated, gated, eyeballed and signed off, and every byte of them was written to a session
-// scratchpad that now holds zero files. Every villager in the town drew the checkerboard.
-//
-// A character ships as ONE record: the packed atlas as the png, the atlas manifest as the
-// meta. That is exactly what `packCharacterAtlas` produced at ingest time from 24 loose cell
-// files, so committing the packed result rather than the 24 cells commits the same art in
-// five files instead of a hundred and twenty, and removes the packing step from boot.
+// A character ships as ONE codex record: the packed atlas as the png, the atlas manifest as the
+// meta — five files instead of a hundred and twenty, and no packing step at boot.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -34,9 +26,8 @@ export type CommittedCharacter = {
   atlas: Buffer
 }
 
-/** Every committed character sheet, in id order. A directory missing either file is an ERROR,
- *  and so is a manifest that does not address all 24 cells of the renderer's contract — a
- *  sheet with 23 cells draws nothing at all for the pose it is missing. */
+/** Every committed character sheet, in id order. A missing file, or a manifest short of the 24
+ *  cells, throws: a sheet with 23 cells draws nothing at all for the pose it is missing. */
 export function listCommittedCast(root: string = CAST_CONTENT_DIR): CommittedCharacter[] {
   if (!existsSync(root)) return []
   const out: CommittedCharacter[] = []

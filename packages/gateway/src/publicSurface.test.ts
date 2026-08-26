@@ -1,8 +1,5 @@
-// WHAT A STRANGER CAN REACH. Every case here was a live hole or a live amplifier on `main`
-// before the streaming lane, and each one is written so that reverting its guard fails it.
-//
-// The world these run against is the one `pnpm stream` serves: a real gateway, a real world db,
-// a real agent-memory directory, spoken to over a real socket by a client that is not the app.
+// WHAT A STRANGER CAN REACH. Each case is written so that reverting its guard fails it, against
+// the world `pnpm stream` serves — a real gateway, a real db, a real socket, and not the app.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,9 +23,8 @@ const outside = join(dir, 'outside')
 mkdirSync(agentDbDir)
 mkdirSync(outside)
 
-// The file a traversal would be reaching FOR: a sqlite db outside `agentDbDir` that happens to
-// carry the schema the reader selects, which is what makes the traversal an exfiltration and
-// not merely an error.
+// The file a traversal reaches FOR: a db outside `agentDbDir` carrying the schema the reader
+// selects, which is what makes it an exfiltration rather than an error.
 const secret = new Database(join(outside, 'secret.db'))
 secret.exec('CREATE TABLE journal (id INTEGER PRIMARY KEY, agent_id TEXT, tick INT, day INT, text TEXT)')
 secret.prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, 1, 0, ?)')
@@ -86,9 +82,8 @@ describe('the public surface a stranger reaches', () => {
     const mine = await (await fetch(`${base}/api/agent/walker/journal`)).json()
     expect(mine).toEqual([{ tick: 1, day: 0, text: 'I walked east.' }])
 
-    // `:id` is decoded AFTER the router splits on '/', so these all arrive as one segment
-    // holding a path separator. Remove `AGENT_ID.test` from readAgentRows and the first of
-    // these returns THE PRIVATE THING.
+    // `:id` is decoded AFTER the router splits on '/', so these arrive as one segment holding a
+    // path separator. Remove `AGENT_ID.test` from readAgentRows and the first returns the secret.
     for (const id of ['..%2foutside%2fsecret', '..%2F..%2Fetc%2Fpasswd', '%2e%2e%2foutside%2fsecret']) {
       const r = await fetch(`${base}/api/agent/${id}/journal`)
       expect(r.status).toBe(200)
@@ -223,17 +218,8 @@ describe('the guards themselves', () => {
     expect(cache.size()).toBeLessThanOrEqual(4)
   })
 
-  /**
-   * ★ A KEY CAP OVER UNBOUNDED BODIES IS NOT A CAP.
-   *
-   * `seqCache`'s own comment promised bounded memory and the code bounded the number of KEYS, so
-   * the real ceiling was 32 × the largest body — and the largest body was `/api/bonds` at
-   * 83 704 521 B. "Bounded" meant about 2.7 GB.
-   *
-   * MUTATION-PROVED: deleting the `held + body.length > maxBytes` eviction loop takes the held
-   * bytes below from 4 008 to 15 030 — nearly four times its budget, on fifteen keys well under
-   * the key cap.
-   */
+  /** MUTATION-PROVED: deleting the `held + body.length > maxBytes` eviction loop takes the held
+   *  bytes below from 4 008 to 15 030 — four times its budget, on fifteen keys under the key cap. */
   it('★ the seq cache holds a budget of BYTES, not a number of bodies', () => {
     let seq = 1
     const cache = makeSeqCache(() => seq, MAX_KEYS, 4096)
@@ -256,17 +242,8 @@ describe('the guards themselves', () => {
     expect(MAX_BYTES).toBeLessThan(64 * 1024 * 1024)
   })
 
-  /**
-   * ★ THE ONE PACT ON THIS SURFACE THAT NOTHING ENFORCED, AND IT HAS BROKEN THE STREAM TWICE.
-   *
-   * `/assets/:file` is the codex PNG route and answers 404 to anything that is not a png, so a
-   * client bundle emitted to vite's default `assets/` 404s on every one of its own scripts —
-   * a blank page served by a gateway reporting itself healthy. `@sj/web` emits to `client/`
-   * and `CLIENT_ASSET_DIR` is the other half of it.
-   *
-   * Both files carried a comment saying "keep in step with the other one" and nothing read
-   * either comment. This is the pact, named, in the file that owns what a stranger can reach.
-   */
+  /** `/assets/:file` is the codex PNG route and 404s anything that is not a png, so a bundle
+   *  emitted to vite's default `assets/` serves a blank page. This is that pact, enforced. */
   it('★ the built client is not served from under /assets, and the two halves agree', () => {
     const vite = readFileSync(new URL('../../web/vite.config.ts', import.meta.url), 'utf8')
     const declared = /assetsDir:\s*'([^']+)'/.exec(vite)?.[1]

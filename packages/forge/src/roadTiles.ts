@@ -6,8 +6,7 @@ export const ROAD_BASE = 0xD4BC9E, ROAD_EDGE = 0xB89D7E, ROAD_GRIT = 0xE8D5BC   
 export const ROAD_ARM_HALF_W = 5     // arm half-width in tile-space units before the dimetric skew
 
 // Tile-space N/E/S/W are the NE/SE/SW/NW screen edges of the diamond, so a road joins its
-// neighbour at these edge midpoints. Each falls on a lattice corner, so these are the
-// innermost pixels touching it.
+// neighbour at these edge midpoints — each on a lattice corner, the innermost pixels touching it.
 export const ARM_EDGE_MIDPOINT: Record<'n' | 'e' | 's' | 'w', readonly [number, number]> = {
   n: [23, 4], e: [23, 11], s: [8, 11], w: [8, 4],
 }

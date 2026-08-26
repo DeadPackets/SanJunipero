@@ -12,9 +12,8 @@ import {
   roomFurnishings, roomPlan,
 } from './interiors.js'
 
-// GATE G10 — the automated half, renderer side. The gateway half is
-// packages/gateway/src/g10.test.ts; the web package is DOM-typed and bundler-resolved, so a
-// gateway test cannot import `tilesetPlan` or `interiorOf` without breaking `tsc -b`.
+// The renderer side. A gateway test cannot import `tilesetPlan` or `interiorOf` without
+// breaking `tsc -b`: the web package is DOM-typed and bundler-resolved.
 
 // ── the showcase terrain, rasterised here from the same C13 template the gateway uses ──
 function showcaseTerrain(): TileId[][] {
@@ -25,12 +24,8 @@ function showcaseTerrain(): TileId[][] {
     // T_PATH (8) does not exist in the engine yet — a path rasterises as road
     grid[tile.dy]![tile.dx] = (tile.to === T_PATH ? T_ROAD : tile.to) as TileId
   }
-  // ★ A LANE AND A STUB, WHICH THE TOWN ITSELF NEVER ASKS FOR. The town's streets are three
-  // tiles wide and meet on a lattice, so they resolve to nine of the fifteen autotile shapes:
-  // crosses, tees and corners, never a straight run or a dead end. That regularity is a
-  // property of the grammar and a good one — but the STRIP still has to be exercised whole, so
-  // the two remaining shapes are drawn here, in the renderer's fixture, in open ground west of
-  // the town where no street of the town's own runs. They belong to this test, not to a town.
+  // The town's three-tile streets meet on a lattice and resolve to nine of the fifteen autotile
+  // shapes, so a straight run and a dead end are drawn here to exercise the whole strip.
   for (let y = 2; y <= 6; y++) grid[y]![13] = T_ROAD as TileId       // straight-ns, cap-n, cap-s
   for (let x = 12; x <= 16; x++) grid[10]![x] = T_ROAD as TileId     // straight-ew, cap-e, cap-w
   return grid

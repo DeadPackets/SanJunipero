@@ -33,23 +33,12 @@ import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
-/** The camera's bounds are the ends of `ZOOM_STOPS` (task 75) — one source, so the HUD's
- *  disabled state and the wheel's clamp can never disagree. `ZOOM_MIN` is 0.5 now: the
- *  overview stop that makes the whole town visible at once. */
+/** The ends of `ZOOM_STOPS`, so the HUD's disabled state and the wheel's clamp share a source. */
 export const ZOOM_MIN: ZoomStop = ZOOM_STOPS[0]
 export const ZOOM_MAX: ZoomStop = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
-// ★ THE BAKE SEAM (C11 §9 supersession point), TAKEN. The whole-map pass this factory used to
-// run allocated ONE render texture the size of the entire field: `(w+h)·16 × (w+h)·8`, which
-// grows as the SQUARE of the ring count. At ten rings that is 12 768 × 6 384 px — 326 MB, and a
-// dimension past `MAX_TEXTURE_SIZE` on a great many GPUs, where the allocation does not merely
-// cost memory, it FAILS and the ground is not drawn at all.
-//
-// It is a grid of fixed-size chunks now. `groundChunks.ts` owns every decision — the grid, what
-// is resident, and the seam law that keeps NEAREST honest across a boundary — and holds the
-// numbers. This factory is the glue that turns those decisions into textures, and the shape of
-// the picture it paints into each chunk is the whole-map pass unchanged: same layer order, same
-// material matrices in the same bake space, same shoulders, same kerb and furrows.
+// A grid of fixed-size chunks, not one texture the size of the field: a whole-map bake grows as
+// the square of the ring count and passes `MAX_TEXTURE_SIZE`, where the allocation FAILS.
 export type GroundBaker = {
   rebake(terrain: TileId[][], records: AssetRecord[]): void
   /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it. */
@@ -80,24 +69,8 @@ export function createGroundBaker(
   const loaded = new Map<string, Texture>()
   let generation = 0
 
-  // TERRAIN V2. One pass PER TERRAIN, not one stamp per tile. Every tile of a terrain
-  // contributes its outline to a single Graphics, and that whole shape is filled from the
-  // terrain's material in bake space, which is world space. The material therefore flows
-  // across tile boundaries, and nothing in the picture varies at tile frequency. The old
-  // `shade` checkerboard is gone with it: alternating every other diamond by 15% was a
-  // literal checkerboard in the fallback path.
-  //
-  // V2.2 (U6): the fill matrix is no longer the identity. An identity tiled one 256px material
-  // on an axis-aligned lattice across the whole map, so the pattern the eye found had simply
-  // moved from tile frequency to material frequency.
-  //
-  // ★ WHAT CHUNKING CHANGED HERE, AND WHAT IT DELIBERATELY DID NOT. Geometry is still built in
-  // BAKE space — `sx + offX` — and only the container is translated onto the chunk's origin, so
-  // every material matrix samples the coordinates it always sampled and a continuous ground
-  // flows across a boundary exactly as it flowed across the middle of the old single texture.
-  // The shapes handed in are the chunk's bucket, and a shape that straddles a boundary is in
-  // BOTH buckets, submitted whole to each: the render target's own bounds do the cutting, which
-  // is a framebuffer edge rather than a geometry edge and therefore has no edge of its own.
+  // Geometry stays in BAKE space (`sx + offX`) with only the container translated, so a material
+  // samples the same coordinates in any chunk and the framebuffer edge does all the cutting.
   function drawChunk(rect: ChunkRect, target: RenderTexture, offX: number): void {
     const layer = new Container()
     layer.position.set(-rect.x, -rect.y)
@@ -105,13 +78,10 @@ export function createGroundBaker(
     for (let li = 0; li < stack.length; li++) {
       const l = stack[li]!
       if (l.shapes.length === 0) continue   // its index is still its index — see bucketLayers
-      // A road needs a rim or it disappears into the grass at 1x — v1's art carried a painted
-      // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
-      // neighbour's rim can never sit on top of this tile's surface.
+      // Every shoulder is laid down BEFORE any ribbon, so a neighbour's rim can never sit on
+      // top of this tile's surface.
       if (l.kind === 'road') {
-        // Two tones across the rim's depth: light where the shoulder meets the ground, dark
-        // where it meets the road. One flat shoulder measured only 0.060 luma from the grass,
-        // which is why a road vanished at 1x (U5).
+        // Two tones, because one flat shoulder sat 0.060 luma from the grass and vanished at 1x.
         for (const [tone, pick] of [
           [ROAD_SHOULDER_LIGHT, 'light'], [ROAD_SHOULDER_DARK, 'dark'],
         ] as const) {
@@ -154,25 +124,20 @@ export function createGroundBaker(
         layer.addChild(g)
       } else {
         tex.source.addressMode = 'repeat'      // the field wraps; the material must too
-        // An IDENTITY matrix tiled one 256px material on an axis-aligned lattice across the
-        // whole map — tile-frequency pattern replaced by material-frequency pattern (U6). Each
-        // layer now samples through its own rotation and offset.
+        // An identity matrix would tile one 256px material on an axis-aligned lattice across
+        // the whole map, so each layer samples through its own rotation and offset instead.
         g.fill({ texture: tex, matrix: materialMatrix(l.id, li) })
         layer.addChild(g)
-        // One coarser pass at an incommensurate scale. Two periods with no common multiple
-        // inside the map cannot line up into a lattice. One extra fill per ground layer, at
-        // bake time — not a frame cost.
+        // A coarser octave at an incommensurate scale: two periods with no common multiple
+        // inside the map cannot line up into a lattice. Bake-time cost only.
         const oct = new Graphics()
         shapesInto(oct)
         oct.fill({ texture: tex, matrix: octaveMatrix(l.id, li), alpha: OCTAVE_ALPHA })
         layer.addChild(oct)
       }
     }
-    // U7: a patch was only ever the union of its tiles' diamonds under one material — a shape
-    // with no edge, which is what read as an amorphous blob. Paved ground gets a kerb, a field
-    // gets a headland and furrows. All of it lands in the BAKE, so it costs nothing per frame.
-    // The tile scan that finds the patches moved to the terrain pass: it is O(the map), and
-    // running it once per chunk would have put the whole map back into every chunk's bake.
+    // The tile scan that finds these patches lives in the terrain pass, not here: it is O(the
+    // map), and running it per chunk would put the whole map into every chunk's bake.
     const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
       if (polys.length === 0) return
       const g = new Graphics()
@@ -252,9 +217,8 @@ export function createGroundBaker(
       residency.setGrid(grid)
       applyResidency()
 
-      // Textures load async. Paint the flat fallback now, then repaint once the tile art is
-      // in — a viewer never waits on a blank map, and a stale load never overwrites a newer bake.
-      // one material per terrain — at most eight urls for the whole map
+      // Textures load async: paint the flat fallback now, repaint once the art is in, and let
+      // the generation counter stop a stale load overwriting a newer bake.
       const urls = [...new Set(field.layers.map((l) => l.url))]
         .filter((u): u is string => u !== null && !loaded.has(u))
       if (urls.length === 0) return
@@ -289,14 +253,8 @@ export function createGroundBaker(
   }
 }
 
-/**
- * A SCENE'S CLOCK, HELD BY THE SCENE RATHER THAN REACHED FOR THROUGH `app.ticker`.
- *
- * Pixi's `Application.destroy()` nulls that field, so an effect queued before a teardown lands
- * after it and throws `Cannot read properties of null (reading 'start')` — the load-time error
- * R1 forbids. A closed scene does nothing when it is asked to tick, because that is the truth
- * about it; it is not a null-check standing in for one.
- */
+/** A scene's clock, held rather than reached for through `app.ticker`: Pixi's
+ *  `Application.destroy()` nulls that field, so an effect queued before teardown throws. */
 export function sceneClock(app: { ticker: { start(): void; stop(): void } | null }): {
   set(on: boolean): void
   close(): void
@@ -333,10 +291,8 @@ export type Scene = {
   depthCounts(): DepthCounts
   /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
   viewRect(): { x: number; y: number; w: number; h: number }
-  /** ★ THE BOX THE CAMERA MAY TRAVEL OVER — the ground that exists union the town as it is
-   *  drawn, recomputed every time the town grows. The minimap draws exactly this and nothing
-   *  else, so "every point on the map is a place the camera can go" is true by construction
-   *  rather than by two modules agreeing about the size of a town neither of them fixes. */
+  /** The box the camera may travel over: the ground that exists union the town as it is drawn.
+   *  The minimap draws exactly this, so every point it shows is somewhere the camera can go. */
   reachableBox(): CameraBounds
   /** THE label layer. One owner for every world tag, so two can never be up by accident and
    *  a torn-down sprite cannot leave one behind. */
@@ -354,21 +310,16 @@ export type Scene = {
   setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
   /** the scale being drawn this frame — animated during a transit */
   getZoom(): number
-  /** ONE owner of `prefers-reduced-motion` for the whole canvas. The glide, the zoom settle
-   *  and the walk's bob all ask this, so a viewer who opted out cannot be honoured by two of
-   *  the three and forgotten by the fourth thing somebody adds next. */
+  /** The one owner of `prefers-reduced-motion` for the whole canvas. */
   wantsMotion(): boolean
   /** where the camera is going, and where it will be at rest. The HUD reads THIS, so a label
    *  never shows a number the stop set does not contain. */
   getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
-  /** ★ GO THERE. A press on the minimap, in the space `tileToScreen` returns. It is a CUT, not
-   *  a glide: a glide is the continuation of a hand the viewer moved, and nobody's hand crossed
-   *  a ten-ring town. It is also the FIFTH thing that outranks a running throw, and it takes the
-   *  same four steps in the same order as `centerHome` for exactly that reason. */
+  /** A press on the minimap, in the space `tileToScreen` returns. A cut, never a glide. */
   travelTo(sx: number, sy: number): void
   centerHome(): void
-  /** a view of the whole settlement, at the largest stop it fits at (task 76) */
+  /** a view of the whole settlement, at the largest stop it fits at */
   fitToTown(): void
   /** False once the town has outgrown the widest stop, so the bar can name what the overview
    *  control will actually do instead of promising the whole town. */
@@ -387,9 +338,8 @@ export type Scene = {
   destroy(): void
 }
 
-// Pixi defaults to one backing pixel per CSS pixel. On a DPR-2 screen the browser then resamples
-// the whole canvas, so NEAREST art and every in-canvas glyph arrive soft. `autoDensity` keeps the
-// CSS box (and therefore `app.screen`, which all the camera maths is written in) unchanged.
+// Pixi defaults to one backing pixel per CSS pixel, so a DPR-2 screen resamples the canvas and
+// NEAREST art arrives soft. `autoDensity` keeps the CSS box — and `app.screen` — unchanged.
 export function rendererOptions(rootEl: HTMLElement, dpr: number): Partial<ApplicationOptions> {
   return {
     antialias: false,
@@ -406,11 +356,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const app = new Application()
   await app.init(rendererOptions(rootEl, globalThis.devicePixelRatio))
   rootEl.appendChild(app.canvas)
-  // resizeTo only tracks window resizes; a panel opening, or the control bar moving to
-  // another edge (task 78), changes the root element itself — and a stage that got smaller
-  // can leave the camera showing outside the world, so the clamp runs with it. A camera that
-  // was showing the WHOLE TOWN re-fits instead: it only re-clamped, and the town fell off the
-  // edge of a narrower stage until the viewer pressed the overview again.
+  // `resizeTo` only tracks window resizes, but a panel opening changes the root element itself,
+  // and a stage that got smaller can leave the camera showing outside the world.
   const ro = new ResizeObserver(() => {
     app.resize()
     const intent = resizeIntent(fitted, townBox(), screenBox())
@@ -420,9 +367,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   ro.observe(rootEl)
 
   const world = new Container()
-  // One table decides what is over what (layers.ts). A label is a reading aid, not a thing in
-  // the world: every layer but `entities` is event-inert, so it can never steal a click from
-  // the building it names.
+  // One table decides what is over what (layers.ts). Every layer but `entities` is event-inert,
+  // so a label can never steal a click from the building it names.
   const layers = createLayers(world)
 
   // The ground is a grid of chunk sprites now, not one sprite the size of the map. `layers.ground`
@@ -457,13 +403,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     baker.rebake(terrain, records ?? store.assetRecords())
   }
 
-  // THE EDGES (task 76). Every write to `world.position` goes through the clamp, so there is
-  // no path by which a drag, a pan, a follow or a zoom can push the town off the screen.
-  //
-  // The box is the ground that exists UNION the town as it is drawn (`reachableBoundsOf`),
-  // because under the ring grammar a building can stand past the end of the tile array and a
-  // clamp that knows only the array would make it unreachable. It is recomputed whenever the
-  // world changes — the built extent is what moves, and nothing here knows its size.
+  // Every write to `world.position` goes through the clamp against this box, which is the
+  // ground that exists UNION the town as drawn — a building can stand past the tile array.
   let bounds: CameraBounds = cameraBoundsOf([])
 
   const structureList = (): Array<{ x: number; y: number; w: number; h: number }> => {
@@ -475,16 +416,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
 
-  /**
-   * ★ THE ONE WRITER OF THE CAMERA'S POSITION, AND THEREFORE THE ONE THAT ANNOUNCES IT.
-   *
-   * `onCamera` is how every surface off the canvas learns the view moved. Four of the ways it
-   * moves never fired it: a drag, a follow, a resize and `panBy` — the arrow keys. The four
-   * that did (zoom, throw, fit, `centerHome`) were simply the ones the landed chrome happened
-   * to depend on, so nothing had noticed. Task 76 already made this the single point every
-   * write passes through; the announcement belongs here, where a mover that has not been
-   * written yet cannot forget it.
-   */
+  /** The one writer of the camera's position, and therefore the one that fires `onCamera` —
+   *  a mover added later cannot forget to announce itself. */
   function place(x: number, y: number): void {
     const p = clampCamera({ x, y }, world.scale.x, bounds, screenBox())
     if (p.x === world.position.x && p.y === world.position.y) return
@@ -509,13 +442,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     return list.length === 0 ? bounds : drawnBoundsOf(list)
   }
 
-  /** A VIEW OF THE WHOLE TOWN: the largest stop at which the settlement fits with a margin,
-   *  centred on the settlement — not on the middle of a mostly-empty terrain array. The
-   *  transit reuses the zoom anchor, so the town eases into the middle of the stage rather
-   *  than jumping there. */
-  /** True while the camera is showing the whole town — set by a fit, cleared the moment the
-   *  viewer takes the camera anywhere themselves. A resize honours the view that was asked
-   *  for and leaves a steered camera alone. */
+  /** True while the camera shows the whole town, so a resize refits rather than reclamping. */
   let fitted = false
 
   function fitTo(stop: ZoomStop): void {
@@ -563,9 +490,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     for (const cb of cameraCbs) cb()
   }
 
-  // THE ZOOM (task 75). Rest stops stay exact so the pixel grid stays exact; the transit
-  // between them is eased, and it turns about the world point under the POINTER rather than
-  // about the screen centre, so zooming toward a thing keeps that thing where it is.
+  // Rest stops stay exact so the pixel grid stays exact; the eased transit turns about the
+  // world point under the POINTER, so zooming toward a thing keeps that thing where it is.
   let zoom: ZoomState = initialZoom(1)
   let anchor = { sx: 0, sy: 0, wx: 0, wy: 0 }
 
@@ -584,11 +510,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const setZoom = (stop: ZoomStop): void =>
     setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
 
-  // One ticker step applies the scale — a hand's, or the ease that follows it. A settled
-  // camera costs one comparison a frame.
-  //
-  // THE RELEASE LIVES HERE and not in `onWheel`, because the end of a gesture is the ABSENCE
-  // of an event: nothing arrives to notice it. The frame is the only thing still running.
+  // The release lives here and not in `onWheel`, because the end of a gesture is the ABSENCE
+  // of an event: nothing arrives to notice it, and the frame is the only thing still running.
   const zoomTick = (): void => {
     const now = performance.now()
     // reduced motion gets the exact stop immediately; the tracking during the gesture stays,
@@ -607,15 +530,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.renderer.events.cursorStyles.default = 'grab'
-  // DRAG, AND THE THROW THAT MAKES IT REACH (fling.ts owns the physics; this owns the wiring).
-  //
-  // One tracker answers both questions the pointer raises. `isDrag` is what tells a tile pick
-  // from a pan, exactly as the landed 2 px test did, and it is the SAME answer the throw reads
-  // — so a click can never become a fling and the two can never disagree about one gesture.
-  //
-  // A viewer who asked for less motion gets a drag that stops where their hand stopped. That is
-  // the sheet's own reading of reduced motion: not "no motion" but no motion they did not ask
-  // for, and a glide is the one part of this the hand did not do.
+  // One tracker answers both questions the pointer raises: `isDrag` tells a tile pick from a
+  // pan and is the same answer the throw reads, so a click can never become a fling.
   const wantsMotion = (): boolean =>
     typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -653,22 +569,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
-  // ★ THE THIRD GROUND SQUARE, AND THE ONE WITH A SECOND JOB.
-  //
-  // `app.stage.hitArea = app.screen` is a screen-sized rectangle that catches every pointer
-  // event the town does not — and the tap on it turned the pointer into a TILE. That tile was
-  // the pointer's, not the clicked thing's, which is the open defect handed to this lane: a
-  // body in a shoulder rank is drawn up to 1.3 tiles from the tile the record puts it on, so a
-  // click on a fanned body reported ground the body is not standing on.
-  //
-  // ★ BUT THE STAGE HIT AREA ITSELF STAYS, BECAUSE IT IS DOING A SECOND JOB NOBODY REMEMBERS:
-  // drag-to-pan, the fling, and the wheel-zoom anchor are all `app.stage` handlers and every
-  // one of them needs a target under the pointer. Removing the square would take the camera
-  // with it. What is retired is the CLAIM the tap made on top of it.
-  //
-  // A tile pick now means what it says: the pointer landed on the ground. `e.target` is the
-  // object Pixi hit, and if that is anything but the stage the viewer clicked a THING — which
-  // has its own handler, its own answer, and its own tile if it ever needs one.
+  // The screen-sized `app.stage.hitArea` must stay: drag-to-pan, the fling and the wheel-zoom
+  // anchor are all `app.stage` handlers and each needs a target under the pointer.
   app.stage.on('pointertap', (e: FederatedPointerEvent) => {
     if (isDrag(drag)) return // a drag is not a tile pick
     if (e.target !== app.stage) return // nor is a click that landed on a body or a building
@@ -699,10 +601,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     // from under the anchor, which is the class of defect the wheel gate already exists for.
     stopGlide()
     const now = performance.now()
-    // ★ THE ANCHOR IS CAPTURED ONCE PER GESTURE, NOT ONCE PER STEP. The landed code re-pinned
-    // whenever the stop changed, which was fine when the scale only moved at those moments.
-    // A continuous zoom moves it on every event, and re-pinning each time makes the town swim
-    // under the cursor instead of growing beneath it.
+    // Once per gesture, not once per step: a continuous zoom moves the scale on every event,
+    // and re-pinning each time makes the town swim under the cursor instead of growing.
     if (zoom.live === null || now - zoom.lastWheelMs > WHEEL_GESTURE_GAP_MS) {
       fitted = false
       captureAnchor(e.offsetX, e.offsetY)
@@ -716,17 +616,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   let bakedTerrain: TileId[][] | null = null
   let bakedArtSig = -1
   // A bake tessellates every tile outline on the map, so it must never run more than once a
-  // frame — and it must not run at all for art the ground does not use. Booting used to fire
-  // one full bake PER ASSET MESSAGE; with the library ingested that is ~166 of them back to
-  // back, which blocks the main thread hard enough that requestAnimationFrame itself drops to
-  // fractions of a frame per second. Mark dirty, bake once on the next tick.
+  // frame: one bake per asset message blocks the main thread hard enough to stall rAF.
   let dirty = false
   const bakeTick = (): void => {
-    // ★ THE GROUND FOLLOWS THE CAMERA NOW. The bake is chunked, so what is resident is a
-    // function of the view, and the view moves on a frame — a drag, a glide, a follow, an eased
-    // zoom. Asking here rather than from `place()` means one question a frame however many
-    // times the camera moved inside it, and it happens before the renderer draws because
-    // Application adds its own render at a lower priority than a ticker callback.
+    // Asking here rather than from `place()` costs one question a frame however many times the
+    // camera moved, and still runs before the render, which Application adds at lower priority.
     baker.setView(viewRect())
     if (!dirty || bakedTerrain === null) return
     dirty = false
@@ -737,9 +631,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const offSub = store.subscribe(() => {
     const s = store.getState()
     if (s === null) return
-    // A building that went up is an edge that moved. The bake is gated on the terrain, but the
-    // reachable box is not: it must follow the town every time the town grows, or the newest
-    // house on the outermost ring is the one the camera cannot get to.
+    // The bake is gated on the terrain, but the reachable box is not: it must follow the town
+    // every time it grows, or the newest house is the one the camera cannot get to.
     recomputeBounds(s.terrain)
     // terrain art arriving is a rebake trigger too — the flat ground hot-swaps to materials
     const sig = groundArtSignature(store.assetRecords())

@@ -25,9 +25,8 @@ const lamp = (x: number, y: number, fueledUntilTick?: number): LitWorld => world
   },
 })
 
-// ★ ONE SOURCE, TWO CONSUMERS — the whole reason this file exists. Before it, the render
-// darkened the screen with a clock tint that knew nothing about fire while `isDark` walked the
-// flames, so a lit lamp changed the world a mind lived in and changed nothing a viewer saw.
+// One source, two consumers: before it, the render darkened the screen with a clock tint that
+// knew nothing about fire while `isDark` walked the flames.
 
 describe('the picture and the query cannot disagree about what is alight', () => {
   it('paints a pool for exactly the flames `isDark` answers to, and for no others', () => {
@@ -73,11 +72,9 @@ describe('the pool is a pool of light and not a pale plate', () => {
     expect(POOL_COLOR).not.toBe(SMOKE_COLOR)   // cream read as white glass; that is the round-3 defect
   })
 
-  // ★ THE HUE HAS TO SURVIVE THE NIGHT, AND THE OBVIOUS CHOICE DID NOT. `atmosphere.ts`
-  // multiplies the whole stage by the clock tint, so what a viewer sees is `colour × tint` —
-  // and at deep night that tint keeps 95% of blue against 45% of red. Honey `#F2C879`, which
-  // every other lit thing in the render uses, comes out BLUE-dominant and reads as moonlight
-  // rather than lamplight. This is the arithmetic, so nobody has to re-derive it by eye.
+  // `atmosphere.ts` multiplies the whole stage by the clock tint, and at deep night that tint
+  // keeps 95% of blue against 45% of red — so honey `#F2C879` comes out BLUE-dominant and reads
+  // as moonlight. This is the arithmetic, so nobody has to re-derive it by eye.
   it('★ still reads WARM after the night multiply — measured, not chosen', () => {
     const NIGHT_TINT = CLOCK_STOPS.find((s) => s.minute === 0)!.tint
     const after = (rgb: number): [number, number, number] => [
@@ -115,17 +112,15 @@ describe('the pool is a pool of light and not a pale plate', () => {
 
 describe('what this pass must not have broken', () => {
   const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
-  // ★ THE COMMENTS ARE NOT THE CODE. The bake guard below first read the whole file and
-  // tripped on its own explanation of why it does not touch the bake — a guard that a
-  // paragraph can turn red is measuring prose. Everything asserted as ABSENT reads this.
+  // The guard below first read the whole file and tripped on its own explanation of why it does
+  // not touch the bake, so everything asserted as ABSENT reads comment-stripped source.
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
     .filter((l) => !l.trim().startsWith('//')).join('\n')
 
   it('★ does not touch the ground bake: it draws on groundDecal, never on `ground`', () => {
     // The bake is chunked and `MAX_TEXTURE_SIZE` 2048 is crossed between ring one and ring two.
-    // A pool painted INTO the bake would be in that budget and would also have to be
-    // re-baked every time a torch moved. It is a sprite on the decoration layer instead, so
-    // the bake's byte count is unchanged: this pass allocates no ground texture at all.
+    // A pool painted INTO the bake would be in that budget and would be re-baked every time a
+    // torch moved. It is a sprite on the decoration layer instead.
     expect(src).toContain('scene.layers.groundDecal.addChild(root)')
     expect(code).not.toContain('layers.ground.')
     expect(code).not.toMatch(/bake|chunk/i)
@@ -152,19 +147,12 @@ describe('what this pass must not have broken', () => {
     expect(src).toContain("s.eventMode = 'none'")
   })
 
-  // ★ THE CRASH THIS PASS SHIPPED ONCE, AND THE TWO LINES THAT ANSWER IT.
-  //
-  // The whole stage went black the first night a lamp stood:
-  // `TypeError: Cannot read properties of null (reading 'alphaMode')`, thrown out of pixi's
-  // `_buildInstructions`. Pixi's `GCSystem` unloads any resource with `autoGarbageCollect` that
-  // goes untouched for `maxUnusedTime`, and an unloaded source is a null one. Two causes, both
-  // this file's: a shared texture left collectable, and a pool that was destroyed at every
-  // sunrise and rebuilt at every dusk. A source-text guard is a weak guard, so these say
-  // exactly which line they are standing on.
+  // Pixi's `GCSystem` unloads any resource with `autoGarbageCollect` that goes untouched for
+  // `maxUnusedTime`, and an unloaded source is a null one that takes the whole stage down. A
+  // source-text guard is weak, so these say exactly which line they stand on.
   it('★ pins BOTH the texture and the sprites against pixi\'s GC', () => {
-    // Two resources, two defaults, one crash. `TextureSource` and `ViewContainer` are both
-    // GC-managed, and a pool sitting at `visible = false` through a day is untouched on both
-    // counts. Whoever owns a lifetime explicitly must say so, or the GC assumes it does not.
+    // Two resources, two defaults, one crash: `TextureSource` and `ViewContainer` are both
+    // GC-managed, and a pool at `visible = false` through a day is untouched on both counts.
     expect(src).toContain('tex.source.autoGarbageCollect = false')
     expect(src).toContain('s.autoGarbageCollect = false')
   })
@@ -174,9 +162,8 @@ describe('what this pass must not have broken', () => {
     expect(src).toContain('const flames = flamesAt(state, tick, DEFAULT_CONFIG)')
     expect(code).not.toMatch(/strength === 0 \? \[\]/)
     expect(src).toContain('s.visible = seen')
-    // and nothing this file destroys may ever take the shared texture with it
-    // Every destroy on a SPRITE must spare the shared texture. `root` and the throwaway
-    // Graphics own nothing shared, so they are named exemptions rather than a blanket skip.
+    // Every destroy on a SPRITE must spare the shared texture. `root` and the throwaway Graphics
+    // own nothing shared, so they are named exemptions rather than a blanket skip.
     for (const m of code.match(/(\w+)\.destroy\(([^)]*)\)/g) ?? []) {
       if (m.startsWith('root.destroy') || m.startsWith('g.destroy') || m.startsWith('tex.destroy')) continue
       expect(m, `${m} could destroy the texture every sprite shares`)

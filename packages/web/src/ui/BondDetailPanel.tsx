@@ -5,11 +5,8 @@ import {
 import { ARC_COLOR } from './relationGraph.js'
 import type { PeopleIndex } from './bondsModel.js'
 
-// WHAT PASSED BETWEEN TWO PEOPLE, in the order it passed.
-//
-// THE BAR IS GONE. It filled toward the closest pair in town, which makes a relationship into a
-// meter with a leader (P3). The level word plus the dated history says strictly more, and it
-// can go DOWN — which the bar could not express at all.
+// The bar is gone: it filled toward the closest pair in town, which makes a relationship a
+// meter with a leader. The level word plus the dated history can also go DOWN.
 
 const moment = (tick: number): string => {
   const m = tickToMoment(tick)

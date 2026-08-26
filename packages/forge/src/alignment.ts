@@ -7,24 +7,12 @@ import { checkerBackground, compositeOver } from './visionQa/rubric.js'
 
 export type AlignmentConfig = ForgeConfig['alignment']   // one source; never a re-declared shape
 
-// Ruling R-2: the plan's `nearVertexY = cell.h - 1` stays the default, but shipped v4 cells
-// declare their own feet line (storehouse: 866 tall, feetY 861), so an explicit one wins.
-// Without it nothing can sit BELOW the near vertex and the sunken check is unreachable.
+// Shipped v4 cells declare their own feet line (storehouse: 866 tall, feetY 861), so an explicit
+// one wins over `cell.h - 1`; without it nothing can sit below the near vertex.
 export type AlignmentCell = { w: number; h: number; feetY?: number }
 
-// ★ THE DIAMOND IS SKEWED, AND FOR A WHOLE MERGE THIS FUNCTION SAID IT WAS NOT.
-//
-// `leftX`/`rightX` were `centerX ± span/2` with `span = (w + h)·TILE_W/2` — a function of
-// `w + h` ALONE, so a footprint and its transpose produced the identical window. That is the
-// whole reason `farmhouse-se` shipped declaring 4×2 while standing on 2×4 and no gate said a
-// word: `spriteDensity` is `(w + h)·TILE_W/2` too, and so is `targetSize('building')`. All
-// three measured the diamond's SIZE. None of them measured which way it is TURNED.
-//
-// The real geometry, from the projection: the footprint's four tile corners land at (0,0),
-// (w,0), (0,h) and (w,h), so measured from the NEAR vertex — the (w,h) corner the feet anchor
-// sits on — the west vertex is `w·TILE_W/2` to the left and the east vertex is `h·TILE_W/2` to
-// the right. Those are equal only when `w === h`, which is why the three square kinds were
-// never affected and the two rectangular ones were.
+// Measured from the near vertex the west vertex is `w·TILE_W/2` to the left and the east one
+// `h·TILE_W/2` to the right — equal only when `w === h`, so this window is not symmetric.
 export function footprintDiamond(fp: Footprint, cell: AlignmentCell): {
   nearVertexY: number; centerX: number; leftX: number; rightX: number
 } {
@@ -39,10 +27,8 @@ export function footprintDiamond(fp: Footprint, cell: AlignmentCell): {
   }
 }
 
-// Ruling R-3: v4 building cells ship at NATIVE resolution, trimmed to the figure, with a feet
-// anchor; the renderer scales them into the target cell. The alignment law is written in
-// TARGET-cell pixels, so the cell has to be rebuilt before the law can be applied — validating
-// a raw hi-res cell fails every shipped building spuriously.
+// v4 building cells ship at native resolution with a feet anchor; the alignment law is written in
+// TARGET-cell pixels, so validating a raw hi-res cell fails every shipped building spuriously.
 export function toTargetCell(
   img: RawImage, man: { footprint: Footprint; cell: { w: number; h: number; feetX: number; feetY: number } },
 ): { img: RawImage; cell: Required<AlignmentCell> } {

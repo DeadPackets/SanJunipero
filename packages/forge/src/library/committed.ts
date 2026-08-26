@@ -1,13 +1,5 @@
-// ★ WHERE AN ITEM'S ART LIVES. Same answer as `buildingArt.ts`, for the same reason.
-//
-// Round 3 paid for a 50-item library and wrote all of it to a session scratchpad. That
-// scratchpad now holds ZERO files, so every item in the world drew the checkerboard
-// placeholder and no test noticed for a whole merge train. The terrain and (since round 4)
-// the building cells survived the same wipe because they are COMMITTED.
-//
-// So items are committed too, beside them, and this module is the one place that reads them.
-// Layout mirrors `content/buildings/<kind>/`: `content/items/<kind>/` holding sprite.png,
-// icon.png and the manifest the renderer's `parseLibraryItemManifest` reads back.
+// Items are committed under `content/items/<kind>/` — sprite.png, icon.png and the manifest the
+// renderer's `parseLibraryItemManifest` reads back — and this module is the one place reading them.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -46,9 +38,8 @@ export function listCommittedItems(root: string = ITEMS_CONTENT_DIR): CommittedI
     const manifest = LibraryItemManifestSchema.parse(JSON.parse(readFileSync(paths.manifest, 'utf8')))
     if (manifest.kind !== kind) throw new Error(
       `items/${kind}: manifest kind "${manifest.kind}" belongs in items/${manifest.kind}`)
-    // The catalog is the specification and the content is the answer to it. Content for a
-    // kind the catalog does not carry has nothing to place it, and is caught here rather
-    // than shipping as a row nothing can ever resolve.
+    // The catalog is the specification and the content is the answer to it: content for a kind
+    // the catalog does not carry would ship as a row nothing can ever resolve.
     const entry = libraryEntry(kind)
     if (entry === null) throw new Error(`items/${kind}: no LIBRARY entry — the catalog does not carry this kind`)
     if (manifest.category !== entry.category) throw new Error(
@@ -68,16 +59,13 @@ function latestItem(codex: AssetCodex, kind: string) {
     .filter((r) => r.status === 'ready' && r.class === 'item' && r.kind === kind).at(-1) ?? null
 }
 
-/** Idempotent, on the same law the committed buildings register by: unchanged sprite bytes
- *  register nothing, and regenerated art gets a new record that wins by seq. Registration is
- *  free — the generation booked its own spend in the forge ledger when it was paid for. */
+/** Idempotent: unchanged sprite bytes register nothing, and regenerated art gets a new record that
+ *  wins by seq. Registration is free — the generation booked its own spend when it was paid for. */
 export function registerCommittedItems(
   codex: AssetCodex, opts: { root?: string; interiorRoot?: string } = {},
 ): ItemIngestEntry[] {
-  // ★ THE INTERIOR TILESET RIDES IN WITH THE FURNITURE IT STANDS IN. The gateway's terrain
-  // ingest short-circuits the moment every terrain kind exists, so a resumed town would never
-  // see a piece added later; the library ingest is idempotent per item and always runs. The
-  // tileset is the room the furniture is placed in, so this is where it belongs.
+  // The gateway's terrain ingest short-circuits once every terrain kind exists, so a resumed town
+  // would never see a piece added later; this ingest is idempotent per item and always runs.
   const out: ItemIngestEntry[] = registerCommittedInteriors(codex, { root: opts.interiorRoot })
   for (const item of listCommittedItems(opts.root)) {
     const existing = latestItem(codex, item.kind)

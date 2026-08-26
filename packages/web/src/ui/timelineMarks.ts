@@ -1,13 +1,6 @@
 /**
- * U14 — THE SCRUBBER HAS SOMEWHERE TO AIM.
- *
- * The landed timeline derived its marks from `store.recentEvents()`, a 400-entry ring that
- * only holds what arrived since the viewer connected. On a mature world that is zero marks
- * against tens of thousands of recorded events: a scrub bar with nothing on it.
- *
- * Marks come from the RECORD instead — the world's own event log and the narrator's tables —
- * and they are weighted toward CHANGE, because a day somebody became different is worth more
- * of a viewer's attention than a day a wall went up (P22.5).
+ * Marks come from the RECORD — the world's own event log and the narrator's tables — never from
+ * `store.recentEvents()`, a 400-entry ring holding only what arrived since the viewer connected.
  */
 
 export const MARK_KINDS = [
@@ -17,10 +10,8 @@ export type MarkKind = (typeof MARK_KINDS)[number]
 
 export type Mark = { tick: number; kind: MarkKind; words: string; weight: number }
 
-/** The weighting the controller ruling asks for, written as a table rather than as a habit.
- *  `discovery` sits above the old ceiling on two arguments: it is rarer than every other kind,
- *  so a high weight costs them almost nothing; and it is the only PERMANENT one — a death
- *  removes one person, a discovery changes what everyone can do for the rest of the run. */
+/** `discovery` sits above the old ceiling on two arguments: it is rarer than every other kind, so a
+ *  high weight costs them almost nothing, and it is the only PERMANENT one. */
 export const MARK_WEIGHT: Readonly<Record<MarkKind, number>> = {
   discovery: 18,
   changed: 16, first: 16, death: 14, birth: 14, joined: 12, quarrel: 12, chapter: 10, built: 8,
@@ -40,9 +31,8 @@ export const MARK_GLYPH_PX = 7
 export const MARK_GLYPH_SCALE = 3
 export const MARK_HIT_PX = 26
 
-/** WHAT THE BROWSER CAUGHT: a mark at tick 0 is centred on the track's first pixel, so half of
- *  it was drawn outside the slab and under the frame. Clamped, the extremes stay whole and
- *  every mark between them keeps its true position. */
+/** A mark at tick 0 is centred on the track's first pixel, so half of it drew outside the slab.
+ *  Clamped, the extremes stay whole and every mark between them keeps its true position. */
 export function markPercent(tick: number, span: number): number {
   return span <= 0 ? 0 : Math.min(100, Math.max(0, (tick * 100) / span))
 }

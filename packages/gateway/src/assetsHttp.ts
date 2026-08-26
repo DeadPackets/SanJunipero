@@ -91,13 +91,9 @@ const stripPng = (file: string): string | null => (file.endsWith('.png') ? file.
 export const MAX_ENCODED = 128
 
 /**
- * ★ THE PLACEHOLDER ROUTES ENCODE A PNG PER REQUEST, AND THE KEY IS THE STRANGER'S TO CHOOSE.
- *
- * `/assets/character/<anything>.png` built and `sharp`-encoded a fresh 384×576 sheet for any id
- * asked for, real agent or not. sharp runs on libuv's four-thread pool, which the whole process
- * shares with every file read, so a stranger looping over made-up ids starves the server of
- * threads with a handful of GETs. Two guards, and neither costs a real viewer anything:
- * the id must name somebody the world actually has, and each sheet is encoded once.
+ * The key is the stranger's to choose and `sharp` runs on libuv's four-thread pool, which the
+ * whole process shares with every file read. Two guards: the id must name somebody the world
+ * actually has, and each sheet is encoded once.
  */
 export type AssetRouteDeps = {
   getCodex(): AssetCodex | null
@@ -106,9 +102,7 @@ export type AssetRouteDeps = {
 }
 
 export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
-  // ★ ONE ZOD PARSE PER ROW FOR THE PROCESS, NOT PER IMAGE GET. The character route read the
-  // whole `assets` table and `AssetRecordSchema.parse`d every row to keep one element, on every
-  // request, and the browser asks once per agent on load. The cursor tops itself up from the
+  // One zod parse per row for the process, not per image GET. The cursor tops itself up from the
   // codex's own seq at read time, so a sheet registered a millisecond ago is already here.
   let readySeq = 0
   const readyByKind = new Map<string, string>()
@@ -120,10 +114,9 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
     return readyByKind.get(kind)
   }
 
-  // The PROMISE is what is held, not the buffer: the buffer was only written after the encode
-  // resolved, so N concurrent misses on one key ran N sharp encodes on libuv's four threads —
-  // the starvation the note above says this cache prevents. Oldest-first past the cap, because
-  // fold.ts leaves the dead in `state.agents` for ever and `knowsAgent` lets them all through.
+  // The PROMISE is held, not the buffer: N concurrent misses on one key would otherwise run N
+  // sharp encodes on libuv's four threads. Oldest-first past the cap — `fold.ts` leaves the dead
+  // in `state.agents` for ever and `knowsAgent` lets them all through.
   const encoded = new Map<string, Promise<Buffer>>()
   const onceEncoded = (key: string, build: () => RawImage, then: (buf: Buffer) => void): void => {
     let p = encoded.get(key)

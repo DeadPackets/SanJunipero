@@ -37,9 +37,8 @@ function readBody(req: IncomingMessage): Promise<string | null> {
 // viewer socket, so no viewer connection can ever reach a write path.
 export function createLawsAdmin(opts: LawsAdminOpts): Server {
   const host = opts.host ?? DEFAULT_ADMIN_HOST
-  // Binding is the operator's job; this check is the second lock. A listener
-  // accidentally started on 0.0.0.0 still refuses every request that did not
-  // arrive on the address the channel was configured for.
+  // Binding is the operator's job; this is the second lock — a listener started on 0.0.0.0
+  // still refuses every request that did not arrive on the configured address.
   const wrongInterface = (req: IncomingMessage): boolean =>
     host !== '0.0.0.0' && host !== '::' && (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
 

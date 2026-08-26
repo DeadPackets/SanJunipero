@@ -69,12 +69,9 @@ describe('cullByBox', () => {
   })
 })
 
-// ── ★ THE POPPING TEST ────────────────────────────────────────────────────────────────────
-//
-// "A popping edge is worse than no culling." A pop is one specific event: a drawable whose
-// painted pixels are already inside the view while the cull still calls it hidden. Sweeping a
-// real town across a real viewport one step at a time either finds that event or proves it
-// cannot happen — a bound on the rendered picture, not on the code that computes it.
+// ── THE POPPING TEST ──────────────────────────────────────────────────────────────────────
+// A pop is a drawable whose painted pixels are already inside the view while the cull still
+// calls it hidden.
 
 describe('nothing ever pops in at an edge', () => {
   const boxes = bigTown(2).map((s) => structureDepthBox(s.id, s))

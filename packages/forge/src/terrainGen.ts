@@ -9,16 +9,8 @@ import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js
 import { paintRoadAutotile } from './roadTiles.js'
 import { tileSeamGate } from './pixelGates.js'
 
-// USER RULING 2026-08-17: "I want properly generated repeating tiling textures from an image
-// model." This supersedes C10 T1's code-painted tiles and C13's code-painted road strip. The
-// renderer contract does not move — the art lands under the same codex kinds and manifest
-// keys, so it hot-swaps.
-
-// Image models draw vignettes and rims almost reflexively, and no amount of "no border" in
-// the prompt reliably stops it — grass:2 came back framed three attempts running. So the
-// margin is CUT rather than argued with: the outer 8% of each side is discarded before the
-// material is measured, which removes any rim deterministically and leaves the seam check to
-// judge what actually remains.
+// Image models draw vignettes and rims reflexively and no amount of "no border" in the prompt
+// stops it, so the outer 8% of each side is CUT before the material is measured.
 export const CANDIDATE_MARGIN = 0.08
 
 export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): RawImage {
@@ -33,23 +25,12 @@ export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): Ra
   return out
 }
 
-// TERRAIN V2 (user directive 2026-08-17): the ground is a CONTINUOUS world-space material
-// field, not per-tile art. A tile is a window onto the material, so the material must carry
-// the fidelity — 64px was four tile-widths and read as low-resolution mush once it stopped
-// being squashed into a 32x16 diamond. 256 is eight tile-widths at full ground resolution,
-// and it is what the 512 generation can actually support after the margin crop.
+// The ground is a CONTINUOUS world-space material field, not per-tile art, so the material carries
+// the fidelity: 256 is eight tile-widths, and what a 512 generation supports after the crop.
 export const MATERIAL_PX = 256
 
-// MEASURED, not guessed (2026-08-17, live batch). The first version of this check compared
-// opposing edges PIXEL BY PIXEL, which is the wrong instrument for organic noise: two edges
-// of the same stochastic material disagree per-pixel almost everywhere. Across the thirteen
-// generated materials it scored 2.6 to 32.5, while a genuine discontinuity (half grass, half
-// water) scored only 41.6 — barely any separation, and farmland at its WORST score of 32.2
-// tiles with no visible seam at all in a 10x10 dimetric lattice.
-//
-// What actually matters is whether the two edges are the same MATERIAL. So the check compares
-// the mean tone of an edge STRIP against its opposite: homogeneous material lands near zero,
-// a real discontinuity lands far away, and the two are cleanly separated.
+// Comparing opposing edges PIXEL BY PIXEL is the wrong instrument for organic noise: two edges of
+// one stochastic material disagree almost everywhere. This compares the mean tone of a strip.
 export const SEAM_STRIP_PX = 3
 export const SEAM_TOLERANCE = 14
 
@@ -67,9 +48,8 @@ export function terrainBoilerplate(): string {
     'so it can repeat without a visible seam. Hard pixel clusters, no gradients, no blur. ' +
     'Warm cozy pastel palette: sage green, honey wood, cream stone, warm grey, dusty rose. ' +
     'The left edge must continue into the right edge and the top edge into the bottom edge. ' +
-    // The lesson the first live run taught: the wrap was numerically perfect and the tile
-    // still failed, because three bright flowers in one square become a lattice of flowers
-    // once it repeats. A ground material must have NOTHING the eye can lock onto.
+    // A numerically perfect wrap still fails if three bright flowers in one square become a
+    // lattice of flowers once it repeats: the material must have NOTHING the eye can lock onto.
     'CRITICAL: the texture must be uniform and featureless at the scale of the whole square. ' +
     'No single distinctive mark anywhere — no flower, no bright blob, no large stone, no ' +
     'branch, no lighter or darker patch that the eye can pick out and follow. Fine, even, ' +
@@ -82,11 +62,8 @@ export function terrainBoilerplate(): string {
     'smooth wash, not single-pixel noise — visible texture with no landmarks in it.'
 }
 
-// Ground vocabulary, one line per material. Written about earth and water, never about the
-// thing drawing it.
-// Every line describes a UNIFORM MATERIAL. Variety between tiles is the renderer's job (four
-// grass variants picked by a per-tile hash); variety inside one tile is what makes a repeat
-// visible. Differences between variants are in colour and grain density, never in landmarks.
+// Every line describes a UNIFORM MATERIAL. Variety between tiles is the renderer's job; variety
+// inside one tile is what makes a repeat visible.
 export const TERRAIN_COMMISSIONS: Record<string, string> = {
   'grass:0': 'Close-cropped sage meadow grass: short blade clusters in three clear tones of green, evenly spread over the whole square, plainly visible texture with no bare patches.',
   'grass:1': 'Meadow grass one shade deeper and slightly coarser than the last: the same even all-over blade grain, a little more contrast between blades, still one uniform tone.',
@@ -97,10 +74,8 @@ export const TERRAIN_COMMISSIONS: Record<string, string> = {
   'forest:0': 'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
   'rock:0': 'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
   'sand:0': 'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
-  // The first farmland came back as a picture of the style-anchor COTTAGE — the reference
-  // bled in whole, and it passed every mechanical gate because a cottage wraps as well as
-  // soil does. The reference is now another ground material (REFS=), and the commission
-  // names the furrow as the only structure in the square.
+  // The first farmland came back as the style-anchor COTTAGE, and every mechanical gate passed it
+  // because a cottage wraps as well as soil. The commission names the furrow as the only structure.
   'farmland:0': 'Ploughed soil seen from directly above: rich damp brown, covered corner to corner with straight parallel furrow ridges at a small even pitch, every ridge the same width and the same length as every other, running in ONE direction across the whole square. The furrows are the only structure in the picture. No building, no roof, no wall, no window, no door, no fence, no crop, no plant, no path, no headland, no field boundary, no bare patch.',
 }
 
@@ -111,9 +86,8 @@ export const SEASON_COMMISSIONS: Record<Season, string> = {
   winter: 'under winter: cool blue-shadowed frost over it, the colour evenly drained',
 }
 
-// TERRAIN V2.1 (controller, final art round): the plaza cobble reads beautifully at plaza
-// scale and as a noisy stone-string on a 16px ribbon. Thin runs get their own CALM material —
-// same warm sand family, same mean, much lower contrast — and the plaza keeps its cobbles.
+// The plaza cobble reads beautifully at plaza scale and as a noisy stone-string on a 16px ribbon,
+// so thin runs get their own CALM material — same warm sand family, same mean, lower contrast.
 export const CALM_ROAD_NAME = 'road-calm'
 export const CALM_ROAD_ID = `terrain:${CALM_ROAD_NAME}:0`
 export const CALM_ROAD_COMMISSION =
@@ -126,9 +100,8 @@ export const ROAD_COMMISSION =
   'with fine pale grit between them, the same all over, no kerb, no grass, no ruts, no large ' +
   'stone that stands out from the rest.'
 
-// `generateFrom` names the material a piece is CUT from rather than generated for. All
-// fifteen road shapes are stencils of one road surface: fifteen separate generations would
-// cost fifteen times as much AND look like a patchwork, because a lattice must be one road.
+// All fifteen road shapes are stencils of ONE road surface: fifteen generations would cost fifteen
+// times as much AND look like a patchwork, because a lattice must be one road.
 export type TerrainItem = { assetId: string; commission: string; generateFrom?: string } & (
   | { sort: 'ground'; kind: TerrainTileKind; variant: number }
   | { sort: 'road'; roadKey: RoadAutotileKey }
@@ -147,10 +120,8 @@ export function terrainAssetId(i: IdInput): string {
   return `terrain:season:${i.season}`
 }
 
-// TERRAIN V2: per-tile variants are GONE. They existed to break up a repeating tile stamp,
-// and a continuous world-space field has no tile stamp to break up — the material's own
-// variation does that job, at its own scale rather than at tile frequency. One material per
-// ground, which is also seven fewer calls.
+// No per-tile variants: they existed to break up a repeating tile stamp, and a continuous
+// world-space field has no tile stamp to break up.
 export const GROUND_VARIANTS: Record<TerrainTileKind, number> = {
   grass: 1, earth: 1, water: 1, forest: 1, rock: 1, sand: 1, farmland: 1, road: 1,
 }
@@ -193,14 +164,8 @@ export function planTerrainProgram(): TerrainItem[] {
 
 // ------------------------------------------------------------------ post
 
-// Box-average down to the material grid, then snap to MASTER_PALETTE. Averaging first is what
-// keeps a 512 generation's grain from aliasing into noise; quantizing after is what makes the
-// result palette-true rather than merely close.
-// Box-average any source onto the material grid, then snap to MASTER_PALETTE. Averaging
-// first keeps a 512 generation's grain from aliasing into noise; quantizing after makes the
-// result palette-true rather than merely close. Block bounds are computed in floating point
-// so a source SMALLER than the grid still fills every cell — an integer step silently left
-// the right and bottom edges black.
+// Box-average onto the material grid, then snap to MASTER_PALETTE: averaging first keeps a 512
+// generation's grain from aliasing, and float block bounds let a smaller source still fill it.
 export function toMaterialGrid(img: RawImage, px: number = MATERIAL_PX): RawImage {
   const out: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   for (let y = 0; y < px; y++) {
@@ -268,9 +233,8 @@ export function seamReport(m: RawImage): SeamReport {
   return { horizontalDelta, verticalDelta, worstAxis, pass, note }
 }
 
-// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the
-// wrap (left edge == right edge), so seamReport reads 0.0 and the material still renders as
-// a grid of framed cards. Live finding, water:0. The ring must look like the middle.
+// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the wrap, so
+// `seamReport` reads 0.0 and the material renders as a grid of framed cards.
 export const BORDER_TOLERANCE = 18      // mean per-channel distance, ~one palette step
 export const BORDER_RING_PX = 2
 
@@ -298,10 +262,8 @@ export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): Border
   }
 }
 
-// The one veto the generator answers to. seamReport reads the wrap in ABSOLUTE tone, which
-// is blind on smooth ground: terrain_earth wraps at 2.9 against a tolerance of 14 and the
-// line is still plainly there, because the material's own interior only varies by 2.1.
-// tileSeamGate reads the same wrap RELATIVE to that grain and catches it.
+// `seamReport` reads the wrap in ABSOLUTE tone, which is blind on smooth ground: earth wraps at
+// 2.9 against a tolerance of 14 with the line plainly there. `tileSeamGate` reads it RELATIVE.
 export function materialVeto(m: RawImage): string | null {
   const seam = seamReport(m)
   if (!seam.pass) return seam.note
@@ -313,16 +275,8 @@ export function materialVeto(m: RawImage): string | null {
 }
 
 // ---------------------------------------------------------------- making the wrap true
-//
-// Three live rounds on eight materials returned 0/8: an image model does not draw a torus,
-// and the shipped set only ever passed because the absolute tolerance was loose enough to
-// miss a quiet line on smooth ground. So the wrap is made true by CONSTRUCTION, the way the
-// pixel grid was — not by asking the model again.
-//
-// Layer A is the material. Layer B is A rolled by (ox, oy). A's seam is at the border and
-// B's is wherever the roll put it, so the two never break in the same place: take B at the
-// border, A in the middle, and smoothstep between. B's border columns were ADJACENT columns
-// inside A, so the wrap comes out as quiet as ordinary grain.
+// An image model does not draw a torus, so the wrap is made true by CONSTRUCTION: layer B is the
+// material rolled by (ox, oy), taken at the border where A's seam is, with a smoothstep between.
 
 const wrapIndex = (m: RawImage, x: number, y: number): number =>
   ((((y % m.height) + m.height) % m.height) * m.width + (((x % m.width) + m.width) % m.width)) * 4
@@ -338,10 +292,8 @@ function bandDelta(m: RawImage, axis: 'col' | 'row', a: number, b: number): numb
   return s / (outer * 3)
 }
 
-// The border has to fall between two lines that are ALREADY quiet neighbours — rolling by
-// exactly half lands farmland's border on a furrow edge and the road's mid-cobble-course,
-// and the wrap stays broken at 25 and 26. It also has to stay clear of the tile's own edges
-// so both layers have room to fade.
+// The border has to fall between two lines that are ALREADY quiet neighbours — rolling by exactly
+// half lands farmland's border on a furrow edge — and clear of the tile's own edges.
 export function bestRollOffsets(m: RawImage): { ox: number; oy: number } {
   const pick = (axis: 'col' | 'row', span: number): number => {
     const margin = Math.max(8, span >> 3)
@@ -374,12 +326,8 @@ export function seamlessMaterial(m: RawImage): RawImage {
   return q
 }
 
-// A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather
-// than regenerated: sand:0 came back framed at ring 24.7 even through the 8% crop, because
-// the model drew a thick one. Cutting is free; another attempt is not.
-// Every pass costs WRAP: cropping a seamless square breaks its own edges, and farmland went
-// from h=2.0 to h=23.4 under a single 10% bite. So the step is small and the loop stops at
-// the FIRST crop that clears the frame — the least damage that does the job.
+// A rim on art that is already paid for gets CUT rather than regenerated. Every pass costs WRAP —
+// cropping a seamless square breaks its own edges — so the step is small and stops at the first.
 export const DEFRAME_STEP = 0.03
 export const DEFRAME_MAX_PASSES = 6
 
@@ -392,11 +340,8 @@ export function deframe(m: RawImage): { material: RawImage; passes: number } {
   return { material: out, passes: DEFRAME_MAX_PASSES }
 }
 
-// TONE GRADING ($0, deterministic, no regeneration). Measured against the v1 materials the
-// user accepted structurally: v1 grass mean [151,184,119] with contrast SD 11; the v2
-// generation came back [146,160,116] at SD 21 — a third of the green gone (G-R fell from +33
-// to +14) and twice the noise, which is exactly "washed-out grey-green" that "reads as static
-// rather than texture" at 1x. Grading fixes both without paying for new art.
+// Tone grading: $0, deterministic, no regeneration. It corrects a washed-out mean and excess
+// noise without paying for new art.
 export type Grade = {
   targetMean?: readonly [number, number, number]
   contrast?: number
@@ -406,18 +351,14 @@ export type Grade = {
   noRose?: boolean
 }
 
-// Quantizing a green-grey midtone against the WHOLE palette lets it snap to dusty rose or
-// ember, which is why the graded grass came out flecked with pink at 1x. A ground that is
-// green has no business borrowing the warm ramp, so grass quantizes against the palette
-// minus its warm entries. Everything else keeps the full palette.
+// Quantizing a green-grey midtone against the WHOLE palette lets it snap to dusty rose, which is
+// why the graded grass came out flecked with pink. Green ground has no business on the warm ramp.
 export function coolPalette(): ReturnType<typeof paletteRgb> {
   return paletteRgb().filter((p) => p[0] <= p[1] + 18)
 }
 
-// A stone road is warm, so it cannot use the grass filter — it needs its sandy ramp. What it
-// must not borrow is the ROSE ramp, which is what speckled road segments and the plaza's north
-// edge pink. Pinks and the purple sit where red leads green but green does NOT lead blue;
-// tans and golds have green well clear of blue, so this keeps every road tone.
+// A stone road is warm and needs its sandy ramp; what it must not borrow is the ROSE ramp. Pinks
+// sit where red leads green but green does NOT lead blue; tans keep green well clear of blue.
 export function noRosePalette(): ReturnType<typeof paletteRgb> {
   return paletteRgb().filter((p) => !(p[0] > p[1] + 25 && p[1] - p[2] < 20))
 }
@@ -463,11 +404,8 @@ export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
 export const MATERIAL_GRADES: Record<string, Grade> = {
   grass: { targetMean: [151, 184, 119], contrast: 0.6, coolOnly: true },
   road: { targetMean: [205, 183, 148], contrast: 0.85, noRose: true },
-  // The calm variant came back almost FLAT — 90.6% a single palette entry at SD 8 — and a
-  // large flat warm tan against a sage field reads chromatic (the "salmon" stretch), even
-  // though the material contains no rose whatever: it is v1's own ROAD_BASE and ROAD_EDGE
-  // plus two neutral greys. So it is nudged UP, to keep some grit while staying far under
-  // the plaza cobble's SD 28.
+  // The calm variant came back almost FLAT, and a large flat warm tan against a sage field reads
+  // chromatic, so it is nudged UP — still far under the plaza cobble's grit.
   [CALM_ROAD_NAME]: { targetMean: [205, 183, 148], contrast: 1.2, noRose: true },
 }
 
@@ -491,8 +429,7 @@ export function selfTile3x3(m: RawImage): RawImage {
 }
 
 // Cut the dimetric top face out of the material. The diamond is the SAME mask the code-painted
-// tiles used, so alignment (four edge midpoints opaque, four square corners clear) is
-// unchanged and every downstream consumer keeps working.
+// tiles used, so alignment is unchanged and every downstream consumer keeps working.
 export function diamondFromMaterial(m: RawImage): RawImage {
   const src = m.width === TERRAIN_TILE_W && m.height === TERRAIN_TILE_H
     ? m
@@ -516,9 +453,8 @@ export function generationItems(plan: TerrainItem[] = planTerrainProgram()): Ter
   return plan.filter((p) => p.generateFrom === undefined)
 }
 
-// C13's road geometry is correct and tested; this re-skins it. The painted tile is used as
-// an ALPHA STENCIL and the generated road surface fills it, so every junction is cut from
-// the same surface and the lattice reads as one road.
+// The painted road tile is used as an ALPHA STENCIL and the generated road surface fills it, so
+// every junction is cut from the same surface and the lattice reads as one road.
 export function stencilRoadTile(material: RawImage, key: RoadAutotileKey): RawImage {
   const stencil = paintRoadAutotile(key)
   const surface = diamondFromMaterial(material)
@@ -533,8 +469,8 @@ export function stencilRoadTile(material: RawImage, key: RoadAutotileKey): RawIm
   return out
 }
 
-// Seasonal grading taken from GENERATED art rather than from D-3's hand-guessed tints: the
-// per-channel ratio between a season's own material and the summer one.
+// Seasonal grading taken from GENERATED art: the per-channel ratio between a season's own
+// material and the summer one.
 export function seasonTintFrom(seasonMat: RawImage, summerMat: RawImage): { r: number; g: number; b: number } {
   const mean = (m: RawImage, k: number): number => {
     let s = 0, n = 0

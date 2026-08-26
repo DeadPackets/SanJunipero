@@ -21,24 +21,13 @@ export const GAMIFICATION_BAN = /progress|score|level|quest|points|badge|streak|
 export type LensHint = { lens: Lens; count: number | null; hint: string }
 
 /**
- * ★ A BADGE COUNTS THE SURFACE IT BADGES, OR IT COUNTS NOTHING — and every lens has to say
- * which, because this went wrong by silence once already.
- *
- * `chronicle` used to be badged with `recentEvents.length`: the LIVE SOCKET FEED, what has
- * arrived since the viewer joined. The panel behind that tab lists `/api/chronicle`, the whole
- * record. On a town that is days old the feed is empty and the record is not, so the first
- * screen a viewer meets said `CHRONICLE 0` over sixteen entries — the nav telling them the
- * simulation was doing nothing while it was visibly doing something.
- *
- * So this is TOTAL, with a written reason per row, exactly as `MINIMAP_LENSES` was made total
- * for the same class of bug: the next surface anybody adds is a type error until it decides
- * where its number comes from, and "the number I happen to have in hand" is no longer reachable.
+ * TOTAL by design: the next lens anybody adds is a type error until it decides where its number comes
+ * from, so "the number I happen to have in hand" is not reachable.
  */
 export type LensCounts = Record<Lens, number | null>
 
-/** What the viewer can count without asking the server: the living, and nothing else. The two
- *  that have a real number — the chronicle and the bonds — are fetched from the very endpoints
- *  their own panels read, and `LensTabs` lays them over this. */
+/** What the viewer can count without asking the server: the living, and nothing else. The chronicle
+ *  and the bonds are fetched from the endpoints their own panels read, and `LensTabs` lays them over. */
 export const countsFromWorld = (stats: TownStats): LensCounts => ({
   map: null,          // the map IS the town; a number stuck on it would be a score
   inspector: stats.alive,   // the living, straight out of the state the viewer already holds
@@ -49,45 +38,16 @@ export const countsFromWorld = (stats: TownStats): LensCounts => ({
   laws: null,         // a rule count is machinery, not a thing to show a viewer
 })
 
-/**
- * ★ THE BADGES A VIEWER ACTUALLY SEES — the world's own count, with the two that come off the
- * wire laid over it. A pure function rather than a line inside the component, because the line
- * inside the component was the one thing no test could reach: a mutation that dropped both
- * fetched counts on the floor left every UI test green while the nav went back to reading
- * `CHRONICLE ·` on a town with sixteen entries in the record.
- *
- * `null` from either endpoint means it has not answered yet, and no badge is better than a
- * wrong one — the same rule `useRemoteCount`'s catch already follows.
- */
+/** The world's own counts with the two that come off the wire laid over them. A pure function, since
+ *  the same line inside the component was unreachable by test; `null` means not answered yet. */
 export function lensCountsFor(
   stats: TownStats, chronicle: number | null, bonds: number | null,
 ): LensCounts {
   return { ...countsFromWorld(stats), chronicle, society: bonds }
 }
 
-/**
- * ★ TWO NUMBERS ON ONE BUTTON, AND THEY DISAGREED.
- *
- * A LENS TAB CARRIES A COUNT AND A HINT, and the hint is the button's `aria-label` AND its
- * `title`. The badge itself is rendered `aria-hidden`, so the hint is the only place a screen
- * reader or a hovering pointer can learn the number. Two things were wrong with that:
- *
- *  · `chronicle` defaulted its count to `recentEvents.length` — the ring of what has arrived
- *    SINCE YOU JOINED, which is the panel's SECOND tab. The panel opens on "What mattered",
- *    the curated record from `/api/chronicle`, so a town two hours old showed `CHRONICLE 0`
- *    beside a list of eleven finished buildings, both on screen at once. The ring is the wrong
- *    shape for a badge whatever tab is open: it is capped, so the number plateaus at the cap
- *    and stops meaning anything. `StatusStrip` now supplies the ledger's own length, and until
- *    it answers there is no badge at all — no badge is better than a wrong one.
- *
- *  · and the hint was a FIXED STRING built beside a count an override could then replace, so
- *    the label and the badge could name different numbers. `Bonds` showed a visible 3 under a
- *    label that read *"Who the town has tied itself to"* and never said three at all.
- *
- * So the count is resolved FIRST and the hint is a function of it. Two tables, because a lens
- * with a number and a lens without one are different sentences in English; one loop, because
- * "a badged lens speaks its badge" is a law and not a per-lens decision.
- */
+/** The count is resolved FIRST and the hint is a function of it, so the visible number and the
+ *  spoken label cannot disagree. */
 
 /** What each lens says when it has nothing to count. The VIEW already prefixes the lens's own
  *  name, so a hint never repeats it. */
@@ -132,13 +92,8 @@ export const EMPTY_COPY = {
   // The live feed holds what has arrived since you joined. On a town that is days old, saying
   // day one is unwritten is a lie about the world rather than a description of the feed.
   chronicleQuiet: 'Nothing has happened since you arrived. The whole record is under “What mattered”.',
-  // ★ IT USED TO PROMISE, AND IN THE DEV WORLD THE PROMISE WAS FALSE. "Watch long enough and
-  // the town will braid its own ties" is not true of a world whose cast cannot form one:
-  // `buildBonds` derives every tie from six acts, and the scripted founders perform none of
-  // them, so the ledger is permanently and correctly empty. A demo surface may show an empty
-  // ledger; it may not tell a viewer to wait for something that will never arrive. The copy
-  // DESCRIBES now — and describing is exactly true whenever this panel is on screen, because
-  // a bond count of zero IS "none of those six things has been recorded".
+  // Describes rather than promises: the scripted founders perform none of the six acts, so this
+  // ledger can be permanently and correctly empty.
   bonds: 'No bonds yet. A town braids its ties out of what people do to one another — a word, '
     + 'a gift, a lesson, a blow, a night under one roof, a child — and none of that is in the '
     + 'record here.',

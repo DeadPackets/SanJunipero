@@ -68,18 +68,6 @@ describe('what the redraw took OUT', () => {
   })
 })
 
-/**
- * ★ A PANEL THAT IS HANDED A WINDOW MUST NOT READ AS IF IT WERE HANDED EVERYTHING.
- *
- * The feed used to carry every act that ever formed the tie — 83 704 521 B at sim-day 20 of a
- * talkative town, and a list of two hundred thousand identical sentences that no browser was
- * going to render and no person was going to read. It is now the last `BOND_RECENT_ACTS` of it,
- * so the panel has to SAY that: a tally of the whole history above the column, and a line under
- * it naming how many acts are counted rather than listed.
- *
- * This is the "silently blank" failure from the badge, one panel over — a reader shown a short
- * list with nothing telling it the list is short.
- */
 describe('★ the panel says what the window cannot', () => {
   const long: Bond = bondFrom('alice', 'bob', [
     ...Array.from({ length: 300 }, (_, i) => ({ tick: 100 + i * 10, kind: 'friend' as const })),

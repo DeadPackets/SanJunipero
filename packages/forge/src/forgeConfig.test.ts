@@ -63,9 +63,6 @@ describe('forge config', () => {
     })).toThrow()
   })
 
-  // The forge's config is ops-side. The invariant the pin was an expensive proxy for: nothing
-  // in this package reaches world law — `DEFAULT_CONFIG` is still exactly the schema's own
-  // default, and no forge-only key has leaked into it.
   it('leaves SimConfig untouched — DEFAULT_CONFIG is still the schema default', () => {
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')

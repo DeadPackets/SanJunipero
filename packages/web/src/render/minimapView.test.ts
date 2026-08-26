@@ -71,11 +71,10 @@ describe('the map a viewer can find, press and speak to', () => {
   })
 })
 
-// ── ★ THE CLAIM THIS LANE IS MOST ACCOUNTABLE FOR ─────────────────────────────────────────
+// ── ★ NOTHING PER FRAME ──────────────────────────────────────────────────────────────────
 //
-// "Nothing per frame." A ticker callback would be the easy way to keep the rectangle in step
-// and it would put the minimap's whole cost on every frame of a town already fighting for
-// them. The claim is only worth anything if it is enforced, so it is scanned.
+// A ticker callback is the easy way to keep the rectangle in step, and it would put the
+// minimap's whole cost on every frame. The claim is only worth anything if it is enforced.
 
 describe('the map costs a resting camera nothing', () => {
   it('★ adds no ticker callback, no frame loop and no poll of its own', () => {

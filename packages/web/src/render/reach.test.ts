@@ -12,16 +12,6 @@ const terrainOf = (w: number, h: number): TileId[][] =>
 const STAGE = { w: 1728, h: 824 }
 
 // ── ★ A TOWN THAT OUTGREW ITS OWN MAP ─────────────────────────────────────────────────────
-//
-// `cameraBoundsOf` measures the TILE ARRAY, and every write to the camera goes through a clamp
-// against it. That was right while the town was a fixed 48 × 48 fixture. Under the ring grammar
-// the built area is sparse and unbounded: blocks plat outward and agents claim plots forever,
-// so a building can stand past the end of the array — and a clamp that knows only the array
-// makes that building UNREACHABLE. Not hard to reach. Unreachable: the camera is pinned and no
-// pan, drag, follow or fit can cross the line.
-//
-// The reachable box is therefore the ground that exists UNION the town as it is drawn, and the
-// second half is what has no fixed size.
 
 describe('reachableBoundsOf', () => {
   const terrain = terrainOf(48, 48)
@@ -121,11 +111,6 @@ describe('nothing in the renderer assumes a fixed map size', () => {
 })
 
 // ── ★ GOING SOMEWHERE, ON A TOWN THAT DOES NOT FIT ────────────────────────────────────────
-//
-// Following a person, jumping to a place and clicking a name all end in the same move: put a
-// world point in the middle of the stage. Every one of them then goes through the clamp, so
-// "can a viewer reach X" is one question with one answer, asked here of every building in a
-// town three rings out and of a body walking past the end of the tile array.
 
 const centreOn = (
   sx: number, sy: number, scale: number, bounds: ReturnType<typeof reachableBoundsOf>,

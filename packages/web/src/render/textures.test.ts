@@ -116,9 +116,7 @@ describe('buildingArt (v4-hires-building manifest)', () => {
     expect(buildingArt([], 'well', 1, 1).url).toBeNull()
   })
 
-  // ★ A TURNED BUILDING DRAWS ITS TURNED FACE. The claim seam seats a house sw or se and the
-  // world now carries which; a turned 2x2 is byte-identical to an unturned one, so `w`/`h`
-  // could never have answered. Seven kinds have a committed `-se` cell.
+  // A turned 2x2 is byte-identical to an unturned one, so `w`/`h` cannot answer the facing.
   describe('★ the face the building presents', () => {
     const sw = rec({ id: 'asset_house_sw', kind: 'house' })
     const se = rec({ id: 'asset_house_se', kind: 'house:se' })
@@ -182,9 +180,8 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
   })
 
   it('★ and the room reads it — the furniture path peeks BEFORE it awaits', () => {
-    // A behavioural test would need a Pixi stage; this is the composition, and it is the thing
-    // that regresses: somebody tidies the branch back into a bare `get(...).then(...)` and the
-    // empty first frame is back with nothing to say so.
+    // A behavioural test would need a Pixi stage; what regresses is the composition — the
+    // branch tidied back into a bare `get(...).then(...)`, and the empty first frame returns.
     const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'interiorScene.ts'), 'utf8')
     const add = src.slice(src.indexOf('function addPiece('), src.indexOf('function bodyFor('))
     expect(add).toMatch(/const inHand = book\.peek\(url\)/)

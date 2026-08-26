@@ -94,16 +94,8 @@ export function MomentCardView({ moment, people, open, onOpen }: {
   )
 }
 
-/**
- * U16 — THE PICTURE IS THE PICTURE, AND THE BAND IS THE FILMSTRIP.
- *
- * The stage is three boxes (`frame.ts`) and every surface is placed into one of them. The top
- * band is the letterbox; the BOTTOM band is this strip, so the rail that used to run the full
- * height of the stage over both bars is gone and the 12% is spent on something.
- *
- * Pure by construction: the scroll offset comes from `stripLayout`, so where the strip has got
- * to is a number a test can read rather than a scrollLeft nobody can.
- */
+/** The bottom band of the three-box stage frame (`frame.ts`). Pure by construction: the scroll
+ *  offset comes from `stripLayout`, so where the strip has got to is a number a test can read. */
 export function MomentsFrameView({
   moments, people, momentId, letterboxed, leaving, bandW, onOpen, children,
 }: {
@@ -119,11 +111,8 @@ export function MomentsFrameView({
   const days = moments ?? []
   const { scrollX } = stripLayout(days.length, days.findIndex((m) => m.id === momentId), bandW)
 
-  // ★ WHAT THE BROWSER CAUGHT. A computed `translate` put the open day in the middle of the
-  // band and left every card past the edge unreachable: the strip clipped, so tabbing to the
-  // sixth day focused something nobody could see. The strip scrolls NATIVELY — which is how
-  // focus gets carried into view for free — and `stripLayout` drives that scroll rather than
-  // replacing it, so opening a day still centres it.
+  // The strip scrolls NATIVELY — which is how focus gets carried into view for free — and
+  // `stripLayout` drives that scroll rather than replacing it, so opening a day still centres it.
   const stripRef = useRef<HTMLOListElement>(null)
   useEffect(() => {
     if (stripRef.current !== null) stripRef.current.scrollLeft = scrollX
@@ -251,9 +240,8 @@ export function MomentsLens({ store, handle, scene, momentId, televised, leaving
     return () => { alive = false }
   }, [])
 
-  // The strip's scroll is computed, not scrolled, so the band's own width is the only thing
-  // the DOM has to tell us. ResizeObserver rather than a window listener: the stage narrows
-  // when a side panel opens without the window changing at all.
+  // ResizeObserver rather than a window listener: the stage narrows when a side panel opens
+  // without the window changing at all.
   useEffect(() => {
     const el = rootRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
@@ -278,9 +266,8 @@ export function MomentsLens({ store, handle, scene, momentId, televised, leaving
     handle?.scrub(open.startTick)
   }, [open, handle])
 
-  // The rAF loop owns the clock and hands the player elapsed ms; the player owns the tick.
-  // Scrubs go out only when the tick actually changes, so 60 frames a second do not become
-  // 60 socket messages.
+  // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
+  // socket messages.
   const scrubbedRef = useRef<number | null>(null)
   useEffect(() => {
     if (open === null || player.status !== 'playing') return
@@ -320,9 +307,8 @@ export function MomentsLens({ store, handle, scene, momentId, televised, leaving
     onOpen(null)
   }
 
-  // Audit M7: the letterbox and the camera move belong to the composed view, not to whichever
-  // of two siblings happened to be mounted. The bands are the frame; the auto-cut runs only
-  // while the town is being televised, so it cannot fight a recorded day's playback.
+  // The auto-cut runs only while the town is being televised, so it cannot fight a recorded
+  // day's playback.
   const letterboxed = momentId !== null || televised
 
   return (

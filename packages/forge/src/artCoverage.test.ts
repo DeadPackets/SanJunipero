@@ -22,19 +22,8 @@ import {
   castArtCoverage, coverageFailure, itemArtCoverage, requiredCastKinds, requiredItemKinds,
 } from './artCoverage.js'
 
-// ★ THE GATE THAT WOULD HAVE CAUGHT THE OTHER TWO.
-//
-// Round 4 wrote the same gate for structures after a farmhouse stood with no art for a merge
-// train. It only ever asked about buildings. Measured on that same tip:
-//
-//   class building:  10 records
-//   class item:       0 records    <- fifty items, all of them paid for, none of them on disk
-//   class rig-part:   0 records    <- five founders, all of them paid for, none of them on disk
-//
-// IT MUST NOT BE SATISFIABLE BY THE FALLBACK. `makePlaceholder` answers EVERY class, so a gate
-// that asks "did something draw?" passes forever. Everything below reads the CODEX — the same
-// class/kind columns `textures.ts` and `roomPlan` resolve on — and the placeholder writes no
-// codex row. `the fallback cannot satisfy this gate` states that in a test.
+// Reads the CODEX, not the renderer: `makePlaceholder` answers every class, so a gate that asks
+// "did something draw?" passes forever.
 
 /** The registration the dev world does at boot, against a real codex. */
 function registeredKinds(klass: 'item' | 'rig-part'): string[] {
@@ -105,8 +94,7 @@ describe('every founder the town spawns has a committed sheet', () => {
   })
 })
 
-// ★ THE RED PROOF, FROZEN. Shipping the content ends the live failure, so the exact shape of
-// the defect this lane found is kept as data. Same technique round 4 used for `hut`.
+// Shipping the content ends the live failure, so the shape of the defect is kept as a fixture.
 describe('the pre-recovery tree, as a fixture', () => {
   it('an empty codex reports all fifty items and all five founders', () => {
     const items = itemArtCoverage([])
@@ -136,11 +124,6 @@ describe('the pre-recovery tree, as a fixture', () => {
   })
 })
 
-// ★ THE SAME DEFECT SHAPE, FOUND IN A THIRD PLACE. `loadReferenceSheet()` demanded three
-// files that have never existed in this repository, so `gen-rigs.ts` and `gen-terrain.ts`
-// threw on their first line and the discovery lane's `discoveryArt` shipped as a tested
-// no-op. Nothing asserted the dependency was there. This is that assertion: every entry
-// point that needs a reference must get one, from the repo as shipped, with no curation step.
 describe('nothing an art pipeline depends on is missing from the tree as shipped', () => {
   it('the reference every generation carries resolves, and is not a picture of an object', async () => {
     const refs = await loadReferenceSheet()
@@ -156,20 +139,6 @@ describe('nothing an art pipeline depends on is missing from the tree as shipped
 })
 
 // ── ★ THE COMMITTED BUILDINGS, WHICH NOTHING WAS ASKING ABOUT ─────────────────────────────
-//
-// The items below get a pixel bar. The cast gets a pixel bar and a silhouette gate. The
-// twenty committed buildings — the things the town is actually made of — got neither: the
-// only assertion anywhere was that `content/buildings` exists as a directory.
-//
-// And `mirrorFacingGate` has been in `structureArt.ts` since round 4, written after a
-// mirrored SE cell was caught by eye, with SE_MIRROR_MIN_DISTANCE calibrated and a unit test
-// on synthetic images — and it has NEVER been run against the art. That is the shape this
-// lane was asked to sweep for: a thing that measures, and no caller. `classDensityGate` is
-// the same, one step milder: three generators computed it and put it in a markdown table.
-//
-// All three pass today. Measured, so the numbers are on the record rather than implied:
-// closest to a mirror is `shed` at 0.1752 against the 0.05 floor (3.5x headroom); one density,
-// 8 art px per world px, across all twenty; pixel bar clean on every cell.
 describe('★ the committed buildings', () => {
   const buildings = listCommittedBuildings()
 
@@ -185,9 +154,8 @@ describe('★ the committed buildings', () => {
     expect(img.width, 'a building cell is square').toBe(img.height)
   })
 
-  // ★ THE GATE NOBODY EVER RAN. A turned building is not a flipped one: flipping moves the
-  // door to the other wall AND gets the light wrong, because the sun does not flip with the
-  // building. That is the cheap wrong answer that looks almost right.
+  // A turned building is not a flipped one: flipping moves the door to the other wall and gets
+  // the light wrong, because the sun does not flip with the building.
   it('★ no SE cell is its SW cell mirrored — the gate that had no caller', async () => {
     const img = new Map<string, Awaited<ReturnType<typeof decodePng>>>()
     for (const b of buildings) img.set(b.dir, await decodePng(b.png))
@@ -288,16 +256,6 @@ describe('the committed cast', () => {
     expect(paletteGate(atlas).failures).toEqual([])
   })
 
-  // ★ AND EVERY CELL IS ONE PERSON, WHICH IS THE ONE THING NOTHING ABOVE ASKS.
-  //
-  // `amara/contact-b-ne` shipped a figure in a tactical harness with TACTICAL GEAR set beside
-  // her in silver, and its mirror shipped the caption backwards. A viewer saw it in the running
-  // product. It cleared the alpha gate (hard-edged letters), the palette gate (MASTER_PALETTE
-  // silver), the manifest gate (a legal rect) and the generator's own coherence gate (1.1855
-  // against a 1.18 tolerance, shipped as the least-bad of three failures).
-  //
-  // Two cells is not a list to keep up to date — the gate is the PROPERTY, and it holds over
-  // all 120 cells with the whole detached mass measuring 0.0000 % once these two are repaired.
   it.each(cast.map((c) => [c.id, c] as const))('%s draws one body per cell and nothing else', async (id, c) => {
     const atlas = await decodePng(c.atlas)
     const bad: string[] = []

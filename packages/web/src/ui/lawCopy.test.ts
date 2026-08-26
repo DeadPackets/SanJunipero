@@ -149,9 +149,8 @@ describe('audit M2, at the source: nothing in the panel is wider than its column
     expect(ruleBody('.law-path')).toMatch(/font-size:\s*0\.75rem/)
   })
 
-  // WHAT THE BROWSER CAUGHT: Silkscreen has no lowercase, so the pixel face rendered
-  // `aging.deathOfOldAgeEnabled` as one unbroken run of capitals — less readable than the
-  // machine key it was supposed to make optional.
+  // Silkscreen has no lowercase, so the pixel face renders `aging.deathOfOldAgeEnabled` as one
+  // unbroken run of capitals.
   it('sets the operator path in a face that has lowercase letters', () => {
     const body = ruleBody('.law-path')
     expect(body).toMatch(/font-family:\s*var\(--font-data\)/)

@@ -6,21 +6,8 @@ import {
 } from './bondModel2.js'
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondsModel.js'
 
-// A SOCIETY YOU CAN READ (U15, P22).
-//
-// THE DEFECTS THIS REDRAWS:
-//   · the graph drew only people who HAVE an edge, so a young town was "1728 × 880 of empty
-//     dot-grid and one italic sentence" (audit R4) — and "strangers", which U15 demands, was
-//     inexpressible because an unlinked person was not even a node;
-//   · one line colour carried one kind, so colour was the only signal (D-25);
-//   · the legend's off state was a DIMMING, when audit M4 asked for a mark;
-//   · nothing showed change.
-//
-// FOUR CHANNELS, ONE MEANING EACH:
-//   EVERY LIVING PERSON IS A NODE  — strangers exist and are visible
-//   EDGE LENGTH  → LEVEL           — length is the one channel a force graph gives for free
-//   EDGE MARK    → TYPE            — dash and stroke count, so colour is never the only signal
-//   EDGE COLOUR  → the ARC         — three states, three palette tokens, all AA-clear
+// Four channels, one meaning each: EVERY LIVING PERSON IS A NODE, so strangers are visible; edge
+// length is LEVEL, edge mark is TYPE, edge colour is the ARC — colour is never the only signal.
 
 export type RelationLink = {
   id: string
@@ -72,11 +59,8 @@ export const LENS_BACKGROUND = '#322B38'
 const nameOf = (people: PeopleIndex, id: string): string => people[id]?.name ?? id
 
 /**
- * Every living person is a node. Every pair the log knows about is considered, and only the
- * pairs that are more than strangers get a line.
- *
- * A kin edge is oriented PARENT → CHILD however the endpoint stored it, so one family fact
- * draws one mark and not two different ones depending on which end was read first.
+ * Every living person is a node; only pairs that are more than strangers get a line. A kin edge is
+ * oriented PARENT → CHILD however the endpoint stored it, so one family fact draws one mark.
  */
 export function toRelationGraph(
   bonds: BondsResponse, lineage: LineageLike, people: PeopleIndex, nowTick: number,
@@ -133,10 +117,8 @@ const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
   warming: 'Getting closer', cooling: 'Drifting apart', steady: 'Holding steady',
 }
 
-/**
- * Two axes plus the arc, without becoming a manual. Every row says what the channel means and
- * carries the mark it means it with, so the legend is a key rather than a paragraph.
- */
+/** Every row says what the channel means and carries the mark it means it with, so the legend is a
+ *  key rather than a paragraph. */
 export function relationLegend(): LegendRow[] {
   const out: LegendRow[] = []
   for (const level of BOND_LEVELS) {

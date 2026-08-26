@@ -4,13 +4,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import { LAW_GROUPS, lawCopyFor, lawGroupOf, lawReadingRank } from '../ui/lawCopy.js'
 import { lawRows, type LawRow } from './lawsModel.js'
 
-/**
- * The World Laws submenu: every law of this town, what it means, what it is set to now, and
- * every time it changed. Read-only for everyone — the panel has no write path.
- *
- * U17: a viewer should learn what governs this world without reading a config key. The human
- * title leads; the machine path is a small subtitle for the operator who needs it.
- */
+/** Every law of this town and every time it changed. Read-only: there is no write path. */
 export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
   const byGroup = LAW_GROUPS.map((group) => ({
     group,

@@ -3,16 +3,8 @@ import { TICK_PERIOD_MAX_MS, WALK_LEAD_TICKS } from '../render/charAnim.js'
 
 export { easeOutCubic } from '../render/camera.js'
 
-/**
- * U23 — ONE VOCABULARY OF MOTION, AND BOTH RUNTIMES SPEAK IT.
- *
- * Motion existed but it was not a system. The sheet carried three unnamed durations and eleven
- * surfaces each picked their own combination in their own rule; the canvas side — the interior
- * fade, the follow lerp, the zoom ease — shared none of it. Nothing named what a duration was
- * FOR, so nothing could be consistent.
- *
- * A motion is named by WHAT IT IS, so two surfaces doing the same thing move the same way.
- */
+/** One vocabulary of motion, spoken by both runtimes: a motion is named by WHAT IT IS, so two
+ *  surfaces doing the same thing move the same way. */
 export const MOTIONS = ['tap', 'reveal', 'enter', 'move', 'scene', 'ambient'] as const
 export type MotionName = (typeof MOTIONS)[number]
 export type Motion = { ms: number; ease: string; stagger?: number }
@@ -30,43 +22,9 @@ export const MOTION: Readonly<Record<MotionName, Motion>> = {
 export const MOTION_CEILING_MS = 300
 export const MOTION_FLOOR_MS = 90
 
-/**
- * ★ EVERY MOTION IN THIS PRODUCT THAT RUNS PAST THE CEILING, AND WHY IT MAY.
- *
- * AN UNWRITTEN EXCEPTION IS A BUG WITH A DELAY FUSE. The next person to read the table sees a
- * number over 300 with nothing beside it, calls it a violation, and "fixes" a thing that was
- * deliberate — or, worse, adds their own long motion because one already exists. So an exemption
- * is a row here with its reason, and a test asserts that every long motion in the product has
- * one. Two do:
- *
- *  · `ambient` is SCENERY. It is never a response to an input, so there is no viewer waiting on
- *    it and no duration the band could be an opinion about.
- *
- *  · `fling` is THE HAND, STILL ARRIVING. The camera lane's drag glide runs to 700 ms and it is
- *    exempt for the mirror of ambient's reason. The band governs a TRANSITION, where the
- *    duration is the product's opinion about how long a viewer waits for an answer. A glide is
- *    not an answer to an input — it is the continuation of a movement the viewer made with their
- *    own hand, and its length is their throw, not our choice. `FLING_MAX_MS` is a safety cut, so
- *    the exempted number is a ceiling nothing normally reaches: a throw ends when it drops under
- *    `FLING_STOP_PX_PER_MS`, which at any speed a hand produces comes first.
- *    (Ruled on by the controller after the camera lane shipped it. `render/fling.ts` carries the
- *    physics; this row is the reason it is allowed to.)
- *
- *  · `walk` is THE WORLD'S OWN CLOCK. A body crosses a tile in one tick of the simulation —
- *    2500 ms by the declared default, 400 in the dev world — and the renderer carries it
- *    across that interval so it arrives as the next tick lands. The duration is not the
- *    product's opinion about how long a viewer waits; it is how long the person takes, and the
- *    only alternative to spending it is teleporting the body 2.5 times a second, which is the
- *    defect the interpolation exists to prevent. The exempted number is `TICK_PERIOD_MAX_MS`,
- *    the widest cadence the clock will believe at all — a real leg is one tick plus at most one
- *    tick of buffer, and both are the world's numbers rather than ours.
- *
- *    This one was ALREADY over the ceiling before the motion lane touched it — the landed
- *    glide ran to 4000 ms — and had no row. An unwritten exception is a bug with a delay fuse
- *    whether or not the lane that wrote it noticed.
- */
 export type MotionExemption = { what: string; ms: number; because: string }
 
+// Motions past MOTION_CEILING_MS; a test asserts every long motion in the product has a row here.
 export const MOTION_EXEMPT: readonly MotionExemption[] = [
   {
     what: 'ambient',
@@ -92,11 +50,8 @@ export const AMBIENT_EXEMPT: readonly MotionName[] = MOTION_EXEMPT
   .map((e) => e.what)
   .filter((w): w is MotionName => (MOTIONS as readonly string[]).includes(w))
 
-/**
- * The sheet's spelling for each motion. `--t-fast`, `--t-med` and `--t-slow` are the landed
- * names of `reveal`, `enter` and `scene`; they keep their spelling and lose their independence —
- * the value now comes from the table above, and a test proves the two agree.
- */
+/** The sheet's spelling for each motion. The value comes from the table above and a test proves
+ *  the two agree. */
 export const CSS_DURATION_TOKEN: Readonly<Record<MotionName, string>> = {
   tap: '--t-tap', reveal: '--t-fast', enter: '--t-med', move: '--t-move',
   scene: '--t-slow', ambient: '--t-ambient',
@@ -107,9 +62,8 @@ export const CSS_EASE_TOKEN: Readonly<Record<MotionName, string>> = {
 }
 
 /**
- * Reduced motion is not "no motion": it is INSTANT ARRIVAL. A viewer who opted out still needs
- * to see that something changed, so opacity survives at a third of the duration and every
- * property that moves a box goes to zero. A stagger is movement in time and goes with them.
+ * Reduced motion is not "no motion": it is INSTANT ARRIVAL. Opacity survives at a third of the
+ * duration and every property that moves a box goes to zero, a stagger with them.
  */
 const OPACITY_PROPS: readonly string[] = ['opacity', 'color', 'background-color', 'border-color', 'fill']
 
@@ -217,9 +171,7 @@ export function durationsIn(css: string): Array<{ selector: string; value: strin
 const TOKEN_NAMES = new Set(Object.values(CSS_DURATION_TOKEN))
 
 /** ZERO IS NOT A MOTION, it is the absence of one, so it cannot come from a table of motions.
- *  The one legitimate use is finish line 6: a hover arrives over `--t-fast` and leaves the
- *  instant the pointer does, because a hover that fades OUT goes on claiming the pointer is
- *  somewhere it already left. Stated here rather than quietly skipped by the regex. */
+ *  Stated here rather than quietly skipped by the regex. */
 const ZERO = /^0m?s$/
 
 /** A duration written as a number rather than as a name from this table. The report is the

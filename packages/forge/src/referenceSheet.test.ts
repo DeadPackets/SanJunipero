@@ -7,18 +7,8 @@ import { MASTER_PALETTE } from './palette.js'
 import { REFERENCE_CONTENT_DIR, listCommittedBuildings } from './buildingArt.js'
 import { loadReferenceSheet, paletteSwatchPng, REF_SWATCH_COLS, REF_SWATCH_PX } from './referenceSheet.js'
 
-// ★ A DEPENDENCY NOTHING ASSERTED THE EXISTENCE OF.
-//
-// This loader demanded `ref-1.png`, `ref-2.png` and `ref-3.png`, and those three files have
-// never existed in this repository. Every caller therefore threw on its first line, and the
-// discovery lane's `discoveryArt` shipped as a tested no-op because of it — a feature silently
-// degraded by a file nobody ever checked was there. The old tests could not catch that: all
-// three wrote their fixtures into a temp dir first, so they proved the loader could read files
-// that exist somewhere, never that the reference this repo actually ships resolves.
-//
-// It resolves now, and it resolves to a colour chart. See the module header for the two
-// separate rounds of measurement that say a picture of a different object must never be
-// attached to a generation.
+// The reference this repo actually ships must resolve. A fixture written into a temp dir proves
+// only that the loader can read files that exist somewhere.
 
 describe('loadReferenceSheet', () => {
   it('resolves against the repository as shipped — no curation step, no missing file', async () => {

@@ -11,9 +11,8 @@ import { buildingArt } from './textures.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 import { TOWN_KINDS } from './landmarks.js'
 
-// The forge's 40-colour master palette (packages/forge/src/palette.ts). @sj/web cannot import
-// it — forge pulls sharp and better-sqlite3 — so it is restated here exactly as patches.test.ts
-// does, and every colour a built form draws must be a member.
+// The forge's 40-colour master palette (packages/forge/src/palette.ts), restated because
+// @sj/web cannot import it: forge pulls sharp and better-sqlite3.
 const MASTER_PALETTE = [
   0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e,
   0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38, 0x7e512b,
@@ -26,8 +25,7 @@ const MASTER_PALETTE = [
   0xf5d3b3, 0xd9a876, 0x9c6b47,
 ]
 
-// Every structure kind this product can raise today. The well and the fire pit are the two
-// the C12a batch-1 town put in the DEAD CENTRE of the plaza with no art in any root.
+// Every structure kind this product can raise today.
 const ALL_KINDS = [...new Set([...TOWN_KINDS, ...INTERIOR_KINDS, 'grave', 'bridge', 'cottage'])]
 const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 3], [4, 2]]
 

@@ -1,12 +1,6 @@
 /**
- * THE KEY IS SOMETHING YOU OPEN (controller ruling R6).
- *
- * Thirteen chips laid out permanently across the top-left of the bonds lens is a card that
- * stands on the graph it explains, and on a town larger than five people a node spawns behind
- * it. A legend that hides the graph is a new U15, and U15 closed last batch.
- *
- * So the geometry is written down here, next to the sheet it describes, and the lens opens the
- * key only when a viewer asks for it.
+ * Thirteen chips laid out permanently across the bonds lens is a card standing on the graph it
+ * explains, so the key opens only when a viewer asks. The geometry lives beside the sheet it describes.
  */
 
 export type Box = { x: number; y: number; w: number; h: number }

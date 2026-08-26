@@ -1,7 +1,5 @@
-// Packs the 24 native-resolution v4 cells into ONE atlas image + manifest so a
-// character ships as a single codex record (png = atlas, meta = manifest JSON).
-// Layout: one row per facing (sw/se/ne/nw), poses left-to-right in POSES_V2 order.
-// The renderer trusts only the manifest rects — layout here is free to change.
+// Packs the 24 v4 cells into ONE atlas + manifest so a character is a single codex record.
+// The renderer trusts only the manifest rects, so the layout here is free to change.
 import type { CharacterAtlasManifest, AtlasCell } from '@sj/shared'
 import type { RawImage } from './post/raw.js'
 import { FACINGS, POSES_V2 } from './sheet.js'

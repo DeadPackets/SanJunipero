@@ -2,19 +2,8 @@ import { luma } from './groundField.js'
 import { clockTint } from './tints.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
 
-/**
- * ★ A CONTRAST RATIO AFTER DARK BELONGS TO SOMEBODY, AND IT IS NOT THE MATERIAL.
- *
- * The night is a full-screen MULTIPLY quad over `app.stage` (atmosphere.ts), so it multiplies
- * every pixel the town draws — the ground, the buildings, and every word the world says. A
- * bubble whose ink measures 10.2:1 against its own paper measures **4.41:1 to a viewer** once
- * the quad is over it, and that is below AA.
- *
- * The ceiling under the deep-night tint is **6.37:1** (pure black on pure white), so there is
- * very little room. Every world-text pair in `WORLD_TEXT_PAIRS` is chosen to clear AA inside
- * that ceiling, in BOTH bands, and the test names the offenders rather than trusting the
- * material's number.
- */
+/** The night is a full-screen MULTIPLY quad over the whole stage, so a bubble measured against
+ *  its own paper is not what a viewer sees — the ceiling under the deep-night tint is 6.37:1. */
 export const AA_RATIO = 4.5
 
 /** The two extremes of the day, read off the clock rather than copied from it. */
@@ -42,13 +31,8 @@ export function bandRatios(fg: number, bg: number): Record<LightBand, number> {
   return { day: readableRatio(fg, bg, LIGHT_BANDS.day), night: readableRatio(fg, bg, LIGHT_BANDS.night) }
 }
 
-/**
- * ★ A LABEL WITH NO GROUND UNDER IT IS NOT A LABEL. A place name used to be `#5D5751` painted
- * straight on the terrain: **1.26–4.98:1 by day and 1.11–2.85:1 at night**, depending on which
- * tile it fell across, and never once clearing AA after dark. It gets the same cream paper
- * every other floating slab in the town wears. These live HERE, not in landmarks.ts, because
- * the pair is a legibility decision and this module is the one that has to prove it.
- */
+/** The landmark pair lives here, not in landmarks.ts: the choice is a legibility decision and
+ *  this module is the one that has to prove it. */
 export const LANDMARK_INK = 0x241f2b       // --deep:  15.02:1 day / 5.19:1 night
 export const LANDMARK_PLATE = 0xfff6e9     // --cream
 export const LANDMARK_EDGE = 0x241f2b      // the stepped ledge every slab in the town wears
@@ -80,10 +64,8 @@ export function worldTextOffenders(pairs: readonly WorldTextPair[]): string[] {
 
 // ── ★ A MARK DRAWN ON THE GROUND, WHICH IS THE OTHER HALF OF THE PROBLEM ──────────────────
 //
-// World TEXT brings its own paper, so `WORLD_TEXT_PAIRS` can name both sides of every pair.
-// An affordance drawn straight on the terrain cannot: its background is whichever of eleven
-// tile tones the lattice happened to plat under it, times the light band. The door sill was
-// the one mark in this product with that shape, and it was invisible — see `entities.ts`.
+// An affordance drawn on the terrain brings no paper of its own: its background is whichever
+// tile tone the lattice platted under it, times the light band — hence the `grounds` sweep.
 
 /** WCAG 1.4.11: the floor for a UI component's own boundary. Lower than AA because a shape
  *  is not a glyph — but a floor, and one that a 45 % opacity cannot reach. */

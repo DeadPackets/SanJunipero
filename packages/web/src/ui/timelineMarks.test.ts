@@ -169,9 +169,8 @@ describe('the marks are drawn, and they are told apart by their shape', () => {
     }
   })
 
-  // MEASURED, not chosen: of the eight tokens the chrome paints marks with, only ink (7.63)
-  // and deep (11.24) clear 3:1 on the sand track. Honey is 1.10 and sage 1.61 — a mark drawn
-  // in either is a smudge. So the warm hues are interior detail and never the shape.
+  // Of the eight tokens the chrome paints marks with, only ink (7.63) and deep (11.24) clear 3:1 on
+  // the sand track; honey is 1.10 and sage 1.61, so the warm hues are detail and never the shape.
   const ch = (v: number): number => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
   const lum = (hex: string): number => {
     const [r, g, b] = [1, 3, 5].map((i) => ch(Number.parseInt(hex.slice(i, i + 2), 16) / 255))

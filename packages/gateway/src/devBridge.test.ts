@@ -1,15 +1,7 @@
-// @slow — ★ THE PROOF THAT THE TOWN A VIEWER OPENS CAN CROSS ITS OWN RIVER.
+// @slow — the town a viewer opens can cross its own river.
 //
-// `farBank.test.ts` proves a deck opens the far bank — on an ENGINE FIXTURE, whose terrain
-// `makeGenesisWorld` lays. The product's terrain is `showcaseTerrain`, and it lays no ford. So
-// the feature was real in the engine and unreachable in the app: measured through the engine's
-// own refusal, ZERO of the 408 water tiles in a ring-3 showcase accepted a deck, 405 of them
-// with "both ends must reach something solid". The channel is three tiles wide at every one of
-// its rows and the recipe spans two, so a deck always leaves one end in the water.
-//
-// The fix is a world fact, not a wider rule: `showcaseMap` lays a spit of sand across the
-// eastmost column of the channel on the square's own latitude, exactly as `GENESIS_FORD` does
-// for the genesis world. The recipe is untouched, so the forge pin does not move.
+// The channel is three tiles wide at every row and the deck recipe spans two, so `showcaseMap`
+// lays a spit of sand across the eastmost column, as `GENESIS_FORD` does for the genesis world.
 //
 // Scripted policies only. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
@@ -49,9 +41,8 @@ function builderWorld(rings: number): WorldState {
 const at = (s: WorldState, x: number, y: number): WorldState =>
   ({ ...s, agents: { ...s.agents, wright: { ...s.agents['wright']!, x, y } } })
 
-/** The engine's own answer for a deck whose top-left corner is this tile, asked from every
- *  tile a builder could stand on around it. The best answer wins, so "not close enough" can
- *  never be mistaken for "the water will not take it". */
+/** The engine's own answer for a deck whose top-left corner is this tile, asked from every tile
+ *  a builder could stand on. The best answer wins, so "not close enough" cannot mask a refusal. */
 function deckAnswerAt(world: WorldState, x: number, y: number): string | null {
   let worst: string | null = 'nowhere to stand'
   for (const [dx, dy] of [[-1, 0], [2, 0], [0, -1], [0, 2], [-1, -1], [1, 1], [3, 0], [0, 3]] as const) {
@@ -107,12 +98,8 @@ describe('★ WHERE A DECK MAY STAND IN THE SHOWCASE, asked of the engine and no
 })
 
 describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its own guard', () => {
-  // Mutation M5 deleted the `bridgeAt` early return and the 4 320-tick run came back BYTE
-  // IDENTICAL — 33 houses, 5 on the far bank, the same two ticks. It passed for the wrong
-  // reason: after 480 ticks of hammering the wright is too tired to price a second deck, so
-  // the errand check refused what the completion check should have. Rested, it would have
-  // stood on the sand rebuilding a bridge that already exists for the rest of the run. Asked
-  // of the pure function, with a fresh body, the distinction is not inert at all.
+  // Asked of the pure function with a fresh body: in a run the wright is too tired to price a
+  // second deck, so the errand check masks the completion check.
   const rings = RINGS
   const deck = showcaseDeck(SHOWCASE_ANCHOR, rings)
   const stand = { x: deck.x + deck.w, y: deck.y }
@@ -213,16 +200,8 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
     expect(run.crossedTick, 'the town was never offered a plot across the water').not.toBeNull()
     expect(run.crossedTick!, 'the far bank was offered before the deck existed')
       .toBeGreaterThan(run.deckTick!)
-    // ★ AND THE GAP IS NOT THE DECK'S DOING, which is worth saying because `farBank.test.ts`
-    // reports these two as the SAME tick and this town does not. There the far bank was the
-    // nearest free ground the moment it became reachable; here the town still had east plots
-    // ahead of it in the register, so it took another 322 ticks and four more roofs to work
-    // round to the water. Reachability is the deck's; ORDER is the claim's, and the two are
-    // separated below by taking the deck away again.
-    //
-    // The gap was 402 ticks until a bed became worth something: this town's founders sleep in
-    // houses, `needs.bedRegenMultiplier` is 1.5, and they are back on their feet 80 ticks
-    // sooner. The deck's own tick did not move — nobody is asleep when it goes up.
+    // Reachability is the deck's; ORDER is the claim's — the town still had east plots ahead of
+    // it in the register, and the two are separated below by taking the deck away again.
     expect(run.deckTick).toBe(766)
     expect(run.crossedTick).toBe(1088)
   })

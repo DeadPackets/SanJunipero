@@ -1,15 +1,5 @@
-// THE STAGE IS A COMPOSITION, NOT A PILE (U16, P19).
-//
-// The user: the left summary is "very jarring because it doesn't fit into the letterbox view."
-// In the stylesheet that was `.moments-lens { z-index: 18 }` with the rail at
-// `top: 0.8rem; bottom: 0.8rem` — FULL stage height — drawn over `.director { z-index: 15 }`
-// and its two 12% bands. A z-index cannot fix that, because nothing in the layout knew the
-// two views were one picture.
-//
-// So the geometry gets one owner. The stage is exactly three boxes; every floating surface is
-// placed INTO one of them and never across the boundary between two. `straddlers` is the
-// mechanical proof, and the bottom band stops being dead space: it becomes the filmstrip, so
-// the picture is genuinely unobstructed and the 12% is earned.
+// The stage is exactly three boxes, and every floating surface is placed INTO one of them, never
+// across the boundary between two. `straddlers` is the mechanical proof.
 
 export type Frame = { x: number; y: number; w: number; h: number }
 export type FrameLayout = { picture: Frame; bandTop: Frame; bandBottom: Frame }
@@ -18,10 +8,8 @@ export type FrameLayout = { picture: Frame; bandTop: Frame; bandBottom: Frame }
 export const LETTERBOX_FRACTION = 0.12
 
 /**
- * ★ WHAT THE BROWSER CAUGHT. On a 594px stage 12% is 71px and a postcard is 80, so the strip
- * grew to hold one and the top band did not: the two bands came out 71 and 88 and the frame
- * was visibly lopsided. The band has a floor, in the model and in the sheet, or the model is
- * describing a stage that is not on screen.
+ * On a 594px stage 12% is 71px and a postcard is 80, so the strip grew to hold one and the top band
+ * did not — 71 against 88, visibly lopsided. The band has a floor, in the model and in the sheet.
  */
 export const BAND_MIN_PX = 104
 
@@ -40,9 +28,8 @@ export function frameLayout(stage: { w: number; h: number }, letterboxed: boolea
 }
 
 /**
- * P19's guard: every box that CROSSES a band edge rather than sitting on one side of it.
- * Touching an edge is how a surface fills a band exactly, so only a strict crossing counts.
- * The gate asserts this is empty.
+ * P19's guard: every box that CROSSES a band edge rather than sitting on one side of it. Touching
+ * an edge is how a surface fills a band exactly, so only a strict crossing counts.
  */
 export function straddlers(
   boxes: ReadonlyArray<{ id: string } & Frame>, l: FrameLayout,
@@ -61,9 +48,8 @@ export const STRIP_CARD_W = 168
 export const STRIP_GAP = 8
 
 /**
- * Cards laid along the bottom band, scrolled so the open day is the one under your eyes.
- * Pure: the DOM half only applies the offsets, so the scroll position is testable without a
- * layout engine and cannot drift from what is drawn.
+ * Cards laid along the bottom band, scrolled so the open day is the one under your eyes. Pure: the
+ * DOM half only applies the offsets, so the scroll position is testable without a layout engine.
  */
 export function stripLayout(
   count: number, openIndex: number, bandW: number,

@@ -53,14 +53,8 @@ const bodyOf = (db: Database.Database, mirror: WorldMirror, path: string): strin
 }
 
 /**
- * ★ THE READ API WAS O(WORLD AGE) EVERY TICK, AND RESUME IS WHAT MADE THAT REACHABLE.
- *
- * `readEvents` memoised the parsed log per `mirror.seq()` generation — but the generation
- * changes every tick, so the memo bought exactly nothing over a long run: the whole table was
- * re-read and re-`JSON.parse`d on the tick thread every 2.5 seconds. Measured at 185 ns/event,
- * that is 250 ms per tick at sim-day 52 and 485 ms at sim-day 100.
- *
- * Nobody had reached it because no town had ever survived a restart.
+ * A memo keyed on `mirror.seq()` buys nothing: the generation changes every tick, so the whole
+ * table is re-read and re-`JSON.parse`d on the tick thread.
  */
 describe('★ the read API reads the tick, not the history', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-apiscale-'))

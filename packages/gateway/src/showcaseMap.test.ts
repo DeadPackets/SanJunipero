@@ -35,9 +35,8 @@ describe('makeShowcaseMap', () => {
   })
 
   it('rasterises C13 makeCityTemplate rather than a rival hand-authored layout', () => {
-    // ★ WITH EXACTLY ONE AUTHORED EXCEPTION, NAMED, AND COUNTED. The ford is the only tile in
-    // this map that is not the template's, and it is four of them. The count is asserted so a
-    // second exception cannot arrive quietly under the first one's licence.
+    // The ford is the only tile that is not the template's, and it is four of them. The count is
+    // asserted so a second exception cannot arrive quietly under the first one's licence.
     const template = makeCityTemplate(SHOWCASE_ANCHOR)
     const ford = showcaseFord()
     const differs: string[] = []
@@ -60,9 +59,7 @@ describe('makeShowcaseMap', () => {
 })
 
 describe('the founders landscape (spec §10)', () => {
-  // The channel is where the TOWN says it is — the town paints the water it is built beside,
-  // and the map takes it. A river column asserted at x = 0 was a fact about the old template's
-  // geometry, not about a river.
+  // The channel is where the TOWN says it is: the town paints the water it is built beside.
   it('runs a contiguous river down the town west side', () => {
     const column = map.terrain.map((row) => row[SHOWCASE_ANCHOR.x + RIVER_LOCAL_DX]!)
     const first = column.indexOf(WATER_TILE)
@@ -173,14 +170,8 @@ describe('devTerrain', () => {
   })
 })
 
-// ★★ THERE IS NO WAY TO LOOK AT A GROWN TOWN, AND THE LINE THAT SAYS SO READS LIKE A DERIVATION.
-//
-// `SHOWCASE_W = CITY_W + 2 * SHOWCASE_MARGIN` looks derived and is a constant: `CITY_W` is
-// `townSpan(TOWN_RINGS_GENESIS)`. The world-growth lane removed the world's ceiling and proved
-// rings 5 and 6; the town-generator proved ring 3 renders at 1904 × 816; merge train 2 could
-// reach neither in a browser and refused to fake one by editing this line. Every dimension is a
-// function of the ring count now, and the property below is the one that matters: it never asks
-// for a number, it asks that the map be the size the GRAMMAR says, at any ring count.
+// The property that matters: it never asks for a number, it asks that the map be the size the
+// GRAMMAR says, at any ring count.
 describe('★ the showcase map is sized by the ring count, not by a constant', () => {
   const RINGS = [1, 2, 3, 4, 5, 6]
 

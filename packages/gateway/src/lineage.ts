@@ -5,17 +5,6 @@ import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { toEvent, type EventRow } from './http.js'
 
-// WHO CAME FROM WHOM (v1 task 23, the reader half — the prerequisite task 84 needs).
-//
-// SCOPE, stated plainly: this is the read-only endpoint and its pure fold, which is all task 84
-// needs to tell a sibling from a cousin. Task 23's `LineagePanel`, its inspector tab and its
-// Society-lens subview are NOT here and Task 23 still owns them.
-//
-// THE INTERFACE CORRECTION, verified in source: `bonds.ts` reads `agent_born` as
-// `{ id, motherId, fatherId }`, not `{ parents }`. This reader is written against the payload
-// the gateway actually folds, and the plan is amended to match it rather than the other way
-// round.
-
 export type LineagePerson = { id: string; name: string; alive: boolean }
 export type ParentEdge = { parentId: string; childId: string; tick: number }
 export type Household = { structureId: string; memberIds: string[] }

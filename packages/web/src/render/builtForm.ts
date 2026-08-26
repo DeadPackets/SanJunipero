@@ -1,21 +1,10 @@
 import { TILE_H, TILE_W } from './iso.js'
 
-// A STRUCTURE WITH NO ART IS STILL A THING THAT WAS BUILT.
-//
-// C12a batch 1 instantiated the real eleven-building town, and two of those buildings — the
-// well and the fire pit — have no art in any root. They rendered as the forge's transparent
-// checkerboard placeholder in the dead centre of the plaza, at the exact focal point the town
-// plan had just created. This module is the bridge to that art (v1 Task 17), not a
-// replacement for it: any kind lacking a root draws a deliberate simple volume out of the
-// master palette — a plinth, a low prism and one accent — so a viewer reads "a modest built
-// thing whose portrait has not been painted", never "missing art".
-//
-// It is generic over kind on purpose. The hole recurs every time the world learns to raise
-// something the art lane has not reached yet.
+// A kind with no art draws a deliberate volume from the master palette — plinth, low prism, one
+// accent — so it reads as a building nobody has painted yet, never as missing art. Generic over
+// kind on purpose: the hole reopens each time the world learns to raise something new.
 
-/** The footprint diamond in the sprite's LOCAL space — origin at the top vertex of the centre
- *  tile, exactly where a structure sprite is positioned. The one ground shape the hit area and
- *  the built form are both cut from, so they can never disagree about where a building stands. */
+/** The footprint diamond in the sprite's LOCAL space, origin at the centre tile's top vertex — the one ground shape both the hit area and the built form are cut from. */
 export function footprintDiamond(w: number, h: number): number[] {
   const corners: ReadonlyArray<readonly [number, number]> = [
     [0.5 - w / 2, 0.5 - h / 2],   // north
@@ -26,9 +15,7 @@ export function footprintDiamond(w: number, h: number): number[] {
   return corners.flatMap(([dx, dy]) => [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2)])
 }
 
-/** Four warm-grey stones, five honey timbers, three clay tones — all MASTER_PALETTE members.
- *  One ramp per material, lit from above: the top face catches the light, the south-east face
- *  holds mid tone, the south-west face falls away, and the plinth is the ground contact. */
+/** One MASTER_PALETTE ramp per material, lit from above: top catches the light, south-east holds mid tone, south-west falls away, plinth is the ground contact. */
 export const BUILT_FORM_RAMPS = {
   stone:  { top: 0xe9e2da, right: 0xaba198, left: 0x857d75, plinth: 0x5d5751 },
   timber: { top: 0xe0a95e, right: 0xa66e38, left: 0x7e512b, plinth: 0x5d5751 },
@@ -65,9 +52,8 @@ export const BUILT_FORM_UNIT_PX = TILE_W
 export const BUILT_FORM_HEIGHT_TILES: Readonly<Record<string, number>> = {
   fire_pit: 0.4, well: 0.6, grave: 0.45, wagon: 0.65,
   standing_stone: 1.1, scaffolding: 1.0, bridge: 0.35,
-  // Three dwellings that differ in the two things a roofline can differ in. A cottage stands
-  // taller than the cabin it is bigger than; a farmhouse is the widest roof and sits LOW, so
-  // width alone tells it apart from a house that is merely nearer.
+  // The dwellings differ in height as well as width, so the farmhouse's wide low roof does not
+  // read as a house that is merely nearer.
   cabin: 0.85, cottage: 1.05, farmhouse: 0.95,
 }
 export const BUILT_FORM_DEFAULT_HEIGHT_TILES = 0.9

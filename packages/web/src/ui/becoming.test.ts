@@ -44,9 +44,6 @@ function rng(seed: number): () => number {
   }
 }
 
-// ★ THE MANDATE THIS MODULE EXISTS FOR (U26–U31, P22). The default arm starts everyone
-// NEUTRAL, so nothing in the UI may display an authored personality field, and the one number
-// the gate reads must measure what a RUN made of a person — never what they were handed.
 describe('substanceOf — a measure of becoming, not of being', () => {
   it('★ GENESIS FACTS CANNOT INFLATE IT: name, age and temperament are not even inputs', () => {
     expect(Object.keys(ZERO).sort()).toEqual([

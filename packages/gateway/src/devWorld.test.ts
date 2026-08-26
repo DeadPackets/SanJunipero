@@ -34,15 +34,8 @@ describe('showcase weather', () => {
   })
 })
 
-// ★★ WHICH WORLD DOES A PERSON GET, AND WHICH DOES A GATE GET?
-//
-// They must be different, and the difference must not be a silence. `startDevWorld()` with no
-// `map:` handed everyone the frozen G6 fixture — six hand-placed buildings, four of them with
-// no art, on a 64×64 map the grammar never drew. G1, G2 and G6 hash exactly that world so it
-// cannot change; but a lane that ran `pnpm --filter @sj/gateway dev:world` to LOOK at the
-// product got it too, and had no way to know. The three-defects lane measured the cost: the
-// ambient canopy is 38 of 140 quads outside the ground on the fixture and 0 outside on the
-// showcase — same code, opposite verdicts, decided by which map loaded.
+// The two defaults must differ, and the difference must not be a silence: the gates hash the
+// fixture world, so the LIBRARY default cannot become the product town.
 describe('★ the fixture world must be asked for by name, never received by silence', () => {
   const CLI = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'devWorld.ts'), 'utf8')
 

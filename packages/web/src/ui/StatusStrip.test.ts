@@ -47,9 +47,8 @@ describe('StatusStripView', () => {
 describe('LensTabsView', () => {
   const hints = lensHints(stats)
   const html = renderToStaticMarkup(createElement(LensTabsView, { lens: 'chronicle', hints, onNav: () => {} }))
-  // The same bar once both history endpoints have answered: the only render in which a lens
-  // other than the living carries a badge at all, so it is the one the "speaks its badge" law
-  // below has to walk.
+  // The only render in which a lens other than the living carries a badge at all, so it is the
+  // one the "speaks its badge" law below has to walk.
   const badged = renderToStaticMarkup(createElement(LensTabsView, {
     lens: 'chronicle',
     hints: lensHints(stats, { ...countsFromWorld(stats), chronicle: 11, society: 3 }),
@@ -69,9 +68,7 @@ describe('LensTabsView', () => {
   })
 
   it('★ and every VISIBLE count is spoken, because the badge itself is aria-hidden', () => {
-    // The number is decoration in the tree; the label is the only place it exists for a
-    // screen reader. A tab that shows a count and does not say it is a tab whose count only
-    // some readers get.
+    // The number is decoration in the tree; the label is the only place it exists for a reader.
     for (const [, label, badge] of badged.matchAll(
       /aria-label="[^—]+— ([^"]*)"[^>]*>[^<]*(?:<span class="tab-count" aria-hidden="true">(\d+)<\/span>)?/g,
     )) {
@@ -81,10 +78,8 @@ describe('LensTabsView', () => {
   })
 
   it('★ and the strip ACTUALLY ASKS for every count it is able to badge', () => {
-    // `lensHints` is a pure model and its tests can only prove what it does with a number it
-    // is handed. Deleting the fetch that hands it over leaves every model test green and puts
-    // the badge back to nothing — a per-element law that cannot see the screen. This is the
-    // wiring, named.
+    // `lensHints` is a pure model, so deleting the fetch that hands it a number leaves every
+    // model test green and the badge back at nothing. This is the wiring, named.
     const src = readFileSync(new URL('./StatusStrip.tsx', import.meta.url), 'utf8')
     const body = src.slice(src.indexOf('export function LensTabs('))
     for (const [lens, url, binding] of [
@@ -95,12 +90,8 @@ describe('LensTabsView', () => {
     }
   })
 
-  /**
-   * ★ AND IT MUST NOT COUNT BY DOWNLOADING. The badge shows one number and used to fetch the
-   * whole ledger to measure the array — 5 260 B at sim-day 100, every 20 s, per viewer, for two
-   * digits. Pointing the URL at `/count` is only half the fix: a parser still reading `entries`
-   * would answer `null` and the badge would silently go blank. The shape it parses is named.
-   */
+  /** Pointing the URL at `/count` is only half the fix: a parser still reading `entries` would
+   *  answer `null` and the badge would silently go blank, so the shape it parses is named. */
   it('★ counts from the count endpoints, never by downloading the feed', () => {
     const src = readFileSync(new URL('./StatusStrip.tsx', import.meta.url), 'utf8')
     for (const feed of ['/api/chronicle', '/api/bonds']) {
@@ -120,8 +111,6 @@ describe('LensTabsView', () => {
   it('badges only the lenses that have a real count', () => {
     expect(html).toContain('<span class="tab-count" aria-hidden="true">2</span>')  // 2 alive
     // Townsfolk alone, because the living are the only count the viewer holds without asking.
-    // The chronicle used to be badged here too, with the length of the LIVE SOCKET FEED, and
-    // it read `CHRONICLE 0` over a panel of sixteen. It arrives from `/api/chronicle` now.
     expect(html.match(/tab-count/g)).toHaveLength(1)
   })
 

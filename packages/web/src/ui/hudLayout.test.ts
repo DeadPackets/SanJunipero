@@ -77,9 +77,8 @@ describe('hudReducer — moving one thing moves one thing', () => {
   })
 })
 
-// SHIP NO DEAD OPTIONS (batch 3 concern 9, controller ruling R4.3). The reducer advertised all
-// five slots for all four surfaces while only the control bar has left/right in CSS — the other
-// three are honoured for `hidden` and placed where they already live otherwise.
+// Only the control bar has left/right in CSS; the other three surfaces are honoured for `hidden`
+// and placed where they already live.
 describe('SLOTS_FOR — a surface is only offered a slot the renderer can place it in', () => {
   it('every surface can be put away and can go back where it started, and no more is claimed', () => {
     for (const what of DOCKABLE) {

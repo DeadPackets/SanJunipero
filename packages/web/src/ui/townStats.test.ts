@@ -46,14 +46,6 @@ describe('lensHints', () => {
     expect(lensHints(stats).map((h) => h.lens)).toEqual([...LENSES])
   })
 
-  // ★ A BADGE COUNTS THE SURFACE IT BADGES, OR IT COUNTS NOTHING.
-  //
-  // This test used to assert `chronicle === events.length`, and `events` is the LIVE SOCKET
-  // FEED — what has arrived since the viewer joined. The panel behind that tab lists
-  // `/api/chronicle`, the whole record. Merge train 3 photographed the gap: `CHRONICLE 0` in
-  // the nav over a panel holding sixteen entries, on the first screen a viewer sees. The file
-  // already knew the two were different things — `EMPTY_COPY.chronicleQuiet` exists to say so
-  // in words — and the badge read the wrong one anyway.
   it('badges the townsfolk count, and never counts the live feed as the chronicle', () => {
     const by = new Map(lensHints(stats).map((h) => [h.lens, h]))
     expect(by.get('inspector')!.count).toBe(2)
@@ -61,9 +53,8 @@ describe('lensHints', () => {
     expect(by.get('map')!.count).toBeNull()
   })
 
-  // ★ AND THE LIVE FEED CANNOT REACH IT AT ALL, which is the part a number-swap would not fix.
-  // `lensHints` no longer takes the socket feed, so there is nothing for a chronicle count to
-  // be accidentally derived FROM. The only way a badge gets a number is a caller handing it one.
+  // `lensHints` no longer takes the socket feed, so there is nothing for a chronicle count to be
+  // accidentally derived FROM.
   it('★ takes no live feed at all — the only counts are the ones a caller declares', () => {
     const declared: LensCounts = { ...countsFromWorld(stats), chronicle: 16, society: 7 }
     const by = new Map(lensHints(stats, declared).map((h) => [h.lens, h]))
@@ -83,9 +74,8 @@ describe('lensHints', () => {
     }
   })
 
-  // ★ THE WIRING ITSELF, because a mutation proved it was the one line no test could reach:
-  // dropping both fetched counts on the floor inside `LensTabs` left all 796 UI tests green
-  // while the nav went back to showing no chronicle number at all.
+  // A mutation proved this was the one line no test could reach: dropping both fetched counts inside
+  // `LensTabs` left every UI test green while the nav showed no chronicle number at all.
   it('★ lays the two fetched counts over the world’s, and shows nothing until they answer', () => {
     expect(lensCountsFor(stats, 16, 2)).toEqual({ ...countsFromWorld(stats), chronicle: 16, society: 2 })
     // Before either endpoint has answered: no badge is better than a wrong one.
@@ -97,9 +87,8 @@ describe('lensHints', () => {
   })
 
   it('★★ THE BADGE AND ITS LABEL ARE ONE NUMBER, not two that can disagree', () => {
-    // A hint is the tooltip AND the screen-reader label for the badge beside it. When the
-    // hint was built before the override was applied, the two could name different numbers on
-    // the same button — the defect this whole change is about, one layer down.
+    // A hint is the tooltip AND the screen-reader label for the badge beside it, so a hint built
+    // before the override was applied could name a different number on the same button.
     const declared: LensCounts = {
       ...countsFromWorld(stats), chronicle: 11, inspector: 40, society: 3, director: 4,
     }
@@ -110,9 +99,8 @@ describe('lensHints', () => {
     const hintOf = (over: Partial<LensCounts>, lens: Lens): string =>
       lensHints(stats, { ...countsFromWorld(stats), ...over }).find((h) => h.lens === lens)!.hint
     expect(hintOf({ chronicle: 11 }, 'chronicle')).toBe('11 in the town’s own ledger')
-    // ★ AND IT WAS TWO LENSES, NOT ONE. `Bonds` and `Moments` rendered a visible count that
-    // the button's own aria-label never mentioned, and the badge itself is `aria-hidden`, so
-    // there was no way to hear the number at all.
+    // The badge itself is aria-hidden, so a visible count the label never mentions cannot be heard
+    // at all.
     expect(hintOf({ society: 3 }, 'society')).toBe('3 ties the town has made')
     expect(hintOf({ director: 4 }, 'director')).toBe('4 days the town kept')
   })
@@ -158,15 +146,8 @@ describe('EMPTY_COPY', () => {
     expect(EMPTY_COPY.rosterSub).toBe('The founders arrive at dawn.')
   })
 
-  // ★ AND THE BONDS COPY NAMES EVERY ACT A BOND IS MADE OF — derived from `BOND_NOTES`, the
-  // list `buildBonds` actually reads, so a seventh act turns this red instead of leaving the
-  // panel describing five sixths of the truth.
-  //
-  // It used to say "watch long enough and the town will braid its own ties", and in the dev
-  // world that was FALSE: the scripted founders perform none of the six, so the ledger is
-  // permanently and correctly empty. The tab could not populate and the copy told a viewer to
-  // wait. Describing what a tie is made of is true whenever the panel is on screen — zero
-  // bonds IS none of these recorded — and it shows a viewer of the demo why it is empty.
+  // Derived from `BOND_NOTES`, the list `buildBonds` actually reads, so a seventh act turns this red
+  // instead of leaving the panel describing five sixths of the truth.
   it('★ names every act a bond is derived from, and there are six', () => {
     const acts = Object.keys(BOND_NOTES)
     expect(acts).toHaveLength(6)

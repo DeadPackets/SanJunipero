@@ -4,44 +4,17 @@ import { TILE_H, TILE_W } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 
 /**
- * ★ THE GROUND BAKE, CUT INTO PIECES — THE C11 §9 SUPERSESSION `scene.ts` HAS NAMED SINCE C11.
+ * One whole-map bake grows as the square of the ring count — 12 768 px at ten rings, past
+ * `MAX_TEXTURE_SIZE`, so the allocation fails outright. Fixed chunks bound it to
+ * CHUNK_PX_W × CHUNK_PX_H.
  *
- * The landed baker tessellates the WHOLE map into ONE render texture sized `(w+h)·16` by
- * `(w+h)·8`. The town grammar plats outward without bound, so that texture grows as the SQUARE
- * of the ring count. At ten rings it is 12 768 × 6 384 px — 326 MB of VRAM in a single
- * allocation, and 12 768 px is past `MAX_TEXTURE_SIZE` on a great many GPUs. That is not a
- * frame-rate problem: the allocation FAILS and the ground is simply not there.
+ * Every texture samples NEAREST; a chunk boundary is a new place for a half pixel, so three
+ * seam rules are load-bearing:
  *
- * So the bake is a grid of fixed-size chunks, only the ones the camera can reach are resident,
- * and the rest are released. Two properties follow, and both are measured rather than claimed:
- *
- *   · the largest single allocation is CHUNK_PX_W × CHUNK_PX_H, whatever the town does;
- *   · resident VRAM is a function of the VIEWPORT, not of the town — it stops growing.
- *
- * ── ★ THE SEAM LAW, WHICH IS THE WHOLE RISK OF DOING THIS ────────────────────────────────
- *
- * `4ee54b3` removed the `smoothSource` opt-out after measuring off-palette at zoom 4 fall from
- * 38–79 % to 0.0 %. Every texture samples NEAREST. A chunk boundary is a new place for a
- * half-pixel to appear, and a half-pixel at a boundary is exactly the artefact NEAREST exists
- * to prevent. Three things hold it shut, and each has a test:
- *
- * 1. **The boundary lands on a whole screen pixel at every rest stop.** A chunk is drawn at the
- *    world scale, so the boundary sits at `n · CHUNK_PX_W · z` screen px from the origin. That
- *    is an integer for every `z` in `ZOOM_STOPS` because both chunk dimensions are multiples of
- *    `1 / min(ZOOM_STOPS)`. This is also what makes the renderer's global `roundPixels` safe:
- *    two neighbours round their positions by the same fraction and stay exactly a chunk apart.
- *
- * 2. **A one-pixel bleed covers the transit.** Between two rest stops the eased scale is
- *    fractional and property 1 does not hold for those ~200 ms. Each chunk's texture is one
- *    pixel wider and taller than its rect and carries its neighbour's first column, so a gap
- *    can never open — the pixel is overdrawn with identical content at rest and fills the crack
- *    in transit. It costs 0.3 % of the chunk.
- *
- * 3. **Geometry is never clipped by hand.** A shape that straddles a boundary is submitted
- *    WHOLE to both chunks and the render target's own bounds cut it. A framebuffer edge is not
- *    a geometry edge, so it gets no anti-aliasing and no rounding of its own: the two halves
- *    reconstitute the shape exactly. The material matrices are unchanged and are applied in
- *    bake space, so a continuous ground flows across a boundary as it always did.
+ * 1. The boundary lands on a whole screen pixel at every `ZOOM_STOP`.
+ * 2. A one-pixel bleed covers the fractional scales of a transit.
+ * 3. A straddling shape is submitted WHOLE to both chunks and cut by the render target, never
+ *    clipped by hand.
  */
 
 /** Both dimensions are multiples of `1 / min(ZOOM_STOPS)` — see the seam law, property 1.
@@ -100,9 +73,7 @@ export function groundGrid(fieldW: number, fieldH: number, offsetX: number): Chu
   }
 }
 
-/** The last column and row are cut to the field rather than padded out to a full chunk: the
- *  field's own edge has no neighbour to seam against, and `(w+h)·16` and `(w+h)·8` are both
- *  multiples of 8, so the remainder still satisfies the whole-pixel law. */
+/** The last column and row are cut to the field, not padded out: the field's own edge has no neighbour to seam against, and the remainder still satisfies the whole-pixel law. */
 export function chunkAt(grid: ChunkGrid, c: number, r: number): ChunkRect {
   const x = c * CHUNK_PX_W, y = r * CHUNK_PX_H
   const w = Math.min(CHUNK_PX_W, grid.fieldW - x)
@@ -119,12 +90,7 @@ export function allChunks(grid: ChunkGrid): ChunkRect[] {
   return out
 }
 
-/**
- * The chunks whose paint reaches the view. `view` is in WORLD space, the same rectangle
- * `scene.viewRect()` hands the entity cull, and the question is asked through the entity cull's
- * own `rectInView` with the entity cull's own margin — a ground that decided what is on screen
- * by a different rule than the buildings standing on it would show a hole at the stage edge.
- */
+/** The chunks whose paint reaches the WORLD-space view, asked through the entity cull's own `rectInView` and margin — deciding by a different rule would show a hole at the stage edge. */
 export function chunksInView(
   grid: ChunkGrid, view: ViewRect, margin: number = CULL_MARGIN_PX,
 ): ChunkRect[] {
@@ -160,9 +126,7 @@ export const chunkBoundaryIsWhole = (scale: number): boolean =>
 export const chunkBoundariesAreWhole = (): boolean => ZOOM_STOPS.every(chunkBoundaryIsWhole)
 
 // ── assigning the field's geometry to chunks ──────────────────────────────────────────────
-//
-// One O(shapes) pass on a terrain change — the same trigger the whole-map bake already ran on —
-// and every later chunk bake is O(the chunk), never O(the map).
+// One O(shapes) pass on a terrain change, so every later chunk bake is O(the chunk).
 
 const spanLo = (v: number, size: number, max: number): number =>
   Math.max(0, Math.min(max, Math.floor(v / size) - 1))
@@ -202,16 +166,7 @@ export function shapeBox(
   }
 }
 
-/**
- * The field's layers, cut into per-chunk copies.
- *
- * ★ EVERY CHUNK GETS EVERY LAYER, AT ITS ORIGINAL INDEX, EMPTY OR NOT — and that is not
- * tidiness, it is the seam law again. `materialMatrix(l.id, index)` and `octaveMatrix` take the
- * layer's POSITION in the stack, so a chunk that dropped an empty layer would renumber the ones
- * after it and sample the same ground through a different rotation than its neighbour. The
- * boundary would then be a visible break in the material with no gap in the geometry at all.
- * A layer with no shapes in this chunk costs one empty `Graphics` and paints nothing.
- */
+/** Every chunk gets every layer at its ORIGINAL index, empty or not: `materialMatrix` and `octaveMatrix` take the layer's POSITION, so a renumbered stack samples the same ground through a different rotation than its neighbour. */
 export function bucketLayers(
   grid: ChunkGrid, layers: readonly FieldLayer[],
 ): Map<ChunkKey, FieldLayer[]> {
@@ -238,11 +193,7 @@ export function bucketLayers(
 /** A stroke is 1 px wide and centred on its path; two pixels of slack covers it either side. */
 export const POLY_PAD_PX = 2
 
-/**
- * The kerb, headland and furrow polylines, cut the same way. A polyline is assigned WHOLE to
- * every chunk its bounding box reaches — never split — so a patch outline that crosses a
- * boundary is one continuous stroke that the two targets clip between them.
- */
+/** The kerb, headland and furrow polylines, cut the same way: assigned WHOLE to every chunk their bounding box reaches, never split, so a crossing outline stays one continuous stroke. */
 export function bucketPolys(
   grid: ChunkGrid, polys: readonly number[][],
 ): Map<ChunkKey, number[][]> {
@@ -284,16 +235,7 @@ export type ChunkResidency = {
   clear(): ChunkKey[]
 }
 
-/**
- * WHAT IS RESIDENT, AND WHY THE VISIBLE SET IS NEVER EVICTED.
- *
- * A budget in bytes would be a threshold nobody can derive, and the one case it would bite is
- * the case where evicting is WRONG — a viewport whose chunks alone exceed it would thrash a
- * texture in and out every frame and draw a hole. So the rule is stated the other way round:
- * everything on screen is resident, always, and a fixed ring of recently-used neighbours is
- * kept behind it. The resident set is therefore bounded by the VIEWPORT plus `CHUNK_RETAIN`,
- * and that bound does not contain the size of the town.
- */
+/** Everything on screen is resident always, with a fixed ring of recently-used neighbours behind it: a byte budget would bite exactly where evicting is wrong, thrashing a viewport's own chunks. */
 export function createChunkResidency(retain: number = CHUNK_RETAIN): ChunkResidency {
   let grid: ChunkGrid | null = null
   const live = new Map<ChunkKey, ChunkRect>()

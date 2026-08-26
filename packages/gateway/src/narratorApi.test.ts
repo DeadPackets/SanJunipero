@@ -8,10 +8,8 @@ import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleE
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { NARRATOR_READ_TABLES, createGateway, type Gateway } from './index.js'
 
-// @sj/narrator depends on @sj/agents (onnxruntime, transformers) and the gateway must not
-// carry that weight to run four SELECTs — the same call api.test.ts makes for agent memory.
-// The DDL below is copied from packages/narrator/src/schema.ts, and the last test in this
-// file reads that file and fails if the columns ever move.
+// The DDL below is copied from packages/narrator/src/schema.ts — importing @sj/narrator would
+// drag @sj/agents (onnxruntime, transformers) in. The last test fails if those columns move.
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
   db.exec(`
@@ -126,12 +124,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     ])
   })
 
-  /**
-   * ★ THE BADGE ASKED FOR A NUMBER AND WAS SENT THE WHOLE LEDGER.
-   *
-   * `/api/chronicle/count` is the same scan, the same window clamp and the same memo as the
-   * body route — only the shape sent differs.
-   */
+  /** Same scan, same window clamp and same memo as the body route — only the shape sent differs. */
   it('answers the ledger length without sending the ledger', async () => {
     const res = await fetch(`${base}/api/chronicle/count`)
     expect(res.status).toBe(200)

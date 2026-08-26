@@ -50,10 +50,8 @@ function ScrubBanner({ store }: { store: WorldStore }) {
   )
 }
 
-// ★ R8, AUDIT M9. With the socket down this went on reading `Now · Day 0 · 19:31` in its live
-// colour — a broadcast showing a confident clock it is no longer being told about, which is
-// worse than showing nothing because the viewer has no way to know. One pure function decides
-// the state now (broadcastReady.ts), and the word and the class both come from it.
+// Both the word and the class come from broadcastReady.ts: with the socket down, a confident
+// clock the viewer cannot know is stale is worse than showing nothing.
 function TickBadge({ store, link }: { store: WorldStore; link: LinkStatus }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
@@ -94,10 +92,8 @@ export function App() {
     try { return loadHud(localStorage) } catch { return DEFAULT_HUD }
   })
   const [dockOpen, setDockOpen] = useState(false)
-  // A LENS CHANGE IS A CHANGE OF SUBJECT (U23). The outgoing view leaves before the incoming
-  // arrives — never both at once — so the body of the panel lags the tab bar by SCENE_OUT_MS
-  // and the viewer sees which way they moved. The reducer owns the timing; the sheet owns the
-  // curve; a viewer mashing the lens bar retargets the same transition rather than restarting it.
+  // The outgoing view leaves before the incoming arrives, never both at once, so the panel body
+  // lags the tab bar by SCENE_OUT_MS. The reducer owns the timing; the sheet owns the curve.
   const [lensScene, setLensScene] = useState<SceneState>(() => idleScene('lens', route.lens))
   const shownLens: Lens = lensScene.phase === 'out' ? (lensScene.from as Lens) : route.lens
   // the key handler is registered once; it reads the layout through a ref rather than
@@ -284,9 +280,8 @@ export function App() {
     scene.textScale = route.broadcast ? BROADCAST_TEXT_SCALE : 1
   }, [scene, route.broadcast])
 
-  // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a
-  // recorded day playing back. Opening a day retires the auto-cut so its heat-driven camera
-  // cannot fight the playback; LIVE brings it back.
+  // Opening a recorded day retires the auto-cut so its heat-driven camera cannot fight the
+  // playback; LIVE brings it back.
   const televised = shownLens === 'director' && route.momentId === null
 
   // leaving the televised view: keep the director mounted briefly so the letterboxes slide out

@@ -2,15 +2,8 @@ import { CONDITION_WORD } from '../status.js'
 import { MOOD_GLYPH_PX, MOOD_WORD, moodGlyph, type RosterRow2 } from './rosterRow.js'
 import type { Expression } from '../../render/mood.js'
 
-// The row is a GRID, not a stack of badges: a portrait rail, a name+state column, a mood glyph
-// and a place line. Four columns is the shape a game roster uses, and it is what makes a row
-// scannable at a glance — which is the whole of U12's complaint.
-
-/**
- * WHAT THE BROWSER CAUGHT: drawn at its own grid size, one art pixel became one screen pixel
- * and the face read as a smudge in the corner. A 16-px face needs the same 2× the control bar
- * gives its 8-px glyphs — U12 asks for a mood status ICON, and an icon has to be legible.
- */
+/** A 16-px face drawn at its own grid size read as a smudge in the corner: it needs the same 2× the
+ *  control bar gives its 8-px glyphs. */
 export const MOOD_GLYPH_SCALE = 2
 
 /** Decorative: the row's own label speaks the mood, so the glyph stays out of the

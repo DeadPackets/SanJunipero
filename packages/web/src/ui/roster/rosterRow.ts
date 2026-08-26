@@ -7,18 +7,8 @@ import { placeOf, type Place } from '../place.js'
 import { bustStyle, type BustStyle } from '../rosterModel.js'
 import { STATE_WORD, conditionsOf, stateWord, type Condition } from '../status.js'
 
-// A CHARACTER ROSTER, NOT A LIST (U12).
-//
-// THE ASK, verbatim: "TOWNSFOLK TAB — redesign as a video-game character roster. Required per
-// row: portrait · name · current status · a MOOD STATUS ICON · WHERE THEY ARE."
-//
-// The landed card is a bust, a name and three badges, one of which duplicates another, with
-// ~60% of the card blank. Five required fields, none of them present at a glance.
-//
-// P22 SHAPES EVERY FIELD. On sim-day 0 a row is name + age band + status + place + a neutral
-// mood: complete, dignified, and visibly a person who has not lived yet. By day 5 the same row
-// carries a mood that moved, a place that means something and company. Nothing is authored and
-// nothing is a placeholder — `substance` is what makes the difference measurable.
+// P22 shapes every field: on sim-day 0 a row is name + age band + status + place + a neutral mood —
+// complete, and visibly a person who has not lived yet. Nothing is authored, nothing is a placeholder.
 
 /** Three honest fallbacks: the painted face, the sprite bust cut from the atlas, the initial. */
 export type RosterPortrait = { url: string } | { bust: BustStyle } | { token: string }
@@ -31,24 +21,22 @@ export type RosterRow2 = {
   portrait: RosterPortrait
   /** v1 task 2's `moodOf` — the ONE face table, reused, never a second one */
   mood: Expression
-  /** task 79 — exactly one word */
+  /** Exactly one word. */
   state: string
-  /** task 79 — a disjoint vocabulary */
+  /** A vocabulary disjoint from `state`. */
   conditions: Condition[]
-  /** task 80 */
   place: Place
   /** names of people within earshot — run-produced company */
   with: string[]
-  /** task 83 — 0 on day 0, rising with what they have done. NEVER printed. */
+  /** 0 on day 0, rising with what they have done. NEVER printed. */
   substance: number
 }
 
 export const BUST_PX = 48
 
-/** The FALLBACK earshot, for the frames before the snapshot's config has arrived — the same
- *  shape `pipsFilled` uses for `BUILD_TICKS_FULL`, and for the same reason: a transcribed copy
- *  that is also the authority goes stale in silence. Same number as
- *  `DEFAULT_CONFIG.movement.earshotRadius`, and `configCopies.test.ts` asserts it still is. */
+/** The FALLBACK earshot, for the frames before the snapshot's config has arrived: a transcribed copy
+ *  that is also the authority goes stale in silence. `configCopies.test.ts` holds it to
+ *  `DEFAULT_CONFIG.movement.earshotRadius`. */
 export const EARSHOT_TILES = 8
 
 /** A bond this warm or warmer is a relationship the run actually made. */
@@ -60,15 +48,9 @@ const ageWordsOf = (ageDays: number): RosterRow2['ageWords'] => {
 }
 
 /**
- * What the run has made of this person, from what the roster can actually see.
- *
- * SOURCING, because this is the mandate: `daysLived` is the run's own clock, `actsDone` is the
- * skilled acts the engine booked plus the exchanges the bond log recorded, `bondsAtOrAbove` is
- * relationships warm enough to be relationships, and `skillBands` is the crafts they have taken
- * up. Every one is a thing that HAPPENED. Age, name and sex are not inputs at all.
- *
- * `personalityVersions` and `changeDays` are zero here and non-zero in the expansion, which
- * fetches them — so a row's substance is a LOWER BOUND on the panel's, never a different number.
+ * What the run has made of this person, from what the roster can actually see. `personalityVersions`
+ * and `changeDays` are zero here and non-zero in the expansion, which fetches them, so a row's
+ * substance is a LOWER BOUND on the panel's rather than a different number.
  */
 function substanceFor(
   state: WorldState, agentId: string, bonds: BondsResponse | null, nowTick: number,
@@ -335,13 +317,8 @@ export function moodGlyph(e: Expression): MoodPixel[] {
   return MOOD_GLYPH[e]
 }
 
-/**
- * What the icon is called out loud. Never a diagnosis — the town observes, it does not judge.
- *
- * These describe the drawn FACE, and task 79's status scan enforces that none of them is a
- * synonym of a state: it caught `asleep: 'sleeping'` here, which would have put two words for
- * one fact back in the row the moment it shipped.
- */
+/** What the icon is called out loud, describing the drawn FACE. None of these may be a synonym of a
+ *  state word: `asleep: 'sleeping'` would put two words for one fact back in the row. */
 export const MOOD_WORD: Readonly<Record<Expression, string>> = {
   neutral: 'settled', happy: 'in good spirits', sad: 'low', angry: 'angry',
   surprised: 'startled', weary: 'worn down', asleep: 'eyes closed',

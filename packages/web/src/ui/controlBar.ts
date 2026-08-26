@@ -2,15 +2,8 @@ import type { ZoomStop } from '../render/camera.js'
 import { ZOOM_STOPS, stepStop } from '../render/camera.js'
 import { LENSES, type Lens } from './route.js'
 
-// THE BOTTOM CONTROL BAR (U22, plan task 77).
-//
-// THE ASK, verbatim: "I should also have controls at the bottom to let me do what I want."
-// Today the only floating control is a three-button `.camera-hud` pinned bottom-right, and
-// the lens nav is in the top bar 900 px away. The bar is one control surface, not two: the
-// camera HUD retires into its `camera` group.
-//
-// The bar's contents are DERIVED from what the viewer can currently do, so it can never
-// advertise a control that does nothing, and a refusal is SHOWN rather than merely implied.
+// The bar's contents are DERIVED from what the viewer can currently do, so it can never advertise
+// a control that does nothing, and a refusal is SHOWN rather than merely implied.
 
 export const CONTROL_GROUPS = ['time', 'camera', 'lens', 'view'] as const
 export type ControlGroup = (typeof CONTROL_GROUPS)[number]
@@ -36,9 +29,8 @@ export type ControlCtx = {
   following: string | null
   insideId: string | null
   hudHidden: boolean
-  /** Does the whole settlement fit on the stage at the widest stop? The stop ladder ends at
-   *  0.25 and the town grows without bound, so eventually it does not — and the overview
-   *  control says what it will actually do rather than promising the whole town. */
+  /** Does the whole settlement fit on the stage at the widest stop? The ladder ends at 0.25 and
+   *  the town grows without bound, so the overview control says what it will actually do. */
   townFits: boolean
 }
 

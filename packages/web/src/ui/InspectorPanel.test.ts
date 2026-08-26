@@ -5,9 +5,6 @@ import { BackToRoster } from './InspectorPanel.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 
-// USER BUG 2026-08-17: "there is no way to go back to the selection of townsfolk after
-// picking one character to follow." This is the visible route back; the TOWNSFOLK nav item
-// and Escape are the other two, both tested as reducer transitions in route.test.ts.
 describe('BackToRoster', () => {
   const html = renderToStaticMarkup(createElement(BackToRoster, { onBack: () => {} }))
 

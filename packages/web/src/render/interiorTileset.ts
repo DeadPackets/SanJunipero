@@ -1,31 +1,18 @@
 import { interiorPieceKind, materialKind, type AssetRecord } from '@sj/shared'
 import { INTERIOR_TILE, ROOM_TILES, WALL_H_PX, WALL_KINDS, type WallKind } from './interiorMap.js'
 
-// ★ THE INTERIOR TILESET, ON THE RENDERER'S SIDE — Option C's walls and floors as ART.
-//
-// The room's shell was a code-painted polygon: two cream trapezoids, a cream diamond and a few
-// stroked lines. `g12c.test.ts` said so in as many words — "it is a POLYGON, not a tileset, and
-// that is why U4 stays open". This module is the other half: which authored strip goes where on
-// which wall, and which patch of floor is boards and which is flagstone.
-//
-// ART INDEPENDENCE, unchanged: every function here answers `null` when the codex holds no
-// piece, and the code-painted shell stands. A missing texture is never a hole.
+// Which authored strip goes where on which wall, and which patch of floor is which material.
+// Every function answers `null` when the codex holds no piece: the code-painted shell stands,
+// and a missing texture is never a hole.
 
 /** How many interior tiles of wall one authored strip spans. The art is `4 × 128 / 2` = 256 px
  *  across, which is the whole reason the strip is 256 and not some other number. */
 export const WALL_STRIP_TILES = 4
 export const WALL_STRIP_W = (WALL_STRIP_TILES * INTERIOR_TILE.w) / 2
 
-/** ★ THE SHEAR THAT PUTS A FLAT ELEVATION ON A DIMETRIC WALL.
- *
- *  A wall strip is authored square-on: `x` runs along the wall and `y` up it. On the wall plane
- *  one step along the wall moves one pixel across the screen and HALF a pixel down it — the
- *  town's own 2:1 ratio, which is why the interior can borrow the town's projection wholesale.
- *
- *  As a Pixi transform with `rotation = 0` and `skew.x = 0`, the matrix is
- *  `[cos(skewY)·scaleX, sin(skewY)·scaleX; 0, scaleY]`, so `tan(skewY) = 1/2` puts the rise at
- *  half the run and `scaleX = 1 / cos(skewY)` keeps the run itself at 1:1. The art is therefore
- *  never stretched ALONG the wall: `WALL_SHEAR_X * Math.cos(WALL_SKEW_Y)` is exactly 1. */
+/** The shear that puts a flat elevation on a dimetric wall: `tan(skewY) = 1/2` puts the rise at
+ *  half the run, and `scaleX = 1 / cos(skewY)` keeps the run itself at 1:1, so the art is never
+ *  stretched ALONG the wall. */
 export const WALL_SKEW_Y = Math.atan(INTERIOR_TILE.h / INTERIOR_TILE.w)
 export const WALL_SHEAR_X = 1 / Math.cos(WALL_SKEW_Y)
 
@@ -53,13 +40,9 @@ export function wallStripWidth(wall: WallKind, atTiles: number, room = ROOM_TILE
 export type WallCourse = { wall: WallKind; piece: string; atTiles: number }
 
 /**
- * ★ THE WALL A ROOM ACTUALLY HAS, laid out from what the room actually contains.
- *
- * Every wall is plain from end to end first, so there is never a gap; then each FEATURE is
- * drawn over it at its own place. A feature is either a wall furnishing the room carries — a
- * hearth becomes the chimney breast, which is the whole of Task 2's fix: the hearth is drawn
- * ONCE, as the wall it is built into, and never again as an object standing in front of it —
- * or one of the room's own fixtures, the door and the window it must have to be a room.
+ * Every wall is plain from end to end first, so there is never a gap; a FEATURE is drawn over
+ * it. A hearth becomes the chimney breast — drawn ONCE as the wall it is built into, and never
+ * again as an object standing in front of it.
  */
 export const FURNISHING_WALL_PIECE: Readonly<Record<string, string>> = {
   hearth: 'wall-chimney',
@@ -78,14 +61,8 @@ export function wallCourses(
     const tiles = wall === 'back-right' ? room.w : room.h
     for (let at = 0; at < tiles; at += WALL_STRIP_TILES) out.push({ wall, piece: 'wall-plain', atTiles: at })
   }
-  // The door is on the near end of the long wall, where the exterior door is.
-  //
-  // ★ AND EVERY OTHER BAY OF THAT WALL IS GLAZED. It used to be one window, at the far end, and
-  // a 12-tile wall is THREE bays: the middle one was 256 px of blank wainscot in the visual
-  // centre of the room, which is a large part of why the room read as emptier than the mock.
-  // A window per bay is a rule and not a coordinate — it holds when the room is longer, and it
-  // is the same class of thing the door already is: a hole in a wall, not a piece of furniture
-  // the world does not know the room owns.
+  // The door is on the near end of the long wall, where the exterior door is; every other bay
+  // of that wall is glazed, which is a rule and not a coordinate — it holds for a longer room.
   const doorAt = Math.max(0, room.w - WALL_STRIP_TILES)
   const fixtures: WallCourse[] = [{ wall: 'back-right', piece: 'wall-door', atTiles: doorAt }]
   for (let at = 0; at < room.w; at += WALL_STRIP_TILES) {
@@ -126,10 +103,8 @@ export function hasInteriorTileset(records: readonly AssetRecord[]): boolean {
   return resolveInteriorPiece(records, 'wall-plain') !== null
 }
 
-/**
- * The flagstone patches: a hearth stands on stone, and so does the ground just inside a door.
- * Rectangles in interior tiles, in the room's own coordinates.
- */
+/** A flagstone patch — a hearth stands on stone, and so does the ground just inside a door.
+ *  Rectangles in interior tiles, in the room's own coordinates. */
 export type FloorRegion = { x0: number; y0: number; x1: number; y1: number }
 
 export function flagstoneRegions(

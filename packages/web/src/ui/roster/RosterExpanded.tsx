@@ -1,11 +1,8 @@
 import { BOND_LEVEL_LABEL, SECTION_EMPTY, SECTION_TITLE, type Becoming } from './expand.js'
 
-// WHO THEY HAVE BECOME, opened under their own row. The list stays mounted behind it, so the
-// way back is never gone — it is the row the viewer just clicked.
-//
-// Every section is run-produced, and an empty one says what THIS PERSON has not done yet. The
-// `wants` section does not render at all while it is empty: an empty chip rail is a promise the
-// product has not kept, and P22.2 bans it.
+// The list stays mounted behind the expansion, so the way back is never gone — it is the row the
+// viewer just clicked. The `wants` section does not render while empty: an empty chip rail is a
+// promise the product has not kept.
 
 function Section(
   { name, empty, children }: { name: keyof Becoming; empty: boolean; children?: React.ReactNode },

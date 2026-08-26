@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
-// ★ THE WIRING HAS TO BE TESTED, NOT THE FUNCTION. Every assertion in this file about the
-// prism's SHAPE passes if `structureHitPoints` is never called — that is the vacuous-guard
-// family's whole shape, and this project has now found sixteen of them. So the layer is driven
-// for real against a structural Pixi, and what is read back is the hitArea the SPRITE carries.
+// Every assertion here about the prism's SHAPE passes if `structureHitPoints` is never called,
+// so the layer is driven for real and what is read back is the hitArea the SPRITE carries.
 vi.mock('pixi.js', () => {
   class Point {
     x = 0; y = 0
@@ -66,11 +64,6 @@ import { builtFormSpec } from './builtForm.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
 import { rendersOnMap } from './characters.js'
 
-// FIX ROUND 2 defect 2: the door affordance was drawn at the door TILE's depth, but the
-// building it belongs to is depth-sorted from its FAR corner — a whole depth row higher. In
-// a sortableChildren container the top-most child takes the pointer, so the building's
-// (wider than its own diamond) sprite swallowed every hover and the door never lit.
-
 const box = (x: number, y: number, w: number, h: number, kind = 'house'): Structure => ({
   id: `s-${x}-${y}`, kind, x, y, w, h, hp: 50, maxHp: 50, flammable: true,
   stage: 'complete', progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
@@ -96,13 +89,8 @@ describe('doorTileOf', () => {
   })
 })
 
-// ★ THE TWO CLICK SQUARES ARE RETIRED AND ONE HITBOX REPLACES BOTH.
-//
-// A building carried a SEPARATE `Rectangle` target on its door tile under a honey sill drawn
-// flat on the ground. It is gone: a building is one object and takes one pointer, and what a
-// click MEANS is a property of the building — enterable and complete goes in, everything else
-// tells its story. `InteriorBar` puts the same provenance line at the top of the room, so the
-// nine enterable buildings lose nothing by giving the popover up.
+// A building is one object and takes one pointer; what a click MEANS is then a property of the
+// building rather than of where inside it the pointer landed.
 describe('one building, one hitbox, and the building says what a click does', () => {
   const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
   const code = src.split('\n').map((l) => l.trim())
@@ -164,20 +152,10 @@ describe('one building, one hitbox, and the building says what a click does', ()
   })
 })
 
-// ★ THE ROSTER THAT CAME BACK, AND THE GUARD THAT KEEPS IT DEAD.
-//
-// This describe used to be `expect([...ENTERABLE_KINDS].sort()).toEqual(['house','shed',
-// 'storehouse'])` — a check whose passing condition is satisfiable without the property holding,
-// because it pinned the roster to a transcription of ITSELF. It passed on the day `cabin`,
-// `cottage` and `farmhouse` became rooms a body walks into, and it would have gone on passing
-// while the viewer refused the door to the founding valley's only indoor fire.
-//
-// The guard is now the general law: over EVERY kind this product can stand, the viewer's answer
-// is `isRoofedKind`'s answer. A hand-list cannot satisfy it, because the second test moves the
-// config out from under it.
+// The general law: over EVERY kind this product can stand, the viewer's answer is
+// `isRoofedKind`'s answer. A hand-list cannot satisfy it — the second test moves the config.
 describe('★ enterability is asked of the config, and there is no second list', () => {
-  // comments stripped — the epitaph above the fix names the roster it replaced, and the point
-  // is that no CODE does
+  // comments stripped: the claim is that no CODE names a roster
   const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
     .split('\n').map((l) => l.trim())
     .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
@@ -244,17 +222,9 @@ describe('★ enterability is asked of the config, and there is no second list',
 })
 
 
-// ★ WHAT A CLICK ON A BUILDING NOW HITS, AND WHAT THE OLD TARGET MISSED.
-//
 // Pixi hit-tests a sprite's full RECTANGULAR bounds unless a hitArea says otherwise, and a
-// building sprite is 1.9× – 2.0× wider than the ground it stands on — which is how a wagon's
-// empty canopy padding used to intercept the storehouse. The answer to that was the flat
-// footprint diamond, and the answer went too far: measured against every codex root's decoded
-// alpha it contained 0.0 % – 0.8 % of the building's DRAWN pixels.
-//
-// The prism is the middle that is not a compromise: it is the drawn cell with its corners cut
-// off by the diamond, so it can claim no pixel outside the picture and it misses almost none
-// inside it.
+// building sprite is about twice as wide as the ground it stands on. The prism is the drawn cell
+// with its corners cut off by the diamond, so it claims no pixel outside the picture.
 
 // the sprite sits at the top vertex of its centre tile; local points are offsets from there
 function spriteAt(s: Structure): { sx: number; sy: number } {
@@ -327,10 +297,8 @@ describe('a structure hit-tests the structure', () => {
   })
 
   it('★ NEIGHBOURS AT THE TOWN GRAMMAR\'S PROVEN 86.1626 px SPACING DO OVERLAP', () => {
-    // Two houses on adjacent plots. Their prisms genuinely intersect on screen — that is not a
-    // defect and it cannot be designed away, because the drawn buildings intersect. Which one
-    // answers is settled by the DEPTH ORDER, in `layers.applyDepthOrder`, from the same boxes
-    // the painter uses. This test exists so nobody "fixes" the overlap by shrinking a hitbox.
+    // Their prisms genuinely intersect on screen because the drawn buildings do; which one
+    // answers is the depth order's business. Nobody may "fix" the overlap by shrinking a hitbox.
     const near = box(32, 25, 2, 2, 'house')
     const far = box(30, 22, 2, 2, 'house')
     const p = worldPoly(structureHitPoints('house', 2, 2, 1), near)
@@ -409,10 +377,8 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
   const cottage = box(30, 30, 3, 2, 'cottage')
   const well = box(40, 40, 1, 1, 'well')
 
-  // The harness hands the layer no asset records, so these buildings take the no-art path and
-  // draw a `builtFormSpec` volume — which is a real product state (the well and the fire pit
-  // stood like that until the structure set was commissioned) and the one whose hit prism can
-  // be checked without a texture round trip.
+  // The harness hands the layer no asset records, so these take the no-art path and draw a
+  // `builtFormSpec` volume — the one whose hit prism can be checked without a texture round trip.
   it('★ the sprite\'s hitArea IS the prism — not the diamond, and not nothing', () => {
     const h = harness([house])
     syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
@@ -469,9 +435,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     const tap = (id: string): void =>
       (entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void })
         .fire('pointertap')
-    // A WELL IS THE NEGATIVE HERE, AND IT USED TO BE THE COTTAGE. The landed test tapped a
-    // cottage and asserted `doors == []` with the comment "a cottage has no room" — a test that
-    // held the roster's mistake in place. A cottage is roofed, so it is a door.
+    // The well is the negative: it is unroofed, while a cottage is roofed and so is a door.
     tap(well.id)
     expect(h.doors).toEqual([])
     tap(cottage.id)
@@ -482,11 +446,8 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
 })
 
 
-// FINAL ROUND. The controller saw a founder "sleeping OUTDOORS next to the house with a
-// blanket". A 5500-tick measurement of the dev world says nobody ever sleeps or collapses
-// outdoors — so that was an occupant asleep INSIDE the cottage, still being drawn on the town
-// map at the door tile they walked in through, because the character layer only ever checked
-// `alive`.
+// An occupant asleep inside a cottage was still drawn on the town map, at the door tile they
+// walked in through, when the character layer checked only `alive`.
 describe('rendersOnMap', () => {
   it('draws the living who are out of doors', () => {
     expect(rendersOnMap({ alive: true })).toBe(true)
@@ -503,16 +464,8 @@ describe('rendersOnMap', () => {
   })
 })
 
-// ★ THE PROGRESS METER MEASURES THE BUILD THE WORLD IS ACTUALLY RUNNING.
-//
-// The denominator was a hardcoded 2880, transcribed from `DEFAULT_CONFIG.construction
-// .houseTicks`. It is the only affordance that says a tinted building is GOING UP rather than
-// simply odd-looking, and it was a second copy of a number the viewer already holds.
-//
-// The dev world raises a house in 240 ticks so somebody can watch one rise. Under the
-// transcribed denominator a house finishing at 240 lights `floor((240/2880) x 4)` = ZERO pips
-// - every house in the demo would stand under scaffolding for its whole build with the meter
-// dark, and nothing would have failed.
+// The denominator has to be the world's own `houseTicks`: a dev world raising a house in 240
+// ticks lights `floor((240/2880) x 4)` = zero pips against the default's 2880.
 describe('pipsFilled', () => {
   it('* fills across the build the world is running, not the one the default assumes', () => {
     expect(pipsFilled(0, 240)).toBe(0)

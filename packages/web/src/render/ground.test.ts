@@ -24,11 +24,8 @@ describe('groundPlan', () => {
   })
 })
 
-// ── FIX ROUND 2 defect 1 ────────────────────────────────────────────────────────────────
-// The C13 autotile strip is a road RIBBON on transparency, not a filled diamond: half of a
-// `straight-ns` tile is a hole. Drawn INSTEAD of the ground it showed the dark stage through
-// those holes — the black dashes at 1x and the black band at 4x. It is an OVERLAY, and the
-// plan has to carry the ground that goes under it.
+// The autotile strip is a road RIBBON on transparency, not a filled diamond — half of a
+// `straight-ns` tile is a hole — so it is an OVERLAY and the plan carries the ground under it.
 
 const record = (kind: string, meta: string | null, seq: number): AssetRecord => ({
   id: `rec-${kind}`, seq, class: 'terrain', kind, status: 'ready', desc: kind, meta,

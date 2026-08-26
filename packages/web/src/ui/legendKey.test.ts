@@ -12,9 +12,8 @@ const LENS_SRC = readFileSync(new URL('./SocietyLens.tsx', import.meta.url), 'ut
 // A 1525 x 880 lens is the stage the batch-4 review looked at.
 const STAGE = { w: 1525, h: 880 }
 
-// A chip's width depends on a pixel font's advance, which no node test can measure. So every
-// claim below is swept across every width a 12px uppercase chip could plausibly take, and the
-// finding has to hold at all of them. A conclusion that survives the sweep is not a guess.
+// A chip's width depends on a pixel font's advance, which no node test can measure, so every claim
+// below is swept across every width a 12px uppercase chip could plausibly take.
 const CHIP_WIDTHS = [80, 100, 120, 140, 160, 170]
 
 describe('the model is the stylesheet, not a second copy of it', () => {

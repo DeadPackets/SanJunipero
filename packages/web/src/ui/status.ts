@@ -1,17 +1,8 @@
-// ONE VOCABULARY FOR WHAT A PERSON IS DOING (U13, plan task 79).
-//
-// THE DEFECT, exactly: `rosterModel.ts` set `doing: 'resting'` while `RosterPanel.tsx` rendered
-// a separate `asleep` badge, so a sleeping founder's card carried BOTH words for one fact —
-// the user's own example. Four more rest words were in flight beside them ("at rest forever",
-// "resting", "awake", "idle").
-//
-// The cure is a shape, not a rename. A person has exactly ONE STATE and zero or more
-// CONDITIONS, and the two vocabularies are DISJOINT sets of words, asserted — so a condition
-// can never quietly become a synonym of a state again.
+// A person has exactly ONE STATE and zero or more CONDITIONS, and the two vocabularies are DISJOINT
+// sets of words, asserted — so a condition can never quietly become a synonym of a state.
 
-/** What a status needs to know about a body: a structural read of `AgentBody`, plus the fields
- *  C11 will add. An absent optional field simply never matches its row, so every rule here is
- *  correct before C11 lands. */
+/** A structural read of `AgentBody`. An absent optional field simply never matches its row, so every
+ *  rule here is correct before the fields it anticipates exist. */
 export type AgentView = {
   alive: boolean
   asleep: boolean
@@ -22,18 +13,13 @@ export type AgentView = {
   injuries: ReadonlyArray<{ kind: string; day: number }>
   collapsedSinceTick: number | null
   lastSpokeTick?: number
-  /** C11 */
   thirst?: number
 }
 
 /**
- * STATE: exactly ONE per person per surface. First match wins, in this order.
- *
- * DEVIATION from the plan's list, and the reason: the plan gives the order
- * `… working, walking, talking, eating …` AND asserts that "a walking talker is `talking`".
- * Those cannot both hold while the array IS the priority. The assertion is the one that
- * describes what a viewer wants to read — someone crossing the square mid-conversation is in a
- * conversation — so the order is amended and the array stays the single priority table.
+ * STATE: exactly ONE per person per surface, first match wins in this order. Someone crossing the
+ * square mid-conversation is in a conversation, so `talking` precedes `walking` and the array stays
+ * the single priority table.
  */
 export const STATES = [
   'gone', 'collapsed', 'asleep', 'talking', 'eating', 'working', 'walking', 'idle',
@@ -53,8 +39,7 @@ export const STATE_WORD: Readonly<Record<State, string>> = {
 }
 
 /** How long after a word a person still reads as being in the conversation. The gateway's
- *  `TALK_WINDOW_TICKS` is the same idea on the same clock; this is the viewer's own copy,
- *  because P1 keeps the viewer out of the gateway's modules. */
+ *  `TALK_WINDOW_TICKS` is the same idea; P1 keeps the viewer out of the gateway's modules. */
 export const TALK_RECENT_TICKS = 20
 
 /** A need at or under this is worth saying out loud. */
@@ -66,11 +51,8 @@ const SPEECH_VERBS: ReadonlySet<string> = new Set(['speak', 'teach'])
 const gerund = (verb: string): string => `${verb.endsWith('e') ? verb.slice(0, -1) : verb}ing`
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
-/**
- * `nowTick` is optional and only ever ADDS the conversation: with a clock, a person who spoke
- * a moment ago reads as talking even while they walk; without one, the activity verb decides.
- * No caller is ever made worse off by not having the tick.
- */
+/** `nowTick` is optional and only ever ADDS the conversation: with a clock, a person who spoke a
+ *  moment ago reads as talking even while they walk. */
 export function statusOf(a: AgentView, nowTick?: number): State {
   if (!a.alive) return 'gone'
   if (a.collapsedSinceTick !== null) return 'collapsed'
@@ -85,9 +67,8 @@ export function statusOf(a: AgentView, nowTick?: number): State {
   return 'working'
 }
 
-/** The word to print: the verb's own gerund while a person is at work, else `STATE_WORD`. The
- *  gerund is used ONLY for `working`, so the printed word can never contradict the state — a
- *  walking talker must not be labelled "Walking". */
+/** The word to print: the verb's own gerund while a person is at work, else `STATE_WORD`. The gerund
+ *  is used ONLY for `working`, so a walking talker can never be labelled "Walking". */
 export function stateWord(a: AgentView, nowTick?: number): string {
   const s = statusOf(a, nowTick)
   if (s === 'working' && a.activity !== null) return sentenceCase(gerund(a.activity.verb))
@@ -132,12 +113,8 @@ export function drivesOf(_a: AgentView): Drive[] {
 export const BANNED_STATUS_LITERALS: readonly string[] =
   ['resting', 'Resting', 'awake', 'Awake', 'idle', 'Idle', 'at rest', 'sleeping', 'Sleeping']
 
-/**
- * The ids the code must keep, named rather than silently skipped. `idle` is a `State` id, an
- * animation row in `charAnim`, and the moments player's stopped state; none of those is ever
- * printed, and the tests assert that no `STATE_WORD` value is a state id, so the lowercase
- * form cannot reach a viewer through this module. Its printable form, `Idle`, is still banned.
- */
+/** The ids the code must keep, named rather than silently skipped. `idle` is a `State` id, an
+ *  animation row and the player's stopped state; none is printed, and `Idle` is still banned. */
 export const MACHINE_STATUS_IDS: readonly string[] = ['idle']
 
 /** The two places a word can be printed from: a quoted string, and JSX text. Comments are

@@ -36,9 +36,8 @@ describe('U18 — the town speaks in its own typeface', () => {
   // bubbles.ts, characters.ts, tooltip.ts and landmarks.ts all ask for `monospace`.
   const CALL_SITES = ['./bubbles.ts', './characters.ts', './tooltip.ts', './landmarks.ts']
 
-  // The call sites never wrote 'monospace' themselves — batch 2 had already routed them through
-  // WORLD_FONT_FAMILY, so scanning only them passes against the broken code and measures
-  // nothing. worldLabel.ts is where the word actually was, so it is scanned too.
+  // The call sites route through WORLD_FONT_FAMILY, so scanning only them measures nothing —
+  // worldLabel.ts is where the word would actually be.
   it('leaves no world label asking the browser for its default mono', () => {
     for (const f of [...CALL_SITES, './worldLabel.ts']) {
       expect(src(f), `${f} still asks for monospace`).not.toMatch(/=\s*'monospace'|fontFamily:\s*'monospace'/)
@@ -54,10 +53,8 @@ describe('U18 — the town speaks in its own typeface', () => {
   })
 })
 
-// ★ WHAT THE BROWSER SETTLED, and it inverts the obvious assignment: Silkscreen has NO
-// lowercase — "Hey Nadia" sets as HEY NADIA. Press Start 2P has real lowercase and is the
-// more readable of the two at a sentence. So the pixel face labels and the display face
-// SPEAKS, which is the opposite of what the two names suggest.
+// Silkscreen has NO lowercase, so the pixel face labels and the display face speaks — the
+// opposite of what the two names suggest.
 describe('the two faces, and which one is allowed to say a sentence', () => {
   it('sets labels in the face with no lowercase and sentences in the face that has it', () => {
     expect(FACE_SOURCE[FACE_PX]).toBe('Silkscreen')
@@ -210,9 +207,6 @@ describe('the tail points at the speaker', () => {
   })
 })
 
-// ★ THE ALPHA BAN. A thought was `alpha: 0.55` — the exact de-emphasis-by-transparency habit
-// the ui-blockers round removed from 24 chrome sites, still alive on the one surface where
-// legibility matters most.
 describe('a thought is a different material, never a thinner one', () => {
   it('leaves no alpha on a bubble node', () => {
     // comments stripped: the source SAYS `alpha: 0.55` where it explains what it stopped doing
@@ -222,11 +216,8 @@ describe('a thought is a different material, never a thinner one', () => {
     expect(text).not.toMatch(/alpha:\s*0\.\d/)
   })
 
-  // ★ AMENDED BY MEASUREMENT (C12a batch 6). This used to require a different INK as well as
-  // different paper. The night quad is a multiply over the whole stage, and under it the
-  // ceiling is 6.37:1 — only three palette pairs clear AA in BOTH bands, and two of them share
-  // `--deep`. The distinction is therefore carried by the paper, the frame art and the edge
-  // shape; requiring a second ink would have meant one of the two bubbles failing AA at night.
+  // Paper, not ink: under the night multiply the ceiling is 6.37:1 and only three palette pairs
+  // clear AA in both bands, so requiring a second ink would fail one bubble at night.
   it('paints a thought on its own paper', () => {
     expect(THOUGHT_FILL).not.toBe(SPEECH_FILL)
   })
@@ -243,11 +234,8 @@ describe('a thought is a different material, never a thinner one', () => {
   })
 })
 
-// ★ WHAT THE BROWSER CAUGHT AND NO UNIT TEST DID. World text is drawn in world space, so its
-// apparent size is multiplied by the camera: at the 3x stop a thought bubble measured 750 CSS
-// px across and buried the town under it, and at the 0.5x stop the same face was 8 px. The
-// landmark layer had already solved this for itself with a private `1 / world.scale`; every
-// other label site had no rule at all. One rule now, in one place.
+// World text is drawn in world space, so without a counter-scale the camera multiplies its
+// apparent size — 8 px at the 0.5x stop, 750 CSS px across at 3x.
 describe('a world label is the same size to the viewer at every zoom stop', () => {
   it('cancels the camera exactly, so the face is FACE_INSTALL_PX on screen wherever it is read', () => {
     for (const zoom of ZOOM_STOPS) {
@@ -274,13 +262,8 @@ describe('a world label is the same size to the viewer at every zoom stop', () =
   })
 })
 
-// ★★ THE ONE THE BROWSER SAVED US FROM, AND THE WHOLE POINT OF LOOKING. With the font landed
-// and every test green, the town said "the fsh are biting" and "i wonder f the roof will hold".
-//
-// Press Start 2P carries `fi` and `fl` LIGATURES, so the browser measures "fi" as ONE 16px em.
-// Pixi derives a kerning pair as measure(ab) − measure(a) − measure(b) = 16 − 16 − 16 = **−16**,
-// a whole em of negative kerning, and draws the `i` exactly on top of the `f`. Both faces are
-// monospace on a fixed em, so there is no real kerning to lose by refusing to derive any.
+// Press Start 2P carries `fi`/`fl` ligatures, so the browser measures "fi" as ONE 16px em and
+// Pixi derives a −16 kern, drawing the `i` on top of the `f`.
 describe('the letter after an f survives — no derived kerning on a ligature face', () => {
   it('installs both faces with kerning skipped', async () => {
     installs.length = 0

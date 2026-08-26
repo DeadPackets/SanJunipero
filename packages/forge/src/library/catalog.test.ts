@@ -31,17 +31,8 @@ describe('the library catalog', () => {
     expect(() => LibraryEntrySchema.parse({ ...axe, interior: chair.interior })).toThrow()
   })
 
-  // The C-level bar: 128 px of sprite and a 64 px icon, both exact divisors of the 512
-  // generation. The old pair were 24 and 24, and 512/24 = 21.33.
-  // ★ AND THE SIZE IS THE FOOTPRINT'S, NOT ONE NUMBER FOR EVERYTHING. This asserted 128 for
-  // every entry, which reads as a law and is really the 1x1 answer written down twice: a 1x2
-  // bed covers `(1 + 2) x 64` = 192 px of the interior tile, which is what
-  // `assetResolution.nativeSizeFor` has said since the C-level bar landed. Shipping it at 128
-  // drew a bed two-thirds the length of the person lying in it.
-  //
-  // `512 % spritePx === 0` went with it, and it was never the law either: the published rule is
-  // INTEGER DOWNSCALE OF A CROP — 192 x 2 = 384 px taken out of a 512 generation and halved.
-  // `resolveScale` is that rule, and it throws rather than returning a fractional factor.
+  // The published rule is INTEGER DOWNSCALE OF A CROP, not `512 % spritePx === 0`: 192 x 2 = 384
+  // px taken out of a 512 generation and halved. `resolveScale` throws on a fractional factor.
   it('every entry is authored at the size its own footprint covers', () => {
     for (const e of LIBRARY) {
       expect(e.iconPx, e.kind).toBe(ICON_PX)
@@ -83,14 +74,14 @@ describe('the library catalog', () => {
         expect(INTERIOR_KINDS, e.kind).toContain(k)
   })
 
-  // The C10 bedSlots law: only a house can hold a bed.
+  // Only a house can hold a bed.
   it('a house has at least one bed available; a shed and a storehouse have none', () => {
     const beds = byCategory('furniture').filter(e => e.interior!.isBed === true)
     expect(beds.length).toBeGreaterThan(0)
     for (const b of beds) expect(b.interior!.interiorKinds).toEqual(['house'])
   })
 
-  // C12 §10: the art never labels the danger. Knowledge is the town's, not the picture's.
+  // The art never labels the danger. Knowledge is the town's, not the picture's.
   it('the two mushrooms differ by exactly one word', () => {
     const a = libraryEntry('field_mushroom')!.desc.split(/\s+/)
     const b = libraryEntry('pale_mushroom')!.desc.split(/\s+/)

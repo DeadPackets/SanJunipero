@@ -113,11 +113,8 @@ describe('the same person, five days apart, is not the same row', () => {
     expect(a5.with).toEqual(['Yusuf'])
   })
 
-  // ★ "NEAR" IS THE WORLD'S OWN EARSHOT, NOT THE VIEWER'S COPY OF IT. `EARSHOT_TILES = 8` was
-  // a transcription of `DEFAULT_CONFIG.movement.earshotRadius` and also the AUTHORITY, which
-  // is exactly the shape `BUILD_TICKS_FULL` had when it went stale unnoticed. It is a fallback
-  // now and the snapshot's own figure wins, so a world that hears further — or less far — has
-  // a roster that says so.
+  // `EARSHOT_TILES` is a fallback, not the authority: the snapshot's own figure wins, so a world
+  // that hears further — or less far — has a roster that says so.
   it('★ a world with a different earshot has a different idea of who is near', () => {
     const at = (earshot?: number): string[] =>
       rosterRows2(day5, [], bonds, 5 * DAY_TICKS, [], earshot).find((r) => r.id === 'amara')!.with
@@ -296,13 +293,8 @@ describe('the rendered row', () => {
     expect(html).toContain(`aria-label="${label.replace(/"/g, '&quot;')}"`)
   })
 
-  // ★ PROXIMITY IS NOT A BOND, AND THE ROW MUST NOT SAY IT IS.
-  //
-  // `row.with` is `companyOf` — who is inside earshot right now. It printed as "with Yusuf",
-  // and the nav tab beside it is labelled BONDS. Merge train 3 read the two as one claim and
-  // filed `BONDS 0` as a counter that lies. The count was right — the scripted founders never
-  // speak, give, teach or share a roof, so the bond ledger genuinely holds nothing — and the
-  // word was borrowed from a surface that means something else.
+  // `row.with` is `companyOf` — who is inside earshot right now — and the nav tab beside it is
+  // labelled BONDS. Reading the two as one claim made a correct `BONDS 0` look like a lie.
   it('★ says who is NEAR, never who someone is "with" — that word belongs to the bonds', () => {
     expect(row.with).toEqual(['Yusuf'])          // they are one tile apart, and that is all
     expect(html).toContain('near Yusuf')

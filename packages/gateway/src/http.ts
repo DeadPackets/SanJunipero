@@ -9,8 +9,7 @@ export const sendJson = (res: ServerResponse, body: unknown, status = 200): void
 export const notFound = (res: ServerResponse): void => sendJson(res, { error: 'not found' }, 404)
 
 /** One `events` row as the read paths take it. Deliberately NOT `EventEnvelope.parse`d:
- *  `worldMirror.ts` validates what enters the world, and a fold that re-validated every row
- *  would pay a zod parse per event to learn what the schema already knows. */
+ *  `worldMirror.ts` already validates what enters the world. */
 export type EventRow = { seq: number; tick: number; type: string; payload: string }
 export const toEvent = (r: EventRow): SimEvent =>
   ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })

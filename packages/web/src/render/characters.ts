@@ -27,11 +27,7 @@ export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
 export const SHADOW_ALPHA = 0.25
 export const EMOTE_PX = 16
 
-/**
- * The movement law's shape, and its defaults, restated where the renderer can reach them for a
- * world whose snapshot has not arrived yet. `charAnim.test.ts` reads `shared/src/config.ts` and
- * asserts these are the numbers the schema actually defaults to.
- */
+/** The movement law's defaults, restated for a world whose snapshot has not arrived; `charAnim.test.ts` asserts these are what `shared/src/config.ts` defaults to. */
 export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 1, debuff: 2 } as const
 
 type CharArt = ReturnType<typeof characterArt>
@@ -108,10 +104,8 @@ function sliceV4(atlas: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number],
     new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }))
 }
 
-// Who belongs on the TOWN map. The dead leave it (grave tone is Task 15), and so does anyone
-// who has gone indoors — C9 gives them an `insideId` and the interior sub-scene draws them
-// there. Without this an occupant kept being drawn at the door tile they entered from, which
-// is why a founder asleep in the cottage appeared to be asleep on the grass beside it.
+// Who belongs on the TOWN map. The dead leave it, and so does anyone who has gone indoors — an
+// occupant carries an `insideId` and the interior sub-scene draws them there instead.
 export function rendersOnMap(a: { alive: boolean; insideId?: string }): boolean {
   return a.alive && a.insideId === undefined
 }
@@ -122,9 +116,8 @@ export type CharacterCell = {
   figureH: number
 }
 
-// One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint.
-// The map layer and the interior sub-scene both go through this rather than growing a second
-// slicer that could disagree about where a body's feet are — or about which way it is pointing.
+// One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint. The map
+// layer and the interior sub-scene share it so they cannot disagree about feet or facing.
 export function characterCell(
   sheet: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing,
 ): CharacterCell | null {
@@ -134,8 +127,8 @@ export function characterCell(
       scale: CHAR_TARGET_PX / 64, figureH: 64,
     }
   }
-  // ★ A MISSING CELL DEGRADES INSIDE ITS OWN FACING (charAnim.cellRowLadder) — never across
-  // one, and never by leaving the last texture where it was.
+  // A missing cell degrades inside its own facing — never across one, and never by leaving the
+  // last texture where it was.
   for (const r of cellRowLadder(row)) {
     const cell = art.manifest.cells[`${r}-${facing}`]
     const texture = sliceV4(sheet, art, r, facing)
@@ -195,18 +188,9 @@ export function createCharacterLayer(
   const shadowTexture = scene.app.renderer.generateTexture(shadowG)
   shadowG.destroy()
 
-  // ONE Polygon per entry, its points rewritten in place whenever the applied sprite scale
-  // moves. U9: the landed 52×72 rectangle was 2.77× the drawn silhouette's area — it claimed
-  // the sky where the name tag sits and reached far enough sideways to steal a neighbour's
-  // door. The capsule is 0.93×, and it is inflated only when the figure would otherwise be
-  // under HIT_MIN_PX on screen.
-  //
-  // ★ AND `ranked` IS WHERE THE FLOOR MEETS THE RANK. The floor is a Fitts's-law rule about a
-  // target in open space; a body standing 14 px from a neighbour is not in open space. Grown
-  // to 24 px at the overview stop, the five bodies of a shoulder rank become one 24 px contest
-  // and the viewer can no longer choose which of them they meant. Hitting the WRONG person is
-  // a worse failure than a small target, so the width takes the pitch as its ceiling and the
-  // height keeps the whole floor — bodies in a rank stand beside each other, not on each other.
+  // One Polygon per entry, rewritten in place when the applied sprite scale moves. HIT_MIN_PX is
+  // a Fitts's-law floor for a target in open space, so a `ranked` body caps its WIDTH at the rank
+  // pitch — hitting the wrong person is worse than a small target — and keeps the whole height.
   let hitZoom = 1
   const setHitScale = (e: CharEntry, scale: number, figureH: number, ranked = e.ranked): void => {
     if (e.hitScale === scale && e.figureH === figureH && e.ranked === ranked) return
@@ -285,9 +269,8 @@ export function createCharacterLayer(
     const state = store.getState()
     if (state === null) return
     const now = performance.now()
-    // ★ THE WORLD'S CADENCE, MEASURED RATHER THAN ASSUMED. One `onEvents` call is one delta
-    // message; the ticks inside it are what the world advanced by, so a catch-up burst is not
-    // mistaken for the world suddenly running fast.
+    // One `onEvents` call is one delta message, so the ticks inside it are what the world
+    // advanced by — a catch-up burst is not mistaken for the world running fast.
     const ticks = new Set(evts.map((ev) => ev.tick)).size
     clock = observeTick(clock, now, Math.max(1, ticks))
     const conf = store.getConfig()
@@ -305,9 +288,8 @@ export function createCharacterLayer(
       const dx = p.x - last.x
       const dy = p.y - last.y
       e.facing = facingFrom(dx, dy) ?? e.facing // a body that has not moved keeps its facing
-      // ★ THE LEG'S LENGTH COMES FROM THE RECORD, NOT FROM A STOPWATCH ON THE SOCKET.
-      // `ticksPerTileOf` is the engine's own rule: a body whose needs have fallen under the
-      // debuff threshold takes twice as many ticks per tile, and always has.
+      // The leg's length comes from the record: `ticksPerTileOf` is the engine's own rule, where
+      // a body under the debuff threshold takes twice as many ticks per tile.
       const perTile = ticksPerTileOf(state.agents[p.id]?.needs ?? {}, cfg)
       e.legMs = clock.periodMs * perTile
       e.path = scheduleLeg(e.path, p.x, p.y, {
@@ -341,9 +323,8 @@ export function createCharacterLayer(
       }
     }
     const live = new Set<string>()
-    // ★ TWO PASSES, BECAUSE A RANK IS A PROPERTY OF A TILE AND NOT OF A BODY. Where a body
-    // stands now depends on who else is standing there, so every position is settled before
-    // any of them is drawn. One frame's worth of small arrays; the cull still runs downstream.
+    // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
+    // who else is there and every position must settle before any of them is drawn.
     const standing: Array<{ id: string; x: number; y: number; settled: boolean }> = []
     const drawing: Array<{
       a: { id: string; name: string }; e: CharEntry; pos: { x: number; y: number }; bobY: number
@@ -363,9 +344,6 @@ export function createCharacterLayer(
       // idle orientation after arrival
       if (walking) e.facing = legFacing(e.path) ?? e.facing
       const sheet = sheets.get(a.id)
-      // ★ THE LEGS FOLLOW THE GROUND AND THE PERSON. `legMs` is what the record says this leg
-      // costs; `gait.stride` is how long this body's own step is; `gait.phase` is where in the
-      // loop it happens to be. All three are derived — none of them is a clock nobody set.
       const pose = charPose(
         { asleep: a.asleep, collapsed: a.collapsedSinceTick !== null, walking, facing: e.facing, nowMs },
         strideFrameMs(e.legMs, e.gait.stride),
@@ -420,7 +398,7 @@ export function createCharacterLayer(
         e.nameTagBg.roundRect(-e.nameTagLabel.width / 2 - 4, -e.nameTagLabel.height - 4, e.nameTagLabel.width + 8, e.nameTagLabel.height + 8, 2)
         e.nameTagBg.fill(0xfff6e9)
       }
-      // ONE placement rule for every label in the product (U10): above the DRAWN figure,
+      // ONE placement rule for every label in the product: above the DRAWN figure,
       // flipped or slid to stay on screen instead of being drawn off the edge of it.
       if (e.nameTag.visible) {
         // The tag holds its size for the reader, so its world FOOTPRINT is what the camera

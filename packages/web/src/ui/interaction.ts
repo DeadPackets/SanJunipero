@@ -66,9 +66,8 @@ export function lensFromKey(key: string, current: Lens): Lens | null {
 
 const TEXT_ENTRY_TAGS: ReadonlySet<string> = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 
-// The arrows belong to whatever is under the pointer's focus first: a text field types with
-// them and the map pans with them (StageMount, role="application"). Lens cycling is the
-// fallback, never the interception.
+// The arrows belong to whatever has focus first: a text field types with them and the map pans with
+// them. Lens cycling is the fallback, never the interception.
 export function lensKeyAllowed(tagName: string, isContentEditable: boolean, inApplication: boolean): boolean {
   return !TEXT_ENTRY_TAGS.has(tagName.toUpperCase()) && !isContentEditable && !inApplication
 }

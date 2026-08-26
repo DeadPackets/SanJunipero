@@ -19,18 +19,7 @@ export { BUILDING_PX_PER_TILE } from './textures.js'
 
 export const CONSTRUCTION_TINT = 0xcfc6bc
 export const WITHERED_TINT = 0x857d75
-/**
- * ★ THE PRE-C-LEVEL CEILING, MOVED. `assetResolution.ts` says it moved and lists four places it
- * lived; this was a fifth it missed, and the art lane measured what it cost: the 100 item
- * records it shipped are authored at `WORLD_SPRITE_PX` = 128, and 128 / 24 is **5.333** — a
- * fractional downscale against a law that says whole numbers only. Every item in the town was
- * resampled onto a grid it was not drawn on.
- *
- * 32, and it is two derivations that had to agree: 128 / 4 puts the deepest zoom stop at 1:1,
- * exactly as `CHAR_FIGURE_PX = 52 * 4` does for a cast cell; and (1+1) half-tiles of a 32 px
- * tile is the world span of the 1×1 ground an item stands on. Either alone would be a constant
- * fitted to make a division come out. `drawScale.test.ts` holds both.
- */
+/** Two derivations that had to agree: 128 / 4 puts the deepest zoom stop at 1:1, and (1+1) half-tiles of a 32 px tile is the world span an item stands on. `drawScale.test.ts` holds both. */
 export const ITEM_PX = 32
 export const CROP_SCALE_BASE = 0.4
 export const CROP_SCALE_PER_STAGE = 0.15
@@ -40,72 +29,16 @@ export const PIP_COLOR = 0xf2c879
  *  `DEFAULT_CONFIG.construction.houseTicks` and it is NOT the authority — see `pipsFilled`. */
 export const BUILD_TICKS_FULL = 2880
 
-/**
- * ★ HOW FULL THE PROGRESS PIPS ARE — READ OFF THE WORLD'S OWN CLOCK, NOT A COPY OF IT.
- *
- * This was `progressTicks / BUILD_TICKS_FULL`, a hardcoded 2880 transcribed from
- * `DEFAULT_CONFIG`. The dev world raises a house in 240 ticks so a viewer can watch one go up,
- * and under the transcribed denominator `floor((240 / 2880) × 4)` is **zero at completion** —
- * every house in the demo would stand under scaffolding for its whole build with not one pip
- * lit, and the guard would have been the eye of whoever happened to look.
- *
- * `houseTicks` comes off the snapshot the viewer is already holding (`store.getConfig()`, which
- * `worldStore` parses with the engine's own strict schema), so the meter measures the build the
- * world is actually running. A non-positive or absent figure falls back rather than dividing by
- * zero.
- */
+/** `houseTicks` comes off the snapshot the viewer already holds, so the meter measures the build the world is actually running; a non-positive or absent figure falls back. */
 export function pipsFilled(progressTicks: number, houseTicks: number | undefined): number {
   const full = houseTicks !== undefined && houseTicks > 0 ? houseTicks : BUILD_TICKS_FULL
   return Math.max(0, Math.min(PIP_COUNT, Math.floor((progressTicks / full) * PIP_COUNT)))
 }
 
-/**
- * ★ A ROSTER CAME BACK, IN THE ONE PACKAGE NOBODY SWEPT.
- *
- * This was `ENTERABLE_KINDS = new Set(INTERIOR_KINDS)` — a SECOND, independent derivation of
- * enterability, sitting beside the engine's `isRoofedKind`. The project deleted four rosters and
- * replaced them with properties (`enterableKinds`/`sleepableKinds` → `roofed`,
- * `HEAT_SOURCE_KINDS` → `hearth`, `isPlottedKind` → `sited`); this one was never merged in, so
- * no merge brief caught it, and it only became WRONG when the world grew.
- *
- * It disagreed with the property on FOUR kinds: it said yes to `shed`, which has no recipe row
- * at all and which the engine refuses by name; and no to `cabin`, `cottage` and `farmhouse`,
- * which a body can now walk into and be warm in. A viewer that will not open the door to the
- * founding valley's only indoor fire.
- *
- * A roster says which names somebody remembered. Ask the kind.
- */
+/** Ask the kind, never a roster: a roster says which names somebody remembered, and it goes wrong the moment the world grows a new one. */
 export function enterableKind(config: SimConfig | null, kind: string): boolean {
   return config !== null && isRoofedKind(config, kind)
 }
-
-// ★ THE "CLICK TO ENTER" SQUARE IS RETIRED, AND SO IS THE SLAB THAT DREW IT.
-//
-// THE RULING: *"the 'click to inspect or enter building' squares [must] be retired and instead
-// replaced with accurate hitboxes of the actual structures themselves."*
-//
-// There were TWO squares on a building and both were on the GROUND rather than on the thing:
-//
-//  · INSPECT — `footprintHitPoints`, the flat ground diamond. Measured against every codex
-//    root's decoded alpha, it contained 0.0 % – 0.8 % of the building's DRAWN pixels. Clicking
-//    a roof, a wall or a doorway did nothing; the house answered only on the grass it touches.
-//
-//  · ENTER — a `Rectangle` hitArea over the door tile, floored to 24 px, under a honey sill
-//    drawn flat on that tile. An axis-aligned screen rectangle over a diamond, and the sill it
-//    marked reads in the running product as a paving slab lying in the yard: the art is fitted
-//    to a `(w + h) · 32` square whose lowest row sits at the sprite's own anchor, so the DRAWN
-//    house stands about a footprint's half-height north of the ground plan the sill is cut
-//    from. The affordance and the door in the picture were not in the same place.
-//
-// ★ AND ONE HITBOX REPLACES BOTH, WHICH IS WHAT THE RULING ASKS FOR. A building is one object,
-// so it takes one pointer: the prism of what is drawn. What the click MEANS is then a property
-// of the building rather than of where inside it you landed —
-//
-//   enterable and complete → go in.      anything else → its provenance popover.
-//
-// Nothing is lost by dropping the popover on the nine enterable buildings: `InteriorBar` puts
-// the same `/api/structure/:id/provenance` line at the top of the room you have just walked
-// into. The hover tag says which of the two a click will do, before you make it.
 
 /** Whether clicking this building walks into it. A shell still going up has no room to walk
  *  into, and a well has no room at all — both answer with their story instead. */
@@ -116,15 +49,7 @@ export function entersOnClick(
   return s !== undefined && s.stage === 'complete' && enterableKind(config, s.kind)
 }
 
-/**
- * What the pointer promises: the same building, said two ways, because a click on it does two
- * different things. The tag is the affordance now that the ground slab is gone.
- *
- * The building is named FIRST and the offer follows on a middot, which is a composition fix
- * found by eye: `hoverLabel` already spends an em-dash on "house — built by script", so the
- * landed `Look inside — {name}` read as LOOK INSIDE — HOUSE — BUILT BY SCRIPT, three phrases
- * on two identical separators with the least important one in the middle.
- */
+/** The building is named FIRST and the offer follows on a middot: `hoverLabel` already spends an em-dash, so an em-dash here read as three phrases on two identical separators. */
 export const LOOK_INSIDE = 'Look inside'
 export function structureHoverText(
   config: SimConfig | null, state: WorldState | null, structureId: string,
@@ -144,30 +69,14 @@ export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): numb
   return depthKey(s.x + s.w - 1, s.y + s.h - 1)
 }
 
-/**
- * @deprecated as a hit area — it is the BASE of the hit prism now, and on its own it is the
- * defect the ruling names. Still the shape `builtForm` cuts its plinth from, and
- * `entities.test.ts` cites it as the before-state whose coverage of the drawn art was measured
- * at 0.0 % – 0.8 %.
- */
+/** @deprecated as a hit area — it is the BASE of the hit prism now. Still the shape `builtForm` cuts its plinth from, and the before-state `entities.test.ts` cites. */
 export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
   const k = scale === 0 ? 1 : scale
   return footprintDiamond(w, h).map((v) => v / k)
 }
 
-/**
- * ★ THE HITBOX OF THE STRUCTURE ITSELF, in the sprite's local space.
- *
- * Two sources, because a building is drawn two ways and the hitbox follows WHAT IS DRAWN:
- *
- *  · with ART — `artPrismPolygon`, the drawn cell's diamond footprint swept up the drawn cell's
- *    own height. Coverage of the decoded alpha is 89.1 % – 99.7 % over all twenty codex roots.
- *  · with NO art — `builtFormSpec` draws a plinth and a volume out of the palette, so the prism
- *    is that plinth's diamond swept up that volume's own `heightPx`. Exact, by construction.
- *
- * The 24 px floor is a SCREEN size, so the shape is re-cut when the camera scale moves — a
- * 1 × 1 shed is 64 world px across, which is 16 px at the 0.25 overview stop.
- */
+/** The hitbox of the structure itself, in the sprite's local space — the drawn cell's footprint swept up its own height, or the built form's plinth and volume when there is no art.
+ *  The 24 px floor is a SCREEN size, so the shape is re-cut when the camera scale moves. */
 export function structureHitPoints(
   kind: string, w: number, h: number, scale: number, zoom = 1, hasArt = true,
 ): number[] {
@@ -214,9 +123,8 @@ function applyBuildingArt(
   book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null,
   footprint: { w: number; h: number }, kind: string,
 ): void {
-  // NO ART IN ANY ROOT — draw the thing rather than the forge's checkerboard. The volume is
-  // a child of the sprite, so it inherits the sprite's depth, position and tint for free and
-  // disappears the moment real art arrives.
+  // No art in any root: draw the built form. It is a child of the sprite, so it inherits depth,
+  // position and tint, and disappears the moment real art arrives.
   if (art.url === null) {
     entry.url = NO_ART
     entry.sprite.texture = Texture.EMPTY
@@ -253,10 +161,7 @@ function applyBuildingArt(
   })
 }
 
-/**
- * Re-cut the structure's hit prism. Called when the art's scale lands, when the footprint
- * changes and when the camera settles at a new zoom — never per frame.
- */
+/** Re-cut the structure's hit prism: on the art's scale landing, on a footprint change and on the camera settling at a new zoom — never per frame. */
 function cutHitPrism(entry: Entry, zoom = entry.hitZoom, scale = entry.sprite.scale.x || 1): void {
   entry.hitZoom = zoom
   const { w, h } = entry.footprint
@@ -335,9 +240,8 @@ export function syncEntities(
       hitZoom: scene.getZoom(),
     }
     syncStates.set(scene, sync)
-    // The 24 px floor is a SCREEN size, and the 0.25 overview stop makes it live: a 1 × 1 shed
-    // is 64 world px across, 16 px there. Re-cut every prism when the camera settles, not on a
-    // 2.5 s world tick and not per frame.
+    // The 24 px floor is a SCREEN size and the 0.25 overview stop makes it live, so every prism
+    // is re-cut when the camera settles — not on a world tick and not per frame.
     const cut = sync
     scene.onCamera(() => {
       const z = scene.getZoom()
@@ -386,9 +290,8 @@ export function syncEntities(
       sprite.anchor.set(0.5, 1.0) // bottom-center pinned to the ground point (manifest law)
       const sid = s.id
       nameOnHover(sprite, 'structure', sid)
-      // ONE TARGET, TWO MEANINGS, AND THE BUILDING DECIDES WHICH. A door you can walk through
-      // is the reason to click a house; everything else answers with its story. The hover tag
-      // says which one this click will do before it is made.
+      // One target, two meanings: an enterable complete building goes in, anything else answers
+      // with its story. The hover tag says which before the click is made.
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         if (entersOnClick(store.getConfig(), store.getState(), sid)) {
           sync!.onDoor?.(sid)

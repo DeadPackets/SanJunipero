@@ -1,9 +1,5 @@
-// The integer-downscale post path for a single-subject sprite.
-//
-// The old chain (toSpriteCell) fitted the subject's bounding box to the cell, so the pitch
-// between source and cell was whatever the bbox happened to be — a fractional resample, the
-// exact thing that made the 512 -> 192 bed soft. This one picks a WHOLE factor first, crops
-// a factor-sized window around the subject, and divides by it.
+// The integer-downscale post path for a single-subject sprite: pick a WHOLE factor first, crop a
+// factor-sized window around the subject, and divide by it — never a fractional resample.
 import { chromaKey } from '../post/chromaKey.js'
 import { quantize } from '../post/quantize.js'
 import type { RawImage } from '../post/raw.js'
@@ -27,9 +23,8 @@ export function chooseCropFactor(subjectLongPx: number, cellPx: number, genPx: n
   return Math.min(ceiling, Math.max(MIN_DOWNSCALE_FACTOR, fit))
 }
 
-// Majority vote over one factor x factor block. A block is opaque only when at least half
-// its pixels are, which keeps alpha binary by construction; the colour is the median of the
-// opaque pixels, which survives the generation's dither where a corner sample would not.
+// A block is opaque only when at least half its pixels are, which keeps alpha binary by
+// construction; the colour is the median, which survives dither where a corner sample would not.
 function blockSample(
   img: RawImage, x0: number, y0: number, f: number,
 ): [number, number, number, number] {

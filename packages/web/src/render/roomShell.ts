@@ -3,42 +3,16 @@ import {
   type Tile, type WallKind,
 } from './interiorMap.js'
 
-// THE ROOM SHELL — WALLS, A BACK PLANE, A THRESHOLD (U4, plan task 66; Option C, task 84).
-//
-// THE COMPLAINT: interiors are "way too low quality, way too under detailed". The room was a
-// flat cream diamond with a 2 px rim, one shaded far row and up to five sprites standing on
-// it. There were NO WALLS — `interiors.ts` even carried a `placement: 'wall'` meta whose only
-// effect was a 0 px offset, because there was nothing to hang anything on.
-//
-// A room is three planes, not one: the floor a body stands on and the two back walls a
-// dimetric camera can see. This module is the geometry of all three, plus the two things that
-// stop a plane reading as a coloured card — the courses that give a wall its grain and the
-// pools of light that say where the light comes from. Pure functions and palette tokens only:
-// no Pixi, no pixels, so every number here is measurable offline.
-//
-// ★ THE UNIT IS NOW THE INTERIOR TILE, AND THAT IS THE WHOLE OF OPTION C. Every length below
-// was a count of 32×16 TOWN tiles, drawn at a scene zoom of 3 or 4. It is now interior pixels
-// on the 128×64 interior tile at a scene zoom of ONE — the same pixel density on the glass, a
-// room twice as wide, and art that lands 1:1 instead of being doubled by the camera.
-// `interiorMap.ts` owns the lattice; this module owns what is painted on it.
+// Geometry for a room's floor and its two visible walls, in interior pixels on the 128×64
+// interior tile `interiorMap.ts` owns. Pure functions, so every number here measures offline.
 
 export { ROOM_TILES, WALL_H_PX, WALL_KINDS, type WallKind } from './interiorMap.js'
 
 /** The room's size, in interior tiles. */
 export type RoomSize = { w: number; h: number }
 
-/**
- * ★ THE SCENE ZOOM IS ONE, AND THAT IS NOT A DEMOTION.
- *
- * It was 4, over a 6×6 room of 32×16 town tiles: one tile reached the glass 128 px across and
- * a 128 px library sprite was drawn at 256 — a clean doubling, but a DOUBLING, so half the
- * pixels on the screen were invented by the sampler. Option C keeps the tile exactly 128 px
- * wide on the glass and makes the TILE the authored unit instead of the camera. The room is
- * 12×6 of those, the furniture lands at its own native size, and nothing is upscaled.
- *
- * There is no smaller integer, so a stage too short for the box crops it rather than
- * resampling it — `roomOriginY` spends what headroom there is on the wall top first.
- */
+/** 1, because the interior tile is authored at the size it reaches the glass: any other
+ *  factor resamples pixel art, and a stage too short for the box crops instead. */
 export const ROOM_ZOOM = 1
 /** Stage left above the wall top and below the near floor vertex. A room flush to the edge of
  *  the screen reads as a room that has been cut off. */
@@ -67,12 +41,8 @@ export const THRESHOLD_TILES = 1.6
 /** How deep the walls' shade falls across the row of floor nearest them. */
 export const FAR_ROW_SHADE_ALPHA = 0.22
 
-/** Every colour the shell paints. All MASTER_PALETTE members, asserted as a set by the test.
- *  The two walls are a light and a shade of one material so the corner reads as a corner;
- *  the floor is a third step, so no two adjacent planes share a tone.
- *
- *  This is the ART-INDEPENDENT shell: what the room is when the codex holds no interior
- *  tileset. With one, the walls and the floor are drawn from it and only the light is code. */
+/** Every colour the shell paints, all MASTER_PALETTE members. This is the art-independent
+ *  room: with an interior tileset the walls and floor come from it and only the light is code. */
 export const ROOM_SHELL_PAINT = {
   floor: 0xf6e8d5,        // warm paper — the landed INTERIOR_FLOOR, kept
   floorSeam: 0xd4bc9e,    // board seams
@@ -114,10 +84,7 @@ export function floorRegionPoly(r: { x0: number; y0: number; x1: number; y1: num
   return c.flatMap((p) => [p.sx, p.sy])
 }
 
-/**
- * The centre of the ground a piece stands on, in room space — the point its sprite's feet
- * belong at. A furnishing two tiles deep has its foot TWO tiles from its origin, not one.
- */
+/** The centre of the ground a piece stands on: a two-tile-deep piece foots two tiles out. */
 export function tileSpanCentre(
   tile: Tile, size: { w: number; h: number },
 ): { sx: number; sy: number } {
@@ -135,11 +102,7 @@ function wallBase(kind: WallKind, room: RoomSize): { sx: number; sy: number } {
   return kind === 'back-right' ? interiorToScreen(room.w, 0) : interiorToScreen(0, room.h)
 }
 
-/**
- * The two back walls, as closed quads in room space: the base edge, then the same edge raised
- * by `wallH` interior pixels. The pair shares exactly one edge — the far vertical column at
- * the room's origin — which is what makes the corner a corner.
- */
+/** The two back walls as closed quads: each base edge, raised by `wallH` interior pixels. */
 export function wallPolys(
   room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
 ): Record<WallKind, number[]> {
@@ -187,17 +150,8 @@ export function floorBoards(room: RoomSize = ROOM_TILES): Line4[] {
   return lines
 }
 
-/**
- * ★ WHERE A WALL PIECE HANGS — AND WHICH WAY IT THEN FACES.
- *
- * This used to pick the wall with `slot.x > slot.y` and say nothing at all about facing, which
- * is how a fireplace authored SW came to be mounted on the SE-facing wall. The wall is now the
- * one the piece's TILE is actually against (`interiorMap.wallOfTile`), and the facing is that
- * wall's own — there is no third answer, because `TownFacing` has no third member.
- *
- * `null` for a tile against no wall: a wall piece in the middle of the floor is a placement
- * error and reads as one instead of hanging in mid-air.
- */
+/** Where a wall piece hangs and which way it faces; `null` for a tile against no wall, so a
+ *  misplaced piece reads as a placement error rather than hanging in mid-air. */
 export function wallMount(tile: Tile): { sx: number; sy: number; wall: WallKind } | null {
   const wall = wallOfTile(tile)
   if (wall === null) return null
@@ -206,11 +160,7 @@ export function wallMount(tile: Tile): { sx: number; sy: number; wall: WallKind 
   return { sx: base.sx, sy: base.sy - WALL_MOUNT_H_PX, wall }
 }
 
-/**
- * The doorway: a plate straddling the room's NEAR vertex, on the same face the exterior door
- * sits on, so entering and leaving are the same place. Half of it lies inside the room and
- * half outside — which is what a threshold is.
- */
+/** The doorway plate, straddling the room's near vertex: half inside the room, half out. */
 export function thresholdPoly(room: RoomSize = ROOM_TILES): number[] {
   const c = interiorToScreen(room.w, room.h)
   const hx = (THRESHOLD_TILES * INTERIOR_TILE.w) / 2
@@ -220,14 +170,8 @@ export function thresholdPoly(room: RoomSize = ROOM_TILES): number[] {
 
 // ── ★ THE CEILING, SEEN THE ONLY WAY A DIMETRIC CAMERA CAN SEE IT ────────────────────────
 //
-// A room drawn from above has no ceiling on the screen, and the mock the user approved solves
-// that the way a painter does: three joists, drawn as the shadows they cast down the floor.
-// It is the cheapest thing in the picture and it is most of what stops a big floor reading as
-// an empty one. The lane before this one ran out of room before them and said so.
-//
-// The spacing is the WALL BAY, not a number: a joist lands over the joint between two wall
-// strips, which is where a joist actually goes, so the ceiling and the walls are the same
-// building. `WALL_STRIP_TILES` lives in `interiorTileset.ts`, so it is passed in.
+// Joist spacing is the wall bay, so a joist lands over the joint between two wall strips.
+// `WALL_STRIP_TILES` lives in `interiorTileset.ts`, so it is passed in.
 
 /** How far a joist reaches either side of its own centre line, in interior tiles. */
 export const BEAM_HALF_TILES = 0.22
@@ -250,11 +194,8 @@ export function ceilingBeams(bayTiles: number, room: RoomSize = ROOM_TILES): num
 
 export type FloorPool = { sx: number; sy: number; radius: number; alpha: number }
 
-/**
- * Light falls from the doorway and from any furnishing that provides it. The doorway pool
- * always exists — a room with no fire is lit by the way in, never by nothing — and it is
- * returned first, so the painter lays the ambient light down before any fire.
- */
+/** Light from the doorway and from any furnishing that provides it. The doorway pool always
+ *  exists and comes first, so the painter lays the ambient light down before any fire. */
 export function floorPools(
   items: ReadonlyArray<{ tile: Tile; light: boolean }>, room: RoomSize = ROOM_TILES,
 ): FloorPool[] {
@@ -274,14 +215,8 @@ export function floorPools(
   return pools
 }
 
-/**
- * The union outline of the two walls and the floor — the room as ONE closed shape.
- *
- * WHAT THE BROWSER CAUGHT: a hearth's glow is a child of its sprite, so it grew with the
- * furniture scale and painted a pale disc across the town outside the room. A room is a box;
- * nothing drawn inside it belongs outside it. One mask on the room container settles that for
- * every prop, present and future, instead of one clamp per light.
- */
+/** The union outline of the two walls and the floor — the room as one closed shape. Masking
+ *  the room container with it keeps every prop's glow inside the room. */
 export function roomMaskPoly(room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number[] {
   const e = wallBase('back-right', room)
   const w = wallBase('back-left', room)
@@ -292,11 +227,8 @@ export function roomMaskPoly(room: RoomSize = ROOM_TILES, wallH: number = WALL_H
   ]
 }
 
-/**
- * The room's whole drawn box in room space: the top of the walls down to the floor's near
- * vertex. The camera centres THIS, never the floor alone — walls made the box twice as tall
- * as the thing the landed code was centring, so the top of the room went off the stage.
- */
+/** The whole drawn box: wall top down to the floor's near vertex. The camera centres this,
+ *  never the floor alone, or the walls push the top of the room off the stage. */
 export function roomBox(
   room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
 ): { top: number; bottom: number; height: number } {
@@ -305,43 +237,19 @@ export function roomBox(
   return { top, bottom, height: bottom - top }
 }
 
-/**
- * ★ HOW CLOSE THIS STAGE HOLDS THE ROOM — and why the answer no longer depends on the stage.
- *
- * It used to choose between 4 and 3 by whether the box fitted. Option C has ONE integer scene
- * zoom and it is 1: the interior tile is authored at the size it reaches the glass, so any
- * other factor resamples pixel art, and there is no integer below 1 to fall back to. A stage
- * that cannot hold the box CROPS it — `roomCropPx` says by how much — because a cropped room
- * of real pixels beats a whole room of invented ones.
- *
- * It stays a function of the stage so the scene keeps asking rather than writing a constant.
- */
+/** Always `ROOM_ZOOM`; still a function of the stage so the scene asks rather than inlines it. */
 export function roomZoomFor(_screenH: number): number {
   return ROOM_ZOOM
 }
 
-/**
- * How much of the room's box a stage this tall cannot show. 0 when it all fits — the number the
- * crop costs, so "it does not fit" is measured rather than asserted.
- *
- * ★ THE MARGIN IS NOT PART OF THE BOX. It was counted here, so a stage that could hold the room
- * exactly was told it was 16 px short and threw away the near corner — the threshold, which is
- * the way out — to buy two strips of nothing. A courtesy is paid out of slack or it is not paid:
- * `roomOriginY` clamps it to the headroom that exists, and this counts only the picture.
- */
+/** How much of the room's box a stage this tall cannot show; 0 when it all fits. `ROOM_MARGIN_Y`
+ *  is deliberately NOT counted here — it is paid out of slack by `roomOriginY`. */
 export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number {
   return Math.max(0, roomBox(room, wallH).height * ROOM_ZOOM - screenH)
 }
 
-/**
- * ★ THE ROOM'S DRAWN WIDTH — and it is the half of the crop nobody was measuring.
- *
- * `roomCropPx` takes a HEIGHT and returns one number, so the only overflow anybody could see
- * was the vertical one. A room is a diamond: it spreads `room.h` tiles to the WEST of its
- * origin and `room.w` tiles to the EAST, so a 24 × 6 farmhouse is **1 920 px across** and no
- * laptop is that wide. The hearth stands on the back-left wall, which is the west vertex —
- * the first thing a centred horizontal crop eats.
- */
+/** The room's drawn width: a diamond spreads `room.h` tiles west of its origin and `room.w`
+ *  east, so a wide room overflows a stage horizontally as well as vertically. */
 export function roomWidthPx(room: RoomSize = ROOM_TILES): number {
   return wallBase('back-right', room).sx - wallBase('back-left', room).sx
 }
@@ -356,24 +264,8 @@ export function roomCrop(
   }
 }
 
-/**
- * ★ WHERE THE CAMERA MAY GO INSIDE A ROOM IT CANNOT SHOW WHOLE — and the range IS the crop.
- *
- * `roomOriginX`/`roomOriginY` place a room that fits. When it does not fit there is nothing
- * left to choose but WHICH part is on the glass, and that choice is a camera. The travel it is
- * allowed is exactly `roomCrop`, because a pixel of travel past the crop is a pixel of stage
- * showing nothing:
- *
- * - **x**: `roomOriginX` CENTRES the box, so the overflow is split — the camera may go half the
- *   crop either way.
- * - **y**: `roomOriginY` pins the wall top when the box overflows, so the whole overflow is
- *   below. The camera may only travel DOWN into the room, never up into blank stage above a
- *   wall that is already flush with the top.
- *
- * A room that fits gets a range of zero in that axis and therefore cannot move at all: a house,
- * a cabin, a shed and a storehouse are pinned exactly where they are today, on every stage that
- * holds them. **Nothing that fits acquires a camera.**
- */
+/** The camera's allowed travel, which is exactly the crop: split either way in x, because
+ *  `roomOriginX` centres, and downward only in y, because `roomOriginY` pins the wall top. */
 export function roomPanRange(
   screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
 ): { minX: number; maxX: number; minY: number; maxY: number } {
@@ -385,13 +277,8 @@ export function roomPanRange(
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
 
-/**
- * The camera offset that brings `focus` — a point in ROOM space — as near the middle of the
- * stage as the room allows, added to the origin the two `roomOrigin*` functions already give.
- *
- * `null` focus is the room's own life being nowhere: the offset is 0 in both axes, which is the
- * landed placement to the pixel. An empty room does not drift.
- */
+/** The offset that brings a room-space `focus` as near the stage's middle as the room allows,
+ *  added to the `roomOrigin*` placement; a `null` focus offsets by 0 in both axes. */
 export function roomPanTo(
   focus: { sx: number; sy: number } | null,
   screenW: number, screenH: number, zoom: number,
@@ -407,26 +294,8 @@ export function roomPanTo(
   }
 }
 
-/**
- * ★ WHAT THE CAMERA FOLLOWS — and the order is the answer to "a camera that follows nobody is
- * a camera the viewer has to drive".
- *
- * The user chose this room for one stated reason: *"I want NPCs to be able to actually walk
- * around and interact with objects."* So the camera watches the room's LIFE, not its geometry:
- *
- * 1. the body the viewer is already following, if it is in this room — never lose the person
- *    you came in for;
- * 2. otherwise the centroid of everybody in the room, so a room with people in it is framed on
- *    the people;
- * 3. otherwise `resting` — where the room's life happens when nobody is having it. ★ THIS IS
- *    NOT AN OPTIONAL EXTRA. An empty farmhouse crops exactly as hard as a full one, and a
- *    camera with nobody to follow would leave it cropped: the browser showed the hearth off
- *    the left edge and the doorway off the bottom of a room with nobody in it. The caller
- *    passes the room's own first perch, which is hearth-first by `AWAKE_PREFERENCE` — so an
- *    empty room rests on its fire, which is the thing a viewer opened the door to see.
- * 4. and `null` only when the room furnishes nowhere to rest either, where the landed
- *    placement is the honest answer.
- */
+/** What the camera watches, in order: the followed body if it is in this room, else the
+ *  centroid of everybody in it, else `resting`, else `null`. */
 export function roomFocusOf(
   bodies: ReadonlyArray<{ id: string; sx: number; sy: number }>,
   followedId: string | null,
@@ -450,29 +319,16 @@ export function easePan(from: number, to: number, dtMs: number): number {
   return to + (from - to) * Math.pow(0.5, dtMs / ROOM_PAN_HALF_LIFE_MS)
 }
 
-/**
- * ★ WHERE THE ROOM'S ORIGIN GOES ACROSS THE STAGE — and it is NOT the middle of it.
- *
- * The origin is the room's FAR corner, and the room only spreads evenly around it while it is
- * square. Option C's room is 12 × 6, so its west vertex is 384 px to the left of the origin
- * and its east vertex 768 px to the right: dropping the origin on the middle of the stage
- * hangs the room 192 px off to the right, which is what the browser showed.
- */
+/** Where the room's origin goes across the stage. The origin is the FAR corner, which is only
+ *  centred in a square room, so a non-square room is centred on its west/east vertices. */
 export function roomOriginX(screenW: number, zoom: number, room: RoomSize = ROOM_TILES): number {
   const west = interiorToScreen(0, room.h).sx
   const east = interiorToScreen(room.w, 0).sx
   return screenW / 2 - ((west + east) / 2) * zoom
 }
 
-/**
- * Where the room container's origin goes so the whole box is centred in a stage `screenH`
- * tall, lifted clear of the chrome at the bottom by `offsetY`.
- *
- * ★ THE LIFT IS A COURTESY, NOT A LICENCE. It was subtracted unconditionally, which pushes a
- * wall off the top the moment the box is not half the stage. It is clamped to the headroom the
- * stage actually has, less the margin, so the invariant the landed test states — every wall
- * point on the stage — holds at every height that can hold the box at all.
- */
+/** Where the room container's origin goes so the box is centred in a stage `screenH` tall,
+ *  lifted clear of the bottom chrome by `offsetY` — clamped to the headroom that exists. */
 export function roomOriginY(
   screenH: number, offsetY: number, zoom: number, room: RoomSize = ROOM_TILES,
   wallH: number = WALL_H_PX,
@@ -480,14 +336,7 @@ export function roomOriginY(
   const box = roomBox(room, wallH)
   const centred = screenH / 2 - ((box.top + box.bottom) / 2) * zoom
   const headroom = centred + box.top * zoom     // stage above the wall top, centred
-  // ★ A SHORT STAGE LOSES THE NEAR CORNER, NOT THE WALL TOP. Centring split the overflow
-  // evenly, which spends half of it on the windows, the chimney breast and the beams and the
-  // other half on a corner of bare boards. The walls are where the room's detail is.
-  //
-  // ★ AND IT LOSES AS LITTLE OF IT AS IT CAN. This pinned the wall top a full `ROOM_MARGIN_Y`
-  // down whatever the stage had, so a room that overflowed by 2 px lost 10 — the margin taken
-  // out of the picture instead of out of the slack. Clamped to the headroom that exists, which
-  // is the same rule the lift above it already answers to.
+  // A short stage loses the near corner, not the wall top — the walls carry the room's detail.
   if (headroom < ROOM_MARGIN_Y) return Math.max(0, headroom) - box.top * zoom
   return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
 }
@@ -532,13 +381,8 @@ export function drawWalls(
   }
 }
 
-/**
- * The floor's surface and its grain.
- *
- * `surface` is `null` when the caller has already laid a continuous MATERIAL down under this
- * pass — the interior's half of the landed hot-swap law. The detail is identical either way,
- * so a floor with art and a floor without differ in one fill and nothing else.
- */
+/** The floor's surface and its grain. `surface` is `null` when the caller has already laid a
+ *  continuous material down under this pass. */
 export function drawFloorBase(
   g: ShellPainter, room: RoomSize = ROOM_TILES,
   surface: number | null = ROOM_SHELL_PAINT.floor,
@@ -553,13 +397,8 @@ export function drawFloorBase(
   strokeLines(g, floorBoards(room), ROOM_SHELL_PAINT.floorSeam, 0.4)
 }
 
-/**
- * The light on the floor, and the threshold it falls through. A pool on a dimetric floor is
- * an ellipse — half as tall as it is wide, like every tile.
- *
- * THE CALLER MUST MASK THIS TO `floorPolyOf`. Both the doorway pool and the threshold are
- * centred ON the near vertex, so half of each lies outside the room BY CONSTRUCTION.
- */
+/** The light on the floor and the threshold it falls through. The caller MUST mask this to
+ *  `floorPolyOf`: the doorway pool and the threshold straddle the near vertex by construction. */
 export function drawFloorLight(
   g: ShellPainter, pools: readonly FloorPool[], room: RoomSize = ROOM_TILES,
   beams: readonly number[][] = [],

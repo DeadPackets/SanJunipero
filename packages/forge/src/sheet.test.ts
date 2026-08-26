@@ -100,12 +100,8 @@ describe('downscaleMajority', () => {
     expect(out.data[15]).toBe(0)
   })
 
-  // ★ THE PROPERTY THAT MAKES A GATE A GATE AND NOT A COIN. Half of every character sheet
-  // is `mirrorX` of the other half, so the reduction the gates measure through has to
-  // commute with a flip. It did not: `floor(i*src/n)` boxes are not their own mirror on a
-  // non-integer factor, and the tie-break read left to right. Both are fixed; this asserts
-  // the consequence over the AWKWARD sizes — odd source, even output and the reverse — which
-  // is where every one of the disagreements lived.
+  // Half of every character sheet is `mirrorX` of the other half, so the reduction the gates
+  // measure through has to commute with a flip — asserted over the AWKWARD source/output parities.
   it('★ commutes with a horizontal flip, at every source/output parity', () => {
     const offenders: string[] = []
     for (const src of [31, 32, 33, 96, 127, 128]) for (const out of [7, 8, 9, 10]) {

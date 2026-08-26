@@ -17,9 +17,8 @@ import type { DepthBox } from './depth.js'
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
 // THE GROUND BAKE AT TEN RINGS.
-//
-// MEASUREMENT LAW: every number in this file comes from a pure function or from the REAL
-// `createGroundBaker` driven over the `bigTown` ring grammar in this process. No browser.
+// Every number comes from a pure function or from the REAL `createGroundBaker` driven over the
+// `bigTown` ring grammar in this process. No browser.
 // ════════════════════════════════════════════════════════════════════════════════════════════
 
 const MB = 1024 * 1024
@@ -239,11 +238,7 @@ describe('what stays on the GPU', () => {
 const gridForSide = (side: number) =>
   groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2))
 
-/**
- * The WORST a view can do, swept across the whole field rather than around its middle: a view
- * straddling a boundary touches one more column and one more row than a view sitting on one,
- * and a view at the field's edge touches fewer. Both matter, so the sweep sees both.
- */
+/** The WORST a view can do, swept across the whole field: straddling a boundary touches one more column and row than sitting on one, and a view at the edge touches fewer. */
 function peakVisible(grid: ReturnType<typeof gridForSide>, z: number): {
   bytes: number; chunks: number
 } {
@@ -315,10 +310,8 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
   })
 
   it('the chunk size is near the bottom of its own cost curve, not a round number', () => {
-    // A chunk grid pays twice: rounding — a view that straddles a boundary drags in a whole
-    // extra column and row — and DRAW CALLS, one per resident chunk, because each carries its
-    // own texture and nothing batches across them. Small chunks waste less and cost more calls.
-    // Measured over the widest stop at ten rings, which is the worst case for both.
+    // A chunk grid pays twice: rounding (a straddling view drags in a whole extra column and
+    // row) and DRAW CALLS, one per resident chunk, because nothing batches across textures.
     const side = 2 * 10 * 19 + 19
     const rows: string[] = []
     for (const [w, h] of [[256, 128], [512, 256], [1024, 512], [2048, 1024]] as const) {
@@ -338,18 +331,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     expect(rows).toHaveLength(4)
   })
 
-  /**
-   * ★ THE WORLD HAS NO CEILING ANY MORE, so neither may this.
-   *
-   * The world-growth lane deleted the world's fixed size: `genesisTerrainAt(x, y)` was always
-   * pure arithmetic with no bounds, and the 128-tile array was only how much of it had been
-   * written down. The terrain now widens to owe the built set a block pitch on every side —
-   * 250² at five rings, 440² at ten, against today's 128². So the chunked bake is not an
-   * optimisation, it is what decides whether a grown town renders at all, and a working set
-   * that still contained the size of the world would be wrong against a branch that exists.
-   *
-   * These are that lane's own numbers, plus one far past anything planned.
-   */
+  /** The terrain has no fixed size: it widens to owe the built set a block pitch on every side — 250² at five rings, 440² at ten, against today's 128². */
   const GROWN_SIDES: ReadonlyArray<[string, number]> = [
     ['today, 128²', 128],
     ['world-growth, 5 rings, 250²', 250],
@@ -363,13 +345,9 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     for (const z of ZOOM_STOPS) {
       const got = GROWN_SIDES.map(([, s]) => peakVisible(gridForSide(s), z))
       rows.push(`z=${String(z).padEnd(5)} ${got.map((g) => `${(g.bytes / MB).toFixed(1)}MB/${g.chunks}`.padStart(12)).join('')}`)
-      // ★ IT CONVERGES, AND THE SMALL SIDES ARE CHEAPER RATHER THAN EQUAL. A field that is not
-      // much bigger than the view runs off its own edge, and the clipped last column and row
-      // cost less than full chunks — so 128² and 250² sit UNDER the asymptote rather than on
-      // it. From 440² up, where the peak view sits entirely in the interior, the answer stops
-      // moving: 440, 1539 and 4000 are the same number. That is the claim — the size of the
-      // world is not a term in it — and it has to be stated as convergence, not equality,
-      // because equality would be false for exactly the towns that exist today.
+      // Convergence, not equality: a field barely bigger than the view runs off its own edge and
+      // its clipped last column and row cost LESS than full chunks, so small sides sit under the
+      // asymptote. The claim is that the size of the world is not a term in the answer.
       const asymptote = got[got.length - 1]!.bytes
       for (const g of got.slice(2)) expect(g.bytes).toBe(asymptote)
       for (const g of got) expect(g.bytes).toBeLessThanOrEqual(asymptote)
@@ -413,10 +391,9 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
   })
 })
 
-// ── ★ THE REAL BAKER, DRIVEN ────────────────────────────────────────────────────────────────
-//
-// Not a source read and not a re-implementation: `createGroundBaker` itself, with a stub for the
-// one thing it needs a GPU for. Everything it allocates is the production path.
+// ── THE REAL BAKER, DRIVEN ──────────────────────────────────────────────────────────────────
+// `createGroundBaker` itself, stubbed only where it needs a GPU: everything it allocates below
+// is the production path.
 
 type Bake = { at: { x: number; y: number }; texW: number; texH: number; kids: number; bounds: Bounds }
 
@@ -493,18 +470,7 @@ describe('★ what the real baker puts on the GPU', () => {
     expect(back.bytes).toBeLessThan(wide.bytes)
   })
 
-  /**
-   * ★ THE ONE THING A BROWSER WOULD HAVE CAUGHT, CHECKED WITHOUT ONE.
-   *
-   * The whole-map baker put ONE sprite at `(-offX, 0)` holding geometry drawn at bake
-   * coordinates, so a bake-space point B landed at world `(B.x - offX, B.y)`. Every chunk has
-   * to land in exactly the same place, and it is reached the other way round — the geometry is
-   * translated onto the chunk's origin and the sprite is translated back off it. Two sign
-   * errors that cancel look identical to two that do not, and the difference is the entire
-   * ground shifted by a chunk. There is no test for "the picture is right", so this is the
-   * arithmetic stated as a claim: for a probe point in every resident chunk, the world position
-   * of the texel holding it is the world position the single texture gave it.
-   */
+  /** The geometry is translated ONTO a chunk's origin and the sprite translated back off it, so two sign errors that cancel look exactly like two that do not — and the difference is the whole ground shifted by a chunk. */
   it('★ a chunk lands exactly where the one whole-map texture put the same pixel', () => {
     const d = drive(3)
     d.baker.setView(viewAt(0.5, d.grid.fieldW / 2, d.grid.fieldH / 2, d.grid.offsetX))
@@ -530,12 +496,7 @@ describe('★ what the real baker puts on the GPU', () => {
     expect(probes).toBeGreaterThan(9)
   })
 
-  /**
-   * ★ AND THE OTHER HALF OF THE SAME ARITHMETIC: the geometry has to be translated ONTO the
-   * chunk's origin before it is rendered, or every chunk paints the same corner of the map into
-   * its own texture and only the first one is right. The sprite positions above would be
-   * perfect and the picture would be twelve copies of one chunk.
-   */
+  /** The other half of the same arithmetic: without the translation every chunk paints the same corner of the map, and the picture is twelve copies of one chunk with perfect sprite positions. */
   it('★ each chunk renders the geometry translated onto its own origin, inside its target', () => {
     const d = drive(3)
     d.baker.setView(viewAt(0.5, d.grid.fieldW / 2, d.grid.fieldH / 2, d.grid.offsetX))
@@ -550,9 +511,8 @@ describe('★ what the real baker puts on the GPU', () => {
       expect(r.at.x).toBeLessThanOrEqual(0)
       expect(r.at.y).toBeLessThanOrEqual(0)
       seen.add(`${r.at.x}:${r.at.y}`)
-      // A chunk in the corner of the field's AABB can be outside the world diamond entirely
-      // and legitimately draw nothing; every chunk that DOES carry ground must land on its own
-      // target, which is the half of this the translation can get wrong.
+      // A chunk in the corner of the field's AABB can be outside the world diamond entirely and
+      // legitimately draw nothing; every chunk that DOES carry ground must land on its target.
       if (r.kids === 0) continue
       painted++
       expect(r.bounds.maxX, `${r.at.x},${r.at.y} draws entirely left of its target`)

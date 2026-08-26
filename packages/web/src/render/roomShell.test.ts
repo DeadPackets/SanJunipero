@@ -125,10 +125,6 @@ describe('roomShell — the two back walls', () => {
   })
 })
 
-// ★ TASK 84 §2 — THE TWO FIREPLACES. A wall piece used to be sent to a wall by
-// `slot.x > slot.y`, from a slot that need not touch a wall at all, with nothing saying which
-// way the piece then faced. The wall is now the one the TILE is against, the facing is that
-// wall's own, and a tile against no wall gets no mount instead of an arbitrary one.
 describe('roomShell — where a wall piece hangs, and which way it then faces', () => {
   it('a tile on the x=0 column takes back-left; a tile on the y=0 row takes back-right', () => {
     expect(wallMount({ x: 0, y: 4 })!.wall).toBe('back-left')
@@ -287,10 +283,6 @@ describe('roomShell — what the painter is asked to draw', () => {
     expect(light).toBeLessThan(sill)
   })
 
-  // ★ THE CEILING, THE ONLY WAY A DIMETRIC CAMERA CAN SEE IT. The mock the user approved has
-  // three joists across the floor; the product had none, and a 72-tile floor with nothing on
-  // it is most of what "nowhere near as nice as expected" is looking at. The spacing is the
-  // WALL BAY, so the ceiling and the walls are the same building rather than two guesses.
   it('★ a joist over every wall bay, under the light and inside the floor', () => {
     const beams = ceilingBeams(WALL_STRIP_TILES)
     expect(beams).toHaveLength(Math.ceil(ROOM_TILES.w / WALL_STRIP_TILES))
@@ -312,9 +304,6 @@ describe('roomShell — what the painter is asked to draw', () => {
       ops.findIndex((o) => o.op === 'ellipse'))
   })
 
-  // WHAT THE BROWSER CAUGHT: unmasked, the doorway pool painted a pale ellipse across the town
-  // and the threshold hung below the floor like a tab. Both straddle the near vertex BY
-  // CONSTRUCTION, which is why one masked node holds them — and why that is now an assertion.
   it('both the doorway pool and the threshold overflow the floor, so both must be masked', () => {
     const floor = floorPolyOf()
     const p = floorPools([])[0]!
@@ -394,22 +383,16 @@ describe('roomShell — the room fits the stage', () => {
     expect(landed + box.top * ROOM_ZOOM).toBeLessThan(0)
   })
 
-  // ★ THE SAME INVARIANT, TOTALLY: over every stage a viewer could have. The landed test
-  // asserted it at ONE pair of numbers, which is how a 40 px lift that spends more headroom
-  // than a stage has could sit there unnoticed.
   it('★ the whole box is on the stage at every height that can hold it, 600 to 1600', () => {
     const box = roomBox()
     for (let h = 600; h <= 1600; h += 1) {
       const z = roomZoomFor(h)
       const y = roomOriginY(h, OFFSET, z)
-      // A stage too short for the one zoom there is crops, and says by how much. The skip is
-      // measured against `roomCropPx` and never against the zoom under test, or a zoom that
-      // ignored the stage would excuse itself from this check (mutation M9).
+      // The skip is measured against `roomCropPx`, never against the zoom under test, or a
+      // zoom that ignored the stage would excuse itself from this check.
       if (roomCropPx(h) > 0) continue
-      // ★ TWO INVARIANTS, NOT ONE, because the margin is a courtesy and the box is not. The
-      // whole box is on the stage the moment it fits at all; the margin is honoured the moment
-      // there is slack to pay it out of. Stating only the second is what made a stage 2 px
-      // short throw away 18 px of the near corner.
+      // Two invariants: the box fits the moment it can at all, and the margin is only paid
+      // once there is slack to pay it out of.
       expect(y + box.top * z, `wall top off the stage at ${h} px`).toBeGreaterThanOrEqual(0)
       expect(y + box.bottom * z, `floor off the stage at ${h} px`).toBeLessThanOrEqual(h)
       if (h < box.height * z + 2 * ROOM_MARGIN_Y) continue
@@ -425,9 +408,6 @@ describe('roomShell — the room fits the stage', () => {
     expect(roomOriginY(tall, OFFSET, roomZoomFor(tall))).toBe(centred - OFFSET)
   })
 
-  // ★ WHAT THE BROWSER CAUGHT, AGAIN: the origin is the room's FAR CORNER, and a 12x6 room does
-  // not spread evenly around it. Dropping the origin on the middle of the stage hung the whole
-  // room 192 px to the right of centre — visible the moment the room stopped being square.
   it('★ the room is centred by its own BOX across the stage, not by its origin', () => {
     const screenW = 1568
     const x = roomOriginX(screenW, ROOM_ZOOM)
@@ -440,24 +420,18 @@ describe('roomShell — the room fits the stage', () => {
   })
 
   it('★ a stage too short loses the near corner, never the wall top', () => {
-    // MEASURED in the running app: 1728 x 823 window gives a canvas 678 CSS px tall, and the
-    // box is 736. 58 px do not fit and every one of them comes off the bottom, because the
-    // walls carry the window, the chimney breast and the beams.
+    // 678 is a measured canvas height — a 1728 x 823 window — against a 736 px box.
     const short = 678
     expect(roomCropPx(short)).toBe(58)
     const box = roomBox()
     const y = roomOriginY(short, OFFSET, ROOM_ZOOM)
-    // ★ THE MARGIN IS NOT PAID OUT OF THE PICTURE. It used to pin the wall top a full 8 px
-    // down however short the stage was, which bought two strips of nothing with 16 px of room.
     expect(y + box.top * ROOM_ZOOM).toBe(0)                      // the wall top is kept, flush
     expect(y + box.bottom * ROOM_ZOOM).toBeGreaterThan(short)    // the near corner is what goes
     expect(y + box.bottom * ROOM_ZOOM - short).toBe(roomCropPx(short))   // and it is the measured number
   })
 
   it('★ the crop is measured, not asserted — and it is zero on the stage the app reports', () => {
-    // MEASURED in the running app on this machine's window: 1728 x 879 gives
-    // `app.screen.height` = 734, and the box is 736 — 2 px, where the counted-in margins made
-    // it 18 and cost the threshold.
+    // 734 is a measured canvas height — a 1728 x 879 window — against a 736 px box.
     expect(roomCropPx(855)).toBe(0)
     expect(roomCropPx(752)).toBe(0)
     expect(roomCropPx(736)).toBe(0)
@@ -469,22 +443,9 @@ describe('roomShell — the room fits the stage', () => {
   })
 })
 
-// ★★ A FARMHOUSE ROOM DOES NOT FIT A LAPTOP — AND THE CAMERA IS WHAT MAKES IT WHOLE.
-//
-// Rooms are as big as their buildings (12x6 / 18x6 / 24x6) and the factor is forced by the
-// house's landed room, so a farmhouse's box is 1 120 px tall and 1 920 px WIDE. There is no
-// integer scene zoom below 1 to fall back on, so what is off the glass cannot be zoomed back
-// on: the only thing left to choose is WHICH part is showing, and that choice is a camera.
-//
-// The travel it is allowed IS `roomCrop`, in both axes. That is the whole design: a room that
-// fits gets a range of zero and cannot move, so nothing that fits acquires a camera.
 describe('★★ the camera inside a room, and its range IS the crop', () => {
-  // ★ THE ENUMERATION IS THE UNION OF EVERY PLACE A ROOM KIND CAN COME FROM, never a hand-list.
-  // `web-sync` found three rosters in this package and one of them was pinned to a
-  // transcription of itself; a crop guard naming `cabin, cottage, farmhouse` would be the same
-  // defect, passing forever and never seeing the fourth dwelling. A kind added to the recipe
-  // table, to the town the template plants, or to the renderer's own room vocabulary is in this
-  // law the day it lands, with nobody editing this test.
+  // The union of every place a room kind can come from, never a hand-list, so a kind added to
+  // the recipes, the template or the renderer's vocabulary is in this law the day it lands.
   const roomsOf = (): ReadonlyArray<{ kind: string; room: { w: number; h: number } }> => {
     const kinds = [...new Set([
       ...Object.keys(DEFAULT_CONFIG.structures.recipes),
@@ -494,16 +455,8 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     return kinds.map((kind) => ({ kind, room: roomSizeOf(kind as never) }))
   }
 
-  // ★ THE SMALLEST STAGE THIS LAW IS HELD AT, AND WHERE THE NUMBER COMES FROM.
-  //
-  // It is a STAGE, not a window: `roomOriginY` is called with `app.screen.height`, and the
-  // renderer's `resizeTo` is `#stage-root`, which sits under the app header and the status
-  // strip and over the control bar. The one measured pair on record is a 1728 x 823 window
-  // giving a 1478 x 678 canvas — so the chrome costs 250 px across and 145 px down.
-  //
-  // The smallest laptop worth supporting is a 1280 x 800 window, which by that measurement is a
-  // 1030 x 655 stage. Rounded DOWN to 1024 x 640, so the law is held slightly tighter than the
-  // hardware demands rather than slightly looser.
+  // A stage, not a window: chrome costs ~250 px across and ~145 px down, so a 1280 x 800
+  // laptop gives ~1030 x 655. Rounded DOWN, holding the law tighter than the hardware demands.
   const MIN_STAGE = { w: 1024, h: 640 } as const
   // …and the two the crop was measured at, so the reported table stays under test.
   const STAGES = [MIN_STAGE, { w: 1478, h: 678 }, { w: 1478, h: 900 }] as const
@@ -550,9 +503,7 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
           .toBeLessThanOrEqual(stage.h)
       }
     }
-    // ANTI-VACUITY: a range of zero everywhere satisfies the four above only if nothing was
-    // ever cropped. Something must be, or this test is asserting that the defect does not
-    // exist rather than that it is fixed.
+    // Anti-vacuity: a range of zero everywhere satisfies the four above unless something crops.
     expect(anyCropped, 'nothing was cropped — this law proved nothing').toBe(true)
   })
 
@@ -627,12 +578,6 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     }
   })
 
-  // ★ WHAT THE CAMERA IS FOR, restated as arithmetic: follow a body and the body is on screen.
-  // The user chose Option C to watch NPCs walk about; a camera that crops the person you are
-  // following is worse than one that crops a wall.
-  // ★★ THE WHOLE POINT, AS ARITHMETIC: focus on any tile of any room and that tile is on the
-  // glass. It covers both drivers at once — a body the camera is following, and the perch an
-  // EMPTY room rests on, which is the hearth. Over every room kind, at every stage.
   it('★★ any tile the camera is asked for lands on the glass, in every room', () => {
     let offWithout = 0
     let onWith = 0
@@ -667,10 +612,7 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     expect(offWithout, 'no tile was ever off the glass — nothing was fixed').toBeGreaterThan(50)
   })
 
-  // ★ AND THE FIRE IS WHAT AN EMPTY ROOM RESTS ON. The hearth stands against the back-left
-  // wall, which is the room's west vertex — the first thing a centred horizontal crop eats. A
-  // camera that only followed bodies would leave it off the edge of every empty room, which is
-  // exactly what the browser showed before this line existed.
+  // The hearth stands on the back-left wall, the west vertex — what a centred crop eats first.
   it('★ an empty room rests on its fire, and the fire is on the glass', () => {
     let rested = 0
     for (const { kind, room } of roomsOf()) {
@@ -691,9 +633,6 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     expect(rested).toBeGreaterThan(50)
   })
 
-  // ★ WHAT IT FOLLOWS WHEN NOBODY IS SELECTED, decided rather than defaulted. A room with four
-  // sleepers and no action still needs a defined resting position; "wherever it was left" reads
-  // as broken.
   it('★ it follows the person you came in for, then the room, then nothing', () => {
     const a = { id: 'amara', sx: 100, sy: 40 }
     const b = { id: 'yusuf', sx: 300, sy: 80 }
@@ -720,9 +659,6 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     expect(roomFocusOf(sleepers, null)).toEqual({ sx: 400, sy: 100 })
   })
 
-  // ★ THE FOCUS IS ALWAYS INSIDE THE ROOM. A focus outside the walls is how a camera ends up
-  // framing a viewer on nothing at all — it clamps to an edge and parks there. Over every room
-  // kind the config knows, and over every body in it.
   it('★ the focus never leaves the room, whoever is in it and wherever they stand', () => {
     let checked = 0
     for (const { kind, room } of roomsOf()) {
@@ -796,23 +732,9 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
   })
 })
 
-// ★ WHAT THE SCALE IS FOR. Both of these are about the picture, not the geometry, and neither
-// is visible to `drawScale.test.ts`, which measures WORLD size and leaves the zoom on top to
-// the camera's own law.
 describe('★ the room is drawn at the same pixel density as the town at its closest', () => {
-  // ★ THIS TEST USED TO ASSERT THE DEFECT AS A LAW, and it was green while the user was
-  // looking at a man taller than his own wall. It said "a body is exactly as tall indoors as
-  // it is out of doors" and pinned `CHAR_TARGET_PX x INTERIOR_PX_SCALE x ROOM_ZOOM` at 208.
-  //
-  // The claim is false, and the reason is the whole of the scale defect: `INTERIOR_PX_SCALE`
-  // is the PIXEL factor between the two views and the WORLD factor is a different number. An
-  // interior tile is a metre of floor — the library authors a bed at 1x2 and a table at 1x1 —
-  // where a town tile is a corner of a plot. Carrying a body across on the pixel factor alone
-  // keeps the town's body-to-tile ratio in a room where a tile means something else.
-  //
-  // What IS true, and is what this pair of tests was for, is the PIXEL DENSITY: one interior
-  // tile reaches the glass at exactly the size the town's deepest stop draws a town tile, so
-  // nothing in the room is resampled. `interiorScale.test.ts` owns the body's own law.
+  // `INTERIOR_PX_SCALE` is the PIXEL factor between the two views; the WORLD factor differs, so
+  // a body does not take it. `interiorScale.test.ts` owns the body's own law.
   it('★ one interior tile is on the glass at the town\'s own deepest density', () => {
     expect(INTERIOR_PX_SCALE).toBe(ZOOM_SCALE_MAX)
     expect(INTERIOR_TILE.w * ROOM_ZOOM).toBe(TILE_W * ZOOM_SCALE_MAX)
@@ -822,9 +744,8 @@ describe('★ the room is drawn at the same pixel density as the town at its clo
   })
 
   it('★ and a furnishing reaches the screen at exactly the pixels it was drawn on', () => {
-    // `furnishingScale` is the world-space half; the zoom is the other half, and the COMPOSITE
-    // is what the sampler sees. It was 0.5 x 4 = 2 — a clean doubling, but a DOUBLING, so half
-    // the pixels on the glass were invented. Option C makes it 1 x 1.
+    // `furnishingScale` is the world-space half and the zoom the other; the sampler sees the
+    // composite, so anything but 1 invents pixels.
     const composite = furnishingScale() * ROOM_ZOOM
     expect(Number.isInteger(composite), `composite is ${composite}`).toBe(true)
     expect(composite).toBe(1)

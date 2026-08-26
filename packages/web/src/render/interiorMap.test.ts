@@ -72,18 +72,16 @@ describe('interiorMap — the room is a map a body can occupy', () => {
     const map = roomMapOf(HUT)
     const table = at(map, 'table')
     for (const t of tilesOf(table)) expect(isWalkable(map, t), `${t.x},${t.y}`).toBe(false)
-    // ★ THREE, NOT FOUR — and the fourth is the CHAIR. The template says the chair's slot is
-    // next to the table's, and `seatInBlock` now puts it on the side of its own block the
-    // table is on, so the two are drawn as a pair instead of two tiles apart. The seat a body
-    // cannot stand on is a chair standing there.
+    // THREE, not four — the fourth is the CHAIR. `seatInBlock` puts it on the side of its own
+    // block the table is on, so the seat a body cannot stand on is a chair standing there.
     expect(standingTiles(map, table).length).toBe(3)
     expect(at(map, 'chair').tile).toEqual({ x: table.tile.x, y: table.tile.y - 1 })
   })
 
   it('★ seatInBlock groups what the template says belongs together, and moves nothing else', () => {
-    // WHAT THE USER REACTED TO: the room reads as a warehouse. The chair's slot is adjacent to
-    // the table's and it was drawn TWO tiles away, because every piece took the same corner of
-    // its own two-deep block. Derived from the slots, so it is still world data.
+    // The chair's slot is adjacent to the table's and it was drawn TWO tiles away, because every
+    // piece took the same corner of its own two-deep block. Derived from the slots, so it is
+    // still world data.
     const map = roomMapOf(HUT)
     expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 2 }])).toEqual({ x: 5, y: 3 })  // pulled near
     expect(seatInBlock({ x: 1, y: 2 }, [{ x: 1, y: 1 }])).toEqual({ x: 5, y: 4 })  // stays far
@@ -120,13 +118,9 @@ describe('interiorMap — the room is a map a body can occupy', () => {
 describe('interiorMap — a body walks it', () => {
   const map = roomMapOf(HUT)
   const table = at(map, 'table')
-  // DIRECTLY across the table from each other. The straight line between these two tiles is
-  // two steps and the middle one is the table, so a walk that is not a detour is a walk
-  // through the furniture — which is the whole thing this test exists to catch.
-  //
-  // ACROSS THE TABLE, NOT UP IT: the chair now stands on the tile behind the table, so the
-  // depth axis has two blockers on it and the detour it forces is a different length. The
-  // x axis has one, which is the case this proof is about.
+  // DIRECTLY across the table from each other: the straight line between these two tiles is two
+  // steps and the middle one is the table, so a walk that is not a detour walks through the
+  // furniture. Across the X axis, which has one blocker; the depth axis has two.
   const start: Tile = { x: table.tile.x - 1, y: table.tile.y }
   const goal: Tile = { x: table.tile.x + 1, y: table.tile.y }
 
@@ -168,9 +162,8 @@ describe('interiorMap — a body walks it', () => {
   })
 
   it('★ VACUOUS GUARD: the same check FAILS when the room is not walkable', () => {
-    // Fence the goal in on all four sides. If the walk above could pass over an unwalkable
-    // room, this would still find a path — this project has found 15+ checks that measured
-    // nothing, and a pathing test is the easiest one to write vacuously.
+    // Fence the goal in on all four sides. If the walk above could pass over an unwalkable room
+    // this would still find a path — a pathing test is the easiest one to write vacuously.
     const fenced: RoomMap = { ...map, blocked: new Uint8Array(map.blocked) }
     for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]] as const) {
       const n = { x: goal.x + dx, y: goal.y + dy }

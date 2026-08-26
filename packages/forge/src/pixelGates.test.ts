@@ -88,10 +88,8 @@ describe('paletteGate', () => {
     expect(r.offenders[0]!.count).toBeGreaterThan(0)
     expect(r.offenders.length).toBeLessThanOrEqual(8)
   })
-  // USER RULING 2026-08-18: the blanket exemption this gate used to grant portraits is
-  // REVOKED. A class may answer to a WIDER palette, never to none — so the option is the
-  // palette itself, and the shipped bust fails against every one of them until it is
-  // re-quantized. See src/ramps.ts.
+  // A class may answer to a WIDER palette, never to none — so the option is the palette itself,
+  // and the shipped bust fails against every one of them until it is re-quantized.
   it('RED on the shipped bust against the master palette', async () => {
     const r = paletteGate(await fixture('portrait-neutral-128.png'))
     expect(r.ok).toBe(false)

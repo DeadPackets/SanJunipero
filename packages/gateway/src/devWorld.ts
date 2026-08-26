@@ -21,13 +21,8 @@ export const DEV_MS_PER_TICK = 2500
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
 
-// ★ A HOUSE YOU CAN WATCH GO UP. `construction.houseTicks` is two sim days by default, which
-// at the dev world's 2.5 s tick is two REAL HOURS for one roof — a builder nobody would ever
-// see. 240 is the declared fixture dial `townGrowth.test.ts` and `farBank.test.ts` both use,
-// for the same reason and to the same number, so the dev world and the two landed proofs speak
-// one figure. It changes how LONG a build takes and nothing about WHERE it goes: `buildTicks`
-// is read after the site is settled. `config.test.ts` requires the dial and the recipe's
-// `durationTicks` to stay equal, so they move together.
+// `construction.houseTicks` defaults to two sim days — two REAL HOURS at the dev world's 2.5 s
+// tick. `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
 export const DEV_HOUSE_TICKS = 240
 
 // The founders showcase is an art demo: freeze weather to sunny so the storm
@@ -64,28 +59,15 @@ export type DevWorld = {
   /** True when a live cast is driving the bodies. `false` is the scripted puppets, and the
    *  distinction is the whole seam — a caller that cannot read it cannot tell the two apart. */
   live: boolean
-  /** ONE WHOLE TICK, the way the wall clock takes it: the loop step AND the observer scan that
-   *  follows it. Tests used to reach past this and call `loop.step()`, which is most of a tick
-   *  and not all of it — the thought channel was outside every test in the repo. */
+  /** ONE WHOLE TICK the way the wall clock takes it: the loop step AND the observer scan that
+   *  follows it. `loop.step()` is most of a tick and not all of it. */
   tick(): void
   stop(): Promise<void>
 }
 
 /**
- * ★ THE PORT A LIVE CAST PLUGS INTO, AND WHY IT IS A PORT AND NOT AN IMPORT.
- *
- * A world with minds in it needs `@sj/agents`, and — the moment anything wants an arbiter or a
- * narrator around those minds — `@sj/arbiter` and `@sj/narrator` too. Both of those depend on
- * `@sj/agents`, so the assembly cannot live in `@sj/agents`; and `@sj/gateway` is what serves
- * the world, so the assembly cannot live below it either. It lives in `gateway/src/liveWorld.ts`,
- * which is the one node in the graph where all four may legally meet.
- *
- * This file stays ignorant of every one of them. It is handed something that knows how to wrap
- * the world's tick handler and how to stop, and it does not care what is inside. That is what
- * keeps `startDevWorld` — which 300-odd tests call — free of an onnxruntime import.
- *
- * `attach` is called AFTER the loop exists and BEFORE the first tick, because a bridge needs
- * the loop it is bridging and the loop needs the handler the bridge returns.
+ * A port, not an import: this file stays free of `@sj/agents` and its onnxruntime. `attach` runs
+ * after the loop exists and before the first tick — each needs the other first.
  */
 export type LiveCast = {
   attach(deps: {
@@ -101,16 +83,8 @@ export type LiveCast = {
 }
 
 /**
- * ★ FRESH MUST MEAN FRESH FOR THE MINDS TOO, OR THE TOWN GETS AMNESIA BACKWARDS.
- *
- * Agent memory is not in the world db — it is a separate `<id>.db` per mind, which the world
- * delete never touched. That is harmless only for as long as the cast is scripted. The moment
- * live minds are wired to this gateway, a fresh boot would hand you the one state that is
- * worse than either a clean reset or a clean resume: the buildings gone, the day counter back
- * to 0, and every mind still remembering all of it.
- *
- * World and mind are wiped as ONE unit. Only `*.db` goes — anything else in the directory is
- * not this function's to delete.
+ * Agent memory is a separate `<id>.db` per mind, not the world db, so world and mind are wiped
+ * as ONE unit. Only `*.db` goes — the rest of the directory is not this function's to delete.
  */
 function wipeAgentMemory(agentDbDir: string | undefined): number {
   if (agentDbDir === undefined) return 0
@@ -126,23 +100,8 @@ function wipeAgentMemory(agentDbDir: string | undefined): number {
 }
 
 /**
- * ★ THE TWO DEV WORLDS, AND WHICH ONE IS THE PRODUCT.
- *
- * | kind | terrain | town | what it is |
- * |---|---|---|---|
- * | `scripted` | `makeFixtureMap()`, 64×64 | 6 hand-placed buildings (`TOWN_STRUCTURES`) | **A FROZEN TEST FIXTURE.** G1, G2 and G6 hash the world it folds, so it may never change. Four of its six kinds — `wagon`, `shed`, `scaffolding`, `standing_stone` — are the four the art ingest reports `NO ART` for, so two thirds of this town draws as untextured placeholder. |
- * | `showcase` | `showcaseTerrain()`, 76×76 at one ring | the 11 the grammar plats | **THE PRODUCT.** Same `makeCityTemplate` genesis calls, same anchor, same eleven buildings, real art on all of them but the well and the fire pit. |
- *
- * ★ AND THE DEFAULT USED TO BE THE FIXTURE. `startDevWorld()` with no `map:` handed a caller
- * the frozen G6 town, silently. The three-defects lane found the cost: it measured the ambient
- * canopy at 38 of 140 quads outside the ground on the fixture and 0 outside on the showcase —
- * same code, opposite verdicts, decided entirely by which map had loaded. Several lanes met the
- * looking law honestly and may have been looking at a fixture.
- *
- * The LIBRARY default stays `scripted`, because `g6.test.ts` and `devWorld.test.ts` call
- * `startDevWorld()` bare and their gates hash exactly that world. The HUMAN-FACING default — the
- * CLI at the bottom of this file — is the product, and the boot line now says which map loaded
- * and why in every case. A fixture must be asked for by name, not received by silence.
+ * `scripted` is a FROZEN TEST FIXTURE — `g6.test.ts` and `devWorld.test.ts` hash the world it
+ * folds, so it may never change. The library default stays `scripted`; a person gets the product.
  */
 export type DevMapKind = 'scripted' | 'showcase'
 /** For `startDevWorld()` called as a library, i.e. by the gates. Never by a person. */
@@ -157,19 +116,9 @@ export function devTerrain(
 }
 
 /**
- * ★ THE DEV WORLD'S GENESIS, WHICH HAS TO SAY WHERE IT STANDS.
- *
- * `state.origin` is where the array's (0, 0) sits in the AUTHORED frame, and the engine's whole
- * claim seam hangs off it: `townSquareOf` reads `TOWN_SQUARE − origin`. The showcase town is
- * the same `makeCityTemplate` town at a different array offset, so without an origin the engine
- * looked for the square ten rows north of where it is, landed on a paved tile of the plaza's
- * street ring, and answered confidently about a town that is not there. `devWorldOrigin`
- * derives the offset; `devTown.ts` carries the proof that it is a derivation.
- *
- * ★ THE FROZEN FIXTURE GETS NO ORIGIN, deliberately. `makeFixtureMap` is 64 tiles of meadow
- * with six buildings on it and no lattice anywhere — a world with no town in it, which is
- * exactly the domain `townSquareOf` returns null for. Leaving the field absent is what keeps
- * G1, G2 and G6 folding byte-identical worlds.
+ * `state.origin` is where the array's (0, 0) sits in the AUTHORED frame, and the engine's claim
+ * seam hangs off it. The frozen fixture gets none deliberately — an absent field keeps its fold
+ * byte-identical.
  */
 export function devGenesisState(
   config: SimConfig, terrain: ReturnType<typeof makeFixtureMap>,
@@ -183,33 +132,26 @@ export async function startDevWorld(
   opts: {
     dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean
     map?: DevMapKind
-    /** ★ HOW MANY RINGS OF BLOCKS THE SHOWCASE TOWN IS PLATTED FOR. Ignored by `scripted`,
-     *  which is frozen. Every dimension of the map derives from it — the world-growth lane
-     *  removed the ceiling and nothing in the running app could reach past ring 1 until this
-     *  existed. Ring 3 is 136 + 16 = 152 tiles square, which bakes past 2048 px and is the
-     *  case the chunked ground was written for. */
+    /** How many rings of blocks the showcase town is platted for; ignored by `scripted`, which
+     *  is frozen. Every dimension of the map derives from it. */
     rings?: number
-    /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
-     *  Off by default, so every existing gate folds exactly the events it always did. */
+    /** dev/demo only: tired founders go indoors and come out again. Off by default, so every
+     *  existing gate folds exactly the events it always did. */
     interiors?: boolean
-    /** dev/demo only: the founders raise houses on plots the town claims for them, through the
-     *  real `build` verb. Off by default; the frozen fixture has no lattice to build on and
-     *  every existing gate folds exactly the events it always did. */
+    /** dev/demo only: the founders raise houses on claimed plots through the real `build` verb.
+     *  Off by default — the frozen fixture has no lattice to build on. */
     builders?: boolean
     /** dev/demo only: how many lamp posts one founder raises along the street and keeps fed.
      *  ABSENT by default — the stream asks for them; no gate does. */
     lamps?: number
-    /** dev/demo only: one founder lays a deck over the ford before it joins the masons, and the
-     *  fourteen plattable blocks across the water join the town. Off by default; only the
-     *  showcase has a ford, and every existing gate folds exactly the events it always did. */
+    /** dev/demo only: one founder decks the ford, joining the blocks across the water to the
+     *  town. Off by default — only the showcase has a ford. */
     bridge?: boolean
-    /** dev/demo only: a mason beside somebody's half-raised walls lends a hand instead of
-     *  walking to the next plot. Off by default — the hands are real and the calendar does not
-     *  know it; see `jointBuild` on `FoundersOpts` for the numbers. */
+    /** dev/demo only: a mason beside somebody's half-raised walls lends a hand. Off by default —
+     *  see `jointBuild` on `FoundersOpts` for the numbers. */
     jointBuild?: boolean
-    /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
-     *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
-     *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
+    /** The narrator db, opened readonly. Absent, every narrated surface — chapters, milestones,
+     *  moments — answers typed-empty. */
     narratorDbPath?: string
     /** The built `@sj/web`. Present, this process is the whole stream — world, socket and
      *  viewer on one port. Absent, it is the API/socket half and vite proxies to it. */
@@ -218,26 +160,13 @@ export async function startDevWorld(
      *  `wipeAgentMemory` — thrown away together with the world when `fresh` is asked for. */
     agentDbDir?: string
     /**
-     * ★ THROW THE TOWN AWAY AND START A NEW DAY 0. Off by default, and that default is the
-     * whole point of this option existing.
-     *
-     * This function used to `rmSync` the world db unconditionally, so every boot — every
-     * deploy, every crash, every `docker restart` — was a new town. The event log held every
-     * fact the old one ever had and nothing read it back. A function handed a path to a
+     * Throw the town away and start a new day 0. Off by default: a function handed a path to a
      * database does not get to delete it without being asked.
      */
     fresh?: boolean
     /**
-     * ★ MINDS INSTEAD OF PUPPETS. Absent, the founders are the scripted cast this file has
-     * always run and the world costs $0.00/hour. Present, the same town is raised and the
-     * bodies in it are driven by whatever the cast drives them with. See `LiveCast`.
-     *
-     * ★ AND IT IS A FACTORY, NOT A CAST, FOR ONE MEASURED REASON. A cast built before this
-     * call has already OPENED the per-mind databases, and `fresh` then deletes them out from
-     * under the open handles — observed on the first live boot, which reported "the world db
-     * was deleted along with 3 agent memory db(s)" and unlinked the very call ledger the spend
-     * cap reads. Wipe first, build second. It also means a boot that is going to be refused
-     * for a ring mismatch no longer pays a second of ONNX load to find out.
+     * Minds instead of puppets; absent, the founders are the scripted cast. A FACTORY, not a
+     * cast: one built before this call has already opened the per-mind dbs that `fresh` deletes.
      */
     cast?: () => Promise<LiveCast>
   } = {},
@@ -268,11 +197,10 @@ export async function startDevWorld(
     } finally { probe.close() }
   }
 
-  const forgeDb = openForgeDb(dbPath) // migrate forge assets/jobs tables for the push loop + hot-swap demo
+  const forgeDb = openForgeDb(dbPath)
   if (opts.ingest === true) {
-    // load the approved production art so the town wakes with its real cast + buildings
-    // (CLI default; tests skip the cost). Idempotent: unchanged bytes register nothing, so a
-    // resumed town does not grow a second copy of the ~6 MB art cache on every boot.
+    // Idempotent: unchanged bytes register nothing, so a resumed town does not grow a second
+    // copy of the art cache on every boot.
     const tiles = await ingestTerrainArt(forgeDb) // code-painted, offline, $0 — never throws on a missing root
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
@@ -284,7 +212,7 @@ export async function startDevWorld(
     } catch (e) {
       console.log(`dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`)
     }
-    // the C13 premade library: the furniture the interior scenes place on their slots
+    // the premade library: the furniture the interior scenes place on their slots
     try {
       const lib = await ingestLibraryArt(forgeDb)
       console.log(`dev world: ingested library art (${lib.length} items, furniture included)`)
@@ -304,18 +232,8 @@ export async function startDevWorld(
   const structures = townStructuresFor(map, rings)
 
   /**
-   * ★ RESUME IS NOT A NEW FUNCTION. IT IS THE ONE THE ENGINE ALREADY HAS, FINALLY CALLED.
-   *
-   * `replayLatest` loads the latest snapshot — state AND rng cursor — folds the events after
-   * it, and cross-checks the rng checkpoint's tick against the folded tick, throwing rather
-   * than resuming skewed. It has been in `engine/src/replay.ts` all along with exactly one
-   * caller, and that caller was a gate script.
-   *
-   * The fold starts at the latest snapshot, never at genesis, so this is flat in world age:
-   * at most `DEV_SNAPSHOT_EVERY_TICKS` ticks of events however old the town is.
-   *
-   * ★ AND THE TERRAIN COMES BACK WITH IT. `WorldState.terrain` rides in the snapshot, so the
-   * resumed map is the town's real one — which is exactly why the gateway must be handed THIS
+   * The fold starts at the latest snapshot, never at genesis, so resume is flat in world age.
+   * `WorldState.terrain` rides in the snapshot, which is why the gateway must be handed THIS
    * array and not `devTerrain(map, rings)` recomputed from the environment.
    */
   const store = new EventStore(db)
@@ -344,9 +262,8 @@ export async function startDevWorld(
     console.log('dev world: a new day 0 — no town on disk')
   }
 
-  // ★ THE HANDLER IS AN INDIRECTION BECAUSE A BRIDGE AND A LOOP EACH NEED THE OTHER FIRST.
-  // A live cast's bridge is constructed around `loop`, and the handler `loop` runs is the one
-  // that bridge returns. Scripted, this costs one function call per tick and nothing else.
+  // The handler is an indirection because a bridge and a loop each need the other first: the
+  // bridge is constructed around `loop`, and `loop` runs the handler that bridge returns.
   let handler: TickHandler = () => {}
   const loop: TickLoop = new TickLoop({
     store, state: resumed ? resumed.state : devGenesisState(config, terrain, map, rings), rng, config,
@@ -386,22 +303,15 @@ export async function startDevWorld(
       ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
     })
   } catch (e) {
-    // A taken port used to leave five booted minds holding open databases and a process that
-    // never exited, because nothing outside this function had a handle to stop them. Observed
-    // on the first live boot. The world db goes too — this function opened it.
+    // Nothing outside this function has a handle to stop the cast or close the db it opened.
     await cast?.stop()
     db.close()
     throw e
   }
 
-  // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
-  // ★ The cursor starts at the END of the log, not at 0: a resumed world would otherwise scan
-  // its whole history on its first tick and re-publish every thought the town ever had.
-  //
-  // ★ AND A LIVE CAST TURNS THEM OFF. `THOUGHT_LINES` is ten canned strings keyed by verb;
-  // a mind that walks has an actual thought and the cast publishes it to the same table. Left
-  // on, the bubble over a live founder would read "The path is clear enough." over the top of
-  // what it was really thinking, which is the one lie this file must not tell.
+  // The cursor starts at the END of the log, not at 0: a resumed world would otherwise
+  // re-publish every thought the town ever had. A live cast publishes real ones to the same
+  // table, so these canned lines go off.
   let lastSeq = store.lastSeq()
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
@@ -446,20 +356,12 @@ export async function startDevWorld(
 //   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
 //   SJ_DEV_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
 //   SJ_DEV_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
-//   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (OFF by default, and
-//                         the only default here that is off for a MEASURED reason rather than
-//                         a conservative one — see `jointBuild` on `FoundersOpts`)
+//   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (off by default for a
+//                         measured reason — see `jointBuild` on `FoundersOpts`)
 //   SJ_FRESH=1            throw the town on disk away and start a new day 0
 //
-// ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
-// integration trains in a row reported no interior seen; two of them had the surface switched
-// off by silence and the third watched the cast collapse before reaching a door. A viewer who
-// runs this is here to see the town live in itself. The LIBRARY default stays off — `g6` and
-// `devWorld.test.ts` hash exactly the world they always folded.
-//
-// ★ THE HUMAN PATH DEFAULTS TO THE PRODUCT. It used to default to the fixture, and a lane that
-// ran `pnpm --filter @sj/gateway dev:world` and looked at what came up was looking at six
-// hand-placed buildings, four of them with no art, on a 64×64 map the grammar never drew.
+// The human path defaults to the product town and to interiors on; the LIBRARY defaults stay
+// `scripted` and interiors off, because `g6.test.ts` and `devWorld.test.ts` hash exactly that.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
   const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'

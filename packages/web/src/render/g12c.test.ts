@@ -5,14 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { CITY_FURNISHING_KINDS, makeCityTemplate, danglingRoadEnds, frontages } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
-// GATE G12c — THE CANVAS HALF. Split by package for the D-41 reason: `@sj/web` is private,
-// DOM-typed and bundler-resolved, so a gateway test cannot import its modules without
-// breaking `tsc -b`. The other two files are:
-//   packages/web/src/ui/g12c.test.ts        — the chrome half (U12–U17, U20–U24, P22)
-//   packages/gateway/src/g12c.test.ts       — the town, U25, and the read-only proof
-//
-// EVERY LINE IS A GATE CRITERION, NOT A SUGGESTION, and each names its U-id so a failure is
-// reported in the user's own vocabulary.
+// The canvas half (chrome: ui/g12c.test.ts; town: packages/gateway/src/g12c.test.ts). Split by
+// package because `@sj/web` is DOM-typed and bundler-resolved: a gateway test cannot import it.
 
 import {
   ZOOM_SETTLE_MS, ZOOM_STOPS, WHEEL_GESTURE_GAP_MS, fitStop, initialZoom, nearestStop, stageFill, stageFillFloor,
@@ -116,12 +110,8 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
     expect(roomFurnishings('house').some((f) => f.kind === 'bed')).toBe(true)
   })
 
-  // ★ THE HONEST LINE, ANSWERED. This said "it is a POLYGON, not a tileset, and that is why U4
-  // stays open" — and it invited its own retirement: "if this is true, U4 can be reassessed".
-  // It is true. The room is a 12×6 map of 128×64 interior tiles drawn from an authored tileset:
-  // continuous floorboards, a flagstone hearth, and wall ELEVATIONS carrying the window, the
-  // door and the chimney breast. The polygon is still there and still correct — it is the
-  // art-independent fallback, which is why both halves are asserted here.
+  // The polygon shell is still there as the art-independent fallback, which is why both halves
+  // are asserted here.
   it('★ is a TILESET now, over a polygon that still stands when the codex is empty', () => {
     expect(src('render/roomShell.ts')).toMatch(/Graphics|poly/)   // the fallback shell, kept
     const anyInteriorTileset = sources().some((f) => /interior-tileset|interiorTileset/.test(f.source))
@@ -352,10 +342,7 @@ describe('U18 — "text boxes are not vibrant, not stylized, not clear enough"',
 
 // ── U19 · smooth, damped, bounded zoom ────────────────────────────────────────────────────
 
-// The gate's own reading of U19 is unchanged — a flick may not cross the range by accident —
-// but the gesture now RELEASES, so what the gate reads is the resting stop after the hand has
-// lifted. That is the whole of the motion lane's amendment: the camera is continuous under a
-// hand and exact the moment it is let go.
+// The gesture releases, so what the gate reads is the resting stop after the hand has lifted.
 describe('U19 — "I zoom way too much by accident and I can\'t control my zoom at all"', () => {
   it('advances exactly one stop under thirty trackpad events', () => {
     let z = initialZoom(1)

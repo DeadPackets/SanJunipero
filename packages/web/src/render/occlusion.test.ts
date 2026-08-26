@@ -7,18 +7,8 @@ import {
   structureDepthBox, type DepthBox,
 } from './depth.js'
 
-// U8 asked for a REVIEW of the layering, and a review that leaves no artefact is an opinion.
-// This is the artefact: a headless proof, run on every commit, over the real town.
-//
-// THE ORACLE works in SCREEN COLUMNS, from the projection alone, and knows nothing about
-// depth.ts — so this test is not the implementation checking itself. In dimetric,
-// sx = (x − y)·16 and sy = (x + y)·8, so a screen column fixes u = x − y and a screen row
-// fixes f = x + y, and "nearer the viewer" is simply "larger f IN THE SAME COLUMN".
-//
-// For the body's own column the structure's ground occupies rows f ∈ [sMin, sMax]; the body's
-// feet are at f. Above that band it is behind, below it, it is in front, inside it — or in a
-// column that misses the ground altogether — the question is not decidable from feet and the
-// oracle abstains.
+// The oracle derives depth from the projection alone, knowing nothing of depth.ts: a screen
+// column fixes u = x − y, and "nearer the viewer" is a larger f = x + y in that same column.
 
 export function expectedInFront(s: DepthBox, tile: { x: number; y: number }): boolean | 'level' {
   const u = tile.x - tile.y
@@ -31,10 +21,8 @@ export function expectedInFront(s: DepthBox, tile: { x: number; y: number }): bo
   return 'level'
 }
 
-// The REAL town, not a fixture: the same template `devTown()` instantiates, at the same
-// showcase anchor, so these are the eleven buildings C12a task 59 put on the map. The ids
-// below carry the anchor in their coordinates, so a moved anchor fails this test loudly
-// rather than quietly testing a different town.
+// The same template `devTown()` instantiates, not a fixture. The ids carry the anchor in their
+// coordinates, so a moved anchor fails loudly instead of testing a different town.
 const ANCHOR = { x: 0, y: 9 }        // gateway SHOWCASE_ANCHOR
 const town = {
   anchor: ANCHOR,
@@ -92,15 +80,8 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
   it('MEASURES U8: the landed rule disagreed with the geometry on this many tiles', () => {
     const { decided, disagreements } = sweep((_b, i, tile) => landedInFront(town.structures[i]!, tile))
     expect(decided).toBe(432)
-    // THE MEASURED SIZE OF U8 on the real town: the tiles where the landed rule drew a body
-    // standing at a door BEHIND the building it was standing in front of. That is U8's
-    // sentence, in coordinates.
-    //
-    // RE-MEASURED once the town became a grammar. It is twelve rather than thirteen and the
-    // coordinates all moved, because the buildings are now platted on the block lattice and
-    // half of them face SE — a turned building presents its +x wall, so its tie row runs down
-    // a column instead of across a row. The SHAPE of the defect is unchanged: one tie per
-    // frontage face, wider frontages tying on more tiles.
+    // One tie per frontage face: the tiles where the landed rule drew a body at a door behind
+    // the building it stood in front of.
     expect(disagreements.map((d) => `${d.structure} ${d.tile} oracle=${d.oracle} got=${d.got}`)).toEqual([
       'structure_storehouse_36_14 (36,16) oracle=true got=false',
       'structure_house_36_21 (36,23) oracle=true got=false',

@@ -5,9 +5,8 @@ export const THUMB_CAST_MAX = 2
 
 export type ThumbLabel = { day: number; cast: string; location: string | null }
 
-// A postcard, not a screenshot: who was there, where, and which day it was. A real capture of
-// the scene would need a second headless renderer (deferred — plan's Open Question 1); the
-// deep link and the playback are the substance, this is the affordance.
+// A postcard, not a screenshot: a real capture of the scene would need a second headless renderer.
+// The deep link and the playback are the substance; this is the affordance.
 export function thumbLabel(m: Moment, people: PeopleIndex): ThumbLabel {
   const named = m.cast.slice(0, THUMB_CAST_MAX).map((id) => people[id]?.name ?? id)
   const rest = m.cast.length - named.length

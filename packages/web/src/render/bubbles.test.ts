@@ -32,9 +32,6 @@ describe('wrapBubble', () => {
     expect(lines.join('')).toBe('a'.repeat(50))
   })
 
-  // U18: the wrap was a hardcoded 24, which is only right for one face at one size. It comes
-  // from the face's own advance now, so installing a wider face narrows the line instead of
-  // overflowing the box.
   it('takes its default from the face the bubble is set in', () => {
     const face = faceFor('speech')
     expect(WRAP_CHARS).toBe(wrapCharsFor(face.family, BUBBLE_FONT_PX, BUBBLE_MAX_PX))
@@ -48,10 +45,6 @@ describe('wrapBubble', () => {
   })
 })
 
-// ★ CARRY-IN FROM BATCH 5, ruling A4.2. Two adjacent speakers stacked into an unreadable pile:
-// bubbles PUBLISHED their boxes to `scene.tags.setOccupied`, so only a tooltip avoided them,
-// and nothing avoided another bubble. `placeTag` is the product's one placement rule and it
-// already solves exactly this for tag-vs-bubble (audit M8).
 describe('two speakers standing together do not composite into one pile', () => {
   const overlaps = (a: Rect, b: Rect): boolean =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h

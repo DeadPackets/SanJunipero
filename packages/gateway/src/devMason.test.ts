@@ -1,18 +1,7 @@
-// @slow — ★ THE PROOF THAT SOMETHING IN THE RUNNING APP CAN BUILD.
+// @slow — the proof that something in the running app can build.
 //
-// Merge train 3's second finding: "a ring-3 town is reachable, but nothing will ever be built
-// in it." The engine could grow a town, plat rings and cross a river; the dev world's agent
-// policy had four verbs in it — walk, sleep, enter, exit — and no mason. Everything the
-// claim-seam, town-growth and far-bank lanes built was proved on engine fixtures and had no
-// reachable surface at all.
-//
-// ★ AND THE SEAM DID NOT FIT, WHICH IS THE FINDING UNDER THE FINDING. The engine locates the
-// town by reading the AUTHORED `TOWN_SQUARE` (65, 78) less `state.origin`. The showcase town is
-// the same `makeCityTemplate` town at its own anchor — square (68, 68) at ring 3 — and the dev
-// world carried no origin, so `townSquareOf` looked at (65, 78), found a paved tile of the
-// plaza's own street ring, and answered. Every plot it offered sat off the lattice that is
-// drawn, and `layBlock` would have paved a second grid across the first. `devWorldOrigin` says
-// where the array stands; the agreement test below is what makes that a derivation.
+// The engine locates the town by reading the authored `TOWN_SQUARE` less `state.origin`. The
+// agreement test below is what makes `devWorldOrigin` a derivation, not a number that works once.
 //
 // Scripted masons, declared as such in `founders.ts`. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
@@ -66,10 +55,8 @@ function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild
 
 describe('★ the dev world says where its array stands, so the engine can find its town', () => {
   it('★ THE AGREEMENT: under this origin the showcase channel IS the grammar’s channel', () => {
-    // The grammar knows one river, at `CITY_GROUND` dx −17…−15 off the square. If the derived
-    // origin is right, the water the showcase actually LAYS reads as those same three columns
-    // in the authored frame — at every ring count, which is what makes it a derivation and not
-    // a number that happens to work at three rings.
+    // The grammar knows one river, at `CITY_GROUND` dx −17…−15 off the square. Checked at every
+    // ring count, which is what makes the origin a derivation and not a number that works once.
     for (const rings of [1, 2, 3, 4]) {
       const terrain = devTerrain('showcase', rings)
       const origin = devWorldOrigin(rings)
@@ -90,13 +77,8 @@ describe('★ the dev world says where its array stands, so the engine can find 
     const terrain = devTerrain('showcase', rings)
     const state = devGenesisState(SHOWCASE_CONFIG, terrain, 'showcase', rings)
     expect(townSquareOf(state)).toEqual(devTownSquare(rings))
-    // ★ THE BEFORE-STATE, AND THE ENGINE HAZARD BEHIND IT, NOW CLOSED. With no origin the
-    // engine did not fail, it ANSWERED — `(65, 78)`, a different tile ten rows north of the
-    // square that is drawn, which happens to be paved. That was the vacuous-guard family's
-    // fourteenth member: a passing condition (one tile is road) satisfiable without the
-    // property (this world's town is centred here). `townSquareOf` asks about the whole
-    // plaza now, so the blind lookup REFUSES instead of lying, and the origin below is what
-    // makes it answer.
+    // With no origin the engine does not fail, it ANSWERS — a paved tile ten rows north of the
+    // square that is drawn. `townSquareOf` asks about the whole plaza now, so it refuses instead.
     expect(townSquareOf({ ...state, origin: undefined }),
       'the engine still answers about a town that is not there').toBeNull()
     expect(devTownSquare(rings)).not.toEqual({ x: TOWN_SQUARE.x, y: TOWN_SQUARE.y })
@@ -144,12 +126,8 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     for (const e of raised) expect(FOUNDERS.map((f) => f.id)).toContain(String(e.payload['builderId']))
   })
 
-  // ★ THE GUARD THAT CATCHES A LATTICE OFF ITS OWN FRAME, and it took a mutation to find the
-  // one that does. "Not on water, not on a street tile" PASSES with the square ten rows out,
-  // because a plot shifted by a third of a block still mostly lands on grass — mutation M8 is
-  // saved beside this report showing it. What does not pass is PLOT CONTAINMENT: a house on a
-  // shifted grid does not fit inside any plot of the lattice that is drawn. Same question
-  // `townGrowth.test.ts` asks of its town, asked here of the dev world's own square.
+  // "Not on water, not on a street tile" PASSES with the square ten rows out — a plot shifted by
+  // a third of a block still mostly lands on grass. PLOT CONTAINMENT is what does not pass.
   it('★ and every roof the town raised sits INSIDE a plot of the lattice that is drawn', () => {
     const square = devTownSquare(RINGS)
     const plots = freePlots(RINGS + 2, townGroundOf(run.state, square)).map((p) => plotExtent(p))
@@ -199,19 +177,9 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
 
 // ── ★ TWO MASONS, ONE HOUSE ──────────────────────────────────────────────────────────────────
 //
-// OD22: `buildSiteOf` and `stepBuild` both resolved a plotted site off `ownSite`, keyed on the
-// BUILDER, so the second body was handed the next FREE plot and a town of five raised five
-// houses. `joinableSite` restored the other half. `buildSeam.test.ts` proves it on the engine's
-// own town; this proves it in the world a viewer boots, through a real `TickLoop`.
-//
-// ★ AND IT IS OFF BY DEFAULT, WHICH IS A MEASUREMENT AND NOT A TASTE — see `jointBuild` on
-// `FoundersOpts`: the hands are real and the calendar does not know it, because a building
-// completes off the BUILDER's activity clock and not off the site's `progressTicks`.
-//
-// The DEFAULT is guarded by the describe above and not by anything here. A "with the flag off
-// this is the landed world" row would compare two runs of the same mutated policy and pass —
-// mutation M8 (the policy ignores the flag) reds `nothing was built: expected 18 to be greater
-// than 20` up there, and would have gone green on such a row. It is not written.
+// Off by default for a measured reason — see `jointBuild` on `FoundersOpts`. A "with the flag
+// off this is the landed world" row is deliberately absent: it would compare two runs of the
+// same policy and pass even when the policy ignores the flag.
 describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickLoop', () => {
   const TICKS_J = 1440
   const on = runDevWorld(true, RINGS, TICKS_J, true)
@@ -240,9 +208,8 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     expect(builds(off).length - planted(off).length).toBe(0)
     expect(mostHands(off)).toBe(1)
 
-    // ★ AND THEY ARE DIFFERENT PEOPLE, not one body counted twice. `stepBuild` emits the
-    // worker's `action_progressed` immediately before the site's `structure_progressed`, in
-    // that agent's own turn of `actionsSystem`, so the pairing reads straight off the log.
+    // Different people, not one body counted twice: `stepBuild` emits the worker's
+    // `action_progressed` immediately before the site's, so the pairing reads off the log.
     const bodiesOn = new Map<string, Set<string>>()   // `${tick}:${siteId}` -> agent ids
     let worker = ''
     for (const e of on.events) {
@@ -292,11 +259,8 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     for (const f of FOUNDERS) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
   })
 
-  // ★ TWO THINGS THE RUN CANNOT SEE, asked of the pure function instead — the shape the
-  // wright's M5 needed. Mutation M8 (the policy ignores its flag) is caught by the describe
-  // above; mutation M9 (a joiner never prices the work) came back BYTE IDENTICAL from 1 440
-  // ticks, because a founder only ever decides with its hands free and `homeIntent` has
-  // already taken it to bed by then. Asked with a spent body, the reserve is not inert.
+  // Asked of the pure function instead: in a run a founder only decides with its hands free and
+  // `homeIntent` has taken it to bed by then, so the reserve looks inert.
   describe('the mason, asked directly', () => {
     /** A showcase town with `a` raising a house and `b` standing at the same walls. */
     function twoAtOneSite(): WorldState {

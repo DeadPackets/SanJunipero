@@ -35,13 +35,6 @@ describe('mechanicalGate', () => {
 })
 
 // ── ★ THE RULING: A GATE'S VERDICT MAY NOT BE DISCARDED BY ITS CALLER ─────────────────────
-//
-// `gen-cast-v5.bestOf` shipped the least-bad of three FAILING candidates, and that is how
-// `amara/contact-b-ne` — a figure in the wrong costume with TACTICAL GEAR written beside her,
-// measured at 1.1855 against a 1.18 tolerance — reached the running product. The same policy
-// is written three different ways across the three generators, which is why it was never seen
-// as one policy. This is the shared shape, tested here so it is not another unexercised
-// script: the generators are live-spend and no test can run them.
 
 describe('refusalMessage — choosing is not deciding', () => {
   const cand = (key: string, ...failures: string[]) => ({ key, failures })
@@ -69,9 +62,6 @@ describe('refusalMessage — choosing is not deciding', () => {
     expect(msg).toContain('amara ne/contact-b')
   })
 
-  // ★ THE PROPERTY, not the wording. An operator cannot tell a threshold that is 0.5 % too
-  // tight from a model that cannot draw the thing unless EVERY candidate's margins are in
-  // front of them, so every candidate and every failure has to survive into the message.
   it('★ carries every candidate and every failure into the message', () => {
     const cands = [
       cand('c0', 'silhouette: 1.1855 against 1.1800', 'head: 0.24 against 0.20'),
@@ -90,9 +80,7 @@ describe('refusalMessage — choosing is not deciding', () => {
   })
 })
 
-// ★ AND THE POLICY IS ACTUALLY WIRED INTO THE LIVE GENERATOR. `gen-cast-v5.ts` is a
-// live-spend script; no test can run it, so the only available check is that the decision
-// points still go through the refusal and that the discarded-verdict shapes are gone.
+// `gen-cast-v5.ts` is live-spend and no test can run it, so its source is the only check available.
 describe('gen-cast-v5 ships nothing that failed a gate', () => {
   const src = readFileSync(new URL('../scripts/gen-cast-v5.ts', import.meta.url), 'utf8')
 
@@ -116,13 +104,8 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
 })
 
 // ── ★ AND THE MARGIN IN THAT MESSAGE HAS TO BE THE REAL ONE ───────────────────────────────
-//
-// Measured live in this lane: the refusal for salma's `ne/contact-a` read
-//   `silhouette: ... 1.2429 against 0.1800 (off by 1.0629)`
-// because `silhouette` is the one gate whose VALUE is a ratio around 1 while its threshold is
-// a half-width, and it put the half-width in `limit`. The true miss is 0.0629. Overstating it
-// SEVENTEEN-FOLD defeats the only purpose the message has — telling an operator a threshold
-// that is 0.5 % too tight from a model that cannot draw the thing.
+// `silhouette` is the one gate whose VALUE is a ratio around 1 while its threshold is a half-width,
+// so reporting the tolerance instead of the bound overstates the miss many times over.
 describe('★ a failure reports the bound it crossed, not the tolerance', () => {
   it('names the upper bound for a body that grew, and the lower for one that shrank', () => {
     expect(silhouetteBound(1.2429)).toBeCloseTo(1.18, 10)
@@ -136,28 +119,12 @@ describe('★ a failure reports the bound it crossed, not the tolerance', () => 
   })
 })
 
-// ── ★ AND IN EVERY OTHER GENERATOR, WHICH IS SIX AND NOT THREE ────────────────────────────
-//
-// The audit that found the policy named three generators. There are SEVEN — the same policy
-// pasted between siblings, so a count by disguise undercounts it:
-//
-//   bestOf, least-bad reduce      gen-cast-v5 (fixed first), gen-cast-v4, gen-character-v4
-//   (clean.length ? clean : ...)  gen-structures-v5, gen-dwellings-v2, gen-dwellings
-//   rank = fails * 100 + ...      gen-library-v2
-//
-// `gen-dwellings-v2` is the one that matters most and was not on the list: it is live, it
-// writes `content/buildings`, and it wrote the ten dwelling cells the town stands on today.
-//
-// THESE ARE FILE-CONTENT ASSERTIONS BECAUSE NO TEST CAN RUN A LIVE-SPEND SCRIPT. That makes
-// the LAST test here the load-bearing one: it scans the whole scripts directory for the
-// policy's shapes rather than for a list of filenames, so the eighth copy somebody pastes
-// tomorrow reds without anyone remembering to add it here.
+// File-content assertions, because no test can run a live-spend script. That makes the LAST test
+// here load-bearing: it scans the scripts directory for the shapes, not for a list of filenames.
 describe('★ no generator in the package ships a candidate that failed a gate', () => {
   const scriptsDir = fileURLToPath(new URL('../scripts', import.meta.url))
-  // ★ CODE ONLY. Every one of these files now carries a comment QUOTING the shape it used to
-  // have — that is the point of the comment — so a scan that reads the prose reds on the
-  // explanation of the fix. Whole-line comments come out first; the shapes below all live on
-  // a line of their own.
+  // CODE ONLY: each of these files carries a comment QUOTING the shape it used to have, so a scan
+  // that reads the prose reds on the explanation of the fix.
   const read = (f: string): string => readFileSync(join(scriptsDir, f), 'utf8')
     .split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
 
@@ -216,15 +183,8 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   })
 
   // ── ★ THE OTHER HALF OF THE SWEEP: A GATE THAT RUNS AFTER THE WRITE ────────────────────
-  //
-  // The generators above chose a failing candidate. These scripts did something quieter and
-  // in one case worse: they computed the verdict AFTER the file was already on disk, and put
-  // it in a markdown cell or a log line. `gen-library.ts` carried a comment saying "a sprite
-  // that fails the pixel bar never ships" directly above the code that shipped it — a
-  // superseded script with a lie in it is worse than a superseded script, because the lie is
-  // what the next person reads.
-  // Each entry names the file's OWN shipped artifact, because the ordering that matters is
-  // the gate against that write and not against a candidate dump into a scratch directory.
+  // Each entry names the file's OWN shipped artifact: the ordering that matters is the gate
+  // against that write, not against a candidate dump into a scratch directory.
   const REPAIRS = [
     ['gen-library.ts', /writeFileSync\(join\(dir, 'sprite\.png'\)/, /pixelBarReport\(/],
     ['recell-buildings.ts', /writeFileSync\(join\(to, 'cell\.png'\)/, /integerScaleGate\(/],
@@ -244,18 +204,16 @@ describe('★ no generator in the package ships a candidate that failed a gate',
     expect(g, 'the gate still runs after the artifact is already on disk').toBeLessThan(w)
   })
 
-  // ★ THE ANTI-VACUITY ONE, and the only one that catches a script nobody listed. The class
-  // that matters is the one that writes COMMITTED content: a scratchpad probe that ignores a
-  // gate costs a re-run, and this costs the product.
+  // The class that matters is the one that writes COMMITTED content: a scratchpad probe that
+  // ignores a gate costs a re-run, and this costs the product.
   it('★ and every script that writes into content/ refuses, or its consumer is in the suite', () => {
     const offenders: string[] = []
     for (const f of readdirSync(scriptsDir).filter((n) => n.endsWith('.ts')).sort()) {
       const s = read(f)
       if (!/CONTENT_DIR|content\/tilesets|content\/buildings|content\/items|content\/cast|MATERIALS/.test(s)) continue
       if (!/writeFileSync/.test(s)) continue
-      // `write-generated-terrain.ts` prints SEAM and writes anyway — and that is correct:
-      // `terrainIngest.test.ts` asserts `tileSeamGate(img).failures === ''` over every shipped
-      // material. For committed content the suite is the right place for the consumer.
+      // `write-generated-terrain.ts` prints SEAM and writes anyway; `terrainIngest.test.ts` asserts
+      // `tileSeamGate` over every shipped material, so the consumer is in the suite.
       if (f === 'write-generated-terrain.ts') continue
       if (!/throw new Error|refusedCells\.push|refused\.push/.test(s))
         offenders.push(`${f}: writes committed content with no refusal beside its gates`)
