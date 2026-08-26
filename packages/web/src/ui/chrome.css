@@ -466,7 +466,7 @@ body {
   background: var(--cream); border-radius: 0; box-shadow: 0 0 0 2px var(--ink);
   padding: 0.05rem 0.4rem;
 }
-.badge.ill { background: var(--rose); color: var(--cream); }
+.badge.ill { background: var(--rose); color: var(--deep); }
 
 .block { margin: 0.8rem 0; }
 .block h3 {
@@ -476,7 +476,9 @@ body {
 }
 .block h3::after {
   content: ''; display: block; margin-top: 2px; height: 2px; width: 2.2rem;
-  background: repeating-linear-gradient(90deg, var(--sand) 0 4px, transparent 4px 6px);
+  /* --sand is 1.19:1 on parchment and 1.34:1 on the modal's cream — this rule was a smudge.
+     --ink-quiet is 5.83 and 6.57 on the two grounds .block is ever laid on. */
+  background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 6px);
 }
 .block ul { margin: 0; padding-left: 1.1rem; }
 .block p { margin: 0.25rem 0; text-wrap: pretty; }
@@ -1226,7 +1228,7 @@ body {
   padding: 0.05rem 0.3rem; background: var(--sand);
   border: 1px solid var(--ink); border-radius: 0;
 }
-.rr-cond.ill { background: var(--rose); color: var(--cream); }
+.rr-cond.ill { background: var(--rose); color: var(--deep); }
 /* the mood token: a 16-px face at 2×, on its own ground so it reads as an icon and not as
    ink that fell off the row */
 .rr-mood {
@@ -1471,36 +1473,40 @@ body {
 /* ── the Discovery Record: a chain of museum labels, one per thing the town worked out ──
    PER-BAND COLOUR: no palette token clears AA on both a light ground and a dark one — the dual-band
    set is EMPTY. Opacity is never the strategy. */
-.discovery-record { padding: 12px 14px; background: var(--parchment); }
-.discovery-summary { font-size: 14px; color: var(--ink); margin: 0 0 12px; }
+.discovery-record { padding: 1rem; }
+.discovery-summary { font-size: 0.875rem; color: var(--ink); margin: 0 0 0.75rem; }
 .discovery-chain {
   /* --sand on --parchment is 1.19:1: the rule meant to bind the panel into one history was
      invisible. --ink-quiet is 5.83 on parchment. */
-  list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--ink-quiet);
+  list-style: none; margin: 0; padding: 0 0 0 0.9rem; border-left: 2px solid var(--ink-quiet);
 }
 .discovery-leaf {
-  display: flex; gap: 12px; width: 100%; min-height: 64px; padding: 10px;
-  text-align: left; background: var(--cream); border: 1px solid var(--sand); border-radius: 3px;
-  margin: 0 0 10px; cursor: pointer;
-  transition: background var(--t-fast) var(--ease-tap), border-color var(--t-fast) var(--ease-tap);
+  display: flex; gap: 0.75rem; width: 100%; min-height: 64px; padding: 0.6rem;
+  text-align: left; background: var(--cream) var(--grain);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+  margin: 0 0 0.6rem; cursor: pointer;
+  transition-property: background-color, translate, box-shadow;
+  transition-duration: var(--t-fast); transition-timing-function: var(--ease-tap);
 }
 .discovery-leaf:hover, .discovery-leaf:focus-visible {
-  background: var(--parchment); border-color: var(--ink-quiet);
+  background-color: var(--honey-l); translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep);
 }
-.discovery-leaf[aria-current='true'] { border-color: var(--ember); }
-.discovery-leaf h3 { font-size: 14px; color: var(--ink); margin: 0 0 4px; }
-.discovery-leaf p { font-size: 12px; color: var(--ink-quiet); margin: 0 0 4px; }
+.discovery-leaf:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+/* the leaf you are standing in — an ember rail as well as a ring, never colour alone */
+.discovery-leaf[aria-current='true'] { border-left-width: 6px; border-left-color: var(--ember); }
+.discovery-leaf h3 { font-size: 0.875rem; color: var(--ink); margin: 0 0 0.25rem; }
+.discovery-leaf p { font-size: 0.75rem; color: var(--ink-quiet); margin: 0 0 0.25rem; }
 .discovery-body { min-width: 0; }
 .discovery-credit { color: var(--ink); }
 .discovery-quote {
-  font-size: 12px; color: var(--cream-quiet); background: var(--deep);
-  padding: 6px 8px; border-radius: 2px; margin: 6px 0;
+  font-size: 0.75rem; color: var(--cream-quiet); background: var(--deep);
+  padding: 0.35rem 0.5rem; border-radius: 0; margin: 0.35rem 0;
 }
 .discovery-makes { color: var(--ink-quiet); }
 .discovery-art {
   width: 48px; height: 48px; image-rendering: pixelated; flex: 0 0 48px;
 }
-.discovery-art-none { background: var(--sand); border: 1px dashed var(--ink-quiet); }
+.discovery-art-none { background: var(--sand); box-shadow: inset 0 0 0 2px var(--ink-quiet); }
 @media (prefers-reduced-motion: reduce) { .discovery-leaf { transition: none; } }
 /* ══ ★ THE LITTLE MAP ══════════════════════════════════════════════════════════════════════
    `render/minimap.ts` states the design. No width or height here: the canvas carries its own from
