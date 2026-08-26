@@ -426,6 +426,20 @@ describe('★ a block is laid out when its first building is raised', () => {
     expect(lines).toEqual([])
   })
 
+  it('★ leaves worked ground alone: a tilled field survives the block being laid', () => {
+    let s = genesisTown()
+    const block = { i: 2, j: 0 }
+    const field = blockGroundOf(TOWN_SQUARE, block).cleared
+      .find((t) => s.terrain[t.y]![t.x] !== T_GRASS)!
+    s = apply(s, [{ type: 'tile_changed', payload: {
+      x: field.x, y: field.y, from: s.terrain[field.y]![field.x], to: 6, reason: 'tilled', byId: 'a',
+    } }])
+    // NON-VACUITY: the block is laid, and laid wide — this one tile is the exception, not a no-op.
+    const lay = layBlock(s, TOWN_SQUARE, block) as TileChange[]
+    expect(lay.length).toBeGreaterThan(400)
+    expect(lay.find((c) => c.x === field.x && c.y === field.y)).toBeUndefined()
+  })
+
   it('lays the ground before it plants the roof, in that order', () => {
     const { before } = raiseUntilRing(2)
     const r = submitIntent(before, CFG, 'x', 'build', { kind: 'house' })

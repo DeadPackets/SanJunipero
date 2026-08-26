@@ -99,6 +99,9 @@ export function layBlock(
     for (const t of tiles) {
       const from = state.terrain[t.y]?.[t.x]
       if (from === undefined) return 'off the map'
+      // A field and a street are somebody's work; a channel is not spared, because it is
+      // impassable and a plot the town can never build on is worse than a lost ditch.
+      if (reason === 'levelled' && (from === 6 || from === T_ROAD)) continue
       if (from !== to) out.push({ x: t.x, y: t.y, from, to, reason })
     }
   }
