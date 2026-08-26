@@ -1,13 +1,17 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ChronicleEntry } from '@sj/shared'
 import {
   CHRONICLE_VIEWS, CHRONICLE_VIEW_LABEL, ChronicleViewTabs, EverythingFeedView, ImportantFeedView,
+  tabFromKey,
 } from './ChroniclePanel.js'
 import { EMPTY_COPY, GAMIFICATION_BAN } from './townStats.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
+// renderToStaticMarkup drops handlers, so the one thing it cannot show is read from source.
+const SRC = readFileSync(new URL('./ChroniclePanel.tsx', import.meta.url), 'utf8')
 
 const entries: ChronicleEntry[] = [
   { seq: 9, tick: 50, type: 'agent_died', icon: 'cross', label: 'Cara has died (hunger).' },
@@ -73,6 +77,13 @@ describe('EverythingFeedView', () => {
   it('still says day one is unwritten on a town that is actually on day one', () => {
     expect(render(createElement(EverythingFeedView, { lines: [], tick: 12 }))).toContain(EMPTY_COPY.chronicle)
   })
+
+  // The store's ring splices its front once it is at cap, shifting every surviving index: keyed
+  // on the index, every surviving row's identity changes on the wrap.
+  it('keys each row on the event seq, which the ring never renumbers', () => {
+    expect(SRC).toContain('key: ev.seq')
+    expect(SRC, 'the ring index is not an identity').not.toContain('key: i,')
+  })
 })
 
 describe('ChronicleViewTabs', () => {
@@ -92,6 +103,26 @@ describe('ChronicleViewTabs', () => {
   it('speaks of the town, never of a score', () => {
     for (const label of Object.values(CHRONICLE_VIEW_LABEL)) {
       expect(label, label).not.toMatch(GAMIFICATION_BAN)
+    }
+  })
+
+  // A roving tabindex without a walk is a tab nothing can reach: 'Everything' was pointer-only.
+  it('walks the tablist with the arrows, so the other reading is reachable', () => {
+    expect(SRC, 'the tablist has no keyboard handler').toMatch(/role="tablist"[\s\S]{0,120}onKeyDown=\{onKeyDown\}/)
+    expect(tabFromKey('ArrowRight', 'important')).toBe('everything')
+    expect(tabFromKey('ArrowRight', 'everything')).toBe('important')
+    expect(tabFromKey('ArrowLeft', 'everything')).toBe('important')
+    expect(tabFromKey('ArrowLeft', 'important')).toBe('everything')
+  })
+
+  it('jumps to the ends with Home and End', () => {
+    expect(tabFromKey('Home', 'everything')).toBe(CHRONICLE_VIEWS[0])
+    expect(tabFromKey('End', 'important')).toBe(CHRONICLE_VIEWS[CHRONICLE_VIEWS.length - 1])
+  })
+
+  it('leaves every other key alone', () => {
+    for (const key of ['ArrowUp', 'ArrowDown', 'Enter', ' ', 'a', 'Escape']) {
+      expect(tabFromKey(key, 'important'), key).toBeNull()
     }
   })
 })
