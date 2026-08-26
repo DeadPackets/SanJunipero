@@ -14,7 +14,7 @@ export const NEED_LOW = 30
 const EMPTY_COPY = 'Nothing written yet.'
 
 /** Two tabs a viewer picks between, plus the personality feed the panel always reads. */
-type Tab = 'ledger' | 'journal' | 'personality'
+export type Tab = 'ledger' | 'journal' | 'personality'
 type LedgerRow = { personId: string; doc: string; updatedDay: number }
 type JournalRow = { tick: number; day: number; text: string }
 type PersonalityRow = { version: number; day: number; doc: string; edit: string }
@@ -22,12 +22,15 @@ type PersonalityRow = { version: number; day: number; doc: string; edit: string 
 const ENDPOINT: Record<Tab, string> = { ledger: 'ledgers', journal: 'journal', personality: 'personality' }
 
 const cache = new Map<string, { at: number; rows: unknown[] }>()
-async function fetchTab<T>(agentId: string, tab: Tab): Promise<T[]> {
+/** A read that failed is NOT an empty record: caching it turns one 500 into 30 seconds of
+ *  "Nothing written yet." about a person. Only an answer is cached. */
+export async function fetchTab<T>(agentId: string, tab: Tab, fetchFn: typeof fetch = fetch): Promise<T[]> {
   const key = `${agentId}:${tab}`
   const hit = cache.get(key)
   if (hit !== undefined && performance.now() - hit.at < TAB_CACHE_MS) return hit.rows as T[]
-  const res = await fetch(`/api/agent/${encodeURIComponent(agentId)}/${ENDPOINT[tab]}`)
-  const rows = res.ok ? ((await res.json()) as T[]) : []
+  const res = await fetchFn(`/api/agent/${encodeURIComponent(agentId)}/${ENDPOINT[tab]}`)
+  if (!res.ok) return []
+  const rows = (await res.json()) as T[]
   cache.set(key, { at: performance.now(), rows })
   return rows
 }
@@ -49,6 +52,15 @@ function NeedBar({ label, value }: { label: string; value: number }) {
       <div className="need-track">
         <div className={v < NEED_LOW ? 'need-fill low' : 'need-fill'} style={{ width: `${v}%` }} />
       </div>
+    </div>
+  )
+}
+
+/** The sheet's own loading shape, the one every other panel already uses. */
+function TabSkeleton() {
+  return (
+    <div aria-busy="true">
+      {[0, 1, 2].map((i) => <div key={i} className="skeleton-row" />)}
     </div>
   )
 }
@@ -85,11 +97,10 @@ export function InspectorBodyView(
         <NeedBar label="Rest" value={agent.needs.energy} />
         <NeedBar label="Warmth" value={agent.needs.warmth} />
         <NeedBar label="Company" value={agent.needs.social} />
-        <p>
-          Health {agent.hp}
-          {agent.injuries.length > 0
-            && ` — ${agent.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}`}
-        </p>
+        <NeedBar label="Health" value={agent.hp} />
+        {agent.injuries.length > 0 && (
+          <p>{agent.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}</p>
+        )}
       </section>
 
       {/* WHAT THE BROWSER CAUGHT: the header badge already prints the state, so an idle
@@ -268,7 +279,7 @@ export function InspectorPanel(
 
       {tab === 'ledger' && (
         <section className="block tab-body">
-          {ledger === null ? <p>…</p> : ledger.length === 0 ? <p>{EMPTY_COPY}</p> : ledger.map((row) => (
+          {ledger === null ? <TabSkeleton /> : ledger.length === 0 ? <p>{EMPTY_COPY}</p> : ledger.map((row) => (
             <article key={row.personId}>
               <h4>{row.personId}</h4>
               <p className="doc">{row.doc}</p>
@@ -278,7 +289,7 @@ export function InspectorPanel(
       )}
       {tab === 'journal' && (
         <section className="block tab-body">
-          {journal === null ? <p>…</p> : journal.length === 0 ? <p>{EMPTY_COPY}</p> : journal.map((row, i) => (
+          {journal === null ? <TabSkeleton /> : journal.length === 0 ? <p>{EMPTY_COPY}</p> : journal.map((row, i) => (
             <p key={i} className="doc"><span className="stamp">Day {row.day}</span> {row.text}</p>
           ))}
         </section>
