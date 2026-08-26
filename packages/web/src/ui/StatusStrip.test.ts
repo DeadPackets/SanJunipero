@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { LENS_LABELS, LensTabsView, StatusStripView } from './StatusStrip.js'
-import { LENSES } from './route.js'
+import { LensTabsView, StatusStripView } from './StatusStrip.js'
+import { LENSES, LENS_LABELS } from './route.js'
 import { countsFromWorld, lensHints, type LensCounts, type TownStats } from './townStats.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
@@ -12,12 +12,17 @@ const stats: TownStats = { day: 0, time: '14:30', weather: 'rain', alive: 2, tot
 describe('StatusStripView', () => {
   const html = renderToStaticMarkup(createElement(StatusStripView, { stats }))
 
-  it('shows the day, the clock, the sky and the living count', () => {
-    expect(html).toContain('Day 0')
-    expect(html).toContain('14:30')
+  it('shows the sky and the living count', () => {
     expect(html).toContain('rain')            // the weather glyph's own word
     expect(html).toContain('Townsfolk')
     expect(html).toContain('remembered')      // one of the three is gone
+  })
+
+  // The topbar badge already reads `Now · Day 0 · 14:30` off the same viewed tick. Two cells of
+  // the three were a verbatim repeat of the band directly above them.
+  it('does not say the clock the topbar badge is already saying', () => {
+    expect(html).not.toContain('14:30')
+    expect(html).not.toContain('Day 0')
   })
 
   it('draws the weather as palette pixels, never as an emoji', () => {
@@ -29,7 +34,6 @@ describe('StatusStripView', () => {
 
   it('labels the strip and keeps the decorative glyph out of the a11y tree', () => {
     expect(html).toContain('aria-label="The town right now"')
-    expect(html).toContain('aria-label="Day 0, 14:30"')
     expect(html).toContain('aria-label="2 townsfolk walking"')
     expect(html).toContain('aria-hidden="true"')
   })
@@ -38,7 +42,6 @@ describe('StatusStripView', () => {
     const cold = renderToStaticMarkup(createElement(StatusStripView, {
       stats: { day: 0, time: '00:00', weather: '—', alive: 0, total: 0 },
     }))
-    expect(cold).toContain('Day 0')
     expect(cold).not.toContain('remembered')  // nobody has died, so nothing is remembered
     expect(cold).toMatch(/not read yet/)
   })

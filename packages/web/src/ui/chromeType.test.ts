@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BODY_MIN_PX, TEXT_MIN_PX } from '../textFloor.js'
 
@@ -60,6 +60,28 @@ describe('B4 (partial) — the chrome type floors', () => {
       const hit = DECLS.filter((d) => d.selectors.split(',').some((s) => s.trim() === title))
       expect(hit.length, `no font-size found for ${title}`).toBeGreaterThan(0)
       for (const d of hit) expect(d.px, where(d)).toBeGreaterThanOrEqual(BODY_MIN_PX)
+    }
+  })
+})
+
+
+// The sheet styles no bare `h2` outside `.digest-modal`, so an unclassed one is the browser's
+// system-ui bold at 21px — and RosterPanel's own skeleton used `.px-title`, so the heading
+// changed face and size the moment the data landed.
+describe('every panel heading is the sheet\u2019s own face', () => {
+  const HERE = new URL('.', import.meta.url)
+  const views = readdirSync(HERE).filter((f) => f.endsWith('.tsx'))
+
+  it('finds the views it is meant to be checking', () => {
+    expect(views.length).toBeGreaterThan(10)
+  })
+
+  it('leaves no <h2> to the browser default', () => {
+    for (const file of views) {
+      const src = readFileSync(new URL(file, HERE), 'utf8')
+      for (const [tag] of src.matchAll(/<h2\b[^>]*>/g)) {
+        expect(tag, `${file} — ${tag}`).toMatch(/className=/)
+      }
     }
   })
 })

@@ -57,6 +57,16 @@ export function itemCropDetail(state: WorldState | null, kind: 'item' | 'crop', 
   return `${c.kind}, planted day ${c.plantedDay}, ${growth}`
 }
 
+/** What Escape takes one step out of, in priority order, or `null` when it takes no step. Two
+ *  window listeners cannot settle this between them, so the whole order lives here. */
+export function escapeStep(
+  insideId: string | null, dockOpen: boolean, onOnePerson: boolean,
+): 'room' | 'dock' | 'roster' | null {
+  if (insideId !== null) return 'room'
+  if (dockOpen) return 'dock'
+  return onOnePerson ? 'roster' : null
+}
+
 export function lensFromKey(key: string, current: Lens): Lens | null {
   const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0
   if (step === 0) return null
@@ -66,8 +76,12 @@ export function lensFromKey(key: string, current: Lens): Lens | null {
 
 const TEXT_ENTRY_TAGS: ReadonlySet<string> = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 
-// The arrows belong to whatever has focus first: a text field types with them and the map pans with
-// them. Lens cycling is the fallback, never the interception.
-export function lensKeyAllowed(tagName: string, isContentEditable: boolean, inApplication: boolean): boolean {
-  return !TEXT_ENTRY_TAGS.has(tagName.toUpperCase()) && !isContentEditable && !inApplication
+// The arrows belong to whatever has focus first: a text field types with them, the map pans with
+// them, and any control that already consumed the press keeps it. Lens cycling is the fallback,
+// never the interception.
+export function lensKeyAllowed(
+  tagName: string, isContentEditable: boolean, inApplication: boolean, alreadyHandled = false,
+): boolean {
+  return !alreadyHandled
+    && !TEXT_ENTRY_TAGS.has(tagName.toUpperCase()) && !isContentEditable && !inApplication
 }

@@ -161,7 +161,7 @@ describe('the opacity habit, at every ink-on-paper site it produced', () => {
 // ── ★ THE BADGE THAT RAISES ITS VOICE, MEASURED ───────────────────────────────────────────
 
 describe('a stale clock is legible, not just loud', () => {
-  const ROSE_SITES = ['.tick-badge.stale', '.link-pill']
+  const ROSE_SITES = ['.tick-badge.stale', '.link-pill', '.badge.ill', '.rr-cond.ill']
 
   it.each(ROSE_SITES)('%s clears AA on the rose it wears', (selector) => {
     const body = ruleBody(CSS, selector)
@@ -175,5 +175,25 @@ describe('a stale clock is legible, not just loud', () => {
   it('records the pair it rejected, so it cannot come back', () => {
     expect(contrast(T['cream']!, T['rose']!)).toBeCloseTo(3.12, 2)
     expect(contrast(T['deep']!, T['rose']!)).toBeCloseTo(4.82, 2)
+  })
+})
+
+// ── ★ A RULE IS STRUCTURE, HELD TO 3:1 ────────────────────────────────────────────────────
+
+describe('a mark drawn to divide the panel can actually be seen', () => {
+  // .block is laid on #panel-outlet's parchment and on .digest-modal's cream. --sand is 1.19:1
+  // on the first and 1.34:1 on the second: the rule was a smudge on both.
+  it('paints the section rule in a token that clears 3:1 on both grounds it is laid on', () => {
+    const body = ruleBody(CSS, '.block h3::after')
+    const colour = /repeating-linear-gradient\([^)]*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(colour, 'the rule paints no palette token').toBeDefined()
+    for (const paper of ['parchment', 'cream'] as const) {
+      expect(contrast(T[colour!]!, T[paper]!), `.block h3::after on ${paper}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('records the pair it rejected, so it cannot come back', () => {
+    expect(contrast(T['sand']!, T['parchment']!)).toBeCloseTo(1.19, 2)
+    expect(contrast(T['sand']!, T['cream']!)).toBeCloseTo(1.34, 2)
   })
 })

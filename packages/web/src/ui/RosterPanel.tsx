@@ -32,7 +32,7 @@ export function RosterPanelView(
   return (
     <div className="roster-panel" aria-label="Townsfolk roster">
       <header className="roster-head">
-        <h2>Townsfolk</h2>
+        <h2 className="px-title">Townsfolk</h2>
         {rows.length > 1 && (
           <div className="roster-sorts" role="group" aria-label="Order the roster">
             {ROSTER_SORTS.map((by) => (

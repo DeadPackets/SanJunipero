@@ -46,9 +46,32 @@ function Glyph({ icon }: { icon: string }) {
   )
 }
 
+/** Where Left/Right/Home/End land from `from`, or `null` for a key the tablist does not own. */
+export function tabFromKey(key: string, from: ChronicleView): ChronicleView | null {
+  const n = CHRONICLE_VIEWS.length
+  const i = CHRONICLE_VIEWS.indexOf(from)
+  if (key === 'ArrowRight') return CHRONICLE_VIEWS[(i + 1) % n]!
+  if (key === 'ArrowLeft') return CHRONICLE_VIEWS[(i - 1 + n) % n]!
+  if (key === 'Home') return CHRONICLE_VIEWS[0]!
+  if (key === 'End') return CHRONICLE_VIEWS[n - 1]!
+  return null
+}
+
+/** A tablist with a ROVING TABINDEX: one tab stop for the pair, Left and Right walk it. Without
+ *  the walk the inactive tab is out of the tab order and nothing else can reach it. */
 export function ChronicleViewTabs({ view, onView }: { view: ChronicleView; onView: (v: ChronicleView) => void }) {
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const next = tabFromKey(e.key, view)
+    if (next === null) return
+    e.preventDefault()
+    onView(next)
+    e.currentTarget.querySelector<HTMLButtonElement>(`#chronicle-tab-${next}`)?.focus()
+  }
   return (
-    <div className="feed-switch" role="tablist" aria-label="What the chronicle shows">
+    <div
+      className="feed-switch" role="tablist" aria-label="What the chronicle shows"
+      onKeyDown={onKeyDown}
+    >
       {CHRONICLE_VIEWS.map((v) => (
         <button
           key={v}
@@ -162,7 +185,7 @@ export function ChroniclePanel({ store, handle, onView }: {
   for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
     const ev = events[i]!
     const text = describeEvent(ev, state)
-    if (text !== null) lines.push({ key: i, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
+    if (text !== null) lines.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
   }
 
   const jump = (tick: number): void => {

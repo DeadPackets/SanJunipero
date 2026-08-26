@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ZOOM_STOPS, type ZoomStop } from '../render/camera.js'
-import { LENSES, type Lens } from './route.js'
+import { LENSES, LENS_LABELS, type Lens } from './route.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
   CONTROL_BAR_H, CONTROL_GLYPH, CONTROL_GLYPH_PALETTE, CONTROL_GLYPH_PX, CONTROL_GROUPS,
@@ -161,6 +161,15 @@ describe('actionFor — total over everything the bar can render', () => {
       actionFor(controlItems({ ...base, hudHidden }).find((i) => i.id === 'hud')!)
     expect(of(false)).toEqual({ kind: 'hud', op: 'hide' })
     expect(of(true)).toEqual({ kind: 'hud', op: 'show' })
+  })
+
+  // The bar and the top nav used to keep a table each, and the two had drifted: the same
+  // destination was "The town" on one surface and "Town" on the other, on one screen.
+  it('names a lens with the same word the top nav uses', () => {
+    for (const item of controlItems(base).filter((i) => i.group === 'lens')) {
+      const lens = (actionFor(item) as { lens: Lens }).lens
+      expect(item.label, lens).toBe(LENS_LABELS[lens])
+    }
   })
 
   it('every lens a route can hold is reachable from the bar', () => {

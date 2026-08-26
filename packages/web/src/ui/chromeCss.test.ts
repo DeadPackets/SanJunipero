@@ -100,6 +100,24 @@ describe('★ the control bar keeps every control at every stage width', () => {
     expect(btn).toMatch(/min-height:\s*44px/)
   })
 
+  // Two roster controls sat at 24px and 32px against fourteen siblings at 40 or 44: the sheet's
+  // own floor, undercut only where nobody measured.
+  it('holds every pointer target in the sheet at 40px or more', () => {
+    for (const [, sel, body] of BARE.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const px = /min-height:\s*(\d+)px/.exec(body ?? '')?.[1]
+      if (px === undefined || !/cursor:\s*pointer/.test(body ?? '')) continue
+      expect(Number(px), `${(sel ?? '').trim()} { min-height: ${px}px }`).toBeGreaterThanOrEqual(40)
+    }
+  })
+
+  // A control with no pressed state does not feel pressed. Every other slab in the sheet
+  // collapses its ledge on :active.
+  it('gives the roster sort buttons the sheet\u2019s own press', () => {
+    expect(topRule('.roster-sort')).toMatch(/box-shadow:\s*var\(--ledge\)/)
+    expect(topRule('.roster-sort:active')).toMatch(/translate:\s*0 1px/)
+    expect(topRule('.roster-sort:active')).toMatch(/box-shadow:\s*1px 1px 0 0 var\(--deep\)/)
+  })
+
   it('leaves the bar clear of the dock handle pinned to the same corner', () => {
     expect(barRule, 'a control under the 44px handle is as unreachable as one past the edge')
       .toMatch(/padding:\s*0\.3rem 52px 0\.3rem 0\.8rem/)

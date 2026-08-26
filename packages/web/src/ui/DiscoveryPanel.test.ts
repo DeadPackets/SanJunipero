@@ -139,11 +139,36 @@ describe('the Discovery Record clears AA in both bands', () => {
     }
   })
 
+  // Sizes are read in px through the sheet's own resolver: this block used to state them in
+  // raw px while the rest of the sheet stepped in rem, and the floor has to hold either way.
+  const sizePx = (sel: string): number => {
+    const raw = /font-size:\s*([\d.]+)(rem|px)/.exec(ruleBody(CSS, sel))
+    expect(raw, `${sel} sets no font-size`).not.toBeNull()
+    return raw![2] === 'rem' ? Number(raw![1]) * 16 : Number(raw![1])
+  }
+
   it('holds the type floors and the hit target', () => {
-    expect(ruleBody(CSS, '.discovery-quote')).toMatch(/font-size:\s*1[2-9]px/)
-    expect(ruleBody(CSS, '.discovery-leaf p')).toMatch(/font-size:\s*1[2-9]px/)
-    expect(ruleBody(CSS, '.discovery-leaf h3')).toMatch(/font-size:\s*1[4-9]px/)
+    expect(sizePx('.discovery-quote')).toBeGreaterThanOrEqual(12)
+    expect(sizePx('.discovery-leaf p')).toBeGreaterThanOrEqual(12)
+    expect(sizePx('.discovery-leaf h3')).toBeGreaterThanOrEqual(14)
     expect(ruleBody(CSS, '.discovery-leaf')).toMatch(/min-height:\s*(2[4-9]|[3-9]\d|\d{3})px/)
+  })
+
+  // The panel was the one lens built in a second idiom: raw px, 1px hairlines and rounded
+  // corners, on a sheet that everywhere else steps in rem behind a 2px ink ring at radius 0.
+  it('is built in the sheet’s own system, not a second one', () => {
+    for (const sel of ['.discovery-record', '.discovery-summary', '.discovery-chain',
+      '.discovery-leaf', '.discovery-quote']) {
+      expect(ruleBody(CSS, sel), `${sel} still sets a raw px length`)
+        .not.toMatch(/(padding|margin|gap|border-radius):[^;]*\dpx/)
+    }
+    expect(ruleBody(CSS, '.discovery-leaf')).toMatch(/border:\s*2px solid var\(--ink\)/)
+    expect(ruleBody(CSS, '.discovery-leaf')).toMatch(/border-radius:\s*0/)
+  })
+
+  it('opens with a heading, as every other lens panel does', () => {
+    expect(renderPanel([])).toContain('class="px-title"')
+    expect(renderPanel([])).toContain('What they made')
   })
 
   it('keeps its motion inside the band and honours a viewer who asked for none', () => {

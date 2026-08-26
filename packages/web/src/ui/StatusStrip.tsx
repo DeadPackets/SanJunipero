@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BondsCountSchema, ChronicleCountSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { LENSES, type Lens } from './route.js'
+import { LENSES, LENS_LABELS, type Lens } from './route.js'
 import {
   lensCountsFor, lensHints, townStats, weatherGlyph,
   type LensHint, type TownStats, type WeatherGlyph,
@@ -13,12 +13,6 @@ export const BOND_COUNT_REFETCH_MS = 60_000
 /** The chronicle's own beat, matching `ChroniclePanel.CHRONICLE_REFETCH_MS`: the badge and the
  *  panel read the same endpoint, so they should go stale at the same rate too. */
 export const CHRONICLE_COUNT_REFETCH_MS = 20_000
-
-// chrome copy speaks about townsfolk, never machinery (spec §5)
-export const LENS_LABELS: Record<Lens, string> = {
-  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
-  society: 'Bonds', director: 'Moments', laws: 'World Laws',
-}
 
 export const GLYPH_PX = 8   // the glyph grid; rendered at 2× so it stays on whole pixels
 
@@ -38,20 +32,17 @@ function Glyph({ glyph }: { glyph: WeatherGlyph }) {
   )
 }
 
-// The documentary strip: what day it is, what the sky is doing, how many are still walking.
+// The documentary strip: what the sky is doing, and how many are still walking. The clock is
+// the topbar's badge and was read off the same viewed tick here — one fact, said twice.
 export function StatusStripView({ stats }: { stats: TownStats }) {
   const glyph = weatherGlyph(stats.weather)
   const gone = stats.total - stats.alive
   return (
     <div className="status-strip" role="group" aria-label="The town right now">
-      <span className="strip-cell strip-clock">
+      <span className="strip-cell strip-weather">
         <Glyph glyph={glyph} />
-        <span className="strip-num" aria-label={`Day ${stats.day}, ${stats.time}`}>
-          Day {stats.day} <i>{stats.time}</i>
-        </span>
+        {glyph.label}
       </span>
-      <span className="strip-rule" aria-hidden="true" />
-      <span className="strip-cell strip-weather">{glyph.label}</span>
       <span className="strip-cell strip-people">
         <span className="strip-num" aria-label={`${stats.alive} townsfolk walking`}>
           Townsfolk <i>{stats.alive}</i>
@@ -64,7 +55,7 @@ export function StatusStripView({ stats }: { stats: TownStats }) {
   )
 }
 
-// Reads the VIEWED tick, so scrubbing back moves the clock with the town.
+// Reads the VIEWED tick, so scrubbing back moves the count with the town.
 export function StatusStrip({ store }: { store: WorldStore }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)

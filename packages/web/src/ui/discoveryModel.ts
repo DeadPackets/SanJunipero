@@ -1,4 +1,5 @@
 import { discoveryHeadline, tickToMoment, type AssetRecord, type DiscoveryRecord } from '@sj/shared'
+import { EMPTY_COPY } from './townStats.js'
 
 export const DISCOVERY_REFETCH_MS = 20_000
 const MINUTES_PER_DAY = 1440
@@ -43,7 +44,7 @@ const people = (n: number): string => COUNTED[n] ?? `${n} people`
 
 // An observation, never a score. The town is not winning anything.
 export function recordSummary(leaves: readonly Leaf[], throughTick: number): string {
-  if (leaves.length === 0) return 'The town has not worked anything out yet.'
+  if (leaves.length === 0) return EMPTY_COPY.discoveries
   const n = Math.max(1, Math.floor(throughTick / MINUTES_PER_DAY))
   const days = n === 1 ? '1 day' : `${n} days`
   const minds = new Set(leaves.map((l) => l.record.byId)).size

@@ -10,15 +10,24 @@ import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary, type Leaf } from './disc
  */
 
 /** The whole record, as a pure view. The panel below is the same thing with a fetch on it. */
-export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump }: {
+export function DiscoveryRecordView({ leaves, throughTick, viewTick, onJump, loading = false }: {
   leaves: readonly Leaf[]
   throughTick: number
   viewTick: number | null
   onJump: (tick: number) => void
+  /** the first fetch has not answered yet — which is NOT the same thing as "nothing was made" */
+  loading?: boolean
 }) {
   return (
     <section className="discovery-record" aria-label="The discovery record">
-      <p className="discovery-summary">{recordSummary(leaves, throughTick)}</p>
+      <h2 className="px-title">What they made</h2>
+      {loading && leaves.length === 0 ? (
+        <div aria-busy="true">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton-row" />)}
+        </div>
+      ) : (
+        <p className="discovery-summary">{recordSummary(leaves, throughTick)}</p>
+      )}
       {leaves.length === 0 ? null : (
         <ol className="discovery-chain">
           {leaves.map((leaf) => (
@@ -63,7 +72,9 @@ export function DiscoveryPanel({ store, onView }: {
 }) {
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  const mode = useSyncExternalStore(store.subscribe, store.getMode)
   const [records, setRecords] = useState<DiscoveryRecord[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   // The archive is history, not a stream: read on the same slow beat the Chronicle uses, so a
   // 2.5s world never re-renders the record underneath the reader's pointer.
@@ -73,9 +84,11 @@ export function DiscoveryPanel({ store, onView }: {
       void fetch('/api/discoveries')
         .then(async (r) => (r.ok ? DiscoveryResponseSchema.safeParse(await r.json()) : null))
         .then((parsed) => {
-          if (alive && parsed?.success === true) setRecords(parsed.data.discoveries)
+          if (!alive) return
+          if (parsed?.success === true) setRecords(parsed.data.discoveries)
+          setLoaded(true)
         })
-        .catch(() => { /* the record simply has not arrived yet */ })
+        .catch(() => { if (alive) setLoaded(true) })
     }
     load()
     const timer = setInterval(load, DISCOVERY_REFETCH_MS)
@@ -89,7 +102,8 @@ export function DiscoveryPanel({ store, onView }: {
     <DiscoveryRecordView
       leaves={leavesOf(records, assets)}
       throughTick={state?.tick ?? 0}
-      viewTick={null}
+      loading={!loaded}
+      viewTick={mode.live ? null : mode.tick}
       onJump={(tick) => onView(tick)}
     />
   )

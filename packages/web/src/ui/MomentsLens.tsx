@@ -168,7 +168,6 @@ export function PlayerStripView({ moment, player, onToggle, onSeek, onSpeed, onL
       : null
     if (step === null) return
     e.preventDefault()
-    e.stopPropagation()   // the app cycles lenses with the arrows; inside the bar they seek
     onSeek(Math.abs(step) === 1 ? (step + 1) / 2 : frac + step)
   }
 

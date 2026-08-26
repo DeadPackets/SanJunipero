@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import { CROP_STAGES, hoverLabel, itemCropDetail, lensFromKey, lensKeyAllowed } from './interaction.js'
+import {
+  CROP_STAGES, escapeStep, hoverLabel, itemCropDetail, lensFromKey, lensKeyAllowed,
+} from './interaction.js'
 import { LENSES } from './route.js'
 
 function fixture(): WorldState {
@@ -142,5 +144,36 @@ describe('lensKeyAllowed', () => {
 
   it('leaves the arrows to the map, which pans with them', () => {
     expect(lensKeyAllowed('DIV', false, true)).toBe(false)
+  })
+
+  // The toolbar and both scrubbers call preventDefault and nothing else: without this the same
+  // press walked their cursor AND cycled the lens, unmounting the surface being driven.
+  it('never takes an arrow a control has already consumed', () => {
+    expect(lensKeyAllowed('BUTTON', false, false, true)).toBe(false)
+    expect(lensKeyAllowed('DIV', false, false, true)).toBe(false)
+    expect(lensKeyAllowed('BUTTON', false, false, false)).toBe(true)
+  })
+})
+
+// Escape used to be claimed by two window listeners that could not see each other: closing the
+// dock would also have stepped back to the roster, because stopPropagation cannot reach a
+// sibling listener on the same target.
+describe('escapeStep', () => {
+  it('gives the room the first claim, whatever else is open', () => {
+    expect(escapeStep('house-1', true, true)).toBe('room')
+    expect(escapeStep('house-1', false, false)).toBe('room')
+  })
+
+  it('closes the controls menu before it leaves the person', () => {
+    expect(escapeStep(null, true, true)).toBe('dock')
+    expect(escapeStep(null, true, false)).toBe('dock')
+  })
+
+  it('steps back to the roster only when nothing else is open', () => {
+    expect(escapeStep(null, false, true)).toBe('roster')
+  })
+
+  it('takes no step when there is nothing to step out of', () => {
+    expect(escapeStep(null, false, false)).toBeNull()
   })
 })

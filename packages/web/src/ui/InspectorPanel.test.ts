@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { BackToRoster } from './InspectorPanel.js'
+import { BackToRoster, InspectorBodyView, fetchTab, type InspectorAgent } from './InspectorPanel.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
+
+const person = (over: Partial<InspectorAgent> = {}): InspectorAgent => ({
+  alive: true, asleep: false, activity: null,
+  needs: { hunger: 80, energy: 60, warmth: 70, social: 90 },
+  hp: 100, ill: false, injuries: [], collapsedSinceTick: null, skills: {},
+  ...over,
+})
+
+const body = (agent: InspectorAgent): string => renderToStaticMarkup(createElement(InspectorBodyView, {
+  agent, tick: 0, thought: null, carrying: [], changes: [],
+}))
 
 describe('BackToRoster', () => {
   const html = renderToStaticMarkup(createElement(BackToRoster, { onBack: () => {} }))
@@ -23,5 +34,49 @@ describe('BackToRoster', () => {
 
   it('is drawn, never typed as an emoji', () => {
     expect(html).not.toMatch(EMOJI)
+  })
+})
+
+// Five 0-100 body readings, four of them tracks and one a sentence, read as a need row whose
+// track failed to render.
+describe('the body block', () => {
+  it('draws health as a track, like the four readings beside it', () => {
+    const html = body(person())
+    expect(html.match(/class="need-row"/g)).toHaveLength(5)
+    expect(html).toContain('>Health<')
+    expect(html).not.toContain('Health 100')
+  })
+
+  it('runs the low fill under the same threshold the needs use', () => {
+    expect(body(person({ hp: 12 }))).toContain('need-fill low')
+    expect(body(person({ hp: 100 })).match(/need-fill low/g)).toBeNull()
+  })
+
+  it('keeps an injury as its own line, which no track can carry', () => {
+    const html = body(person({ injuries: [{ kind: 'burn', day: 3 }] }))
+    expect(html).toContain('burn injury (day 3)')
+    expect(body(person())).not.toContain('injury')
+  })
+})
+
+// A non-OK response used to be stored as `[]` and re-served for TAB_CACHE_MS, so one transient
+// 500 became 30 seconds of "Nothing written yet." about a person.
+describe('fetchTab', () => {
+  const ok = (rows: unknown[]): Response =>
+    ({ ok: true, json: async () => rows }) as unknown as Response
+  const fail = (): Response => ({ ok: false, json: async () => [] }) as unknown as Response
+
+  it('never caches a read that failed', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok([{ a: 1 }]))
+    expect(await fetchTab('miss-1', 'ledger', fetchFn)).toEqual([])
+    expect(await fetchTab('miss-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('still caches an answer, so a tab flip is not a second read', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(ok([{ a: 1 }]))
+    expect(await fetchTab('hit-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
+    expect(await fetchTab('hit-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
+    expect(fetchFn).toHaveBeenCalledTimes(1)
   })
 })

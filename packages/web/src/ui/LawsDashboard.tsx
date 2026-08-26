@@ -37,7 +37,7 @@ export function LawsDashboard({ store, token, endpoint = DEFAULT_ADMIN_ENDPOINT,
 
   return (
     <div className="laws-dashboard" aria-label="World law controls">
-      <h2>World law controls</h2>
+      <h2 className="px-title">World law controls</h2>
       {notice !== null && (
         <p className="laws-notice" role="status">
           {notice}
