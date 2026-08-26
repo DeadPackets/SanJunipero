@@ -9,9 +9,10 @@ import { cellAnchor } from '../src/hires.js'
 import { buildingCellPx, reCell } from '../src/reCell.js'
 import { alphaBinaryGate, integerScaleGate, nativeDensityGate, paletteGate, spriteDensity, classDensityGate } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
-import { SJ_SCRATCH } from './scratch.js'
+import { scratch } from './scratch.js'
 
-const S = SJ_SCRATCH
+const S = scratch()
+
 const SRC = `${S}/c5/production`
 const OUT = `${S}/fqc2/art-root/production`
 

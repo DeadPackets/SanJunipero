@@ -1,7 +1,8 @@
+import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
-/** Where a forge script parks candidates, sheets and audit dumps. Untracked working ground,
- *  not a build output — point `SJ_SCRATCH` elsewhere to keep a run. */
-export const SJ_SCRATCH = process.env.SJ_SCRATCH ?? 'out/scratch'
+// Under `packages/forge/out`, which is gitignored, so a run never lands in `git status`.
+const ROOT = process.env.SJ_SCRATCH ?? fileURLToPath(new URL('../out/scratch/', import.meta.url))
 
-export const scratch = (...parts: string[]): string => join(SJ_SCRATCH, ...parts)
+/** Where a forge script parks candidates, sheets and audit dumps. Override with `SJ_SCRATCH`. */
+export const scratch = (...parts: string[]): string => join(ROOT, ...parts)

@@ -2,10 +2,10 @@
 // era ladder in that century.
 import { describe, expect, it } from 'vitest'
 import { scanPromptForGlassLeak } from '@sj/agents'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { CANON, ERAS, ERA_ORDER, GENESIS_CODEX } from './canon.js'
 import { CodexStore } from './codex.js'
 import { openArbiterDb } from './schema.js'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 
 // Words that only belong to a town with no metal and no machine. A canon that names one

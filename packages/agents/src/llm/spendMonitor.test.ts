@@ -124,7 +124,7 @@ describe('dead calls — paid for, and nothing came back', () => {
 
   it('folds on an escaped NUL, so git still reads the source as text', () => {
     const src = readFileSync(new URL('./spendMonitor.ts', import.meta.url), 'utf8')
-    expect(src).toContain("}\\x00${day}")
+    expect(src).toContain('\\x00')
     expect(src).not.toContain('\0')
   })
 

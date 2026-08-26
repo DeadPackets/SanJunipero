@@ -10,9 +10,10 @@ import { cellAnchor } from '../src/hires.js'
 import { CHAR_FIGURE_PX, reCell } from '../src/reCell.js'
 import { sleepAxisDeg, sleepAxisGate } from '../src/mirror.js'
 import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
-import { SJ_SCRATCH } from './scratch.js'
+import { scratch } from './scratch.js'
 
-const S = SJ_SCRATCH
+const S = scratch()
+
 const ROOT = `${S}/fqc2/art-root`
 const CHAR_CELL_PX = 256
 
