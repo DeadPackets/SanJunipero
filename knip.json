@@ -9,7 +9,7 @@
     "packages/engine": { "entry": ["src/**/*.test.ts"], "project": ["src/**/*.ts"] },
     "packages/shared": { "entry": ["src/**/*.test.ts"], "project": ["src/**/*.ts"] },
     "packages/gateway": {
-      "entry": ["src/serve.ts", "src/devWorld.ts", "src/**/*.test.ts", "scripts/*.ts"],
+      "entry": ["src/serve.ts", "src/devWorld.ts", "src/hotswapDemo.ts", "src/**/*.test.ts", "scripts/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.ts"]
     },
     "packages/web": {
