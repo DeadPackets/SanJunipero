@@ -45,7 +45,7 @@ export function entersOnClick(
   structureId: string,
 ): boolean {
   const s = state?.structures[structureId]
-  return s !== undefined && s.stage === 'complete' && enterableKind(config, s.kind)
+  return s?.stage === 'complete' && enterableKind(config, s.kind)
 }
 
 /** The building is named FIRST and the offer follows on a middot: `hoverLabel` already spends an em-dash, so an em-dash here read as three phrases on two identical separators. */
@@ -64,13 +64,14 @@ export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: numb
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
 }
 
-/** @deprecated for sorting — depth.ts owns the painter's order. Kept as the landed
- *  before-state that depth.test.ts and occlusion.test.ts measure U8 against. */
+/** NOT the painter's order — depth.ts owns that. This is the landed before-state that
+ *  depth.test.ts and occlusion.test.ts measure U8 against. */
 export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
   return depthKey(s.x + s.w - 1, s.y + s.h - 1)
 }
 
-/** @deprecated as a hit area — it is the BASE of the hit prism now. Still the shape `builtForm` cuts its plinth from, and the before-state `entities.test.ts` cites. */
+/** NOT a hit area — it is the BASE of the hit prism, the shape `builtForm` cuts its plinth
+ *  from, and the before-state `entities.test.ts` cites. */
 export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
   const k = scale === 0 ? 1 : scale
   return footprintDiamond(w, h).map((v) => v / k)

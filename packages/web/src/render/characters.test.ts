@@ -31,7 +31,7 @@ vi.mock('pixi.js', () => {
     on(): this {
       return this
     }
-    destroy(_opts?: unknown): void {
+    destroy(): void {
       if (this.parent !== null) {
         const i = this.parent.children.indexOf(this)
         if (i >= 0) this.parent.children.splice(i, 1)
@@ -210,9 +210,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
 }
 
 const publishedBoxes = (scene: Scene): { id: string }[] =>
-  ((scene as unknown as { sortDepth: () => { box: { id: string } }[] }).sortDepth() ?? []).map(
-    (e) => e.box,
-  )
+  (scene as unknown as { sortDepth: () => { box: { id: string } }[] }).sortDepth().map((e) => e.box)
 
 // every display object the layer put anywhere in the stack
 const placed = (scene: Scene): InstanceType<typeof MockContainer>[] => {
@@ -291,7 +289,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     layer.tick(1000)
     layer.tick(1016)
     const charCalls = get.mock.calls.filter(([url]) => String(url).startsWith('/assets/character/'))
-    expect(charCalls.map(([url]) => url).sort()).toEqual([
+    expect(charCalls.map(([url]) => String(url)).sort()).toEqual([
       '/assets/character/nadia.png',
       '/assets/character/omar.png',
     ])
@@ -384,7 +382,7 @@ function loadedBook(): TextureBook {
 /** Which of the six sheet rows a body is drawn on, read off the slice rectangle. */
 function drawnRow(layer: ReturnType<typeof createCharacterLayer>, id: string): string | null {
   const s = layer.getSprite(id) as unknown as { texture: { frame?: { y: number } } } | null
-  const y = s?.texture?.frame?.y
+  const y = s?.texture.frame?.y
   return y === undefined ? null : (SHEET_ROWS[y / CELL] ?? null)
 }
 
@@ -646,7 +644,7 @@ describe('★ four people on one tile, through the real layer', () => {
   })
 
   it('★ ONE body on a tile is left exactly where the record puts it', () => {
-    for (const n of NAMES.slice(1)) delete agents[n]
+    for (const n of NAMES.slice(1)) Reflect.deleteProperty(agents, n)
     layer.tick(1000)
     layer.tick(2000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
@@ -794,7 +792,7 @@ describe('★ five people on one tile are five separate hit targets', () => {
       bestI = -1
     for (const e of entries) {
       const pts = e.node.hitArea?.points
-      if (pts === undefined || pts === null) continue
+      if (pts === undefined) continue
       const k = e.node.scale.x || 1
       if (!containsPoly(pts, (sx - e.node.position.x) / k, (sy - e.node.position.y) / k)) continue
       const i = order.indexOf(e.box.id)

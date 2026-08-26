@@ -124,7 +124,7 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
         )
         return rules.some((r) => {
           const v = decl(rulesFor(CSS, r), 'outline-offset')
-          return v !== null && v.startsWith('-')
+          return v?.startsWith('-') === true
         })
       }),
     ).toEqual([])

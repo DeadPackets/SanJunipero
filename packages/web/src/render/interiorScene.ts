@@ -526,7 +526,7 @@ export function createInteriorScene(
   function sheetFor(agentId: string, records: AssetRecord[]): Sheet {
     const art = characterArt(records, agentId)
     let sheet = sheets.get(agentId)
-    if (sheet === undefined || sheet.art.url !== art.url) {
+    if (sheet?.art.url !== art.url) {
       sheet = { art, texture: null }
       sheets.set(agentId, sheet)
       const claimed = sheet

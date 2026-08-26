@@ -44,7 +44,7 @@ export function trackDrag(prev: DragTrack | null, x: number, y: number, t: numbe
 
 /** A drag, not a pick. The one question `pointertap` and the fling both ask. */
 export function isDrag(track: DragTrack | null): boolean {
-  return track !== null && track.moved
+  return track?.moved === true
 }
 
 /** A throw in flight: the speed it was let go at, decayed, and how long it has been going. */

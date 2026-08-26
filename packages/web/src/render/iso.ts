@@ -14,10 +14,8 @@ export function screenToTile(sx: number, sy: number): { x: number; y: number } {
   return { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
 }
 
-/**
- * @deprecated for sorting — depth.ts owns the painter's order. Kept as the before-state that
- * `depth.test.ts` and `occlusion.test.ts` measure the topological pass against.
- */
+/** NOT the painter's order — depth.ts owns that. This is the before-state that `depth.test.ts`
+ *  and `occlusion.test.ts` measure the topological pass against. */
 export function depthKey(x: number, y: number): number {
   return (x + y) * 1000 + x
 }

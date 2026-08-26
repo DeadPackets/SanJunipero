@@ -121,7 +121,11 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
     ready[k] = ready[ready.length - 1]!
     ready.pop()
     out.push(seeded[i]!.id)
-    for (const j of after[i]!) if (--indeg[j]! === 0) ready.push(j)
+    for (const j of after[i]!) {
+      const left = indeg[j]! - 1
+      indeg[j] = left
+      if (left === 0) ready.push(j)
+    }
   }
   if (out.length < n) {
     fallbackFrames++

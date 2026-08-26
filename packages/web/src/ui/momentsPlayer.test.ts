@@ -34,12 +34,12 @@ function run(prev: PlayerState, frames: number[], startTick = START, endTick = E
 describe('tickPlayer', () => {
   it('advances one tick per step at 1×', () => {
     expect(run(playing(), [MOMENT_STEP_MS]).tick).toBe(START + 1)
-    expect(run(playing(), Array(4).fill(MOMENT_STEP_MS)).tick).toBe(START + 4)
+    expect(run(playing(), Array<number>(4).fill(MOMENT_STEP_MS)).tick).toBe(START + 4)
   })
 
   it('advances four times as fast at 4×', () => {
     expect(run(playing({ speed: 4 }), [MOMENT_STEP_MS]).tick).toBe(START + 4)
-    expect(run(playing({ speed: 8 }), Array(2).fill(MOMENT_STEP_MS)).tick).toBe(START + 16)
+    expect(run(playing({ speed: 8 }), Array<number>(2).fill(MOMENT_STEP_MS)).tick).toBe(START + 16)
   })
 
   it('does not move on a single frame shorter than a step', () => {
@@ -50,8 +50,8 @@ describe('tickPlayer', () => {
 
   it('keeps the leftover, so a 60fps loop still plays', () => {
     // 31 frames of 16ms is 496ms — still short; the 32nd crosses 500 and one tick lands.
-    expect(run(playing(), Array(31).fill(16)).tick).toBe(START)
-    expect(run(playing(), Array(32).fill(16)).tick).toBe(START + 1)
+    expect(run(playing(), Array<number>(31).fill(16)).tick).toBe(START)
+    expect(run(playing(), Array<number>(32).fill(16)).tick).toBe(START + 1)
   })
 
   it('is a pure function of its inputs — the same frames always land in the same place', () => {
@@ -62,7 +62,7 @@ describe('tickPlayer', () => {
   })
 
   it('stops at the end of the moment rather than running past it', () => {
-    const s = run(playing({ speed: 8 }), Array(20).fill(MOMENT_STEP_MS))
+    const s = run(playing({ speed: 8 }), Array<number>(20).fill(MOMENT_STEP_MS))
     expect(s.tick).toBe(END)
     expect(s.status).toBe('idle')
   })

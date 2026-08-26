@@ -134,7 +134,7 @@ export function MomentCardView({
   onOpen: (id: number) => void
 }) {
   const label = thumbLabel(moment, people)
-  const where = label.location === null ? 'somewhere in the town' : label.location
+  const where = label.location ?? 'somewhere in the town'
   return (
     <li>
       <button

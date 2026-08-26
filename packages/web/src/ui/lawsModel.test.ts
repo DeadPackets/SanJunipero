@@ -143,7 +143,7 @@ describe('postLaw (T25c)', () => {
     expect(r).toEqual({ ok: true })
     expect(calls[0]!.url).toBe('http://127.0.0.1:8788/admin/laws')
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer a-token')
-    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
       path: 'mystery.enabled',
       value: false,
     })

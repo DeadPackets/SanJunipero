@@ -30,8 +30,9 @@ export const TILE_KIND: Record<TileId, TerrainTileKind> = {
   10: 'water',
 }
 
+const KIND_BY_ID: Partial<Record<number, TerrainTileKind>> = TILE_KIND
 export function tileKind(id: number): TerrainTileKind {
-  return TILE_KIND[id as TileId] ?? TERRAIN_KIND_FALLBACK
+  return KIND_BY_ID[id] ?? TERRAIN_KIND_FALLBACK
 }
 
 export const TILE_VARIANT_SALT = 0x9e3779b9

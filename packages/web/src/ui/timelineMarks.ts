@@ -100,10 +100,11 @@ const KEY: Readonly<Record<string, string>> = {
 function art(...rows: string[]): MarkPixel[] {
   const out: MarkPixel[] = []
   rows.forEach((row, y) => {
-    ;[...row].forEach((ch, x) => {
-      const fill = KEY[ch]
+    // by code unit, not code point: x is the column in a fixed-width ASCII grid
+    for (let x = 0; x < row.length; x++) {
+      const fill = KEY[row.charAt(x)]
       if (fill !== undefined) out.push([x, y, fill] as const)
-    })
+    }
   })
   return out
 }

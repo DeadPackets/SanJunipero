@@ -273,6 +273,7 @@ export function roomBox(
 }
 
 /** Always `ROOM_ZOOM`; still a function of the stage so the scene asks rather than inlines it. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- the stage height is the question the scene asks; the answer is a constant today.
 export function roomZoomFor(_screenH: number): number {
   return ROOM_ZOOM
 }
