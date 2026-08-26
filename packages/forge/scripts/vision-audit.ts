@@ -1,9 +1,5 @@
-// REPORT-ONLY retrofit audit: runs the C13 vision gate BACKWARDS over already-shipped art.
-// It never mutates the codex, never overwrites art, never regenerates. Failures are queued
-// in the report for a human, not acted on.
-//
-//   DRY=1 node --env-file=<env> node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/vision-audit.ts
+// REPORT-ONLY retrofit audit: runs the vision gate BACKWARDS over already-shipped art. It never
+// mutates the codex, overwrites art or regenerates; failures are queued for a human.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

@@ -1,12 +1,5 @@
-// LIVE (Asset Standard v3 production run, buildings) — cap $BUILD_CAP (default $2.00).
-// The building set the sim/codex references beyond the approved anchor cottage
-// (style-anchor/building-1, which serves the 'hut' dwelling): genesis storehouse +
-// wagon (C8 T8), scripted-world shed, T16 scaffolding (construction stage), and the
-// genesis standing stone landmark. Buildings are NEVER mirrored (NW-light law) and
-// author ONE facing each (door-sw default). Standard v3: hi-res native cell, chroma
-// key, trim+margin, 40-color quantize, per-asset ground-anchor manifest; the webview
-// scales down. 2 candidates each, picked by pixel pitch; quality gate = HUMAN EYEBALL
-// on the batch artifacts — this script never claims sign-off.
+// LIVE (Asset Standard v3, buildings) — cap $BUILD_CAP (default $2.00).
+// Buildings are NEVER mirrored (NW-light law) and author ONE facing each (door-sw default).
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'

@@ -1,17 +1,6 @@
-// OFFLINE, $0.00 — re-quantize every shipped portrait onto the DERIVED RAMPS.
-//
-// USER RULING 2026-08-18: the blanket palette exemption the forge asked for is not granted.
-// Extra tones are allowed only where they are interpolated between existing MASTER_PALETTE
-// members. This re-quantizes from the shipped bust — the portraits' own raws are the 512
-// generations, and the shipped 128 is already the integer-downscaled art (7/7 on that gate),
-// so the palette is the only thing moving.
-//
-// It reports the measured tone count for HAIR and SKIN before and after, which is the
-// evidence the ruling asked for: if ramps cannot hold the range the user approved, that
-// shows up here as a collapse and the class stops rather than quietly widening the rule.
-//
-//   node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/requantize-portraits.ts
+// OFFLINE, $0.00 — re-quantize every shipped portrait onto the DERIVED RAMPS. Extra tones are
+// allowed only where they interpolate between existing MASTER_PALETTE members.
+// Reports HAIR and SKIN tone counts before and after: a collapse stops the class.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

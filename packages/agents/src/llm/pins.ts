@@ -6,7 +6,7 @@ export const FALLBACK_MODELS: string[] = ['deepseek/deepseek-chat']
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
 // $/M tokens, read from OpenRouter's own endpoint list for MIND_MODEL on 2026-08-26
-// (`/api/v1/models/<id>/endpoints`, free and unauthenticated — scripts/price-probe.ts re-reads it).
+// (`/api/v1/models/<id>/endpoints`, free and unauthenticated).
 //
 // The old table was a single flat row of 0.14/0.28/0.028. That is Baidu's price, and it was
 // correct for Baidu. `PROVIDER_ORDER` is only a PREFERENCE while `allow_fallbacks` is true, so

@@ -1,14 +1,5 @@
-// FIX 2 — pick the turn provider BY PROBE, not by publication.
-//
-// A provider's datasheet does not say whether it will emit an OPTIONAL property of a schema,
-// and that is the only question that matters for the turn caller: a mind that cannot emit
-// `action` cannot act. C11 batch 12 pinned DeepInfra on its published capabilities and lost a
-// 38-minute, $0.76 gate and a whole town to it. This runs the committed pre-flight against
-// every candidate for about two cents and prints the table the pin is chosen from.
-//
-// LIVE. Run only as:
-//   node --env-file=<repo>/.env node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/agents/scripts/provider-probe.ts
+// LIVE (~2c) — pick the turn provider BY PROBE: a datasheet does not say whether a provider
+// will emit an OPTIONAL schema property, and a mind that cannot emit `action` cannot act.
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -38,10 +29,8 @@ const CANDIDATES: Candidate[] = [
   { name: 'unpinned', order: PROVIDER_ORDER, hardAllowList: false },
 ]
 
-// Three calls is the gate's bar, and three calls is also a coin flip on an optional field a
-// mind may legitimately not use: the first run of this probe passed three of four candidates
-// and the second passed none, on identical code. ROUNDS repeats the whole 3-call bar, so the
-// pin rests on the aggregate and the report can say how often the bar itself swings.
+// Three calls is the gate's bar and also a coin flip on an optional field: one run passed three
+// of four candidates and the next passed none, on identical code. ROUNDS repeats the whole bar.
 const ROUNDS = Number(process.env.PROBE_ROUNDS ?? 1)
 
 type Row = {
@@ -63,10 +52,8 @@ type Row = {
   answers: PreflightAnswer[]
 }
 
-// OpenRouter publishes per-provider pricing for a model id. Our own cost model prices the
-// pinned model, not the back end that served it, so the booked figure cannot separate two
-// providers of the same model — this can. Free, unauthenticated, and reported beside the
-// measured spend rather than instead of it.
+// Our own cost model prices the pinned model, not the back end that served it, so the booked
+// figure cannot separate two providers of one model — OpenRouter's per-provider pricing can.
 async function publishedPrices(): Promise<Map<string, { prompt: number; completion: number }>> {
   const out = new Map<string, { prompt: number; completion: number }>()
   try {

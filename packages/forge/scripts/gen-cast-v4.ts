@@ -1,12 +1,5 @@
-// LIVE (Asset Standard v3 production run) — cap $PROD_CAP (default $6.00).
-// Generates the remaining founder cast (cast.ts; Omar = the approved reference
-// character, not regenerated) through the calibrated v3 hi-res mirror pipeline:
-// per character 1 concept → master pair (2 candidates, picked by pixel pitch) →
-// 6 single-figure walk edit-calls → 1 sleep → code derivation to the 24-cell
-// contract + feet-anchor manifest + contact sheet + 4 GIFs. Prompts are the
-// calibrated gen-character-v4 prompts verbatim with only persona descriptors
-// swapped. Facing gate = HUMAN EYEBALL on the batch artifacts — this script
-// never claims facing sign-off.
+// LIVE (Asset Standard v3) — cap $PROD_CAP (default $6.00). Omar is not regenerated.
+// Facing gate = HUMAN EYEBALL on the batch artifacts; this script never claims sign-off.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
@@ -52,14 +45,9 @@ if (RUN_CAST.length === 0) throw new Error(`CAST=${process.env.CAST} matches no 
 
 class OutOfBudget extends Error {}
 
-// ── ★ SUPERSEDED BY gen-cast-v5.ts, AND STILL UNDER THE SAME RULING ────────────────────────
-//
-// This script is the previous standard and its output directory has been wiped, but `bestOf`
-// below is the identical policy that put TACTICAL GEAR into `content/cast`: a gate measures a
-// candidate, the caller ships the least-bad failure anyway. It stays reachable by anyone who
-// types the wrong filename, so it obeys the ruling too. The shape and the reason are in
-// `src/gate.ts`; this is the adapter that renders a `GateFailure` with its margin, because the
-// margin is what tells an operator a threshold from a bad drawing.
+// Superseded by gen-cast-v5.ts and still under the same ruling: `bestOf` chooses, it does not
+// decide. This renders a `GateFailure` with its margin — the margin is what tells an operator
+// a threshold from a bad drawing.
 const said = (x: GateFailure): string =>
   `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
   + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`

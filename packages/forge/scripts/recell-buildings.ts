@@ -1,12 +1,6 @@
-// OFFLINE, $0.00 — re-cell the five production buildings from their cached 1024 raws.
-//
-// Every shipped cell.png was matched byte-for-byte to exactly one raw by reprocessing that raw
-// through the chain that made it, so this is a repair from source, not a regeneration. It
-// writes a LEAN art root holding only what ingestProductionArt reads, so nothing is decided
-// for the user: point SJ_ART_ROOT at it to see the repair in the game, and remove it to undo.
-//
-//   node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/recell-buildings.ts
+// OFFLINE, $0.00 — re-cell the five production buildings from their cached 1024 raws; every
+// shipped cell.png was matched byte-for-byte to one raw, so this repairs from source.
+// Writes a LEAN art root: point SJ_ART_ROOT at it to see the repair, remove it to undo.
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

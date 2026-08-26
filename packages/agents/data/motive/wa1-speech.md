@@ -1,9 +1,0 @@
-- t=1100 {"agentId":"nadia","text":"The bushes are heavy out east. Won't be long till the birds notice.","x":67,"y":75}
-- t=1119 {"agentId":"yusuf","text":"Morning, Amara. Fair one.","x":79,"y":70}
-- t=1134 {"agentId":"amara","text":"Morning, Yusuf. Wood's for the house, east of the well.","x":81,"y":61}
-- t=1136 {"agentId":"yusuf","text":"Morning, Amara. Fair day for it.","x":79,"y":68}
-- t=1184 {"agentId":"nadia","text":"Morning, Yusuf! Fair one — the bush is loaded east.","x":74,"y":71}
-- t=1185 {"agentId":"yusuf","text":"Amara, it'll be framed before full dark. Stand by.","x":81,"y":61}
-- t=1241 {"agentId":"nadia","text":"Night's coming on fast. I'll get this load tucked away and call it a day.","x":75,"y":75}
-- t=1289 {"agentId":"nadia","text":"Roof over my head, berries in my hand — that's a fair day's end.","x":75,"y":75,"insideId":"structure_4"}
-- t=1313 {"agentId":"omar","text":"Now then. That's that for the day.","x":81,"y":106,"insideId":"structure_6"}

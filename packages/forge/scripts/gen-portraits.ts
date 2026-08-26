@@ -1,9 +1,5 @@
-// LIVE (Phase B) — cap $PORTRAIT_CAP (default $2). Portrait pipeline (class 'portrait'):
-// 512 gen on magenta → v7 primitive chain → 128×128 ship. Stage 1: neutral base,
-// 3 candidates + judge + report for the HUMAN pick. Stage 2 (rerun with
-// PORTRAIT_NEUTRAL=<candidate index>): 6 expressions, 2 candidates each,
-// refs = [style anchor, (concept), chosen neutral raw], consistency-gated vs neutral.
-// Flag: --concept <path> inserts the concept image right after the style anchor.
+// LIVE (Phase B) — cap $PORTRAIT_CAP (default $2). 512 gen on magenta -> v7 chain -> 128x128.
+// Stage 1 is 3 neutral candidates for a HUMAN pick; stage 2 reruns with PORTRAIT_NEUTRAL=<index>.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'

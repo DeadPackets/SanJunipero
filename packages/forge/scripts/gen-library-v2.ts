@@ -1,28 +1,6 @@
 // LIVE — the fifty-item library, COMMITTED. Cap $LIB_CAP.
-//
-//   BATCH=tools node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-library-v2.ts
-//
-// WHAT CHANGED SINCE gen-library.ts (round 3):
-//
-// 1. THE OUTPUT IS COMMITTED. Round 3 wrote all fifty items to `$C13/library` and registered
-//    them from there. That directory now holds ZERO files, so every item this project has
-//    ever paid for is gone and every item in the world draws the checkerboard placeholder.
-//    These land in `content/items/<kind>/`, beside the terrain and beside round 4's building
-//    cells — the two roots that survived the same wipe because they are committed.
-//
-// 2. ★ NO STYLE ANCHOR ON ANY CALL. Round 3 attached `style-anchor.png` — a cottage — to all
-//    fifty item calls. Round 4 measured what a reference actually buys ($0.2053, same prompt
-//    twice): with the anchor attached the model returned THE ANCHOR RECOLOURED, against a
-//    prompt that banned its architecture by name; with a code-painted MASTER_PALETTE swatch
-//    it returned the subject asked for. A swatch has no architecture in it. The only
-//    reference any call here carries is that swatch. `plan.ts` carries the clause.
-//
-// 3. THE ICON IS ITS OWN INTEGER DOWNSCALE OF THE PAID GENERATION, not a resample of the
-//    sprite. 1024/128 = 8 and 1024/64 = 16, both whole; 512/24 = 21.33 is what made every
-//    earlier item mush.
-//
+// The icon is a WHOLE-number downscale of the paid generation (1024/128, 1024/64); a
+// fractional divide is what made the round-3 items mush.
 // Controls: BATCH (required, or `all`), ITEMS=<comma list> for reruns, LIB_DRY=1,
 // LIB_ATTEMPTS, LIB_REJECTED=<candidate keys a human refused>.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -184,17 +162,9 @@ for (const item of items) {
     }
   }
 
-  // ★ THE RANK ORDERED FAILURES INSTEAD OF EXCLUDING THEM (user ruling; the shape and the
-  // reason are in src/gate.ts). A failed pixel bar used to cost 100 rank points and a judge
-  // rejection 10 — both a penalty, neither a disqualification — so the least-bad candidate of
-  // a bad batch went into `content/items` and into the codex as `ready`. Both verdicts are
-  // binding now; the rank still chooses among what is left.
-  //
-  // ★ INCLUDING THE JUDGE'S. It is the only gate in the package that can tell a pail from a
-  // market stall, it is paid for on every candidate, and it could never refuse one.
-  //
-  // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called,
-  // and a cached raw would otherwise refuse itself.
+  // Both verdicts are binding, the judge's included — it is the only gate that can tell a pail
+  // from a market stall. The rank chooses among what is left.
+  // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called.
   const judgeFails = (c: Cand): string[] => (c.verdict !== null && c.verdict.overall !== 'pass'
     ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`] : [])
   const clean = cands.filter((c) => c.fails.length === 0 && judgeFails(c).length === 0)

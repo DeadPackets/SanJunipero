@@ -1,24 +1,7 @@
-// The five founders, RE-AUTHORED FOR THE CONTEMPORARY VALLEY.
-//
-// Source of authority: `docs/superpowers/content/c8-founders.md` on main @ 9efff94 — the
-// re-authored sheets, not the old fantasy drafts `cast.ts` was written from. Those sheets fix
-// name, age, sex and role-shape and give the voice cards; they deliberately say almost nothing
-// about clothes, so the costumes below are DERIVED from role + age + the setting, and that
-// derivation is the part a human should argue with:
-//
-//   the valley is PRESENT DAY. `gen-dwellings-v2.ts` names the same period for the buildings —
-//   "a small remote modern farming village, the kind of place that still mends its own tools
-//   but has electric light and glazed windows". A founder in a homespun tunic standing in front
-//   of a house with glazed windows and a slate roof is the mismatch this file exists to avoid.
-//
-// The three-signature-feature cap is round 3's ruling and it stands: at three heads tall a
-// fourth feature is a smudge. Where the doc gives a physical tic that implies a prop, the prop
-// is one of the three — Amara "touches the strap of her bag when uneasy", so the bag strap is
-// hers and is drawn wide enough to read.
-//
-// OMAR KEEPS THE APPROVED DESIGN. `CHAR_DESC_V4` — sage cap, white tee, honey overalls,
-// satchel — is the one character design a human has actually signed off, and it was designed
-// around the 24-year-old dockside tinkerer. It is already contemporary. It is not re-derived.
+// The five founders, re-authored for the CONTEMPORARY valley from c8-founders.md. Those sheets
+// say almost nothing about clothes, so the costumes below are DERIVED from role, age and
+// period — that derivation is the part a human should argue with. Omar keeps CHAR_DESC_V4,
+// the one design a human has signed off, and is not re-derived.
 export type CastMember = {
   id: string
   /** swaps in for CHAR_DESC_V4 in the calibrated prompts */

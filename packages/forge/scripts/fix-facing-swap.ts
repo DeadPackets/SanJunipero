@@ -1,9 +1,6 @@
-// Zero-spend facing repair: swaps mislabeled SE<->SW cell pairs in a v4-hires
-// production dir (SW cells are exact mirrors of SE, so a file swap re-labels the
-// authored view), mirrors master/master-se.png to match, swaps walk-se/walk-sw
-// GIFs, and rebuilds contact-sheet.png from the fixed cells.
-// Usage: fix-facing-swap.ts <production-char-dir> [pose ...]  (default poses:
-// idle contact-a passing-a contact-b passing-b)
+// Zero-spend facing repair: swaps mislabeled SE/SW cell pairs. Legal because SW cells are
+// exact mirrors of SE, so a file swap re-labels the authored view.
+// Usage: fix-facing-swap.ts <production-char-dir> [pose ...]
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

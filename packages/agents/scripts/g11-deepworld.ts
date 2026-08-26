@@ -1,11 +1,5 @@
-// GATE G11b — the live half of the deep-world gate (addendum §18).
-// Five minds on the 128x128 genesis town, two sim-days, a real arbiter with a real materials
-// table, a real construct pass, a real chronicle and a real nightly semantic pass. Everything
-// the report claims is read back out of the run's own tables and event log.
-//
-// The ops plane is WIRED HERE OR THE GATE RUNS DARK (batch-7 concern 1, batch-8 concern 1):
-// runConstructPass, narrateDay's world and semantic seams, the arbiter's `vocabulary` table
-// and reportDeadCalls each have exactly one live caller, and it is this file.
+// The live half of the deep-world gate: five minds on the 128x128 genesis town for two
+// sim-days, with every claim read back out of the run's own tables and event log.
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -63,12 +57,8 @@ import {
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 import type { DiscoveryCredit } from '@sj/shared'
 
-// The user has ratified Baidu Qianfan as the v1 provider (cleanup/c8-cost-plan.md L1).
-// OpenRouter's `provider.order` is a PREFERENCE, not an allow-list: `defaultExtraBody` sends
-// allow_fallbacks:true and the client exposes no way to turn it off. Recorded as a C8 item in
-// the report rather than assumed away.
-// `G11_PROVIDER` lets the gate be run twice against the same world with only the routing
-// changed, which is the only way to tell a provider's answer rate from a town's behaviour.
+// OpenRouter's `provider.order` is a PREFERENCE: `defaultExtraBody` sends allow_fallbacks:true
+// and the client exposes no way to turn it off. `G11_PROVIDER` varies routing over one world.
 const PROVIDER_ORDER = (process.env.G11_PROVIDER ?? 'Baidu').split(',').filter((x) => x.length > 0)
 // C11 R20 made this real: false leaves OpenRouter free to fall through to whatever answers,
 // true turns `G11_PROVIDER` into an allow-list. Default stays false so this run is routed
@@ -96,10 +86,8 @@ const START_TICK = 7 * 60
 // The tick the operator drops the wear threshold. A trail forms inside a two-day window only
 // if the number it has to cross is a two-day number — the flip is criterion 6 and 7 at once.
 const FLIP_TICK = START_TICK + 120
-// The dial the operator drops mid-run. A two-day town walks 80 tiles and retraces none of
-// them, so anything above one is unreachable inside the window; §18 asks for a DIALLED-DOWN
-// threshold and this is how far down it has to go. What the threshold means exactly — worn at
-// it, not one footfall before — is G11a-W5's row, offline and on real walking.
+// A two-day town walks 80 tiles and retraces none, so any threshold above one is unreachable
+// inside the window — this is how far down the dial has to go.
 const WEAR_THRESHOLD = Number(process.env.G11_WEAR ?? 1)
 // STOP-and-report tripwire, not a cap (controller: no per-task cap on this batch).
 const TRIPWIRE_USD_PER_MIND_SIM_HOUR = 20
@@ -119,11 +107,8 @@ const MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.ur
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-// The per-tick bookkeeping a day produces tens of thousands of, and which no scene, heat score
-// or milestone reads. `narrateDay` segments and digests whatever it is handed, so a caller that
-// hands it the raw stream builds a prompt out of every need a body felt all day. This is the
-// caller's filter and it is deliberately NOT `NOT_CHRONICLED` — that set says which events get
-// a chronicle LINE, and it drops half of what the milestone detectors match on.
+// The caller's filter, deliberately NOT `NOT_CHRONICLED` — that set says which events get a
+// chronicle LINE and drops half of what the milestone detectors match on.
 const SEMANTIC_RECORD_CAP = 300
 const NARRATOR_NOISE: ReadonlySet<string> = new Set([
   'tick_advanced', 'need_changed', 'thirst_changed', 'hp_changed', 'agent_moved', 'agent_aged',
@@ -317,13 +302,8 @@ const qRows = <T>(db: Database.Database, sql: string, ...p: unknown[]): T[] =>
 
 const payloadOf = (e: SimEvent): Record<string, unknown> => (e.payload ?? {}) as Record<string, unknown>
 
-// The commit this run's code is at, and whether the tree it was run from was clean. A resume
-// across a code change would score a repaired run on the broken one's evidence, so the sha is
-// part of the fingerprint and a dirty tree is a different fingerprint every time it changes.
-//
-// `-uno` and the excluded data directory are not laxity: the run REWRITES its own artifacts in
-// `packages/agents/data` as it goes, so counting those would give the same run a different
-// fingerprint before and after its first day-close and no run could ever resume itself.
+// The sha is part of the fingerprint so a resume cannot score a repaired run on broken evidence.
+// The run rewrites its own artifacts under data/, so `-uno` and that exclusion let it resume.
 function gitSha(): string {
   try {
     const at = fileURLToPath(new URL('../../../', import.meta.url))
@@ -363,9 +343,7 @@ async function main(): Promise<void> {
     dryRun: DRY_RUN,
   }
 
-  // A resume puts the last checkpoint's snapshot back where the live database lives and reads
-  // the run's memory out of it; a fresh run wipes the database and builds from genesis. The
-  // checkpoint's fingerprint has to match this run's or the resume is refused: continuing a
+  // The checkpoint's fingerprint has to match this run's or the resume is refused: continuing a
   // different gate's evidence is the one way a checkpoint could launder a failure into a pass.
   if (RESUME) {
     if (!existsSync(CHECKPOINT_PATH)) {
@@ -504,10 +482,8 @@ async function main(): Promise<void> {
   const runtimes = new Map<string, AgentRuntime>()
   let seam: { adjudicate: Adjudicator; codify: Codifier } | null = null
 
-  // A resumed mind comes back with the clock, the half-run plan and the counts it had. A fresh
-  // clock would make it think the instant the run woke up, drop what it was doing, and start
-  // counting turns at zero — and criterion 8 gates on `reflectionsStarted` matching the
-  // resolved half, which is counted out of the database and does NOT restart.
+  // A resumed mind keeps its clock, half-run plan and counts: a fresh clock would restart turn
+  // counting at zero, and criterion 8 gates on `reflectionsStarted` matching the resolved half.
   const restoring = new Map(
     (saved?.sidecar.minds ?? []).map((m) => [m.agentId, m.snapshot] as const))
 
@@ -542,12 +518,8 @@ async function main(): Promise<void> {
   }
   const arbiterLlm = makeClient(db, 'arbiter')
 
-  // ART IS NOT WIRED HERE YET, AND THAT IS DELIBERATE. `createForge` needs a reference sheet,
-  // and `loadReferenceSheet()` requires content/reference/ref-1..3.png, which are not in the
-  // tree — `gen-rigs.ts`, the only script that builds a Forge, cannot run today either. The
-  // record does not wait on a picture: this watcher draws nothing and every discovery is
-  // still credited, announced and archived. Swapping in `watchDiscoveryArt({ forge, codex })`
-  // is the whole of the remaining work, and its tests are already green.
+  // `createForge` needs content/reference/ref-1..3.png, which are not in the tree. The record
+  // does not wait on a picture: this watcher draws nothing and discoveries are still archived.
   const discoveryArt = noDiscoveryArt()
 
   const arbiter = makeArbiter({
@@ -818,10 +790,8 @@ async function main(): Promise<void> {
   }
 
   // ------------------------------------------------------- the report writer ---
-  // Callable at any moment, and called at every day-close and again the instant the tick loop
-  // ends. It reads the run out of the event store, the database and the accumulators above —
-  // never out of a variable only the end of the run would have — so a partial written at 93%
-  // is the same arithmetic as the final one on the same evidence.
+  // Reads the run out of the event store and the accumulators, never out of an end-of-run
+  // variable, so a partial written at 93% is the same arithmetic as the final one.
   async function resolveReuse(): Promise<void> {
     if (reuseResolved) return
     reuseResolved = true
@@ -902,12 +872,8 @@ async function main(): Promise<void> {
     return s
   }
 
-  // The spit narrows the channel to two tiles: at a ford row the water is x 48 and 49 and the
-  // spit at x 50 is the bank on the town's side. The deck spans the water, not the sand.
-  //
-  // A run in which the map grew has moved every coordinate the genesis constants name — the
-  // fold shifts the world when it widens north or west — so the ford is wherever the growths
-  // put it. Run 4 of this gate failed C and D for exactly this and nothing else.
+  // The deck spans the water, not the sand: at a ford row the water is x 48-49 and the spit at
+  // x 50 is the bank. A run in which the map grew has moved every genesis coordinate.
   const shift = allEvents.filter((e) => e.type === 'world_grown').reduce((acc, e) => {
     const p = payloadOf(e) as { edge?: string; depth?: number }
     return {
@@ -1048,10 +1014,8 @@ async function main(): Promise<void> {
     return { acts, eaten }
   })()
 
-  // --- the response to the sick founder ---
-  // A visible response is a hand, a thing put into her hands, or her name in somebody's
-  // mouth (plan §18: tend, herb, or witnessed avoidance — recovery and death both pass,
-  // silence does not). The window is the stretch she was actually ill for.
+  // A visible response is a hand, a thing put into her hands, or her name in somebody's mouth:
+  // recovery and death both pass, silence does not. The window is the stretch she was ill for.
   const illFrom = 0
   const illTo = allEvents.find((e) => e.type === 'affliction_recovered' && payloadOf(e).agentId === SICK_ONE)?.tick
     ?? allEvents.find((e) => e.type === 'agent_died' && payloadOf(e).agentId === SICK_ONE)?.tick

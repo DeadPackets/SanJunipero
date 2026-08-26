@@ -1,8 +1,5 @@
-// LIVE — cap $1. Regenerates 3 villager candidates (rig-part3) grounded on the
-// human-curated 4-direction walk sheet (ref-sheet.png, CC0 'Green Cap Character 16x18').
-// The detail-enhanced prompt from gen-character-detail.ts is preserved, plus clauses
-// pinning the candidate to the reference's proportions, 3/4 view, south-west facing,
-// walk-sheet compatibility, hard pixel edges, and thick readable silhouette.
+// LIVE — cap $1. Three villager candidates grounded on the curated 4-direction walk sheet
+// (ref-sheet.png, CC0 'Green Cap Character 16x18'), with the gen-character-detail prompt.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { makeImageClient } from '../src/imageClient.js'
 import { buildAssetPrompt } from '../src/styleBible.js'

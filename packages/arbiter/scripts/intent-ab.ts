@@ -1,20 +1,9 @@
-// ★ DOES GIVING THE GOD THE MIND'S OWN WORDS CHANGE THE VERDICT? Measured, not argued.
-//
-// Two arms over the SAME intents in the SAME order against the real model, each with its own
-// empty `_arbiter.db` so neither can read the other's precedent:
-//
-//   A  BEFORE — `flattenIntent`: the verb as an underscored token, values joined by spaces,
-//               and no thought at all. `smoke_fish over green wood`.
-//   B  AFTER  — `humanizeIntent` plus `AgentCtx.saying`: `smoke fish over green wood`, and the
-//               sentence the mind actually wrote, fenced under the intent.
-//
-// Counted per arm: how many intents reach a CLASSED verdict — an attempt, a map, or an
-// impossible the arbiter itself formed — rather than `FALLBACK_IMPOSSIBLE`, which is the string
-// returned when every model try failed validation; and how many of the attempts would CODIFY,
-// which is a mind changing the rules of its world and the single most valuable event here.
-//
-//   node --env-file=<repo>/.env node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs \
-//     packages/arbiter/scripts/intent-ab.ts
+// Does giving the god the mind's own words change the verdict? Two arms over the SAME intents,
+// each with its own empty `_arbiter.db` so neither can read the other's precedent:
+//   A  `flattenIntent` — the verb as an underscored token, no thought at all.
+//   B  `humanizeIntent` plus `AgentCtx.saying` — the sentence the mind actually wrote.
+// Counted per arm: intents reaching a CLASSED verdict rather than `FALLBACK_IMPOSSIBLE`, and
+// how many attempts would CODIFY.
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -42,10 +31,8 @@ const VOCABULARY = {
   structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
 } as const
 
-// ★ THE SEED. Seven invented verbs a mind reached for, each with the thought behind it. The
-// first is Amara's, verbatim off `data/arb-proof/minds/amara.db` — the intent this whole lane
-// exists because of. The rest are the same shape: an act the engine has no verb for, motivated
-// by a want the town can see. Fixed order, fixed cast, so the two arms differ in one thing.
+// Seven invented verbs a mind reached for, each with the thought behind it — an act the engine
+// has no verb for. Fixed order and cast, so the two arms differ in exactly one thing.
 const SEED: Array<{ verb: string; params: Record<string, unknown>; thought: string }> = [
   {
     verb: 'smoke_fish', params: { over: 'green wood' },

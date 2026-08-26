@@ -1,8 +1,5 @@
-// LIVE (Phase B) — cap $CONCEPT_CAP (default $1). Character concept art: ONE
-// high-detail box-art style image establishing costume, palette and accessories.
-// NOT a sprite: rich rendering allowed, no pixel constraints, no chroma background.
-// 2 candidates + judge + report; the HUMAN pick becomes the identity root passed to
-// gen-character-v3.ts / gen-portraits.ts via --concept <path>.
+// LIVE (Phase B) — cap $CONCEPT_CAP (default $1). NOT a sprite: rich rendering allowed, no
+// pixel constraints, no chroma background. The HUMAN pick becomes the identity root.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'

@@ -1,23 +1,5 @@
 // COST LADDER — one arm of the reasoning-dial ladder, with the quality measure beside the bill.
-//
-// ★ THE ONLY WAY THIS LANE CAN FAIL IS BY MAKING THE MINDS STUPIDER, and a token count cannot
-// see that. So every arm reports six behaviours that were MEASURED TO BE ABSENT and then
-// appeared — a regression in any of them is visible as a number, not as an opinion:
-//
-//   enteredWarm   a mind goes indoors when cold      (0,0,0,0 -> 1,1,1,1, world-fixes)
-//   lightActs     a mind makes light                 (0 across eight live nights, then t133)
-//   recovered     a mind recovers from a refusal     ("you cannot: stoke needs a {structureId}")
-//   bonds         a tie forms                        (BONDS 0 -> 1, fifteen unscripted lines)
-//   completed     a mind builds                      ("Begun by Amara on Day 0 - still rising")
-//   emDashPct     voice quality                      (0.0% em dash, opener reuse 82% -> 30%)
-//
-// Three of the six are read with the PRODUCT'S OWN code rather than a proxy invented here:
-// `buildBonds` is the gateway's shipped derivation, the shiver line is the one `prose.ts` uses
-// to tell a mind it is cold, and the repair count is `repair.ts`'s own `decode_repaired` alert.
-//
-// Every arm is matched: same seed, same cast, same spawn tiles, same tick count, same machine,
-// same wood and bread in hand. The ONLY difference between arms is what `reasoning` the turn
-// client and the reflection client send.
+// Every arm reports quality beside cost — a token count cannot see a dumber mind.
 //
 //   LADDER_TURN=unset|off|minimal|low|medium|high
 //   LADDER_REFL=unset|off|minimal|low|medium|high
@@ -45,15 +27,8 @@ import { makeReflectionLlm } from '../src/reflection.js'
 
 const LABEL = process.env.LADDER_LABEL ?? 'ladder'
 const TOTAL_TICKS = Number(process.env.LADDER_TICKS ?? 420)
-// ★ A WINTER NIGHT, BECAUSE THE FIRST CONTROL ARM MEASURED NOTHING.
-//
-// Run on the default day 0 the arm came back `enteredWarm 0, lightActs 0, completed 0` — not
-// because the minds failed, but because day 0 is SPRING (`SEASONS[floor(dayOfYear/91)]`) and
-// spring night sits at ambient 9. Nobody drops under the shiver line, so three of the six
-// behaviours cannot fire in the control and a measure that cannot fire cannot detect a
-// regression. Winter night is ambient -12: the cold is real, the dark is real, and all six are
-// live. Day 273 is the first winter day; 20:00 is where night-probe starts, an hour before the
-// deep dark, so a mind meets the night rather than waking in it.
+// Day 0 is SPRING (ambient 9) and nobody drops under the shiver line, so three of the six
+// behaviours cannot fire. Day 273 20:00 is the first winter night, an hour before the deep dark.
 const WINTER_NIGHT = 273 * MINUTES_PER_DAY + 20 * 60
 const START_TICK = Number(process.env.LADDER_START_TICK ?? WINTER_NIGHT)
 const CAP_USD = Number(process.env.LADDER_CAP ?? 3.0)

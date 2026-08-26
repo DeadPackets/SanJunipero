@@ -1,11 +1,6 @@
-// LIVE — the building repair round. One targeted EDIT call per building on its cached raw
-// (the gen-master-edit precedent, buildings instead of characters), reprocessed through the
-// same v4 hi-res chain, then judged by BOTH instruments: the vision rubric on the native cell
-// and the pixel + seat alignment law on the rebuilt target cell. A repair deploys only when
-// the rubric passes and the pixel half is green; otherwise the candidate is kept and reported.
-//
-//   BUILDINGS=shed,standing-stone node --env-file=... scripts/repair-building.ts
-//   DEPLOY=0 keeps the repair out of the production copies (judge it first).
+// LIVE — one targeted EDIT call per building on its cached raw, judged by BOTH instruments:
+// the vision rubric on the native cell and the pixel + seat alignment law on the target cell.
+// A repair deploys only when both pass. DEPLOY=0 keeps it out of the production copies.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

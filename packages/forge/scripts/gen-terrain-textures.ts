@@ -1,15 +1,6 @@
-// LIVE. Generated repeating tiling ground textures (USER RULING 2026-08-17), through the
-// C13 forge gate: rubric + retry-with-feedback + SpendLedger read-merge-write.
-//
-//   DRY=1 npx tsx packages/forge/scripts/gen-terrain-textures.ts
-//   node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-terrain-textures.ts
-//
-// Controls: DRY=1 offline plan, ONLY=<comma list of assetIds>, CAP=<usd>, FORCE=1 to redo
-// an asset that already has art. SPEND SAFETY: an asset whose material is already on disk is
-// SKIPPED — a restart mid-batch must never pay twice for the same picture.
-// Nothing generated is committed by this script — art lands under $C3/ for curation.
+// LIVE. Repeating tiling ground textures, through the forge gate. Controls: DRY=1 offline plan,
+// ONLY=<assetIds>, CAP=<usd>, FORCE=1 to redo an asset that already has art.
+// An asset whose material is already on disk is SKIPPED — a restart must never pay twice.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -111,10 +102,8 @@ async function main(): Promise<void> {
       try { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       catch { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       eyeTiling.push(r.verdict.criteria.tiling.score)
-      // RULING (corrected after the water:0 finding): a measurement may VETO, never RESCUE.
-      // An objective failure is decisive; an objective pass is only a floor the eye still has
-      // to clear. The first version floored the eye's tiling score whenever the seam measured
-      // clean — and a DRAWN FRAME wraps perfectly, so it sailed through with a purple grid.
+      // A measurement may VETO, never RESCUE: an objective pass is only a floor the eye still has
+      // to clear. A DRAWN FRAME wraps perfectly, so a clean seam once sailed a purple grid through.
       const attempt = a.attempt ?? 1
       if (broke === undefined || broke === null) return r
       const criteria = { ...r.verdict.criteria, tiling: { pass: false, score: 0, evidence: broke } }

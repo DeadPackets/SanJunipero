@@ -1,26 +1,7 @@
 // LIVE — the three dwellings of a CONTEMPORARY rural San Junipero, cap $DWELL_CAP ($2.00).
-//
-// The user looked at the old `hut` and said it "seems a bit old", and set the period:
-// modern-day countryside, not rudimentary. A remote farming settlement in the present day —
-// power from a generator, no factory within reach, what breaks here is mended here.
-// `hut` is retired as a dwelling; these three replace it.
-//
-// They must read as THREE DIFFERENT BUILDINGS at a glance, at every zoom stop, while still
-// reading as one town. They share the ground footprint (2x2, so the layout lane can place any
-// of them wherever a dwelling goes) and differ on the three axes that carry at sprite size:
-//
-//   cottage    single storey, wide and low   steep symmetrical GABLE, pantile   broad triangle
-//   farmhouse  TWO storeys, tall             HIPPED roof with a dormer          porch breaks the front
-//   cabin      single storey, smallest       MONO-PITCH, one slope only         low asymmetric wedge
-//
-// Generated at 2048 so the 512 cell (2x2 x the 4x zoom stop = 1:1 at the close-up) is reached
-// by dividing a crop by a WHOLE number with the subject filling the window. A 1024 generation
-// cannot: its ceiling factor is 2, the window is the whole frame, and the building would draw
-// a tenth smaller than it should — the margin the storehouse is stuck with.
-//
-//   node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-dwellings.ts
+// cottage: one storey, gable. farmhouse: two storeys, hipped + dormer. cabin: one storey, mono-pitch.
+// Generated at 2048 so the 512 cell is a whole-number divide; a 1024 generation's ceiling
+// factor is 2 and the building draws a tenth small.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
@@ -52,11 +33,9 @@ const GEN_PX = 2048
 const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
 const OUT = `${S}/r3/dwellings`
 const ART = `${S}/fqc2/art-root/production`
-// The anchor carries the palette and the craft. It also carries the architecture the user
-// rejected, and on `farmhouse` it won: two rolls came back with an arched door, a green
-// shingle roof and half-timbering, against a prompt that banned all three by name. Same bleed
-// gen-cast-v4 built WALK_NO_STYLE_ANCHOR for. DWELL_REF swaps in an already-approved building
-// of this round instead — same palette, same craft, and no medieval architecture to copy.
+// The anchor carries the palette AND the architecture the user rejected, and on `farmhouse` the
+// architecture won against a prompt that banned it by name. DWELL_REF swaps in an approved
+// building of this round instead.
 const STYLE_ANCHOR = readFileSync(process.env.DWELL_REF ?? 'packages/forge/content/reference/style-anchor.png')
 
 // The anchor cottage is the craft reference and ALSO the architecture the user rejected —

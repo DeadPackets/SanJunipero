@@ -1,7 +1,5 @@
-// Offline, $0. What the founding valley holds, against how many bodies there are — the one
+// Offline, $0. What the founding valley holds against how many bodies there are — the one
 // arithmetic that decides whether a run can watch a town answer the cold at all.
-//
-//   node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs packages/agents/scripts/shelter-ledger.ts
 import { DEFAULT_CONFIG, FOUNDER_IDS, isRoofedKind, type SimEvent } from '@sj/shared'
 import { buildTicks, fold, genesisState, makeGenesisWorld, roomCapacity, shelterLedger } from '@sj/engine'
 

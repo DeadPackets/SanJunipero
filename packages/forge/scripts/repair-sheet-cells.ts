@@ -1,7 +1,6 @@
-// LIVE — cap $0.40. Targeted repair of two gen-character-sheet cells:
-// se/idle (near-duplicate of sw/idle) and se/walk-b (identity drift).
-// Mirroring a reference INPUT is legal — the model re-renders with correct NW
-// lighting; output pixels are never mirrored.
+// LIVE — cap $0.40. Targeted repair of two gen-character-sheet cells.
+// Mirroring a reference INPUT is legal — the model re-renders with correct NW lighting;
+// output pixels are never mirrored.
 import { writeFileSync, readFileSync } from 'node:fs'
 import { makeImageClient } from '../src/imageClient.js'
 import { makeVlmJudge } from '../src/judge.js'

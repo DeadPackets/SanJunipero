@@ -1,9 +1,5 @@
-// Node loader for running the monorepo's TypeScript under plain `node`.
-// The source tree uses the NodeNext `.js`-in-imports convention (a.ts imports
-// './b.js' where only b.ts exists) and, in a few classes, TypeScript parameter
-// properties — neither of which Node's built-in strip-only mode supports.
-// The resolve hook maps `.js` -> `.ts`; the load hook transpiles `.ts` with the
-// workspace's own TypeScript so parameter properties are lowered.
+// Node loader for the monorepo's TypeScript: Node's strip-only mode supports neither the
+// NodeNext `.js`-in-imports convention nor parameter properties, so resolve maps .js -> .ts.
 import { registerHooks } from 'node:module'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'

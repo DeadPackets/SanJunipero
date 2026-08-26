@@ -1,10 +1,5 @@
-// LIVE batched generation of the 50-entry premade library. One BATCH per invocation, so
-// every batch meets an eyeball before the next one spends.
-//
-//   BATCH=tools DRY=1 node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs packages/forge/scripts/gen-library.ts
-//
-// Controls: BATCH (required), ITEMS=<comma list> for reruns, DRY=1 for the offline plan,
+// LIVE batched generation of the 50-entry premade library. One BATCH per invocation, so every
+// batch meets an eyeball before the next one spends. Controls: BATCH (required), ITEMS=, DRY=1,
 // CANDIDATES=2|3. Nothing generated is committed — art lives under $C13/library/.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -165,15 +160,8 @@ async function main(): Promise<void> {
 
     if (chosen) {
       icon ??= chosenRaw ? integralSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)
-      // Mechanical criteria are COUNTED, never asked of the judge. A sprite that fails the
-      // pixel bar never ships, whatever the eye said about it.
-      //
-      // ★ THAT COMMENT WAS FALSE FOR AS LONG AS IT HAS BEEN HERE. The loop below set
-      // `status = 'blocked'` and the code under it wrote `sprite.png`, `icon.png`, a codex
-      // record and `report.json` anyway — a gate that computes a verdict beside a caller
-      // that discards it, with a comment on top claiming the opposite. A superseded script
-      // with a lie in it is worse than a superseded script, because the lie is what the next
-      // person reads. The code now does what the comment always said.
+      // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
+      // bar never ships, whatever the eye said about it.
       const barFailures = (await Promise.all([
         pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
         pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),

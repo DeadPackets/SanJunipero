@@ -1,10 +1,5 @@
-// LIVE — one targeted edit-call on a cached character master (phase 2b precedent:
-// master-b0-c1 was an edit of the approved a1-c0). Env:
-//   EDIT_CHAR  cast id (production dir name)
-//   EDIT_SRC   source raw key (e.g. master-yusuf-c1)
-//   EDIT_OUT   output raw key (e.g. master-yusuf-c2)
-//   EDIT_NOTE  the edit instruction sentence(s)
-//   EDIT_CAP   budget cap (default $0.20)
+// LIVE — one targeted edit-call on a cached character master.
+// Env: EDIT_CHAR, EDIT_SRC, EDIT_OUT, EDIT_NOTE, EDIT_CAP (default $0.20).
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'

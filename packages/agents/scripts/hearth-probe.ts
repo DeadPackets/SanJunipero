@@ -1,22 +1,7 @@
 // HEARTH PROBE — not a gate. One question, asked of real minds: when there is a fire in the
 // room and a body can reach it, does anybody feed it?
-//
-// ★ WHY THE WORLD HAS TO BE CHANGED AT ALL, AND IT IS THE POINT. The founding valley as it
-// ships holds TWO sound roofs — a storehouse and a cabin — and NEITHER HAS A HEARTH. The only
-// fire in the whole valley is the fire pit in the square, out under the sky. Every one of the
-// five founders' houses stands roofless, 720 ticks short. So the shipped valley cannot answer
-// this question at all: there is no indoor fire to walk to. `vlong1` showed a house CAN be
-// finished in a night and a day, and this probe starts the morning after that.
-//
-// Two arms over the identical world, the identical seed and the identical cast. The ONLY
-// difference is the config's two furnishing flags:
-//
-//   hb  the world before this lane: `house.hearth` and `house.bed` are false, so no verb
-//       reaches the fire in a house, the packet carries neither field, and a bed is a floor.
-//       Byte-for-byte what `19669b6` gave a mind standing in a finished house.
-//   h   the world after: the same house, with the fire in it reachable and the bed worth
-//       something. Nothing tells a mind to feed it — the packet says "The hearth here is
-//       cold." and stops.
+//   hb  house.hearth and house.bed false — no verb reaches the fire, the packet omits both fields.
+//   h   the same house with the fire reachable; nothing tells a mind to feed it.
 //
 //   HEARTH_ARM=h|hb  HEARTH_TICKS=720  HEARTH_LABEL=h1
 import { fileURLToPath } from 'node:url'
@@ -43,21 +28,16 @@ import { FOUNDER_MINDS as MINDS } from '../src/live/founderMinds.js'
 const ARM = (process.env.HEARTH_ARM ?? 'h').toLowerCase()
 const LABEL = process.env.HEARTH_LABEL ?? ARM
 const TOTAL_TICKS = Number(process.env.HEARTH_TICKS ?? 720)
-// 18:00, the motive probe's own hour, so the two records stack. `HEARTH_DAY` moves the night
-// into another season without touching anything else: day 0 is early spring, and day 273 is
-// the winter the whole cold design was ratified for — the only season in which an indoor body
-// crosses the shiver line, and therefore the only one in which a hearth answers a want a body
-// can feel on itself rather than only see in the room.
+// 18:00 so the record stacks with the motive probe. Day 273 is the only season in which an
+// indoor body crosses the shiver line, and therefore the only one a hearth answers a want in.
 const START_TICK = Number(process.env.HEARTH_DAY ?? 0) * MINUTES_PER_DAY + 18 * 60
 const CAP_USD = 6.0
 const REAL_MS_PER_TICK = Number(process.env.HEARTH_MS_PER_TICK ?? 250)
 const WOOD_IN_HAND = 10
 const DATA_DIR = fileURLToPath(new URL('../data/hearth/', import.meta.url))
 
-// ★ THE ARM IS ONE CONFIG EDIT AND NOTHING ELSE. Two booleans off is exactly the world before
-// this lane: `isHeatSource` says a house holds no fire, `structureGlowRadius` gives it no glow,
-// `sleepRegenPerTick` gives a bed nothing, and perception composes neither field. The world,
-// the seed, the cast, the wood in hand and the finished house are identical in both arms.
+// The arm is one config edit and nothing else — two booleans off is exactly the world before
+// this lane. World, seed, cast, wood in hand and the finished house are identical in both arms.
 const BEFORE = ARM === 'hb'
 const config: SimConfig = BEFORE
   ? SimConfigSchema.parse({
@@ -71,15 +51,9 @@ const config: SimConfig = BEFORE
   : SimConfigSchema.parse({})
 
 // ------------------------------------------------------------------ the world ---
-// The founding valley, plus ONE finished house — the thing `vlong1` proved five pairs of hands
-// do in a night and a day — and MINUS the cabin.
-//
-// ★ THE CABIN COMES OUT SO THE LEDGER DOES NOT MOVE, and that is not tidying. Finishing a house
-// adds two slots: `per` would go 0.8 -> 1.2, over the bar the wants lane set, and a run that
-// starts above 1.0 cannot tell a wanting town from a busy one. Out with the cabin, the ledger
-// is 2 roofs / 4 slots / 5 bodies = 0.8, the shipped number, and the twelve nights on record
-// stay comparable. The house is then the only roof in the valley with a fire in it — the
-// storehouse has a roof and no hearth, which is the shipped valley's own arrangement.
+// The founding valley plus ONE finished house, MINUS the cabin. The cabin comes out so the
+// ledger stays at 2 roofs / 4 slots / 5 bodies = 0.8 — finishing a house would take `per` to
+// 1.2 and a run starting above 1.0 cannot tell a wanting town from a busy one.
 function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }>; houseId: string } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)

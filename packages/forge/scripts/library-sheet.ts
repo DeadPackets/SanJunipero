@@ -1,6 +1,5 @@
-// OFFLINE contact sheet for the premade library: world sprite + icon per entry, 4x/6x
-// nearest onto a neutral checker (so any transparency residue shows), with the palette card
-// along the header for colour comparison. No key, no network, no spend.
+// OFFLINE contact sheet for the premade library. Nearest-scaled onto a neutral checker so any
+// transparency residue shows. No key, no network, no spend.
 //
 //   BATCH=tools OUT=$C13/reports/batch-1-sheet.png node ... scripts/library-sheet.ts
 //   ALL=1 TITLE='master' OUT=$C13/reports/library-master-sheet.png node ... scripts/library-sheet.ts

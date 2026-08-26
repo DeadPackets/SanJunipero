@@ -1,24 +1,8 @@
 // OFFLINE, $0.00 — re-cell all five founders from the raws their sheets were authored from.
-//
-// The raws survive: `master/master.png` is the chosen master's own bytes (gen-cast-v4 writes
-// it), and report.txt's `chosen:` line names the six walk raws and the sleep raw by file.
-//
-// What the shipped cells do wrong: processHiResCell TRIMS to the figure bbox and then calls
-// normalizeFigureHeight, which is a NEAREST resample by targetH/bbox with each axis rounded
-// on its own — fractional, anisotropic, and an UPSCALE on one axis. The result is ~388x845 of
-// soft art that the renderer then divides by 52/figureH through a linear filter.
-//
-// What this does instead: one WHOLE factor per cell, chosen so the figure lands on
-// CHAR_FIGURE_PX (208 = CHAR_TARGET_PX x the 4x zoom stop), which makes the renderer's scale
-// exactly 1/4 and the close-up exactly 1:1.
-//
-// The generator returned two frame sizes — 840 px of figure in a 1024 frame and ~2100 in a
-// 2528 one — so the factors are 4 and 10, and the leftover is taken as a SOURCE correction of
-// a few per cent before the divide. Without it the walk cycle pulses by 8%, because the model
-// drew the figure anywhere between 2054 and 2333 px tall. The correction is stated, not hidden.
-//
-//   node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/recell-characters.ts
+// Raws: `master/master.png` plus the walk and sleep files named on report.txt's `chosen:` line.
+// One WHOLE factor per cell so the figure lands on CHAR_FIGURE_PX and the renderer's scale is
+// exactly 1/4 — factors 4 and 10, with a few-per-cent SOURCE correction, without which the
+// walk cycle pulses 8%.
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

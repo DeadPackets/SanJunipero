@@ -1,12 +1,6 @@
-// Re-derives every library icon at the catalog's current iconPx, re-registers both codex rows
-// and rewrites the durable index. Offline and $0; JUDGE=1 re-runs the vision judge over the
-// new icons (LIVE, ~$0.0055 each).
-//
-//   KINDS=needle,totem JUDGE=1 node --env-file=... scripts/rederive-icons.ts
-//
-// Under the controller icon ruling iconPx === spritePx, so deriveIcon is a byte-for-byte
-// no-op and the icon becomes exactly the sprite the gate already judged. That is the fix:
-// the 16 px cell was the only thing failing seven otherwise clean items.
+// Re-derives every library icon at the catalog's current iconPx. Offline and $0; JUDGE=1 re-runs
+// the vision judge (LIVE, ~$0.0055 each). Under the icon ruling iconPx === spritePx, so
+// deriveIcon is a byte-for-byte no-op and the icon becomes the sprite the gate already judged.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

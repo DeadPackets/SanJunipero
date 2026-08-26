@@ -1,10 +1,8 @@
 // MOTIVE PROBE — not a gate. One question, asked of real minds: with a cold night coming, no
 // roof within reach and the wood already in hand, does anybody raise one?
 //
-// Two arms over the identical world and the identical seed. The ONLY difference is whether
-// the packet carries the `cold` field this lane added — arm A strips it back off at the seam,
-// so arm A is exactly what `645a8d9` gave a mind and arm B is exactly what it gives now.
-// Nothing in either arm tells a mind to build.
+// Two arms over the identical world and seed; the ONLY difference is whether the packet
+// carries the `cold` field. Nothing in either arm tells a mind to build.
 //
 //   MOTIVE_ARM=a|b  MOTIVE_TICKS=360  MOTIVE_LABEL=run1
 import { fileURLToPath } from 'node:url'
@@ -39,31 +37,17 @@ const DATA_DIR = fileURLToPath(new URL('../data/motive/', import.meta.url))
 const config: SimConfig = DEFAULT_CONFIG
 
 // ------------------------------------------------------------------ the world ---
-// The genesis valley exactly as it is — its ground, its river, its trees and the ground the
-// town keeps for a new roof — with some of its buildings taken out of it. Nothing else is
-// touched.
+// The genesis valley with some of its buildings taken out; nothing else touched.
+// The arm worlds are FROZEN named kinds, never a `roofed`/`enterableKinds` lookup — `roofed`
+// has since grown to cover cabins and cottages, and reading it here would gut arms A and B
+// and stop the run stacking against the nights already on record.
 //
-// ★ THE ARM WORLDS ARE NAMED KINDS AND NOT A PROPERTY LOOKUP, ON PURPOSE. The motivation lane
-// wrote `new Set(config.structures.enterableKinds)`, which was `['house','storehouse']` on the
-// day it ran. `roofed` has since made cabins, cottages and farmhouses shelter too, and reading
-// the property here would silently gut arms A and B and make this run incomparable with the
-// nine nights already on record. These four sets are frozen so the table can be stacked.
+//   a  control — the founding valley, the `cold` field stripped at the seam.
+//   b  the cold felt, and the valley SOUND — every roof back on. 21 slots for 5 bodies.
+//   c  the cold felt, and nowhere at all to go in: no roof of any kind.
+//   g  the founding exactly as it ships — two sound roofs, seven dwellings at three quarters.
 //
-// The nine nights the motivation lane ran are `a1..c3` in `data/motive/`, left untouched. This
-// lane's twelve are `wa1..wd3` — pass MOTIVE_LABEL=w<arm><round> to add to them rather than
-// overwrite the record.
-//
-//   a  control — the founding valley, and main's prose: the `cold` field stripped at the seam.
-//   b  the cold felt, and the valley SOUND — every roof back on, which is the town every
-//      production figure this project ever reported was measured in. 21 slots for 5 bodies.
-//   c  the cold felt, and nowhere at all to go in: no roof of any kind, nothing half-raised.
-//   g  ★ THE FOUNDING, EXACTLY AS IT SHIPS. Nothing added, nothing taken away. Two sound roofs
-//      and seven dwellings standing at three quarters. `per` 0.8.
-//
-// Arms `a`, `b` and `c` are the founding valley with something DONE to it; `g` is the founding
-// valley. The nine nights of the motivation lane (`a1..c3`) and the twelve of the wants lane's
-// first pass (`wa1..wd3`) both ran on a valley whose roofs were all sound, so neither stacks on
-// this table run for run — what stacks is the question each arm asks.
+// MOTIVE_LABEL=w<arm><round> adds to the record rather than overwriting it.
 const SPAWN_KINDS = new Set(['house', 'storehouse'])
 const REMOVED_BY_ARM: Record<string, string[]> = {
   a: [],

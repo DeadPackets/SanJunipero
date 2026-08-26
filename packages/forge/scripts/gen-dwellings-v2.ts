@@ -1,47 +1,5 @@
 // LIVE — the four dwellings and the storehouse, in BOTH facings the user chose. Cap $DWELL_CAP.
-//
-//   node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-dwellings-v2.ts
-//
-// WHAT CHANGED SINCE gen-dwellings.ts (round 3):
-//
-// 1. THE OUTPUT IS COMMITTED. Round 3 wrote its cells to a session scratchpad and registered
-//    them from there. That scratchpad now holds the whole directory tree and zero files, so
-//    every cell round 3 paid for is gone and the town wakes as prisms. These land in
-//    `content/buildings`, beside the terrain that survived the same wipe.
-//
-// 2. THE FOOTPRINTS ARE THE TEMPLATE'S. Round 3 authored all three at 2x2. The template gives
-//    a cottage 3x2 and a farmhouse 4x2, so the cell sizes here are 32*(w+h)*4 = 512, 640, 768.
-//    Density stays 8 art px per world px across the whole class.
-//
-// 3. TWO FACINGS. SW is the door on the +y face, screen-left. SE is the door on the +x face,
-//    screen-right — the same building turned ninety degrees under the same fixed camera, NOT
-//    the SW cell mirrored. Mirroring flips the light too, and `structureArt.test.ts` measures
-//    the distance from a mirror and fails if a cell is one.
-//
-// 4. ★ NO BUILDING REFERENCE AT ALL — FOR ANY OF THEM, NOT ONLY THE FARMHOUSE.
-//    Round 3 lost the farmhouse three times and diagnosed it exactly: the REFERENCE IMAGE, not
-//    the prompt text, decided the architecture every time. The style anchor IS a cottage, so
-//    attempts 1 and 2 came back half-timbered with an arched door. Round 3's fix was to swap in
-//    a different BUILDING (the approved cottage) — and the model copied that instead, returning
-//    a near-duplicate single storey. The plough lane hit the identical failure on farmland_0:
-//    "the material the user rejected self-tiles into rows of isometric cottages" — it WAS the
-//    anchor cottage, copied whole.
-//    So the answer is not a better building to copy. It is NO BUILDING TO COPY: every call
-//    carries a code-painted MASTER_PALETTE swatch as its only reference — palette and nothing
-//    else, because a swatch has no architecture in it — and names the mass, the roof pitch and
-//    the frontage in words.
-//    MEASURED, not assumed. The same cabin prompt was run twice for $0.2053, once with the
-//    style anchor attached and once with the swatch. With the anchor it came back as the ANCHOR
-//    RECOLOURED — arched door, round gable window, green shingle gable, stone base — against a
-//    prompt that banned the arch by name and asked for a single mono-pitch plane. With the
-//    swatch it came back as the cabin that was asked for: sage-green horizontal boards, one
-//    flat sloping roof, no ridge, concrete blocks, flue pipe. Both raws are in the round-4
-//    scratchpad. Craft did not go with the reference: it comes from the post chain
-//    (2048 generation -> whole-number divide -> median block sample -> quantize).
-//    A third run added a CRAFT clause naming the outline and the flatness in words. It came
-//    back MUTED and lower-contrast than the run without it, so the clause is not here.
+// Reference is a MASTER_PALETTE swatch, never a building — a building overrides the prompt (A/B, $0.2053).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'
@@ -130,16 +88,12 @@ const PALETTE_WORDS = [
   'Flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
 ].join(' ')
 
-// ★ THE CRAFT CLAUSE THAT MADE IT WORSE, kept as a warning. Naming the outline, the flatness
-// and the chunkiness in words came back MUTED and lower-contrast than the same prompt without
-// it — the model spent its budget on "hand-made" and lost the colour. The craft comes from the
-// post chain (2048 -> whole-number divide -> median block sample -> quantize), not from asking.
+// Kept as a warning: naming the outline and the flatness in words came back MUTED and lower-
+// contrast. The craft comes from the post chain, not from asking for it.
 
 // ── the frontage clauses, one per facing ────────────────────────────────────────────────────
-//
-// A 2:1 dimetric sprite shows exactly two walls. The +y wall runs down-left from the top of the
-// sprite and the +x wall runs down-right. Turning the building ninety degrees swaps which of
-// those two the front is, and reverses the roof ridge with it.
+// A 2:1 dimetric sprite shows exactly two walls: +y runs down-left, +x down-right. Turning the
+// building ninety degrees swaps which is the front and reverses the roof ridge with it.
 const FACING_CLAUSE: Record<StructureFacing, string> = {
   sw: 'ORIENTATION: the FRONT of the building — its door, its main windows, its porch or step — '
     + 'is on the wall facing the viewer\'s LOWER-LEFT. The right-hand wall shows only its plain '
@@ -334,11 +288,8 @@ for (const s of SUBJECTS) {
       }
     }
 
-    // ★ AMONG THE CLEAN ONES ONLY (user ruling; the shape and the reason are in src/gate.ts).
-    // This wrote the ten committed dwelling cells, and the line below used to fall back to the
-    // DIRTY candidate set when nothing was clean — committing the least-corrected FAILURE.
-    // Choosing is not deciding: the ranker still takes the smallest source correction, from a
-    // pool that cannot contain a failure.
+    // Among the CLEAN candidates only (user ruling; the shape and reason are in src/gate.ts).
+    // Choosing is not deciding: the ranker picks from a pool that cannot contain a failure.
     const clean = cands.filter((c) => c.fails.length === 0)
     const win = clean
       .sort((a, b) => Math.abs(1 - b.plan.sourceScale) - Math.abs(1 - a.plan.sourceScale)).at(-1)
@@ -379,10 +330,8 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/dwellings-v2.md`, md)
 console.log(`\n${md}`)
 
-// ★ THE VERDICTS ARE BINDING, AFTER THE REPORT IS ON DISK — the report is what tells an
-// operator whether the model or the threshold is wrong. `classDensityGate` only ever went into
-// that markdown; it can only judge what this run produced, so the whole committed class is
-// judged by `artCoverage.test.ts`.
+// The report is written FIRST and then the run fails: it is what tells an operator whether the
+// model or the threshold is wrong. `classDensityGate` is a class property, judged by artCoverage.
 const stopped = [
   ...(refusedCells.length === 0 ? [] : [`${refusedCells.length} cell(s) shipped nothing: ${refusedCells.join(', ')}`]),
   ...cls.failures,

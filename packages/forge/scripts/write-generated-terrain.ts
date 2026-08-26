@@ -1,12 +1,6 @@
-// OFFLINE, $0. Reads the materials gen-terrain-textures.ts produced and lands them in the
-// SHIPPED content directory under the keys the renderer already consumes: four seasonal 4x4
-// sheets and the 15-cell road strip. Read-merge-write, so neither the C10 seasons half nor
-// the C13 autotile half of the manifest is ever clobbered.
-//
-//   npx tsx packages/forge/scripts/write-generated-terrain.ts
-//
-// A material that was never generated falls back to its code-painted tile, so this is safe
-// to run after a partial generation batch.
+// OFFLINE, $0. Lands the generated materials in the SHIPPED content directory. Read-merge-write,
+// so neither the seasons half nor the autotile half of the manifest is ever clobbered.
+// A material that was never generated falls back to its code-painted tile.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -81,10 +75,8 @@ for (const [assetId, raw] of [...book]) {
     `ring=${border.ringDelta.toFixed(1)} wrap=${bar.wrapH.toFixed(1)}/${bar.wrapV.toFixed(1)}` +
     `${passes > 0 ? ` (deframed x${passes})` : ''}${bar.ok ? '' : '  SEAM'}${border.framed ? '  STILL FRAMED' : ''}`)
 }
-// The shipped state describes itself: what each material measured and how hard it had to be
-// cropped to lose its frame. A deframed material is ALLOWED a looser wrap, because the crop
-// that removed the frame is precisely what damaged the wrap — and a frame is the worse
-// artifact of the two. The test reads this rather than carrying a list of exceptions.
+// A deframed material is ALLOWED a looser wrap: the crop that removed the frame is what damaged
+// the wrap, and a frame is the worse artifact. The test reads this instead of a list of exceptions.
 writeFileSync(join(MATERIALS_DIR, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`)
 console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 

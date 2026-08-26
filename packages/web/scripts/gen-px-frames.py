@@ -1,7 +1,6 @@
 # Generates the 9-slice pixel frame art + dither grain for the observatory chrome.
 # Run: uv run --with pillow scripts/gen-px-frames.py   (from packages/web)
-# All colors are the town master palette; art is on a 2px pixel grid, drawn 1:1
-# so border-image never rescales it (slice == border-width).
+# Drawn 1:1 on a 2px grid so border-image never rescales it (slice == border-width).
 from PIL import Image, ImageDraw
 
 INK = (0x43, 0x39, 0x4A, 255)

@@ -1,10 +1,6 @@
-// LIVE (Phase B step 2) — cap $PROBE_CAP (default $0.50). Guided-vs-unguided strip
-// probe on ONE facing (sw): one candidate WITH grid guides, one WITHOUT. Slice → v7
-// per frame → within-facing gates → compare. Shares gen-character-v3.ts cache keys
-// (strip-sw-a0-c0 unguided / strip-sw-a0-c1 guided) and judge refs so the full run
-// reuses the paid raws. BLOCKED-STRIPS protocol: if BOTH candidates fail slicing or
-// coherence gates, retry once each with a hardened prompt (separate probe-hard keys);
-// if still both fail, exit 2 — the controller escalates to image-to-video.
+// LIVE (Phase B step 2) — cap $PROBE_CAP (default $0.50). Guided-vs-unguided strip probe on sw.
+// Shares gen-character-v3.ts cache keys and judge refs so the full run reuses the paid raws.
+// If both candidates fail twice it exits 2 rather than shipping a flagged strip.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'

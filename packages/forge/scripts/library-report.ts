@@ -1,7 +1,5 @@
-// OFFLINE. Composes $C13/reports/library-report.md from the durable per-item report.json
-// files (the per-batch batch-<name>.md files are overwritten by any ITEMS= rerun). Emits the
-// per-item table, the per-category rollup, and the PER-CRITERION pass rates the controller
-// ruled G13b assertion 1 must be read from. No key, no network, no spend.
+// OFFLINE, no spend. Composes library-report.md from the DURABLE per-item report.json files —
+// the per-batch batch-<name>.md files are overwritten by any ITEMS= rerun.
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { CRITERIA, criterionOf, type Criterion, type VisionVerdict } from '../src/visionQa/verdict.js'

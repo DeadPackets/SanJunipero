@@ -1,24 +1,8 @@
 // NIGHT PROBE — not a gate. One question, asked of real minds: the dark already charges a
 // builder half again for every hour it works blind. Given a standing light it could raise for
 // two wood, does anybody raise one — and does having the option make anything WORSE?
-//
-// ★ THE SECOND HALF OF THAT QUESTION IS THE POINT. The motivation lane made the cold
-// perceivable without giving the minds anywhere to go and production fell from 4 builds to 0:
-// eighty of arm B's refusals were "there is no way into a cabin". A hazard with no road is
-// worse than no hazard. The dark has charged `light.nightWorkPenalty` since C11 and the only
-// fixed answers were the square's fire pit and the hearths indoors, so THE HAZARD WAS ALREADY
-// SHIPPED AND THE ROAD WAS NOT. This lane adds no new cost; it adds the road. These two arms
-// are the check that the road is real and that adding it cost nothing.
-//
-// Two arms over the identical world, the identical seed and the identical prose. The ONLY
-// difference is whether `lamp_post` is in `structures.recipes` — arm A is the world before
-// this lane, arm B is the world after. Nothing in either arm tells a mind to build anything.
-//
-// ★ AND THE WORLD IT ASKS IN WENT STALE UNDER IT. These numbers were taken before `wants`
-// landed and before the world-fixes lane, and the harness DELETES EVERY ROOFED BUILDING — so
-// re-running it unchanged would measure a town with the cabin, the cottage and the farmhouse
-// lifted out of it, which is not a town this project ships. `NIGHT_VALLEY` and `NIGHT_LADDER`
-// are what make the gap readable against the shipped world and against the world before it.
+// The harness DELETES every roofed building — re-running it unchanged measures a town this
+// project does not ship; NIGHT_VALLEY/NIGHT_LADDER are what make it comparable.
 //
 //   NIGHT_ARM=a|b  NIGHT_TICKS=300  NIGHT_LABEL=run1
 //   NIGHT_VALLEY=shipped|stripped   NIGHT_LADDER=after|before
@@ -58,12 +42,8 @@ const REAL_MS_PER_TICK = Number(process.env.NIGHT_MS_PER_TICK ?? 250)
 const WOOD_IN_HAND = 12
 const DATA_DIR = fileURLToPath(new URL('../data/night/', import.meta.url))
 
-// ★ ARM A IS THE WORLD BEFORE THIS LANE, MADE BY TAKING THE LAMP BACK OUT. Both arms keep the
-// dark and its 1.5x penalty, which have been shipped since C11 — the difference is only
-// whether a pair of hands has anything to answer them with. `makeablesLine` reads the recipe
-// table, so removing the row is also what takes the words "a lamp post (2 wood)" out of the
-// prose: arm A's minds are never given the noun, and by the canon-vocabulary law a word a mind
-// is never given is a word it never uses.
+// Arm A is the world before this lane, made by taking the lamp row back out. `makeablesLine`
+// reads the recipe table, so arm A's minds are never given the noun "lamp post" at all.
 const LAMP = 'lamp_post'
 const withoutLamp = (c: SimConfig): SimConfig => {
   const { [LAMP]: _r, ...recipes } = c.structures.recipes
@@ -96,31 +76,19 @@ const withArm = ARM === 'a' ? withoutLamp(DEFAULT_CONFIG) : DEFAULT_CONFIG
 const config: SimConfig = LADDER === 'before' ? beforeTheLadder(withArm) : withArm
 
 // ---------------------------------------------------------------- the minds ---
-// The founding cast, read from the one place it is defined. This file used to carry its own
-// copy, which drifted: the copy still put a literal `says "now then"` in Omar's mouth after
-// `founderMinds.ts` had already rewritten that tic as a behaviour, so every run of this probe
-// would have reproduced the stock opener the voice lane measured out.
+// The founding cast, read from the one place it is defined — a local copy drifted from
+// `founderMinds.ts` and reproduced a tic the voice lane had already rewritten.
 const MINDS = FOUNDER_MINDS
 
 // ------------------------------------------------------------------ the world ---
-// The genesis valley exactly as it is — its ground, its river, its trees and the ground the
-// town keeps for a new roof — with every ROOF taken out of it. Nothing else is touched: the
-// question is what five bodies do about a cold night when there is nowhere to go in out of it.
-// `structures.enterableKinds` was the roster this read; `wants` replaced it with the `roofed`
-// property, so the question is asked of every recipe rather than of a remembered list.
+// The genesis valley with every ROOF taken out; nothing else touched. Read from the `roofed`
+// property rather than a remembered roster, so the question is asked of every recipe.
 const ROOFED = new Set(
   Object.keys(config.structures.recipes).filter((k) => isRoofedKind(config, k)))
 
-// ★ AND WHICH WORLD IT ASKS IT OF, WHICH IS THE THING THAT WENT STALE. `stripped` is the world
-// the landed numbers were taken in: every roof lifted out, because the motivation lane was
-// measuring eighty refusals a night on "there is no way into a cabin" and a probe that left
-// them in would have spent its budget re-measuring somebody else's defect.
-//
-// That defect is closed. A cabin is a room a body walks into and, since the world-fixes lane,
-// the one indoor fire in the valley. So `stripped` now deletes the very buildings the question
-// is about — a lamp A/B run in it cannot see a hearth, a bed or a ladder, and the number it
-// returns describes a town this project does not ship. `shipped` is the founding valley as it
-// stands: two sound roofs, seven sets of walls three quarters up, and a fire under one of them.
+// `stripped` is the world the landed numbers were taken in — every roof lifted out — but a
+// cabin is now a room with the valley's one indoor fire, so a lamp A/B run in `stripped`
+// describes a town this project does not ship. `shipped` is the founding valley as it stands.
 const VALLEY = (process.env.NIGHT_VALLEY ?? 'shipped').toLowerCase()
 const REMOVED: ReadonlySet<string> = VALLEY === 'stripped' ? ROOFED : new Set<string>()
 
@@ -140,10 +108,8 @@ function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: n
       dropped.add(String(p['id']))
       continue
     }
-    // Anything that names a building that is not there: the completion, the walls genesis
-    // stands three quarters up, and the founder kit that would have been spawned inside it.
-    // `structure_progressed` and the kits did not exist here when this probe last ran, and an
-    // item carries its own `id` — so the location has to be asked FIRST or the kit slips past.
+    // Anything naming a building that is not there. An item carries its own `id`, so the location
+    // has to be asked FIRST or the founder kit spawned inside the walls slips past.
     const loc = p['loc'] as { t?: string; id?: string } | undefined
     const names = loc?.t === 'structure' ? loc.id : (p['structureId'] ?? p['id'])
     if (e.type !== 'structure_planned' && typeof names === 'string' && dropped.has(names)) continue

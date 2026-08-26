@@ -1,11 +1,5 @@
 // COST DIAL PROBE — the cheapest possible answer to "does the dial do anything".
-//
-// `llm/pins.ts` pins a reasoning model and `PROVIDER_ORDER=['Wafer']`; the OpenRouter catalogue
-// says both the model and that endpoint accept `reasoning_effort`. Nothing in the codebase has
-// ever sent one. Before any world run spends real money on a ladder, this asks the provider
-// directly: for each rung, how many of the output tokens are reasoning, and who served it.
-//
-// One fixed structured ask, repeated per rung. No world, no minds, no memory.
+// One structured ask per rung, no world: how many output tokens are reasoning, and who served it.
 import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'

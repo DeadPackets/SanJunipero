@@ -1,42 +1,4 @@
 // LIVE — the five founders, COMMITTED. Cap $CAST_CAP.
-//
-//   node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-cast-v5.ts
-//
-// WHAT CHANGED SINCE gen-cast-v4.ts (round 3):
-//
-// 1. THE OUTPUT IS COMMITTED. Round 3 wrote all five characters — concept, master, 24 cells,
-//    manifest, contact sheet, GIFs — into `$C5/production`. That directory now holds ZERO
-//    files. `class rig-part: 0 records`: every villager in the town draws the checkerboard.
-//    A character ships here as ONE committed record's worth of bytes, the packed atlas plus
-//    its manifest, under `content/cast/<id>/` beside the terrain and the building cells.
-//
-// 2. ★ NO STYLE ANCHOR ON ANY CALL. Round 3 attached the anchor cottage to the concept, the
-//    master, every walk frame and the sleep cell — and then grew a WALK_NO_STYLE_ANCHOR escape
-//    hatch because "the style-anchor cottage keeps bleeding in as scenery (amara-v2 ne-passing
-//    x5)". Round 4 measured the same defect on buildings for $0.2053 and named the fix: a
-//    code-painted MASTER_PALETTE swatch, which has no architecture in it to copy. The escape
-//    hatch is now the only path. The master sheet IS still attached to the walk and sleep
-//    calls — that is the SAME character, which is identity, not a different object to copy.
-//
-// 3. THE CONCEPT CALL IS GONE. Round 3 spent one painterly concept per character to establish
-//    costume before the master. It is the one call whose output never reaches the sheet, and
-//    the costume it established is now written out in words in `cast-v5.ts` instead. Five
-//    calls saved; the master carries the same descriptors it would have carried.
-//
-// 4. SPEND GOES THROUGH SpendLedger, so the $5 per-asset anomaly stop is live on every call
-//    instead of a hand-rolled counter.
-//
-// 5. ★ NO CANDIDATE THAT FAILS A GATE IS EVER SHIPPED (user ruling). `bestOf` chooses; it does
-//    not decide. See `refuseFailing` — the run fails loudly, names every candidate, every gate
-//    and every margin, and writes nothing for that character. The stride trio and the packed
-//    atlas pixel bar are binding too; both used to be computed, logged and ignored.
-//
-// UNCHANGED, because it is the calibrated part: the mirror standard. 9 authored cells derive
-// the 24-cell contract in code — 2 facings x 4 strip poses + 1 sleep — and SW/NW are flips of
-// SE/NE. `mirror.ts` owns that and this script does not second-guess it.
-//
 // Controls: CAST=<comma ids>, CAST_ATTEMPTS=<n, default 3>, CAST_DRY=1,
 //           CAST_REJECTED=<raw keys the eye refused>.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -129,23 +91,13 @@ const VIEW: Record<AuthoredFacing, string> = {
   se: 'front three-quarter view, facing bottom-right',
   ne: 'back three-quarter view seen from behind, facing top-right, back of the head visible, NO face visible',
 }
-// ★ THE REFERENCE IS ONE FIGURE, NOT THE MASTER SHEET. Round 3 pointed these calls at the
-// two-figure master and told the model in words which half to use ("the LEFT figure of the
-// last reference image"). Measured here on omar: three straight candidates came back as TWO
-// figures — the model copies the reference's LAYOUT as readily as its identity, and a word
-// does not outrank a picture. The master's own single-figure crop carries exactly the same
-// costume and pixel scale and has no second figure in it to copy.
+// The reference is ONE figure, not the master sheet: the model copies the reference's LAYOUT as
+// readily as its identity, and a word naming which half to use does not outrank a picture.
 const VIEW_REF = 'the reference image'
 type WalkPose = Exclude<StripPoseV4, 'idle'>
 const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
-// ★ SEEN FROM BEHIND, "THE OTHER FOOT" IS NOT A DESCRIPTION OF A SHAPE. Every SE contact
-// frame in the committed cast has feet 1.36x-2.04x the idle's; the NE contacts the model
-// volunteered across two lanes measured 1.00, 1.00, 1.02 and 1.02, and one of them is in the
-// committed art. `POSE_V4['contact-b']` asked for "the OTHER foot planted forward this time",
-// which from a back view — where you cannot tell one foot from the other — the model renders
-// as a body standing still. The A/B distinction has to stay, because `strideGateV4` needs the
-// two frames to differ; what it needs BESIDE it is the stride stated as a geometry rather
-// than as an identity, so that it survives a view in which the feet are interchangeable.
+// From behind you cannot tell one foot from the other, so "the OTHER foot planted forward"
+// renders as a body standing still. The stride has to be stated as a geometry, not an identity.
 const STRIDE_CLAUSE =
   ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the '
   + 'shoulders, with clear background visible between the legs. This is the WIDEST frame of '
@@ -173,11 +125,8 @@ const NO_SCENERY =
   + 'NO text, NO words, NO labels, NO captions anywhere.'
 
 function masterPrompt(m: CastMember, proportionRef: boolean): string {
-  // ★ THE PROPORTION REFERENCE IS LOAD-BEARING, and it was measured here, not assumed. The
-  // first four founders were generated without it because the anchor was not in that run:
-  // every one of them came back at FIVE heads tall in a finer pixel, beside a three-heads
-  // anchor. Round 3 recorded the same drift on nadia and reached the same fix. Words alone
-  // ("about 3 heads tall") did not hold it — the picture does.
+  // The proportion reference is load-bearing: generated without it, every founder came back at
+  // FIVE heads tall beside a three-heads anchor. Words alone did not hold it; the picture does.
   const proportionClause = proportionRef
     ? 'The SECOND reference image shows ANOTHER villager of this same game in the exact required '
       + 'layout: LEFT figure is the front three-quarter view facing bottom-right, RIGHT figure is '
@@ -228,11 +177,8 @@ function sleepPrompt(m: CastMember): string {
 
 // ── the pipeline ─────────────────────────────────────────────────────────────────────────────
 
-// ★ A REFERENCE WITH A TRANSPARENT BACKGROUND ASKS FOR A BACKGROUND. The master crop is
-// chroma-keyed and trimmed, so attaching it bare shows the model a figure on nothing — and
-// several frames came back on white with a little grass diorama under the feet, which keyBg
-// then refused (<10% keyed). The magenta is part of what the reference has to teach, so the
-// figure goes back onto a magenta field before it is attached. Same figure, right background.
+// The master crop is chroma-keyed and trimmed, so attaching it bare shows the model a figure on
+// nothing and it invents a background. The figure goes back onto a magenta field first.
 const MAGENTA: readonly [number, number, number] = [255, 0, 255]
 function onMagenta(img: RawImage, pad = 0.18): RawImage {
   const m = Math.round(Math.max(img.width, img.height) * pad)
@@ -352,23 +298,16 @@ async function runCharacter(m: CastMember): Promise<void> {
     try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
     if (two) throw new Error('slices into 2 figure clusters — multi-figure frame')
     const hi = processHiResCell(keyed, TARGET_H)
-    // ★ AND ONE BODY, NOTHING ELSE. `sliceStrip` above catches a SECOND FIGURE, which is what
-    // it was written for; it does not catch the model captioning its own work. Amara's
-    // contact-b-ne shipped with TACTICAL GEAR set beside her in silver, and the caption sat
-    // inside the figure's own column, so the strip slicer saw one cluster. This is a hard
-    // reject like the two above it: the candidate is dropped and another is drawn.
+    // `sliceStrip` catches a second FIGURE but not the model captioning its own work — a caption
+    // inside the figure's own column reads as one cluster. Hard reject: another candidate is drawn.
     const sole = soleSilhouetteGate(hi)
     if (!sole.ok) throw new Error(sole.failures.join('; '))
     const b = opaqueBbox(hi)!
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)
     const gate = gateView(hi)
-    // ★ AND A CONTACT FRAME HAS TO BE A CONTACT POSE. Four candidates across two lanes were
-    // refused BY EYE for being standing figures dropped into a walk loop, every one of them
-    // clean on every gate in the package; `strideGateV4` cannot see it because it measures
-    // frame-to-frame distance, not stance. A failure rather than a throw, so the refusal
-    // message carries the margin — the operator's question is whether the model can draw a
-    // stride from behind at all, and only the numbers answer it.
+    // `strideGateV4` measures frame-to-frame distance, not stance, so it cannot see a standing
+    // figure dropped into a walk loop. A failure rather than a throw, so the margin is reported.
     const stance = p === 'passing' ? []
       : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
     return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
@@ -410,10 +349,8 @@ async function runCharacter(m: CastMember): Promise<void> {
       refuseFailing(`${m.id} ${f}/${p}`, cands.map((c) => ({ key: c.key, failures: c.failures })))
       chosen[f][p] = best
     }
-    // ★ THE STRIDE TRIO IS BINDING. It used to `push` a FLAGGED line and go on — a gate that
-    // computes a verdict beside a caller that discards it, which is what the whole of this
-    // block's ruling is about. There is no candidate to re-roll here: the trio is a property
-    // of three frames already chosen, so the failure is the character's, loudly.
+    // The stride trio is binding, and there is no candidate to re-roll: the trio is a property of
+    // three frames already chosen, so the failure is the character's.
     const stride = strideGateV4(f, {
       'idle': masterGate[f],
       'contact-a': chosen[f]['contact-a'].gate,

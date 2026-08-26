@@ -1,9 +1,5 @@
-// LIVE (Phase B) — cap $V3_CAP (default $4). Character standard v2 generation:
-// one FACING per call as a 1×5 horizontal phase strip (idle + 4 walk phases), sleep
-// as its own single-cell call per facing. Slice → per-frame v7 chain → register →
-// HARD gates (fail → regen that strip, max 2 retries, then BLOCKED — never ship a
-// flagged sheet). Flags: --guides (A/B: odd candidates get grid-guide refs),
-// --concept <path> (concept image inserted right after the style anchor).
+// LIVE (Phase B) — cap $V3_CAP (default $4). One FACING per call as a 1x5 phase strip.
+// HARD gates: a failing strip regenerates twice, then BLOCKED — a flagged sheet never ships.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'

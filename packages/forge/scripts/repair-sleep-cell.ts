@@ -1,16 +1,6 @@
-// OFFLINE, $0.00 — put one founder's four sleep cells back on the pose the user approved,
-// by re-celling from a NAMED raw instead of the one report.txt's `chosen:` line points at.
-//
-// Why this exists. recell-characters resolves `sleep=<key>` by searching `rawDirs` in order
-// and taking the first hit. amara's key is `sleep-amara-c0` and TWO directories hold a file
-// with that name — `production/amara/raws` (her v1 sleep, head at the LEFT) and
-// `production/amara-v2/raws` (the v2 re-run, mirrored head-RIGHT by the art-fixes round).
-// The v1 directory is searched first, so the correction was shadowed by a stale namesake and
-// the fixed orientation never reached the sheet. Same filename, two directories, first wins.
-//
-//   SLEEP_RAW=/abs/path.png FOUNDER=production/amara \
-//     node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//       packages/forge/scripts/repair-sleep-cell.ts
+// OFFLINE, $0.00 — re-cell one founder's sleep cells from a NAMED raw.
+// recell-characters resolves `sleep=<key>` by first hit across `rawDirs`, and two directories
+// hold a file of that name — so the v1 raw shadowed the corrected v2 orientation.
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

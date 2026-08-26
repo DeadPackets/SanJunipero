@@ -1,12 +1,5 @@
-// LIVE — cap $1.5. Regenerates 3 villager candidates (rig-part4) with model
-// openai/gpt-image-2, grounded on the human-curated 4-direction walk sheet
-// (ref-sheet.png, CC0 'Green Cap Character 16x18'). Same detail-enhanced prompt
-// + walk-sheet grounding clauses as gen-character-refsheet.ts. gpt-image-2 takes
-// aspect_ratio/quality/n instead of size/response_format, so this script posts the
-// image body directly (like probe-image-api.ts) while keeping the client's
-// input_references encoding: base64 data URL inside {type:'image_url', image_url:{url}}.
-// On a 4xx with the reference it retries once WITHOUT the reference; if that also
-// fails it exits non-zero so the caller can report BLOCKED evidence.
+// LIVE — cap $1.5. gpt-image-2 takes aspect_ratio/quality/n instead of size/response_format,
+// so this posts the image body directly. On a 4xx with the reference it retries once without it.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { buildAssetPrompt } from '../src/styleBible.js'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
