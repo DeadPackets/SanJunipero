@@ -115,6 +115,18 @@ describe('asset http routes', () => {
     expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
   })
 
+  // The route no longer re-reads the whole `assets` table per GET, so "newest ready wins" is now
+  // a claim about a cursor rather than about `.at(-1)`. This is that claim.
+  it('a second ready sheet for the same agent replaces the first', async () => {
+    const png = await encodePng({ width: 8, height: 8, data: new Uint8ClampedArray(8 * 8 * 4).fill(150) })
+    codex.register({
+      class: 'rig-part', desc: 'character:weaver', kind: 'character:weaver', footprint: { w: 1, h: 1 },
+      png, widthPx: 8, heightPx: 8, status: 'ready', score: 9, attempts: 1, costUsd: 0,
+    })
+    const res = await fetch(`${base}/assets/character/weaver.png`)
+    expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
+  })
+
   it('a placeholder-status codex row does NOT shadow the built sheet', async () => {
     const png = await encodePng({ width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4).fill(90) })
     codex.register({
