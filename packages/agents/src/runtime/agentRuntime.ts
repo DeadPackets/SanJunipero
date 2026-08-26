@@ -23,7 +23,7 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
-import { buildAgentCtx, flattenIntent, type Adjudicator, type Codifier, type SeamArbiter } from './arbiterSeam.js'
+import { buildAgentCtx, humanizeIntent, type Adjudicator, type Codifier, type SeamArbiter } from './arbiterSeam.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -52,6 +52,31 @@ export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
   const hint = impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
   return `You realize you cannot: ${reason}${hint}`
+}
+
+// ★ THE LOOP-BREAKER. A refusal a mind cannot learn from is a refusal it repeats: the live
+// proof has Amara re-adjudicating one idea three times in 34 ticks, at a full arbiter call
+// each. The refusal text was widened where it is written (`FALLBACK_IMPOSSIBLE`), and this is
+// the other half — the second ask inside the window is answered from the mind's own history
+// instead of from the god.
+//
+// It names the repetition and nothing else. That is the only content the glass allows here: the
+// mind's own past is not a hint, where "try it with a rack" would be.
+export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
+
+// Sim minutes. Long enough to cover the eight-to-twelve turns a looping mind burned in the live
+// proof, short enough that a town which has changed around the mind gets asked again.
+export const REFUSAL_MEMORY_TICKS = 240
+
+// How many refused intents a mind carries. Bounded because it is per-mind state held for the
+// life of the process, not because 16 is special.
+const REFUSAL_MEMORY_SIZE = 16
+
+// Only enough to make "the same idea, said again" match. The arbiter's own `normalizeIntent`
+// would be the one true copy, but `@sj/arbiter` depends on `@sj/agents`, so importing it back
+// is a package cycle.
+function sameIntent(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '')
 }
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
@@ -126,6 +151,10 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
+  // What this mind has already been refused, and when. Read before the god is asked again.
+  #refusedIntents = new Map<string, number>()
+  // The thought behind the act now in flight. The god is shown it; the precedent key is not.
+  #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
   #reflectionInFlight = false
@@ -325,7 +354,7 @@ export class AgentRuntime {
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
         if (this.#reroutesUnknownVerb(res.reason)) {
-          void this.#adjudicateFreeform(flattenIntent(intent.verb, intent.params))
+          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params))
           return
         }
         void this.#writeActionMemory(refusalMemoryText(res.reason))
@@ -355,15 +384,23 @@ export class AgentRuntime {
   async #adjudicateFreeform(description: string): Promise<void> {
     const fallback = (): Promise<void> =>
       this.#holdIntent({ verb: 'experiment', params: { description } })
+    // The same idea, said again, inside the window: answered from this mind's own history. It
+    // costs no call, and the memory is DIFFERENT from the first refusal, which is the whole
+    // point — a mind handed the identical sentence a third time has learned nothing.
+    if (this.#alreadyRefused(description)) {
+      await this.#writeActionMemory(REPEATED_REFUSAL)
+      return
+    }
     let verdict
     try {
-      verdict = await this.#adjudicator!(description, buildAgentCtx(this.#bridge, this.#agentId))
+      verdict = await this.#adjudicator!(description, buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought))
     } catch (err) {
       this.#llm.alert('adjudicate_failed', err instanceof Error ? err.message : String(err))
       return fallback()
     }
     if (verdict.kind === 'map') return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
     if (verdict.kind === 'impossible') {
+      this.#rememberRefusal(description)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
@@ -381,13 +418,28 @@ export class AgentRuntime {
     return this.#holdIntent({ verb, params: {} })
   }
 
+  #alreadyRefused(description: string): boolean {
+    const at = this.#refusedIntents.get(sameIntent(description))
+    return at !== undefined && this.#bridge.currentTick() - at < REFUSAL_MEMORY_TICKS
+  }
+
+  #rememberRefusal(description: string): void {
+    const key = sameIntent(description)
+    this.#refusedIntents.delete(key)
+    this.#refusedIntents.set(key, this.#bridge.currentTick())
+    // Insertion-ordered, so the first key is the oldest.
+    while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
+      this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
+    }
+  }
+
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     if (res.ok) return
     this.#plan.lastResult = 'blocked'
     this.#plan.queue = []
     this.#planHeadInFlight = false
     if (this.#reroutesUnknownVerb(res.reason)) {
-      void this.#adjudicateFreeform(flattenIntent(head.verb, head.params))
+      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params))
       return
     }
     void this.#writeActionMemory(refusalMemoryText(res.reason))
@@ -556,6 +608,8 @@ export class AgentRuntime {
 
   async #applyTurn(turn: Turn, tick: number, day: number): Promise<void> {
     const mem = this.#mem!
+    // Held for the god: the sentence that reached for whatever this turn is about to try.
+    this.#lastThought = turn.thought
     await mem.insertMemory({ tick, kind: 'thought', text: turn.thought, importance: turn.importance, tags: EMPTY_TAGS })
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 

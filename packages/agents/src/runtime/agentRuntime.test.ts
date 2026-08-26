@@ -16,9 +16,11 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema, stateHash, type DiscoveryCredit, type SimConfig } from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type DiscoveryCredit, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
+import {
+  AgentRuntime, CRAFT_HINT, REFUSAL_MEMORY_TICKS, REPEATED_REFUSAL, refusalMemoryText,
+} from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
@@ -835,6 +837,63 @@ describe('arbiter seam (T19)', () => {
       'You realize you cannot: your hands do not yet know the weave — perhaps someone nearby knows the craft.',
     )
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  // ★ THE LOOP. The live proof has Amara reaching the same idea three times in 34 ticks,
+  // because the refusal she got back told her nothing she could act on. Three full arbiter
+  // calls for one idea, and a mind that never moves on.
+  it('★ asks the god ONCE for one idea: the same intent again is answered from the mind\'s own past', async () => {
+    let calls = 0
+    const adjudicator: Adjudicator = async () => {
+      calls += 1
+      return { kind: 'impossible', reason: 'the reeds will not hold that shape', class: 'physically_impossible' }
+    }
+    const { loop, agentDb } = await setup({
+      // The same idea, three turns running — and said differently the third time, because a
+      // mind rephrases. `sameIntent` normalizes case, spacing and trailing punctuation.
+      model: turnModel([
+        freeformTurn,
+        freeformTurn,
+        { ...freeformTurn, action: { freeform: 'Weave reeds into a basket.' } },
+      ]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 3, 400)
+
+    // One call for three asks. The other two cost nothing at all.
+    expect(calls).toBe(1)
+    const texts = memoriesOfKind(agentDb, 'action').map((m) => m.text)
+    expect(texts[0]).toBe('You realize you cannot: the reeds will not hold that shape')
+    // ★ AND THE SECOND MEMORY IS DIFFERENT FROM THE FIRST. Handing a mind the identical
+    // sentence a third time is the defect, not the call count.
+    expect(texts[1]).toBe(REPEATED_REFUSAL)
+    expect(texts[2]).toBe(REPEATED_REFUSAL)
+    expect(REPEATED_REFUSAL).not.toBe(texts[0])
+  })
+
+  it('★ ANTI-VACUITY: a DIFFERENT idea still reaches the god, and so does the same one later', async () => {
+    // A breaker that silences the second ask of anything would be worse than the loop: it
+    // would cap a mind at one novel act per lifetime.
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'the reeds will not hold that shape', class: 'physically_impossible' }
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        freeformTurn,
+        { ...freeformTurn, action: { freeform: 'bank the fire with river clay' } },
+      ]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
+
+    expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
+    // The window is a window: it is measured in ticks and it expires.
+    expect(REFUSAL_MEMORY_TICKS).toBeGreaterThan(0)
+    expect(REFUSAL_MEMORY_TICKS).toBeLessThan(MINUTES_PER_DAY)
   })
 
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {

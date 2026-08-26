@@ -323,14 +323,14 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // TWO minds, so the ceiling is 2 x $0.10 = $0.20/sim-day. $0.09 inside a 15-minute window
-    // projects to $0.36/sim-day — over the flow ceiling and 1.8% of the $5 total.
+    // TWO minds, so the ceiling is 2 x $0.21 = $0.42/sim-day. $0.19 inside a 15-minute window
+    // projects to $0.76/sim-day — over the flow ceiling and 3.8% of the $5 total.
     opsDb.prepare(
       `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-    ).run(Date.now(), 0.09)
+    ).run(Date.now(), 0.19)
     expect(ledgerTotalUsd(opsDb)).toBeLessThan(5)
 
     await run(world, 10)
@@ -616,8 +616,11 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(discoveries.map((p) => p['name'])).toContain(SMOKE_RECIPE.name)
     const mine = discoveries.find((p) => p['name'] === SMOKE_RECIPE.name)!
     expect(mine['byId']).toBe('amara')
-    // Credited to the words the mind actually used, flattened by `flattenIntent`.
-    expect(String(mine['intent'])).toContain(INVENTED_VERB)
+    // ★ Credited to the words the mind actually used — and they are now WORDS. `humanizeIntent`
+    // takes the underscore out of the coined verb, so the discovery the chronicle renders reads
+    // `smoke fish green wood` and not the identifier our schema made of it.
+    expect(String(mine['intent'])).toContain(INVENTED_VERB.replace(/_/g, ' '))
+    expect(String(mine['intent'])).not.toContain(INVENTED_VERB)
 
     // 4. ★ AND THE BODY DID IT. The mind's own hands ran a verb that did not exist eight ticks
     //    ago. Without this row the three above are satisfied by a god talking to itself.
