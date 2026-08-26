@@ -844,8 +844,14 @@ body {
    The room itself is drawn on the canvas; this card is what the room IS — whose it is, who
    raised it, who lives in it, what it holds. Every line is omitted when the world has nothing
    to put in it, so an honest empty room is short rather than full of blanks. */
+/* ★ THE CARD SITS IN THE CORNER THE ROOM DOES NOT REACH, AND THAT IS THE BOTTOM ONE.
+   It was top-left, which is where the back-left wall goes — and the hearth is ON the back-left
+   wall, so the card hid the one thing a viewer opens a door to see, in every room. The room is
+   a diamond: its west vertex is halfway down the stage and its near vertex is bottom-centre, so
+   the bottom-left of the stage is outside the floor for every room size. Nothing else is there
+   while a room is open — the minimap hides indoors and the timeline is the chronicle lens's. */
 .room-card {
-  position: absolute; top: 0.8rem; left: 0.8rem; z-index: 21;
+  position: absolute; bottom: 0.8rem; left: 0.8rem; z-index: 21;
   display: grid; gap: 0.55rem;
   width: 17rem; max-width: calc(100% - 1.6rem);
   max-height: calc(100% - 1.6rem); overflow-y: auto;
@@ -933,7 +939,7 @@ body {
   .room-card { animation: interior-in var(--t-slow) var(--ease-enter); }
   .interior-back { transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast); }
   @keyframes interior-in {
-    from { opacity: 0; translate: 0 -6px; }
+    from { opacity: 0; translate: 0 6px; }   /* in from its own edge, which is now the bottom */
     to { opacity: 1; translate: 0 0; }
   }
 }

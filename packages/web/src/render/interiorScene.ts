@@ -645,7 +645,12 @@ export function createInteriorScene(
       walking.delete(id)
     }
 
-    camFocus = roomFocusOf(bodyPts, followedId)
+    // ★ AND WHERE IT RESTS WHEN THE ROOM IS EMPTY: the first perch, which `AWAKE_PREFERENCE`
+    // makes the hearth wherever there is one. An empty farmhouse crops as hard as a full one,
+    // so a camera that only follows bodies would leave the fire off the left edge of a room
+    // nobody is in — which is what the browser showed.
+    const rest = perches[0] === undefined ? null : tileCentreScreen(perches[0].x, perches[0].y)
+    camFocus = roomFocusOf(bodyPts, followedId, rest)
   }
 
   /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */

@@ -418,16 +418,23 @@ export function roomPanTo(
  *    you came in for;
  * 2. otherwise the centroid of everybody in the room, so a room with people in it is framed on
  *    the people;
- * 3. otherwise `null` — and an empty room does not drift. `roomPanTo(null)` is the landed
- *    placement to the pixel, so a room nobody is in looks exactly as it does today.
+ * 3. otherwise `resting` — where the room's life happens when nobody is having it. ★ THIS IS
+ *    NOT AN OPTIONAL EXTRA. An empty farmhouse crops exactly as hard as a full one, and a
+ *    camera with nobody to follow would leave it cropped: the browser showed the hearth off
+ *    the left edge and the doorway off the bottom of a room with nobody in it. The caller
+ *    passes the room's own first perch, which is hearth-first by `AWAKE_PREFERENCE` — so an
+ *    empty room rests on its fire, which is the thing a viewer opened the door to see.
+ * 4. and `null` only when the room furnishes nowhere to rest either, where the landed
+ *    placement is the honest answer.
  */
 export function roomFocusOf(
   bodies: ReadonlyArray<{ id: string; sx: number; sy: number }>,
   followedId: string | null,
+  resting: { sx: number; sy: number } | null = null,
 ): { sx: number; sy: number } | null {
   const followed = bodies.find((b) => b.id === followedId)
   if (followed !== undefined) return { sx: followed.sx, sy: followed.sy }
-  if (bodies.length === 0) return null
+  if (bodies.length === 0) return resting
   const sx = bodies.reduce((a, b) => a + b.sx, 0) / bodies.length
   const sy = bodies.reduce((a, b) => a + b.sy, 0) / bodies.length
   return { sx, sy }

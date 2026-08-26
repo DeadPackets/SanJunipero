@@ -630,30 +630,65 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
   // ★ WHAT THE CAMERA IS FOR, restated as arithmetic: follow a body and the body is on screen.
   // The user chose Option C to watch NPCs walk about; a camera that crops the person you are
   // following is worse than one that crops a wall.
-  it('★ following a body in a farmhouse puts that body on the glass, wherever it stands', () => {
-    const room = roomSizeOf('farmhouse')
-    const stage = { w: 1478, h: 678 }
-    const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
-    const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+  // ★★ THE WHOLE POINT, AS ARITHMETIC: focus on any tile of any room and that tile is on the
+  // glass. It covers both drivers at once — a body the camera is following, and the perch an
+  // EMPTY room rests on, which is the hearth. Over every room kind, at every stage.
+  it('★★ any tile the camera is asked for lands on the glass, in every room', () => {
     let offWithout = 0
-    for (let x = 0; x < room.w; x++) {
-      for (let y = 0; y < room.h; y++) {
-        const f = tileCentreScreen(x, y)
-        const pan = roomPanTo(f, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX)
-        const sx = ox + pan.dx + f.sx * ROOM_ZOOM
-        const sy = oy + pan.dy + f.sy * ROOM_ZOOM
-        expect(sx, `tile ${x},${y} off the stage horizontally`).toBeGreaterThanOrEqual(0)
-        expect(sx).toBeLessThanOrEqual(stage.w)
-        expect(sy, `tile ${x},${y} off the stage vertically`).toBeGreaterThanOrEqual(0)
-        expect(sy).toBeLessThanOrEqual(stage.h)
-        // and how many of those tiles are off the glass with the camera pinned, which is the
-        // defect this lane was given, counted
-        const px = ox + f.sx * ROOM_ZOOM, py = oy + f.sy * ROOM_ZOOM
-        if (px < 0 || px > stage.w || py < 0 || py > stage.h) offWithout++
+    let onWith = 0
+    for (const { kind, room } of roomsOf()) {
+      for (const stage of STAGES) {
+        const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
+        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        for (let x = 0; x < room.w; x++) {
+          for (let y = 0; y < room.h; y++) {
+            const f = tileCentreScreen(x, y)
+            const pan = roomPanTo(f, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX)
+            const sx = ox + pan.dx + f.sx * ROOM_ZOOM
+            const sy = oy + pan.dy + f.sy * ROOM_ZOOM
+            expect(sx, `${kind} @${stage.w}x${stage.h}: tile ${x},${y} off the glass across`)
+              .toBeGreaterThanOrEqual(0)
+            expect(sx).toBeLessThanOrEqual(stage.w)
+            expect(sy, `${kind} @${stage.w}x${stage.h}: tile ${x},${y} off the glass down`)
+              .toBeGreaterThanOrEqual(0)
+            expect(sy).toBeLessThanOrEqual(stage.h)
+            onWith++
+            // and the same tile with the camera pinned, which is the defect this lane was
+            // given — counted rather than described
+            const px = ox + f.sx * ROOM_ZOOM, py = oy + f.sy * ROOM_ZOOM
+            if (px < 0 || px > stage.w || py < 0 || py > stage.h) offWithout++
+          }
+        }
       }
     }
-    // ANTI-VACUITY, and the size of the defect: a fifth of a farmhouse's floor was unreachable
-    expect(offWithout, 'no tile was ever off the glass — nothing was fixed').toBeGreaterThan(20)
+    // ANTI-VACUITY, and the size of the defect in one number: tiles that were off the glass
+    // before and are reachable now.
+    expect(onWith).toBeGreaterThan(500)
+    expect(offWithout, 'no tile was ever off the glass — nothing was fixed').toBeGreaterThan(50)
+  })
+
+  // ★ AND THE FIRE IS WHAT AN EMPTY ROOM RESTS ON. The hearth stands against the back-left
+  // wall, which is the room's west vertex — the first thing a centred horizontal crop eats. A
+  // camera that only followed bodies would leave it off the edge of every empty room, which is
+  // exactly what the browser showed before this line existed.
+  it('★ an empty room rests on its fire, and the fire is on the glass', () => {
+    let rested = 0
+    for (const { kind, room } of roomsOf()) {
+      // the back-left wall's own tiles: x = 0, every depth — where a hearth is mounted
+      for (let y = 0; y < room.h; y++) {
+        const fire = tileCentreScreen(0, y)
+        for (const stage of STAGES) {
+          const focus = roomFocusOf([], null, fire)
+          expect(focus, `${kind}: an empty room with a fire has no focus`).toEqual(fire)
+          const pan = roomPanTo(focus, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX)
+          const sx = roomOriginX(stage.w, ROOM_ZOOM, room) + pan.dx + fire.sx * ROOM_ZOOM
+          expect(sx, `${kind} @${stage.w}: the fire is off the left edge of an empty room`)
+            .toBeGreaterThanOrEqual(0)
+          rested++
+        }
+      }
+    }
+    expect(rested).toBeGreaterThan(50)
   })
 
   // ★ WHAT IT FOLLOWS WHEN NOBODY IS SELECTED, decided rather than defaulted. A room with four
@@ -668,7 +703,15 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     // 2. followed but NOT in this room falls through to the room, it does not freeze
     expect(roomFocusOf([a, b], 'someone-else')).toEqual({ sx: 200, sy: 60 })
     expect(roomFocusOf([a, b], null)).toEqual({ sx: 200, sy: 60 })
-    // 3. an empty room is the landed placement, never a stale one
+    // 3. an empty room rests where its life happens — the caller's first perch, hearth-first
+    const fire = { sx: -192, sy: 192 }
+    expect(roomFocusOf([], 'amara', fire)).toEqual(fire)
+    expect(roomFocusOf([], null, fire)).toEqual(fire)
+    // ★ AND THE RESTING POINT IS A FALLBACK, NEVER AN OVERRIDE. A body in the room outranks it,
+    // or walking in would throw the camera back at the fire.
+    expect(roomFocusOf([a, b], null, fire)).toEqual({ sx: 200, sy: 60 })
+    expect(roomFocusOf([a, b], 'amara', fire)).toEqual({ sx: 100, sy: 40 })
+    // 4. and a room that furnishes nowhere to rest is the landed placement, never a stale one
     expect(roomFocusOf([], 'amara')).toBeNull()
     expect(roomFocusOf([], null)).toBeNull()
     // and four sleepers who never move give one FIXED resting point, not a drift
