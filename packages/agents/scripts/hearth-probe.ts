@@ -1,22 +1,7 @@
 // HEARTH PROBE — not a gate. One question, asked of real minds: when there is a fire in the
 // room and a body can reach it, does anybody feed it?
-//
-// ★ WHY THE WORLD HAS TO BE CHANGED AT ALL, AND IT IS THE POINT. The founding valley as it
-// ships holds TWO sound roofs — a storehouse and a cabin — and NEITHER HAS A HEARTH. The only
-// fire in the whole valley is the fire pit in the square, out under the sky. Every one of the
-// five founders' houses stands roofless, 720 ticks short. So the shipped valley cannot answer
-// this question at all: there is no indoor fire to walk to. `vlong1` showed a house CAN be
-// finished in a night and a day, and this probe starts the morning after that.
-//
-// Two arms over the identical world, the identical seed and the identical cast. The ONLY
-// difference is the config's two furnishing flags:
-//
-//   hb  the world before this lane: `house.hearth` and `house.bed` are false, so no verb
-//       reaches the fire in a house, the packet carries neither field, and a bed is a floor.
-//       Byte-for-byte what `19669b6` gave a mind standing in a finished house.
-//   h   the world after: the same house, with the fire in it reachable and the bed worth
-//       something. Nothing tells a mind to feed it — the packet says "The hearth here is
-//       cold." and stops.
+//   hb  house.hearth and house.bed false — no verb reaches the fire, the packet omits both fields.
+//   h   the same house with the fire reachable; nothing tells a mind to feed it.
 //
 //   HEARTH_ARM=h|hb  HEARTH_TICKS=720  HEARTH_LABEL=h1
 import { fileURLToPath } from 'node:url'

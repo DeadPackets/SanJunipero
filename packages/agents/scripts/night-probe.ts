@@ -1,24 +1,8 @@
 // NIGHT PROBE — not a gate. One question, asked of real minds: the dark already charges a
 // builder half again for every hour it works blind. Given a standing light it could raise for
 // two wood, does anybody raise one — and does having the option make anything WORSE?
-//
-// ★ THE SECOND HALF OF THAT QUESTION IS THE POINT. The motivation lane made the cold
-// perceivable without giving the minds anywhere to go and production fell from 4 builds to 0:
-// eighty of arm B's refusals were "there is no way into a cabin". A hazard with no road is
-// worse than no hazard. The dark has charged `light.nightWorkPenalty` since C11 and the only
-// fixed answers were the square's fire pit and the hearths indoors, so THE HAZARD WAS ALREADY
-// SHIPPED AND THE ROAD WAS NOT. This lane adds no new cost; it adds the road. These two arms
-// are the check that the road is real and that adding it cost nothing.
-//
-// Two arms over the identical world, the identical seed and the identical prose. The ONLY
-// difference is whether `lamp_post` is in `structures.recipes` — arm A is the world before
-// this lane, arm B is the world after. Nothing in either arm tells a mind to build anything.
-//
-// ★ AND THE WORLD IT ASKS IN WENT STALE UNDER IT. These numbers were taken before `wants`
-// landed and before the world-fixes lane, and the harness DELETES EVERY ROOFED BUILDING — so
-// re-running it unchanged would measure a town with the cabin, the cottage and the farmhouse
-// lifted out of it, which is not a town this project ships. `NIGHT_VALLEY` and `NIGHT_LADDER`
-// are what make the gap readable against the shipped world and against the world before it.
+// The harness DELETES every roofed building — re-running it unchanged measures a town this
+// project does not ship; NIGHT_VALLEY/NIGHT_LADDER are what make it comparable.
 //
 //   NIGHT_ARM=a|b  NIGHT_TICKS=300  NIGHT_LABEL=run1
 //   NIGHT_VALLEY=shipped|stripped   NIGHT_LADDER=after|before

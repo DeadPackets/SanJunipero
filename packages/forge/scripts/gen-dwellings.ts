@@ -1,26 +1,7 @@
 // LIVE — the three dwellings of a CONTEMPORARY rural San Junipero, cap $DWELL_CAP ($2.00).
-//
-// The user looked at the old `hut` and said it "seems a bit old", and set the period:
-// modern-day countryside, not rudimentary. A remote farming settlement in the present day —
-// power from a generator, no factory within reach, what breaks here is mended here.
-// `hut` is retired as a dwelling; these three replace it.
-//
-// They must read as THREE DIFFERENT BUILDINGS at a glance, at every zoom stop, while still
-// reading as one town. They share the ground footprint (2x2, so the layout lane can place any
-// of them wherever a dwelling goes) and differ on the three axes that carry at sprite size:
-//
-//   cottage    single storey, wide and low   steep symmetrical GABLE, pantile   broad triangle
-//   farmhouse  TWO storeys, tall             HIPPED roof with a dormer          porch breaks the front
-//   cabin      single storey, smallest       MONO-PITCH, one slope only         low asymmetric wedge
-//
-// Generated at 2048 so the 512 cell (2x2 x the 4x zoom stop = 1:1 at the close-up) is reached
-// by dividing a crop by a WHOLE number with the subject filling the window. A 1024 generation
-// cannot: its ceiling factor is 2, the window is the whole frame, and the building would draw
-// a tenth smaller than it should — the margin the storehouse is stuck with.
-//
-//   node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-dwellings.ts
+// cottage: one storey, gable. farmhouse: two storeys, hipped + dormer. cabin: one storey, mono-pitch.
+// Generated at 2048 so the 512 cell is a whole-number divide; a 1024 generation's ceiling
+// factor is 2 and the building draws a tenth small.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'

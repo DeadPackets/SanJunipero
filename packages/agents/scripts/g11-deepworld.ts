@@ -542,12 +542,8 @@ async function main(): Promise<void> {
   }
   const arbiterLlm = makeClient(db, 'arbiter')
 
-  // ART IS NOT WIRED HERE YET, AND THAT IS DELIBERATE. `createForge` needs a reference sheet,
-  // and `loadReferenceSheet()` requires content/reference/ref-1..3.png, which are not in the
-  // tree — `gen-rigs.ts`, the only script that builds a Forge, cannot run today either. The
-  // record does not wait on a picture: this watcher draws nothing and every discovery is
-  // still credited, announced and archived. Swapping in `watchDiscoveryArt({ forge, codex })`
-  // is the whole of the remaining work, and its tests are already green.
+  // `createForge` needs content/reference/ref-1..3.png, which are not in the tree. The record
+  // does not wait on a picture: this watcher draws nothing and discoveries are still archived.
   const discoveryArt = noDiscoveryArt()
 
   const arbiter = makeArbiter({

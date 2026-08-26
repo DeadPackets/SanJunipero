@@ -1,47 +1,5 @@
 // LIVE — the four dwellings and the storehouse, in BOTH facings the user chose. Cap $DWELL_CAP.
-//
-//   node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-dwellings-v2.ts
-//
-// WHAT CHANGED SINCE gen-dwellings.ts (round 3):
-//
-// 1. THE OUTPUT IS COMMITTED. Round 3 wrote its cells to a session scratchpad and registered
-//    them from there. That scratchpad now holds the whole directory tree and zero files, so
-//    every cell round 3 paid for is gone and the town wakes as prisms. These land in
-//    `content/buildings`, beside the terrain that survived the same wipe.
-//
-// 2. THE FOOTPRINTS ARE THE TEMPLATE'S. Round 3 authored all three at 2x2. The template gives
-//    a cottage 3x2 and a farmhouse 4x2, so the cell sizes here are 32*(w+h)*4 = 512, 640, 768.
-//    Density stays 8 art px per world px across the whole class.
-//
-// 3. TWO FACINGS. SW is the door on the +y face, screen-left. SE is the door on the +x face,
-//    screen-right — the same building turned ninety degrees under the same fixed camera, NOT
-//    the SW cell mirrored. Mirroring flips the light too, and `structureArt.test.ts` measures
-//    the distance from a mirror and fails if a cell is one.
-//
-// 4. ★ NO BUILDING REFERENCE AT ALL — FOR ANY OF THEM, NOT ONLY THE FARMHOUSE.
-//    Round 3 lost the farmhouse three times and diagnosed it exactly: the REFERENCE IMAGE, not
-//    the prompt text, decided the architecture every time. The style anchor IS a cottage, so
-//    attempts 1 and 2 came back half-timbered with an arched door. Round 3's fix was to swap in
-//    a different BUILDING (the approved cottage) — and the model copied that instead, returning
-//    a near-duplicate single storey. The plough lane hit the identical failure on farmland_0:
-//    "the material the user rejected self-tiles into rows of isometric cottages" — it WAS the
-//    anchor cottage, copied whole.
-//    So the answer is not a better building to copy. It is NO BUILDING TO COPY: every call
-//    carries a code-painted MASTER_PALETTE swatch as its only reference — palette and nothing
-//    else, because a swatch has no architecture in it — and names the mass, the roof pitch and
-//    the frontage in words.
-//    MEASURED, not assumed. The same cabin prompt was run twice for $0.2053, once with the
-//    style anchor attached and once with the swatch. With the anchor it came back as the ANCHOR
-//    RECOLOURED — arched door, round gable window, green shingle gable, stone base — against a
-//    prompt that banned the arch by name and asked for a single mono-pitch plane. With the
-//    swatch it came back as the cabin that was asked for: sage-green horizontal boards, one
-//    flat sloping roof, no ridge, concrete blocks, flue pipe. Both raws are in the round-4
-//    scratchpad. Craft did not go with the reference: it comes from the post chain
-//    (2048 generation -> whole-number divide -> median block sample -> quantize).
-//    A third run added a CRAFT clause naming the outline and the flatness in words. It came
-//    back MUTED and lower-contrast than the run without it, so the clause is not here.
+// Reference is a MASTER_PALETTE swatch, never a building — a building overrides the prompt (A/B, $0.2053).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'

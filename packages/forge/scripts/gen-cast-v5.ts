@@ -1,42 +1,4 @@
 // LIVE — the five founders, COMMITTED. Cap $CAST_CAP.
-//
-//   node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-cast-v5.ts
-//
-// WHAT CHANGED SINCE gen-cast-v4.ts (round 3):
-//
-// 1. THE OUTPUT IS COMMITTED. Round 3 wrote all five characters — concept, master, 24 cells,
-//    manifest, contact sheet, GIFs — into `$C5/production`. That directory now holds ZERO
-//    files. `class rig-part: 0 records`: every villager in the town draws the checkerboard.
-//    A character ships here as ONE committed record's worth of bytes, the packed atlas plus
-//    its manifest, under `content/cast/<id>/` beside the terrain and the building cells.
-//
-// 2. ★ NO STYLE ANCHOR ON ANY CALL. Round 3 attached the anchor cottage to the concept, the
-//    master, every walk frame and the sleep cell — and then grew a WALK_NO_STYLE_ANCHOR escape
-//    hatch because "the style-anchor cottage keeps bleeding in as scenery (amara-v2 ne-passing
-//    x5)". Round 4 measured the same defect on buildings for $0.2053 and named the fix: a
-//    code-painted MASTER_PALETTE swatch, which has no architecture in it to copy. The escape
-//    hatch is now the only path. The master sheet IS still attached to the walk and sleep
-//    calls — that is the SAME character, which is identity, not a different object to copy.
-//
-// 3. THE CONCEPT CALL IS GONE. Round 3 spent one painterly concept per character to establish
-//    costume before the master. It is the one call whose output never reaches the sheet, and
-//    the costume it established is now written out in words in `cast-v5.ts` instead. Five
-//    calls saved; the master carries the same descriptors it would have carried.
-//
-// 4. SPEND GOES THROUGH SpendLedger, so the $5 per-asset anomaly stop is live on every call
-//    instead of a hand-rolled counter.
-//
-// 5. ★ NO CANDIDATE THAT FAILS A GATE IS EVER SHIPPED (user ruling). `bestOf` chooses; it does
-//    not decide. See `refuseFailing` — the run fails loudly, names every candidate, every gate
-//    and every margin, and writes nothing for that character. The stride trio and the packed
-//    atlas pixel bar are binding too; both used to be computed, logged and ignored.
-//
-// UNCHANGED, because it is the calibrated part: the mirror standard. 9 authored cells derive
-// the 24-cell contract in code — 2 facings x 4 strip poses + 1 sleep — and SW/NW are flips of
-// SE/NE. `mirror.ts` owns that and this script does not second-guess it.
-//
 // Controls: CAST=<comma ids>, CAST_ATTEMPTS=<n, default 3>, CAST_DRY=1,
 //           CAST_REJECTED=<raw keys the eye refused>.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

@@ -1,32 +1,4 @@
 // LIVE — the EIGHT kinds the widened coverage gate found bare, in ten cells. Cap $STRUCT_CAP.
-//
-//   node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-structures-v5.ts
-//
-// WHY THERE WERE EIGHT AND NOT THE FOUR THE BOOT LOG NAMED.
-//
-// The gateway logged `NO ART for production/building-{wagon,shed,scaffolding,standing-stone}`,
-// four ENOENTs against a session scratchpad that has held zero files since round 3. That list
-// was the four kinds SOMEBODY HAD ONCE GENERATED, not the four the world was missing.
-// `structureArt.ts` now enumerates the kinds instead of trusting a log, and there are eight:
-//
-//   wagon shed scaffolding standing_stone   the gateway's dev town (`founders.ts`)
-//   well fire_pit                           the city template — and EXEMPTED by name from the
-//                                           old gate, which is why two grey prisms stood in
-//                                           the middle of the town square for a whole train
-//   bridge                                  an agent raises one at the ford, `build` verb
-//   grave                                   the world lays one when somebody dies
-//
-// FACINGS. The user's ruling is two, SW and SE, for everything that can stand in both. The shed
-// has a door and the wagon has a head end, so both turn. The other six ship one cell each and
-// `ONE_CELL_KINDS` carries the reason for every one of them — a well is a circle, a bridge
-// turns by swapping its FOOTPRINT rather than its facing.
-//
-// THE REFERENCE IS A COLOUR CHART. Round 4 measured this for $0.2053: with `style-anchor.png`
-// attached the model returns THE ANCHOR RECOLOURED, against a prompt that bans its arch by
-// name; with a code-painted MASTER_PALETTE swatch it returns the subject asked for. A swatch
-// has no architecture in it to copy. Every call here carries the swatch and nothing else.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'

@@ -1,23 +1,5 @@
 // COST LADDER — one arm of the reasoning-dial ladder, with the quality measure beside the bill.
-//
-// ★ THE ONLY WAY THIS LANE CAN FAIL IS BY MAKING THE MINDS STUPIDER, and a token count cannot
-// see that. So every arm reports six behaviours that were MEASURED TO BE ABSENT and then
-// appeared — a regression in any of them is visible as a number, not as an opinion:
-//
-//   enteredWarm   a mind goes indoors when cold      (0,0,0,0 -> 1,1,1,1, world-fixes)
-//   lightActs     a mind makes light                 (0 across eight live nights, then t133)
-//   recovered     a mind recovers from a refusal     ("you cannot: stoke needs a {structureId}")
-//   bonds         a tie forms                        (BONDS 0 -> 1, fifteen unscripted lines)
-//   completed     a mind builds                      ("Begun by Amara on Day 0 - still rising")
-//   emDashPct     voice quality                      (0.0% em dash, opener reuse 82% -> 30%)
-//
-// Three of the six are read with the PRODUCT'S OWN code rather than a proxy invented here:
-// `buildBonds` is the gateway's shipped derivation, the shiver line is the one `prose.ts` uses
-// to tell a mind it is cold, and the repair count is `repair.ts`'s own `decode_repaired` alert.
-//
-// Every arm is matched: same seed, same cast, same spawn tiles, same tick count, same machine,
-// same wood and bread in hand. The ONLY difference between arms is what `reasoning` the turn
-// client and the reflection client send.
+// Every arm reports quality beside cost — a token count cannot see a dumber mind.
 //
 //   LADDER_TURN=unset|off|minimal|low|medium|high
 //   LADDER_REFL=unset|off|minimal|low|medium|high
