@@ -53,9 +53,8 @@ const levelOf = (body: AlarmBody, need: AlarmNeed): number =>
   need === 'thirst' ? body.thirst ?? 100 : body.needs[need]
 
 export type MindClock = {
-  // `null` is a mind that has never taken a turn, and it is not the same as tick 0: a fresh town
-  // starts at tick 0, so a zero here made five new arrivals wait out the whole boredom floor
-  // before their first thought.
+  // `null` is a mind that has never taken a turn, and is not tick 0: a fresh town starts there,
+  // so a zero makes a new arrival wait out the whole boredom floor first.
   lastTurnTick: number | null
   reconsiderAtTick: number | null
   conversationUntilTick: number
@@ -99,9 +98,8 @@ export function decideWake(
     if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
       return 'salient_perception'
     }
-    // Asleep, the one-shot armed flags give way to the retry backoff: a
-    // starving sleeper never recovers past the re-arm point, so the alarm
-    // rings again each backoff until the body actually rises.
+    // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
+    // the re-arm point, so the alarm has to ring again until the body rises.
     if (tick < clock.wakeRetryAtTick) return null
     if (bodyAlarmBelow(cfg, packet.self.body)) return 'body_alarm'
     if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
@@ -154,9 +152,8 @@ function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alar
   return ringing(cfg, body).some((key) => armed[key] ?? true)
 }
 
-// Called every tick: a need that has recovered past threshold + hysteresis re-arms its alarm,
-// so oscillation around the threshold cannot re-fire it. An affliction has no scale to
-// oscillate on — losing it is the recovery, and getting worse is not a second bell.
+// A need recovered past threshold + hysteresis re-arms, so oscillation cannot re-fire it. An
+// affliction has no scale to oscillate on: getting worse is not a second bell.
 export function rearmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
   for (const need of ALARM_NEEDS) {
     if (levelOf(body, need) >= cfg.bodyAlarm[need] + cfg.alarmHysteresis) clock.alarmArmed[need] = true

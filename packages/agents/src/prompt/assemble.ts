@@ -35,8 +35,7 @@ export type AssembledPrompt = {
   needsCompaction: boolean // est(dayLog) > 6000 tokens
 }
 
-// The delimiter between the three system blocks. Byte-stable so that blocks
-// 1–3 form an unbroken cache prefix until sleep rewrites block 3.
+// Byte-stable, so blocks 1-3 form an unbroken cache prefix until sleep rewrites block 3.
 const BLOCK_DELIM = '\n\n---\n\n'
 
 export const DAYLOG_COMPACTION_TOKENS = 6000
@@ -126,9 +125,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   }
 }
 
-// Emergency mid-day summarize: the day's log collapses to one wandering line
-// plus its ten most recent entries. Sleep is the real compaction; this is the
-// overflow path.
+// The overflow path only: sleep is the real compaction.
 export function compactDayLog(dayLog: string[], summary: string): string[] {
   return [`Your mind wanders back over the day: ${summary}`, ...dayLog.slice(-10)]
 }

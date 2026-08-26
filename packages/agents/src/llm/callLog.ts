@@ -4,18 +4,16 @@ export type LlmCallInsert = {
   agentId: string | null
   caller: string
   model: string
-  // Which of OpenRouter's back ends actually served it. Null when the answer did not say —
-  // and null is itself a finding, because a run cannot be attributed to a provider it
-  // cannot name (C11 R20).
+  // Null when the answer did not say, which is itself a finding: a run cannot be attributed
+  // to a provider it cannot name.
   provider: string | null
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
   reasoningTokens: number
   costUsd: number
-  // What the provider said it charged, when it said. Null on failures, on the repair path, and
-  // for any back end that does not report one — kept beside `costUsd` so the two can be
-  // reconciled over a whole run, not only per call.
+  // What the provider said it charged, when it said. Kept beside `costUsd` so the two can be
+  // reconciled over a whole run and not only per call.
   reportedCostUsd: number | null
   latencyMs: number
   ok: boolean
@@ -81,10 +79,8 @@ export type BudgetGuard = {
   sumReserved(): number
 }
 
-// The budget guard cannot book after the fact: five calls in flight all pass a
-// read-only check and all overshoot. Reading the ledger and writing the claim
-// inside one synchronous better-sqlite3 transaction makes that impossible —
-// the worst overshoot left is a single reserved call.
+// Booking after the fact lets every call in flight pass one read-only check and all overshoot.
+// Read and claim inside one synchronous transaction; the worst overshoot is one reserved call.
 export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGuard {
   const insert = db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)')
   const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')

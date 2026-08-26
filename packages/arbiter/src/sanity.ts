@@ -1,11 +1,8 @@
 import { slugify } from './rulebook.js'
 import type { Recipe } from './verdict.js'
 
-// The mini-rehearsal minted eight permanent verbs nobody could use: `recipe:arrative` (a name
-// with its first letter eaten), `recipe:attempt` (the verdict word, taken for a craft), three
-// rival waterskins — one of them keyed to the entity id `item_28` — and a requires clause
-// naming sand for work against a wooden wall. Every one of those is refusable by arithmetic,
-// and a codified verb is forever, so they are refused here before the rulebook ever sees them.
+// A codified verb is forever, so every fault refusable by arithmetic is refused here before
+// the rulebook sees it.
 
 // The words the arbiter answers WITH. None of them is the name of a craft, and one of them
 // arriving as an id means the model wrote its verdict into the wrong field.
@@ -42,9 +39,8 @@ export function nearDuplicate(a: string, b: string): boolean {
   return long.length - short.length <= 2 && (long.startsWith(short) || long.endsWith(short))
 }
 
-// One act, named twice: every word of the shorter id is a word of the longer, and the shorter
-// says more than one thing on its own. `fill_waterskin_well` is `fill_waterskin` with a place
-// bolted onto it, and the live run minted both.
+// One act named twice: every word of the shorter id is a word of the longer, and the shorter
+// says more than one thing on its own.
 export function sameActNamedTwice(a: string, b: string): boolean {
   if (a === b) return false
   const [x, y] = [tokens(a), tokens(b)]
@@ -81,10 +77,8 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
   const slug = recipe.id.replace(/^recipe:/, '')
   if (VERDICT_WORDS.has(slug)) return `${recipe.id} is a verdict word, not a craft`
 
-  // A truncated id is the tell of a name that lost a letter on the way out: every word of the
-  // id must be a word of the name, allowing for a shortening or an ending — `smoked` for
-  // `smoke`, `gunpowder` for `gun`. A word with its HEAD eaten is a prefix of nothing, which
-  // is exactly how `recipe:arrative` is caught.
+  // Every word of the id must be a word of the name, allowing a shortening or an ending. A word
+  // with its HEAD eaten is a prefix of nothing, which is how a truncated id is caught.
   const nameTokens = tokens(recipe.name)
   const nameHas = (t: string): boolean => nameTokens.some((n) => n === t
     || (Math.min(n.length, t.length) >= 3 && (n.startsWith(t) || t.startsWith(n))))
