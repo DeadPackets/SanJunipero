@@ -4,10 +4,8 @@ import { DEFAULT_CONFIG } from '@sj/shared'
 import { makeablesLine } from './prose.js'
 import { FORBIDDEN_FRAMING } from './rulesOfBeing.js'
 
-// R-H — production was 0.6% and nobody tried to build or craft once, because the words
-// `build` and `craft` were given without a single thing they could be given. These rows are
-// the vocabulary, derived from the two tables the verbs already validate against, and the
-// sentence a mind actually reads. Its home is the volatile block: block 1 stays byte-frozen.
+// `build` and `craft` are useless without the nouns they take. The vocabulary is derived from
+// the two tables the verbs validate against, and it lives in the volatile block.
 
 const C = DEFAULT_CONFIG
 

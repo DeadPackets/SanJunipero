@@ -8,10 +8,8 @@ import type { Verdict } from './verdict.js'
 
 const DIM = 384
 
-// The shared FakeEmbedder is sha256-based: distinct text yields near-orthogonal
-// unit vectors, so a rephrase (the brief's similarity case) cannot reach cosine
-// > 0.8 through it. This deterministic bag-of-words embedder gives token-overlap
-// similarity instead, exercising the KNN → cosine path without any live model.
+// The shared FakeEmbedder is sha256-based, so a rephrase can never clear the cosine bar. This
+// bag-of-words one gives token-overlap similarity, exercising KNN → cosine with no live model.
 const STOPWORDS = new Set(['a', 'an', 'the', 'for', 'by', 'to', 'of', 'i', 'try', 'want', 'attempt', 'and', 'with'])
 
 function unitVec(bytes: Uint8Array): Float32Array {

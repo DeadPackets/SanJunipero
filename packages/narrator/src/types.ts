@@ -72,9 +72,8 @@ export type Institution = {
   memberIds: string[]
   sourceEventIds: number[]
 }
-// detectInstitutions output: foundingSceneIndex is an INDEX into the scenes array
-// (or -1 when the founding event sits in a dropped scene). The caller maps it to a
-// store id via insertScenes' returned ids before persisting — never persist -1.
+// `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
+// dropped scene. Map it through `insertScenes`' returned ids; never persist -1.
 export type DetectedInstitution = Omit<Institution, 'foundingSceneId'> & { foundingSceneIndex: number }
 export type DetectConfig = {
   groupMinCoScenes: number

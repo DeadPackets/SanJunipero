@@ -6,8 +6,8 @@ import { IntentSchema } from '../turn.js'
 // A rollback point, not a bookmark: an atomic VACUUM INTO with the accumulators written inside,
 // so a resume drops the tail. Four rules bar laundering: fingerprint, forward-only, hash, resumes.
 
-// 2: the sidecar gained `semanticSkippedNights`. A version-1 checkpoint carries no count of
-// the nights it lost, so it cannot be resumed into a run that reports one.
+// 2: a version-1 checkpoint carries no count of the nights it lost, so it cannot be resumed
+// into a run that reports one.
 export const G11_CHECKPOINT_VERSION = 2
 
 const Thought = z.object({ tick: z.number().int(), agentId: z.string(), text: z.string() }).strict()
@@ -68,9 +68,8 @@ export const G11FingerprintSchema = z.object({
 }).strict()
 export type G11Fingerprint = z.infer<typeof G11FingerprintSchema>
 
-// The run's memory. Nothing here is in the event log, and every one of these feeds a criterion
-// or the transcript: adjudications carry criterion 9, tickMs carries criterion 1's tick budget,
-// the full-need tally carries the discretionary table's last column.
+// The run's memory: nothing here is in the event log, and every field feeds a criterion or
+// the transcript.
 export const G11SidecarSchema = z.object({
   tick: z.number().int(),
   lastDayClosed: z.number().int(),
@@ -86,7 +85,7 @@ export const G11SidecarSchema = z.object({
   semanticRan: z.boolean(),
   semanticErrors: z.number().int(),
   // Restored like the rest: a resume that zeroed it would turn a lost night into one that
-  // never happened (C11 batch 16 fix 3).
+  // never happened.
   semanticSkippedNights: z.number().int(),
   narrateErrors: z.number().int(),
   constructErrors: z.number().int(),
@@ -142,10 +141,8 @@ export function readCheckpoint(db: Database.Database): G11Checkpoint | null {
   return G11CheckpointSchema.parse(JSON.parse(row.payload))
 }
 
-// The checkpoint goes into the live database first and the whole database is then copied out
-// with `VACUUM INTO`, so the snapshot and the accumulators inside it are one consistent object
-// in one file. The copy lands on a temporary name and is renamed over the previous snapshot,
-// so a process killed mid-write leaves the previous checkpoint intact rather than a torn one.
+// The checkpoint goes into the live database before the `VACUUM INTO`, so snapshot and
+// accumulators are one object; the copy is renamed in, so a killed write leaves the old one.
 export function writeCheckpoint(
   db: Database.Database, snapshotPath: string, checkpoint: G11Checkpoint,
 ): void {

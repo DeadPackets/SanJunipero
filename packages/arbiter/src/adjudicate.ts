@@ -90,9 +90,8 @@ export type ArbiterDeps = {
   llm: LlmClient
   embedder: { embed(t: string): Promise<Float32Array> }
   tick?: () => number
-  // The materials and buildings the town has words for. Rendered into the prompt AND enforced
-  // against the answer, so the two can never disagree (canon-vocabulary law). A caller that
-  // shows no table gets the checks that need no table; the rest wait for one.
+  // Rendered into the prompt AND enforced against the answer, so the two can never disagree.
+  // A caller that shows no table gets only the checks that need none.
   vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
   // Told what was just minted, so a caller that owns a world can put it in the record. The
   // arbiter itself never touches the world log — it does not have one.
@@ -268,9 +267,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
-      // Deterministic adjacency gate: an attempt whose recipe canon the codex
-      // has not earned is beyond adjacency, never codifiable. Record the
-      // corrected verdict so the exploit never becomes shared precedent.
+      // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
+      // corrected verdict is what gets recorded, so an exploit never becomes precedent.
       const verdict: Verdict =
         value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
           ? { kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' }

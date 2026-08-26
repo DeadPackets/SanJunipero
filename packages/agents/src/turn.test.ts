@@ -48,10 +48,8 @@ describe('TurnSchema', () => {
   })
 
   it('keeps a complete turn that wrote null where it had nothing to say', () => {
-    // Measured live: Baidu returned a turn carrying a valid action AND speech and the whole
-    // answer was discarded, because it wrote `"reconsider_at": null` where the schema wanted
-    // the key absent. A null in an optional field is the model saying "none", not a malformed
-    // answer, and it costs a repair call every time.
+    // A null in an optional field is the model saying "none", not a malformed answer — a strict
+    // optional throws away a whole valid turn over it.
     for (const key of ['speech', 'action', 'plan', 'journal', 'reconsider_at'] as const) {
       const parsed = TurnSchema.safeParse({ ...validTurn, [key]: null })
       expect(parsed.success, key).toBe(true)
@@ -71,9 +69,8 @@ describe('TurnSchema', () => {
   })
 
   it('still names exactly two required fields, and no transform blocks the emitted grammar', () => {
-    // A `.transform()` that normalised null to absent would read better and cannot be used:
-    // `z.toJSONSchema(..., { io: 'output' })` throws on one, and that is the direction the
-    // SDK converts an output schema in.
+    // A `.transform()` normalising null to absent cannot be used: `z.toJSONSchema(..., { io:
+    // 'output' })` throws on one, and that is the direction an output schema is converted in.
     for (const io of ['input', 'output'] as const) {
       const emitted = z.toJSONSchema(TurnSchema, { io }) as { required: string[] }
       expect(emitted.required, io).toEqual(['thought', 'importance'])
@@ -91,9 +88,8 @@ describe('TurnSchema', () => {
   })
 })
 
-// Every `*Params` schema the engine exports, which is every parameter shape a registered
-// Tier-1 verb reads. The arbiter's `ExpressiveParams` is not reachable from here — @sj/arbiter
-// depends on @sj/agents — so its single key is named explicitly below.
+// Every parameter shape a registered Tier-1 verb reads. `ExpressiveParams` is not reachable
+// from here — @sj/arbiter depends on @sj/agents — so its single key is named below.
 const enginePlaces = Object.entries(engine as Record<string, unknown>)
   .filter(([name]) => name.endsWith('Params'))
   .map(([name, schema]) => [name, Object.keys((schema as z.ZodObject).shape)] as const)

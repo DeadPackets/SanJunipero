@@ -2,10 +2,8 @@ import type { SimEvent } from '@sj/shared'
 import type { NarratorStore } from './store.js'
 import type { ChapterRow, EraRow, NarratorLlm, SceneDigest, SceneSegment } from './types.js'
 
-// The narrator's binding vocabulary (addendum §12). Every line of it is a rule about what
-// may be SAID, and every one of them is a rule against inventing: hurt is never a number,
-// sickness is never a severity, care is credited only where somebody actually sat down, and
-// a killing names the hand that was witnessed and never a verdict on it.
+// Every line here is a rule against inventing: hurt is never a number, sickness never a
+// severity, care is credited only where somebody sat down, and a killing names only the hand.
 export const NARRATOR_VOCABULARY_NOTES = [
   'Write "hurt" or "wounded"; never how much.',
   'Write "sickness" or "a bad turn"; never how bad.',

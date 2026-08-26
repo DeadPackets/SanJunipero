@@ -498,9 +498,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: turnModel([]),
       mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
       reflectionLlm: reflection,
-      // Warmth is pinned off with the other two clocks: from C11 Task 22 a body left out in a
-      // spring night loses warmth until the C2 body alarm rings, and a woken sleeper is not
-      // what this row is about.
+      // Warmth is pinned off with the other two clocks: a body out in a spring night loses it
+      // until the alarm rings, and a woken sleeper is not what this row is about.
       simConfig: SimConfigSchema.parse({
         needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
         structures: { sleepIndoorsOnly: false }, warmth: { enabled: false },
@@ -669,9 +668,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(b.filter((m) => m.role === 'user')[0]!.text).not.toContain('a house (10 wood)')
   })
 
-  // Controller amendment to T37b — a blank answer is not a wrong answer. R20's first
-  // measurement put empty calls at 6.0% of a live gate, and every one of them used to cost
-  // the mind a whole turn and leave a drift in its memory that it never actually had.
+  // A blank answer is not a wrong answer: charging a mind a whole turn for one leaves a drift
+  // in its memory that it never actually had.
   it('asks a blank answer again, unchanged — not as a correction for something never said', async () => {
     const { model, prompts } = blankModel(1)
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
@@ -726,9 +724,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
-    // Agent at (3, 3), storehouse footprint at (5, 5). A storehouse is a thing you can walk
-    // into, so the prose names the doorway `enter` measures against (C11 batch-8 R7) rather
-    // than the nearest open ground beside the wall.
+    // A storehouse is a thing you can walk into, so the prose names the doorway `enter`
+    // measures against rather than the nearest open ground beside the wall.
     expect(runtime.dayLogSnapshot()[0]).toContain('its doorway is at (5, 6); stand there and you can go in')
   })
 
@@ -839,9 +836,7 @@ describe('arbiter seam (T19)', () => {
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
   })
 
-  // ★ THE LOOP. The live proof has Amara reaching the same idea three times in 34 ticks,
-  // because the refusal she got back told her nothing she could act on. Three full arbiter
-  // calls for one idea, and a mind that never moves on.
+  // A refusal a mind cannot act on is a refusal it repeats, at a full arbiter call each time.
   it('★ asks the god ONCE for one idea: the same intent again is answered from the mind\'s own past', async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {

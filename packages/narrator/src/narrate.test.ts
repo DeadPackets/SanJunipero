@@ -110,9 +110,7 @@ describe('narrateDay', () => {
   })
 })
 
-// GATE G11b day 3, 2026-08-17: the chronicle would not render and the night's semantic pass
-// never ran, because the pass sat downstream of the render. One night's chronicle failing is
-// one loss; it must not silently cost the pass as well (C11 batch 16 fix 1).
+// One night's chronicle failing is one loss; it must not silently cost the semantic pass too.
 describe('narrateDay: a chronicle that will not render does not take the semantic pass with it', () => {
   const throwingLlm = (): NarratorLlm =>
     ({

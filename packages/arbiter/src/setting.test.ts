@@ -1,7 +1,5 @@
-// THE SETTING. San Junipero is contemporary rural, hands-on: the user established the
-// period after C12a and the arbiter's canon said the opposite. These are the assertions
-// that keep the canon and the era ladder in the century the Style Bible's sole reference
-// anchor (Stardew Valley) always implied.
+// San Junipero is contemporary rural and hands-on. These assertions keep the canon and the
+// era ladder in that century.
 import { describe, expect, it } from 'vitest'
 import { scanPromptForGlassLeak } from '@sj/agents'
 import { CANON, ERAS, ERA_ORDER, GENESIS_CODEX } from './canon.js'

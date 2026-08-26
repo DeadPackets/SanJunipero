@@ -78,9 +78,8 @@ describe('repairToSchema: it refuses rather than guesses', () => {
     expect(repairCandidates('I could not write that chapter.')).toEqual([])
   })
 
-  // The KNOWN GAP, pinned so it cannot be forgotten: a perfectly correct turn emitted as YAML
-  // (batch 14's pre-flight, quoted verbatim in its report) is a different serialisation, not a
-  // reframing, and reading it needs a parser this repair pass deliberately does not have.
+  // The known gap, pinned: a correct turn emitted as YAML is a different serialisation, not a
+  // reframing, and reading it needs a parser this pass deliberately does not have.
   it('does not pretend to read YAML', () => {
     const yaml = 'title: A Grave at the Northern Ford\ntext: At the fork where the water bends.\ncitations:\n  - 4\n  - 9\n'
     expect(repairToSchema(yaml, Chapter)).toBeUndefined()

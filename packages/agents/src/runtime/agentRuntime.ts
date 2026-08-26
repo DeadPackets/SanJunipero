@@ -202,10 +202,8 @@ export class AgentRuntime {
     }
   }
 
-  // Everything a mind carries between ticks that is not in the database. A run that is
-  // interrupted and picked up again restores this, or every mind wakes with a fresh clock: it
-  // would think the moment the run resumed rather than when it meant to, drop the plan it was
-  // halfway through, and report a turn count that starts at the resume.
+  // Everything a mind carries between ticks that is not in the database. A resume restores it,
+  // or every mind wakes with a fresh clock, a dropped plan and a turn count starting at zero.
   snapshot(): RuntimeSnapshot {
     return {
       clock: { ...this.#clock, alarmArmed: { ...this.#clock.alarmArmed }, prevVisibleIds: [...this.#clock.prevVisibleIds] },

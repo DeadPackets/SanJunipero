@@ -12,9 +12,8 @@ import type {
   SceneSegment,
 } from './types.js'
 
-// Deterministic composition over the day's already-verified chapter — no second
-// LLM call. scenes (optional, index-aligned with heats) supplies the top-heat
-// scene's cast; the plan's 4-arg shape carried no cast source.
+// Deterministic composition over the day's already-verified chapter, with no second LLM call.
+// `scenes` is index-aligned with `heats` and supplies the top-heat scene's cast.
 export function renderNewspaper(
   day: number,
   chapter: ChapterRow,
@@ -51,9 +50,8 @@ export function timelapseCaptions(
     .map((c) => ({ day: c.day, caption: `Day ${c.day}: ${c.title}` }))
 }
 
-// The public-record boundary: structure_completed carries only the structure id
-// and crop_harvested only the crop id — unattributable, so excluded. Building is
-// attributed via structure_planned.builderId; harvests via action_completed.
+// The public-record boundary: `structure_completed` and `crop_harvested` carry no person, so
+// building is attributed via `structure_planned.builderId` and harvests via `action_completed`.
 export const PUBLIC_EVENT_TYPES = [
   'agent_spoke',
   'action_completed',

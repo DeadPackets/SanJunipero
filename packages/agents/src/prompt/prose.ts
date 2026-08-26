@@ -108,9 +108,8 @@ export type PerceptionPacket = {
   ground?: { wellTravelled: true }
   // Present only while the dark is charging this body for the work in its hands.
   fumbling?: true
-  // How the cold stands against this body when the air outside would bite: getting in, or held
-  // off, and by what. Absent whenever the air is warm enough that nothing is deciding anything,
-  // so a packet from a mild afternoon — or from before the cold could be felt — reads as before.
+  // How the cold stands against this body: getting in, or held off, and by what. Absent
+  // whenever the air is warm enough that nothing is deciding anything.
   cold?: { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' }
   // Present only while the legs are on a route that stops short of where they were sent.
   wayUnclear?: true

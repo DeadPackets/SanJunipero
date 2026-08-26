@@ -14,10 +14,8 @@ import { SimConfigSchema } from '@sj/shared'
 import { perceptionToProse } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
-// `hunt` was tried once in two live sim-days and refused — "hunt needs a {faunaId}" — and
-// `forage` failed both its tries with "no forest nearby". The engine had composed the deer and
-// the berry bushes all along; the bridge dropped them and the prose never named one. These
-// rows walk both verbs from the sentence a mind reads to the thing it takes.
+// The engine composes the deer and the berry bushes; the bridge used to drop them, so no mind
+// could name one. These rows walk both verbs from the sentence a mind reads to the thing taken.
 const AGENT = 'tamar'
 
 function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {

@@ -54,9 +54,8 @@ CREATE TABLE IF NOT EXISTS publications (
   rendered_at TEXT NOT NULL DEFAULT (datetime('now')));
 `
 
-// C11 widens C7's ledger rather than standing a rival one beside it: every existing row is a
-// tier-1 engine first, which is exactly what the defaults say. Idempotent — the columns are
-// added only where they are missing, so a second run is a no-op.
+// One ledger widened rather than a rival one beside it; every existing row is a tier-1 engine
+// first, which is what the defaults say. Idempotent: columns are added only where missing.
 const MILESTONE_COLUMNS: ReadonlyArray<{ name: string; ddl: string }> = [
   { name: 'tier', ddl: "ALTER TABLE milestones ADD COLUMN tier TEXT NOT NULL DEFAULT '1'" },
   { name: 'domain', ddl: "ALTER TABLE milestones ADD COLUMN domain TEXT NOT NULL DEFAULT 'engine'" },

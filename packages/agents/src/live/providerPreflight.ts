@@ -6,7 +6,6 @@ import { TurnSchema, type Turn } from '../turn.js'
 
 // Asks the real `TurnSchema` with the real system prompt and model id — a grammar-constrained
 // provider can return only a schema's required properties, so a toy schema proves nothing.
-
 export const PREFLIGHT_CALLS = 3
 // `action` on every call is the bar — it separated four candidates cleanly over 48 probe calls;
 // `speech` measures a mind's choice, not a provider's capability, so it is reported and never gates.

@@ -3,9 +3,8 @@ import { partnershipOf } from '@sj/engine'
 import type { WorldState } from '@sj/engine'
 import type { Milestone } from '../types.js'
 
-// Tier 2 — pattern firsts. A tier-1 row is one event; a row here is a shape across several,
-// and sometimes across a relationship the engine already keeps. Deterministic rules only:
-// no model reads this file, and nothing it writes reaches a mind.
+// Tier 2 — pattern firsts: a shape across several events. Deterministic rules only, and
+// nothing this file writes reaches a mind.
 
 const p = (ev: SimEvent): Record<string, unknown> => (ev.payload ?? {}) as Record<string, unknown>
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null)
@@ -114,10 +113,8 @@ function affair(events: SimEvent[], ctx: Tier2Ctx): Found | null {
   return null
 }
 
-// Carry-item 4. A partnership dissolves on the engine's rolling window, which a brief
-// separation is enough to trip — so a BREAKUP asks for more: the row must be dissolved AND
-// the two of them must have stopped speaking and stopped sharing a roof for the whole window.
-// A long partnership must not break on a gap they talked across.
+// A partnership dissolves on a rolling window a brief separation can trip, so a breakup asks
+// for more: dissolved, and no speech and no shared roof for the whole window.
 function breakup(events: SimEvent[], ctx: Tier2Ctx): Found | null {
   const state = ctx.state
   if (state === undefined) return null
