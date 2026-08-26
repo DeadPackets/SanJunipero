@@ -12,7 +12,10 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'warn',
       // The omit-a-key idiom `const { [id]: _, ...rest } = obj` is how the fold keeps key order.
-      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true, argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { ignoreRestSiblings: true, argsIgnorePattern: '^_' },
+      ],
       // 484 object types, 0 interfaces: the measured house style, not the plugin's default.
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // Invariant 6: the tuned prices, thresholds and tuning constants stay written where they are.
@@ -55,11 +58,7 @@ export default tseslint.config(
     },
   },
   {
-    files: [
-      '**/*.js',
-      'vitest.config.ts',
-      'packages/web/vite.config.ts',
-    ],
+    files: ['**/*.js', 'vitest.config.ts', 'packages/web/vite.config.ts'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 )
