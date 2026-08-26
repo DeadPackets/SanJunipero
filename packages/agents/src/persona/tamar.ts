@@ -1,7 +1,7 @@
 import type { IdentityCore } from '../prompt/assemble.js'
 import type { PersonalityDoc } from '../personality.js'
 
-// Test persona for GATE G3 — NOT a founder; founders are C8 content.
+// A test persona, not a founder.
 export const TAMAR: IdentityCore = {
   name: 'Tamar',
   age: 31,

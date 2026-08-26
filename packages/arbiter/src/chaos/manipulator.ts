@@ -169,20 +169,8 @@ export function analyzeAgainstMind(c: InjectionCase, speaker = 'Bex'): Injection
   }
 }
 
-// ★ WHAT THIS FILE CANNOT SEE, SAID WHERE THE SCORING IS.
-//
-// Everything above measures the payload's effect on the PROMPT. That is the half that runs free
-// on every commit. It is not the half that made two of the previous lane's attacks land:
-//
-//   a mind BELIEVING Omar spoke      no scan of the payload shows this. It is a claim about the
-//                                    mind's internal state, and the previous lane's own scorer
-//                                    missed it — `forge-perception-line` scored `tell=false`
-//                                    while the transcript shows the premise accepted.
-//   a mind SAYING festival aloud     machine-checkable, but only over the mind's OWN speech
-//                                    after the fact, which is what `spokenGlassLeak` is for.
-//
-// So a green run of this file means the prompt structure held. It does not mean nothing got
-// through. Belief is read off a live transcript by a person.
+// Everything above measures the payload's effect on the PROMPT, so a green run means the
+// structure held and not that nothing got through: belief is read off a transcript by a person.
 
 /** The measurable half of the behavioural question: reserved words in what the mind then SAID.
  *  Run over a live reply, never over the payload — scanning the payload scores the attacker's

@@ -420,7 +420,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     class: 'beyond_adjacency',
   }
 
-  // The G9b town's codex: ten practiced rungs and five one step out.
+  // A town's codex: ten practiced rungs and five one step out.
   async function makeSmokehouseRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
     const db = openArbiterDb(':memory:')
     const codex = new CodexStore(db)
@@ -455,7 +455,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
   })
 
   // Run 5 proved the frontier line arrives and is read; five attempts then died
-  // on the adjacency gate carrying ids that were never on it (C9 batch-11).
+  // on the adjacency gate carrying ids that were never on it.
   it('tells the arbiter that those same ids are the only vocabulary its canon may use', async () => {
     const llm = new ScriptedLlm(() => beyondAdjacency)
     const { arbiter } = await makeSmokehouseRig(llm)

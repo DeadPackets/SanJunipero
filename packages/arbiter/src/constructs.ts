@@ -33,7 +33,7 @@ export type ConstructOpsType = 'construct_recognized' | 'construct_named' | 'con
 export type ConstructOpsEvent = { type: ConstructOpsType; constructId: string; tick: number; payload: unknown }
 
 // How near two bodies must be to be at the same thing. A module const, not a dial: G11b tunes
-// the world by its genesis, not by a config row nobody would ever turn (batch-4 ruling 4).
+// the world by its genesis, not by a config row nobody would ever turn.
 const ANCHOR_CELL = 4
 
 export type Gathering = { tick: number; participants: string[] }

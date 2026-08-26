@@ -113,7 +113,7 @@ function reconcile(
       })),
       crops: raw.visible.crops,
       // The engine composes both; reconcile dropped them on the floor, so no mind had ever
-      // seen an animal or a berry patch (batch-7 concern 3).
+      // seen an animal or a berry patch.
       fauna: raw.visible.fauna,
       forageables: raw.visible.forageables,
     },

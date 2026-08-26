@@ -205,7 +205,7 @@ describe('perceptionToProse', () => {
     }
   })
 
-  // 313 of these fired in G9b run 4 and every one read "You sense something
+  // 313 of these fired in one live run and every one read "You sense something
   // change nearby." A body going down is the loudest thing that can happen to it.
   it('renders a collapse as its own sensation, never the fallback, never an alert', () => {
     const alert = vi.fn()
@@ -217,7 +217,7 @@ describe('perceptionToProse', () => {
   })
 
   // The enumeration comes from the engine, so a new tag cannot slip in mute:
-  // run 5 left `you_died` and four illness tags with no prose at all (batch-10 concern 3).
+  // one run left `you_died` and four illness tags with no prose at all.
   it('renders every felt tag the engine can emit as its own sensation, never the fallback', () => {
     expect(FELT_TAGS.length).toBeGreaterThan(0)
     for (const tag of FELT_TAGS) {
@@ -425,7 +425,7 @@ describe('perceptionToProse', () => {
   })
 
   // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
-  // to rest can only ever try one and be refused (C11 batch-8 R11).
+  // to rest can only ever try one and be refused.
   it('escalates weariness severity so the mind knows to sleep', () => {
     const tired = {
       ...quietMeadowPacket,

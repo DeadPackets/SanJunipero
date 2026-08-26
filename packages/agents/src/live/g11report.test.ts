@@ -165,7 +165,7 @@ describe('the pure helpers', () => {
 
   it('counts a single failed night once, not twice', () => {
     // The day-close catch raises `narrateErrors` and, when the night had records, `semanticErrors`
-    // too. Summing them reported C11 batch 14's ONE bad night (day 3's chronicle) as `errors=2`.
+    // too, so summing them reports one bad night as `errors=2`.
     expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 1 })).toBe(1)
     expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 0 })).toBe(1)
     expect(semanticPassErrorCount({ narrateErrors: 0, semanticErrors: 0 })).toBe(0)

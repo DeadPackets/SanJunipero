@@ -305,7 +305,7 @@ export function survivalTax(rows: readonly G11Discretion[]): number {
   return rows.reduce((t, r) => t + r.survival, 0) / turns
 }
 
-// The executable form of §18's G11b list plus the brief's binding additions. A null detail
+// The executable form of §18's list plus the brief's binding additions. A null detail
 // means PASS. Every criterion reads evidence the run wrote down; none of them reads a mock.
 export function checkG11Report(report: G11Report): Record<string, string | null> {
   const e = report.evidence

@@ -26,7 +26,7 @@ export type HeatCtx = {
 }
 
 // Tiers: 1 engine firsts, 2 pattern firsts, 2.5 semantic firsts, 3 reserved. Stored as TEXT
-// so 2.5 is representable (POST-REVIEW USER RULING 3).
+// so 2.5 is representable.
 export type MilestoneTier = 1 | 2 | 2.5 | 3
 
 export type MilestoneRow = {

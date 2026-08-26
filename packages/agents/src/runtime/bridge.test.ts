@@ -177,7 +177,7 @@ describe('EngineBridge.drain (T23)', () => {
   })
 })
 
-// R21-B: the road to a meal. Thirst has had `nearestWater` since the last batch and hunger
+// The road to a meal. Thirst has had `nearestWater` and hunger
 // had nothing, and the live run drank fifteen times and ate once.
 describe('nearestFood: the nearest thing worth walking to for a meal', () => {
   function larder(): EngineBridge {

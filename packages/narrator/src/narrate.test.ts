@@ -61,7 +61,7 @@ describe('narrateDay', () => {
     expect(kinds.has('first_speech')).toBe(true)
     expect(kinds.has('first_trade')).toBe(true)
     expect(store.milestoneKinds().has('first_speech')).toBe(true)
-    // F3 ruling: a never-seen type scores full novelty — the idle scene's two
+    // A never-seen type scores full novelty — the idle scene's two
     // fresh types give it novelty 2, not 0.
     expect(heat[0]!.novelty).toBeCloseTo(2, 5)
   })

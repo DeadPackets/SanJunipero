@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { repairCandidates, repairToSchema } from './repair.js'
 
 // The chronicle schema the narrator asks for, verbatim — this is the decode that failed on
-// GATE G11b day 3 and cost the run criterion 11.
+// a live night and cost the run a criterion.
 const Chapter = z.object({
   title: z.string().min(1),
   text: z.string().min(1),

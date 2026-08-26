@@ -227,7 +227,7 @@ export class AgentRuntime {
     this.#pendingDreamMood = s.pendingDreamMood
   }
 
-  // Post-construction wiring: G9b and C8's supervisor build the arbiter after
+  // Post-construction wiring: the supervisor builds the arbiter after
   // the minds. Called through `wireArbiter`.
   useArbiter(arbiter: SeamArbiter): void {
     this.#adjudicator = arbiter.adjudicate

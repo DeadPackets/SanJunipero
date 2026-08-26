@@ -242,7 +242,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       const { system, messages } = assembleAdjudicationPrompt({
         canon: `${CANON}\n\nThe town currently knows: ${codex.known().join(', ')}`,
         // Without the frontier the model cannot tell an unearned rung one step
-        // out from a craft the town wholly lacks (C9 batch-10, user ruling 1).
+        // out from a craft the town wholly lacks.
         frontier: codex.frontier(),
         agent: agentCtx,
         precedent,

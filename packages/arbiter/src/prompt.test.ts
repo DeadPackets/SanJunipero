@@ -96,7 +96,7 @@ describe('the adjacency frontier in the adjudication context (C9 batch-10, user 
   })
 })
 
-// G9b run 5: five attempts came back and the adjacency gate destroyed all five,
+// Five attempts came back and the adjacency gate destroyed all five,
 // because nothing tied the `canon` field to the ids the context had just listed.
 describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
   it('binds the recipe canon to the two lists of ids the context carries', () => {
@@ -122,8 +122,8 @@ describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
   })
 })
 
-// One G9b run-5 verdict reasoned "therefore it is an attempt" and then emitted
-// kind "impossible" — schema-valid, so no retry could catch it (batch-10 concern 2).
+// One live verdict reasoned "therefore it is an attempt" and then emitted
+// kind "impossible" — schema-valid, so no retry could catch it.
 describe('the reasoning must agree with the verdict word (C9 batch-11)', () => {
   it('makes a ruling that reasons to an attempt and says impossible a format error', () => {
     const { system } = assembleAdjudicationPrompt(fixtureBlocks())
