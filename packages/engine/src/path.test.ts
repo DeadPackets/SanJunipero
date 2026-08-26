@@ -300,8 +300,31 @@ describe('the A* node budget', () => {
     }), tight)
     expect(s.agents.a1!.activity!.path).toEqual(partial)
     expect(composePerception(s, tight, 'a1', []).wayUnclear).toBe(true)
-    // The same walk under a budget that can finish it is an ordinary walk.
-    expect(composePerception(s, UNBOUNDED, 'a1', []).wayUnclear).toBeUndefined()
+    // The same walk under a budget that could finish it is an ordinary walk — the route the
+    // fold stored is the whole one, so the body has nothing to tell.
+    let open = genesisState(UNBOUNDED, serpentineMaze())
+    open = fold(open, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), UNBOUNDED)
+    const whole = searchPath(open, MAZE_FROM, MAZE_TO, UNBOUNDED)!
+    expect(whole.capped).toBe(false)
+    open = fold(open, ev(2, 'action_started', {
+      agentId: 'a1', verb: 'walk', params: { ...MAZE_TO }, duration: whole.path.length,
+    }), UNBOUNDED)
+    expect(composePerception(open, UNBOUNDED, 'a1', []).wayUnclear).toBeUndefined()
+  })
+
+  it('stays unclear once the legs are moving: the stored route is the answer', () => {
+    const tight = withMaxNodes(DEFAULT_CONFIG, 200)
+    let s = genesisState(tight, serpentineMaze())
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    const partial = searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path
+    s = fold(s, ev(2, 'action_started', {
+      agentId: 'a1', verb: 'walk', params: { ...MAZE_TO }, duration: partial.length,
+    }), tight)
+    // The legs walk the stored route to its end. It still stops short of where the mind aimed.
+    const last = partial[partial.length - 1]!
+    s = fold(s, ev(3, 'agent_moved', { id: 'a1', x: last[0], y: last[1] }), tight)
+    expect([s.agents.a1!.x, s.agents.a1!.y]).not.toEqual([MAZE_TO.x, MAZE_TO.y])
+    expect(composePerception(s, tight, 'a1', []).wayUnclear).toBe(true)
   })
 })
 

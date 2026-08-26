@@ -505,7 +505,7 @@ export function composePerception(
     ...(ground === undefined ? {} : { ground }),
     light: lightBandAt(state, self.x, self.y, state.tick, config),
     ...(fumbling ? { fumbling: true as const } : {}),
-    ...(walkIsCapped(state, config, agentId) ? { wayUnclear: true as const } : {}),
+    ...(walkIsCapped(state, agentId) ? { wayUnclear: true as const } : {}),
     visible: {
       agents: visibleAgents, structures: visibleStructures, items: visibleItems,
       crops: visibleCrops, fauna: visibleFauna, forageables: visibleForageables,
