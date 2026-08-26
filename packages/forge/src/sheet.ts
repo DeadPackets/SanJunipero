@@ -1,6 +1,5 @@
 import { decodePng, type RawImage } from './post/raw.js'
 import { chromaKey } from './post/chromaKey.js'
-import type { Rgb } from './palette.js'
 
 export const FACINGS = ['sw', 'se', 'ne', 'nw'] as const // sheet column order, left→right
 export type Facing = typeof FACINGS[number]
@@ -41,21 +40,6 @@ export function assembleGrid(cells: RawImage[][], cellW: number, cellH: number):
     }
   }
   return { width: sheetW, height: rows * cellH, data: out }
-}
-
-export function sliceGrid(img: RawImage, cols: number, rows: number): RawImage[][] {
-  if (img.width % cols !== 0 || img.height % rows !== 0)
-    throw new Error(`${img.width}x${img.height} does not divide into ${cols}x${rows} cells`)
-  const cellW = img.width / cols, cellH = img.height / rows
-  return Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) => {
-      const data = new Uint8ClampedArray(cellW * cellH * 4)
-      for (let y = 0; y < cellH; y++) {
-        const src = ((r * cellH + y) * img.width + c * cellW) * 4
-        data.set(img.data.subarray(src, src + cellW * 4), y * cellW * 4)
-      }
-      return { width: cellW, height: cellH, data }
-    }))
 }
 
 /**
@@ -980,21 +964,6 @@ export function sweepMagenta(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
-// DEPRECATED for sprite post-processing (pipeline v3): aggregates detectArtScale's
-// degenerate round-trip metric — see its note. Kept for grid-true inputs.
-// Modal detected art scale across a set of images; ties break to the smallest scale.
-export function sheetScale(imgs: RawImage[]): number {
-  const counts = new Map<number, number>()
-  for (const img of imgs) {
-    const k = detectArtScale(img)
-    counts.set(k, (counts.get(k) ?? 0) + 1)
-  }
-  let best = -1, bestN = 0
-  for (const [k, n] of [...counts].sort((a, b) => a[0] - b[0]))
-    if (n > bestN) { bestN = n; best = k }
-  return best
-}
-
 // Horizontal-only registration: the dx (|dx| <= maxShift) that minimizes opaque-mask
 // mismatch when img is shifted by dx onto ref. Ties prefer the smallest |dx|.
 export function registerToReference(ref: RawImage, img: RawImage, maxShift = 8): { dx: number } {
@@ -1075,20 +1044,6 @@ export function fillPinholes(img: RawImage, maxHole = 2): RawImage {
     }
   }
   return { width: img.width, height: img.height, data: out }
-}
-
-// DEPRECATED: unused by live pipelines since v5 (ε-cluster sampling replaced shared
-// palettes); kept for palette audits.
-// Frequency-ranked union of exact opaque colors across images, capped at k.
-export function unionPalette(imgs: RawImage[], k = 48): Rgb[] {
-  const counts = new Map<number, number>()
-  for (const img of imgs) for (let i = 0; i < img.data.length; i += 4) {
-    if (img.data[i + 3] === 0) continue
-    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, k)
-    .map(([c]) => [c >> 16, (c >> 8) & 255, c & 255] as Rgb)
 }
 
 export function mirrorX(img: RawImage): RawImage {
