@@ -1,7 +1,5 @@
-// GATE G9b — the live half of the living-world gate (addendum §17).
-// Five minds, one staged birth, a real arbiter, a real admin law channel, and
-// at least two sim-days (G9_TICKS). Everything the report claims is read back
-// out of the run's own tables and event log; nothing here asserts on a mock.
+// The live half of the living-world gate: five minds, one staged birth, a real arbiter and
+// admin channel, at least two sim-days (G9_TICKS). Every claim is read back out of the run.
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
