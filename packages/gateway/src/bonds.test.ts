@@ -8,7 +8,7 @@ import {
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './index.js'
-import { buildBonds } from './bonds.js'
+import { BOND_TYPES, buildBonds } from './bonds.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
 
@@ -17,10 +17,11 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
   let gw: Gateway
   let base: string
   let body: BondsResponse
+  let db: ReturnType<typeof openDb>
 
   beforeAll(async () => {
     const dbPath = join(dir, 'world.db')
-    const db = openDb(dbPath)
+    db = openDb(dbPath)
     const loop = new TickLoop({
       store: new EventStore(db),
       state: genesisState(DEFAULT_CONFIG, GRASS),
@@ -141,6 +142,21 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
    * it every 60 s to display one number. The feed has a ceiling now; the badge still may not
    * pay for it.
    */
+  /**
+   * ★ THE ROUTE READS FIVE TYPES, AND THAT IS THE SAME ANSWER AS THE WHOLE LOG. `buildBonds`
+   * folds exactly `BOND_TYPES`; every other row fell through its chain, so the SELECT may drop
+   * them — `fauna_moved` alone carries 640 B payloads and dominates a real log. This is the
+   * "same answer" half of that claim, against the mounted route rather than a fixture.
+   */
+  it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
+    const rows = db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq').all() as
+      Array<{ seq: number; tick: number; type: string; payload: string }>
+    const all = rows.map((r) =>
+      ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
+    expect(all.some((e) => !BOND_TYPES.includes(e.type)), 'the log carries types bonds ignore').toBe(true)
+    expect(buildBonds(all, DEFAULT_CONFIG.movement.earshotRadius, body.asOfTick)).toEqual(body)
+  })
+
   it('★ counts the bonds without sending them', async () => {
     const count = BondsCountSchema.parse(await (await fetch(`${base}/api/bonds/count`)).json())
     expect(count.count).toBe(body.bonds.length)
