@@ -966,9 +966,9 @@ export const CraftParams = z.object({ recipe: z.string() }).strict()
 export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
-  return Object.keys(state.items).sort()
-    .map((id) => state.items[id]!)
+  return Object.values(state.items)
     .filter((i) => i.kind === kind && i.loc.t === 'agent' && i.loc.id === agentId)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
 }
 
 function heldQty(state: WorldState, agentId: string, kind: string): number {
@@ -1454,8 +1454,9 @@ function consumeForInput(state: WorldState, agentId: string, input: string, qty:
 }
 
 const heldWater = (state: WorldState, agentId: string) =>
-  Object.keys(state.items).sort().map((id) => state.items[id]!)
-    .find((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
+  Object.values(state.items)
+    .filter((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))[0]
 
 // A fire somebody is feeding, within arm's reach of where the cooking happens — and a hearth
 // somebody has fed is one, so a pot can finally go over a fire that is out of the weather.
