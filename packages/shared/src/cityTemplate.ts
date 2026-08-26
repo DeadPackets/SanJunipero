@@ -311,7 +311,7 @@ export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
 /** A bed is 1x2, so three beds fill two rows of a 3x3 grid and a farmhouse's fourth has nowhere
  *  to go: the grid, not the floor, is what runs out. Widens with roomCapacity, never below 3. */
 export function citySlotsFor(kind: string): { w: number; h: number } {
-  const plan = DWELLING_FOOTPRINTS[kind as DwellingKind]
+  const plan = (DWELLING_FOOTPRINTS as Record<string, { w: number; h: number } | undefined>)[kind]
   const w =
     plan === undefined ? CITY_INTERIOR_SLOTS.w : Math.max(CITY_INTERIOR_SLOTS.w, roomCapacity(plan))
   return { w, h: CITY_INTERIOR_SLOTS.h }
