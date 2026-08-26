@@ -214,7 +214,7 @@ describe('10 · a world with nothing happening still breathes', () => {
     expect(src('../render/ambient.ts')).toMatch(/SHIMMER_MAX|TREES_MAX/)
     // the ambient population is a positive constant in every band, asserted as a finish line
     for (const n of ['SHIMMER_MAX', 'TREES_MAX', 'SMOKE_PUFFS']) {
-      const v = new RegExp(`export const ${n} = (\\d+)`).exec(src('../render/ambient.ts'))
+      const v = new RegExp(`\\bconst ${n} = (\\d+)`).exec(src('../render/ambient.ts'))
       expect(v, n).not.toBeNull()
       expect(Number(v![1]), n).toBeGreaterThan(0)
     }

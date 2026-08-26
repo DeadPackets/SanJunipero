@@ -9,7 +9,7 @@ import { BUILDING_PX_PER_TILE } from './textures.js'
 /** Who wins when two drawables stand on the SAME ground. A body in a doorway is in FRONT of
  *  the building it is standing in, never inside it; an item on the floor is under both. */
 export const OVERLAP_RANK = { ground: 0, structure: 1, body: 2 } as const
-export type OverlapRank = (typeof OVERLAP_RANK)[keyof typeof OVERLAP_RANK]
+type OverlapRank = (typeof OVERLAP_RANK)[keyof typeof OVERLAP_RANK]
 
 export type DepthBox = {
   id: string
@@ -38,7 +38,7 @@ export function screenOverlap(a: DepthBox, b: DepthBox): boolean {
 }
 
 /** The two are standing on some of the same ground — a body mid-way through a doorway. */
-export function groundOverlap(a: DepthBox, b: DepthBox): boolean {
+function groundOverlap(a: DepthBox, b: DepthBox): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
 }
 
@@ -140,8 +140,8 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
 const BODY_SCALE = CHAR_TARGET_PX / 64
 /** The drawn figure's own extent, derived from the sheet geometry rather than guessed. */
 export const BODY_SPRITE_W = CELL * BODY_SCALE
-export const BODY_ABOVE_FEET_PX = FEET_Y * BODY_SCALE
-export const BODY_BELOW_FEET_PX = (CELL - FEET_Y) * BODY_SCALE
+const BODY_ABOVE_FEET_PX = FEET_Y * BODY_SCALE
+const BODY_BELOW_FEET_PX = (CELL - FEET_Y) * BODY_SCALE
 
 /** A body stands on ONE tile, at its interpolated position — no rounding anywhere (F-3c). */
 export function bodyDepthBox(id: string, px: number, py: number): DepthBox {

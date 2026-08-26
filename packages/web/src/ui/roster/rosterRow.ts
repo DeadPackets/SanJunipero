@@ -11,7 +11,7 @@ import { STATE_WORD, conditionsOf, stateWord, type Condition } from '../status.j
 // complete, and visibly a person who has not lived yet. Nothing is authored, nothing is a placeholder.
 
 /** Three honest fallbacks: the painted face, the sprite bust cut from the atlas, the initial. */
-export type RosterPortrait = { url: string } | { bust: BustStyle } | { token: string }
+type RosterPortrait = { url: string } | { bust: BustStyle } | { token: string }
 
 export type RosterRow2 = {
   id: string
@@ -32,7 +32,7 @@ export type RosterRow2 = {
   substance: number
 }
 
-export const BUST_PX = 48
+const BUST_PX = 48
 
 /** The FALLBACK earshot, for the frames before the snapshot's config has arrived: a transcribed copy
  *  that is also the authority goes stale in silence. `configCopies.test.ts` holds it to
@@ -40,7 +40,7 @@ export const BUST_PX = 48
 export const EARSHOT_TILES = 8
 
 /** A bond this warm or warmer is a relationship the run actually made. */
-export const SUBSTANCE_BOND_LEVEL: BondLevel = 'acquaintances'
+const SUBSTANCE_BOND_LEVEL: BondLevel = 'acquaintances'
 
 const ageWordsOf = (ageDays: number): RosterRow2['ageWords'] => {
   const years = Math.floor(ageDays / 364)

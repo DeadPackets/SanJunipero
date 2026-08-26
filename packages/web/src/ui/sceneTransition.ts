@@ -4,7 +4,7 @@ import { MOTION, easeFn, type Motion } from './motion.js'
  *  as a smear at this pixel density, so the outgoing leaves before the incoming arrives. */
 export const SCENES = ['lens', 'interior', 'follow', 'daybreak', 'nightfall'] as const
 export type SceneName = (typeof SCENES)[number]
-export type ScenePhase = 'idle' | 'out' | 'in'
+type ScenePhase = 'idle' | 'out' | 'in'
 export type SceneState = {
   name: SceneName
   phase: ScenePhase

@@ -4,7 +4,7 @@ import type { Expression } from '../../render/mood.js'
 
 /** A 16-px face drawn at its own grid size read as a smudge in the corner: it needs the same 2× the
  *  control bar gives its 8-px glyphs. */
-export const MOOD_GLYPH_SCALE = 2
+const MOOD_GLYPH_SCALE = 2
 
 /** Decorative: the row's own label speaks the mood, so the glyph stays out of the
  *  accessibility tree instead of being read twice. */

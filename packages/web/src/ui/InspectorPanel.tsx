@@ -14,8 +14,8 @@ import {
   type ChangeEntry,
 } from './becoming.js'
 
-export const TAB_CACHE_MS = 30_000
-export const NEED_LOW = 30
+const TAB_CACHE_MS = 30_000
+const NEED_LOW = 30
 const EMPTY_COPY = 'Nothing written yet.'
 
 /** Two tabs a viewer picks between, plus the personality feed the panel always reads. */

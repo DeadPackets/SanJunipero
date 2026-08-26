@@ -4,14 +4,14 @@ import type { SimConfig, SimEvent } from '@sj/shared'
 import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 
 export const ADMIN_TOKEN_KEY = 'sj.adminToken'
-export const ADMIN_LAWS_ROUTE = '/admin/laws'
+const ADMIN_LAWS_ROUTE = '/admin/laws'
 
 export type LawChange = { tick: number; path: string; value: unknown }
 export type LawRow = { path: string; value: unknown; overridden: boolean; history: LawChange[] }
-export type LawKind = 'boolean' | 'number' | 'other'
+type LawKind = 'boolean' | 'number' | 'other'
 export type EditRow = LawRow & { kind: LawKind; editable: boolean }
 
-export const LAW_PATHS: readonly string[] = Object.keys(TOGGLABLE_PATHS).sort()
+const LAW_PATHS: readonly string[] = Object.keys(TOGGLABLE_PATHS).sort()
 
 // The event log is the truth. A law's history is read out of the deltas the
 // viewer received, never out of anything the panel did or hoped for.
@@ -58,7 +58,7 @@ export function formatLawValue(value: unknown): string {
 
 // The whitelist carries each law's schema, so the control a law needs is a
 // question for the schema, not a second table that can drift from it.
-export function lawKind(path: string): LawKind {
+function lawKind(path: string): LawKind {
   const schema = TOGGLABLE_PATHS[path]
   if (schema === undefined) return 'other'
   if (schema.safeParse(true).success) return 'boolean'

@@ -26,7 +26,7 @@ import type { Scene } from './scene.js'
 export const SPEECH_MS_BASE = 2500
 export const SPEECH_MS_PER_CHAR = 40
 export const SPEECH_MAX_CHARS = 140
-export const THOUGHT_DRIFT_PX = 2
+const THOUGHT_DRIFT_PX = 2
 
 /** How wide a bubble may grow in world pixels before it wraps. */
 export const BUBBLE_MAX_PX = 210
@@ -35,12 +35,11 @@ export const BUBBLE_LINE_H = Math.max(WORLD_TEXT_LINE_H, BUBBLE_FONT_PX + 4)
 /** DERIVED, not the hardcoded 24 it was: the wide face wraps sooner than the narrow one. */
 export const WRAP_CHARS = wrapCharsFor(faceFor('speech').family, BUBBLE_FONT_PX, BUBBLE_MAX_PX)
 
-export const BUBBLE_FILL = SPEECH_FILL
-export const BUBBLE_INK = SPEECH_INK
+const BUBBLE_INK = SPEECH_INK
 
 /** The same nine-slice art every floating slab in the chrome wears. */
-export const SPEECH_FRAME_URL = new URL('../ui/px/frame-cream.png', import.meta.url).href
-export const THOUGHT_FRAME_URL = new URL('../ui/px/frame-parchment.png', import.meta.url).href
+const SPEECH_FRAME_URL = new URL('../ui/px/frame-cream.png', import.meta.url).href
+const THOUGHT_FRAME_URL = new URL('../ui/px/frame-parchment.png', import.meta.url).href
 
 export function bubbleLife(text: string): number {
   return SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * Math.min(text.length, SPEECH_MAX_CHARS)

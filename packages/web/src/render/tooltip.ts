@@ -15,7 +15,7 @@ export const TAG_FONT_PX = faceFor('label').size
 export const TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, TAG_FONT_PX + 2)
 export const TAG_PAD_X = 5
 export const TAG_PAD_Y = 3
-export const TAG_MAX_CHARS = 48
+const TAG_MAX_CHARS = 48
 
 /** Gap between the thing and its label; keep-out from the viewport edge; and how far a label
  *  moves to get clear of something already occupying its place. */
@@ -98,7 +98,7 @@ export function anchorForSprite(
 // ── the one owner ────────────────────────────────────────────────────────────────────────
 
 /** Three things may want a label. Only one of each, and never a stale one. */
-export type TagOwner = 'hover' | 'door' | 'selection'
+type TagOwner = 'hover' | 'door' | 'selection'
 
 export type TooltipLayer = {
   show(owner: TagOwner, text: string, a: Anchor): void

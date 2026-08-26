@@ -221,9 +221,6 @@ importers:
       react-force-graph-2d:
         specifier: ^1.25.0
         version: 1.29.1(react@19.2.8)
-      zod:
-        specifier: ^4.4.0
-        version: 4.4.3
     devDependencies:
       '@types/react':
         specifier: ^19.0.0

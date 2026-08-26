@@ -26,7 +26,7 @@ export const ZOOM_COMMIT_OCTAVES = 1 / 8
 /** Snapping the live scale to 1/512 keeps a ground chunk a whole number of screen pixels at every scale a gesture passes through; a gesture lasts too long to lean on the chunk bleed instead. */
 export const ZOOM_LIVE_QUANTUM = 1 / 512
 
-export const ZOOM_SCALE_MIN: number = ZOOM_STOPS[0]
+const ZOOM_SCALE_MIN: number = ZOOM_STOPS[0]
 export const ZOOM_SCALE_MAX: number = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
 export type ZoomState = {
@@ -188,7 +188,7 @@ export function structureBoundsOf(
 }
 
 /** A building sprite is drawn to a `(w + h) · 32 px` square anchored at its base diamond, so it overhangs its own ground upward and to each side; a fit that ignores that cuts the roofs off. */
-export const BUILDING_OVERHANG_PX_PER_TILE = 32 // textures.BUILDING_PX_PER_TILE
+const BUILDING_OVERHANG_PX_PER_TILE = 32 // textures.BUILDING_PX_PER_TILE
 
 export function drawnBoundsOf(
   list: readonly { x: number; y: number; w: number; h: number }[],

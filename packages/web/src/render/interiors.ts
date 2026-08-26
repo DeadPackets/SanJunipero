@@ -22,13 +22,11 @@ import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's — one source, so a kind added there cannot go missing here.
-// Re-exported because the gate reads it off this module.
-export { INTERIOR_KINDS } from '@sj/shared'
 export type { InteriorKind }
 
 // `bench` joined for the cabin. A refuge is a fire and somewhere to sit by it, and the bench is
 // the piece the library already ships for that (1x2 floor, honey-wood planks on two trestles).
-export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools' | 'bench'
+type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools' | 'bench'
 export type Furnishing = { kind: FurnishingKind; slot: { x: number; y: number } }
 
 // The declared minimum room: the floor the renderer can always draw, and the contract the gate
@@ -236,7 +234,7 @@ export function occupancyOf(kind: string): OccupancyMode {
  *  is wide — the ground plane's own ratio. `lift` exists because an iso object's lowest drawn
  *  pixel is the NEAR VERTEX of its ground, not the centre; a body's feet already are that. */
 export const CONTACT_SHADOW_ALPHA = 0.22
-export const CONTACT_SHADOW_SHARE = 0.42
+const CONTACT_SHADOW_SHARE = 0.42
 export function contactShadow(widthPx: number): {
   rx: number
   ry: number
@@ -251,7 +249,7 @@ export function contactShadow(widthPx: number): {
 /** A cell of the room grid. Since Option C that grid IS the 128x64 interior tile lattice
  *  (`interiorMap.ROOM_TILES`), NOT the template's 3x3 slots — `slotToTile` is the boundary. */
 export type Tile = { x: number; y: number }
-export type TileSize = { w: number; h: number }
+type TileSize = { w: number; h: number }
 
 /** The tile the library authors against — `assetResolution.INTERIOR_TILE.w`. Its art covers
  *  exactly the span its footprint takes on that tile and the scene zoom is 1, so the factor is
@@ -276,7 +274,7 @@ export function interiorBodyScale(townCellScale: number): number {
 
 /** Furnishings that LIE on the floor rather than stand on it: anchored at the CENTRE of their
  *  own ground and casting no contact shadow, or a rug floats up the back wall. */
-export const FLAT_FURNISHINGS: ReadonlySet<string> = new Set(['rug'])
+const FLAT_FURNISHINGS: ReadonlySet<string> = new Set(['rug'])
 export const isFlat = (kind: string): boolean => FLAT_FURNISHINGS.has(kind)
 
 /** One drawable in the room. An 'in' furnishing contributes two, split at its mid-line. */
@@ -300,14 +298,14 @@ export const furnishingId = (kind: string, tile: Tile): string => `${kind}:${til
 
 /** Broad phase only: how far a room sprite may rise above the ground it stands on, in interior
  *  tiles. Generous on purpose — it decides whether two pieces CAN overlap, never who wins. */
-export const ROOM_SPRITE_RISE_TILES = 3
+const ROOM_SPRITE_RISE_TILES = 3
 
 export type PlacedItem = { kind: string; tile: Tile; meta: InteriorMeta | null }
 export type PlacedBody = { id: string; tile: Tile; inside: string | null }
 
 /** Where a body actually stands, given what it is doing. You lie IN a bed and keep its cell;
  *  you stand AT a table, so the body takes the slot BEHIND it and depth falls out of geometry. */
-export function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): Tile {
+function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): Tile {
   if (mode !== 'at' || at === null) return own
   return { x: at.x, y: Math.max(0, at.y - 1) }
 }
@@ -357,7 +355,7 @@ export function interiorPieces(
 }
 
 /** A piece's box in TILE space, plus a generous screen box for the broad phase. */
-export function roomDepthBox(p: RoomPiece): DepthBox {
+function roomDepthBox(p: RoomPiece): DepthBox {
   const x0 = p.tile.x,
     y0 = p.tile.y,
     x1 = p.tile.x + p.size.w,

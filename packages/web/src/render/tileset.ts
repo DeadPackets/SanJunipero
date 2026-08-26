@@ -11,7 +11,7 @@ import type { TileId } from '@sj/engine/state'
 
 export { roadAutotileKind } from '@sj/shared'
 
-export const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
+const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
 export const ROAD_TILE_ID = 7
 
 // Every TileId the engine can emit needs an entry, or it falls back to grass. 8/9/10
@@ -35,7 +35,7 @@ export function tileKind(id: number): TerrainTileKind {
   return KIND_BY_ID[id] ?? TERRAIN_KIND_FALLBACK
 }
 
-export const TILE_VARIANT_SALT = 0x9e3779b9
+const TILE_VARIANT_SALT = 0x9e3779b9
 export const TERRAIN_VARIANTS = 4
 
 export function tileVariant(x: number, y: number): number {

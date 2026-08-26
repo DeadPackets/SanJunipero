@@ -14,8 +14,8 @@ export const KEY_PAD_Y = 1.6 // 0.1rem
 export const KEY_MARGIN = 12.8 // 0.8rem — the inset from the lens edge
 export const KEY_BORDER = 10 // the 9-slice frame, on all four sides
 export const KEY_SUMMARY_W = 168 // the shut control: one chip that says what it opens
-export const KEY_AXIS_NAME_W = 110 // "HOW CLOSE" / "FAMILY" / "WHICH WAY"
-export const KEY_AXES = 3
+const KEY_AXIS_NAME_W = 110 // "HOW CLOSE" / "FAMILY" / "WHICH WAY"
+const KEY_AXES = 3
 
 export function keyBox(stage: Stage, opts: { open: boolean; chips: number; chipW: number }): Box {
   const frame = 2 * KEY_BORDER

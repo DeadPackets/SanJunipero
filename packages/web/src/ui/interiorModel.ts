@@ -37,8 +37,8 @@ export type Provenance = {
 
 /** `kind` is the engine's slug and is what resolves the icon; `words` is what a viewer reads. The
  *  grid printed the slug once, so `wheat_sheaf` reached a viewer as `wheat_s…`. */
-export type RoomHolding = { kind: string; words: string; qty: number; iconUrl: string | null }
-export type RoomPresence = { id: string; name: string; state: string }
+type RoomHolding = { kind: string; words: string; qty: number; iconUrl: string | null }
+type RoomPresence = { id: string; name: string; state: string }
 
 export type RoomCard = {
   /** "Amara’s house" | "the storehouse" — owner-aware, P12-clean */
@@ -58,12 +58,12 @@ export type RoomCard = {
   empty: string
 }
 
-export const ROOM_EMPTY_LINE = 'No one is in just now.'
+const ROOM_EMPTY_LINE = 'No one is in just now.'
 
 const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
 
 /** "Raised by Yusuf, Day 3", or the day it was begun while it is still going up. */
-export function builtLine(state: WorldState, p: Provenance | null): string | null {
+function builtLine(state: WorldState, p: Provenance | null): string | null {
   if (p === null) return null
   const who = nameOf(state, p.builderId)
   if (p.completedTick === null)

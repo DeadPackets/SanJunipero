@@ -22,7 +22,7 @@ export const BOND_KIND_LABEL: Record<BondKind, string> = {
 }
 
 // The middle of the tooltip sentence: "Alice — kept house with — Bob".
-export const BOND_KIND_PHRASE: Record<BondKind, string> = {
+const BOND_KIND_PHRASE: Record<BondKind, string> = {
   partner: 'kept house with',
   kin: 'kin of',
   friend: 'friend of',
@@ -34,7 +34,7 @@ export const BOND_KIND_PHRASE: Record<BondKind, string> = {
 export const NODE_ALIVE = '#93B573'
 export const NODE_DEAD = '#857D75'
 
-export type Person = { name: string; alive: boolean }
+type Person = { name: string; alive: boolean }
 export type PeopleIndex = Readonly<Record<string, Person>>
 
 export type BondNode = { id: string; name: string; size: number; color: string; alive: boolean }

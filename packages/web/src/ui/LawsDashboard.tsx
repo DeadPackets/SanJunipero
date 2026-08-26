@@ -10,7 +10,7 @@ export type LawsDashboardProps = {
   fetchFn?: typeof fetch
 }
 
-export const DEFAULT_ADMIN_ENDPOINT = 'http://127.0.0.1:8788'
+const DEFAULT_ADMIN_ENDPOINT = 'http://127.0.0.1:8788'
 
 function nextValue(row: EditRow, raw: string): unknown {
   return row.kind === 'boolean' ? raw === 'on' : Number(raw)

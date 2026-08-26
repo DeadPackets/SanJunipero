@@ -1,16 +1,16 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { Scene } from './scene.js'
 
-export const PARTICLES = {
+const PARTICLES = {
   rain: { n: 220, vy: 380, vx: -60, len: 6, color: 0x7fb0c9, alpha: 0.7 },
   snow: { n: 140, vy: 40, vx: -12, len: 2, color: 0xfff6e9, alpha: 0.9 },
   storm: { n: 320, vy: 480, vx: -110, len: 8, color: 0x5a8cab, alpha: 0.8 },
 } as const
 
-export const FLASH_MS = 90
-export const FLASH_COLOR = 0xf4e289
-export const FLASH_MIN_GAP_S = 6
-export const FLASH_MAX_GAP_S = 14
+const FLASH_MS = 90
+const FLASH_COLOR = 0xf4e289
+const FLASH_MIN_GAP_S = 6
+const FLASH_MAX_GAP_S = 14
 
 export type WeatherLayer = {
   setKind(kind: string): void

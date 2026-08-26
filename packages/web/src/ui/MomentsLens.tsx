@@ -18,7 +18,7 @@ import {
 } from './momentsPlayer.js'
 import { EMPTY_COPY } from './townStats.js'
 
-export const MOTIF_PX = 8
+const MOTIF_PX = 8
 
 const clock = (tick: number): string => {
   const m = tickToMoment(tick)

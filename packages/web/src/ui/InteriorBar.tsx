@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { roomCard, type Provenance, type RoomCard } from './interiorModel.js'
 
-export { roomWord as interiorRoomWord } from './interiorModel.js'
-
 export function RoomCardView({
   card,
   onBack,
@@ -75,7 +73,7 @@ export function RoomCardView({
 
 /** The provenance endpoint, as a hook. A room the gateway has forgotten is `null`, which the
  *  card renders by omitting the line rather than by printing a blank. */
-export function useProvenance(structureId: string | null): Provenance | null {
+function useProvenance(structureId: string | null): Provenance | null {
   // held WITH the room it describes, so a new room reads as "nothing yet" in the same render
   const [got, setGot] = useState<{ id: string; prov: Provenance | null } | null>(null)
   useEffect(() => {

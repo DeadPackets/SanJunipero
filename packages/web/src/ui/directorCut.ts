@@ -1,7 +1,7 @@
 export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
 
 export const CUT_MIN_MS = 8000 // never cut faster — letterboxed TV pacing
-export const RECENT_TICKS = 120
+const RECENT_TICKS = 120
 export const STICKY_FACTOR = 1.25
 
 // hottest window overlapping [nowTick−120, nowTick]; sticky toward the current agent

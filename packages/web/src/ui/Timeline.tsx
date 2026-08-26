@@ -14,12 +14,12 @@ import {
   type MarkSources,
 } from './timelineMarks.js'
 
-export const KEY_STEP_TICKS = 10
-export const KEY_PAGE_TICKS = MINUTES_PER_DAY
+const KEY_STEP_TICKS = 10
+const KEY_PAGE_TICKS = MINUTES_PER_DAY
 
 /** The marks come from the record, in one request. Refreshed slowly, because a mark is a
  *  thing that already happened and re-folding it per frame would buy nothing. */
-export const MARKS_REFETCH_MS = 30_000
+const MARKS_REFETCH_MS = 30_000
 
 const EMPTY_SOURCES: MarkSources = {
   chapters: [],

@@ -6,7 +6,7 @@ import { LENSES, LENS_LABELS, type Lens } from './route.js'
 // a control that does nothing, and a refusal is SHOWN rather than merely implied.
 
 export const CONTROL_GROUPS = ['time', 'camera', 'lens', 'view'] as const
-export type ControlGroup = (typeof CONTROL_GROUPS)[number]
+type ControlGroup = (typeof CONTROL_GROUPS)[number]
 
 export type ControlItem = {
   id: string
@@ -34,7 +34,7 @@ export type ControlCtx = {
   townFits: boolean
 }
 
-export const LENS_GLYPH: Readonly<Record<Lens, string>> = {
+const LENS_GLYPH: Readonly<Record<Lens, string>> = {
   map: 'tile',
   inspector: 'folk',
   chronicle: 'scroll',

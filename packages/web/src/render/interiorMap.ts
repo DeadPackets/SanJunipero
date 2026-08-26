@@ -24,7 +24,7 @@ export const ROOM_TILES = {
 
 /** Forced, not chosen: a 2 × 2 house's room is 12 × 6, so one plan tile is 6 interior tiles
  *  across and 3 deep — and a house, a storehouse and a cabin all still come out at 12 × 6. */
-export const ROOM_TILES_PER_PLAN_TILE = { w: 6, h: 3 } as const
+const ROOM_TILES_PER_PLAN_TILE = { w: 6, h: 3 } as const
 
 export function roomTilesFor(plan: { w: number; h: number }): Size {
   return {
@@ -35,7 +35,7 @@ export function roomTilesFor(plan: { w: number; h: number }): Size {
 
 /** How many interior tiles one template slot owns in a room this size. The template grid is
  *  3 × 3 for every kind, so this is a division and never a second table. */
-export function tilesPerSlot(room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Size {
+function tilesPerSlot(room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Size {
   return {
     w: Math.max(1, Math.floor(room.w / Math.max(1, slots.w))),
     h: Math.max(1, Math.floor(room.h / Math.max(1, slots.h))),
@@ -43,7 +43,7 @@ export function tilesPerSlot(room: Size = ROOM_TILES, slots: Size = CITY_INTERIO
 }
 /** Where inside its 4×2 block a furnishing's origin tile sits: one tile of clearance on the
  *  -x side, so nothing is jammed into the block seam. */
-export const SLOT_ORIGIN_OFFSET = { x: 1, y: 0 } as const
+const SLOT_ORIGIN_OFFSET = { x: 1, y: 0 } as const
 
 /** The wall's height above the floor plane, in interior pixels — the height the wall art is
  *  authored at (`wall-*.png` is 256 × 160). */
@@ -110,7 +110,7 @@ export function seatInBlock(
   return { x: base.x, y: base.y + (nearer ? tilesPerSlot(room, slots).h - 1 : 0) }
 }
 
-export const inRoom = (t: Tile, room: Size = ROOM_TILES): boolean =>
+const inRoom = (t: Tile, room: Size = ROOM_TILES): boolean =>
   t.x >= 0 && t.y >= 0 && t.x < room.w && t.y < room.h
 
 // ── THE TWO WALLS, AND THE TWO FACINGS THEY PRESENT ──────────────────────────────────────
@@ -145,7 +145,7 @@ export const WALL_PIECES_THAT_STAND: ReadonlySet<string> = new Set(['hearth', 'd
 
 /** How far above the ground's near vertex each piece's own surface sits, measured off the
  *  shipped art: a body anchored at its feet would otherwise lie under a mattress, not on it. */
-export const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = {
+const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = {
   bed: 44,
   chair: 34,
   bench: 30,

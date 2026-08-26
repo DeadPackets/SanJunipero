@@ -12,9 +12,9 @@ export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] =
   { minute: 1440, tint: [0.45, 0.52, 0.95] },
 ]
 
-export const STORM_DIAG: [number, number, number] = [0.72, 0.82, 0.76] // grey-green (TINTS.storm)
+const STORM_DIAG: [number, number, number] = [0.72, 0.82, 0.76] // grey-green (TINTS.storm)
 // TINTS.winter blue 1.10 exceeds ColorMatrix-safe 1.0 headroom on lit pixels — clamped; r/g keep the ratio
-export const WINTER_DIAG: [number, number, number] = [0.86, 0.93, 1.0]
+const WINTER_DIAG: [number, number, number] = [0.86, 0.93, 1.0]
 
 export function clockTint(minuteOfDay: number): number {
   const m = Math.min(Math.max(minuteOfDay, 0), 1440)

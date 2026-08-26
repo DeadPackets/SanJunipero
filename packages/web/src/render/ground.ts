@@ -59,16 +59,6 @@ export const TILE_COLORS: Record<TileId, number> = {
   10: 0x8fbfd6 /* channel */,
 }
 
-// shade tiles draw one ramp step darker for subtle checker texture
-export const SHADE_MULT = 0.85
-
-export function shadeColor(color: number): number {
-  const r = Math.round(((color >> 16) & 0xff) * SHADE_MULT)
-  const g = Math.round(((color >> 8) & 0xff) * SHADE_MULT)
-  const b = Math.round((color & 0xff) * SHADE_MULT)
-  return (r << 16) | (g << 8) | b
-}
-
 export type GroundCell = { sx: number; sy: number; color: number; shade: boolean }
 
 export function groundPlan(terrain: TileId[][]): GroundCell[] {
@@ -95,7 +85,7 @@ export function tileColor(id: number): number {
 
 // One plan entry per tile: a codex texture url when terrain art exists, otherwise the C6
 // flat palette-true diamond. Art independence — an empty record set renders exactly as C6 did.
-export type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
+type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
 
 export type TilePlan = TileLayer & {
   sx: number

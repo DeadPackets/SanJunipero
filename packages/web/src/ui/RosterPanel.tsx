@@ -15,8 +15,7 @@ import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
 import { changeLog, type PersonalityRow } from './becoming.js'
 import { EMPTY_COPY } from './townStats.js'
 
-export const BUST_PX = 48
-export const BONDS_REFETCH_MS = 30_000
+const BONDS_REFETCH_MS = 30_000
 const NO_CHANGES: PersonalityRow[] = []
 
 /** The panel with the store taken out of it, so a test can render the markup without a fake

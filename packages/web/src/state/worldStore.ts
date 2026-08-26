@@ -9,15 +9,15 @@ import { fold } from '@sj/engine/fold'
 import type { WorldState } from '@sj/engine/state'
 import { isNarratable } from '../ui/chronicleFormat.js'
 
-export const THOUGHT_LOG_CAP = 200
+const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
 export const RECENT_EVENTS_CAP = 400
 
-export type ViewMode = { live: true } | { live: false; tick: number }
-export type Thought = { agentId: string; tick: number; text: string }
+type ViewMode = { live: true } | { live: false; tick: number }
+type Thought = { agentId: string; tick: number; text: string }
 // Law flips are kept whole, outside the capped delta ring: a town's legal history
 // is short and must not scroll away behind four hundred footsteps.
-export type LawChange = { tick: number; path: string; value: unknown }
+type LawChange = { tick: number; path: string; value: unknown }
 
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
