@@ -235,18 +235,9 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
 export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): LlmPrompt {
   const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
   return {
-    // ★ 156 WORDS DOWN TO 62, AND THE THREE LINES THAT WENT WERE THE SCHEMA SPELLED TWICE.
-    // `ProposeEditSchema` is a discriminated union over `verdict` and `PersonalityEditSchema`
-    // already names `op`, `field`, `text`, `index` and their enums; the provider is sent that
-    // schema on every call. Restating it in prose bought nothing and cost the longest prompt of
-    // the six. What the schema genuinely cannot say — that `evidence` means today's memory
-    // numbers, and that temperament is not on the table — stays.
-    //
-    // ★ AND THE QUESTION ITSELF CHANGED SHAPE. "If today held an event that changed how you see
-    // the world" is a yes/no gate that can only be answered by re-reading every memory, which
-    // is the best explanation there is for 93% reasoning on a two-token answer. Pointing it at
-    // the day's own telling first, and saying plainly that most days change nothing, gives the
-    // answer somewhere to stop.
+    // The provider is sent `ProposeEditSchema` on every call, so it is not spelled out again
+    // here; only what the schema cannot say stays — that `evidence` is today's memory numbers,
+    // and that temperament is not on the table.
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',

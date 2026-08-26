@@ -25,15 +25,11 @@ import type { SimConfig, SimEvent } from '@sj/shared'
 import type { PerceptionPacket } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
-// A mind is handed only the events of this window when it next looks, so a
-// window shorter than the gap between its turns makes the town half-deaf:
-// speech and every witnessed taking expire before anybody perceives them
-// (D-28-6, measured at ~59 ticks per mind). The boredom floor is the longest
-// an awake mind can go without a turn; 10% covers the tick it actually lands on.
+// A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
+// floor is the longest an awake mind can go without a turn; 10% covers the tick it lands on.
 export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredomTicks * 1.1)
-// The agents-local intent shape. The turn schema keeps `verb` a free string so a
-// novel intent can round-trip to the engine; the FROZEN submitIntent call just
-// forwards it and the verb registry answers in-world.
+// The turn schema keeps `verb` a free string so a novel intent can round-trip to the engine;
+// the verb registry is what answers it in-world.
 export type Intent = { verb: string; params: Record<string, unknown> }
 export type SubmitResult = { ok: true } | { ok: false; reason: string }
 
@@ -44,15 +40,8 @@ type QueuedSubmit = {
   resolve: (result: SubmitResult) => void
 }
 
-// reconcile maps the engine's PerceptionPacket onto the agents-local mirror in
-// prose.ts. The engine ships `self` without asleep/collapsed booleans and
-// visible.items with flat x/y; prose.ts expects self.asleep/self.collapsed and
-// tile-located items. Perception remains a pure projection either way.
-// The engine names an owner for everything it can; a mind needs telling only
-// when the thing is not its own. Names, not ids — the packet carries no ids to
-// compare, and two people in one town do not share a name.
-// `spoiling` rides along: the engine composes it and the mapping used to drop it, the same
-// way it dropped fauna and forageables, so nobody was ever told their fish was going over.
+// A mind is told about an owner only when the thing is not its own. Names, not ids — the
+// packet carries no ids to compare, and two people in one town do not share a name.
 function claims(
   i: { ownerName?: string; crafterMarkName?: string; spoiling?: true },
   selfName: string,
@@ -64,10 +53,8 @@ function claims(
   }
 }
 
-// How the cold stands against a body, read straight off the engine's own law. `isExposed`
-// decides in one order — a roof, then what is on your back, then a fire — and this reads that
-// same order forward, so the sentence a mind gets and the number its body loses cannot
-// disagree. Absent whenever the air is warm enough that nothing is standing between anything.
+// Reads `isExposed`'s own order forward — a roof, then what is on your back, then a fire — so
+// the sentence a mind gets and the number its body loses cannot disagree.
 function coldOf(
   state: WorldState, config: SimConfig, agentId: string,
 ): { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' } | undefined {

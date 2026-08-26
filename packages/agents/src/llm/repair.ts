@@ -1,16 +1,8 @@
 import type { z } from 'zod'
 
-// The provider's own bytes, re-framed — never re-imagined. Three faults have each cost this
-// project a run or a night: prose written before the JSON, the answer wrapped in a fence, and
-// a chronicle whose `title` and `text` were both complete while the object around them was
-// the wrong shape. Every one of them is FRAMING: the content was there and only the shape was
-// wrong (C11 batch 16 fix 2).
-//
-// The law of this module: it may remove framing, re-parse the provider's own characters, and
-// drop what the caller's schema does not model. It may never add a field, a value, or a
-// meaning. Every candidate is checked back against the CALLER'S OWN SCHEMA before it is
-// allowed to be an answer, so a repair can widen what is accepted and can never invent what
-// it says. A payload that cannot be read without guessing stays a failure.
+// May remove framing, re-parse the provider's own characters, and drop what the schema does not
+// model. It may never add a field, a value or a meaning, and every candidate is checked back
+// against the caller's own schema, so a payload that needs guessing stays a failure.
 
 export type RepairCandidate = { value: unknown; how: string }
 

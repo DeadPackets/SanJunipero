@@ -43,9 +43,8 @@ function jsonOrRaw(text: string): unknown {
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
-// A refusal must leave a door open (addendum §9). The hint is rendered here, at
-// prose time, and is never written back into the arbiter's stored ruling. Only
-// a skill deficit earns it: a thing nobody can do teaches no one a false path.
+// Rendered at prose time and never written back into a stored ruling. Only a skill deficit
+// earns it: a thing nobody can do teaches no one a false path.
 export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
@@ -53,27 +52,19 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${reason}${hint}`
 }
 
-// ★ THE LOOP-BREAKER. A refusal a mind cannot learn from is a refusal it repeats: the live
-// proof has Amara re-adjudicating one idea three times in 34 ticks, at a full arbiter call
-// each. The refusal text was widened where it is written (`FALLBACK_IMPOSSIBLE`), and this is
-// the other half — the second ask inside the window is answered from the mind's own history
-// instead of from the god.
-//
-// It names the repetition and nothing else. That is the only content the glass allows here: the
-// mind's own past is not a hint, where "try it with a rack" would be.
+// The second ask inside the window is answered from the mind's own history, not from the god.
+// It names the repetition and nothing else: a mind's own past is not a hint.
 export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
 
-// Sim minutes. Long enough to cover the eight-to-twelve turns a looping mind burned in the live
-// proof, short enough that a town which has changed around the mind gets asked again.
+// Sim minutes: long enough to cover a loop, short enough that a changed town gets asked again.
 export const REFUSAL_MEMORY_TICKS = 240
 
 // How many refused intents a mind carries. Bounded because it is per-mind state held for the
 // life of the process, not because 16 is special.
 const REFUSAL_MEMORY_SIZE = 16
 
-// Only enough to make "the same idea, said again" match. The arbiter's own `normalizeIntent`
-// would be the one true copy, but `@sj/arbiter` depends on `@sj/agents`, so importing it back
-// is a package cycle.
+// Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
+// true copy, but importing @sj/arbiter back here is a package cycle.
 function sameIntent(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '')
 }

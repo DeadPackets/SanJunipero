@@ -9,11 +9,8 @@ export const ReconsiderAtSchema = z.union([
 ])
 export type ReconsiderAt = z.infer<typeof ReconsiderAtSchema>
 
-// Every key any registered verb reads, named. An open `z.record` says the same thing with
-// `propertyNames`, which a grammar-constrained decoder refuses outright — `Grammar error:
-// Unimplemented keys: ["propertyNames"]` — and that key will break such a provider whichever
-// one is pinned. The object stays LOOSE so a verb minted at runtime can still be handed a
-// parameter nobody has written down yet; the verb's own schema is what refuses a wrong one.
+// Named rather than an open `z.record`, whose `propertyNames` a grammar-constrained decoder
+// refuses. Loose, so a verb minted at runtime can still be handed a parameter nobody listed.
 export const IntentParamsSchema = z.looseObject({
   x: z.number().optional(),
   y: z.number().optional(),
@@ -33,13 +30,9 @@ export const IntentSchema = z.object({
   verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
   params: IntentParamsSchema.default({}).describe('Exactly what the act asks for, named by its keys.'),
 }).strict()
-// Every optional field takes null as well as absence. A model writing `null` for a field it
-// has nothing to put in is saying "none", and a strict optional turns that into a whole-turn
-// parse failure: one live turn carried a valid action AND speech and was thrown away for
-// `"reconsider_at": null`, at the price of a repair call. Null is not normalised away by a
-// `.transform()` on purpose — `z.toJSONSchema(..., { io: 'output' })` refuses to represent one,
-// and that is the direction an output schema is converted in. Every reader below treats null
-// and absent alike instead.
+// Every optional field takes null as well as absence: a strict optional turns a model's "none"
+// into a whole-turn parse failure. Not normalised away by `.transform()`, which
+// `z.toJSONSchema(..., { io: 'output' })` refuses to represent — readers treat both alike.
 export const TurnSchema = z.object({
   thought: z.string().min(1)
     .describe('What passes through your mind this moment. Yours alone; no one else ever hears it.'),
