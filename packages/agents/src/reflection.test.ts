@@ -86,7 +86,7 @@ async function seedDay(
 
 class ScriptedReflectionLlm implements ReflectionLlm {
   calls: string[] = []
-  constructor(private readonly edit: unknown | null) {}
+  constructor(private readonly edit: unknown) {}
 
   async extractFacts(dayMemories: MemoryRow[]) {
     this.calls.push('extractFacts')
@@ -122,7 +122,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     ]
   }
 
-  async summarizeDay(_scenes: { title: string; text: string }[]) {
+  async summarizeDay() {
     this.calls.push('summarizeDay')
     return { title: 'Trade and promises', text: 'The day was full of deals.' }
   }
@@ -137,7 +137,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     return `Today, still ${doc.current.mood}, I kept my word.`
   }
 
-  async proposeEdit(_daySummary: string, _doc: PersonalityDoc, _dayMemories: MemoryRow[]) {
+  async proposeEdit() {
     this.calls.push('proposeEdit')
     return this.edit
   }

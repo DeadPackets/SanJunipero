@@ -38,7 +38,7 @@ const uncommented = (src: string): string => {
     if (q === '"' || q === "'" || q === '`') {
       out += q
       for (i++; i < src.length && src[i] !== q; i++) {
-        out += src[i]
+        out += src[i]!
         if (src[i] === '\\') {
           out += src[i + 1] ?? ''
           i++
@@ -83,7 +83,7 @@ const entries = (arrayLiteral: string): string[] => {
         i++
         continue
       }
-      s += arrayLiteral[i]
+      s += arrayLiteral[i]!
     }
     out.push(s)
   }

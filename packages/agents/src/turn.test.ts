@@ -96,7 +96,7 @@ describe('TurnSchema', () => {
     const shape = TurnSchema.shape
     for (const key of Object.keys(shape) as (keyof typeof shape)[]) {
       const desc = (shape[key] as z.ZodType).description
-      expect(desc, String(key)).toBeTruthy()
+      expect(desc, key).toBeTruthy()
       expect(desc).not.toMatch(FORBIDDEN_FRAMING)
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)

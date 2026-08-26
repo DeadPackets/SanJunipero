@@ -41,10 +41,10 @@ const ok = (raw: unknown): PreflightAnswer => ({ ok: true, turn: TurnSchema.pars
 function fakeLlm(answers: readonly unknown[]): PreflightLlm {
   let i = 0
   return {
-    async object<T>(): Promise<{ value: T }> {
+    async object(): Promise<{ value: unknown }> {
       const a = answers[i++]
       if (a instanceof Error) throw a
-      return { value: a as T }
+      return { value: a }
     },
   }
 }
@@ -73,7 +73,7 @@ describe('the provider pre-flight asks the real question', () => {
     const json = JSON.stringify(z.toJSONSchema(TurnSchema, { io: 'input', unrepresentable: 'any' }))
     expect(json).toContain('"action"')
     expect(json).toContain('"speech"')
-    expect(JSON.parse(json).required).toEqual(['thought', 'importance'])
+    expect((JSON.parse(json) as { required: string[] }).required).toEqual(['thought', 'importance'])
   })
 })
 

@@ -238,15 +238,15 @@ function footprintPhrase(w: number, h: number): string {
 // Answers about the world the packet cannot carry: whether ground is open to
 // stand on, and whether a carried kind is food. Both come from the bridge.
 export type ProseWorld = {
-  isWalkable?(x: number, y: number): boolean
-  isEdible?(kind: string): boolean
+  isWalkable?: (x: number, y: number) => boolean
+  isEdible?: (kind: string) => boolean
   // Where the water is. Nothing in the packet can say: terrain is the one thing perception
   // never projects, and block 1 now teaches two verbs that need it.
-  waterAtHand?(): boolean
-  nearestWater?(x: number, y: number): { x: number; y: number } | null
+  waterAtHand?: () => boolean
+  nearestWater?: (x: number, y: number) => { x: number; y: number } | null
   // Where the food is. The same answer thirst has had since the last batch, for the need that
   // never got one: the run that drank fifteen times ate once (R21).
-  nearestFood?(x: number, y: number): { x: number; y: number; kind: string } | null
+  nearestFood?: (x: number, y: number) => { x: number; y: number; kind: string } | null
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);

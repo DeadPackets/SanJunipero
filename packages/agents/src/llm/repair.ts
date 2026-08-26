@@ -7,7 +7,7 @@ export type RepairCandidate = { value: unknown; how: string }
 
 const FENCE = /```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)```/
 
-const jsonOrNothing = (text: string): unknown | undefined => {
+const jsonOrNothing = (text: string): unknown => {
   try {
     return JSON.parse(text) as unknown
   } catch {
@@ -153,6 +153,7 @@ function applySchemaIssues<T>(
         if (!isRecord(holder)) continue
         for (const key of issue.keys)
           if (key in holder) {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
             delete holder[key]
             changed = true
           }

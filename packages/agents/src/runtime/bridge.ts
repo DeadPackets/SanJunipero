@@ -311,7 +311,7 @@ export class EngineBridge {
       const node = state.forageables![id]!
       if (node.stock <= 0) continue
       const kind = FORAGEABLE_YIELD[node.kind]
-      if (kind === undefined || !isFoodKind(this.#simConfig, kind)) continue
+      if (!isFoodKind(this.#simConfig, kind)) continue
       offer(node.x, node.y, kind)
     }
     return best

@@ -147,11 +147,11 @@ export function preflightRefusal(r: PreflightResult): string {
 // The only part that spends. A call that throws is recorded as a failure rather than aborting:
 // failing outright and answering emptily are both disqualifying and both worth reporting.
 export type PreflightLlm = {
-  object<T>(opts: {
+  object(opts: {
     system: string
     messages: { role: 'user' | 'assistant'; content: string }[]
     schema: { _zod?: unknown }
-  }): Promise<{ value: T }>
+  }): Promise<{ value: unknown }>
 }
 
 export async function runPreflight(opts: {
@@ -183,7 +183,7 @@ export async function runPreflight(opts: {
     }
     for (const prompt of preflightPrompts(opts.identity, opts.personality)) {
       try {
-        const { value } = await opts.llm.object<Turn>({
+        const { value } = await opts.llm.object({
           system: prompt.system,
           messages: prompt.messages,
           schema: TurnSchema,

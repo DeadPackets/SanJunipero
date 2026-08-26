@@ -51,6 +51,10 @@ function nightOf(tick: number): number {
   return Math.max(0, Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY))
 }
 
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 function jsonOrRaw(text: string): unknown {
   try {
     return JSON.parse(text)
@@ -303,7 +307,7 @@ export class AgentRuntime {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
-    this.#submitPendingIfIdle(packet.self.activity)
+    void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
     this.#answerWakeOwed(packet)
     if (packet.heard.length > 0) {
@@ -432,7 +436,7 @@ export class AgentRuntime {
         buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought),
       )
     } catch (err) {
-      this.#llm.alert('adjudicate_failed', err instanceof Error ? err.message : String(err))
+      this.#llm.alert('adjudicate_failed', messageOf(err))
       return fallback()
     }
     if (verdict.kind === 'map')
@@ -449,7 +453,7 @@ export class AgentRuntime {
     try {
       verb = this.#codify(verdict.recipe, { agentId: this.#agentId, intent: description }).verb
     } catch (err) {
-      this.#llm.alert('codify_failed', err instanceof Error ? err.message : String(err))
+      this.#llm.alert('codify_failed', messageOf(err))
       return fallback()
     }
     return this.#holdIntent({ verb, params: {} })
@@ -510,7 +514,7 @@ export class AgentRuntime {
     try {
       await this.#runTurnBody()
     } catch (err) {
-      this.#llm.alert('turn_crash', err instanceof Error ? err.message : String(err))
+      this.#llm.alert('turn_crash', messageOf(err))
       this.#clock.lastTurnTick = tick + this.#config.dozeTicks
       this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
     } finally {
@@ -763,7 +767,7 @@ export class AgentRuntime {
         if (dream.dreamed) this.#pendingDreamMood = dream.mood
       }
     } catch (err) {
-      this.#llm.alert('reflection_failed', err instanceof Error ? err.message : String(err))
+      this.#llm.alert('reflection_failed', messageOf(err))
     } finally {
       this.#reflectionInFlight = false
     }
@@ -789,21 +793,16 @@ export class AgentRuntime {
   }
 
   // Node's default terminates the process on a rejection nobody holds, and this file starts
-  // four promises it does not await.
+  // promises it does not await.
   #sink(kind: string): (err: unknown) => void {
     return (err) => {
-      this.#llm.alert(kind, err instanceof Error ? err.message : String(err))
+      this.#llm.alert(kind, messageOf(err))
     }
   }
 
   #doze(tick: number, cause?: unknown): void {
     this.#stats.dozes += 1
-    const why =
-      cause === undefined
-        ? 'providers unavailable'
-        : cause instanceof Error
-          ? cause.message
-          : String(cause)
+    const why = cause === undefined ? 'providers unavailable' : messageOf(cause)
     this.#llm.alert('doze_off', `${why}; the mind dozes off mid-thought`)
     this.#clock.lastTurnTick = tick + this.#config.dozeTicks
     this.#clock.dozeUntilTick = tick + this.#config.dozeTicks

@@ -795,8 +795,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
     // Message 0 is the append-only dayLog: turn 2's must extend turn 1's, byte
     // for byte, so the provider prefix survives everything but scene + now.
-    const dayLogA = a.filter((m) => m.role === 'user')[0]!.text
-    const dayLogB = b.filter((m) => m.role === 'user')[0]!.text
+    const dayLogA = a.find((m) => m.role === 'user')!.text
+    const dayLogB = b.find((m) => m.role === 'user')!.text
     expect(dayLogB.startsWith(dayLogA)).toBe(true)
     expect(dayLogB.length).toBeGreaterThan(dayLogA.length)
   })
@@ -815,7 +815,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // And not in the day log, which is the day's events: a standing fact repeated every turn
     // would compact the day out of the mind that lived it.
     expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a house (10 wood)')
-    expect(b.filter((m) => m.role === 'user')[0]!.text).not.toContain('a house (10 wood)')
+    expect(b.find((m) => m.role === 'user')!.text).not.toContain('a house (10 wood)')
   })
 
   // A blank answer is not a wrong answer: charging a mind a whole turn for one leaves a drift
@@ -972,7 +972,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => seen.length >= 1, 100)
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
-    expect(seen[0]).toEqual({ tick: expect.any(Number), agentId: AGENT, text: 'I rest.' })
+    expect(seen[0]).toEqual({ tick: expect.any(Number) as number, agentId: AGENT, text: 'I rest.' })
     expect(seen[0]!.tick).toBeGreaterThan(0)
   })
 })
