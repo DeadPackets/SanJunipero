@@ -131,7 +131,7 @@ export type PathSearch = { path: [number, number][]; capped: boolean }
 
 function pathTo(node: Node): [number, number][] {
   const path: [number, number][] = []
-  for (let n: Node | null = node; n && n.parent; n = n.parent) path.push([n.x, n.y])
+  for (let n: Node | null = node; n.parent; n = n.parent) path.push([n.x, n.y])
   return path.reverse()
 }
 
@@ -154,7 +154,7 @@ export function searchPath(
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
   const key = `${from.x},${from.y}|${to.x},${to.y}`
   const hit = memo.get(state)
-  if (hit !== undefined && hit.config === config && hit.key === key) return hit.found
+  if (hit?.config === config && hit.key === key) return hit.found
   const found = runSearch(state, from, to, config)
   memo.set(state, { config, key, found })
   return found

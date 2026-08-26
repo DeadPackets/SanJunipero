@@ -283,7 +283,7 @@ function globalMysteryTag(asleep: boolean, ev: SimEvent): string | null {
   const kind = (ev.payload as { kind?: unknown } | null)?.kind
   if (typeof kind !== 'string') return null
   const entry = MYSTERY_BY_KIND[kind]
-  return entry !== undefined && entry.scope === 'global' ? entry.kind : null
+  return entry?.scope === 'global' ? entry.kind : null
 }
 
 const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
@@ -610,7 +610,7 @@ export function composePerception(
     if (ev.type !== 'mystery_event') continue
     const p = ev.payload as { kind?: unknown; x?: unknown; y?: unknown }
     const entry = typeof p.kind === 'string' ? MYSTERY_BY_KIND[p.kind] : undefined
-    if (entry === undefined || entry.scope !== 'located') continue
+    if (entry?.scope !== 'located') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
     if (indoors !== null || !withinSight(p.x, p.y)) continue
     seen.push({ kind: 'mystery', mystery: entry.kind, prose: entry.prose })
