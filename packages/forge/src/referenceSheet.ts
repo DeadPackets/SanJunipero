@@ -1,35 +1,5 @@
-// ★ THE REFERENCE SHEET IS A COLOUR CHART. IT WAS NEVER SUPPOSED TO BE THREE PICTURES.
-//
-// This module used to demand four files — `style-anchor.png` plus `ref-1.png`, `ref-2.png`,
-// `ref-3.png` — and hand all four to `createForge`, which passes them as `input_references` on
-// EVERY generation. `gen-reference-sheet.ts` says what the three were meant to be: a cottage,
-// a bucket and a villager, one per subject class, curated by hand.
-//
-// ref-1..3 were never curated, so this function threw on every call, so `gen-rigs.ts` and
-// `gen-terrain.ts` could not start and the discovery lane's `discoveryArt` had to ship as a
-// tested no-op. The obvious repair is to generate the three missing pictures. THE OBVIOUS
-// REPAIR IS WRONG, and it is wrong for a reason this project has now measured twice:
-//
-//   Round 3 lost the farmhouse three times to the reference image overriding the prompt, and
-//   lost farmland_0 to the anchor cottage self-tiling into rows of isometric cottages. Round 4
-//   ran the A/B for $0.2053 — same cabin prompt, once with the style anchor attached and once
-//   with a code-painted MASTER_PALETTE swatch. With the anchor it came back as THE ANCHOR
-//   RECOLOURED, arched door and gable and all, against a prompt that banned the arch by name.
-//   With the swatch it came back as the cabin that was asked for.
-//   `gen-cast-v4.ts` found the same thing independently and grew a WALK_NO_STYLE_ANCHOR
-//   escape hatch because the anchor cottage kept bleeding into walk frames as scenery.
-//
-// ONE reference object of a DIFFERENT subject costs a generation its architecture. The old
-// contract attached FOUR. Curating ref-1..3 would have been paying real money to make every
-// future generation worse, permanently, and the loader would have been green while it did it.
-//
-// So the reference sheet is now what a reference is actually for: the palette, and nothing
-// else. A swatch has no architecture in it to copy. It is code-painted, so it is free, it is
-// deterministic, and it can never go missing from a scratchpad — which is the third defect
-// this lane exists to close.
-//
-// `style-anchor.png` stays committed. It is the craft record and the human-designated look,
-// and `styleBible.md` still points at it. It is simply not attached to generations any more.
+// The reference sheet is the palette and nothing else: ONE reference object of a different subject
+// costs a generation its architecture (measured A/B, $0.2053). `style-anchor.png` is never attached.
 import { encodePng } from './post/raw.js'
 import { MASTER_PALETTE, paletteRgb } from './palette.js'
 

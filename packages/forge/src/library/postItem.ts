@@ -18,9 +18,8 @@ export type SpriteCell = {
   opaqueFrac: number // share of the cell that is opaque
 }
 
-// The 512 px generation carries its own big-pixel lattice. Point-sampling it down to 16 px
-// samples sub-pixels at a random phase and returns noise, so the chain resamples ON the
-// lattice instead: median per art cell, opaque only where the cell is mostly opaque.
+// The 512 px generation carries its own big-pixel lattice, so point-sampling it down to 16 px hits
+// sub-pixels at a random phase and returns noise; the chain resamples ON the lattice instead.
 export function toSpriteCell(raw: RawImage, px: number): SpriteCell {
   const keyed = chromaKey(raw)
   const cleaned = despeckle(keyed, Math.max(3, Math.ceil(opaqueArea(keyed) * 0.01)))
@@ -84,10 +83,8 @@ export function padSquare(img: RawImage, px: number): RawImage {
   return { width: px, height: px, data }
 }
 
-// Rank by silhouette cleanliness, lower is better: one connected subject beats a subject
-// plus floating debris, and among equals the fuller cell wins. The plan named pixel pitch,
-// but estimatePitch pins to its range floor on these painterly generations and cannot
-// separate two candidates — islands can, and it is what the judge actually rejects on.
+// Rank by silhouette cleanliness, lower is better. Pixel pitch cannot separate two candidates —
+// `estimatePitch` pins to its range floor on these painterly generations — and islands can.
 export function candidateRank(c: { islands: number; opaqueFrac: number }): number {
   return c.islands - c.opaqueFrac
 }

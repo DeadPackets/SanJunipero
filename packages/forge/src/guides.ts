@@ -1,8 +1,6 @@
 import type { RawImage } from './post/raw.js'
 
-// Deterministic grid-guide reference images for the Phase B A/B experiment:
-// half the strip candidates generate with these appended as extra input_references,
-// half without; judge scores + measured pitch cleanliness decide whether they stay.
+// Deterministic grid-guide reference images, appended to a generation as extra input_references.
 
 export const CHECKER_GUIDE_SIZE = 1024
 

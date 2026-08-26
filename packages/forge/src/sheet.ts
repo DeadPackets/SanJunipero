@@ -42,18 +42,8 @@ export function assembleGrid(cells: RawImage[][], cellW: number, cellH: number):
   return { width: sheetW, height: rows * cellH, data: out }
 }
 
-/**
- * Box bounds for output index `i` of `n`, over `src` source columns/rows, as a partition
- * that is its OWN MIRROR: box(n-1-i) is the reflection of box(i) for every i.
- *
- * ★ THIS IS WHY `downscaleMajority` USED TO DISAGREE WITH ITSELF ACROSS A FLIP. The old
- * bounds were `floor(i*src/n)`, and `floor((n-1-i)*src/n)` is not `src - floor((i+1)*src/n)`
- * unless the product is an integer — so mirroring the source shifted every box by one column
- * and a 10-wide box's modal colour got compared with an 11-wide box's. Symmetric bounds fix
- * it exactly. When `n` is even and `src` is odd there is no centre boundary on the grid at
- * all, so the centre column votes in BOTH middle boxes: the only rule that stays its own
- * mirror. Costs one duplicated source column out of `src`.
- */
+/** Box bounds for output index `i` of `n` over `src` sources, as a partition that is its OWN
+ *  MIRROR — including the odd-`src`/even-`n` case, where the centre column votes in both boxes. */
 function boxBounds(i: number, n: number, src: number): [number, number] {
   const at = (j: number) => (j * 2 <= n ? Math.round((j * src) / n) : src - Math.round(((n - j) * src) / n))
   let lo = at(i), hi = at(i + 1)
@@ -64,10 +54,8 @@ function boxBounds(i: number, n: number, src: number): [number, number] {
   return [lo, hi]
 }
 
-// Majority-vote reduction for big-pixel source art: each output pixel is the most
-// frequent opaque RGBA in its source block (ties: the smallest RGBA, so the answer does
-// not depend on scan order); transparent iff >50% of the block is transparent. Robust to
-// speckle noise, unlike point sampling. Mirror-equivariant: see `boxBounds`.
+// Majority-vote reduction for big-pixel art: each output pixel is the most frequent opaque RGBA in
+// its block (ties: smallest RGBA, so order does not matter). Mirror-equivariant, see `boxBounds`.
 export function downscaleMajority(img: RawImage, w: number, h: number): RawImage {
   const out = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) {
@@ -93,11 +81,8 @@ export function downscaleMajority(img: RawImage, w: number, h: number): RawImage
   return { width: w, height: h, data: out }
 }
 
-// DEPRECATED for sprite post-processing (pipeline v3): the round-trip metric is
-// degenerate — smaller blocks always fit better on non-lattice art, so it oversamples
-// the true pitch. Use resampleToArtHeight instead. Kept for grid-true inputs.
-// Finds the art-pixel size of big-pixel source art: the block size whose
-// majority-downscale -> integer-upscale round trip loses the least detail.
+// DEPRECATED for sprite post-processing: the round-trip metric is degenerate — smaller blocks
+// always fit better on non-lattice art, so it oversamples the true pitch. Use resampleToArtHeight.
 export function detectArtScale(img: RawImage, candidates: number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12]): number {
   let best = candidates[0]!, bestErr = Infinity
   for (const k of candidates) {
@@ -165,9 +150,8 @@ export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, 
   return { width: canvasW, height: canvasH, data: out }
 }
 
-// Removes chroma-key halos (magenta -> maroon family): an opaque edge pixel matching
-// the contamination predicate takes the most frequent clean opaque neighbor color in
-// its 3x3 window; with no clean neighbor it desaturates to r=b=(r+b)/2. Alpha untouched.
+// Removes chroma-key halos: an opaque edge pixel matching the contamination predicate takes the
+// most frequent clean opaque neighbour colour; with none it desaturates to r=b=(r+b)/2.
 export function defringe(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data)
   const at = (x: number, y: number) =>
@@ -221,18 +205,16 @@ export function erodeAlpha(img: RawImage, radius = 1): RawImage {
   return { width: img.width, height: img.height, data: cur }
 }
 
-// Pitch-derived erosion (controller-approved): radius = max(1, round(sourcePitch/2))
-// with sourcePitch = opaque bboxH / targetH, measured BEFORE erosion — the chroma blend
-// band scales with the art pitch, so the erosion must too.
+// The chroma blend band scales with the art pitch, so the erosion must too: the radius comes from
+// `bboxH / targetH`, measured BEFORE erosion.
 export function erodeForPitch(img: RawImage, targetH: number): RawImage {
   const b = opaqueBbox(img)
   if (!b) throw new Error('erodeForPitch: no opaque pixels')
   return erodeAlpha(img, Math.max(1, Math.round((b.y1 - b.y0 + 1) / targetH / 2)))
 }
 
-// Resamples big-pixel art to its true art pitch: lattice of pitch = bboxH/targetH,
-// phased at the bbox bottom-center; per cell, channel-wise MEDIAN of opaque pixels in
-// the central 1/3 x 1/3 (fallback: whole cell); opaque iff >=50% of the region is opaque.
+// Resamples big-pixel art to its true art pitch, phased at the bbox bottom-centre: per cell the
+// channel-wise MEDIAN of the central third, opaque iff at least half the region is.
 export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
   const b = opaqueBbox(img)
   if (!b) throw new Error('resampleToArtHeight: no opaque pixels')
@@ -275,9 +257,8 @@ export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
   return { width: outW, height: targetH, data: out }
 }
 
-// Fractional art pitch via gradient comb: per-column/-row sums of |color delta| over
-// both-opaque neighbor pairs peak at lattice boundaries; the candidate pitch whose comb
-// (best phase) catches the highest mean profile value wins.
+// Fractional art pitch via gradient comb: per-column sums of |colour delta| over both-opaque
+// neighbour pairs peak at lattice boundaries; the candidate whose comb catches the most wins.
 export function estimatePitch(img: RawImage, range: [number, number] = [4, 12], step = 0.05): number {
   const colD = new Float64Array(img.width), rowD = new Float64Array(img.height)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width - 1; x++) {
@@ -292,11 +273,8 @@ export function estimatePitch(img: RawImage, range: [number, number] = [4, 12], 
   }
   if (colD.reduce((a, v) => a + v, 0) === 0 && rowD.reduce((a, v) => a + v, 0) === 0)
     throw new Error('estimatePitch: no opaque neighbor pairs')
-  // Octave-proof score = lift x coverage. lift = how concentrated the profile is at
-  // lattice lines (mean-at-lattice / overall mean; a 2x octave keeps this high by
-  // cherry-picking strong boundaries, a 1/2 pitch dilutes it with mid-block zeros).
-  // coverage = fraction of total gradient energy the comb captures (a 2x octave only
-  // reaches half the boundaries). The true pitch alone maximizes the product.
+  // Octave-proof score = lift x coverage: a 2x octave keeps lift high by cherry-picking strong
+  // boundaries but only reaches half of them, so the true pitch alone maximises the product.
   function combScore(D: Float64Array, p: number): number {
     let tot = 0
     for (const v of D) tot += v
@@ -392,9 +370,8 @@ export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number
     }
     step /= 2
   }
-  // Joint pitch x phase polish per axis: pitch and phase sit in a coupled valley that
-  // per-coordinate moves cannot cross (a wrong pitch relocates the optimal phase).
-  // Scan (p, φ) jointly on a subsampled cost, then confirm at full resolution.
+  // Pitch and phase sit in a coupled valley that per-coordinate moves cannot cross (a wrong pitch
+  // relocates the optimal phase), so scan (p, φ) jointly on a subsampled cost, then confirm.
   for (const axis of ['y', 'x'] as const) {
     const pKey = axis === 'x' ? 'px' : 'py', oKey = axis === 'x' ? 'ox' : 'oy'
     let bestPair = { p: lat[pKey], o: lat[oKey] }
@@ -411,13 +388,8 @@ export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number
   return lat
 }
 
-// Mode-color resample on an explicit lattice: per cell, bin the central-60% opaque pixels
-// at 5 bits/channel, output the densest bin's mean color; if dominance < 40%, retry with
-// the window nudged ±pitch/4 in each axis direction and keep the most dominant result.
-// dominance[] parallels out (0 for transparent); origin maps lattice indices to out pixels.
-// DEPRECATED for sprite pipelines (v5): 5-bit bins split ε-close colors and the per-cell
-// nudge is superseded by driftField — use resampleClusterLattice. Kept for metrics.
-// When a drift field is passed, windows follow it and the nudge is disabled.
+// DEPRECATED for sprite pipelines: 5-bit bins split ε-close colours and the per-cell nudge is
+// superseded by `driftField` — use `resampleClusterLattice`. Kept for metrics.
 export function resampleModeLattice(img: RawImage, lat: Lattice, drift?: { rowOffsets: number[]; colOffsets: number[] }):
   { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
   const bb = opaqueBbox(img)
@@ -476,9 +448,8 @@ export function resampleModeLattice(img: RawImage, lat: Lattice, drift?: { rowOf
   return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
 }
 
-// Jumble metrics: ambiguousPct = % of opaque output pixels sampled at <50% dominance;
-// dupRowCount = adjacent byte-identical opaque rows; reconErr = mean per-channel distance
-// between each opaque source pixel and its lattice cell's output color (both-opaque only).
+// ambiguousPct: opaque output pixels sampled below 50% dominance. dupRowCount: adjacent identical
+// opaque rows. reconErr: mean per-channel distance from a source pixel to its cell's output colour.
 export function sheetMetrics(cells: {
   out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }
 }[]): { ambiguousPct: number; dupRowCount: number; reconErr: number } {
@@ -548,12 +519,8 @@ function clusterDominant(px: [number, number, number][], eps = 8):
   }
 }
 
-// DEPRECATED (v6 ruling): regressed reconErr on all real material — the recovered
-// offsets were sprite-edge jitter, not drift; refineLattice already captures the lattice.
-// Smooth lattice deformation: per art-row (and per art-column) integer offsets in
-// [-2, 2] maximizing summed full-cell ε-cluster dominance across the band, solved by
-// DP with |Δoffset| ≤ 1 between neighbors and a 0.5/px jump penalty. Full-cell windows
-// (no margin) so a 1px misalignment already dents dominance.
+// DEPRECATED: regressed reconErr on all real material — the recovered offsets were sprite-edge
+// jitter, not drift, and `refineLattice` already captures the lattice.
 export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy: number }): Drift {
   const bb = opaqueBbox(img)
   if (!bb) throw new Error('driftField: no opaque pixels')
@@ -631,9 +598,8 @@ export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy
   return { rowOffsets: solve('row'), colOffsets: solve('col') }
 }
 
-// ε-cluster resample (pipeline v5): like resampleModeLattice but the dominant color
-// comes from single-linkage ε-clustering (≤8/channel) instead of 5-bit bins, and an
-// optional drift field shifts each cell's sample window instead of per-cell nudging.
+// Like `resampleModeLattice`, but the dominant colour comes from single-linkage ε-clustering
+// instead of 5-bit bins, and a drift field shifts each cell's window instead of per-cell nudging.
 export function resampleClusterLattice(img: RawImage, lat: Lattice, drift?: Drift):
   { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
   const bb = opaqueBbox(img)
@@ -670,10 +636,8 @@ export function resampleClusterLattice(img: RawImage, lat: Lattice, drift?: Drif
   return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
 }
 
-// DEPRECATED (v6 ruling): single-linkage chaining collapses natural palettes (Δ2-5 color
-// chains fuse across the gamut — the cottage roof merged into brown). Do not use blind.
-// Sheet-wide near-duplicate color merge: union-find over every output color across the
-// images (per-channel ≤ eps), each replaced by its cluster's population-weighted centroid.
+// DEPRECATED: single-linkage chaining collapses natural palettes — Δ2-5 colour chains fuse across
+// the gamut and the cottage roof merged into brown. Do not use blind.
 export function mergeSheetColors(imgs: RawImage[], eps = 6): RawImage[] {
   const counts = new Map<number, number>()
   for (const img of imgs) for (let i = 0; i < img.data.length; i += 4) {
@@ -759,13 +723,8 @@ export function sweepMagentaCensus(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
-// Outline↔fill blend repair (pipeline v7, two-sided snap): silhouette pixels whose
-// color sits on the RGB segment between their inward fill color and the outline
-// palette are generation blends; authored pixel art has no fractional-membership
-// pixels, so each commits to its majority side — t >= 0.4 snaps to the nearest
-// outline color, t in [0.15, 0.4) snaps to the fill color (no line-weight change,
-// no new colors), t < 0.15 is already fill-committed within noise and stays.
-// OOB counts as transparent because inputs are bbox-tight on a clear canvas.
+// Authored pixel art has no fractional-membership pixels, so a silhouette pixel sitting on the RGB
+// segment between its inward fill and the outline palette commits to its majority side.
 export function repairOutlineBlends(img: RawImage):
   { out: RawImage; repainted: number; outlineSnaps: number; fillSnaps: number } {
   const EPS = 10, SEG_DIST = 12, OUTLINE_T = 0.4, FILL_T = 0.15
@@ -888,11 +847,8 @@ export function repairOutlineBlends(img: RawImage):
   return { out: { width: w, height: h, data: out }, repainted: outlineSnaps + fillSnaps, outlineSnaps, fillSnaps }
 }
 
-// Pipeline v7 stage chain on a chroma-keyed input: erode(round(pitch/2)) →
-// refineLattice → resampleClusterLattice → despeckle → fillPinholes →
-// sweepMagentaCensus (`before`, the v6 output) → repairOutlineBlends (`out`).
-// exclBefore/exclAfter are reconErr with the repainted pixels alpha'd out of BOTH
-// outputs (the exclusion gate); exclDelta = exclAfter - exclBefore.
+// The v7 stage chain on a chroma-keyed input. `exclBefore`/`exclAfter` are reconErr with the
+// repainted pixels alpha'd out of BOTH outputs — the exclusion gate.
 export function v7Chain(keyed: RawImage, pitch: number): {
   out: RawImage; before: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice
   origin: { i0: number; j0: number }; despeckleRemoved: number; sweepHits: number
@@ -933,11 +889,8 @@ export function v7Chain(keyed: RawImage, pitch: number): {
   }
 }
 
-// DEPRECATED: predicate false-positives on legitimate palette colors; use sweepMagentaCensus.
-// Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND
-// b>g+25) takes the mode color of its opaque 8-neighbors — magenta is not a Style
-// Bible color, so this is always safe at art resolution. Ties break first-seen;
-// a pixel with no opaque neighbors is left unchanged.
+// DEPRECATED: the predicate false-positives on legitimate palette colours; use
+// `sweepMagentaCensus`. Magenta is not a Style Bible colour, so the sweep is safe at art scale.
 export function sweepMagenta(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
@@ -1089,10 +1042,8 @@ export function pairwiseMedian(imgs: RawImage[]): number {
   return ds[Math.floor(ds.length / 2)]!
 }
 
-// v2 locked recipe for a generated character raw: chromaKey → majority downscale at the
-// detected art scale (coarsening until the sprite fits) → defringe → anchor. Real gemini
-// big-pixel art has no exact lattice (round-trip error rises monotonically from k=4),
-// so start at the detected scale and coarsen until the sprite fits the canvas.
+// Real big-pixel art has no exact lattice (round-trip error rises monotonically from k=4), so this
+// starts at the detected art scale and coarsens until the sprite fits the canvas.
 export async function postProcessCell(rawPng: Buffer, canvas: number, feetY: number): Promise<RawImage> {
   const keyed = chromaKey(await decodePng(rawPng))
   for (let k = detectArtScale(keyed); ; k++) {
@@ -1104,9 +1055,8 @@ export async function postProcessCell(rawPng: Buffer, canvas: number, feetY: num
 }
 
 // ───────────────────────── Character asset standard v2 ─────────────────────────
-// Strip-based walk cycles: 4 facings × 6 poses. idle + the 4 walk phases generate as
-// one 1×5 horizontal phase strip per facing; sleep is its own single-cell call per
-// facing. Layout keeps cols=FACINGS; rows are POSES_V2 → 384×576.
+// idle and the 4 walk phases generate as one 1×5 horizontal phase strip per facing; sleep is its
+// own single-cell call per facing.
 
 export const POSES_V2 = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b', 'sleep'] as const // sheet row order, top→bottom
 export type PoseV2 = typeof POSES_V2[number]
@@ -1128,10 +1078,8 @@ export const POSE_CLAUSES_V2: Record<PoseV2, string> = {
   'sleep': 'lying on the ground fast asleep, body fully horizontal, eyes closed, relaxed peaceful face, same outfit',
 }
 
-// Hard QA gate constants (v2): ratios are ×(pairwise median) of the sheet's cells.
-// Calibrated against the rejected v1 sheet (median 0.310): NEAR_DUPE catches the
-// ne/nw back-view dupe at 0.123 (limit ≈0.171), MIRROR_DUPE catches the sw/se
-// mirror at 0.030 (limit ≈0.109), STRIDE catches the rigid se stride at 0.091.
+// Ratios are ×(pairwise median) of the sheet's cells, calibrated against the rejected v1 sheet:
+// NEAR_DUPE catches the ne/nw back-view dupe, MIRROR_DUPE the sw/se mirror, STRIDE the rigid se.
 export const NEAR_DUPE_RATIO = 0.55
 export const MIRROR_DUPE_RATIO = 0.35
 export const STRIDE_MIN_RATIO = 0.35
@@ -1141,12 +1089,8 @@ export const PALETTE_EPS = 8 // per-channel single-linkage radius, as in v7 clus
 export const PALETTE_MIN_SHARE = 0.01 // clusters under 1% of opaque pixels are speckle, not palette
 export const SILHOUETTE_AREA_TOL = 0.18
 
-// ★ `limit` IS THE BOUND THE VALUE CROSSED, NOT THE TOLERANCE. Every reader of a GateFailure
-// prints `value against limit (off by |value - limit|)`, and silhouette is the one gate whose
-// value is a RATIO around 1 while its tolerance is a half-width. Reporting 0.18 there made the
-// refusal message say salma's `ne/contact-a` missed by 1.0629 when it missed by 0.0629 —
-// SEVENTEEN TIMES the real margin, in the one artifact whose whole job is to let an operator
-// tell a threshold that is slightly too tight from a model that cannot draw the thing.
+// `limit` IS THE BOUND THE VALUE CROSSED, NOT THE TOLERANCE: silhouette is the one gate whose
+// value is a RATIO around 1 while its tolerance is a half-width, so reporting 0.18 overstates it.
 export const silhouetteBound = (areaRatio: number): number =>
   areaRatio > 1 ? 1 + SILHOUETTE_AREA_TOL : 1 - SILHOUETTE_AREA_TOL
 export const HEAD_REGION_FRAC = 0.40
@@ -1157,21 +1101,11 @@ export type GateFailure = {
   a: string; b: string; value: number; limit: number
 }
 
-// ★ A CONTACT FRAME IS A STANCE, AND NOTHING MEASURED THE STANCE. `strideGateV4` asks whether
-// two frames differ; a body standing still differs from a body standing still slightly
-// differently, so it passes. Four candidates were caught BY EYE across two lanes — omar's
-// ne/contact-a c3 at 1.004, salma's ne/contact-a c1 at 1.007, amara's ne/contact-b c3 at
-// 1.000 and c6 at 1.018 — every one of them a walk frame with no walk in it, and every one
-// cleared every gate in the package. One is in the committed art: `amara/se/contact-b`.
-//
-// Feet, not arms: the bottom quarter of the figure's own bbox, so a swung arm does not read
-// as a stride. Measured on the NATIVE cell, not the gate view — a 96px canvas quantises a
-// 271px foot span into 20 steps and the whole separation is 0.19 wide.
+// A contact frame is a STANCE: `strideGateV4` asks whether two frames DIFFER, and a body standing
+// still differs from itself. Feet, not arms — the bottom quarter of the bbox, on the NATIVE cell.
 export const STANCE_FRAC = 0.25
-// The four eye-refused standing candidates top out at 1.018 and the narrowest stride a lane
-// accepted is 1.206 — a 1.18x gap. 1.10 sits inside it: 8% above the worst standing figure,
-// 9.6% below the narrowest real stride. Passing frames span 0.870-1.257 and overlap the
-// contact band, which is why only contact frames are asked.
+// The eye-refused standing candidates top out at 1.018 and the narrowest accepted stride is 1.206;
+// 1.10 sits inside that gap. Passing frames overlap the contact band, so only contacts are asked.
 export const STANCE_MIN_RATIO = 1.10
 
 /** Width of the opaque mass in the bottom `frac` of the figure's bbox — the feet. */
@@ -1185,10 +1119,8 @@ export function footSpan(img: RawImage, frac = STANCE_FRAC): number {
   return x1 < 0 ? 0 : x1 - x0 + 1
 }
 
-// Slices a 1×n horizontal phase strip into n full-height segments by clustering
-// opaque columns: contiguous opaque-column runs, speckle runs (<1% of opaque mass)
-// dropped, then smallest-gap merges down to n. Robust to uneven spacing/widths —
-// NEVER assumes equal fifths.
+// Slices a 1×n phase strip by clustering opaque columns, dropping speckle runs and merging the
+// smallest gaps down to n. Robust to uneven spacing — it NEVER assumes equal fifths.
 export function sliceStrip(img: RawImage, n = 5): RawImage[] {
   const colMass = new Array<number>(img.width).fill(0)
   let total = 0
@@ -1230,10 +1162,8 @@ export function opaqueArea(img: RawImage): number {
   return count
 }
 
-// Palette agreement (coherence gate a): ε-cluster (single-linkage, like v7) the UNION
-// of both images' opaque colors, drop clusters under minShare of opaque pixels in both
-// images, then set-Jaccard over the surviving clusters. Population weighting is what
-// keeps this from failing on speckle: v7 outputs carry many 1-off colors.
+// ε-cluster the UNION of both images' opaque colours, drop clusters under `minShare` in both, then
+// set-Jaccard. Population weighting keeps v7's many 1-off speckle colours from failing it.
 export function paletteJaccard(a: RawImage, b: RawImage, eps = PALETTE_EPS, minShare = PALETTE_MIN_SHARE): number {
   const counts = (img: RawImage) => {
     const m = new Map<number, number>()
@@ -1273,16 +1203,8 @@ export function paletteJaccard(a: RawImage, b: RawImage, eps = PALETTE_EPS, minS
   return either === 0 ? 1 : both / either
 }
 
-// Head-region stability (coherence gate c): opaque-mask disagreement over the top
-// `frac` of each sprite's opaque bbox, aligned bbox-top / bbox-center-x, normalized
-// by the union of opaque pixels. Legs move between walk phases; heads must not.
-//
-// ★ THE CENTRES ARE ALIGNED IN HALF PIXELS, and that is the second half of the mirror fix.
-// Two bboxes of DIFFERENT width parity have their centres half a column apart, which no
-// integer offset can express: `floor((w - c.w)/2)` rounds one way and its mirror rounds the
-// other, so the same two frames flipped produced a different number. Sampling each mask at
-// 2x horizontally makes the offset `w - c.w`, an integer, in both directions. The value is
-// UNCHANGED wherever the two widths share a parity — which is where the gate was calibrated.
+// Opaque-mask disagreement over the top `frac` of each bbox. Centres align in HALF pixels: two
+// bboxes of different width parity sit half a column apart, which no integer offset can express.
 export function headRegionDiff(a: RawImage, b: RawImage, frac = HEAD_REGION_FRAC): number {
   const prep = (img: RawImage) => {
     const bb = opaqueBbox(img)
@@ -1306,9 +1228,8 @@ export function headRegionDiff(a: RawImage, b: RawImage, frac = HEAD_REGION_FRAC
   return union === 0 ? 0 : diff / union
 }
 
-// Cross-facing dupe gate: every pair FAILS hard when straight distance < 0.55×median
-// or mirrored distance < 0.35×median. Unlike v1's duplicateReport this is a failure,
-// not a flag — a failed strip regenerates, and a still-failing sheet is BLOCKED.
+// Every pair FAILS hard when the straight or mirrored distance falls under its ratio of the
+// median — a failure, not a flag: a failed strip regenerates and a still-failing sheet is BLOCKED.
 export function crossFacingDupeGate(cells: { label: string; img: RawImage }[], median: number): GateFailure[] {
   const failures: GateFailure[] = []
   for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
@@ -1325,9 +1246,8 @@ export function crossFacingDupeGate(cells: { label: string; img: RawImage }[], m
   return failures
 }
 
-// Stride differentiation within a facing: contact-A vs contact-B and passing-A vs
-// passing-B must each clear 0.35×median; every contact vs passing pair must clear
-// 0.25×median (a reused frame reads as rigid animation).
+// Stride differentiation within a facing: contact-A vs contact-B and passing-A vs passing-B, plus
+// every contact vs passing pair — a reused frame reads as rigid animation.
 export function strideGate(facing: string, frames: Record<WalkPoseV2, RawImage>, median: number): GateFailure[] {
   const failures: GateFailure[] = []
   const check = (pa: WalkPoseV2, pb: WalkPoseV2, ratio: number, gate: 'stride' | 'contact-passing') => {
@@ -1342,9 +1262,8 @@ export function strideGate(facing: string, frames: Record<WalkPoseV2, RawImage>,
   return failures
 }
 
-// Frame coherence within a facing (NEW in v2 — v1 had no such gate and independent
-// per-frame generation drifted costume details): every frame must agree with the
-// facing's idle on (a) palette, (b) silhouette area ±18%, (c) head-region stability.
+// Every frame must agree with the facing's idle on palette, silhouette area ±18% and head-region
+// stability: independent per-frame generation drifts costume details.
 export function frameCoherenceGate(facing: string, idle: RawImage,
   frames: { label: string; img: RawImage }[]): GateFailure[] {
   const failures: GateFailure[] = []

@@ -1,19 +1,5 @@
-// RE-CELL: put an already-approved generation back on a whole-number pixel grid.
-//
-// The buildings and the cast were never resampled at all on the way out of the forge —
-// processHiResCell only TRIMS to the figure's bounding box, so a 1024 generation shipped as
-// an 810x866 cell of the model's own painterly pixels. The fractional step happens later, on
-// the GPU: hi-res sources render through `smoothSource` (scaleMode 'linear'), and the renderer
-// fits an 810 px cell into 64 world px. A bilinear tap between two palette members returns a
-// colour that is in neither, which is the "weird discolouration" the user saw on close-ups.
-//
-// The cure is to author the cell at the size the deepest zoom stop draws it, so at that stop
-// the scale is exactly 1 and the filter has nothing to interpolate:
-//
-//   building   cell = 32*(w+h) world px  x  the 4x stop      1x1 -> 256, 1x2 -> 384, 2x2 -> 512
-//   character  figure = CHAR_TARGET_PX (52) x the 4x stop    -> 208 px of figure in the cell
-//
-// and to reach that size by dividing a crop of the generation by a WHOLE number.
+// A bilinear tap between two palette members returns a colour that is in neither, so a cell is
+// authored at the size the deepest zoom stop draws it — scale exactly 1, nothing to interpolate.
 import type { Footprint } from '@sj/shared'
 import { MIN_DOWNSCALE_FACTOR } from './assetResolution.js'
 import { quantize } from './post/quantize.js'
@@ -40,12 +26,8 @@ export type ReCellPlan = {
   scaledSourcePx: number
 }
 
-// The plan, in one place so it can be asserted without decoding an image.
-//
-// `figurePx` + `targetFigurePx` pin the figure to one height across generations of different
-// sizes — the cast came back at 840 px of figure in a 1024 frame and 2100 px in a 2528 one,
-// and the renderer applies a SINGLE figureH to all 24 cells, so without this the walk cycle
-// would pulse by 8%. Without them the plan is a pure crop-and-divide.
+// `figurePx` + `targetFigurePx` pin the figure to one height across generations of different sizes;
+// the renderer applies a SINGLE figureH to all 24 cells, so without them the walk cycle pulses.
 export function planReCell(a: {
   subjectPx: number; cellPx: number; sourcePx: number; fill?: boolean
   figurePx?: number; targetFigurePx?: number
@@ -53,10 +35,8 @@ export function planReCell(a: {
   const ceiling = Math.max(MIN_DOWNSCALE_FACTOR, Math.floor(a.sourcePx / a.cellPx))
 
   if (a.figurePx !== undefined && a.targetFigurePx !== undefined) {
-    // The figure decides the factor: whichever whole divisor lands the figure nearest its
-    // target, then the source takes the leftover as a nudge of a few per cent. Raising the
-    // factor scales the window and the source together, so the only thing it can fix is a
-    // subject that is wider than it is tall — a lying figure measured on its height.
+    // The figure decides the factor: whichever whole divisor lands the figure nearest its target.
+    // Raising it scales window and source together, so it can only fix a subject wider than tall.
     let factor = Math.max(MIN_DOWNSCALE_FACTOR, Math.round(a.figurePx / a.targetFigurePx))
     const fits = (f: number): boolean =>
       a.subjectPx * (a.targetFigurePx! * f / a.figurePx!) <= a.cellPx * f
@@ -68,10 +48,8 @@ export function planReCell(a: {
     }
   }
 
-  // `fill` takes the factor DOWN instead of up, so the window is smaller than the subject and
-  // the correction closes the gap: the subject then fills the cell edge to edge, which is what
-  // the trimmed cells it replaces did. Without it a 866 px subject leaves 15% of a 4x window
-  // empty and buildingArt draws the building 15% smaller than the one that was signed off.
+  // `fill` takes the factor DOWN, so the window is smaller than the subject and the correction
+  // closes the gap; without it a 866 px subject leaves 15% of a 4x window empty.
   const want = a.fill === true
     ? Math.max(MIN_DOWNSCALE_FACTOR, Math.floor(a.subjectPx / a.cellPx))
     : Math.max(MIN_DOWNSCALE_FACTOR, Math.ceil(a.subjectPx / a.cellPx))
@@ -83,8 +61,7 @@ export function planReCell(a: {
   return { factor, window, sourceScale, scaledSourcePx: Math.round(a.sourcePx * sourceScale) }
 }
 
-// Majority vote over one factor x factor block: opaque only when at least half the block is,
-// which keeps alpha binary by construction, and the MEDIAN of the opaque colours, which
+// A block is opaque only when at least half of it is, which keeps alpha binary; the MEDIAN colour
 // survives the generation's JPEG ringing where a point sample would ship it.
 function blockSample(img: RawImage, x0: number, y0: number, f: number): [number, number, number, number] {
   const rs: number[] = [], gs: number[] = [], bs: number[] = []
@@ -114,9 +91,8 @@ export function reCell(keyed: RawImage, opts: {
   const b0 = opaqueBbox(cleaned)
   if (!b0) throw new Error('reCell: no opaque pixels')
 
-  // Erode the chroma blend band before anything measures the figure, while the band is still
-  // a known few source pixels wide. Eroding after a correction eats real art, and measuring
-  // before it puts the figure a band-width off its target height.
+  // Erode the chroma blend band before anything measures the figure, while the band is still a
+  // known few source pixels wide: eroding after a correction eats real art.
   const banded = erodeAlpha(cleaned, opts.erode
     ?? Math.min(4, Math.max(1, Math.floor(Math.min(b0.x1 - b0.x0 + 1, b0.y1 - b0.y0 + 1) / 4))))
   const b = opaqueBbox(banded)

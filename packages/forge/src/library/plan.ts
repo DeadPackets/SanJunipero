@@ -13,9 +13,8 @@ const BATCH_CATEGORY: Record<LibraryBatch, LibraryCategory> = {
   tools: 'tool', foods: 'food', materials: 'material', ritual: 'ritual', furniture: 'furniture',
 }
 
-// One candidate per attempt, and the gate's retry loop does the choosing. Picking between
-// parallel candidates needs a pixel heuristic, and no pixel heuristic tells a pail from a
-// market stall — the judge does, and three judged attempts cost less than two blind ones.
+// One candidate per attempt: picking between parallel candidates needs a pixel heuristic, and no
+// pixel heuristic tells a pail from a market stall — the judge does.
 export const DEFAULT_CANDIDATES: Record<LibraryBatch, number> = {
   tools: 1, foods: 1, materials: 1, ritual: 1, furniture: 1,
 }
@@ -38,16 +37,8 @@ export type PlannedItem = {
   candidates: number
 }
 
-// ★ A STYLE ANCHOR TEACHES ARCHITECTURE; A SWATCH TEACHES COLOUR.
-//
-// This clause used to be `STYLE_ANCHOR_CLAUSE` — "match the first reference image exactly",
-// with the anchor cottage attached. Round 4's A/B measured what that actually buys ($0.2053,
-// same prompt twice): with the anchor attached the model returned THE ANCHOR RECOLOURED —
-// arched door, gable, stone base — against a prompt that banned the arch by name. With a
-// code-painted MASTER_PALETTE swatch it returned the subject that was asked for. A swatch has
-// no architecture in it to copy. Across fifty items of five different categories that matters
-// more than it did for five buildings, because a knife and a bed have nothing in common with
-// a cottage and every reference pulls both of them toward it.
+// A style anchor teaches architecture; a swatch teaches colour. With the anchor cottage attached
+// the model returned THE ANCHOR RECOLOURED against a prompt that banned the arch by name.
 export const SWATCH_CLAUSE =
   'The reference image is a COLOUR CHART, not an object. It carries the palette and nothing ' +
   'else. There is NO object to copy anywhere in this request — invent the subject from the ' +
@@ -60,9 +51,8 @@ export const PALETTE_WORDS = [
   '— flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
 ].join(' ')
 
-// At 24 px the instruction was "few colours, no hair-thin detail" — survival advice for a
-// cell that could not hold detail. At the C-level 128 px cell the cell CAN hold it, and an
-// under-detailed sprite is the failure mode instead.
+// At 24 px the instruction was survival advice for a cell that could not hold detail. At the
+// C-level 128 px cell an UNDER-detailed sprite is the failure mode instead.
 export function itemBoilerplate(e: LibraryEntry): string {
   const density = e.spritePx >= 64
     ? `The artwork is drawn at ${e.spritePx} pixels across, so it carries real detail: ` +

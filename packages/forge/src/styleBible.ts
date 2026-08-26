@@ -30,9 +30,8 @@ export function buildAssetPrompt(desc: string, footprint: Footprint, klass: Asse
   return `${STYLE_PROMPT} ${CLASS_HINTS[klass]}${anchor} Subject: ${desc}. World footprint: ${footprint.w}x${footprint.h} tiles on a 32x16 pixel tile grid.`
 }
 
-// Final sprite canvas sizes (post NEAREST downscale from 512px generation).
-// Buildings: 32·(w+h) px square → 1x1 = 64px, matching the Style Bible's
-// "~64px sprite for a 1x1 building". Crops/rigs are 4-frame horizontal sheets.
+// Final sprite canvas sizes, post NEAREST downscale. Buildings are 32·(w+h) px square, so a 1x1 is
+// the ~64 px sprite the Style Bible names; crops and rigs are 4-frame horizontal sheets.
 export function targetSize(klass: AssetClass, fp: Footprint): { w: number; h: number } {
   switch (klass) {
     case 'building': return { w: 32 * (fp.w + fp.h), h: 32 * (fp.w + fp.h) }

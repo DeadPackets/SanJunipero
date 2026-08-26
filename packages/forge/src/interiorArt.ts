@@ -5,26 +5,14 @@ import { interiorPieceKind, materialKind, type AssetRecord } from '@sj/shared'
 import type { AssetCodex } from './codex.js'
 import { INTERIOR_TILE } from './assetResolution.js'
 
-// ★ THE INTERIOR TILESET — Option C's nine pieces, and where they came from.
-//
-// The interior-mock round generated twelve images for treatment C: five furnishings, which
-// already ship as committed library items, and SEVEN floor-and-wall pieces, which had nowhere
-// to live because nothing in the product could draw a wall from art. They lived in a mock
-// worktree, which is exactly how the round-3 library was lost twice. They are committed here,
-// beside the buildings, the cast and the items, and registered into the codex at ingest.
-//
-// ★ NOTHING IS RE-GENERATED AND NOTHING IS PAID FOR AGAIN. The mock's `art/spend.json` books
-// the whole round at $1.80; these are those bytes, moved. `costUsd: 0` on every row.
-//
-// The remaining two of the nine are cut from these in code: the far-row shade and the seam the
-// two walls meet in, which is why the stat strip says nine pieces from seven generations.
+// Seven committed floor-and-wall pieces; the remaining two of the nine are cut from these in
+// code — the far-row shade and the seam the two walls meet in.
 
 export const INTERIORS_CONTENT_DIR =
   fileURLToPath(new URL('../content/interiors', import.meta.url))
 
-/** A floor material is sampled continuously across the room, so it has no orientation and is
- *  registered the way the ground's own materials are. A wall is an ELEVATION: a flat, square-on
- *  view of the inside face of one wall, sheared onto the wall plane by the renderer. */
+/** A floor material is sampled continuously across the room and has no orientation. A wall is an
+ *  ELEVATION: a square-on view of one wall's inside face, sheared onto the wall plane. */
 export type InteriorPieceRole = 'floor-material' | 'wall'
 
 export type InteriorPiece = {
@@ -70,13 +58,8 @@ export const INTERIOR_PIECES: readonly InteriorPiece[] = [
   },
 ]
 
-/**
- * The codex kind a piece is registered under. A floor material takes the ground's own
- * `material:` namespace, because the renderer already resolves a continuous interior floor
- * through `resolveMaterial('interior-floor')` and a second namespace for the same idea would
- * be two things to keep in step. A wall takes `interior:` — it is an elevation, not a material,
- * and it is never sampled continuously.
- */
+/** The codex kind a piece registers under. A floor material takes the ground's own `material:`
+ *  namespace, because the renderer already resolves `resolveMaterial('interior-floor')`. */
 export function interiorCodexKind(piece: InteriorPiece): string {
   return piece.role === 'floor-material'
     ? materialKind(piece.id === 'floor' ? 'interior-floor' : `interior-${piece.id}`)

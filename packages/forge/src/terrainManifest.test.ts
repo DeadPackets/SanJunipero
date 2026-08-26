@@ -79,9 +79,8 @@ describe('TilesetManifest.autotile (additive, optional)', () => {
   })
 })
 
-// C13 wrote the autotile block into the shipped manifest and left the rest for C10 T1.
-// The merge is read-merge-write, so this is the guard that neither half ever overwrites
-// the other: the real content directory must carry BOTH and still load.
+// The manifest merge is read-merge-write, so this is the guard that neither half ever overwrites
+// the other: the real content directory must carry BOTH blocks and still load.
 describe('the shipped content/tilesets manifest', () => {
   it('carries the C10 seasons/scaffolding block AND the C13 autotile block', () => {
     const m = loadTilesetManifest()

@@ -27,14 +27,12 @@ export const VisionVerdictSchema = z.object({
 }).strict()
 export type VisionVerdict = z.infer<typeof VisionVerdictSchema>
 
-// Filled by code, never asked of the model, and skipped by the derivation (deviation D-5).
+// Filled by code, never asked of the model, and skipped by the derivation.
 export const NA_CRITERIA_BY_CLASS: Record<string, readonly Criterion[]> = {
   icon: ['facing', 'alignment', 'proportion', 'tiling'],
   item: ['facing', 'alignment', 'tiling'],
   // terrain is the one class that DOES tile, and the one class that is not a subject.
-  // `transparency` is code-guaranteed here (materialFromCandidate forces alpha 255, the
-  // diamond mask cuts the edge) and unjudgeable besides: a full-bleed ground square hides
-  // the checker card entirely, so an eye can only ever fail it.
+  // `transparency` is code-guaranteed and unjudgeable: a full-bleed square hides the checker card.
   terrain: ['facing', 'alignment', 'proportion', 'singleFigure', 'transparency'],
   building: ['tiling'],
   portrait: ['alignment', 'tiling'],

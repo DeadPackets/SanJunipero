@@ -5,11 +5,8 @@ import { paletteGate, tileSeamGate } from './pixelGates.js'
 import { MATERIAL_PX } from './terrainGen.js'
 import { FURROW_PITCH_PX, ploughFurrows } from './plough.js'
 
-// How strongly does the material repeat along the furrow normal? Ploughed soil is ridges at a
-// regular pitch, so the test measures the thing the word means: fold every pixel onto its
-// phase of (x + 2y) mod pitch, and ask how far the profile moves (the ridge) against how far
-// individual lines stray from it (one-off marks). This is a measurement for this test, not a
-// gate — mechanical gates are necessary and never sufficient, and farmland_0 is the exhibit.
+// Fold every pixel onto its phase of (x + 2y) mod pitch and ask how far the profile moves (the
+// ridge) against how far individual lines stray from it (one-off marks). A measurement, not a gate.
 function furrowPeriodicity(m: RawImage, pitch: number): { withinPitch: number; acrossPitch: number } {
   const lines = new Map<number, { s: number; n: number }>()
   for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
@@ -38,9 +35,8 @@ describe('ploughFurrows', () => {
     const rejected = await decodePng(
       readFileSync(new URL('./fixtures/pixel-gates/rejected-farmland_0.png', import.meta.url)))
     const p = furrowPeriodicity(rejected, FURROW_PITCH_PX)
-    // the material the user rejected self-tiles into rows of isometric cottages: whatever
-    // profile you fold it onto, the individual lines stray from it by just as much — 1.05x,
-    // which is another way of saying it has no repeating structure at this pitch at all
+    // The rejected material self-tiles into rows of isometric cottages: whatever profile you fold
+    // it onto, the lines stray from it by just as much — no repeating structure at this pitch.
     expect(p.withinPitch / p.acrossPitch).toBeLessThan(2)
   })
 

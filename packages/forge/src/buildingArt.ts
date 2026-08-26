@@ -1,20 +1,5 @@
-// ★ WHERE A BUILDING'S ART LIVES.
-//
-// Every dwelling cell this project ever produced was written to a session scratchpad and
-// registered from there. A scratchpad is not durable: on this tip the whole art root exists
-// with ZERO files in it, so `ingestProductionArt` throws on the first founder and the town
-// wakes as eleven procedural blocks with no art of any kind. The terrain survived the same
-// wipe because terrain art is COMMITTED, under `content/tilesets/materials`.
-//
-// So building cells are committed too, beside the terrain, and this module is the one place
-// that reads them. A scratchpad may still overlay them (that is where a fresh generation
-// lands first), but nothing the renderer needs depends on a scratchpad surviving.
-//
-// FACING. The user chose two: SW, the door on the +y face — screen-left in this projection —
-// and SE, the door on the +x face, screen-right. The codex has one `kind` column and the
-// renderer resolves on it, so the facing rides IN the kind: `house` is the SW cell and
-// `house:se` is the SE one. SW keeps the bare kind, so every existing record, every renderer
-// lookup and every engine structure kind is unchanged by the second facing arriving.
+// FACING rides IN the codex `kind`: `house` is the SW cell, `house:se` the SE one. SW keeps the
+// bare kind, so every existing record and renderer lookup is unchanged by the second facing.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'

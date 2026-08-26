@@ -94,9 +94,8 @@ describe('paintRoadAutotile', () => {
   })
 })
 
-// FIX ROUND 2 defect 1: this is the fact the renderer has to respect. A road tile is a
-// RIBBON on transparency, not a filled diamond — half of a straight run is a hole. Drawn
-// instead of the ground it shows the stage behind it; drawn over the ground it is a road.
+// A road tile is a RIBBON on transparency, not a filled diamond — half of a straight run is a hole.
+// Drawn instead of the ground it shows the stage behind it; drawn over the ground it is a road.
 describe('a road tile is an overlay, not a ground tile', () => {
   const inDiamond = (x: number, y: number): boolean => {
     const half = 2 * ((y < TILE_H / 2 ? y : TILE_H - 1 - y) + 1)

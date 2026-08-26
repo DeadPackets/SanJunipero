@@ -1,62 +1,4 @@
-// ── ★ WHAT THE LEAST-BAD POLICY ALREADY SHIPPED ───────────────────────────────────────────
-//
-// USER RULING: `bestOf` may not ship a candidate that failed a gate. The question that came
-// with it was the important one — *what has it shipped already* — because one measured
-// instance almost never means one instance on this project. TACTICAL GEAR was the instance
-// somebody happened to see; this is the sweep.
-//
-// The generator gates against a MASTER figure that is not committed, so this uses the two
-// references the v2 standard already names and that ARE committed:
-//   walk frames -> the same facing's own idle (`frameCoherenceGate`, exactly as written)
-//   sleep       -> the SE idle, once (the generator uses `masterGate.se` and nothing else,
-//                  and `deriveSheet` gives all four facings the same one authored sleep cell)
-//
-// ★ THE MIRROR ASYMMETRY IS FIXED, AND THE CAUSE THIS FILE RECORDED WAS WRONG TWICE OVER.
-//
-// What it said: `frameCoherenceGate` returns different verdicts for `se` and its exact flip
-// `sw` on 3 of 10 pairs; the cause is majority downscale at a NON-INTEGER factor, which "no
-// tie-break rule reaches"; three candidate fixes were measured and none moved the count.
-//
-// Both halves of that are wrong, and the second is why the first was believed.
-//
-//  1. THE INSTRUMENT WAS WRONG. The three candidates were judged on `gateView(flip)` vs
-//     `flip(gateView)` in PIXELS — ~30 000 of them, which barely moved. That number is
-//     dominated by `anchorToCanvas` centring an odd-width bbox on an even-width canvas: a
-//     one-column TRANSLATION, which cannot change a histogram and so cannot change a palette
-//     or a silhouette verdict. Measure the downscale on its own and it is 7 313 px.
-//  2. A SYMMETRIC PARTITION REACHES IT EXACTLY. `floor(i*src/n)` boxes are not their own
-//     mirror; boundaries built so that box(n-1-i) reflects box(i) are, and with an
-//     order-independent tie-break the reduction commutes with a flip to the byte:
-//
-//       downscale(flip) vs flip(downscale)     7 313 px  ->  0 px
-//       frameCoherenceGate verdicts disagree      3/10   ->  0/10
-//
-//     The one place a symmetric partition does not exist — even output width over an odd
-//     source, where there is no centre boundary on the grid — the centre column votes in both
-//     middle boxes. `headRegionDiff` needed the other half: two bboxes of different width
-//     parity are half a column apart, so it aligns their centres in HALF pixels now.
-//
-// ★ WHAT IT COST, BECAUSE IT WAS NOT FREE: `omar se/contact-a` went 0.8125 -> 0.6875 on
-// palette and is pinned below. It is not that the art changed. `paletteJaccard` counts
-// clusters over a 1 % floor after a 10.6x majority downscale, and measured across the whole
-// committed cast a MEAN OF 12.1 of the ~13-17 deciding clusters per verdict sit within 2x of
-// that floor. omar's cell was passing at 13/16 — one cluster over the 0.80 bar — and its own
-// mirror already read 0.6875 under the shipped gate. Three of the four samplings of that art
-// say 0.6875; the audit was reading the fourth.
-//
-// A weighted (Ruzicka) palette agreement with no floor at all was measured as the way out and
-// REFUSED: over the 100 committed pairs plus four known-bad cells out of git history, clean
-// art spans 0.599-0.898 and the TACTICAL GEAR cell scores 0.898 — above 46 of the clean ones.
-// Not weak, inverted, same as the baked-shadow metric. No threshold exists. See the report.
-//
-// ONLY THE AUTHORED FACINGS ARE STILL JUDGED, now for the only reason that was ever good:
-// `deriveSheet` builds `sw` as `mirrorX(se)` and the test below asserts the two are identical
-// to the pixel, so a derived verdict is the authored art measured twice. What changed is that
-// it is no longer measured twice through a lens that answers differently.
-//
-// THIS FILE PINS THE DEBT, IT DOES NOT BLESS IT. Every entry is a cell that would not pass
-// today. Fixing one turns this red, which is the point: the list may only get shorter, and it
-// may never get longer without somebody writing the reason down.
+// Pins the cells that would fail the gate today; the list may only get shorter.
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
@@ -117,12 +59,8 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
       ['contact-a', 'contact-b'].map((p) => ({ label: p, img: crop(`${p}-${f}`) }))))
       found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}`)
   }
-  // ★ AND THE FRONT VIEW MUST NOT BE THE BACK VIEW. `crossFacingDupeGate` was written for the
-  // v1 sheet's ne/nw back-view dupe, calibrated, unit-tested on that fixture — and its only
-  // caller is `gen-character-v3.ts`, superseded. It has never run against committed art.
   // AUTHORED facings only: `sw`/`nw` are mirrors by construction, so judging them would fire
-  // `mirror-dupe` by design and say nothing about the drawing. Closest today is yusuf/idle at
-  // 0.2614 against a 0.1705 bar — 1.53x headroom across all twenty pairs.
+  // `mirror-dupe` by design and say nothing about the drawing.
   for (const p of ['idle', ...WALK]) {
     for (const x of crossFacingDupeGate(
       AUTHORED.map((f) => ({ label: `${f}/${p}`, img: view.get(`${p}-${f}`)! })), CALIBRATED_MEDIAN))
@@ -130,53 +68,16 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   }
   for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
     found.push(`${c.id} sleep ${x.gate}`)
-  // ★ AND THE AXIS, WHICH THE AUDIT WAS NOT ASKING. The head-term gap ran the other way:
-  // `coherenceGateV4` (pre-spend) asked less than `frameCoherenceGate` (post-hoc). For SLEEP
-  // it is the audit that asks less — `sleepGate` checks palette and wider-than-tall, while the
-  // generator's `sleepCoherenceGateV4` also checks that the body lies ALONG the ground diagonal
-  // rather than flat across the screen. A body drawn flat passes `aspect > 1`; three of the
-  // five shipped that way once. All five committed cells are in the band today
-  // (-33.4, -36.1, -37.7, -38.0, -36.2 against -50..-20), so asking costs nothing and the
-  // two gates now ask the same set in both directions.
+  // `sleepGate` checks palette and wider-than-tall only, and a body drawn flat across the screen
+  // still passes `aspect > 1`, so the ground-diagonal axis is asked separately.
   for (const x of sleepAxisGate(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
   return found
 }
 
-/**
- * ★ THE DEBT, AS OF THIS SWEEP. ONE cell, and it is the only one that is not a drawing.
- *
- * ★ AMARA IS OUT, BOTH ENTRIES, AND THE STRIDE SURVIVED. Her `se/contact-b` was a contact
- * frame with no contact in it — feet 280 px apart against 277 px standing, 1.011x, so she
- * walked without her weight ever landing. It was the last of the four defects the least-bad
- * policy shipped, and it was invisible to every gate in the package until `stanceGate`.
- *
- * The trap was named in advance and did not spring. Regenerating her cost her nothing:
- *
- *     cell                se/contact-b        ne/contact-b
- *     stance              1.011  -> 1.412     1.299  -> 2.199
- *     silhouette          1.0005 -> 1.1568    0.9911 -> 1.1030   (bar 1.18)
- *     head                0.0014 -> 0.1045    0.0473 -> 0.1293   (bar 0.20)
- *     stride trio         PASS   -> PASS      FAIL   -> PASS
- *
- * FOUR of her twenty-four cells moved — `contact-b` in each facing, which is two authored
- * cells and their two mirrors — and the other twenty are byte-identical. `figureH` is
- * unchanged at 954. So the second entry cleared as a side effect of the first: `ne/contact-b`
- * had been `contact-a-ne` copied, which is why its stride read 0.0000, and it is now a real
- * back-view stride. THREE new draws, $0.2060.
- *
- * ★ AND THE EYE-ONLY CONTROL BECAME A GATE. The two cached NE candidates a previous lane had
- * to refuse BY EYE — c3 at 1.000 and c6 at 1.018, both clean on every other gate — were
- * refused mechanically this time, by name and with a margin, before any money was spent.
- * That, and not the repair, is why the run cost three draws instead of seven.
- */
+/** One pinned cell remains; adding an entry requires a written reason. */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // ★ THE RULER MOVED, NOT THE ART — the only entry left, and the only one here that is not
-  // a drawing defect. It is written down rather than absorbed because that is what this list
-  // is for. See the header: this cell measured 0.8125 through a partition that answered
-  // differently on its own mirror, which read 0.6875. The gate is consistent now and reads
-  // 0.6875 in both. Clearing it means redrawing omar's se/contact-a, which also carries head
-  // 0.1871 against a 0.20 bar — the cell is marginal on two terms and a lane that regenerates
-  // it must watch both.
+  // The ruler moved, not the art. Clearing it means redrawing omar's se/contact-a, which also
+  // carries head 0.1871 against a 0.20 bar — a lane that regenerates it must watch both terms.
   'omar se palette contact-a':
     '0.6875 against 0.8000 — one palette cluster of sixteen, exposed by the mirror fix',
 }
@@ -220,11 +121,6 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
     }
   })
 
-  // ★ THIS USED TO ASSERT THE OPPOSITE. It was written to red the day `gateView` was made
-  // mirror-safe, so that the sweep could be widened; that day is this commit. It now pins the
-  // property, to the sixth decimal of every measured VALUE rather than to the verdict — a
-  // verdict-level check would go on passing while the numbers drifted right up to a
-  // threshold, which is how the defect hid in the first place.
   it('★ every measured value is identical on a facing and on its mirror', async () => {
     const disagreements: string[] = []
     for (const c of cast) {
@@ -246,12 +142,8 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
     expect(disagreements, 'the gate answers differently on the same pixels flipped').toEqual([])
   })
 
-  // ★ AND THE ONE PIECE THAT CANNOT BE FIXED, measured rather than assumed, so nobody spends
-  // a lane on it. `anchorToCanvas` centres an opaque bbox on a 96-wide canvas. An ODD bbox
-  // width has no placement that is its own mirror, so the sprite lands one column off between
-  // an image and its flip — irreducible on an integer grid, not a rounding choice. Palette,
-  // silhouette and head do not care: the first two are histograms and the third re-derives
-  // the bbox. `cellDistance` does, which is why `strideGateV4` stays authored-facings-only.
+  // An ODD opaque-bbox width has no centred placement that is its own mirror, so the sprite lands
+  // one column off between an image and its flip — which is why `strideGateV4` stays authored-only.
   it('the residual is the anchor, it is exactly one column, and only cellDistance sees it', async () => {
     const crop = cropper(cast[0]!, await decodePng(cast[0]!.atlas))
     let odd = 0

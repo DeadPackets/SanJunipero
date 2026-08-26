@@ -22,43 +22,12 @@ export function mechanicalGate(img: RawImage, expected: { w: number; h: number; 
   return { ok: failures.length === 0, failures }
 }
 
-// ── ★ A GATE THAT COMPUTES A VERDICT MAY NOT HAVE THAT VERDICT DISCARDED ───────────────────
-//
-// USER RULING. Every generator in this package chose a winner the same way and wrote it
-// differently, which is why nobody saw it was one policy. There are SEVEN of them in three
-// disguises — and a count by disguise undercounts, because each disguise was pasted between
-// siblings:
-//
-//   least-bad `bestOf` reduce     gen-cast-v5, gen-cast-v4, gen-character-v4
-//   `(clean.length ? clean : …)`  gen-structures-v5, gen-dwellings-v2, gen-dwellings
-//   `rank = fails.length * 100`   gen-library-v2 — a failure ranks worse, never excluded
-//
-// ★ `gen-dwellings-v2` is the one that matters and was not on the first list: it is live, it
-// writes `content/buildings`, and it wrote the ten dwelling cells the town stands on. Those
-// cells are measured clean today — but the policy that could have shipped a bad one was live
-// the whole time.
-//
-// So a gate could measure a cell, write the number into a report, and be overruled by its own
-// caller. It happened: `amara/contact-b-ne` was measured at 1.1855 opaque area against a 1.18
-// silhouette tolerance and committed — a figure in the wrong costume with the words TACTICAL
-// GEAR set beside her in silver, which a viewer saw in the running product. The audit that
-// followed found three more the same way. This is the vacuous-guard family in its purest form:
-// the check ran, the check was right, and nothing was downstream of it.
-//
-// Choosing and deciding are now separate. A ranker may still pick the least-bad candidate; it
-// may not ship one that has a failure against it.
+// bestOf chooses; it never ships a candidate that failed a gate.
 
 export type GateVerdict = { key: string; failures: readonly string[] }
 
-/**
- * The message a refusal must carry. Empty means at least one candidate was clean and the run
- * may go on; a non-empty string is meant to be thrown.
- *
- * ★ IT NAMES EVERY CANDIDATE, NOT JUST THE WINNER. The operator's first question is always
- * "is the model wrong or is the threshold wrong", and only seeing all N sets of margins
- * answers it: three candidates failing the same gate by 0.005 is a threshold, three failing
- * different gates by a mile is a prompt.
- */
+/** The message a refusal must carry: empty means a candidate was clean and the run may go on, a
+ *  non-empty string is meant to be thrown. It names EVERY candidate, not just the winner. */
 export function refusalMessage(what: string, cands: readonly GateVerdict[]): string {
   if (cands.length === 0 || cands.some((c) => c.failures.length === 0)) return ''
   const detail = cands

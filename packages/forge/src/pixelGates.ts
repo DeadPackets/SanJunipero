@@ -1,9 +1,5 @@
-// Mechanical criteria are COUNTED, never asked of the vision judge. These are the pixel-bar
-// gates: pure functions over a shipped PNG that stop obviously broken art before an eye ever
-// sees it. They are NECESSARY, NOT SUFFICIENT — the user's eye remains the only art gate.
-//
-// The governing rule they enforce is INTEGER DOWNSCALE ONLY: a target that does not divide
-// the generation evenly cannot preserve a pixel grid, and that is the "weird pixel effect".
+// Pixel-bar gates: pure functions over a shipped PNG. NECESSARY, NOT SUFFICIENT — the user's eye
+// remains the only art gate. They enforce INTEGER DOWNSCALE ONLY, the rule that keeps the grid.
 import type { Footprint } from '@sj/shared'
 import { paletteRgb } from './palette.js'
 import type { RawImage } from './post/raw.js'
@@ -87,11 +83,8 @@ export function alphaBinaryGate(
 
 // ---------------------------------------------------------------- 4. palette conformance
 
-// USER RULING 2026-08-18: the blanket portrait exemption this gate once carried is REVOKED.
-// A class may answer to a WIDER palette, never to none. `palette` is how it says which —
-// portraits pass `derivedPalette()`, which is MASTER_PALETTE plus the tones interpolated
-// between adjacent members of the same ramp. Faces keep their range, the world keeps its
-// harmony, and the gate stays mechanical.
+// A class may answer to a WIDER palette, never to none, and `palette` is how it says which:
+// portraits pass `derivedPalette()`, MASTER_PALETTE plus the tones interpolated within each ramp.
 export function paletteGate(
   img: RawImage, opts: { palette?: readonly (readonly number[])[] } = {},
 ): GateResult & { offPalette: number; offenders: { hex: string; count: number }[] } {
@@ -116,9 +109,8 @@ export function paletteGate(
 
 // ---------------------------------------------------------------- 5. density within a sprite
 
-// A sprite's density is how many art pixels it spends per world pixel of the ground it
-// covers. A fractional density cannot land on the pixel grid at any zoom, which is what
-// 192 px of bed over a 1x2 footprint on a 128x64 tile asks for.
+// A sprite's density is how many art pixels it spends per world pixel of the ground it covers.
+// A fractional density cannot land on the pixel grid at any zoom.
 export function spriteDensity(a: { canvas: Size; footprint: Footprint; tile: Size }): number {
   const spanW = (a.footprint.w + a.footprint.h) * (a.tile.w / 2)
   return a.canvas.w / spanW
@@ -147,11 +139,8 @@ export function classDensityGate(
 
 // ---------------------------------------------------------------- 7. tileset seams
 
-// A seam is only a seam relative to the material's own noise: a busy stone wall wraps with
-// a bigger absolute delta than still water and is no worse for it. Calibrated on the nine
-// shipped terrain materials plus the mock wall: sound wraps land at 1.1-1.8x their interior
-// baseline, the repeating wall piece at 4.5x. The absolute floor keeps a near-uniform
-// material from failing on dither noise.
+// A seam is only a seam relative to the material's own noise: a busy stone wall wraps with a
+// bigger absolute delta than still water. The floor keeps a near-uniform material off dither noise.
 export const SEAM_RATIO_MAX = 2.5
 export const SEAM_ABSOLUTE_FLOOR = 8
 
@@ -192,9 +181,8 @@ export function tileSeamGate(img: RawImage): GateResult & {
   return { ok: ok(failures), failures, wrapH, baselineH, wrapV, baselineV }
 }
 
-// The other half of a seam: a join can be perfect and the repeat still read as a pattern.
-// The mock round's wall came back every 4 tiles with a timber post at its edge, and the
-// repeat looked like deliberate half-timbering.
+// The other half of a seam: a join can be perfect and the repeat still read as a pattern — a wall
+// piece coming back every 4 tiles looked like deliberate half-timbering.
 export function tilesetVarietyGate(
   sequence: readonly string[], opts: { minPeriod: number },
 ): GateResult & { shortestPeriod: number | null } {
@@ -218,25 +206,8 @@ export function tilesetVarietyGate(
 
 // ------------------------------------------------- 9. one body, one silhouette
 
-// ★ THE GATE THAT WOULD HAVE STOPPED "TACTICAL GEAR".
-//
-// `amara/contact-b-ne` shipped a standing figure in a tactical harness with the words
-// TACTICAL GEAR set beside her in silver pixel type — the image model captioning the costume
-// it had just invented — and its mirror `contact-b-nw` shipped the caption backwards. It
-// reached the running product: one frame in four of Amara's walk loop, in two of her four
-// facings. EVERY LANDED GATE PASSED IT. `alphaBinaryGate` passed because the letters are hard
-// alpha; `paletteGate` passed because they are drawn in MASTER_PALETTE silver; the coherence
-// gate measured 1.1855 against a 1.18 silhouette tolerance and the generator shipped the
-// least-bad of three failing candidates anyway; and `despeckle` removes islands under 1 % of
-// the mass, while "TACTICAL" alone is 8.93 %.
-//
-// What none of them asked is the thing a person can see instantly: A PERSON IS ONE SHAPE.
-// Text, a caption, a stray prop, a second figure, a baked drop shadow — every one of them is
-// opaque mass that does not touch the body. Measured over the 120 committed cast cells: 118
-// are exactly ONE island and the largest detached mass anywhere among them is 0.0000 %.
-//
-// The tolerance is `despeckle`'s own contract, so this gate asks for nothing the pipeline does
-// not already promise: anything the pipeline should have swept, and nothing it should not.
+// A PERSON IS ONE SHAPE. Text, a caption, a stray prop, a second figure or a baked drop shadow is
+// opaque mass that does not touch the body; the tolerance is `despeckle`'s own contract.
 export const DETACHED_MASS_MAX = 0.01
 
 export function soleSilhouetteGate(img: RawImage): GateResult & {

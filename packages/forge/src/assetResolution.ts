@@ -1,14 +1,5 @@
-// THE C-LEVEL BAR. Treatment C of the interior-mock round is the quality the user chose:
-// 4x town scale, a 128x64 interior tile, furniture authored at 128-192 px. This file is the
-// one place that says, per asset class, how big the art is and how it gets there.
-//
-// GOVERNING RULE: INTEGER DOWNSCALE ONLY. A generation is always GEN_SIZE square. The shipped
-// size is a crop of that generation divided by a whole number. A target that does not divide
-// its source evenly is a bug, not a taste call — 512 / 192 = 2.667 is what made the pixels
-// soft, and 512 / 24 = 21.33 is why every item in the game looks like mush.
-//
-// The factor floor is 2: dividing by one ships the generation's own painterly pixels, which
-// is how the character cells ended up UPSCALED to 843 px of soft art off a 512 source.
+// INTEGER DOWNSCALE ONLY: a shipped size is a crop of the generation divided by a WHOLE number,
+// factor floor 2. A fractional divide (512 / 192 = 2.667) is what makes the pixels soft.
 import type { Footprint } from '@sj/shared'
 import { GEN_SIZE } from './imageClient.js'
 import type { Size } from './pixelGates.js'
@@ -17,11 +8,8 @@ export const TOWN_TILE = { w: 32, h: 16 } as const
 export const INTERIOR_TILE = { w: 128, h: 64 } as const
 export const MIN_DOWNSCALE_FACTOR = 2
 
-// NOT every class generates at GEN_SIZE. gen-buildings-v4 and the character scripts ask the
-// provider for 1024x1024 directly, and the provider returns JPEG bytes whatever the size —
-// so the "raw" already carries DCT ringing around every hard edge before anything is scaled.
-// Sampling the MEDIAN of each block on the way down is what washes that out; a point sample
-// would ship it.
+// Buildings and character cells are asked for at 1024 directly, and the provider returns JPEG at
+// any size — sample the MEDIAN of each block on the way down or the DCT ringing ships.
 export const GENERATION_PX = {
   item: GEN_SIZE, icon: GEN_SIZE, terrain: GEN_SIZE, portrait: GEN_SIZE, 'interior-tile': GEN_SIZE,
   building: 1024, structure: 1024, 'character-cell': 1024,
@@ -35,11 +23,6 @@ export const C_LEVEL = {
   zoomStops: [1, 2, 3, 4],
 } as const
 
-// The old ceiling, moved. It lived in three places and is quoted in the report:
-//   packages/shared/src/interiorMeta.ts   LibraryItemManifestSchema.spritePx  max(24)
-//   packages/forge/src/library/catalog.ts LibraryEntrySchema.spritePx         max(24)
-//   packages/forge/src/library/catalog.ts WORLD_SPRITE_PX                      = 24
-//   packages/forge/src/styleBible.ts      targetSize('item')                   = 24x24
 export const WORLD_SPRITE_PX = 128
 export const ICON_PX = 64
 

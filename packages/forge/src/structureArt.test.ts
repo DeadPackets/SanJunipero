@@ -18,24 +18,8 @@ import {
   worldStructureKinds,
 } from './structureArt.js'
 
-// ★ THE GATE THAT WOULD HAVE CAUGHT ALL OF THIS — AND THE BLIND SPOT IT SHIPPED WITH.
-//
-// A farmhouse stood in the town with no art for a whole merge train and CI stayed green. The
-// founders' home registered under kind `hut` — a kind nothing places — and CI stayed green.
-// Round 4 added the coverage law and both stopped.
-//
-// It then missed SIX MORE KINDS for the same reason in a different place: it asked only what
-// `makeCityTemplate()` places. `bridge` is raised by an agent through the `build` verb,
-// `grave` is laid by the world when somebody dies, and `wagon`, `shed`, `scaffolding` and
-// `standing_stone` are stood by the gateway's own dev town. None of the six was in the
-// template, so the gate never looked, stayed green, and all six drew a grey prism. Worse,
-// `well` and `fire_pit` were EXEMPTED by name — and a human found them standing bare in the
-// middle of the town square.
-//
-// IT MUST NOT BE SATISFIABLE BY THE PROCEDURAL FALLBACK. `builtForm` answers EVERY kind, so a
-// gate that asks "did something draw?" passes forever. Everything below is measured on the
-// CODEX — the same `class`/`kind` columns `buildingArt()` resolves on — and `builtForm` never
-// writes a codex row. `the fallback cannot satisfy this gate` states that in a test.
+// Measured on the CODEX, never on the renderer: `builtForm` answers EVERY kind, so a gate that
+// asks "did something draw?" passes forever, and `builtForm` writes no codex row.
 
 /** The registration the dev world does at boot, against a real codex. */
 function registeredKinds(): string[] {
@@ -55,22 +39,15 @@ const TEMPLATE = makeCityTemplate()
 const RECIPES = DEFAULT_CONFIG.structures.recipes
 
 /** The four the GATEWAY's fixture town stands. `@sj/forge` cannot import `@sj/gateway`, so the
- *  names are frozen here as data and `ingestArt.test.ts` asserts they are still that town's
- *  kinds — the two halves of one law, each next to the source it can see. */
+ *  names are frozen here and `ingestArt.test.ts` asserts they are still that town's kinds. */
 const DEV_TOWN_KINDS = ['scaffolding', 'shed', 'standing_stone', 'wagon'] as const
 
 const CREATABLE = worldStructureKinds({
   structures: TEMPLATE.structures, recipes: RECIPES, extra: DEV_TOWN_KINDS,
 })
 
-/** Where a kind's UNTURNED mass is stated — `w` along the street, `h` into the block. The
- *  template and the recipe table are both authorities and they agree on `house`; the dev town's
- *  four are asserted in the gateway, next to it.
- *
- *  ★ A TEMPLATE INSTANCE STATES ITS TURNED GROUND, so it is un-turned by its own facing before
- *  it can key a per-kind table. `footprintFor` is its own inverse. Reading `s.w`/`s.h` straight
- *  made this map last-instance-wins: the only farmhouse in the template faces SE, so the table
- *  said 2×4 and the SW cell that stands on 4×2 was graded against the wrong diamond. */
+/** Where a kind's UNTURNED mass is stated — `w` along the street, `h` into the block. A template
+ *  instance states its TURNED ground, so it is un-turned by its own facing before it keys this. */
 const untorn = (s: { w: number; h: number; facing: 'sw' | 'se' }) =>
   footprintFor({ w: s.w, h: s.h }, s.facing)
 const AUTHORITATIVE_FOOTPRINT = new Map<string, { w: number; h: number }>([
@@ -243,11 +220,8 @@ describe('the committed cells', () => {
 
   it.each(cells.map((c) => [c.dir, c] as const))('%s clears the pixel bar', async (_dir, c) => {
     const img = await decodePng(c.png)
-    // ★ A TURNED BUILDING TURNS ITS GROUND, AND EVERY CREATABLE KIND IS ASKED. The mass is the
-    // UNTURNED one — `w` along the street, `h` into the block — so an SE cell is graded against
-    // it TURNED. Reading the mass straight is the mistake `footprintFor` exists to prevent:
-    // `farmhouse-se` declared 4×2 and stands on 2×4, and every gate downstream graded the
-    // diamond it was told about rather than the one the building covers.
+    // The mass is the UNTURNED one, so an SE cell is graded against it TURNED. Reading the mass
+    // straight is what let `farmhouse-se` declare 4×2 while standing on 2×4.
     const mass = AUTHORITATIVE_FOOTPRINT.get(c.kind)
     // the four dev-town kinds are asserted against TOWN_STRUCTURES in the gateway's own test
     if (mass !== undefined) {

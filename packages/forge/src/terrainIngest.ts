@@ -20,19 +20,16 @@ import {
 } from './terrainGen.js'
 import { paintRoadAutotile } from './roadTiles.js'
 
-// The generated art, keyed by the program's asset id. A missing material is not an error:
-// the code-painted tile stands in, so the town never loses its ground because one call
-// failed. Art independence, the same law the ground bake already lives by.
+// The generated art, keyed by the program's asset id. A missing material is not an error: the
+// code-painted tile stands in, so the town never loses its ground because one call failed.
 export type MaterialBook = ReadonlyMap<string, RawImage>
 
 export function materialFor(book: MaterialBook, assetId: string): RawImage | null {
   return book.get(assetId) ?? null
 }
 
-// The generated materials ship WITH the repo, beside the sheets they grade, because the
-// gateway registers them into the codex at boot — the renderer reads the codex, not the
-// manifest. Filenames are the asset id with ':' swapped for '_', so the mapping is obvious
-// on disk and reversible without a side table.
+// The materials ship WITH the repo because the gateway registers them into the codex at boot —
+// the renderer reads the codex, not the manifest. A filename is the asset id with ':' as '_'.
 export const MATERIALS_DIR =
   join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets', 'materials')
 
@@ -46,15 +43,8 @@ export async function loadMaterialBook(dir: string = MATERIALS_DIR): Promise<Map
   return book
 }
 
-// VARIANT COHESION. The renderer picks a variant per tile by hash, so any difference in
-// average TONE between a kind's variants renders as a harlequin checkerboard — four clearly
-// different colours tiled at random. Seen at lattice scale in the first preview: the four
-// grass variants came back pale sage, dark green, mid green and sandy tan, and the field
-// looked far worse than the flat colour it replaced. Neither the seam check nor the frame
-// check nor the eye can see this, because it does not exist inside one tile.
-//
-// Variants exist to break up REPETITION, not to add COLOUR. So each variant is shifted onto
-// the kind's mean tone and re-quantized: the grain survives, the patchwork does not.
+// VARIANT COHESION: the renderer picks a variant per tile by hash, so any difference in average
+// TONE renders as a harlequin checkerboard. Variants break REPETITION, they never add COLOUR.
 export const VARIANT_TONE_TOLERANCE = 4      // mean per-channel distance considered cohesive
 
 const meanRgb = (m: RawImage): [number, number, number] => {
@@ -96,9 +86,8 @@ export type TerrainIngestReport = {
   kinds: string[]
 }
 
-// Registers into EXACTLY the codex kinds the renderer already reads — `grass`…`road` for the
-// flat variants and `road:<key>` for the autotile strip — so generated art hot-swaps and the
-// renderer contract does not move.
+// Registers into EXACTLY the codex kinds the renderer already reads, so generated art hot-swaps
+// and the renderer contract does not move.
 export async function registerGeneratedTerrain(
   codex: AssetCodex, book: MaterialBook,
 ): Promise<{ records: AssetRecord[]; report: TerrainIngestReport }> {
@@ -118,9 +107,8 @@ export async function registerGeneratedTerrain(
     kinds.push(kind)
   }
 
-  // TERRAIN V2: the CONTINUOUS material, registered whole under `material:<kind>`. This is
-  // what the ground bake samples in world space; the per-tile records below stay only as the
-  // fallback path and for anything still asking for a single tile.
+  // The CONTINUOUS material, registered whole under `material:<kind>` — what the ground bake
+  // samples in world space. The per-tile records below stay only as the fallback path.
   for (const kind of TERRAIN_TILE_KINDS) {
     const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: 0 }))
     if (m === null) continue
@@ -135,8 +123,8 @@ export async function registerGeneratedTerrain(
     kinds.push(materialKind(kind))
   }
 
-  // TERRAIN V2.1: the calm ribbon material has no TileId — a road tile picks between it and
-  // the cobble by SHAPE, so it is registered as a material and nothing else.
+  // The calm ribbon material has no TileId — a road tile picks between it and the cobble by
+  // SHAPE — so it is registered as a material and nothing else.
   const calm = materialFor(book, CALM_ROAD_ID)
   if (calm !== null) {
     generated++
@@ -169,9 +157,8 @@ export async function registerGeneratedTerrain(
     }
   }
 
-  // All fifteen shapes are cut from ONE road surface, so the lattice is one road. Without a
-  // generated surface they are C13's painted cells — every key is always registered, because
-  // a missing `road:<key>` record drops the whole lattice back to flat variants.
+  // All fifteen shapes are cut from ONE road surface. Every key is always registered, because a
+  // missing `road:<key>` record drops the whole lattice back to flat variants.
   const road = materialFor(book, ROAD_MATERIAL_ID)
   for (const key of ROAD_AUTOTILE_KEYS) {
     if (road === null) painted++
@@ -185,9 +172,8 @@ export async function registerGeneratedTerrain(
 
 // ------------------------------------------------------------------ seasonal sheets
 
-// D-3 shipped four seasonal sheets tinted by hand-guessed ratios. These are graded from the
-// GENERATED seasonal materials instead: the tint is measured off real art, then applied to
-// the generated ground and re-quantized so the sheet stays palette-true.
+// The tint is measured off the GENERATED seasonal materials rather than hand-guessed, then applied
+// to the generated ground and re-quantized so the sheet stays palette-true.
 export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
   const width = SHEET_COLS * TERRAIN_TILE_W, height = SHEET_ROWS * TERRAIN_TILE_H
   const sheet: RawImage = { width, height, data: new Uint8ClampedArray(width * height * 4) }

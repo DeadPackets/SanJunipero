@@ -1,22 +1,9 @@
-// DERIVED RAMPS — USER RULING 2026-08-18.
-//
-// The forge asked for a blanket palette exemption for portraits, on the evidence that the
-// forty-colour master palette is sized for a 32x16 world tile and snapping a 128 px bust to
-// it flattens the hair to one tone and the skin shading to two. The exemption was NOT granted.
-// The ruling instead: extra tones are allowed ONLY where they are interpolated between
-// existing MASTER_PALETTE members. Faces keep their range, the world keeps its harmony, and
-// the gate stays mechanical — just wider.
-//
-// A ramp is a run of members of the same hue family, light to dark, as the palette's own
-// comment lays them out. Interpolation happens INSIDE a ramp and between ADJACENT members:
-// a tone half way between two neighbouring creams is a cream, and a tone half way between
-// the purple accent and the yellow one is arbitrary colour with a straight line drawn
-// through it.
+// A class may answer to a wider palette, never to none: extra tones are allowed ONLY where they
+// interpolate between ADJACENT members of one ramp — between two creams, never across two hues.
 import { MASTER_PALETTE, paletteRgb, type Rgb } from './palette.js'
 
-// The groups the palette's own header names, as index runs into MASTER_PALETTE. `accent` is
-// FOUR UNRELATED HUES, not a ramp — it is listed as four ramps of one so that every member
-// is accounted for and nothing interpolates across it.
+// The palette's own groups, as index runs. `accent` is FOUR UNRELATED HUES, listed as four ramps
+// of one so every member is accounted for and nothing interpolates across it.
 export const PALETTE_RAMPS: Record<string, readonly (readonly number[])[]> = {
   cream: [[0, 1, 2, 3, 4]],
   honey: [[5, 6, 7, 8, 9]],
@@ -29,9 +16,8 @@ export const PALETTE_RAMPS: Record<string, readonly (readonly number[])[]> = {
   skin: [[37, 38, 39]],
 }
 
-// How many equal parts each adjacent pair is cut into. 2 inserts one tone between every
-// neighbouring pair — it turns a five-step ramp into nine, which is what returns the four
-// skin tones and the dark hair outline the master palette was flattening.
+// 2 inserts one tone between every neighbouring pair, turning a five-step ramp into nine — which
+// returns the four skin tones and the dark hair outline the master palette was flattening.
 export const RAMP_STEPS = 2
 
 // Every adjacent pair inside every ramp, as index pairs.

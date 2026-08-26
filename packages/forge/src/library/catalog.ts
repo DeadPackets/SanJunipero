@@ -28,18 +28,8 @@ const material = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'material', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const ritual = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'ritual', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
-/**
- * ★ A FURNISHING IS AUTHORED FOR THE GROUND IT COVERS, NOT FOR A SINGLE SIZE.
- *
- * `WORLD_SPRITE_PX` is the 1×1 answer. A 1×2 bed spans `(1 + 2) × 64` = 192 px of the 128×64
- * interior tile — `assetResolution.nativeSizeFor` has said so since the C-level bar landed —
- * and shipping it at 128 draws a bed two-thirds the length of the person lying in it, which is
- * what the browser showed the moment the room stopped scaling everything up.
- *
- * `SHORT_OF_FOOTPRINT` is the honest half: two 1×2 kinds have no 192 px art yet. They keep the
- * size their art actually is — nothing is ever declared bigger than the pixels behind it — and
- * `catalog.test.ts` names them, so closing the gap is one deletion per kind.
- */
+/** Two 1×2 kinds have no 192 px art yet, so they keep the size their art actually is — nothing is
+ *  ever declared bigger than the pixels behind it. Closing the gap is one deletion per kind. */
 export const SHORT_OF_FOOTPRINT: ReadonlySet<string> = new Set(['bench', 'loom'])
 
 const furniture = (kind: string, desc: string, interior: LibraryEntry['interior']): LibraryEntry => ({
@@ -76,9 +66,8 @@ const FOODS: LibraryEntry[] = [
   food('venison', 'a cut of deer meat, deep rose flesh with a rim of cream fat, tied with a loop of twine'),
   food('rabbit_meat', 'a small dressed rabbit cut, pale rose flesh on a short bone, ready for the pot'),
   food('stew', 'a shallow bowl of thick stew, honey-brown broth with chunks of root vegetable showing'),
-  // The two caps differ by one word and nothing else — the picture never tells the town what it knows.
-  // The anti-spot clause is on BOTH caps: the one that came back a red toadstool needed it,
-  // and the pair may only ever differ by the colour word.
+  // The anti-spot clause is on BOTH caps — one came back a red toadstool — and the pair may only
+  // ever differ by the colour word.
   food('field_mushroom', 'a single squat mushroom with a rounded unmarked chestnut cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
   food('pale_mushroom', 'a single squat mushroom with a rounded unmarked ivory cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
   food('herb_bundle', 'a tied bunch of green herbs, sage and pale mint leaves gathered by a strip of dusty-rose cloth'),

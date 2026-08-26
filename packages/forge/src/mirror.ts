@@ -1,6 +1,5 @@
-// Character standard v3 (mirror standard): 2 authored facings + 1 sleep cell derive
-// the full 24-cell sheet in code. SW = flip(SE), NW = flip(NE); passing-a = passing-b;
-// sleep-se/sw = the one sleep cell, sleep-ne/nw = its flip. Facing-correct by construction.
+// 2 authored facings + 1 sleep cell derive the full 24-cell sheet: SW = flip(SE), NW = flip(NE),
+// passing-a = passing-b, sleep-ne/nw = its flip. Facing-correct by construction.
 import type { RawImage } from './post/raw.js'
 import {
   FACINGS, POSES_V2, mirrorX, cellDistance, paletteJaccard, opaqueArea, opaqueBbox,
@@ -72,13 +71,8 @@ export function strideGateV4(facing: string, strip: Record<StripPoseV4, RawImage
   return failures
 }
 
-/**
- * ★ THE GATE `strideGateV4` IS NOT. It asks whether two frames DIFFER; this asks whether a
- * contact frame is a contact POSE. See `footSpan` in `sheet.ts` for the calibration and for
- * the four standing figures that cleared every other gate in the package.
- *
- * NATIVE cells, not gate views: the separation is 0.19 wide and a 96px canvas cannot hold it.
- */
+/** `strideGateV4` asks whether two frames DIFFER; this asks whether a contact frame is a contact
+ *  POSE. NATIVE cells: the separation is 0.19 wide and a 96px gate canvas cannot hold it. */
 export function stanceGate(facing: string, idle: RawImage,
   contacts: { label: string; img: RawImage }[], min = STANCE_MIN_RATIO): GateFailure[] {
   const base = footSpan(idle)
@@ -90,18 +84,8 @@ export function stanceGate(facing: string, idle: RawImage,
   })
 }
 
-// The ONE coherence gate: palette-jaccard + silhouette (opaque area) + head, vs the master's
-// figure for the same view. Catches identity drift in edit calls; nothing else.
-//
-// ★ THE HEAD TERM WAS MISSING, AND THAT IS THE FINDING. This gate runs BEFORE the money is
-// spent and decides which candidate ships; `frameCoherenceGate` runs AFTER, over the committed
-// cells, in `castAudit.test.ts`. It asks three questions and this one asked two — so the
-// pre-spend gate was a STRICT SUBSET of the post-hoc audit and a candidate could clear the one
-// that costs money and red the one that costs nothing. Two of the cast's known debts are
-// exactly that: `omar ne/contact-a` at 0.2379, and salma's first replacement `ne/contact-a`,
-// drawn live in this lane, at 0.3366 — clean on silhouette and palette, and a different head.
-// Legs move between walk frames; heads do not, and the number that says so was only ever read
-// after the fact.
+// The ONE coherence gate: palette-jaccard + silhouette + head against the master's figure for the
+// same view. The head term is load-bearing — legs move between walk frames, heads do not.
 export function coherenceGateV4(label: string, master: RawImage, cell: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
   const jac = paletteJaccard(master, cell)
@@ -116,10 +100,8 @@ export function coherenceGateV4(label: string, master: RawImage, cell: RawImage)
   return failures
 }
 
-// A body asleep on a 2:1 dimetric ground plane runs ALONG the ground diagonal, so its long
-// axis tilts up to the right; drawn flat across the screen it reads as pasted on rather than
-// lying on. The band is signed, so the same number also catches a cell whose head points the
-// wrong way — the mirrored one has the right magnitude and the wrong sign.
+// A body asleep on a 2:1 dimetric ground plane lies ALONG the ground diagonal, so its long axis
+// tilts up to the right. The band is SIGNED, so it also catches a head pointing the wrong way.
 export const SLEEP_AXIS_DEG_MIN = -50
 export const SLEEP_AXIS_DEG_MAX = -20
 

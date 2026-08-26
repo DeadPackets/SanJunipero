@@ -1,22 +1,5 @@
-// ★ THE COVERAGE LAW, EXTENDED FROM STRUCTURES TO ITEMS AND TO THE CAST.
-//
-// `structureArt.ts` asserts that a kind standing in the town has a cell. It was written after
-// a farmhouse stood with no art for a whole merge train and CI stayed green. The SAME hole was
-// open two more times over, wider, and nothing caught either:
-//
-//   class item:      0 records   every one of the fifty library items drew the placeholder
-//   class rig-part:  0 records   every villager in the town drew the placeholder
-//
-// Both were paid for, both were written to a session scratchpad, and the scratchpad was
-// emptied. The reason no test noticed is the reason `structureArt.ts` gives for buildings:
-// THE FALLBACK ALWAYS ANSWERS. `makePlaceholder` returns a palette-true checkerboard for every
-// class, so a gate that asks the renderer "did something draw?" passes forever, whatever the
-// codex holds. Every assertion here therefore reads the CODEX — the same class/kind columns
-// `textures.ts` and `roomPlan` resolve on — and the placeholder writes no codex row.
-//
-// Two directions, both of which have actually happened in this repo:
-//   MISSING   a kind the world will ask for, with no record to answer it.
-//   ORPHAN    a record registered under a kind nothing asks for. `hut` was one for a train.
+// The coverage law, extended from structures to items and to the cast. It reads the CODEX, not
+// the renderer: `makePlaceholder` answers every class, so "did something draw?" passes forever.
 import { FOUNDER_IDS } from '@sj/shared'
 import { LIBRARY } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
@@ -41,10 +24,8 @@ function compare(required: readonly string[], registered: readonly string[]): Co
 
 // ── items ───────────────────────────────────────────────────────────────────────────────────
 
-/** Every codex kind the fifty-item library must answer to. An item is TWO records, not one:
- *  the world sprite the ground draws and the icon the roster and inventory draw. Shipping the
- *  sprite alone leaves every inventory row a checkerboard, which is how the icon half of this
- *  went missing without being noticed separately from the sprite half. */
+/** Every codex kind the fifty-item library must answer to; an item is TWO records, the world
+ *  sprite and the inventory icon, and they go missing separately. */
 export function requiredItemKinds(): string[] {
   return LIBRARY.flatMap((e) => [e.kind, `${e.kind}${ICON_SUFFIX}`]).sort()
 }

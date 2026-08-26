@@ -78,10 +78,8 @@ const terrainMeta = (kind: TerrainTileKind, variant: number): string => JSON.str
   { version: 'v1-terrain-tile', kind, variant, wPx: TERRAIN_TILE_W, hPx: TERRAIN_TILE_H },
 )
 
-// C13's 15-tile road strip, one codex record per key. The manifest kind stays the flat
-// `road` (the strip is road art, autotiled); the codex KIND carries the shape, which is what
-// resolveTerrainTile looks up. Without this the renderer's autotile seam always falls back
-// to the four flat road variants and every junction draws as the same slab.
+// The manifest kind stays the flat `road` (the strip is road art, autotiled); the codex KIND
+// carries the shape, which is what `resolveTerrainTile` looks up.
 export async function registerRoadAutotiles(codex: AssetCodex): Promise<AssetRecord[]> {
   const out: AssetRecord[] = []
   for (const key of ROAD_AUTOTILE_KEYS) {

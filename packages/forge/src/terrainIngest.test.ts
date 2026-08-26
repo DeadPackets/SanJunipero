@@ -25,8 +25,7 @@ import {
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
 // A GRAINY palette-true material — a flat fill would collapse to one picture under variant
-// cohesion, and a real generated material never is flat. Grain is seeded per material so two
-// variants of the same tone still differ pixel for pixel.
+// cohesion, and a real generated material never is flat. Grain is seeded per material.
 function material(hex: number, px = MATERIAL_PX, seed = hex): RawImage {
   const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   const base = [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff]
@@ -184,16 +183,11 @@ describe('seasonSheetFrom', () => {
 })
 
 
-// Whatever ships in content/tilesets/materials is what the town's ground actually looks
-// like, so it meets the same two measurements the generator gates on. An empty directory is
-// a valid state (the code-painted tiles stand in) — but a material that IS there must wrap
-// and must not be a framed card.
+// Whatever ships in content/tilesets/materials is what the town's ground looks like, so it meets
+// the same two measurements the generator gates on. An empty directory is a valid state.
 describe('the shipped materials', () => {
-  // A frame is unambiguous and always rejected. The wrap is judged against what it cost to
-  // remove that frame: cropping a square breaks its own edges, so a material that had to be
-  // deframed is allowed a looser wrap — farmland went from h=2.0 framed to h=11.7 clean.
-  // provenance.json is written by the shipper, so this is read from the shipped state rather
-  // than from a hand-kept list of exceptions.
+  // A material that had to be deframed is allowed a looser wrap, because cropping a square breaks
+  // its own edges. `provenance.json` is read from the shipped state, not a hand-kept list.
   const DEFRAMED_SEAM_TOLERANCE = 20
 
   it('none of them is a drawn frame, and every one wraps as well as its crop allows', async () => {
@@ -213,10 +207,8 @@ describe('the shipped materials', () => {
     }
   })
 
-  // The absolute check above is blind on smooth ground: terrain_earth wrapped at 2.9 against
-  // a tolerance of 14 and the line was plainly there, because the tile's own interior only
-  // varies by 2.1. Every shipped material now closes its wrap by construction, so the wrap
-  // has to be as quiet as the grain — not merely quiet in absolute terms.
+  // The absolute check above is blind on smooth ground: earth wrapped at 2.9 against a tolerance
+  // of 14 with the line plainly there. The wrap has to be as quiet as the grain.
   it('wraps as quietly as its own grain, which is the only bar a smooth material can fail', async () => {
     const book = await loadMaterialBook()
     for (const [assetId, img] of book) {
@@ -252,8 +244,7 @@ describe('the shipped materials', () => {
 
 
 // The renderer picks a variant per tile by hash, so any difference in average TONE between a
-// kind's variants renders as a harlequin checkerboard. Seen at lattice scale in the first
-// preview and invisible to every other check, because it does not exist inside one tile.
+// kind's variants renders as a harlequin checkerboard, invisible inside any one tile.
 describe('variant cohesion', () => {
   const four = [0x93b573, 0x4f7040, 0xb9d19a, 0xe8d5bc].map((h) => material(h))
 
@@ -293,10 +284,8 @@ describe('variant cohesion', () => {
       .toEqual(cohereVariants(four).map((m) => Buffer.from(m.data).toString('base64')))
   })
 
-  // TERRAIN V2 superseded the defect this guarded: there are no per-tile variants left to
-  // disagree in tone, because there is no per-tile choice at all. Cohesion stays as the guard
-  // on the FALLBACK set — which now reuses one material, so the four tiles are identical by
-  // construction and the spread is zero rather than merely small.
+  // There are no per-tile variants left to disagree in tone. Cohesion stays as the guard on the
+  // FALLBACK set, which reuses one material, so the spread is zero by construction.
   it('leaves the fallback set in one tone, because v2 has one material per ground', async () => {
     const db = openForgeDb(':memory:')
     try {

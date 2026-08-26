@@ -1,8 +1,7 @@
 export type Rgb = [number, number, number]
 
-// 40-color warm cozy pastel master palette (spec §7). Ramps:
-// cream stone ×5, honey wood ×5, sage green ×5, dusty rose ×4, water/sky ×5,
-// warm grey ×5, shadow darks ×4, warm accents ×4, skin tones ×3.
+// 40-colour warm cozy pastel master palette. Ramps: cream stone ×5, honey wood ×5, sage green ×5,
+// dusty rose ×4, water/sky ×5, warm grey ×5, shadow darks ×4, warm accents ×4, skin tones ×3.
 export const MASTER_PALETTE = [
   '#FFF6E9', '#F6E8D5', '#E8D5BC', '#D4BC9E', '#B89D7E',
   '#F2C879', '#E0A95E', '#C68A48', '#A66E38', '#7E512B',

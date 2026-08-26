@@ -1,23 +1,5 @@
-// ★ THE COVERAGE LAW: EVERY KIND THE WORLD CAN CREATE HAS A CELL.
-//
-// No test asserted this, and that is why a farmhouse stood with no art for a whole merge
-// train while CI stayed green, and why `ingestArt` could register the founders' home under
-// kind `hut` — a kind NOTHING PLACES — without one thing going red. The renderer answers a
-// missing cell with `builtForm`, a deliberate palette-true prism, so the product never looks
-// broken enough to fail a test. That is exactly why the law has to be measured here, on the
-// codex, and never on the screen: `builtForm` always answers, so a gate that asks the
-// renderer whether something drew has measured nothing.
-//
-// ★ AND THE FIRST VERSION OF THIS LAW HAD A BLIND SPOT, WHICH IS WHY IT IS NOW WORDED THAT WAY.
-// It asked only about `makeCityTemplate()`. Four kinds — wagon, shed, scaffolding and standing
-// stone — are stood by the gateway's `TOWN_STRUCTURES` dev town, `bridge` is raised by an agent
-// at runtime through the `build` verb, and `grave` is placed by the world when somebody dies.
-// None of the six is in the template, so the gate never looked at any of them, stayed green,
-// and every one of them drew a grey prism. The template is one SOURCE of kinds, not the set.
-//
-// Two directions, because task 1's defect had both:
-//   MISSING   a kind the world can create, in a facing it can stand in, with no cell.
-//   ORPHAN    a registered cell whose kind nothing can ever create. `hut` was one for a train.
+// THE COVERAGE LAW: every kind the world can create has a cell. Measured on the CODEX, never on
+// the screen — `builtForm` always answers, so asking the renderer whether it drew measures nothing.
 import {
   CITY_DWELLING_KINDS, isDwellingKind, type CityStructure,
 } from '@sj/shared'
@@ -29,26 +11,14 @@ import type { RawImage } from './post/raw.js'
  *  non-dwelling structure the user asked to be turned, so it carries the same two facings. */
 export const STOREHOUSE_KIND = 'storehouse'
 
-/** ★ THE EXEMPTION IS GONE, AND THAT IS THE FIX.
- *
- *  `BUILT_FORM_ONLY = ['well', 'fire_pit']` stood here, and `exemptionIsClosed()` was supposed
- *  to keep it honest. It did not: it only refused to waive a kind on `TWO_FACING_KINDS`, so it
- *  was satisfiable with the property broken — guard family #12 — and the well and the fire pit
- *  sat on that line, exempted, for a whole merge train, until a human looked at the running
- *  product and found two bare grey prisms in the middle of the town square.
- *
- *  There is now no lever. Every kind the world can create carries art; the only way to make
- *  this gate green is to draw the cell. */
 
-/** USER RULING: two facings, SW and SE, for everything that can stand in both. Dwellings and
- *  the storehouse turn; so do the shed (it has a door) and the wagon (wheels and a tailgate
- *  along a 1×2 long axis). */
+/** Two facings, SW and SE, for everything that can stand in both: dwellings, the storehouse, the
+ *  shed (it has a door) and the wagon (wheels and a tailgate along a 1×2 long axis). */
 export const TWO_FACING_KINDS: readonly string[] =
   [...CITY_DWELLING_KINDS, STOREHOUSE_KIND, 'shed', 'wagon']
 
-/** The kinds that ship ONE cell, each with the reason it cannot turn. This is NOT an exemption
- *  from art — every one of these ships a cell — it is an exemption from the SECOND cell, and
- *  `facingPartitionIsTotal` refuses to let a kind fall outside both lists unnoticed. */
+/** The kinds that ship ONE cell, each with the reason it cannot turn. Not an exemption from art —
+ *  every one ships a cell — but from the SECOND cell; `facingPartitionIsTotal` closes the gap. */
 export const ONE_CELL_KINDS: Readonly<Record<string, string>> = {
   well: 'a circular stone ring: the same object from every angle',
   fire_pit: 'a ring of stones round a fire: the same object from every angle',
@@ -78,19 +48,8 @@ export function facingPartitionIsTotal(creatable: readonly string[]): string[] {
 
 // ── every kind the world can create ─────────────────────────────────────────────────────────
 
-/**
- * The union of every source that can put a structure in the world. The gate's blind spot was
- * that it knew only the first of these:
- *
- *  · `structures` — the city template, the town the world wakes with;
- *  · `recipes` — `config.structures.recipes`. A row WITH materials is a kind an agent raises
- *    through the `build` verb (house, well, bridge); a row with EMPTY inputs is a kind the
- *    world places and nobody builds (the grave, laid when somebody dies). Both are kinds the
- *    world creates, so the whole table counts, not the buildable half of it;
- *  · `extra` — the dev world's own fixture town. `TOWN_STRUCTURES` lives in `@sj/gateway`,
- *    which `@sj/forge` must not import, so the gateway passes its kinds in and asserts the
- *    same law on its own side (`ingestArt.test.ts`).
- */
+/** The union of every source that can put a structure in the world: the city template, the WHOLE
+ *  recipe table, and `extra` — the gateway's kinds, which `@sj/forge` must not import. */
 export function worldStructureKinds(a: {
   structures: readonly (CityStructure | { kind: string })[]
   recipes: Readonly<Record<string, unknown>>
@@ -125,9 +84,8 @@ export function placedFacings(
   return out
 }
 
-/** kind → every facing that kind must ship: the ones the town stands it in, the default facing
- *  for every other kind the world can create, plus both facings for the kinds the user's
- *  two-facing ruling covers. */
+/** kind → every facing that kind must ship: the ones the town stands it in, the default for every
+ *  other creatable kind, plus both facings for the two-facing kinds. */
 export function requiredFacings(
   structures: readonly (CityStructure | { kind: string })[],
   creatable: readonly string[] = [],
@@ -179,16 +137,8 @@ export function structureArtCoverage(a: {
 }
 
 // ── SE IS NOT A MIRROR ──────────────────────────────────────────────────────────────────────
-//
-// In this projection the two visible walls are the +y face (screen-left) and the +x face
-// (screen-right). Turning a building ninety degrees moves the door and the windows from one
-// to the other AND reverses the roof ridge. Flipping the SW cell moves the door to the right
-// wall and reverses the ridge too — and gets the LIGHT wrong, because the sun does not flip
-// with the building. A mirrored cell is therefore the cheap wrong answer that looks almost
-// right, which is precisely the kind a gate has to catch.
-//
-// A mirror scores exactly 0 here. Two independent generations of the same building, turned,
-// score far above the floor; the measured values for the shipped set are in the round-4 report.
+// Turning a building moves the door and reverses the roof ridge; flipping does that too and gets
+// the LIGHT wrong, because the sun does not flip with the building. A mirror scores exactly 0.
 export const SE_MIRROR_MIN_DISTANCE = 0.05
 
 /** 0 when `se` is `sw` flipped left-to-right; 1 when they share no pixel. */

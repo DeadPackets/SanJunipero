@@ -15,10 +15,8 @@ import { paintRoadAutotile } from './roadTiles.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
-// A HOMOGENEOUS stochastic material — what an image model actually returns, and what the
-// seam check is really asking about: are the two opposing edges the same material? A
-// synthetic torus (f(0) === f(px)) would also pass, but it is not what the pipeline sees,
-// and it cannot survive the margin crop that real framed output requires.
+// A HOMOGENEOUS stochastic material — what an image model actually returns. A synthetic torus
+// (f(0) === f(px)) would also pass, but it cannot survive the margin crop real output requires.
 function seamlessSquare(px = MATERIAL_PX): RawImage {
   const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   // two real MASTER_PALETTE greens, so quantizing is a no-op and the measurement is not
@@ -154,9 +152,8 @@ describe('materialVeto', () => {
     expect(materialVeto(asMaterial(seamedSquare(MATERIAL_PX)))).toMatch(/left|right|horizontal/i)
   })
 
-  // The one the absolute check cannot see. terrain_earth is a near-uniform material: its wrap
-  // delta is 2.9 against a tolerance of 14, so seamReport calls it clean — and the wrap is
-  // still 5x its own interior noise, which is a visible line on smooth ground.
+  // The one the absolute check cannot see: earth's wrap delta is 2.9 against a tolerance of 14,
+  // and still 5x its own interior noise — a visible line on smooth ground.
   it('vetoes a wrap that is quiet in absolute terms and loud against its own grain', async () => {
     const earth = await decodePng(readFileSync(
       new URL('./fixtures/pixel-gates/terrain-earth-seamed.png', import.meta.url)))
@@ -166,13 +163,10 @@ describe('materialVeto', () => {
   })
 })
 
-// Three live rounds on eight materials came back 0/8: an image model does not return a
-// torus, and asking it three more times costs money to learn the same thing. The wrap is
-// made true by CONSTRUCTION instead, the way the pixel grid was.
+// An image model does not return a torus, so the wrap is made true by CONSTRUCTION instead.
 describe('seamlessMaterial', () => {
-  // The four offenders as they shipped BEFORE the construction landed. Frozen as fixtures:
-  // a gate proven against the live content directory stops being proven the moment the
-  // content is fixed.
+  // The four offenders as they shipped BEFORE the construction landed, frozen: a gate proven
+  // against the live content directory stops being proven the moment the content is fixed.
   const offender = async (name: string): Promise<RawImage> => decodePng(readFileSync(
     new URL(`./fixtures/pixel-gates/terrain-${name}-seamed.png`, import.meta.url)))
 
@@ -355,9 +349,8 @@ describe('seasonTintFrom', () => {
 })
 
 
-// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the
-// wrap, so seamReport reads 0.0 while the material renders as a grid of framed cards. This
-// is the live water:0 finding, pinned so it cannot come back.
+// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the wrap, so
+// `seamReport` reads 0.0 while the material renders as a grid of framed cards.
 describe('borderReport', () => {
   const framed = (px = MATERIAL_PX, ring = 2): RawImage => {
     const img = seamlessSquare(px)

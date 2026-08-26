@@ -129,10 +129,8 @@ describe('headRegionDiff', () => {
     expect(headRegionDiff(sprite(0), sprite(6))).toBeGreaterThan(0.3)
   })
 
-  // ★ THE MIRROR PROPERTY, and the awkward case is the one that used to break it: two
-  // bboxes of DIFFERENT width parity have their centres half a column apart, and an integer
-  // offset has to round one way going and the other way coming back. The pair below is
-  // 10 wide against 11 wide on purpose.
+  // Two bboxes of DIFFERENT width parity have their centres half a column apart, and an integer
+  // offset rounds one way going and the other coming back. The pair below is 10 wide against 11.
   it('★ gives the same number for a pair of sprites and their mirrors, at either parity', () => {
     const wide = (w: number) => img(30, 40, (x, y) => {
       if (y >= 5 && y < 15 && x >= 10 && x < 10 + w) return RED
