@@ -330,7 +330,12 @@ export function MomentsLens({
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const [moments, setMoments] = useState<Moment[] | null>(null)
-  const [player, setPlayer] = useState<PlayerState>(() => idlePlayer(0))
+  // The player belongs to the day it plays: opening another one is a new player, never this
+  // one carried across, so nothing has to be reset after the fact.
+  const [playerOf, setPlayerOf] = useState<{ id: number | null; state: PlayerState }>(() => ({
+    id: null,
+    state: idlePlayer(0),
+  }))
   const rootRef = useRef<HTMLDivElement>(null)
   const [bandW, setBandW] = useState(0)
 
@@ -370,12 +375,21 @@ export function MomentsLens({
   }, [state])
 
   const open = moments?.find((m) => m.id === momentId) ?? null
+  const player = useMemo(
+    () => (playerOf.id === open?.id ? playerOf.state : idlePlayer(open?.startTick ?? 0)),
+    [playerOf, open],
+  )
+  const setPlayer = (step: (prev: PlayerState) => PlayerState): void => {
+    setPlayerOf((prev) => {
+      const base = prev.id === (open?.id ?? null) ? prev.state : idlePlayer(open?.startTick ?? 0)
+      return { id: open?.id ?? null, state: step(base) }
+    })
+  }
 
   // Opening a day parks the view at its first minute; a cold /moment/<id> load lands here too,
   // as soon as the list arrives.
   useEffect(() => {
     if (open === null) return
-    setPlayer(idlePlayer(open.startTick))
     handle?.scrub(open.startTick)
   }, [open, handle])
 
@@ -417,7 +431,7 @@ export function MomentsLens({
 
   const goLive = (): void => {
     scrubbedRef.current = null
-    setPlayer(idlePlayer(0))
+    setPlayerOf({ id: null, state: idlePlayer(0) })
     handle?.goLive()
     onOpen(null)
   }

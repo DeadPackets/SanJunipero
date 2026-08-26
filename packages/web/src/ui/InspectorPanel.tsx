@@ -20,6 +20,7 @@ const EMPTY_COPY = 'Nothing written yet.'
 
 /** Two tabs a viewer picks between, plus the personality feed the panel always reads. */
 export type Tab = 'ledger' | 'journal' | 'personality'
+type Rows<T> = { id: string; rows: T[] }
 type LedgerRow = { personId: string; doc: string; updatedDay: number }
 type JournalRow = { tick: number; day: number; text: string }
 type PersonalityRow = { version: number; day: number; doc: string; edit: string }
@@ -217,26 +218,31 @@ export function InspectorPanel({
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const [tab, setTab] = useState<Tab>('ledger')
-  const [ledger, setLedger] = useState<LedgerRow[] | null>(null)
-  const [journal, setJournal] = useState<JournalRow[] | null>(null)
-  const [personality, setPersonality] = useState<PersonalityRow[] | null>(null)
+  // Rows are held WITH the person they were fetched for, so a new subject reads as "nothing
+  // loaded" in the same render — the panel can never show the previous person's ledger.
+  const [ledgerOf, setLedgerOf] = useState<Rows<LedgerRow> | null>(null)
+  const [journalOf, setJournalOf] = useState<Rows<JournalRow> | null>(null)
+  const [personalityOf, setPersonalityOf] = useState<Rows<PersonalityRow> | null>(null)
   const [follow, setFollow] = useState(false)
+  const ledger = ledgerOf?.id === agentId ? ledgerOf.rows : null
+  const journal = journalOf?.id === agentId ? journalOf.rows : null
+  const personality = personalityOf?.id === agentId ? personalityOf.rows : null
 
   useEffect(() => {
     if (tab === 'ledger' && ledger === null)
-      void fetchTab<LedgerRow>(agentId, 'ledger').then(setLedger)
+      void fetchTab<LedgerRow>(agentId, 'ledger').then((rows) => {
+        setLedgerOf({ id: agentId, rows })
+      })
     if (tab === 'journal' && journal === null)
-      void fetchTab<JournalRow>(agentId, 'journal').then(setJournal)
+      void fetchTab<JournalRow>(agentId, 'journal').then((rows) => {
+        setJournalOf({ id: agentId, rows })
+      })
     // no longer behind a tab: what changed about a person is the panel's own subject now
     if (personality === null)
-      void fetchTab<PersonalityRow>(agentId, 'personality').then(setPersonality)
+      void fetchTab<PersonalityRow>(agentId, 'personality').then((rows) => {
+        setPersonalityOf({ id: agentId, rows })
+      })
   }, [tab, agentId, ledger, journal, personality])
-
-  useEffect(() => {
-    setLedger(null)
-    setJournal(null)
-    setPersonality(null)
-  }, [agentId])
 
   // follow-cam: the scene's follow rig eases toward the agent's sprite; a user
   // drag takes the camera back and un-presses the button (never lie about state)
