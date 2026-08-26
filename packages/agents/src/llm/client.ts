@@ -179,9 +179,9 @@ export class LlmClient {
         return {
           usage: r.usage,
           value: r.output,
-          servedModel: r.response.modelId,
-          provider: servedProvider(r.response, r.providerMetadata),
-          reportedCostUsd: reportedCostUsd(r.providerMetadata),
+          servedModel: r.finalStep.response.modelId,
+          provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
+          reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
         }
       } catch (err) {
         // Re-frames the provider's own bytes against this caller's schema; never re-asks,
@@ -216,9 +216,9 @@ export class LlmClient {
       return {
         usage: r.usage,
         value: r.text,
-        servedModel: r.response.modelId,
-        provider: servedProvider(r.response, r.providerMetadata),
-        reportedCostUsd: reportedCostUsd(r.providerMetadata),
+        servedModel: r.finalStep.response.modelId,
+        provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
+        reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
       }
     })
     return { text: value, usage }

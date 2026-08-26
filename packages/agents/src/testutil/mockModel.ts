@@ -20,7 +20,7 @@ export type ScriptedResponse = {
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
   let next = 0
   return new MockLanguageModelV4({
-    doGenerate: async () => {
+    doGenerate: () => {
       const scripted = responses[next]
       next += 1
       if (scripted === undefined) throw new Error('mockModel: no scripted response left')
@@ -30,7 +30,7 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
       const outputTokens = u.outputTokens ?? 0
       const cacheRead = u.cacheReadTokens ?? 0
       const reasoning = u.reasoningTokens ?? 0
-      return {
+      return Promise.resolve({
         content: [{ type: 'text' as const, text: scripted.text ?? JSON.stringify(scripted.json) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: {
@@ -58,7 +58,7 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
                 },
               },
             }),
-      }
+      })
     },
   })
 }

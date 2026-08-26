@@ -4,6 +4,7 @@ import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS } from '../src/llm/pins.js'
+import { servedProvider } from '../src/llm/client.js'
 
 const CAP_USD = 0.5
 const REPS = Number(process.env.DIAL_REPS ?? 10)
@@ -66,14 +67,14 @@ for (let rep = 0; rep < REPS; rep++) {
       const u = r.usage
       const inTok = u.inputTokens ?? 0
       const outTok = u.outputTokens ?? 0
-      const reasonTok = u.outputTokenDetails?.reasoningTokens ?? 0
+      const reasonTok = u.outputTokenDetails.reasoningTokens ?? 0
       spent += (inTok * 0.28 + outTok * 0.56) / 1e6
       rows.push({
         rung: rung.name,
         rep,
         ok: true,
-        provider: String((r.providerMetadata as any)?.openrouter?.provider ?? 'unknown'),
-        served: String(r.response?.modelId ?? '?'),
+        provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata) ?? 'unknown',
+        served: r.finalStep.response.modelId,
         inTok,
         outTok,
         reasonTok,
@@ -101,7 +102,7 @@ for (let rep = 0; rep < REPS; rep++) {
 
 for (const r of rows) {
   console.log(
-    `${r.ok ? 'OK ' : 'ERR'} rung=${r.rung.padEnd(14)} rep=${r.rep} prov=${String(r.provider).padEnd(12)} served=${r.served} in=${r.inTok} out=${r.outTok} reasoning=${r.reasonTok} :: ${r.note}`,
+    `${r.ok ? 'OK ' : 'ERR'} rung=${r.rung.padEnd(14)} rep=${r.rep} prov=${r.provider.padEnd(12)} served=${r.served} in=${r.inTok} out=${r.outTok} reasoning=${r.reasonTok} :: ${r.note}`,
   )
 }
 

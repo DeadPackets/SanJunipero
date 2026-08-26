@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto'
 import { EMBEDDING_DIM } from '../memory/embedder.js'
 
 export class FakeEmbedder {
-  static async create(_cacheDir = 'data/models'): Promise<FakeEmbedder> {
-    return new FakeEmbedder()
+  static create(): Promise<FakeEmbedder> {
+    return Promise.resolve(new FakeEmbedder())
   }
 
-  async embed(text: string): Promise<Float32Array> {
+  embed(text: string): Promise<Float32Array> {
     const v = new Float32Array(EMBEDDING_DIM)
     let digest = createHash('sha256').update(text).digest()
     let i = 0
@@ -22,6 +22,6 @@ export class FakeEmbedder {
     for (const x of v) norm += x * x
     norm = Math.sqrt(norm)
     for (let j = 0; j < v.length; j += 1) v[j]! /= norm
-    return v
+    return Promise.resolve(v)
   }
 }

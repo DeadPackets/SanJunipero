@@ -180,18 +180,18 @@ class DryLlm {
     private readonly agentId: string | null,
   ) {}
 
-  async object<T>(opts: {
+  object<T>(opts: {
     schema: { safeParse(v: unknown): { success: boolean; data?: T } }
   }): Promise<{ value: T; usage: typeof NO_USAGE }> {
     for (const candidate of dryAnswers()) {
       const parsed = opts.schema.safeParse(candidate)
-      if (parsed.success) return { value: parsed.data as T, usage: NO_USAGE }
+      if (parsed.success) return Promise.resolve({ value: parsed.data as T, usage: NO_USAGE })
     }
     throw new Error('dry run: no canned answer fits this schema')
   }
 
-  async text(): Promise<{ text: string; usage: typeof NO_USAGE }> {
-    return { text: 'the day passes', usage: NO_USAGE }
+  text(): Promise<{ text: string; usage: typeof NO_USAGE }> {
+    return Promise.resolve({ text: 'the day passes', usage: NO_USAGE })
   }
 
   totalCostUsd(): number {
