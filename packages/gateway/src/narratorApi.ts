@@ -121,10 +121,9 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
 
   router.route('GET', '/api/chronicle', (req: IncomingMessage, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    sendPrebuilt(res, cache.json(`chronicle${url.search}`, () => {
-      const { fromTick, toTick } = windowOf(url)
-      return { entries: chronicleEntries(fromTick, toTick) }
-    }))
+    const { fromTick, toTick } = windowOf(url)
+    sendPrebuilt(res, cache.json(`chronicle:${fromTick}:${toTick}`, () =>
+      ({ entries: chronicleEntries(fromTick, toTick) })))
   })
 
   /**
@@ -140,8 +139,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
    */
   router.route('GET', '/api/chronicle/count', (req: IncomingMessage, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    sendPrebuilt(res, cache.json(`chronicle-count${url.search}`, () => {
-      const { fromTick, toTick } = windowOf(url)
+    const { fromTick, toTick } = windowOf(url)
+    sendPrebuilt(res, cache.json(`chronicle-count:${fromTick}:${toTick}`, () => {
       const entries = chronicleEntries(fromTick, toTick)
       const last = entries[entries.length - 1]
       // `latestSeq` is the feed's newest entry, so a badge can say "N new" without the body.

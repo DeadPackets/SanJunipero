@@ -5,7 +5,7 @@ import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@s
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
-  HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
+  HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
   type HeatScores, type HeatWindow,
 } from './heatStub.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -65,7 +65,7 @@ export type DataApiDeps = {
  *  links, drama windows, deaths, buildings — and none of them is a count of events. */
 export type Footprint = {
   provenance: number; heat: number; links: number; spokes: number
-  started: number; deaths: number; completions: number
+  started: number; deaths: number
   /** The highest seq folded. Present so a guard can prove the fold really consumed the log. */
   seq: number
 }
@@ -127,7 +127,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const heat: HeatScores = new Map()
   const weights = new Map<string, number>()        // `${source}\n${target}\n${kind}` → weight
   const deaths: Array<{ agentId: string; tick: number; cause: string }> = []
-  const completions: Array<{ id: string; tick: number }> = []
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
   let spokes: Spoke[] = []
@@ -183,9 +182,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
         return
       }
       case 'structure_completed': {
-        const id = (ev.payload as { id: string }).id
-        completedTick.set(id, ev.tick)
-        completions.push({ id, tick: ev.tick })
+        completedTick.set((ev.payload as { id: string }).id, ev.tick)
         return
       }
       case 'agent_died': {
@@ -210,8 +207,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   }
   deps.onFootprint?.(() => ({
     provenance: planned.size + completedTick.size, heat: heat.size, links: weights.size,
-    spokes: spokes.length, started: started.size, deaths: deaths.length,
-    completions: completions.length, seq: foldCursor,
+    spokes: spokes.length, started: started.size, deaths: deaths.length, seq: foldCursor,
   }))
 
   /**
@@ -336,24 +332,33 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()
-    sendPrebuilt(res, cache.json('heat', () =>
-      heatSince(heatFromScores(heat), deps.mirror.state().tick)))
+    sendPrebuilt(res, cache.json('heat', () => {
+      const nowTick = deps.mirror.state().tick
+      // The windows `heatSince` would keep, picked out before they are built and sorted: it keeps
+      // `60w + 59 >= nowTick − HORIZON`, which is exactly `w >= floor((nowTick − HORIZON) / 60)`.
+      const floorW = Math.floor((nowTick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
+      const recent: HeatScores = new Map()
+      for (const [key, score] of heat) {
+        if (Number(key.slice(0, key.indexOf('\n'))) >= floorW) recent.set(key, score)
+      }
+      return heatSince(heatFromScores(recent), nowTick)
+    }))
   })
 
   router.route('GET', '/api/digest', (req: IncomingMessage, res) => {
     readFold()
     const url = new URL(req.url ?? '/', 'http://localhost')
-    sendPrebuilt(res, cache.json(`digest${url.search}`, () => {
-      const { fromTick, toTick } = clampWindow(
-        url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
+    const { fromTick, toTick } = clampWindow(
+      url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
+    sendPrebuilt(res, cache.json(`digest:${fromTick}:${toTick}`, () => {
       const inWindow = (t: number): boolean => t >= fromTick && t <= toTick
 
       const days: number[] = []
       for (let d = Math.floor(fromTick / MINUTES_PER_DAY); d <= Math.floor(toTick / MINUTES_PER_DAY); d++) days.push(d)
 
       const state = deps.mirror.state()
-      const structuresCompleted = completions.filter(c => inWindow(c.tick)).map(c => ({
-        id: c.id, kind: state.structures[c.id]?.kind ?? 'structure', tick: c.tick,
+      const structuresCompleted = [...completedTick].filter(([, tick]) => inWindow(tick)).map(([id, tick]) => ({
+        id, kind: state.structures[id]?.kind ?? 'structure', tick,
       }))
 
       const topMoments = heatOver(fromTick, toTick)
