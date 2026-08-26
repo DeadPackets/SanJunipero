@@ -66,8 +66,15 @@ export type RecipeVocabulary = {
   knownRecipeIds?: ReadonlySet<string>
 }
 
-const productsOf = (recipe: Recipe): string[] =>
-  recipe.outcomeTable.flatMap((row) => row.effects.flatMap((e) => (e.op === 'spawn_item' ? [e.kind] : [])))
+// What a recipe unlocked, as item kinds. Sorted and deduped so the same recipe always yields
+// the same array — the forge keys off it and a byte-unstable list would re-commission art.
+export function productsOf(recipe: Recipe): string[] {
+  const kinds = new Set<string>()
+  for (const row of recipe.outcomeTable) {
+    for (const e of row.effects) if (e.op === 'spawn_item') kinds.add(e.kind)
+  }
+  return [...kinds].sort()
+}
 
 // null when the recipe may be codified; otherwise the reason it may never be, in one line.
 export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}): string | null {

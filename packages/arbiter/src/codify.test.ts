@@ -6,7 +6,8 @@ import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
-import { codify, emitOutcomeEffects, isExpertRecipe, productsOf, verbFromRecipe } from './codify.js'
+import { codify, emitOutcomeEffects, isExpertRecipe, verbFromRecipe } from './codify.js'
+import { productsOf } from './sanity.js'
 import type { Codified } from './adjudicate.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
