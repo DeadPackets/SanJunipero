@@ -23,6 +23,15 @@ export default tseslint.config(
     },
   },
   {
+    // Test scaffolding: stub callbacks, async fixtures without awaits, and `expect(obj.method)`.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
     files: ['packages/web/src/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],
   },
