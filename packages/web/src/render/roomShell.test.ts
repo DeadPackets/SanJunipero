@@ -20,7 +20,7 @@ import {
   tileCentreScreen,
   thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
-import { INTERIOR_KINDS } from '@sj/shared'
+import { DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures } from '@sj/shared'
 import { roomSizeOf } from './interiors.js'
 
 // Every colour the room shell paints must be a MASTER_PALETTE member — the same law the
@@ -479,15 +479,34 @@ describe('roomShell — the room fits the stage', () => {
 // The travel it is allowed IS `roomCrop`, in both axes. That is the whole design: a room that
 // fits gets a range of zero and cannot move, so nothing that fits acquires a camera.
 describe('★★ the camera inside a room, and its range IS the crop', () => {
-  // Every room the renderer draws, by its own size function rather than a transcription — a
-  // seventh room kind is in this enumeration without anybody editing this test.
-  const KINDS = [...INTERIOR_KINDS].sort()
-  const roomsOf = (): ReadonlyArray<{ kind: string; room: { w: number; h: number } }> =>
-    KINDS.map((kind) => ({ kind, room: roomSizeOf(kind) }))
+  // ★ THE ENUMERATION IS THE UNION OF EVERY PLACE A ROOM KIND CAN COME FROM, never a hand-list.
+  // `web-sync` found three rosters in this package and one of them was pinned to a
+  // transcription of itself; a crop guard naming `cabin, cottage, farmhouse` would be the same
+  // defect, passing forever and never seeing the fourth dwelling. A kind added to the recipe
+  // table, to the town the template plants, or to the renderer's own room vocabulary is in this
+  // law the day it lands, with nobody editing this test.
+  const roomsOf = (): ReadonlyArray<{ kind: string; room: { w: number; h: number } }> => {
+    const kinds = [...new Set([
+      ...Object.keys(DEFAULT_CONFIG.structures.recipes),
+      ...cityStructures().map((s) => s.kind),
+      ...INTERIOR_KINDS,
+    ])].sort()
+    return kinds.map((kind) => ({ kind, room: roomSizeOf(kind as never) }))
+  }
 
-  // The two stages the crop was measured at. 678 is the CANVAS height at a 1728 x 823 window,
-  // measured in the running app (see the landed test above); 900 is a taller one.
-  const STAGES = [{ w: 1478, h: 678 }, { w: 1478, h: 900 }] as const
+  // ★ THE SMALLEST STAGE THIS LAW IS HELD AT, AND WHERE THE NUMBER COMES FROM.
+  //
+  // It is a STAGE, not a window: `roomOriginY` is called with `app.screen.height`, and the
+  // renderer's `resizeTo` is `#stage-root`, which sits under the app header and the status
+  // strip and over the control bar. The one measured pair on record is a 1728 x 823 window
+  // giving a 1478 x 678 canvas — so the chrome costs 250 px across and 145 px down.
+  //
+  // The smallest laptop worth supporting is a 1280 x 800 window, which by that measurement is a
+  // 1030 x 655 stage. Rounded DOWN to 1024 x 640, so the law is held slightly tighter than the
+  // hardware demands rather than slightly looser.
+  const MIN_STAGE = { w: 1024, h: 640 } as const
+  // …and the two the crop was measured at, so the reported table stays under test.
+  const STAGES = [MIN_STAGE, { w: 1478, h: 678 }, { w: 1478, h: 900 }] as const
 
   it('★ the crop has TWO axes, and the width is the one that was never measured', () => {
     // `roomCropPx` takes a height and returns one number, so a room 1 920 px across on a
@@ -579,13 +598,14 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
         for (const w of [1280, 1478, 1512, 1920, 2400]) {
           const crop = roomCrop(w, h, room, WALL_H_PX)
           const range = roomPanRange(w, h, room, WALL_H_PX)
+          // zero TRAVEL, and zero at both ends of it — a range of [0, 0] is no camera
           if (crop.x === 0) {
-            expect(range.minX, `${kind} @${w}x${h}`).toBe(0)
-            expect(range.maxX, `${kind} @${w}x${h}`).toBe(0)
+            expect(range.maxX - range.minX, `${kind} @${w}x${h}`).toBe(0)
+            expect(Math.abs(range.minX), `${kind} @${w}x${h}`).toBe(0)
           }
           if (crop.y === 0) {
-            expect(range.minY, `${kind} @${w}x${h}`).toBe(0)
-            expect(range.maxY, `${kind} @${w}x${h}`).toBe(0)
+            expect(range.maxY - range.minY, `${kind} @${w}x${h}`).toBe(0)
+            expect(Math.abs(range.minY), `${kind} @${w}x${h}`).toBe(0)
           }
         }
       }

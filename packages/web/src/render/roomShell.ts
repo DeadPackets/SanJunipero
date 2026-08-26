@@ -378,7 +378,9 @@ export function roomPanRange(
   screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
 ): { minX: number; maxX: number; minY: number; maxY: number } {
   const crop = roomCrop(screenW, screenH, room, wallH)
-  return { minX: -crop.x / 2, maxX: crop.x / 2, minY: -crop.y, maxY: 0 }
+  // `0 - x` and not `-x`: a room that fits must give a range of [+0, +0], or the clamp hands
+  // back -0 and "this room has no camera" stops being an equality anyone can assert.
+  return { minX: 0 - crop.x / 2, maxX: crop.x / 2, minY: 0 - crop.y, maxY: 0 }
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
