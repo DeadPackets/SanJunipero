@@ -1,5 +1,5 @@
-import { sanitizeSpokenText, SPEECH_MAX_CHARS } from '@sj/shared'
-import { scanPromptForGlassLeak, scanRulingForGlassLeak } from '@sj/agents'
+import { SPEECH_MAX_CHARS } from '@sj/shared'
+import { heardLine, scanPromptForGlassLeak, scanRulingForGlassLeak } from '@sj/agents'
 
 // Prompt-injection payloads at both untrusted-speech surfaces: the arbiter (`fenceIntent`) and
 // a mind's prose render (`sanitizeSpokenText`). Every row is a delta against the pre-fix render.
@@ -123,10 +123,8 @@ export const INJECTION_CORPUS: readonly InjectionCase[] = [
   },
 ] as const
 
-/** Exactly what `prose.ts` does with an utterance, so the analysis cannot drift from the render. */
-export function renderHeard(name: string, text: string): string {
-  return `You hear ${name} say: "${sanitizeSpokenText(text)}" (from nearby)`
-}
+/** The render itself, not a copy of it, so the analysis cannot drift from what a mind reads. */
+export const renderHeard = heardLine
 
 /** What the render did BEFORE the fix. Kept so every row can measure the delta rather than
  *  assert a clean bill of health, and so a regression is a diff and not a memory. */

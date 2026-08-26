@@ -345,6 +345,18 @@ function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
 
 // Renders mechanics as fiction. Every clause here states a fact and names no act — no remedy,
 // no counsel, no comparison; the inference is the mind's.
+/** One utterance, as a listener reads it. The only untrusted string in a prompt; sanitized here
+ *  as well as at the verb, because a world resumed from an older log carries raw text. */
+export function heardLine(name: string, text: string): string {
+  return `You hear ${name} say: "${sanitizeSpokenText(text)}" (from nearby)`
+}
+
+/** Every utterance in earshot, one per line. Kept out of the perception prose: a delimiter a
+ *  speaker cannot write stops a forged attribution, and only separation stops a forged voice. */
+export function heardProse(packet: PerceptionPacket): string {
+  return packet.heard.map((h) => heardLine(h.name, h.text)).join('\n')
+}
+
 export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void, world?: ProseWorld): string {
   const lines: string[] = []
   const { x, y } = packet.self
@@ -491,12 +503,6 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   for (const it of packet.self.inventory) {
     lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id})${claimPhrase(it)}.`)
-  }
-
-  // The one untrusted string in this file. Re-run here as well as at the verb: a world resumed
-  // from an older log carries raw text.
-  for (const h of packet.heard) {
-    lines.push(`You hear ${h.name} say: "${sanitizeSpokenText(h.text)}" (from nearby)`)
   }
 
   for (const s of packet.seen) {

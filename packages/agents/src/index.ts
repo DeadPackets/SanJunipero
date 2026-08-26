@@ -17,6 +17,7 @@ export { migrateLlmTables, insertAlert, sumCostUsd } from './llm/callLog.js'
 // The live seam's public face: what a caller outside this package needs to boot a mind,
 // exported by package name so a served world does not have to reach in by relative path.
 export { AgentRuntime, OPAQUE_REFUSAL, type RuntimeSnapshot, type RuntimeStats } from './runtime/agentRuntime.js'
+export { heardLine, heardProse } from './prompt/prose.js'
 export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
 export { wireArbiter, buildAgentCtx, type Adjudicator, type Codifier, type SeamArbiter } from './runtime/arbiterSeam.js'
 export { PersonalityStore, type PersonalityDoc } from './personality.js'

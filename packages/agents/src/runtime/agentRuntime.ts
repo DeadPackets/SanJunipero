@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
 import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
-import { makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket } from '../prompt/prose.js'
+import { heardProse, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
@@ -477,7 +477,11 @@ export class AgentRuntime {
       nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
       nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
     })
-    this.#dayLog.push(prose)
+    // The prompt keeps another mouth's bytes out of the narrator's block; the day log and this
+    // mind's own memory still hold the whole moment.
+    const heard = heardProse(packet)
+    const moment = heard.length > 0 ? `${prose} ${heard}` : prose
+    this.#dayLog.push(moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
     const nowProse = [
@@ -494,7 +498,7 @@ export class AgentRuntime {
     await this.#mem!.insertMemory({
       tick,
       kind: 'perception',
-      text: prose,
+      text: moment,
       importance: 3,
       tags: {
         people: packet.visible.agents.map((a) => a.name),
@@ -510,7 +514,7 @@ export class AgentRuntime {
       personality: { doc: this.#personality.current().doc, autobiography: this.#mem!.autobiography() },
       scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
       dayLog: this.#dayLog,
-      now: { prose: nowProse },
+      now: { prose: nowProse, heard },
     }
     let assembled = assemblePrompt(blocks)
 
