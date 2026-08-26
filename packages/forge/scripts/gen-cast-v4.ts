@@ -21,6 +21,7 @@ import { processHiResCell, cellAnchor, buildManifestV4 } from '../src/hires.js'
 import { refusalMessage } from '../src/gate.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V4, type CastMember } from './cast.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -29,7 +30,7 @@ const budget = new BudgetGuard(CAP)
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const PRODUCTION = `${SCRATCH}/production`
 
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')

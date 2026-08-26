@@ -3,6 +3,7 @@
 // Env: FLIP_CHAR, FLIP_SRC, FLIP_OUT, FLIP_HALF left|right.
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { decodePng, encodePng } from '../src/post/raw.js'
+import { scratch } from './scratch.js'
 
 const CHAR = process.env.FLIP_CHAR
 const SRC = process.env.FLIP_SRC
@@ -11,7 +12,7 @@ const HALF = process.env.FLIP_HALF ?? 'left'
 if (!CHAR || !SRC || !OUT) throw new Error('FLIP_CHAR, FLIP_SRC, FLIP_OUT required')
 if (HALF !== 'left' && HALF !== 'right') throw new Error('FLIP_HALF must be left or right')
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const RAWS = `${SCRATCH}/production/${CHAR}/raws`
 const srcPath = `${RAWS}/${SRC}.png`
 if (!existsSync(srcPath)) throw new Error(`source raw missing: ${srcPath}`)

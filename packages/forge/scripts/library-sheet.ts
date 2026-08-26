@@ -11,8 +11,9 @@ import { upscaleNearest } from '../src/sheet.js'
 import { checkerBackground, compositeOver, paletteCard } from '../src/visionQa/rubric.js'
 import { LIBRARY } from '../src/library/catalog.js'
 import { planBatch } from '../src/library/plan.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
+const C13 = scratch('c13')
 const LIB = join(C13, 'library')
 
 const ALL = process.env.ALL === '1'

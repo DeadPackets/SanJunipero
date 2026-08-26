@@ -4,8 +4,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { encodePng } from '../src/post/raw.js'
 import { EMOTE_KINDS, EMOTE_SIZE, renderEmote } from '../src/emotes.js'
 import { assembleGrid, upscaleNearest } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
-const OUT = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/emotes'
+const OUT = scratch('c5', 'emotes')
 mkdirSync(OUT, { recursive: true })
 
 const COLS = 4, ROWS = 3

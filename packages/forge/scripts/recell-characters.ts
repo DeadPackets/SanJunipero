@@ -12,8 +12,9 @@ import { buildManifestV4 } from '../src/hires.js'
 import { deriveSheet, CELL_NAMES_V4 } from '../src/mirror.js'
 import { CHAR_FIGURE_PX, reCell } from '../src/reCell.js'
 import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
+import { SJ_SCRATCH } from './scratch.js'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
+const S = SJ_SCRATCH
 const OUT = `${S}/fqc2/art-root`
 
 // the cell canvas: 208 px of figure needs headroom for hair and a lying pose's length

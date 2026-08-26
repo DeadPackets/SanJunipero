@@ -10,10 +10,11 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { makeVisionJudge, EST_COST_PER_VISION_CALL } from '../src/visionQa/visionJudge.js'
 import { recordVerdict, passRates } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
+import { scratch } from './scratch.js'
 
 const DRY = process.env.DRY === '1'
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
-const C5 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/production'
+const C13 = scratch('c13')
+const C5 = scratch('c5', 'production')
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
 const TILESETS = join(FORGE, 'content', 'tilesets')
 

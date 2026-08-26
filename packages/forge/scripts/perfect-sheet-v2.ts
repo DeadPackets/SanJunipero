@@ -9,9 +9,10 @@ import {
   sheetMetrics, v7Chain, opaqueBbox, upscaleNearest, distanceMatrix, pairwiseMedian,
   type Facing, type Pose,
 } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const DURABLE = scratch('c5')
 const SHEET_DIR = `${DURABLE}/character-sheet-v2`
 const REFS_DIR = `${DURABLE}/refs-v2`
 const GIFS_DIR = `${DURABLE}/walk-gifs`

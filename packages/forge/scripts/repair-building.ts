@@ -17,9 +17,10 @@ import { recordVerdict } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { validateBuildingAlignment, testGridRender, toTargetCell, SEAT_CRITERION_PROMPT } from '../src/alignment.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
-const C5 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/production'
+const C13 = scratch('c13')
+const C5 = scratch('c5', 'production')
 const ARCHIVE = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/archive/session-2026-08-16-finish-v1/c5/production'
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'

@@ -20,6 +20,7 @@ import { candidateRank } from '../src/library/postItem.js'
 import { refusalMessage } from '../src/gate.js'
 import { ITEMS_CONTENT_DIR } from '../src/library/committed.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -33,7 +34,7 @@ const ONLY = (process.env.ITEMS ?? '').split(',').map((s) => s.trim()).filter(Bo
 const REJECTED = new Set((process.env.LIB_REJECTED ?? '').split(',').map((s) => s.trim()).filter(Boolean))
 const DRY = process.env.LIB_DRY === '1'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/ar'
+const S = scratch('ar')
 const RAWS = `${S}/raws/items`
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'

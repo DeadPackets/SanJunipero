@@ -17,6 +17,7 @@ import { TOWN_TILE } from '../src/assetResolution.js'
 import { refusalMessage } from '../src/gate.js'
 import { BUILDINGS_CONTENT_DIR, facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -28,7 +29,7 @@ const ONLY = (process.env.STRUCT_ONLY ?? '').split(',').map((s) => s.trim()).fil
 const REJECTED = new Set((process.env.STRUCT_REJECTED ?? '').split(',').map((s) => s.trim()).filter(Boolean))
 const DRY = process.env.STRUCT_DRY === '1'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/td/v5'
+const S = scratch('td', 'v5')
 const RAWS = `${S}/raws`
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)

@@ -10,6 +10,7 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import { quantize } from '../src/post/quantize.js'
 import { outlinePass } from '../src/post/outline.js'
 import { upscaleNearest } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -26,7 +27,7 @@ const judge = makeVlmJudge({
 })
 
 const OUT = 'packages/forge/out/building-facing'
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/building-facing'
+const DURABLE = scratch('c5', 'building-facing')
 for (const d of [`${OUT}/candidates`, `${DURABLE}/candidates`]) mkdirSync(d, { recursive: true })
 
 const PROMPT = `${STYLE_PROMPT} A single free-standing building sprite. ` +

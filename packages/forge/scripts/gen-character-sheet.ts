@@ -13,6 +13,7 @@ import {
   FACINGS, POSES, FACING_CLAUSES, POSE_CLAUSES, STRAIGHT_DUPE, MIRROR_DUPE,
   assembleGrid, cellDistance, mirrorX, duplicateReport, upscaleNearest, type Facing, type Pose,
 } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -27,7 +28,7 @@ const judge: JudgeFn = makeVlmJudge({
 })
 
 const OUT = 'packages/forge/out/character-sheet'
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/character-sheet'
+const DURABLE = scratch('c5', 'character-sheet')
 for (const d of [`${OUT}/cells`, `${OUT}/raws`, `${DURABLE}/cells`, `${DURABLE}/raws`]) mkdirSync(d, { recursive: true })
 
 const CHAR_DESC = 'a friendly young villager in a sage-green cap and overalls'

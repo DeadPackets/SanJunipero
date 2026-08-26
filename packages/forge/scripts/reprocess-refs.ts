@@ -5,11 +5,12 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { decodePng, encodePng } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import { snapToGrid, detectArtScale, defringe, upscaleNearest } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
-const SE_COTTAGE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/building-facing/candidates/1.png'
+const SE_COTTAGE = scratch('c5', 'building-facing', 'candidates', '1.png')
 const OUT = 'packages/forge/out/refs-v2'
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/refs-v2'
+const DURABLE = scratch('c5', 'refs-v2')
 mkdirSync(OUT, { recursive: true })
 mkdirSync(DURABLE, { recursive: true })
 

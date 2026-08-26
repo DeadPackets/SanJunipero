@@ -22,8 +22,9 @@ import { pixelBarReport } from '../src/pixelGates.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
 import { spriteGateStatus } from '../src/library/status.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
+const C13 = scratch('c13')
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
 // ROOT lets a re-run at a new resolution land beside the old art rather than over it.
 const ROOT = process.env.LIB_ROOT ?? C13

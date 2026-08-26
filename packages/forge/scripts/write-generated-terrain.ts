@@ -16,8 +16,9 @@ import {
 import { tileSeamGate } from '../src/pixelGates.js'
 import { MATERIALS_DIR, seasonSheets } from '../src/terrainIngest.js'
 import { paintRoadAutotile } from '../src/roadTiles.js'
+import { scratch } from './scratch.js'
 
-const C3 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c3/materials'
+const C3 = scratch('c3', 'materials')
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
 const SCAFFOLDING_FILE = 'scaffolding.png', STRIP_FILE = 'road-autotile.png'
 

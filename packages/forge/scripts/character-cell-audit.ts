@@ -16,6 +16,7 @@ import { CELL_NAMES_V4 } from '../src/mirror.js'
 import { FACINGS, POSES_V2 } from '../src/sheet.js'
 import { paletteRgb } from '../src/palette.js'
 import type { RawImage } from '../src/post/raw.js'
+import { scratch } from './scratch.js'
 
 const DRY = process.env.DRY === '1'
 // REPORT=1 recomposes the tables from the verdicts already on disk: no key, no call, no spend.
@@ -24,8 +25,8 @@ const REPORT = process.env.REPORT === '1'
 // concern 3, and 21 of the library's 100 density readings live there). A REAL defect is a
 // hard fail or a criterion the judge scores at or under this.
 const DEFECT_AT = 4
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
-const C5 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/production'
+const C13 = scratch('c13')
+const C5 = scratch('c5', 'production')
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(C13, 'audit')
 

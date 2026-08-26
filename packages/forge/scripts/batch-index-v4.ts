@@ -3,8 +3,9 @@
 // comparison) and the 5 building previews. Zero generation, zero spend.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
+import { scratch } from './scratch.js'
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const PRODUCTION = `${SCRATCH}/production`
 const W = 1920
 const LABEL_H = 44

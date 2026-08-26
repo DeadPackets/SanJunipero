@@ -17,6 +17,7 @@ import {
 import { TOWN_TILE } from '../src/assetResolution.js'
 import { refusalMessage } from '../src/gate.js'
 import { BUILDINGS_CONTENT_DIR, STRUCTURE_FACINGS, facingKind, type StructureFacing } from '../src/buildingArt.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -32,7 +33,7 @@ const DRY = process.env.DWELL_DRY === '1'
 /** Forces every subject onto one reference mode, for the A/B that decided the default. */
 const REF_OVERRIDE = process.env.DWELL_REF_MODE as 'anchor' | 'swatch' | undefined
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/r4'
+const S = scratch('r4')
 const RAWS = `${S}/raws`
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)

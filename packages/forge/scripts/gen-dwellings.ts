@@ -16,6 +16,7 @@ import {
 } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
 import { refusalMessage } from '../src/gate.js'
+import { SJ_SCRATCH } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -30,7 +31,7 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 const GEN_PX = 2048
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
+const S = SJ_SCRATCH
 const OUT = `${S}/r3/dwellings`
 const ART = `${S}/fqc2/art-root/production`
 // The anchor carries the palette AND the architecture the user rejected, and on `farmhouse` the

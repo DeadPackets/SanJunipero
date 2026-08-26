@@ -7,8 +7,9 @@ import { encodePng, type RawImage } from '../src/post/raw.js'
 import { upscaleNearest } from '../src/sheet.js'
 import { checkerBackground, compositeOver } from '../src/visionQa/rubric.js'
 import { paintRoadAutotile, TILE_W, TILE_H } from '../src/roadTiles.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
+const C13 = scratch('c13')
 const OUT = process.env.OUT ?? join(C13, 'reports')
 const SCALE = Number(process.env.SCALE ?? '4')
 
