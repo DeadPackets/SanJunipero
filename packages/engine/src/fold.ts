@@ -23,6 +23,7 @@ import {
 } from './events.def.js'
 import { countsAsFootfall, decayTraffic, fromTrafficKey, quietPathsAt, trafficKey } from './systems/desirePaths.js'
 import { fromSaplingKey, saplingKey } from './systems/regrowth.js'
+import { INJURY_HEAL_DAYS } from './systems/illness.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
@@ -518,7 +519,10 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentAged.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_aged for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, ageDays: a.ageDays + 1 } } }
+      // The day turning is also when a wound closes: keep exactly the window septicWounds rolls on.
+      const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      const injuries = a.injuries.filter((w) => day - w.day < INJURY_HEAL_DAYS)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, ageDays: a.ageDays + 1, injuries } } }
     }
     case 'agent_died': {
       const p = AgentDied.parse(event.payload)
