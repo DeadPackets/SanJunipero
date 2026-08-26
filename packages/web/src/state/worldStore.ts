@@ -44,10 +44,8 @@ export function createWorldStore(): WorldStore {
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
 
-  // A pump arrives as many messages — a hello alone is one `asset` frame per codex row — and
-  // every subscriber pass is a full entity sync, so the burst is coalesced onto the next frame
-  // rather than paid once per message. Off a browser (the tests, and any node host) there is
-  // no frame to wait for and the pass stays synchronous.
+  // Every subscriber pass is a full entity sync, so a burst is coalesced onto the next frame.
+  // Off a browser there is no frame to wait for and the pass stays synchronous.
   let pending = false
   const flush = (): void => {
     pending = false
@@ -92,10 +90,8 @@ export function createWorldStore(): WorldStore {
               laws = { ...laws, [p.path]: p.value }
               lawChanges.push({ tick: ev.tick, path: p.path, value: p.value })
             }
-            // Only what the chronicle can narrate. The ring was ~95% `need_changed`, so the
-            // lens badge counted four hundred entries the panel it labels could not render,
-            // and a death scrolled out of the ring behind a wall of hunger ticks. Every event
-            // still folds into state above and still reaches `onEvents` below.
+            // Only what the chronicle can narrate: unnarratable events would push a death out
+            // of the ring. Every event still folds into state above and reaches `onEvents`.
             for (const ev of msg.events) if (isNarratable(ev)) events.push(ev)
             if (events.length > RECENT_EVENTS_CAP) events.splice(0, events.length - RECENT_EVENTS_CAP)
             for (const fn of eventSubs) fn(msg.events)

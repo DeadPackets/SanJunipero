@@ -1,6 +1,4 @@
-// LEGIBILITY FLOORS. Partial C12 Task 53 — the floors only; the coherent six-step scale is
-// still C12's. One number per floor, in one place, so a new call site cannot quietly
-// reintroduce 8px text the way seventeen ad-hoc sizes did.
+// One number per floor, in one place, so a call site cannot quietly reintroduce 8px text.
 
 /** Nothing in the product renders a glyph below this, in CSS pixels. */
 export const TEXT_MIN_PX = 12

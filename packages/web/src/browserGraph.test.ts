@@ -3,21 +3,10 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// The browser bundle is a LAYER, and vitest runs in Node — so nothing in the suite can feel
-// a Node-only module leaking into it. `packages/engine`'s index re-exports `db.ts`, which
-// imports `better-sqlite3` at module scope; one `from '@sj/engine'` anywhere that gets bundled
-// and the dev server hands the browser a module that throws before React mounts.
-//
-// WHY THIS GUARD IS WIDER THAN IT WAS (C12a batch-1 ruling R2). It walked the graph from
-// `main.tsx` ALONE. C12a task 62 wrote `import type { WorldState } from '@sj/engine'` into
-// `render/landmarks.ts`, and the guard stayed green for a whole commit — because landmarks.ts
-// was not yet imported by anything the entry reached. It only fired one commit later, when
-// StageMount imported the module, i.e. at the exact moment the defect became fatal in the
-// browser. A guard that reports a leak only once it is already fatal buys false confidence.
-//
-// Every `.ts`/`.tsx` under `src` is a file the bundler WILL take the moment somebody imports
-// it, so every one of them is a root here. Dynamic `import('…')` is scanned too — it is a
-// wire crossing that the static forms do not cover.
+// vitest runs in Node, so the suite cannot feel a Node-only module leaking into the browser
+// bundle: one `from '@sj/engine'` pulls in better-sqlite3 and the page throws before React
+// mounts. Every file under `src` is a root, not just the entry — walking from `main.tsx` alone
+// reports a leak only once something imports the file, which is already too late.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = resolve(HERE, '..')                 // packages/web
@@ -61,9 +50,8 @@ function resolveRelative(spec: string, fromFile: string): string | null {
   return null
 }
 
-// '@sj/engine/state' → the file its package.json `exports` map names. Following the map is
-// the whole point: '@sj/engine' and '@sj/engine/state' are different files with very
-// different dependencies, so a package-level rule cannot tell them apart.
+// Follows the package.json `exports` map: '@sj/engine' and '@sj/engine/state' are different
+// files with different dependencies, so a package-level rule cannot tell them apart.
 function resolveWorkspace(spec: string): string | null {
   const m = /^@sj\/([^/]+)(\/.*)?$/.exec(spec)
   if (m === null) return null
@@ -116,9 +104,7 @@ export function webSourceFiles(dir = join(WEB, 'src')): string[] {
   return out
 }
 
-/** The banned modules a bare specifier drags in with it. This is the rule stated about the
- *  DOOR rather than about the file that happens to open it, so it holds for a file nobody
- *  has written yet. */
+/** The banned modules a bare specifier drags in with it. */
 export function bannedReachableFrom(spec: string): string[] {
   const target = resolveWorkspace(spec)
   if (target === null) return NEVER.includes(spec) ? [spec] : []
@@ -194,16 +180,8 @@ describe('the browser graph', () => {
   })
 })
 
-// ★ WHAT THE BROWSER CAUGHT AND NOTHING ELSE DID (C12a batch 6). `landmarks.ts` wrote
-//
-//     import { LANDMARK_EDGE } from './legibility.js'
-//     export { LANDMARK_EDGE }
-//
-// `tsc -b` accepted it, all 2842 tests accepted it, and `@sj/web build` accepted it — the
-// bundler concatenates modules, so the binding was there. The DEV ESM graph, which is what a
-// person actually looks at, threw `Export 'LANDMARK_EDGE' is not defined in module` and every
-// place name in the town vanished. A per-file transpile cannot know the name came from
-// somewhere else, so a re-export has to NAME ITS SOURCE.
+// A re-export must name its source: tsc, the suite and the bundler all accept a bare
+// `export { X }` after importing X, but the dev ESM graph throws at runtime.
 
 /** The names one source re-exports through a bare `export { … }` after importing them. */
 export function bareReexports(source: string): string[] {
