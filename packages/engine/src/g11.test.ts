@@ -417,8 +417,8 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
   })
 
   it('a mid-run pave is visible to the very next search — there is no cache to go stale', () => {
-    // Task 37(d) (hierarchical pathing, `pathing.regionSize`, a cached portal graph) was never
-    // implemented; the dial is parsed and read by nothing. The property the cache line was
+    // Task 37(d) (hierarchical pathing, a cached portal graph) was never implemented, and the
+    // `pathing.regionSize` dial that nothing read is gone. The property the cache line was
     // there to protect is asserted directly: the search reads the ground as it stands.
     const terrain = MAP(40)
     let s = genesisState(CFG, terrain)

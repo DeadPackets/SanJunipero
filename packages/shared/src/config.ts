@@ -117,7 +117,6 @@ const ConstructionSchema = z.object({
     w: z.number().int().default(2),
     h: z.number().int().default(2),
   }).strict().prefault({}),
-  houseMaxHp: z.number().default(50),
 }).strict()
 
 // `weaponKinds` is optional and carries NO default, which is the whole of it: absent from
@@ -302,11 +301,10 @@ const MysterySchema = z.object({
   chancePerDay: z.number().default(0.08),
 }).strict()
 
-// C11 adds maxNodes/regionSize here; roadCost stays C9's (deep-world addendum §11).
+// C11 adds maxNodes here; roadCost stays C9's (deep-world addendum §11).
 const PathingSchema = z.object({
   roadCost: z.number().default(0.6),
   maxNodes: z.number().int().positive().default(6000),
-  regionSize: z.number().int().positive().default(16),
 }).strict()
 
 // Flag-only sections: the feature they gate is physics that already has a home elsewhere.

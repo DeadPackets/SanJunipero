@@ -154,7 +154,7 @@ describe('verb: build reads structures.recipes', () => {
     const house = CFG.structures.recipes.house!
     expect(house.inputs).toEqual(CFG.construction.houseMaterials)
     expect({ w: house.w, h: house.h }).toEqual(CFG.construction.houseSize)
-    expect(house.maxHp).toBe(CFG.construction.houseMaxHp)
+    expect(house.maxHp).toBe(50)
     expect(house.durationTicks).toBe(CFG.construction.houseTicks)
   })
 })
