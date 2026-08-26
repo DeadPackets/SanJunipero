@@ -791,7 +791,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     tags,
     sortDepth: () => {
       const entries: DepthEntry[] = []
-      for (const fn of depthSources) entries.push(...fn())
+      for (const fn of depthSources) for (const e of fn()) entries.push(e)
       lastCounts = applyDepthOrder(entries, viewRect())
     },
     depthCounts: () => lastCounts,

@@ -74,7 +74,8 @@ export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect):
   const { drawn, hidden } = cullByBox(entries, view)
   for (const e of hidden) e.node.visible = false
   const order = depthOrder(drawn.map((e) => e.box))
-  const index = new Map(order.map((id, i) => [id, i]))
+  const index = new Map<string, number>()
+  for (let i = 0; i < order.length; i++) index.set(order[i]!, i)
   for (const e of drawn) {
     e.node.visible = true
     e.node.zIndex = index.get(e.box.id) ?? 0
