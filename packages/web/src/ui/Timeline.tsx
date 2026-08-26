@@ -137,7 +137,7 @@ export function TimelineView({
           aria-valuetext={`Day ${m.day} ${m.time}`}
           onKeyDown={onKey}
           onPointerDown={(e) => {
-            ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+            ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
             pick(e.clientX)
           }}
           onPointerMove={(e) => {
@@ -176,13 +176,8 @@ export function Timeline({
   handle: ObservatoryHandle | null
   onView: (tick: number | null) => void // null = went live; updates the address bar
 }) {
-  const liveEdgeRef = useRef(0)
-  const liveTick = useSyncExternalStore(store.subscribe, () => {
-    const s = store.getState()
-    return store.getMode().live ? (s?.tick ?? 0) : Math.max(s?.tick ?? 0, liveEdgeRef.current)
-  })
+  const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  if (mode.live) liveEdgeRef.current = Math.max(liveEdgeRef.current, liveTick)
   const [sources, setSources] = useState<MarkSources>(EMPTY_SOURCES)
 
   useEffect(() => {
@@ -213,7 +208,7 @@ export function Timeline({
     }
   }, [])
 
-  const edge = Math.max(liveEdgeRef.current, 1)
+  const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick
   const marks = useMemo(() => coalesceMarks(marksFrom(sources), edge), [sources, edge])
 

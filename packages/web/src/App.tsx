@@ -37,6 +37,7 @@ import {
   loadHud,
   saveHud,
   type HudEv,
+  type HudLayout,
 } from './ui/hudLayout.js'
 import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
 import { BADGE_WORD, tickBadgeState } from './ui/broadcastReady.js'
@@ -80,9 +81,7 @@ function TickBadge({ store, link }: { store: WorldStore; link: LinkStatus }) {
 }
 
 export function App() {
-  const storeRef = useRef<WorldStore | null>(null)
-  storeRef.current ??= createWorldStore()
-  const store = storeRef.current
+  const [store] = useState(createWorldStore)
   const sockRef = useRef<ObservatoryHandle | null>(null)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
   const [scene, setScene] = useState<Scene | null>(null)
@@ -112,14 +111,12 @@ export function App() {
   // lags the tab bar by SCENE_OUT_MS. The reducer owns the timing; the sheet owns the curve.
   const [lensScene, setLensScene] = useState<SceneState>(() => idleScene('lens', route.lens))
   const shownLens: Lens = lensScene.phase === 'out' ? (lensScene.from as Lens) : route.lens
-  // the key handler is registered once; it reads the layout through a ref rather than
-  // re-registering on every dock change
-  const hudRef = useRef(hud)
-  hudRef.current = hud
   const hudHidden = hud.controlBar === 'hidden'
-  const applyHud = (ev: HudEv): void => {
+  // the key handler is registered once; taking the event from the previous layout is what lets
+  // it read the current one without re-registering on every dock change
+  const commitHud = (step: (prev: HudLayout) => HudEv): void => {
     setHud((prev) => {
-      const next = hudReducer(prev, ev)
+      const next = hudReducer(prev, step(prev))
       try {
         saveHud(localStorage, next)
       } catch {
@@ -127,6 +124,24 @@ export function App() {
       }
       return next
     })
+  }
+  const applyHud = (ev: HudEv): void => {
+    commitHud(() => ev)
+  }
+
+  // ONE way a route becomes the shown route. The lens transition is kicked here, where the
+  // change happens, so a scrub or a row toggle that leaves the lens alone cannot restart it.
+  const goRoute = (next: Route): void => {
+    setLensScene((p) =>
+      p.to === next.lens
+        ? p
+        : sceneReducer(p, { kind: 'go', name: 'lens', to: next.lens, atMs: performance.now() }),
+    )
+    setRoute(next)
+  }
+  const pushRoute = (next: Route): void => {
+    history.pushState(null, '', routeToPath(next))
+    goRoute(next)
   }
 
   useEffect(() => {
@@ -138,6 +153,7 @@ export function App() {
       onStatus: setLink,
     })
     sockRef.current = handle
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(handle)
 
     // deep link: once the first snapshot lands, scrub to the linked moment
@@ -151,7 +167,7 @@ export function App() {
     }
 
     const onPop = (): void => {
-      setRoute(parseRoute(location.pathname, location.search))
+      goRoute(parseRoute(location.pathname, location.search))
     }
     window.addEventListener('popstate', onPop)
     return () => {
@@ -164,29 +180,25 @@ export function App() {
   const onView = (tick: number | null): void => {
     const next: Route = { ...route, moment: tick === null ? null : tickToMoment(tick) }
     history.replaceState(null, '', routeToPath(next))
-    setRoute(next)
+    goRoute(next)
   }
 
   // ADAPTER: the nav item is the way back a viewer reaches for first, so TOWNSFOLK returns
   // to the roster when one person is already open (see navToLens).
   const nav = (lens: Lens): void => {
     const next = navToLens(route, lens)
-    history.pushState(null, '', routeToPath(next))
-    setRoute(next)
+    pushRoute(next)
   }
 
   // ADAPTER: the back affordance in the single-character view.
   const showRoster = (): void => {
     const next = backToRoster(route)
     if (next === route) return
-    history.pushState(null, '', routeToPath(next))
-    setRoute(next)
+    pushRoute(next)
   }
 
   const pickAgent = (agentId: string): void => {
-    const next: Route = { ...route, lens: 'inspector', agentId, openId: null }
-    history.pushState(null, '', routeToPath(next))
-    setRoute(next)
+    pushRoute({ ...route, lens: 'inspector', agentId, openId: null })
   }
 
   // Opening a roster row is a state of the LIST, not a navigation: the list never unmounts, so
@@ -195,17 +207,13 @@ export function App() {
     const nextState = expandReducer({ openId: route.openId }, { kind: 'toggle', id: agentId }, [
       agentId,
     ])
-    const next: Route = { ...route, openId: nextState.openId }
-    history.pushState(null, '', routeToPath(next))
-    setRoute(next)
+    pushRoute({ ...route, openId: nextState.openId })
   }
 
   // Opening a recorded day puts its id in the address bar and keeps it there while it plays,
   // so the link a viewer copies mid-playback reopens the same day.
   const openMoment = (momentId: number | null): void => {
-    const next: Route = { ...route, lens: 'director', momentId, moment: null }
-    history.pushState(null, '', routeToPath(next))
-    setRoute(next)
+    pushRoute({ ...route, lens: 'director', momentId, moment: null })
   }
 
   // ADAPTER: Escape takes ONE step out, and this is the one place that decides which step.
@@ -240,7 +248,7 @@ export function App() {
     const onKey = (e: KeyboardEvent): void => {
       if (e.altKey || e.ctrlKey || e.metaKey) return
       const t = e.target as HTMLElement | null
-      const inApplication = t?.closest?.('[role="application"]') != null
+      const inApplication = t?.closest('[role="application"]') != null
       if (
         !lensKeyAllowed(
           t?.tagName ?? '',
@@ -273,19 +281,13 @@ export function App() {
       if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
       if (t?.isContentEditable === true) return
       e.preventDefault()
-      applyHud(hudToggle(hudRef.current))
+      commitHud(hudToggle)
     }
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
     }
   }, [])
-
-  useEffect(() => {
-    setLensScene((p) =>
-      sceneReducer(p, { kind: 'go', name: 'lens', to: route.lens, atMs: performance.now() }),
-    )
-  }, [route.lens])
 
   // `sceneReducer` returns the same object when nothing changed, so React bails out and this
   // whole frame loop costs two renders per transition, not one per frame.
@@ -350,6 +352,7 @@ export function App() {
   // face in the canvas, and 16px of it is 4.00px on a 480-wide player.
   useEffect(() => {
     if (scene === null) return
+    // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle kept in state only so children re-render when it lands; this writes to the canvas, not to React data.
     scene.textScale = route.broadcast ? BROADCAST_TEXT_SCALE : 1
   }, [scene, route.broadcast])
 

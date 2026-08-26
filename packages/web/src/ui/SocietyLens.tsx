@@ -140,8 +140,6 @@ export function SocietyLens({
   // held by ref: a clone would discard the layout on every render, and the label pass below
   // needs the positions force-graph is mutating.
   const graphData = useMemo(() => ({ nodes: graph.nodes, links }), [graph, links])
-  const nodesRef = useRef<PositionedNode[]>(graphData.nodes)
-  nodesRef.current = graphData.nodes
 
   // A shut key must not hide the fact that lines are being filtered out.
   const hiddenCount = hidden.size
@@ -274,7 +272,8 @@ export function SocietyLens({
           ctx.font = `${fontSize}px Silkscreen, monospace`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'top'
-          for (const n of nodesRef.current) {
+          const nodes: PositionedNode[] = graphData.nodes
+          for (const n of nodes) {
             if (n.x === undefined || n.y === undefined) continue
             const side = slabSide(n)
             const lx = Math.round(n.x)

@@ -24,7 +24,7 @@ describe('the bonds graph paints every slab before any name', () => {
   it('paints every name in the post-frame pass, after the last slab is down', () => {
     const post = propBody(SRC, 'onRenderFramePost')
     expect(post).toContain('fillText')
-    expect(post, 'the post pass must walk every node, not one').toContain('nodesRef.current')
+    expect(post, 'the post pass must walk every node, not one').toContain('graphData.nodes')
   })
 })
 

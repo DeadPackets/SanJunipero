@@ -316,8 +316,8 @@ export function createGroundBaker(
 /** A scene's clock, held rather than reached for through `app.ticker`: Pixi's
  *  `Application.destroy()` nulls that field, so an effect queued before teardown throws. */
 export function sceneClock(app: { ticker: { start(): void; stop(): void } | null }): {
-  set(on: boolean): void
-  close(): void
+  set: (on: boolean) => void
+  close: () => void
 } {
   let closed = false
   return {

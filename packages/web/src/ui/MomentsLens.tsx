@@ -285,7 +285,7 @@ export function PlayerStripView({
         aria-valuetext={clock(player.tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
