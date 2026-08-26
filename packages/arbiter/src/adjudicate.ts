@@ -240,7 +240,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
             return stored
           }
           // Unregistered verb → fall through to the LLM.
-        } else if (stored.kind === 'impossible') {
+        } else {
           if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
           // Contextual (insufficient_skill/materials) → fall through to the LLM,
           // which sees the asking agent's own skills and inventory.

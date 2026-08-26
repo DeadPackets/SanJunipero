@@ -189,7 +189,7 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     ...(recipe.skillCheck === undefined
       ? {}
       : { skill: { track: recipe.skillCheck.track, xp: 10 } }),
-    ...(recipe.rngStream === undefined ? {} : { rngStream: recipe.rngStream }),
+    rngStream: recipe.rngStream,
   }
 }
 

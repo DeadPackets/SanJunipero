@@ -219,7 +219,7 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
     const speech = presences.filter((p) => p.ev.type === 'agent_spoke')
     const tokens = new Map<string, Set<string>>()
     for (const s of speech) {
-      const text = String((s.ev.payload as { text?: unknown }).text ?? '')
+      const text = (s.ev.payload as { text?: string }).text ?? ''
       for (const raw of text.toLowerCase().split(/[^\p{L}']+/u)) {
         if (raw.length < 3 || STOPWORDS.has(raw)) continue
         const speakers = tokens.get(raw) ?? new Set<string>()
