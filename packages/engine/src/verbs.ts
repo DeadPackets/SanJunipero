@@ -1186,6 +1186,21 @@ const words = (kind: string): string => kind.replace(/_/g, ' ')
 export function buildSiteOf(
   state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
 ): BuildSiteAnswer {
+  const key = `${agentId}|${params.kind}|${params.x ?? ''}|${params.y ?? ''}`
+  const hit = siteMemo.get(state)
+  if (hit !== undefined && hit.config === config && hit.key === key) return hit.answer
+  const answer = computeBuildSite(state, config, agentId, params)
+  siteMemo.set(state, { config, key, answer })
+  return answer
+}
+
+// One build intent asks this from `validate`, `duration` and `onStart` over the same immutable
+// world, and each answer costs a claim search of the whole lattice.
+const siteMemo = new WeakMap<WorldState, { config: SimConfig; key: string; answer: BuildSiteAnswer }>()
+
+function computeBuildSite(
+  state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
+): BuildSiteAnswer {
   const recipe = buildableRecipe(config, params.kind)!
   if (!buildIsPlotted(state, config, params.kind)) {
     if (params.x === undefined || params.y === undefined) {
