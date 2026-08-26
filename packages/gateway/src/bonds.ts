@@ -7,6 +7,7 @@ import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { TALK_WINDOW_TICKS } from './api.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { toEvent, type EventRow } from './http.js'
 
 // What the town did, read as what the town became. Each rule is one observable act; the
 // SEMANTICS (trust, debt, grudge, love from the ledgers) stay C9 T11/T12's job — when they
@@ -15,6 +16,10 @@ import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 export { BOND_NOTES } from '@sj/shared'
 
 const VERB_BONDS: Readonly<Record<string, BondKind>> = { give: 'owe', teach: 'work', attack: 'rival' }
+
+/** The whole of what `buildBonds` folds; every other type falls through its chain untouched. */
+export const BOND_TYPES: readonly string[] =
+  ['agent_spoke', 'action_started', 'action_completed', 'co_slept', 'agent_born']
 
 export type BondsDeps = {
   db: Database.Database
@@ -30,7 +35,7 @@ export type BondsDeps = {
  * 30 s per viewer. What is kept per pair is now a 24-act window, six rollup rows and three
  * scalars — a constant, whatever the town's age.
  */
-export function buildBonds(events: SimEvent[], earshot: number, asOfTick: number): BondsResponse {
+export function buildBonds(events: Iterable<SimEvent>, earshot: number, asOfTick: number): BondsResponse {
   const drafts = new Map<string, BondFold>()
 
   const tie = (a: string, b: string, kind: BondKind, tick: number): void => {
@@ -86,14 +91,19 @@ export function buildBonds(events: SimEvent[], earshot: number, asOfTick: number
 }
 
 export function mountBondsApi(router: Router, deps: BondsDeps): void {
-  const selEvents = deps.db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
-  // Whole-log scan per request; see seqCache.ts for why a public stream cannot pay that per viewer.
+  const selEvents = deps.db.prepare(
+    `SELECT seq, tick, type, payload FROM events WHERE type IN (${BOND_TYPES.map(() => '?').join(', ')})
+     ORDER BY seq`)
+  // A filtered scan per generation; see seqCache.ts for why a public stream cannot pay one per viewer.
   const cache = makeSeqCache(() => deps.mirror.seq())
 
   const bonds = (): BondsResponse => cache.value('bonds', () => {
-    const events = (selEvents.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
-      .map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
-    return buildBonds(events, deps.config.movement.earshotRadius, deps.mirror.state().tick)
+    // Streamed, so the rows and the parsed events are never both fully materialised: measured on
+    // this shape at 86.9 MB of retained log, see the fold note in `api.ts`.
+    const events = function* (): Generator<SimEvent> {
+      for (const r of selEvents.iterate(...BOND_TYPES) as Iterable<EventRow>) yield toEvent(r)
+    }
+    return buildBonds(events(), deps.config.movement.earshotRadius, deps.mirror.state().tick)
   })
 
   router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', bonds)))

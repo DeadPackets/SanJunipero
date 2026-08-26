@@ -35,6 +35,13 @@ export const MAX_KEYS = 32
  * A single body larger than the whole budget is still admitted, after everything else has been
  * dropped for it. Refusing it would mean rebuilding it on every request, which is exactly the
  * amplification this cache exists to stop.
+ *
+ * ★ AND IT IS A BUDGET PER MOUNTED ROUTER, NOT PER PROCESS. Five routers build one cache each —
+ * `api.ts`, `narratorApi.ts`, `bonds.ts`, `discoveries.ts`, `lineage.ts` — so the honest process
+ * ceiling is 5 × MAX_BYTES over 5 × MAX_KEYS. The isolation is the point rather than an
+ * oversight: `values` is one map with one eviction, so a single shared instance would let a
+ * stranger walking `?fromTick=` windows on `/api/chronicle` churn out the `bonds` memo and buy
+ * the most expensive build in the gateway on the next `/api/bonds`.
  */
 export const MAX_BYTES = 4 * 1024 * 1024
 

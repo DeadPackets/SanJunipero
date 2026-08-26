@@ -5,6 +5,7 @@ import {
   encodePng, makePlaceholder, paletteRgb, renderEmote, type Facing, type RawImage, type Rgb,
 } from '@sj/forge'
 import type { Router } from './server.js'
+import { notFound } from './http.js'
 
 export const PLACEHOLDER_PX: Record<AssetClass, { w: number; h: number }> = {
   building: { w: 64, h: 64 }, item: { w: 24, h: 24 }, crop: { w: 32, h: 32 },
@@ -77,11 +78,6 @@ export function buildEmoteAtlas(): RawImage {
   return atlas
 }
 
-const notFound = (res: ServerResponse): void => {
-  res.writeHead(404, { 'content-type': 'application/json' })
-  res.end('{"error":"not found"}')
-}
-
 const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {
   const headers: Record<string, string> = { 'content-type': 'image/png' }
   if (immutable) headers['cache-control'] = 'public, max-age=31536000, immutable'
@@ -90,6 +86,9 @@ const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {
 }
 
 const stripPng = (file: string): string | null => (file.endsWith('.png') ? file.slice(0, -4) : null)
+
+/** Encoded sheets held at once. A character sheet is 5 938 B here, so this is about 760 KB. */
+export const MAX_ENCODED = 128
 
 /**
  * ★ THE PLACEHOLDER ROUTES ENCODE A PNG PER REQUEST, AND THE KEY IS THE STRANGER'S TO CHOOSE.
@@ -107,11 +106,34 @@ export type AssetRouteDeps = {
 }
 
 export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
-  const encoded = new Map<string, Buffer>()
+  // ★ ONE ZOD PARSE PER ROW FOR THE PROCESS, NOT PER IMAGE GET. The character route read the
+  // whole `assets` table and `AssetRecordSchema.parse`d every row to keep one element, on every
+  // request, and the browser asks once per agent on load. The cursor tops itself up from the
+  // codex's own seq at read time, so a sheet registered a millisecond ago is already here.
+  let readySeq = 0
+  const readyByKind = new Map<string, string>()
+  const newestReady = (codex: AssetCodex, kind: string): string | undefined => {
+    for (const r of codex.listSince(readySeq)) {
+      readySeq = r.seq
+      if (r.status === 'ready' && r.kind !== null) readyByKind.set(r.kind, r.id)
+    }
+    return readyByKind.get(kind)
+  }
+
+  // The PROMISE is what is held, not the buffer: the buffer was only written after the encode
+  // resolved, so N concurrent misses on one key ran N sharp encodes on libuv's four threads —
+  // the starvation the note above says this cache prevents. Oldest-first past the cap, because
+  // fold.ts leaves the dead in `state.agents` for ever and `knowsAgent` lets them all through.
+  const encoded = new Map<string, Promise<Buffer>>()
   const onceEncoded = (key: string, build: () => RawImage, then: (buf: Buffer) => void): void => {
-    const hit = encoded.get(key)
-    if (hit !== undefined) { then(hit); return }
-    void encodePng(build()).then((buf) => { encoded.set(key, buf); then(buf) })
+    let p = encoded.get(key)
+    if (p === undefined) {
+      p = encodePng(build())
+      if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value as string)
+      encoded.set(key, p)
+    }
+    // A failed encode must not be remembered as this key's answer for the life of the process.
+    void p.then(then, () => { encoded.delete(key) })
   }
 
   router.route('GET', '/assets/placeholder/:file', (_req, res, params) => {
@@ -129,13 +151,9 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
     // binding: newest ready codex sheet registered for this agent, else the built placeholder
     const codex = deps.getCodex()
     if (codex) {
-      const match = codex.listSince(0)
-        .filter(r => r.status === 'ready' && r.kind === `character:${agentId}`)
-        .at(-1)
-      if (match) {
-        const hit = codex.get(match.id)
-        if (hit) { sendPng(res, hit.png); return }
-      }
+      const id = newestReady(codex, `character:${agentId}`)
+      const hit = id === undefined ? null : codex.get(id)
+      if (hit) { sendPng(res, hit.png); return }
     }
     onceEncoded(`character:${agentId}`, () => buildPlaceholderSheet(agentId), (buf) => sendPng(res, buf))
   })

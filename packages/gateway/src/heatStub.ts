@@ -141,17 +141,3 @@ export function heatFromScores(scores: ReadonlyMap<string, number>): HeatWindow[
     })
     .sort((a, b) => a.fromTick - b.fromTick || (a.agentId < b.agentId ? -1 : a.agentId > b.agentId ? 1 : 0))
 }
-
-// readonly: the caller's array is never retained past this call.
-export function heatWindows(events: readonly SimEvent[]): HeatWindow[] {
-  const scores: HeatScores = new Map()
-  const plans = new Map<string, string>()
-  for (const ev of events) {
-    if (ev.type !== 'structure_planned') continue
-    const p = ev.payload as { id?: string; builderId?: string }
-    if (typeof p.id === 'string' && typeof p.builderId === 'string') plans.set(p.id, p.builderId)
-  }
-  const ctx = heatContext((id) => plans.get(id) ?? null)
-  for (const ev of events) scoreEvent(scores, ev, ctx)
-  return heatFromScores(scores)
-}

@@ -14,6 +14,7 @@ import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
+import { notFound } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -116,12 +117,18 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (ok) { r.fn(req, res, params); return }
     }
     if (site !== null && site(req, res, url.pathname)) return
-    res.writeHead(404, { 'content-type': 'application/json' })
-    res.end('{"error":"not found"}')
+    notFound(res)
   })
 
   // ── snapshot string, cached per pump generation ──
   let snapJson: string | null = null
+  // Asset catch-up frames, built once for the process and topped up at hello time. Per
+  // CONNECTION this was one `AssetRecordSchema.parse` and one `JSON.stringify` per row, on the
+  // tick thread; a reconnect storm against a 166-record library is ~83k of each. Topped up from
+  // the codex's own seq rather than the pump's, because `codex.register` fires in-process and a
+  // hello landing between two pumps must still see the sheet registered a millisecond ago.
+  const catchUp: string[] = []
+  let catchUpSeq = 0
   const snapshotJson = (): string => {
     if (snapJson === null) {
       snapJson = JSON.stringify({ t: 'snapshot', tick: mirror.state().tick, seq: mirror.seq(), state: mirror.state(), config, laws: mirror.state().laws ?? {}, live: true })
@@ -174,7 +181,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         sock.send(snapshotJson())
         // asset catch-up: late joiners must not render placeholders the codex already replaced
         const cdx = getCodex()
-        if (cdx) for (const record of cdx.listSince(0)) sock.send(JSON.stringify({ t: 'asset', record }))
+        if (cdx) {
+          for (const record of cdx.listSince(catchUpSeq)) {
+            catchUpSeq = record.seq
+            catchUp.push(JSON.stringify({ t: 'asset', record }))
+          }
+          for (const frame of catchUp) sock.send(frame)
+        }
         return
       }
       if (msg.t === 'scrub') {
