@@ -121,9 +121,9 @@ describe('detectInstitutions', () => {
       ...rest,
       foundingSceneId: foundingSceneIndex + 1,
     }))
-    for (const i of mapped) store.insertInstitution(i)
+    const ids = mapped.map((i) => store.insertInstitution(i))
     const got = store.institutions()
     expect(got).toHaveLength(out.length)
-    expect(got.map(({ id: _id, ...rest }) => rest)).toEqual(mapped)
+    expect(got).toEqual(mapped.map((i, n) => ({ ...i, id: ids[n] })))
   })
 })

@@ -71,8 +71,7 @@ export class ReviewStore {
     const rb = this.db.prepare('SELECT reverted_at_tick FROM rulebook WHERE id = ?').get(ruleId) as
       | { reverted_at_tick: number | null }
       | undefined
-    if (!rb || rb.reverted_at_tick !== null)
-      throw new Error(`cannot approve reverted rule ${ruleId}`)
+    if (rb?.reverted_at_tick !== null) throw new Error(`cannot approve reverted rule ${ruleId}`)
     this.db
       .prepare('UPDATE ruling_reviews SET status = ? WHERE rule_id = ?')
       .run('approved', ruleId)

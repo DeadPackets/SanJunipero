@@ -128,11 +128,11 @@ class ScriptedLlm {
   lastSystem = ''
   constructor(private readonly respond: (intent: string, system: string) => Verdict) {}
 
-  async object<T>(opts: {
+  async object(opts: {
     system: string
     messages: LlmMessage[]
     schema: unknown
-  }): Promise<{ value: T; usage: LlmUsage }> {
+  }): Promise<{ value: unknown; usage: LlmUsage }> {
     this.objectCalls += 1
     this.lastSystem = opts.system
     const content = opts.messages.at(-1)?.content ?? ''
@@ -141,7 +141,7 @@ class ScriptedLlm {
         .split('\n')
         .at(-1)
         ?.replace(/^Intent: /, '') ?? ''
-    return { value: this.respond(intent, opts.system) as unknown as T, usage: emptyUsage() }
+    return { value: this.respond(intent, opts.system), usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {
@@ -826,12 +826,7 @@ describe('the ground the arbiter was shown is the ground a recipe may ask for', 
     expect(verdict.kind).toBe('impossible')
     expect(llm.objectCalls).toBe(2)
     expect((db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n).toBe(0)
-    expect(
-      arbiter.sanity(
-        sandVerdict.kind === 'attempt' ? sandVerdict.recipe : basketRecipe,
-        seeing(['grass']),
-      ),
-    ).toMatch(/sand/)
+    expect(arbiter.sanity(sandVerdict.recipe, seeing(['grass']))).toMatch(/sand/)
   })
 
   it('lets the same recipe through where the sand actually is', async () => {
@@ -940,7 +935,7 @@ describe('live codification round trip (T20)', () => {
       // Codify: the recipe becomes a verb the engine itself answers for.
       expect(VERBS[matRecipe.id]).toBeUndefined()
       expect(arbiter.codify(matRecipe, CODIFY_CREDIT)).toEqual({
-        ruleId: expect.any(Number),
+        ruleId: expect.any(Number) as number,
         verb: matRecipe.id,
       })
       expect(VERBS[matRecipe.id]).toBeDefined()

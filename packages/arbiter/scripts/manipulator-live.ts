@@ -4,7 +4,7 @@
 // BEFORE arm reproduces the landing the previous lane recorded.
 import { writeFileSync } from 'node:fs'
 import { openDb } from '@sj/engine'
-import { LlmClient, migrateLlmTables, TurnSchema } from '@sj/agents'
+import { LlmClient, migrateLlmTables, type Turn, TurnSchema } from '@sj/agents'
 // Relative, like `g11-deepworld.ts`'s cross-package imports: `assemblePrompt` and the prompt
 // fixtures are internals of `@sj/agents` and not on its public surface. A script is outside
 // the package graph, which is the only reason this is legal here and nowhere in `src`.
@@ -18,12 +18,12 @@ import {
 } from '../src/chaos/manipulator.js'
 
 const CAP_USD = 0.75
-const OUT = process.env['SJ_OUT'] ?? '/tmp/manipulator-live.json'
+const OUT = process.env.SJ_OUT ?? '/tmp/manipulator-live.json'
 // One sample is an anecdote. `SJ_ONLY=<id> SJ_REPEAT=5` re-runs one payload enough times to
 // tell a landing from a bad roll — four of twelve rows in the first full run produced outright
 // persona collapse, so this harness is noisy and a single transcript cannot settle anything.
-const ONLY = process.env['SJ_ONLY'] ?? null
-const REPEAT = Number(process.env['SJ_REPEAT'] ?? '1')
+const ONLY = process.env.SJ_ONLY ?? null
+const REPEAT = Number(process.env.SJ_REPEAT ?? '1')
 
 const db = openDb(':memory:')
 migrateLlmTables(db)
@@ -78,34 +78,30 @@ type Arm = {
 
 type Row = { id: string; goal: string; spoken: string; arms: Arm[] }
 
-async function askMind(prose: string): Promise<Record<string, unknown>> {
+async function askMind(prose: string): Promise<Turn> {
   const blocks = fixtureBlocks({ now: { prose } })
   const { system, messages } = assemblePrompt(blocks)
-  return (await llm.object({ schema: TurnSchema, system, messages })).value as Record<
-    string,
-    unknown
-  >
+  return (await llm.object({ schema: TurnSchema, system, messages })).value
 }
 
 async function runArm(id: string, prose: string, render: Arm['render']): Promise<Arm | null> {
-  let value: Record<string, unknown>
+  let value: Turn
   try {
     value = await askMind(prose)
   } catch (err) {
     console.log(`[${id}/${render}] THREW: ${err instanceof Error ? err.message : String(err)}`)
     return null
   }
-  const thought = String(value['thought'] ?? '')
-  const speech =
-    value['speech'] === undefined || value['speech'] === null ? null : String(value['speech'])
-  const surface = `${thought} ${speech ?? ''} ${JSON.stringify(value['action'] ?? {})}`
+  const thought = value.thought
+  const speech = value.speech ?? null
+  const surface = `${thought} ${speech ?? ''} ${JSON.stringify(value.action ?? {})}`
   const arm: Arm = {
     render,
     promptLines: prose.split('\n').length,
     promptChars: prose.length,
     thought,
     speech,
-    action: value['action'] ?? null,
+    action: value.action ?? null,
     tell: TELLS[id]?.test(surface) ?? false,
     spokenGlassWords: spokenLeak(speech),
     ghostAttribution: ghostAttribution(surface),
@@ -116,12 +112,12 @@ async function runArm(id: string, prose: string, render: Arm['render']): Promise
   )
   console.log(`    thought : ${thought}`)
   console.log(`    speech  : ${speech ?? '(silent)'}`)
-  console.log(`    action  : ${JSON.stringify(value['action'] ?? null)}`)
+  console.log(`    action  : ${JSON.stringify(value.action ?? null)}`)
   return arm
 }
 
 async function main(): Promise<void> {
-  if (!process.env['OPENROUTER_API_KEY']) {
+  if (!process.env.OPENROUTER_API_KEY) {
     console.error('needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     process.exit(1)
   }

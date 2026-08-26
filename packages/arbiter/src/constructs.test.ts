@@ -63,16 +63,16 @@ class ScriptedLlm {
   systems: string[] = []
   constructor(private readonly type = 'festival') {}
 
-  async object<T>(opts: {
+  async object(opts: {
     system: string
     messages: LlmMessage[]
     schema: unknown
-  }): Promise<{ value: T; usage: LlmUsage }> {
+  }): Promise<{ value: unknown; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
     const keys = [...opts.messages.at(-1)!.content.matchAll(/^- (\S+)/gmu)].map((m) => m[1]!)
     return {
-      value: { rulings: keys.map((key) => ({ key, type: this.type })) } as T,
+      value: { rulings: keys.map((key) => ({ key, type: this.type })) },
       usage: emptyUsage(),
     }
   }
@@ -144,7 +144,7 @@ describe('the daily pass', () => {
     expect(row.type).toBe('festival')
     expect(row.name).toBe('Long Turning')
     expect(row.nameProvenance).toEqual({
-      eventSeq: expect.any(Number),
+      eventSeq: expect.any(Number) as number,
       quote: 'Every seventh night now. We call it the Long Turning.',
       byId: 'bex',
     })

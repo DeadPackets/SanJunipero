@@ -34,7 +34,7 @@ export class CodexStore {
     let best: Era = 'handwork'
     let bestOrder = 0
     for (const row of rows) {
-      const order = ERA_ORDER[row.era as Era]
+      const order = (ERA_ORDER as Record<string, number | undefined>)[row.era]
       if (order !== undefined && order > bestOrder) {
         bestOrder = order
         best = row.era as Era
@@ -62,8 +62,8 @@ export class CodexStore {
     for (const id of recipeCanon) {
       if (known.has(id)) continue
       const row = prerequisite.get(id) as { prerequisite_id: string | null } | undefined
-      if (row !== undefined && row.prerequisite_id !== null && known.has(row.prerequisite_id))
-        continue
+      const prerequisiteId = row?.prerequisite_id ?? null
+      if (prerequisiteId !== null && known.has(prerequisiteId)) continue
       return false
     }
     return true

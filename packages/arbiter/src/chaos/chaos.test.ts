@@ -110,18 +110,18 @@ function emptyUsage(): LlmUsage {
 class ScriptedExploitLlm {
   constructor(private readonly respond: (intent: string) => Verdict) {}
 
-  async object<T>(opts: {
+  async object(opts: {
     system: string
     messages: LlmMessage[]
     schema: unknown
-  }): Promise<{ value: T; usage: LlmUsage }> {
+  }): Promise<{ value: unknown; usage: LlmUsage }> {
     const content = opts.messages.at(-1)?.content ?? ''
     const intent =
       content
         .split('\n')
         .at(-1)
         ?.replace(/^Intent: /, '') ?? ''
-    return { value: this.respond(intent) as unknown as T, usage: emptyUsage() }
+    return { value: this.respond(intent), usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {

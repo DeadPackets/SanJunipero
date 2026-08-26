@@ -18,7 +18,6 @@ export const SEMANTIC_CONCEPTS = [
   'multi_day_plan',
   'past_reference',
 ] as const
-export type SemanticConcept = (typeof SEMANTIC_CONCEPTS)[number]
 
 // Narrator-side ops config, not world law (deviation 12): nothing here reaches physics, the
 // hash or a prompt a mind reads.
@@ -76,7 +75,7 @@ export type SemanticCandidateRow = {
 
 // The verdict shape, `.strict()`. A hit cites either a logged event or a remembered record —
 // never neither, because a claim with no provenance cannot be checked.
-export const SemanticHitSchema = z
+const SemanticHitSchema = z
   .object({
     conceptKind: z.string().min(1),
     agentId: z.string().min(1),
@@ -95,7 +94,7 @@ export const SemanticHitSchema = z
     message: 'a hit must cite an event or a remembered record',
   })
 export const SemanticVerdictSchema = z.object({ hits: z.array(SemanticHitSchema) }).strict()
-export type SemanticHit = z.infer<typeof SemanticHitSchema>
+type SemanticHit = z.infer<typeof SemanticHitSchema>
 
 // Every id the model must answer with is on the page in front of it (canon-vocabulary law),
 // and so is the whole of the lie contract. This prompt is ops-side and no mind ever reads it.
@@ -103,7 +102,7 @@ const SEMANTIC_HEADER = `You read one day of a town's words: what people said al
 
 // Every id the model must answer with, with the plain sentence that says what it is. The pass
 // renders only the ones still unfound, which is what makes the nightly cost decay to nothing.
-export const CONCEPT_DESCRIPTIONS: Readonly<Record<string, string>> = {
+const CONCEPT_DESCRIPTIONS: Readonly<Record<string, string>> = {
   god_afterlife:
     'god_afterlife: speaking of gods, of the dead continuing, of anything beyond the world',
   fear_of_death: 'fear_of_death: naming death as a thing to be afraid of',

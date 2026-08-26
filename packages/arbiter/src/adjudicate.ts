@@ -38,11 +38,11 @@ const MAX_LLM_ATTEMPTS = 2
 
 // Returned, never recorded, so a bad run cannot become precedent; mind-facing, so it may name
 // the attempt, never the act. Widening `ImpossibleClassSchema` would hand the model an easy out.
-export const FALLBACK_IMPOSSIBLE: Verdict = {
+export const FALLBACK_IMPOSSIBLE = {
   kind: 'impossible',
   reason: 'you turn it over and it will not come together as it stands',
   class: 'physically_impossible',
-}
+} satisfies Verdict
 
 // Canned diegetic line replacing an impossible reason that leaks the machinery.
 const CLEAN_IMPOSSIBLE_REASON = 'nothing in the town lends itself to this'
@@ -240,7 +240,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
             return stored
           }
           // Unregistered verb → fall through to the LLM.
-        } else if (stored.kind === 'impossible') {
+        } else {
           if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
           // Contextual (insufficient_skill/materials) → fall through to the LLM,
           // which sees the asking agent's own skills and inventory.
