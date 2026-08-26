@@ -117,7 +117,6 @@ export function conditionsOf(a: AgentView): Condition[] {
  *  and an empty set renders nothing at all — never a placeholder chip. */
 export const DRIVES = [] as const
 export type Drive = string
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- P22 hook: the person is the question, and the society lane has no answer yet.
 export function drivesOf(_a: AgentView): Drive[] {
   return []
 }

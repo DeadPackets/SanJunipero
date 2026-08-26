@@ -9,7 +9,7 @@
     "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/gateway serve",
     "test": "vitest run",
     "typecheck": "tsc -b packages/shared packages/engine packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && for p in agents arbiter forge gateway narrator; do tsc -p packages/$p/tsconfig.scripts.json || exit 1; done",
-    "lint": "eslint .",
+    "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js .",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "knip": "knip",
