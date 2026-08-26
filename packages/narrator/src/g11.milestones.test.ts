@@ -1,6 +1,5 @@
-// @slow — GATE G11a, the ledger half: the firsts an engine event makes, the firsts a shape
-// across several makes, and the firsts only a reader can find. No network: the model here is a
-// script. $0.
+// @slow — the ledger half: the firsts an engine event makes, the firsts a shape across several
+// makes, and the firsts only a reader can find. The model here is a script.
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'
@@ -133,9 +132,8 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
     expect(t2(lapse).map((m) => m.kind)).not.toContain('first_breakup')
   })
 
-  // C11 R16: both of these match on `agent_harmed{source:'attack'}`, and nothing in the world
-  // emitted one, so neither could ever fire. `attack` emits it now, and the log the verb
-  // actually produces is what these rows are driven with.
+  // Both of these match on `agent_harmed{source:'attack'}`, so they are driven with the log
+  // the verb actually produces rather than a hand-written one.
   it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
     const s = pairWorld({})
     const blow = VERBS.attack.onComplete(s, DEFAULT_CONFIG, 'ada', { targetId: 'bex' }, new RngStreams('c1').get('combat'))

@@ -12,8 +12,8 @@ import {
   TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
-// Cross-package by relative path, the way g9-livingworld reaches the arbiter: @sj/gateway
-// depends on @sj/agents, so a package-level dependency here would close a cycle.
+// Cross-package by relative path: @sj/gateway depends on @sj/agents, so a package-level
+// dependency here would close a cycle.
 import { buildBonds } from '../../gateway/src/bonds.js'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'

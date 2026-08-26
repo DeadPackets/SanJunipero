@@ -71,9 +71,8 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   })
 })
 
-// Batch-7 ruling 5, the one-time amendment: twelve verbs were registered, nameable, and shown
-// to nobody. The mini-rehearsal found `drink` and `fill` through the turn schema alone;
-// discovery by schema is not knowledge, and `hunt` proved it by asking for an id no mind had.
+// Discovery by schema is not knowledge: a verb registered and nameable but shown to nobody is
+// a verb `hunt` can only ask for by an id no mind was ever given.
 describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
   const C11_VERBS = [
     'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt',
@@ -100,15 +99,8 @@ describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
   })
 })
 
-// ★ R4 — BLOCK 1 WAS LYING, AND THIS IS THE CHECK THAT IT IS NOT ANY MORE.
-//
-// The line said "sleep — name it sleep when weary; nothing more is needed" while
-// `sleepIndoorsOnly` refused every bed under the open sky. Thirty sleeps in one live night were
-// turned down on a rule the one place a mind is taught its own hands had told it did not exist.
-//
-// Asserting the new WORDS on their own would be vacuous — any sentence contains itself. So each
-// half of what block 1 now claims is run through `submitIntent` on a real world, and the words
-// are only allowed to say what the verb does.
+// Asserting block 1's words on their own would be vacuous — any sentence contains itself — so
+// each half of what it claims is run through `submitIntent` on a real world.
 describe('★ block 1 tells the truth about sleep', () => {
   const CFG = DEFAULT_CONFIG
   const ev = (seq: number, type: string, payload: unknown): SimEvent =>
@@ -186,9 +178,8 @@ describe('the shared calendar', () => {
   })
 })
 
-// What the pinned bytes were an expensive proxy for: block 1 is the cache-stable prefix, so
-// what matters is that every prompt opens with the SAME one. Two minds as unlike as the
-// fixtures get is the check; the bytes themselves are free to be edited.
+// Block 1 is the cache-stable prefix, so what matters is that every prompt opens with the SAME
+// one; the bytes themselves are free to be edited.
 describe('block 1 is the shared prefix', () => {
   it('opens every system prompt, unchanged by identity or personality', () => {
     const a = assemblePrompt(fixtureBlocks())

@@ -2,10 +2,8 @@ import Database from 'better-sqlite3'
 
 export { NARRATOR_TABLES, openNarratorDb } from './schema.js'
 
-// The glass has two faces and this module is both of them. One: the narrator may not own a
-// world table. Two: nothing the narrator names — a milestone kind, a tier, a construct type —
-// may reach a mind. The scan and the naming law are the agents-side enforcement points, and
-// they are re-exported here so the narrator has exactly one door to each.
+// Two rules, one door each: the narrator may not own a world table, and nothing it names may
+// reach a mind. Both enforcement points live agents-side and are re-exported here.
 export {
   assertQuotedName, CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY,
   type NameSource, type QuotedName,

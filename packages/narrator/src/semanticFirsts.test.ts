@@ -49,9 +49,8 @@ const run = async (llm: ScriptedLlm, over: Record<string, unknown> = {}) => {
 const alerts = (db: Database.Database): Array<{ kind: string; detail: string }> =>
   db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as Array<{ kind: string; detail: string }>
 
-// A model whose answer the generator refuses outright. GATE G11b met this on its first live
-// night: a hit that cited neither an event nor a remembered record, and the throw took the
-// whole chapter down with it.
+// A model whose answer the generator refuses outright — a hit citing neither an event nor a
+// remembered record — because that throw used to take the whole chapter down with it.
 class ThrowingLlm {
   objectCalls = 0
   async object(): Promise<never> {

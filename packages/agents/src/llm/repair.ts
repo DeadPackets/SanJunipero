@@ -1,16 +1,7 @@
 import type { z } from 'zod'
 
-// The provider's own bytes, re-framed — never re-imagined. Three faults have each cost this
-// project a run or a night: prose written before the JSON, the answer wrapped in a fence, and
-// a chronicle whose `title` and `text` were both complete while the object around them was
-// the wrong shape. Every one of them is FRAMING: the content was there and only the shape was
-// wrong (C11 batch 16 fix 2).
-//
-// The law of this module: it may remove framing, re-parse the provider's own characters, and
-// drop what the caller's schema does not model. It may never add a field, a value, or a
-// meaning. Every candidate is checked back against the CALLER'S OWN SCHEMA before it is
-// allowed to be an answer, so a repair can widen what is accepted and can never invent what
-// it says. A payload that cannot be read without guessing stays a failure.
+// May remove framing and re-read the provider's own characters; it may never add a field, a
+// value or a meaning, and a payload that needs guessing stays a failure.
 
 export type RepairCandidate = { value: unknown; how: string }
 
@@ -24,9 +15,8 @@ const jsonOrNothing = (text: string): unknown | undefined => {
   }
 }
 
-// Every balanced object or array that starts at depth zero, found with a string-aware walk so
-// a brace inside a quoted sentence is never mistaken for structure — and so prose containing
-// its own braces cannot hide the real payload behind it.
+// Every balanced object or array at depth zero, found with a string-aware walk so a brace
+// inside a quoted sentence is never mistaken for structure.
 export function balancedSpans(text: string): string[] {
   const spans: string[] = []
   let depth = 0
@@ -133,9 +123,8 @@ const quotedNumber = (v: unknown): number | undefined => {
   return Number.isFinite(n) && String(n) === trimmed ? n : undefined
 }
 
-// The two repairs the schema itself asks for by name, applied to a fixpoint. Both only remove
-// or re-read what is already written: a key the schema does not model is dropped, and a number
-// the provider put in quotes is read as the number it spells. Nothing is supplied.
+// The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
+// dropped and a quoted number is read as the number it spells. Nothing is supplied.
 function applySchemaIssues<T>(value: unknown, schema: z.ZodType<T>): { value: T; how: string } | undefined {
   let current = structuredClone(value)
   const applied: string[] = []

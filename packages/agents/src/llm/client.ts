@@ -40,10 +40,7 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
-// `provider.order` is a PREFERENCE; only `allow_fallbacks:false` makes it an allow-list. It
-// was a hardcoded literal, so pinning a provider pinned nothing and the run got the pinned
-// provider's answer rate AND whatever OpenRouter fell through to — which is why an empty-call
-// rate that swung 14-51% across identical runs decided the last gate (C11 R20).
+// `provider.order` is a preference; only `allow_fallbacks:false` makes it an allow-list.
 // The default stays `true`: this exposes the switch, it does not throw one.
 export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
@@ -71,18 +68,15 @@ export function servedProvider(response: unknown, meta: unknown): string | null 
   return typeof fromBody === 'string' && fromBody.length > 0 ? fromBody : null
 }
 
-// OpenRouter bills in credits that are USD and reports the charge back on the same response,
-// under `usage.cost`, once `usage: { include: true }` is set on the request. This is the only
-// number in the system that cannot go stale: it is what the bill says. A table has to be
-// maintained and was wrong for the life of the project.
+// What the bill says, reported under `usage.cost` once `usage: { include: true }` is set on
+// the request. The only number here that cannot go stale.
 export function reportedCostUsd(meta: unknown): number | null {
   const cost = (meta as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter?.usage?.cost
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : null
 }
 
-// How far the table may sit from the bill before it is a defect rather than rounding. The
-// mispricing this guard exists for was 100% out; sub-cent calls round hard enough that a bare
-// ratio is noisy, so a divergence has to clear BOTH bars to be worth waking anyone for.
+// How far the table may sit from the bill before it is a defect rather than rounding. Sub-cent
+// calls round hard, so a divergence has to clear BOTH bars.
 export const COST_DIVERGENCE_FRACTION = 0.2
 export const COST_DIVERGENCE_FLOOR_USD = 5e-6
 
@@ -99,9 +93,8 @@ export type LlmClientOpts = {
   // Absent falls back to the per-caller pin in `pins.ts`; `null` sends nothing at all.
   reasoning?: ReasoningSetting | null
   maxRetries?: number
-  // How long one attempt may sit before it is abandoned. A stalled provider response used to
-  // hang the caller for ever: an interrupted G11b night lost 614 s to one `semantic` call and
-  // then failed anyway, with two more retries queued behind it (C11 T37b).
+  // How long one attempt may sit before it is abandoned; without it a stalled response hangs
+  // the caller for ever, with the retries queued behind it.
   requestTimeoutMs?: number
   budgetUsd?: number
   maxOutputTokens?: number
@@ -111,8 +104,7 @@ export type LlmClientOpts = {
 
 export const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 
-// Six minutes. The slowest call that has ever legitimately answered is a nightly chronicle at
-// 205 s, so this is ~75% headroom over it; the stall that forced the bound sat for 614 s.
+// Six minutes: ~75% headroom over the slowest call that has ever legitimately answered.
 export const DEFAULT_REQUEST_TIMEOUT_MS = 360_000
 
 export class LlmClient {
@@ -170,10 +162,8 @@ export class LlmClient {
           reportedCostUsd: reportedCostUsd(r.providerMetadata),
         }
       } catch (err) {
-        // The shape was wrong; the content may not have been. GATE G11b day 3 threw away a
-        // chronicle whose title and text were both complete and whole. The repair re-frames
-        // the provider's own bytes and re-checks them against this caller's schema — it never
-        // re-asks and never invents (C11 batch 16 fix 2).
+        // Re-frames the provider's own bytes against this caller's schema; never re-asks,
+        // never invents.
         if (!NoObjectGeneratedError.isInstance(err)) throw err
         const repaired = repairToSchema(err.text ?? '', opts.schema)
         if (repaired === undefined) throw err
@@ -218,12 +208,8 @@ export class LlmClient {
     insertAlert(this.db, { agentId: this.agentId, kind, detail })
   }
 
-  // What the ledger records for one call, and the only place the two numbers ever meet.
-  //
-  // The provider's own charge wins when it is offered: it is the bill, it already includes
-  // discounts and time-of-day rates, and it cannot go stale the way a table does. The table is
-  // kept as the second opinion — a single source of truth cannot reconcile against itself — and
-  // as the fallback for the calls that come back without a cost.
+  // The provider's own charge wins when offered: it is the bill. The table stays as the second
+  // opinion — a single source of truth cannot reconcile against itself — and as the fallback.
   private book(
     computed: ComputedCost,
     reported: number | null,
@@ -243,8 +229,7 @@ export class LlmClient {
     const gap = Math.abs(reported - computed.costUsd)
     const scale = Math.max(reported, computed.costUsd)
     if (gap > COST_DIVERGENCE_FLOOR_USD && scale > 0 && gap / scale > COST_DIVERGENCE_FRACTION) {
-      // This is the alert that would have caught the 0.14-vs-0.28 pin on the very first call
-      // instead of after 611 of them.
+      // The alert that catches a mispriced pin on the first call rather than the six hundredth.
       this.alert(
         'llm_price_divergence',
         `${provider ?? 'unattributed'} charged $${reported.toFixed(6)} for ${served} but the ` +
@@ -342,8 +327,7 @@ export class LlmClient {
     if (this.model !== undefined) return this.model
     const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })
     this.model = openrouter(MIND_MODEL, {
-      // Without this OpenRouter omits `usage.cost` and the ledger has only its own table to
-      // check itself against — which is how a 2x mispricing survived the life of the project.
+      // Without this OpenRouter omits `usage.cost` and the ledger has no second opinion.
       usage: { include: true },
       extraBody: defaultExtraBody(
         this.fallbackModels,

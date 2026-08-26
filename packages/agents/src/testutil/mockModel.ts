@@ -11,7 +11,7 @@ export type ScriptedResponse = {
   }
   fail?: boolean
   servedModelId?: string
-  // Which OpenRouter back end answered, as OpenRouter reports it (C11 R20).
+  // Which OpenRouter back end answered, as OpenRouter reports it.
   provider?: string
   // What OpenRouter says it charged, as `usage.cost` under usage accounting.
   reportedCostUsd?: number

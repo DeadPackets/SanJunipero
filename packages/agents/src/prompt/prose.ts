@@ -3,10 +3,8 @@ import {
 } from '@sj/shared'
 import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
 
-// Local mirror of the engine's PerceptionPacket (composePerception) plus the
-// two self-state booleans the bridge reconciles in (asleep/collapsed). The
-// Task 12 EngineBridge maps the engine shape onto this one; keep the field
-// shapes identical to @sj/engine's perception types so the mapping is 1:1.
+// Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
+// reconciles in. Keep the field shapes identical to @sj/engine's so the mapping stays 1:1.
 
 export type PerceptionItem = {
   id: string
@@ -77,9 +75,8 @@ export type PerceptionCrop = {
   withered: boolean
 }
 
-// A shape at a distance and a patch of ground worth working. The engine has composed both
-// since C11 Task 21; nothing on the mind side ever looked at them, so `hunt` needed an id no
-// mind had ever been given and `forage` could only ever mean "any forest nearby".
+// A shape at a distance and a patch of ground worth working: `hunt` wants an id and `forage`
+// a node, and neither was nameable before.
 export type PerceptionFauna = { id: string; kind: string; x: number; y: number }
 export type PerceptionForageable = { id: string; kind: string; x: number; y: number; prose: string }
 
@@ -111,9 +108,8 @@ export type PerceptionPacket = {
   ground?: { wellTravelled: true }
   // Present only while the dark is charging this body for the work in its hands.
   fumbling?: true
-  // How the cold stands against this body when the air outside would bite: getting in, or held
-  // off, and by what. Absent whenever the air is warm enough that nothing is deciding anything,
-  // so a packet from a mild afternoon — or from before the cold could be felt — reads as before.
+  // How the cold stands against this body: getting in, or held off, and by what. Absent
+  // whenever the air is warm enough that nothing is deciding anything.
   cold?: { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' }
   // Present only while the legs are on a route that stops short of where they were sent.
   wayUnclear?: true
@@ -214,9 +210,8 @@ function seasonPart(dayOfSeason: number): string {
   return dayOfSeason <= (DAYS_PER_SEASON * 2) / 3 ? 'mid' : 'late'
 }
 
-// The calendar every mind shares, said the same way every turn: which day it is, where the
-// day has got to, and where the year has got to. A fact, like the weather — it says nothing
-// about what a day is for. The phase is `dayPhaseFromTick` and no second derivation (G4).
+// The calendar every mind shares, said the same way every turn. The phase is
+// `dayPhaseFromTick` and never a second derivation.
 export function calendarLine(time: SimTime): string {
   const day = Math.floor(time.tick / MINUTES_PER_DAY) + 1
   return `It is day ${day}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
@@ -290,10 +285,8 @@ function roadPhrase(r: MakeableRoad): string {
   return [costPhrase(r.inputs), ...conditions].join(', ')
 }
 
-// ★ HOW FAR UP, IN WORDS AND NOT A TICK COUNT. A mind was told a building was "still being
-// built" and nothing else, so a wall one hour short read exactly like a wall four days short —
-// and five founders raised five separate houses and finished none of them. Says where the work
-// has got to and never what to do about it.
+// How far up in words, not a tick count: "still being built" reads the same one hour short as
+// four days short.
 const HOW_FAR = [
   'barely begun', 'a little way up', 'a quarter of the way up', 'a third of the way up',
   'half up', 'well past half', 'three quarters up', 'nearly done',
@@ -306,12 +299,8 @@ export function howFarUp(raised?: { done: number; needs: number }): string {
   return `its walls are ${HOW_FAR[i]}`
 }
 
-// Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
-// the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
-/** ★ THE OTHER PLACE WORK CAN GO, SAID PLAINLY AND WITH NO COUNSEL IN IT. Where walls already
- *  stand and how far up they are. It names no act, asks for nothing, and points at no remedy —
- *  the pair (ground to begin on, walls already standing) is the whole of what there is to learn,
- *  and the inference is the mind's, exactly as it is for the cold. */
+// Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it.
+/** The other place work can go: where walls already stand, and how far up. */
 export function standingWallsLine(w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null): string {
   if (w === undefined || w === null) return ''
   return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${w.kind.replace(/_/g, ' ')}, ${
@@ -324,15 +313,8 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
     parts.push(`What your hands know how to raise, given the stuff and a spot to put it: ${
       m.builds.map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`).join(', ')
     }.`)
-    // The spot, named — the line has always promised one and never said where. A mind that
-    // has to be refused before it can learn where to go wastes a waking hour on it, which is
-    // the same complaint R21 candidate 3 settled about every other refusal in the world.
-    //
-    // ★ "to BEGIN a new one", not "to raise one", and the difference is the whole of R3's
-    // remainder. This ground is where a roof STARTS. Walls that already stand are raised where
-    // they stand, and a mind sent to the town's next free plot while a half-raised house waited
-    // two streets away read the old wording as the only place work could go — measured, in
-    // yusuf's own words, twelve ticks apart.
+    // "to begin a new one", never "to raise one": this ground is where a roof starts, and walls
+    // that already stand are raised where they stand.
     if (groundForBuilding !== undefined && groundForBuilding !== null) {
       parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to begin a new one.`)
     }
@@ -345,14 +327,8 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
   return parts.join(' ')
 }
 
-/** ★ THE FIRE IN THE ROOM, AND NOTHING ABOUT WHAT TO DO WITH IT. Five furnishings stand in
- *  every house and no mind had ever been told one of them was there — a body could walk to the
- *  hearth and there was nothing it could do at it, and nothing that said it was a hearth.
- *
- *  Inside, both states are said, because the room you are in is the room you are in. From
- *  outside only a LIT one is said: firelight through a doorway is a thing eyes actually get,
- *  and reciting the cold hearth of every house in sight is five lines a turn that carry no
- *  news. It names no act and points at no remedy, exactly as the cold and the walls do. */
+/** Inside, both states; from outside only a lit one — firelight through a doorway is what eyes
+ *  get, and a cold hearth in every house in sight is five lines a turn of no news. */
 function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
   if (s.hearth === undefined) return ''
   if (isTheRoomYouAreIn) {
@@ -361,19 +337,14 @@ function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): strin
   return s.hearth === 'lit' ? ' Firelight moves inside it.' : ''
 }
 
-/** ★ THE BED, SAID BEFORE THE WALK AND NOT AT THE DOOR. Two roofs the same size are not the
- *  same night: one has beds in it and one has a floor. A body that can only learn which by
- *  lying down in both has spent two nights finding out. Says what is there and never that it
- *  is better — the comparison is the mind's, exactly as it is for the cold. */
+/** Said before the walk, not at the door: two roofs the same size are not the same night. */
 function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
   if (s.bed !== true) return ''
   return isTheRoomYouAreIn ? ' There are beds in here.' : ' There are beds in it.'
 }
 
-// Renders mechanics as fiction: body numbers become felt sentences, speech is
-// quoted hearsay (sound, never instruction), felt tags become sensation, and
-// the visible world is named — with its place and its mark — so the mind knows
-// exactly what surrounds it and how to reach it.
+// Renders mechanics as fiction. Every clause here states a fact and names no act — no remedy,
+// no counsel, no comparison; the inference is the mind's.
 export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void, world?: ProseWorld): string {
   const lines: string[] = []
   const { x, y } = packet.self
@@ -408,9 +379,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   else if (energy < 25) lines.push('Your legs tremble. You can barely stand; you must sleep.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
-  // Said as the body has it, and only ever as a fact: where the cold is, and what stands
-  // between. No remedy is named — a mind that reads one of these under the sky and the other
-  // under a roof has the pair, and the pair is the whole of what there is to learn.
+  // Where the cold is, and what stands between: the pair is the whole of what there is to learn.
   if (packet.cold !== undefined) {
     lines.push('biting' in packet.cold
       ? 'The cold is getting into you out here.'
@@ -424,9 +393,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     if (prose !== undefined) lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
   }
 
-  // Said whenever the body is dry, and never as a refusal: a thirsty mind with no field to
-  // look at answered its throat 204 times in the live run and got water 133 times only
-  // because a throwaway patch told it where to go.
+  // Said whenever the body is dry, and never as a refusal.
   if (thirst < 30) {
     if (world?.waterAtHand?.() === true) {
       lines.push('Water lies within reach of your hands. You could drink here, or fill what you carry.')
@@ -496,11 +463,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
     }
-    // ★ A ROOFLESS BUILDING HAS NO INSIDE YET, SAID AT THE WALL INSTEAD OF AT THE REFUSAL.
-    // `enter` and `stow` were turned away with "it is not finished" 34 times across twelve live
-    // nights: a mind reads "its walls are three quarters up", walks over and tries the door
-    // anyway. The packet said how far up the walls were and never that there was nothing
-    // behind them yet. A fact about now — it names no act and promises no later.
+    // Said at the wall instead of at the refusal: how far up the walls are never said that
+    // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
     lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
       approach}${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`)
@@ -529,10 +493,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id})${claimPhrase(it)}.`)
   }
 
-  // ★ THE ONE UNTRUSTED STRING IN THIS FILE. The speaker writes `h.text`; everything else on
-  // this list is composed from world state. `sanitizeSpokenText` takes the fence character off
-  // the speaker, so every `"` a mind reads is one of ours and pairs around one named mouth.
-  // Re-run here as well as at the verb: a world resumed from an older log carries raw text.
+  // The one untrusted string in this file. Re-run here as well as at the verb: a world resumed
+  // from an older log carries raw text.
   for (const h of packet.heard) {
     lines.push(`You hear ${h.name} say: "${sanitizeSpokenText(h.text)}" (from nearby)`)
   }

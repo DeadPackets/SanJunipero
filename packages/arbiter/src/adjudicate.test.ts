@@ -122,11 +122,8 @@ class ScriptedLlm {
   alert(): void {}
 }
 
-// The shared FakeEmbedder is sha256-based: distinct text yields near-orthogonal
-// vectors, so a rephrase cannot reach SIMILARITY_SHORT_CIRCUIT through it. This
-// deterministic bag-of-words embedder gives token-overlap similarity instead, so
-// a word-reorder rephrase (same bag, different normalized name) lands on the
-// stored ruling and exercises stage 2 without any live model.
+// The shared FakeEmbedder is sha256-based, so a rephrase can never reach the cosine gate. This
+// bag-of-words one gives token-overlap similarity, which exercises stage 2 with no live model.
 const STOPWORDS = new Set(['a', 'an', 'the', 'for', 'by', 'to', 'of', 'i', 'try', 'want', 'attempt', 'and', 'with'])
 
 function unitVec(bytes: Uint8Array): Float32Array {
@@ -225,10 +222,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(row).not.toBeUndefined()
   })
 
-  // ★ THE ONE-WAY GLASS OVER A REFUSAL. `refusalMemoryText` writes this string verbatim into
-  // the mind's memory and the next prompt reads it back, so a ruling that reaches for our
-  // vocabulary is a hint delivered by the machinery itself. `FORBIDDEN_FRAMING` never covered
-  // it: it names what is BEHIND the mind, and none of the five construct words is in it.
+  // `refusalMemoryText` writes this string verbatim into the next prompt, and `FORBIDDEN_FRAMING`
+  // does not cover it: that names what is behind the mind, not what the town may reach.
   it('★ swaps a refusal that names what the town is watched to invent', async () => {
     for (const leak of [
       'the market has nothing to trade for this',
@@ -390,12 +385,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   })
 })
 
-// Esen's smoked fish — the G9b run-4 regression (t917 and t1213), replayed.
-// She stood at a lit hearth holding two fish, in a town whose codex carries
-// `smoking_food` as an unearned rung resting on `fire`. Both asks came back
-// `impossible / beyond_adjacency`, because the adjudication context named only
-// what the town knew. The scripted model below rules the way that model ruled:
-// it can only reach for the rung the context puts within its reach.
+// A context that names only what the town already knows makes every unearned rung read as
+// beyond adjacency. The scripted model below can only reach for what the context shows it.
 describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1)', () => {
   const ESEN_INTENT =
     'I hang the two fish from my hands over the campfire’s smoke, close enough that the heat and smoke bathe them.'
@@ -429,7 +420,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     class: 'beyond_adjacency',
   }
 
-  // The G9b town's codex: ten practiced rungs and five one step out.
+  // A town's codex: ten practiced rungs and five one step out.
   async function makeSmokehouseRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
     const db = openArbiterDb(':memory:')
     const codex = new CodexStore(db)
@@ -464,7 +455,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
   })
 
   // Run 5 proved the frontier line arrives and is read; five attempts then died
-  // on the adjacency gate carrying ids that were never on it (C9 batch-11).
+  // on the adjacency gate carrying ids that were never on it.
   it('tells the arbiter that those same ids are the only vocabulary its canon may use', async () => {
     const llm = new ScriptedLlm(() => beyondAdjacency)
     const { arbiter } = await makeSmokehouseRig(llm)

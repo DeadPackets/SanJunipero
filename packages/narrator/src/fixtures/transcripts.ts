@@ -1,8 +1,7 @@
 import type { TranscriptRecord } from '../semanticFirsts.js'
 
-// One authored day, written so each rule of §20 has something to bite on: a god reference in
-// plain speech, a clean lie with both sides inside the window, a change of mind whose thought
-// comes AFTER the words, and an honest error where the inner record agrees with the mouth.
+// One authored day with something for each rule to bite on: a god reference, a clean lie, a
+// change of mind whose thought comes after the words, and an honest error.
 
 export const DAY = 4
 const tickOf = (hour: number, minute = 0): number => DAY * 1440 + hour * 60 + minute

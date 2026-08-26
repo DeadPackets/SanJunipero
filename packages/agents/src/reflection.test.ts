@@ -421,17 +421,14 @@ describe('makeReflectionLlm prompts', () => {
       expect(c.system).toMatch(/\byou\b/i)
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
       expect(c.messages.map((m) => m.content).join('\n')).not.toMatch(FORBIDDEN_FRAMING)
-      // Reflection is the most expensive prompt in the system per call and the last one still
-      // demonstrating the separator it forbids elsewhere. `rulesOfBeing.test.ts` holds this over
-      // SPEECH_RULES and `assemble.test.ts` over the perception; neither reaches these six.
+      // `rulesOfBeing.test.ts` holds this over SPEECH_RULES and `assemble.test.ts` over the
+      // perception; neither reaches these six.
       expect(c.system, 'a reflection prompt spends an em dash a mind will imitate')
         .not.toContain('—')
     }
   })
-  // ★ SIX AUTHORED SURFACES EVERY MIND READS EVERY NIGHT, AND NOTHING HELD THEM TO THE GLASS.
-  // `founderMinds.test.ts` scans the persona cards and `assemblePrompt` scans the turn; neither
-  // reaches these. That gap is why this test exists BEFORE the prose is rewritten: a shorter
-  // reflection prompt must not buy its brevity by turning a question into an instruction.
+  // Six authored surfaces every mind reads every night, which neither the card scan nor
+  // `assemblePrompt` reaches. A shorter prompt must not turn a question into an instruction.
   it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
     const authored = [
       extractFactsPrompt(memories).system,
@@ -465,10 +462,8 @@ describe('makeReflectionLlm prompts', () => {
     expect(text).not.toMatch(FORBIDDEN_FRAMING)
   })
 
-  // ★ THE PROSE THAT WENT IS THE PROSE THE SCHEMA ALREADY ENFORCES. This is the assertion that
-  // stops it coming back: every field name and enum below reaches the provider as JSON schema
-  // on the same call, so spelling them again in English bought nothing and made this the
-  // longest of the six prompts by 2.5x.
+  // Every field name and enum below reaches the provider as JSON schema on the same call, so
+  // spelling them again in English buys nothing.
   it('proposeEdit no longer restates its own schema in prose', () => {
     const system = proposeEditPrompt('The day was full of deals.', doc, memories).system
     for (const spelledTwice of ['`verdict`', '`no_proposal`', '`op`', '`field`', '`index`', 'counting from 0']) {

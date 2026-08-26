@@ -43,9 +43,8 @@ function jsonOrRaw(text: string): unknown {
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
-// A refusal must leave a door open (addendum §9). The hint is rendered here, at
-// prose time, and is never written back into the arbiter's stored ruling. Only
-// a skill deficit earns it: a thing nobody can do teaches no one a false path.
+// Rendered at prose time and never written back into a stored ruling. Only a skill deficit
+// earns it: a thing nobody can do teaches no one a false path.
 export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
@@ -53,27 +52,19 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${reason}${hint}`
 }
 
-// ★ THE LOOP-BREAKER. A refusal a mind cannot learn from is a refusal it repeats: the live
-// proof has Amara re-adjudicating one idea three times in 34 ticks, at a full arbiter call
-// each. The refusal text was widened where it is written (`FALLBACK_IMPOSSIBLE`), and this is
-// the other half — the second ask inside the window is answered from the mind's own history
-// instead of from the god.
-//
-// It names the repetition and nothing else. That is the only content the glass allows here: the
-// mind's own past is not a hint, where "try it with a rack" would be.
+// The second ask inside the window is answered from the mind's own history, not from the god.
+// It names the repetition and nothing else: a mind's own past is not a hint.
 export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
 
-// Sim minutes. Long enough to cover the eight-to-twelve turns a looping mind burned in the live
-// proof, short enough that a town which has changed around the mind gets asked again.
+// Sim minutes: long enough to cover a loop, short enough that a changed town gets asked again.
 export const REFUSAL_MEMORY_TICKS = 240
 
 // How many refused intents a mind carries. Bounded because it is per-mind state held for the
 // life of the process, not because 16 is special.
 const REFUSAL_MEMORY_SIZE = 16
 
-// Only enough to make "the same idea, said again" match. The arbiter's own `normalizeIntent`
-// would be the one true copy, but `@sj/arbiter` depends on `@sj/agents`, so importing it back
-// is a package cycle.
+// Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
+// true copy, but importing @sj/arbiter back here is a package cycle.
 function sameIntent(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '')
 }
@@ -211,10 +202,8 @@ export class AgentRuntime {
     }
   }
 
-  // Everything a mind carries between ticks that is not in the database. A run that is
-  // interrupted and picked up again restores this, or every mind wakes with a fresh clock: it
-  // would think the moment the run resumed rather than when it meant to, drop the plan it was
-  // halfway through, and report a turn count that starts at the resume.
+  // Everything a mind carries between ticks that is not in the database. A resume restores it,
+  // or every mind wakes with a fresh clock, a dropped plan and a turn count starting at zero.
   snapshot(): RuntimeSnapshot {
     return {
       clock: { ...this.#clock, alarmArmed: { ...this.#clock.alarmArmed }, prevVisibleIds: [...this.#clock.prevVisibleIds] },
@@ -238,7 +227,7 @@ export class AgentRuntime {
     this.#pendingDreamMood = s.pendingDreamMood
   }
 
-  // Post-construction wiring: G9b and C8's supervisor build the arbiter after
+  // Post-construction wiring: the supervisor builds the arbiter after
   // the minds. Called through `wireArbiter`.
   useArbiter(arbiter: SeamArbiter): void {
     this.#adjudicator = arbiter.adjudicate
@@ -296,8 +285,7 @@ export class AgentRuntime {
     }
   }
 
-  // A roused sleeper owes the world a wake. If the turn it was given put no
-  // act into the world — or the world refused every act it tried — the body
+  // A roused sleeper owes the world a wake: if its turn put no act into the world, the body
   // answers its own alarm and rises by the wake verb.
   #answerWakeOwed(packet: PerceptionPacket): void {
     if (!this.#wakeOwed) return
@@ -310,9 +298,8 @@ export class AgentRuntime {
     void this.#bridge.submit(this.#agentId, { verb: 'wake', params: {} })
   }
 
-  // Submit the queue head exactly when the agent is idle, and advance the queue
-  // when an in-flight head's action completes. A rejected head is handled
-  // synchronously during the drain (onResult), before #pumpPlan ever runs.
+  // Submit the queue head only when the agent is idle. A rejected head is handled
+  // synchronously during the drain, before `#pumpPlan` ever runs.
   #pumpPlan(activity: string | null): void {
     if (this.#plan.lastResult !== 'running') return
     // A held direct action outranks the plan: the queue waits its turn.
@@ -357,9 +344,8 @@ export class AgentRuntime {
       .then(() => undefined)
   }
 
-  // An invented verb is not a mistake, it is a proposal: it re-enters the turn
-  // as freeform words for the arbiter. Once per turn — a second failure is the
-  // world's final answer, or an unwired arbiter would loop on itself.
+  // An invented verb is a proposal, not a mistake: it re-enters the turn as freeform words.
+  // Once per turn, or an unwired arbiter would loop on itself.
   #reroutesUnknownVerb(reason: string): boolean {
     if (!reason.startsWith('unknown verb:')) return false
     if (this.#adjudicator === null || this.#reframedThisTurn) return false
@@ -379,9 +365,8 @@ export class AgentRuntime {
   async #adjudicateFreeform(description: string): Promise<void> {
     const fallback = (): Promise<void> =>
       this.#holdIntent({ verb: 'experiment', params: { description } })
-    // The same idea, said again, inside the window: answered from this mind's own history. It
-    // costs no call, and the memory is DIFFERENT from the first refusal, which is the whole
-    // point — a mind handed the identical sentence a third time has learned nothing.
+    // The same idea inside the window, answered from this mind's own history at no call. The
+    // memory it leaves differs from the first refusal, or the mind learns nothing.
     if (this.#alreadyRefused(description)) {
       await this.#writeActionMemory(REPEATED_REFUSAL)
       return
@@ -399,9 +384,8 @@ export class AgentRuntime {
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
-    // Adjudicate once, physics forever: the recipe becomes a verb the engine
-    // owns, and this mind is the first to use it. With no codifier wired the
-    // attempt still reaches the world rather than vanishing.
+    // Adjudicate once, physics forever. With no codifier wired the attempt still reaches the
+    // world rather than vanishing.
     if (this.#codify === null) return fallback()
     let verb: string
     try {
@@ -537,9 +521,8 @@ export class AgentRuntime {
       // retry is the same request again — byte-identical, and so still a cached prefix.
       if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
       if (isBlankAnswer(answer.raw)) {
-        // Twice nothing. The turn is left UNSPENT: no thought the mind never had, no turn
-        // counted, and whatever the body was already doing carries on being done. The doze
-        // is the back-pressure, so a silent back end is not hammered.
+        // Twice nothing leaves the turn UNSPENT: no invented thought, no turn counted. The
+        // doze is the back-pressure, so a silent back end is not hammered.
         this.#llm.alert('blank_answer', 'two blank answers; the turn is left unspent')
         this.#doze(tick)
         return

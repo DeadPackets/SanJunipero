@@ -77,10 +77,8 @@ describe('rankScenesForDirector', () => {
   })
 })
 
-// C11 R19: the sickness chunk put poison, illness, wounds and burials into the world and the
-// heat tables weighted none of them, so a day the town nearly lost somebody scored the same as
-// a day of nothing. Two of the rows that WERE there — agent_fell_ill, agent_infected — have had
-// no emitter since C11 landed the affliction model.
+// A day the town nearly lost somebody must not score as a day of nothing. `agent_fell_ill` and
+// `agent_infected` have had no emitter since the affliction model landed.
 describe('scoreHeat: the C11 sickness plane is visible to the director', () => {
   const quiet: SimEvent[] = [
     ev(1, 0, 'agent_moved', { id: 'a', x: 1, y: 1 }),

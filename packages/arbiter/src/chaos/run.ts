@@ -9,11 +9,8 @@ export type ChaosResult = {
   physicsBreaking: boolean
 }
 
-// Drives every corpus intent through the arbiter and reports the raw verdict.
-// The adjacency gate lives in adjudicate — this runner only measures it: an
-// `attempt` whose recipe canon the codex has not earned is a physics break.
-// With the production gate in place the exploit never surfaces as such, so
-// `physicsBreaking` stays false across the corpus.
+// The adjacency gate lives in adjudicate; this runner only measures it. An `attempt` whose
+// recipe canon the codex has not earned is a physics break.
 export async function runChaos(arbiter: Arbiter, ctx: AgentCtx, codex: CodexStore): Promise<ChaosResult[]> {
   const results: ChaosResult[] = []
   for (const entry of EXPLOIT_CORPUS) {

@@ -9,15 +9,8 @@ import { scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 import { perceptionToProse } from './prose.js'
 
-// ★ THE ROOM A MIND COULD NOT SEE INTO — INCLUDING THE ONE IT WAS STANDING IN.
-//
-// Five furnishings stand in every house the town has ever raised. Nothing a mind ever read
-// said one of them was there. `PerceivedInterior` was `{ id, kind }` — a roof and a word for
-// it — so a body walked to the hearth and there was nothing it could do at it, and no sentence
-// that said it was a hearth.
-//
-// The pair below is the whole lesson, and it is the same shape the cold's pair is: the room
-// with a fire in it and the room without, read off the same body on the same night.
+// The pair below is the whole lesson, the same shape the cold's pair is: the room with a fire
+// in it and the room without, read off the same body on the same night.
 
 const CFG = DEFAULT_CONFIG
 
@@ -29,9 +22,8 @@ const WORLD = {
   nearestFood: () => null,
 }
 
-// The genesis valley, wired through a real bridge — the same object the runtime reads packets
-// from, so nothing here is a hand-built fixture. Amara is put at the cabin's door with wood in
-// hand; the cabin is one of the two roofs the ruling left standing, and it is 2x2 like a house.
+// The genesis valley through a real bridge, so nothing here is a hand-built fixture. The cabin
+// is one of the two roofs left standing, and it is 2x2 like a house.
 function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId: string } {
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
@@ -105,9 +97,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     expect(proseFor(bridge)).not.toContain('hearth')
   })
 
-  // ★ AND WHICH ROOF HAS BEDS IN IT, SAID BEFORE THE WALK. Two 2x2 roofs are not the same
-  // night: the house has beds and the cabin has a floor. A body that can only learn which by
-  // lying down in both has spent two nights finding out — the lesson `full` already taught.
+  // Two 2x2 roofs are not the same night: the house has beds and the cabin has a floor.
   it('★ the two 2x2 roofs read differently, and only one of them has beds', () => {
     const { bridge, loop, homeId } = town(NIGHT - 3)
     loop.step()
@@ -149,10 +139,8 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
   })
 })
 
-// ★ `enter: it is not finished` — 34 refusals across twelve live nights, and the wants lane
-// named it as this one's. A mind reads "its walls are three quarters up", walks over, and tries
-// the door. The packet said how far up the walls were and never that there was nothing behind
-// them yet.
+// A mind reads "its walls are three quarters up", walks over and tries the door; how far up
+// the walls are never said there was nothing behind them yet.
 describe('★ a roofless building has no inside yet, and the wall says so', () => {
   const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
 

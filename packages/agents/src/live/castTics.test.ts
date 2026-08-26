@@ -1,14 +1,5 @@
-// ★ THE TIC RULE, OVER EVERY CAST IN THE REPOSITORY — INCLUDING THE ONES IN `scripts/`.
-//
-// `founderMinds.test.ts` holds the same rule over the shared cast by IMPORTING it. That cannot
-// reach the probe casts: `scripts/*.ts` are executables with top-level side effects, so a test
-// that imported one would boot a world and spend real money to read a string. This reads the
-// source text instead, which costs nothing and covers the files an import cannot touch.
-//
-// The rule it enforces is measured, not stylistic. Across 6 867 lines of real mind output the
-// only two minds with a stock opener were the only two whose card named words to SAY as a
-// quoted string; the minds whose tics were written as behaviours produced no opener at all.
-// A literal tic string is the mechanism, so the string is what is forbidden.
+// The tic rule over every cast, including the ones in `scripts/`. It reads source text rather
+// than importing, because a `scripts/*.ts` boots a world on import.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -103,9 +94,8 @@ const args = (parenSpan: string): string[] => {
 
 type Card = { file: string; tics: string[]; exampleLines: string[] }
 
-/** Every voice card written down anywhere, in either of the two shapes this repo uses: the
- *  `voice(register, rhythm, tics, neverSays, exampleLines, …)` helper each probe defines for
- *  itself, and a plain `{ tics: […], …, exampleLines: […] }` object literal. */
+/** Every voice card written down anywhere, in either shape this repo uses: the `voice(...)`
+ *  helper each probe defines for itself, and a plain object literal. */
 const cards = (): Card[] => {
   const found: Card[] = []
   for (const file of sources(PACKAGES)) {
@@ -136,21 +126,17 @@ const cards = (): Card[] => {
   return found
 }
 
-// A tic that hands a mind words to utter, rather than describing what the mind does. The verb
-// list is the introducer, and the quotes are the utterance; `calls food "provisions"` and
-// `calls the path "the way"` are deliberately NOT caught — they name a thing mid-sentence, they
-// are how Amara's, Nadia's and Salma's cards are written, and none of those produced an opener.
+// A tic that hands a mind words to utter, not one describing what it does: the verb list is the
+// introducer and the quotes are the utterance, so `calls food "provisions"` is not caught.
 const UTTERANCE = /\b(say|says|saying|open|opens|start|starts|begin|begins|greet|greets|answer|answers|replies|reply)\b[^"'“]{0,20}["'“]/i
 
 describe('★ a tic is a habit, not a script — over every cast in the repo', () => {
   it('finds the casts it is meant to be guarding', () => {
-    // Without this the suite passes by scanning nothing, which is the failure mode a static
-    // guard actually has. These four files are where a cast is written down today.
+    // Without this the suite passes by scanning nothing, the failure mode a static guard has.
     const files = new Set(cards().map((c) => c.file))
     for (const expected of [
       'agents/src/live/founderMinds.ts',
       'agents/scripts/g11-deepworld.ts',
-      'agents/scripts/g9-livingworld.ts',
       'agents/src/persona/tamar.ts',
     ]) expect(files, `no cast found in ${expected}`).toContain(expected)
     expect(cards().length).toBeGreaterThanOrEqual(15)
@@ -166,9 +152,8 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
   })
 
   it('and no card demonstrates a quoted tic in opening position', () => {
-    // The other half of the same defect: naming the words and then showing them first is what
-    // put "Now then" at the head of 63% of Omar's lines. `founderMinds.test.ts` holds this over
-    // the shared cast; this holds it over the probe casts too.
+    // The other half of the same defect: naming the words and then showing them first.
+    // `founderMinds.test.ts` holds this over the shared cast; this holds it over the probe casts.
     for (const card of cards()) {
       for (const tic of card.tics) {
         for (const quoted of tic.match(/"([^"]+)"/g) ?? []) {

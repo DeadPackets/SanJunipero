@@ -16,9 +16,8 @@ import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
 import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
 
-// A cosine at or above this threshold returns the stored ruling verbatim, so a
-// rephrasing of an already-ruled intent resolves to identical physics with zero
-// LLM calls.
+// At or above this cosine the stored ruling is returned verbatim, so a rephrasing of an
+// already-ruled intent resolves to identical physics with zero LLM calls.
 export const SIMILARITY_SHORT_CIRCUIT = 0.92
 
 // Impossible classes that depend on who asked (skills, inventory) must never
@@ -29,39 +28,8 @@ const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically
 // many total tries before the diegetic fallback below.
 const MAX_LLM_ATTEMPTS = 2
 
-// ★ THE CONTENTLESS REFUSAL, AND WHERE THE GLASS LINE IS DRAWN.
-//
-// Returned — never recorded — when every try was invalid, so a bad run can never become
-// immutable precedent. The live proof caught what that costs: Amara reached the same idea three
-// times in 34 ticks, because `no clear way to do this presents itself` told her nothing she
-// could act on. Every novel intent therefore cost up to 3x, in money and in her own attention.
-//
-// The trap is that this string is MIND-FACING — `refusalMemoryText` writes it verbatim into a
-// memory the next prompt reads back — so the glass forbids naming the fix. The line this lane
-// draws, and argues for:
-//
-//   A REFUSAL MAY NAME THE ATTEMPT AND THE MIND'S OWN HISTORY. IT MAY NEVER NAME THE ACT THAT
-//   WOULD HAVE WORKED.
-//
-//   safe and useless   "no clear way to do this presents itself" — true, and unactionable
-//   safe and learnable "it will not come together as it stands" — says the attempt was
-//                      understood and did not hold, so trying the identical thing again is
-//                      not new information. Names nothing absent and no next step.
-//   NOT ALLOWED        "you cannot smoke fish without a rack" — hands over the solution and
-//                      poisons every emergence measurement C8 exists to take.
-//
-// ★ THE CLASS STAYS `physically_impossible`, AND THAT IS A DELIBERATE NON-CHANGE. The honest
-// cause here is "no method could be formed", and there is no class for it — but
-// `ImpossibleClassSchema` is the MODEL'S answer space, handed to it as structured output, so a
-// fifth option called `no_method_found` is an easy out the model can take on any hard intent.
-// Buying an accurate label for our own fallback by widening the model's choices is a bad trade.
-// The class is inert either way: the fallback is returned and never recorded, so
-// `CONTEXT_INDEPENDENT_IMPOSSIBLE` never reads it, and the only live consumer is `CRAFT_HINT`.
-//
-// ★ IT DOES NOT EARN `CRAFT_HINT`. "Perhaps someone nearby knows the craft" asserts that
-// somebody knows — a fact we do not have when the god could not form an answer at all. A door
-// that may open onto nothing is a path invented for the mind, which is the thing this comment
-// is about.
+// Returned, never recorded, so a bad run cannot become precedent; mind-facing, so it may name
+// the attempt, never the act. Widening `ImpossibleClassSchema` would hand the model an easy out.
 export const FALLBACK_IMPOSSIBLE: Verdict = {
   kind: 'impossible',
   reason: 'you turn it over and it will not come together as it stands',
@@ -79,20 +47,14 @@ function framingTainted(v: Verdict): boolean {
   return texts.some((t) => FORBIDDEN_FRAMING.test(t))
 }
 
-// The other half of the same law. `framingTainted` only ever sees an `attempt`, so the coined
-// word — which becomes a permanent verb AND an agent-visible chronicle line — went unchecked.
-// The glass scan is the wider half: `FORBIDDEN_FRAMING` names the machinery BEHIND the mind
-// and not one of `festival`, `faith`, `council`, `market` or `custom` is in it, so a coined
-// word could have minted the town a permanent verb for the concept it is being watched to
-// reach on its own.
+// A coined word becomes a permanent verb and an agent-visible chronicle line, so it needs the
+// wider roster too: `FORBIDDEN_FRAMING` names the machinery but not a concept the town may reach.
 export function wordTainted(word: string): boolean {
   return FORBIDDEN_FRAMING.test(word) || scanRulingForGlassLeak(word).length > 0
 }
 
-// A refusal is the one arbiter output written verbatim into a mind's memory
-// (`refusalMemoryText`), so it is scanned on the wider roster and for directives too. Replaced
-// rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the true reason,
-// where a swap keeps the verdict and only loses the words.
+// A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
+// Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
 function reasonTainted(reason: string): boolean {
   return FORBIDDEN_FRAMING.test(reason) || scanRulingForGlassLeak(reason).length > 0
 }
@@ -128,9 +90,8 @@ export type ArbiterDeps = {
   llm: LlmClient
   embedder: { embed(t: string): Promise<Float32Array> }
   tick?: () => number
-  // The materials and buildings the town has words for. Rendered into the prompt AND enforced
-  // against the answer, so the two can never disagree (canon-vocabulary law). A caller that
-  // shows no table gets the checks that need no table; the rest wait for one.
+  // Rendered into the prompt AND enforced against the answer, so the two can never disagree.
+  // A caller that shows no table gets only the checks that need none.
   vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
   // Told what was just minted, so a caller that owns a world can put it in the record. The
   // arbiter itself never touches the world log — it does not have one.
@@ -281,7 +242,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       const { system, messages } = assembleAdjudicationPrompt({
         canon: `${CANON}\n\nThe town currently knows: ${codex.known().join(', ')}`,
         // Without the frontier the model cannot tell an unearned rung one step
-        // out from a craft the town wholly lacks (C9 batch-10, user ruling 1).
+        // out from a craft the town wholly lacks.
         frontier: codex.frontier(),
         agent: agentCtx,
         precedent,
@@ -306,9 +267,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
-      // Deterministic adjacency gate: an attempt whose recipe canon the codex
-      // has not earned is beyond adjacency, never codifiable. Record the
-      // corrected verdict so the exploit never becomes shared precedent.
+      // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
+      // corrected verdict is what gets recorded, so an exploit never becomes precedent.
       const verdict: Verdict =
         value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
           ? { kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' }

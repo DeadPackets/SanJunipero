@@ -1,9 +1,8 @@
 import { simTimeFromTick, type SimEvent } from '@sj/shared'
 import type { FirstCtx, MilestoneDef } from '../types.js'
 
-// Tier 1 — engine firsts. Data, not code: every row is a kind, a human label and a predicate
-// over one event, so a new first is a row and never a branch. Detection is ops-plane; no
-// label here ever reaches a mind (G8), and none of them names a number (G10).
+// Tier 1 — engine firsts, as data: a new first is a row and never a branch. No label here
+// reaches a mind, and none of them names a number.
 
 const p = (ev: SimEvent): Record<string, unknown> => (ev.payload ?? {}) as Record<string, unknown>
 const verbOf = (ev: SimEvent): unknown => p(ev).verb
@@ -58,7 +57,7 @@ export const TIER1_DEFS: MilestoneDef[] = [
   { kind: 'first_death', label: 'the first grave', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_died', agentIds: one('agentId') },
   { kind: 'first_trade', label: 'the first trade', tier: 1, domain: 'engine', match: (ev) => ev.type === 'action_completed' && verbOf(ev) === 'give', agentIds: one('agentId') },
   { kind: 'first_harvest', label: 'the first harvest', tier: 1, domain: 'engine', match: (ev) => ev.type === 'crop_harvested' },
-  // C11 Task 37 moved sickness onto afflictions; the C7 event still counts so an older
+  // Sickness moved onto afflictions; the older event still counts so an older
   // town's ledger reads true, and a C11 town's first fever is the same first.
   { kind: 'first_infection', label: 'the first sickness', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_infected' || (ev.type === 'agent_afflicted' && p(ev).kind === 'illness'), agentIds: one('agentId') },
   { kind: 'first_recovery', label: 'the first recovery', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_recovered', agentIds: one('agentId') },

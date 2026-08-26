@@ -13,10 +13,8 @@ export {
 } from './prompt/glassScan.js'
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/pins.js'
 export { migrateLlmTables, insertAlert, sumCostUsd } from './llm/callLog.js'
-// ★ THE LIVE SEAM'S PUBLIC FACE. Until now nothing outside this package could boot a mind:
-// `AgentRuntime`, `EngineBridge` and `openAgentDb` were reachable only by a script's relative
-// path, which is why the only live worlds in the repo were scripts. The served world imports
-// these by package name like everything else.
+// The live seam's public face: what a caller outside this package needs to boot a mind,
+// exported by package name so a served world does not have to reach in by relative path.
 export { AgentRuntime, type RuntimeSnapshot, type RuntimeStats } from './runtime/agentRuntime.js'
 export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
 export { wireArbiter, buildAgentCtx, type Adjudicator, type Codifier, type SeamArbiter } from './runtime/arbiterSeam.js'

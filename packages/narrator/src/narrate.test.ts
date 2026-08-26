@@ -61,7 +61,7 @@ describe('narrateDay', () => {
     expect(kinds.has('first_speech')).toBe(true)
     expect(kinds.has('first_trade')).toBe(true)
     expect(store.milestoneKinds().has('first_speech')).toBe(true)
-    // F3 ruling: a never-seen type scores full novelty — the idle scene's two
+    // A never-seen type scores full novelty — the idle scene's two
     // fresh types give it novelty 2, not 0.
     expect(heat[0]!.novelty).toBeCloseTo(2, 5)
   })
@@ -110,9 +110,7 @@ describe('narrateDay', () => {
   })
 })
 
-// GATE G11b day 3, 2026-08-17: the chronicle would not render and the night's semantic pass
-// never ran, because the pass sat downstream of the render. One night's chronicle failing is
-// one loss; it must not silently cost the pass as well (C11 batch 16 fix 1).
+// One night's chronicle failing is one loss; it must not silently cost the semantic pass too.
 describe('narrateDay: a chronicle that will not render does not take the semantic pass with it', () => {
   const throwingLlm = (): NarratorLlm =>
     ({
@@ -229,10 +227,8 @@ describe('narrateWeek', () => {
   })
 })
 
-// C11 R18: `first_house` and `first_bridge` read a structure's kind, and a house takes two sim-days
-// to raise — so the day the roof goes on, the plan that named it is in a stream this pass never
-// sees. `narrateDay` passed no `structureKind` at all, so both firsts missed every building the
-// town actually built.
+// `first_house` and `first_bridge` read a structure's kind, and the day a roof goes on is not
+// the day its plan named it.
 describe('narrateDay: a roof finished on a day whose plan it never read', () => {
   const FINISH: SimEvent[] = [
     ev(1, 4320, 'structure_completed', { id: 'structure_9' }),

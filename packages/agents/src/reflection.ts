@@ -71,9 +71,8 @@ export async function runSleepReflection(deps: {
     }
   }
 
-  // 2. Facts FIRST (spec §6 step 2 — before any summarizing). A hallucinated
-  // src_memory_id would trip the memories(id) FK (foreign_keys=ON) and abort the
-  // whole pipeline mid-write, so keep only facts that cite today's memories.
+  // Facts first, before any summarizing: a hallucinated `src_memory_id` trips the FK and
+  // aborts the pipeline mid-write, so keep only facts that cite today's memories.
   const facts = (await step(() => llm.extractFacts(dayMemories))) ?? []
   const todayIds = new Set(dayMemories.map((m) => m.id))
   const insertedFacts = facts.filter((f) => todayIds.has(f.srcMemoryId))
@@ -163,9 +162,8 @@ export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return {
     system: [
       'Before sleep, you sort the day into what is solidly true.',
-      // "From each moment" is a pass per memory, against an array that had no bound: the only
-      // prompt of the six with no length word, and the one that spent most. A day does not
-      // hold thirty solid facts; asking for the few surest ones asks for the same work once.
+      // "From each moment" is a pass per memory against an unbounded array; asking for the few
+      // surest ones asks for the same work once.
       'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
       'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
       'Write down only what the memories actually show, never what you merely suspect.',
@@ -235,18 +233,8 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
 export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): LlmPrompt {
   const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
   return {
-    // ★ 156 WORDS DOWN TO 62, AND THE THREE LINES THAT WENT WERE THE SCHEMA SPELLED TWICE.
-    // `ProposeEditSchema` is a discriminated union over `verdict` and `PersonalityEditSchema`
-    // already names `op`, `field`, `text`, `index` and their enums; the provider is sent that
-    // schema on every call. Restating it in prose bought nothing and cost the longest prompt of
-    // the six. What the schema genuinely cannot say — that `evidence` means today's memory
-    // numbers, and that temperament is not on the table — stays.
-    //
-    // ★ AND THE QUESTION ITSELF CHANGED SHAPE. "If today held an event that changed how you see
-    // the world" is a yes/no gate that can only be answered by re-reading every memory, which
-    // is the best explanation there is for 93% reasoning on a two-token answer. Pointing it at
-    // the day's own telling first, and saying plainly that most days change nothing, gives the
-    // answer somewhere to stop.
+    // `ProposeEditSchema` is sent on every call, so only what it cannot say stays: `evidence`
+    // is today's memory numbers, and temperament is not on the table.
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',
@@ -271,9 +259,8 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMe
 const FACT_SCHEMA = z
   .object({ subject: z.string().min(1), predicate: z.string().min(1), object: z.string().min(1), srcMemoryId: z.number().int() })
   .strict()
-// Ten, against a prose bound of eight. The prose is the real ask; the schema is the runaway
-// stop, set loose enough that an honest answer is never rejected — a night that returns nine
-// solid facts still lands, and only a per-memory enumeration is refused.
+// Ten, against a prose bound of eight: the prose is the real ask and the schema is only the
+// runaway stop, set loose enough that an honest answer is never rejected.
 const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA).max(10) }).strict()
 const SCENE_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1), memoryIds: z.array(z.number().int()) }).strict()
 const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()

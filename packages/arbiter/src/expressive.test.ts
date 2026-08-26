@@ -326,9 +326,8 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
     }
   })
 
-  // R2. A discovery record that hooked only codify() would silently miss every coined word.
-  // This is the guard against the same mistake being made a THIRD time: a new row in the
-  // rulebook is a new codification, and every one of them must report it.
+  // A discovery record hooked only to codify() misses every coined word: a new rulebook row is
+  // a new codification, and every one of them must report it.
   it('every rulebook INSERT in the arbiter reports its mint — a third path could not be silent', () => {
     const dir = new URL('.', import.meta.url)
     const sources = readdirSync(dir)
@@ -342,9 +341,8 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
       })
     }
 
-    // Two today: codifyExpressive() for a coined word, codify() for a craft. A third arriving
-    // is the whole point — the count fails and the author must come here and look. Counted by
-    // file rather than by line so an unrelated edit above does not cry wolf.
+    // A third codification path arriving fails this count, which is the point. Counted by file
+    // rather than by line so an unrelated edit above does not cry wolf.
     expect(mints.map((m) => m.file)).toEqual(['adjudicate.ts', 'codify.ts'])
 
     for (const mint of mints) {

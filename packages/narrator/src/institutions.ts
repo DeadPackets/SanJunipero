@@ -24,9 +24,8 @@ const IRREGULAR_PAST: Record<string, string> = { teach: 'taught', build: 'built'
 const pastTense = (verb: string): string =>
   IRREGULAR_PAST[verb] ?? (verb.endsWith('e') ? `${verb}d` : `${verb}ed`)
 
-// foundingSceneIndex is the INDEX into the scenes array (SceneSegment has no id),
-// -1 when the founding event sits in a dropped scene — the caller maps indexes to
-// store ids and must never persist -1.
+// `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
+// dropped scene. The caller maps it to a store id and must never persist -1.
 export function detectInstitutions(
   scenes: SceneSegment[],
   events: SimEvent[],

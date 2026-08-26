@@ -7,9 +7,8 @@ import {
   type PreflightAnswer, type PreflightLlm,
 } from './providerPreflight.js'
 
-// Recorded, not invented. Two signatures, both measured live in C11 batch 12's 12-call A/B:
-// a grammar-constrained back end returns ONLY the required properties of the schema; a back
-// end that serves the optional ones returns a whole turn.
+// Two recorded signatures: a grammar-constrained back end returns only the schema's required
+// properties, and a back end that serves the optional ones returns a whole turn.
 const REQUIRED_ONLY = { thought: 'Salma looks ill. I should tend to her.', importance: 6 }
 const WHOLE_TURNS = [
   {
@@ -90,9 +89,8 @@ describe('scorePreflight', () => {
   })
 
   it('SPEECH IS ADVISORY: a silent back end that acts three times still starts the gate', () => {
-    // C11 batch 13 ran the same probe twice on identical code and got 3/3 speech then 0/3.
-    // `speech` measures a mind's CHOICE, not a provider's CAPABILITY, so gating on it aborts
-    // a $0.70 run on sampling. Controller ruling: measured and reported, never aborting.
+    // `speech` measures a mind's choice, not a provider's capability, so gating on it aborts a
+    // paid run on sampling. Measured and reported, never aborting.
     const r = score([
       ok({ ...WHOLE_TURNS[0], speech: undefined }),
       ok(WHOLE_TURNS[1]),

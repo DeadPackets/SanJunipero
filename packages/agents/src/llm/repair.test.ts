@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { repairCandidates, repairToSchema } from './repair.js'
 
 // The chronicle schema the narrator asks for, verbatim — this is the decode that failed on
-// GATE G11b day 3 and cost the run criterion 11.
+// a live night and cost the run a criterion.
 const Chapter = z.object({
   title: z.string().min(1),
   text: z.string().min(1),
@@ -78,9 +78,8 @@ describe('repairToSchema: it refuses rather than guesses', () => {
     expect(repairCandidates('I could not write that chapter.')).toEqual([])
   })
 
-  // The KNOWN GAP, pinned so it cannot be forgotten: a perfectly correct turn emitted as YAML
-  // (batch 14's pre-flight, quoted verbatim in its report) is a different serialisation, not a
-  // reframing, and reading it needs a parser this repair pass deliberately does not have.
+  // The known gap, pinned: a correct turn emitted as YAML is a different serialisation, not a
+  // reframing, and reading it needs a parser this pass deliberately does not have.
   it('does not pretend to read YAML', () => {
     const yaml = 'title: A Grave at the Northern Ford\ntext: At the fork where the water bends.\ncitations:\n  - 4\n  - 9\n'
     expect(repairToSchema(yaml, Chapter)).toBeUndefined()

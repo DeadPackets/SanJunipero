@@ -2,9 +2,8 @@ import type { SimEvent } from '@sj/shared'
 
 const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent => ({ seq, tick, type, payload })
 
-// The committed day-0 "recording" the G7 gate replays: three scenes separated by
-// >20-tick silences. The evening trade carries a trailing agent_moved so the scene
-// survives the segmenter's minEvents=2 floor.
+// Three scenes separated by >20-tick silences. The evening trade carries a trailing
+// `agent_moved` so the scene survives the segmenter's minEvents floor.
 export const EVENTFUL_DAY: SimEvent[] = [
   // scene 1 — morning idle: low heat
   ev(1, 480, 'agent_moved', { id: 'omar', x: 1, y: 1 }),

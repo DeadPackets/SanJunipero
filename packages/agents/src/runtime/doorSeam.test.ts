@@ -14,9 +14,8 @@ import { SimConfigSchema } from '@sj/shared'
 import { perceptionToProse } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
-// The mini-rehearsal's worst causal chain, walked end to end: prose names a doorway, the mind
-// reads the tile out of the words it was given, walks there, and `enter` lets it in. Nothing in
-// this test knows the door tile except the sentence the mind read.
+// Walked end to end: prose names a doorway, the mind reads the tile out of the words, walks
+// there, and `enter` lets it in. Nothing here knows the tile except the sentence the mind read.
 const AGENT = 'tamar'
 const HOUSE = 'structure_1'
 
@@ -34,7 +33,7 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
     id: HOUSE, kind: 'house', x: 5, y: 5, w: 2, h: 2, maxHp: 50, flammable: true, builderId: AGENT,
   })
   put('structure_completed', { id: HOUSE })
-  // Noon: after C11 Task 26 the sight horizon shrinks with the light, and a house seven tiles
+  // Noon: the sight horizon shrinks with the light, and a house seven tiles
   // off is a shape in the dark at midnight.
   state = { ...state, tick: 720 }
 

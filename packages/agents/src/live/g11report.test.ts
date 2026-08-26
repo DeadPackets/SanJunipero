@@ -5,9 +5,7 @@ import {
   type G11Report,
 } from './g11report.js'
 
-// Offline, $0: the checker is proved against a recorded fixture before a single live call is
-// made. A criterion that cannot fail on a doctored report is not a criterion (the C9
-// `g9report` pattern).
+// Offline: a criterion that cannot fail on a doctored report is not a criterion.
 
 // A pass-shaped report. Every row below is a plausible reading off a real 2-sim-day run.
 const PASSING: G11Report = {
@@ -124,10 +122,8 @@ describe('the report shape', () => {
     expect(g11GatePassed(resumed)).toBe(true)
   })
 
-  // GATE G11b day 3: the pass never ran, because the chronicle render it sat behind failed
-  // first. Under any reading of criterion 11 a night the pass never reached has to be visible
-  // in the report — and it is not a criterion, so it can never be the thing that fails a gate
-  // (C11 batch 16 fix 3).
+  // A night the pass never reached has to be visible in the report, and it is not a criterion,
+  // so it can never be the thing that fails a gate.
   it('reports the nights the semantic pass never reached, and never scores them', () => {
     expect(PASSING.evidence.semanticSkippedNights).toBe(0)
     const lostANight: G11Report = {
@@ -169,7 +165,7 @@ describe('the pure helpers', () => {
 
   it('counts a single failed night once, not twice', () => {
     // The day-close catch raises `narrateErrors` and, when the night had records, `semanticErrors`
-    // too. Summing them reported C11 batch 14's ONE bad night (day 3's chronicle) as `errors=2`.
+    // too, so summing them reports one bad night as `errors=2`.
     expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 1 })).toBe(1)
     expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 0 })).toBe(1)
     expect(semanticPassErrorCount({ narrateErrors: 0, semanticErrors: 0 })).toBe(0)
@@ -323,9 +319,7 @@ describe('the gate criteria', () => {
 })
 
 describe('FullNeedTally', () => {
-  // The batch-12 reporting flaw: every row of the per-mind-per-sim-day table carried the same
-  // number, because the tally was kept per mind for the whole run. A window that opened on
-  // day three is not a window that was open all week.
+  // A window that opened on day three is not a window that was open all week.
   const tally = (): FullNeedTally => {
     const t = new FullNeedTally(10)
     for (let i = 0; i < 5; i++) t.sample('amara', 0)

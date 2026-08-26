@@ -86,7 +86,7 @@ describe('the codification sanity gate', () => {
   })
 })
 
-// The four rows the live run actually minted, each named in the batch-8 brief, walked one at
+// The four rows a live run actually minted, walked one at
 // a time against the landed gate. None of these may ever become a permanent verb again.
 describe('the four verbs the mini-rehearsal minted', () => {
   const ground = { ...vocab, tileKinds: new Set(['grass', 'dirt', 'water', 'forest']) }

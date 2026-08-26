@@ -190,9 +190,8 @@ describe('decideWake — hysteresis', () => {
   })
 })
 
-// C11 shipped four new ways for a body to fail and the alarm clock knew about none of them:
-// the mini-rehearsal's minds ended two sim-days at hunger 0 with fatigue on every one of them,
-// and a sleeper dying of thirst had no path back at all.
+// The alarm clock has to know every way a body can fail, or a sleeper dying of thirst has no
+// path back at all.
 describe('decideWake — the thirst rung and the affliction rung', () => {
   const withThirst = (thirst: number): PerceptionPacket => ({
     ...quietMeadowPacket,
@@ -279,9 +278,8 @@ describe('decideWake — conversation cadence and reconsider', () => {
 })
 
 describe('a mind that has never taken a turn', () => {
-  // `lastTurnTick: 0` could not tell "never" from "took one at tick 0", and a fresh town starts
-  // at tick 0. At the stream's 2 500 ms tick that charged five new arrivals the whole 120-tick
-  // boredom floor — five real minutes of statues — for the first thing a viewer ever sees.
+  // `lastTurnTick: 0` cannot tell "never" from "took one at tick 0", and a fresh town starts at
+  // tick 0 — so every new arrival waits out the whole boredom floor before its first thought.
   it('is bored on its first tick, not `boredomTicks` later', () => {
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: null }), 1, pln())).toBe('boredom')
   })

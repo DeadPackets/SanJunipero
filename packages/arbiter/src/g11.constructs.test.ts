@@ -1,6 +1,5 @@
-// @slow — GATE G11a, the recognition plane: the word a town buys once, the thing it keeps
-// coming back to, and the glass nothing said here may cross. No network: every model in this
-// file is a script. $0.
+// @slow — the recognition plane: the word a town buys once, the thing it keeps coming back to,
+// and the glass nothing said here may cross. Every model in this file is a script.
 import { describe, expect, it } from 'vitest'
 import {
   FakeEmbedder, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY,

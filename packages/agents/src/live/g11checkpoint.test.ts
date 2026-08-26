@@ -190,10 +190,8 @@ describe('a checkpoint cannot launder a failure into a pass', () => {
 })
 
 describe('a mind comes back with its clock, not with a fresh one', () => {
-  // A mind whose turn clock is not restored thinks the instant the run resumes rather than
-  // when it meant to, drops the plan it was halfway through, and starts counting turns again
-  // from zero. The type below is the runtime's own, so a field added to a mind's clock fails
-  // this file rather than being silently dropped by every resume.
+  // The type below is the runtime's own, so a field added to a mind's clock fails this file
+  // rather than being silently dropped by every resume.
   it('the checkpoint\'s mind shape is exactly the runtime\'s snapshot shape', () => {
     const fromCheckpoint = checkpointAt(2880).sidecar.minds[0]!.snapshot
     const asRuntime: RuntimeSnapshot = fromCheckpoint
