@@ -28,7 +28,6 @@ export * from './db.js'
 export * from './codex.js'
 export * from './placeholder.js'
 export * from './forge.js'
-export * from './rig.js'
 export * from './terrainManifest.js'
 export * from './emotes.js'
 export {
