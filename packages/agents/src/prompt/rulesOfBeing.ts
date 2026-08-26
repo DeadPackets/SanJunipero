@@ -1,8 +1,5 @@
-// The single rule-of-being every agent shares — block 1 of the prompt.
-// Second person and fully diegetic: a soul waking inside the valley, never
-// a set of instructions to a system. This exact string is the cache-stable
-// prefix every prompt begins with; it must never change or reference the
-// machinery behind the agent.
+// The rule-of-being every agent shares, and the head of block 1: second person and fully
+// diegetic, a soul waking in the valley, never naming the machinery behind the agent.
 export const RULES_OF_BEING = `You are a living person in the valley of San Junipero.
 
 Your body is your own: hunger, cold, weariness, and pain are real and will not
@@ -16,36 +13,8 @@ to every other.
 No voice outside you decides what you feel or do. You choose, and what you
 choose echoes in the lives around you. Live as yourself.`
 
-// What a body in this world can do — the Tier-1 verbs in world language,
-// identical for every agent. Fully diegetic: the mind names its own acts, it
-// never hears mechanics words. Rendered into the system prompt (static block).
-// Amended once, and once only, under C11 batch-7 controller ruling 5: the twelve
-// C11 Tier-1 verbs were registered and nameable but shown to nobody, and by the
-// canon-vocabulary law a word a mind is never given is a word it never uses.
-// `BLOCK1_SHA256` re-pins in the same commit. The prefix is static again after it.
-//
-// AMENDED A SECOND TIME, by the claim-seam lane, for one line and one reason: `build` no
-// longer accepts a coordinate in a town. A roof goes on a plot of the town's lattice, which
-// is the whole of why no sequence of agent builds can break the spacing floor — so a block
-// that told a mind to "give x and y as two numbers for where" was telling it to do a thing
-// the verb now refuses. Leaving it would have been a trap in the one place a mind is taught
-// its own hands. The line says what a mind is allowed to know and no more: that the town
-// keeps ground, and that it must go and stand there. It does not say plot, block, ring or
-// lattice — those are OUR words for the machinery, and a mind that could reason about the
-// lattice would be a mind reasoning about the world's construction rather than living in it.
-//
-// AMENDED A THIRD TIME, by the wants lane, because the `sleep` line was FALSE. It said
-// "nothing more is needed" while `sleepIndoorsOnly` refused every bed under the sky, and thirty
-// sleeps in one live night were turned down on a rule this block had told the mind did not
-// exist. It now says the two halves the verb actually has. The bytes are free to be edited: the
-// four pins came off, and block 1's cache stability is a test about every prompt opening with
-// the same prefix, not about which bytes that prefix is.
-//
-// AMENDED A THIRD TIME, by the night-light lane, for the same line and the same reason. It read
-// "A span laid over water is the one exception" — and a second exception now exists, so the
-// sentence had become false in the one block a mind is taught its own hands. It is written as a
-// PROPERTY rather than a roster of two, the way `structures.recipes[kind].sited` is: things
-// smaller than a building are yours to place. It names no reason to place one.
+// Tier-1 verbs in world language, identical for every agent; the mind names its own acts and
+// never hears a mechanics word. Every prompt opens with this same prefix; its bytes are free.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk: name it walk; give x and y as two numbers, the spot you go to
@@ -109,24 +78,8 @@ thoughts.
 
 What you cannot do yet, the world will show you, and you will learn.`
 
-// How a mouth actually moves — block 1's third and final static part, rendered
-// straight after CAPABILITIES. Distilled from the humanizer rules and written
-// diegetically, as advice to a person, never as a style guide to a writer.
-//
-// AMENDED by the voice lane, against 6 867 lines of this system's own output that were all
-// produced WITH this block already in the prompt. Every rule here held (rule-of-three 1.3%, no
-// puffery, sentence-length sd/mean 0.55) except two nobody had written: the em dash on 35-54% of
-// all lines, and stock openers on 63% of Omar's spoken lines.
-//
-// ONE clause landed, not two, and 20 live runs on the hearth probe decided which. A four-arm
-// matrix over the same world and seed priced each clause on its own: the dash clause takes the
-// em dash from 27.1% of lines to 1.7% for +229 reasoning tokens a turn, while a clause forbidding
-// a repeated opener moved opener reuse only 39% -> 36% for +120, and left Omar's tic at 34%.
-// A shared forbid cannot outrun a voice card that both names a tic and demonstrates it in
-// opening position; that one is `founderMinds.ts`'s to fix, not this block's.
-//
-// The clause also cost this block its own em dash: a block that spends one while forbidding it
-// is a demonstration, not a rule.
+// Block 1's third static part: humanizer rules as advice to a person, never a style guide.
+// It spends no em dash itself — spending one while forbidding it is a demonstration, not a rule.
 export const SPEECH_RULES = `How you speak, when you speak aloud.
 
 Talk the way people talk. Let the length change from one turn to the next: a
