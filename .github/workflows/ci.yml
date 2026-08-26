@@ -88,8 +88,16 @@ jobs:
       #
       # If this step starts flaking anyway, raise `--testTimeout` first and lower `--maxWorkers`
       # to 1. Do not add `--retry`: a retried flake is a flake nobody fixes.
+      #
+      # ★ `pnpm exec vitest run`, NOT `pnpm test -- …`, AND THE DIFFERENCE IS THE WHOLE STEP.
+      # `pnpm test -- --testTimeout=1 <one-file>` was measured here running all 337 files and
+      # 5 199 tests with the default 5 s timeout: pnpm silently DROPS everything after `--`, so
+      # both the flag and the file filter vanish. Written that way this step would have run in
+      # precisely the flaky configuration it exists to avoid while looking configured. The same
+      # arguments through `pnpm exec` ran 1 file and failed 2 tests on the 1 ms budget, which is
+      # the flag landing.
       - name: test
-        run: pnpm test -- --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
+        run: pnpm exec vitest run --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
 
       # The Dockerfile is part of the deliverable now, so a change that breaks the image should
       # fail here and not on the box. Build only — nothing is pushed to any registry, and there
