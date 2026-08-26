@@ -26,23 +26,52 @@ export function bridgeAt(state: WorldState, x: number, y: number): boolean {
   return false
 }
 
-export function isPassable(state: WorldState, x: number, y: number): boolean {
+// The same two questions about structures, answered from one walk of them instead of one walk
+// per tile — what a search that expands thousands of tiles over an unchanging world can do.
+export type PathCtx = { decks: Set<number>; blocked: Set<number>; cost: Record<TileId, number>; width: number }
+
+function pathCtx(state: WorldState, config: SimConfig): PathCtx {
+  const width = state.terrain[0]!.length
+  const decks = new Set<number>()
+  const blocked = new Set<number>()
+  for (const s of Object.values(state.structures)) {
+    const into = s.kind === BRIDGE_KIND && s.stage === 'complete' ? decks : blocked
+    for (let y = s.y; y < s.y + s.h; y++) {
+      if (y < 0 || y >= state.terrain.length) continue
+      for (let x = s.x; x < s.x + s.w; x++) {
+        if (x < 0 || x >= width) continue
+        into.add(y * width + x)
+      }
+    }
+  }
+  return { decks, blocked, cost: terrainCostFor(config), width }
+}
+
+const onDeck = (state: WorldState, x: number, y: number, ctx?: PathCtx): boolean =>
+  ctx === undefined ? bridgeAt(state, x, y) : ctx.decks.has(y * ctx.width + x)
+
+const underStructure = (state: WorldState, x: number, y: number, ctx?: PathCtx): boolean => {
+  if (ctx !== undefined) return ctx.blocked.has(y * ctx.width + x)
+  for (const s of Object.values(state.structures)) {
+    if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return true
+  }
+  return false
+}
+
+export function isPassable(state: WorldState, x: number, y: number, ctx?: PathCtx): boolean {
   if (y < 0 || y >= state.terrain.length) return false
   const row = state.terrain[y]!
   if (x < 0 || x >= row.length) return false
-  if (bridgeAt(state, x, y)) return true
+  if (onDeck(state, x, y, ctx)) return true
   if (!Number.isFinite(TERRAIN_COST[row[x]!])) return false
-  for (const s of Object.values(state.structures)) {
-    if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return false
-  }
-  return true
+  return !underStructure(state, x, y, ctx)
 }
 
 // The single place that prices a step (G4). Terrain is what the map says; a bridge deck is
 // what the town built over it, and it walks like the road it is.
-export function stepCostAt(state: WorldState, x: number, y: number, config: SimConfig): number {
-  if (bridgeAt(state, x, y)) return config.pathing.roadCost
-  return terrainCostFor(config)[state.terrain[y]![x]!]!
+export function stepCostAt(state: WorldState, x: number, y: number, config: SimConfig, ctx?: PathCtx): number {
+  if (onDeck(state, x, y, ctx)) return config.pathing.roadCost
+  return (ctx?.cost ?? terrainCostFor(config))[state.terrain[y]![x]!]!
 }
 
 // Neighbor order + comparator prefer lower y then lower x: deterministic ties under a Manhattan heuristic.
@@ -50,9 +79,11 @@ export function stepCostAt(state: WorldState, x: number, y: number, config: SimC
 const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
 
 // Legal when the destination is passable and a diagonal step doesn't squeeze between two impassable tiles.
-export function canStep(state: WorldState, x: number, y: number, dx: number, dy: number): boolean {
-  if (!isPassable(state, x + dx, y + dy)) return false
-  if (dx !== 0 && dy !== 0 && !isPassable(state, x + dx, y) && !isPassable(state, x, y + dy)) return false
+export function canStep(
+  state: WorldState, x: number, y: number, dx: number, dy: number, ctx?: PathCtx,
+): boolean {
+  if (!isPassable(state, x + dx, y + dy, ctx)) return false
+  if (dx !== 0 && dy !== 0 && !isPassable(state, x + dx, y, ctx) && !isPassable(state, x, y + dy, ctx)) return false
   return true
 }
 
@@ -75,14 +106,28 @@ function closerToGoal(a: Node, b: Node): boolean {
   return a.h < b.h || (a.h === b.h && (a.y < b.y || (a.y === b.y && a.x < b.x)))
 }
 
+// One walk is searched by `validate` and again by `duration` over the same immutable world, so
+// the answer is kept against the identity of that world and the config it was judged under.
+const memo = new WeakMap<WorldState, { config: SimConfig; key: string; found: PathSearch | null }>()
+
 export function searchPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): PathSearch | null {
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
-  if (!isPassable(state, to.x, to.y)) return null
-  const width = state.terrain[0]!.length
+  const key = `${from.x},${from.y}|${to.x},${to.y}`
+  const hit = memo.get(state)
+  if (hit !== undefined && hit.config === config && hit.key === key) return hit.found
+  const found = runSearch(state, from, to, config)
+  memo.set(state, { config, key, found })
+  return found
+}
+
+function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig): PathSearch | null {
+  const ctx = pathCtx(state, config)
+  if (!isPassable(state, to.x, to.y, ctx)) return null
+  const width = ctx.width
   // Charging a full grass tile per remaining step over-estimates the moment anything is
   // cheaper than grass — a road is 0.6 — and an over-estimating A* returns a short route
   // instead of a cheap one. The cheapest tile the config can price is the honest floor.
-  const minCost = Math.min(...Object.values(terrainCostFor(config)).filter(Number.isFinite))
+  const minCost = Math.min(...Object.values(ctx.cost).filter(Number.isFinite))
   const h = (x: number, y: number) => (Math.abs(x - to.x) + Math.abs(y - to.y)) * minCost
   const key = (x: number, y: number) => y * width + x
   const best = new Map<number, Node>()
@@ -107,8 +152,8 @@ export function searchPath(state: WorldState, from: Point, to: Point, config: Si
     if (cur.x === to.x && cur.y === to.y) return { path: pathTo(cur), capped: false }
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx, ny = cur.y + dy
-      if (!canStep(state, cur.x, cur.y, dx, dy) || closed.has(key(nx, ny))) continue
-      const g = cur.g + stepCostAt(state, nx, ny, config)
+      if (!canStep(state, cur.x, cur.y, dx, dy, ctx) || closed.has(key(nx, ny))) continue
+      const g = cur.g + stepCostAt(state, nx, ny, config, ctx)
       const known = best.get(key(nx, ny))
       if (known && known.g <= g) continue
       const node: Node = { x: nx, y: ny, g, h: h(nx, ny), f: g + h(nx, ny), parent: cur }
