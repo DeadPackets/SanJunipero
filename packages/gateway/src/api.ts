@@ -7,7 +7,7 @@ import type { WorldMirror } from './worldMirror.js'
 import {
   HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
   type HeatScores, type HeatWindow,
-} from './heatStub.js'
+} from './heat.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
@@ -93,7 +93,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   }
 
   // The drama scorer's one piece of world knowledge, and the read path already keeps it: a fire
-  // at a place is scored to the person who raised the place. See `heatStub.dramatis`.
+  // at a place is scored to the person who raised the place. See `heat.dramatis`.
   const builderOf = (id: string): string | null => planned.get(id)?.builderId ?? null
   const heatCtx = heatContext(builderOf)
 
