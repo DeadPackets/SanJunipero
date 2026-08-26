@@ -10,7 +10,7 @@ import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
 // The constants themselves, not copies of them: a test that retypes the string it guards stops
 // guarding the day somebody edits the source and not the test.
-import { CRAFT_HINT, REPEATED_REFUSAL } from '../runtime/agentRuntime.js'
+import { CRAFT_HINT, OPAQUE_REFUSAL, REPEATED_REFUSAL } from '../runtime/agentRuntime.js'
 
 describe('scanPromptForGlassLeak', () => {
   it('flags the taxonomy, whatever case it arrives in', () => {
@@ -204,6 +204,7 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
       'you turn it over and it will not come together as it stands',
       REPEATED_REFUSAL,
       CRAFT_HINT,
+      OPAQUE_REFUSAL,
     ]) {
       expect(scanRulingForGlassLeak(reason), reason).toEqual([])
     }

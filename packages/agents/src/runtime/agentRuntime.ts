@@ -47,7 +47,15 @@ const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [
 // earns it: a thing nobody can do teaches no one a false path.
 export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 
+// The engine's own words for its registry and for its parameter schemas. An arbiter reason is
+// scanned before it gets here; an engine reason was scanned by nothing.
+const MACHINE_REASON = /[{}]|^(unknown verb:|no such agent)/
+
+// What a mind reads instead. It states that the asking failed and connects that to no method.
+export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
+
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
+  if (MACHINE_REASON.test(reason)) return `You realize you cannot: ${OPAQUE_REFUSAL}`
   const hint = impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
   return `You realize you cannot: ${reason}${hint}`
 }
@@ -336,10 +344,10 @@ export class AgentRuntime {
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
         if (this.#reroutesUnknownVerb(res.reason)) {
-          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params))
+          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(this.#sink('adjudicate_crash'))
           return
         }
-        void this.#writeActionMemory(refusalMemoryText(res.reason))
+        void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(this.#sink('memory_write_failed'))
       })
       .then(() => undefined)
   }
@@ -418,10 +426,10 @@ export class AgentRuntime {
     this.#plan.queue = []
     this.#planHeadInFlight = false
     if (this.#reroutesUnknownVerb(res.reason)) {
-      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params))
+      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(this.#sink('adjudicate_crash'))
       return
     }
-    void this.#writeActionMemory(refusalMemoryText(res.reason))
+    void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(this.#sink('memory_write_failed'))
   }
 
   #handleNight(tick: number, packet: PerceptionPacket): void {
@@ -533,8 +541,8 @@ export class AgentRuntime {
         (issues) => this.#repair(assembled, badText, issues),
         (detail) => this.#llm.alert('turn_fallback', detail),
       )
-    } catch {
-      this.#doze(tick)
+    } catch (err) {
+      this.#doze(tick, err)
       return
     }
 
@@ -683,9 +691,18 @@ export class AgentRuntime {
     })
   }
 
-  #doze(tick: number): void {
+  // Node's default terminates the process on a rejection nobody holds, and this file starts
+  // four promises it does not await.
+  #sink(kind: string): (err: unknown) => void {
+    return (err) => { this.#llm.alert(kind, err instanceof Error ? err.message : String(err)) }
+  }
+
+  #doze(tick: number, cause?: unknown): void {
     this.#stats.dozes += 1
-    this.#llm.alert('doze_off', 'providers unavailable; the mind dozes off mid-thought')
+    const why = cause === undefined
+      ? 'providers unavailable'
+      : (cause instanceof Error ? cause.message : String(cause))
+    this.#llm.alert('doze_off', `${why}; the mind dozes off mid-thought`)
     this.#clock.lastTurnTick = tick + this.#config.dozeTicks
     this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
   }
