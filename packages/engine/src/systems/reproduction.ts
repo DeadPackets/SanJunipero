@@ -21,7 +21,7 @@ export function pairKey(a: string, b: string): string {
   return [a, b].sort().join('|')
 }
 
-// The read path C11's breakup detector uses, so nothing reaches into pairNights.
+// The read path the breakup detector uses, so nothing reaches into pairNights.
 export function partnershipOf(state: WorldState, a: string, b: string): PairRow | undefined {
   return state.pairNights?.[pairKey(a, b)]
 }

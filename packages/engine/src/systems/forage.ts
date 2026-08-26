@@ -4,7 +4,7 @@ import type { TickCtx } from '../worldTick.js'
 // Standing things with a stock, which the town can strip and the ground slowly puts back — never
 // in winter, which is the whole of why a winter larder has to be filled in autumn.
 
-// Not a dial (SimConfigSchema is closed after Task 2): how often a stripped patch puts back
+// Not a dial (SimConfigSchema is closed): how often a stripped patch puts back
 // one handful of what was taken.
 export const FORAGE_REGROW_CHANCE = 0.2
 

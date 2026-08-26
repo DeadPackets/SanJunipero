@@ -98,7 +98,7 @@ describe('verb: till', () => {
   })
 
   it('converts grass and dirt to farmland via tile_changed; plant then works there', () => {
-    // By daylight: from C11 Task 25 a tilled furrow cut at midnight takes half again as long.
+    // By daylight: a tilled furrow cut at midnight takes half again as long.
     let s = atTick(makeWorld([',.', '..']), NOON)
     const r = submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 })
     if (!r.ok) throw new Error(r.reason)

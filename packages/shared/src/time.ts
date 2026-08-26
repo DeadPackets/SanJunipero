@@ -7,7 +7,7 @@ export type Season = (typeof SEASONS)[number]
 
 export type DayPhase = 'day' | 'dusk' | 'night'
 
-// The only phase derivation in the codebase (C11 G4). `SimTime.isNight` is C1's two-way
+// The only phase derivation in the codebase. `SimTime.isNight` is the older two-way
 // clock and every landed caller keeps it — the two disagree at dusk on purpose.
 export function dayPhaseFromTick(tick: number): DayPhase {
   const hour = Math.floor((tick % MINUTES_PER_DAY) / 60)

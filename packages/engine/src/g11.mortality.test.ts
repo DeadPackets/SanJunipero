@@ -359,7 +359,7 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
 
   it('the same rung, driven by a night the cold billed, is named for the cold', () => {
     // Deep winter, out of doors, nothing worn: the cold takes the energy and the ladder does
-    // the killing — which is the one road cold takes to a grave (Task 22).
+    // the killing — which is the one road cold takes to a grave.
     const WINTER_TICK = 3 * 30 * MINUTES_PER_DAY + 22 * 60 // winter, night
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'cold', x: 5, y: 5 })
     // No warmth left to spend, a little energy still to lose — the cold only reaches the

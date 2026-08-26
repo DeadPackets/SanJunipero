@@ -132,8 +132,8 @@ describe('worldTick: infection is not healthSystem\'s any more', () => {
   })
 })
 
-// C11 deviation 3: healthSystem no longer spreads anything. `agent_fell_ill` still folds for
-// recorded logs, but nothing in the engine emits it — illnessSystem owns contagion from Task 7.
+// healthSystem no longer spreads anything. `agent_fell_ill` still folds for
+// recorded logs, but nothing in the engine emits it — illnessSystem owns contagion.
 describe('worldTick: contagion is not healthSystem\'s any more', () => {
   it('an ill body beside a healthy one infects nobody, at any dial', () => {
     let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 0 }, { id: 'a3', x: 10, y: 0 }])

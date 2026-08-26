@@ -186,7 +186,7 @@ export function makePolicies(config: SimConfig): Record<string, Policy> {
 
 // One-shot scripted injections keyed on absolute tick (setup + the day-2 fire).
 function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, payload: unknown) => void): void {
-  // Sexes ride the reproduction flag: a fixture with it off spawns the pre-C9 bodies exactly.
+  // Sexes ride the reproduction flag: a fixture with it off spawns the earlier bodies exactly.
   const sex = (s: 'f' | 'm'): { sex?: 'f' | 'm' } => (config.reproduction.enabled ? { sex: s } : {})
   if (tick === 1) {
     emit('agent_spawned', { id: FARMER, name: 'Farmer', x: 26, y: 21, ageDays: 7300, ...sex('f') })
@@ -208,7 +208,7 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   if (tick === 1445) emit('weather_changed', { kind: 'rain', temperatureC: 10 })
 
   // The theft rides the witness flag the way the sexes ride the reproduction flag: a fixture
-  // with §19 off runs the pre-C11 timeline body for body and event for event.
+  // with §19 off runs the earlier timeline body for body and event for event.
   if (!config.nightWitness.enabled) return
   if (tick === 1) {
     emit('agent_spawned', { id: THIEF, name: 'Thief', x: THIEF_POST.x, y: THIEF_POST.y, ageDays: 7300, ...sex('m') })

@@ -9,7 +9,7 @@ const GRASS: TileId = 0
 const FOREST: TileId = 3
 const SAPLING: TileId = 9
 
-// The one spelling of a tile's name in the sparse sapling map (G4) — the same shape the
+// The one spelling of a tile's name in the sparse sapling map — the same shape the
 // traffic map uses, for the same reason: a 128x128 array of nothing is a hash of nothing.
 export function saplingKey(x: number, y: number): string {
   return `${x},${y}`

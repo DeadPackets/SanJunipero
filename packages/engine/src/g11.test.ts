@@ -430,8 +430,6 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
   })
 })
 
-// ------------------------------------------------- batch-9 concern 1, answered on the bench
-
 // The question is not "did they die" but "would a COMPETENT body have lived" — one that eats when
 // there is food, sleeps when there is a bed, drinks when there is water.
 describe('G11a-D1: a competent body comes through three days on the default world, untouched', () => {

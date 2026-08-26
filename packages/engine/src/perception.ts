@@ -31,7 +31,7 @@ export type PerceivedAgent = {
   asleep: boolean
   ageBand: AgeBand   // a face carries no birthday, but it does carry this much
   // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
-  // town that has sewn nothing reads exactly as it always did, and never a number (G10).
+  // town that has sewn nothing reads exactly as it always did, and never a number.
   worn?: string
   // Absent on a well body, so a healthy town reads exactly as it always did — and never a number.
   // The packet carries the phrase, because the phrase is what a pair of eyes actually gets.
@@ -157,21 +157,21 @@ export type PerceptionPacket = {
     forageables: PerceivedForageable[]
   }
   ground?: PerceivedGround
-  // How much light is on the ground this body stands on. Three words, never a number (G10).
+  // How much light is on the ground this body stands on. Three words, never a number.
   light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
   // so a packet from a town that never worked at night reads exactly as it always did.
   fumbling?: true
   // Present only while the legs are walking a route the search could not follow to its end.
-  // A distance, not a failure — and never the word for what the search did (G10).
+  // A distance, not a failure — and never the word for what the search did.
   wayUnclear?: true
   heard: HeardSpeech[]
   seen: SeenEvent[]
   feltEvents: string[]
 }
 
-// Road and worn path both. The advantage is already real — it is the move cost roads changed
-// in C9 — and this only says so out loud.
+// Road and worn path both. The advantage is already real — it is the move cost roads
+// changed — and this only says so out loud.
 const TRAVELLED_TILES: ReadonlySet<number> = new Set([7, 8])
 
 function groundUnderfoot(state: WorldState, config: SimConfig, x: number, y: number): PerceivedGround | undefined {
@@ -208,7 +208,7 @@ const SELF_EVENT_TAG: Record<string, string> = {
 }
 
 // Every tag `feltTagFor` can produce, so the prose map can be proven complete
-// rather than sampled (C9 batch-11). Mystery tags come from MYSTERIES.
+// rather than sampled. Mystery tags come from MYSTERIES.
 export const FELT_TAGS: readonly string[] = [
   ...Object.keys(PRECIPITATION).map((kind) => `${kind}_started`),
   ...Object.values(SELF_EVENT_TAG),
@@ -247,7 +247,7 @@ export function hears(state: WorldState, baseConfig: SimConfig, speakerEv: SimEv
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
 
-  // Occlusion off drops the wall, not the distance: plain earshot, as it was before C9.
+  // Occlusion off drops the wall, not the distance: plain earshot, as it was before.
   if (!config.occlusion.enabled) return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
 
   const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
@@ -329,7 +329,7 @@ export function composePerception(
   }
 
   // The way in, from the same function the verb uses. A body that reads this and stands there
-  // is a body `enter` accepts (C11 batch-8 R7).
+  // is a body `enter` accepts.
   const wayIn = (s: Structure): { door?: { x: number; y: number }; full?: true } => {
     if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) return {}
     const door = doorTile(state, s)

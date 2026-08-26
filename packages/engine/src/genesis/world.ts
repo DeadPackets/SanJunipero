@@ -128,7 +128,7 @@ function plannedPayload(
     maxHp: durability.maxHp,
     flammable: durability.flammable,
     builderId: GENESIS_BUILDER_ID,
-    // Absent, never null: an unowned building is the hash-stable shape C9 landed.
+    // Absent, never null: an unowned building is the hash-stable shape.
     ...(s.owner === null ? {} : { owner: s.owner }),
   }
 }
@@ -161,7 +161,7 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
     if (stood > 0) events.push({ type: 'structure_progressed', payload: { id, ticks: stood } })
   })
 
-  // The kind is READ from the template, never retyped here (C8 global constraint C14).
+  // The kind is READ from the template, never retyped here.
   const houseIdByOwner = new Map<string, string>()
   template.structures.forEach((s, i) => {
     if (s.kind === 'house' && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)

@@ -45,8 +45,8 @@ describe('GATE G2: 3-day scripted world run', () => {
   it('survival, rescue, death, build, fire, and crops all land in 3 sim days', () => {
     const { state, evs } = runScenario()
 
-    // 1. Neither the Farmer nor the Fisher ever runs the hunger clock down — C9's line, and
-    // still true. What takes them is C11: see the death table below.
+    // 1. Neither the Farmer nor the Fisher ever runs the hunger clock down — an old line, and
+    // still true. What takes them is in the death table below.
     expect(state.agents[FARMER]!.zeroHungerSinceTick).toBeNull()
     expect(state.agents[FISHER]!.zeroHungerSinceTick).toBeNull()
     expect(state.agents[FARMER]!.needs.hunger).toBeGreaterThan(0)
@@ -149,7 +149,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[FARMER]!.sex).toBe('f')
   })
 
-  // The same argument as the C9 row above. The two that do not fire here — a desire-path tile
+  // The same argument as the row above. The two that do not fire here — a desire-path tile
   // wearing through and a fauna kill — need a walker with a route and a hunter with a knife.
   it('C11 is live in this run: bodies thirst, wear out, are poisoned, and are buried', () => {
     const { state, evs } = runScenario()

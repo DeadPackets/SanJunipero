@@ -140,7 +140,7 @@ describe('the lattice the template plats on', () => {
 })
 
 describe('the genesis anchor', () => {
-  // The standing stone and the wild need room beyond the edge of town (C11 §9).
+  // The standing stone and the wild need room beyond the edge of town (§9).
   it('leaves at least 8 tiles of margin on every side of a 128x128 world', () => {
     const { x, y } = CITY_ANCHOR_DEFAULT
     expect(x).toBeGreaterThanOrEqual(8)
@@ -172,7 +172,7 @@ describe('city roads', () => {
     expect(roadSet.size).toBe(roads.length)
   })
 
-  // THE NO-BRIDGE LAW. The far bank is an earned milestone (C11 §2); a template author will be
+  // THE NO-BRIDGE LAW. The far bank is an earned milestone (§2); a template author will be
   // tempted, and this is the guard.
   it('no road tile lies on water, and the water is really there', () => {
     const water = new Set(terrain.filter(t => t.to === T_WATER).map(t => key(t.dx, t.dy)))
@@ -368,7 +368,7 @@ describe('city structures', () => {
       }
   })
 
-  // C11 §9: the standing stone stands beyond the edge of town, unexplained.
+  // §9: the standing stone stands beyond the edge of town, unexplained.
   it('does not build the standing stone', () => {
     expect(structures.some(s => s.kind === 'standing_stone')).toBe(false)
   })
@@ -399,7 +399,7 @@ describe('city structures', () => {
     }
   })
 
-  // The stand-in for the cross-package check; Task 28 asserts this list against the library.
+  // The stand-in for the cross-package check; g13.test.ts asserts this list against the library.
   it('furnishes only kinds the stand-in list declares', () => {
     for (const s of structures)
       for (const f of s.furnishings)

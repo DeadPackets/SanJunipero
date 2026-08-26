@@ -42,7 +42,7 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
 ]
 
 // How a node reads from across the clearing. Never a count — a picker sees abundance or
-// bareness, and the difference between the two mushrooms is not one of them (G10).
+// bareness, and the difference between the two mushrooms is not one of them.
 export const FORAGEABLE_PROSE: Readonly<Record<ForageableKind, { standing: string; bare: string }>> = {
   berry_bush: { standing: 'berry bushes heavy with fruit', bare: 'the berry bushes are picked bare' },
   mushroom_patch: { standing: 'mushrooms pushing up through the leaf litter', bare: 'the mushroom ground is turned over and empty' },

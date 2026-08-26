@@ -172,7 +172,7 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
   it('★ buys back the night work penalty — the road the hazard never had', () => {
     const raised = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 })
     const id = (raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }).id
-    // Unfed: the dark charges half again, exactly as it has since C11.
+    // Unfed: the dark charges half again, exactly as it always has.
     expect(workPenalty(raised.state, CFG, 'wright', 'pave')).toBe(CFG.light.nightWorkPenalty)
     const fed = doVerb(raised.state, raised.state.tick, 'wright', 'stoke', { structureId: id })
     expect(workPenalty(fed.state, CFG, 'wright', 'pave')).toBe(1)

@@ -31,7 +31,7 @@ export function submitIntent(
     return { ok: true, events }
   }
   // The one place a duration is settled, so the dark can charge for work without every verb
-  // having to remember that it is night (G4).
+  // having to remember that it is night.
   const penalty = workPenalty(state, config, agentId, verb)
   const base = def.duration(state, config, agentId, params)
   const duration = penalty === 1 ? base : Math.ceil(base * penalty)

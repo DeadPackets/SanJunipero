@@ -172,7 +172,7 @@ describe('findPath (A*)', () => {
   })
 })
 
-// ------------------------------------------- Task 37(a): the admissible heuristic
+// ------------------------------------------- the admissible heuristic
 
 // The straight grass line home is 13 steps at 1 each; the road runs 19 and still costs less,
 // because a road is 0.6. An A* charging a full grass tile per remaining step cannot believe that.
@@ -207,7 +207,7 @@ describe('the A* heuristic is admissible (Task 37a)', () => {
   })
 })
 
-// ------------------------------------------------------- Task 29: the node budget
+// ------------------------------------------------------- the node budget
 
 const withMaxNodes = (config: SimConfig, maxNodes: number): SimConfig =>
   ({ ...config, pathing: { ...config.pathing, maxNodes } })
@@ -386,7 +386,7 @@ describe('build: planning a bridge', () => {
     expect(dry.ok).toBe(false)
   })
 
-  // Batch-3 controller ruling 2: a recipe's w and h are a shape, not a bearing.
+  // A recipe's w and h are a shape, not a bearing.
   describe('the transpose fallback', () => {
     const TALL3 = SimConfigSchema.parse({ structures: { recipes: {
       bridge: { inputs: { wood: 6 }, w: 1, h: 3, maxHp: 20, flammable: false, durationTicks: 480 },

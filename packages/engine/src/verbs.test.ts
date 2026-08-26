@@ -112,7 +112,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     expect(out[0]).toEqual({
       type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'poison', severity: 1, itemId: 'item_1' },
     })
-    // A pale mushroom is a poor meal as well as a gamble (C11 Task 27's per-kind nutrition).
+    // A pale mushroom is a poor meal as well as a gamble (per-kind nutrition).
     expect(out).toContainEqual({
       type: 'need_changed',
       payload: {
@@ -243,7 +243,7 @@ describe('tend: an hour of another body\'s hands', () => {
     expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(3)
     expect(complete(pair(), { targetId: 'a1' }))
       .toEqual([{ type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } }])
-    // A recorded C9 log carries the target and nothing else, and still folds.
+    // A recorded older log carries the target and nothing else, and still folds.
     const old = fold(pair(), ev(3, 'agent_tended', { agentId: 'a1' }), CFG)
     expect(old.agents.a1!.tendedTick).toBe(0)
   })
@@ -403,7 +403,7 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     if (!empty.ok) expect(empty.reason).toBe('nothing there to hunt')
   })
 
-  // Task 37, batch-4 ruling 1. SimConfigSchema is closed, so a recipe says what it makes is
+  // SimConfigSchema is closed, so a recipe says what it makes is
   // a weapon in its own row, and a spear nobody authored can take a deer.
   it('a recipe that says it makes a weapon makes one, and the knife stays a weapon regardless', () => {
     const speared = (config: SimConfig): WorldState => {
@@ -481,7 +481,7 @@ describe('fish: a school is where the fish are', () => {
   })
 })
 
-// ------------------------------------------------- Task 23: the clothing line, and one slot
+// ------------------------------------------------- the clothing line, and one slot
 describe('wear and doff: one body slot, and a night you can survive', () => {
   const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
   const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
@@ -593,7 +593,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
   })
 })
 
-// ------------------------------------------ Task 25: night work costs time, or it costs fuel
+// ------------------------------------------ night work costs time, or it costs fuel
 describe('night work: the choice is fuel or time, and it is theirs', () => {
   const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
   const OFF = SimConfigSchema.parse({
@@ -694,7 +694,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   })
 })
 
-// --------------------------------- Task 27: monotony is a cost, and a shared stew is a reason
+// --------------------------------- monotony is a cost, and a shared stew is a reason
 describe('food variety: the same meal twice is worth less than two meals', () => {
   const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
   const OFF = SimConfigSchema.parse({

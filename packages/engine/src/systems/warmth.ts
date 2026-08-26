@@ -11,7 +11,7 @@ export function isHeatSource(config: SimConfig, kind: string): boolean {
   return isHearthKind(config, kind)
 }
 
-// The one derivation of what the air is doing (G4): the season's band for this phase of the
+// The one derivation of what the air is doing: the season's band for this phase of the
 // day, plus whatever the sky is taking off it.
 export function ambientTempAt(state: WorldState, config: SimConfig): number {
   const band = config.warmth.ambient[simTimeFromTick(state.tick).season]
@@ -67,7 +67,7 @@ export function isExposed(state: WorldState, config: SimConfig, agentId: string)
   return !besideAKeptFire(state, config, agentId)
 }
 
-// One writer of warmth, chosen by the flag: with the cold switched off `needsSystem` keeps C1's
+// One writer of warmth, chosen by the flag: with the cold switched off `needsSystem` keeps the old
 // equalization, and with it on this law owns the number in both directions.
 export function warmthSystem(ctx: TickCtx): void {
   const cfg = ctx.config.warmth

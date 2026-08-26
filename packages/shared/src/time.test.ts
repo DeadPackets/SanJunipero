@@ -17,7 +17,7 @@ describe('dayPhaseFromTick', () => {
     expect(dayPhaseFromTick(9 * MINUTES_PER_DAY + 12 * 60)).toBe('day')
     expect(dayPhaseFromTick(9 * MINUTES_PER_DAY)).toBe('night')
   })
-  // The two clocks disagree by design: isNight is C1's and every landed caller keeps it.
+  // The two clocks disagree by design: isNight is the older one and every landed caller keeps it.
   it('leaves SimTime.isNight exactly as it was', () => {
     expect(simTimeFromTick(20 * 60).isNight).toBe(true)
     expect(dayPhaseFromTick(20 * 60)).toBe('dusk')

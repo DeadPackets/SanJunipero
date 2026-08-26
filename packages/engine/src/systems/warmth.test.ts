@@ -131,7 +131,7 @@ describe('exposure: what the cold takes, and who it cannot reach', () => {
     const r = tickOnce(bodyAt(WINTER_NIGHT, OFF), OFF)
     expect(isExposed(r.state, OFF, 'a1')).toBe(false)
     expect(chills(r)).toEqual([])
-    // With the law off, C1's equalization is still the one that writes warmth.
+    // With the law off, the old equalization is still the one that writes warmth.
     expect(needs(r, 'warmth')).toHaveLength(1)
   })
 

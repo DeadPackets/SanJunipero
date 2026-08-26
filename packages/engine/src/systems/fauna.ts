@@ -15,7 +15,7 @@ export const FAUNA_HABITAT: Readonly<Record<FaunaKind, ReadonlySet<TileId>>> = {
   fish: new Set<TileId>([2, 10]),
 }
 
-// Not a dial (the SimConfigSchema is closed after Task 2): how often a dawn slot actually
+// Not a dial (the SimConfigSchema is closed): how often a dawn slot actually
 // fills. The caps are the ecology; this is only how fast the world walks back to them.
 export const FAUNA_SPAWN_CHANCE = 0.25
 

@@ -67,7 +67,7 @@ function adjacentLivingTarget(
   if (reasons.busy !== undefined && target.activity) return reasons.busy
   const a = state.agents[agentId]!
   // A refusal must leave a door open (addendum §9): the one thing missing is two paces, so
-  // the answer says which two. Zero tends and one give across five live runs (C11 R21).
+  // the answer says which two. Zero tends and one give across five live runs.
   if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) {
     return `${reasons.far} — they are at (${target.x}, ${target.y})`
   }
@@ -157,7 +157,7 @@ export function worstAffliction(state: WorldState, agentId: string): Affliction 
   return worst
 }
 
-// One relief, whether it was chewed or pressed into a patient's hands (G4).
+// One relief, whether it was chewed or pressed into a patient's hands.
 export function relieveWorst(state: WorldState, agentId: string, amount: number): PendingEvent[] {
   const worst = worstAffliction(state, agentId)
   if (worst === undefined) return []
@@ -254,7 +254,7 @@ const wake: VerbDef = makeVerb({
 })
 
 // What a meal is worth to THIS body right now: the kind's own nutrition, then a mild bonus for
-// every distinct kind the window still remembers. The one derivation of both (G4).
+// every distinct kind the window still remembers. The one derivation of both.
 export function mealRestore(state: WorldState, config: SimConfig, agentId: string, kind: string): number {
   if (!config.foodVariety.enabled) return config.needs.eatRestoreHunger
   const kinds = new Set((state.agents[agentId]?.recentFoods ?? []).map((m) => m.kind))
@@ -321,7 +321,7 @@ const eat: VerbDef = makeVerb({
 
 export const TendParams = z.object({ targetId: z.string(), itemId: z.string().optional() }).strict()
 
-// An hour, not a scribble: three ticks, the C9 carving precedent.
+// An hour, not a scribble: three ticks, the carving precedent.
 const TEND_TICKS = 3
 
 const tend: VerbDef = makeVerb({
@@ -446,7 +446,7 @@ const fill: VerbDef = makeVerb({
 export const WearParams = z.object({ itemId: z.string() }).strict()
 
 // What counts as clothing is what the world knows how to be warmed by: `warmth.insulation` is
-// the one table of it (G4), so a kind nobody can be warmed by is a kind nobody can wear.
+// the one table of it, so a kind nobody can be warmed by is a kind nobody can wear.
 export function isWearable(config: SimConfig, kind: string): boolean {
   return (config.warmth.insulation as Record<string, number | undefined>)[kind] !== undefined
 }
@@ -546,7 +546,7 @@ const snuff: VerbDef = makeVerb({
 export const FUEL_KIND = 'wood'
 
 // Arm's reach of a fire: the room you are standing in, or a footprint you are beside. The wall
-// half is `warmth`'s one derivation of it; only the distance is this verb's own (G4).
+// half is `warmth`'s one derivation of it; only the distance is this verb's own.
 function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
   const a = state.agents[agentId]!
   if (!fireIsOnYourSide(a, s)) return false
@@ -595,7 +595,7 @@ export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: 
   return !litSourceWithin(state, a.x, a.y, state.tick, config, config.light.workRadius)
 }
 
-// The one derivation of what the dark costs (G4): submitIntent multiplies a duration by it,
+// The one derivation of what the dark costs: submitIntent multiplies a duration by it,
 // and perception says so out loud. Never a refusal — burning fuel or burning time is a choice.
 export function workPenalty(state: WorldState, config: SimConfig, agentId: string, verb: string): number {
   return NIGHT_WORK_VERBS.has(verb) && fumblesInTheDark(state, config, agentId)
@@ -718,7 +718,7 @@ const harvest: VerbDef = makeVerb({
 export const FISH_SCHOOL_RADIUS = 2
 
 // The school a cast reaches, if any: the nearest one in id order. Gated on the fauna law, so
-// with the entity layer off the C9 catch chance is exactly what it always was.
+// with the entity layer off the catch chance is exactly what it always was.
 export function schoolNear(
   state: WorldState, config: SimConfig, x: number, y: number,
 ): { id: string; stock: number } | null {
@@ -732,7 +732,7 @@ export function schoolNear(
   return null
 }
 
-// The one derivation of a cast's odds (G4): season and school compose on top of skill, which
+// The one derivation of a cast's odds: season and school compose on top of skill, which
 // is why winter's 0.5 and a school's 2x cancel to exactly the plain-day chance.
 export function fishCatchChance(
   state: WorldState, config: SimConfig, agentId: string, x: number, y: number,
@@ -841,7 +841,7 @@ const hunt: VerbDef = makeVerb({
 })
 
 // Naming a node is optional, and that is the whole of the backward compatibility: an empty
-// `{}` is still C9's "gather from the wood beside you", event for event.
+// `{}` is still the old "gather from the wood beside you", event for event.
 export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
 
 const forage: VerbDef = makeVerb({
@@ -958,7 +958,7 @@ export function buildableRecipe(config: SimConfig, kind: string): StructureRecip
   return row !== undefined && Object.keys(row.inputs).length > 0 ? row : null
 }
 
-// The house keeps its C9 dial as the duration source; every other kind reads its row. The two
+// The house keeps its own dial as the duration source; every other kind reads its row. The two
 // are asserted equal in config.test.ts, so this is one number under two names, not two numbers.
 export function buildTicks(config: SimConfig, kind: string): number {
   return kind === 'house' ? config.construction.houseTicks : (config.structures.recipes[kind]?.durationTicks ?? 0)
@@ -1628,7 +1628,7 @@ export const TeachParams = z.object({ targetId: z.string(), track: z.string() })
 export const AttackParams = z.object({ targetId: z.string() }).strict()
 
 // One function under two names, so the word a busy body says and the word an idle one says are
-// composed in exactly one place (G4).
+// composed in exactly one place.
 const spoken = (
   state: WorldState, _config: SimConfig, agentId: string, params: Record<string, unknown>,
 ): PendingEvent[] => {
