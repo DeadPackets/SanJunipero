@@ -1,23 +1,5 @@
-// ★ THE ASSEMBLY THAT WAS TRAPPED IN A SCRIPT.
-//
-// Every live run in this repo — `g11-deepworld.ts`, `night-probe.ts`, `motive-probe.ts`,
-// `hearth-probe.ts` — writes the same twelve lines by hand: a `PersonalityStore`, a turn
-// client, a reflection client, an `AgentRuntime`, `start`, the optional `restore`, the optional
-// `wireArbiter`, into a map. Four copies of one wiring is four places a mind can be booted
-// subtly differently, and until now there was no way to boot one from anything that is not a
-// script, because the wiring did not exist as a function.
-//
-// This is that function. It is deliberately the SMALL half of the job:
-//
-//   what is here          the minds, on a bridge somebody else built
-//   what is NOT here      the world, the loop, the store, the arbiter, the narrator, the
-//                         checkpoints, the report, the money
-//
-// The reason is the dependency graph and it is not negotiable: `@sj/arbiter` and
-// `@sj/narrator` both depend on `@sj/agents`, so nothing in `@sj/agents` may import them. The
-// arbiter therefore arrives as an INJECTED seam (`SeamArbiter`), exactly as `wireArbiter`
-// already intended, and the place where minds, world, arbiter and narrator may legally meet is
-// the top of the graph — `@sj/gateway`. See `gateway/src/liveWorld.ts`.
+// Boots minds only; the arbiter arrives as an injected `SeamArbiter` because @sj/arbiter
+// depends on @sj/agents and the cycle is not negotiable.
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -52,12 +34,9 @@ export type BootMindsOpts = {
   minds: readonly MindSpec[]
   bridge: EngineBridge
   embedder: { embed(t: string): Promise<Float32Array> }
-  /**
-   * Where this mind's memory, journal, ledgers and personality live. One database per mind is
-   * what the gateway's read API expects (`<agentDbDir>/<id>.db`); one shared database for all
-   * of them is what the gate scripts do. Both are legal — the store keys every row by
-   * `agent_id` either way — so the choice is the caller's and this function does not care.
-   */
+  /** One database per mind (`<agentDbDir>/<id>.db`) is what the gateway's read API expects; one
+   *  shared database is what the gate scripts pass. Both are legal — every row is keyed by
+   *  `agent_id`. */
   dbFor: (agentId: string) => Database.Database
   /** The LLM for a mind's turns. Separate from `dbFor`: the call ledger is ops, not memory. */
   turnLlm: (agentId: string) => LlmClient
@@ -75,14 +54,8 @@ export type BootMindsOpts = {
   arbiter?: SeamArbiter
 }
 
-/**
- * ★ WRITE A FIRST PERSONALITY, OR TRUST THE ONE ON DISK — AND DECIDE IT BY LOOKING, NOT BY A
- * FLAG THE CALLER MIGHT GET WRONG. `PersonalityStore.current()` THROWS on a mind with no
- * version 1, and `init` on a mind that already has one writes a SECOND version 1, after which
- * `current()` reads back whichever row the index happens to pick. A caller passing
- * `resuming = false` on a directory that still holds yesterday's minds gets the second failure
- * silently. Asking the database removes the question.
- */
+/** `init` on a mind that already has version 1 writes a second one and `current()` then reads
+ *  whichever row the index picks — so ask the database, never a `resuming` flag. */
 export function hasPersonality(db: Database.Database, agentId: string): boolean {
   try {
     return db.prepare('SELECT 1 FROM personality_versions WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined

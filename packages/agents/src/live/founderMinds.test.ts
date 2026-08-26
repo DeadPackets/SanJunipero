@@ -1,14 +1,5 @@
-// ★ THE ONE-WAY GLASS, OVER THE CAST THAT IS ABOUT TO BE STREAMED TO STRANGERS.
-//
-// `assemblePrompt` calls `assertNoGlassLeak` on every prompt it builds, so a leak in a
-// backstory or a goal throws at the first turn of a live run — twenty minutes and a few dollars
-// after boot, in front of whoever is watching. These rows pay that cost now, offline, for $0.
-//
-// The second half matters more than the first: a cast is also where a FIXTURE INSTRUCTS A MIND.
-// g11's own goals say "cut timber for a deck" and "walk north and look at the narrows"; a run
-// on that cast measures the fixture, which is the exact reading error the wants lane found in
-// arm B. This cast's goals were neutralised for that reason and the row below is what keeps
-// them neutral.
+// A leak in a backstory or a goal otherwise throws at the first turn of a live run; these rows
+// pay that offline. A cast is also where a fixture instructs a mind, which the goal rows hold.
 import { describe, expect, it } from 'vitest'
 import { assemblePrompt } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
@@ -28,10 +19,8 @@ const promptFor = (mind: typeof FOUNDER_MINDS[number]): string => {
 }
 
 describe('★ the streamed cast and the one-way glass', () => {
-  // ★ THE FULL ROSTER, NOT THE MID-RUN ONE. `assemblePrompt`'s own `assertNoGlassLeak` refuses
-  // only ops-key SHAPES mid-run, deliberately: crashing a live town over a word one of its
-  // people said is the label harming the world. A cast is an AUTHORED surface — we wrote every
-  // byte of it — so it is held to `scanPromptForGlassLeak`, which is every ordinary word too.
+  // The full roster, not the mid-run shapes: a cast is an authored surface, so every ordinary
+  // word counts too.
   it('every founder assembles a prompt with no construct word in it', () => {
     for (const mind of FOUNDER_MINDS) {
       expect(scanPromptForGlassLeak(promptFor(mind)), `${mind.id} leaks`).toEqual([])
@@ -63,9 +52,8 @@ describe('★ the streamed cast and the one-way glass', () => {
   })
 
   it('no goal points a mind at a thing to make — the fixture does not get to instruct', () => {
-    // Not a style rule. The wants lane measured a want with no road as WORSE than no want, and
-    // g11's cast carries goals like "cut timber for a deck". A streamed town that shipped those
-    // would be measuring its own prompt.
+    // A want with no road measures worse than no want, and a town shipped with one would be
+    // measuring its own prompt.
     const POINTING = ['build', 'raise a', 'cut timber', 'deck', 'bridge', 'you should', 'you must']
     for (const mind of FOUNDER_MINDS) {
       const said = [
@@ -78,18 +66,9 @@ describe('★ the streamed cast and the one-way glass', () => {
     }
   })
 
-  // ★ A TIC IS A HABIT, NOT A GREETING — AND THE CARD IS WHERE IT BECOMES ONE.
-  //
-  // Omar spent 63% of his spoken lines on "Now then" across 6 867 measured lines, and Yusuf 18.6%
-  // on "Aye". They were the only two minds in the corpus with a stock opener, and the only two
-  // whose card both NAMED words to say and DEMONSTRATED them in opening position. Amara's
-  // "counts aloud", Nadia's `calls the path "the way"` and Salma's "understates" are behaviours,
-  // or a word placed mid-sentence, and none of them produced an opener at all. No shared forbid
-  // beat the card: the voice lane's clause moved Omar 41.1% -> 34.3% over twenty live runs.
-  //
-  // So the bound goes where the grant is. `derivePersona.ts:81` samples tics into children
-  // without copying anything written beside them, which is the second reason this cannot be a
-  // sentence in a shared block.
+  // A literal tic string in a card is the mechanism: the only two minds with a stock opener were
+  // the only two whose card quoted words to say. `derivePersona` samples tics without their
+  // surroundings, so the bound has to go on the card.
   it('no card demonstrates its own tic in opening position', () => {
     for (const mind of FOUNDER_MINDS) {
       for (const tic of mind.identity.voiceCard.tics) {
