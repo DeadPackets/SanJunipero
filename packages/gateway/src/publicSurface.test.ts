@@ -259,8 +259,9 @@ describe('the public surface a stranger reaches', () => {
     const gw = await gwPromise
     const sock = await connect(gw.port)
     open.push(sock)
-    const frames: { t: string; reqId?: number; tick?: number }[] = []
-    sock.on('message', (d) => frames.push(JSON.parse(frameText(d)) as (typeof frames)[number]))
+    type Frame = { t: string; reqId?: number; tick?: number }
+    const frames: Frame[] = []
+    sock.on('message', (d) => frames.push(JSON.parse(frameText(d)) as Frame))
     sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
     await wait(60)
     frames.length = 0
