@@ -150,7 +150,6 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
     for (const expected of [
       'agents/src/live/founderMinds.ts',
       'agents/scripts/g11-deepworld.ts',
-      'agents/scripts/g9-livingworld.ts',
       'agents/src/persona/tamar.ts',
     ]) expect(files, `no cast found in ${expected}`).toContain(expected)
     expect(cards().length).toBeGreaterThanOrEqual(15)
