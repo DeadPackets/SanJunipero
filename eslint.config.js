@@ -11,6 +11,8 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'warn',
+      // 484 object types, 0 interfaces: the measured house style, not the plugin's default.
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // Invariant 6: the tuned prices, thresholds and tuning constants stay written where they are.
       'no-magic-numbers': 'off',
       '@typescript-eslint/no-magic-numbers': 'off',
