@@ -30,6 +30,7 @@ import {
   ceilingBeams, drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
   floorRegionPoly, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, tileCentreScreen,
   tileSpanCentre, wallMount,
+  easePan, roomFocusOf, roomPanTo,
 } from './roomShell.js'
 
 // Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
@@ -160,6 +161,20 @@ export function createInteriorScene(
    *  is going. The engine has no interior position, so this is the renderer's own. */
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
   const changeCbs: Array<(id: string | null) => void> = []
+
+  // ★★ THE ROOM CAMERA. A farmhouse's box is 1 920 × 1 120 and there is no integer scene zoom
+  // below 1, so on any laptop part of it is off the glass and cannot be zoomed back on. What is
+  // left to choose is WHICH part, and `roomPanTo` clamps that choice to `roomCrop` — a room
+  // that fits gets a range of zero and never moves a pixel from where it is drawn today.
+  //
+  // It is set from the room's own life, one frame behind `layoutRoom`, because a camera that
+  // follows nobody is a camera the viewer has to drive.
+  let camFocus: { sx: number; sy: number } | null = null
+  let camX = 0
+  let camY = 0
+  /** A room change is a cut: the new room starts where it belongs rather than sliding in from
+   *  wherever the last one was being watched. */
+  let camSnap = true
 
   // A cut, not a fade, for a viewer who asked for less motion — the destination is the
   // point, and 260ms of dissolve is the part they opted out of.
@@ -300,6 +315,8 @@ export function createInteriorScene(
     bodies.clear()
     walking.clear()
     plannedFor = null
+    camFocus = null
+    camSnap = true
   }
 
   const onWall = (item: RoomItem): boolean => item.meta?.placement === 'wall'
@@ -595,6 +612,7 @@ export function createInteriorScene(
     const hostKind = new Map(placed.map((b) =>
       [b.id, b.inside === null ? null : b.inside.slice(0, b.inside.indexOf(':'))]))
     shadows.clear()
+    const bodyPts: Array<{ id: string; sx: number; sy: number }> = []
     for (const p of pieces) {
       const node = p.kind === 'body' ? bodies.get(p.id) : furniture.get(p.id)
       if (node === undefined) continue
@@ -603,6 +621,7 @@ export function createInteriorScene(
       if (p.kind === 'body') {
         const foot = advanceWalk(p.id, dtMs)
         node.position.set(foot.sx, foot.sy - lift)
+        bodyPts.push({ id: p.id, sx: foot.sx, sy: foot.sy - lift })
       }
       // A split furnishing casts ONE shadow, under its front half, not two; a flat one casts
       // none, because it IS on the floor — and neither does a body that is off the floor, in a
@@ -625,6 +644,13 @@ export function createInteriorScene(
       bodies.delete(id)
       walking.delete(id)
     }
+
+    // ★ AND WHERE IT RESTS WHEN THE ROOM IS EMPTY: the first perch, which `AWAKE_PREFERENCE`
+    // makes the hearth wherever there is one. An empty farmhouse crops as hard as a full one,
+    // so a camera that only follows bodies would leave the fire off the left edge of a room
+    // nobody is in — which is what the browser showed.
+    const rest = perches[0] === undefined ? null : tileCentreScreen(perches[0].x, perches[0].y)
+    camFocus = roomFocusOf(bodyPts, followedId, rest)
   }
 
   /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */
@@ -708,11 +734,26 @@ export function createInteriorScene(
     // where it arrives.
     const zoom = roomZoomFor(app.screen.height)
     room.scale.set(zoom)
+    // ★★ THE CAMERA INSIDE THE ROOM. The origin below is where a room that FITS goes, and it is
+    // unchanged. `roomPanTo` adds nothing to it unless `roomCrop` is non-zero — a 12 × 6 room on
+    // a stage that holds it gets a travel range of [0, 0] and cannot drift by construction, so
+    // this is a camera that only exists when there is something off the glass to reach.
+    const target = roomPanTo(
+      camFocus, app.screen.width, app.screen.height, zoom, roomTiles, WALL_H_PX,
+    )
+    if (camSnap) {
+      camX = target.dx
+      camY = target.dy
+      camSnap = false
+    } else {
+      camX = easePan(camX, target.dx, dtMs)
+      camY = easePan(camY, target.dy, dtMs)
+    }
     // The whole box, walls included — centring the floor alone put the top of the walls off
     // the top of the stage, which is what the browser showed.
     room.position.set(
-      roomOriginX(app.screen.width, zoom, roomTiles),
-      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, roomTiles, WALL_H_PX),
+      roomOriginX(app.screen.width, zoom, roomTiles) + camX,
+      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, roomTiles, WALL_H_PX) + camY,
     )
     if (activeId !== null) layoutRoom(dtMs)
   }
