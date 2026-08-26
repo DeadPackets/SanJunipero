@@ -9,8 +9,6 @@ export {
   CONSTRUCT_VOCABULARY,
   scanPromptForGlassLeak,
   UNNAMED_CONSTRUCT_COPY,
-  type NameSource,
-  type QuotedName,
 } from '@sj/agents'
 
 // Every world+agent table the narrator must not own (asserted absent from narrator.db).

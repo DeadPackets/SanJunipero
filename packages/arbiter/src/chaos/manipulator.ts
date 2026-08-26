@@ -3,7 +3,7 @@ import { heardLine, scanPromptForGlassLeak, scanRulingForGlassLeak } from '@sj/a
 
 // Prompt-injection payloads at both untrusted-speech surfaces: the arbiter (`fenceIntent`) and
 // a mind's prose render (`sanitizeSpokenText`). Every row is a delta against the pre-fix render.
-export type InjectionTarget = 'mind' | 'arbiter'
+type InjectionTarget = 'mind' | 'arbiter'
 
 export type InjectionCase = {
   id: string

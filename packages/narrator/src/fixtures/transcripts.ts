@@ -10,9 +10,9 @@ export const GOD_QUOTE = 'When Bex went, she went on somewhere. The dead are not
 export const LIE_SPOKEN = 'I never touched your knife.'
 export const LIE_THOUGHT = 'I took the knife off the shelf and I mean to keep it.'
 export const CHANGED_MIND_SPOKEN = 'I will go north at first light.'
-export const CHANGED_MIND_THOUGHT = 'North is folly. I stay where the fire is.'
+const CHANGED_MIND_THOUGHT = 'North is folly. I stay where the fire is.'
 export const HONEST_ERROR_SPOKEN = 'The weir is empty. There are no fish left in the river.'
-export const HONEST_ERROR_THOUGHT = 'The weir is empty.'
+const HONEST_ERROR_THOUGHT = 'The weir is empty.'
 
 export const AUTHORED_DAY: TranscriptRecord[] = [
   {
