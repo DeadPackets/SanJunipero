@@ -32,15 +32,8 @@ export type VerbDef = {
   validate(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): string | null
   duration(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): number
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
-  /** ★ THE MOUTH IS NOT THE HANDS. A verb that declares this never takes the activity slot and
-   *  is never refused for busy-ness: its events land the moment it is asked for. `speak` is the
-   *  whole of the list, and it is there because a body with an axe in its hands can still answer
-   *  when it is spoken to. Before this, `submitIntent` refused EVERY act while an activity ran
-   *  and the runtime submits speech directly, so 159 utterances across twelve live nights were
-   *  swallowed by `already busy with build` — 39% of every refusal in the run, and a 2 880-tick
-   *  house is two sim-days of silence in the arm where the town most needed to talk to itself.
-   *  It takes no rng, on purpose: a thing that happens at intent time cannot draw from a stream
-   *  the tick loop is keeping. */
+  /** A verb declaring this never takes the activity slot and is never refused for busy-ness;
+   *  speak is the whole list. Takes no rng: an intent-time event cannot draw from the tick loop's stream. */
   atOnce?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
   results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
@@ -49,15 +42,6 @@ export type VerbDef = {
 }
 
 // Fills the one default nearly every verb repeats: a one-tick duration.
-//
-// ★ THERE IS NO `interruptible` HERE ANY MORE, AND THAT IS THE HONEST SHAPE. Every verb in the
-// registry declared it `true`, `codify` mapped it off every recipe the arbiter authored, and
-// NOTHING EVER READ IT: `submitIntent` refuses every intent while an activity runs, whatever
-// the running verb says about itself. Measured — two verbs differing only in that field are
-// refused in the same words, and all 37 verbs answer a second intent identically. Interruption
-// in this world is something the WORLD does to a body (`action_interrupted` {blocked, gone,
-// collapsed, rest}), never something a mind can ask for, and `intent.test.ts` now proves that
-// over the whole registry instead of asserting that a dead field is set.
 function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'duration'>>): VerbDef {
   return { duration: () => 1, ...spec }
 }
@@ -144,10 +128,8 @@ export const FOOD_KINDS: ReadonlySet<string> = new Set([
   STEW_KIND,
 ])
 
-// What a kind is worth at the table, as a share of `needs.eatRestoreHunger`. A module const,
-// not a dial: `SimConfigSchema` is closed after Task 2. An unlisted kind is a full meal, which
-// is what every crop the config names has always been.
-// The herb's 0.05 is the point of the table: chewing a remedy is not dinner.
+// A share of needs.eatRestoreHunger, a module const and not a dial: SimConfigSchema is closed.
+// An unlisted kind is a full meal; the herb's 0.05 is the point — chewing a remedy is not dinner.
 export const FOOD_NUTRITION: Readonly<Record<string, number>> = {
   [HERB_KIND]: 0.05,
   [MUSHROOM_KIND]: 0.4,
@@ -185,9 +167,8 @@ export function relieveWorst(state: WorldState, agentId: string, amount: number)
     : { type: 'affliction_recovered', payload: { agentId, kind: worst.kind } }]
 }
 
-// A body that has already gone down does not get to pick its bed — and neither does one that
-// is only just still upright. Rest a body must fall over to earn is a ratchet: it was 74% of
-// the last live gate's refusals and half of its completed acts (C11 ruling R-C, R15 half 2).
+// A body already down does not get to pick its bed, and neither does one only just upright:
+// rest a body must fall over to earn is a ratchet.
 function mayLieDownRough(state: WorldState, config: SimConfig, agentId: string): boolean {
   const a = state.agents[agentId]!
   return a.collapsedSinceTick !== null || a.needs.energy < config.needs.debuffThreshold
@@ -206,9 +187,8 @@ const sleep: VerbDef = makeVerb({
     return null
   },
   onComplete(state, _config, agentId) {
-    // A night lifts the ladder as well as the counter, and lifts it EVERY time. Recovery that
-    // works once is a body that can only ever wear out; sleep is what answers wearing out
-    // (R15 half 1). The herb keeps working and is no longer the only thing that does.
+    // A night lifts the ladder as well as the counter, and lifts it every time — recovery that
+    // works once is a body that can only ever wear out.
     const weary = state.agents[agentId]?.afflictions?.some((x) => x.kind === 'fatigue') ?? false
     return [
       { type: 'agent_slept', payload: { agentId } },
@@ -233,10 +213,8 @@ const enter: VerbDef = makeVerb({
     const door = doorTile(state, s)
     if (!door) return 'there is no way in'
     if (Math.abs(a.x - door.x) > 1 || Math.abs(a.y - door.y) > 1) return 'not close enough to the door'
-    // ★ FULL IS NOT IMPOSSIBLE, AND THE WORDS HAVE TO SAY WHICH. A mind that cannot tell one
-    // from the other spends the night walking back to the same door — that is arm B's defect in
-    // a new costume. This one names the bodies and it names the floor, so it reads as a thing
-    // that changes when somebody steps out.
+    // Full is not impossible and the words have to say which: this names the bodies and the
+    // floor, so it reads as a thing that changes when somebody steps out.
     if (roomIsFull(state, s)) {
       const n = occupantsOf(state, s.id).length
       return `there is no floor left in there — ${n === 1 ? 'one body fills' : `${n} bodies fill`} it`
@@ -285,9 +263,8 @@ export function mealRestore(state: WorldState, config: SimConfig, agentId: strin
   return config.needs.eatRestoreHunger * nutritionOf(config, kind) * (1 + bonus)
 }
 
-// In the hands, or close enough to put there in the same motion (C11 R-I): the founders' bread
-// woke up on a shelf and their hands woke up empty, and once the hunger line started saying
-// where the loaf was, `eat: not holding that` rose 2 → 18. Reaching for supper is not a turn.
+// In the hands, or close enough to put there in the same motion: once the hunger line started
+// saying where the loaf was, `eat: not holding that` rose 2 → 18. Reaching for supper is not a turn.
 function mealInHand(state: WorldState, agentId: string, itemId: string): Item | undefined {
   const item = state.items[itemId]
   if (!item) return undefined
@@ -321,9 +298,8 @@ const eat: VerbDef = makeVerb({
     const p = EatParams.parse(params)
     const item = mealInHand(state, agentId, p.itemId)
     if (item === undefined) return []
-    // A pale mushroom is always a gamble; anything else only on its last day. The roll is
-    // drawn once, here at emission, and never when the meal is safe — a fresh loaf must not
-    // move the stream, or two worlds that ate differently would diverge for no reason.
+    // Drawn once, here at emission, and never when the meal is safe: a fresh loaf must not move
+    // the stream, or two worlds that ate differently would diverge for no reason.
     const risky = config.mortality.enabled
       && (item.kind === PALE_MUSHROOM || isSpoiling(state, item, config))
       && rng.next() < config.mortality.poisonChanceSpoiled
@@ -509,16 +485,8 @@ const doff: VerbDef = makeVerb({
 export const KindleParams = z.object({ itemId: z.string() }).strict()
 export const StokeParams = z.object({ structureId: z.string() }).strict()
 
-// A light that STANDS: one the world places and feeds (a hearth, the square's fire pit), or one
-// a pair of hands raises. The other side of this line is a light you carry. One table of what
-// glows (`light.glowRadius`) plus this one line answers both, so a codified lantern needs no
-// second list — and so does a lamp post, which is fed rather than struck.
-//
-// `CITY_HEARTH_KIND` is named here because the glow table holds it and `structures.recipes` does
-// NOT: a hearth is a furnishing, not a building, so `isHeatSource` cannot speak for it and the
-// glow row exists only to give the house that holds one its reach (`structureGlowRadius`). It
-// stands in for the `HEAT_SOURCE_KINDS` roster this line used to read, which `furnishings`
-// replaced with the `hearth` property.
+// A light the world or a pair of hands stands, against one you carry — light.glowRadius answers both.
+// CITY_HEARTH_KIND is named here because a hearth is a furnishing and has no structures.recipes row.
 function isStandingLight(config: SimConfig, kind: string): boolean {
   return isHeatSource(config, kind) || kind === CITY_HEARTH_KIND
     || config.structures.recipes[kind] !== undefined
@@ -585,14 +553,8 @@ function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
   return inTheRoomWith(a, s) || nearRect(state, agentId, s.x, s.y, s.w, s.h)
 }
 
-// A standing thing you can feed: it glows, and `fueledUntilTick` is where the feeding goes.
-// This was `HEAT_SOURCE_KINDS`, a roster kept by the WARMTH system — so a lamp post could be
-// raised and never lit, because the only list that would let you feed it was a list of things
-// that keep you warm. Warmth keeps its own roster and should: a lamp is not a hearth. Feeding
-// belongs to the glow table, which is the same table `isKindleable` reads for a torch.
-//
-// It asks `structureGlowRadius`, not `glowRadiusFor`: a house is not in the glow table and
-// glows with its hearth's reach, so the flat table would have made every house's fire unfeedable.
+// Feeding belongs to the glow table, not to warmth: a lamp is not a hearth. Asks
+// structureGlowRadius, because a house glows with its hearth's reach and is not in the flat table.
 export function isStokeable(config: SimConfig, kind: string): boolean {
   return structureGlowRadius(config, kind) !== undefined && isStandingLight(config, kind)
 }
@@ -817,9 +779,8 @@ export const HuntParams = z.object({ faunaId: z.string() }).strict()
 // codified spear arrives without anybody re-authoring the knife.
 export const WEAPON_KINDS: ReadonlySet<string> = new Set(['knife'])
 
-// The one reader of the weapon list (G4): the module's own kinds plus whatever a recipe row
-// declares it makes. `weaponKinds` is absent from every authored row, so at world defaults
-// this is `WEAPON_KINDS` exactly (C11 Task 37, batch-4 ruling 1).
+// The one reader of the weapon list: the module's own kinds plus whatever a recipe row declares.
+// `weaponKinds` is absent from every authored row, so at world defaults this is WEAPON_KINDS exactly.
 export function weaponKindsFor(config: SimConfig): ReadonlySet<string> {
   const out = new Set(WEAPON_KINDS)
   for (const row of Object.values(config.crafting.recipes)) {
@@ -943,19 +904,8 @@ export function crafterStamp(
   return skillLevel(state, agentId, track, config) >= config.crafting.expertLevel ? { crafterMark: agentId } : {}
 }
 
-// ★ A BUILD DOES NOT TAKE A COORDINATE — NOT IN A TOWN.
-//
-// The grammar's spacing floor (86.1626 px, proven exhaustively over 2 496 pairings) holds
-// BECAUSE every building goes on a plot of the lattice. An agent that can name a coordinate
-// can break it, so the two shapes below are the whole of the seam: in a town, `build` accepts
-// `{kind}` and NOTHING ELSE — a strict object with no `x` and no `y` in it, so a coordinate is
-// not a thing the act can be given. `onStart` reads the site from `claimInWorld` and never
-// from the params, so even a hand-written event cannot seat a roof off the lattice.
-//
-// A world with no town in it is the other shape. Every fixture in the repository is a meadow
-// with a shed on it, and a meadow has no plots; there, a build names its own ground exactly as
-// it always has. That is not a hole in the invariant, it is the invariant's domain — a world
-// with no lattice has no lattice to break.
+// In a town, build takes {kind} only — strict, no x/y — so a coordinate is not a thing the act
+// can be given. A world with no town (every fixture) has no lattice, and keeps the sited shape.
 export const SitedBuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
 export const PlottedBuildParams = z.object({ kind: z.string() }).strict()
 /** The loose reader for the stages after `validate`, which has already judged the shape. */
@@ -1030,12 +980,8 @@ function banked(state: WorldState, x: number, y: number): boolean {
   return !WATER_TILES.has(tile) || bridgeAt(state, x, y)
 }
 
-// Two or three tiles of deck, every one of them over water, and a foot on solid ground at each
-// end. Longer than that and it is a causeway, which is more than six planks can hold up.
-//
-// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped
-// `bridge` is 1×2, and both ends of the range are exercised by configs that are not
-// (`path.test.ts` "build: planning a bridge" — a 3×1 deck is accepted, a 4×1 is refused).
+// Two or three tiles of deck, every one over water, with a foot on solid ground at each end.
+// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped bridge is 1x2.
 const BRIDGE_SPAN = { min: 2, max: 3 }
 
 function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {
@@ -1057,12 +1003,8 @@ function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h
 
 type BuildSite = { kind: string; x: number; y: number }
 
-// ★ A LAMP GOES ON THE KERB, NOT IN THE CARRIAGEWAY. Every structure makes its tiles
-// impassable (`isPassable`), so a post raised in the street would close the street — and a post
-// on somebody's door tile would close their door, which `doorTile` reads off the road ring. A
-// plotted kind can never hit this, because the lattice never plats a mass onto a street; only
-// a sited one can be aimed at a road, so only a sited one is asked. The glow is 4 tiles, so a
-// lamp on the verge lights the road it stands beside anyway. The refusal names the reason.
+// Every structure makes its tiles impassable, so a post raised in the street would close the
+// street. Only a sited kind can be aimed at a road, so only a sited one is asked.
 function roadBlockRefusal(
   state: WorldState, kind: string, x: number, y: number, w: number, h: number,
 ): string | null {
@@ -1104,10 +1046,8 @@ function footprintRefusal(
   return null
 }
 
-// A recipe's w and h are a shape, not a compass bearing: a deck written three long and one
-// wide is the same deck turned sideways. As written wins; the turned reading is tried only
-// when the written one refuses, and a refusal is always the written one's words. Deterministic,
-// so validate, duration and onStart all reach for the same rectangle.
+// A recipe's w and h are a shape, not a compass bearing. As written wins; the turned reading is
+// tried only when the written one refuses, and a refusal always uses the written one's words.
 export function buildFootprint(
   state: WorldState, config: SimConfig, agentId: string, d: BuildSite,
 ): { w: number; h: number; refusal: string | null } {
@@ -1118,10 +1058,8 @@ export function buildFootprint(
   return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
 }
 
-/** A mass stands on the town's ground and the town decides where; a sited thing belongs to a
- *  spot somebody picked, and says so in its own recipe. This was `kind !== BRIDGE_KIND` — the
- *  roster form of the same question, and it had no room for a second answer. `bridgeSiteRefusal`
- *  is still the bridge's alone: the water rule is not every sited kind's rule. */
+/** A mass stands where the town decides; a sited thing belongs to a spot somebody picked and says
+ *  so in its recipe. bridgeSiteRefusal stays the bridge's alone: the water rule is not every sited kind's. */
 export const isPlottedKind = (config: SimConfig, kind: string): boolean =>
   config.structures.recipes[kind]?.sited !== true
 
@@ -1130,9 +1068,8 @@ export function buildIsPlotted(state: WorldState, config: SimConfig, kind: strin
   return isPlottedKind(config, kind) && townSquareOf(state) !== null
 }
 
-/** The site this agent already has half-raised, so a build that was interrupted goes back to
- *  the same walls instead of claiming a second plot. Keyed on the BUILDER, because on a plot
- *  there is no coordinate to look one up by. */
+/** The site this agent already has half-raised, so an interrupted build goes back to the same
+ *  walls. Keyed on the BUILDER, because on a plot there is no coordinate to look one up by. */
 function ownSite(state: WorldState, agentId: string, kind: string) {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
@@ -1141,11 +1078,8 @@ function ownSite(state: WorldState, agentId: string, kind: string) {
   return null
 }
 
-/** ★ THE HALF `ownSite` CANNOT ANSWER: somebody else's walls, within reach. Keyed on the
- *  GROUND, exactly as the sited branch has always been through `siteAt` — without it
- *  `claimInWorld` hands the second body the next FREE plot and five bodies raise five houses.
- *  There is never a choice to make: the lattice holds plots four tiles apart, so no tile in a
- *  town is within reach of two half-raised roofs, and `buildSeam.test.ts` asserts it. */
+/** Somebody else's walls, within reach, keyed on the GROUND — without it claimInWorld hands the
+ *  second body the next FREE plot and five bodies raise five houses. Plots are four tiles apart, so there is never a choice. */
 function joinableSite(state: WorldState, agentId: string, kind: string): Structure | null {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
@@ -1154,9 +1088,8 @@ function joinableSite(state: WorldState, agentId: string, kind: string): Structu
   return null
 }
 
-/** The walls this body should be raising: its own half-finished ones first, then a neighbour's
- *  within reach, and only then does the town claim new ground. Because `ownSite` is asked
- *  first, `joinableSite` is never looking at walls this body began. */
+/** Its own half-finished walls first, then a neighbour's within reach, and only then new ground.
+ *  ownSite is asked first, so joinableSite is never looking at walls this body began. */
 function siteToRaise(state: WorldState, agentId: string, kind: string) {
   return ownSite(state, agentId, kind) ?? joinableSite(state, agentId, kind)
 }
@@ -1174,15 +1107,8 @@ export type BuildSiteAnswer = {
 
 const words = (kind: string): string => kind.replace(/_/g, ' ')
 
-/**
- * ★ THE ONE ANSWER TO "WHERE DOES THIS GO", and the reason a mind cannot choose.
- *
- * On a plot, nothing about the asker reaches the site: it is the free plot nearest the square,
- * `claimInWorld` decides it, and the params are not consulted at all. The builder still has to
- * be standing at it — a house is not raised by wishing — and the refusal SAYS WHERE, which is
- * the addendum §9 shape every other refusal in this file already uses. A seam that fails by
- * offering nothing is invisible; this one fails by naming a place to walk to.
- */
+/** On a plot, nothing about the asker reaches the site: claimInWorld decides it and params are
+ *  not consulted. The refusal names the place to walk to rather than offering nothing. */
 export function buildSiteOf(
   state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
 ): BuildSiteAnswer {
@@ -1226,10 +1152,8 @@ function computeBuildSite(
     return { site: raising, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
   }
   const site = raising ?? { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
-  // ★ AND THE GROUND IT STANDS ON HAS TO EXIST. The town lays the block the first time
-  // somebody builds on it; if the array does not reach that far yet the answer says so out
-  // loud, because a plot silently withheld for want of a bigger world is the ring-1 clamp all
-  // over again. The world widens at midnight and the same build lands the next morning.
+  // The town lays the block the first time somebody builds on it; "off the map" is loud because a
+  // plot silently withheld for want of a bigger world is the ring-1 clamp all over again.
   const lay = layBlock(state, square, claim.block)
   if (lay === 'off the map') {
     return {
@@ -1238,10 +1162,8 @@ function computeBuildSite(
     }
   }
   const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
-  // ★ THE DOOR TILE, not the corner of the footprint — the spot on the street the new frontage
-  // will face. It is a road, it is passable, and it is adjacent to EVERY mass the plot can
-  // hold, so one number answers the question whatever is being raised. The same number
-  // `groundForBuilding` puts in the perception, so a mind is never told two places.
+  // The door tile, not the corner of the footprint: a road, passable, and adjacent to every mass
+  // the plot can hold. The same number groundForBuilding puts in the perception.
   const go = `go and stand at (${claim.door.x}, ${claim.door.y})`
   if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
     return { site, resume, lay, refusal: `the town keeps ground for a ${words(params.kind)} — ${go}` }
@@ -1252,26 +1174,14 @@ function computeBuildSite(
   }
 }
 
-/** Where the town has room for the next roof, as a place to walk to — the plot's own street
- *  corner. `null` for a world with no town, or a town with nothing left to offer. Every plot
- *  in the lattice holds every legal mass, so this is one answer for every buildable kind.
- *
- *  ★ IT NAMES FREE GROUND, AND THAT IS BOTH FACES OF ONE DEFECT. Before anybody starts, the
- *  lattice's first free plot is the same plot for everyone, so masons converge on it — the dev
- *  world's finding. The moment one body plants walls there that plot stops being free, so
- *  everyone who asks next is sent somewhere else — the live probe's finding: five founders,
- *  ten separate houses, none finished. Same rule, opposite behaviour either side of the first
- *  wall. The fix is not to change which plot this names. It is that free ground was the ONLY
- *  answer the world ever gave to "where does work go", and `unfinishedWork` is the other one. */
+/** The next free plot's street corner; every plot holds every legal mass, so one answer serves
+ *  every buildable kind. Free ground is only half of "where does work go" — unfinishedWork is the rest. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
 }
 
-/** ★ THE OTHER PLACE WORK CAN GO: walls that already stand, unfinished, and the tile a body
- *  reaches them from. Nearest first, ties by id so two minds asked in the same tick are told
- *  the same thing. Only kinds a pair of hands can actually carry on — a wall nobody can finish
- *  is the cottage-that-was-not-a-cottage all over again, and naming one would be worse than
- *  silence. `null` when the town has nothing half-raised in it. */
+/** Walls that already stand, unfinished, and the tile a body reaches them from. Nearest first,
+ *  ties by id. Only kinds a pair of hands can carry on: naming a wall nobody can finish is worse than silence. */
 export type StandingWalls = { id: string; kind: string; at: { x: number; y: number }; done: number; needs: number }
 
 export function unfinishedWork(state: WorldState, config: SimConfig, from: { x: number; y: number }): StandingWalls | null {
@@ -1365,9 +1275,8 @@ const build: VerbDef = makeVerb({
   skill: { track: 'carpentry', xp: 1 },
 })
 
-// The one recipe the world ships knowing (§9 genesis rulebook). It is code and not a dial,
-// because `SimConfigSchema` closed at Task 2 — and it wants two things a config row cannot
-// say: a fire somebody is feeding, and a vessel with water in it.
+// Code and not a dial, because SimConfigSchema is closed — and it wants two things a config row
+// cannot say: a fire somebody is feeding, and a vessel with water in it.
 export type SeedRecipe = RecipeDef & { atFire?: true; water?: number }
 
 export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
@@ -1378,9 +1287,8 @@ export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
     atFire: true,
     water: 1,
   },
-  // The hunter's road to a warm back. `crafting.recipes` already holds the weaver's road
-  // (fiber → cloth → garment) and closed at Task 2, so the one that skips the loom lives
-  // here. The name has to differ from the row it stands beside; the thing it makes does not.
+  // crafting.recipes holds the weaver's road (fiber → cloth → garment) and is closed, so the road
+  // that skips the loom lives here. The name has to differ from that row; the thing it makes does not.
   hide_garment: {
     inputs: { hide: 2 },
     output: { kind: 'garment', qty: 1 },
@@ -1399,10 +1307,8 @@ export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefin
   return config.crafting.recipes[name] ?? SEED_RECIPES[name]
 }
 
-// A mind asks for the THING, not the road to it: "craft garment" with two hides in hand must
-// not be told there is no cloth. Precedence is unchanged — the row that owns the name is
-// always tried first — and every other route makes the same product. Deterministic by key
-// order, so two towns holding the same larder take the same road.
+// A mind asks for the THING, not the road to it: "craft garment" with two hides in hand must not
+// be told there is no cloth. The row that owns the name is tried first; order is by key.
 export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
   const named = recipeFor(config, name)
   const product = named?.output.kind ?? name
@@ -1414,9 +1320,8 @@ export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
   return routes
 }
 
-// What a pair of hands can raise and what it can shape, off the same two tables `build` and
-// `craft` already validate against. No new physics: this is the vocabulary those verbs have
-// always accepted, gathered in one place so somebody can finally be told it (C11 R-H).
+// Off the same two tables build and craft already validate against. No new physics: the vocabulary
+// those verbs have always accepted, gathered in one place so somebody can be told it.
 export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
 export type Makeables = {
   builds: Array<{ kind: string; inputs: Record<string, number> }>
@@ -1486,9 +1391,8 @@ function keptFireInReach(state: WorldState, config: SimConfig, agentId: string):
   return false
 }
 
-// Where a material comes from, for the refusal that says a pair of hands is short of one.
-// The emergence law's first lever is refusal prose that teaches a path, and the live gate
-// answered "not enough meat" to a town that had never seen an animal (C11 R21).
+// Where a material comes from, for the refusal that says a pair of hands is short of one: the
+// live gate answered "not enough meat" to a town that had never seen an animal.
 const MATERIAL_SOURCE: Readonly<Record<string, string>> = {
   meat: 'meat comes off an animal you have hunted, or a fish out of the water',
   vegetables: 'a vegetable comes from a berry patch, a mushroom ground or a field you have harvested',
@@ -1629,10 +1533,8 @@ const pave: VerbDef = makeVerb({
   skill: { track: 'masonry', xp: 1 },
 })
 
-// A sapling is not timber yet. Clearing one costs the swing and yields nothing at all; felling
-// a grown tree costs an hour's work and hands over the wood the town has otherwise only ever
-// been given. Either way the ground goes back to grass, where the next seed can fall — which
-// is what makes the regrowth cycle a cycle and not an ornament.
+// A sapling is not timber yet: clearing one costs the swing and yields nothing. Either way the
+// ground goes back to grass, which is what makes the regrowth cycle a cycle and not an ornament.
 const SAPLING_TILE: TileId = 9
 const FOREST_TILE: TileId = 3
 export const CLEAR_TICKS = 4
@@ -1715,9 +1617,8 @@ const douse: VerbDef = makeVerb({
   },
 })
 
-// The cap is a size bound, not a style rule: `speak` is the only verb whose text a listener's
-// prompt interpolates, so an unbounded one is an unbounded prompt. Anything a mind actually
-// says is an order of magnitude under it.
+// A size bound, not a style rule: `speak` is the only verb whose text a listener's prompt
+// interpolates, so an unbounded one is an unbounded prompt.
 export const SpeakParams = z.object({ text: z.string().min(1).max(SPEECH_INPUT_MAX_CHARS) }).strict()
 export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
 export const TakeParams = z.object({ itemId: z.string() }).strict()
@@ -1956,10 +1857,8 @@ const teach: VerbDef = makeVerb({
   skill: { track: 'scholarship', xp: 1 },
 })
 
-// How deep the wound goes, as a clock the body then carries. `agent_injured` takes the hp and
-// remembers the day; the affliction is what a death can be attributed to, and it is the only
-// thing that carries the hand behind the blow — without it `slain` is a word DEATH_CAUSES holds
-// and the world can never produce (gap found by GATE G11a).
+// The affliction is the only thing that carries the hand behind the blow — without it `slain` is
+// a word DEATH_CAUSES holds and the world can never produce.
 const INJURY_SEVERITY: Readonly<Record<'minor' | 'serious' | 'grave', number>> = {
   minor: 1, serious: 2, grave: 3,
 }
@@ -1986,11 +1885,8 @@ const attack: VerbDef = makeVerb({
     const loserId = scoreA < scoreB ? agentId : p.targetId
     const kind = margin < 0.2 ? 'minor' : margin < 0.5 ? 'serious' : 'grave'
     const winnerId = loserId === agentId ? p.targetId : agentId
-    // Three things happen when a blow lands, and each is owned by exactly one event: the hp
-    // comes off through `agent_harmed`, which is the only event in the world that says a hand
-    // was behind it; the wound goes on the record through `agent_injured`; and the clock that
-    // can kill starts with the affliction. `agent_harmed` had no emitter at all before this,
-    // so first_quarrel and first_reconciliation could never fire (C11 R16).
+    // Each of the three is owned by exactly one event: agent_harmed is the only one that says a
+    // hand was behind it, agent_injured records the wound, and the affliction starts the clock.
     return [
       { type: 'agent_harmed', payload: { agentId: loserId, amount: config.health.injuryDamage[kind], source: 'attack', byId: winnerId } },
       { type: 'agent_injured', payload: { agentId: loserId, kind } },
@@ -2025,9 +1921,8 @@ export function unregisterVerb(kind: string): void {
   delete VERBS[kind]
 }
 
-/** The walls an in-progress build is raising, resolved the one way `stepBuild` resolves them:
- *  on a plot there is no coordinate to look them up by, so it is the walls this body began or
- *  the neighbour's it is standing at; a bridge is looked up by the water it was named on. */
+/** On a plot there is no coordinate to look the walls up by, so it is the walls this body began
+ *  or the neighbour's it is standing at; a bridge is looked up by the water it was named on. */
 function siteOfBuild(state: WorldState, agentId: string): Structure | null {
   const act = state.agents[agentId]?.activity
   if (!act || act.verb !== 'build') return null
@@ -2038,10 +1933,8 @@ function siteOfBuild(state: WorldState, agentId: string): Structure | null {
     : siteAt(state, p.data.x, p.data.y)
 }
 
-/** ★ HOW MANY PAIRS OF HANDS ARE ON THESE WALLS THIS TICK — the number the world could count
- *  and could not spend. An ACTIVITY is asked for, not a body: dying and collapsing both null
- *  the activity, so the dead and the fallen are already not counted and a liveness test here
- *  would be a condition nothing can satisfy. */
+/** An ACTIVITY is asked for, not a body: dying and collapsing both null the activity, so a
+ *  liveness test here would be a condition nothing can satisfy. */
 export function handsOnSite(state: WorldState, siteId: string): number {
   let n = 0
   for (const id of Object.keys(state.agents)) {
@@ -2058,30 +1951,18 @@ export function stepBuild(state: WorldState, config: SimConfig, agentId: string)
   const p = BuildParams.parse(act.params)
   const site = siteOfBuild(state, agentId)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
-  // ★ THE HANDS ARE THE RATE, AND THIS IS THE WHOLE OF "HELP MUST HELP". A builder's clock is
-  // settled once, at intent time, as the work the walls still needed then — so it is only
-  // honest if it runs down exactly as fast as the walls go up. Every hand on the site adds one
-  // to the walls, so every hand's clock loses `hands`. That keeps `ticksRemaining` equal to
-  // `durationTicks − progressTicks` for every builder however many arrive or leave, and five
-  // hands raise a house in a fifth of the time for the same five hands' wages. Before this the
-  // clock ignored the crowd: five hands took exactly as long as one and cost five times as
-  // much, and cooperation was a net penalty in the one measurement G8 asks for.
+  // Every hand on the site adds one to the walls, so each builder's clock loses `hands` — that
+  // keeps ticksRemaining === durationTicks - progressTicks however many arrive or leave.
   const hands = handsOnSite(state, site.id)
-  // ★ AND THE WALLS NEVER RECORD MORE WORK THAN THE BUILDING IS. `workPenalty` lengthens a
-  // night builder's clock without slowing the walls, so the ledger ran half again past
-  // `durationTicks` in the dark — G2's own pinned world books 2 903 ticks of work into a
-  // 2 880-tick house. It reads back as a NEGATIVE duration when such a build is resumed, and
-  // it fills the renderer's pips a third of a house early. The dark still costs the builder
-  // the time; it no longer costs the ledger its meaning.
+  // workPenalty lengthens a night builder's clock without slowing the walls, so the ledger ran
+  // past durationTicks in the dark and read back as a negative duration when the build resumed.
   const left = buildTicks(config, p.kind) - site.progressTicks
   const events: PendingEvent[] = [{ type: 'action_progressed', payload: { agentId, ticks: hands } }]
   if (left > 0) events.push({ type: 'structure_progressed', payload: { id: site.id, ticks: 1 } })
   return events
 }
 
-// One tick of an in-progress walk. Returns the events to append this tick:
-// action_progressed (+ agent_moved on tile boundaries), or a lone
-// action_interrupted {reason:'blocked'} if the next tile became impassable.
+// One tick of an in-progress walk: action_progressed, agent_moved on tile boundaries, or a lone action_interrupted {blocked}.
 export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity

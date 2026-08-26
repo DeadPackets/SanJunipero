@@ -1,7 +1,5 @@
-// Canon ingredient classes. A recipe that wants "any meat" names the sentinel and the craft
-// resolves it against what the hands are actually holding — which is how one stew recipe
-// survives a town that hunts deer, snares rabbits or fishes, without three recipes for it.
-// These are canon ids, never world text: `CLASS_PROSE` is what a refusal is allowed to say.
+// A recipe that wants "any meat" names the sentinel and the craft resolves it against what the
+// hands are holding. Canon ids, never world text: CLASS_PROSE is what a refusal may say.
 
 export const ITEM_CLASSES: Readonly<Record<string, readonly string[]>> = {
   any_meat: ['fish', 'rabbit_meat', 'venison'],

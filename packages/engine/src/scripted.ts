@@ -10,9 +10,8 @@ import { EventStore } from './eventStore.js'
 import { TickLoop } from './tickLoop.js'
 import { openDb } from './db.js'
 
-// Deterministic scripted policies: pure functions of perception, no Math.random,
-// no hidden closure state. Everything a policy decides must be derivable from the
-// packet (or fixed constants baked into the closure at construction time).
+// Deterministic scripted policies: pure functions of perception, no Math.random and no hidden
+// closure state — everything a policy decides is derivable from the packet.
 
 export type ScriptedIntent = { verb: string; params: Record<string, unknown> }
 export type Policy = (p: PerceptionPacket) => ScriptedIntent | null
@@ -39,9 +38,8 @@ export const WHEAT_FARMER = 'item_2'
 export const WHEAT_BUILDER = 'item_3'
 export const FISHER_WATER = { x: 3, y: 32 }
 
-// ------------------------------------------------------- Task 37(b): the scripted theft
-// The knife's id ends in no number on purpose: the counter law only rises on a numeric
-// suffix, so putting this on the shelf shifts no id the fixture already minted.
+// ------------------------------------------------------- the scripted theft
+// The knife's id ends in no number on purpose: the counter law only rises on a numeric suffix.
 export const STOLEN_ITEM = 'item_knife'
 export const THIEF_POST = { x: 19, y: 20 } // beside the storehouse, on the far side from the traffic
 // Six tiles from (20, 20), the corner a taking out of the storehouse is logged at. Night
@@ -161,9 +159,8 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
   }
 }
 
-// Keeper: owns the knife on the storehouse shelf and stands his post for three days. He
-// does nothing on purpose — he is the pair of eyes the night is measured against, and a body
-// that walks about would change what is six tiles away from the taking.
+// Keeper: owns the knife on the storehouse shelf and stands his post for three days. He does
+// nothing on purpose — a body that walks about would change what is six tiles from the taking.
 export function makeKeeperPolicy(_config: SimConfig): Policy {
   return () => null
 }
@@ -221,9 +218,8 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   // The knife goes back on the shelf, so the noon taking is the same act as the night one and
   // the light is the only thing that changed.
   if (tick === RESTOW_TICK) emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: STOREHOUSE.id } })
-  // These two are placed, not lived: they hold one post for three days, and a body that only
-  // stands runs out before the second night. Twice a day the fixture puts them back on their
-  // feet — the same device the Builder's rest break uses, on a fixed clock so replay agrees.
+  // These two are placed, not lived: a body that only stands runs out before the second night,
+  // so twice a day the fixture puts them back on their feet, on a fixed clock so replay agrees.
   if (tick % UPKEEP_EVERY === 0) {
     for (const id of [THIEF, KEEPER]) {
       emit('need_changed', { id, need: 'energy', delta: 100 })
@@ -232,12 +228,8 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   }
 }
 
-// The bed law (C9 T2b) refuses sleep in the open, and a policy sees only a packet — which
-// never says "you are indoors". So the harness, which does hold the state, steps an actor
-// through a doorway it is *already standing in* before it lies down, and puts it back
-// outside the moment it wants anything else. Deliberately no commuting: an actor whose bed
-// is more than a step away sleeps rough and collapses, which is the law working, not a bug.
-// In this fixture exactly one actor qualifies — the Builder, who works at his own door.
+// A policy sees only a packet, which never says "you are indoors", so the harness steps an actor
+// through a doorway it is already standing in before it lies down. No commuting: rough is the law.
 function bedGate(state: WorldState, config: SimConfig, id: string, intent: ScriptedIntent): ScriptedIntent {
   const a = state.agents[id]!
   const here = a.insideId === undefined ? undefined : state.structures[a.insideId]
@@ -255,9 +247,8 @@ function bedGate(state: WorldState, config: SimConfig, id: string, intent: Scrip
 
 export type ScriptedOnTick = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
 
-// Builds a TickLoop onTick handler. getState() must return the *current* loop state;
-// every decision is recomputed from it, so the handler has no hidden mutable state
-// and replays bit-identically from the store.
+// getState() must return the *current* loop state; every decision is recomputed from it, so the
+// handler has no hidden mutable state and replays bit-identically from the store.
 export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState: () => WorldState): ScriptedOnTick {
   const policies = makePolicies(config)
   const worldTick = createWorldTick(config, rng)
@@ -268,9 +259,8 @@ export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState:
     const result = worldTick(getState())
     for (const e of result.events) emit(e.type, e.payload)
 
-    // The build verb is one long, continuous activity: submitIntent rejects any
-    // other intent while it is active, so the Builder cannot eat or sleep mid-build.
-    // Script a brief rest break (energy recovery) and an eat break (interrupt) here.
+    // build is one long continuous activity and submitIntent rejects any other intent while it
+    // runs, so the Builder's rest break and eat break are scripted here.
     const builder = getState().agents[BUILDER]
     if (builder && builder.alive && builder.activity?.verb === 'build') {
       if (builder.needs.energy < 30) emit('need_changed', { id: BUILDER, need: 'energy', delta: 70 })

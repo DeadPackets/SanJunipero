@@ -150,9 +150,8 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
-  // ★ A ROOF, NOT A ROSTER, AND NOT AN OWNER. `sleepableKinds` used to say `house` and nothing
-  // else, so a body standing dry inside a storehouse — or a cottage, or a cabin — was refused a
-  // bed and walked back out into the weather. Anything with a roof over it will do.
+  // sleepableKinds used to say `house` and nothing else, so a body standing dry inside a
+  // storehouse was refused a bed and walked back into the weather. Anything with a roof will do.
   it('checks the roof, not the owner — a storehouse and a cottage both do', () => {
     for (const kind of ['storehouse', 'cottage', 'cabin', 'farmhouse']) {
       let s = withAgent(withHouse(world(), kind), 'a1', 2, 3)

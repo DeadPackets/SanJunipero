@@ -38,15 +38,8 @@ describe('InteriorMetaSchema', () => {
     expect(() => InteriorMetaSchema.parse({ ...BED, interiorKinds: ['barn'] })).toThrow()
   })
 
-  // ★ THE LAW, WHERE A TRANSCRIPTION USED TO BE.
-  //
-  // This was `expect([...INTERIOR_KINDS]).toEqual(['house','storehouse','shed'])` — the list
-  // pinned to a copy of itself, which is satisfiable without the property holding and which
-  // passed for the whole time three roofed dwellings had no room to draw.
-  //
-  // The property is an IMPLICATION, not an equality: a body can enter anything `roofed`, so
-  // anything `roofed` must have a room here, or entering it is a body vanishing into a shape.
-  // The converse is allowed and has exactly one member.
+  // An implication, not an equality: everything roofed must have a room here. The converse is
+  // allowed and has one member.
   const roofedKinds = Object.keys(DEFAULT_CONFIG.structures.recipes)
     .filter((k) => isRoofedKind(DEFAULT_CONFIG, k)).sort()
 
@@ -61,9 +54,8 @@ describe('InteriorMetaSchema', () => {
   it('★ and the rooms nobody can enter are exactly the shed, by name', () => {
     const unenterable = [...INTERIOR_KINDS]
       .filter((k) => !isRoofedKind(DEFAULT_CONFIG, k)).sort()
-    // `shed` is not roofed, the engine refuses `enter` on it by name, and it keeps a room
-    // because its art and eight furnishing manifests are shipped and name it. One exception,
-    // written down — a second one has to be argued for here rather than arriving quietly.
+    // shed is not roofed and the engine refuses enter on it by name; it keeps a room because its
+    // shipped art and furnishing manifests name it.
     expect(unenterable).toEqual(['shed'])
   })
 })

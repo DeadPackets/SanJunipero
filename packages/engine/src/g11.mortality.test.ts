@@ -1,6 +1,5 @@
-// @slow — GATE G11a, the mortality half: the second clock, the four afflictions, the nine ways
-// to die and the one night a fever crosses a room. Scripted actors only: no LLM, no network,
-// $0. Every row here is a criterion from deep-world addendum §18, not a suggestion.
+// @slow — the mortality half: the second clock, the four afflictions, the nine ways to die and
+// the one night a fever crosses a room. Scripted actors only: no LLM, no network.
 import { describe, it, expect } from 'vitest'
 import {
   DAYS_PER_YEAR, MINUTES_PER_DAY, SimConfigSchema, thirstDecayPerTick,

@@ -1,15 +1,5 @@
-// @slow — ★ THE END-TO-END PROOF THAT A BRIDGE OPENS THE FAR BANK.
-//
-// `townGrowth.test.ts` proves the town reaches ring 2 on the EAST bank, and that every plot
-// west of the channel is refused, because nobody can get there. This is the other half of the
-// ruling: a mind works out that the far bank is unreachable, an agent raises a deck over the
-// two planks' width of channel at the ford, and the west of the river JOINS THE TOWN — with
-// every invariant the claim seam proved still standing on the far side.
-//
-// The river stops being a wall and becomes a problem the town can solve. That is what this
-// world exists to watch, and it is measured here on a real `TickLoop`, not asserted.
-//
-// Scripted policies only. No LLM, no network, $0.
+// @slow — the other half of townGrowth.test.ts: a deck over the ford joins the west bank to the
+// town, with every claim-seam invariant still standing on the far side. Scripted only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
   MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, doorFrontOf, freePlots, grammarOf,
@@ -29,9 +19,8 @@ import { isAdjacentToRect } from './verbs.js'
 import { BRIDGE_KIND, bridgeAt } from './path.js'
 import { claimInWorld, standingRects, townGroundOf, townWalkOf, townSquareOf } from './town.js'
 
-// The same declared fixture dial `townGrowth.test.ts` uses: a house takes four hours here
-// instead of two days, so a town that crosses a river fits inside a test suite. It changes how
-// LONG a build takes and nothing whatever about WHERE it goes.
+// The same declared fixture dial townGrowth.test.ts uses: a house takes four hours here instead
+// of two days. It changes how LONG a build takes and nothing whatever about WHERE it goes.
 const HOUSE_TICKS = 240
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -47,10 +36,8 @@ const DAYS = 3
 const UPKEEP_EVERY = 240
 const WET: ReadonlySet<number> = new Set([2, 10])
 
-// ★ THE ONLY PLACE A SIX-PLANK DECK CAN SPAN. A spit of sand reaches out from the near bank at
-// rows 50–53, so the channel there is two tiles instead of three — the world was authored that
-// way so that feet and a bridge would converge on the same crossing. The deck is asked for at
-// the WRITTEN 1×2, and the engine turns it; see the orientation test at the bottom.
+// A spit of sand at rows 50–53 makes the channel two tiles instead of three — the only place a
+// six-plank deck can span. The deck is asked for at the WRITTEN 1x2, and the engine turns it.
 const FORD_ROW = 51
 const DECK = { x: GENESIS_RIVER_X - 1, y: FORD_ROW }   // 48, 51
 const BANK_STAND = { x: GENESIS_RIVER_X + 1, y: FORD_ROW }  // 50, 51 — the sand, east of the deck
@@ -60,12 +47,8 @@ type Run = {
   growths: number; bridgeTick: number | null; crossedTick: number | null
 }
 
-/**
- * Six masons who want roofs. One of them is a bridgewright first: it walks to the sand at the
- * ford and lays a deck, and only then joins the others. Nobody ever names a coordinate for a
- * house — the two-step below is what a mind reads out of the perception line — and the deck is
- * the one exception the verb keeps, because the water decides where a bridge can stand.
- */
+/** Six masons who want roofs; one lays a deck at the ford first. Nobody ever names a coordinate
+ *  for a house — the deck is the one exception, because the water decides where a bridge stands. */
 function runTown(seed = 'far-bank'): Run {
   const { terrain, events: genesis } = makeGenesisWorld(CFG)
   const store = new EventStore(openDb(':memory:'))
@@ -182,10 +165,8 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(decks[0]!.builtBy).toBe('mason_0')
     expect(decks[0]!.stage).toBe('complete')
     expect(run.bridgeTick).not.toBeNull()
-    // ★ THE ORDER IS THE WHOLE CLAIM. `crossedTick` is the FIRST tick in the entire run at
-    // which the claim pointed west of the channel, and it is not before the deck stood — so
-    // in 764 ticks of trying, the far bank was never once offered. Measured, the two are the
-    // SAME tick: the crossing opens the moment the last plank lands, not a tick later.
+    // crossedTick is the FIRST tick in the run at which the claim pointed west of the channel,
+    // and it is not before the deck stood: the crossing opens the moment the last plank lands.
     expect(run.crossedTick!).toBeGreaterThanOrEqual(run.bridgeTick!)
     expect(run.crossedTick! - run.bridgeTick!).toBeLessThan(2)
     expect(west.length).toBeGreaterThanOrEqual(4)
@@ -264,9 +245,8 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(west.every((s) => plotOf(state, s) !== null)).toBe(true)
   })
 
-  // ★ TASK 3 — TWO NUMBERS, NAMED SEPARATELY. The old whole-town figure was dominated by two
-  // 1×1 monuments the lattice never governed; a 2×1 deck now joins them, and the old proxy for
-  // "governed" — bigger than 1×1 — would have counted it. Being ON A PLOT is the test.
+  // The old whole-town figure was dominated by two 1x1 monuments the lattice never governed, and
+  // a 2x1 deck would pass the old "bigger than 1x1" proxy. Being ON A PLOT is the test.
   it('★ and the two spacing numbers are reported apart, because they measure different things', () => {
     const governed = all.filter((s) => plotOf(state, s) !== null).map(massOf)
     const ungoverned = all.filter((s) => plotOf(state, s) === null).map(massOf)
@@ -316,19 +296,8 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(stateHash(twin.loop.state)).toBe(stateHash(state))
   }, 120_000)
 
-  // ★ A TURNED BRIDGE IS A TURNED BRIDGE, AND THE ENGINE SAYS SO.
-  //
-  // The recipe writes the deck 1 wide and 2 deep. The only crossing in the world runs
-  // EAST–WEST, so `buildFootprint` turns it and the structure that stands is 2×1. The engine
-  // therefore already publishes the orientation, in `w` and `h`, on `structure_planned` and in
-  // `state.structures` — the renderer is handed both and resolves its cell on `kind` alone.
-  //
-  // ★ THE PRECEDENT, CHECKED: the world-growth lane found `farmhouse-se`/`cottage-se` declaring
-  // the unturned footprint and it survived because every downstream measure was a function of
-  // `w + h`, which a transpose preserves. `buildingArt` scales to `(w + h) × 32`, so the deck's
-  // turn is invisible to the geometry for exactly the same reason — and visible to the eye,
-  // because a plank deck is not transpose-symmetric the way a scale factor is. That is an ART
-  // seam, not an engine one: it needs a second cell, and `packages/forge` is not this lane's.
+  // The recipe writes the deck 1x2; the only crossing runs east-west, so buildFootprint turns it
+  // and the standing structure is 2x1. w/h on structure_planned is where the engine says so.
   it('★ the deck the engine stands is TURNED, and w/h is where it says so', () => {
     const d = decks[0]!
     expect(CFG.structures.recipes[BRIDGE_KIND]).toMatchObject({ w: 1, h: 2 })
@@ -342,11 +311,8 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(d.w + d.h).toBe(CFG.structures.recipes[BRIDGE_KIND]!.w + CFG.structures.recipes[BRIDGE_KIND]!.h)
   })
 
-  // ★ `scaffolding` IS A STAGE, NOT A KIND — the ruling, so it is not left ambiguous a third
-  // time. A house being built is a HOUSE that is not finished; calling it a scaffolding would
-  // make the kind lie about what is being raised and would change on completion, which is a
-  // second source of truth for something `stage` already says. The engine publishes `stage` on
-  // every structure and a renderer that wants to draw poles and canvas reads that.
+  // A house being built is a HOUSE that is not finished: a scaffolding KIND would lie about what
+  // is being raised and would change on completion, which `stage` already says.
   it('★ nothing the engine can build is ever OF KIND scaffolding — the stage is the channel', () => {
     expect(Object.keys(CFG.structures.recipes)).not.toContain('scaffolding')
     expect(all.map((s) => s.kind)).not.toContain('scaffolding')
@@ -361,21 +327,8 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     for (const s of raising) expect(['house', 'cottage', 'farmhouse', BRIDGE_KIND]).toContain(s.kind)
   })
 
-  // ★ THE ONE-COMPONENT PROPERTY, RESTATED OVER THE WALK GRAPH — merge train 3's ruling.
-  //
-  // `cityTemplate.test.ts` PROPERTY 2 says every structure sits in one road-connected group.
-  // It asks that of `makeCityTemplate()`, a one-bank plan with no crossing in it, and nothing
-  // has ever asked it of a running world. Measured on this one, the ROAD TILES are two
-  // components — 1664 tiles at x 62..121 east of the channel, 390 at x 24..45 west — and the
-  // deck cannot join them: its tiles are 48,51 and 49,51, whose four neighbours are water,
-  // water, water, grass and sand. Not one is a road. Counting the deck as a road gives THREE
-  // components, not one, because a two-plank deck five rows north of the far bank's nearest
-  // street touches neither network.
-  //
-  // So the property was mis-stated, not violated. What a person can actually do is the walk
-  // graph, and on that the town is ONE piece: 20999 tiles reachable from the square with the
-  // deck standing, 13619 without — and all six far-bank houses are cut by pulling it. That is
-  // the claim below, and the deck is load-bearing on it rather than incidental to it.
+  // Road tiles are two components and the deck's neighbours are none of them, so connectivity
+  // is asserted on the WALK graph — what a person can actually do — not on the road network.
   it('★ the town is ONE piece on the walk graph, and the deck is what makes it one', () => {
     const H = state.terrain.length, W = state.terrain[0]!.length
     const reachedFromSquare = (s: WorldState): Set<string> => {

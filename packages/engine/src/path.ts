@@ -89,9 +89,8 @@ export function canStep(
 
 type Node = { x: number; y: number; g: number; h: number; f: number; parent: Node | null }
 
-// A finished search and a search that ran out of budget are both walkable answers; only the
-// second one is a lie about where the walking ends. `capped` is the one bit that tells them
-// apart, and it is why a long walk is a partial and not a refusal.
+// A finished search and one that ran out of budget are both walkable answers; only the second is
+// a lie about where the walking ends, and `capped` is the bit that tells them apart.
 export type PathSearch = { path: Array<[number, number]>; capped: boolean }
 
 function pathTo(node: Node): Array<[number, number]> {
@@ -124,9 +123,8 @@ function runSearch(state: WorldState, from: Point, to: Point, config: SimConfig)
   const ctx = pathCtx(state, config)
   if (!isPassable(state, to.x, to.y, ctx)) return null
   const width = ctx.width
-  // Charging a full grass tile per remaining step over-estimates the moment anything is
-  // cheaper than grass — a road is 0.6 — and an over-estimating A* returns a short route
-  // instead of a cheap one. The cheapest tile the config can price is the honest floor.
+  // Charging a full grass tile per remaining step over-estimates the moment anything is cheaper
+  // than grass — a road is 0.6 — and an over-estimating A* returns a short route, not a cheap one.
   const minCost = Math.min(...Object.values(ctx.cost).filter(Number.isFinite))
   const h = (x: number, y: number) => (Math.abs(x - to.x) + Math.abs(y - to.y)) * minCost
   const key = (x: number, y: number) => y * width + x

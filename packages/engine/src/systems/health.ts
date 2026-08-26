@@ -1,11 +1,6 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { TickCtx } from '../worldTick.js'
 
-// C11 deviation 3 (controller ruling 3): the per-tick contagion loop that used to live at the
-// foot of this file is gone. Illness spreads once, at midnight, from systems/illness.ts — two
-// contagion systems at different cadences was one too many. Task 37 took the last of it: the
-// dawn injury-infection roll went with it, and mints an affliction instead of a boolean.
-
 // Four ways back, all of them arithmetic on one dawn payment. With mortality off the world
 // keeps C9's flat rates exactly, which is what holds the G2 fixture still until Task 37.
 function recoveryDelta(ctx: TickCtx, hunger: number, asleep: boolean, tended: boolean): number {

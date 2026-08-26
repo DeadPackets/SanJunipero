@@ -38,9 +38,8 @@ describe('GATE G1: golden replay', () => {
     expect(stateHash(replayFromGenesis(store))).toBe(stateHash(live.state))
   })
 
-  // The guarantee scrubbing needs, stated directly: folding one recorded log twice lands on
-  // one state. Anything ambient inside the fold — Math.random, a clock, module state — shows
-  // up here as two different towns at the same tick.
+  // The guarantee scrubbing needs: folding one recorded log twice lands on one state. Anything
+  // ambient inside the fold — Math.random, a clock, module state — shows up here as two towns.
   it('folding the same recorded log twice gives the same state', () => {
     const store = new EventStore(openDb(':memory:'))
     const live = makeLoop(store, new RngStreams('golden'))
@@ -48,9 +47,8 @@ describe('GATE G1: golden replay', () => {
     expect(stateHash(replayFromGenesis(store))).toBe(stateHash(replayFromGenesis(store)))
   })
 
-  // And at every tick along the way, not only at the end. This is the shape `WorldMirror.
-  // stateAt` scrubs with: fold the events up to a tick and show what you get. Scrubbing back
-  // to a tick you already visited must not show a second town.
+  // And at every tick along the way. This is the shape WorldMirror.stateAt scrubs with: scrubbing
+  // back to a tick you already visited must not show a second town.
   it('folding to a mid-log tick twice lands on the same state', () => {
     const store = new EventStore(openDb(':memory:'))
     const live = makeLoop(store, new RngStreams('golden'))

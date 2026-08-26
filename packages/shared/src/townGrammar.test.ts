@@ -9,13 +9,8 @@ import {
   type Ground, type Plot,
 } from './townGrammar.js'
 
-// ★ THE GRAMMAR IS THE DELIVERABLE, AND THE PROOF IS EXHAUSTIVE.
-//
-// Not "the town this file happens to build has no overlaps" — "no town this grammar can EVER
-// generate has one". Every legal building on every plot of a 3×3 patch of blocks, against
-// every other, is 2 496 pairings; the floor that survey finds is the floor for the whole
-// infinite lattice, because the lattice is periodic on `PITCH` in both axes and a building
-// never leaves its own block.
+// Not "this town has no overlaps" but "no town this grammar can generate has one": 2 496 pairings
+// over a 3x3 patch, which covers the infinite lattice because it is periodic on PITCH in both axes.
 
 describe('the constants are rulings, not dials', () => {
   // STREET was 2 and gave 71.6 px against a 72 px floor. maxDeep was unbounded and a 4×4 at a
@@ -28,9 +23,7 @@ describe('the constants are rulings, not dials', () => {
     expect(MIN_SEP).toBe(72)
   })
 
-  // sx = (dx-dy)*16, sy = (dx+dy)*8. Moving equally in +dx and +dy is PURE DEPTH: zero
-  // sideways travel and maximum occlusion, which is why the grammar builds out along the
-  // south and east edges and never along a diagonal.
+  // Moving equally in +dx and +dy is pure depth, which is why the grammar builds south and east.
   it('pins the projection every one of those numbers was measured in', () => {
     expect([ISO_HALF_W, ISO_HALF_H]).toEqual([16, 8])
     expect(screenOf(1, 0)).toEqual({ sx: 16, sy: 8 })
@@ -89,9 +82,8 @@ describe('the lattice', () => {
     for (const p of ps) expect([p.maxAlong, p.maxDeep]).toEqual([MAX_ALONG, MAX_DEEP])
   })
 
-  // ★ THE STRUCTURAL LEMMA every other proof in this file rests on. A plot is anchored to its
-  // STREET and the building grows AWAY from it, into the block — so a building's tiles are a
-  // subset of its own block's tiles, always, for every legal size on every plot.
+  // The structural lemma the other proofs rest on: a plot is anchored to its street and the
+  // building grows away from it, so a building's tiles are a subset of its own block's.
   it('never lets a legal building leave its own block', () => {
     let checked = 0
     for (const b of [[0, 0], [1, 0], [0, 1], [-1, -1], [3, -2]] as const)
@@ -194,9 +186,8 @@ describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
     expect(checked).toBe(8520)
   })
 
-  // The lemma is what makes the claim hold at EVERY ring rather than the four measured above:
-  // a building's tiles are its block's tiles, and a block is platted only if every one of
-  // them is dry. So the property is a property of the plat rule, not of a ring count.
+  // The lemma is what makes this hold at every ring: a block is platted only if every one of its
+  // tiles is dry, so the property belongs to the plat rule and not to a ring count.
   it('holds against an adversarial river the reference never drew', () => {
     const stripes: Ground = (dx, dy) => (((dx * 7 + dy * 13) % 23) === 0 ? 'water' : 'dry')
     let wet = 0
@@ -213,9 +204,8 @@ describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
     expect(blockIsPlattable(1, 0, oneTile)).toBe(true)
   })
 
-  // The brief's rule reads "water, bank, path or plaza". The bank is the wet earth beside the
-  // channel and nothing is platted on it either; measured against the reference, excluding it
-  // costs the town nothing at ring 1 or ring 3.
+  // The bank is the wet earth beside the channel and nothing is platted on it either; excluding
+  // it costs the town nothing at ring 1 or ring 3.
   it('refuses the bank as well as the channel', () => {
     const bank: Ground = (dx, dy) => (dx === 5 && dy === 5 ? 'bank' : 'dry')
     expect(blockIsPlattable(0, 0, bank)).toBe(false)
@@ -223,9 +213,8 @@ describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
 })
 
 describe('★ EVERY DOOR FRONTS A ROAD', () => {
-  // Salma's door opened onto a non-road in the town this replaces. This project's single most
-  // repeated root cause, four times over — so it is asserted for every plot the grammar can
-  // produce, not for the ones a fixture happened to build.
+  // A door onto a non-road is this project's most repeated root cause, four times over — so it is
+  // asserted for every plot the grammar can produce, not the ones a fixture happened to build.
   for (const rings of [1, 2, 3]) {
     it(`holds for every legal building on every plot at ring ${rings}`, () => {
       const road = new Set(streetTiles(rings, RIVER_GROUND).map((t) => `${t.dx},${t.dy}`))
@@ -244,9 +233,8 @@ describe('★ EVERY DOOR FRONTS A ROAD', () => {
     expect(doorFrontOf(place(e0, 'x', 3, 2, null))).toEqual({ dx: 16, dy: 3 })
   })
 
-  // ★ A PHANTOM ROAD ROW AT y = -3 once ran through the frontage of block (0,-1), putting
-  // buildings on roads. It came from a special case that widened the main street; the fix was
-  // deleting the special case. There is none here, and this is the guard that keeps it so.
+  // A special case that widened the main street once ran a phantom road row at y = -3 through the
+  // frontage of block (0,-1). There is none here, and this is the guard that keeps it so.
   it('never lays a street tile on a block, at any ring', () => {
     const onBlock = new Set(plattedBlocks(3, RIVER_GROUND).flatMap((b) =>
       blockTiles(b.i, b.j).map((t) => `${t.dx},${t.dy}`)))

@@ -160,9 +160,8 @@ const died = (r: { events: Array<{ type: string; payload: unknown }> }) =>
   r.events.find((e) => e.type === 'agent_died')?.payload
 const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
 
-// A sliver of hp: less than one tick of the SMALLEST drain any row below applies, so one
-// tick is a death with a name on it. Derived, not a literal — T37b halved the injury
-// drain and a hardcoded 0.1 silently stopped being a sliver.
+// Less than one tick of the SMALLEST drain any row below applies, so one tick is a death with a
+// name on it. Derived, not a literal: a hardcoded 0.1 silently stopped being a sliver.
 const SLIVER = 0.01
 const nearlyDead = (s: WorldState) => hurt(s, CFG.health.maxHp - SLIVER)
 

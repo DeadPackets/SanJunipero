@@ -17,10 +17,8 @@ export function warmthTargetFromAir(temperatureC: number): number {
   return clamp(0, 100, 50 + 2 * (temperatureC - 10))
 }
 
-// ★ HOW WELL THIS BODY IS SLEEPING, and it is the first time the world has asked. One flat rate
-// answered the bare ground, a storehouse floor and a bed alike — `sleep` validated the HOUSE and
-// nothing ever named the bed in it, so the five founders' beds were furniture the renderer drew.
-// A bed is a property of the kind, the same shape as the roof over it (G4).
+// A bed is a property of the kind, the same shape as the roof over it. One flat rate used to
+// answer the bare ground, a storehouse floor and a bed alike.
 export function sleepRegenPerTick(state: WorldState, config: SimConfig, agentId: string): number {
   const insideId = state.agents[agentId]?.insideId
   const kind = insideId === undefined ? undefined : state.structures[insideId]?.kind

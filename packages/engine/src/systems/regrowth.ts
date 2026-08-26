@@ -2,9 +2,8 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { TileId, WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
-// A town that clear-cuts its edge waits a season for the edge to creep back. Scarcity is a
-// cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at emission;
-// the maturing is arithmetic on the day the seed was stamped, and the fold stays pure.
+// Scarcity is a cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at
+// emission; the maturing is arithmetic on the day the seed was stamped, so the fold stays pure.
 
 const GRASS: TileId = 0
 const FOREST: TileId = 3

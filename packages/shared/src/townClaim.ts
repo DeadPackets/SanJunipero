@@ -1,27 +1,11 @@
-// ★ A PLOT IS A CLAIMABLE THING.
-//
-// Agents build. When one does, it claims a free plot and stands a building on it — it never
-// chooses a coordinate, so it cannot choose a bad one. Every invariant `townGrammar` proves
-// about the plot lattice is therefore true of every town any sequence of agent builds can
-// reach, in any order, forever. The spacing holds BY CONSTRUCTION and not by hope.
-//
-// THE THREE RULINGS THIS FILE MAKES, and why:
-//
-//   CLAIMABLE   free, platted, and big enough. "Free" is read off the buildings that stand in
-//               the town, never off a register: a register is a second source of truth that
-//               can drift from the world, and this one would drift on every crash recovery.
-//   ORDER       the free plot nearest the square, ties broken by block then slot. So the town
-//               DENSIFIES BEFORE IT SPRAWLS, and the choice is pure — replay depends on it.
-//   PLATTING    a ring plats the moment the platted area holds no plot the builder can use,
-//               and never before. Growth is monotone: platting ring R+1 withdraws nothing
-//               ring R offered, so a claim made on day one is still valid a hundred days on.
+// Free is read off standing buildings, never a register that could drift on crash recovery.
+// Order is the plot nearest the square, block then slot — pure, because replay depends on it.
 import {
   MAX_ALONG, MAX_DEEP, freePlots, place, type Ground, type PlacedStructure, type Plot,
 } from './townGrammar.js'
 
-/** How far the town may plat looking for a claimable plot before it admits there is none.
- *  A guard against an unbuildable ground, not a size limit: the town is as large as it has
- *  grown, and nothing here caps that. */
+/** How far the town may plat looking for a claimable plot before it admits there is none. A
+ *  guard against unbuildable ground, not a size limit: nothing here caps how large a town grows. */
 export const CLAIM_RING_LIMIT = 24
 
 export type PlotRef = { block: { i: number; j: number }; slot: string }
@@ -50,14 +34,8 @@ export function claimPlot(a: {
   return claimPlotWhere({ isTaken: (p) => a.taken.has(plotKey(p)), ground: a.ground, need: a.need })
 }
 
-// ★ WHO HOLDS A PLOT IS A QUESTION, NOT A REGISTER.
-//
-// `claimAll` knows the plots it has just handed out and can answer with a set of keys. A
-// RUNNING WORLD cannot: what stands in it is a list of rectangles, some of them raised by the
-// grammar and some of them — a bridge, a grave, a thing an arbiter minted — never platted at
-// all. So the claim takes a PREDICATE and the caller answers however it can see. The caller
-// above and `townPlot.ts` are the whole of it, and the set-of-keys reading is now one
-// predicate among several rather than the only shape a claim understands.
+// A running world holds rectangles, not plot keys — some of them, a bridge or a grave, never
+// platted at all — so the claim takes a PREDICATE and the caller answers however it can see.
 
 export type IsTaken = (plot: Plot) => boolean
 
@@ -74,9 +52,8 @@ export function claimPlotWhere(a: { isTaken: IsTaken; ground: Ground; need: Need
 
 export type Wanted = { kind: string; along: number; deep: number; owner: string | null }
 
-/** Raise a list of buildings, each on its own claim, starting from a town already standing.
- *  This is the ONE function that builds a town — the genesis nine and the thirtieth thing an
- *  agent puts up go through it, so there is no special case for the start. */
+/** Raise a list of buildings, each on its own claim, from a town already standing. The ONE
+ *  function that builds a town, so there is no special case for the start. */
 export function claimAll(a: {
   ground: Ground
   wanted: readonly Wanted[]

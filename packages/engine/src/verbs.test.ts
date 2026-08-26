@@ -145,10 +145,8 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     expect(rng.state()).toEqual(before)
   })
 
-  // C11 R-I, T37b step 1b — THE TAKE-THEN-EAT SEAM. `eat: not holding that` rose 2 → 18 the
-  // moment the hunger line started working: the stomach now knows where the loaf is and the
-  // hands still have to be told to close around it in a separate turn, which costs a turn the
-  // mind rarely spends. A body that means to eat something it can reach may now simply eat it.
+  // The take-then-eat seam: `eat: not holding that` rose 2 → 18 the moment the hunger line started
+  // naming where the loaf was. A body that means to eat something it can reach may simply eat it.
   describe('a meal within reach is a meal', () => {
     const at = (loc: unknown, kind = 'bread'): WorldState =>
       fold(makeWorld(), ev(2, 'item_spawned', { id: 'item_1', kind, qty: 1, loc }))

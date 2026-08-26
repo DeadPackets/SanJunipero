@@ -4,14 +4,11 @@ import { mintId, type TileId, type WorldState } from '../state.js'
 import type { RngStream } from '../rng.js'
 import type { TickCtx } from '../worldTick.js'
 
-// Bodies with no minds. They wander where the ground suits them, they run from anything alive
-// that comes close, and at dawn the world puts back some of what was taken — up to the caps,
-// and half as generously in winter. Every roll is drawn here, at emission, and the destination
-// it produced travels in the payload, so `fold` never touches the stream.
+// Bodies with no minds: they wander where the ground suits them and run from anything alive.
+// Every roll is drawn here at emission and travels in the payload, so fold never touches the stream.
 
-// The ground each kind will stand on. This is the whole of "home range": a deer does not leave
-// the wood and the meadow beside it, a fish does not leave the water. No stored anchor, because
-// a second copy of where a body belongs is a second thing that can drift (G4).
+// The whole of "home range": a deer does not leave the wood and the meadow beside it. No stored
+// anchor, because a second copy of where a body belongs is a second thing that can drift.
 export const FAUNA_HABITAT: Readonly<Record<FaunaKind, ReadonlySet<TileId>>> = {
   deer: new Set<TileId>([0, 3]),
   rabbit: new Set<TileId>([0, 1]),

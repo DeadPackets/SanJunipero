@@ -1,9 +1,8 @@
 import { simTimeFromTick } from '@sj/shared'
 import type { TickCtx } from '../worldTick.js'
 
-// The berries, the mushrooms, the clay and the loose stone: standing things with a stock, which
-// the town can strip and the ground slowly puts back — never in winter, which is the whole of
-// why a winter larder has to be filled in autumn.
+// Standing things with a stock, which the town can strip and the ground slowly puts back — never
+// in winter, which is the whole of why a winter larder has to be filled in autumn.
 
 // Not a dial (SimConfigSchema is closed after Task 2): how often a stripped patch puts back
 // one handful of what was taken.

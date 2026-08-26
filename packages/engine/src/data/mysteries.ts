@@ -1,5 +1,4 @@
-// The authored table of things the world does and never explains. Nothing here
-// resolves: no discovery node, no ruling, no chapter may attribute a cause. The
+// The authored table of things the world does and never explains. Nothing here resolves: the
 // prose is the whole of the event — fold changes no state at all.
 export type MysteryScope = 'global' | 'located'
 

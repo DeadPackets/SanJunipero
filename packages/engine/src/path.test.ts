@@ -174,9 +174,8 @@ describe('findPath (A*)', () => {
 
 // ------------------------------------------- Task 37(a): the admissible heuristic
 
-// The straight grass line home is 13 steps at 1 each. The road runs the long way round —
-// 19 steps — and still costs less, because a road is 0.6. An A* whose heuristic charges a
-// full grass tile per remaining step cannot believe that, so it walks the dearer line.
+// The straight grass line home is 13 steps at 1 each; the road runs 19 and still costs less,
+// because a road is 0.6. An A* charging a full grass tile per remaining step cannot believe that.
 const ROAD_RING = [
   '..............',
   'R............R',

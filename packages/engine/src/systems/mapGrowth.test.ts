@@ -47,9 +47,8 @@ function town(config = CFG, structures = 2, size = SIZE, at = { x: 10, y: 20 }):
   return s
 }
 
-/** A pair of roofs in the north-west of a world big enough for the rule to have an opinion:
- *  nine rows short of its northern margin and ten columns short of its western one, clear to
- *  the south and the east. */
+/** A pair of roofs in the north-west of a world big enough for the rule to have an opinion: nine
+ *  rows short of its northern margin and ten columns short of its western one. */
 const bigTown = (config = CFG): WorldState => town(config, 2, TOWN_SIZE, { x: 10, y: 9 })
 
 // Midnight of day 1: hour 0, minute 0, and past tick 0 so the world has actually run.
@@ -63,13 +62,8 @@ function tickAt(s: WorldState, tick: number, config = CFG, seed = 'grow') {
 const grown = (r: { events: Array<{ type: string; payload: unknown }> }) =>
   r.events.filter((e) => e.type === 'world_grown')
 
-// ★ THE WORLD IS AS BIG AS WHAT STANDS IN IT, PLUS A BLOCK PITCH OF WILD.
-//
-// There is no `maxSize` here any more and there is no counter. The rule is a clearance: the
-// world owes every side of the built set `WORLD_MARGIN` of ground, and it widens whichever side
-// it is short on. The two things that used to decide growth — twelve buildings per step and a
-// 192-tile ceiling — are both gone from the config, because a clearance says by itself which
-// edge to widen and by how much, and it has no maximum.
+// The rule is a clearance: the world owes every side of the built set WORLD_MARGIN of ground and
+// widens whichever side it is short on. No counter, no ceiling.
 describe('mapGrowthSystem', () => {
   // Two roofs at 10..14 x 9..10 in a 128-tile world: ten short to the north, nine to the west,
   // and a hundred clear on the other two.
@@ -85,9 +79,8 @@ describe('mapGrowthSystem', () => {
     expect(grown(tickAt(empty, MIDNIGHT))).toHaveLength(0)
   })
 
-  // ★ A WORLD TOO SMALL TO HOLD A TOWN IS A FIXTURE, NOT A WORLD. The floor is the smallest
-  // world a one-ring town needs — derived, not chosen — and below it the rule stays silent
-  // rather than widening every test map in the repository forever.
+  // The floor is the smallest world a one-ring town needs — derived, not chosen — and below it
+  // the rule stays silent rather than widening every test map in the repository forever.
   it('says nothing at all about a world that could not hold a town of one ring', () => {
     expect(GROWABLE_FLOOR).toBe(worldSizeForRings(TOWN_RINGS_GENESIS))
     expect(SIZE).toBeLessThan(GROWABLE_FLOOR)
@@ -161,14 +154,11 @@ describe('mapGrowthSystem', () => {
     for (const row of west.tiles) expect(row).toHaveLength(9)
   })
 
-  // ★ THE STRIP IS THE WORLD CONTINUED, NOT NOISE BESIDE IT. `genesisTerrainAt` has no bounds
-  // in it — the world was always infinite and the array is only how much of it is written down
-  // — so the ground that arrives is the ground that was always going to be there.
+  // genesisTerrainAt has no bounds in it: the world was always infinite and the array is only how
+  // much of it is written down, so the ground that arrives was always going to be there.
   it('fills the strip from the authored world, in the frame the world will be in', () => {
-    // ★ WIDE ENOUGH TO SEE THE DIFFERENCE. The channel at columns 48-50 runs at every row, so
-    // a strip addressed in the WRONG frame still finds a river there — the frame only shows in
-    // the forest edge, whose ragged line is a function of y. A narrower fixture, or an
-    // all-grass one, would pass this test with the shift deleted.
+    // Wide enough to see the difference: the channel at columns 48-50 runs at every row, so a
+    // strip in the WRONG frame still finds a river. The frame only shows in the forest edge.
     const W = 100
     const wide = genesisState(CFG, Array.from({ length: SIZE }, () =>
       Array.from({ length: W }, (): TileId => 0)))
@@ -314,9 +304,8 @@ describe('world_grown: replay', () => {
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 
-  // Growth is no longer a roll at all: it is the authored world continued, so a different seed
-  // reaches the same map for a stronger reason than it used to. The tiles still ride in the
-  // payload, because a log must replay without re-deriving anything.
+  // Growth is no longer a roll at all: it is the authored world continued. The tiles still ride
+  // in the payload, because a log must replay without re-deriving anything.
   it('replays identically from the payload alone, and does not consult a stream', () => {
     const s = bigTown()
     const live = tickAt(s, MIDNIGHT).state

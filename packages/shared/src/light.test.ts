@@ -129,9 +129,8 @@ describe('lightBandAt: three words, never a number', () => {
     }
   })
 
-  // ★ TWO LAWS, TWO QUESTIONS. The band used to be read off `lightLevelAt`, which answers the
-  // witness dial — so a world with `nightWitness` off read "bright" at midnight while the same
-  // midnight still charged 1.5x for the work. The dark belongs to the light law.
+  // The band used to be read off lightLevelAt, which answers the witness dial: a world with
+  // nightWitness off read "bright" at midnight while that midnight still charged 1.5x for work.
   it('is still dark at midnight with the WITNESS law off, and bright with the LIGHT law off', () => {
     expect(lightBandAt(world(), 0, 0, MIDNIGHT, DARK)).toBe('dark')
     expect(lightBandAt(world(), 0, 0, DUSK, DARK)).toBe('dim')
@@ -157,9 +156,8 @@ describe('lightBandAt: three words, never a number', () => {
 })
 
 describe('isDark: the one answer to "is it dark here"', () => {
-  // ★ NOT VACUOUS. Every assertion below is paired: one place that IS dark and one that is NOT,
-  // in the SAME world at the SAME tick. A build that lit the whole map, or one that darkened it,
-  // fails this — a single-sided assertion would pass either.
+  // Every assertion below is paired: one place that IS dark and one that is NOT, in the same world
+  // at the same tick. A single-sided assertion would pass a build that lit or darkened the map.
   it('tells a lamp-lit tile from the street beside it, at one instant in one world', () => {
     const lit = torchAt(10, 10, MIDNIGHT + 100)
     expect(isDark(lit, 13, 10, MIDNIGHT, CFG)).toBe(false)  // inside the glow

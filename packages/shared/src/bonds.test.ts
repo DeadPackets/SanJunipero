@@ -29,11 +29,8 @@ describe('BondSchema', () => {
     expect(BondSchema.safeParse({ ...bond, recent: [{ tick: 1, kind: 'friend', note: 'x' }] }).success).toBe(false)
   })
 
-  /**
-   * ★ THE CEILING IS IN THE PARSER. A `history` that grew with the town's age is how the feed
-   * reached 83 704 521 B at sim-day 20; a `.max()` on the window is a bound that fails LOUDLY
-   * on both ends of the wire rather than a comment that promises one.
-   */
+  // A history that grew with the town's age is how the feed reached 83.7 MB at sim-day 20; a
+  // .max() on the window fails loudly on both ends of the wire.
   it('refuses a window longer than the ceiling, however many acts formed the bond', () => {
     const many: BondAct[] = Array.from({ length: 500 }, (_, i) => ({ tick: i, kind: 'friend' as const }))
     const big = bondFrom('alice', 'bob', many, 600)

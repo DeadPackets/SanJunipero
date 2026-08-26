@@ -5,11 +5,8 @@ import {
 } from './townGrammar.js'
 import { plotKey, takenPlots, claimPlot, claimAll } from './townClaim.js'
 
-// ★ A PLOT IS A CLAIMABLE THING, AND THE SPACING HOLDS BY CONSTRUCTION.
-//
-// Agents build. When one does it claims a free plot and stands a building on it — it does not
-// choose a coordinate, so it cannot choose a bad one. Everything the grammar proves about the
-// plot lattice is therefore true of every town any sequence of agent builds can reach.
+// An agent claims a free plot and stands a building on it — never a coordinate, so it cannot
+// choose a bad one. What the grammar proves is therefore true of every town builds can reach.
 
 const NEED = { along: 2, deep: 2 }
 

@@ -47,10 +47,8 @@ describe('verb: speak', () => {
     expect(s.agents.a1!.lastSpokeTick).toBe(s.tick)
   })
 
-  // ★ 159 REFUSALS ACROSS TWELVE LIVE NIGHTS WERE THIS, 39% of every refusal in the run. The
-  // runtime submits speech directly while `submitIntent` refused every act during an activity,
-  // so a body raising a 2 880-tick house was mute for two sim-days — in the one arm where the
-  // town most needed to talk to itself.
+  // The runtime submits speech directly while submitIntent refused every act during an activity,
+  // so a body raising a 2 880-tick house was mute for two sim-days — 39% of the run's refusals.
   it('★ a body with its hands full can still answer when it is spoken to', () => {
     let s = makeWorld()
     const busy = submitIntent(s, CFG, 'a1', 'build', { kind: 'house', x: 2, y: 2 })
@@ -275,9 +273,8 @@ describe('verb: attack', () => {
       .toMatchObject({ ok: false, reason: expect.stringMatching(/^not adjacent to attack — they are at \(/) })
   })
 
-  // A blow is three events and one subtraction (C11 R16): `agent_harmed` takes the hp and
-  // names the hand, so first_quarrel and first_reconciliation finally have something to
-  // match on; `agent_injured` puts the wound on the record; the affliction starts the clock.
+  // A blow is three events and one subtraction: agent_harmed takes the hp and names the hand,
+  // agent_injured puts the wound on the record, and the affliction starts the clock.
   it('seeded outcome runs both directions: attacker wins (c1) and loses (c6)', () => {
     const s = makeWorld()
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([

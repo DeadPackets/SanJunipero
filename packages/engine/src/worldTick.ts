@@ -113,10 +113,8 @@ const SYSTEMS: System[] = [
   collapseDeathSystem,
 ]
 
-// Each emit folds immediately, so every system — and every later event within a
-// system — is generated against the already-folded state, never a stale snapshot.
-// `ctx.config` is a getter: it re-derives from the world's current laws, so a flip
-// drained at this boundary is already true for every system that runs after it.
+// Each emit folds immediately, so every system is generated against the already-folded state.
+// ctx.config is a getter: a law flipped at this boundary is true for every system that runs after.
 export function createWorldTick(
   config: SimConfig, rng: RngStreams, laws?: LawQueue,
 ): (state: WorldState) => WorldTickResult {

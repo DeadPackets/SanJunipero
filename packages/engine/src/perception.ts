@@ -11,9 +11,8 @@ import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
 import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
 
-// Perception is a pure projection: what one agent can sense from the shared
-// world state plus the events that just happened. It never mutates state and
-// never draws randomness, so identical inputs produce bit-identical packets.
+// A pure projection of what one agent can sense: it never mutates state and never draws
+// randomness, so identical inputs produce bit-identical packets.
 
 export type SelfBody = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
@@ -34,9 +33,8 @@ export type PerceivedAgent = {
   // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
   // town that has sewn nothing reads exactly as it always did, and never a number (G10).
   worn?: string
-  // How the body looks, when it looks bad. Absent on a well one, so a healthy town reads
-  // exactly as it always did — and never a number (G10). The forageable-prose precedent: the
-  // packet carries the phrase, because the phrase is what a pair of eyes actually gets.
+  // Absent on a well body, so a healthy town reads exactly as it always did — and never a number.
+  // The packet carries the phrase, because the phrase is what a pair of eyes actually gets.
   condition?: string
 }
 
@@ -52,9 +50,8 @@ export function wornProse(state: WorldState, agentId: string): string | undefine
   return kind === undefined ? undefined : WORN_PROSE[kind]
 }
 
-// What ails a body, as it shows from across the square. The self already reads these in the
-// first person; a town whose healer cannot see a fever six tiles away tends nobody, and the
-// live gate's healer looked for the sick in 33 turns and found none (C11 R21).
+// What ails a body, as it shows from across the square: a town whose healer cannot see a fever
+// six tiles away tends nobody.
 export const CONDITION_PROSE: Readonly<Record<AfflictionKind, string>> = {
   illness: 'flushed with fever',
   poison: 'grey-faced and doubled over',
@@ -79,37 +76,25 @@ export function conditionProse(state: WorldState, config: SimConfig, agentId: st
   return undefined
 }
 
-// Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
-// You can tell from across the square that something is carved there; the words need arm's length.
-// `door` is the tile `enter` measures against — absent on a kind with no way in, on a building
-// still going up, and on one nothing passable rings. One doorway, one source of truth.
+// Both fields absent on a blank wall. `door` is the tile `enter` measures against — absent on a
+// kind with no way in, on a building still going up, and on one nothing passable rings.
 export type PerceivedStructure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   burning: boolean; stage: 'construction' | 'complete'
   hasInscription?: true
   inscription?: { text: string; by: string }
   door?: { x: number; y: number }
-  // ★ FULL, SAID BEFORE THE WALK. A room holds only so many bodies, and a mind that has to be
-  // refused at the door to learn it has already spent the turn. Present only alongside `door`
-  // and only when no more fit, so a packet from a town with room in it reads as it always did.
+  // Said before the walk: a mind refused at the door has already spent the turn. Present only
+  // alongside `door`, and only when no more fit.
   full?: true
-  // ★ HOW FAR UP THE WALLS ARE. Present only while a thing is going up. A house is 2 880 ticks
-  // of work and a night is 720 — but every hand on a site adds one to the walls, so five pairs
-  // raise one in 576. Nothing in the packet had ever said a half-raised wall was a place work
-  // could go, and five founders raised five separate houses and finished none.
+  // Present only while a thing is going up. Nothing in the packet had ever said a half-raised
+  // wall was a place work could go, and five founders raised five houses and finished none.
   raised?: { done: number; needs: number }
-  // ★ WHAT IS IN THE ROOM, AND THE ONLY THING IN IT A BODY CAN DO ANYTHING WITH. The five
-  // furnishings a house holds were the renderer's alone: nothing a mind read had ever said
-  // there was a fire in there. Present only on a finished building of a kind that has one —
-  // and `lit` only while somebody is still feeding it, because a fire burns down on its own.
-  //
-  // The table, the chair and the rug are deliberately NOT here. A mind that is handed the word
-  // "chair" and has no verb for it spends turns being refused, which is a road with nothing at
-  // the end of it; the day a verb reaches one, this is where it becomes visible.
+  // Only on a finished building of a kind that has one; lit only while somebody is feeding it.
+  // Table, chair and rug are absent on purpose: a word with no verb behind it only buys refusals.
   hearth?: 'lit' | 'cold'
-  // ★ AND WHETHER THERE IS A BED IN IT. A body has to be able to tell a room it will sleep
-  // WELL in from a room with a floor, BEFORE it walks there — being told at the door is a turn
-  // already spent, which is the lesson `full` learned. Absent on a kind with no bed.
+  // A body has to tell a room it will sleep WELL in from a room with a floor BEFORE it walks
+  // there; being told at the door is a turn already spent. Absent on a kind with no bed.
   bed?: true
 }
 
@@ -229,9 +214,8 @@ export const FELT_TAGS: readonly string[] = [
   ...Object.values(SELF_EVENT_TAG),
 ]
 
-// A felt event is something that happens *to* this agent (or ambient weather).
-// Anything about other agents — including out-of-range speech or injuries —
-// produces no tag and appears nowhere in the packet.
+// A felt event is something that happens *to* this agent (or ambient weather). Anything about
+// other agents produces no tag and appears nowhere in the packet.
 function feltTagFor(agentId: string, ev: SimEvent): string | null {
   if (ev.type === 'weather_changed') {
     const p = ev.payload as { kind?: unknown; prevKind?: unknown } | null
@@ -255,9 +239,8 @@ function globalMysteryTag(asleep: boolean, ev: SimEvent): string | null {
 const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
   Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
 
-// A wall stops sound. Speech carries iff both parties share an interior, both are
-// outdoors within earshot, or the one outdoors is standing in the other's doorway.
-// The speaker's side is read from the event so a recorded log replays identically.
+// A wall stops sound: speech carries iff both share an interior, both are outdoors within
+// earshot, or the one outdoors is standing in the other's doorway.
 export function hears(state: WorldState, baseConfig: SimConfig, speakerEv: SimEvent, hearerId: string): boolean {
   const config = effectiveConfig(baseConfig, state.laws)
   const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null

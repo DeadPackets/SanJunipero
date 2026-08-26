@@ -18,10 +18,8 @@ export function submitIntent(
   if (a.collapsedSinceTick !== null && verb !== 'eat' && verb !== 'sleep') return { ok: false, reason: 'collapsed and unable to act' }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
-  // ★ THE ONE INTERRUPT POLICY STILL HOLDS, AND IT IS ABOUT THE HANDS. A verb that declares
-  // `atOnce` does not use them: it never takes the activity slot and is never refused for
-  // busy-ness. `speak` is the whole of that list. Everything else waits its turn exactly as it
-  // always has, and nothing here can end a running activity early.
+  // A verb that declares `atOnce` does not use the hands: it never takes the activity slot and is
+  // never refused for busy-ness. Nothing here can end a running activity early.
   const usesHands = def.atOnce === undefined
   if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
   const invalid = def.validate(state, config, agentId, params)

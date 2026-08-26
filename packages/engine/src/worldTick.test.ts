@@ -114,9 +114,8 @@ describe('verbs: sleep / wake / eat', () => {
   })
 })
 
-// Noon, so the equalization is what runs: a spring midnight is cold enough to be exposure,
-// and from C11 Task 22 the cold owns warmth whenever it has the body (warmthSystem).
-// Off the hour as well as off the night, so the weather roll leaves the sky as the row set it.
+// Noon, so the equalization is what runs: a spring midnight is cold enough to be exposure, and
+// the cold owns warmth whenever it has the body. Off the hour, so the weather roll leaves the sky.
 const atNoon = (s: WorldState): WorldState => ({ ...s, tick: 700 })
 
 describe('worldTick: needs system', () => {

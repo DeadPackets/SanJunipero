@@ -173,11 +173,8 @@ describe('how many rings are standing', () => {
     expect([Math.floor(g.dx / PITCH), Math.floor(g.dy / PITCH)]).toEqual([-1, -2])
   })
 
-  // ★ THE ONE ABOVE IS VACUOUS ON ITS OWN and I only found that by running the mutation: the
-  // real ford does not land on any plot of its block, so the plot test alone excludes it and
-  // deleting `blockIsPlattable` changed nothing. This is the case that needs the rule — a deck
-  // laid across the channel exactly where block (-1,-2)'s south-west plot WOULD be, if that
-  // block were ever platted. It never is; the river runs through it.
+  // The test above is vacuous alone: the real ford lands on no plot of its block, so the plot
+  // test excludes it by itself. This is the case that needs the rule.
   it('★ nor does one standing exactly where an unplattable block s plot would be', () => {
     const deck: WorldRect = { x: 49, y: 54, w: 2, h: 1 }
     const g = grammarOf(TOWN_SQUARE, deck)
@@ -271,13 +268,8 @@ describe('the masses the town actually builds', () => {
 })
 
 
-// ★ THE FAR BANK IS NOT THE TOWN UNTIL SOMEBODY CAN GET THERE.
-//
-// Found by running a world, not by reading the grammar: the first plot ring 2 offers is block
-// (-2,0), which is across the channel. Masons walked to its door and were refused twenty-one
-// thousand times, and the town stopped at ring 1 for good.
-// The channel the grammar knows is three columns wide — dx -17, -16, -15 — and it runs at
-// every dy, so it is a wall and not an obstacle. Measured, not assumed, by the first test here.
+// The first plot ring 2 offers is block (-2,0), across the channel. The channel the grammar knows
+// is three columns wide at every dy — a wall, not an obstacle — measured by the first test here.
 const CHANNEL = [-17, -16, -15] as const
 
 /** A walk with a deck laid over the named grammar tiles. A deck over water is not water; a
@@ -290,9 +282,8 @@ const deck = (base: Walk, tiles: ReadonlyArray<{ dx: number; dy: number }>): Wal
 const span = (dy: number, cols: readonly number[] = CHANNEL): Array<{ dx: number; dy: number }> =>
   cols.map((dx) => ({ dx, dy }))
 
-/** The blocks the claim will actually offer, in order, for a 2×2 — read off the claim itself
- *  rather than off a second notion of "reachable", so a test cannot pass on a rule the running
- *  world does not use. */
+/** The blocks the claim will actually offer, in order, for a 2x2 — read off the claim itself, so
+ *  a test cannot pass on a rule the running world does not use. */
 const offered = (walk: Walk, n = 40, standing = genesisStanding()): string[] =>
   raiseWith(walk, n, standing).built.map((b) => {
     const g = grammarOf(TOWN_SQUARE, b.site)
@@ -314,9 +305,8 @@ describe('★ a plot you cannot walk to is not ground the town keeps for you', (
   const dry = walkOnGround(CITY_GROUND)
 
   it('the channel is a WALL, not an obstacle: there is no way round it inside the town', () => {
-    // The whole reason a bridge has to be the mechanism. If any row of the town's box were
-    // dry across the channel, the far bank would already be reachable and every test below
-    // would pass with the bridge doing nothing.
+    // If any row of the town's box were dry across the channel, the far bank would already be
+    // reachable and every test below would pass with the bridge doing nothing.
     const lo = -townOrigin(2), hi = lo + townSpan(2) - 1
     for (let dy = lo; dy <= hi; dy++)
       for (const dx of CHANNEL) expect(CITY_GROUND(dx, dy), `${dx},${dy}`).toBe('water')

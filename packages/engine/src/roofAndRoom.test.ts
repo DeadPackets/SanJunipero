@@ -12,11 +12,8 @@ import { makeGenesisWorld } from './genesis/world.js'
 import { buildableRecipe } from './verbs.js'
 import { FOUNDER_IDS } from '@sj/shared'
 
-// ★ THE SCENERY AND THE ROOM. Two abundance defects the motive probe measured on a live night:
-// the valley's cabins, cottages and farmhouses were buildings nobody could get into (278 wasted
-// `enter` acts across three nights, five founders down in the street one step from a wall), and
-// `enter` had no cap at all, so one roof sheltered the whole town and the second house anybody
-// raised was worth exactly nothing.
+// Two abundance defects measured on a live night: the valley's cabins, cottages and farmhouses
+// were buildings nobody could get into, and `enter` had no cap, so one roof sheltered the town.
 
 const CFG: SimConfig = DEFAULT_CONFIG
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -106,19 +103,8 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
 
 // ------------------------------------------------------------- R1b: the ladder ---
 
-// ★ THE LADDER RAN THE WRONG WAY AND NOTHING SAID SO.
-//
-// Every dwelling is priced at ONE rate — 2.5 wood and 720 ticks a tile — so a farmhouse is 20
-// wood, 5 760 ticks and 4 sleeping slots, and so is a PAIR of houses, to the wood and to the
-// tick. With no `hearth` and no `bed` on its row the farmhouse was therefore the same floor for
-// the same price MINUS two fires and two beds: not a worse rung, a STRICTLY DOMINATED one. A
-// mind that saved half again and worked half again got less, and `wants` would have pointed it
-// straight up that ladder — "a drive with no road is not a drive", in its purest form.
-//
-// The fix was effectiveness and not price, and this is the law rather than the two rows: what a
-// dearer roof buys is floor, and the fuel economy that comes with floor. `stoke` feeds the
-// BUILDING for one armful and `besideAKeptFire` warms everybody in the room off it, so wood per
-// body-night falls as the roof grows. No new dial, no retuned rate.
+// One rate prices every dwelling, so a farmhouse costs a pair of houses. What a dearer roof
+// buys is fuel economy — stoke feeds the building, besideAKeptFire warms the room — not floor.
 describe('★ a dearer dwelling is never a worse one', () => {
   const r = CFG.structures.recipes
   const buildableDwellings = Object.keys(r)
@@ -149,10 +135,8 @@ describe('★ a dearer dwelling is never a worse one', () => {
     }
   })
 
-  // ★ VACUOUS GUARD: the loop above passes on an empty world and on a flat one. These are the
-  // rungs as real numbers, and the price they were bought at is UNCHANGED — the tuning order on
-  // this project is effectiveness → abundance → time-cost → difficulty LAST, and this fix never
-  // reached the last step.
+  // Vacuous guard: the loop above passes on an empty world and on a flat one. These are the rungs
+  // as real numbers, and the price they were bought at is unchanged.
   it('★ is a real ladder — three rungs of fuel, at one unmoved rate', () => {
     expect(buildableDwellings.map(slotsOf)).toEqual([3, 4, 2])
     expect(buildableDwellings.map(woodPerBodyNight)).toEqual([0.5, 0.375, 0.75])
@@ -163,10 +147,8 @@ describe('★ a dearer dwelling is never a worse one', () => {
     }
   })
 
-  // ★ AND THE SMALL ROOF IS NOT DOMINATED IN RETURN. A house buys the cheapest door in the
-  // world and the only PRIVATE one: `reproductionSystem` counts a night only under a kind named
-  // here, so a couple's own roof is a thing no farmhouse can be. That is what the two-slot
-  // dwelling keeps, and it is why the ladder is a trade rather than a ranking.
+  // reproductionSystem counts a night only under a kind named in privateKinds, so a couple's own
+  // roof is a thing no farmhouse can be — which makes the ladder a trade rather than a ranking.
   it('★ leaves the house the one thing no bigger roof can buy', () => {
     expect(CFG.structures.privateKinds).toEqual(['house'])
     expect(woodOf('house')).toBe(Math.min(...buildableDwellings.map(woodOf)))
@@ -324,10 +306,8 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
   })
 
-  // ★ THE NUMBER, AND IT IS THE WHOLE OF WHY THE ROOFS CAME DOWN. Sound, this village handed
-  // five founders 21 bodies' worth of floor before the first tick — 4.2x — and the only want
-  // this project models was answered at tick zero. Every production figure ever reported from
-  // here was measured in that town. Two roofs held; the other seven are walls.
+  // Sound, this village handed five founders 21 bodies' worth of floor before the first tick —
+  // 4.2x — so the only want this project models was answered at tick zero.
   it('★ puts the founding valley below 1.0, which sound it never was', () => {
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
     expect(led.bodies).toBe(5)
@@ -351,10 +331,8 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(21 - 5 * 2).toBe(11)
   })
 
-  // 0.8 and not lower, and the reason is a hard constraint rather than a taste: every roof that
-  // comes down has to be one a pair of hands can put back. The only other 2-slot kinds are the
-  // cabin and the storehouse, both 2x2 — exactly a house's mass — so making either buildable
-  // would mint a second name for `house`. A one-body want beats a wall that lies.
+  // 0.8 and not lower: every roof that comes down has to be one a pair of hands can put back, and
+  // the only other 2-slot kinds are the cabin and the storehouse, both exactly a house's mass.
   it('is the floor reachable without standing up a wall nobody could finish', () => {
     for (const st of Object.values(genesisTown(0).structures)) {
       if (st.stage !== 'construction') continue

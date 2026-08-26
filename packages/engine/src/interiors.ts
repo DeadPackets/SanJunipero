@@ -2,9 +2,8 @@ import { isRoofedKind, roomCapacity, T_ROAD, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
-// The ring of tiles hugging a footprint, ordered clockwise on screen (y grows south)
-// starting from the south-east corner. Pure geometry — no state read. Exported because
-// it is the codebase's one "nearest tile" tiebreak, and graves reuse it (C11 Task 6).
+// The ring of tiles hugging a footprint, clockwise on screen from the south-east corner. Exported
+// because it is the codebase's one "nearest tile" tiebreak, and graves reuse it.
 export function perimeter(s: { x: number; y: number; w: number; h: number }): Point[] {
   const x0 = s.x - 1, x1 = s.x + s.w, y0 = s.y - 1, y1 = s.y + s.h
   const ring: Point[] = []
@@ -15,14 +14,8 @@ export function perimeter(s: { x: number; y: number; w: number; h: number }): Po
   return ring
 }
 
-// ★ A DOOR OPENS ONTO THE STREET. The town plats every building against a street and the
-// template guarantees the face it presents is a road — so a doorway found by walking the ring
-// from the south-centre put half the town's bodies out through a side wall onto the grass, on
-// exactly the buildings the grammar had turned to face east. The road ring is preferred and
-// the passable ring is the fallback, so a building standing in open country still has a door.
-//
-// Read off the TERRAIN, not off a facing column: the world state carries no facing, and it
-// does not need one for this — the street is already there to be seen.
+// Road ring preferred, passable ring as fallback, so a turned building's door is not a side wall
+// onto grass. Read off the terrain: world state carries no facing and does not need one here.
 export function doorTile(state: WorldState, s: Structure): Point | null {
   const ring = perimeter(s)
   const start = ring.findIndex((p) => p.x === s.x + Math.floor((s.w - 1) / 2) && p.y === s.y + s.h)
@@ -49,17 +42,8 @@ export function occupantsOf(state: WorldState, structureId: string): string[] {
   return Object.keys(state.agents).sort().filter((id) => state.agents[id]!.insideId === structureId)
 }
 
-// ★ A ROOM HOLDS ONLY SO MANY BODIES, AND FLOOR IS WHY. Two tiles of floor per body: a 2x2
-// house takes two, a 4x2 farmhouse four. This is PHYSICS AND NOT OWNERSHIP — nothing here asks
-// whose the building is, because whose it is, is a thing the town has to invent and we do not
-// get to hand it over. Without a cap one roof sheltered the whole town and the second house
-// anybody raised was worth exactly nothing.
-//
-// ★ IT MOVED TO `@sj/shared` AND IT IS STILL ONE DEFINITION. The city template has to lay a bed
-// down for every body a dwelling sleeps, and the template is in shared, which cannot import the
-// engine. Transcribing `floor(w × h / 2)` over there would have been a second derivation of the
-// number the whole dwelling ladder is priced on. Re-exported here so every existing caller is
-// untouched.
+// Two tiles of floor per body — physics, not ownership. In shared because the city template must
+// lay a bed per body and cannot import the engine.
 export { TILES_PER_BODY, roomCapacity } from '@sj/shared'
 
 /** True when no more bodies fit. `enter` refuses on it and perception says it out loud, so a
@@ -73,11 +57,8 @@ export function sameInterior(state: WorldState, aId: string, bId: string): boole
   return insideOf(state, aId) === insideOf(state, bId)
 }
 
-/** ★ THE ONE ARITHMETIC NOBODY WAS DOING: how many bodies the standing roofs hold, against how
- *  many bodies there are. Every "production was zero" number this project has reported was
- *  measured in a town whose only modelled want was already answered — the genesis valley holds
- *  21 and the cast is 5. A run that wants to watch a town build shelter has to start below 1.0,
- *  and this is the one place to ask whether it does. */
+/** How many bodies the standing roofs hold, against how many bodies there are. A run that wants
+ *  to watch a town build shelter has to start below 1.0, and this is the one place to ask. */
 export type ShelterLedger = { roofs: number; slots: number; bodies: number; per: number }
 
 export function shelterLedger(state: WorldState, config: SimConfig): ShelterLedger {

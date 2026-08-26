@@ -17,10 +17,8 @@ import {
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs.js'
-// Task 16 Step 0 took C9's four pins off. Task 37 took C11's fourteen off in one act: this
-// world has nothing suppressed in it at all. Every C11 law — mortality, thirst, fauna,
-// warmth, light, the night witness, regrowth, desire paths — is live on the 3-day run, and
-// the tests below name the ones that fire as well as hashing the state they leave behind.
+// Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
+// witness, regrowth and desire paths are all live on the 3-day run.
 const G2_CONFIG = SimConfigSchema.parse({})
 
 const SEED = 'g2-scripted'
@@ -54,10 +52,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[FARMER]!.needs.hunger).toBeGreaterThan(0)
     expect(state.agents[FISHER]!.needs.hunger).toBeGreaterThan(0)
 
-    // 2. Idler collapses before death, and still dies of hunger — but not of C9's clock.
-    // Task 37 unpinned mortality, and `hungerHpDrainPerTick` empties an empty body's hp bar
-    // long before `deathAfterZeroHungerTicks` runs out, so the death lands early and the
-    // attribution names the same thing the old timer would have.
+    // hungerHpDrainPerTick empties an empty body's hp bar long before deathAfterZeroHungerTicks
+    // runs out, so the death lands early and the attribution names what the old timer would have.
     const collapseEv = evs.find((e) => e.type === 'agent_collapsed' && (e.payload as Payload).agentId === IDLER)
     expect(collapseEv).toBeDefined()
     const diedEv = evs.find((e) => e.type === 'agent_died' && (e.payload as Payload).agentId === IDLER)
@@ -69,9 +65,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[IDLER]!.hp).toBeLessThanOrEqual(G2_CONFIG.health.deathHp)
     expect(diedEv!.tick).toBeLessThan(zeroTick! + G2_CONFIG.needs.deathAfterZeroHungerTicks + 1)
 
-    // 3. Builder's house completes — and the walls book the work the building is, never the
-    // hours the dark cost her. This fixture is where `workPenalty` booked 2 903 ticks against a
-    // 2 880-tick house; the ledger cap is the law, and this is the world that broke without it.
+    // The walls book the work the building is, never the hours the dark cost her. This fixture is
+    // where workPenalty booked 2 903 ticks against a 2 880-tick house.
     const house = Object.values(state.structures).find((s) => s.kind === 'house')
     expect(house?.stage).toBe('complete')
     expect(house!.progressTicks).toBeLessThanOrEqual(G2_CONFIG.construction.houseTicks)
@@ -85,8 +80,6 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(evs.some((e) => e.type === 'fire_extinguished'
       && (e.payload as Payload).structureId === SHED.id && (e.payload as Payload).cause === 'rain')).toBe(true)
     // Three buildings and one stone for each of the two dead: graves are structures too.
-    // Was six. Task 37b's fatigue ladder is why the third stone is not cut — see the death
-    // table in the C11 row below.
     expect(Object.keys(state.structures)).toHaveLength(5)
 
     // 5. Wheat planted day 1: stage 0 after 2 dawns (floor(2×3/8)), not mature (growthDays 8), not withered.
@@ -96,9 +89,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(wheat!.withered).toBe(false)
     expect(wheat!.stage).not.toBe(G2_CONFIG.crops.wheat!.stages - 1)
 
-    // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies.
-    // Task 27 unpinned here priced the meal by kind: a fish is worth less than the flat
-    // `eatRestoreHunger` it used to be, and `nutritionOf` is the one place that says so.
+    // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies. A fish is
+    // worth less than the flat eatRestoreHunger, and nutritionOf is the one place that says so.
     const giveEv = evs.find((e) => e.type === 'item_moved'
       && (e.payload as Payload).loc !== undefined
       && ((e.payload as Payload).loc as Payload).t === 'agent'
@@ -124,9 +116,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(actEv!.tick).toBeLessThan(diedEv!.tick)
   })
 
-  // Task 16 removed the four pins that used to hold these laws off this fixture. If a
-  // later change quietly stops one of them firing, the hash row above would still pass —
-  // so each law is named here as well as hashed.
+  // If a later change quietly stops one of these laws firing, the hash row above would still
+  // pass — so each law is named here as well as hashed.
   it('C9 is live in this run: things are owned, a body sleeps under a roof, food turns', () => {
     const { state, evs } = runScenario()
 
@@ -158,20 +149,16 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[FARMER]!.sex).toBe('f')
   })
 
-  // Task 37(c). The same argument as the C9 row above, for the fourteen pins that came off
-  // here: the hash would still pass if a law quietly stopped firing, so each one that fires
-  // on this fixture is named. The two that do not — a desire-path tile wearing through and a
-  // fauna kill — need a walker with a route and a hunter with a knife, and belong to G11a.
+  // The same argument as the C9 row above. The two that do not fire here — a desire-path tile
+  // wearing through and a fauna kill — need a walker with a route and a hunter with a knife.
   it('C11 is live in this run: bodies thirst, wear out, are poisoned, and are buried', () => {
     const { state, evs } = runScenario()
     const types = evs.map((e) => e.type)
     const dead = evs.filter((e) => e.type === 'agent_died')
       .map((e) => [(e.payload as Payload).agentId, (e.payload as Payload).cause])
 
-    // Mortality: two bodies, two different ways out, and each cause is one the world names.
-    // THE FARMER USED TO BE THE THIRD, of fatigue. Task 37b's R15 is why he is not: his falls
-    // still put him on the ladder, and now each night he sleeps takes him back off it. The
-    // ladder is not switched off — it is answerable, which is the whole of ruling R-C.
+    // Two bodies, two ways out, each cause one the world names. The farmer used to be the third,
+    // of fatigue: his falls still put him on the ladder, and every night he sleeps takes him off it.
     expect(dead).toEqual([[IDLER, 'hunger'], [FISHER, 'poison']])
     for (const [, cause] of dead) expect(DEATH_CAUSES).toContain(cause)
     // A grave at the tile each of them fell on.
@@ -181,9 +168,8 @@ describe('GATE G2: 3-day scripted world run', () => {
 
     // The fatigue ladder and the poison that killed the Fisher are afflictions, not booleans.
     expect(evs.some((e) => e.type === 'agent_afflicted' && (e.payload as Payload).kind === 'poison')).toBe(true)
-    // The ladder is still minted by a fall — three times here — and it is lifted every time a
-    // body sleeps, which is the named proof that R15 fires on this fixture and not merely that
-    // the death stopped happening.
+    // The ladder is still minted by a fall — three times here — and lifted every time a body
+    // sleeps: the named proof that the rule fires, not merely that the death stopped happening.
     const fatigue = (type: string): number =>
       evs.filter((e) => e.type === type && (e.payload as Payload).kind === 'fatigue').length
     expect(fatigue('agent_afflicted')).toBe(3)
@@ -203,9 +189,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(evs.some((e) => e.type === 'tile_changed' && (e.payload as Payload).reason === 'seeded')).toBe(true)
     expect(types).toContain('traffic_decayed')
 
-    // Warmth and light are live and inert-by-arithmetic here: a spring meadow is inside the
-    // comfort band, and nobody in this fixture works at night. The proof they are on is that
-    // the two laws above them — the fatigue death and the night theft — both landed.
+    // Warmth and light are live and inert by arithmetic here: a spring meadow is inside the
+    // comfort band and nobody works at night. The fatigue death and the night theft are the proof.
     expect(G2_CONFIG.warmth.enabled).toBe(true)
     expect(G2_CONFIG.light.enabled).toBe(true)
   })
@@ -221,9 +206,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(stateHash(replayFromGenesis(store, G2_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
   })
 
-  // Task 37(b). The C8 delta's missing fixture: `item_taken` had no scripted witness in the
-  // golden world. Two takings of the same knife off the same shelf by the same pair of hands,
-  // watched from the same six tiles — the only difference between them is the light.
+  // Two takings of the same knife off the same shelf by the same pair of hands, watched from the
+  // same six tiles — the only difference between them is the light.
   it('the same theft is invisible at night and plain at noon (§19)', () => {
     const seen = (tick: number) => {
       const store = new EventStore(openDb(':memory:'))

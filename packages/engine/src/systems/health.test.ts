@@ -41,9 +41,8 @@ function wound(s: WorldState, agentId: string, kind: 'minor' | 'serious' | 'grav
 }
 
 describe('fold: health events', () => {
-  // A blow is two events and one subtraction (C11 R16): `agent_harmed` takes the hp and is
-  // the only event that can name the hand behind it, `agent_injured` puts the wound on the
-  // record. Every row that used to drive one now drives the pair, as `attack` does.
+  // A blow is two events and one subtraction: `agent_harmed` takes the hp and is the only event
+  // that can name the hand behind it; `agent_injured` puts the wound on the record.
   it('agent_injured records the injury day, and the hp comes off through agent_harmed', () => {
     let s = makeWorld()
     s = wound(s, 'a1', 'minor', 2885)
@@ -121,9 +120,8 @@ describe('verb: tend', () => {
   })
 })
 
-// Task 37 (batch-2 ruling 1): the dawn injury-infection roll left this file with the rest of
-// the illness. `agent_infected` still folds for a recorded log; nothing emits it any more, and
-// what a septic wound produces is an illness affliction — see systems/illness.test.ts.
+// `agent_infected` still folds for a recorded log; nothing emits it any more, and what a septic
+// wound produces is an illness affliction — see systems/illness.test.ts.
 describe('worldTick: infection is not healthSystem\'s any more', () => {
   it('an open wound at dawn infects nobody here, on the seed that used to', () => {
     let s = makeWorld()

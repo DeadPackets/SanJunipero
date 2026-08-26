@@ -1,6 +1,5 @@
 // Authored initial conditions: the herd, the warren and the schools that are already here on
-// day zero. Task 19 owns the fauna system and emits from this table; nothing reads it yet.
-// Coordinates are absolute on the 128x128 genesis map (C11 section 9).
+// day zero. Coordinates are absolute on the 128x128 genesis map.
 
 export const FAUNA_KINDS = ['deer', 'rabbit', 'fish'] as const
 export type FaunaKind = (typeof FAUNA_KINDS)[number]

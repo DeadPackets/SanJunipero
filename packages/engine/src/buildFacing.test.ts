@@ -1,21 +1,5 @@
-// ★ WHICH WAY DOES AN AGENT-BUILT HOUSE FACE?
-//
-// The town-generator lane made facing DATA on the template — `CityStructure.facing` — precisely
-// so that nothing downstream would have to infer it. An agent-built house bypassed that
-// entirely: the claim seam turns a building to suit its plot (`place` answers `sw` or `se` and
-// swaps `w`/`h` with it), and then `structure_planned` carried `x, y, w, h` and NO facing. So
-// the world forgot the one thing the plot had decided.
-//
-// ★ AND A HOUSE IS 2x2, WHICH IS WHY THE FOOTPRINT CANNOT ANSWER FOR IT. A turned 1x2 shows up
-// as 2x1 and `farBank.test.ts`'s bridge test reads the orientation straight off `w`/`h`. A
-// turned SQUARE is byte-identical to an unturned one. `doorFrontOf` on it therefore had exactly
-// one answer available — the default, `sw` — and on an SE plot that answer is a wall.
-//
-// `farBank.test.ts` sidesteps this by recomputing the placement from the plot the building
-// happens to sit on. That works for a test holding the whole town; it is not available to a
-// renderer holding one structure, and the renderer is what draws the door.
-//
-// Scripted, no LLM, $0.
+// A turned 2x2 house is byte-identical to an unturned one, so facing cannot be inferred from
+// w/h — structure_planned has to carry it, and a renderer holding one structure needs it.
 import { describe, expect, it } from 'vitest'
 import {
   SimConfigSchema, T_ROAD, doorFrontOf, grammarOf,
@@ -44,9 +28,8 @@ function world(): WorldState {
   return apply(s, [{ type: 'item_spawned', payload: { id: 'item_wood_b1', kind: 'wood', qty: 9999, loc: { t: 'agent', id: BUILDER } } }])
 }
 
-/** `onStart` sets the hands going and only a `TickLoop` puts them down again; these helpers
- *  fold events by hand, so the body is set idle between builds rather than waiting out 240
- *  ticks of hammering. Nothing about WHERE a house goes reads the activity. */
+/** onStart sets the hands going and only a TickLoop puts them down; these helpers fold events by
+ *  hand, so the body is set idle between builds. Nothing about WHERE a house goes reads the activity. */
 const idle = (s: WorldState): WorldState =>
   ({ ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, activity: null } } })
 

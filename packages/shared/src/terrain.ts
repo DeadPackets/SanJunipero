@@ -4,9 +4,8 @@ export const TERRAIN_TILE_KINDS = ['grass', 'earth', 'water', 'forest', 'rock', 
 export type TerrainTileKind = (typeof TERRAIN_TILE_KINDS)[number]
 export const TerrainTileKindSchema = z.enum(TERRAIN_TILE_KINDS)
 
-// TERRAIN V2: the codex kind a CONTINUOUS world-space material is registered under, distinct
-// from the flat per-tile kinds which stay for the fallback path. The forge writes this string
-// and the renderer reads it, so — like roadAutotileKind — it lives here or it drifts.
+// The codex kind a CONTINUOUS world-space material is registered under, distinct from the flat
+// per-tile kinds. The forge writes this string and the renderer reads it, so it lives here or it drifts.
 export const MATERIAL_KIND_PREFIX = 'material:'
 
 // widened past TerrainTileKind on purpose: TERRAIN V2.1 adds `road-calm`, a material with no
@@ -15,10 +14,8 @@ export function materialKind(kind: string): string {
   return `${MATERIAL_KIND_PREFIX}${kind}`
 }
 
-// OPTION C's interior tileset. A wall ELEVATION is not a material — it is never sampled
-// continuously, it has an up and a down, and it belongs to one face of one wall — so it takes
-// its own namespace. Same law as `materialKind`: the forge writes this string and the renderer
-// reads it, so it lives here or the two drift.
+// A wall elevation is not a material — never sampled continuously, and it belongs to one face of
+// one wall — so it takes its own namespace. Written by the forge, read by the renderer.
 export const INTERIOR_PIECE_KIND_PREFIX = 'interior:'
 
 export function interiorPieceKind(id: string): string {

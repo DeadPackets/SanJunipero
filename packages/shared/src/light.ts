@@ -1,10 +1,8 @@
 import { DEFAULT_CONFIG, isHearthKind, type SimConfig } from './config.js'
 import { dayPhaseFromTick } from './time.js'
 
-// Where the physics of light lives, so the engine's witness radius and C12's render read the
-// same function and can never disagree about what a night looks like. Pure, no RNG, no state
-// written — and structurally typed, because `WorldState` belongs to the engine and this
-// package is underneath it.
+// The physics of light, so the engine's witness radius and the render read one function.
+// Structurally typed: WorldState belongs to the engine and this package is underneath it.
 
 // The least a light calculation needs to know about a world. `WorldState` satisfies it.
 export type LitWorld = {
@@ -27,9 +25,8 @@ export function glowRadiusFor(config: SimConfig, kind: string): number | undefin
 // The same table at world defaults, for the render side, which has no config in its hands.
 export const LIGHT_GLOW_RADIUS: Readonly<Record<string, number>> = DEFAULT_CONFIG.light.glowRadius
 
-// ★ A HOUSE GLOWS WITH ITS HEARTH'S OWN RADIUS, and never with a second number written beside
-// it. `glowRadius` is keyed by kind, so a fed house threw no light at all until this: the fire
-// in it is the hearth's fire, so the reach of it is the hearth's reach (G4).
+// glowRadius is keyed by kind, so a fed house threw no light at all until this: the fire in it
+// is the hearth's fire, so the reach of it is the hearth's reach.
 export function structureGlowRadius(config: SimConfig, kind: string): number | undefined {
   return glowRadiusFor(config, kind) ?? (isHearthKind(config, kind) ? glowRadiusFor(config, 'hearth') : undefined)
 }
@@ -105,11 +102,8 @@ export function lightLevelAt(
   return phase === 'dusk' ? config.nightWitness.duskFactor : config.nightWitness.nightFactor
 }
 
-// How far a pair of eyes reaches TO A GIVEN TILE. The viewer is in the signature and unused on
-// purpose: a torch does not let you see into the dark, it lets the dark see you. A thief
-// carrying a flame is lit, and so is the theft; a lantern hung by the storehouse keeps its
-// tiles bright, so a taking there is witnessed at full day radius. That asymmetry IS the
-// deterrence (addendum deviation 11 — it reads as a bug to anyone expecting a flashlight).
+// The viewer is in the signature and unused on purpose: a torch does not let you see into the
+// dark, it lets the dark see you. That asymmetry is the deterrence.
 export function visionRadiusAt(
   state: LitWorld,
   _viewer: { x: number; y: number },
@@ -118,14 +112,8 @@ export function visionRadiusAt(
   return Math.round(config.movement.sightRadius * lightLevelAt(state, x, y, tick, config))
 }
 
-// The same fact in the three words a body would use for it. Never a number (G10).
-//
-// ★ IT ASKS THE LIGHT LAW, NOT THE WITNESS LAW. Reading this off `lightLevelAt` made the dark
-// answer `nightWitness.enabled` — a dial about who sees a theft — so switching that off left a
-// mind reading "bright" at midnight while the same midnight still charged it 1.5x for the work.
-// Two laws, two questions. Identical at world defaults; the phase and the glow decide, and no
-// factor is compared against another, so a config that sets `nightFactor === duskFactor` no
-// longer turns dusk into deep night.
+// The three words a body would use, never a number. Asks the light law, not the witness law:
+// reading it off lightLevelAt made the dark answer nightWitness.enabled, a dial about theft.
 export function lightBandAt(
   state: LitWorld, x: number, y: number, tick: number, config: SimConfig,
 ): 'bright' | 'dim' | 'dark' {
@@ -136,10 +124,8 @@ export function lightBandAt(
   return phase === 'dusk' ? 'dim' : 'dark'
 }
 
-// ★ THE ONE ANSWER TO "IS IT DARK HERE". A boolean, and it is the band's own word — not a
-// second threshold. Dusk is not dark: a body can still work by it, and `fumblesInTheDark` has
-// always charged for `night` alone. The threshold is therefore not a number anybody chose. It
-// is the phase boundary the clock already keeps, and the reach of a flame's own glow radius.
+// The band's own word, not a second threshold: dusk is not dark, and fumblesInTheDark has always
+// charged for night alone. The threshold is the phase boundary, not a number anybody chose.
 export function isDark(
   state: LitWorld, x: number, y: number, tick: number, config: SimConfig,
 ): boolean {

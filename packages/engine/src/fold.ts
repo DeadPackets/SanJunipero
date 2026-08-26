@@ -160,9 +160,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       AgentExpressed.parse(event.payload)
       return state
     }
-    // The record, and only the record. A discovery changes what the town CAN do — which lives
-    // in the verb registry, not in the state — so the state this fold returns is the one it was
-    // given, by identity. That is also why no golden can move.
+    // The record, and only the record: a discovery changes what the town CAN do, which lives in
+    // the verb registry and not in the state. That is also why no golden can move.
     case 'discovery_made': {
       DiscoveryMade.parse(event.payload)
       return state
@@ -527,9 +526,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, alive: false, asleep: false, activity: null } } }
     }
-    // The wound on the record, and only that: the hp it costs comes off through the
-    // `agent_harmed` the same blow emits, which is the one event that can name the hand
-    // behind it. Two events, one subtraction (C11 R16).
+    // The wound on the record, and only that: the hp comes off through the `agent_harmed` the
+    // same blow emits, which is the one event that can name the hand behind it.
     case 'agent_injured': {
       const p = AgentInjured.parse(event.payload)
       const a = state.agents[p.agentId]
@@ -697,9 +695,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = WildlifeChanged.parse(event.payload)
       return { ...state, wildlife: { fish: p.fish ?? state.wildlife.fish, deer: p.deer ?? state.wildlife.deer } }
     }
-    // A body arrives, a batch of bodies move, a body is taken. The map is absent until the
-    // first arrival and absent again when the last one is gone, so a world with no herd
-    // hashes exactly as one that never had any.
+    // The map is absent until the first arrival and absent again when the last one is gone, so a
+    // world with no herd hashes exactly as one that never had any.
     case 'fauna_spawned': {
       const p = FaunaSpawned.parse(event.payload)
       if (state.fauna?.[p.id]) throw new Error(`fauna_spawned for existing fauna ${p.id}`)

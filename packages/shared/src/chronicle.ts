@@ -51,10 +51,8 @@ export const CHRONICLE_ICONS: Record<string, string> = {
   agent_expressed: 'spark',
 }
 
-// The other half of the vocabulary, and the reason a future event cannot be silently dropped:
-// every type the fold knows is either weighted above or named here on purpose. Routine bodily
-// and housekeeping acts stay out of the feed — a body drinking is not news, and a worn path is
-// noticed by whoever is looking at the ground, which is the whole point of it.
+// Every type the fold knows is either weighted above or named here on purpose, so a future event
+// cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   // C11's quiet acts, named one by one (addendum §12).
   'agent_drank', 'item_filled', 'item_equipped', 'item_unequipped', 'item_lit', 'item_snuffed',
@@ -109,18 +107,16 @@ export function chronicleIcon(type: string): string {
   return CHRONICLE_ICONS[type] ?? CHRONICLE_FALLBACK_ICON
 }
 
-// Everything the line needs from the world, injected — so the gateway (which can reach the
-// engine's authored mystery prose) and the viewer (which cannot) produce the same sentence
-// from the same code rather than two formatters that drift apart.
+// Everything the line needs from the world, injected, so the gateway (which can reach the engine's
+// authored mystery prose) and the viewer (which cannot) produce the same sentence.
 export type ChronicleLookup = {
   agentName(id: string): string
   structureKind(id: string): string
   mysteryProse(kind: string): string | null
 }
 
-// One sentence for each way of dying, in the words the town would use. Cause is a fact and
-// the sentence says it plainly; what it MEANT is nobody's to write down. The cold is named
-// for the night that did it and never for a reading off the air (batch-5 ruling 7).
+// Cause is a fact and the sentence says it plainly; what it MEANT is nobody's to write down.
+// The cold is named for the night that did it, never for a reading off the air.
 const DEATH_SENTENCES: Readonly<Record<string, (who: string) => string>> = {
   hunger: (who) => `${who} starved.`,
   thirst: (who) => `${who} died of thirst.`,
@@ -133,9 +129,8 @@ const DEATH_SENTENCES: Readonly<Record<string, (who: string) => string>> = {
   fatigue: (who) => `${who} was worn out past mending.`,
 }
 
-// The same table for the four ways a body can be afflicted (engine AFFLICTION_KINDS). Fatigue
-// is the one that matters: `escalateFatigue` mints it after every collapse, so it is by far the
-// commonest affliction a town produces and it is not a sickness.
+// escalateFatigue mints fatigue after every collapse, so it is by far the commonest affliction
+// a town produces — and it is not a sickness.
 const AFFLICTION_SENTENCES: Readonly<Record<string, (who: string) => string>> = {
   illness: (who) => `${who} has fallen ill.`,
   poison: (who) => `${who} was poisoned.`,
@@ -143,9 +138,8 @@ const AFFLICTION_SENTENCES: Readonly<Record<string, (who: string) => string>> = 
   injury: (who) => `${who} is carrying a wound.`,
 }
 
-// Only two of the eight reasons ground changes are anybody's doing. A path worn by feet, a
-// path going back to grass, a seeded stump, a sapling grown and a tilled field are all
-// noticed by whoever is looking at the ground — never announced.
+// Only two of the eight reasons ground changes are anybody's doing. A worn path, a seeded stump,
+// a grown sapling and a tilled field are noticed by whoever looks at the ground, never announced.
 function tileChangedLine(p: Record<string, unknown>, look: ChronicleLookup): string | null {
   const who = typeof p.byId === 'string' ? look.agentName(p.byId) : null
   switch (p.reason) {
@@ -172,12 +166,8 @@ export function faunaSightingLine(kind: string, farBank: boolean): string {
 // is the truth; the alternative is a label, and labels are ours, not theirs (G9).
 export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
 
-// The human-framing law, one declaration for every package that enforces it: no world text,
-// block template, perception prose, recipe name, verdict reason, outcome label or viewer-facing
-// narrator string may ever name the machinery behind the agent. This regex is the enforcement
-// point. `(?!\w)` closes the boundary instead of a trailing `\b`: every alternative ends in a
-// word character except `A\.I\.`, whose final `.` a `\b` can never follow. Plurals are folded
-// in as `s?` so "prompts"/"tokens"/"models"/"tools" are caught too.
+// No world-facing string may name the machinery behind the agent, and this regex is the point it
+// is enforced. `(?!\w)` closes the boundary because a `\b` can never follow the final `.` of A.I.
 export const FORBIDDEN_FRAMING =
   /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
 
@@ -207,10 +197,8 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       return `${look.agentName(str(p.agentId))} was hurt.`
     case 'agent_afflicted': {
       const who = look.agentName(str(p.agentId))
-      // One sentence per affliction kind. This used to be "poison, or else illness", and
-      // `escalateFatigue` mints a fatigue affliction after EVERY collapse — so a town that had
-      // simply walked itself into the ground was chronicled as five people falling ill within
-      // the same minute. An unnamed kind is not silently a fever; it says what it is.
+      // An unnamed kind is not silently a fever: escalateFatigue mints one after EVERY collapse,
+      // and a town that had walked itself into the ground read as five people falling ill at once.
       return AFFLICTION_SENTENCES[str(p.kind)]?.(who) ?? `${who} is unwell.`
     }
     case 'affliction_worsened':
@@ -246,9 +234,8 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const forWhom = typeof p.targetId === 'string' ? ` for ${look.agentName(p.targetId)}` : ''
       return verb === '' ? null : `${who} ${witness} to ${verb}${forWhom}.`
     }
-    // Who and what, never the words they used: the intent is free text a mind wrote and this
-    // sentence is one a mind can read. The archive keeps the quote (gateway `/api/discoveries`),
-    // and no agent can reach the archive.
+    // Who and what, never the words they used: the intent is free text a mind wrote. The archive
+    // keeps the quote (gateway /api/discoveries), and no agent can reach the archive.
     case 'discovery_made': {
       const name = str(p.name)
       const kind = str(p.kind)
