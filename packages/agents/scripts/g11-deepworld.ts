@@ -621,7 +621,7 @@ async function main(): Promise<void> {
           privateCounts: { thoughts: thoughts.filter((t) => Math.floor(t.tick / MINUTES_PER_DAY) === day).length, journals: 0 },
           world: { config, state: loop.state },
           ...(records.length === 0 ? {} : {
-            semantic: { db, llm: semanticLlm, records, spentUsdToday: 0 },
+            semantic: { db, llm: semanticLlm, records },
           }),
         })
         reachedThePass = out.semanticRan

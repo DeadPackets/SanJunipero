@@ -244,16 +244,6 @@ describe('G11a-L3: the firsts no rule can catch, and the checks that keep them h
     expect(llm.systems[0]).toBeDefined()
     // Every id the model must answer with is on the page in front of it.
     for (const concept of SEMANTIC_CONCEPTS) expect(SEMANTIC_INSTRUCTION).toContain(concept)
-    // This prompt is ops-side and no mind reads it; the budget is the narrator's own dial.
-    expect(DEFAULT_SEMANTIC_CONFIG.dailyBudgetUsd).toBeGreaterThan(0)
   })
 
-  it('past the day\'s budget the pass is skipped and the skip is an alert, never a silence', async () => {
-    const llm = new ScriptedLlm()
-    const { db, milestones } = await runSemantic(llm, { spentUsdToday: DEFAULT_SEMANTIC_CONFIG.dailyBudgetUsd })
-    expect(milestones).toEqual([])
-    expect(llm.objectCalls).toBe(0)
-    const alerts = db.prepare('SELECT kind FROM alerts').all() as Array<{ kind: string }>
-    expect(alerts.map((a) => a.kind)).toContain('semantic_firsts_budget')
-  })
 })
