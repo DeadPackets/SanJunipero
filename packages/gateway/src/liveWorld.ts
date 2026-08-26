@@ -207,25 +207,32 @@ export async function settle(
 /**
  * ★ THE RATE TRIPWIRE — the guard the `$5` cap cannot be.
  *
- * At the seam lane's measured **$0.053/hour** the total cap is **94 hours of streaming**. It stops
- * a lane's mistake and it cannot stop a runaway on a process meant to run for weeks: a regression
- * has to be ~90x the normal rate before the cap lands inside an hour. A total is the wrong
- * instrument for a leak — you need the FLOW.
+ * The seam lane's **$0.053/hour** books HALF of what a turn costs — `pins.ts` counts one side of
+ * the call — so the true rate is **$0.106/hour** and the total cap is **~45 hours of streaming**,
+ * not the 94 this comment claimed. Either way it stops a lane's mistake and cannot stop a runaway
+ * on a process meant to run for weeks: a regression has to be ~45x the normal rate before the cap
+ * lands inside an hour. A total is the wrong instrument for a leak — you need the FLOW.
  *
  * PER MIND, deliberately. The bill scales with the cast and not with the world, so a total ceiling
  * would false-fire the day somebody streams ten people. The arithmetic behind the number:
  *
  * | | $/mind/sim-day |
  * |---|---|
- * | measured, five minds over 1 252 ticks | **0.0106** |
- * | the same run's worst 15 minutes — the nightly reflection burst, 34% of a day's spend in 90 s | ~0.0154 |
- * | **this ceiling** | **0.10** — 9.4x the measured rate, 6.5x the worst measured window |
+ * | measured, five minds over 1 252 ticks, as booked | **0.0106** |
+ * | the same figure with `pins.ts`' half-counting undone | **0.0212** |
+ * | the same run's worst 15 minutes — the nightly reflection burst, 34% of a day's spend in 90 s | ~0.0308 |
+ * | **this ceiling** | **0.21** — 9.9x the true rate, 6.8x the worst measured window |
+ *
+ * ★ RAISED 0.10 → 0.21 BY THE INTENTS LANE, on the `price` lane's finding that the booked rate
+ * is half the real one. At 0.10 the ceiling sat 4.7x over a correctly-counted normal run instead
+ * of the 9.4x it was designed for, and the arbiter lane's eager harness tripped it on a run that
+ * was doing nothing wrong. The multiple is what the number means; the multiple is preserved.
  *
  * So it survives the reflection burst, a doubled prompt and a doubled cast, and it kills a 10x
- * regression inside one 15-minute window instead of four days from now. One sim-day is one real
+ * regression inside one 15-minute window instead of two days from now. One sim-day is one real
  * hour at this tick, so `usdPerSimDay` and $/real-hour are the same number.
  */
-export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.10
+export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. `checkSpend`'s own default, and g11 uses the same 15. */
 export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
