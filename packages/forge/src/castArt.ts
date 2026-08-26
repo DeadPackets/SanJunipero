@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  CharacterAtlasManifestSchema, FOUNDER_IDS, type CharacterAtlasManifest,
+  CharacterAtlasManifestSchema, FOUNDER_IDS, type AssetRecord, type CharacterAtlasManifest,
 } from '@sj/shared'
 import type { AssetCodex } from './codex.js'
 import { CELL_NAMES_V4 } from './mirror.js'
@@ -48,20 +48,20 @@ export function listCommittedCast(root: string = CAST_CONTENT_DIR): CommittedCha
 
 export type CastIngestEntry = { kind: string; action: 'registered' | 'unchanged'; id: string }
 
-function latestCharacter(codex: AssetCodex, kind: string) {
-  return codex.listSince(0)
-    .filter((r) => r.status === 'ready' && r.class === 'rig-part' && r.kind === kind).at(-1) ?? null
-}
-
 /** Idempotent on the same law the committed buildings register by. */
 export function registerCommittedCast(
   codex: AssetCodex, opts: { root?: string } = {},
 ): CastIngestEntry[] {
   const out: CastIngestEntry[] = []
+  // One scan for the whole ingest, written in seq order so the last ready record still wins.
+  const latest = new Map<string, AssetRecord>()
+  for (const r of codex.listSince(0)) {
+    if (r.status === 'ready' && r.class === 'rig-part' && r.kind !== null) latest.set(r.kind, r)
+  }
   for (const c of listCommittedCast(opts.root)) {
     const meta = JSON.stringify(c.manifest)
-    const existing = latestCharacter(codex, c.codexKind)
-    if (existing !== null && existing.meta === meta) {
+    const existing = latest.get(c.codexKind)
+    if (existing !== undefined && existing.meta === meta) {
       const stored = codex.get(existing.id)
       if (stored !== null && stored.png.equals(c.atlas)) {
         out.push({ kind: c.codexKind, action: 'unchanged', id: existing.id })
