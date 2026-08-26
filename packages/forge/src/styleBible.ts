@@ -20,8 +20,8 @@ const CLASS_HINTS: Record<AssetClass, string> = {
   portrait: 'A large character portrait, bust framing, painted pixel-art style.',
 }
 
-// Canonical style anchor law: non-character classes match the first reference image
-// (style-anchor.png, always refs[0]) explicitly; characters carry their own identity refs.
+// Non-character classes are told to match refs[0], which `loadReferenceSheet` makes the palette
+// swatch; characters carry their own identity refs and get no such clause.
 export const STYLE_ANCHOR_CLAUSE =
   'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
 
