@@ -94,14 +94,42 @@ const RULING_DIRECTIVE =
 const RULING_NAMES_THE_MISSING_THING =
   /\b(without (a|an|any|the|one)\b|unless you (have|hold|find)\b|until you (have|hold|find)\b|for lack of\b|requires? (a|an|any|the|one)\b|once (you|he|she|they) (have|has|hold|holds|find|finds)\b|there is no \w+ to \w+ (it|this|them) with\b)/i
 
+/** What the town has a word for. A conditional that names one of these hands over nothing the
+ *  mind's own perception block does not already list. */
+export type RulingVocabulary = {
+  itemKinds: readonly string[]
+  structureKinds: readonly string[]
+}
+
+// How far past the conditional the named thing may sit: `without a length of cord` is four.
+const NAMED_THING_WORDS = 6
+
+const vocabularyTokens = (v: RulingVocabulary): ReadonlySet<string> => {
+  const out = new Set<string>()
+  for (const kind of [...v.itemKinds, ...v.structureKinds]) {
+    for (const word of fold(kind).split(/[^a-z0-9]+/u)) if (word.length > 0) out.add(word)
+  }
+  return out
+}
+
+const namesAKnownThing = (rest: string, vocabulary: RulingVocabulary | undefined): boolean => {
+  if (vocabulary === undefined) return false
+  const known = vocabularyTokens(vocabulary)
+  const words = rest.split(/[^a-z0-9]+/u).filter((w) => w.length > 0).slice(0, NAMED_THING_WORDS)
+  return words.some((w) => known.has(w) || (w.endsWith('s') && known.has(w.slice(0, -1))))
+}
+
 /** Every ops word, directive and named-absence in text a mind will be handed. Empty is the only
- *  acceptable answer. */
-export function scanRulingForGlassLeak(text: string): string[] {
+ *  acceptable answer. Told the town's vocabulary, a conditional naming a thing the town already
+ *  has a word for is a fact rather than a recipe, and passes. */
+export function scanRulingForGlassLeak(text: string, vocabulary?: RulingVocabulary): string[] {
   const folded = fold(text)
   const out = scan(folded, ALL_PATTERNS)
-  for (const re of [RULING_DIRECTIVE, RULING_NAMES_THE_MISSING_THING]) {
-    const hit = re.exec(folded)
-    if (hit !== null) out.push(hit[0].toLowerCase().trim())
+  const directive = RULING_DIRECTIVE.exec(folded)
+  if (directive !== null) out.push(directive[0].trim())
+  const missing = RULING_NAMES_THE_MISSING_THING.exec(folded)
+  if (missing !== null && !namesAKnownThing(folded.slice(missing.index + missing[0].length), vocabulary)) {
+    out.push(missing[0].trim())
   }
   return out
 }

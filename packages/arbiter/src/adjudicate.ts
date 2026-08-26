@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { scanRulingForGlassLeak, type LlmClient } from '@sj/agents'
+import { scanRulingForGlassLeak, type LlmClient, type RulingVocabulary } from '@sj/agents'
 import { registerVerb, VERBS } from '@sj/engine'
 import { FORBIDDEN_FRAMING, type DiscoveryCredit, type DiscoveryKind } from '@sj/shared'
 import { CANON } from './canon.js'
@@ -53,10 +53,21 @@ export function wordTainted(word: string): boolean {
   return FORBIDDEN_FRAMING.test(word) || scanRulingForGlassLeak(word).length > 0
 }
 
+// A reason that is a bare identifier is machinery, not a sentence: the model answering with
+// its own `ImpossibleClassSchema` token.
+const MACHINE_TOKEN = /^[A-Z0-9_]+$/
+
+// The law prompt.ts states and the validation loop never checked: a refusal whose own words
+// say the act can be begun. Subject-led, so an honest "no one can begin this" is not a match.
+const REASON_AFFIRMS_THE_ATTEMPT = /\b(you|he|she|they|it|this) (can|could|may|might) (attempt|try|begin|start)\b/i
+
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
-function reasonTainted(reason: string): boolean {
-  return FORBIDDEN_FRAMING.test(reason) || scanRulingForGlassLeak(reason).length > 0
+function reasonTainted(reason: string, vocabulary?: RulingVocabulary): boolean {
+  return FORBIDDEN_FRAMING.test(reason)
+    || MACHINE_TOKEN.test(reason.trim())
+    || REASON_AFFIRMS_THE_ATTEMPT.test(reason)
+    || scanRulingForGlassLeak(reason, vocabulary).length > 0
 }
 
 export type AgentCtx = {
@@ -263,7 +274,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
-      if (value.kind === 'impossible' && reasonTainted(value.reason)) {
+      if (value.kind === 'impossible' && reasonTainted(value.reason, deps.vocabulary)) {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 

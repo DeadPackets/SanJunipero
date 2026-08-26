@@ -248,6 +248,34 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
     }
   })
 
+  // ★ The conditional is a recipe only when the thing it names is one the town has no word
+  // for. Told the town's materials, the scan tells a fact about a known thing from a hint.
+  it('★ a conditional naming a KNOWN material is a fact; an unknown one is still a recipe', () => {
+    const vocabulary = { itemKinds: ['wood', 'stone', 'axe', 'cord'], structureKinds: ['hearth'] }
+    for (const line of [
+      'this requires a sharpened axe you do not carry',
+      'this will not hold unless you have a length of cord',
+      'nothing comes of it once she has a sharper stone',
+      'it will not stand without a hearth',
+    ]) {
+      expect(scanRulingForGlassLeak(line, vocabulary), line).toEqual([])
+    }
+    for (const line of [
+      'you cannot smoke fish without a rack',
+      'this requires a bellows you do not carry',
+      'nothing comes of it until you find a crucible',
+    ]) {
+      expect(scanRulingForGlassLeak(line, vocabulary), line).not.toEqual([])
+    }
+    // ANTI-VACUITY: told nothing, the scan refuses all of them exactly as it did before.
+    for (const line of ['this requires a sharpened axe you do not carry', 'it will not stand without a hearth']) {
+      expect(scanRulingForGlassLeak(line), line).not.toEqual([])
+    }
+    // And a vocabulary never excuses an ops word or a directive.
+    expect(scanRulingForGlassLeak('you should build it without a hearth', vocabulary)).toContain('you should')
+    expect(scanRulingForGlassLeak('the festival needs no axe', vocabulary)).toContain('festival')
+  })
+
   it('★ and it does not ban a verb the mind was already taught by name', () => {
     // Block 1 teaches these verbs to every mind by name, so the directive is the leak and never
     // the verb; forbidding them would leave the arbiter no vocabulary to refuse in.
