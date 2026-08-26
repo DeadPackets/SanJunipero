@@ -155,7 +155,8 @@ function breakup(events: SimEvent[], ctx: Tier2Ctx): Found | null {
       const a = ids[i]!
       const b = ids[j]!
       const row = partnershipOf(state, a, b)
-      if (row === undefined || row.formedTick === null || row.dissolvedTick === null) continue
+      if (row === undefined) continue
+      if (row.formedTick === null || row.dissolvedTick === null) continue
       const since = row.dissolvedTick - windowTicks
       const spoke = events.some((ev) => {
         if (ev.tick < since || ev.tick > row.dissolvedTick!) return false

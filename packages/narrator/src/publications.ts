@@ -67,6 +67,8 @@ export const PUBLIC_EVENT_TYPES = [
 
 type P = Record<string, unknown>
 
+const strOr = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback)
+
 const publicAgentOf = (type: string, p: P): string | null => {
   if (type === 'agent_moved') return typeof p.id === 'string' ? p.id : null
   if (type === 'structure_planned') return typeof p.builderId === 'string' ? p.builderId : null
@@ -77,19 +79,19 @@ export function publicRecordText(ev: SimEvent): string {
   const p = (ev.payload ?? {}) as P
   switch (ev.type) {
     case 'agent_spoke':
-      return `was heard to say: "${String(p.text ?? '')}"`
+      return `was heard to say: "${strOr(p.text, '')}"`
     case 'action_completed':
-      return `was seen to ${String(p.verb ?? 'act')}`
+      return `was seen to ${strOr(p.verb, 'act')}`
     case 'structure_planned':
       return 'laid out plans for a structure'
     case 'agent_died':
-      return `died of ${String(p.cause ?? 'unknown causes')}`
+      return `died of ${strOr(p.cause, 'unknown causes')}`
     case 'agent_injured':
       return 'was seen wounded'
     case 'agent_recovered':
       return 'was seen back on their feet'
     case 'skill_gained':
-      return `grew skilled at ${String(p.skill ?? 'a craft')}`
+      return `grew skilled at ${strOr(p.skill, 'a craft')}`
     case 'agent_moved':
       return 'was seen about the settlement'
     case 'agent_slept':
