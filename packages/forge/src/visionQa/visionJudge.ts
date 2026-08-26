@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { generateObject } from 'ai'
+import { generateText, Output, type LanguageModel } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type { Footprint } from '@sj/shared'
 import { encodePng, type RawImage } from '../post/raw.js'
@@ -64,7 +64,15 @@ export function makeVisionJudge(opts: {
   const config = opts.config ?? DEFAULT_FORGE_CONFIG
   const modelName = opts.model ?? config.visionQa.model
   const gen: VisionGenerateFn =
-    opts.generateFn ?? ((args) => generateObject(args as Parameters<typeof generateObject>[0]))
+    opts.generateFn ??
+    (async (args) => {
+      const r = await generateText({
+        model: args.model as LanguageModel,
+        messages: args.messages as NonNullable<Parameters<typeof generateText>[0]['messages']>,
+        output: Output.object({ schema: args.schema as z.ZodType }),
+      })
+      return { object: r.output, providerMetadata: r.finalStep.providerMetadata }
+    })
   const model = opts.generateFn ? null : createOpenRouter({ apiKey: opts.apiKey }).chat(modelName)
 
   return async (a) => {

@@ -207,7 +207,7 @@ describe('tilesetVarietyGate', () => {
 
 describe('pixelBarReport', () => {
   it('names the one thing wrong with the real bed: the downscale, nothing else', async () => {
-    const r = await pixelBarReport({
+    const r = pixelBarReport({
       name: 'furniture-bed',
       img: await fixture('bed-192.png'),
       raw: { w: 512, h: 512 },
@@ -219,7 +219,7 @@ describe('pixelBarReport', () => {
     expect(r.failures[0]).toContain('2.667')
   })
   it('collects failures from every gate it was handed', async () => {
-    const r = await pixelBarReport({
+    const r = pixelBarReport({
       name: 'wall-plain',
       img: await fixture('wall-plain-256x160.png'),
       raw: { w: 512, h: 512 },

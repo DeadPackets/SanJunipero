@@ -11,7 +11,7 @@ import {
   resampleToArtHeight,
 } from '../sheet.js'
 
-export const ITEM_PITCH_RANGE: [number, number] = [4, 24]
+const ITEM_PITCH_RANGE: [number, number] = [4, 24]
 export const ART_MIN_ISLAND = 3
 export const CHROMA_BAND_PX = 4
 
@@ -94,7 +94,7 @@ export function countIslands(img: RawImage): number {
   return n
 }
 
-export function padSquare(img: RawImage, px: number): RawImage {
+function padSquare(img: RawImage, px: number): RawImage {
   if (img.width === px && img.height === px) return img
   const data = new Uint8ClampedArray(px * px * 4)
   const w = Math.min(img.width, px),

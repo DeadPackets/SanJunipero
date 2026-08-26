@@ -24,7 +24,7 @@ import {
 
 export const AUTHORED_FACINGS = ['se', 'ne'] as const
 export type AuthoredFacing = (typeof AUTHORED_FACINGS)[number]
-export const MIRROR_OF: Record<'sw' | 'nw', AuthoredFacing> = { sw: 'se', nw: 'ne' }
+const MIRROR_OF: Record<'sw' | 'nw', AuthoredFacing> = { sw: 'se', nw: 'ne' }
 
 // 1×4 wide-canvas strip order per authored facing (3 unique walk frames + idle).
 export const STRIP_POSES_V4 = ['idle', 'contact-a', 'passing', 'contact-b'] as const

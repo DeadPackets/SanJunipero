@@ -11,10 +11,8 @@ describe('makeQuantizer', () => {
     })
   })
   it('off-palette colors snap to the nearest by squared RGB distance', () => {
-    const { nearest } = makeQuantizer([
-      [0, 0, 0],
-      [100, 100, 100],
-    ])
+    // biome-ignore format: pixel grid
+    const { nearest } = makeQuantizer([[0, 0, 0], [100, 100, 100]])
     expect(nearest(10, 10, 10)).toBe(0)
     expect(nearest(90, 80, 95)).toBe(1)
   })
@@ -32,15 +30,10 @@ describe('quantize', () => {
     const img = {
       width: 2,
       height: 1,
+      // biome-ignore format: pixel grid
       data: new Uint8ClampedArray([
-        0xff,
-        0xf5,
-        0xe8,
-        255, // near cream #FFF6E9
-        42,
-        42,
-        42,
-        0, // transparent garbage
+        0xff, 0xf5, 0xe8, 255, // near cream #FFF6E9
+        42, 42, 42, 0,         // transparent garbage
       ]),
     }
     const out = quantize(img)

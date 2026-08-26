@@ -20,7 +20,6 @@ export const GENERATION_PX = {
   structure: 1024,
   'character-cell': 1024,
 } as const
-export type GeneratedClass = keyof typeof GENERATION_PX
 
 export const C_LEVEL = {
   // 512 / 2. Anything larger than this cannot be an integer downscale of a 512 generation.
@@ -59,7 +58,7 @@ export function nativeSizeFor(_klass: SizedClass, fp: Footprint): Size {
 }
 
 export type ResolutionRow = ClassResolution & {
-  klass: GeneratedClass | string
+  klass: string
   genPx: number
   todayPx: number // what the class ships at on main, for the "how far did it move" column
   note: string

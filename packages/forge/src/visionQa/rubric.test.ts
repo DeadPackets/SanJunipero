@@ -28,7 +28,7 @@ function opaqueColors(img: RawImage): Set<string> {
   const s = new Set<string>()
   for (let y = 0; y < img.height; y++)
     for (let x = 0; x < img.width; x++)
-      if (img.data[(y * img.width + x) * 4 + 3]! === 255) s.add(hex(img, x, y))
+      if (img.data[(y * img.width + x) * 4 + 3] === 255) s.add(hex(img, x, y))
   return s
 }
 

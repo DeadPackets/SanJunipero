@@ -299,7 +299,7 @@ const md = [
   '## The keyless half — palette and transparency need no eye',
   '',
   'The master palette is a closed set of 40 colours and alpha is a number, so both are counted',
-  'rather than judged. Over every opaque pixel of all ' + results.length + ' cells:',
+  `rather than judged. Over every opaque pixel of all ${results.length} cells:`,
   '',
   `- **${offPaletteCells.length} of ${results.length} cells carry an off-palette or semi-opaque pixel.**`,
   `- Total off-palette pixels ${results.reduce((s, r) => s + r.keyless.offPalette, 0)}, ` +

@@ -60,7 +60,10 @@ const judge: JudgeFn = makeVlmJudge({ apiKey: KEY, refSheets: REFS })
 const SCORES_PATH = `${CACHE}/scores.json`
 const scores: Record<string, { score: number; notes: string }> = (() => {
   try {
-    return JSON.parse(readFileSync(SCORES_PATH, 'utf8'))
+    return JSON.parse(readFileSync(SCORES_PATH, 'utf8')) as Record<
+      string,
+      { score: number; notes: string }
+    >
   } catch {
     return {}
   }

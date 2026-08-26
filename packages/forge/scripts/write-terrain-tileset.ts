@@ -31,15 +31,12 @@ console.log(`wrote ${SCAFFOLDING_FILE} — ${sheets.scaffolding.width}x${sheets.
 
 const tiles = seasonTileNames()
 const path = join(DIR, 'manifest.json')
-const {
-  tileW: _w,
-  tileH: _h,
-  cols: _c,
-  rows: _r,
-  seasons: _s,
-  scaffolding: _sc,
-  ...rest
-} = (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}) as Record<string, unknown>
+const existing = (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}) as Record<
+  string,
+  unknown
+>
+const REGENERATED = ['tileW', 'tileH', 'cols', 'rows', 'seasons', 'scaffolding']
+const rest = Object.fromEntries(Object.entries(existing).filter(([k]) => !REGENERATED.includes(k)))
 const merged = {
   tileW: TERRAIN_TILE_W,
   tileH: TERRAIN_TILE_H,

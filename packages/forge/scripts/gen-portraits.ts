@@ -57,7 +57,10 @@ const EXPRESSION_CLAUSES: Record<Expression, string> = {
 const SCORES_PATH = `${CACHE}/scores.json`
 const scores: Record<string, { score: number; notes: string }> = (() => {
   try {
-    return JSON.parse(readFileSync(SCORES_PATH, 'utf8'))
+    return JSON.parse(readFileSync(SCORES_PATH, 'utf8')) as Record<
+      string,
+      { score: number; notes: string }
+    >
   } catch {
     return {}
   }
@@ -247,7 +250,7 @@ exprLoop: for (const expr of EXPRESSIONS) {
     )
     if (problems.length === 0 && (!best || best.problems.length > 0 || c.score > best.c.score))
       best = { c, problems }
-    else if (!best) best = { c, problems }
+    else best ??= { c, problems }
   }
   if (!best) {
     report.push(`${expr}: every candidate failed post-processing`)

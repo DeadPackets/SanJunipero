@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { generateObject } from 'ai'
+import { generateText, Output, type LanguageModel } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 export const JUDGE_MODEL = 'openai/gpt-5.6-luna'
@@ -31,8 +31,14 @@ export function makeVlmJudge(opts: {
 }): JudgeFn {
   const gen: GenerateFn =
     opts.generateFn ??
-    ((args) =>
-      generateObject(args as Parameters<typeof generateObject>[0]) as ReturnType<GenerateFn>)
+    (async (args) => {
+      const r = await generateText({
+        model: args.model as LanguageModel,
+        messages: args.messages as NonNullable<Parameters<typeof generateText>[0]['messages']>,
+        output: Output.object({ schema: args.schema }),
+      })
+      return { object: r.output }
+    })
   const model = opts.generateFn
     ? null
     : createOpenRouter({ apiKey: opts.apiKey }).chat(opts.model ?? JUDGE_MODEL)

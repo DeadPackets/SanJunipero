@@ -20,7 +20,7 @@ console.log(
 
 const path = join(DIR, 'manifest.json')
 const existing: Record<string, unknown> = existsSync(path)
-  ? JSON.parse(readFileSync(path, 'utf8'))
+  ? (JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>)
   : {}
 const merged = {
   ...existing,

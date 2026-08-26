@@ -203,4 +203,7 @@ async function main() {
   writeFileSync('docs/superpowers/probes/2026-08-15-c5-image-api.md', report)
   console.log(report)
 }
-main()
+main().catch((err: unknown) => {
+  console.error(err)
+  process.exit(1)
+})

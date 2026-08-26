@@ -122,7 +122,7 @@ describe('criterionOf', () => {
   })
 
   it('returns undefined for a criterion the stored verdict predates, rather than crashing', () => {
-    const { tiling, ...older } = v.criteria
+    const older = Object.fromEntries(Object.entries(v.criteria).filter(([k]) => k !== 'tiling'))
     const stored = { ...v, criteria: older as unknown as VisionCriteria }
     expect(criterionOf(stored, 'tiling')).toBeUndefined()
     expect(criterionOf(stored, 'palette')?.score).toBe(8)

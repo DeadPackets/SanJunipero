@@ -19,37 +19,16 @@ const MAP_W = 15,
 // A hollow ring (four corners, both straights), a two-tile branch off each ring edge (the four
 // T junctions and four caps), and a detached plus (the cross). Branches are two tiles long so
 // a branch reads as a branch and not as a flare on the ring.
+// biome-ignore format: pixel grid
 const RING = [
   ...Array.from({ length: 5 }, (_, i) => [2 + i, 2] as const),
   ...Array.from({ length: 5 }, (_, i) => [2 + i, 6] as const),
-  [2, 3],
-  [2, 4],
-  [2, 5],
-  [6, 3],
-  [6, 4],
-  [6, 5],
+  [2, 3], [2, 4], [2, 5], [6, 3], [6, 4], [6, 5],
 ] as const
-const BRANCHES = [
-  [4, 1],
-  [4, 0],
-  [4, 7],
-  [4, 8],
-  [1, 4],
-  [0, 4],
-  [7, 4],
-  [8, 4],
-] as const
-const PLUS = [
-  [12, 2],
-  [12, 3],
-  [12, 4],
-  [12, 5],
-  [12, 6],
-  [10, 4],
-  [11, 4],
-  [13, 4],
-  [14, 4],
-] as const
+// biome-ignore format: pixel grid
+const BRANCHES = [[4, 1], [4, 0], [4, 7], [4, 8], [1, 4], [0, 4], [7, 4], [8, 4]] as const
+// biome-ignore format: pixel grid
+const PLUS = [[12, 2], [12, 3], [12, 4], [12, 5], [12, 6], [10, 4], [11, 4], [13, 4], [14, 4]] as const
 
 const cells = new Set([...RING, ...BRANCHES, ...PLUS].map(([x, y]) => `${x},${y}`))
 const on = (x: number, y: number): boolean => cells.has(`${x},${y}`)
