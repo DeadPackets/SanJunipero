@@ -30,12 +30,15 @@ export class TickLoop {
   step(): void {
     const prevTick = this.#tick
     const prevState = this.#state
+    const prevRng = this.#rng.snapshot()
     this.#tick += 1
     try {
       this.#doStep()
     } catch (err) {
       this.#tick = prevTick
       this.#state = prevState
+      // In place: the tick handler holds this same object, so reassigning would split the two.
+      this.#rng.load(prevRng)
       throw err
     }
   }

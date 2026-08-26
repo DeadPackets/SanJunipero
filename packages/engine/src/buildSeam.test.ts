@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CONFIG, MIN_SEP, PITCH, STREET, TOWN_SQUARE, T_GRASS, T_ROAD, WORLD_MARGIN,
-  blockGroundOf, centreOf, dayPhaseFromTick, edgesOwed, type SimEvent, type TownClaim,
+  blockGroundOf, centreOf, chronicleLine, dayPhaseFromTick, edgesOwed, type SimEvent, type TownClaim,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
@@ -12,7 +12,7 @@ import {
   buildIsPlotted, buildSiteOf, groundForBuilding, handsOnSite, isAdjacentToRect, isPlottedKind,
   stepBuild, workPenalty,
 } from './verbs.js'
-import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
+import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf, type TileChange } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
 
 const CFG = DEFAULT_CONFIG
@@ -410,8 +410,34 @@ describe('★ a block is laid out when its first building is raised', () => {
     const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 })
     expect(lay).not.toBe('off the map')
     const changes = lay as Array<{ from: number; reason: string }>
-    expect(changes.filter((c) => c.reason === 'cleared' && c.from === T_FOREST).length).toBeGreaterThan(200)
-    expect(changes.filter((c) => c.reason === 'paved').length).toBeGreaterThan(100)
+    expect(changes.filter((c) => c.reason === 'levelled' && c.from === T_FOREST).length).toBeGreaterThan(200)
+    expect(changes.filter((c) => c.reason === 'surfaced').length).toBeGreaterThan(100)
+  })
+
+  it('★ lays a block in silence: the town levelling ground is nobody\'s deed', () => {
+    const s = genesisTown()
+    const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 }) as TileChange[]
+    // NON-VACUITY: one build intent moves hundreds of tiles, every one stamped with the builder.
+    expect(lay.length).toBeGreaterThan(400)
+    const look = { agentName: () => 'Rahel', structureKind: () => 'house', mysteryProse: () => null }
+    const lines = lay
+      .map((t, i) => chronicleLine(ev('tile_changed', { ...t, byId: 'a' }), look))
+      .filter((l) => l !== null)
+    expect(lines).toEqual([])
+  })
+
+  it('★ leaves worked ground alone: a tilled field survives the block being laid', () => {
+    let s = genesisTown()
+    const block = { i: 2, j: 0 }
+    const field = blockGroundOf(TOWN_SQUARE, block).cleared
+      .find((t) => s.terrain[t.y]![t.x] !== T_GRASS)!
+    s = apply(s, [{ type: 'tile_changed', payload: {
+      x: field.x, y: field.y, from: s.terrain[field.y]![field.x], to: 6, reason: 'tilled', byId: 'a',
+    } }])
+    // NON-VACUITY: the block is laid, and laid wide — this one tile is the exception, not a no-op.
+    const lay = layBlock(s, TOWN_SQUARE, block) as TileChange[]
+    expect(lay.length).toBeGreaterThan(400)
+    expect(lay.find((c) => c.x === field.x && c.y === field.y)).toBeUndefined()
   })
 
   it('lays the ground before it plants the roof, in that order', () => {

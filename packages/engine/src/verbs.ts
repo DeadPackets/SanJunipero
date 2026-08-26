@@ -12,7 +12,7 @@ const DEFAULT_TOWN_FACING: TownFacing = 'sw'
 import { mintId, type Affliction, type Item, type Structure, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, occupantsOf, roomIsFull, sameInterior } from './interiors.js'
-import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
+import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
@@ -105,11 +105,14 @@ const walk: VerbDef = makeVerb({
 
 // A walk the search could not finish inside its budget. The legs still go, and they stop short
 // of where the mind aimed them — which is a thing the body can tell, and the only thing it can.
-export function walkIsCapped(state: WorldState, config: SimConfig, agentId: string): boolean {
+export function walkIsCapped(state: WorldState, agentId: string): boolean {
   const a = state.agents[agentId]
   if (!a?.activity || a.activity.verb !== 'walk') return false
   const p = WalkParams.safeParse(a.activity.params)
-  return p.success && searchPath(state, a, p.data, config)?.capped === true
+  if (!p.success) return false
+  // An empty route is a walk that was already there, not a walk that stops short.
+  const last = a.activity.path?.at(-1)
+  return last !== undefined && (last[0] !== p.data.x || last[1] !== p.data.y)
 }
 
 export const EatParams = z.object({ itemId: z.string() }).strict()

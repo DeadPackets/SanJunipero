@@ -2,7 +2,7 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
-const INJURY_HEAL_DAYS = 3
+export const INJURY_HEAL_DAYS = 3
 
 // A fever is a nightly coin, not a per-tick one: the body either loses ground or gains it, and
 // the same event carries both. This file is the world's only contagion, once a night, one stream.

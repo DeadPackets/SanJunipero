@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
 import { genesisState } from './state.js'
 import { fold } from './fold.js'
 
@@ -98,6 +98,19 @@ describe('fold', () => {
     let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
     s = fold(s, ev(2, 'tile_changed', { x: 0, y: 0, from: 0, to: 7, reason: 'paved', byId: 'a1' }))
     expect(s.terrain[0]![0]).toBe(7)
+  })
+
+  it('the day turning drops wounds that have healed and keeps the open ones', () => {
+    const DAY = MINUTES_PER_DAY
+    let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    s = fold(s, ev(2, 'agent_injured', { agentId: 'a1', kind: 'minor' }, 0))
+    s = fold(s, ev(3, 'agent_injured', { agentId: 'a1', kind: 'serious' }, 2 * DAY))
+    expect(s.agents.a1!.injuries).toHaveLength(2)
+    // Day 3: the day-0 wound is outside the three-day window, the day-2 one is still in it.
+    s = fold(s, ev(4, 'agent_aged', { agentId: 'a1' }, 3 * DAY))
+    expect(s.agents.a1!.injuries).toEqual([{ kind: 'serious', day: 2 }])
+    s = fold(s, ev(5, 'agent_aged', { agentId: 'a1' }, 5 * DAY))
+    expect(s.agents.a1!.injuries).toEqual([])
   })
 
   it('bumps counters.nextEntityId on spawn and never lowers it', () => {

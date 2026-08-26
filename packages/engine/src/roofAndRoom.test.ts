@@ -206,6 +206,17 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     expect(enter(s, 'a3').ok).toBe(true)
   })
 
+  it('gives the floor back when a body dies indoors', () => {
+    let s = withBuilding(world(), 'house')
+    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
+    s = fold(s, ev(22, 'agent_died', { agentId: 'a1', cause: 'starvation' }))
+    expect(occupantsOf(s, 'structure_1')).toEqual(['a2'])
+    expect(roomIsFull(s, s.structures.structure_1!)).toBe(false)
+    expect(enter(s, 'a3').ok).toBe(true)
+  })
+
   // ★ PHYSICS, NOT OWNERSHIP. Ownership is a concept the town has to invent; gating the door on
   // it would hand it over. The owner gets no key and no priority — only floor decides.
   it('never asks whose the building is', () => {

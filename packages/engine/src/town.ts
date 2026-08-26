@@ -86,7 +86,7 @@ export function townGroundBox(state: WorldState): WorldBox | null {
     : townBoxOf(square, ringsStanding(square, standingRects(state), townGroundOf(state, square)))
 }
 
-export type TileChange = { x: number; y: number; from: number; to: number; reason: 'cleared' | 'paved' }
+export type TileChange = { x: number; y: number; from: number; to: number; reason: 'levelled' | 'surfaced' }
 
 /** Returns only the tiles that differ, so a block whose streets a neighbour paved costs nothing.
  *  'off the map' is the loud answer: the world widens at midnight and the build succeeds next morning. */
@@ -95,10 +95,13 @@ export function layBlock(
 ): TileChange[] | 'off the map' {
   const { cleared, paved } = blockGroundOf(square, block, townGroundOf(state, square))
   const out: TileChange[] = []
-  for (const [tiles, to, reason] of [[cleared, T_GRASS, 'cleared'], [paved, T_ROAD, 'paved']] as const) {
+  for (const [tiles, to, reason] of [[cleared, T_GRASS, 'levelled'], [paved, T_ROAD, 'surfaced']] as const) {
     for (const t of tiles) {
       const from = state.terrain[t.y]?.[t.x]
       if (from === undefined) return 'off the map'
+      // A field and a street are somebody's work; a channel is not spared, because it is
+      // impassable and a plot the town can never build on is worse than a lost ditch.
+      if (reason === 'levelled' && (from === 6 || from === T_ROAD)) continue
       if (from !== to) out.push({ x: t.x, y: t.y, from, to, reason })
     }
   }
