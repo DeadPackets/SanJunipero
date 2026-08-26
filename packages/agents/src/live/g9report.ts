@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { median } from './g11report.js'
 
 // Shared schema for `data/g9-report.json`: the run script writes it and checks addendum §17's
 // G9b criteria 1–8 against what it just ran. One module so the writer and the checker cannot
@@ -106,12 +107,6 @@ export const G9ReportSchema = z.object({
 }).strict()
 export type G9Report = z.infer<typeof G9ReportSchema>
 
-const median = (xs: number[]): number => {
-  if (xs.length === 0) return 0
-  const s = [...xs].sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!
-}
 export { median }
 
 // Budgets differentiate when the tersest persona's median utterance is shorter

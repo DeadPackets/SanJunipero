@@ -231,8 +231,7 @@ export async function classifyCandidates(
     system: CONSTRUCT_TYPE_INSTRUCTION,
     messages: [{ role: 'user', content: renderCandidates(candidates) }],
   })
-  const parsed = ClassificationSchema.safeParse(r.value)
-  const rulings = parsed.success ? parsed.data.rulings : []
+  const rulings = r.value.rulings
   for (const c of candidates) {
     const said = rulings.find((x) => x.key === c.key)?.type
     const type = said !== undefined && allowed.has(said as ConstructType) ? said as ConstructType : 'custom'

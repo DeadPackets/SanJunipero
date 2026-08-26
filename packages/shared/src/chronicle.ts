@@ -171,6 +171,16 @@ export function faunaSightingLine(kind: string, farBank: boolean): string {
 // What a viewer reads where a name would be. The town has not named the thing, and saying so
 // is the truth; the alternative is a label, and labels are ours, not theirs (G9).
 export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
+
+// The human-framing law, one declaration for every package that enforces it: no world text,
+// block template, perception prose, recipe name, verdict reason, outcome label or viewer-facing
+// narrator string may ever name the machinery behind the agent. This regex is the enforcement
+// point. `(?!\w)` closes the boundary instead of a trailing `\b`: every alternative ends in a
+// word character except `A\.I\.`, whose final `.` a `\b` can never follow. Plurals are folded
+// in as `s?` so "prompts"/"tokens"/"models"/"tools" are caught too.
+export const FORBIDDEN_FRAMING =
+  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
+
 export const CONSTRUCT_CHRONICLE_WEIGHT = 16
 export const CONSTRUCT_CHRONICLE_ICON = 'star'
 

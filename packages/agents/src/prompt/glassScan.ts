@@ -184,9 +184,8 @@ export function assertNoGlassLeak(text: string, where: string): void {
   if (leaks.length > 0) throw new Error(`one-way glass leak in ${where}: ${leaks.join(', ')}`)
 }
 
-// What the viewer reads where a name would go. Not a label — it says plainly that the town
-// has not named the thing yet, which is the truth (G9).
-export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
+// One declaration, in @sj/shared, so the viewer copy and the glass-side copy cannot drift.
+export { UNNAMED_CONSTRUCT_COPY } from '@sj/shared'
 
 export type NameSource = {
   sourceKind: 'speech' | 'inscription'

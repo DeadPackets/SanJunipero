@@ -18,7 +18,6 @@ import {
   type MindClock,
   type MindConfig,
   type PlanState,
-  type WakeReason,
 } from '../wake.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
@@ -274,7 +273,7 @@ export class AgentRuntime {
     const packet = this.#bridge.perception(this.#agentId)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#submitPendingIfIdle(packet.self.activity)
-    this.#advancePlan(packet)
+    this.#pumpPlan(packet.self.activity)
     this.#answerWakeOwed(packet)
     if (packet.heard.length > 0) {
       this.#clock.conversationUntilTick = tick + this.#config.conversationWindowTicks
@@ -293,7 +292,7 @@ export class AgentRuntime {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
       }
-      void this.#startTurn(reason)
+      void this.#startTurn()
     }
   }
 
@@ -311,13 +310,9 @@ export class AgentRuntime {
     void this.#bridge.submit(this.#agentId, { verb: 'wake', params: {} })
   }
 
-  #advancePlan(packet: PerceptionPacket): void {
-    this.#pumpPlan(packet.self.activity)
-  }
-
   // Submit the queue head exactly when the agent is idle, and advance the queue
   // when an in-flight head's action completes. A rejected head is handled
-  // synchronously during the drain (onResult), before #advancePlan ever runs.
+  // synchronously during the drain (onResult), before #pumpPlan ever runs.
   #pumpPlan(activity: string | null): void {
     if (this.#plan.lastResult !== 'running') return
     // A held direct action outranks the plan: the queue waits its turn.
@@ -462,7 +457,7 @@ export class AgentRuntime {
     this.#wasNight = isNight
   }
 
-  async #startTurn(_reason: WakeReason): Promise<void> {
+  async #startTurn(): Promise<void> {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
     const tick = this.#bridge.currentTick()
@@ -511,9 +506,9 @@ export class AgentRuntime {
       importance: 3,
       tags: {
         people: packet.visible.agents.map((a) => a.name),
-        place: nearestStructureKind(packet),
+        place: cues.place,
         objects: [],
-        topics: keywords(packet.heard.map((h) => h.text).join(' ')),
+        topics: cues.topics,
       },
     })
 

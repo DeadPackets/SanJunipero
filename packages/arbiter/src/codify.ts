@@ -4,7 +4,7 @@ import type { DiscoveryCredit, SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
-import { recipeSanityRefusal } from './sanity.js'
+import { productsOf, recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
 import type { Codified } from './adjudicate.js'
@@ -163,16 +163,6 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,
     rngStream: recipe.rngStream,
   }
-}
-
-// What a recipe unlocked, as item kinds. Sorted and deduped so the same recipe always yields
-// the same array — the forge keys off it and a byte-unstable list would re-commission art.
-export function productsOf(recipe: Recipe): string[] {
-  const kinds = new Set<string>()
-  for (const row of recipe.outcomeTable) {
-    for (const e of row.effects) if (e.op === 'spawn_item') kinds.add(e.kind)
-  }
-  return [...kinds].sort()
 }
 
 export function codify(

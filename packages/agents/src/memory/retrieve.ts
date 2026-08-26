@@ -59,11 +59,15 @@ export function keywords(text: string, max = 6): string[] {
   return out
 }
 
-export function cuesToQuery(cues: SceneCues): string {
+function cueParts(cues: SceneCues): string[] {
   const parts: string[] = [...cues.people]
   if (cues.place !== null) parts.push(cues.place)
   parts.push(...cues.topics)
-  return parts.join(' ')
+  return parts
+}
+
+export function cuesToQuery(cues: SceneCues): string {
+  return cueParts(cues).join(' ')
 }
 
 function flattenTags(tags: MemoryTags): string[] {
@@ -183,11 +187,8 @@ export async function retrieveAmbient(
   k = 8,
   w: RetrievalWeights = DEFAULT_WEIGHTS,
 ): Promise<ScoredMemory[]> {
-  const query = cuesToQuery(cues)
-  const queryTags = [...cues.people]
-  if (cues.place !== null) queryTags.push(cues.place)
-  queryTags.push(...cues.topics)
-  return retrieve(store, query, queryTags, nowTick, k, w, 'ambient')
+  const queryTags = cueParts(cues)
+  return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w, 'ambient')
 }
 
 export async function recall(

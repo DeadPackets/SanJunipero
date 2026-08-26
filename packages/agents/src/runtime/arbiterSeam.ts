@@ -76,9 +76,6 @@ export function humanizeIntent(verb: string, params: Record<string, unknown>): s
   return [verb.replace(/_/g, ' '), ...values].join(' ')
 }
 
-/** @deprecated The name the flattened form had. Kept so nothing outside this package breaks. */
-export const flattenIntent = humanizeIntent
-
 // The one call G9b and C8's supervisor make once both halves exist.
 export function wireArbiter(runtime: { useArbiter(a: SeamArbiter): void }, arbiter: SeamArbiter): void {
   runtime.useArbiter(arbiter)

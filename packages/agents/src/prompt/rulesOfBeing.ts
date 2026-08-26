@@ -142,11 +142,5 @@ The long dash is a crutch. A full stop does the same work, and a comma does the
 rest.`
 
 
-// The human-framing law: no world text, block template, or perception prose may
-// ever name the machinery behind the agent. This regex is the enforcement point.
-// `(?!\w)` closes the boundary instead of a trailing `\b`: every alternative
-// ends in a word character except `A\.I\.`, whose final `.` a `\b` can never
-// follow. Plurals are folded in as `s?` so "prompts"/"tokens"/"models"/"tools"
-// are caught too.
-export const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
+// The human-framing law lives in @sj/shared so the three packages that enforce it cannot drift.
+export { FORBIDDEN_FRAMING } from '@sj/shared'
