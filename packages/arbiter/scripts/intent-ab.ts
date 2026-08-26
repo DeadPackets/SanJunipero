@@ -14,13 +14,13 @@ import { CodexStore, GENESIS_CODEX, makeArbiter, openArbiterDb } from '../src/in
 import { FALLBACK_IMPOSSIBLE } from '../src/adjudicate.js'
 
 const CAP_USD = 1.5
-const OUT = process.env['SJ_OUT'] ?? '/tmp/intent-ab.json'
+const OUT = process.env.SJ_OUT ?? '/tmp/intent-ab.json'
 // Each arm opens its own EMPTY `_arbiter.db`, so an arm is self-contained and can be run and
 // scored on its own. `SJ_ARM=after` re-runs one half instead of re-spending on both — which is
 // what the first attempt needed after a watchdog killed it with the before arm complete.
-const ARM = process.env['SJ_ARM'] ?? null
+const ARM = process.env.SJ_ARM ?? null
 const MODELS_DIR =
-  process.env['SJ_MODELS_DIR'] ?? fileURLToPath(new URL('../../../data/models/', import.meta.url))
+  process.env.SJ_MODELS_DIR ?? fileURLToPath(new URL('../../../data/models/', import.meta.url))
 
 const VOCABULARY = {
   itemKinds: [
@@ -161,7 +161,7 @@ async function runArm(
     if (v.kind === 'attempt') {
       // The only honest measure of "would codify": run the same call the runtime runs.
       try {
-        arbiter.codify(v.recipe as never, { agentId: AGENT.agentId, intent })
+        arbiter.codify(v.recipe, { agentId: AGENT.agentId, intent })
         codified = true
       } catch {
         codified = false
@@ -190,7 +190,7 @@ async function runArm(
 }
 
 async function main(): Promise<void> {
-  if (!process.env['OPENROUTER_API_KEY']) {
+  if (!process.env.OPENROUTER_API_KEY) {
     console.error('needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     process.exit(1)
   }

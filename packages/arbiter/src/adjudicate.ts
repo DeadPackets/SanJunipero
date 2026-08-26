@@ -38,11 +38,11 @@ const MAX_LLM_ATTEMPTS = 2
 
 // Returned, never recorded, so a bad run cannot become precedent; mind-facing, so it may name
 // the attempt, never the act. Widening `ImpossibleClassSchema` would hand the model an easy out.
-export const FALLBACK_IMPOSSIBLE: Verdict = {
+export const FALLBACK_IMPOSSIBLE = {
   kind: 'impossible',
   reason: 'you turn it over and it will not come together as it stands',
   class: 'physically_impossible',
-}
+} satisfies Verdict
 
 // Canned diegetic line replacing an impossible reason that leaks the machinery.
 const CLEAN_IMPOSSIBLE_REASON = 'nothing in the town lends itself to this'
