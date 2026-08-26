@@ -26,7 +26,7 @@ import { lawChangesFrom } from '../../web/src/panels/lawsModel.js'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import {
-  buildAgentCtx, flattenIntent, wireArbiter, type Adjudicator, type Codifier,
+  buildAgentCtx, humanizeIntent, wireArbiter, type Adjudicator, type Codifier,
 } from '../src/runtime/arbiterSeam.js'
 import { openAgentDb } from '../src/memory/schema.js'
 import { MemoryStore } from '../src/memory/store.js'
@@ -541,7 +541,7 @@ async function main(): Promise<void> {
   const unknownVerbRejections = bridge.rejections.filter((r) => r.reason.startsWith('unknown verb:'))
   const routedIntents = new Set(adjudications.map((a) => a.intent))
   const adjudicationsAfterUnknownVerb = unknownVerbRejections
-    .filter((r) => routedIntents.has(flattenIntent(r.verb, r.params))).length
+    .filter((r) => routedIntents.has(humanizeIntent(r.verb, r.params))).length
   const unknownVerbRefusalMemories = qInt(
     db, `SELECT COUNT(*) FROM memories WHERE text LIKE 'You realize you cannot: unknown verb:%'`,
   )

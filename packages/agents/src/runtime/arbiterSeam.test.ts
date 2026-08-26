@@ -12,7 +12,7 @@ import {
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { buildAgentCtx, flattenIntent, wireArbiter, type SeamArbiter } from './arbiterSeam.js'
+import { buildAgentCtx, humanizeIntent, wireArbiter, type SeamArbiter } from './arbiterSeam.js'
 
 const AGENT = 'tamar'
 
@@ -85,19 +85,19 @@ describe('buildAgentCtx', () => {
   })
 })
 
-describe('flattenIntent', () => {
+describe('humanizeIntent', () => {
   it('turns a rejected named verb back into the words a mind would use', () => {
-    expect(flattenIntent('patch', { structureId: 'structure_1' })).toBe('patch structure_1')
-    expect(flattenIntent('inspect', {})).toBe('inspect')
+    expect(humanizeIntent('patch', { structureId: 'structure_1' })).toBe('patch structure_1')
+    expect(humanizeIntent('inspect', {})).toBe('inspect')
   })
 
   it('is deterministic: params read in key order, whatever order they arrived in', () => {
-    expect(flattenIntent('walk', { y: 6, x: 5 })).toBe('walk 5 6')
-    expect(flattenIntent('walk', { x: 5, y: 6 })).toBe('walk 5 6')
+    expect(humanizeIntent('walk', { y: 6, x: 5 })).toBe('walk 5 6')
+    expect(humanizeIntent('walk', { x: 5, y: 6 })).toBe('walk 5 6')
   })
 
   it('flattens a nested param without losing it', () => {
-    expect(flattenIntent('offer', { gift: { kind: 'bread' } })).toBe('offer {"kind":"bread"}')
+    expect(humanizeIntent('offer', { gift: { kind: 'bread' } })).toBe('offer {"kind":"bread"}')
   })
 })
 
