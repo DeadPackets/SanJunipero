@@ -192,13 +192,16 @@ export function App() {
   }, [route, insideId])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
-  // panning and a text field owns them for typing, so both keep them (lensKeyAllowed).
+  // panning, a text field owns them for typing, and a toolbar or scrubber that already
+  // consumed the press owns it too, so all three keep them (lensKeyAllowed).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.altKey || e.ctrlKey || e.metaKey) return
       const t = e.target as HTMLElement | null
       const inApplication = t?.closest?.('[role="application"]') != null
-      if (!lensKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false, inApplication)) return
+      if (!lensKeyAllowed(
+        t?.tagName ?? '', t?.isContentEditable ?? false, inApplication, e.defaultPrevented,
+      )) return
       const next = lensFromKey(e.key, route.lens)
       if (next === null) return
       e.preventDefault()

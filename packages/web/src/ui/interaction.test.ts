@@ -143,4 +143,12 @@ describe('lensKeyAllowed', () => {
   it('leaves the arrows to the map, which pans with them', () => {
     expect(lensKeyAllowed('DIV', false, true)).toBe(false)
   })
+
+  // The toolbar and both scrubbers call preventDefault and nothing else: without this the same
+  // press walked their cursor AND cycled the lens, unmounting the surface being driven.
+  it('never takes an arrow a control has already consumed', () => {
+    expect(lensKeyAllowed('BUTTON', false, false, true)).toBe(false)
+    expect(lensKeyAllowed('DIV', false, false, true)).toBe(false)
+    expect(lensKeyAllowed('BUTTON', false, false, false)).toBe(true)
+  })
 })
