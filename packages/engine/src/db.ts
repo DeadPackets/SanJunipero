@@ -12,6 +12,7 @@ export function openDb(path: string): Database.Database {
       payload TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_events_tick ON events(tick);
+    CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
     CREATE TABLE IF NOT EXISTS snapshots (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tick INTEGER NOT NULL,
