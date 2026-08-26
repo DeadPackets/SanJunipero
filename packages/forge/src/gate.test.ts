@@ -111,7 +111,7 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
   it('★ the stride trio and the atlas pixel bar are no longer advisory', () => {
     expect(src, 'the stride trio still just logs FLAGGED').not.toContain("'FLAGGED'")
     expect(src, 'the packed atlas is still written whatever the bar says').toMatch(
-      /if \(bar\.length > 0\) throw new Error/,
+      /if \(bar\.length > 0\)\s+throw new Error/,
     )
   })
 

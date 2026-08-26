@@ -95,7 +95,9 @@ describe('LensTabsView', () => {
       ['society', '/api/bonds/count', 'bonds'],
       ['chronicle', '/api/chronicle/count', 'chronicle'],
     ] as const) {
-      expect(body, `${lens} must be badged from ${url}`).toContain(`useHistoryCount('${url}'`)
+      expect(body, `${lens} must be badged from ${url}`).toMatch(
+        new RegExp(`useHistoryCount\\(\\s*'${url}'`),
+      )
       expect(body, `${lens} must reach the counts object`).toMatch(new RegExp(`\\b${binding}\\b`))
     }
   })
@@ -105,8 +107,8 @@ describe('LensTabsView', () => {
   it('★ counts from the count endpoints, never by downloading the feed', () => {
     const src = readFileSync(new URL('./StatusStrip.tsx', import.meta.url), 'utf8')
     for (const feed of ['/api/chronicle', '/api/bonds']) {
-      expect(src, `${feed} must not be fetched whole to find its length`).not.toContain(
-        `useHistoryCount('${feed}',`,
+      expect(src, `${feed} must not be fetched whole to find its length`).not.toMatch(
+        new RegExp(`useHistoryCount\\(\\s*'${feed}',`),
       )
     }
     // Pointing the URL at /count is only half of it: a parser still reading the array would
