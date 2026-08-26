@@ -871,7 +871,11 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
     case 'traffic_decayed': {
       TrafficDecayed.parse(event.payload)
       const traffic: Record<string, number> = {}
-      for (const [key, value] of Object.entries(state.traffic ?? {})) traffic[key] = decayTraffic(value, config)
+      // A tile worn back to nothing leaves the map — every reader of it is already `?? 0`.
+      for (const [key, value] of Object.entries(state.traffic ?? {})) {
+        const worn = decayTraffic(value, config)
+        if (worn > 0) traffic[key] = worn
+      }
       const quietSince = quietPathsAt(state, traffic, Math.floor(event.tick / MINUTES_PER_DAY), config)
       const next: WorldState = { ...state }
       if (Object.keys(traffic).length > 0) next.traffic = traffic
