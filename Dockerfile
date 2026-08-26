@@ -1,14 +1,5 @@
-# San Junipero, as a stream: one image, one process, one port.
-#
-# ★ WHY THE WHOLE WORKSPACE IS COPIED AND NOT JUST THE GATEWAY. pnpm workspaces link
-# `@sj/gateway` to `@sj/shared`, `@sj/engine` and `@sj/forge` by symlink, and the gateway runs
-# from TypeScript SOURCE under tsx — there is no build step that would flatten those links into
-# one directory. A per-package prune (`pnpm deploy`) would have to bring all four packages plus
-# their sources anyway, so it buys nothing but a longer Dockerfile.
-#
-# ★ WHY THERE ARE TWO STAGES ANYWAY. `@sj/web` pulls in vite, react, pixi and rolldown — some
-# 200 MB that exist only to turn `src/` into `dist/`. The build stage keeps them; the runtime
-# stage takes the built `dist/` and installs production dependencies only.
+# The whole workspace is copied: pnpm links @sj/* by symlink and the gateway runs from TS source
+# under tsx, so there is nothing to prune to. Two stages only to leave vite/react/pixi behind.
 
 FROM node:24-slim AS build
 RUN corepack enable
@@ -25,15 +16,11 @@ FROM node:24-slim AS runtime
 RUN corepack enable
 WORKDIR /app
 ENV NODE_ENV=production
-# ★ THE TREE IS COPIED WHOLE RATHER THAN RE-INSTALLED --prod, and that is a decision, not haste.
-# `better-sqlite3` has no prebuild for this node/arch pair and compiles from source, so a second
-# `pnpm install` in this stage would need python3/make/g++ back — more image than the
-# devDependencies it set out to remove. What this stage DOES buy is leaving the apt toolchain
-# behind, since it lives outside /app.
+# Copied whole rather than re-installed --prod: better-sqlite3 has no prebuild for this
+# node/arch pair, so a second install would need the python3/make/g++ toolchain back.
 COPY --from=build /app /app
 
-# The world writes its db here, and resumes from it on the next boot. WITHOUT a volume the town
-# dies with the container; with one (see compose.yaml) it survives restart, upgrade and crash.
+# Without a volume the town dies with the container — see compose.yaml.
 RUN mkdir -p /app/packages/gateway/data
 VOLUME ["/app/packages/gateway/data"]
 
