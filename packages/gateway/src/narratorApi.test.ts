@@ -1,12 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleEntry } from '@sj/shared'
+import {
+  CHRONICLE_ICONS, DEFAULT_CONFIG, MINUTES_PER_DAY, MomentsResponseSchema, type ChronicleEntry,
+} from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { NARRATOR_READ_TABLES } from './narratorApi.js'
+import { CHRONICLE_MAX, NARRATOR_READ_TABLES } from './narratorApi.js'
 import { createGateway, type Gateway } from './server.js'
 
 // The DDL below is copied from packages/narrator/src/schema.ts — importing @sj/narrator would
@@ -357,5 +359,112 @@ describe('the scrub bar can aim at a discovery', () => {
     const body = await (await fetch(`${bareBase}/api/timeline/marks`)).json() as
       { discoveries: unknown }
     expect(body.discoveries).toEqual([])
+  })
+})
+
+describe('the days a personality moved', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-marks-'))
+  const agentDbDir = join(dir, 'minds')
+  let gw: Gateway
+  let base: string
+  let loop: TickLoop
+
+  const changes = async (): Promise<Array<{ tick: number }>> =>
+    (await (await fetch(`${base}/api/timeline/marks`)).json() as
+      { changes: Array<{ tick: number }> }).changes
+
+  beforeAll(async () => {
+    mkdirSync(agentDbDir)
+    const adb = new Database(join(agentDbDir, 'alice.db'))
+    adb.exec(`CREATE TABLE personality_versions (
+      agent_id TEXT NOT NULL, version INTEGER NOT NULL, day INTEGER NOT NULL,
+      doc TEXT NOT NULL, edit TEXT, PRIMARY KEY (agent_id, version));`)
+    adb.prepare('INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)')
+      .run('alice', 2, 3, 'wary of fire', 'grew wary of fire')
+    adb.close()
+
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    loop = new TickLoop({
+      store: new EventStore(db), state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('marks-memo'), snapshotEveryTicks: 500,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+        else emit('agent_moved', { id: 'alice', x: tick % 8, y: 0 })
+      },
+    })
+    loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, agentDbDir })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** The memo is keyed on `mirror.seq()`, which moves every pump — so a 30 s-per-viewer poll
+   *  reopens every agent memory db from disk, on the tick thread, essentially every time. */
+  it('★ does not re-open every agent memory db when only the tick moved', async () => {
+    expect(await changes()).toEqual([{ tick: 3 * MINUTES_PER_DAY }])
+
+    // The sweep's only source, taken away: a re-swept answer is [], a held one is unchanged.
+    rmSync(join(agentDbDir, 'alice.db'))
+    loop.step()
+    gw.pump()
+    expect(await changes()).toEqual([{ tick: 3 * MINUTES_PER_DAY }])
+  })
+
+  /** A day is the resolution the mark itself reports, so a day is what it may lag by — and it
+   *  must actually lag by no more, or the memo is a cache that never refreshes. */
+  it('re-reads them once the world reaches a new day', async () => {
+    for (let i = 0; i < MINUTES_PER_DAY; i++) loop.step()
+    gw.pump()
+    expect(await changes()).toEqual([])
+  })
+})
+
+describe('a town with more history than a viewer can read', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-long-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('chronicle-length'),
+      snapshotEveryTicks: 100,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 1, ageDays: 7300 })
+        }
+        if (tick > 1) emit('co_slept', { aId: 'alice', bId: 'bob', day: tick })
+      },
+    })
+    for (let i = 0; i < CHRONICLE_MAX * 2; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** Every open panel refetches this every 20 s; unbounded it is the whole town history per
+   *  viewer per poll, and an unbounded list of rows at the other end. */
+  it('★ sends the newest page, while the badge still counts the whole record', async () => {
+    const entries = ((await (await fetch(`${base}/api/chronicle`)).json()) as
+      { entries: ChronicleEntry[] }).entries
+    expect(entries.length).toBe(CHRONICLE_MAX)
+
+    const count = await (await fetch(`${base}/api/chronicle/count`)).json() as
+      { count: number; latestSeq: number }
+    expect(count.count, 'the badge counts what the panel does not send')
+      .toBeGreaterThan(CHRONICLE_MAX)
+    // the page kept is the newest one, not the first N of a town nobody is watching any more
+    expect(entries[entries.length - 1]!.seq).toBe(count.latestSeq)
   })
 })

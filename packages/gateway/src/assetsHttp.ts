@@ -5,7 +5,8 @@ import {
   encodePng, makePlaceholder, paletteRgb, renderEmote, type Facing, type RawImage, type Rgb,
 } from '@sj/forge'
 import type { Router } from './server.js'
-import { notFound } from './http.js'
+import { notFound, sendJson } from './http.js'
+import { reportOnce } from './degraded.js'
 
 export const PLACEHOLDER_PX: Record<AssetClass, { w: number; h: number }> = {
   building: { w: 64, h: 64 }, item: { w: 24, h: 24 }, crop: { w: 32, h: 32 },
@@ -118,22 +119,36 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
   // sharp encodes on libuv's four threads. Oldest-first past the cap — `fold.ts` leaves the dead
   // in `state.agents` for ever and `knowsAgent` lets them all through.
   const encoded = new Map<string, Promise<Buffer>>()
-  const onceEncoded = (key: string, build: () => RawImage, then: (buf: Buffer) => void): void => {
+  const onceEncoded = (
+    res: ServerResponse, key: string, build: () => RawImage, then: (buf: Buffer) => void,
+  ): void => {
+    // A failed encode must not be remembered as this key's answer for the life of the process,
+    // and an unanswered request holds the socket until Node's 300 s timeout.
+    const failed = (e: unknown): void => {
+      encoded.delete(key)
+      reportOnce(`encode.${key.split(':')[0]}`, () =>
+        `could not encode ${key} — ${e instanceof Error ? e.message : String(e)}`)
+      if (!res.headersSent) sendJson(res, { error: 'could not draw that' }, 500)
+    }
     let p = encoded.get(key)
     if (p === undefined) {
-      p = encodePng(build())
+      try {
+        p = encodePng(build())
+      } catch (e) {
+        failed(e)
+        return
+      }
       if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value as string)
       encoded.set(key, p)
     }
-    // A failed encode must not be remembered as this key's answer for the life of the process.
-    void p.then(then, () => { encoded.delete(key) })
+    void p.then(then, failed)
   }
 
   router.route('GET', '/assets/placeholder/:file', (_req, res, params) => {
     const klass = stripPng(params.file ?? '')
     const size = klass !== null && klass in PLACEHOLDER_PX ? PLACEHOLDER_PX[klass as AssetClass] : undefined
     if (!size) { notFound(res); return }
-    onceEncoded(`placeholder:${klass}`, () => makePlaceholder(klass as AssetClass, size),
+    onceEncoded(res, `placeholder:${klass}`, () => makePlaceholder(klass as AssetClass, size),
       (buf) => sendPng(res, buf))
   })
 
@@ -148,13 +163,13 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       const hit = id === undefined ? null : codex.get(id)
       if (hit) { sendPng(res, hit.png); return }
     }
-    onceEncoded(`character:${agentId}`, () => buildPlaceholderSheet(agentId), (buf) => sendPng(res, buf))
+    onceEncoded(res, `character:${agentId}`, () => buildPlaceholderSheet(agentId), (buf) => sendPng(res, buf))
   })
 
   router.route('GET', '/assets/:file', (_req, res, params) => {
     const file = params.file ?? ''
     if (file === 'emotes.png') {
-      onceEncoded('emotes', buildEmoteAtlas, (buf) => sendPng(res, buf))
+      onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => sendPng(res, buf))
       return
     }
     if (file === 'emotes.json') {

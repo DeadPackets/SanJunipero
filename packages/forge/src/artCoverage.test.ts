@@ -72,6 +72,31 @@ describe('every item the catalog specifies has committed art, sprite and icon', 
   })
 })
 
+/** Every boot re-runs this ingest, and `listSince(0)` zod-parses every row of the assets table.
+ *  Per item and per character, that is quadratic in the art catalogue. */
+describe('★ the committed-art ingest scans the codex once, not once per item', () => {
+  it('is idempotent on a second boot without re-reading the table per piece', () => {
+    const db = openForgeDb(':memory:')
+    try {
+      const codex = new AssetCodex(db)
+      const first = [...registerCommittedItems(codex), ...registerCommittedCast(codex)]
+      expect(first.length).toBeGreaterThan(50)
+
+      let scans = 0
+      const real = codex.listSince.bind(codex)
+      codex.listSince = (since: number) => { scans++; return real(since) }
+
+      const again = [...registerCommittedItems(codex), ...registerCommittedCast(codex)]
+      // the second boot registers nothing — otherwise a low scan count means nothing was checked
+      expect(again.map((e) => e.action)).toEqual(again.map(() => 'unchanged'))
+      // items + interiors + cast: three whole-table passes, not one per piece
+      expect(scans, `${scans} full codex scans for ${again.length} pieces`).toBeLessThanOrEqual(3)
+    } finally {
+      db.close()
+    }
+  })
+})
+
 describe('every founder the town spawns has a committed sheet', () => {
   it('is measuring the cast it thinks it is', () => {
     expect(requiredCastKinds()).toEqual([...FOUNDER_IDS].map(characterKind).sort())

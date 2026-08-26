@@ -9,9 +9,11 @@ import WebSocket from 'ws'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
-import { createGateway, CLOSE_TOO_MANY, SCRUB_MIN_MS, type Gateway } from './server.js'
+import {
+  createGateway, CLOSE_BAD_HELLO, CLOSE_TOO_MANY, HELLO_DEADLINE_MS, SCRUB_MIN_MS, type Gateway,
+} from './server.js'
 import { AGENT_ID } from './api.js'
-import { MAX_BYTES, MAX_KEYS, makeSeqCache } from './seqCache.js'
+import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
@@ -58,6 +60,13 @@ const connect = (port: number): Promise<WebSocket> => new Promise((resolve, reje
   s.on('error', reject)
 })
 
+/** The close code, or 'open' if the socket is still up after `ms` — so "was not closed" is an
+ *  assertion rather than a timeout. */
+const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> => new Promise((resolve) => {
+  const t = setTimeout(() => resolve('open'), ms)
+  s.on('close', (code) => { clearTimeout(t); resolve(code) })
+})
+
 describe('the public surface a stranger reaches', () => {
   const open: Array<WebSocket | Gateway> = []
   afterAll(async () => {
@@ -91,6 +100,20 @@ describe('the public surface a stranger reaches', () => {
     }
     const leak = await (await fetch(`${base}/api/agent/..%2foutside%2fsecret/journal`)).text()
     expect(leak).not.toContain('THE PRIVATE THING')
+  })
+
+  it('★ survives a malformed percent-escape in a routed segment', async () => {
+    const gw = await gwPromise
+    const base = `http://127.0.0.1:${gw.port}`
+    // `decodeURIComponent('%')` throws URIError, and the router decodes inside the createServer
+    // listener — unguarded this is an uncaughtException that takes the whole stream down.
+    for (const path of ['/assets/%', '/api/agent/%/profile', '/assets/character/%ZZ.png']) {
+      const r = await fetch(`${base}${path}`)
+      expect(r.status, path).toBe(404)
+      await r.text()
+    }
+    // The town is still serving, which is the whole point.
+    expect((await fetch(`${base}/api/agent/walker/profile`)).status).toBe(200)
   })
 
   it('answers nothing for __proto__, which is a truthy agent that does not exist', async () => {
@@ -135,6 +158,31 @@ describe('the public surface a stranger reaches', () => {
     }
   })
 
+  /** The cap used to be read off the hub, which a socket joins only after a valid `hello` — so
+   *  a stranger who opens sockets and says nothing was never counted and never timed out. */
+  it('★ counts sockets, not greetings, toward the viewer cap', async () => {
+    const gw = await gwPromise
+    const silent = await Promise.all([connect(gw.port), connect(gw.port), connect(gw.port)])
+    for (const s of silent) open.push(s)
+    // `wss.clients` already holds the arriving socket: counted with `>=` the cap would serve
+    // maxViewers − 1, and the third honest viewer would be the one turned away.
+    expect(await Promise.all(silent.map((s) => closeCode(s, 300)))).toEqual(['open', 'open', 'open'])
+
+    const extra = new WebSocket(`ws://127.0.0.1:${gw.port}/ws`)
+    open.push(extra)
+    expect(await closeCode(extra)).toBe(CLOSE_TOO_MANY)
+
+    for (const s of silent) s.close()
+    await wait(120)
+  })
+
+  it('★ closes a socket that opens and never says hello', async () => {
+    const gw = await gwPromise
+    const mute = await connect(gw.port); open.push(mute)
+    expect(await closeCode(mute, HELLO_DEADLINE_MS * 2)).toBe(CLOSE_BAD_HELLO)
+    await wait(120)
+  }, HELLO_DEADLINE_MS * 3)
+
   it('turns the extra viewer away instead of degrading for the others', async () => {
     const gw = await gwPromise
     const held = await Promise.all([connect(gw.port), connect(gw.port), connect(gw.port)])
@@ -173,6 +221,36 @@ describe('the public surface a stranger reaches', () => {
     expect(scrubbed.length).toBeLessThan(10)
     // The last ask is the one a dragging finger stopped on, so it must be the one answered.
     expect(scrubbed.at(-1)?.reqId).toBe(59)
+  })
+})
+
+describe('a route handler that throws', () => {
+  const open: Gateway[] = []
+  const brokenDir = mkdtempSync(join(tmpdir(), 'sj-broken-'))
+  afterAll(async () => {
+    for (const gw of open) await gw.close()
+    rmSync(brokenDir, { recursive: true, force: true })
+  })
+
+  it('★ answers 500 without a stack, and the next request still lands', async () => {
+    const dbPath = join(brokenDir, 'broken.db')
+    openForgeDb(dbPath).close()
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 4; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const base = `http://127.0.0.1:${gw.port}`
+    expect((await fetch(`${base}/api/chapters`)).status).toBe(200)
+
+    // The world db changing under a mounted read path: the prepared SELECT now throws when it
+    // runs, straight out of the handler and into the listener that ticks the town.
+    db.exec('DROP TABLE events')
+    const r = await fetch(`${base}/api/chronicle`)
+    expect(r.status).toBe(500)
+    const body = await r.text()
+    expect(body).not.toContain('at ')
+    expect(body).not.toContain('.ts:')
+    expect((await fetch(`${base}/api/chapters`)).status).toBe(200)
   })
 })
 
@@ -240,6 +318,22 @@ describe('the guards themselves', () => {
     // and the shipped budget is a real number rather than "whatever the biggest answer is"
     expect(MAX_BYTES).toBeGreaterThan(0)
     expect(MAX_BYTES).toBeLessThan(64 * 1024 * 1024)
+  })
+
+  it('★ the seq cache holds a couple of intermediates, not a key cap of unmeasured ones', () => {
+    const cache = makeSeqCache(() => 1)
+    const built: string[] = []
+    const build = (k: string) => () => { built.push(k); return { k } }
+    // A stranger's window is the memo key and the value is a full entry array — 32 of those
+    // resident at once is 144 MB against a body budget of 4 MiB.
+    for (const k of ['a', 'b', 'c', 'd']) cache.value(k, build(k))
+    cache.value('a', build('a'))
+    expect(built.filter((k) => k === 'a').length, 'the oldest window was evicted').toBe(2)
+
+    // and the pair a real viewer asks for — panel then badge on one window — still shares a scan
+    cache.value('a', build('a'))
+    expect(built.filter((k) => k === 'a').length).toBe(2)
+    expect(MAX_VALUES).toBeLessThanOrEqual(4)
   })
 
   /** `/assets/:file` is the codex PNG route and 404s anything that is not a png, so a bundle

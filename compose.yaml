@@ -20,12 +20,23 @@ services:
     environment:
       # Ring 3 is a 152-tile square, ring 1 the 76-tile showcase. Changing it on a running town
       # refuses the boot; a new ring count needs a new town (SJ_FRESH=1).
-      SJ_RINGS: "${SJ_RINGS:-1}"
-      SJ_INTERIORS: "${SJ_INTERIORS:-0}"
-      # Hard-coded, never `${SJ_FRESH:-0}`: a stray SJ_FRESH=1 in `.env` would then delete the
-      # world on every restart. A reset is one explicit run: `compose run --rm -e SJ_FRESH=1 town`.
-      SJ_FRESH: "0"
-      NODE_OPTIONS: "--enable-source-maps"
+      - SJ_RINGS=${SJ_RINGS:-1}
+      - SJ_INTERIORS=${SJ_INTERIORS:-0}
+      # Named with NO value: compose reads `.env` and passes these on only when they are SET, so
+      # an unset knob keeps the code's own default. Written as `${SJ_LAMPS:-}` it would arrive as
+      # an empty string, and `Number('')` is 0 — an unlit town nobody asked for.
+      - SJ_MAP
+      - SJ_LAMPS
+      - SJ_LIVE
+      - SJ_ARBITER
+      - SJ_MINDS_DIR
+      - SJ_MODELS_DIR
+      - OPENROUTER_API_KEY
+      # Hard-coded, never `${SJ_FRESH:-0}` and never a bare pass-through: a stray SJ_FRESH=1 in
+      # `.env` would then delete the world on every restart. A reset is one explicit run:
+      # `compose run --rm -e SJ_FRESH=1 town`.
+      - SJ_FRESH=0
+      - NODE_OPTIONS=--enable-source-maps
     volumes:
       # The whole `data` directory, not the world file inside it — see the header.
       # `docker compose down -v` is the deliberate way to end a town.

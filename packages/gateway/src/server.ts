@@ -14,7 +14,8 @@ import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
-import { notFound } from './http.js'
+import { reportOnce } from './degraded.js'
+import { notFound, sendJson } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -33,8 +34,12 @@ export type Router = { route(method: string, pattern: string, fn: RouteHandler):
 
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
-const CLOSE_BAD_HELLO = 4400
+export const CLOSE_BAD_HELLO = 4400
 export const CLOSE_TOO_MANY = 4429
+
+/** How long a socket may hold a seat without greeting. A viewer sends `hello` on open, so this
+ *  is only ever reached by a socket that has nothing to say. */
+export const HELLO_DEADLINE_MS = 5_000
 
 /** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
  *  defaults to a 100 MB frame, which is 100 MB a stranger can make the server buffer. */
@@ -106,10 +111,23 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       let ok = true
       for (let i = 0; i < r.segs.length; i++) {
         const p = r.segs[i]!
-        if (p.startsWith(':')) params[p.slice(1)] = decodeURIComponent(segs[i]!)
-        else if (p !== segs[i]) { ok = false; break }
+        // A malformed escape is not this route's path: `decodeURIComponent` throws, and unguarded
+        // that throw is an uncaughtException in the listener that ticks the town.
+        if (p.startsWith(':')) {
+          try { params[p.slice(1)] = decodeURIComponent(segs[i]!) } catch { ok = false; break }
+        } else if (p !== segs[i]) { ok = false; break }
       }
-      if (ok) { r.fn(req, res, params); return }
+      if (ok) {
+        try {
+          r.fn(req, res, params)
+        } catch (e) {
+          reportOnce(`route.${r.method} ${r.segs.join('/')}`, () =>
+            `${r.method} /${r.segs.join('/')} threw — ${e instanceof Error ? e.message : String(e)}`)
+          if (res.headersSent) res.destroy()
+          else sendJson(res, { error: 'internal error' }, 500)
+        }
+        return
+      }
     }
     if (site !== null && site(req, res, url.pathname)) return
     notFound(res)
@@ -137,8 +155,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
-    if (hub.size() >= maxViewers) { sock.close(CLOSE_TOO_MANY); return }
+    // `wss.clients` already holds the arriving socket, hence `>`. Counted here rather than off
+    // the hub, which a socket joins only after a valid hello.
+    if (wss.clients.size > maxViewers) { sock.close(CLOSE_TOO_MANY); return }
     let greeted = false
+    const helloTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
+      if (!greeted) sock.close(CLOSE_BAD_HELLO)
+    }, HELLO_DEADLINE_MS)
     let scrubAt = 0                       // last answered scrub, for coalescing
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
@@ -196,6 +219,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
     })
     sock.on('close', () => {
+      clearTimeout(helloTimer)
       if (scrubTimer !== null) clearTimeout(scrubTimer)
       removers.get(sock)?.()
       removers.delete(sock)

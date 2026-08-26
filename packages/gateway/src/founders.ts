@@ -545,14 +545,14 @@ export function makeFoundersOnTick(
       // Rule A: decide only when the hands are free. `submitIntent` refuses everything while an
       // activity runs, so a decision taken here would be a decision discarded.
       if (a.activity) continue
-      const packet = composePerception(state, config, f.id, [])
       // Home comes first because a spent body has no business starting anything; the deck comes
       // before the houses because until it stands half the town is unreachable.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
         ?? (f.id === wright ? bridgewrightIntent(state, config, f.id, opts.deck!) : null)
         ?? (f.id === lighter ? lamplighterIntent(state, config, f.id, opts.lamps!) : null)
         ?? (opts.builders === true ? masonIntent(state, config, f.id, opts.jointBuild === true) : null)
-        ?? policies.get(f.id)!(state, config, packet)
+        // composed here, not above: an earlier intent usually wins, and the packet is O(world)
+        ?? policies.get(f.id)!(state, config, composePerception(state, config, f.id, []))
       if (!intent) continue
       const r = submitIntent(state, config, f.id, intent.verb, intent.params)
       if (r.ok) for (const e of r.events) emit(e.type, e.payload)

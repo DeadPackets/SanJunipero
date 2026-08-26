@@ -12,25 +12,39 @@ import type { RouteHandler, Router } from './server.js'
 
 const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0 as TileId))
 
-/** Counts the rows every `FROM events` read hands back, so a full re-scan is visible. */
-function spyOnEventReads(db: Database.Database): number[] {
-  const rows: number[] = []
+type EventRead = { via: 'all' | 'iterate'; rows: number }
+
+/** Counts the rows every `FROM events` read hands back, so a full re-scan is visible — through
+ *  `.iterate` as well as `.all`, or swapping one for the other stops the measurement. */
+function spyOnEventReads(db: Database.Database): EventRead[] {
+  const reads: EventRead[] = []
   const realPrepare = db.prepare.bind(db)
   Object.defineProperty(db, 'prepare', {
     value: (sql: string) => {
-      const st = realPrepare(sql) as { all: (...a: unknown[]) => unknown[] }
+      const st = realPrepare(sql) as {
+        all: (...a: unknown[]) => unknown[]
+        iterate: (...a: unknown[]) => Iterable<unknown>
+      }
       if (!/FROM events/.test(sql)) return st
       const realAll = st.all.bind(st)
       st.all = (...a: unknown[]): unknown[] => {
         const r = realAll(...a)
-        rows.push(r.length)
+        reads.push({ via: 'all', rows: r.length })
         return r
+      }
+      const realIterate = st.iterate.bind(st)
+      st.iterate = function* (...a: unknown[]): Iterable<unknown> {
+        const read: EventRead = { via: 'iterate', rows: 0 }
+        reads.push(read)
+        for (const row of realIterate(...a)) { read.rows++; yield row }
       }
       return st
     },
   })
-  return rows
+  return reads
 }
+
+const rowsRead = (reads: EventRead[]): number => reads.reduce((a, r) => a + r.rows, 0)
 
 const collect = (): { router: Router; call: (key: string) => void } => {
   const routes = new Map<string, RouteHandler>()
@@ -85,14 +99,17 @@ describe('★ the read API reads the tick, not the history', () => {
     mountDataApi(router, { db: apiDb, mirror, config: DEFAULT_CONFIG })
 
     call('GET /api/society')
-    const firstRead = rows.reduce((a, b) => a + b, 0)
+    const firstRead = rowsRead(rows)
     expect(firstRead, 'the first ask still has to read the town it never saw').toBe(total)
+    // ★ and it reads them one at a time: `.all` on a resumed town's backlog is the whole log
+    // materialised, and JSON.parsed, in one synchronous stall on the tick thread.
+    expect(rows.map((r) => r.via)).not.toContain('all')
 
     loop.step()
     mirror.poll() // a new generation: the memo must be refreshed
     rows.length = 0
     call('GET /api/society')
-    const secondRead = rows.reduce((a, b) => a + b, 0)
+    const secondRead = rowsRead(rows)
 
     expect(secondRead, 'a second generation must cost the tick, not the town').toBeLessThan(20)
     expect(secondRead, 'and it must be exactly the events that tick appended')

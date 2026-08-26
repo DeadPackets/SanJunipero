@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { LibraryItemManifestSchema, type LibraryItemManifest } from '@sj/shared'
+import { LibraryItemManifestSchema, type AssetRecord, type LibraryItemManifest } from '@sj/shared'
 import type { AssetCodex } from '../codex.js'
 import { libraryEntry, type LibraryEntry } from './catalog.js'
 import { ICON_SUFFIX, registerLibraryEntry } from './register.js'
@@ -54,11 +54,6 @@ export function listCommittedItems(root: string = ITEMS_CONTENT_DIR): CommittedI
 
 export type ItemIngestEntry = { kind: string; action: 'registered' | 'unchanged'; id: string }
 
-function latestItem(codex: AssetCodex, kind: string) {
-  return codex.listSince(0)
-    .filter((r) => r.status === 'ready' && r.class === 'item' && r.kind === kind).at(-1) ?? null
-}
-
 /** Idempotent: unchanged sprite bytes register nothing, and regenerated art gets a new record that
  *  wins by seq. Registration is free — the generation booked its own spend when it was paid for. */
 export function registerCommittedItems(
@@ -67,12 +62,21 @@ export function registerCommittedItems(
   // The gateway's terrain ingest short-circuits once every terrain kind exists, so a resumed town
   // would never see a piece added later; this ingest is idempotent per item and always runs.
   const out: ItemIngestEntry[] = registerCommittedInteriors(codex, { root: opts.interiorRoot })
+  // One scan for the whole ingest. `latest` keeps "the last ready item record for this kind wins
+  // by seq"; `seen` is unfiltered, because the icon check asks only whether a row exists at all.
+  const latest = new Map<string, AssetRecord>()
+  const seen = new Set<string>()
+  for (const r of codex.listSince(0)) {
+    if (r.kind === null) continue
+    seen.add(r.kind)
+    if (r.status === 'ready' && r.class === 'item') latest.set(r.kind, r)
+  }
   for (const item of listCommittedItems(opts.root)) {
-    const existing = latestItem(codex, item.kind)
-    if (existing !== null) {
+    const existing = latest.get(item.kind)
+    if (existing !== undefined) {
       const stored = codex.get(existing.id)
       if (stored !== null && stored.png.equals(item.sprite)
-        && codex.listSince(0).some((r) => r.kind === `${item.kind}${ICON_SUFFIX}`)) {
+        && seen.has(`${item.kind}${ICON_SUFFIX}`)) {
         out.push({ kind: item.kind, action: 'unchanged', id: existing.id })
         continue
       }
