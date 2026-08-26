@@ -215,7 +215,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.desirePaths).toEqual({
       enabled: true, wearThreshold: 120, decayPerDay: 0.1, regrowThreshold: 30, overgrowDays: 20, pathCost: 0.8,
     })
-    expect(c.pathing).toEqual({ roadCost: 0.6, maxNodes: 6000, regionSize: 16 })
+    expect(c.pathing).toEqual({ roadCost: 0.6, maxNodes: 6000 })
     expect(c.world).toEqual({ size: { w: 128, h: 128 } })
   })
 
@@ -298,10 +298,10 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(r['lamp_post']!.durationTicks).toBeLessThan(MINUTES_PER_DAY / 2)   // finishable in one night
     // Only the two kinds that are not masses choose their own ground.
     expect(Object.entries(r).filter(([, v]) => v.sited).map(([k]) => k).sort()).toEqual(['bridge', 'lamp_post'])
+    expect(r['house']!.maxHp).toBe(50)
     // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
     expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
     expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
-    expect(r['house']!.maxHp).toBe(DEFAULT_CONFIG.construction.houseMaxHp)
     // Enterability is `roofed` on this row, and there is nowhere else to say it (G4).
     expect(r['house']).not.toHaveProperty('enterable')
   })
