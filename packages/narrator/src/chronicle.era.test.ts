@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { renderEra } from './chronicle.js'
-import { FORBIDDEN_FRAMING } from './llm/framing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import type { ChapterRow, NarratorLlm } from './types.js'
 
 const memStore = (): NarratorStore => {

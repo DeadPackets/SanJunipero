@@ -5,7 +5,7 @@ import { TILE_H, TILE_W } from './iso.js'
 // use one, and whether a walk between two tiles exists. Pure — no Pixi, no pixels. The
 // projection is the town's own 2:1; only the pixel scale of one tile changes.
 
-/** How many town pixels one interior pixel is worth. The mock's `ips`. */
+/** How many town pixels one interior pixel is worth. */
 export const INTERIOR_PX_SCALE = 4
 /** One interior tile, in interior pixels: `TOWN_TILE × INTERIOR_PX_SCALE`. This is the tile the
  *  forge already authors against — `assetResolution.INTERIOR_TILE`. */

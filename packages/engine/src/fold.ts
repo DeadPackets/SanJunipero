@@ -434,7 +434,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, lastSpokeTick: event.tick } } }
     }
     // The ladder is counted here and climbed by mortality.ts. Gated on the flag so a world
-    // with mortality off keeps the pre-C11 body shape, hash and all.
+    // with mortality off keeps the earlier body shape, hash and all.
     case 'agent_collapsed': {
       const p = AgentCollapsed.parse(event.payload)
       const a = state.agents[p.agentId]
@@ -775,7 +775,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (row[p.x] !== p.from) throw new Error(`tile_changed from-mismatch at (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r))
       // The maturity clock is stamped where the seed fell and dropped however the sapling
-      // leaves — grown, chopped, paved or tilled. Nothing else is stored about it (G2, G4).
+      // leaves — grown, chopped, paved or tilled. Nothing else is stored about it.
       if (p.from !== SAPLING_TILE && p.to !== SAPLING_TILE) return { ...state, terrain }
       const key = saplingKey(p.x, p.y)
       const saplings = { ...state.saplings }

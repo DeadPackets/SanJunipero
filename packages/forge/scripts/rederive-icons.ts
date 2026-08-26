@@ -15,8 +15,9 @@ import { recordVerdict } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
 import { LIBRARY } from '../src/library/catalog.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
+const C13 = scratch('c13')
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
 const LIB = join(C13, 'library')
 

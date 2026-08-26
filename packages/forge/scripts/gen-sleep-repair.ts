@@ -11,6 +11,9 @@ import { processHiResCell } from '../src/hires.js'
 import { sleepAxisDeg, SLEEP_AXIS_DEG_MIN, SLEEP_AXIS_DEG_MAX } from '../src/mirror.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V4 } from './cast.js'
+import { scratch } from './scratch.js'
+
+const S = scratch()
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -20,7 +23,6 @@ const budget = new BudgetGuard(CAP)
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
 const OUT = `${S}/r3/sleep`
 
 const id = process.env.FOUNDER

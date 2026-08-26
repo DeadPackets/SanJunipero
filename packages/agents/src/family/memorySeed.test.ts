@@ -4,7 +4,7 @@ import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore } from '../memory/store.js'
 import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
 import { buildHouseholdSeed } from './memorySeed.js'
-import { FORBIDDEN_FRAMING } from '../prompt/rulesOfBeing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 const CHILD = 'agent_7'
 const MOTHER = 'amara'

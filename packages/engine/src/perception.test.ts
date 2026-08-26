@@ -10,7 +10,7 @@ import { RngStream } from './rng.js'
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
-// Noon by default: from C11 Task 26 the witness radius scales with the light on the thing seen,
+// Noon by default: the witness radius scales with the light on the thing seen,
 // and every row below the night-witness block is about a horizon, not about the dark.
 const NOON = 720
 
@@ -158,7 +158,7 @@ describe('composePerception: packet shape', () => {
     let s = makeWorld([{ id: 'a', x: 2, y: 3 }])
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a' } }), DEFAULT_CONFIG)
     s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'stone', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }), DEFAULT_CONFIG)
-    // A blow is two events and one subtraction (C11 R16): the hp comes off through
+    // A blow is two events and one subtraction: the hp comes off through
     // `agent_harmed` and the wound goes on the record through `agent_injured`.
     s = fold(s, ev('agent_harmed', {
       agentId: 'a', amount: DEFAULT_CONFIG.health.injuryDamage.minor, source: 'attack',
@@ -232,7 +232,7 @@ describe('composePerception: structure contents', () => {
   })
 })
 
-// --- C9 Task 3: occlusion, interior sight, witnessed channel ---------------
+// --- occlusion, interior sight, witnessed channel ---------------
 
 // A complete 2x2 house anchored at (10,10); its door is the tile south of centre, (10,12).
 const HOUSE = { id: 'structure_1', kind: 'house', x: 10, y: 10, w: 2, h: 2 }
@@ -373,7 +373,7 @@ describe('composePerception: seen channel', () => {
   })
 })
 
-// --- C9 Task 5: ownership prose + witnessed takings -------------------------
+// --- ownership prose + witnessed takings -------------------------
 
 const taken = (takerId: string, ownerId: string, x: number, y: number, itemId = 'item_1', kind = 'bread'): SimEvent =>
   ev('item_taken', { itemId, kind, takerId, ownerId, x, y })
@@ -496,7 +496,7 @@ describe('the ground underfoot: a benefit stated, never a rule given', () => {
   })
 })
 
-// ------------------------- Task 26: the dark is a price change, and it is paid at the target
+// ------------------------- the dark is a price change, and it is paid at the target
 describe('night-witness: a torch does not let you see, it lets the dark see you', () => {
   const CFG = DEFAULT_CONFIG
   const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })

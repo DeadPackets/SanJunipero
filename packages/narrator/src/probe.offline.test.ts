@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { NARRATOR_CANON } from './canon.js'
-import { FORBIDDEN_FRAMING } from './llm/framing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 

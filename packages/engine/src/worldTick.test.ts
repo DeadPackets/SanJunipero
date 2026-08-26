@@ -13,7 +13,7 @@ const FAST: SimConfig = SimConfigSchema.parse({
     socialDecayPerTick: 2, warmthEqualizeFactorPerTick: 0.5,
     collapseThreshold: 5, deathAfterZeroHungerTicks: 3, eatRestoreHunger: 60,
   },
-  // Bare 8x4 worlds with no house: the bed law (C9 T2b) is not what these rows test.
+  // Bare 8x4 worlds with no house: the bed law is not what these rows test.
   structures: { sleepIndoorsOnly: false },
 })
 
@@ -175,7 +175,7 @@ describe('worldTick: sleep and eat flows', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t1 = tickOnce(s)
-    // decay first (20−5), then eat completes: berries are half a meal (C11 Task 27), so +30.
+    // decay first (20−5), then eat completes: berries are half a meal, so +30.
     expect(t1.state.agents.a1!.needs.hunger).toBe(15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'))
     expect(t1.state.items.item_1!.qty).toBe(1)
     expect(t1.state.agents.a1!.activity).toBeNull()

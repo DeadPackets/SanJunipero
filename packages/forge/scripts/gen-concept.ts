@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'
 import { CHAR_DESC, ASYMMETRY_CLAUSE } from './character.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -13,7 +14,7 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 const RESERVE = 0.046
 
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/concept'
+const DURABLE = scratch('c5', 'concept')
 mkdirSync(DURABLE, { recursive: true })
 
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')

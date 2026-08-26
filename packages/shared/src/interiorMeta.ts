@@ -45,7 +45,7 @@ export function parseLibraryItemManifest(meta: string | null): LibraryItemManife
   }
 }
 
-// C10 T10's six originals include `tools`, which the addendum resolves as "anvil + saw wall rack".
+// The six original furnishings include `tools`, which the addendum resolves as "anvil + saw wall rack".
 export const FURNISHING_KIND_ALIASES: Record<string, string> = { tools: 'anvil' }
 
 export function resolveFurnishingKind(kind: string): string {

@@ -16,7 +16,6 @@ export {
   CONSTRUCT_VOCABULARY, UNNAMED_CONSTRUCT_COPY, assertQuotedName, scanPromptForGlassLeak,
 } from './glass.js'
 export { DEFAULT_DETECT_CONFIG, ROLE_VERBS, detectInstitutions } from './institutions.js'
-export { FORBIDDEN_FRAMING } from './llm/framing.js'
 export { renderChapter, renderEra, sceneDigests, verifyCitations } from './chronicle.js'
 export { ChapterRenderError, MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
 export { PUBLIC_EVENT_TYPES, collectPublicRecord, publicRecordText, renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'

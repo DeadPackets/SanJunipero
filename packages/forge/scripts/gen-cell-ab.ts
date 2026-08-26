@@ -9,6 +9,7 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import { quantize } from '../src/post/quantize.js'
 import { outlinePass } from '../src/post/outline.js'
 import { FACING_CLAUSES, POSE_CLAUSES, downscaleMajority, upscaleNearest } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -17,7 +18,7 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const RESERVE = 0.06
 
 const ANCHOR = readFileSync('packages/forge/content/reference/identity-anchor.png')
-const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/quality-ab'
+const DURABLE = scratch('c5', 'quality-ab')
 mkdirSync(`${DURABLE}/raws`, { recursive: true })
 mkdirSync(`${DURABLE}/cells`, { recursive: true })
 

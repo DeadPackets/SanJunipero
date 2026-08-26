@@ -14,7 +14,7 @@ export type RoadAutotileKey = (typeof ROAD_AUTOTILE_KEYS)[number]
 export const RoadAutotileKeySchema = z.enum(ROAD_AUTOTILE_KEYS)
 
 // Tile-space N/E/S/W = (x,y-1) (x+1,y) (x,y+1) (x-1,y) — the NE/SE/SW/NW screen
-// edges under the C6 dimetric projection.
+// edges under the dimetric projection.
 export type RoadNeighbors = { n: boolean; e: boolean; s: boolean; w: boolean }
 
 // Indexed by n | e<<1 | s<<2 | w<<3. An isolated tile draws as `cap-s`, the

@@ -152,7 +152,7 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
   })
 })
 
-// ---------------------------------------------------------------- Task 6: cause and grave
+// ---------------------------------------------------------------- cause and grave
 const hurt = (s: WorldState, amount: number) =>
   fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
 const starve = (s: WorldState) => fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }), CFG)
@@ -177,7 +177,7 @@ const SCENARIOS: Array<[DeathCause, () => WorldState]> = [
     const s = nearlyDead(body())
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, thirst: 0 } } }
   }],
-  // The same fatigue rung, on a body the cold has been billing. Task 22: the ladder is the
+  // The same fatigue rung, on a body the cold has been billing. The ladder is the
   // only road the cold takes, so the drain is identical and only the name changes.
   ['exposure', () => {
     const s = nearlyDead(afflict(body(), 'fatigue', 3, 0))
@@ -207,7 +207,7 @@ describe('death has a cause', () => {
   })
 
   it('a body worn to nothing with no affliction on it still names the wound', () => {
-    // The C1 path: a wound drops hp with no named affliction behind it.
+    // The older path: a wound drops hp with no named affliction behind it.
     let s = fold(body(), ev('agent_harmed', {
       agentId: 'a1', amount: CFG.health.injuryDamage.grave, source: 'attack',
     }), CFG)
@@ -306,7 +306,7 @@ describe('a grave where the life ended', () => {
   })
 })
 
-// ------------------------------------------------- Task 9: the collapse ladder gets a floor
+// ------------------------------------------------- the collapse ladder gets a floor
 describe('a collapse that never recovers becomes fatigue', () => {
   // Hunger under collapseThreshold puts the body down; raising it lifts the collapse so the
   // next fall is a fresh one. Nothing here feeds the body — that is the whole point.

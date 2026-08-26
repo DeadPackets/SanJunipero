@@ -256,7 +256,7 @@ describe('verb: douse', () => {
   })
 })
 
-// ------------------------------------------------- Task 25: a carried flame is a fire risk
+// ------------------------------------------------- a carried flame is a fire risk
 describe('a carried flame is both the light and the hazard', () => {
   const SURE: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1 } })
   const OFF: SimConfig = SimConfigSchema.parse({
@@ -294,7 +294,7 @@ describe('a carried flame is both the light and the hazard', () => {
   })
 })
 
-// C11 R17: `sources` is captured before the spread loop and every emit inside it folds, so a
+// `sources` is captured before the spread loop and every emit inside it folds, so a
 // source can be gone by the time its turn comes. The non-null assertion made that a crash.
 describe('fire_spread: a source that is gone by its turn is skipped, not crashed on', () => {
   it('survives a structure removed mid-loop, and still spreads from the ones still standing', () => {

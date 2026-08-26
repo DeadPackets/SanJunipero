@@ -20,7 +20,7 @@ export function recipeTileKind(tile: TileId): string | null {
 }
 
 // The four ways a body can be failing. A named affliction is a cause with a clock on it —
-// `ill: boolean` stays for the C1 logs that only ever knew the one word.
+// `ill: boolean` stays for the older logs that only ever knew the one word.
 export const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison'] as const
 export type AfflictionKind = (typeof AFFLICTION_KINDS)[number]
 // `sourceId` is the hand behind it, absent when nobody is: a death has to be able to name
@@ -89,7 +89,6 @@ export type Item = {
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 
-
 export type Crop = { id: string; kind: string; x: number; y: number; plantedDay: number; stage: number; withered: boolean }
 
 // A body with no mind. `stock` is the size of a fish school and is absent on anything that
@@ -157,14 +156,14 @@ export function authoredOrigin(state: { origin?: { x: number; y: number } }): { 
   return state.origin ?? { x: 0, y: 0 }
 }
 
-// The one reader of the field (G4). A body that has never been thirsty is a full one, which
-// is what lets every pre-C11 log fold to the hash it always had.
+// The one reader of the field. A body that has never been thirsty is a full one, which
+// is what lets every older log fold to the hash it always had.
 export function thirstOf(a: { thirst?: number }): number {
   return a.thirst ?? 100
 }
 
 // `offset` is for the rare emitter that mints two ids before either has folded — a carcass
-// that yields meat and a hide. One derivation of an id, still (G4).
+// that yields meat and a hide. One derivation of an id, still.
 export function mintId(state: WorldState, prefix: string, offset = 0): string {
   return `${prefix}_${state.counters.nextEntityId + offset}`
 }

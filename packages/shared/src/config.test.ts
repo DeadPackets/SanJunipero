@@ -6,7 +6,7 @@ import {
 import { CITY_BED_KIND, CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-// Every C11 section flag, in the order Task 37 will unpin them.
+// Every section flag, in the order they will be unpinned.
 const C11_FLAGS = [
   'mortality', 'illness', 'thirst', 'fertility', 'roads', 'desirePaths', 'fauna',
   'warmth', 'light', 'nightWitness', 'foodVariety', 'regrowth', 'mapGrowth', 'constructs',
@@ -151,7 +151,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(o.spoilage.enabled).toBe(true)
   })
 
-  // C11 Task 2 — the single SimConfigSchema edit for the chunk. Leaf by leaf, never a snapshot:
+  // The single SimConfigSchema edit for the chunk. Leaf by leaf, never a snapshot:
   // a snapshot would let a wrong default ride in behind a green test.
   it('every C11 section carries an enabled flag defaulting true', () => {
     const c = SimConfigSchema.parse({}) as unknown as Record<string, { enabled: boolean }>
@@ -178,7 +178,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.thirst.waterskinCharges).toBe(4)
   })
 
-  // Deviation 1: mortality reads health.maxHp. Deviation 3: C9's per-tick contagion is retired.
+  // Deviation 1: mortality reads health.maxHp. Deviation 3: the per-tick contagion is retired.
   it('mortality has no maxHp of its own, and health lost its contagion dials', () => {
     expect(DEFAULT_CONFIG.mortality).not.toHaveProperty('maxHp')
     expect(DEFAULT_CONFIG.health).not.toHaveProperty('contagionRadius')
@@ -186,7 +186,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(DEFAULT_CONFIG.health.maxHp).toBe(100)
   })
 
-  // Deviation 2: the spec writes thirst decay as a derivation, so it is exported once (G4).
+  // Deviation 2: the spec writes thirst decay as a derivation, so it is exported once.
   it('thirstDecayPerTick is the one derivation of the slower clock', () => {
     expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.021, 10)
     const fast = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.1 }, thirst: { decayFactorOfHunger: 0.5 } })
@@ -218,7 +218,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(() => SimConfigSchema.parse({ mapGrowth: { maxSize: 192 } })).toThrow()
   })
 
-  // Controller ruling 4 ratified these numbers: they decide whether the first winter is survivable.
+  // These numbers are ratified: they decide whether the first winter is survivable.
   it('warmth and light carry the ratified values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.warmth.comfortBand).toBe(8)
@@ -275,10 +275,10 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     // Only the two kinds that are not masses choose their own ground.
     expect(Object.entries(r).filter(([, v]) => v.sited).map(([k]) => k).sort()).toEqual(['bridge', 'lamp_post'])
     expect(r['house']!.maxHp).toBe(50)
-    // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
+    // The house row must agree with the dials it replaces, or the generalisation drifts.
     expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
     expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
-    // Enterability is `roofed` on this row, and there is nowhere else to say it (G4).
+    // Enterability is `roofed` on this row, and there is nowhere else to say it.
     expect(r['house']).not.toHaveProperty('enterable')
   })
 

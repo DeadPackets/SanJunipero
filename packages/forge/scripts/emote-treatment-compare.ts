@@ -8,11 +8,12 @@ import { renderEmote, EMOTE_PALETTE } from '../src/emotes.js'
 import { upscaleNearest, opaqueBbox, downscaleMajority } from '../src/sheet.js'
 import { makeImageClient } from '../src/imageClient.js'
 import { BudgetGuard } from '../src/budget.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/emotes'
+const SCRATCH = scratch('c5', 'emotes')
 mkdirSync(SCRATCH, { recursive: true })
 
 // ─────────────────────────── Authored 32×32 glyphs ───────────────────────────

@@ -22,7 +22,7 @@ import {
   type ReflectionLlm,
 } from './reflection.js'
 import { BudgetExceededError } from './llm/client.js'
-import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
 import type { LlmClient, LlmMessage } from './llm/client.js'
 

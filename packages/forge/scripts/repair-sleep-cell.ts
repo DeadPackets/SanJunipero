@@ -10,8 +10,10 @@ import { cellAnchor } from '../src/hires.js'
 import { CHAR_FIGURE_PX, reCell } from '../src/reCell.js'
 import { sleepAxisDeg, sleepAxisGate } from '../src/mirror.js'
 import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
+import { scratch } from './scratch.js'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
+const S = scratch()
+
 const ROOT = `${S}/fqc2/art-root`
 const CHAR_CELL_PX = 256
 

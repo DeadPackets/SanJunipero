@@ -67,7 +67,7 @@ export function isPassable(state: WorldState, x: number, y: number, ctx?: PathCt
   return !underStructure(state, x, y, ctx)
 }
 
-// The single place that prices a step (G4). Terrain is what the map says; a bridge deck is
+// The single place that prices a step. Terrain is what the map says; a bridge deck is
 // what the town built over it, and it walks like the road it is.
 export function stepCostAt(state: WorldState, x: number, y: number, config: SimConfig, ctx?: PathCtx): number {
   if (onDeck(state, x, y, ctx)) return config.pathing.roadCost

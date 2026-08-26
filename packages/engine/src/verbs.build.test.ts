@@ -13,7 +13,7 @@ const FAST: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0
 let seq = 13000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
-// Noon: from C11 Task 25 work started in the dark takes half again as long, and nothing in
+// Noon: work started in the dark takes half again as long, and nothing in
 // this file is about the dark.
 const NOON = 720
 

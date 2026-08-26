@@ -54,7 +54,7 @@ export const CHRONICLE_ICONS: Record<string, string> = {
 // Every type the fold knows is either weighted above or named here on purpose, so a future event
 // cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
-  // C11's quiet acts, named one by one (addendum §12).
+  // The quiet acts, named one by one (addendum §12).
   'agent_drank', 'item_filled', 'item_equipped', 'item_unequipped', 'item_lit', 'item_snuffed',
   'item_burned_out', 'structure_fueled', 'fauna_spawned', 'fauna_moved', 'fauna_stock_changed',
   'forageable_spawned', 'forageable_stock_changed', 'forageable_depleted', 'forageable_regrown',
@@ -63,7 +63,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'tick_advanced', 'agent_moved', 'need_changed', 'hp_changed', 'skill_gained', 'agent_woke',
   'agent_slept', 'agent_entered', 'agent_exited', 'agent_aged', 'agent_collapsed', 'agent_spawned',
   'agent_spoke', 'agent_conceived',
-  // Superseded by the C11 mortality events above, which say the same things better.
+  // Superseded by the mortality events above, which say the same things better.
   'agent_injured', 'agent_infected', 'agent_fell_ill', 'agent_recovered',
   // Work in progress, and things changing hands.
   'action_started', 'action_progressed', 'action_completed', 'action_interrupted',
@@ -155,7 +155,7 @@ function tileChangedLine(p: Record<string, unknown>, look: ChronicleLookup): str
 }
 
 // A herd on the far bank is a thing you can see and cannot reach, and the words say so:
-// visible, never available (batch-4 ruling 6). C12's render and inspector read this too.
+// visible, never available. The render and inspector read this too.
 export const FAR_BANK_PHRASE = 'across the river'
 
 export function faunaSightingLine(kind: string, farBank: boolean): string {
@@ -163,7 +163,7 @@ export function faunaSightingLine(kind: string, farBank: boolean): string {
 }
 
 // What a viewer reads where a name would be. The town has not named the thing, and saying so
-// is the truth; the alternative is a label, and labels are ours, not theirs (G9).
+// is the truth; the alternative is a label, and labels are ours, not theirs.
 export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
 
 // No world-facing string may name the machinery behind the agent, and this regex is the point it
@@ -175,7 +175,7 @@ export const CONSTRUCT_CHRONICLE_WEIGHT = 16
 export const CONSTRUCT_CHRONICLE_ICON = 'star'
 
 // The observer's voice: what they do, and what they call it if they call it anything. Never
-// the type, which is ours (G8).
+// the type, which is ours.
 export function constructLine(c: { name: string | null }): string {
   return c.name === null
     ? `They have taken to gathering — ${UNNAMED_CONSTRUCT_COPY}.`

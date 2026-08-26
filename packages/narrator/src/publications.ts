@@ -1,6 +1,5 @@
 import type Database from 'better-sqlite3'
-import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
-import { FORBIDDEN_FRAMING } from './llm/framing.js'
+import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import type { NarratorStore } from './store.js'
 import type {
   ChapterRow,

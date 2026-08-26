@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LlmUsage } from '@sj/agents'
 import type { ChapterDigest, PublicRecord, SceneDigest } from '../types.js'
-import { FORBIDDEN_FRAMING } from './framing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import {
   ChapterSummarySchema,
   EraSummarySchema,

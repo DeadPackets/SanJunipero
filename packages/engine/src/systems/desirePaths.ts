@@ -8,7 +8,7 @@ import type { TickCtx } from '../worldTick.js'
 const GRASS: TileId = 0
 const PATH: TileId = 8
 
-// The one spelling of a tile's name in the sparse maps (G4).
+// The one spelling of a tile's name in the sparse maps.
 export function trafficKey(x: number, y: number): string {
   return `${x},${y}`
 }

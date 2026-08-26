@@ -2,7 +2,7 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { TickCtx } from '../worldTick.js'
 
 // Four ways back, all of them arithmetic on one dawn payment. With mortality off the world
-// keeps C9's flat rates exactly, which is what holds the G2 fixture still until Task 37.
+// keeps the old flat rates exactly, which is what holds the scripted fixture still.
 function recoveryDelta(ctx: TickCtx, hunger: number, asleep: boolean, tended: boolean): number {
   const { health, mortality } = ctx.config
   const base = tended ? health.tendedRecoveryHpPerDay : health.recoveryHpPerDay

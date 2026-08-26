@@ -9,8 +9,10 @@ import { paletteRgb } from '../src/palette.js'
 import { paletteGate } from '../src/pixelGates.js'
 import { derivedPalette, onARamp, RAMP_STEPS } from '../src/ramps.js'
 import { upscaleNearest } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
+const S = scratch()
+
 const OUT = `${S}/fqc2/portraits`
 
 // Where each cast member's shipped busts live.

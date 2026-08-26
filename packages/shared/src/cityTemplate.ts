@@ -72,7 +72,6 @@ export function edgesOwed(
     .filter((x) => x.owed > 0)
 }
 
-// C9 T1b + C11 §9 TileIds.
 export const T_GRASS = 0, T_EARTH = 1, T_WATER = 2, T_ROAD = 7, T_PATH = 8
 
 export type Rect = { dx0: number; dy0: number; dx1: number; dy1: number }
@@ -257,8 +256,8 @@ export const footprintFor = (
 export const FOUNDER_IDS = ['amara', 'yusuf', 'nadia', 'omar', 'salma'] as const
 export type FounderId = (typeof FOUNDER_IDS)[number]
 
-// The room grid every enterable structure exposes to its furnishings. Template vocabulary:
-// C10 T11 owns what a room actually looks like.
+// The room grid every enterable structure exposes to its furnishings: template vocabulary
+// only, never what a room actually looks like.
 export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
 
 /** A bed is 1x2, so three beds fill two rows of a 3x3 grid and a farmhouse's fourth has nowhere
@@ -270,8 +269,8 @@ export function citySlotsFor(kind: string): { w: number; h: number } {
   return { w, h: CITY_INTERIOR_SLOTS.h }
 }
 
-// Shared cannot import the forge catalog, so these stand in for it here and Task 28's
-// g13.test.ts asserts them equal to the library (the plan's declared seam).
+// Shared cannot import the forge catalog, so these stand in for it here; g13.test.ts
+// asserts them equal to the library.
 export const CITY_FURNISHING_KINDS =
   ['bed', 'hearth', 'table', 'chair', 'rug', 'shelf', 'crate', 'barrel', 'anvil', 'bench'] as const
 export const CITY_BED_KIND = 'bed'

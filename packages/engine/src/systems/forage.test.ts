@@ -28,7 +28,7 @@ const CHAR_TILE: Record<string, TileId> = { '.': 0, f: 3 }
 let seq = 41000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
-// A clearing with the wood at its southern edge, so the C9 forest-adjacency forage still works.
+// A clearing with the wood at its southern edge, so forest-adjacency forage still works.
 const CLEARING = ['..', 'ff']
 
 function patch(

@@ -26,7 +26,7 @@ function world(kind = 'house', stage: 'construction' | 'complete' = 'complete'):
   return s
 }
 
-// Noon: from C11 Task 26 the witness radius scales with the light on the thing looked at, and
+// Noon: the witness radius scales with the light on the thing looked at, and
 // ten paces at midnight is past it. What is carved is not about the dark.
 const withCarver = (s: WorldState, x: number, y: number): WorldState =>
   ({ ...fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x, y, ageDays: 7300 })), tick: 720 })

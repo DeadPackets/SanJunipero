@@ -32,7 +32,7 @@ const HealthSchema = z.object({
     grave: z.number().default(60),
   }).strict().prefault({}),
   infectionChancePerInjuryPerDay: z.number().default(0.2),
-  // C11 deviation 3: the per-tick contagion dials are gone with the loop that read them.
+  // The per-tick contagion dials are gone with the loop that read them.
   // Contagion is one midnight roll now, on `illness`, so the world has one contagion system.
   recoveryHpPerDay: z.number().default(5),
   tendedRecoveryHpPerDay: z.number().default(15),
@@ -220,7 +220,7 @@ const MysterySchema = z.object({
   chancePerDay: z.number().default(0.08),
 }).strict()
 
-// C11 adds maxNodes here; roadCost stays C9's (deep-world addendum §11).
+// maxNodes lives here; roadCost keeps its original default (deep-world addendum §11).
 const PathingSchema = z.object({
   roadCost: z.number().default(0.6),
   maxNodes: z.number().int().positive().default(6000),
@@ -252,7 +252,7 @@ const MortalitySchema = z.object({
   graveEnabled: z.boolean().default(true),
 }).strict()
 
-// Contagion is ON at a low dial from genesis (§13 option A, user ruling 2). §13 is closed.
+// Contagion is ON at a low dial from genesis (§13 option A). §13 is closed.
 const IllnessSchema = z.object({
   enabled: z.boolean().default(true),
   dailyWorsenChance: z.number().default(0.25),
@@ -313,8 +313,8 @@ const ambientBand = (day: number, dusk: number, night: number) => z.object({
   day: z.number().default(day), dusk: z.number().default(dusk), night: z.number().default(night),
 }).strict().prefault({})
 
-// Controller ruling 4 ratified these numbers: they decide whether the first winter is
-// survivable with effort, which is the product intent. Retune in C8 via config_changed.
+// These numbers are ratified: they decide whether the first winter is
+// survivable with effort, which is the product intent. Retune via config_changed.
 const WarmthSchema = z.object({
   enabled: z.boolean().default(true),
   comfortBand: z.number().default(8),
@@ -465,7 +465,7 @@ export function isBeddedKind(config: SimConfig, kind: string): boolean {
   return config.structures.recipes[kind]?.bed === true
 }
 
-// The one derivation of the slower clock (G4): 0.021/tick at defaults, 0.6x hunger by ruling D4.
+// The one derivation of the slower clock: 0.021/tick at defaults, 0.6x hunger.
 export function thirstDecayPerTick(config: SimConfig): number {
   return config.needs.hungerDecayPerTick * config.thirst.decayFactorOfHunger
 }

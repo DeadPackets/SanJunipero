@@ -17,7 +17,7 @@ export type LitWorld = {
   }>
 }
 
-// The one reader of the glow table (G4). A kind that is not in it throws no light.
+// The one reader of the glow table. A kind that is not in it throws no light.
 export function glowRadiusFor(config: SimConfig, kind: string): number | undefined {
   return (config.light.glowRadius as Record<string, number | undefined>)[kind]
 }
@@ -43,7 +43,7 @@ function itemAt(state: LitWorld, item: LitWorld['items'][string]): { x: number; 
 }
 
 // Everything alight in the world right now, as footprints with a reach. One walk of the world
-// answers both "is this tile lit" and "is there a flame near this pair of hands" (G4).
+// answers both "is this tile lit" and "is there a flame near this pair of hands".
 export type Flame = {
   id: string; source: 'item' | 'structure'
   x: number; y: number; w: number; h: number; radius: number

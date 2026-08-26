@@ -42,7 +42,7 @@ function withAgentAtDoor(s: WorldState, id: string): WorldState {
 const enter = (s: WorldState, id: string): ReturnType<typeof submitIntent> =>
   submitIntent(s, CFG, id, 'enter', { structureId: 'structure_1' })
 
-// ------------------------------------------------------------------ R1: the scenery ---
+// ------------------------------------------------------------------ the scenery ---
 
 describe('★ a roof is a property of the kind, and the valley meant what it looked like', () => {
   const DWELLINGS = ['house', 'cabin', 'cottage', 'farmhouse', 'storehouse']
@@ -159,7 +159,7 @@ describe('★ a dearer dwelling is never a worse one', () => {
   })
 })
 
-// ------------------------------------------------------------------ R2: the room ---
+// ------------------------------------------------------------------ the room ---
 
 describe('★ a room holds only so many bodies, and floor area is why', () => {
   it('is two tiles of floor a body, from the footprint and nothing else', () => {
@@ -274,7 +274,7 @@ describe('★ full reaches the packet, so nobody pays a turn to find out', () =>
   })
 })
 
-// ---------------------------------------- R5: the fixtures pre-satisfy the only want we model ---
+// ---------------------------------------- the fixtures pre-satisfy the only want we model ---
 
 describe('★ the shelter ledger — roofs against bodies, which nobody was counting', () => {
   function genesisTown(bodies: number): WorldState {

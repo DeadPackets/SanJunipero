@@ -5,14 +5,14 @@ import { ageBand } from './aging.js'
 
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 
-// The one derivation of the warmth a body drifts toward (G4): warmthSystem takes the number
+// The one derivation of the warmth a body drifts toward: warmthSystem takes the number
 // over the moment the cold has teeth, and it must be the same number in both places.
 export function warmthTarget(state: WorldState, _config: SimConfig): number {
   return warmthTargetFromAir(state.weather.temperatureC)
 }
 
 /** The same curve, taking the air a particular body is actually in. `warmthTargetFor` in
- *  `warmth.ts` is the one caller that has a body to ask about; both land here (G4). */
+ *  `warmth.ts` is the one caller that has a body to ask about; both land here. */
 export function warmthTargetFromAir(temperatureC: number): number {
   return clamp(0, 100, 50 + 2 * (temperatureC - 10))
 }

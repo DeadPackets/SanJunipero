@@ -14,6 +14,7 @@ import {
   strideGate, frameCoherenceGate, upscaleNearest, downscaleMajority, type GateFailure,
 } from '../src/sheet.js'
 import { CHAR_DESC, ASYMMETRY_CLAUSE, BIG_PIXEL } from './character.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -26,7 +27,7 @@ const RESERVE = 0.046
 const conceptIdx = process.argv.indexOf('--concept')
 const CONCEPT = conceptIdx >= 0 ? readFileSync(process.argv[conceptIdx + 1]!) : null
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const DURABLE = `${SCRATCH}/character-v3`
 const CACHE = `${DURABLE}/candidates`
 const PROBE = `${DURABLE}/probe-wide`

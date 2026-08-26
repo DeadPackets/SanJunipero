@@ -1,4 +1,4 @@
-// The ground contract C11 hands C12: the world is baked, cached and invalidated in
+// The ground contract: the world is baked, cached and invalidated in
 // 32-tile squares, so a paved tile redraws its own chunk and not a 128x128 map.
 
 export const CHUNK_TILES = 32

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { renderShareCard } from './shareCard.js'
-import { FORBIDDEN_FRAMING } from './llm/framing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 describe('renderShareCard', () => {
   const svg = renderShareCard({ day: 3, title: 'The First Trade', subtitle: 'Omar gives Yusuf a pot.', heat: 7.5 })

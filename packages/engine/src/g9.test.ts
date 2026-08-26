@@ -364,7 +364,7 @@ describe('G9a-7: what is carved can be read back', () => {
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
     s = spawn(s, config, { id: 'passerby', x: 12, y: 6 })  // in sight, out of arm's reach
     // By daylight, for the same reason the ownership chain above is: what "in sight" means
-    // now depends on the light on the wall (C11 Task 26).
+    // now depends on the light on the wall.
     return { ...s, tick: 720 }
   }
 

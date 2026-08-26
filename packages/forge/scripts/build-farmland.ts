@@ -8,6 +8,9 @@ import { decodePng, encodePng } from '../src/post/raw.js'
 import { gradeMaterial, seamReport, borderReport, materialVeto, selfTile3x3 } from '../src/terrainGen.js'
 import { FURROW_DEPTH, FURROW_LIP, FURROW_PITCH_PX, ploughFurrows } from '../src/plough.js'
 import { paletteGate } from '../src/pixelGates.js'
+import { scratch } from './scratch.js'
+
+const S = scratch()
 
 const MATERIALS = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets', 'materials')
 
@@ -35,6 +38,5 @@ if (veto !== null || bar.length > 0) throw new Error(
   + `  The shipped material on disk is untouched.`)
 
 writeFileSync(join(MATERIALS, 'terrain_farmland_0.png'), await encodePng(farmland))
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
 writeFileSync(`${S}/fqc2/plough/shipped-3x3.png`, await encodePng(selfTile3x3(farmland)))
 console.log('wrote content/tilesets/materials/terrain_farmland_0.png')

@@ -16,8 +16,9 @@ import {
   generationItems, materialFromCandidate, planTerrainProgram,
   borderReport, materialVeto, seamReport, selfTile3x3, terrainBoilerplate,
 } from '../src/terrainGen.js'
+import { scratch } from './scratch.js'
 
-const C3 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c3'
+const C3 = scratch('c3')
 // TERRAIN_ROOT lets a re-run under a stricter bar land beside the old art, and book its
 // spend against its own lane's ledger rather than C3's.
 const OUT = process.env.TERRAIN_ROOT ?? C3

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// A day the town kept, as C7 recorded it. The id is the narrator's own scene id, so a
+// A day the town kept. The id is the narrator's own scene id, so a
 // /moment/<id> link outlives any renumbering of the feed it was found in.
 export const MomentSchema = z.object({
   id: z.number().int().positive(),

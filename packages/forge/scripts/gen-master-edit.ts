@@ -3,6 +3,7 @@
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -14,7 +15,7 @@ if (!CHAR || !SRC || !OUT || !NOTE) throw new Error('EDIT_CHAR, EDIT_SRC, EDIT_O
 const CAP = Number(process.env.EDIT_CAP ?? '0.2')
 const budget = new BudgetGuard(CAP)
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const RAWS = `${SCRATCH}/production/${CHAR}/raws`
 const srcPath = `${RAWS}/${SRC}.png`
 const outPath = `${RAWS}/${OUT}.png`

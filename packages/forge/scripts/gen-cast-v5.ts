@@ -25,6 +25,7 @@ import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastMember } from './cast-v5.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -37,7 +38,7 @@ const RUN = CAST_V5.filter((c) => FILTER.includes(c.id))
   .sort((a, b) => Number(b.id === PROPORTION_ANCHOR_ID) - Number(a.id === PROPORTION_ANCHOR_ID))
 if (RUN.length === 0) throw new Error(`CAST=${process.env.CAST} matches no cast member`)
 
-const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/ar'
+const S = scratch('ar')
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 

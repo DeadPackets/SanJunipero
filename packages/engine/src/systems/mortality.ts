@@ -30,7 +30,7 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
   const { mortality } = config
   if (!mortality.enabled) return []
   const out: Drain[] = []
-  // The ladder is the only road the cold takes (Task 22), so a fatal rung a winter night drove
+  // The ladder is the only road the cold takes, so a fatal rung a winter night drove
   // is named for the night. Nothing else about the drain changes: same amount, same clock.
   const chilled = (a.coldTicksSinceRecovery ?? 0) > 0
   for (const x of a.afflictions ?? []) {
@@ -52,7 +52,7 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
   return out
 }
 
-// The single attribution (G4): biggest drain, then the oldest of them, then the order of
+// The single attribution: biggest drain, then the oldest of them, then the order of
 // DEATH_CAUSES. A body worn down with nothing named on it died of the wounds it took.
 export function deathAttribution(
   state: WorldState, config: SimConfig, agentId: string,

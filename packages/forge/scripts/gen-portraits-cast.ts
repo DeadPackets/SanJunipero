@@ -10,6 +10,7 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import {
   estimatePitch, v7Chain, anchorToCanvas, opaqueBbox, upscaleNearest, paletteJaccard, assembleGrid,
 } from '../src/sheet.js'
+import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -21,7 +22,7 @@ const RESERVE = 0.046
 // Measured $0.696/character (B3) + worst-case 3rd-candidate margin.
 const START_HEADROOM = 0.95
 
-const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
+const SCRATCH = scratch('c5')
 const PRODUCTION = `${SCRATCH}/production`
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
 

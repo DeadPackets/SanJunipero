@@ -5,8 +5,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, SPEND_KINDS, ANOMALY_STOP_USD, type SpendKind } from '../src/spendLedger.js'
+import { scratch } from './scratch.js'
 
-const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
+const C13 = scratch('c13')
 
 const config = loadForgeConfig()
 const ledger = new SpendLedger(join(C13, 'spend.json'))

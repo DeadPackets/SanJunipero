@@ -116,7 +116,6 @@ describe('★ where the town is, in a world that moves under it', () => {
   })
 })
 
-
 // This guard passed its first mutation: rings 1 and 2 hold no water the grammar does not already
 // know about. It is ring 3 that needs the world half of the ground.
 describe('★ the plat rule reads the world s water too, not only the grammar s', () => {

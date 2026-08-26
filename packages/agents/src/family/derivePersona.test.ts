@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { derivePersona, type ParentPersona } from './derivePersona.js'
-import { FORBIDDEN_FRAMING } from '../prompt/rulesOfBeing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 const MOTHER: ParentPersona = {
   agentId: 'amara',

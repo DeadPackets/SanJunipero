@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import { migrateLlmTables } from './callLog.js'
 import {
@@ -119,6 +120,12 @@ describe('dead calls — paid for, and nothing came back', () => {
     // Two days for one mind means two rows, never one lumped total.
     expect(rows.filter((r) => r.agentId === 'omar')).toHaveLength(2)
     expect(new Set(rows.filter((r) => r.agentId === 'omar').map((r) => r.day)).size).toBe(2)
+  })
+
+  it('folds on an escaped NUL, so git still reads the source as text', () => {
+    const src = readFileSync(new URL('./spendMonitor.ts', import.meta.url), 'utf8')
+    expect(src).toContain('\\x00')
+    expect(src).not.toContain('\0')
   })
 
   it('a clean run reports nothing at all', () => {

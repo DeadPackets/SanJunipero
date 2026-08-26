@@ -1,7 +1,7 @@
 import type { SimConfig } from './config.js'
 
 // Standing water and a dug channel are the same thing to a root, a mouth and a bucket:
-// one definition site for the whole world (G4).
+// one definition site for the whole world.
 export const WATER_TILES: ReadonlySet<number> = new Set([2, 10])
 
 // A distance function, never a stored gradient: the harvest and the overlay call this same

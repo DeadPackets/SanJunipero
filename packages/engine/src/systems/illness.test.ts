@@ -119,7 +119,7 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
   })
 })
 
-// Task 37, batch-2 ruling 1: the wound's own way into the fever. C9 set a boolean nothing
+// The wound's own way into the fever. An older pass set a boolean nothing
 // could lift; the same roll now mints the affliction the midnight turn above can worsen or lift.
 describe('illnessSystem: a wound turns septic at dawn', () => {
   const DAWN = 360
