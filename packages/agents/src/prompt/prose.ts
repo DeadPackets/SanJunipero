@@ -11,7 +11,7 @@ import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
 // Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
 // reconciles in. Keep the field shapes identical to @sj/engine's so the mapping stays 1:1.
 
-export type PerceptionItem = {
+type PerceptionItem = {
   id: string
   kind: string
   qty: number
@@ -30,12 +30,12 @@ export type PerceptionItem = {
 
 // Things this agent watched happen: a taking that was not theirs, or one of the
 // world's unexplained happenings close enough to see.
-export type PerceptionSeen =
+type PerceptionSeen =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
   | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
 
-export type PerceptionAgent = {
+type PerceptionAgent = {
   id: string
   name: string
   x: number
@@ -49,7 +49,7 @@ export type PerceptionAgent = {
   condition?: string
 }
 
-export type PerceptionStructure = {
+type PerceptionStructure = {
   id: string
   kind: string
   x: number
@@ -74,7 +74,7 @@ export type PerceptionStructure = {
   bed?: true
 }
 
-export type PerceptionCrop = {
+type PerceptionCrop = {
   id: string
   kind: string
   x: number
@@ -85,8 +85,8 @@ export type PerceptionCrop = {
 
 // A shape at a distance and a patch of ground worth working: `hunt` wants an id and `forage`
 // a node, and neither was nameable before.
-export type PerceptionFauna = { id: string; kind: string; x: number; y: number }
-export type PerceptionForageable = { id: string; kind: string; x: number; y: number; prose: string }
+type PerceptionFauna = { id: string; kind: string; x: number; y: number }
+type PerceptionForageable = { id: string; kind: string; x: number; y: number; prose: string }
 
 export type PerceptionPacket = {
   time: SimTime

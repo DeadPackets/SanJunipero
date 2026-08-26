@@ -23,7 +23,7 @@ export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.
-export const PRICE_PER_M_BY_MODEL: Record<string, ModelPrices> = {
+const PRICE_PER_M_BY_MODEL: Record<string, ModelPrices> = {
   [MIND_MODEL]: PRICE_PER_M,
 }
 
@@ -58,7 +58,7 @@ export type ReasoningSetting =
 
 // Per `LlmClient` caller. `null` sends no reasoning parameter, which is what every call did
 // before the dial existed.
-export const REASONING_BY_CALLER: Record<string, ReasoningSetting | null> = {}
+const REASONING_BY_CALLER: Record<string, ReasoningSetting | null> = {}
 
 export function reasoningFor(caller: string): ReasoningSetting | null {
   return REASONING_BY_CALLER[caller] ?? null

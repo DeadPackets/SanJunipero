@@ -7,7 +7,7 @@ export const G11_MIN_SIM_DAYS = 2
 
 // What a turn was for: a town that spends its whole day staying alive is a failed tuning
 // outcome. Movement is nobody's purpose, so it gets its own bucket.
-export const SURVIVAL_VERBS: readonly string[] = [
+const SURVIVAL_VERBS: readonly string[] = [
   'eat',
   'drink',
   'sleep',
@@ -27,7 +27,7 @@ export const SURVIVAL_VERBS: readonly string[] = [
   'enter',
   'exit',
 ]
-export const PRODUCTION_VERBS: readonly string[] = [
+const PRODUCTION_VERBS: readonly string[] = [
   'build',
   'craft',
   'till',
@@ -40,7 +40,7 @@ export const PRODUCTION_VERBS: readonly string[] = [
   'inscribe',
   'write',
 ]
-export const SOCIAL_VERBS: readonly string[] = ['speak', 'give', 'teach', 'read', 'attack']
+const SOCIAL_VERBS: readonly string[] = ['speak', 'give', 'teach', 'read', 'attack']
 
 export type TurnClass = 'survival' | 'production' | 'social' | 'other'
 
@@ -72,7 +72,7 @@ export function chronicleViolations(lines: readonly string[]): string[] {
   return out
 }
 
-export const G11MindSchema = z
+const G11MindSchema = z
   .object({
     agentId: z.string(),
     turns: z.number().int(),
@@ -81,7 +81,7 @@ export const G11MindSchema = z
   .strict()
 
 // One mind, one sim-day: a town with no full-need moments has no window for society.
-export const G11DiscretionSchema = z
+const G11DiscretionSchema = z
   .object({
     agentId: z.string(),
     day: z.number().int(),
@@ -96,7 +96,7 @@ export const G11DiscretionSchema = z
   .strict()
 export type G11Discretion = z.infer<typeof G11DiscretionSchema>
 
-export const G11OpsPlaneSchema = z
+const G11OpsPlaneSchema = z
   .object({
     runConstructPass: z.enum(['wired', 'refused']),
     narrateDayWorldSeam: z.enum(['wired', 'refused']),
@@ -106,7 +106,7 @@ export const G11OpsPlaneSchema = z
   })
   .strict()
 
-export const G11MeasurementSchema = z
+const G11MeasurementSchema = z
   .object({
     mapWidth: z.number().int(),
     mapHeight: z.number().int(),
@@ -122,7 +122,7 @@ export const G11MeasurementSchema = z
   })
   .strict()
 
-export const G11SpendSchema = z
+const G11SpendSchema = z
   .object({
     totalCostUsd: z.number(),
     llmCallCount: z.number().int(),
@@ -153,7 +153,7 @@ export const G11SpendSchema = z
   })
   .strict()
 
-export const G11ConstructsSchema = z
+const G11ConstructsSchema = z
   .object({
     expressiveVerbs: z.array(z.string()),
     firstExpressiveBy: z.string().nullable(),
@@ -169,7 +169,7 @@ export const G11ConstructsSchema = z
   })
   .strict()
 
-export const G11EvidenceSchema = z
+const G11EvidenceSchema = z
   .object({
     // 1 — the run itself
     ticksRun: z.number().int(),
@@ -259,11 +259,10 @@ export const G11EvidenceSchema = z
       .strict(),
   })
   .strict()
-export type G11Evidence = z.infer<typeof G11EvidenceSchema>
 
 // The three calls the gate refused to start without. Recorded so a run can never again be
 // read without knowing whether its provider could emit an act.
-export const G11PreflightSchema = z
+const G11PreflightSchema = z
   .object({
     provider: z.string(),
     hardAllowList: z.boolean(),
@@ -285,7 +284,7 @@ export const G11PreflightSchema = z
 
 // Reported, never gated: a resumed run must read as one, or a checkpoint becomes a way to
 // launder a failure into a pass.
-export const G11ResumeSchema = z
+const G11ResumeSchema = z
   .object({
     resumed: z.boolean(),
     attempts: z.number().int(),

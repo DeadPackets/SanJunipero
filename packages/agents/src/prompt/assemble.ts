@@ -40,7 +40,7 @@ export type AssembledPrompt = {
 // Byte-stable, so blocks 1-3 form an unbroken cache prefix until sleep rewrites block 3.
 const BLOCK_DELIM = '\n\n---\n\n'
 
-export const DAYLOG_COMPACTION_TOKENS = 6000
+const DAYLOG_COMPACTION_TOKENS = 6000
 
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard

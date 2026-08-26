@@ -78,7 +78,7 @@ const MindSnapshot = z
 
 // Everything that decides whether two runs are the same run. A resume across ANY difference
 // here is a different gate wearing the first one's evidence.
-export const G11FingerprintSchema = z
+const G11FingerprintSchema = z
   .object({
     gitSha: z.string(),
     configHash: z.string(),
@@ -96,7 +96,7 @@ export type G11Fingerprint = z.infer<typeof G11FingerprintSchema>
 
 // The run's memory: nothing here is in the event log, and every field feeds a criterion or
 // the transcript.
-export const G11SidecarSchema = z
+const G11SidecarSchema = z
   .object({
     tick: z.number().int(),
     lastDayClosed: z.number().int(),

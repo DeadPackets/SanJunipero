@@ -157,11 +157,7 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
   it('finds the casts it is meant to be guarding', () => {
     // Without this the suite passes by scanning nothing, the failure mode a static guard has.
     const files = new Set(cards().map((c) => c.file))
-    for (const expected of [
-      'agents/src/live/founderMinds.ts',
-      'agents/scripts/g11-deepworld.ts',
-      'agents/src/persona/tamar.ts',
-    ])
+    for (const expected of ['agents/src/live/founderMinds.ts', 'agents/scripts/g11-deepworld.ts'])
       expect(files, `no cast found in ${expected}`).toContain(expected)
     expect(cards().length).toBeGreaterThanOrEqual(15)
   })

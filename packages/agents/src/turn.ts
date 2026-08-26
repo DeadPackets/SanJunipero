@@ -3,7 +3,7 @@ import { MINUTES_PER_DAY, type DayPhase } from '@sj/shared'
 
 // An hour of the day is a plan for today; a day and a phase is an appointment. Without the
 // second shape nothing can be arranged in advance, only remembered or improvised.
-export const ReconsiderAtSchema = z.union([
+const ReconsiderAtSchema = z.union([
   z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   z.object({ day: z.number().int().positive(), phase: z.enum(['day', 'dusk', 'night']) }).strict(),
 ])

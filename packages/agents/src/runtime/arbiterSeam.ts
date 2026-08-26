@@ -19,7 +19,7 @@ export type AgentCtx = {
   saying?: string
 }
 
-export type Verdict =
+type Verdict =
   | { kind: 'map'; verb: string; params: Record<string, unknown> }
   | { kind: 'attempt'; recipe: { id: string }; summary: string }
   | { kind: 'impossible'; reason: string; class: string }
