@@ -5,7 +5,7 @@ import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './n
 import {
   backToRoster, isSingleAgentView, navToLens, parseRoute, routeToPath, type Lens, type Route,
 } from './ui/route.js'
-import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
+import { escapeStep, lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
 import { Minimap } from './render/MinimapView.js'
 import { minimapShown } from './render/minimap.js'
@@ -176,20 +176,28 @@ export function App() {
     setRoute(next)
   }
 
-  // ADAPTER: Escape steps back out of one person to the roster — but only when no interior
-  // is open, because the room claimed Escape first and a viewer expects one step at a time.
+  // ADAPTER: Escape takes ONE step out, and this is the one place that decides which step.
+  // Precedence: the room the camera is standing in, then the controls menu, then one person
+  // back to the roster. Two window listeners could not settle it — stopPropagation does not
+  // reach a sibling on the same target, so the order would be registration luck.
   useEffect(() => {
-    if (!isSingleAgentView(route) || insideId !== null) return
+    const step = escapeStep(insideId, dockOpen, isSingleAgentView(route))
+    if (step !== 'dock' && step !== 'roster') return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       const t = e.target as HTMLElement | null
       if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
       e.preventDefault()
+      if (step === 'dock') {
+        setDockOpen(false)
+        document.querySelector<HTMLElement>('.hud-handle')?.focus()
+        return
+      }
       showRoster()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [route, insideId])
+  }, [route, insideId, dockOpen])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
   // panning, a text field owns them for typing, and a toolbar or scrubber that already

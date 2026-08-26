@@ -57,6 +57,16 @@ export function itemCropDetail(state: WorldState | null, kind: 'item' | 'crop', 
   return `${c.kind}, planted day ${c.plantedDay}, ${growth}`
 }
 
+/** What Escape takes one step out of, in priority order, or `null` when it takes no step. Two
+ *  window listeners cannot settle this between them, so the whole order lives here. */
+export function escapeStep(
+  insideId: string | null, dockOpen: boolean, onOnePerson: boolean,
+): 'room' | 'dock' | 'roster' | null {
+  if (insideId !== null) return 'room'
+  if (dockOpen) return 'dock'
+  return onOnePerson ? 'roster' : null
+}
+
 export function lensFromKey(key: string, current: Lens): Lens | null {
   const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0
   if (step === 0) return null
