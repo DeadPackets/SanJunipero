@@ -6,19 +6,11 @@ describe('chromaKey', () => {
     const img = {
       width: 3,
       height: 1,
+      // biome-ignore format: pixel grid
       data: new Uint8ClampedArray([
-        255,
-        0,
-        255,
-        255, // pure magenta
-        250,
-        40,
-        240,
-        255, // near magenta (jpeg-ish drift)
-        200,
-        180,
-        90,
-        255, // honey wood — content
+        255, 0, 255, 255,   // pure magenta
+        250, 40, 240, 255,  // near magenta (jpeg-ish drift)
+        200, 180, 90, 255,  // honey wood — content
       ]),
     }
     const out = chromaKey(img)
@@ -30,15 +22,10 @@ describe('chromaKey', () => {
     const img = {
       width: 2,
       height: 1,
+      // biome-ignore format: pixel grid
       data: new Uint8ClampedArray([
-        255,
-        0,
-        255,
-        128, // magenta with partial alpha → 0
-        10,
-        20,
-        30,
-        128, // content with partial alpha → 255
+        255, 0, 255, 128, // magenta with partial alpha → 0
+        10, 20, 30, 128,  // content with partial alpha → 255
       ]),
     }
     const out = chromaKey(img)

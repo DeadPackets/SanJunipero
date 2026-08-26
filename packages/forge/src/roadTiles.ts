@@ -26,12 +26,8 @@ function tileSpace(x: number, y: number): { u: number; v: number; inside: boolea
   return { u: (a + b) / 2, v: (b - a) / 2, inside: Math.abs(a) + Math.abs(b) <= 1 }
 }
 
-const GRIT_AT: readonly (readonly [number, number])[] = [
-  [8, 4],
-  [23, 5],
-  [12, 11],
-  [20, 10],
-]
+// biome-ignore format: pixel grid
+const GRIT_AT: readonly (readonly [number, number])[] = [[8, 4], [23, 5], [12, 11], [20, 10]]
 
 // Arms come from the key NAME, not from a reverse lookup: the isolated tile and the
 // south stub share the key `cap-s` (deviation 3), and only the name says which arm it opens.
