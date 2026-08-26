@@ -966,9 +966,9 @@ export const CraftParams = z.object({ recipe: z.string() }).strict()
 export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
-  return Object.keys(state.items).sort()
-    .map((id) => state.items[id]!)
+  return Object.values(state.items)
     .filter((i) => i.kind === kind && i.loc.t === 'agent' && i.loc.id === agentId)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
 }
 
 function heldQty(state: WorldState, agentId: string, kind: string): number {
@@ -1186,6 +1186,21 @@ const words = (kind: string): string => kind.replace(/_/g, ' ')
 export function buildSiteOf(
   state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
 ): BuildSiteAnswer {
+  const key = `${agentId}|${params.kind}|${params.x ?? ''}|${params.y ?? ''}`
+  const hit = siteMemo.get(state)
+  if (hit !== undefined && hit.config === config && hit.key === key) return hit.answer
+  const answer = computeBuildSite(state, config, agentId, params)
+  siteMemo.set(state, { config, key, answer })
+  return answer
+}
+
+// One build intent asks this from `validate`, `duration` and `onStart` over the same immutable
+// world, and each answer costs a claim search of the whole lattice.
+const siteMemo = new WeakMap<WorldState, { config: SimConfig; key: string; answer: BuildSiteAnswer }>()
+
+function computeBuildSite(
+  state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
+): BuildSiteAnswer {
   const recipe = buildableRecipe(config, params.kind)!
   if (!buildIsPlotted(state, config, params.kind)) {
     if (params.x === undefined || params.y === undefined) {
@@ -1204,12 +1219,13 @@ export function buildSiteOf(
   const square = townSquareOf(state)!
   const mine = siteToRaise(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const site = mine !== null
-    ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
-    : claim === null ? null : { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
-  if (site === null || claim === null) {
-    return { site, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
+  const raising = mine === null
+    ? null
+    : { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
+  if (claim === null) {
+    return { site: raising, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
   }
+  const site = raising ?? { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
   // ★ AND THE GROUND IT STANDS ON HAS TO EXIST. The town lays the block the first time
   // somebody builds on it; if the array does not reach that far yet the answer says so out
   // loud, because a plot silently withheld for want of a bigger world is the ring-1 clamp all
@@ -1454,8 +1470,9 @@ function consumeForInput(state: WorldState, agentId: string, input: string, qty:
 }
 
 const heldWater = (state: WorldState, agentId: string) =>
-  Object.keys(state.items).sort().map((id) => state.items[id]!)
-    .find((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
+  Object.values(state.items)
+    .filter((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))[0]
 
 // A fire somebody is feeding, within arm's reach of where the cooking happens — and a hearth
 // somebody has fed is one, so a pot can finally go over a fire that is out of the weather.
@@ -1708,7 +1725,6 @@ export const WriteParams = z.object({ itemId: z.string().optional(), text: z.str
 export const ReadParams = z.object({ itemId: z.string() }).strict()
 export const TeachParams = z.object({ targetId: z.string(), track: z.string() }).strict()
 export const AttackParams = z.object({ targetId: z.string() }).strict()
-export const ExperimentParams = z.object({ description: z.string() }).strict()
 
 // One function under two names, so the word a busy body says and the word an idle one says are
 // composed in exactly one place (G4).

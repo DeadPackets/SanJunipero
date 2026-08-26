@@ -41,13 +41,14 @@ function socialRegenActive(ctx: TickCtx, id: string): boolean {
   const window = ctx.config.needs.socialRegenRecencyTicks
   const a = ctx.state().agents[id]!
   const aSpoke = a.lastSpokeTick !== undefined && tick - a.lastSpokeTick <= window
+  const earshotSq = ctx.config.movement.earshotRadius * ctx.config.movement.earshotRadius
   for (const otherId of Object.keys(ctx.state().agents)) {
     if (otherId === id) continue
     const o = ctx.state().agents[otherId]!
     if (!o.alive) continue
     const dx = o.x - a.x
     const dy = o.y - a.y
-    if (dx * dx + dy * dy > ctx.config.movement.earshotRadius * ctx.config.movement.earshotRadius) continue
+    if (dx * dx + dy * dy > earshotSq) continue
     const oSpoke = o.lastSpokeTick !== undefined && tick - o.lastSpokeTick <= window
     if (aSpoke || oSpoke) return true
   }

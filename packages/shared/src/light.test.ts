@@ -138,6 +138,17 @@ describe('lightBandAt: three words, never a number', () => {
     expect(lightBandAt(world(), 0, 0, MIDNIGHT, NO_LIGHT_LAW)).toBe('bright')
   })
 
+  // The walk of the world behind this is kept against the world's identity, so one object asked
+  // twice must still answer the tick and the config in hand.
+  it('answers the tick and the config it was handed, not the pair it answered last', () => {
+    const w = torchAt(10, 10, MIDNIGHT + 1)
+    expect(lightBandAt(w, 12, 10, MIDNIGHT, CFG)).toBe('bright')
+    expect(lightBandAt(w, 12, 10, MIDNIGHT + 2, CFG)).toBe('dark')
+    const stub = SimConfigSchema.parse({ light: { glowRadius: { torch: 1 } } })
+    expect(lightBandAt(w, 12, 10, MIDNIGHT, stub)).toBe('dark')
+    expect(lightBandAt(w, 10, 10, MIDNIGHT, stub)).toBe('bright')
+  })
+
   it('does not turn dusk into deep night when the two factors are set equal', () => {
     const flat = SimConfigSchema.parse({ nightWitness: { duskFactor: 0.35, nightFactor: 0.35 } })
     expect(lightBandAt(world(), 0, 0, DUSK, flat)).toBe('dim')

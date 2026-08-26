@@ -4,7 +4,6 @@ import type { ForageableKind } from './data/forageables.js'
 
 // grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
-export const MAX_TILE_ID = 10
 
 // The ground a recipe is allowed to name, and the one table for it: the arbiter's
 // `adjacent_tile` requirement reads it forwards, and the ground shown to the arbiter reads it

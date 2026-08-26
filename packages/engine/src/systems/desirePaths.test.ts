@@ -93,6 +93,8 @@ describe('desirePathsSystem: wear', () => {
     const after = midnight(cross(withWalker(meadow()), 120), 1).state
     expect(after.traffic).toEqual({ [trafficKey(1, 1)]: 108 })
     expect(midnight(after, 2).state.traffic).toEqual({ [trafficKey(1, 1)]: 97 })
+    // And a counter the fall takes to zero leaves the map, rather than being carried at zero.
+    expect(midnight({ ...after, traffic: { [trafficKey(1, 1)]: 1 } }, 2).state.traffic).toBeUndefined()
   })
 })
 

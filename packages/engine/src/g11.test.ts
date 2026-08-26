@@ -146,7 +146,8 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     expect(Object.keys(before.traffic ?? {}).length).toBeGreaterThan(0)
 
     const grown = pass(before, GROWS, MINUTES_PER_DAY)
-    const p = grown.events.find((e) => e.type === 'world_grown')!.payload as { edge: string; depth: number }
+    const growth = grown.events.find((e) => e.type === 'world_grown')!
+    const p = growth.payload as { edge: string; depth: number }
     // Five rows short of the margin to the north, and the north comes first in n-e-s-w.
     expect({ edge: p.edge, depth: p.depth }).toEqual({ edge: 'n', depth: 14 })
     const dy = p.depth
@@ -161,7 +162,8 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
       const [x, y] = k.split(',').map(Number)
       return `${x},${y! + dy}`
     }).sort()
-    expect(Object.keys(grown.state.traffic!).sort()).toEqual(shifted)
+    // Asked of the growth alone: the same midnight decays these one-footfall tiles off the map.
+    expect(Object.keys(apply(before, GROWS, [growth], MINUTES_PER_DAY).traffic!).sort()).toEqual(shifted)
   })
 
   // ★ THE GROUND THAT ARRIVES IS THE WORLD CONTINUED. The river is a reason for the town's
