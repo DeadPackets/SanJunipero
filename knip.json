@@ -1,20 +1,55 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    ".": { "project": ["*.ts", "*.js"] },
-    "packages/*": {
-      "entry": ["src/**/*.test.ts", "scripts/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts"]
+    ".": {
+      "project": [
+        "*.ts",
+        "*.js"
+      ]
     },
-    "packages/engine": { "entry": ["src/**/*.test.ts"], "project": ["src/**/*.ts"] },
-    "packages/shared": { "entry": ["src/**/*.test.ts"], "project": ["src/**/*.ts"] },
+    "packages/*": {
+      "entry": [
+        "src/**/*.test.ts",
+        "scripts/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts"
+      ]
+    },
+    "packages/engine": {
+      "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/shared": {
+      "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     "packages/gateway": {
-      "entry": ["src/serve.ts", "src/devWorld.ts", "src/hotswapDemo.ts", "src/**/*.test.ts", "scripts/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts"]
+      "entry": [
+        "src/**/*.test.ts",
+        "scripts/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts"
+      ]
     },
     "packages/web": {
-      "entry": ["src/main.tsx", "src/**/*.test.ts", "vite.config.ts"],
-      "project": ["src/**/*.{ts,tsx}", "vite.config.ts"]
+      "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ]
     }
   }
 }
