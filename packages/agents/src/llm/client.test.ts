@@ -156,6 +156,53 @@ describe('LlmClient.object', () => {
     expect(all[0]!.ok).toBe(0)
   })
 
+  // ★ A generation that came back with nothing was still billed. The retry path booked six
+  // hardcoded zeros, so ~10% of the mini-rehearsal's spend was invisible to every guard.
+  it('★ books a paid-but-empty generation at what it cost, not at zero', async () => {
+    const db = openDb()
+    const model = mockModel([{
+      json: { wrong: 'shape' },
+      servedModelId: MIND_MODEL,
+      usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
+    }])
+    const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
+    await expect(
+      client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA }),
+    ).rejects.toThrow()
+
+    const all = rows(db)
+    expect(all).toHaveLength(1)
+    expect(all[0]!.ok).toBe(0)
+    expect(all[0]!.input_tokens).toBe(1000)
+    expect(all[0]!.output_tokens).toBe(50)
+    expect(all[0]!.cache_read_tokens).toBe(600)
+    // A dead call names no back end, so it books at the ceiling — the same rule a landed call
+    // with an unattributed route follows: ((1000-600)*0.44 + 600*0.114 + 50*1.32) / 1e6.
+    const ceiling = ((1000 - 600) * 0.44 + 600 * 0.114 + 50 * 1.32) / 1e6
+    expect(all[0]!.cost_usd).toBeCloseTo(ceiling, 12)
+    expect(all[0]!.reported_cost_usd).toBeNull()
+    // And the per-caller guard can now see the money it burned.
+    expect(client.totalCostUsd()).toBeCloseTo(ceiling, 12)
+    // No `llm_price_unpriced_route` alert: a failure has no bill to reconcile, so it never
+    // goes through `book`, and ~10% of calls would otherwise be an alert flood.
+    expect(db.prepare('SELECT kind FROM alerts').all()).toEqual([])
+  })
+
+  it('★ and it is not vacuous: an error carrying no usage still books nothing', async () => {
+    const db = openDb()
+    const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
+    const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
+    await expect(
+      client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA }),
+    ).rejects.toThrow(/scripted failure/)
+    for (const r of rows(db)) {
+      expect(r.ok).toBe(0)
+      expect(r.cost_usd).toBe(0)
+      expect(r.input_tokens).toBe(0)
+    }
+    expect(client.totalCostUsd()).toBe(0)
+  })
+
   it('repairs a shape the decoder refused, logs the call as answered, and says it repaired it', async () => {
     const db = openDb()
     const model = mockModel([

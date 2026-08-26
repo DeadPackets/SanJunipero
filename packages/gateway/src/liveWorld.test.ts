@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { FakeEmbedder, insertAlert, openAgentDb, type LlmClient, type MindSpec } from '@sj/agents'
+import { FakeEmbedder, insertAlert, OPAQUE_REFUSAL, openAgentDb, type LlmClient, type MindSpec } from '@sj/agents'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
@@ -676,10 +676,11 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(existsSync(join(dir, 'minds', '_arbiter.db'))).toBe(false)
     expect(eventsOf(dir, 'discovery_made')).toHaveLength(0)
 
-    // With no adjudicator wired `#reroutesUnknownVerb` declines to re-route at all, so the mind
-    // is handed the ENGINE'S OWN ERROR STRING as a memory it will read back next turn.
-    expect(memoriesOf(dir, 'amara').some((t) => t.includes(`unknown verb: ${INVENTED_VERB}`)))
-      .toBe(true)
+    // With no adjudicator wired `#reroutesUnknownVerb` declines to re-route at all, and the
+    // refusal still reaches the mind — in the world's words, never the engine's registry's.
+    const memories = memoriesOf(dir, 'amara')
+    expect(memories.some((t) => t.includes(`unknown verb: ${INVENTED_VERB}`))).toBe(false)
+    expect(memories.some((t) => t.includes(OPAQUE_REFUSAL))).toBe(true)
   }, 30_000)
 })
 
