@@ -15,8 +15,6 @@ export const MASTER_PALETTE = [
   '#F5D3B3', '#D9A876', '#9C6B47',
 ] as const
 
-export const OUTLINE_DARKEN = 0.55
-
 export function paletteRgb(hexes: readonly string[] = MASTER_PALETTE): Rgb[] {
   return hexes.map((h) => [
     parseInt(h.slice(1, 3), 16),
