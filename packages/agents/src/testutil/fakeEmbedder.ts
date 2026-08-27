@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { EMBEDDING_DIM } from '../memory/embedder.js'
+import { EMBEDDING_DIM } from '@sj/shared'
 
 export class FakeEmbedder {
   static create(): Promise<FakeEmbedder> {

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { cosine } from '@sj/agents'
+import { cosine } from '@sj/shared'
 import { normalizeIntent } from './rulebook.js'
 import type { Verdict } from './verdict.js'
 

@@ -9,15 +9,12 @@ export {
 } from './turn.js'
 export {
   assertNoGlassLeak,
-  assertQuotedName,
   CONSTRUCT_VOCABULARY,
   scanForLayoutLeak,
   scanPromptForGlassLeak,
   scanRulingForGlassLeak,
   TOWN_LAYOUT_VOCABULARY,
   UNNAMED_CONSTRUCT_COPY,
-  type NameSource,
-  type QuotedName,
   type RulingVocabulary,
 } from './prompt/glassScan.js'
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/pins.js'
@@ -99,5 +96,5 @@ export {
   promptBirthLine,
   MAX_SOCIAL_NAME_CHARS,
 } from './family/socialName.js'
-export { Embedder, cosine, EMBEDDING_DIM } from './memory/embedder.js'
+export { Embedder } from './memory/embedder.js'
 export { FakeEmbedder } from './testutil/fakeEmbedder.js'
