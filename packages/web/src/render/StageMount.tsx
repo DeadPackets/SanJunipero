@@ -83,14 +83,16 @@ export function StageMount({
         const marks = landmarks
         offSync = store.subscribe(() => {
           syncEntities(s, book, store, openDoor)
-          marks.sync()
+          marks.rebuild()
+          marks.place()
         })
         syncEntities(s, book, store, openDoor)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
         offCamera = s.onCamera(() => {
-          marks.sync()
+          marks.place()
         })
-        marks.sync()
+        marks.rebuild()
+        marks.place()
         chars = createCharacterLayer(s, book, store, (agentId) => {
           // click-to-inspect: the G6 check — route change only, React owns the chrome
           const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`

@@ -185,7 +185,8 @@ export function landmarkStyle(rank: 1 | 2 | 3): { size: number; plate: number } 
   return { size: FACE_SIZES[1], plate: THOUGHT_FILL }
 }
 
-export type LandmarkLayer = { sync(): void; destroy(): void }
+/** `rebuild` derives the legend from the world; `place` only fits it to the current camera. */
+export type LandmarkLayer = { rebuild(): void; place(): void; destroy(): void }
 
 /** How far past the edge of the view a place may be and still be named — one plate's width, so
  *  a name whose anchor has just left the screen fades with its subject rather than blinking. */
@@ -278,22 +279,19 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
   scene.layers.overlay.addChild(node)
   type Plate = { node: Container; plate: Graphics; label: WorldLabel; drawn: string }
   const labels = new Map<string, Plate>()
+  /** One mark as the last rebuild left it: unscaled plate size, and world-space boxes. */
+  type Built = { id: string; sx: number; sy: number; w: number; h: number; of: Rect[] }
+  let built: Built[] = []
+  let town: Rect = { x: 0, y: 0, w: 0, h: 0 }
 
-  function sync(): void {
-    const alpha = landmarkAlpha(scene.getZoom())
-    node.visible = alpha > 0
-    node.alpha = alpha
-    if (!node.visible) return
-
+  function rebuild(): void {
     const state = store.getState()
     const marks = state === null ? [] : landmarksOf(state)
     const seen = new Set<string>()
-    const z = scene.world.scale.x
-    const inv = worldTextScale(z)
 
     // Build (or reuse) every plate first, THEN place them together: a name cannot know it is
     // landing on another name until every size is known.
-    const wanted: PlaceableMark[] = []
+    built = []
     for (const m of marks) {
       seen.add(m.id)
       const style = landmarkStyle(m.rank)
@@ -326,25 +324,43 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
         t.plate.fill(style.plate)
         t.plate.stroke({ width: 1, color: LANDMARK_EDGE })
       }
-      t.node.scale.set(inv)
       const { sx, sy } = tileToScreen(m.x, m.y)
-      wanted.push({
+      built.push({
         id: m.id,
         sx,
         sy,
-        size: {
-          w: (t.label.width + LANDMARK_PAD_X * 2) * inv,
-          h: (t.label.height + LANDMARK_PAD_Y * 2) * inv,
-        },
+        w: t.label.width + LANDMARK_PAD_X * 2,
+        h: t.label.height + LANDMARK_PAD_Y * 2,
         // The same drawn box the camera fits and the cull tests, one per building, so the
         // legend and the picture cannot disagree about where a building is.
         of: m.of.map((f) => rectOfBounds(drawnBoundsOf([f]))),
       })
     }
+    town = rectOfBounds(drawnBoundsOf(standingOf(state)))
+
+    for (const [id, t] of labels) {
+      if (seen.has(id)) continue
+      t.node.destroy({ children: true })
+      labels.delete(id)
+    }
+  }
+
+  function place(): void {
+    const alpha = landmarkAlpha(scene.getZoom())
+    node.visible = alpha > 0
+    node.alpha = alpha
+    if (!node.visible) return
+
+    const z = scene.world.scale.x
+    const inv = worldTextScale(z)
+    const wanted: PlaceableMark[] = []
+    for (const b of built) {
+      labels.get(b.id)?.node.scale.set(inv)
+      wanted.push({ id: b.id, sx: b.sx, sy: b.sy, size: { w: b.w * inv, h: b.h * inv }, of: b.of })
+    }
 
     // ★ A LEGEND BIGGER THAN ITS MAP IS NOT A LEGEND. Ink and settlement are compared on
     // SCREEN, where the plate holds a constant size and the town does not.
-    const town = rectOfBounds(drawnBoundsOf(standingOf(state)))
     const ink = wanted.reduce((n, w) => n + w.size.w * w.size.h, 0) * z * z
     const fits = legendFits(ink, town.w * z * (town.h * z))
 
@@ -361,16 +377,11 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       }
     }
     for (const [id, t] of labels) if (!placed.has(id)) t.node.visible = false
-
-    for (const [id, t] of labels) {
-      if (seen.has(id)) continue
-      t.node.destroy({ children: true })
-      labels.delete(id)
-    }
   }
 
   return {
-    sync,
+    rebuild,
+    place,
     destroy: () => {
       node.destroy({ children: true })
       labels.clear()
