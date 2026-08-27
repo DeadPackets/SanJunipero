@@ -218,7 +218,7 @@ export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
 // No world-facing string may name the machinery behind the agent, and this regex is the point it
 // is enforced. `(?!\w)` closes the boundary because a `\b` can never follow the final `.` of A.I.
 export const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
+  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?)(?!\w)/i
 
 export const CONSTRUCT_CHRONICLE_WEIGHT = 16
 export const CONSTRUCT_CHRONICLE_ICON = 'star'

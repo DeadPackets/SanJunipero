@@ -144,14 +144,13 @@ describe('writeBiography', () => {
     expect(store.publications('biography')).toEqual([])
   })
 
-  // ★ `tool` is on the framing roster AND is what the tier-1 milestone "the first tool made"
-  // makes a plausible draft. One refused draft used to lose the whole biography.
+  // One refused draft used to lose the whole biography.
   it('★ asks again once when the first draft breaks the framing law', async () => {
     const world = seedWorld()
     const store = memStore()
     const alert = vi.fn()
     const llm = bioLlmSeq([
-      'She made the first tool the town had seen.',
+      'She was the prompt the town needed.',
       'She shaped the first cutting edge the town had seen.',
     ])
     const row = await writeBiography({

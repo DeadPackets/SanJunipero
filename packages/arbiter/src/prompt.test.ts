@@ -318,15 +318,15 @@ describe('what stands around the asker', () => {
 })
 
 describe('framing-free outputs contract', () => {
-  it('FORBIDDEN_FRAMING catches A.I., plural models, and tools', () => {
-    for (const bad of ['the A.I. decided', 'our models', 'tools']) {
+  it('FORBIDDEN_FRAMING catches A.I., language models, and prompts', () => {
+    for (const bad of ['the A.I. decided', 'our language models', 'prompts']) {
       expect(bad).toMatch(FORBIDDEN_FRAMING)
     }
   })
 
-  it('FORBIDDEN_FRAMING does not match reworded implements or substrings like toolkit', () => {
-    expect('stone implements').not.toMatch(FORBIDDEN_FRAMING)
-    expect('the toolkit sat on the bench').not.toMatch(FORBIDDEN_FRAMING)
+  it('FORBIDDEN_FRAMING lets ordinary tools and models through', () => {
+    expect('the first tool made').not.toMatch(FORBIDDEN_FRAMING)
+    expect('a model of the boat').not.toMatch(FORBIDDEN_FRAMING)
   })
 
   it('assembly takes only structural blocks', () => {

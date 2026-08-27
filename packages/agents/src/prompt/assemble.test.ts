@@ -119,10 +119,6 @@ describe('human framing guard', () => {
       'chatbots',
       'simulation',
       'simulations',
-      'model',
-      'models',
-      'tool',
-      'tools',
     ]
     for (const bad of hits) {
       expect(`the ${bad} was here`).toMatch(FORBIDDEN_FRAMING)
@@ -130,9 +126,9 @@ describe('human framing guard', () => {
     expect('A.I. wrote the note.').toMatch(FORBIDDEN_FRAMING)
   })
 
-  it('FORBIDDEN_FRAMING does not match substrings like toolkit or modelling', () => {
-    expect('the toolkit sat on the bench').not.toMatch(FORBIDDEN_FRAMING)
-    expect('she spent the afternoon modelling clay').not.toMatch(FORBIDDEN_FRAMING)
+  it('FORBIDDEN_FRAMING lets a town speak of its tools and models', () => {
+    expect('the first tool made').not.toMatch(FORBIDDEN_FRAMING)
+    expect('a model of the boat').not.toMatch(FORBIDDEN_FRAMING)
   })
 })
 
