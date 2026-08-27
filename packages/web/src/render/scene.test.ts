@@ -153,7 +153,7 @@ describe('a glide is ended by anything that says where the camera should be', ()
   })
 
   it('★ a tap and a throw read ONE tracker, so a click can never become a fling', () => {
-    expect(src).toMatch(/if \(isDrag\(drag\)\) return \/\/ a drag is not a tile pick/)
+    expect(src).toMatch(/if \(isDrag\(drag\)\) return\b/)
     // and no second, hand-rolled slop test survives anywhere in the scene
     expect(src).not.toMatch(/Math\.abs\(dx\) \+ Math\.abs\(dy\) >/)
   })
