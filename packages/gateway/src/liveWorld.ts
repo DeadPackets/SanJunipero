@@ -36,7 +36,9 @@ import {
   type Codified,
   type Recipe,
 } from '@sj/arbiter'
+import { AssetCodex } from '@sj/forge'
 import type { LiveCast } from './devWorld.js'
+import { createDiscoveryArt, noDiscoveryArt } from './discoveryArt.js'
 import { publishThought } from './observer.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
@@ -407,6 +409,25 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (snap !== null) restoring.set(m.id, snap)
       }
 
+      // A discovered item is drawn once, out of the same daily budget and into the same ledger
+      // the minds bill; until it lands the viewer keeps serving the placeholder.
+      const apiKey = process.env.OPENROUTER_API_KEY
+      const art =
+        apiKey === undefined
+          ? noDiscoveryArt()
+          : createDiscoveryArt({
+              codex: new AssetCodex(db),
+              opsDb,
+              dailyBudgetUsd: dailyBudget,
+              spentTodayUsd: spentToday,
+              apiKey,
+              onError: (kind, err) => {
+                log(
+                  `stream: no art for ${kind} — ${err instanceof Error ? err.message : String(err)}`,
+                )
+              },
+            })
+
       // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
       // `onCodified` needs the bridge, and neither exists until a loop does. `makeClient` points
       // at `opsDb`: an arbiter billing its own db would spend outside the anomaly stop.
@@ -432,6 +453,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
                     intent: d.credit.intent,
                     makes: d.makes,
                   })
+                  art.onDiscovery({ name: d.name, makes: d.makes })
                 },
               })
               return {

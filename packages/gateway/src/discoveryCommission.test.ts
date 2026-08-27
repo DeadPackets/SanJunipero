@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
@@ -44,22 +45,21 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
   let png: Buffer
 
   /** The provider, with no provider: the real `makeImageClient` runs, `fetch` does not. */
-  const fakeFetch = (async (_url: string | URL | Request) => {
+  const fakeFetch: typeof fetch = async () => {
     calls.push('image')
     return new Response(
       JSON.stringify({ data: [{ b64_json: png.toString('base64') }], usage: { cost: IMAGE_USD } }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     )
-  }) as unknown as typeof fetch
+  }
   const judge: JudgeFn = async () => {
     calls.push('judge')
     return { score: 9, notes: 'scripted' }
   }
 
   const spentToday = (): number =>
-    (
-      opsDb.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS t FROM llm_calls').get() as { t: number }
-    ).t
+    (opsDb.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS t FROM llm_calls').get() as { t: number })
+      .t
   const forgeRows = (): { model: string; cost_usd: number }[] =>
     opsDb
       .prepare('SELECT model, cost_usd FROM llm_calls WHERE caller = ? ORDER BY id')
@@ -114,7 +114,9 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
 
     // One asset, resolvable: class + kind + ready is the whole of the renderer's lookup.
     const records = codex.listSince(0)
-    expect(records.map((r) => [r.class, r.kind, r.status])).toEqual([['item', 'waterskin', 'ready']])
+    expect(records.map((r) => [r.class, r.kind, r.status])).toEqual([
+      ['item', 'waterskin', 'ready'],
+    ])
 
     // Every dollar landed in the ledger the minds bill — not beside it.
     const rows = forgeRows()
@@ -179,4 +181,38 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     await art.settle()
     expect(codex.listSince(0).map((r) => r.kind)).toEqual(['waterskin'])
   }, 30_000)
+})
+
+describe('the commission path is live-only, and it IS wired', () => {
+  const src = (name: string): string =>
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), name), 'utf8')
+
+  it('no scripted gateway file reaches the commission path or the SDK behind it', () => {
+    // `discoveryArt.ts` imports `@sj/forge/gen`, 9.7 MB of LLM SDK. The free stream must not
+    // load it, and the only file allowed to is the one behind the SJ_LIVE dynamic import.
+    const scripted = [
+      'devWorld.ts',
+      'founders.ts',
+      'server.ts',
+      'api.ts',
+      'serve.ts',
+      'assetsHttp.ts',
+    ]
+    for (const file of scripted) {
+      expect(src(file), file).not.toContain('discoveryArt')
+      expect(src(file), file).not.toContain('@sj/forge/gen')
+    }
+  })
+
+  it('liveWorld commissions on the codification, after the world has been told', () => {
+    const live = src('liveWorld.ts')
+    const wired = ['createDiscoveryArt(', 'bridge?.announce(', 'art.onDiscovery('].map((n) =>
+      live.indexOf(n),
+    )
+    expect(
+      wired.every((i) => i > 0),
+      'the commission path is not wired',
+    ).toBe(true)
+    expect([...wired].sort((a, b) => a - b)).toEqual(wired) // in that order
+  })
 })
