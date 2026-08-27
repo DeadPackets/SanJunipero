@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { BackToRoster, InspectorBodyView, fetchTab, type InspectorAgent } from './InspectorPanel.js'
+import {
+  BackToRoster,
+  InspectorBodyView,
+  fetchTab,
+  journalStamp,
+  type InspectorAgent,
+} from './InspectorPanel.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 
@@ -94,5 +100,14 @@ describe('fetchTab', () => {
     expect(await fetchTab('hit-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
     expect(await fetchTab('hit-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
     expect(fetchFn).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The journal feed carries two things now. A dream a viewer cannot tell from a written entry
+// reads as the mind claiming it happened.
+describe('journalStamp', () => {
+  it('marks a dream as a dream, and leaves a written entry alone', () => {
+    expect(journalStamp({ tick: 5, day: 3, text: 'x', kind: 'journal' })).toBe('Day 3')
+    expect(journalStamp({ tick: 5, day: 3, text: 'x', kind: 'dream' })).toBe('Day 3, a dream')
   })
 })

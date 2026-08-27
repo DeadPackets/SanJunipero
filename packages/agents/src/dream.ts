@@ -1,5 +1,7 @@
+import { z } from 'zod'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { RngStream } from '@sj/engine'
+import type { LlmClient } from './llm/client.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
 
 const FRAGMENT_COUNT = 6
@@ -43,6 +45,31 @@ export async function rollDream(deps: {
   })
 
   return { dreamed: true, text, mood, memoryId }
+}
+
+export const DREAM_PROMPT = [
+  'You are asleep, and pieces of the last few days are coming back to you out of order.',
+  'Let them run together into one short dream in your own voice, however little sense it makes.',
+  'Then name the mood it leaves you in, in a word or two.',
+].join('\n')
+
+export function dreamFragmentsMessage(fragments: MemoryRow[]): string {
+  return ['What comes back to you:', ...fragments.map((f) => f.text)].join('\n')
+}
+
+const DREAM_SCHEMA = z.object({ text: z.string().min(1), mood: z.string().min(1) }).strict()
+
+export function makeDreamLlm(client: LlmClient): DreamLlm {
+  return {
+    async composeDream(fragments) {
+      const { value } = await client.object({
+        system: DREAM_PROMPT,
+        messages: [{ role: 'user', content: dreamFragmentsMessage(fragments) }],
+        schema: DREAM_SCHEMA,
+      })
+      return value
+    },
+  }
 }
 
 function shuffle<T>(items: T[], stream: RngStream): T[] {

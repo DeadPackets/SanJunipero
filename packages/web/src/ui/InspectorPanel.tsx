@@ -22,7 +22,7 @@ const EMPTY_COPY = 'Nothing written yet.'
 export type Tab = 'ledger' | 'journal' | 'personality'
 type Rows<T> = { id: string; rows: T[] }
 type LedgerRow = { personId: string; doc: string; updatedDay: number }
-type JournalRow = { tick: number; day: number; text: string }
+type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
 type PersonalityRow = { version: number; day: number; doc: string; edit: string }
 
 const ENDPOINT: Record<Tab, string> = {
@@ -48,6 +48,10 @@ export async function fetchTab<T>(
   cache.set(key, { at: performance.now(), rows })
   return rows
 }
+
+/** A dream is the mind's, but it is not something the mind wrote down — say which is which. */
+export const journalStamp = (row: JournalRow): string =>
+  row.kind === 'dream' ? `Day ${row.day}, a dream` : `Day ${row.day}`
 
 function ageBand(ageDays: number): string {
   const years = Math.floor(ageDays / 364)
@@ -375,7 +379,7 @@ export function InspectorPanel({
           ) : (
             journal.map((row, i) => (
               <p key={i} className="doc">
-                <span className="stamp">Day {row.day}</span> {row.text}
+                <span className="stamp">{journalStamp(row)}</span> {row.text}
               </p>
             ))
           )}

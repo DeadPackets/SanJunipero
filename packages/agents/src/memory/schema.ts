@@ -24,6 +24,8 @@ export function migrateAgentTables(db: Database.Database): void {
       tags TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_memories_agent_day ON memories(agent_id, day);
+    -- The viewer's journal feed reads one kind out of a table a turn writes to five times.
+    CREATE INDEX IF NOT EXISTS idx_memories_agent_kind ON memories(agent_id, kind);
     CREATE TRIGGER IF NOT EXISTS memories_no_update BEFORE UPDATE ON memories
       BEGIN SELECT RAISE(ABORT,'memories are immutable'); END;
     CREATE TRIGGER IF NOT EXISTS memories_no_delete BEFORE DELETE ON memories

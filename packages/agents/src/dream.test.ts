@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import type Database from 'better-sqlite3'
 import { RngStream } from '@sj/engine'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
+import { insertLlmCall, migrateLlmTables } from './llm/callLog.js'
+import { BudgetExceededError, LlmClient } from './llm/client.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
 import { FakeEmbedder } from './testutil/fakeEmbedder.js'
-import { rollDream } from './dream.js'
+import { mockModel } from './testutil/mockModel.js'
+import { DREAM_PROMPT, dreamFragmentsMessage, makeDreamLlm, rollDream } from './dream.js'
 
 const TICKS_PER_DAY = 1440
 const AGENT = 'tamar'
@@ -141,5 +146,80 @@ describe('rollDream', () => {
     expect(orders[0]).toHaveLength(6)
     expect(orders[1]).toHaveLength(6)
     expect(orders[0]).toEqual(orders[1])
+  })
+})
+
+describe('makeDreamLlm', () => {
+  async function fragments(): Promise<MemoryRow[]> {
+    const { store } = await makeStore()
+    await store.insertMemory({
+      tick: 100,
+      kind: 'perception',
+      text: 'the bread came out of the ashes',
+      importance: 5,
+      tags: tagsFor(1),
+    })
+    return store.memoriesOfDay(0)
+  }
+
+  function client(db: Database.Database, budgetUsd?: number): LlmClient {
+    return new LlmClient({
+      model: mockModel([{ json: { text: 'the storehouse had no door', mood: 'unsettled' } }]),
+      db,
+      caller: 'dream',
+      agentId: AGENT,
+      maxRetries: 0,
+      ...(budgetUsd === undefined ? {} : { budgetUsd }),
+    })
+  }
+
+  function opsDb(): Database.Database {
+    const db = openAgentDb(':memory:')
+    migrateLlmTables(db)
+    return db
+  }
+
+  it('composes a dream through the client and books the call under caller "dream"', async () => {
+    const db = opsDb()
+    const dream = await makeDreamLlm(client(db)).composeDream(await fragments())
+
+    expect(dream).toEqual({ text: 'the storehouse had no door', mood: 'unsettled' })
+    const rows = db.prepare('SELECT caller, agent_id AS agentId FROM llm_calls').all() as {
+      caller: string
+      agentId: string
+    }[]
+    expect(rows).toEqual([{ caller: 'dream', agentId: AGENT }])
+  })
+
+  it('is refused by the budget guard before it can spend, and books nothing', async () => {
+    const db = opsDb()
+    insertLlmCall(db, {
+      agentId: AGENT,
+      caller: 'dream',
+      model: 'm',
+      provider: null,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      reasoningTokens: 0,
+      costUsd: 0.5,
+      reportedCostUsd: null,
+      latencyMs: 0,
+      ok: true,
+      error: null,
+    })
+    const llm = makeDreamLlm(client(db, 0.1))
+
+    await expect(llm.composeDream(await fragments())).rejects.toBeInstanceOf(BudgetExceededError)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 1 })
+  })
+
+  it('speaks to the mind and never to the machine', () => {
+    const text = [DREAM_PROMPT, dreamFragmentsMessage([])].join('\n')
+    expect(scanPromptForGlassLeak(text)).toEqual([])
+    expect(scanForLayoutLeak(text)).toEqual([])
+    for (const hint of ['you should', 'you must build', 'go inside', 'raise a', 'be sure to']) {
+      expect(text.toLowerCase()).not.toContain(hint)
+    }
   })
 })

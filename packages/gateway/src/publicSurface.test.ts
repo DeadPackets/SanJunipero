@@ -115,7 +115,7 @@ describe('the public surface a stranger reaches', () => {
 
     // The legitimate read still works, so the guard is a filter and not a wall.
     const mine = (await (await fetch(`${base}/api/agent/walker/journal`)).json()) as unknown
-    expect(mine).toEqual([{ tick: 1, day: 0, text: 'I walked east.' }])
+    expect(mine).toEqual([{ tick: 1, day: 0, text: 'I walked east.', kind: 'journal' }])
 
     // `:id` is decoded AFTER the router splits on '/', so these arrive as one segment holding a
     // path separator. Remove `AGENT_ID.test` from readAgentRows and the first returns the secret.

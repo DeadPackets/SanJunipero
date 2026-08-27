@@ -213,10 +213,16 @@ async function liveWorld(opts: {
    *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
   verdict?: unknown
   useArbiter?: boolean
-}): Promise<{ world: DevWorld; cast: LiveCast; opsDb: ReturnType<typeof openAgentDb> }> {
+}): Promise<{
+  world: DevWorld
+  cast: LiveCast
+  opsDb: ReturnType<typeof openAgentDb>
+  callers: string[]
+}> {
   const agentDbDir = join(opts.dir, 'minds')
   let seen: ReturnType<typeof openAgentDb> | null = null
   let cast: LiveCast | null = null
+  const callers: string[] = []
   // Through the factory, exactly as `serve.ts` does it: built out here the cast would already
   // hold the per-mind files open when `fresh` deleted them.
   const world = await startDevWorld({
@@ -243,6 +249,7 @@ async function liveWorld(opts: {
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
+          callers.push(caller)
           // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
           // billed anywhere else would spend outside the money guards, so the rig must not.
           const canned =
@@ -256,7 +263,7 @@ async function liveWorld(opts: {
     },
   })
   worlds.push(world)
-  return { world, cast: cast!, opsDb: seen! }
+  return { world, cast: cast!, opsDb: seen!, callers }
 }
 
 /** Take WHOLE ticks — `world.tick()`, not `loop.step()`. The observer scan runs inside a whole
@@ -347,6 +354,15 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     expect(eventsOf(dir, 'action_started')).toHaveLength(0)
     // And the scripted larder top-up is gone with it: a live town feeds itself or it does not.
     expect(eventsOf(dir, 'need_changed').filter((p) => Number(p.delta) > 0)).toHaveLength(0)
+  }, 30_000)
+
+  // Both are spend the scripted path cannot make, and both must be booked in the one ledger the
+  // cap and the daily budget are read off — never a client of their own.
+  it('★ dreams and births are on the same ledger as every other call', async () => {
+    const { callers } = await liveWorld({ dir: tmp() })
+
+    expect(callers).toContain('dream')
+    expect(callers).toContain('naming')
   }, 30_000)
 })
 

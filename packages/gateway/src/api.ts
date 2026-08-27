@@ -90,6 +90,8 @@ export type Footprint = {
   seq: number
 }
 
+type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
+
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 
@@ -292,13 +294,23 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     })
   })
 
+  // A dream is a memory row and not a journal row, so the feed is two reads merged. `sort` is
+  // stable, so each half keeps its own written order within a tick.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
+    const id = params.id ?? ''
+    const rows = [
+      ...readAgentRows<JournalRow>(
+        id,
+        "SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ? ORDER BY id",
+      ),
+      ...readAgentRows<JournalRow>(
+        id,
+        "SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream' ORDER BY id",
+      ),
+    ]
     sendJson(
       res,
-      readAgentRows(
-        params.id ?? '',
-        'SELECT tick, day, text FROM journal WHERE agent_id = ? ORDER BY id',
-      ),
+      rows.sort((a, b) => a.tick - b.tick),
     )
   })
 

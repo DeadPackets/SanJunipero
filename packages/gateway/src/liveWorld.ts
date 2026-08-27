@@ -21,6 +21,7 @@ import {
   projectDailySpend,
   reportReconciliation,
   runPreflight,
+  wireBirths,
   FOUNDER_MINDS,
   type BootedMinds,
   type MindConfig,
@@ -375,10 +376,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let bridge: EngineBridge | null = null
   let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
+  let stopBirths: (() => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
+    stopBirths?.()
     booted?.stop()
     bridge?.drain('the moment passes')
   }
@@ -466,6 +469,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         dbFor,
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
+        dreamLlm: (id) => makeClient('dream', id),
         mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
@@ -473,6 +477,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         onThought: (t) => {
           if (!stopped) publishThought(db, t)
         },
+      })
+      stopBirths = wireBirths({
+        booted,
+        bridge,
+        store,
+        dbFor,
+        embedder,
+        opsDb,
+        namingLlm: makeClient('naming'),
+        homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
+        log,
       })
       saveRuntime = (tick: number): void => {
         for (const { agentId, snapshot } of booted?.snapshots() ?? []) {
@@ -514,12 +529,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
-        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * minds.length
+        // The cast, not the founders: a town that has borne children spends for all of them.
+        const cast = booted?.cast.size ?? minds.length
+        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * cast
         const rate = projectDailySpend(opsDb, {
           windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
         }).usdPerSimDay
         if (rate <= ceiling) return
-        console.error(rateStopMessage(rate, ceiling, minds.length))
+        console.error(rateStopMessage(rate, ceiling, cast))
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })
