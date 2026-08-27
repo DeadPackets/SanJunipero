@@ -1,4 +1,14 @@
-import { simTimeFromTick } from '@sj/shared'
+import { DEFAULT_CONFIG, simTimeFromTick } from '@sj/shared'
+import {
+  createWorldTick,
+  RngStreams,
+  TickLoop,
+  type EventStore,
+  type LawQueue,
+  type TickHandler,
+  type WorldState,
+} from '@sj/engine'
+import { EngineBridge } from '../runtime/bridge.js'
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import type { IdentityCore, PromptBlocks } from '../prompt/assemble.js'
@@ -140,4 +150,45 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
     now: { prose: 'The sun is high and the meadow is quiet.' },
   }
   return { ...base, ...overrides }
+}
+
+// A flat, foodless, waterless world: every horizon a perception test reads is a distance and
+// nothing else.
+export const FLAT_WORLD = {
+  isWalkable: () => true,
+  isEdible: () => false,
+  waterAtHand: () => false,
+  nearestWater: () => null,
+  nearestFood: () => null,
+}
+
+/** The runtime's own plumbing around an authored state: the world tick, the loop and the bridge
+ *  a perception is read from, so a prose test reads packets the runtime would have produced. */
+export function wireTown(opts: {
+  state: WorldState
+  store: EventStore
+  seed: string
+  startTick: number
+}): { bridge: EngineBridge; loop: TickLoop } {
+  const rng = new RngStreams(opts.seed)
+  const lawQueue: LawQueue = []
+  const worldTick = createWorldTick(DEFAULT_CONFIG, rng, lawQueue)
+  // Replaced below, once the bridge that wraps it exists.
+  let handler: TickHandler = () => undefined
+  const loop = new TickLoop({
+    store: opts.store,
+    state: opts.state,
+    rng,
+    config: DEFAULT_CONFIG,
+    startTick: opts.startTick,
+    realMsPerTick: 0,
+    onTick: (c) => {
+      handler(c)
+    },
+  })
+  const bridge = new EngineBridge({ loop, store: opts.store, simConfig: DEFAULT_CONFIG })
+  handler = bridge.wrapTickHandler(({ emit }) => {
+    for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
+  })
+  return { bridge, loop }
 }

@@ -1,7 +1,6 @@
 // An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
-import type Database from 'better-sqlite3'
 import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import {
   RngStream,
@@ -13,11 +12,8 @@ import {
   submitIntent,
   type WorldState,
 } from '@sj/engine'
-import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
-import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
-import { openArbiterDb } from './schema.js'
 import { RulebookStore } from './rulebook.js'
-import { CodexStore } from './codex.js'
+import { makeArbiterRig, ScriptedLlm, TAMAR_CTX } from './testutil/scriptedLlm.js'
 import type { Recipe, Verdict } from './verdict.js'
 
 // A credit for a test that is not about the credit; the two-argument codify is required so
@@ -59,21 +55,6 @@ const boilSaltVerdict: Verdict = {
   summary: 'Boil river water until only salt remains.',
 }
 
-const ctx: AgentCtx = {
-  agentId: 'a1',
-  name: 'Tamar',
-  skills: { cooking: 80, farming: 120 },
-  inventory: [
-    { kind: 'wood', qty: 2 },
-    { kind: 'clay_pot', qty: 1 },
-  ],
-  position: { x: 3, y: 5 },
-}
-
-function emptyUsage(): LlmUsage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
-}
-
 // Payload guards: the tick pipeline's events are typed `unknown`; narrow to the
 // one field each assertion needs instead of fabricating an unchecked shape.
 function isVerbPayload(p: unknown): p is { verb: string } {
@@ -82,32 +63,6 @@ function isVerbPayload(p: unknown): p is { verb: string } {
 
 function isSpawnPayload(p: unknown): p is { kind: string } {
   return typeof p === 'object' && p !== null && 'kind' in p && typeof p.kind === 'string'
-}
-
-// Scripted LlmClient: never talks to OpenRouter; counts object calls and always
-// returns the boil-salt attempt verdict. The gate asserts the call count stays 1.
-class ScriptedLlm {
-  objectCalls = 0
-
-  async object(opts: {
-    system: string
-    messages: LlmMessage[]
-    schema: unknown
-  }): Promise<{ value: unknown; usage: LlmUsage }> {
-    void opts
-    this.objectCalls += 1
-    return { value: boilSaltVerdict, usage: emptyUsage() }
-  }
-
-  async text(): Promise<{ text: string; usage: LlmUsage }> {
-    return { text: '', usage: emptyUsage() }
-  }
-
-  totalCostUsd(): number {
-    return 0
-  }
-
-  alert(): void {}
 }
 
 let seq = 90000
@@ -142,16 +97,6 @@ function makeWorld(): WorldState {
   )
   s = fold(s, ev('fire_ignited', { structureId: 's1', cause: 'scripted' }), CFG)
   return s
-}
-
-async function makeRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
-  const db = openArbiterDb(':memory:')
-  const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
-  codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
-  const embedder = await FakeEmbedder.create()
-  const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder, tick: () => 100 })
-  return { db, arbiter }
 }
 
 // Seeded stream bag that pins the recipe's named rngStream to a forced roll.
@@ -199,24 +144,25 @@ function runTier1(state: WorldState): {
 
 describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-1', () => {
   it('novel intent → attempt (1 LLM call) → codify → byte-identical intent → map (still 1 call) → Tier-1 completes deterministically', async () => {
-    const llm = new ScriptedLlm()
-    const { db, arbiter } = await makeRig(llm)
+    const llm = new ScriptedLlm(() => boilSaltVerdict)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
     // 3. First adjudication reaches the LLM exactly once and returns the attempt.
-    const r1 = await arbiter.adjudicate(INTENT, ctx)
+    const r1 = await arbiter.adjudicate(INTENT, TAMAR_CTX)
     expect(r1).toEqual(boilSaltVerdict)
     if (r1.kind !== 'attempt') throw new Error('expected attempt verdict')
     expect(r1.recipe.id).toBe('recipe:boil_salt')
     expect(llm.objectCalls).toBe(1)
 
     // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
+    expect(VERBS['recipe:boil_salt']).toBeUndefined()
     const { verb } = arbiter.codify(r1.recipe, CODIFY_CREDIT)
     expect(verb).toBe('recipe:boil_salt')
     expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
     expect(VERBS['recipe:boil_salt']).toBeDefined()
 
     // 5. Byte-identical intent resolves Tier-1 map with zero further LLM calls.
-    const r2 = await arbiter.adjudicate(INTENT, ctx)
+    const r2 = await arbiter.adjudicate(INTENT, TAMAR_CTX)
     expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
     expect(llm.objectCalls).toBe(1)
 

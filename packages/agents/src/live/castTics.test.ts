@@ -153,17 +153,20 @@ const cards = (): Card[] => {
 const UTTERANCE =
   /\b(say|says|saying|open|opens|start|starts|begin|begins|greet|greets|answer|answers|replies|reply)\b[^"'“]{0,20}["'“]/i
 
+// One tree walk for the whole file: every assertion below reads the same scan.
+const CARDS = cards()
+
 describe('★ a tic is a habit, not a script — over every cast in the repo', () => {
   it('finds the casts it is meant to be guarding', () => {
     // Without this the suite passes by scanning nothing, the failure mode a static guard has.
-    const files = new Set(cards().map((c) => c.file))
+    const files = new Set(CARDS.map((c) => c.file))
     for (const expected of ['agents/src/live/founderMinds.ts', 'agents/scripts/g11-deepworld.ts'])
       expect(files, `no cast found in ${expected}`).toContain(expected)
-    expect(cards().length).toBeGreaterThanOrEqual(15)
+    expect(CARDS.length).toBeGreaterThanOrEqual(15)
   })
 
   it('no cast anywhere defines a tic as words to say', () => {
-    for (const card of cards()) {
+    for (const card of CARDS) {
       for (const tic of card.tics) {
         expect(
           UTTERANCE.test(tic),
@@ -176,7 +179,7 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
   it('and no card demonstrates a quoted tic in opening position', () => {
     // The other half of the same defect: naming the words and then showing them first.
     // `founderMinds.test.ts` holds this over the shared cast; this holds it over the probe casts.
-    for (const card of cards()) {
+    for (const card of CARDS) {
       for (const tic of card.tics) {
         for (const quoted of tic.match(/"([^"]+)"/g) ?? []) {
           const words = quoted.slice(1, -1).toLowerCase()

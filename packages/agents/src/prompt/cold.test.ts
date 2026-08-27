@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createWorldTick,
   doorTile,
   EventStore,
   fold,
@@ -8,28 +7,19 @@ import {
   isExposed,
   makeGenesisWorld,
   openDb,
-  RngStreams,
-  TickLoop,
-  type LawQueue,
-  type TickHandler,
+  type TickLoop,
   type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
-import { EngineBridge } from '../runtime/bridge.js'
+import { FLAT_WORLD, wireTown } from '../testutil/fixtures.js'
+import type { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
+import { scanForDirective } from './glassScan.js'
 
 // A roof is worth the whole of a body's warmth (57.4 -> 0.0 under the sky by midnight, 38.4 held
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
 
 const CFG = DEFAULT_CONFIG
-
-const WORLD = {
-  isWalkable: () => true,
-  isEdible: () => false,
-  waterAtHand: () => false,
-  nearestWater: () => null,
-  nearestFood: () => null,
-}
 
 // The genesis town with two founders at their own doorways, wired through a real bridge — the
 // same object the runtime reads its packets from, so nothing here is a hand-built fixture.
@@ -40,7 +30,6 @@ function town(
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
   const store = new EventStore(db)
-  const rng = new RngStreams('cold-test')
   let state: WorldState = genesisState(CFG, g.terrain)
   for (const e of g.events) state = fold(state, store.append(state.tick, e.type, e.payload), CFG)
   // The valley's houses stand roofless, so the body that goes indoors goes into the cabin.
@@ -77,29 +66,11 @@ function town(
       CFG,
     )
   }
-  const lawQueue: LawQueue = []
-  const worldTick = createWorldTick(CFG, rng, lawQueue)
-  let handler: TickHandler = () => {}
-  const loop = new TickLoop({
-    store,
-    state,
-    rng,
-    config: CFG,
-    startTick,
-    realMsPerTick: 0,
-    onTick: (c) => {
-      handler(c)
-    },
-  })
-  const bridge = new EngineBridge({ loop, store, simConfig: CFG })
-  handler = bridge.wrapTickHandler(({ emit }) => {
-    for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
-  })
-  return { bridge, loop, homes }
+  return { ...wireTown({ state, store, seed: 'cold-test', startTick }), homes }
 }
 
 const proseFor = (bridge: EngineBridge, id: string): string =>
-  perceptionToProse(bridge.perception(id), () => {}, { ...WORLD, waterAtHand: () => false })
+  perceptionToProse(bridge.perception(id), () => {}, { ...FLAT_WORLD, waterAtHand: () => false })
 
 // 21:00 on day 1: the first hour of the run in which `isExposed` is true for a body outdoors.
 const COLD_HOUR = 21 * 60
@@ -146,16 +117,10 @@ describe('the cold a body can feel, and the thing that answers it', () => {
   it('the sentence never tells a mind what to do about it', () => {
     const { bridge, loop } = town(COLD_HOUR - 1)
     loop.step()
-    const prose = proseFor(bridge, 'amara')
-    for (const hint of [
-      'build',
-      'raise a',
-      'you should',
-      'you must build',
-      'a roof would',
-      'go inside',
-    ]) {
-      expect(prose.toLowerCase()).not.toContain(hint)
+    const prose = proseFor(bridge, 'amara').toLowerCase()
+    expect(scanForDirective(prose)).toEqual([])
+    for (const hint of ['build', 'raise a', 'a roof would']) {
+      expect(prose).not.toContain(hint)
     }
   })
 })
@@ -202,7 +167,7 @@ describe('food that is turning', () => {
       seen: [],
       feltEvents: [],
     } as unknown as PerceptionPacket
-    expect(perceptionToProse(packet, () => {}, WORLD)).toContain('it is turning')
+    expect(perceptionToProse(packet, () => {}, FLAT_WORLD)).toContain('it is turning')
   })
 
   it('fresh food reads exactly as it always did', () => {
@@ -237,7 +202,7 @@ describe('food that is turning', () => {
       seen: [],
       feltEvents: [],
     } as unknown as PerceptionPacket
-    expect(perceptionToProse(packet, () => {}, WORLD)).not.toContain('turning')
+    expect(perceptionToProse(packet, () => {}, FLAT_WORLD)).not.toContain('turning')
   })
 
   it('the bridge carries the flag the engine composes, all the way to the sentence', () => {

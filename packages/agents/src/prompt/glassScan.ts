@@ -137,6 +137,15 @@ export function scanPromptForGlassLeak(prompt: string): string[] {
 const RULING_DIRECTIVE =
   /\byou (should|must|ought to|need to|could try|may want|will need)\b|\bgo (inside|and)\b|\binstead,? (you|try)\b/i
 
+// The counsel every perception sentence must be free of, and the part of RULING_DIRECTIVE that
+// holds for a mind-facing line too: it hands over a remedy rather than a fact about now.
+const PERCEPTION_DIRECTIVE = /\byou (should|must)\b|\bgo (inside|and)\b/gi
+
+/** Every remedy the sentence hands a mind. Empty is the only acceptable answer. */
+export function scanForDirective(text: string): string[] {
+  return [...text.matchAll(PERCEPTION_DIRECTIVE)].map((m) => m[0].toLowerCase())
+}
+
 // The banned shapes all encode "X requires Y" — `without a`, `unless you have`, `until you have`,
 // `for lack of`, `requires a`, `once she has`. A bare absence ("You have no reeds here.") is a
 // world fact and stays allowed: it connects the absence to no method.

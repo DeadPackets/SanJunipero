@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
-import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
+import { FakeEmbedder, type LlmClient } from '@sj/agents'
 import {
   composePerception,
   fold,
@@ -32,6 +32,7 @@ import {
   type ExpressiveRuling,
 } from './expressive.js'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
+import { makeArbiterRig, ScriptedLlm, type ScriptedCall } from './testutil/scriptedLlm.js'
 import type { Verdict } from './verdict.js'
 
 const ctx: AgentCtx = {
@@ -66,54 +67,14 @@ const impossible: Verdict = {
   class: 'physically_impossible',
 }
 
-function emptyUsage(): LlmUsage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
-}
-
-// Never talks to OpenRouter: it answers with whatever the script hands back and
-// records how many times, and with which prompt, it was asked.
-class ScriptedLlm {
-  objectCalls = 0
-  systems: string[] = []
-  constructor(private readonly respond: (system: string) => unknown) {}
-
-  async object(opts: {
-    system: string
-    messages: LlmMessage[]
-    schema: unknown
-  }): Promise<{ value: unknown; usage: LlmUsage }> {
-    this.objectCalls += 1
-    this.systems.push(opts.system)
-    return { value: this.respond(opts.system), usage: emptyUsage() }
-  }
-
-  async text(): Promise<{ text: string; usage: LlmUsage }> {
-    return { text: '', usage: emptyUsage() }
-  }
-
-  totalCostUsd(): number {
-    return 0
-  }
-  alert(): void {}
-}
-
-async function makeRig(llm: ScriptedLlm): Promise<Arbiter> {
-  const db = openArbiterDb(':memory:')
-  const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
-  return makeArbiter({
-    db,
-    llm: llm as unknown as LlmClient,
-    embedder: await FakeEmbedder.create(),
-    tick: () => 100,
-  })
-}
+const makeRig = async (llm: ScriptedLlm): Promise<Arbiter> =>
+  (await makeArbiterRig({ llm })).arbiter
 
 // The scripted answer for whichever prompt arrived: the cheap one gets a ruling,
 // the expensive one gets a refusal, so the two paths are told apart by the result.
 const script =
   (ruling: ExpressiveRuling) =>
-  (system: string): unknown =>
+  ({ system }: ScriptedCall): unknown =>
     system.includes(EXPRESSIVE_INSTRUCTION) ? ruling : impossible
 
 // Noon on a flat 64×64: the light is full, so every horizon below is a distance and

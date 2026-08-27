@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '@sj/engine'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { NARRATOR_CANON } from './canon.js'
 import {
   CONSTRUCT_VOCABULARY,
   NARRATOR_TABLES,
@@ -66,5 +68,19 @@ describe('the other face of the glass: what the narrator names never reaches a m
   it('is the same list the agents side enforces, through one door', () => {
     expect(CONSTRUCT_VOCABULARY).toContain('milestone')
     expect(CONSTRUCT_VOCABULARY).toContain('tier')
+  })
+})
+
+describe('the canon the chronicler reads from', () => {
+  it('NARRATOR_CANON is the byte-stable diegetic historian prefix', () => {
+    expect(NARRATOR_CANON.startsWith('You are the omniscient historian of San Junipero')).toBe(true)
+    // Long enough that a provider-side prefix cache has something to hold.
+    expect(NARRATOR_CANON.length).toBeGreaterThan(1000)
+    expect(FORBIDDEN_FRAMING.test(NARRATOR_CANON)).toBe(false)
+  })
+
+  it('places the chronicler in the century the town actually lives in', () => {
+    expect(NARRATOR_CANON).not.toMatch(/\bstone[- ]age\b/i)
+    expect(NARRATOR_CANON).toMatch(/farm town/i)
   })
 })

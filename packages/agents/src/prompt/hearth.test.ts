@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createWorldTick,
   doorTile,
   EventStore,
   fold,
@@ -10,13 +9,12 @@ import {
   RngStreams,
   TickLoop,
   warmthTargetFor,
-  type LawQueue,
-  type TickHandler,
   type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { FLAT_WORLD, wireTown } from '../testutil/fixtures.js'
 import { EngineBridge } from '../runtime/bridge.js'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
+import { scanForDirective, scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 import { perceptionToProse } from './prose.js'
 
@@ -25,21 +23,12 @@ import { perceptionToProse } from './prose.js'
 
 const CFG = DEFAULT_CONFIG
 
-const WORLD = {
-  isWalkable: () => true,
-  isEdible: () => false,
-  waterAtHand: () => false,
-  nearestWater: () => null,
-  nearestFood: () => null,
-}
-
 // The genesis valley through a real bridge, so nothing here is a hand-built fixture. The cabin
 // is one of the two roofs left standing, and it is 2x2 like a house.
 function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId: string } {
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
   const store = new EventStore(db)
-  const rng = new RngStreams('hearth-prose')
   let state: WorldState = genesisState(CFG, g.terrain)
   for (const e of g.events) state = fold(state, store.append(state.tick, e.type, e.payload), CFG)
   // A finished house is what has a hearth in it. The valley's own houses stand roofless, so one
@@ -70,29 +59,11 @@ function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId
     }),
     CFG,
   )
-  const lawQueue: LawQueue = []
-  const worldTick = createWorldTick(CFG, rng, lawQueue)
-  let handler: TickHandler = () => {}
-  const loop = new TickLoop({
-    store,
-    state,
-    rng,
-    config: CFG,
-    startTick,
-    realMsPerTick: 0,
-    onTick: (c) => {
-      handler(c)
-    },
-  })
-  const bridge = new EngineBridge({ loop, store, simConfig: CFG })
-  handler = bridge.wrapTickHandler(({ emit }) => {
-    for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
-  })
-  return { bridge, loop, homeId: house.id }
+  return { ...wireTown({ state, store, seed: 'hearth-prose', startTick }), homeId: house.id }
 }
 
 const proseFor = (bridge: EngineBridge): string =>
-  perceptionToProse(bridge.perception('amara'), () => {}, WORLD)
+  perceptionToProse(bridge.perception('amara'), () => {}, FLAT_WORLD)
 
 const NIGHT = 21 * 60
 
@@ -170,12 +141,10 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
+      expect(scanForDirective(said), said).toEqual([])
       for (const hint of [
         'stoke',
-        'you should',
-        'you must',
         'you could feed',
-        'go inside',
         'light it',
         'feed it',
         'sleep here',
@@ -228,7 +197,7 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
       onTick: () => {},
     })
     const bridge = new EngineBridge({ loop, store, simConfig: CFG })
-    return perceptionToProse(bridge.perception('a1'), () => {}, WORLD)
+    return perceptionToProse(bridge.perception('a1'), () => {}, FLAT_WORLD)
   }
 
   it('says it at the wall instead of at the refusal', () => {
@@ -243,13 +212,8 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
 
   it('names no remedy: it is a fact about now and promises nothing later', () => {
     const said = site('construction').toLowerCase()
-    for (const hint of [
-      'you should',
-      'you must',
-      'once the roof',
-      'when it is finished',
-      'come back',
-    ]) {
+    expect(scanForDirective(said), said).toEqual([])
+    for (const hint of ['once the roof', 'when it is finished', 'come back']) {
       expect(said, hint).not.toContain(hint)
     }
   })

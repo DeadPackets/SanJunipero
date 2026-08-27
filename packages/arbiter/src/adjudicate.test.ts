@@ -1,20 +1,15 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
-import {
-  EMBEDDING_DIM,
-  FakeEmbedder,
-  type LlmClient,
-  type LlmMessage,
-  type LlmUsage,
-} from '@sj/agents'
-import { fold, genesisState, submitIntent, unregisterVerb, VERBS } from '@sj/engine'
-import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
+import { EMBEDDING_DIM, FakeEmbedder, type LlmClient } from '@sj/agents'
+import { unregisterVerb, VERBS } from '@sj/engine'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
 import { CodexStore } from './codex.js'
 import { RulingsStore } from './rulings.js'
+import { makeArbiterRig, ScriptedLlm, TAMAR_CTX } from './testutil/scriptedLlm.js'
 import type { Recipe, Verdict } from './verdict.js'
 
 // A credit for a test that is not about the credit; the two-argument codify is required so
@@ -106,55 +101,6 @@ const impossibleVerdict: Verdict = {
   class: 'insufficient_materials',
 }
 
-const ctx: AgentCtx = {
-  agentId: 'a1',
-  name: 'Tamar',
-  skills: { cooking: 80, farming: 120 },
-  inventory: [
-    { kind: 'wood', qty: 2 },
-    { kind: 'clay_pot', qty: 1 },
-  ],
-  position: { x: 3, y: 5 },
-}
-
-function emptyUsage(): LlmUsage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
-}
-
-// Scripted LlmClient: never talks to OpenRouter; records object-call count and
-// returns whatever verdict the script decides.
-class ScriptedLlm {
-  objectCalls = 0
-  lastSystem = ''
-  constructor(private readonly respond: (intent: string, system: string) => Verdict) {}
-
-  async object(opts: {
-    system: string
-    messages: LlmMessage[]
-    schema: unknown
-  }): Promise<{ value: unknown; usage: LlmUsage }> {
-    this.objectCalls += 1
-    this.lastSystem = opts.system
-    const content = opts.messages.at(-1)?.content ?? ''
-    const intent =
-      content
-        .split('\n')
-        .at(-1)
-        ?.replace(/^Intent: /, '') ?? ''
-    return { value: this.respond(intent, opts.system), usage: emptyUsage() }
-  }
-
-  async text(): Promise<{ text: string; usage: LlmUsage }> {
-    return { text: '', usage: emptyUsage() }
-  }
-
-  totalCostUsd(): number {
-    return 0
-  }
-
-  alert(): void {}
-}
-
 // The shared FakeEmbedder is sha256-based, so a rephrase can never reach the cosine gate. This
 // bag-of-words one gives token-overlap similarity, which exercises stage 2 with no live model.
 const STOPWORDS = new Set([
@@ -209,43 +155,21 @@ class LexicalEmbedder {
   }
 }
 
-type EmbedderLike = { embed(t: string): Promise<Float32Array> }
-
-async function makeRig(
-  llm: ScriptedLlm,
-  embedder?: EmbedderLike,
-  vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] },
-): Promise<{ db: Database.Database; arbiter: Arbiter; embedder: EmbedderLike }> {
-  const db = openArbiterDb(':memory:')
-  const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
-  codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
-  const emb = embedder ?? (await FakeEmbedder.create())
-  const arbiter = makeArbiter({
-    db,
-    llm: llm as unknown as LlmClient,
-    embedder: emb,
-    tick: () => 100,
-    ...(vocabulary === undefined ? {} : { vocabulary }),
-  })
-  return { db, arbiter, embedder: emb }
-}
-
 describe('makeArbiter adjudicate three-stage funnel', () => {
   it('rulebook short-circuit returns map with zero LLM calls', async () => {
     const llm = new ScriptedLlm(() => basketVerdict)
-    const { arbiter } = await makeRig(llm)
+    const { arbiter } = await makeArbiterRig({ llm })
 
     arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
 
-    const verdict = await arbiter.adjudicate('I try to boil river water for salt', ctx)
+    const verdict = await arbiter.adjudicate('I try to boil river water for salt', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
     expect(llm.objectCalls).toBe(0)
   })
 
   it('similarity short-circuit returns the stored verdict verbatim with zero LLM calls', async () => {
     const llm = new ScriptedLlm(() => basketVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm)
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm })
 
     await new RulingsStore(db, embedder).record(
       'extract salt by boiling river water',
@@ -253,16 +177,16 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       100,
     )
 
-    const verdict = await arbiter.adjudicate('extract salt by boiling river water', ctx)
+    const verdict = await arbiter.adjudicate('extract salt by boiling river water', TAMAR_CTX)
     expect(verdict).toEqual(boilSaltVerdict)
     expect(llm.objectCalls).toBe(0)
   })
 
   it('novel path reaches the LLM exactly once and records the ruling', async () => {
     const llm = new ScriptedLlm(() => basketVerdict)
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I weave a basket from reeds', ctx)
+    const verdict = await arbiter.adjudicate('I weave a basket from reeds', TAMAR_CTX)
     expect(verdict).toEqual(basketVerdict)
     expect(llm.objectCalls).toBe(1)
 
@@ -274,9 +198,9 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
   it('impossible path returns, records, and stays framing-free', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I build a house of smoke', ctx)
+    const verdict = await arbiter.adjudicate('I build a house of smoke', TAMAR_CTX)
     expect(verdict).toEqual(impossibleVerdict)
     expect(llm.objectCalls).toBe(1)
     expect(FORBIDDEN_FRAMING.test(verdict.kind === 'impossible' ? verdict.reason : '')).toBe(false)
@@ -301,8 +225,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
         reason: leak,
         class: 'physically_impossible',
       }))
-      const { arbiter } = await makeRig(llm)
-      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      const { arbiter } = await makeArbiterRig({ llm })
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, TAMAR_CTX)
       // The verdict survives; only the words are replaced. A retry could have ended at
       // FALLBACK_IMPOSSIBLE and thrown away a true refusal along with its bad sentence.
       expect(verdict.kind, leak).toBe('impossible')
@@ -325,8 +249,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
         reason: leak,
         class: 'insufficient_materials',
       }))
-      const { arbiter } = await makeRig(llm)
-      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      const { arbiter } = await makeArbiterRig({ llm })
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, TAMAR_CTX)
       expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
         'nothing in the town lends itself to this',
       )
@@ -343,8 +267,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       reason: known,
       class: 'insufficient_materials',
     }))
-    const rigKnown = await makeRig(llmKnown, undefined, vocabulary)
-    expect(await rigKnown.arbiter.adjudicate('I fell the tree', ctx)).toHaveProperty(
+    const rigKnown = await makeArbiterRig({ llm: llmKnown, vocabulary })
+    expect(await rigKnown.arbiter.adjudicate('I fell the tree', TAMAR_CTX)).toHaveProperty(
       'reason',
       known,
     )
@@ -355,8 +279,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       reason: unknown,
       class: 'insufficient_materials',
     }))
-    const rigUnknown = await makeRig(llmUnknown, undefined, vocabulary)
-    expect(await rigUnknown.arbiter.adjudicate('I smelt the ore', ctx)).toHaveProperty(
+    const rigUnknown = await makeArbiterRig({ llm: llmUnknown, vocabulary })
+    expect(await rigUnknown.arbiter.adjudicate('I smelt the ore', TAMAR_CTX)).toHaveProperty(
       'reason',
       'nothing in the town lends itself to this',
     )
@@ -374,8 +298,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
         reason: token,
         class: 'physically_impossible',
       }))
-      const { arbiter } = await makeRig(llm)
-      const verdict = await arbiter.adjudicate(`I try ${token}`, ctx)
+      const { arbiter } = await makeArbiterRig({ llm })
+      const verdict = await arbiter.adjudicate(`I try ${token}`, TAMAR_CTX)
       expect(verdict.kind === 'impossible' ? verdict.reason : '', token).toBe(
         'nothing in the town lends itself to this',
       )
@@ -394,8 +318,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
         reason: leak,
         class: 'physically_impossible',
       }))
-      const { arbiter } = await makeRig(llm)
-      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      const { arbiter } = await makeArbiterRig({ llm })
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, TAMAR_CTX)
       expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
         'nothing in the town lends itself to this',
       )
@@ -407,8 +331,8 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       reason: honest,
       class: 'physically_impossible',
     }))
-    const { arbiter } = await makeRig(llm)
-    expect(await arbiter.adjudicate('I work by night', ctx)).toHaveProperty('reason', honest)
+    const { arbiter } = await makeArbiterRig({ llm })
+    expect(await arbiter.adjudicate('I work by night', TAMAR_CTX)).toHaveProperty('reason', honest)
   })
 
   it('★ and it is not vacuous: an honest refusal reaches the mind in its own words', async () => {
@@ -418,39 +342,39 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       reason: honest,
       class: 'physically_impossible',
     }))
-    const { arbiter } = await makeRig(llm)
-    const verdict = await arbiter.adjudicate('I wade the rapids', ctx)
+    const { arbiter } = await makeArbiterRig({ llm })
+    const verdict = await arbiter.adjudicate('I wade the rapids', TAMAR_CTX)
     expect(verdict.kind === 'impossible' ? verdict.reason : '').toBe(honest)
   })
 
   it('stage-2 short-circuit resolves an active codified recipe to map with zero LLM calls', async () => {
     const llm = new ScriptedLlm(() => boilSaltVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('weave reeds to basket', basketVerdict, 100)
     arbiter.codify(basketRecipe, CODIFY_CREDIT)
 
-    const verdict = await arbiter.adjudicate('basket weave reeds', ctx)
+    const verdict = await arbiter.adjudicate('basket weave reeds', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: {} })
     expect(llm.objectCalls).toBe(0)
   })
 
   it('stage-2 short-circuit falls through to the LLM after revert (not the stored verdict)', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', ropeVerdict, 100)
     arbiter.codify(ropeRecipe, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(impossibleVerdict)
     expect(llm.objectCalls).toBe(1)
   })
 
   it('stage-2 short-circuit returns stored context-independent impossible verdicts verbatim', async () => {
     const llm = new ScriptedLlm(() => ropeVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
     const stored: Verdict = {
       kind: 'impossible',
       reason: 'no such craft exists under the sun',
@@ -459,14 +383,14 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(stored)
     expect(llm.objectCalls).toBe(0)
   })
 
   it('stage-2 short-circuit falls through to the LLM for stored agent-contextual impossible verdicts', async () => {
     const llm = new ScriptedLlm(() => ropeVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
     const stored: Verdict = {
       kind: 'impossible',
       reason: 'You have no reeds here.',
@@ -475,14 +399,14 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(ropeVerdict)
     expect(llm.objectCalls).toBe(1)
   })
 
   it('stage-2 short-circuit falls through for stored insufficient_skill impossible verdicts', async () => {
     const llm = new ScriptedLlm(() => ropeVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
     const stored: Verdict = {
       kind: 'impossible',
       reason: 'Your hands are not yet practiced enough.',
@@ -491,16 +415,16 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(ropeVerdict)
     expect(llm.objectCalls).toBe(1)
   })
 
   it('a hallucinated map verb is never returned or recorded; retry then diegetic impossible', async () => {
     const llm = new ScriptedLlm(() => ({ kind: 'map', verb: 'recipe:ghost_dance', params: {} }))
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I dance the ghost dance', ctx)
+    const verdict = await arbiter.adjudicate('I dance the ghost dance', TAMAR_CTX)
     expect(verdict.kind).toBe('impossible')
     // Three: a dance is tried on the cheap expressive path first, and this script has no
     // ruling to give it, so it falls through to the two verdict attempts.
@@ -518,9 +442,9 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
         ? { kind: 'map', verb: 'recipe:ghost_dance', params: {} }
         : { kind: 'map', verb: 'walk', params: { x: 1, y: 1 } }
     })
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I wander toward the river', ctx)
+    const verdict = await arbiter.adjudicate('I wander toward the river', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { x: 1, y: 1 } })
     expect(llm.objectCalls).toBe(2)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
@@ -529,26 +453,26 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
   it('stage-2 short-circuit returns a stored map verdict whose verb is a live engine verb', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
     const stored: Verdict = { kind: 'map', verb: 'walk', params: {} }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(stored)
     expect(llm.objectCalls).toBe(0)
   })
 
   it('stage-2 short-circuit re-checks stored map verdicts pointing at reverted recipe verbs', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
     const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: {} }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
     arbiter.codify(ropeRecipe, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
-    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
     expect(verdict).toEqual(impossibleVerdict)
     expect(llm.objectCalls).toBe(1)
   })
@@ -556,7 +480,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   it('arbiter.revert routes through the review queue, leaving no stale pending disposition', async () => {
     unregisterVerb('recipe:boil_salt')
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
     const review = new ReviewStore(db)
 
     const { ruleId } = arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
@@ -701,7 +625,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
   })
 
   it('rules Esen’s smoked fish an attempt, where run 4 ruled it impossible', async () => {
-    const llm = new ScriptedLlm((_intent, system) =>
+    const llm = new ScriptedLlm(({ system }) =>
       system.includes('smoking_food') ? smokedFish : beyondAdjacency,
     )
     const { db, arbiter } = await makeSmokehouseRig(llm)
@@ -745,9 +669,9 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
         ? { ...basketVerdict, summary: 'The AI grants you a basket.' }
         : basketVerdict
     })
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', ctx)
+    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', TAMAR_CTX)
     expect(verdict).toEqual(basketVerdict)
     expect(llm.objectCalls).toBe(2)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
@@ -770,9 +694,9 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
       },
     }
     const llm = new ScriptedLlm(() => tainted)
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', ctx)
+    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', TAMAR_CTX)
     expect(verdict.kind).toBe('impossible')
     expect(FORBIDDEN_FRAMING.test(verdict.kind === 'impossible' ? verdict.reason : '')).toBe(false)
     expect(llm.objectCalls).toBe(2)
@@ -785,9 +709,9 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
       reason: 'The language model refuses this.',
       class: 'physically_impossible',
     }))
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
-    const verdict = await arbiter.adjudicate('I whistle the rain into being', ctx)
+    const verdict = await arbiter.adjudicate('I whistle the rain into being', TAMAR_CTX)
     expect(verdict.kind).toBe('impossible')
     if (verdict.kind === 'impossible') {
       expect(FORBIDDEN_FRAMING.test(verdict.reason)).toBe(false)
@@ -813,11 +737,14 @@ describe('the ground the arbiter was shown is the ground a recipe may ask for', 
       requires: [{ type: 'adjacent_tile', tile: 'sand' }],
     },
   }
-  const seeing = (ground: string[]): AgentCtx => ({ ...ctx, visible: { structures: [], ground } })
+  const seeing = (ground: string[]): AgentCtx => ({
+    ...TAMAR_CTX,
+    visible: { structures: [], ground },
+  })
 
   it('refuses ground nobody in sight can point at, and retries instead of minting it', async () => {
     const llm = new ScriptedLlm(() => sandVerdict)
-    const { db, arbiter } = await makeRig(llm)
+    const { db, arbiter } = await makeArbiterRig({ llm })
 
     const verdict = await arbiter.adjudicate(
       'I bank the wall against the wind',
@@ -831,7 +758,7 @@ describe('the ground the arbiter was shown is the ground a recipe may ask for', 
 
   it('lets the same recipe through where the sand actually is', async () => {
     const llm = new ScriptedLlm(() => sandVerdict)
-    const { arbiter } = await makeRig(llm)
+    const { arbiter } = await makeArbiterRig({ llm })
 
     const verdict = await arbiter.adjudicate(
       'I bank the wall against the wind',
@@ -843,9 +770,11 @@ describe('the ground the arbiter was shown is the ground a recipe may ask for', 
 
   it('an asker who was shown no world is judged as before', async () => {
     const llm = new ScriptedLlm(() => sandVerdict)
-    const { arbiter } = await makeRig(llm)
+    const { arbiter } = await makeArbiterRig({ llm })
 
-    expect((await arbiter.adjudicate('I bank the wall against the wind', ctx)).kind).toBe('attempt')
+    expect((await arbiter.adjudicate('I bank the wall against the wind', TAMAR_CTX)).kind).toBe(
+      'attempt',
+    )
   })
 })
 
@@ -860,9 +789,9 @@ describe('retrieval efficiency', () => {
       },
     }
     const llm = new ScriptedLlm(() => impossibleVerdict)
-    const { arbiter } = await makeRig(llm, counting)
+    const { arbiter } = await makeArbiterRig({ llm, embedder: counting })
 
-    await arbiter.adjudicate('I chart the river shallows', ctx)
+    await arbiter.adjudicate('I chart the river shallows', TAMAR_CTX)
     expect(embeds).toBe(2)
   })
 })
@@ -883,7 +812,7 @@ describe('rulebook rehydration on construction', () => {
 
   it('re-registers active codified verbs after a process restart; reverted rows stay out', async () => {
     const llm = new ScriptedLlm(() => basketVerdict)
-    const { db, arbiter, embedder } = await makeRig(llm)
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm })
 
     arbiter.codify(rehydrateRecipe, CODIFY_CREDIT)
     arbiter.codify(revertedRecipe, CODIFY_CREDIT)
@@ -897,92 +826,5 @@ describe('rulebook rehydration on construction', () => {
     expect(VERBS['recipe:rehydrate_gone']).toBeUndefined()
 
     unregisterVerb('recipe:rehydrate_basket')
-  })
-})
-
-describe('live codification round trip (T20)', () => {
-  const matRecipe: Recipe = {
-    id: 'recipe:reed_mat',
-    name: 'Weave Reed Mat',
-    durationTicks: 2,
-    costs: [],
-    requires: [],
-    outcomeTable: [
-      {
-        weight: 1,
-        success: true,
-        label: 'The reeds lie flat as a mat.',
-        effects: [{ op: 'spawn_item', kind: 'mat', qty: 1, to: 'agent' }],
-      },
-    ],
-    rngStream: 'recipe:reed_mat',
-    canon: ['fire'],
-  }
-  const matVerdict: Verdict = {
-    kind: 'attempt',
-    recipe: matRecipe,
-    summary: 'Weave reeds into a mat.',
-  }
-
-  it('adjudicates once, codifies, and the same intent then resolves with no further LLM call', async () => {
-    const llm = new ScriptedLlm(() => matVerdict)
-    const { arbiter } = await makeRig(llm, new LexicalEmbedder())
-    try {
-      const first = await arbiter.adjudicate('weave reeds into a mat', ctx)
-      expect(first).toEqual(matVerdict)
-      expect(llm.objectCalls).toBe(1)
-
-      // Codify: the recipe becomes a verb the engine itself answers for.
-      expect(VERBS[matRecipe.id]).toBeUndefined()
-      expect(arbiter.codify(matRecipe, CODIFY_CREDIT)).toEqual({
-        ruleId: expect.any(Number) as number,
-        verb: matRecipe.id,
-      })
-      expect(VERBS[matRecipe.id]).toBeDefined()
-
-      const state = fold(
-        genesisState(DEFAULT_CONFIG),
-        {
-          seq: 1,
-          tick: 0,
-          type: 'agent_spawned',
-          payload: { id: 'a1', name: 'Tamar', x: 5, y: 5, ageDays: 7300 },
-        },
-        DEFAULT_CONFIG,
-      )
-      const res = submitIntent(state, DEFAULT_CONFIG, 'a1', matRecipe.id, {})
-      expect(res.ok).toBe(true)
-
-      // Adjudicate once, physics forever: the second ask never reaches the model.
-      const second = await arbiter.adjudicate('weave reeds into a mat', ctx)
-      expect(second).toEqual({ kind: 'map', verb: matRecipe.id, params: {} })
-      expect(llm.objectCalls).toBe(1)
-    } finally {
-      unregisterVerb(matRecipe.id)
-    }
-  })
-})
-
-describe('framing-free outputs contract', () => {
-  it('every scripted verdict carries framing-free reason/summary/name/label', () => {
-    const texts = [
-      boilSaltVerdict.summary,
-      boilSaltVerdict.recipe.name,
-      boilSaltVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      basketVerdict.summary,
-      basketVerdict.recipe.name,
-      basketVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      ropeVerdict.summary,
-      ropeVerdict.recipe.name,
-      ropeVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      impossibleVerdict.reason,
-    ]
-    for (const text of texts) {
-      expect(FORBIDDEN_FRAMING.test(text)).toBe(false)
-    }
-  })
-
-  it('FORBIDDEN_FRAMING catches a scripted verdict that leaks the machinery', () => {
-    expect(FORBIDDEN_FRAMING.test('the AI says no')).toBe(true)
   })
 })
