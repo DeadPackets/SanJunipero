@@ -103,6 +103,7 @@ import {
   entitySpriteOf,
   footprintHitPoints,
   pipsFilled,
+  setEntityScaleMul,
   structureHitPoints,
   structureHoverText,
   syncEntities,
@@ -625,5 +626,101 @@ describe('pipsFilled', () => {
     expect(pipsFilled(1440, 0)).toBe(pipsFilled(1440, BUILD_TICKS_FULL))
     expect(pipsFilled(1440, -5)).toBe(pipsFilled(1440, BUILD_TICKS_FULL))
     expect(pipsFilled(-5, 240)).toBe(0)
+  })
+})
+
+// An effect that captured the scale it found, then wrote it back when it ended, reverted a
+// building to its pre-art size for good if the art landed inside the effect's 260 ms.
+describe('★ an effect multiplies the scale the layer owns, and never replaces it', () => {
+  const HOUSE_ART = {
+    id: 'asset_house',
+    seq: 1,
+    class: 'building',
+    desc: 'a house',
+    kind: 'house',
+    meta: JSON.stringify({
+      version: 'v4-hires-building',
+      kind: 'house',
+      footprint: { w: 2, h: 2 },
+      cell: { w: 512, h: 512, feetX: 256, feetY: 511 },
+    }),
+    footprint: { w: 2, h: 2 },
+    widthPx: 512,
+    heightPx: 512,
+    status: 'ready',
+    score: null,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '',
+  } as unknown as AssetRecord
+
+  const ART_SCALE = 0.25 // (2 + 2) · BUILDING_PX_PER_TILE / 512
+
+  const drive = (): {
+    scene: Scene
+    store: WorldStore
+    book: TextureBook
+    sync: () => void
+    scale: () => number
+    records: AssetRecord[]
+  } => {
+    const house = box(20, 20, 2, 2, 'house')
+    const records: AssetRecord[] = []
+    const scene = {
+      layers: {
+        entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+      },
+      tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
+      getZoom: () => 1,
+      onCamera: () => () => {},
+      addDepthSource: () => () => {},
+    } as unknown as Scene
+    const store = {
+      getState: () =>
+        ({ structures: { [house.id]: house }, items: {}, crops: {} }) as unknown as WorldState,
+      getConfig: () => DEFAULT_CONFIG,
+      assetsSeq: () => records.length,
+      assetRecords: () => records,
+    } as unknown as WorldStore
+    const book = {
+      get: () => Promise.resolve({} as never),
+      swap: () => Promise.resolve({} as never),
+    } as unknown as TextureBook
+    return {
+      scene,
+      store,
+      book,
+      records,
+      sync: () => {
+        syncEntities(scene, book, store, () => {})
+      },
+      scale: () => entitySpriteOf(scene, 'structure', house.id)!.scale.x,
+    }
+  }
+
+  it('holds the multiplier through the art landing, and releases to the ART scale', async () => {
+    const h = drive()
+    h.sync()
+    expect(h.scale()).toBe(1) // the built-form volume, no art yet
+
+    expect(setEntityScaleMul(h.scene, 'structure', 's-20-20', 1.18)).toBe(true)
+    expect(h.scale()).toBeCloseTo(1.18)
+
+    h.records.push(HOUSE_ART)
+    h.sync()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(h.scale(), 'the art scale, still under the effect').toBeCloseTo(ART_SCALE * 1.18)
+
+    setEntityScaleMul(h.scene, 'structure', 's-20-20', 1)
+    expect(h.scale(), 'the effect ended on the art scale, not the one it started from').toBeCloseTo(
+      ART_SCALE,
+    )
+  })
+
+  it('reports a subject it does not have, so an effect can drop it', () => {
+    const h = drive()
+    h.sync()
+    expect(setEntityScaleMul(h.scene, 'structure', 'nobody', 1.2)).toBe(false)
   })
 })

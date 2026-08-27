@@ -1,5 +1,48 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// Driven for real below, so which config priced the flame is read off the sprite it painted.
+vi.mock('pixi.js', () => {
+  class Point {
+    x = 0
+    y = 0
+    set(x: number, y: number = x): void {
+      this.x = x
+      this.y = y
+    }
+  }
+  class Container {
+    children: Container[] = []
+    visible = true
+    alpha = 1
+    width = 0
+    height = 0
+    eventMode = ''
+    blendMode = ''
+    autoGarbageCollect = true
+    destroyed = false
+    position = new Point()
+    scale = new Point()
+    anchor = new Point()
+    addChild(...cs: Container[]): void {
+      this.children.push(...cs)
+    }
+    destroy(): void {
+      this.destroyed = true
+    }
+  }
+  class Sprite extends Container {}
+  class Graphics extends Container {
+    circle(): this {
+      return this
+    }
+    fill(): this {
+      return this
+    }
+  }
+  const Texture = { EMPTY: {} }
+  return { Container, Graphics, Point, Sprite, Texture }
+})
 import {
   DEFAULT_CONFIG,
   flamesAt,
@@ -16,10 +59,13 @@ import {
   POOL_DUSK_SCALE,
   POOL_MAX_ALPHA,
   POOL_SWING,
+  createLightPools,
   poolCentre,
   poolRadiusPx,
   poolStrengthAt,
 } from './lightPools.js'
+import type { Scene } from './scene.js'
+import type { WorldStore } from '../state/worldStore.js'
 
 const CFG: SimConfig = DEFAULT_CONFIG
 const NOON = 12 * 60,
@@ -192,7 +238,9 @@ describe('what this pass must not have broken', () => {
 
   it('★ does not churn the pool on a clock boundary — that churn is what fed the GC', () => {
     // `flamesAt` is asked EVERY frame, day included; the day only sets `visible`.
-    expect(src).toContain('const flames = flamesAt(state, tick, DEFAULT_CONFIG)')
+    expect(src).toContain(
+      'const flames = flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)',
+    )
     expect(code).not.toMatch(/strength === 0 \? \[\]/)
     expect(src).toContain('s.visible = seen')
     // Every destroy on a SPRITE must spare the shared texture. `root` and the throwaway Graphics
@@ -202,5 +250,42 @@ describe('what this pass must not have broken', () => {
         continue
       expect(m, `${m} could destroy the texture every sprite shares`).toContain('texture: false')
     }
+  })
+})
+
+describe('the pool is priced by the world the store describes, not by the defaults', () => {
+  const painted = (config: SimConfig | null): { width: number; height: number } => {
+    const children: { children: { width: number; height: number }[] }[] = []
+    const decal = { children, addChild: (c: (typeof children)[0]) => children.push(c) }
+    const scene = {
+      app: { renderer: { generateTexture: () => ({ source: {} }) } },
+      layers: { groundDecal: decal },
+      viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+    } as unknown as Scene
+    const store = {
+      getState: () => lamp(10, 10, MIDNIGHT + 500),
+      getTick: () => MIDNIGHT,
+      getConfig: () => config,
+    } as unknown as WorldStore
+    createLightPools(scene, store).tick(16)
+    return children[0]!.children[0]!
+  }
+
+  it('★ a law that widens a lamp’s glow widens the pool it paints', () => {
+    const r = DEFAULT_CONFIG.light.glowRadius.lamp_post
+    const wider: SimConfig = {
+      ...DEFAULT_CONFIG,
+      light: {
+        ...DEFAULT_CONFIG.light,
+        glowRadius: { ...DEFAULT_CONFIG.light.glowRadius, lamp_post: r + 3 },
+      },
+    }
+    expect(painted(wider).width).toBeCloseTo(poolRadiusPx(r + 3).rx * 2)
+    expect(painted(wider).height).toBeCloseTo(poolRadiusPx(r + 3).ry * 2)
+  })
+
+  it('falls back to the defaults for the frames before the snapshot lands', () => {
+    const r = DEFAULT_CONFIG.light.glowRadius.lamp_post
+    expect(painted(null).width).toBeCloseTo(poolRadiusPx(r).rx * 2)
   })
 })

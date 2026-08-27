@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures, simTimeFromTick } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
+import type { TileId, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen, TILE_H } from './iso.js'
 import { rectOnGround, type ScreenRect } from './ground.js'
@@ -8,7 +8,7 @@ import type { Scene } from './scene.js'
 import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
-import { entitySpriteOf } from './entities.js'
+import { setEntityScaleMul } from './entities.js'
 import { isGrave, toneReducer } from './tone.js'
 
 const SMOKE_PUFFS = 3
@@ -197,8 +197,80 @@ export function createAmbient(
   const smoke = new Map<string, Sprite[]>()
   const glows = new Map<string, Sprite>()
   const fires = new Map<string, Sprite>()
+  /** where a structure's effects hang and whether it is alight — rewritten when the world
+   *  changes, so the frame loop below reads it instead of walking every structure again */
+  const anchors = new Map<string, { sx: number; sy: number; hasFire: boolean }>()
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
-  const bounceBase = new Map<string, { x: number; y: number }>()
+  let fxState: WorldState | null = null
+  const working: string[] = [] // the bodies a work verb is squashing, refreshed with the world
+
+  /** Create, place and destroy the effect sprites. Deltas arrive at most every 250 ms, so this
+   *  runs on a new world state rather than on every frame. */
+  const syncStructureFx = (state: WorldState): void => {
+    working.length = 0
+    for (const a of Object.values(state.agents)) {
+      if (
+        a.alive &&
+        a.activity !== null &&
+        (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
+      )
+        working.push(a.id)
+      else layers.chars?.setScaleMulY(a.id, 1)
+    }
+    const live = new Set<string>()
+    for (const s of Object.values(state.structures)) {
+      live.add(s.id)
+      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+      const hasFire = s.stage === 'complete' && HEARTH_KINDS.has(s.kind)
+      anchors.set(s.id, { sx: anchor.sx, sy: anchor.sy, hasFire })
+      if (hasFire && !smoke.has(s.id)) {
+        const puffs: Sprite[] = []
+        for (let i = 0; i < SMOKE_PUFFS; i++) {
+          const p = new Sprite(puffTex)
+          p.anchor.set(0.5, 0.5)
+          p.eventMode = 'none'
+          scene.layers.overhead.addChild(p)
+          puffs.push(p)
+        }
+        smoke.set(s.id, puffs)
+      }
+      if (hasFire && !glows.has(s.id)) {
+        const g = new Sprite(glowTex)
+        g.anchor.set(0.5, 1)
+        g.blendMode = 'add'
+        g.eventMode = 'none'
+        scene.layers.overhead.addChild(g)
+        glows.set(s.id, g)
+      }
+      // the door face — "deep blue night, warm window glow"
+      glows.get(s.id)?.position.set(anchor.sx, anchor.sy - 2)
+      if (s.burning && !fires.has(s.id)) {
+        const f = new Sprite(fireTex)
+        f.anchor.set(0.5, 1)
+        f.blendMode = 'add'
+        f.eventMode = 'none'
+        scene.layers.overhead.addChild(f)
+        fires.set(s.id, f)
+      }
+      const fire = fires.get(s.id)
+      if (fire !== undefined) {
+        if (s.burning) fire.position.set(anchor.sx, anchor.sy - 8)
+        else {
+          fire.destroy()
+          fires.delete(s.id)
+        }
+      }
+    }
+    for (const map of [smoke, glows, fires] as const) {
+      for (const [id, v] of map) {
+        if (live.has(id)) continue
+        if (Array.isArray(v)) for (const p of v) p.destroy()
+        else v.destroy()
+        map.delete(id)
+      }
+    }
+    for (const id of anchors.keys()) if (!live.has(id)) anchors.delete(id)
+  }
 
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
@@ -259,79 +331,33 @@ export function createAmbient(
       sampledTerrain = state.terrain
       sampleTerrain(state.terrain)
     }
+    if (state !== fxState) {
+      fxState = state
+      syncStructureFx(state)
+    }
 
     const night = simTimeFromTick(store.getTick()).isNight
 
     // structures: smoke (complete), night glow (complete), fire (burning)
-    const liveIds = new Set<string>()
-    for (const s of Object.values(state.structures)) {
-      liveIds.add(s.id)
-      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
-      const complete = s.stage === 'complete'
-      const hasFire = complete && HEARTH_KINDS.has(s.kind)
-      if (hasFire && !smoke.has(s.id)) {
-        const puffs: Sprite[] = []
-        for (let i = 0; i < SMOKE_PUFFS; i++) {
-          const p = new Sprite(puffTex)
-          p.anchor.set(0.5, 0.5)
-          p.eventMode = 'none'
-          scene.layers.overhead.addChild(p)
-          puffs.push(p)
-        }
-        smoke.set(s.id, puffs)
-      }
-      const puffs = smoke.get(s.id)
-      if (puffs !== undefined) {
-        puffs.forEach((p, i) => {
-          const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
-          p.position.set(anchor.sx + 8, anchor.sy - 34 - prog * SMOKE_RISE_PX)
-          p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
-          p.visible = hasFire
-        })
-      }
-      if (hasFire && !glows.has(s.id)) {
-        const g = new Sprite(glowTex)
-        g.anchor.set(0.5, 1)
-        g.blendMode = 'add'
-        g.eventMode = 'none'
-        scene.layers.overhead.addChild(g)
-        glows.set(s.id, g)
-      }
-      const glow = glows.get(s.id)
-      if (glow !== undefined) {
-        glow.position.set(anchor.sx, anchor.sy - 2) // the door face — "deep blue night, warm window glow"
-        glow.visible = hasFire && night
-        glow.alpha =
-          GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
-      }
-      if (s.burning && !fires.has(s.id)) {
-        const f = new Sprite(fireTex)
-        f.anchor.set(0.5, 1)
-        f.blendMode = 'add'
-        f.eventMode = 'none'
-        scene.layers.overhead.addChild(f)
-        fires.set(s.id, f)
-      }
-      const fire = fires.get(s.id)
-      if (fire !== undefined) {
-        if (!s.burning) {
-          fire.destroy()
-          fires.delete(s.id)
-        } else {
-          fire.position.set(anchor.sx, anchor.sy - 8)
-          if (!grave)
-            fire.alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
-        }
-      }
+    for (const [id, puffs] of smoke) {
+      const a = anchors.get(id)
+      if (a === undefined) continue
+      puffs.forEach((p, i) => {
+        const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
+        p.position.set(a.sx + 8, a.sy - 34 - prog * SMOKE_RISE_PX)
+        p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
+        p.visible = a.hasFire
+      })
     }
-    for (const map of [smoke, glows, fires] as const) {
-      for (const [id, v] of map) {
-        if (!liveIds.has(id)) {
-          if (Array.isArray(v)) for (const p of v) p.destroy()
-          else v.destroy()
-          map.delete(id)
-        }
-      }
+    const glowAlpha =
+      GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
+    for (const [id, glow] of glows) {
+      glow.visible = (anchors.get(id)?.hasFire ?? false) && night
+      glow.alpha = glowAlpha
+    }
+    if (!grave) {
+      const fireAlpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
+      for (const f of fires.values()) f.alpha = fireAlpha
     }
 
     // water shimmer + swaying trees
@@ -343,45 +369,17 @@ export function createAmbient(
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {
       const b = bounces[i]!
-      const sprite = entitySpriteOf(scene, b.kind, b.id)
-      if (sprite === null) {
-        bounces.splice(i, 1)
-        continue
-      }
-      let base = bounceBase.get(`${b.kind}:${b.id}`)
-      if (base === undefined) {
-        base = { x: sprite.scale.x, y: sprite.scale.y }
-        bounceBase.set(`${b.kind}:${b.id}`, base)
-      }
       const p = (t - b.at) / BOUNCE_MS
-      if (p >= 1 || p < 0) {
-        sprite.scale.set(base.x, base.y)
-        bounceBase.delete(`${b.kind}:${b.id}`)
-        bounces.splice(i, 1)
-      } else {
-        const k = 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
-        sprite.scale.set(base.x * k, base.y * k)
-      }
+      const done = p >= 1 || p < 0
+      const k = done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
+      const subject = setEntityScaleMul(scene, b.kind, b.id, k)
+      if (done || !subject) bounces.splice(i, 1)
     }
 
-    // squash-and-stretch while a work verb persists
-    if (layers.chars !== undefined) {
-      for (const a of Object.values(state.agents)) {
-        const sprite = layers.chars.getSprite(a.id)
-        if (sprite === null) continue
-        const working =
-          a.alive &&
-          a.activity !== null &&
-          (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
-        const baseY = sprite.scale.x // uniform base — the character layer re-asserts x each frame (v2 and v4 scales differ)
-        sprite.scale.y =
-          working && !grave
-            ? baseY *
-              (1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000))))
-            : working
-              ? sprite.scale.y
-              : baseY
-      }
+    // squash-and-stretch while a work verb persists — a grave town stills mid-squash
+    if (!grave && layers.chars !== undefined) {
+      const k = 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
+      for (const id of working) layers.chars.setScaleMulY(id, k)
     }
 
     // birds across the sky band

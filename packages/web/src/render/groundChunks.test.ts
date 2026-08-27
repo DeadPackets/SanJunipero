@@ -24,7 +24,7 @@ import { CULL_MARGIN_PX, boxInView, rectInView, type ViewRect } from './cull.js'
 import { groundField, type GroundField } from './groundField.js'
 import { bigTownTerrain } from './bigTown.js'
 import { TILE_H, TILE_W } from './iso.js'
-import { createGroundBaker } from './scene.js'
+import { createGroundBaker } from './groundBake.js'
 import { TextureBook } from './textures.js'
 import type { DepthBox } from './depth.js'
 

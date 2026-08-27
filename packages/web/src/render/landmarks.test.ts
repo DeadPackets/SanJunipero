@@ -1,4 +1,60 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// The layer is driven for real at the bottom of this file, so a rebuild that never fires is a
+// failing test rather than a legend that quietly stops growing.
+vi.mock('pixi.js', () => {
+  class Point {
+    x = 1
+    y = 1
+    set(x: number, y: number = x): void {
+      this.x = x
+      this.y = y
+    }
+  }
+  class Container {
+    children: Container[] = []
+    visible = true
+    alpha = 1
+    eventMode = ''
+    destroyed = false
+    position = new Point()
+    scale = new Point()
+    anchor = new Point()
+    addChild(...cs: Container[]): void {
+      this.children.push(...cs)
+    }
+    destroy(): void {
+      this.destroyed = true
+    }
+  }
+  class Text extends Container {
+    text: string
+    resolution = 1
+    constructor(o: { text: string }) {
+      super()
+      this.text = o.text
+    }
+    get width(): number {
+      return this.text.length * 6
+    }
+    readonly height = 12
+  }
+  class Graphics extends Container {
+    clear(): this {
+      return this
+    }
+    rect(): this {
+      return this
+    }
+    fill(): this {
+      return this
+    }
+    stroke(): this {
+      return this
+    }
+  }
+  return { BitmapText: Text, Cache: { has: () => false }, Container, Graphics, Point, Text }
+})
 import type { WorldState } from '@sj/engine'
 import { GAMIFICATION_BAN } from '../ui/townStats.js'
 import {
@@ -19,8 +75,12 @@ import {
   placeLandmarks,
   rectOfBounds,
   standingOf,
+  createLandmarkLayer,
+  type LandmarkLayer,
   type PlaceableMark,
 } from './landmarks.js'
+import type { Scene } from './scene.js'
+import type { WorldStore } from '../state/worldStore.js'
 import { AA_RATIO, bandRatios } from './legibility.js'
 import { ZOOM_STOPS, drawnBoundsOf } from './camera.js'
 import { bigTown } from './bigTown.js'
@@ -451,5 +511,54 @@ describe('a place name is never de-emphasised by transparency', () => {
     expect(text).not.toMatch(/RANK_ALPHA/)
     // the LAYER still fades with the camera; nothing inside it has an opacity of its own
     expect([...text.matchAll(/\.alpha\s*=/g)]).toHaveLength(1)
+  })
+})
+
+describe('the legend rebuilds on data and only places on the camera', () => {
+  const layerOver = (
+    list: S[],
+  ): { layer: LandmarkLayer; plates: () => number; complete: (s: S) => void } => {
+    let state = worldOf(list)
+    const kids: { children: { visible: boolean }[] }[] = []
+    const scene = {
+      layers: { overlay: { addChild: (c: (typeof kids)[0]) => kids.push(c) } },
+      world: { scale: { x: 1 } },
+      getZoom: () => 1,
+      viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+    } as unknown as Scene
+    const store = { getState: () => state } as unknown as WorldStore
+    const layer = createLandmarkLayer(scene, store)
+    return {
+      layer,
+      plates: () => kids[0]!.children.filter((c) => c.visible).length,
+      complete: (s: S) => {
+        state = worldOf([...list, s])
+      },
+    }
+  }
+
+  it('a structure completing changes the drawn plate set — but only after a rebuild', () => {
+    const { layer, plates, complete } = layerOver(TOWN.slice(0, 3))
+    layer.rebuild()
+    layer.place()
+    const before = plates()
+    complete(stand('structure_fire_pit_17_25', 'fire_pit', 17, 25))
+
+    layer.place() // a camera move alone must not invent a plate for it
+    expect(plates()).toBe(before)
+
+    layer.rebuild()
+    layer.place()
+    expect(plates()).toBeGreaterThan(before)
+  })
+
+  it('★ place() reads no world state — it draws the legend the last rebuild derived', () => {
+    const { layer, plates } = layerOver(TOWN)
+    layer.rebuild()
+    layer.place()
+    const drawn = plates()
+    layer.place()
+    layer.place()
+    expect(plates()).toBe(drawn)
   })
 })

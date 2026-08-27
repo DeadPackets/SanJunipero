@@ -1,5 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import { CITY_INTERIOR_SLOTS, type AssetRecord, type SimEvent } from '@sj/shared'
+import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
@@ -20,6 +21,7 @@ import {
   roomPlan,
   roomSizeOf,
   slotGridOf,
+  type InteriorKind,
   type InteriorPhaseState,
   type PlacedBody,
   type RoomItem,
@@ -206,6 +208,13 @@ export function createInteriorScene(
   let perches: Tile[] = []
   /** The kinds the wall itself draws this room, so no object is drawn for them as well. */
   let elevated: ReadonlySet<string> = new Set()
+  /** What is on the floor and what the painter's order sorts. Furniture cannot move, so both
+   *  are derived when the plan is, not when a body walks. */
+  let roomState: WorldState | null = null
+  let roomFor: string | null = null
+  let room2: ReturnType<typeof interiorOf> = null
+  let standing: MapPiece[] = []
+  let items: { kind: string; tile: Tile; meta: RoomItem['meta'] | null }[] = []
   /** Where each body is on the room map, and the tiles it still has to cross to get where it
    *  is going. The engine has no interior position, so this is the renderer's own. */
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
@@ -572,50 +581,75 @@ export function createInteriorScene(
     return { sx: a.sx + (b.sx - a.sx) * w.t, sy: a.sy + (b.sy - a.sy) * w.t }
   }
 
+  /** Everything that follows from the room's KIND and the codex, and from nothing a body does. */
+  function replan(kind: InteriorKind, records: AssetRecord[], seq: number): void {
+    clearRoom()
+    plannedFor = kind
+    plannedSeq = seq
+    // The room's own floor plan, before anything is drawn on it. Both masks are cut from it,
+    // so a farmhouse is not clipped to a house's box.
+    roomTiles = roomSizeOf(kind)
+    roomSlots = slotGridOf(kind)
+    roomMask.clear()
+    roomMask.poly(roomMaskPoly(roomTiles, WALL_H_PX))
+    roomMask.fill(0xffffff)
+    floorMask.clear()
+    floorMask.poly(floorPolyOf(roomTiles))
+    floorMask.fill(0xffffff)
+    plan = roomPlan(kind, records)
+    lightKinds = new Set(plan.filter((p) => p.meta?.providesLight === true).map((p) => p.kind))
+    map = mapOf(plan)
+    // ★ AN AWAKE BODY STANDS BESIDE THE THING IT IS USING, NOT ON IT. There is floor to stand
+    // on now, so "at the hearth" is a real tile a real body occupies.
+    perches = AWAKE_PREFERENCE.flatMap((kind2) =>
+      map.pieces.filter((p) => p.kind === kind2),
+    ).flatMap((p) => standingTiles(map, p).slice(0, 1))
+    elevated = elevationKinds(map, records)
+    placeFurniture(map, plan, elevated)
+    paintFloor(map, records) // the light on the floor is the room's own fires
+    paintWalls(map, records)
+
+    // What is actually STANDING in the room: everything on the floor, plus the wall pieces
+    // that reach the ground and are not already drawn as part of the wall.
+    standing = map.pieces.filter(
+      (p) =>
+        !elevated.has(p.kind) && (p.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(p.kind)),
+    )
+    items = standing.map((p) => ({
+      kind: p.kind,
+      tile: p.tile,
+      meta: plan.find((i) => i.kind === p.kind)?.meta ?? null,
+    }))
+  }
+
+  /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */
+  function hosts(piece: MapPiece, tile: Tile): boolean {
+    return (
+      tile.x >= piece.tile.x &&
+      tile.x < piece.tile.x + piece.size.w &&
+      tile.y >= piece.tile.y &&
+      tile.y < piece.tile.y + piece.size.h
+    )
+  }
+
   function layoutRoom(dtMs: number): void {
     const state = store.getState()
     if (activeId === null || state === null) return
-    const room2 = interiorOf(state, activeId)
+    // `interiorOf` walks every agent and every item; the world it reads changes at most every
+    // 250 ms, so it is asked on a new state rather than on a new frame.
+    if (state !== roomState || activeId !== roomFor) {
+      roomState = state
+      roomFor = activeId
+      room2 = interiorOf(state, activeId)
+    }
     if (room2 === null) return
     const records = store.assetRecords()
     const seq = store.assetsSeq()
     // The plan only moves when the room or the codex does — this runs every frame.
-    if (plannedFor !== room2.kind || plannedSeq !== seq) {
-      clearRoom()
-      plannedFor = room2.kind
-      plannedSeq = seq
-      // The room's own floor plan, before anything is drawn on it. Both masks are cut from it,
-      // so a farmhouse is not clipped to a house's box.
-      roomTiles = roomSizeOf(room2.kind)
-      roomSlots = slotGridOf(room2.kind)
-      roomMask.clear()
-      roomMask.poly(roomMaskPoly(roomTiles, WALL_H_PX))
-      roomMask.fill(0xffffff)
-      floorMask.clear()
-      floorMask.poly(floorPolyOf(roomTiles))
-      floorMask.fill(0xffffff)
-      plan = roomPlan(room2.kind, records)
-      lightKinds = new Set(plan.filter((p) => p.meta?.providesLight === true).map((p) => p.kind))
-      map = mapOf(plan)
-      // ★ AN AWAKE BODY STANDS BESIDE THE THING IT IS USING, NOT ON IT. There is floor to stand
-      // on now, so "at the hearth" is a real tile a real body occupies.
-      perches = AWAKE_PREFERENCE.flatMap((kind) =>
-        map.pieces.filter((p) => p.kind === kind),
-      ).flatMap((p) => standingTiles(map, p).slice(0, 1))
-      elevated = elevationKinds(map, records)
-      placeFurniture(map, plan, elevated)
-      paintFloor(map, records) // the light on the floor is the room's own fires
-      paintWalls(map, records)
-    }
+    if (plannedFor !== room2.kind || plannedSeq !== seq) replan(room2.kind, records, seq)
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
     const beds = bedSlots(room2.kind, sleeping, records)
-    // What is actually STANDING in the room: everything on the floor, plus the wall pieces
-    // that reach the ground and are not already drawn as part of the wall.
-    const standing = map.pieces.filter(
-      (p) =>
-        !elevated.has(p.kind) && (p.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(p.kind)),
-    )
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an
@@ -653,11 +687,6 @@ export function createInteriorScene(
 
     // ONE painter's order for the room, from the same authority the town answers to. No
     // module invents a number, so a sleeper can no longer sit on top of the bed it is in.
-    const items = standing.map((p) => ({
-      kind: p.kind,
-      tile: p.tile,
-      meta: plan.find((i) => i.kind === p.kind)?.meta ?? null,
-    }))
     const pieces = interiorPieces(items, placed)
     const index = new Map(interiorOrder(pieces).map((id, i) => [id, i]))
     // What each body is INSIDE, by kind — a bed lifts a sleeper onto its mattress.
@@ -705,16 +734,6 @@ export function createInteriorScene(
     // makes the hearth. An empty farmhouse crops as hard as a full one.
     const rest = perches[0] === undefined ? null : tileCentreScreen(perches[0].x, perches[0].y)
     camFocus = roomFocusOf(bodyPts, followedId, rest)
-  }
-
-  /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */
-  function hosts(piece: MapPiece, tile: Tile): boolean {
-    return (
-      tile.x >= piece.tile.x &&
-      tile.x < piece.tile.x + piece.size.w &&
-      tile.y >= piece.tile.y &&
-      tile.y < piece.tile.y + piece.size.h
-    )
   }
 
   // The camera pushes in to the door tile while the veil rises, and leaving restores the exact

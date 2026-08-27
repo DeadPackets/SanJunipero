@@ -63,7 +63,7 @@ const ROOM_EMPTY_LINE = 'No one is in just now.'
 const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
 
 /** "Raised by Yusuf, Day 3", or the day it was begun while it is still going up. */
-function builtLine(state: WorldState, p: Provenance | null): string | null {
+export function builtLine(state: WorldState, p: Provenance | null): string | null {
   if (p === null) return null
   const who = nameOf(state, p.builderId)
   if (p.completedTick === null)

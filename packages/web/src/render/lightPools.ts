@@ -89,7 +89,7 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
       const strength = poolStrengthAt(tick)
       // `flamesAt` is asked every frame, INCLUDING by day: short-circuiting on `strength === 0`
       // destroyed every pool at sunrise and rebuilt it at dusk, which fed the texture GC.
-      const flames = flamesAt(state, tick, DEFAULT_CONFIG)
+      const flames = flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)
       const view = scene.viewRect()
       const live = new Set<string>()
       drawn = 0

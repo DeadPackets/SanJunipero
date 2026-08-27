@@ -51,6 +51,8 @@ import { WorldLaws } from './ui/WorldLaws.js'
 import { LawsDashboard } from './ui/LawsDashboard.js'
 import { adminToken } from './ui/lawsModel.js'
 import type { Scene } from './render/scene.js'
+import type { WorldPick } from './render/entities.js'
+import { WorldPopover } from './ui/WorldPopover.js'
 
 function ScrubBanner({ store }: { store: WorldStore }) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
@@ -90,6 +92,7 @@ export function App() {
   const [link, setLink] = useState<LinkStatus>('connecting')
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
+  const [pick, setPick] = useState<WorldPick | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
   // what the bottom bar reads: the camera's own stop, and whether the chrome is put away
@@ -221,13 +224,21 @@ export function App() {
   // back to the roster. Two window listeners could not settle it — stopPropagation does not
   // reach a sibling on the same target, so the order would be registration luck.
   useEffect(() => {
-    const step = escapeStep(insideId, dockOpen, isSingleAgentView(route))
-    if (step !== 'dock' && step !== 'roster') return
+    const step = escapeStep(insideId, dockOpen, isSingleAgentView(route), pick !== null)
+    if (step === null) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       const t = e.target as HTMLElement | null
       if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
       e.preventDefault()
+      if (step === 'popover') {
+        setPick(null)
+        return
+      }
+      if (step === 'room') {
+        scene?.interior?.setActive(null)
+        return
+      }
       if (step === 'dock') {
         setDockOpen(false)
         document.querySelector<HTMLElement>('.hud-handle')?.focus()
@@ -239,7 +250,19 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKey)
     }
-  }, [route, insideId, dockOpen])
+  }, [route, insideId, dockOpen, pick, scene])
+
+  // The next press dismisses it, wherever it lands. Pixi's `pointertap` fires after
+  // `pointerdown`, so clicking a second building replaces the popover rather than closing it.
+  useEffect(() => {
+    const onDown = (): void => {
+      setPick(null)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
   // panning, a text field owns them for typing, and a toolbar or scrubber that already
@@ -397,7 +420,13 @@ export function App() {
           className={shownLens === 'society' ? 'stage-hidden' : undefined}
         >
           <div className="stage-cell">
-            <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
+            <StageMount
+              store={store}
+              onScene={setScene}
+              onInterior={setInsideId}
+              onPick={setPick}
+            />
+            <WorldPopover store={store} pick={pick} />
             <StageVeil store={store} />
             <InteriorBar
               store={store}

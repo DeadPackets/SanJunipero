@@ -127,7 +127,7 @@ export function functionBody(src: string, name: string): string {
 }
 
 describe('a glide is ended by anything that says where the camera should be', () => {
-  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
   const body = (name: string): string => functionBody(src, name)
 
   it('the wheel stops it before it captures a zoom anchor', () => {
@@ -139,7 +139,7 @@ describe('a glide is ended by anything that says where the camera should be', ()
   for (const mover of [
     'function fitTo(',
     'panBy: (dx, dy) =>',
-    'centerHome: () =>',
+    'centerHome: () => {',
     'setFollow: (target) =>',
     'travelTo: (sx, sy) =>',
   ]) {
@@ -191,7 +191,7 @@ describe('a glide is ended by anything that says where the camera should be', ()
 // The end of a wheel gesture is the ABSENCE of an event, so the release lives on the frame;
 // without it the camera holds whatever fractional scale the hand left it at.
 describe('★ the wheel gesture is released on the frame, so the resting frame stays exact', () => {
-  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
   const body = (name: string): string => functionBody(src, name)
 
   it('zoomTick asks whether the hand has left, and releases when it has', () => {
@@ -231,7 +231,7 @@ describe('★ the wheel gesture is released on the frame, so the resting frame s
 // the browser until somebody clicked the map while a throw was still in the air.
 
 describe('going somewhere from the map takes the same road as going home', () => {
-  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
   const body = (name: string): string => functionBody(src, name)
 
   it('★ the reader stops at the end of the function it was asked for', () => {
@@ -280,9 +280,14 @@ describe('going somewhere from the map takes the same road as going home', () =>
   })
 
   it('the map is drawn over the SAME box the clamp uses, from one accessor', () => {
-    expect(src).toContain('reachableBox: () => bounds')
-    // and `bounds` is the thing every write to the camera is clamped against
-    expect(src).toMatch(/clampCamera\(\{ x, y \}, world\.scale\.x, bounds, screenBox\(\)\)/)
+    // the scene owns `bounds`, and hands the rig the very accessor the minimap is drawn from
+    const scene = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+    expect(scene).toContain('reachableBox: () => bounds')
+    expect(scene).toContain('reachable: () => bounds')
+    // and that box is the thing every write to the camera is clamped against
+    expect(src).toMatch(
+      /clampCamera\(\{ x, y \}, world\.scale\.x, deps\.reachable\(\), screenBox\(\)\)/,
+    )
   })
 })
 
