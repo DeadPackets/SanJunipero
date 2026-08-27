@@ -6,8 +6,6 @@ import {
   scanPromptForGlassLeak,
   UNNAMED_CONSTRUCT_COPY,
   type LlmClient,
-  type LlmMessage,
-  type LlmUsage,
 } from '@sj/agents'
 import {
   fold,
@@ -32,6 +30,7 @@ import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { EXPRESSIVE_INSTRUCTION, type ExpressiveRuling } from './expressive.js'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 import { openArbiterDb } from './schema.js'
+import { ScriptedLlm } from './testutil/scriptedLlm.js'
 import type { Verdict } from './verdict.js'
 
 let seq = 1
@@ -41,39 +40,6 @@ const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
   type,
   payload,
 })
-
-function emptyUsage(): LlmUsage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
-}
-
-// Never talks to a provider. It answers from a script, counts the calls, and keeps every
-// system prompt it was handed so the glass scan can be run over all of them at the end.
-class ScriptedLlm {
-  objectCalls = 0
-  systems: string[] = []
-  users: string[] = []
-  constructor(private readonly respond: (system: string, user: string) => unknown) {}
-
-  async object(opts: {
-    system: string
-    messages: LlmMessage[]
-    schema: unknown
-  }): Promise<{ value: unknown; usage: LlmUsage }> {
-    this.objectCalls += 1
-    this.systems.push(opts.system)
-    const user = opts.messages.at(-1)!.content
-    this.users.push(user)
-    return { value: this.respond(opts.system, user), usage: emptyUsage() }
-  }
-
-  async text(): Promise<{ text: string; usage: LlmUsage }> {
-    return { text: '', usage: emptyUsage() }
-  }
-  totalCostUsd(): number {
-    return 0
-  }
-  alert(): void {}
-}
 
 // Every prompt any model in this file was shown, so the one-way-glass scan is run over the
 // whole suite's traffic and not over a sample of it.
@@ -115,7 +81,7 @@ async function rig(llm: ScriptedLlm): Promise<Arbiter> {
   })
 }
 
-const scripted = new ScriptedLlm((system) =>
+const scripted = new ScriptedLlm(({ system }) =>
   system.includes(EXPRESSIVE_INSTRUCTION) ? DANCE : IMPOSSIBLE,
 )
 
@@ -198,7 +164,7 @@ const NAMED = (day: number): SimEvent =>
 const NIGHTS = (): SimEvent[] => [...gathering(1), ...gathering(3), ...gathering(5)]
 
 const classifier = (type: string) =>
-  new ScriptedLlm((_system, user) => ({
+  new ScriptedLlm(({ user }) => ({
     rulings: [...user.matchAll(/^- (\S+)/gmu)].map((m) => ({ key: m[1]!, type })),
   }))
 

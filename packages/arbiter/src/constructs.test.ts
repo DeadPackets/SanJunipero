@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CONSTRUCT_VOCABULARY,
-  scanPromptForGlassLeak,
-  type LlmClient,
-  type LlmMessage,
-  type LlmUsage,
-} from '@sj/agents'
+import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, type LlmClient } from '@sj/agents'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
 import {
@@ -18,6 +12,7 @@ import {
 import { ConstructStore } from './constructStore.js'
 import { CANON } from './canon.js'
 import { openArbiterDb } from './schema.js'
+import { ScriptedLlm, type ScriptedCall } from './testutil/scriptedLlm.js'
 
 let seq = 1
 const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
@@ -54,37 +49,12 @@ const NAMING = (day: number): SimEvent =>
 
 const threeNights = (): SimEvent[] => [...gathering(1), ...gathering(3), ...gathering(5)]
 
-function emptyUsage(): LlmUsage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
-}
-
-class ScriptedLlm {
-  objectCalls = 0
-  systems: string[] = []
-  constructor(private readonly type = 'festival') {}
-
-  async object(opts: {
-    system: string
-    messages: LlmMessage[]
-    schema: unknown
-  }): Promise<{ value: unknown; usage: LlmUsage }> {
-    this.objectCalls += 1
-    this.systems.push(opts.system)
-    const keys = [...opts.messages.at(-1)!.content.matchAll(/^- (\S+)/gmu)].map((m) => m[1]!)
-    return {
-      value: { rulings: keys.map((key) => ({ key, type: this.type })) },
-      usage: emptyUsage(),
-    }
-  }
-
-  async text(): Promise<{ text: string; usage: LlmUsage }> {
-    return { text: '', usage: emptyUsage() }
-  }
-  totalCostUsd(): number {
-    return 0
-  }
-  alert(): void {}
-}
+// Answers every candidate key the prompt listed with the same construct type.
+const ruleEvery =
+  (type = 'festival') =>
+  ({ user }: ScriptedCall): unknown => ({
+    rulings: [...user.matchAll(/^- (\S+)/gmu)].map((m) => ({ key: m[1]!, type })),
+  })
 
 const pass = async (
   events: SimEvent[],
@@ -136,7 +106,7 @@ describe('detectCandidates', () => {
 
 describe('the daily pass', () => {
   it('writes exactly one row, typed, named in their own words, with provenance', async () => {
-    const llm = new ScriptedLlm('festival')
+    const llm = new ScriptedLlm(ruleEvery('festival'))
     const { rows, store } = await pass([...threeNights(), NAMING(5)], llm)
     expect(rows).toHaveLength(1)
     expect(llm.objectCalls).toBe(1)
@@ -159,13 +129,13 @@ describe('the daily pass', () => {
   })
 
   it('leaves the name null when nobody has said one', async () => {
-    const { rows } = await pass(threeNights(), new ScriptedLlm())
+    const { rows } = await pass(threeNights(), new ScriptedLlm(ruleEvery()))
     expect(rows[0]!.name).toBeNull()
     expect(rows[0]!.nameProvenance).toBeNull()
   })
 
   it('writes nothing, and asks nothing, when the law is switched off', async () => {
-    const llm = new ScriptedLlm()
+    const llm = new ScriptedLlm(ruleEvery())
     const off = [
       ...threeNights(),
       ev(6 * MINUTES_PER_DAY, 'config_changed', { path: 'constructs.enabled', value: false }),
@@ -177,7 +147,7 @@ describe('the daily pass', () => {
   })
 
   it('reads the world law off the log itself — the recognizer derives its own config (G5)', async () => {
-    const llm = new ScriptedLlm()
+    const llm = new ScriptedLlm(ruleEvery())
     const raised = [
       ev(0, 'config_changed', { path: 'constructs.minParticipants', value: 4 }),
       ...threeNights(),
@@ -190,7 +160,7 @@ describe('the daily pass', () => {
       ...gathering(3, four),
       ...gathering(5, four),
     ]
-    expect((await pass(wider, new ScriptedLlm())).rows).toHaveLength(1)
+    expect((await pass(wider, new ScriptedLlm(ruleEvery()))).rows).toHaveLength(1)
   })
 
   it('runs a second pass over the same days without minting a second row', async () => {
@@ -201,7 +171,7 @@ describe('the daily pass', () => {
       events,
       baseConfig: DEFAULT_CONFIG,
       store,
-      llm: new ScriptedLlm() as unknown as LlmClient,
+      llm: new ScriptedLlm(ruleEvery()) as unknown as LlmClient,
     }
     await runConstructPass(deps)
     await runConstructPass(deps)
@@ -210,7 +180,7 @@ describe('the daily pass', () => {
   })
 
   it('shows the model every type id it is allowed to answer with, and refuses the rest', async () => {
-    const llm = new ScriptedLlm('cult')
+    const llm = new ScriptedLlm(ruleEvery('cult'))
     for (const t of CONSTRUCT_TYPES) expect(CONSTRUCT_TYPE_INSTRUCTION).toContain(t)
     const { rows } = await pass(threeNights(), llm)
     expect(rows[0]!.type).toBe('custom')
@@ -223,7 +193,7 @@ describe('one-way glass', () => {
     let state: WorldState = genesisState(DEFAULT_CONFIG, flat)
     const events = [...threeNights(), NAMING(5)]
     const before = stateHash(state)
-    const { rows, db } = await pass(events, new ScriptedLlm())
+    const { rows, db } = await pass(events, new ScriptedLlm(ruleEvery()))
     for (const e of events) {
       if (e.type === 'agent_moved' || e.type === 'agent_expressed' || e.type === 'agent_spoke')
         continue
