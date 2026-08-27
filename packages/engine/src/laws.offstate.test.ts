@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { effectiveConfig } from './laws.js'
@@ -8,6 +8,7 @@ import { RngStream, RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { VERBS } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // Each row is asserted twice: once with the flag off in the base config, once with it turned off
 // by a world law. Both must behave identically, which is what the effective config buys.
@@ -18,16 +19,8 @@ const cfg = (over: Record<string, unknown> = {}): SimConfig =>
 const ON = cfg()
 const ACTIONS = RngStream.seed('offstate', 'actions')
 
-let seq = 60000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (): TileId[][] =>
-  Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+const MAP = (): TileId[][] => grid(24)
 
 // Fold the law straight in: the same shape the tick-boundary drain produces.
 const legislate = (s: WorldState, path: string, value: unknown, config = ON): WorldState =>

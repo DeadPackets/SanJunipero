@@ -6,14 +6,8 @@ import { doorTile } from './interiors.js'
 import { composePerception, hears } from './perception.js'
 import { VERBS } from './verbs.js'
 import { RngStream } from './rng.js'
+import { ev } from './testutil/world.js'
 
-let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 // Noon by default: the witness radius scales with the light on the thing seen,
 // and every row below the night-witness block is about a horizon, not about the dark.

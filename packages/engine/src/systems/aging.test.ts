@@ -1,21 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { DAYS_PER_YEAR, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ageBand } from './aging.js'
+import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const MIDNIGHT = 1440 // day 1, hour 0, minute 0
 
-let seq = 7000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function makeWorld(ageDays: number): WorldState {
   let s = genesisState(

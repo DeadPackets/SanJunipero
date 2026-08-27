@@ -26,6 +26,7 @@ import { spoilDeadline } from './systems/spoilage.js'
 import { TickLoop } from './tickLoop.js'
 import { VERBS, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // A quiet sky and no mysteries by default: every event this gate names is one a
 // scripted actor or a named system caused, never weather noise.
@@ -39,16 +40,8 @@ const FERTILE: SimConfig = SimConfigSchema.parse({
 
 const RNG = RngStream.seed('g9a', 'actions')
 
-let seq = 900000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 } // door (4,6)

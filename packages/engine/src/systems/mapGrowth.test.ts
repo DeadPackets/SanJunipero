@@ -11,7 +11,6 @@ import {
   stateHash,
   worldSizeForRings,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { genesisTerrainAt } from '../genesis/world.js'
@@ -20,6 +19,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
 import { GROWABLE_FLOOR, authoredOrigin, builtBox, grownStrip, growthsSoFar } from './mapGrowth.js'
+import { ev, grid } from '../testutil/world.js'
 
 // A 32x32 world on a config whose world.size says 128 — the ordinary shape of a fixture, and
 // the case the plan's size-derived growth counter got wrong.
@@ -38,15 +38,7 @@ const CFG = base()
 // rule says nothing about it by design; the fold tests below keep the small map on purpose.
 const TOWN_SIZE = 128
 
-let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (n = SIZE): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const map = (n = SIZE): TileId[][] => grid(n)
 
 function town(config = CFG, structures = 2, size = SIZE, at = { x: 10, y: 20 }): WorldState {
   let s = genesisState(config, map(size))

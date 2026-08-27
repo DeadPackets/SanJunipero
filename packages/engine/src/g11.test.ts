@@ -25,6 +25,7 @@ import { genesisState, thirstOf, type TileId, type WorldState } from './state.js
 import { GROWTH_EDGES } from './systems/mapGrowth.js'
 import { VERBS, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -33,16 +34,8 @@ const QUIET = {
 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
-let seq = 730000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 function pass(
   s: WorldState,

@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type AgentBody, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ambientTempAt, isExposed } from './warmth.js'
+import { ev, grid } from '../testutil/world.js'
 
 // The fixture law: nothing may speak at midnight but the law under test, and no weather rolls.
 // The EXCEPTION the Phase-F brief allows is used deliberately — these tests set the sky by hand.
@@ -20,15 +21,7 @@ const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, warmth: { enabled: fals
 const DECAY = CFG.warmth.exposureDecayPerTick
 const AWAKE = CFG.needs.energyDecayAwakePerTick
 
-let seq = 96000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
+const map = (): TileId[][] => grid(12)
 
 // Minute 30 on purpose: no hour boundary, so nothing but this law runs in the tick under test.
 const at = (day: number, hour: number): number => day * MINUTES_PER_DAY + hour * 60 + 30

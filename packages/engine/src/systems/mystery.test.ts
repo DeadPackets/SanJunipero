@@ -4,7 +4,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { MYSTERIES, MYSTERY_BY_KIND } from '../data/mysteries.js'
 import { composePerception } from '../perception.js'
@@ -13,6 +12,7 @@ import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick } from '../worldTick.js'
 import { MYSTERY_HOUR } from './mystery.js'
+import { ev } from '../testutil/world.js'
 
 // The world keeps one hand hidden. These fire, they are felt or seen, and nothing
 // in the state moves — least of all an explanation.
@@ -20,13 +20,6 @@ import { MYSTERY_HOUR } from './mystery.js'
 const CERTAIN: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 1 } })
 const NEVER: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 0 } })
 
-let seq = 1
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function world(config: SimConfig): WorldState {
   const s = genesisState(

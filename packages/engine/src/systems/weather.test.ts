@@ -4,23 +4,16 @@ import {
   SimConfigSchema,
   simTimeFromTick,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStream, RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { allowedKinds, rollWeatherKind, weatherTemperature } from './weather.js'
+import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 
-let seq = 8000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function tickTo(s: WorldState, tick: number, rng: RngStreams): WorldTickResult {
   const wt = createWorldTick(CFG, rng)

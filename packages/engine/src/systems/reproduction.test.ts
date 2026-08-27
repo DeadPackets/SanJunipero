@@ -5,7 +5,6 @@ import {
   MINUTES_PER_DAY,
   SimConfigSchema,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
@@ -14,6 +13,7 @@ import { createWorldTick } from '../worldTick.js'
 import { ageBand } from './aging.js'
 import { BIRTH_NAMES } from '../data/names.js'
 import { isPartnered, pairKey, partnershipOf, sexOf } from './reproduction.js'
+import { ev } from '../testutil/world.js'
 
 // Partnership is inferred, never declared: the town reads it off who sleeps where.
 
@@ -23,13 +23,6 @@ const OFF: SimConfig = SimConfigSchema.parse({
   reproduction: { enabled: false },
 })
 
-let seq = 50000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 const HOUSE = { id: 'structure_1', kind: 'house', x: 2, y: 2, w: 3, h: 3 }
 const STORE = { id: 'structure_2', kind: 'storehouse', x: 8, y: 2, w: 3, h: 3 }

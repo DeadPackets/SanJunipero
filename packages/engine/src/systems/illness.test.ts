@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { ev, grid } from '../testutil/world.js'
 
 const MIDNIGHT = 1440
 const quiet = {
@@ -20,15 +21,7 @@ const SPREADS = cfg({ dailyWorsenChance: 0, contagionChance: 1 })
 const NO_SPREAD = cfg({ dailyWorsenChance: 0, contagionChance: 1, contagionEnabled: false })
 const OFF = cfg({ enabled: false, dailyWorsenChance: 1, contagionChance: 1 })
 
-let seq = 91000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const map = (): TileId[][] => grid(16)
 
 function town(config: SimConfig, at: [string, number, number][]): WorldState {
   let s = genesisState(config, map())

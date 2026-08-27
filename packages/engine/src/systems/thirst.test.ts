@@ -4,7 +4,6 @@ import {
   stateHash,
   thirstDecayPerTick,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
@@ -12,19 +11,13 @@ import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { ev } from '../testutil/world.js'
 
 const quiet = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, thirst: { enabled: false } })
 const DECAY = thirstDecayPerTick(CFG)
 
-let seq = 93000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 // A pond at (4,4) and a dug channel at (6,6); everything else is grass.
 function map(): TileId[][] {
   const t = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))

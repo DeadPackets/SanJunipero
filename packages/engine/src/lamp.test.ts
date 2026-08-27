@@ -9,7 +9,6 @@ import {
   T_PATH,
   T_ROAD,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { makeGenesisWorld } from './genesis/world.js'
@@ -27,6 +26,7 @@ import {
   type PendingEvent,
 } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // Before this the only fixed flames were the square's own fire pit and the hearths inside houses;
 // everything else was a torch. The road, not a new hazard: nothing here makes the night worse.
@@ -41,16 +41,8 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const NIGHT = 22 * 60
 const NOON = 12 * 60
 
-let seq = 810000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, id: string, x: number, y: number): WorldState =>
   fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), CFG)

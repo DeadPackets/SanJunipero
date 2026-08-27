@@ -5,7 +5,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -16,6 +15,7 @@ import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { TickLoop } from './tickLoop.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // A law is a fact about the world, so it travels the only road facts travel:
 // one event, folded, hashed, snapshotted, replayed.
@@ -25,16 +25,8 @@ const CFG: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
 })
 
-let seq = 70000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const MAP = (): TileId[][] => grid(16)
 
 function world(): WorldState {
   const s = genesisState(CFG, MAP())

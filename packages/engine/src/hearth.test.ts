@@ -7,7 +7,6 @@ import {
   SimConfigSchema,
   structureGlowRadius,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -17,6 +16,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fumblesInTheDark, VERBS } from './verbs.js'
 import { sleepRegenPerTick } from './systems/needs.js'
 import { isExposed, warmthTargetFor } from './systems/warmth.js'
+import { ev, grid } from './testutil/world.js'
 
 // A house's hearth is a real fire: fed, lit, warming the room, cookable on — off one fact,
 // structures.recipes.house.hearth, with no new agent state.
@@ -31,15 +31,7 @@ const quiet = {
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const FUEL = CFG.light.fuelBurnTicks
 
-let seq = 71000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const map = (): TileId[][] => grid(16)
 
 // Minute 30, so no hour boundary rolls anything. 22:00 on a winter day is the coldest hour the
 // warmth table has, and it is the hour the whole cold design exists for.

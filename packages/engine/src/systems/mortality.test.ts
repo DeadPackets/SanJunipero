@@ -4,7 +4,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
@@ -12,6 +11,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
 import { DEATH_CAUSES, dominantDrain, type DeathCause } from './mortality.js'
+import { ev, grid } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -28,15 +28,7 @@ const NO_GRAVE: SimConfig = SimConfigSchema.parse({
   mortality: { graveEnabled: false },
 })
 
-let seq = 80000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const map = (): TileId[][] => grid(16)
 
 function body(config = CFG): WorldState {
   return fold(

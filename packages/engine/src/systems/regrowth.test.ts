@@ -4,7 +4,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
@@ -14,6 +13,7 @@ import { genesisState, type TileId, type WorldState } from '../state.js'
 import { CLEAR_TICKS, FELL_TICKS, TIMBER_PER_TREE, VERBS } from '../verbs.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { saplingKey } from './regrowth.js'
+import { ev } from '../testutil/world.js'
 
 const quiet = {
   weather: { hourlyChangeChance: 0 },
@@ -27,13 +27,6 @@ const SURE: SimConfig = SimConfigSchema.parse({ ...quiet, regrowth: { saplingCha
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, regrowth: { enabled: false } })
 const DAYS = CFG.regrowth.saplingDays
 
-let seq = 98000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 // One forest tile at (2,2). Its orthogonal neighbours are grass; (1,1) is diagonal only.
 function wood(config = CFG, tick = 0): WorldState {

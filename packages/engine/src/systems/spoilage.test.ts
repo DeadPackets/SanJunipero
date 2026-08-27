@@ -4,7 +4,6 @@ import {
   MINUTES_PER_DAY,
   SimConfigSchema,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
@@ -13,6 +12,7 @@ import { RngStream, RngStreams } from '../rng.js'
 import { VERBS } from '../verbs.js'
 import { createWorldTick } from '../worldTick.js'
 import { spoilageFor } from './spoilage.js'
+import { ev } from '../testutil/world.js'
 
 // Food is a countdown. The storehouse is worth arguing over because it slows the clock.
 
@@ -22,13 +22,6 @@ const RNG = RngStream.seed('spoilage-test', 'actions')
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, '#': 3 }
 const ROWS = ['..###...', '........', '........', '..~~....', '........', '........']
 
-let seq = 1
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function world(config = DEFAULT_CONFIG): WorldState {
   const s = genesisState(

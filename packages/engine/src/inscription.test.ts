@@ -6,6 +6,7 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStream } from './rng.js'
 import { VERBS } from './verbs.js'
+import { grid } from './testutil/world.js'
 
 // Inscription is `write` on a surface nobody can carry away: the town's first
 // public text. Any completed structure takes it, and the last hand wins.
@@ -14,8 +15,7 @@ const RNG = RngStream.seed('inscribe-test', 'actions')
 let seq = 1
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: seq++, tick: 0, type, payload })
 
-const MAP = (): TileId[][] =>
-  Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+const MAP = (): TileId[][] => grid(24)
 
 // A 2x2 structure at (2,1); its door is the tile south of centre, (2,3).
 function world(kind = 'house', stage: 'construction' | 'complete' = 'complete'): WorldState {

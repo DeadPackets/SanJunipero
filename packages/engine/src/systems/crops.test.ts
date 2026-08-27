@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { VERBS } from '../verbs.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { ev } from '../testutil/world.js'
 
 const FAST: SimConfig = SimConfigSchema.parse({
   crops: {
@@ -17,13 +18,6 @@ const DAWN = 360 // hour 6, minute 0
 const NOON = 720 // hour 12: daylight, so the night-work penalty is not what is being measured
 const CHAR_TILE: Record<string, TileId> = { '.': 0, ',': 1, '~': 2, '#': 6, c: 10 }
 
-let seq = 9000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function makeWorld(rows: string[] = ['.#', '..'], config = FAST): WorldState {
   const s = genesisState(

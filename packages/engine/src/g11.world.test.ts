@@ -10,7 +10,6 @@ import {
   lightBandAt,
   litSourceWithin,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { FAUNA_YIELD } from './data/faunaDefs.js'
 import { fold } from './fold.js'
@@ -27,6 +26,7 @@ import {
   type PendingEvent,
 } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -35,16 +35,8 @@ const QUIET = {
 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
-let seq = 720000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState =>
   fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
