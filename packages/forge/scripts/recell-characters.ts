@@ -9,7 +9,7 @@ import { sliceStrip, opaqueBbox } from '../src/sheet.js'
 import { buildManifestV4 } from '../src/hires.js'
 import { deriveSheet, CELL_NAMES_V4 } from '../src/mirror.js'
 import { CHAR_FIGURE_PX, spriteCell } from '../src/reCell.js'
-import { paletteDistance } from '../src/pixelGates.js'
+import { alphaBinaryGate, paletteDistance } from '../src/pixelGates.js'
 import { keyBg } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
@@ -171,9 +171,11 @@ for (const c of CAST) {
   // markdown cell. It decides now: a founder whose cells fail is not written, and the loop
   // carries on to the next one so one bad sheet does not cost the others.
   const fails: string[] = []
-  for (const [name, img] of cells)
+  for (const [name, img] of cells) {
+    fails.push(...alphaBinaryGate(img).failures.map((f) => `${name}: ${f}`))
     if (img.width !== CHAR_CELL_PX || img.height !== CHAR_CELL_PX)
       fails.push(`${name}: ${img.width}x${img.height}`)
+  }
   for (const p of cellPlans) factors.add(p.factor)
   if (fails.length === 0) {
     mkdirSync(join(c.dest, 'cells'), { recursive: true })
@@ -205,7 +207,7 @@ const md = [
   '# the cast, re-celled from the raws, $0.00',
   '',
   `Every cell is ${CHAR_CELL_PX}x${CHAR_CELL_PX}. The figure wants ${CHAR_FIGURE_PX} px so the renderer's`,
-  "`CHAR_TARGET_PX / figureH` is 1/4 and the 4x zoom stop is 1:1, but the factor is whole and the",
+  '`CHAR_TARGET_PX / figureH` is 1/4 and the 4x zoom stop is 1:1, but the factor is whole and the',
   'source is never resampled — the spread column is how far the cells actually land apart.',
   '',
   '| founder | before | after | integer factors | figureH | figure spread across cells | palette distance | pixel bar |',

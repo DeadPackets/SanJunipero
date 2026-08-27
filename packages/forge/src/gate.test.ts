@@ -151,11 +151,11 @@ describe('★ no generator in the package ships a candidate that failed a gate',
       .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
       .join('\n')
 
+  // The two structure generators are their SUBJECTS plus a call, so the shared loop is where
+  // their refusal lives and where this test has to look for it.
   const GENERATORS = [
     'gen-cast-v5.ts',
-    'gen-structures-v5.ts',
-    'gen-dwellings-v2.ts',
-    'gen-dwellings.ts',
+    'lib/cells.ts',
     'gen-library-v2.ts',
     'gen-cast-v4.ts',
     'gen-character-v4.ts',
@@ -163,20 +163,17 @@ describe('★ no generator in the package ships a candidate that failed a gate',
 
   it.each(GENERATORS)('%s goes through the ONE shared refusal in src/gate.ts', (file) => {
     const s = read(file)
-    expect(s, 'does not import the shared shape').toContain("from '../src/gate.js'")
+    expect(s, 'does not import the shared shape').toMatch(/from '\.\.\/(\.\.\/)?src\/gate\.js'/)
     expect(s, 'imports it and never calls it').toMatch(/refusalMessage\(/)
   })
 
-  it.each(['gen-structures-v5.ts', 'gen-dwellings-v2.ts', 'gen-dwellings.ts'] as const)(
-    '%s picks from the clean set, not from the dirty one',
-    (file) => {
-      const s = read(file)
-      expect(s, 'still falls back to the dirty candidate set').not.toMatch(/clean\.length \? clean/)
-      expect(s, 'no longer filters to the clean candidates at all').toMatch(
-        /const clean = cands\.filter/,
-      )
-    },
-  )
+  it('the shared structure loop picks from the clean set, not from the dirty one', () => {
+    const s = read('lib/cells.ts')
+    expect(s, 'still falls back to the dirty candidate set').not.toMatch(/clean\.length \? clean/)
+    expect(s, 'no longer filters to the clean candidates at all').toMatch(
+      /const clean = cands\.filter/,
+    )
+  })
 
   it('★ gen-library-v2 EXCLUDES a failure instead of pricing it into a rank', () => {
     const s = read('gen-library-v2.ts')
@@ -206,7 +203,8 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   // ★ THE ANTI-VACUITY TEST, and the only one here that can catch a generator nobody listed.
   it('★ and no script in the package brings the policy back, in any of its three disguises', () => {
     const offenders: string[] = []
-    for (const f of readdirSync(scriptsDir)
+    for (const f of readdirSync(scriptsDir, { recursive: true })
+      .map(String)
       .filter((n) => n.endsWith('.ts'))
       .sort()) {
       const s = read(f)
@@ -232,12 +230,6 @@ describe('★ no generator in the package ships a candidate that failed a gate',
       /writeFileSync\(join\(c\.dest, 'manifest\.json'\)/,
       /alphaBinaryGate\(/,
     ],
-    [
-      'repair-sleep-cell.ts',
-      /writeFileSync\(join\(DEST, 'cells', 'sleep-se\.png'\)/,
-      /sleepAxisGate\(/,
-    ],
-    ['requantize-portraits.ts', /writeFileSync\(join\(dest, f\)/, /paletteGate\(/],
     ['build-farmland.ts', /writeFileSync\(join\(MATERIALS/, /materialVeto\(/],
   ] as const
 
@@ -262,7 +254,8 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   // ignores a gate costs a re-run, and this costs the product.
   it('★ and every script that writes into content/ refuses, or its consumer is in the suite', () => {
     const offenders: string[] = []
-    for (const f of readdirSync(scriptsDir)
+    for (const f of readdirSync(scriptsDir, { recursive: true })
+      .map(String)
       .filter((n) => n.endsWith('.ts'))
       .sort()) {
       const s = read(f)

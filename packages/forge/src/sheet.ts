@@ -1,27 +1,9 @@
-import { decodePng, type RawImage } from './post/raw.js'
-import { chromaKey } from './post/chromaKey.js'
+import type { RawImage } from './post/raw.js'
 
 export const FACINGS = ['sw', 'se', 'ne', 'nw'] as const // sheet column order, left→right
 export type Facing = (typeof FACINGS)[number]
 export const POSES = ['idle', 'walk-a', 'walk-b'] as const // sheet row order, top→bottom
 export type Pose = (typeof POSES)[number]
-
-// Dimetric ¾-view clauses (NOT compass-orthographic):
-export const FACING_CLAUSES: Record<Facing, string> = {
-  sw: 'facing the viewer front-left: three-quarter front view, body and face turned toward the bottom-left of the frame',
-  se: 'facing the viewer front-right: three-quarter front view, body and face turned toward the bottom-right of the frame',
-  ne: 'seen from behind, three-quarter back view, body turned toward the top-right of the frame; back of the head visible, NO face visible',
-  nw: 'seen from behind, three-quarter back view, body turned toward the top-left of the frame; back of the head visible, NO face visible',
-}
-export const POSE_CLAUSES: Record<Pose, string> = {
-  idle: 'standing at rest, both feet planted, arms relaxed at the sides',
-  'walk-a': 'mid-stride walking pose, left foot forward and lifted, right arm swung forward',
-  'walk-b': 'mid-stride walking pose, right foot forward and lifted, left arm swung forward',
-}
-
-// Provisional dupe thresholds — live scripts print full distance matrices for recalibration.
-export const STRAIGHT_DUPE = 0.1
-export const MIRROR_DUPE = 0.06
 
 export function assembleGrid(cells: RawImage[][], cellW: number, cellH: number): RawImage {
   const rows = cells.length,
@@ -108,62 +90,6 @@ export function downscaleMajority(img: RawImage, w: number, h: number): RawImage
   return { width: w, height: h, data: out }
 }
 
-// DEPRECATED for sprite post-processing: the round-trip metric is degenerate — smaller blocks
-// always fit better on non-lattice art, so it oversamples the true pitch. Use resampleToArtHeight.
-export function detectArtScale(
-  img: RawImage,
-  candidates: number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12],
-): number {
-  let best = candidates[0]!,
-    bestErr = Infinity
-  for (const k of candidates) {
-    const w = Math.max(1, Math.round(img.width / k)),
-      h = Math.max(1, Math.round(img.height / k))
-    const down = downscaleMajority(img, w, h)
-    const cw = Math.min(img.width, w * k),
-      ch = Math.min(img.height, h * k)
-    const a = crop(img, cw, ch),
-      b = crop(upscaleNearest(down, k), cw, ch)
-    const err = cellDistance(a, b)
-    if (err < bestErr) {
-      bestErr = err
-      best = k
-    }
-  }
-  return best
-}
-
-function crop(img: RawImage, w: number, h: number): RawImage {
-  if (img.width === w && img.height === h) return img
-  const data = new Uint8ClampedArray(w * h * 4)
-  for (let y = 0; y < h; y++)
-    data.set(img.data.subarray(y * img.width * 4, (y * img.width + w) * 4), y * w * 4)
-  return { width: w, height: h, data }
-}
-
-export function upscaleNearest(img: RawImage, k: number): RawImage {
-  const w = img.width * k,
-    h = img.height * k
-  const out = new Uint8ClampedArray(w * h * 4)
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const s = (Math.floor(y / k) * img.width + Math.floor(x / k)) * 4
-      out.set(img.data.subarray(s, s + 4), (y * w + x) * 4)
-    }
-  return { width: w, height: h, data: out }
-}
-
-// DEPRECATED for sprite post-processing (pipeline v3) — see detectArtScale note.
-// Reduces big-pixel art to its native resolution (one output pixel per art pixel).
-export function snapToGrid(img: RawImage): RawImage {
-  const k = detectArtScale(img)
-  return downscaleMajority(
-    img,
-    Math.max(1, Math.round(img.width / k)),
-    Math.max(1, Math.round(img.height / k)),
-  )
-}
-
 // Bounding box of all opaque pixels; null when the image has none.
 export function opaqueBbox(
   img: RawImage,
@@ -210,61 +136,6 @@ export function anchorToCanvas(
   return { width: canvasW, height: canvasH, data: out }
 }
 
-// Removes chroma-key halos: an opaque edge pixel matching the contamination predicate takes the
-// most frequent clean opaque neighbour colour; with none it desaturates to r=b=(r+b)/2.
-export function defringe(img: RawImage): RawImage {
-  const out = new Uint8ClampedArray(img.data)
-  const at = (x: number, y: number) =>
-    x < 0 || y < 0 || x >= img.width || y >= img.height ? -1 : (y * img.width + x) * 4
-  const contaminated = (i: number) => {
-    const r = img.data[i]!,
-      g = img.data[i + 1]!,
-      b = img.data[i + 2]!
-    return (r > g + 30 && b > g + 15) || r > g + 50 || (b > g + 25 && r > g + 10)
-  }
-  for (let y = 0; y < img.height; y++)
-    for (let x = 0; x < img.width; x++) {
-      const i = at(x, y)
-      if (img.data[i + 3] === 0 || !contaminated(i)) continue
-      let onEdge = false
-      for (let dy = -1; dy <= 1 && !onEdge; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const n = at(x + dx, y + dy)
-          if (n < 0 || img.data[n + 3] === 0) {
-            onEdge = true
-            break
-          }
-        }
-      if (!onEdge) continue
-      const counts = new Map<number, number>()
-      let best = -1,
-        bestN = 0
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue
-          const n = at(x + dx, y + dy)
-          if (n < 0 || img.data[n + 3] === 0 || contaminated(n)) continue
-          const key = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
-          const c = (counts.get(key) ?? 0) + 1
-          counts.set(key, c)
-          if (c > bestN) {
-            bestN = c
-            best = key
-          }
-        }
-      if (best >= 0) {
-        out[i] = best >> 16
-        out[i + 1] = (best >> 8) & 255
-        out[i + 2] = best & 255
-      } else {
-        const m = Math.round((img.data[i]! + img.data[i + 2]!) / 2)
-        out[i] = m
-        out[i + 2] = m
-      }
-    }
-  return { width: img.width, height: img.height, data: out }
-}
-
 // Removes opaque pixels having any transparent 4-neighbor, once per radius iteration.
 // Strips chroma-blended edge halos before resampling instead of recoloring them.
 export function erodeAlpha(img: RawImage, radius = 1): RawImage {
@@ -288,14 +159,6 @@ export function erodeAlpha(img: RawImage, radius = 1): RawImage {
     cur = next
   }
   return { width: img.width, height: img.height, data: cur }
-}
-
-// The chroma blend band scales with the art pitch, so the erosion must too: the radius comes from
-// `bboxH / targetH`, measured BEFORE erosion.
-export function erodeForPitch(img: RawImage, targetH: number): RawImage {
-  const b = opaqueBbox(img)
-  if (!b) throw new Error('erodeForPitch: no opaque pixels')
-  return erodeAlpha(img, Math.max(1, Math.round((b.y1 - b.y0 + 1) / targetH / 2)))
 }
 
 // Resamples big-pixel art to its true art pitch, phased at the bbox bottom-centre: per cell the
@@ -654,70 +517,6 @@ export function resampleModeLattice(
   return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
 }
 
-// ambiguousPct: opaque output pixels sampled below 50% dominance. dupRowCount: adjacent identical
-// opaque rows. reconErr: mean per-channel distance from a source pixel to its cell's output colour.
-export function sheetMetrics(
-  cells: {
-    out: RawImage
-    dominance: Float32Array
-    eroded: RawImage
-    lat: Lattice
-    origin: { i0: number; j0: number }
-  }[],
-): { ambiguousPct: number; dupRowCount: number; reconErr: number } {
-  let opaque = 0,
-    ambiguous = 0,
-    dupRows = 0,
-    reconSum = 0,
-    reconN = 0
-  for (const c of cells) {
-    for (let i = 0; i < c.out.width * c.out.height; i++)
-      if (c.out.data[i * 4 + 3]! > 0) {
-        opaque++
-        if (c.dominance[i]! < 0.5) ambiguous++
-      }
-    for (let y = 0; y < c.out.height - 1; y++) {
-      const rowLen = c.out.width * 4
-      const a = c.out.data.subarray(y * rowLen, (y + 1) * rowLen)
-      const b = c.out.data.subarray((y + 1) * rowLen, (y + 2) * rowLen)
-      let same = true,
-        any = false
-      for (let k = 0; k < rowLen; k++)
-        if (a[k] !== b[k]) {
-          same = false
-          break
-        }
-      for (let k = 3; k < rowLen; k += 4)
-        if (a[k]! > 0) {
-          any = true
-          break
-        }
-      if (same && any) dupRows++
-    }
-    for (let y = 0; y < c.eroded.height; y++)
-      for (let x = 0; x < c.eroded.width; x++) {
-        const s = (y * c.eroded.width + x) * 4
-        if (c.eroded.data[s + 3] === 0) continue
-        const i = Math.floor((x - c.lat.ox) / c.lat.px) - c.origin.i0
-        const j = Math.floor((y - c.lat.oy) / c.lat.py) - c.origin.j0
-        if (i < 0 || j < 0 || i >= c.out.width || j >= c.out.height) continue
-        const d = (j * c.out.width + i) * 4
-        if (c.out.data[d + 3] === 0) continue
-        reconSum +=
-          (Math.abs(c.eroded.data[s]! - c.out.data[d]!) +
-            Math.abs(c.eroded.data[s + 1]! - c.out.data[d + 1]!) +
-            Math.abs(c.eroded.data[s + 2]! - c.out.data[d + 2]!)) /
-          (3 * 255)
-        reconN++
-      }
-  }
-  return {
-    ambiguousPct: opaque ? (100 * ambiguous) / opaque : 0,
-    dupRowCount: dupRows,
-    reconErr: reconN ? reconSum / reconN : 0,
-  }
-}
-
 type Drift = { rowOffsets: number[]; colOffsets: number[] }
 
 // ε-cluster of RGB samples via single-linkage union-find (per-channel distance ≤ eps).
@@ -915,387 +714,7 @@ export function resampleClusterLattice(
   return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
 }
 
-// DEPRECATED: single-linkage chaining collapses natural palettes — Δ2-5 colour chains fuse across
-// the gamut and the cottage roof merged into brown. Do not use blind.
-export function mergeSheetColors(imgs: RawImage[], eps = 6): RawImage[] {
-  const counts = new Map<number, number>()
-  for (const img of imgs)
-    for (let i = 0; i < img.data.length; i += 4) {
-      if (img.data[i + 3] === 0) continue
-      const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-  const colors = [...counts.keys()]
-  const parent = colors.map((_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
-  const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
-  for (let i = 0; i < colors.length; i++)
-    for (let j = i + 1; j < colors.length; j++) {
-      const a = ch(colors[i]!),
-        b = ch(colors[j]!)
-      if (
-        Math.abs(a[0] - b[0]) <= eps &&
-        Math.abs(a[1] - b[1]) <= eps &&
-        Math.abs(a[2] - b[2]) <= eps
-      ) {
-        const ra = find(i),
-          rb = find(j)
-        if (ra !== rb) parent[ra] = rb
-      }
-    }
-  const acc = new Map<number, { n: number; r: number; g: number; b: number }>()
-  colors.forEach((c, i) => {
-    const root = find(i),
-      n = counts.get(c)!,
-      [r, g, b] = ch(c)
-    const a = acc.get(root) ?? { n: 0, r: 0, g: 0, b: 0 }
-    a.n += n
-    a.r += r * n
-    a.g += g * n
-    a.b += b * n
-    acc.set(root, a)
-  })
-  const remap = new Map<number, [number, number, number]>()
-  colors.forEach((c, i) => {
-    const a = acc.get(find(i))!
-    remap.set(c, [Math.round(a.r / a.n), Math.round(a.g / a.n), Math.round(a.b / a.n)])
-  })
-  return imgs.map((img) => {
-    const data = new Uint8ClampedArray(img.data)
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] === 0) continue
-      const m = remap.get((data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!)!
-      data[i] = m[0]
-      data[i + 1] = m[1]
-      data[i + 2] = m[2]
-    }
-    return { width: img.width, height: img.height, data }
-  })
-}
-
-// Census-aware sweep: a predicate-matching color is contamination only if RARE
-// (count < max(2, 0.5% of opaque)) — frequent matchers are palette (wine outline).
-export function sweepMagentaCensus(img: RawImage): RawImage {
-  const out = new Uint8ClampedArray(img.data)
-  const counts = new Map<number, number>()
-  let opaque = 0
-  for (let i = 0; i < img.data.length; i += 4) {
-    if (img.data[i + 3] === 0) continue
-    opaque++
-    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  const threshold = Math.max(2, 0.005 * opaque)
-  const contaminated = new Set<number>()
-  for (const [key, n] of counts) {
-    const r = key >> 16,
-      g = (key >> 8) & 255,
-      b = key & 255
-    if (r > g + 40 && b > g + 25 && n < threshold) contaminated.add(key)
-  }
-  if (contaminated.size === 0) return { width: img.width, height: img.height, data: out }
-  for (let y = 0; y < img.height; y++)
-    for (let x = 0; x < img.width; x++) {
-      const i = (y * img.width + x) * 4
-      if (img.data[i + 3] === 0) continue
-      const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-      if (!contaminated.has(key)) continue
-      const nb = new Map<number, number>()
-      let best = -1,
-        bestN = 0
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue
-          const nx = x + dx,
-            ny = y + dy
-          if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
-          const n = (ny * img.width + nx) * 4
-          if (img.data[n + 3] === 0) continue
-          const nk = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
-          if (contaminated.has(nk)) continue
-          const c = (nb.get(nk) ?? 0) + 1
-          nb.set(nk, c)
-          if (c > bestN) {
-            bestN = c
-            best = nk
-          }
-        }
-      if (best < 0) continue
-      out[i] = best >> 16
-      out[i + 1] = (best >> 8) & 255
-      out[i + 2] = best & 255
-    }
-  return { width: img.width, height: img.height, data: out }
-}
-
-// Authored pixel art has no fractional-membership pixels, so a silhouette pixel sitting on the RGB
-// segment between its inward fill and the outline palette commits to its majority side.
-export function repairOutlineBlends(img: RawImage): {
-  out: RawImage
-  repainted: number
-  outlineSnaps: number
-  fillSnaps: number
-} {
-  const EPS = 10,
-    SEG_DIST = 12,
-    OUTLINE_T = 0.4,
-    FILL_T = 0.15
-  const w = img.width,
-    h = img.height,
-    data = img.data
-  const out = new Uint8ClampedArray(data)
-  const opaque = (x: number, y: number) =>
-    x >= 0 && y >= 0 && x < w && y < h && data[(y * w + x) * 4 + 3]! > 0
-
-  // (a) silhouette: opaque with >= 1 transparent 8-neighbor (covers diagonal-only
-  // inner corners, so the (d) corner case is a subset of this set)
-  const silhouette = new Uint8Array(w * h)
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      if (!opaque(x, y)) continue
-      outer: for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          if ((dx !== 0 || dy !== 0) && !opaque(x + dx, y + dy)) {
-            silhouette[y * w + x] = 1
-            break outer
-          }
-        }
-    }
-
-  // (b) outline palette: eps single-link clusters over silhouette colors; keep
-  // clusters >= 15% of silhouette population within luma 30 of the darkest such cluster
-  const counts = new Map<number, number>()
-  let silTotal = 0
-  for (let i = 0; i < w * h; i++) {
-    if (!silhouette[i]) continue
-    silTotal++
-    const s = i * 4
-    const key = (data[s]! << 16) | (data[s + 1]! << 8) | data[s + 2]!
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  if (silTotal === 0)
-    return { out: { width: w, height: h, data: out }, repainted: 0, outlineSnaps: 0, fillSnaps: 0 }
-  const keys = [...counts.keys()]
-  const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
-  const parent = keys.map((_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
-  for (let i = 0; i < keys.length; i++)
-    for (let j = i + 1; j < keys.length; j++) {
-      const a = ch(keys[i]!),
-        b = ch(keys[j]!)
-      if (
-        Math.abs(a[0] - b[0]) <= EPS &&
-        Math.abs(a[1] - b[1]) <= EPS &&
-        Math.abs(a[2] - b[2]) <= EPS
-      ) {
-        const ra = find(i),
-          rb = find(j)
-        if (ra !== rb) parent[ra] = rb
-      }
-    }
-  const clusters = new Map<number, { n: number; r: number; g: number; b: number }>()
-  keys.forEach((k, i) => {
-    const root = find(i),
-      n = counts.get(k)!,
-      [r, g, b] = ch(k)
-    const a = clusters.get(root) ?? { n: 0, r: 0, g: 0, b: 0 }
-    a.n += n
-    a.r += r * n
-    a.g += g * n
-    a.b += b * n
-    clusters.set(root, a)
-  })
-  const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b
-  const eligible = [...clusters.entries()]
-    .filter(([, a]) => a.n >= 0.15 * silTotal)
-    .map(([root, a]) => ({ root, luma: luma(a.r / a.n, a.g / a.n, a.b / a.n) }))
-  if (eligible.length === 0)
-    return { out: { width: w, height: h, data: out }, repainted: 0, outlineSnaps: 0, fillSnaps: 0 }
-  const darkest = Math.min(...eligible.map((e) => e.luma))
-  const outlineRoots = new Set(eligible.filter((e) => e.luma <= darkest + 30).map((e) => e.root))
-  const members: [number, number, number][] = []
-  keys.forEach((k, i) => {
-    if (outlineRoots.has(find(i))) members.push([...ch(k)])
-  })
-
-  const nearAny = (r: number, g: number, b: number, set: [number, number, number][]) =>
-    set.some(
-      (m) => Math.abs(m[0] - r) <= EPS && Math.abs(m[1] - g) <= EPS && Math.abs(m[2] - b) <= EPS,
-    )
-
-  // inward fill color: mode of opaque non-silhouette 8-neighbors, else the nearest
-  // opaque non-silhouette pixel within Chebyshev radius 4 (mode among distance ties)
-  function fillColorFor(x: number, y: number): [number, number, number] | null {
-    for (let r = 1; r <= 4; r++) {
-      const cand: { color: [number, number, number]; d2: number }[] = []
-      for (let dy = -r; dy <= r; dy++)
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
-          const nx = x + dx,
-            ny = y + dy
-          if (!opaque(nx, ny) || silhouette[ny * w + nx]) continue
-          const s = (ny * w + nx) * 4
-          cand.push({ color: [data[s]!, data[s + 1]!, data[s + 2]!], d2: dx * dx + dy * dy })
-        }
-      if (cand.length === 0) continue
-      const dMin = Math.min(...cand.map((c) => c.d2))
-      const modes = new Map<number, number>()
-      let best = -1,
-        bestN = 0
-      for (const c of cand) {
-        if (c.d2 !== dMin) continue
-        const key = (c.color[0] << 16) | (c.color[1] << 8) | c.color[2]
-        const n = (modes.get(key) ?? 0) + 1
-        modes.set(key, n)
-        if (n > bestN) {
-          bestN = n
-          best = key
-        }
-      }
-      return [...ch(best)]
-    }
-    return null
-  }
-
-  function segProj(
-    c: readonly number[],
-    a: readonly number[],
-    b: readonly number[],
-  ): { d: number; t: number } {
-    const ab = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!]
-    const ac = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!]
-    const len2 = ab[0]! * ab[0]! + ab[1]! * ab[1]! + ab[2]! * ab[2]!
-    const t =
-      len2 === 0
-        ? 0
-        : Math.max(0, Math.min(1, (ac[0]! * ab[0]! + ac[1]! * ab[1]! + ac[2]! * ab[2]!) / len2))
-    return {
-      d: Math.hypot(
-        a[0]! + t * ab[0]! - c[0]!,
-        a[1]! + t * ab[1]! - c[1]!,
-        a[2]! + t * ab[2]! - c[2]!,
-      ),
-      t,
-    }
-  }
-
-  // (c)+(d): segment test on every silhouette pixel that is neither outline nor fill
-  let outlineSnaps = 0,
-    fillSnaps = 0
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      if (!silhouette[y * w + x]) continue
-      const s = (y * w + x) * 4
-      const c = [data[s]!, data[s + 1]!, data[s + 2]!] as const
-      if (nearAny(c[0], c[1], c[2], members)) continue
-      const fill = fillColorFor(x, y)
-      if (!fill) continue
-      if (nearAny(c[0], c[1], c[2], [fill])) continue
-      let o = members[0]!,
-        oD = Infinity
-      for (const m of members) {
-        const d = (m[0] - c[0]) ** 2 + (m[1] - c[1]) ** 2 + (m[2] - c[2]) ** 2
-        if (d < oD) {
-          oD = d
-          o = m
-        }
-      }
-      const { d, t } = segProj(c, fill, o)
-      if (d > SEG_DIST || t < FILL_T) continue
-      const target = t >= OUTLINE_T ? o : fill
-      if (t >= OUTLINE_T) outlineSnaps++
-      else fillSnaps++
-      out[s] = target[0]!
-      out[s + 1] = target[1]!
-      out[s + 2] = target[2]!
-    }
-  return {
-    out: { width: w, height: h, data: out },
-    repainted: outlineSnaps + fillSnaps,
-    outlineSnaps,
-    fillSnaps,
-  }
-}
-
-// The v7 stage chain on a chroma-keyed input. `exclBefore`/`exclAfter` are reconErr with the
-// repainted pixels alpha'd out of BOTH outputs — the exclusion gate.
-export function v7Chain(
-  keyed: RawImage,
-  pitch: number,
-): {
-  out: RawImage
-  before: RawImage
-  dominance: Float32Array
-  eroded: RawImage
-  lat: Lattice
-  origin: { i0: number; j0: number }
-  despeckleRemoved: number
-  sweepHits: number
-  repainted: number
-  outlineSnaps: number
-  fillSnaps: number
-  exclBefore: number
-  exclAfter: number
-  exclDelta: number
-} {
-  const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
-  const b = opaqueBbox(eroded)
-  if (!b) throw new Error('v7Chain: no opaque pixels')
-  const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
-  const r = resampleClusterLattice(eroded, lat)
-  const opaqueCount = (im: RawImage) => {
-    let n = 0
-    for (let i = 3; i < im.data.length; i += 4) if (im.data[i]! > 0) n++
-    return n
-  }
-  const desp = despeckle(r.out, 3)
-  const despeckleRemoved = opaqueCount(r.out) - opaqueCount(desp)
-  const filled = fillPinholes(desp, 2)
-  const before = sweepMagentaCensus(filled)
-  let sweepHits = 0
-  for (let i = 0; i < filled.data.length; i += 4)
-    if (
-      filled.data[i] !== before.data[i] ||
-      filled.data[i + 1] !== before.data[i + 1] ||
-      filled.data[i + 2] !== before.data[i + 2]
-    )
-      sweepHits++
-  const repaired = repairOutlineBlends(before)
-  const mask = (im: RawImage) => {
-    const data = new Uint8ClampedArray(im.data)
-    for (let i = 0; i < data.length; i += 4)
-      if (
-        before.data[i] !== repaired.out.data[i] ||
-        before.data[i + 1] !== repaired.out.data[i + 1] ||
-        before.data[i + 2] !== repaired.out.data[i + 2]
-      )
-        data[i + 3] = 0
-    return { width: im.width, height: im.height, data }
-  }
-  const E = (o: RawImage) =>
-    sheetMetrics([{ out: o, dominance: r.dominance, eroded, lat, origin: r.origin }]).reconErr
-  const exclBefore = E(mask(before)),
-    exclAfter = E(mask(repaired.out))
-  return {
-    out: repaired.out,
-    before,
-    dominance: r.dominance,
-    eroded,
-    lat,
-    origin: r.origin,
-    despeckleRemoved,
-    sweepHits,
-    repainted: repaired.repainted,
-    outlineSnaps: repaired.outlineSnaps,
-    fillSnaps: repaired.fillSnaps,
-    exclBefore,
-    exclAfter,
-    exclDelta: exclAfter - exclBefore,
-  }
-}
-
-// DEPRECATED: the predicate false-positives on legitimate palette colours; use
-// `sweepMagentaCensus`. Magenta is not a Style Bible colour, so the sweep is safe at art scale.
+// Magenta is not a Style Bible colour, so recolouring a magenta-ish survivor is safe at art scale.
 export function sweepMagenta(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data)
   for (let y = 0; y < img.height; y++)
@@ -1333,28 +752,6 @@ export function sweepMagenta(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
-// Horizontal-only registration: the dx (|dx| <= maxShift) that minimizes opaque-mask
-// mismatch when img is shifted by dx onto ref. Ties prefer the smallest |dx|.
-export function registerToReference(ref: RawImage, img: RawImage, maxShift = 8): { dx: number } {
-  if (ref.width !== img.width || ref.height !== img.height)
-    throw new Error(`size mismatch: ${ref.width}x${ref.height} vs ${img.width}x${img.height}`)
-  const opaque = (im: RawImage, x: number, y: number) =>
-    x >= 0 && x < im.width && im.data[(y * im.width + x) * 4 + 3]! > 0
-  let best = 0,
-    bestErr = Infinity
-  for (let a = 0; a <= maxShift; a++)
-    for (const dx of a === 0 ? [0] : [-a, a]) {
-      let err = 0
-      for (let y = 0; y < ref.height; y++)
-        for (let x = 0; x < ref.width; x++) if (opaque(ref, x, y) !== opaque(img, x - dx, y)) err++
-      if (err < bestErr) {
-        bestErr = err
-        best = dx
-      }
-    }
-  return { dx: best }
-}
-
 // Removes opaque 4-connected islands smaller than minIsland pixels.
 export function despeckle(img: RawImage, minIsland = 3): RawImage {
   const out = new Uint8ClampedArray(img.data)
@@ -1384,71 +781,6 @@ export function despeckle(img: RawImage, minIsland = 3): RawImage {
       }
     }
     if (island.length < minIsland) for (const p of island) out.fill(0, p * 4, p * 4 + 4)
-  }
-  return { width: img.width, height: img.height, data: out }
-}
-
-// Fills transparent 4-connected islands of <= maxHole pixels that are fully enclosed
-// by opaque pixels (never touching the border), using the most frequent adjacent color.
-export function fillPinholes(img: RawImage, maxHole = 2): RawImage {
-  const out = new Uint8ClampedArray(img.data)
-  const seen = new Uint8Array(img.width * img.height)
-  for (let start = 0; start < seen.length; start++) {
-    if (seen[start] || img.data[start * 4 + 3]! > 0) continue
-    const stack = [start],
-      hole: number[] = []
-    let touchesBorder = false
-    seen[start] = 1
-    while (stack.length) {
-      const p = stack.pop()!
-      hole.push(p)
-      const x = p % img.width,
-        y = (p / img.width) | 0
-      if (x === 0 || y === 0 || x === img.width - 1 || y === img.height - 1) touchesBorder = true
-      for (const [nx, ny] of [
-        [x - 1, y],
-        [x + 1, y],
-        [x, y - 1],
-        [x, y + 1],
-      ] as const) {
-        if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
-        const n = ny * img.width + nx
-        if (!seen[n] && img.data[n * 4 + 3] === 0) {
-          seen[n] = 1
-          stack.push(n)
-        }
-      }
-    }
-    if (touchesBorder || hole.length > maxHole) continue
-    for (const p of hole) {
-      const x = p % img.width,
-        y = (p / img.width) | 0
-      const counts = new Map<number, number>()
-      let best = -1,
-        bestN = 0
-      for (const [nx, ny] of [
-        [x - 1, y],
-        [x + 1, y],
-        [x, y - 1],
-        [x, y + 1],
-      ] as const) {
-        const n = (ny * img.width + nx) * 4
-        if (img.data[n + 3] === 0) continue
-        const key = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
-        const c = (counts.get(key) ?? 0) + 1
-        counts.set(key, c)
-        if (c > bestN) {
-          bestN = c
-          best = key
-        }
-      }
-      if (best < 0) continue
-      const i = p * 4
-      out[i] = best >> 16
-      out[i + 1] = (best >> 8) & 255
-      out[i + 2] = best & 255
-      out[i + 3] = 255
-    }
   }
   return { width: img.width, height: img.height, data: out }
 }
@@ -1493,22 +825,6 @@ export function cellDistance(a: RawImage, b: RawImage): number {
   return count === 0 ? 0 : sum / count
 }
 
-// Fixed-width pairwise cellDistance table (optionally against mirrored columns).
-export function distanceMatrix(cells: { label: string; img: RawImage }[], mirror: boolean): string {
-  const header = ['            ', ...cells.map((c) => c.label.padStart(11))].join(' ')
-  const lines = cells.map((a) =>
-    [
-      a.label.padEnd(12),
-      ...cells.map((b) =>
-        cellDistance(a.img, mirror ? mirrorX(b.img) : b.img)
-          .toFixed(3)
-          .padStart(11),
-      ),
-    ].join(' '),
-  )
-  return [header, ...lines].join('\n')
-}
-
 // Median of all pairwise cellDistances (upper-median for even pair counts).
 export function pairwiseMedian(imgs: RawImage[]): number {
   const ds: number[] = []
@@ -1516,28 +832,6 @@ export function pairwiseMedian(imgs: RawImage[]): number {
     for (let j = i + 1; j < imgs.length; j++) ds.push(cellDistance(imgs[i]!, imgs[j]!))
   ds.sort((a, b) => a - b)
   return ds[Math.floor(ds.length / 2)]!
-}
-
-// Real big-pixel art has no exact lattice (round-trip error rises monotonically from k=4), so this
-// starts at the detected art scale and coarsens until the sprite fits the canvas.
-export async function postProcessCell(
-  rawPng: Buffer,
-  canvas: number,
-  feetY: number,
-): Promise<RawImage> {
-  const keyed = chromaKey(await decodePng(rawPng))
-  for (let k = detectArtScale(keyed); ; k++) {
-    const snapped = downscaleMajority(
-      keyed,
-      Math.max(1, Math.round(keyed.width / k)),
-      Math.max(1, Math.round(keyed.height / k)),
-    )
-    try {
-      return anchorToCanvas(defringe(snapped), canvas, canvas, feetY)
-    } catch (e) {
-      if (k >= 16) throw e
-    }
-  }
 }
 
 // ───────────────────────── Character asset standard v2 ─────────────────────────
@@ -1554,28 +848,11 @@ export const POSES_V2 = [
 ] as const // sheet row order, top→bottom
 export type PoseV2 = (typeof POSES_V2)[number]
 export const WALK_POSES_V2 = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // renderer loop order, 8fps
-export type WalkPoseV2 = (typeof WALK_POSES_V2)[number]
 export const CELL_V2 = 96
 export const FEET_Y_V2 = 88
 export const SHEET_W_V2 = CELL_V2 * FACINGS.length // 384
 export const SHEET_H_V2 = CELL_V2 * POSES_V2.length // 576
 export const STRIP_POSES_V2 = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // 1×5 strip order
-export type StripPoseV2 = (typeof STRIP_POSES_V2)[number]
-
-export const POSE_CLAUSES_V2: Record<PoseV2, string> = {
-  idle: 'standing at rest, both feet planted, arms relaxed at the sides',
-  'contact-a':
-    'walk cycle CONTACT pose A: legs at full stride spread, LEFT foot planted forward, right foot back with heel lifting, right arm swung forward',
-  'passing-a':
-    'walk cycle PASSING pose A: legs close together, RIGHT foot lifted and passing under the body, left leg planted straight, arms near the sides',
-  'contact-b':
-    'walk cycle CONTACT pose B: legs at full stride spread, RIGHT foot planted forward, left foot back with heel lifting, left arm swung forward',
-  'passing-b':
-    'walk cycle PASSING pose B: legs close together, LEFT foot lifted and passing under the body, right leg planted straight, arms near the sides',
-  sleep:
-    'lying on the ground fast asleep, body fully horizontal, eyes closed, relaxed peaceful face, same outfit',
-}
-
 // Ratios are ×(pairwise median) of the sheet's cells, calibrated against the rejected v1 sheet:
 // NEAR_DUPE catches the ne/nw back-view dupe, MIRROR_DUPE the sw/se mirror, STRIDE the rigid se.
 export const NEAR_DUPE_RATIO = 0.55
@@ -1817,38 +1094,6 @@ export function crossFacingDupeGate(
   return failures
 }
 
-// Stride differentiation within a facing: contact-A vs contact-B and passing-A vs passing-B, plus
-// every contact vs passing pair — a reused frame reads as rigid animation.
-export function strideGate(
-  facing: string,
-  frames: Record<WalkPoseV2, RawImage>,
-  median: number,
-): GateFailure[] {
-  const failures: GateFailure[] = []
-  const check = (
-    pa: WalkPoseV2,
-    pb: WalkPoseV2,
-    ratio: number,
-    gate: 'stride' | 'contact-passing',
-  ) => {
-    const d = cellDistance(frames[pa], frames[pb])
-    if (d < ratio * median)
-      failures.push({
-        gate,
-        a: `${facing}/${pa}`,
-        b: `${facing}/${pb}`,
-        value: d,
-        limit: ratio * median,
-      })
-  }
-  check('contact-a', 'contact-b', STRIDE_MIN_RATIO, 'stride')
-  check('passing-a', 'passing-b', STRIDE_MIN_RATIO, 'stride')
-  for (const c of ['contact-a', 'contact-b'] as const)
-    for (const p of ['passing-a', 'passing-b'] as const)
-      check(c, p, CONTACT_PASSING_MIN_RATIO, 'contact-passing')
-  return failures
-}
-
 // Every frame must agree with the facing's idle on palette, silhouette area ±18% and head-region
 // stability: independent per-frame generation drifts costume details.
 export function frameCoherenceGate(
@@ -1894,27 +1139,4 @@ export function sleepGate(facing: string, idle: RawImage, sleep: RawImage): Gate
   const aspect = (bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1)
   if (aspect <= 1) failures.push({ gate: 'lying', a, b, value: aspect, limit: 1 })
   return failures
-}
-
-export type DupeFinding = { a: string; b: string; distance: number; mirrored: boolean }
-
-export function duplicateReport(
-  cells: { label: string; img: RawImage }[],
-  straightThreshold: number,
-  mirrorThreshold: number,
-): DupeFinding[] {
-  const findings: DupeFinding[] = []
-  for (let i = 0; i < cells.length; i++)
-    for (let j = i + 1; j < cells.length; j++) {
-      const { label: a, img: ai } = cells[i]!,
-        { label: b, img: bi } = cells[j]!
-      const straight = cellDistance(ai, bi)
-      if (straight < straightThreshold) {
-        findings.push({ a, b, distance: straight, mirrored: false })
-        continue
-      }
-      const mirrored = cellDistance(ai, mirrorX(bi))
-      if (mirrored < mirrorThreshold) findings.push({ a, b, distance: mirrored, mirrored: true })
-    }
-  return findings
 }

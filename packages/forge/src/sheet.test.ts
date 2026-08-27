@@ -6,34 +6,18 @@ import {
   assembleGrid,
   mirrorX,
   cellDistance,
-  duplicateReport,
   downscaleMajority,
-  detectArtScale,
-  snapToGrid,
   anchorToCanvas,
-  defringe,
-  registerToReference,
   despeckle,
-  fillPinholes,
   erodeAlpha,
   resampleToArtHeight,
-  erodeForPitch,
   estimatePitch,
   refineLattice,
   resampleModeLattice,
-  sheetMetrics,
   sweepMagenta,
   driftField,
   resampleClusterLattice,
-  mergeSheetColors,
-  sweepMagentaCensus,
-  repairOutlineBlends,
   opaqueBbox,
-  upscaleNearest,
-  distanceMatrix,
-  pairwiseMedian,
-  STRAIGHT_DUPE,
-  MIRROR_DUPE,
 } from './sheet.js'
 
 type Px = [number, number, number, number]
@@ -48,11 +32,9 @@ const RED: Px = [255, 0, 0, 255],
   CLEAR: Px = [0, 0, 0, 0]
 
 describe('sheet constants', () => {
-  it('exports facing/pose orders and thresholds', () => {
+  it('exports the facing and pose orders', () => {
     expect(FACINGS).toEqual(['sw', 'se', 'ne', 'nw'])
     expect(POSES).toEqual(['idle', 'walk-a', 'walk-b'])
-    expect(STRAIGHT_DUPE).toBe(0.1)
-    expect(MIRROR_DUPE).toBe(0.06)
   })
 })
 
@@ -170,40 +152,6 @@ describe('downscaleMajority', () => {
   })
 })
 
-// 70x70 image drawn from 7px art blocks with varied colors per block
-function sevenPxBlockImage(): RawImage {
-  const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [128, 64, 32, 255]]
-  return img(70, 70, (x, y) => {
-    const bx = Math.floor(x / 7),
-      by = Math.floor(y / 7)
-    return palette[(bx * 3 + by * 5 + ((bx * by) % 7)) % palette.length]!
-  })
-}
-
-describe('detectArtScale', () => {
-  it('detects the 7px block size of a synthetic big-pixel image', () => {
-    expect(detectArtScale(sevenPxBlockImage())).toBe(7)
-  })
-  it('honors an explicit candidate list', () => {
-    expect(detectArtScale(sevenPxBlockImage(), [5, 7, 9])).toBe(7)
-  })
-})
-
-describe('snapToGrid', () => {
-  it('reduces a 7px-block 70x70 image to its native 10x10', () => {
-    const src = sevenPxBlockImage()
-    const out = snapToGrid(src)
-    expect(out.width).toBe(10)
-    expect(out.height).toBe(10)
-    for (let by = 0; by < 10; by++)
-      for (let bx = 0; bx < 10; bx++)
-        expect(
-          [...out.data.slice((by * 10 + bx) * 4, (by * 10 + bx) * 4 + 4)],
-          `block ${bx},${by}`,
-        ).toEqual([...src.data.slice((by * 7 * 70 + bx * 7) * 4, (by * 7 * 70 + bx * 7) * 4 + 4)])
-  })
-})
-
 describe('anchorToCanvas', () => {
   it('centers the opaque bbox horizontally and rests its bottom on feetY', () => {
     // 2 wide x 3 tall red block at (1,1) in a 4x5 image
@@ -234,63 +182,6 @@ describe('anchorToCanvas', () => {
     expect(() => anchorToCanvas(solid(4, 4, CLEAR), 8, 8, 6)).toThrow()
   })
 })
-
-describe('defringe', () => {
-  const MAGENTA: Px = [255, 0, 255, 255]
-  const GREEN: Px = [110, 148, 85, 255] // sage: clean under every predicate branch
-  it('replaces a magenta-haloed edge pixel with its clean neighbor color', () => {
-    // col 0 transparent, col 1 magenta halo, col 2 green body
-    const src = img(3, 3, (x) => (x === 0 ? CLEAR : x === 1 ? MAGENTA : GREEN))
-    const out = defringe(src)
-    for (let y = 0; y < 3; y++) {
-      expect([...out.data.slice((y * 3 + 1) * 4, (y * 3 + 1) * 4 + 4)]).toEqual(GREEN)
-      expect([...out.data.slice((y * 3 + 2) * 4, (y * 3 + 2) * 4 + 4)]).toEqual(GREEN)
-      expect(out.data[y * 3 * 4 + 3]).toBe(0)
-    }
-  })
-  it('replaces maroon-family and red-heavy fringe pixels (v2 predicate)', () => {
-    const MAROON: Px = [150, 60, 90, 255] // r>g+30 and b>g+15
-    const REDDISH: Px = [200, 100, 105, 255] // b-g small, but r>g+50
-    for (const bad of [MAROON, REDDISH]) {
-      const src = img(3, 1, (x) => (x === 0 ? CLEAR : x === 1 ? bad : GREEN))
-      expect([...defringe(src).data.slice(4, 8)]).toEqual(GREEN)
-    }
-  })
-  it('catches lavender halo pixels (v3 branch) while sage and cream stay untouched', () => {
-    const LAVENDER: Px = [170, 140, 180, 255] // b>g+25 and r>g+10
-    const src = img(3, 1, (x) => (x === 0 ? CLEAR : x === 1 ? LAVENDER : GREEN))
-    expect([...defringe(src).data.slice(4, 8)]).toEqual(GREEN)
-    const CREAM: Px = [245, 240, 230, 255] // r≈g≈b
-    for (const good of [GREEN, CREAM]) {
-      const edge = img(3, 1, (x) => (x === 0 ? CLEAR : good))
-      expect([...defringe(edge).data.slice(4, 8)]).toEqual(good)
-    }
-  })
-  it('leaves magenta-contaminated interior pixels untouched', () => {
-    // 5x5 fully opaque green with magenta center: center is not on a transparency edge
-    const src = img(5, 5, (x, y) => (x === 2 && y === 2 ? MAGENTA : GREEN))
-    expect([...defringe(src).data.slice((2 * 5 + 2) * 4, (2 * 5 + 2) * 4 + 4)]).toEqual(MAGENTA)
-  })
-  it('does not touch legitimately pink (dusty rose) pixels, even on the edge', () => {
-    const ROSE: Px = [242, 198, 194, 255] // r-g=44<50, b-g<15 -> clean
-    const src = img(3, 1, (x) => (x === 0 ? CLEAR : ROSE))
-    expect([...defringe(src).data.slice(4, 8)]).toEqual(ROSE)
-  })
-  it('desaturates toward r=b=(r+b)/2 when no clean neighbor exists', () => {
-    const src = img(2, 1, (x) => (x === 0 ? CLEAR : ([200, 100, 255, 255] as Px)))
-    expect([...defringe(src).data.slice(4, 8)]).toEqual([228, 100, 228, 255])
-  })
-})
-
-describe('registerToReference', () => {
-  it('recovers a synthetic horizontal shift', () => {
-    const ref = img(12, 6, (x, y) => (x >= 2 && x <= 4 && y >= 1 && y <= 4 ? RED : CLEAR))
-    const shifted = img(12, 6, (x, y) => (x >= 5 && x <= 7 && y >= 1 && y <= 4 ? RED : CLEAR))
-    expect(registerToReference(ref, shifted).dx).toBe(-3)
-    expect(registerToReference(ref, ref).dx).toBe(0)
-  })
-})
-
 describe('despeckle', () => {
   it('removes opaque islands smaller than minIsland, keeps larger ones', () => {
     // 2x2 blob at (0,0), single at (4,0), pair at (0,4)-(1,4)
@@ -303,23 +194,6 @@ describe('despeckle', () => {
     expect(out.data[(4 * 5 + 1) * 4 + 3]).toBe(0)
   })
 })
-
-describe('fillPinholes', () => {
-  it('fills small enclosed transparent holes with the neighboring color', () => {
-    const src = img(5, 5, (x, y) => (x === 2 && y === 2 ? CLEAR : RED))
-    const out = fillPinholes(src, 2)
-    expect([...out.data.slice((2 * 5 + 2) * 4, (2 * 5 + 2) * 4 + 4)]).toEqual(RED)
-  })
-  it('leaves large holes and border-touching transparency alone', () => {
-    // 2x2 hole (size 4 > maxHole 2) in a 6x6 opaque block
-    const big = img(6, 6, (x, y) => (x >= 2 && x <= 3 && y >= 2 && y <= 3 ? CLEAR : RED))
-    expect(fillPinholes(big, 2).data[(2 * 6 + 2) * 4 + 3]).toBe(0)
-    // border-touching single transparent pixel
-    const edge = img(3, 3, (x, y) => (x === 0 && y === 1 ? CLEAR : RED))
-    expect(fillPinholes(edge, 2).data[1 * 3 * 4 + 3]).toBe(0)
-  })
-})
-
 describe('erodeAlpha', () => {
   it('removes a 1px halo ring and keeps the interior intact', () => {
     const MAGENTA: Px = [255, 0, 255, 255]
@@ -345,36 +219,6 @@ describe('erodeAlpha', () => {
     expect(opaque).toBe(4) // 6x6 -> 4x4 -> 2x2
   })
 })
-
-describe('erodeForPitch', () => {
-  it('fully removes a 3px blend band at pitch 6, interior intact', () => {
-    // targetH 8, bboxH 48 -> pitch 6 -> radius max(1, round(3)) = 3
-    const MAGENTA: Px = [255, 0, 255, 255]
-    const src = img(30, 48, (x, y) => {
-      const depth = Math.min(x, y, 29 - x, 47 - y)
-      return depth < 3 ? MAGENTA : RED
-    })
-    const out = erodeForPitch(src, 8)
-    for (let y = 0; y < 48; y++)
-      for (let x = 0; x < 30; x++) {
-        const i = (y * 30 + x) * 4
-        const depth = Math.min(x, y, 29 - x, 47 - y)
-        if (depth < 3) expect(out.data[i + 3], `band ${x},${y}`).toBe(0)
-        else {
-          expect(out.data[i + 3], `core ${x},${y}`).toBe(255)
-          expect([...out.data.slice(i, i + 3)]).toEqual([255, 0, 0])
-        }
-      }
-  })
-  it('never erodes below radius 1', () => {
-    const tiny = solid(4, 4, RED) // pitch 4/8=0.5 -> radius max(1, round(0.25)) = 1
-    const out = erodeForPitch(tiny, 8)
-    let opaque = 0
-    for (let i = 3; i < out.data.length; i += 4) if (out.data[i]! > 0) opaque++
-    expect(opaque).toBe(4)
-  })
-})
-
 describe('resampleToArtHeight', () => {
   const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [128, 64, 32, 255]]
   // sprite whose art blocks have a non-integer pitch, phased at the bbox bottom-left
@@ -454,58 +298,6 @@ describe('opaqueBbox', () => {
     expect(opaqueBbox(src)).toEqual({ x0: 1, x1: 2, y0: 1, y1: 2 })
   })
 })
-
-describe('upscaleNearest', () => {
-  it('replicates each pixel into a k x k block', () => {
-    const src = img(2, 1, (x) => (x === 0 ? RED : BLUE))
-    const up = upscaleNearest(src, 2)
-    expect(up.width).toBe(4)
-    expect(up.height).toBe(2)
-    for (const [x, y, want] of [
-      [0, 0, RED],
-      [1, 1, RED],
-      [2, 0, BLUE],
-      [3, 1, BLUE],
-    ] as const)
-      expect([...up.data.slice((y * 4 + x) * 4, (y * 4 + x) * 4 + 4)]).toEqual(want)
-  })
-})
-
-describe('distanceMatrix / pairwiseMedian', () => {
-  const a = solid(2, 2, RED),
-    b = solid(2, 2, BLUE),
-    c = solid(2, 2, CLEAR)
-  it('renders one header line plus one row per cell with cellDistance values', () => {
-    const out = distanceMatrix(
-      [
-        { label: 'a', img: a },
-        { label: 'b', img: b },
-      ],
-      false,
-    )
-    const lines = out.split('\n')
-    expect(lines).toHaveLength(3)
-    expect(lines[1]).toBe(
-      ['a'.padEnd(12), '0.000'.padStart(11), cellDistance(a, b).toFixed(3).padStart(11)].join(' '),
-    )
-  })
-  it('mirror=true measures against the mirrored column cell', () => {
-    const asym = img(2, 1, (x) => (x === 0 ? RED : BLUE))
-    const out = distanceMatrix(
-      [
-        { label: 'a', img: asym },
-        { label: 'm', img: mirrorX(asym) },
-      ],
-      true,
-    )
-    expect(out.split('\n')[1]).toContain('0.000')
-  })
-  it('pairwiseMedian returns the upper-median pairwise distance', () => {
-    const ds = [cellDistance(a, b), cellDistance(a, c), cellDistance(b, c)].sort((x, y) => x - y)
-    expect(pairwiseMedian([a, b, c])).toBe(ds[1])
-  })
-})
-
 describe('refineLattice', () => {
   it('recovers a known lattice offset by coordinate descent', () => {
     const src = img(
@@ -543,34 +335,6 @@ describe('resampleModeLattice', () => {
     expect([...out.data.slice(0, 4)]).toEqual(GREEN)
   })
 })
-
-describe('sheetMetrics', () => {
-  it('reports clean metrics on a perfect grid', () => {
-    const src = img(28, 28, (x, y) => PAL5[(Math.floor(x / 7) + Math.floor(y / 7) * 2) % 5]!)
-    const lat = { px: 7, py: 7, ox: 0, oy: 0 }
-    const r = resampleModeLattice(src, lat)
-    const m = sheetMetrics([
-      { out: r.out, dominance: r.dominance, eroded: src, lat, origin: r.origin },
-    ])
-    expect(m.ambiguousPct).toBe(0)
-    expect(m.reconErr).toBeLessThan(0.02)
-    expect(m.dupRowCount).toBe(0)
-  })
-  it('counts adjacent identical opaque rows', () => {
-    const out = img(2, 3, (_, y) => (y < 2 ? RED : BLUE))
-    const m = sheetMetrics([
-      {
-        out,
-        dominance: new Float32Array(6).fill(1),
-        eroded: out,
-        lat: { px: 1, py: 1, ox: 0, oy: 0 },
-        origin: { i0: 0, j0: 0 },
-      },
-    ])
-    expect(m.dupRowCount).toBe(1)
-  })
-})
-
 describe('sweepMagenta', () => {
   it('replaces an enclosed magenta pixel with the neighbor mode color', () => {
     const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? ([255, 0, 255, 255] as Px) : RED))
@@ -630,151 +394,5 @@ describe('resampleClusterLattice', () => {
     // weighted mean of the merged cluster
     expect(cluster.out.data[0]!).toBeGreaterThanOrEqual(15)
     expect(cluster.out.data[0]!).toBeLessThanOrEqual(17)
-  })
-})
-
-describe('mergeSheetColors', () => {
-  it('merges Δ6 colors to the population-weighted centroid, keeps Δ30 apart', () => {
-    const a = solid(2, 2, [100, 100, 100, 255]) // 4 px
-    const b = solid(2, 1, [106, 106, 106, 255]) // 2 px, Δ6 -> merges
-    const c = solid(1, 1, [136, 136, 136, 255]) // Δ30 from b -> stays
-    const [ma, mb, mc] = mergeSheetColors([a, b, c], 6)
-    expect([...ma!.data.slice(0, 3)]).toEqual([102, 102, 102]) // (100*4+106*2)/6
-    expect([...mb!.data.slice(0, 3)]).toEqual([102, 102, 102])
-    expect([...mc!.data.slice(0, 3)]).toEqual([136, 136, 136])
-  })
-})
-
-describe('sweepMagentaCensus', () => {
-  it('repaints rare enclosed magenta but keeps a frequent wine outline', () => {
-    const WINE: Px = [125, 28, 65, 255] // matches predicate, but frequent = palette
-    const src = img(10, 10, (x, y) => {
-      if (x === 5 && y === 5) return [255, 0, 255, 255] as Px // rare magenta
-      return y < 5 ? WINE : RED
-    })
-    const out = sweepMagentaCensus(src)
-    expect([...out.data.slice((5 * 10 + 5) * 4, (5 * 10 + 5) * 4 + 3)]).toEqual([255, 0, 0]) // neighbor mode = red
-    expect([...out.data.slice((2 * 10 + 2) * 4, (2 * 10 + 2) * 4 + 3)]).toEqual([125, 28, 65])
-  })
-})
-
-describe('repairOutlineBlends', () => {
-  const WINE: Px = [125, 28, 65, 255],
-    SKIN: Px = [230, 180, 150, 255]
-  const BLEND: Px = [178, 104, 108, 255] // midpoint of WINE and SKIN
-  // transparent ring, wine outline ring, skin interior; edit overrides single pixels
-  const ringSprite = (edit?: (x: number, y: number) => Px | null) =>
-    img(12, 12, (x, y) => {
-      const e = edit?.(x, y)
-      if (e) return e
-      if (x === 0 || y === 0 || x === 11 || y === 11) return CLEAR
-      if (x === 1 || y === 1 || x === 10 || y === 10) return WINE
-      return SKIN
-    })
-
-  it('repaints a midpoint fill->outline blend on the border to the outline color', () => {
-    const { out, repainted } = repairOutlineBlends(
-      ringSprite((x, y) => (x === 5 && y === 1 ? BLEND : null)),
-    )
-    expect(repainted).toBe(1)
-    expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([125, 28, 65])
-  })
-
-  it('leaves an off-segment highlight untouched', () => {
-    const HILITE: Px = [255, 255, 180, 255] // ~85 from the WINE->SKIN segment
-    const { out, repainted } = repairOutlineBlends(
-      ringSprite((x, y) => (x === 5 && y === 1 ? HILITE : null)),
-    )
-    expect(repainted).toBe(0)
-    expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([255, 255, 180])
-  })
-
-  it('snaps a t=0.25 blend to FILL, a t=0.55 blend to outline, leaves t=0.10 alone', () => {
-    const T25: Px = [204, 142, 129, 255] // SKIN + 0.25*(WINE-SKIN)
-    const T55: Px = [172, 96, 103, 255] // SKIN + 0.55*(WINE-SKIN)
-    const T10: Px = [220, 165, 142, 255] // SKIN + 0.10*(WINE-SKIN): fill-committed within noise
-    const px = (1 * 12 + 5) * 4
-    const low = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T25 : null)))
-    expect(low.fillSnaps).toBe(1)
-    expect(low.outlineSnaps).toBe(0)
-    expect([...low.out.data.slice(px, px + 3)]).toEqual([230, 180, 150])
-    const high = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T55 : null)))
-    expect(high.outlineSnaps).toBe(1)
-    expect(high.fillSnaps).toBe(0)
-    expect([...high.out.data.slice(px, px + 3)]).toEqual([125, 28, 65])
-    const noise = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T10 : null)))
-    expect(noise.repainted).toBe(0)
-    expect([...noise.out.data.slice(px, px + 3)]).toEqual([220, 165, 142])
-  })
-
-  it('keeps line weight: outline pixel count grows by at most outlineSnaps, fill-snaps are not outline-colored', () => {
-    const T25: Px = [204, 142, 129, 255]
-    const T55: Px = [172, 96, 103, 255]
-    const src = ringSprite((x, y) => (x === 4 && y === 1 ? T25 : x === 7 && y === 1 ? T55 : null))
-    const { out, outlineSnaps, fillSnaps } = repairOutlineBlends(src)
-    expect(outlineSnaps).toBe(1)
-    expect(fillSnaps).toBe(1)
-    const countWine = (im: RawImage) => {
-      let n = 0
-      for (let i = 0; i < im.data.length; i += 4)
-        if (
-          im.data[i + 3]! > 0 &&
-          im.data[i] === 125 &&
-          im.data[i + 1] === 28 &&
-          im.data[i + 2] === 65
-        )
-          n++
-      return n
-    }
-    expect(countWine(out)).toBeLessThanOrEqual(countWine(src) + outlineSnaps)
-    expect([...out.data.slice((1 * 12 + 4) * 4, (1 * 12 + 4) * 4 + 3)]).toEqual([230, 180, 150]) // fill snap, not outline
-  })
-
-  it('makes zero repaints on a clean sprite', () => {
-    const src = ringSprite()
-    const { out, repainted } = repairOutlineBlends(src)
-    expect(repainted).toBe(0)
-    expect([...out.data]).toEqual([...src.data])
-  })
-
-  it('repairs an inner-corner blend whose only transparency is diagonal', () => {
-    const src = img(10, 10, (x, y) => {
-      if (x === 0 || y === 0 || x === 9 || y === 9 || (x === 1 && y === 1)) return CLEAR
-      if (x === 2 && y === 2) return BLEND // silhouette only via the (1,1) diagonal
-      if (x === 1 || y === 1 || x === 8 || y === 8) return WINE
-      return SKIN
-    })
-    const { out, repainted } = repairOutlineBlends(src)
-    expect(repainted).toBe(1)
-    expect([...out.data.slice((2 * 10 + 2) * 4, (2 * 10 + 2) * 4 + 3)]).toEqual([125, 28, 65])
-  })
-})
-
-describe('duplicateReport', () => {
-  const half = (left: Px, right: Px) => img(4, 4, (x) => (x < 2 ? left : right))
-  it('flags an exact mirror pair as a mirrored dupe and leaves distinct cells alone', () => {
-    const a = half(RED, CLEAR)
-    const findings = duplicateReport(
-      [
-        { label: 'a', img: a },
-        { label: 'b', img: mirrorX(a) },
-        { label: 'c', img: solid(4, 4, BLUE) },
-      ],
-      STRAIGHT_DUPE,
-      MIRROR_DUPE,
-    )
-    expect(findings).toEqual([{ a: 'a', b: 'b', distance: 0, mirrored: true }])
-  })
-  it('flags an exact straight duplicate', () => {
-    const a = half(RED, BLUE)
-    const findings = duplicateReport(
-      [
-        { label: 'x', img: a },
-        { label: 'y', img: a },
-      ],
-      STRAIGHT_DUPE,
-      MIRROR_DUPE,
-    )
-    expect(findings).toEqual([{ a: 'x', b: 'y', distance: 0, mirrored: false }])
   })
 })

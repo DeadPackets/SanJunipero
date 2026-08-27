@@ -9,13 +9,18 @@ import { chromaKey } from '../../src/post/chromaKey.js'
 import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell } from '../../src/reCell.js'
-import { classDensityGate, integerScaleGate, paletteDistance, spriteDensity } from '../../src/pixelGates.js'
+import {
+  classDensityGate,
+  integerScaleGate,
+  paletteDistance,
+  spriteDensity,
+} from '../../src/pixelGates.js'
 import { TOWN_TILE } from '../../src/assetResolution.js'
 import { refusalMessage } from '../../src/gate.js'
 import { BUILDINGS_CONTENT_DIR } from '../../src/buildingArt.js'
 
-export const MODEL = 'google/gemini-3.1-flash-image'
-export const GEN_PX = 2048
+const MODEL = 'google/gemini-3.1-flash-image'
+const GEN_PX = 2048
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 
 // The palette, in words, for the calls that carry no building reference.
@@ -170,7 +175,7 @@ export async function runCells(o: RunOptions): Promise<void> {
         const msg =
           `${job.label}: ${candKey} subject ${r.plan.subjectPx}px, factor ${r.plan.factor}, ` +
           `window ${r.plan.window}, palette distance ${paletteDistance(r.cell).toFixed(1)}, ` +
-          `${fails.length === 0 ? 'gates clean' : fails.join('; ')}` +
+          (fails.length === 0 ? 'gates clean' : fails.join('; ')) +
           (refused ? ' — REFUSED BY EYE' : '')
         lines.push(msg)
         console.log(`  ${msg}`)
@@ -185,8 +190,8 @@ export async function runCells(o: RunOptions): Promise<void> {
     // Among the CLEAN candidates only (user ruling; the shape and reason are in src/gate.ts).
     // Choosing is not deciding: the ranker picks from a pool that cannot contain a failure.
     // The winner is the one whose subject fills the most of its window.
-    const win = cands
-      .filter((c) => c.fails.length === 0)
+    const clean = cands.filter((c) => c.fails.length === 0)
+    const win = clean
       .sort((a, b) => a.plan.subjectPx / a.plan.window - b.plan.subjectPx / b.plan.window)
       .at(-1)
     if (!win) {
@@ -210,7 +215,12 @@ export async function runCells(o: RunOptions): Promise<void> {
     writeFileSync(
       `${dir}/manifest.json`,
       `${JSON.stringify(
-        { version: 'v4-hires-building', kind: job.kind, footprint: job.fp, cell: cellAnchor(win.cell) },
+        {
+          version: 'v4-hires-building',
+          kind: job.kind,
+          footprint: job.fp,
+          cell: cellAnchor(win.cell),
+        },
         null,
         2,
       )}\n`,

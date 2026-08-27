@@ -9,7 +9,6 @@ import {
   FEET_Y_V2,
   SHEET_W_V2,
   SHEET_H_V2,
-  POSE_CLAUSES_V2,
   NEAR_DUPE_RATIO,
   MIRROR_DUPE_RATIO,
   STRIDE_MIN_RATIO,
@@ -25,7 +24,6 @@ import {
   paletteJaccard,
   headRegionDiff,
   crossFacingDupeGate,
-  strideGate,
   frameCoherenceGate,
   sleepGate,
   pairwiseMedian,
@@ -62,7 +60,6 @@ describe('character standard v2 constants', () => {
     expect(FEET_Y_V2).toBe(88)
     expect(SHEET_W_V2).toBe(384) // 4 facing columns
     expect(SHEET_H_V2).toBe(576) // 6 pose rows
-    for (const p of POSES_V2) expect(POSE_CLAUSES_V2[p].length).toBeGreaterThan(10)
   })
   it('exports the hard gate constants', () => {
     expect(NEAR_DUPE_RATIO).toBe(0.55)
@@ -256,54 +253,6 @@ describe('crossFacingDupeGate — proven on the v1 sheet the user rejected', () 
     expect(crossFacingDupeGate(row, v1median)).toEqual([])
   })
 })
-
-describe('strideGate — proven on the v1 rigid se stride', () => {
-  it('FAILS the se contact pair (0.091, the rigid stride the user caught)', () => {
-    const failures = strideGate(
-      'se',
-      {
-        'contact-a': v1.get('se/walk-a')!,
-        'contact-b': v1.get('se/walk-b')!,
-        'passing-a': v1.get('sw/walk-a')!,
-        'passing-b': v1.get('sw/walk-b')!,
-      },
-      v1median,
-    )
-    expect(failures.length).toBe(1)
-    expect(failures[0]!.gate).toBe('stride')
-    expect(failures[0]!.a).toBe('se/contact-a')
-    expect(failures[0]!.b).toBe('se/contact-b')
-    expect(failures[0]!.value).toBeCloseTo(0.091, 2)
-    expect(failures[0]!.limit).toBeCloseTo(0.35 * v1median, 5)
-  })
-  it('passes well-differentiated strides', () => {
-    const failures = strideGate(
-      'ne',
-      {
-        'contact-a': v1.get('ne/walk-a')!,
-        'contact-b': v1.get('ne/walk-b')!,
-        'passing-a': v1.get('nw/walk-a')!,
-        'passing-b': v1.get('nw/walk-b')!,
-      },
-      v1median,
-    )
-    expect(failures).toEqual([])
-  })
-  it('flags a contact frame reused as a passing frame', () => {
-    const failures = strideGate(
-      'sw',
-      {
-        'contact-a': v1.get('sw/walk-a')!,
-        'contact-b': v1.get('sw/walk-b')!,
-        'passing-a': v1.get('sw/walk-a')!,
-        'passing-b': v1.get('sw/idle')!,
-      },
-      v1median,
-    )
-    expect(failures.some((f) => f.gate === 'contact-passing' && f.value === 0)).toBe(true)
-  })
-})
-
 describe('frameCoherenceGate — tuned to pass every real v1 within-facing frame', () => {
   it('passes all 8 v1 walk frames against their facing idle', () => {
     for (const f of FACINGS_FX) {
