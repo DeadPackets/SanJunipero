@@ -502,39 +502,48 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       const writeTheDay = (chronicle: NarratorStore, tick: number): void => {
         const day = tick / MINUTES_PER_DAY - 1
-        const events = store
-          .readFrom(narratedThroughSeq)
-          .filter((e) => Math.floor(e.tick / MINUTES_PER_DAY) === day)
+        const from = narratedThroughSeq
         narratedThroughSeq = store.lastSeq()
-        if (events.length === 0) return
-        const today = spentToday()
-        if (stopped || today >= dailyBudget) {
+        if (stopped || spentToday() >= dailyBudget) {
           log(`stream: day ${day} goes unwritten — the chronicle is outside today's budget`)
           return
         }
         narrating = true
-        void closeDay({
-          store: chronicle,
-          llm: makeNarratorLlm(makeClient('narrator')),
-          worldDb: db,
-          events,
-          rulebookCount: rulebookCount(),
-          privateCounts: { thoughts: thoughtsOn(day), journals: 0 },
-          cast: minds.map((m) => ({ id: m.id, name: m.identity.name })),
-          world: { config, state: loop.state },
-          alert: (d) => {
-            log(`stream: chronicle — ${d}`)
-          },
-        })
-          .then((c) => {
-            log(`stream: day ${day} is written — "${c.title}"`)
-          })
-          .catch((e: unknown) => {
-            log(`stream: day ${day} went unwritten — ${e instanceof Error ? e.message : String(e)}`)
-          })
-          .finally(() => {
+        // Reading the day back is a whole sim-day of rows, so even that waits for the next turn
+        // of the loop: this handler returns to the socket first.
+        setImmediate(() => {
+          const events = store
+            .readFrom(from)
+            .filter((e) => Math.floor(e.tick / MINUTES_PER_DAY) === day)
+          if (events.length === 0) {
             narrating = false
+            return
+          }
+          void closeDay({
+            store: chronicle,
+            llm: makeNarratorLlm(makeClient('narrator')),
+            worldDb: db,
+            events,
+            rulebookCount: rulebookCount(),
+            privateCounts: { thoughts: thoughtsOn(day), journals: 0 },
+            cast: minds.map((m) => ({ id: m.id, name: m.identity.name })),
+            world: { config, state: loop.state },
+            alert: (d) => {
+              log(`stream: chronicle — ${d}`)
+            },
           })
+            .then((c) => {
+              log(`stream: day ${day} is written — "${c.title}"`)
+            })
+            .catch((e: unknown) => {
+              log(
+                `stream: day ${day} went unwritten — ${e instanceof Error ? e.message : String(e)}`,
+              )
+            })
+            .finally(() => {
+              narrating = false
+            })
+        })
       }
 
       // ── the money, on the world's own clock ──
