@@ -1,5 +1,4 @@
-import type { QuotedName } from '@sj/agents'
-import type { SimEvent } from '@sj/shared'
+import type { QuotedName, SimEvent } from '@sj/shared'
 export type SceneSegment = {
   day: number
   startTick: number

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import {

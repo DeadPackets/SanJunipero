@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { MINUTES_PER_DAY, assertQuotedName, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
 import {
-  assertQuotedName,
   CONSTRUCT_VOCABULARY,
   MID_RUN_ENFORCED,
   scanForDirective,

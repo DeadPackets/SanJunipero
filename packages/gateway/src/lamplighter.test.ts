@@ -2,15 +2,8 @@
 // scripted lamplighter, not evidence that a mind wants a lit street. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
 import { dayPhaseFromTick, isDark, lightBandAt, T_PATH, T_ROAD } from '@sj/shared'
-import {
-  EventStore,
-  RngStreams,
-  TickLoop,
-  doorTile,
-  isPassable,
-  openDb,
-  type WorldState,
-} from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, doorTile, isPassable, type WorldState } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import {
   LAMP_VERGE_REACH,

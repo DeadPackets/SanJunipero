@@ -2,13 +2,12 @@ import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, simTimeFromTick, type SimConfig } from '@sj/shared'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
-  EventStore,
   RngStreams,
   TickLoop,
   genesisState,
   makeFixtureMap,
-  openDb,
   replayLatest,
   type TickHandler,
   type TileId,

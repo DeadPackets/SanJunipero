@@ -8,11 +8,11 @@
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { EventStore } from '@sj/engine/store'
 import {
   buildTicks,
   createWorldTick,
   doorTile,
-  EventStore,
   fold,
   genesisState,
   makeGenesisWorld,

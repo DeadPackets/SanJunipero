@@ -1,3 +1,4 @@
+import { type EventStore } from '@sj/engine/store'
 import {
   ambientTempAt,
   composePerception,
@@ -14,7 +15,6 @@ import {
   submitIntent,
   waterWithinReach,
   WELL_KIND,
-  type EventStore,
   type TickHandler,
   type TickLoop,
   type WorldState,

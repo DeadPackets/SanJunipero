@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
   doorTile,
-  EventStore,
   fold,
   genesisState,
   makeGenesisWorld,
-  openDb,
   RngStreams,
   TickLoop,
   warmthTargetFor,

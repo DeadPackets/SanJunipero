@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EventStore, openDb } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore } from '../memory/store.js'
 import { FakeEmbedder } from '../testutil/fakeEmbedder.js'

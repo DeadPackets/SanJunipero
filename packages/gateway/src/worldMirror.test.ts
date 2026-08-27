@@ -4,12 +4,11 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
-  EventStore,
   RngStreams,
   TickLoop,
   genesisState,
-  openDb,
   replayFromGenesis,
   fold,
   type TileId,

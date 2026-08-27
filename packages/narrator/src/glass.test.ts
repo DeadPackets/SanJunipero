@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { NARRATOR_CANON } from './canon.js'
 import {

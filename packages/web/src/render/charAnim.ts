@@ -171,16 +171,6 @@ export function observeTick(prev: TickClock, nowMs: number, ticks = 1): TickCloc
   return { periodMs, lastArrivalMs: nowMs, samples: prev.samples + 1 }
 }
 
-/** Restates `verbs.ticksPerTile` rather than importing it: `@sj/engine` publishes no `./verbs` subpath and its barrel drags `better-sqlite3` into the browser bundle.
- *  `charAnim.test.ts` reads `engine/src/verbs.ts` off disk and asserts the two are one expression. */
-export function ticksPerTileOf(
-  needs: Readonly<Record<string, number>>,
-  cfg: { debuffThreshold: number; base: number; debuff: number },
-): number {
-  const debuffed = Object.values(needs).some((v) => v < cfg.debuffThreshold)
-  return debuffed ? cfg.debuff : cfg.base
-}
-
 /** The renderer plays the record one tick behind itself: enough to absorb websocket jitter, and the smallest amount that is any use — more is visible lag for no gain. */
 export const WALK_LEAD_TICKS = 1
 

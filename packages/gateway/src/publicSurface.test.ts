@@ -7,7 +7,8 @@ import Database from 'better-sqlite3'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
-import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import {
   createGateway,

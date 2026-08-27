@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { assertQuotedName, type LlmClient } from '@sj/agents'
+import { type LlmClient } from '@sj/agents'
 import { effectiveConfig, TOGGLABLE_PATHS } from '@sj/engine'
-import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import { MINUTES_PER_DAY, assertQuotedName, type SimConfig, type SimEvent } from '@sj/shared'
 import type { ConstructStore } from './constructStore.js'
 
 // The recognizer names a TYPE; the name itself is the town's, quoted from a mouth or left null.

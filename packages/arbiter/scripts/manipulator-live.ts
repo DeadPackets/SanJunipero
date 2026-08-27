@@ -3,7 +3,7 @@
 // through `renderHeardRaw` and once through `renderHeard`: a row is only evidence if the
 // BEFORE arm reproduces the landing the previous lane recorded.
 import { writeFileSync } from 'node:fs'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { LlmClient, migrateLlmTables, type Turn, TurnSchema } from '@sj/agents'
 // Relative, like `g11-deepworld.ts`'s cross-package imports: `assemblePrompt` and the prompt
 // fixtures are internals of `@sj/agents` and not on its public surface. A script is outside

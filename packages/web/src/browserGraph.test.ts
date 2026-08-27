@@ -169,10 +169,14 @@ describe('the browser graph', () => {
   })
 
   it('THE BATCH-1 LEAK: the engine ROOT is a banned door, its deep paths are not', () => {
-    // `import type { WorldState } from '@sj/engine'` — the literal line task 62 shipped.
+    // `openDb`/`EventStore` left the root for './store'; the root still reaches the driver
+    // through the scripted-world fixtures it also exports.
+    expect(bannedReachableFrom('@sj/engine/store')).toContain('better-sqlite3')
     expect(bannedReachableFrom('@sj/engine')).toContain('better-sqlite3')
     expect(bannedReachableFrom('@sj/engine/state')).toEqual([])
     expect(bannedReachableFrom('@sj/engine/laws')).toEqual([])
+    expect(bannedReachableFrom('@sj/engine/verbs')).toEqual([])
+    expect(bannedReachableFrom('@sj/engine/perception')).toEqual([])
     expect(bannedReachableFrom('@sj/shared')).toEqual([])
     // and no bundlable source may open a banned door, wherever in src it lives
     for (const file of walk.files) {

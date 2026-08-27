@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
   createWorldTick,
-  EventStore,
   fold,
   genesisState,
-  openDb,
   RngStreams,
   replayFromGenesis,
   TickLoop,

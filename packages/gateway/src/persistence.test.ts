@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { startDevWorld } from './devWorld.js'
 import { FOUNDERS } from './founders.js'
 import { thoughtsSince } from './observer.js'

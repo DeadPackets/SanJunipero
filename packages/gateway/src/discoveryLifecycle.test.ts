@@ -12,15 +12,8 @@ import {
   type ChronicleLookup,
   type SimEvent,
 } from '@sj/shared'
-import {
-  EventStore,
-  RngStreams,
-  TickLoop,
-  genesisState,
-  openDb,
-  replayFromGenesis,
-  type TileId,
-} from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, genesisState, replayFromGenesis, type TileId } from '@sj/engine'
 // NO CROSS-PACKAGE IMPORTS: `packages/web` is a DOM/bundler project and `packages/agents` is not
 // a gateway dependency, so their halves are read as SOURCE instead.
 import { readDiscoveries } from './discoveries.js'

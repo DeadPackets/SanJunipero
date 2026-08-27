@@ -13,7 +13,8 @@ import {
   type BondsResponse,
   type SimEvent,
 } from '@sj/shared'
-import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { toEvent, type EventRow } from './http.js'
 import { BOND_TYPES, buildBonds } from './bonds.js'

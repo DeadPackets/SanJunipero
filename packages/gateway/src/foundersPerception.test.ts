@@ -10,16 +10,9 @@ vi.mock('@sj/engine', async (importOriginal) => {
   return { ...real, composePerception: vi.fn(real.composePerception) }
 })
 
-const {
-  EventStore,
-  RngStreams,
-  TickLoop,
-  composePerception,
-  fold,
-  genesisState,
-  makeFixtureMap,
-  openDb,
-} = await import('@sj/engine')
+const { RngStreams, TickLoop, composePerception, fold, genesisState, makeFixtureMap } =
+  await import('@sj/engine')
+const { EventStore, openDb } = await import('@sj/engine/store')
 const { SHOWCASE_CONFIG, devGenesisState, devTerrain } = await import('./devWorld.js')
 const { showcaseDeck } = await import('./showcaseMap.js')
 const { foundersFor, makeFoundersOnTick, townStructuresFor } = await import('./founders.js')

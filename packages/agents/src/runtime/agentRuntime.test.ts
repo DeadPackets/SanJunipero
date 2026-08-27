@@ -2,12 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModel } from 'ai'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
   createWorldTick,
-  EventStore,
   fold,
   genesisState,
-  openDb,
   replayFromGenesis,
   registerVerb,
   RngStreams,

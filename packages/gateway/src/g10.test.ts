@@ -16,8 +16,10 @@ import {
   T_ROAD,
   type ChronicleEntry,
 } from '@sj/shared'
-import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
+import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
 import { createGateway, type Gateway } from './server.js'
 import {
   PLAZA_TILE,
@@ -36,17 +38,7 @@ const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 
 
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS scenes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL, start_tick INTEGER NOT NULL,
-      end_tick INTEGER NOT NULL, event_ids TEXT NOT NULL, "cast" TEXT NOT NULL, location TEXT);
-    CREATE TABLE IF NOT EXISTS chapters (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL UNIQUE, title TEXT NOT NULL,
-      text TEXT NOT NULL, citations TEXT NOT NULL, scene_ids TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS milestones (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL UNIQUE, label TEXT NOT NULL,
-      event_seq INTEGER NOT NULL, day INTEGER NOT NULL, tick INTEGER NOT NULL);
-  `)
+  db.exec(NARRATOR_DDL)
   return db
 }
 

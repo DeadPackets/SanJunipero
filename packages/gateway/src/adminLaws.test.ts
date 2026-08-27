@@ -5,15 +5,8 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
-import {
-  EventStore,
-  RngStreams,
-  TickLoop,
-  createWorldTick,
-  genesisState,
-  openDb,
-  type TileId,
-} from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, createWorldTick, genesisState, type TileId } from '@sj/engine'
 import { createLawsAdmin } from './adminLaws.js'
 import { createGateway, type Gateway } from './server.js'
 import { frameText } from './http.js'

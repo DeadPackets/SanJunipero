@@ -1,4 +1,4 @@
-import type { EventStore } from '@sj/engine'
+import type { EventStore } from '@sj/engine/store'
 import type { SimEvent } from '@sj/shared'
 
 export type SeedEntry = { text: string; importance: number; tags: string[] }

@@ -136,7 +136,7 @@ describe('codex', () => {
 
 describe('codex known-column migration', () => {
   it('adds the known column (default 1) to a pre-existing codex table and keeps old rows behaving', async () => {
-    const { openDb } = await import('@sj/engine')
+    const { openDb } = await import('@sj/engine/store')
     const sqliteVec = await import('sqlite-vec')
     const { migrateArbiterTables } = await import('./schema.js')
 
