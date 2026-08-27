@@ -10,7 +10,7 @@ import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { INTERIORS_CONTENT_DIR, INTERIOR_PIECES, type InteriorPiece } from '../src/interiorArt.js'
 import { cropToGrid, seamReport, seamlessMaterial, toMaterialGrid } from '../src/terrainGen.js'
-import { paletteDistance } from '../src/pixelGates.js'
+import { SURFACE_PALETTE_DISTANCE_MAX, paletteDistance } from '../src/pixelGates.js'
 import { refusalMessage } from '../src/gate.js'
 import { GEN_MODEL, PALETTE_WORDS, imageGen } from './lib/cells.js'
 import { scratch } from './scratch.js'
@@ -56,7 +56,11 @@ const ROLE_CLAUSE: Record<InteriorPiece['role'], string> = {
     'It fills the frame from left edge to right edge, and stands the full height of the room: ' +
     'the ceiling line is at the very top of the frame and the floor line at the very bottom. ' +
     'NO floor is visible, NO ceiling is visible, NO side walls, NO furniture standing in front ' +
-    'of it, NO people. Lit evenly from the upper left.',
+    'of it, NO people. Lit evenly from the upper left. ' +
+    // Measured: the first round came back with a mean of 184,97,115 — the plaster had drifted
+    // onto the dusty-rose ramp, which is what the terrain path used to spend a palette guard on.
+    'The plaster is CREAM and the timber is HONEY-BROWN: warm, but on the cream-and-wood side ' +
+    'of the palette. NOT pink, NOT rose, NOT mauve, NOT salmon, NOT terracotta anywhere.',
 }
 
 function prompt(p: InteriorPiece): string {
@@ -120,6 +124,11 @@ function gateOf(p: InteriorPiece, img: RawImage): string[] {
       break
     }
   if (p.role === 'floor-material' && !seamReport(img).pass) fails.push('the wrap has a seam')
+  // The piece keeps the model's colours, but one this far from the town's forty is not in the
+  // town. The SURFACE bound, not the sprite one: an interior piece is opaque edge to edge.
+  const dist = paletteDistance(img)
+  if (dist > SURFACE_PALETTE_DISTANCE_MAX)
+    fails.push(`palette distance ${dist.toFixed(1)} over ${SURFACE_PALETTE_DISTANCE_MAX}`)
   return fails
 }
 
