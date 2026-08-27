@@ -8,7 +8,7 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { PALETTE_WORDS, SWATCH_CLAUSE } from '@sj/forge/gen'
-import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   CELL_V2,
@@ -30,9 +30,11 @@ import {
   type AuthoredFacing,
   type StripPoseV4,
 } from '../src/mirror.js'
-import { processHiResCell } from '../src/hires.js'
+import { CHAR_CELL_PX, spriteCell } from '../src/reCell.js'
+import { trimToFigure } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
-import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from '../src/pixelGates.js'
+import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pixelGates.js'
+import { quantize } from '../src/post/quantize.js'
 import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL } from './character.js'
@@ -61,6 +63,11 @@ if (RUN.length === 0) throw new Error(`CAST=${process.env.CAST} matches no cast 
 const S = scratch('ar')
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
+// The figure is asked for at four fifths of the frame, so this decides the whole factor the cell
+// is cut on — and with it how far two generations' figures can land apart. See regen-probe.md.
+const GEN_PX = 2048
+const SIZE = `${GEN_PX}x${GEN_PX}`
+const RESERVE = 0.15
 
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)
@@ -257,8 +264,22 @@ function keyBg(img: RawImage): RawImage {
   throw new Error('keyBg: <10% keyed even at tolerance 110')
 }
 
+// ONE WHOLE FACTOR PER CELL and no source correction: the figure lands where the factor puts it,
+// and the report's figure spread is what says whether the walk cycle still reads.
+const cutCell = (img: RawImage, anchor: 'feet' | 'centre' = 'feet'): RawImage =>
+  spriteCell(img, { cellPx: CHAR_CELL_PX, anchor }).cell
+
+const figureHeight = (img: RawImage): number => {
+  const b = opaqueBbox(img)
+  return b === null ? 0 : b.y1 - b.y0 + 1
+}
+
 const MAX_ART_H = FEET_Y_V2 + 1
-function gateView(img: RawImage): RawImage {
+// TRIMMED first, and that is what makes the fit below NORMALISE scale. The old chain trimmed
+// every cell to its figure, so this got it for free; a 256 canvas with the figure somewhere
+// inside does not, and the gates read the size difference as a broken head and a broken palette.
+function gateView(cell: RawImage): RawImage {
+  const img = trimToFigure(cell)
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
   const fitted =
     k === 1
@@ -268,7 +289,9 @@ function gateView(img: RawImage): RawImage {
           Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
           Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
         )
-  return anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2)
+  // MEASUREMENT ONLY, and the shipped cell is never snapped: paletteJaccard eps-clusters the
+  // union of both images' colours, and on a continuous field that closure swallows every cluster.
+  return quantize(anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2))
 }
 
 const CALIBRATED_MEDIAN = 0.31
@@ -334,17 +357,16 @@ async function runCharacter(m: CastMember): Promise<void> {
       key,
       masterPrompt(m, proportionRef !== null),
       refs,
-      '1024x1024',
-      0.08,
+      SIZE,
+      RESERVE,
       assetId,
     )
     try {
       const segs = sliceStrip(keyBg(await decodePng(raw)), 2)
       const { estimatePitch } = await import('../src/sheet.js')
       const pitches = segs.map((s) => estimatePitch(s))
-      const seHi = processHiResCell(segs[0]!)
-      const b = opaqueBbox(seHi)!
-      const neHi = processHiResCell(segs[1]!, b.y1 - b.y0 + 1)
+      const seHi = cutCell(segs[0]!)
+      const neHi = cutCell(segs[1]!)
       const frontBack = cellDistance(gateView(seHi), gateView(neHi))
       const pitch = Math.min(...pitches)
       push(
@@ -390,7 +412,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       /* one cluster — good */
     }
     if (two) throw new Error('slices into 2 figure clusters — multi-figure frame')
-    const hi = processHiResCell(keyed, TARGET_H)
+    const hi = cutCell(keyed)
     // `sliceStrip` catches a second FIGURE but not the model captioning its own work — a caption
     // inside the figure's own column reads as one cluster. Hard reject: another candidate is drawn.
     const sole = soleSilhouetteGate(hi)
@@ -428,15 +450,7 @@ async function runCharacter(m: CastMember): Promise<void> {
     }
     let raw: Buffer
     try {
-      raw = await candidate(
-        DIR,
-        key,
-        framePrompt(m, f, p),
-        [soloRef[f]],
-        '1024x1024',
-        0.08,
-        assetId,
-      )
+      raw = await candidate(DIR, key, framePrompt(m, f, p), [soloRef[f]], SIZE, RESERVE, assetId)
     } catch (e) {
       if (e instanceof OutOfBudget) throw e
       push(`${key}: generation FAILED — ${String(e).slice(0, 160)}`)
@@ -504,7 +518,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       push(`${key}: REFUSED BY EYE`)
       continue
     }
-    const raw = await candidate(DIR, key, sleepPrompt(m), [soloRef.se], '1024x1024', 0.08, assetId)
+    const raw = await candidate(DIR, key, sleepPrompt(m), [soloRef.se], SIZE, RESERVE, assetId)
     try {
       const keyed = keyBg(await decodePng(raw))
       let two = false
@@ -515,17 +529,7 @@ async function runCharacter(m: CastMember): Promise<void> {
         /* one cluster — good */
       }
       if (two) throw new Error('slices into 2 figure clusters')
-      let hi = processHiResCell(keyed)
-      const b = opaqueBbox(hi)!
-      const bw = b.x1 - b.x0 + 1
-      if (bw !== TARGET_H) {
-        const k = TARGET_H / bw
-        hi = downscaleNearest(
-          hi,
-          Math.max(1, Math.round(hi.width * k)),
-          Math.max(1, Math.round(hi.height * k)),
-        )
-      }
+      const hi = cutCell(keyed, 'centre')
       const failures = sleepCoherenceGateV4(masterGate.se, gateView(hi))
       push(
         `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
@@ -568,9 +572,13 @@ async function runCharacter(m: CastMember): Promise<void> {
   const { image, manifest } = packCharacterAtlas(cells, TARGET_H)
   const atlas = await encodePng(image)
 
-  const bar = [...alphaBinaryGate(image).failures, ...paletteGate(image).failures]
+  // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
+  const bar = alphaBinaryGate(image).failures
+  const figures = [...cells].map(([, img]) => figureHeight(img))
   push(
-    `atlas ${image.width}x${image.height}: ${bar.length === 0 ? 'pixel bar clean' : bar.join('; ')}`,
+    `atlas ${image.width}x${image.height}: ${bar.length === 0 ? 'pixel bar clean' : bar.join('; ')}, ` +
+      `palette distance ${paletteDistance(image).toFixed(1)}, ` +
+      `figure spread ${Math.min(...figures)}–${Math.max(...figures)} px`,
   )
   // the same ruling: the packed atlas is measured here and was written whatever it said
   if (bar.length > 0)

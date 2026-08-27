@@ -13,8 +13,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AssetCodex } from './codex.js'
 import { decodePng, encodePng, type RawImage } from './post/raw.js'
-import { quantize } from './post/quantize.js'
-import { paletteRgb } from './palette.js'
 import { applyTint } from './tints.js'
 import {
   SHEET_COLS,
@@ -107,7 +105,7 @@ export function cohereVariants(variants: RawImage[]): RawImage[] {
     for (let j = 0; j < out.data.length; j += 4) {
       for (let k = 0; k < 3; k++) out.data[j + k] = Math.round(v.data[j + k]! + shift[k]!)
     }
-    return quantize(out, paletteRgb())
+    return out
   })
 }
 
@@ -281,7 +279,7 @@ export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
       }
     }
   })
-  return tint === null ? sheet : quantize(applyTint(sheet, tint))
+  return tint === null ? sheet : applyTint(sheet, tint)
 }
 
 export function seasonSheets(book: MaterialBook): Record<Season, RawImage> {

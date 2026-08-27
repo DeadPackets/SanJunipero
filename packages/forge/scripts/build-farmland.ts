@@ -1,7 +1,7 @@
 // OFFLINE, $0.00 — rebuild the farmland material the user rejected.
 // The soil is `terrain_earth_0` graded and the furrow is arithmetic; every generated attempt
 // self-tiled into a lattice, because the style anchor attached to a terrain call IS a cottage.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodePng, encodePng } from '../src/post/raw.js'
@@ -13,7 +13,7 @@ import {
   selfTile3x3,
 } from '../src/terrainGen.js'
 import { FURROW_DEPTH, FURROW_LIP, FURROW_PITCH_PX, ploughFurrows } from '../src/plough.js'
-import { paletteGate } from '../src/pixelGates.js'
+import { PALETTE_DISTANCE_MAX, paletteDistance } from '../src/pixelGates.js'
 import { scratch } from './scratch.js'
 
 const S = scratch()
@@ -40,15 +40,20 @@ const farmland = ploughFurrows(soil)
 const s = seamReport(farmland),
   b = borderReport(farmland)
 const veto = materialVeto(farmland)
-const bar = paletteGate(farmland).failures
+// Palette MEMBERSHIP was the quantize's signature; the grade keeps the soil's own colours now.
+const dist = paletteDistance(farmland)
+const bar =
+  dist <= PALETTE_DISTANCE_MAX
+    ? []
+    : [`palette distance ${dist.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`]
 console.log(`furrow pitch ${FURROW_PITCH_PX}, depth ${FURROW_DEPTH}, lip ${FURROW_LIP}`)
 console.log(
   `seam h=${s.horizontalDelta.toFixed(1)} v=${s.verticalDelta.toFixed(1)} ring=${b.ringDelta.toFixed(1)}`,
 )
 console.log(`veto: ${veto ?? 'none'}`)
-console.log(`palette: ${bar.join('; ') || 'clean'}`)
+console.log(`palette distance ${dist.toFixed(1)}: ${bar.join('; ') || 'clean'}`)
 
-// `materialVeto` and `paletteGate` are binding here because this writes COMMITTED content;
+// `materialVeto` and the palette distance are binding here because this writes COMMITTED content;
 // the seam gate is instead consumed by `terrainIngest.test.ts` over every shipped material.
 if (veto !== null || bar.length > 0)
   throw new Error(
@@ -58,5 +63,6 @@ if (veto !== null || bar.length > 0)
   )
 
 writeFileSync(join(MATERIALS, 'terrain_farmland_0.png'), await encodePng(farmland))
+mkdirSync(`${S}/fqc2/plough`, { recursive: true })
 writeFileSync(`${S}/fqc2/plough/shipped-3x3.png`, await encodePng(selfTile3x3(farmland)))
 console.log('wrote content/tilesets/materials/terrain_farmland_0.png')

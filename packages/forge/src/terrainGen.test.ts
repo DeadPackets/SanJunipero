@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS } from '@sj/shared'
 import { MASTER_PALETTE } from './palette.js'
+import { paletteDistance } from './pixelGates.js'
 import { decodePng, type RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
@@ -220,10 +221,13 @@ describe('seamlessMaterial', () => {
     expect(materialVeto(seamlessMaterial(road))).toBeNull()
   })
 
-  it('keeps the material palette-true, opaque and the same size', async () => {
+  // Palette-TRUE was the quantize's signature. The wrap blends two rolled copies, so the material
+  // keeps the model's own colours and is only measured for its DISTANCE to the palette.
+  it('keeps the material opaque, near the palette and the same size', async () => {
     const m = seamlessMaterial(await offender('farmland'))
     expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])
-    expect(offenders(m, true)).toEqual([])
+    expect(offenders(m, true).filter((o) => o.startsWith('alpha'))).toEqual([])
+    expect(paletteDistance(m)).toBeLessThan(20)
   })
 
   it('is deterministic', async () => {

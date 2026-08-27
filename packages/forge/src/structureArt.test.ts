@@ -9,7 +9,12 @@ import {
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { decodePng } from './post/raw.js'
-import { alphaBinaryGate, nativeDensityGate, paletteGate } from './pixelGates.js'
+import {
+  PALETTE_DISTANCE_MAX,
+  alphaBinaryGate,
+  nativeDensityGate,
+  paletteDistance,
+} from './pixelGates.js'
 import { TOWN_TILE } from './assetResolution.js'
 import { buildingCellPx } from './reCell.js'
 import {
@@ -314,7 +319,7 @@ describe('the committed cells', () => {
       cellPx,
     ])
     expect(alphaBinaryGate(img).failures).toEqual([])
-    expect(paletteGate(img).failures).toEqual([])
+    expect(paletteDistance(img)).toBeLessThan(PALETTE_DISTANCE_MAX)
     expect(
       nativeDensityGate({
         name: c.dir,

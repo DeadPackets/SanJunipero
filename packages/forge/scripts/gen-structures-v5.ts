@@ -1,4 +1,5 @@
 // LIVE — the EIGHT kinds the widened coverage gate found bare, in ten cells. Cap $STRUCT_CAP.
+import { footprintFor } from '@sj/shared'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
@@ -160,6 +161,19 @@ const SUBJECTS: readonly Subject[] = [
       'the ground. It is noticeably LONGER than it is wide. Parked, weathered, nobody in it',
   },
   {
+    id: 'lamp-post',
+    kind: 'lamp_post',
+    fp: { w: 1, h: 1 },
+    cells: 'one',
+    clause: 'symmetric',
+    desc:
+      'a single village LAMP POST standing on the verge. One slim upright post of dark painted ' +
+      'iron, about three times a person’s height, set in a small square warm-grey stone base. ' +
+      'At the top, a short curved arm carries ONE four-sided lantern of clear glass in a dark ' +
+      'metal frame with a small peaked cap, lit a soft honey-cream. The post is plain: no ' +
+      'ladder bar, no banner, no sign, no wires, no second lamp. Nothing else stands with it',
+  },
+  {
     id: 'bridge',
     kind: 'bridge',
     fp: { w: 1, h: 2 },
@@ -211,7 +225,9 @@ for (const s of SUBJECTS) {
     jobs.push({
       label: facingKind(s.id, facing).replace(':', '-'),
       kind: facingKind(s.kind, facing),
-      fp: s.fp,
+      // `s.fp` is the UNTURNED mass; an SE cell stands on it turned, and the manifest has to say
+      // the ground the object actually covers. `structureArt.test.ts` is what measures this.
+      fp: footprintFor(s.fp, facing),
       prompt: prompt(s, facing),
     })
 }

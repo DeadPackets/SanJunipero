@@ -9,12 +9,7 @@ import { paletteSwatchPng } from '../../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell, type SpritePlan } from '../../src/reCell.js'
-import {
-  classDensityGate,
-  integerScaleGate,
-  paletteDistance,
-  spriteDensity,
-} from '../../src/pixelGates.js'
+import { classDensityGate, paletteDistance, spriteDensity } from '../../src/pixelGates.js'
 import { TOWN_TILE } from '../../src/assetResolution.js'
 import { refusalMessage } from '../../src/gate.js'
 import { BUILDINGS_CONTENT_DIR } from '../../src/buildingArt.js'
@@ -22,6 +17,47 @@ import { BUILDINGS_CONTENT_DIR } from '../../src/buildingArt.js'
 const MODEL = 'google/gemini-3.1-flash-image'
 const GEN_PX = 2048
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
+
+/** ONE provider call. Shared so a second producer cannot drift from this one's request shape. */
+export async function imageGen(o: {
+  key: string
+  prompt: string
+  size: string
+  refs: readonly Buffer[]
+}): Promise<{ raw: Buffer; cost: number | undefined; width: number; height: number }> {
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${o.key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      prompt: o.prompt,
+      size: o.size,
+      response_format: 'b64_json',
+      input_references: o.refs.map((r) => ({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+      })),
+      usage: { include: true },
+    }),
+  })
+  if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
+  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
+  const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
+  if (!b64) throw new Error(`${MODEL}: no b64_json`)
+  const [w, h] = o.size.split('x').map(Number)
+  return { raw: Buffer.from(b64, 'base64'), cost: json.usage?.cost, width: w!, height: h! }
+}
+
+export const GEN_MODEL = MODEL
+
+// ★ `integerScaleGate(GEN_PX, cellPx)` used to stand here, and it refused cells that are provably
+// clean: `spriteCell` divides by `ceil(subjectPx / cellPx)`, so the divide is ALWAYS whole and the
+// window ALWAYS contains the subject — GEN_PX needing to be a multiple of cellPx was never the
+// property. Measured on the cached raws: cottage (cellPx 640, window 1920 INSIDE the 2048 source)
+// was refused, and farmhouse (window 2304, overrunning by 256) came out 630x651 = exactly its
+// source subject divided by 3, binary alpha, feet on the last row. What can really go wrong is a
+// subject too SMALL for its canvas, so that is what refuses one now.
+const CELL_FILL_MIN = 0.6
 
 // The palette, in words, for the calls that carry no building reference.
 export const PALETTE_WORDS = [
@@ -73,32 +109,12 @@ export async function runCells(o: RunOptions): Promise<void> {
     const reserve = 0.15
     if (budget.total + reserve > cap)
       throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${cap})`)
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        prompt,
-        size: `${GEN_PX}x${GEN_PX}`,
-        response_format: 'b64_json',
-        input_references: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${ref.toString('base64')}` },
-          },
-        ],
-        usage: { include: true },
-      }),
-    })
-    if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
-    const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-    const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
-    if (!b64) throw new Error(`${MODEL}: no b64_json`)
-    const cost = json.usage?.cost ?? reserve
+    const r = await imageGen({ key: key!, prompt, size: `${GEN_PX}x${GEN_PX}`, refs: [ref] })
+    const cost = r.cost ?? reserve
     budget.spend(cost)
     ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost }) // throws past the $5 anomaly stop
     ledger.flush()
-    return { raw: Buffer.from(b64, 'base64'), cost }
+    return { raw: r.raw, cost }
   }
 
   // The ONLY reference any call here carries: a colour chart, never a building.
@@ -124,9 +140,6 @@ export async function runCells(o: RunOptions): Promise<void> {
       dist: number
     }
     const cands: Cand[] = []
-    // No per-candidate input: a generation that does not divide by the cell cannot land on the
-    // grid at all, so decide it BEFORE the loop spends on attempts that cannot pass.
-    const fails = integerScaleGate({ w: GEN_PX, h: GEN_PX }, { w: cellPx, h: cellPx }).failures
 
     for (let i = 0; i < maxAttempts; i++) {
       const candKey = `${job.label}-c${i}`
@@ -151,11 +164,19 @@ export async function runCells(o: RunOptions): Promise<void> {
         const r = spriteCell(keyBg(await decodePng(buf)), { cellPx, anchor: 'feet' })
         // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
         const dist = paletteDistance(r.cell)
+        const fill = r.plan.subjectPx / r.plan.window
+        const fails =
+          fill >= CELL_FILL_MIN
+            ? []
+            : [
+                `subject fills ${(fill * 100).toFixed(1)}% of the cell, floor ${CELL_FILL_MIN * 100}%`,
+              ]
         const refused = rejected.has(candKey)
         if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails, dist })
         const msg =
           `${job.label}: ${candKey} subject ${r.plan.subjectPx}px, factor ${r.plan.factor}, ` +
-          `window ${r.plan.window}, palette distance ${dist.toFixed(1)}, ` +
+          `window ${r.plan.window}, fill ${(fill * 100).toFixed(1)}%, ` +
+          `palette distance ${dist.toFixed(1)}, ` +
           (fails.length === 0 ? 'gates clean' : fails.join('; ')) +
           (refused ? ' — REFUSED BY EYE' : '')
         lines.push(msg)

@@ -8,9 +8,7 @@ import {
   type Season,
   type TerrainTileKind,
 } from '@sj/shared'
-import { paletteRgb } from './palette.js'
 import { downscaleNearest, type RawImage } from './post/raw.js'
-import { quantize } from './post/quantize.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import { paintRoadAutotile } from './roadTiles.js'
 import { tileSeamGate } from './pixelGates.js'
@@ -35,6 +33,23 @@ export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): Ra
 // The ground is a CONTINUOUS world-space material field, not per-tile art, so the material carries
 // the fidelity: 256 is eight tile-widths, and what a 512 generation supports after the crop.
 export const MATERIAL_PX = 256
+
+// The material is CUT from the generation, never resampled onto it: the crop is the largest whole
+// multiple of the grid that fits inside the margin, so what follows is a whole-factor divide. From
+// a 512 candidate that is 256 at factor 1 — the model's own pixels, and twice the frame cut.
+export function cropToGrid(img: RawImage, px: number, margin: number = CANDIDATE_MARGIN): RawImage {
+  const span = Math.min(img.width, img.height)
+  const side = Math.floor((span - 2 * Math.round(span * margin)) / px) * px
+  if (side < px) return cropMargin(img, margin)
+  const x0 = (img.width - side) >> 1,
+    y0 = (img.height - side) >> 1
+  const out: RawImage = { width: side, height: side, data: new Uint8ClampedArray(side * side * 4) }
+  for (let y = 0; y < side; y++) {
+    const src = ((y + y0) * img.width + x0) * 4
+    out.data.set(img.data.subarray(src, src + side * 4), y * side * 4)
+  }
+  return out
+}
 
 // Comparing opposing edges PIXEL BY PIXEL is the wrong instrument for organic noise: two edges of
 // one stochastic material disagree almost everywhere. This compares the mean tone of a strip.
@@ -204,8 +219,8 @@ export function planTerrainProgram(): TerrainItem[] {
 
 // ------------------------------------------------------------------ post
 
-// Box-average onto the material grid, then snap to MASTER_PALETTE: averaging first keeps a 512
-// generation's grain from aliasing, and float block bounds let a smaller source still fill it.
+// The MEDIAN of each block, never the mean and never a palette snap: a mean between two palette
+// members is a colour that is in neither, which is the blend the sprite law exists to stop.
 export function toMaterialGrid(img: RawImage, px: number = MATERIAL_PX): RawImage {
   const out: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   for (let y = 0; y < px; y++) {
@@ -214,33 +229,28 @@ export function toMaterialGrid(img: RawImage, px: number = MATERIAL_PX): RawImag
     for (let x = 0; x < px; x++) {
       const x0 = Math.floor((x * img.width) / px)
       const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * img.width) / px))
-      let r = 0,
-        g = 0,
-        b = 0,
-        n = 0
+      const rs: number[] = [],
+        gs: number[] = [],
+        bs: number[] = []
       for (let sy = y0; sy < y1 && sy < img.height; sy++) {
         for (let sx = x0; sx < x1 && sx < img.width; sx++) {
           const i = (sy * img.width + sx) * 4
-          r += img.data[i]!
-          g += img.data[i + 1]!
-          b += img.data[i + 2]!
-          n++
+          rs.push(img.data[i]!)
+          gs.push(img.data[i + 1]!)
+          bs.push(img.data[i + 2]!)
         }
       }
+      const mid = (v: number[]): number => v.sort((p, q) => p - q)[v.length >> 1]!
       const d = (y * px + x) * 4
-      out.data.set(
-        n === 0 ? [0, 0, 0, 255] : [Math.round(r / n), Math.round(g / n), Math.round(b / n), 255],
-        d,
-      )
+      // ground is never see-through
+      out.data.set(rs.length === 0 ? [0, 0, 0, 255] : [mid(rs), mid(gs), mid(bs), 255], d)
     }
   }
-  const q = quantize(out, paletteRgb())
-  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255 // ground is never see-through
-  return q
+  return out
 }
 
 export function materialFromCandidate(raw: RawImage, px: number = MATERIAL_PX): RawImage {
-  return toMaterialGrid(cropMargin(raw), px)
+  return toMaterialGrid(cropToGrid(raw, px), px)
 }
 
 export type SeamReport = {
@@ -405,9 +415,7 @@ export function seamlessMaterial(m: RawImage): RawImage {
         out.data[o + k] = Math.round(m.data[i + k]! * a + m.data[j + k]! * (1 - a))
       out.data[o + 3] = 255
     }
-  const q = quantize(out, paletteRgb())
-  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255
-  return q
+  return out
 }
 
 // A rim on art that is already paid for gets CUT rather than regenerated. Every pass costs WRAP —
@@ -429,22 +437,6 @@ export function deframe(m: RawImage): { material: RawImage; passes: number } {
 export type Grade = {
   targetMean?: readonly [number, number, number]
   contrast?: number
-  /** drop the warm half of MASTER_PALETTE before quantizing (see coolPalette) */
-  coolOnly?: boolean
-  /** drop only the pink/purple entries, keeping the sandy ramp (see noRosePalette) */
-  noRose?: boolean
-}
-
-// Quantizing a green-grey midtone against the WHOLE palette lets it snap to dusty rose, which is
-// why the graded grass came out flecked with pink. Green ground has no business on the warm ramp.
-export function coolPalette(): ReturnType<typeof paletteRgb> {
-  return paletteRgb().filter((p) => p[0] <= p[1] + 18)
-}
-
-// A stone road is warm and needs its sandy ramp; what it must not borrow is the ROSE ramp. Pinks
-// sit where red leads green but green does NOT lead blue; tans keep green well clear of blue.
-export function noRosePalette(): ReturnType<typeof paletteRgb> {
-  return paletteRgb().filter((p) => !(p[0] > p[1] + 25 && p[1] - p[2] < 20))
 }
 
 export function materialMean(m: RawImage): [number, number, number] {
@@ -473,8 +465,8 @@ export function materialContrast(m: RawImage): number {
   return n === 0 ? 0 : Math.sqrt(sd / n)
 }
 
-// Contrast first (pull each pixel toward the material's own mean), then the mean shift, then
-// back onto MASTER_PALETTE so the result is still palette-true.
+// Contrast first (pull each pixel toward the material's own mean), then the mean shift. Both are
+// per-pixel tone: no pixel borrows a neighbour's colour and none is snapped to a palette member.
 export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
   const k = grade.contrast ?? 1
   const from = materialMean(m)
@@ -489,18 +481,16 @@ export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
         out.data[i + c] = out.data[i + c]! + (grade.targetMean[c]! - now[c]!)
     }
   }
-  const palette =
-    grade.coolOnly === true ? coolPalette() : grade.noRose === true ? noRosePalette() : paletteRgb()
-  return quantize(out, palette)
+  return out
 }
 
 // Targets measured off the v1 materials, which the user accepted structurally.
 export const MATERIAL_GRADES: Record<string, Grade> = {
-  grass: { targetMean: [151, 184, 119], contrast: 0.6, coolOnly: true },
-  road: { targetMean: [205, 183, 148], contrast: 0.85, noRose: true },
+  grass: { targetMean: [151, 184, 119], contrast: 0.6 },
+  road: { targetMean: [205, 183, 148], contrast: 0.85 },
   // The calm variant came back almost FLAT, and a large flat warm tan against a sage field reads
   // chromatic, so it is nudged UP — still far under the plaza cobble's grit.
-  [CALM_ROAD_NAME]: { targetMean: [205, 183, 148], contrast: 1.2, noRose: true },
+  [CALM_ROAD_NAME]: { targetMean: [205, 183, 148], contrast: 1.2 },
 }
 
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a
