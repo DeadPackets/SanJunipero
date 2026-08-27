@@ -1,9 +1,10 @@
 import {
   CITY_GROUND,
-  isWet,
+  T_CHANNEL,
   T_FARMLAND,
   T_GRASS,
   T_ROAD,
+  T_WATER,
   TOWN_SQUARE,
   blockGroundOf,
   claimTownPlot,
@@ -62,6 +63,10 @@ export function standingRects(state: WorldState): WorldRect[] {
     .map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h }))
 }
 
+// Open water and a dug channel, named from the shared alphabet but kept as a local set: the
+// lattice search asks this per tile of every claim, and a cross-package call there is measurable.
+const WET: ReadonlySet<number> = new Set([T_WATER, T_CHANNEL])
+
 /** Unions the grammar's channel with the world's water: the fork reaches the lattice at ring 3,
  *  where blocks (0,-3) and (1,-3) would stand in it. Off-array reads DRY — absent is not wet. */
 export function townGroundOf(state: WorldState, square: WorldXY): Ground {
@@ -69,7 +74,7 @@ export function townGroundOf(state: WorldState, square: WorldXY): Ground {
     const g = CITY_GROUND(dx, dy)
     if (g !== 'dry') return g
     const tile = state.terrain[square.y + dy]?.[square.x + dx]
-    return tile !== undefined && isWet(tile) ? 'water' : 'dry'
+    return tile !== undefined && WET.has(tile) ? 'water' : 'dry'
   }
 }
 
@@ -82,7 +87,7 @@ export function townWalkOf(state: WorldState, square: WorldXY): Walk {
       y = square.y + dy
     const tile = state.terrain[y]?.[x]
     if (tile === undefined) return false
-    return !isWet(tile) || bridgeAt(state, x, y)
+    return !WET.has(tile) || bridgeAt(state, x, y)
   }
 }
 
