@@ -30,7 +30,7 @@ import {
   isPlottedKind,
   stepBuild,
   workPenalty,
-} from './verbs.js'
+} from './verbs/index.js'
 import {
   claimInWorld,
   layBlock,

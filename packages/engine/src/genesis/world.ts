@@ -16,7 +16,7 @@ import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
-import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs.js'
+import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
 
 // The world on the morning of day one, authored from (x, y) arithmetic alone. NO RNG anywhere:
 // two calls with the same config are deep-equal, which is what lets replay start here.

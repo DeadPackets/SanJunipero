@@ -6,7 +6,7 @@ import { effectiveConfig } from './laws.js'
 import { composePerception } from './perception.js'
 import { RngStream, RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

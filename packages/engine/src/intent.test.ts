@@ -4,7 +4,7 @@ import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { stepWalk, VERBS } from './verbs.js'
+import { stepWalk, VERBS } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({

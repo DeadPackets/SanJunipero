@@ -1,7 +1,7 @@
 import { flamesAt, simTimeFromTick } from '@sj/shared'
 import { occupantsOf } from '../interiors.js'
 import type { Structure, WorldState } from '../state.js'
-import { isAdjacentToRect } from '../verbs.js'
+import { isAdjacentToRect } from '../verbs/index.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Footprints whose nearest tiles touch, orthogonally or diagonally.

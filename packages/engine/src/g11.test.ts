@@ -23,7 +23,7 @@ import { replayFromGenesis } from './replay.js'
 import { RngStreams } from './rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from './state.js'
 import { GROWTH_EDGES } from './systems/mapGrowth.js'
-import { VERBS, type PendingEvent } from './verbs.js'
+import { VERBS, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

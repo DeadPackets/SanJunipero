@@ -24,7 +24,7 @@ import {
   nutritionOf,
   workPenalty,
   type PendingEvent,
-} from './verbs.js'
+} from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

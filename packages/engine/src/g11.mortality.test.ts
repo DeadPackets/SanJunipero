@@ -15,7 +15,7 @@ import { composePerception } from './perception.js'
 import { RngStreams } from './rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from './state.js'
 import { DEATH_CAUSES, type DeathCause } from './systems/mortality.js'
-import { PALE_MUSHROOM, type PendingEvent } from './verbs.js'
+import { PALE_MUSHROOM, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

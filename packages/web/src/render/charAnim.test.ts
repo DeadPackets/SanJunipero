@@ -398,7 +398,16 @@ describe('character hit area + name tag', () => {
 // ══════════════════════════════════════════════════════════════════════════════════════════
 
 const ENGINE_SRC = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'engine', 'src', 'verbs.ts'),
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    '..',
+    'engine',
+    'src',
+    'verbs',
+    'index.ts',
+  ),
   'utf8',
 )
 const SHARED_CONFIG_SRC = readFileSync(

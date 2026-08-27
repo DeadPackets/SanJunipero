@@ -4,7 +4,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStream } from './rng.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 
 // `stow` is the inverse of `take`: it closes the "no way yet to shelve what you hold" gap.
 

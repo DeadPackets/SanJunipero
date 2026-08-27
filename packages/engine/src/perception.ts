@@ -23,7 +23,7 @@ import {
 } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
+import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs/index.js'
 
 // A pure projection of what one agent can sense: it never mutates state and never draws
 // randomness, so identical inputs produce bit-identical packets.
