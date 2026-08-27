@@ -6,9 +6,35 @@ describe('protocol', () => {
     const msg = {
       t: 'tick',
       tick: 42,
+      seq: 7,
       events: [{ seq: 7, tick: 42, type: 'agent_moved', payload: { id: 'a', x: 1, y: 2 } }],
     }
     expect(ServerMsg.parse(msg)).toEqual(msg)
+    // The invalidation signal: a tick with no `seq` leaves a read model nothing to key on.
+    const { seq: _seq, ...noSeq } = msg
+    expect(() => ServerMsg.parse(noSeq)).toThrow()
+  })
+
+  it('★ hands a greeted socket the codex in one frame, not one frame per record', () => {
+    const record = {
+      id: 'house-1',
+      seq: 1,
+      class: 'building',
+      desc: 'a house',
+      kind: 'house',
+      meta: null,
+      footprint: { w: 2, h: 2 },
+      widthPx: 4,
+      heightPx: 4,
+      status: 'placeholder',
+      score: null,
+      attempts: 1,
+      costUsd: 0,
+      createdAt: '2026-01-01',
+    }
+    const records = [record, { ...record, id: 'house-2', seq: 2 }]
+    expect(ServerMsg.parse({ t: 'assets', records })).toEqual({ t: 'assets', records })
+    expect(() => ServerMsg.parse({ t: 'asset', record })).toThrow()
   })
   it('rejects unknown keys and unknown discriminants', () => {
     expect(() =>

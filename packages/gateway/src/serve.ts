@@ -7,29 +7,39 @@
 //   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
 //   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money.
 //   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
+//   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
+//   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
+//   SJ_ADMIN_TOKEN=… …          open the loopback law channel (POST /admin/laws) behind a bearer
 //
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
 import { existsSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { TOWN_RINGS_GENESIS } from '@sj/shared'
-import { startDevWorld, type DevMapKind, type LiveCast } from './devWorld.js'
+import { createLawsAdmin } from './adminLaws.js'
+import { startDevWorld, type LiveCast } from './devWorld.js'
+import { intEnv, parseWorldEnv } from './worldEnv.js'
 
 export const STREAM_PORT = 8080
 export const STREAM_LAMPS = 8
 /** Per-mind memory, beside the world db so one volume and one `SJ_FRESH=1` cover both. */
 export const STREAM_MINDS_DIR = 'data/minds'
+/** The operator's law channel. LOOPBACK ONLY and off unless `SJ_ADMIN_TOKEN` is set: it is the
+ *  one write path into the world this process has, and Caddy must never proxy it. */
+export const STREAM_ADMIN_PORT = 8788
 export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 
 /** The one instruction a person needs when the viewer has not been built yet. */
 export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 
-const intEnv = (name: string, fallback: number, min: number): number => {
-  const asked = Number(process.env[name] ?? fallback)
-  if (Number.isInteger(asked) && asked >= min) return asked
-  if (process.env[name] !== undefined)
-    console.log(`stream: ${name}=${process.env[name]} ignored; using ${fallback}`)
-  return fallback
+/** Dollars, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
+ *  file may not import — a static import would pull `@sj/agents` onto the scripted path. */
+const usdEnv = (name: string): number | undefined => {
+  const raw = process.env[name]
+  if (raw === undefined) return undefined
+  const asked = Number(raw)
+  if (Number.isFinite(asked) && asked >= 0) return asked
+  console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
+  return undefined
 }
 
 export async function main(): Promise<void> {
@@ -39,16 +49,22 @@ export async function main(): Promise<void> {
     return
   }
   const port = intEnv('PORT', STREAM_PORT, 1)
-  const rings = intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1)
-  const map: DevMapKind = process.env.SJ_MAP === 'scripted' ? 'scripted' : 'showcase'
-  const interiors = process.env.SJ_INTERIORS === '1'
-  const fresh = process.env.SJ_FRESH === '1'
   const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
+  // The served town's answers to the four the dev loop answers differently. Turning any of them
+  // on changes what the world folds, so each is a product decision and not a parse.
+  const env = parseWorldEnv({
+    interiors: false,
+    builders: true,
+    bridge: false,
+    jointBuild: false,
+  })
 
   // The import itself is behind the flag: `@sj/agents` pulls in onnxruntime and a 128 MB
   // sentence-transformer, and a scripted stream should pay for neither.
   const live = process.env.SJ_LIVE === '1'
   const mindsDir = process.env.SJ_MINDS_DIR ?? STREAM_MINDS_DIR
+  const spendDaily = usdEnv('SJ_SPEND_DAILY_USD')
+  const spendCap = usdEnv('SJ_SPEND_CAP_USD')
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
@@ -59,26 +75,24 @@ export async function main(): Promise<void> {
         ...(process.env.SJ_MODELS_DIR === undefined
           ? {}
           : { modelsDir: process.env.SJ_MODELS_DIR }),
+        ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
+        ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
         // The cap kills the process: a stream that stops thinking and keeps serving is a town of
         // statues nobody would notice for hours.
         onSpendStop: () => {
           void world?.stop().then(() => process.exit(1))
         },
         // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
-        // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
+        // call, not a per-turn one. It bills the same ledger and dies on the same stops.
         useArbiter: process.env.SJ_ARBITER !== '0',
       }),
     )
 
   try {
     world = await startDevWorld({
+      ...env,
       ingest: true,
-      map,
-      rings,
-      interiors,
       port,
-      fresh,
-      builders: true,
       lamps,
       staticDir: CLIENT_DIST,
       // `agentDbDir` is what makes `SJ_FRESH=1` delete the minds in the same breath as the town;
@@ -115,10 +129,27 @@ export async function main(): Promise<void> {
   )
   console.log(`stream: the town is open at http://localhost:${running.gateway.port}/`)
 
+  // The only write path into the world. Loopback-bound, bearer-authed, and absent entirely
+  // unless an operator sets the token — see deploy/README.md.
+  const adminToken = process.env.SJ_ADMIN_TOKEN
+  const admin =
+    adminToken === undefined || adminToken === ''
+      ? null
+      : createLawsAdmin({ submitLaw: running.submitLaw, token: adminToken })
+  if (admin !== null) {
+    const adminPort = intEnv('SJ_ADMIN_PORT', STREAM_ADMIN_PORT, 1)
+    admin.listen(adminPort, '127.0.0.1', () => {
+      console.log(`stream: the law channel is open on http://127.0.0.1:${adminPort}/admin/laws`)
+    })
+  } else {
+    console.log('stream: no law channel — SJ_ADMIN_TOKEN opens one on loopback')
+  }
+
   // A stream is a long-running process and a container stops it with a signal; without this the
   // world dies mid-write and the next boot reads a half-flushed db.
   const stop = (signal: string): void => {
     console.log(`stream: ${signal} — closing the town`)
+    admin?.close()
     void running.stop().then(() => process.exit(0))
   }
   process.on('SIGTERM', () => {

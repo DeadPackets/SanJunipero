@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
+import { CLOSE_BAD_HELLO, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
 export const LAST_SEEN_KEY = 'sj:lastSeenTick'
@@ -19,6 +19,7 @@ export function connectObservatory(opts: {
   let sock: WebSocket | null = null
   let backoffMs = BACKOFF_MIN_MS
   let reqId = 0
+  let warnedBadFrame = false
   let status: LinkStatus = 'connecting'
   const setStatus = (next: LinkStatus): void => {
     if (status === next) return
@@ -54,7 +55,17 @@ export function connectObservatory(opts: {
       sock?.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: readLastSeen() }))
     }
     sock.onmessage = (e: MessageEvent) => {
-      const msg = ServerMsg.parse(JSON.parse(String(e.data)))
+      let msg
+      try {
+        msg = ServerMsg.parse(JSON.parse(String(e.data)))
+      } catch {
+        // A frame shape this tab does not know must not take the viewer down with it.
+        if (!warnedBadFrame) {
+          warnedBadFrame = true
+          console.warn('observatory: a frame this viewer cannot read was ignored')
+        }
+        return
+      }
       if (msg.t === 'snapshot') {
         const last = readLastSeen()
         if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
@@ -62,8 +73,14 @@ export function connectObservatory(opts: {
       opts.store.applyServer(msg)
       if (msg.t === 'snapshot' || msg.t === 'tick') writeLastSeen(msg.tick)
     }
-    sock.onclose = () => {
+    sock.onclose = (e: CloseEvent) => {
       if (closed) return
+      // The server refuses a hello it does not recognise; reconnecting with the same one loops
+      // forever, and a reload is the only thing that fetches the viewer this town speaks to.
+      if (e.code === CLOSE_BAD_HELLO) {
+        location.reload()
+        return
+      }
       setStatus('reconnecting')
       setTimeout(open, backoffMs)
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS)

@@ -6,7 +6,7 @@
 #
 #   data/dev-world.db   the world + the forge's asset and vision_qa tables
 #   data/minds/*.db     one per mind: memories, journal, half-run plan
-#   data/minds/_ops.db  the call ledger the $5 anomaly stop is read off
+#   data/minds/_ops.db  the call ledger the daily budget and the lifetime cap are read off
 #
 # Cover the world and miss `minds/` and the town comes back healthy with every person blank —
 # announced on one stdout line, never an error, and invisible in the viewer.
@@ -27,8 +27,17 @@ services:
       # an empty string, and `Number('')` is 0 — an unlit town nobody asked for.
       - SJ_MAP
       - SJ_LAMPS
+      - SJ_BUILDERS
+      - SJ_BRIDGE
+      - SJ_JOINT
       - SJ_LIVE
       - SJ_ARBITER
+      - SJ_SPEND_DAILY_USD
+      - SJ_SPEND_CAP_USD
+      # Loopback INSIDE the container and never published: reach it with
+      # `docker compose exec town`, never through Caddy.
+      - SJ_ADMIN_TOKEN
+      - SJ_ADMIN_PORT
       - SJ_MINDS_DIR
       - SJ_MODELS_DIR
       - OPENROUTER_API_KEY
@@ -96,16 +105,7 @@ services:
       - town
     # The credential check runs in the container, not as `${LITESTREAM_BUCKET:?...}`: compose
     # interpolates every service before applying profiles, so that form breaks a plain `up`.
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        if [ -z "$$LITESTREAM_BUCKET" ] || [ -z "$$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$$LITESTREAM_SECRET_ACCESS_KEY" ]; then
-          echo "litestream: NOT BACKING ANYTHING UP — no S3 credentials." >&2
-          echo "            Set LITESTREAM_BUCKET, LITESTREAM_ACCESS_KEY_ID and" >&2
-          echo "            LITESTREAM_SECRET_ACCESS_KEY in .env — see deploy/.env.example." >&2
-          exit 1
-        fi
-        exec litestream replicate -config /etc/litestream.yml
+    entrypoint: ["/bin/sh", "/etc/litestream.sh"]
     environment:
       # Never written into this file or the image — see deploy/.env.example.
       LITESTREAM_ACCESS_KEY_ID: "${LITESTREAM_ACCESS_KEY_ID:-}"
@@ -114,7 +114,7 @@ services:
       LITESTREAM_REGION: "${LITESTREAM_REGION:-us-east-1}"
       LITESTREAM_ENDPOINT: "${LITESTREAM_ENDPOINT:-}"
     volumes:
-      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+      - ./deploy/litestream.sh:/etc/litestream.sh:ro
       # Not `:ro` on purpose: litestream writes a shadow WAL beside each database, and read-only
       # it replicates nothing while looking healthy.
       - town-data:/data

@@ -6,7 +6,10 @@ import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
-import { createGateway, type Gateway } from './server.js'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createGateway, type Gateway, type RouteHandler } from './server.js'
+import { mountDataApi } from './api.js'
+import { WorldMirror } from './worldMirror.js'
 
 // @sj/agents is frozen this chunk and does not export openAgentDb; DDL below is copied
 // verbatim from packages/agents/src/memory/schema.ts for the three tables the API reads.
@@ -261,5 +264,67 @@ describe('observer data apis', () => {
   it('digest without params covers the whole history', async () => {
     const full = (await (await fetch(`${base}/api/digest`)).json()) as { deaths: unknown[] }
     expect(full.deaths).toHaveLength(1)
+  })
+})
+
+/** Three inspector tabs per viewer, 30 s of client cache and no rate limit: an open+close per GET
+ *  was ~0.5 ms and a discarded page cache, on the thread that ticks the town. */
+describe('★ the per-mind handles are held, not reopened per request', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-agentdb-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  const mount = (): { call: (id: string) => unknown; close: () => void } => {
+    const worldDb = openDb(join(dir, 'world.db'))
+    const mirror = new WorldMirror({ db: worldDb, config: DEFAULT_CONFIG, terrain: GRASS })
+    const routes = new Map<string, RouteHandler>()
+    const close = mountDataApi(
+      {
+        route: (m, path, fn) => {
+          routes.set(`${m} ${path}`, fn)
+        },
+      },
+      { db: worldDb, mirror, config: DEFAULT_CONFIG, agentDbDir: dir },
+    )
+    return {
+      call: (id) => {
+        let body = ''
+        routes.get('GET /api/agent/:id/journal')!(
+          { url: `/api/agent/${id}/journal` } as IncomingMessage,
+          {
+            writeHead: () => {},
+            end: (b: string) => {
+              body = b
+            },
+          } as unknown as ServerResponse,
+          { id },
+        )
+        return JSON.parse(body) as unknown
+      },
+      close: () => {
+        close()
+        worldDb.close()
+      },
+    }
+  }
+
+  it('answers from a handle it already has, and a stranger’s slug opens nothing', () => {
+    const adb = openAgentFixtureDb(join(dir, 'mira.db'))
+    adb
+      .prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, ?, ?, ?)')
+      .run('mira', 5, 0, 'I banked the fire.')
+    adb.close()
+
+    const api = mount()
+    expect(api.call('mira')).toEqual([{ tick: 5, day: 0, text: 'I banked the fire.' }])
+    // The file is gone; `fileMustExist` means a per-request open would answer [] from here on.
+    rmSync(join(dir, 'mira.db'))
+    expect(api.call('mira'), 'the handle was dropped between two requests').toEqual([
+      { tick: 5, day: 0, text: 'I banked the fire.' },
+    ])
+    // …and a name with no file is still no handle and no answer.
+    expect(api.call('nobody')).toEqual([])
+    api.close()
   })
 })

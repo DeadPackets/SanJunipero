@@ -19,6 +19,7 @@ import {
   openAgentDb,
   preflightRefusal,
   projectDailySpend,
+  reportReconciliation,
   runPreflight,
   FOUNDER_MINDS,
   type BootedMinds,
@@ -38,9 +39,14 @@ import {
 import type { LiveCast } from './devWorld.js'
 import { publishThought } from './observer.js'
 
-/** Dollars. Reaching it KILLS THE PROCESS: a stream that quietly stops thinking and keeps serving
- *  a town of statues is the failure mode that would cost the most to discover. */
-export const LIVE_SPEND_STOP_USD = 5
+/** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
+ *  sim-day IS one real hour here, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
+export const LIVE_SPEND_DAILY_USD = 3
+/** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
+ *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
+export const LIVE_SPEND_STOP_USD = 50
+/** The daily budget's window. */
+export const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's 2.5 s tick this is every
  *  25 s of wall clock — far tighter than one turn, so nothing can outrun it. */
 export const LIVE_SPEND_CHECK_TICKS = 10
@@ -97,8 +103,10 @@ export type LiveCastOpts = {
   /** Directory of `<id>.db` files. Created if absent; wiped with the world on `SJ_FRESH=1`. */
   agentDbDir: string
   minds?: readonly MindSpec[]
-  /** Dollars. Reaching it stops the minds and calls `onSpendStop`. */
+  /** Dollars over the town's life; 0 is none. Reaching it stops the minds and calls `onSpendStop`. */
   spendCapUsd?: number
+  /** Dollars in a rolling 24 real hours. Reaching it stops the minds and calls `onSpendStop`. */
+  spendDailyUsd?: number
   /** What a stream does when the cap lands. Default is a loud message and nothing else, so a
    *  test can assert the stop without taking the test runner down with it. */
   onSpendStop?: (spent: number, cap: number) => void
@@ -169,7 +177,7 @@ export function rateStopMessage(rate: number, ceiling: number, minds: number): s
       ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x` +
       ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
     `        Measured over the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is a RATE`,
-    '        stop, not the total cap — the town is nowhere near its $5 and is burning too fast.',
+    '        stop, not a budget — the town is nowhere near either line and is burning too fast.',
     '        Every mind is stopped and no further call will be made. The town on disk is intact.',
   ].join('\n')
 }
@@ -179,6 +187,27 @@ export function spendStopMessage(spent: number, cap: number): string {
     `STREAM STOPPED: the live cast has spent $${spent.toFixed(4)} of its $${cap.toFixed(2)} cap.`,
     '        Every mind is stopped and no further call will be made. The town on disk is intact',
     '        and `pnpm stream` will resume it with the scripted cast for $0.00/hour.',
+  ].join('\n')
+}
+
+export function dailyStopMessage(spent: number, budget: number): string {
+  return [
+    `STREAM STOPPED: the live cast has spent $${spent.toFixed(4)} of its` +
+      ` $${budget.toFixed(2)} daily budget.`,
+    '        Measured over the last 24 real hours. Every mind is stopped and no further call will',
+    '        be made. The town on disk is intact. SJ_SPEND_DAILY_USD raises the budget.',
+  ].join('\n')
+}
+
+/** The daily budget refuses a boot too, and BEFORE the pre-flight: a container that restarts on
+ *  its own would otherwise pay for a pre-flight on every loop to be told the same thing. */
+export function dailyReachedRefusal(spent: number, budget: number): string {
+  return [
+    `stream: could not start — this town has spent $${spent.toFixed(4)} of its` +
+      ` $${budget.toFixed(2)} daily budget in the last 24 hours.`,
+    '        The window rolls, so the budget frees itself as the oldest calls age out of it.',
+    '        Nothing was spent to tell you this. SJ_SPEND_DAILY_USD raises the budget.',
+    '        `pnpm stream` (no SJ_LIVE) resumes this same town scripted, for $0.00/hour.',
   ].join('\n')
 }
 
@@ -195,12 +224,12 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
   ].join('\n')
 }
 
-/** Total dollars in a call ledger, across every caller. `sumCostUsd` is per-caller and the cap
- *  is not: five minds on two callers each would clear a per-caller cap ten times over. */
-export function ledgerTotalUsd(db: Database.Database): number {
-  const row = db.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls').get() as {
-    total: number
-  }
+/** Total dollars in a call ledger, across every caller, since `sinceMs`. `sumCostUsd` is
+ *  per-caller and the cap is not: five minds on two callers each would clear one ten times over. */
+export function ledgerTotalUsd(db: Database.Database, sinceMs = 0): number {
+  const row = db
+    .prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE ts >= ?')
+    .get(sinceMs) as { total: number }
   return row.total
 }
 
@@ -254,17 +283,25 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     })
   const minds = opts.minds ?? FOUNDER_MINDS
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
+  const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
 
   const opsDb = openAgentDb(join(opts.agentDbDir, LIVE_OPS_DB))
   migrateLlmTables(opsDb)
+  opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts)')
+  const spentToday = (): number => ledgerTotalUsd(opsDb, Date.now() - SPEND_DAY_MS)
 
-  // Before the pre-flight, because the pre-flight spends and a town that is already over its
-  // cap must not spend another cent to be told so.
+  // Before the pre-flight, because the pre-flight spends and a town that is already over either
+  // line must not spend another cent to be told so.
   const alreadySpent = ledgerTotalUsd(opsDb)
-  if (alreadySpent >= cap) {
+  if (cap > 0 && alreadySpent >= cap) {
     opsDb.close()
     throw new Error(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
+  }
+  const today = spentToday()
+  if (today >= dailyBudget) {
+    opsDb.close()
+    throw new Error(dailyReachedRefusal(today, dailyBudget))
   }
 
   const makeClient = (caller: string, agentId?: string): LlmClient =>
@@ -276,7 +313,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           ...(agentId === undefined ? {} : { agentId }),
           // The per-caller backstop: it stops one caller running away between two reads of the
           // ledger, which the tick watchdog below cannot see.
-          budgetUsd: cap,
+          ...(cap > 0 ? { budgetUsd: cap } : {}),
         })
 
   if (opts.preflight !== false) {
@@ -299,7 +336,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     log(
       `stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}` +
         ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};` +
-        ` this town has spent $${ledgerTotalUsd(opsDb).toFixed(4)} of its $${cap.toFixed(2)} so far`,
+        ` this town has spent $${spentToday().toFixed(4)} of today's $${dailyBudget.toFixed(2)}`,
     )
     if (!result.passed) throw new Error(preflightRefusal(result))
   }
@@ -430,8 +467,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       log(
-        `stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, cap $${cap.toFixed(2)},` +
-          ` memory in ${opts.agentDbDir}`,
+        `stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, $${dailyBudget.toFixed(2)}/day` +
+          `${cap > 0 ? ` under a $${cap.toFixed(2)} lifetime cap` : ''}, memory in ${opts.agentDbDir}`,
       )
       log(
         arbiter === undefined
@@ -444,8 +481,15 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
         const spent = ledgerTotalUsd(opsDb)
-        if (spent >= cap) {
+        if (cap > 0 && spent >= cap) {
           console.error(spendStopMessage(spent, cap))
+          stopMinds()
+          opts.onSpendStop?.(spent, cap)
+          return
+        }
+        const today = spentToday()
+        if (today >= dailyBudget) {
+          console.error(dailyStopMessage(today, dailyBudget))
           stopMinds()
           opts.onSpendStop?.(spent, cap)
           return
@@ -479,6 +523,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
+      // The run's last word on its own prices: says nothing when the ledger and the provider's
+      // bill agree, and writes an alert row when a pin has gone stale.
+      reportReconciliation(opsDb)
       opsDb.close()
     },
   }

@@ -1,7 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
-import { ClientMsg, DEFAULT_CONFIG, PROTOCOL_VERSION, type SimConfig } from '@sj/shared'
+import {
+  ClientMsg,
+  CLOSE_BAD_HELLO,
+  DEFAULT_CONFIG,
+  PROTOCOL_VERSION,
+  type AssetRecord,
+  type SimConfig,
+} from '@sj/shared'
 import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
@@ -28,6 +35,7 @@ export type GatewayOpts = {
   narratorDbPath?: string // C7's narrator.db; absent or unwritten → typed empties
   staticDir?: string // built @sj/web; absent → API/socket only (the dev split)
   maxViewers?: number // default DEFAULT_MAX_VIEWERS
+  scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
 
@@ -40,7 +48,6 @@ export type Router = { route(method: string, pattern: string, fn: RouteHandler):
 
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
-export const CLOSE_BAD_HELLO = 4400
 export const CLOSE_TOO_MANY = 4429
 
 /** How long a socket may hold a seat without greeting. A viewer sends `hello` on open, so this
@@ -62,6 +69,17 @@ const DEFAULT_MAX_VIEWERS = 500
  * stopped at is worth answering.
  */
 export const SCRUB_MIN_MS = 100
+
+/**
+ * Milliseconds of scrub work the whole process will do per second of wall clock — 4% of one core.
+ * The per-socket floor above is per SOCKET: at a measured 6-11 ms a scrub, ten viewers dragging
+ * at once stop the town ticking and DEFAULT_MAX_VIEWERS is 500. Over budget, a viewer is answered
+ * at the live moment instead of being queued.
+ */
+const SCRUB_BUDGET_MS_PER_S = 40
+
+/** Frames under this go out raw: a `thought` or an `asset` is smaller than the deflate header. */
+const DEFLATE_THRESHOLD_BYTES = 512
 
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG
@@ -104,7 +122,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     getCodex,
     knowsAgent: (id) => mirror.state().agents[id] !== undefined,
   })
-  mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
+  const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
@@ -157,10 +175,24 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── snapshot string, cached per pump generation ──
   let snapJson: string | null = null
-  // Asset catch-up frames, built once for the process. Topped up from the codex's own seq rather
-  // than the pump's: a hello landing between two pumps must still see a just-registered sheet.
-  const catchUp: string[] = []
+  // The asset catch-up, built once for the process as ONE frame: a greeted socket used to take
+  // one send per record — 189 of them on the dev codex, inside the connection handler. Topped up
+  // from the codex's own seq rather than the pump's: a hello landing between two pumps must still
+  // see a just-registered sheet.
+  const catchUp: AssetRecord[] = []
+  let catchUpJson: string | null = null
   let catchUpSeq = 0
+  // The over-budget scrub answer: the live moment in the shape a scrub is already answered in,
+  // stringified once per generation, because only `reqId` differs between the sockets turned away.
+  let busyHead: string | null = null
+  const busyScrubJson = (reqId: number): string => {
+    busyHead ??= JSON.stringify({
+      t: 'scrubbed',
+      tick: mirror.state().tick,
+      state: mirror.state(),
+    }).slice(0, -1)
+    return `${busyHead},"reqId":${reqId}}`
+  }
   const snapshotJson = (): string => {
     snapJson ??= JSON.stringify({
       t: 'snapshot',
@@ -176,12 +208,41 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── ws protocol ──
   let listening = false
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_CLIENT_FRAME })
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/ws',
+    maxPayload: MAX_CLIENT_FRAME,
+    // Caddy's `encode` covers HTTP and never a proxied socket, so without this every frame goes
+    // out raw. `memLevel`/`windowBits` are the memory lever: a shared dictionary per socket is
+    // what 500 viewers cannot afford, and no-context-takeover plus a small window bounds it.
+    perMessageDeflate: {
+      serverNoContextTakeover: true,
+      clientNoContextTakeover: true,
+      threshold: DEFLATE_THRESHOLD_BYTES,
+      concurrencyLimit: 10,
+      zlibDeflateOptions: { level: 6, memLevel: 5, windowBits: 13 },
+    },
+  })
   // An EventEmitter with no 'error' listener THROWS, and ws re-emits every failure of the http
   // server it is attached to — a busy port would take the whole process down.
   wss.on('error', (e) => {
     if (listening) console.error(`gateway: socket server error — ${e.message}`)
   })
+  // One bucket for every socket: scrub work is paid for out of the thread that ticks the town, and
+  // a stranger's drag must not be able to spend more of it than the town can spare.
+  const scrubBudgetMsPerS = opts.scrubBudgetMsPerS ?? SCRUB_BUDGET_MS_PER_S
+  let scrubTokens = scrubBudgetMsPerS
+  let scrubFilledAt = Date.now()
+  const takeScrubBudget = (): boolean => {
+    const now = Date.now()
+    scrubTokens = Math.min(
+      scrubBudgetMsPerS,
+      scrubTokens + ((now - scrubFilledAt) * scrubBudgetMsPerS) / 1000,
+    )
+    scrubFilledAt = now
+    return scrubTokens > 0
+  }
+
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
@@ -201,6 +262,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
+      if (!takeScrubBudget()) {
+        sock.send(busyScrubJson(req.reqId))
+        return
+      }
+      const startedAt = performance.now()
       let tick = req.tick
       let state
       try {
@@ -210,6 +276,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         state = mirror.state()
       }
       sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
+      scrubTokens -= performance.now() - startedAt
     }
 
     sock.on('message', (data) => {
@@ -233,9 +300,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         if (cdx) {
           for (const record of cdx.listSince(catchUpSeq)) {
             catchUpSeq = record.seq
-            catchUp.push(JSON.stringify({ t: 'asset', record }))
+            catchUp.push(record)
+            catchUpJson = null
           }
-          for (const frame of catchUp) sock.send(frame)
+          if (catchUp.length > 0) {
+            catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
+            sock.send(catchUpJson)
+          }
         }
         return
       }
@@ -275,9 +346,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let observerSeen = false
   const pump = (): void => {
     const groups = mirror.poll()
-    if (groups.length > 0) snapJson = null
+    if (groups.length > 0) {
+      snapJson = null
+      busyHead = null
+    }
     for (const g of groups) {
-      hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, events: g.events }))
+      const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
+      hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {
@@ -290,9 +365,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }
     const cdx = getCodex()
     if (cdx) {
-      for (const record of cdx.listSince(lastAssetSeq)) {
-        lastAssetSeq = record.seq
-        hub.broadcast(JSON.stringify({ t: 'asset', record }))
+      const fresh = cdx.listSince(lastAssetSeq)
+      if (fresh.length > 0) {
+        lastAssetSeq = fresh[fresh.length - 1]!.seq
+        hub.broadcast(JSON.stringify({ t: 'assets', records: fresh }))
       }
     }
   }
@@ -314,6 +390,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     clearInterval(timer)
     wss.close()
     httpServer.close()
+    closeDataApi()
     if (ownsDb) db.close()
     narratorDb?.close()
     throw e
@@ -328,6 +405,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         for (const client of wss.clients) client.terminate()
         wss.close(() => {
           httpServer.close(() => {
+            closeDataApi()
             if (ownsDb) db.close()
             narratorDb?.close()
             resolve()

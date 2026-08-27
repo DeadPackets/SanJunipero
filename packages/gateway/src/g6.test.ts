@@ -53,7 +53,10 @@ describe('GATE G6 — automated half', () => {
 
   it('dual-viewer byte parity over ~3 sim days, then a scrub parity sweep', async () => {
     const dbPath = join(dir, 'g6-run.db')
-    const dw = await startDevWorld({ realMsPerTick: 1, port: 0, dbPath })
+    // 5 ms, not 1: the socket is compressed, and zlib finishes on the event loop. A tick loop that
+    // never yields starves those callbacks, and the hub then reads the backlog as a lagging viewer
+    // and drops the very deltas this gate compares. 500x production cadence is still 500x.
+    const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath })
     let finalTick = 0
     try {
       const a = await connect(dw.gateway.port)
@@ -154,7 +157,7 @@ describe('GATE G6 — automated half', () => {
       for (const c of [a, b]) {
         const asset = c.frames
           .map((f) => ServerMsg.parse(JSON.parse(f)))
-          .find((m) => m.t === 'asset' && m.record.id === rec.id)
+          .find((m) => m.t === 'assets' && m.records.some((r) => r.id === rec.id))
         expect(asset).toBeDefined()
       }
       const res = await fetch(`http://127.0.0.1:${dw.gateway.port}/assets/${rec.id}.png`)

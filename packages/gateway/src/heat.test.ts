@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SimEvent } from '@sj/shared'
+import { FOLD_TYPES } from './api.js'
 import {
   HEAT_WEIGHTS,
   HEAT_WINDOW_TICKS,
@@ -144,6 +145,43 @@ describe('heat stub', () => {
         ev(3, 6, 'crop_harvested', { cropId: 'c1' }), // not Ana's — nobody's
       ]),
     ).toEqual([])
+  })
+
+  /** `api.ts` reads a log narrowed to the 12 types it consumes, so the rows that used to end the
+   *  actor's run are no longer read at all — the gap in `seq` is what says they were there. */
+  it('★ a gap in seq ends the actor’s run, so a narrowed log answers what the whole log did', () => {
+    expect(
+      score([
+        ev(1, 5, 'action_completed', { agentId: 'ana', verb: 'walk' }),
+        // seq 2 was an `agent_moved` the SELECT skipped
+        ev(3, 6, 'crop_harvested', { cropId: 'c1' }), // not Ana's — nobody's
+      ]),
+    ).toEqual([])
+  })
+
+  it('★ scoring the narrowed log is scoring the whole log', () => {
+    // One of every weighted type, a completion, its result, and the rows api.ts's SELECT drops
+    // sitting between them — the shape the type filter had to be proved against.
+    const log: SimEvent[] = [
+      ev(1, 1, 'structure_planned', { id: 's1', kind: 'house', builderId: 'omar' }),
+      ev(2, 2, 'need_changed', { agentId: 'ana', need: 'hunger', delta: -1 }),
+      ev(3, 3, 'action_completed', { agentId: 'ana', verb: 'harvest' }),
+      ev(4, 3, 'crop_harvested', { cropId: 'c1' }),
+      ev(5, 4, 'agent_moved', { id: 'ana', x: 1, y: 1 }),
+      ev(6, 5, 'crop_harvested', { cropId: 'c2' }),
+      ev(7, 6, 'action_completed', { agentId: 'omar', verb: 'build' }),
+      ev(8, 6, 'need_changed', { agentId: 'omar', need: 'energy', delta: -1 }),
+      ev(9, 7, 'structure_completed', { id: 's1' }),
+      ev(10, 8, 'agent_spoke', { agentId: 'ana', text: 'hi', x: 0, y: 0 }),
+      ev(11, 9, 'agent_died', { agentId: 'dan', cause: 'hunger' }),
+    ]
+    const narrowed = log.filter((e) => FOLD_TYPES.includes(e.type))
+    expect(narrowed.length, 'the filter must actually drop rows').toBeLessThan(log.length)
+    expect(score(narrowed)).toEqual(score(log))
+  })
+
+  it('names every weighted type, or the fold reads a row its SELECT never fetched', () => {
+    for (const type of Object.keys(HEAT_WEIGHTS)) expect(FOLD_TYPES).toContain(type)
   })
 
   it('returns [] for no events', () => {

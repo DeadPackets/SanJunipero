@@ -6,9 +6,11 @@ import { EventStore, openDb } from '@sj/engine/store'
 import {
   RngStreams,
   TickLoop,
+  applyLaw,
   genesisState,
   makeFixtureMap,
   replayLatest,
+  type LawQueue,
   type TickHandler,
   type TileId,
 } from '@sj/engine'
@@ -18,6 +20,7 @@ import { ensureObserverTables, publishThought } from './observer.js'
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
+import { parseWorldEnv } from './worldEnv.js'
 import { devWorldOrigin } from './devTown.js'
 import {
   assertSameWorld,
@@ -79,6 +82,9 @@ export type DevWorld = {
   /** ONE WHOLE TICK the way the wall clock takes it: the loop step AND the observer scan that
    *  follows it. `loop.step()` is most of a tick and not all of it. */
   tick(): void
+  /** Enqueue a world law. It lands as one `config_changed` at the next tick boundary, hashed,
+   *  snapshotted and replayed like every other fact. See `adminLaws.ts` for the only caller. */
+  submitLaw: (path: string, value: unknown) => void
   stop(): Promise<void>
 }
 
@@ -129,8 +135,6 @@ function wipeAgentMemory(agentDbDir: string | undefined): number {
 export type DevMapKind = 'scripted' | 'showcase'
 /** For `startDevWorld()` called as a library, i.e. by the gates. Never by a person. */
 export const DEV_MAP_DEFAULT: DevMapKind = 'scripted'
-/** For anyone starting a world to LOOK at it. */
-export const DEV_MAP_HUMAN: DevMapKind = 'showcase'
 
 export function devTerrain(
   map: DevMapKind = DEV_MAP_DEFAULT,
@@ -316,7 +320,9 @@ export async function startDevWorld(
     },
   })
   // the founders showcase town
+  const lawQueue: LawQueue = []
   const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
+    laws: lawQueue,
     // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
     interiors: opts.interiors === true,
     structures,
@@ -400,6 +406,9 @@ export async function startDevWorld(
     resumedAtTick: resumed ? resumed.state.tick : null,
     live: cast !== null,
     tick: tickOnce,
+    submitLaw: (path, value) => {
+      applyLaw(lawQueue, path, value)
+    },
     stop: async () => {
       clearInterval(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a
@@ -411,43 +420,15 @@ export async function startDevWorld(
   }
 }
 
-// CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
-//   SJ_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
-//   SJ_RINGS=3        plat the showcase town for three rings of blocks instead of one
-//   SJ_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
-//   SJ_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
-//   SJ_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
-//   SJ_JOINT=1        let a mason lend a hand at a neighbour's walls (off by default for a
-//                     measured reason — see `jointBuild` on `FoundersOpts`)
-//   SJ_FRESH=1        throw the town on disk away and start a new day 0
-//
-// The human path defaults to the product town and to interiors on; the LIBRARY defaults stay
-// `scripted` and interiors off, because `g6.test.ts` and `devWorld.test.ts` hash exactly that.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const map: DevMapKind = process.env.SJ_MAP === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
-  const interiors = process.env.SJ_INTERIORS !== '0'
-  const builders = process.env.SJ_BUILDERS !== '0'
-  const bridge = process.env.SJ_BRIDGE !== '0'
-  const jointBuild = process.env.SJ_JOINT === '1'
-  const fresh = process.env.SJ_FRESH === '1'
-  const asked = Number(process.env.SJ_RINGS ?? TOWN_RINGS_GENESIS)
-  const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
-  if (rings !== asked)
-    console.log(`dev world: SJ_RINGS=${process.env.SJ_RINGS} is not a ring count; using ${rings}`)
-  void startDevWorld({
-    ingest: true,
-    map,
-    interiors,
-    builders,
-    bridge,
-    jointBuild,
-    rings,
-    fresh,
-  }).then(({ gateway }) => {
+  // The dev loop's answers: doors open, the ford decked. `serve.ts` names its own.
+  const env = parseWorldEnv({ interiors: true, builders: true, bridge: true, jointBuild: false })
+  void startDevWorld({ ingest: true, ...env }).then(({ gateway }) => {
+    const showcase = env.map === 'showcase'
     console.log(
-      `dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}` +
-        ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}` +
-        ` joint=${jointBuild && map === 'showcase' ? 'on (a mason lends a hand at walls in reach)' : 'off'}`,
+      `dev world: interiors=${env.interiors ? 'on' : 'off'} builders=${env.builders && showcase ? 'on (SCRIPTED masons, real build verb)' : 'off'}` +
+        ` bridge=${env.bridge && showcase ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, env.rings))})` : 'off'}` +
+        ` joint=${env.jointBuild && showcase ? 'on (a mason lends a hand at walls in reach)' : 'off'}`,
     )
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })

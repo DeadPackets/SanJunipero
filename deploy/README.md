@@ -78,6 +78,10 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
 | `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |
+| `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback law channel. |
+| `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
+| `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
+| `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
 | `SJ_MODELS_DIR` | baked into the image | Where the memory embedder's model is cached. |
 | `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |
@@ -115,8 +119,8 @@ because `serve.ts` passes `agentDbDir` only on the live path.
 **Why the mount is at `data` and not at the world file.** A mount aimed at `dev-world.db` alone
 looks correct for weeks — the scripted town resumes perfectly — and then loses every mind the
 first time somebody streams live. `_ops.db` goes with them, and that one is the spend ledger the
-`$5` anomaly stop reads, so a town that loses it is handed a fresh $5 to spend without anybody
-deciding that.
+spend budget is read off, so a town that loses it is handed a fresh budget to spend without
+anybody deciding that.
 
 **How you would notice, and why it is easy not to.** `liveWorld.ts` *refuses* the mirror image of
 this — a new world whose minds still remember an older one throws and the boot dies. The case
@@ -174,16 +178,36 @@ Both are calibrated against the booked price, so both fire at **twice** their no
 
 | Guard | Nominal | Actually trips at | What it does |
 |---|---|---|---|
-| Anomaly stop | $5 total | **$10 of real money**, after ~94 h (~3.9 days) of normal streaming | Kills the process. The town on disk is intact. |
+| Daily budget | $3.00 per rolling 24 h | **$6 of real money**, ~28 h into a 5-mind stream | Kills the process; a restart refuses until the window rolls. |
+| Anomaly stop | $50 total | **$100 of real money** | Kills the process. The town on disk is intact. |
 | Rate tripwire | $0.10/mind/sim-day over 15 min | **$0.20/mind/real-hour** — $1.00/h for five minds | Stops every mind. The town keeps serving. |
 
-The anomaly stop is **per town, not per process**: the ledger lives in `_ops.db` and resumes with
-the world, so restarting does not reset it. A town that has spent its cap refuses to boot live and
-says so. That is the intent — but it is also why `_ops.db` must be in your backup.
+Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
+with the world, so restarting does not reset either. The daily budget is the one an operator sets;
+the lifetime cap is the disaster ceiling, and `SJ_SPEND_CAP_USD=0` removes it. A town over either
+line refuses to boot live, before the pre-flight spends anything, and says which line it is over.
+That is the intent — but it is also why `_ops.db` must be in your backup.
 
 **Before you set `SJ_LIVE=1`:** the scripted town is not a degraded mode. It is the same world,
 the same viewer, the same event log and the same port — only the deciding is scripted. Stream it
 scripted first and confirm the whole stack is right before attaching a card to it.
+
+## Turning a world law, mid-run
+
+`SJ_ADMIN_TOKEN` opens `POST /admin/laws` on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` **inside the
+container**. It is never published to the host and Caddy never proxies it, so the only way in is
+through the container itself:
+
+```
+docker compose exec town node -e "fetch('http://127.0.0.1:8788/admin/laws',{method:'POST',\
+  headers:{authorization:'Bearer '+process.env.SJ_ADMIN_TOKEN,'content-type':'application/json'},\
+  body:JSON.stringify({path:'mystery.enabled',value:false})}).then(r=>r.text()).then(console.log)"
+```
+
+A law is checked against the engine's whitelist before it is accepted, lands as one
+`config_changed` at the next tick boundary, and is hashed, snapshotted and replayed like every
+other fact. A path that is not on the whitelist is a 400, not a world that dies at the next tick.
+**Unset the token and no write path into the world exists at all** — which is the default.
 
 ## Where the logs go, and the one signal in them
 
@@ -206,21 +230,26 @@ if you want them to survive the box, ship them somewhere yourself; nothing here 
 Litestream restores one database at a time and **you must restore all of them or none**. A world
 restored without its minds is the blank-minds case above.
 
+The running container writes its config to `/tmp/litestream.yml`; copy it out first so a restore
+uses the same S3 keys the backup was written under.
+
 ```
+docker compose --profile backup cp litestream:/tmp/litestream.yml ./litestream.yml
 docker compose down
 docker run --rm -v san-junipero_town-data:/data \
   -e LITESTREAM_ACCESS_KEY_ID=... -e LITESTREAM_SECRET_ACCESS_KEY=... \
-  -v ./deploy/litestream.yml:/etc/litestream.yml:ro \
+  -v ./litestream.yml:/etc/litestream.yml:ro \
   litestream/litestream:0.3.13 restore -config /etc/litestream.yml /data/dev-world.db
 # then repeat for /data/minds/_ops.db and each /data/minds/<name>.db
 docker compose up -d
 ```
 
-**★ A mind born in play is not backed up.** Litestream's config takes one literal path per
-database and has no wildcard, so `deploy/litestream.yml` names the five founders explicitly. A
-child born after genesis gets a `.db` that no block covers. Add a block for it, or accept that a
-restore returns the founders and not the generation after them. This is the one hole in the backup
-story and it is written down rather than left to be discovered.
+**Why the config is generated rather than checked in.** `dbs[].path` takes no wildcard in
+litestream 0.3.13 — a `/data/minds/*.db` entry is taken literally and backs up nothing while
+reporting itself healthy — and a named roster puts every child born in play outside the backup
+with nothing to say so. `deploy/litestream.sh` therefore writes one block per `.db` under `/data`
+at boot, and exits when that set changes so `restart: unless-stopped` brings it back with the new
+mind in it. A birth is outside the backup for at most one minute.
 
 ## Scaling
 

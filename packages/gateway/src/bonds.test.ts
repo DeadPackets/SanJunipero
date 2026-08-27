@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   BOND_RECENT_ACTS,
@@ -17,7 +18,9 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { toEvent, type EventRow } from './http.js'
-import { BOND_TYPES, buildBonds } from './bonds.js'
+import { BONDS_REBUILD_TICKS, BOND_TYPES, buildBonds, mountBondsApi } from './bonds.js'
+import type { RouteHandler } from './server.js'
+import type { WorldMirror } from './worldMirror.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
 
@@ -209,6 +212,90 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     expect(count.asOfTick).toBe(body.asOfTick)
     const full = await (await fetch(`${base}/api/bonds`)).text()
     expect(JSON.stringify(count).length, 'two integers, not a feed').toBeLessThan(full.length / 4)
+  })
+})
+
+/** The fold is over the whole bond history, so what has to be bounded is how OFTEN it runs. */
+describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-bondscadence-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('one tick is not one rebuild, and the cadence still refreshes it', () => {
+    const world = openDb(join(dir, 'w.db'))
+    const store = new EventStore(world)
+    const loop = new TickLoop({
+      store,
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('cadence'),
+      snapshotEveryTicks: 1000,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: 7300 })
+          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: 7300 })
+        }
+        emit('agent_spoke', { agentId: tick % 2 === 0 ? 'a' : 'b', text: 'w', x: 1, y: 1 })
+      },
+    })
+    for (let i = 0; i < 40; i++) loop.step()
+
+    let scans = 0
+    let tick = 0
+    const real = world.prepare.bind(world)
+    Object.defineProperty(world, 'prepare', {
+      value: (sql: string) => {
+        const st = real(sql)
+        if (!sql.includes('FROM events')) return st
+        const iterate = st.iterate.bind(st)
+        st.iterate = function* (...a: unknown[]): IterableIterator<unknown> {
+          scans++
+          yield* iterate(...a) as Iterable<unknown>
+        }
+        return st
+      },
+    })
+    const routes = new Map<string, RouteHandler>()
+    mountBondsApi(
+      {
+        route: (m, p, fn) => {
+          routes.set(`${m} ${p}`, fn)
+        },
+      },
+      {
+        db: world,
+        config: DEFAULT_CONFIG,
+        mirror: { seq: () => tick, state: () => ({ tick }) } as unknown as WorldMirror,
+      },
+    )
+    const ask = (): string => {
+      let out = ''
+      routes.get('GET /api/bonds')!(
+        { url: '/api/bonds' } as IncomingMessage,
+        {
+          writeHead: () => {},
+          end: (b: string) => {
+            out = b
+          },
+        } as unknown as ServerResponse,
+        {},
+      )
+      return out
+    }
+
+    tick = 40
+    const first = ask()
+    expect(scans, 'the first ask folds the history').toBe(1)
+    for (let i = 1; i < BONDS_REBUILD_TICKS; i++) {
+      tick = 40 + i
+      expect(ask(), 'the graph moved inside one cadence window').toBe(first)
+    }
+    expect(scans, 'a tick was a rebuild').toBe(1)
+
+    tick = 40 + BONDS_REBUILD_TICKS
+    ask()
+    expect(scans, 'the cadence never came round').toBe(2)
+    world.close()
   })
 })
 

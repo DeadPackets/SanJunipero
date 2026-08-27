@@ -13,8 +13,8 @@ const DEPLOY_README = read('deploy/README.md')
 const ENV_EXAMPLE = read('deploy/.env.example')
 const COMPOSE = read('compose.yaml')
 
-/** The env table in README.md: one row per knob, `dev:world`-only rows excluded because they
- *  belong to `pnpm dev:world`, which no container runs. */
+/** The env table in README.md: one row per knob. `dev:world`-only rows would be excluded, but
+ *  one env parse means there are none left — every knob reaches the container. */
 function documentedKnobs(): string[] {
   const names = new Set<string>()
   for (const line of README.split('\n')) {
@@ -33,13 +33,38 @@ function documentedKnobs(): string[] {
 const passedThrough = (name: string): boolean =>
   COMPOSE.split('\n').some((l) => new RegExp(`^\\s*-?\\s*${name}\\s*(=|:|$)`).test(l))
 
+/** Properties, not rosters — in ops config too. A named five-founder backup puts every child born
+ *  in play outside it, and the failure is invisible until a restore. */
+describe('★ the backup covers the minds that exist, not the minds that were planned', () => {
+  const SH = read('deploy/litestream.sh')
+
+  it('names no founder, and takes the databases from the volume', () => {
+    for (const founder of ['amara', 'yusuf', 'nadia', 'omar', 'salma']) {
+      expect(SH, `${founder} is named in the backup config`).not.toContain(founder)
+    }
+    expect(SH).toContain("find /data -name '*.db'")
+  })
+
+  /** litestream 0.3.13 takes `dbs[].path` literally, so a `*.db` entry backs up nothing while
+   *  reporting itself healthy — verified against the pinned image. */
+  it('does not hand litestream a wildcard path', () => {
+    expect(SH).not.toContain('path: /data/minds/*.db')
+  })
+
+  it('is the entrypoint compose runs, and nothing else is mounted for it', () => {
+    expect(COMPOSE).toContain('./deploy/litestream.sh:/etc/litestream.sh:ro')
+    expect(COMPOSE).not.toContain('litestream.yml')
+  })
+})
+
 describe('★ every knob the docs promise reaches the container', () => {
   it('is reading the table it thinks it is', () => {
     const knobs = documentedKnobs()
     expect(knobs.length).toBeGreaterThan(6)
     expect(knobs).toContain('SJ_LIVE')
     expect(knobs).toContain('SJ_LAMPS')
-    expect(knobs).not.toContain('SJ_BUILDERS') // `dev:world` only, per the table itself
+    // One env parse: a knob a person can set on `dev:world` is a knob the container answers too.
+    expect(knobs).toContain('SJ_BUILDERS')
   })
 
   it('passes every documented SJ_* knob through compose.yaml', () => {

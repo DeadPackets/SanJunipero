@@ -50,11 +50,15 @@ block reach the container.
 | `SJ_LAMPS` | `8` | How many street lamps the lamplighter raises. `0` leaves the streets dark. `pnpm stream` only; `dev:world` raises none. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** Needs `OPENROUTER_API_KEY`. `pnpm stream` only. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. `pnpm stream` only. |
+| `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. One sim-day is one real hour, so this is the stream's running cost per day. `pnpm stream` only. |
+| `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. Reaching it stops the minds and kills the process. `pnpm stream` only. |
+| `SJ_ADMIN_TOKEN` | unset | Set it to open the loopback law channel (`POST /admin/laws`) behind that bearer token. Unset, no write path into the world exists. `pnpm stream` only. |
+| `SJ_ADMIN_PORT` | `8788` | The port that channel listens on, on `127.0.0.1` only. Never proxy it. `pnpm stream` only. |
 | `SJ_MINDS_DIR` | `data/minds` under `packages/gateway` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
 | `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
-| `SJ_BUILDERS` | on | `0` stops the founders raising houses. `dev:world` only. |
-| `SJ_BRIDGE` | on | `0` leaves the river uncrossed. `dev:world` only. |
-| `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. `dev:world` only. |
+| `SJ_BUILDERS` | on | `0` stops the founders raising houses. |
+| `SJ_BRIDGE` | off on `pnpm stream`, on in `dev:world` | `1` lets one founder deck the ford. |
+| `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. |
 | `DEV_FAST_FORWARD` | `0` | Step the world synchronously to that tick before the real-time cadence starts. Screenshot and QA convenience — it fast-forwards a resumed town too. |
 
 Deployment adds `SJ_SITE_ADDRESS` (the Caddy hostname) and the `LITESTREAM_*` backup credentials —

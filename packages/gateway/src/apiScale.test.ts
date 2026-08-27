@@ -7,7 +7,7 @@ import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
-import { mountDataApi } from './api.js'
+import { FOLD_TYPES, mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler, Router } from './server.js'
 
@@ -49,6 +49,17 @@ function spyOnEventReads(db: Database.Database): EventRead[] {
 }
 
 const rowsRead = (reads: EventRead[]): number => reads.reduce((a, r) => a + r.rows, 0)
+
+/** How many rows past `seq` the fold's own SELECT can see — its whole cost. */
+const foldRows = (db: Database.Database, seq: number): number =>
+  (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM events
+         WHERE seq > ? AND type IN (${FOLD_TYPES.map(() => '?').join(', ')})`,
+      )
+      .get(seq, ...FOLD_TYPES) as { n: number }
+  ).n
 
 const collect = (): { router: Router; call: (key: string) => void } => {
   const routes = new Map<string, RouteHandler>()
@@ -127,12 +138,18 @@ describe('★ the read API reads the tick, not the history', () => {
     const { router, call } = collect()
     mountDataApi(router, { db: apiDb, mirror, config: DEFAULT_CONFIG })
 
-    call('GET /api/society')
-    const firstRead = rowsRead(rows)
-    expect(firstRead, 'the first ask still has to read the town it never saw').toBe(total)
+    // ★ the resumed town is folded at MOUNT — the first stranger's GET does not pay for it —
+    // and only the types the fold consumes are read.
+    const atBoot = rowsRead(rows)
+    expect(atBoot, 'the boot fold read rows no case in it consumes').toBe(foldRows(apiDb, 0))
+    expect(atBoot, 'and the filter dropped nothing, so it read the whole log').toBeLessThan(total)
     // ★ and it reads them one at a time: `.all` on a resumed town's backlog is the whole log
     // materialised, and JSON.parsed, in one synchronous stall on the tick thread.
     expect(rows.map((r) => r.via)).not.toContain('all')
+
+    rows.length = 0
+    call('GET /api/society')
+    expect(rowsRead(rows), 'the first viewer paid for the town it never saw').toBe(0)
 
     loop.step()
     mirror.poll() // a new generation: the memo must be refreshed
@@ -142,7 +159,7 @@ describe('★ the read API reads the tick, not the history', () => {
 
     expect(secondRead, 'a second generation must cost the tick, not the town').toBeLessThan(20)
     expect(secondRead, 'and it must be exactly the events that tick appended').toBe(
-      store.lastSeq() - total,
+      foldRows(apiDb, total),
     )
 
     // …and appending gives byte-identical answers to reading the whole log once

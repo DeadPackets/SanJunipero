@@ -6,13 +6,12 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
+import { CLOSE_BAD_HELLO, DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import {
   createGateway,
-  CLOSE_BAD_HELLO,
   CLOSE_TOO_MANY,
   HELLO_DEADLINE_MS,
   SCRUB_MIN_MS,
@@ -269,6 +268,79 @@ describe('the public surface a stranger reaches', () => {
     expect(scrubbed.length).toBeLessThan(10)
     // The last ask is the one a dragging finger stopped on, so it must be the one answered.
     expect(scrubbed.at(-1)?.reqId).toBe(59)
+  })
+})
+
+/** Caddy's `encode` covers HTTP responses and never a proxied socket, so without this every tick
+ *  frame ships raw to every viewer, forever — measured 3,640 B against 514 B deflated. */
+describe('★ the socket is compressed', () => {
+  const open: (Gateway | WebSocket)[] = []
+  const deflateDir = mkdtempSync(join(tmpdir(), 'sj-deflate-'))
+  afterAll(async () => {
+    for (const o of open) void o.close()
+    await wait(50)
+    rmSync(deflateDir, { recursive: true, force: true })
+  })
+
+  it('negotiates permessage-deflate with a viewer', async () => {
+    const dbPath = join(deflateDir, 'w.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 12; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    // The memory levers — no-context-takeover, memLevel 5, windowBits 13 — are not visible to the
+    // client; what is visible, and what fails if the option is dropped, is that it negotiated.
+    expect(sock.extensions, 'every frame goes out raw').toContain('permessage-deflate')
+  })
+})
+
+/** The per-socket floor is per SOCKET. Ten viewers dragging at once is the whole tick thread, and
+ *  the cap is 500 — so the budget the scrub bar spends from has to be one budget. */
+describe('★ the scrub bar spends from one budget, not one per viewer', () => {
+  const open: (Gateway | WebSocket)[] = []
+  const scrubDir = mkdtempSync(join(tmpdir(), 'sj-scrub-'))
+  afterAll(async () => {
+    for (const o of open) void o.close()
+    await wait(50)
+    rmSync(scrubDir, { recursive: true, force: true })
+  })
+
+  const ask = async (budgetMsPerS: number): Promise<{ t: string; tick: number; reqId: number }> => {
+    const dbPath = join(scrubDir, `scrub-${budgetMsPerS}.db`)
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 12; i++) loop.step()
+    const gw = await createGateway({
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      scrubBudgetMsPerS: budgetMsPerS,
+    })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: { t: string; tick: number; reqId: number }[] = []
+    sock.on('message', (d) => frames.push(JSON.parse(frameText(d)) as (typeof frames)[number]))
+    sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
+    await wait(60)
+    sock.send(JSON.stringify({ t: 'scrub', tick: 3, reqId: 7 }))
+    await wait(120)
+    return frames.filter((f) => f.t === 'scrubbed').at(-1)!
+  }
+
+  it('answers an over-budget ask at the live moment rather than folding for it', async () => {
+    const spent = await ask(0)
+    // The SAME frame shape, so nothing about the viewer changes but the moment it is shown.
+    expect(spent.t).toBe('scrubbed')
+    expect(spent.reqId, 'the answer must be to the ask that was made').toBe(7)
+    expect(spent.tick, 'an over-budget ask was folded anyway').toBe(12)
+  })
+
+  it('and answers the asked tick while there is budget for it', async () => {
+    expect((await ask(1000)).tick).toBe(3)
   })
 })
 

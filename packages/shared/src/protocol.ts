@@ -4,6 +4,10 @@ import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
 export const PROTOCOL_VERSION = 2 // 2: ServerSnapshot.laws is required — a v1 client parses no snapshot
+
+/** The close code for a hello the server does not recognise. Here rather than in the gateway
+ *  because the viewer has to be able to tell it apart from a dropped connection. */
+export const CLOSE_BAD_HELLO = 4400
 const tick = z.number().int().nonnegative()
 
 export const ClientHello = z
@@ -30,7 +34,14 @@ export const ServerSnapshot = z
 // config = the sim's SimConfig: the client folds deltas with the SAME config as the engine, or live view drifts from truth
 // laws = the world laws in force right now, so a late joiner reads them without replaying every config_changed
 export const ServerTick = z
-  .object({ t: z.literal('tick'), tick, events: z.array(EventEnvelope) })
+  .object({
+    t: z.literal('tick'),
+    tick,
+    // The log head this frame carries the client up to: the invalidation signal a read model
+    // needs so a viewer can refetch on a change rather than on a timer.
+    seq: z.number().int().nonnegative(),
+    events: z.array(EventEnvelope),
+  })
   .strict()
 export const ServerScrubbed = z
   .object({
@@ -43,13 +54,18 @@ export const ServerScrubbed = z
 export const ServerThought = z
   .object({ t: z.literal('thought'), agentId: z.string().min(1), tick, text: z.string() })
   .strict()
-export const ServerAsset = z.object({ t: z.literal('asset'), record: AssetRecordSchema }).strict() // png travels over HTTP, never the socket
+// An ARRAY, because a greeted socket is handed the whole codex: one frame per record was 189
+// sends per viewer inside the connection handler, on the thread that ticks the town.
+// The png travels over HTTP, never the socket.
+export const ServerAssets = z
+  .object({ t: z.literal('assets'), records: z.array(AssetRecordSchema) })
+  .strict()
 export const ServerMsg = z.discriminatedUnion('t', [
   ServerSnapshot,
   ServerTick,
   ServerScrubbed,
   ServerThought,
-  ServerAsset,
+  ServerAssets,
 ])
 export type ServerMsg = z.infer<typeof ServerMsg>
 

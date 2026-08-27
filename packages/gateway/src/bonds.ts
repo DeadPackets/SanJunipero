@@ -31,6 +31,14 @@ export const BOND_TYPES: readonly string[] = [
   'agent_born',
 ]
 
+/**
+ * Ticks between rebuilds. The graph is folded from the WHOLE bond history — measured 4.2 ms over
+ * 1,605 rows at tick 5,000, and linear in the town's age — so keying the memo on the mirror's
+ * generation rebuilt it on the tick thread every tick a viewer's poll landed in. Warmth's
+ * half-life is 2,880 ticks, so 20 moves `asOfTick` by under 1% of it.
+ */
+export const BONDS_REBUILD_TICKS = 20
+
 export type BondsDeps = {
   db: Database.Database
   mirror: WorldMirror
@@ -106,8 +114,9 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
     `SELECT seq, tick, type, payload FROM events WHERE type IN (${BOND_TYPES.map(() => '?').join(', ')})
      ORDER BY seq`,
   )
-  // A filtered scan per generation; see seqCache.ts for why a public stream cannot pay one per viewer.
-  const cache = makeSeqCache(() => deps.mirror.seq())
+  // A filtered scan per CADENCE, not per generation; see seqCache.ts for why a public stream
+  // cannot pay one per viewer, and BONDS_REBUILD_TICKS for why it cannot pay one per tick either.
+  const cache = makeSeqCache(() => Math.floor(deps.mirror.state().tick / BONDS_REBUILD_TICKS))
 
   const bonds = (): BondsResponse =>
     cache.value('bonds', () => {

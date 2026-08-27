@@ -42,12 +42,15 @@ export type HeatContext = {
   builderOf(structureId: string): string | null
   /** The actor of the immediately preceding `action_completed`; `scoreEvent` maintains it. */
   prevActor: string | null
+  /** The `seq` of the event before this one, so a caller that reads a FILTERED log still sees
+   *  the rows it skipped as what they are: events between the completion and its result. */
+  lastSeq: number
 }
 
 /** A context for a log with no plans in it — every structure resolves to nobody. */
 export const heatContext = (
   builderOf: (id: string) => string | null = () => null,
-): HeatContext => ({ builderOf, prevActor: null })
+): HeatContext => ({ builderOf, prevActor: null, lastSeq: 0 })
 
 /** Who this event's drama belongs to, or null when the log cannot honestly name anybody. */
 function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
@@ -78,6 +81,10 @@ function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
 /** Add one event's drama to a running score map. `api.ts` keeps ONE of these alive for the world
  *  and folds each event into it exactly once, so the log never has to be held to answer /api/heat. */
 export function scoreEvent(scores: HeatScores, ev: SimEvent, ctx: HeatContext): void {
+  // A gap in `seq` is rows the caller's SELECT filtered out, and every one of them would have
+  // ended the actor's run — so the gap ends it just the same.
+  if (ev.seq !== ctx.lastSeq + 1) ctx.prevActor = null
+  ctx.lastSeq = ev.seq
   // Maintained before the weight check, because `action_completed` is not itself weighted —
   // it is the row that says who the next row belongs to.
   if (ev.type === 'action_completed') {

@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, createWorldTick, genesisState, type TileId } from '@sj/engine'
 import { createLawsAdmin } from './adminLaws.js'
+import { startDevWorld } from './devWorld.js'
 import { createGateway, type Gateway } from './server.js'
 import { frameText } from './http.js'
 import { connect } from './testutil.js'
@@ -225,4 +226,44 @@ describe('laws in the viewer protocol (T25b)', () => {
     if (snap.t !== 'snapshot') throw new Error('unreachable')
     expect(snap.laws).toEqual({ 'mystery.enabled': false })
   })
+})
+
+/** The channel was built, tested and reachable from no entrypoint. This is the wire: a law an
+ *  operator posts has to land in the world the stream is serving. */
+describe('★ the law channel reaches the served world', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-adminwire-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('a submitted law lands as one config_changed at the next tick boundary', async () => {
+    const dw = await startDevWorld({
+      port: 0,
+      realMsPerTick: 10_000_000,
+      dbPath: join(dir, 'w.db'),
+    })
+    try {
+      dw.tick()
+      expect(dw.loop.state.laws?.['mystery.enabled']).toBeUndefined()
+
+      // Exactly what `createLawsAdmin` calls after it has checked the token and the schema.
+      dw.submitLaw('mystery.enabled', false)
+      expect(
+        dw.loop.state.laws?.['mystery.enabled'],
+        'a law must not land mid-tick',
+      ).toBeUndefined()
+
+      dw.tick()
+      expect(dw.loop.state.laws?.['mystery.enabled']).toBe(false)
+      // …and once, not once per tick from then on.
+      dw.tick()
+      await dw.stop()
+      const wdb = openDb(join(dir, 'w.db'))
+      const changes = new EventStore(wdb).readFrom(0).filter((e) => e.type === 'config_changed')
+      wdb.close()
+      expect(changes).toHaveLength(1)
+    } finally {
+      await dw.stop()
+    }
+  }, 30_000)
 })
