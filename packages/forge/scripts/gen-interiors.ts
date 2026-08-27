@@ -8,9 +8,11 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { keyBg } from '../src/post/chromaKey.js'
+import { erodeAlpha, opaqueBbox } from '../src/sheet.js'
 import { INTERIORS_CONTENT_DIR, INTERIOR_PIECES, type InteriorPiece } from '../src/interiorArt.js'
 import { cropToGrid, seamReport, seamlessMaterial, toMaterialGrid } from '../src/terrainGen.js'
-import { SURFACE_PALETTE_DISTANCE_MAX, paletteDistance } from '../src/pixelGates.js'
+import { PALETTE_DISTANCE_MAX, paletteDistance } from '../src/pixelGates.js'
 import { refusalMessage } from '../src/gate.js'
 import { GEN_MODEL, PALETTE_WORDS, imageGen } from './lib/cells.js'
 import { scratch } from './scratch.js'
@@ -37,6 +39,8 @@ const S = scratch('int')
 const RAWS = `${S}/raws`
 // Square, and four times the widest piece: every cut below is then a whole factor of it.
 const GEN_PX = 1024
+// The same blend band `spriteCell` erodes: a JPEG magenta field rings into the subject's edge.
+const CHROMA_BAND_PX = 4
 
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)
@@ -79,20 +83,44 @@ const cutPlan = (p: InteriorPiece, gen: RawImage): { factor: number; window: str
   return { factor, window: `${p.w * factor}x${p.h * factor}` }
 }
 
+// The DRAWN wall, not the frame: STYLE_PROMPT puts every subject on a magenta field, and a
+// window centred on the frame takes that field in with it — the first round shipped five walls
+// with a magenta bar down both edges. Keyed and eroded, the bbox is the wall face itself.
+function wallFace(gen: RawImage): { img: RawImage; x0: number; y0: number } {
+  let keyed: RawImage
+  try {
+    keyed = erodeAlpha(keyBg(gen), CHROMA_BAND_PX)
+  } catch {
+    return { img: gen, x0: 0, y0: 0 } // the model filled the frame: nothing to trim to
+  }
+  const b = opaqueBbox(keyed)
+  if (b === null) return { img: gen, x0: 0, y0: 0 }
+  const w = b.x1 - b.x0 + 1,
+    h = b.y1 - b.y0 + 1
+  const img: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+  for (let y = 0; y < h; y++) {
+    const src = ((y + b.y0) * gen.width + b.x0) * 4
+    img.data.set(gen.data.subarray(src, src + w * 4), y * w * 4)
+  }
+  return { img, x0: b.x0, y0: b.y0 }
+}
+
 // The generation's own pixels, divided by a whole factor and never resampled: the wall's window
-// is centred on the frame, and a floor material is cut to a whole multiple of its own grid.
+// is the largest whole multiple of its shape that fits inside the drawn face, and a floor
+// material is cut to a whole multiple of its own grid.
 function cut(p: InteriorPiece, gen: RawImage): RawImage {
   if (p.role === 'floor-material')
     return seamlessMaterial(toMaterialGrid(cropToGrid(gen, p.w), p.w))
-  const { factor } = cutPlan(p, gen)
+  const face = wallFace(gen)
+  const { factor } = cutPlan(p, face.img)
   const ww = p.w * factor,
     wh = p.h * factor
-  const x0 = (gen.width - ww) >> 1,
-    y0 = (gen.height - wh) >> 1
+  const x0 = (face.img.width - ww) >> 1,
+    y0 = (face.img.height - wh) >> 1
   const window: RawImage = { width: ww, height: wh, data: new Uint8ClampedArray(ww * wh * 4) }
   for (let y = 0; y < wh; y++) {
-    const src = ((y + y0) * gen.width + x0) * 4
-    window.data.set(gen.data.subarray(src, src + ww * 4), y * ww * 4)
+    const src = ((y + y0) * face.img.width + x0) * 4
+    window.data.set(face.img.data.subarray(src, src + ww * 4), y * ww * 4)
   }
   const out: RawImage = { width: p.w, height: p.h, data: new Uint8ClampedArray(p.w * p.h * 4) }
   const mid = (v: number[]): number => v.sort((a, b) => a - b)[v.length >> 1]!
@@ -124,11 +152,15 @@ function gateOf(p: InteriorPiece, img: RawImage): string[] {
       break
     }
   if (p.role === 'floor-material' && !seamReport(img).pass) fails.push('the wrap has a seam')
+  let magenta = 0
+  for (let i = 0; i < img.data.length; i += 4)
+    if (img.data[i]! > 200 && img.data[i + 1]! < 70 && img.data[i + 2]! > 200) magenta++
+  if (magenta > 0) fails.push(`${magenta} background pixels survived the cut`)
   // The piece keeps the model's colours, but one this far from the town's forty is not in the
-  // town. The SURFACE bound, not the sprite one: an interior piece is opaque edge to edge.
+  // town. The pieces measure 12.2-22.5 once the background is out of the cut.
   const dist = paletteDistance(img)
-  if (dist > SURFACE_PALETTE_DISTANCE_MAX)
-    fails.push(`palette distance ${dist.toFixed(1)} over ${SURFACE_PALETTE_DISTANCE_MAX}`)
+  if (dist > PALETTE_DISTANCE_MAX)
+    fails.push(`palette distance ${dist.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`)
   return fails
 }
 

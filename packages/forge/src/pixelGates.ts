@@ -147,11 +147,6 @@ export function paletteGate(
 // regenerated buildings measure 12.6–17.7 on this scale (0 is a fully snapped cell).
 export const PALETTE_DISTANCE_MAX = 25
 
-// A SPRITE is a subject on transparent background, so only the subject's pixels are measured. A
-// SURFACE is opaque edge to edge and every shaded plane counts, which reads further out for the
-// same art. The thirteen regenerated terrain materials span 8.1–27.9, so this is that population.
-export const SURFACE_PALETTE_DISTANCE_MAX = 30
-
 // NOT a gate. A sprite cell keeps the model's own colours, so this is only how far they sit from
 // the world's forty — mean Euclidean RGB distance over the opaque pixels, for the run report.
 export function paletteDistance(img: RawImage): number {
