@@ -11,7 +11,7 @@ export const BUILDING_ZOOM_STOP = 4
 export const CHAR_FIGURE_PX = 52 * BUILDING_ZOOM_STOP
 
 // The chroma blend band is this many source pixels wide whatever the art pitch is.
-export const CHROMA_BAND_PX = 4
+const CHROMA_BAND_PX = 4
 
 // buildingArt fits the cell into 32*(w+h) world px. Times the deepest stop, that is the art
 // size at which the close-up neither blends nor invents a pixel.

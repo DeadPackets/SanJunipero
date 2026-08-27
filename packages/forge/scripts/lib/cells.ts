@@ -8,7 +8,7 @@ import { keyBg } from '../../src/post/chromaKey.js'
 import { paletteSwatchPng } from '../../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
-import { buildingCellPx, spriteCell } from '../../src/reCell.js'
+import { buildingCellPx, spriteCell, type SpritePlan } from '../../src/reCell.js'
 import {
   classDensityGate,
   integerScaleGate,
@@ -44,11 +44,8 @@ export type RunOptions = {
   title: string // the report's H1
   reportFile: string // under `<scratch>/reports/`
   scratch: string
-  cap: number
-  maxAttempts: number
-  rejected: ReadonlySet<string>
-  dry: boolean
-  /** named in the refusal message, so an operator knows which knobs this run answers to */
+  defaultCap: number
+  /** `DWELL`, `STRUCT`: this run's knobs are `<prefix>_CAP`, `_ATTEMPTS`, `_REJECTED`, `_DRY` */
   envPrefix: string
   jobs: readonly CellJob[]
 }
@@ -56,14 +53,26 @@ export type RunOptions = {
 export async function runCells(o: RunOptions): Promise<void> {
   const key = process.env.OPENROUTER_API_KEY
   if (!key) throw new Error('OPENROUTER_API_KEY not set')
-  const budget = new BudgetGuard(o.cap)
+  const env = (name: string): string | undefined => process.env[`${o.envPrefix}_${name}`]
+  const cap = Number(env('CAP') ?? o.defaultCap)
+  const maxAttempts = Number(env('ATTEMPTS') ?? '3')
+  const dry = env('DRY') === '1'
+  // A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
+  // clean its numbers are. The eye is the gate the gates cannot be.
+  const rejected = new Set(
+    (env('REJECTED') ?? '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean),
+  )
+  const budget = new BudgetGuard(cap)
   const ledger = new SpendLedger(`${o.scratch}/spend.json`)
   const RAWS = `${o.scratch}/raws`
 
   async function generate(prompt: string, ref: Buffer, assetId: string) {
     const reserve = 0.15
-    if (budget.total + reserve > o.cap)
-      throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${o.cap})`)
+    if (budget.total + reserve > cap)
+      throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${cap})`)
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -110,7 +119,7 @@ export async function runCells(o: RunOptions): Promise<void> {
     type Cand = {
       key: string
       cell: RawImage
-      plan: ReturnType<typeof spriteCell>['plan']
+      plan: SpritePlan
       fails: string[]
       dist: number
     }
@@ -119,7 +128,7 @@ export async function runCells(o: RunOptions): Promise<void> {
     // grid at all, so decide it BEFORE the loop spends on attempts that cannot pass.
     const fails = integerScaleGate({ w: GEN_PX, h: GEN_PX }, { w: cellPx, h: cellPx }).failures
 
-    for (let i = 0; i < o.maxAttempts; i++) {
+    for (let i = 0; i < maxAttempts; i++) {
       const candKey = `${job.label}-c${i}`
       const path = `${RAWS}/${candKey}.png`
       let buf: Buffer
@@ -127,7 +136,7 @@ export async function runCells(o: RunOptions): Promise<void> {
         buf = readFileSync(path)
         console.log(`  ${candKey}: cached`)
       } else {
-        if (o.dry) {
+        if (dry) {
           console.log(`  ${candKey}: DRY, skipped`)
           continue
         }
@@ -142,7 +151,7 @@ export async function runCells(o: RunOptions): Promise<void> {
         const r = spriteCell(keyBg(await decodePng(buf)), { cellPx, anchor: 'feet' })
         // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
         const dist = paletteDistance(r.cell)
-        const refused = o.rejected.has(candKey)
+        const refused = rejected.has(candKey)
         if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails, dist })
         const msg =
           `${job.label}: ${candKey} subject ${r.plan.subjectPx}px, factor ${r.plan.factor}, ` +
@@ -224,7 +233,7 @@ export async function runCells(o: RunOptions): Promise<void> {
     '',
     ...lines.map((l) => `- ${l}`),
     '',
-    `spend: $${budget.total.toFixed(4)} of $${o.cap} cap`,
+    `spend: $${budget.total.toFixed(4)} of $${cap} cap`,
   ].join('\n')
   mkdirSync(`${o.scratch}/reports`, { recursive: true })
   writeFileSync(`${o.scratch}/reports/${o.reportFile}`, md)

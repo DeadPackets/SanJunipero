@@ -231,10 +231,16 @@ async function main(): Promise<void> {
         : deriveIcon(chosen, e.iconPx)
       // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
       // bar never ships, whatever the eye said about it.
-      const barFailures = [
+      const bars = [
         pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
         pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
-      ].flatMap((bar) => (bar.ok ? [] : bar.failures))
+      ]
+      const barFailures = bars.flatMap((bar) => (bar.ok ? [] : bar.failures))
+      // The palette is reported, never a refusal: the cell keeps the model's own colours.
+      console.log(
+        `  ${e.kind}: palette distance ` +
+          bars.map((b) => `${b.name} ${b.paletteDistance.toFixed(1)}`).join(', '),
+      )
       if (barFailures.length > 0) {
         status = 'blocked'
         note = `${note} pixel bar: ${barFailures.join('; ')}`.trim()

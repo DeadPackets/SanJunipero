@@ -135,7 +135,6 @@ for (const c of CAST) {
     })
   }
 
-  // the sleeping figure is measured along its BODY, which is its width
   const sleepRaw = await decodePng(readFileSync(findRaw(c.rawDirs, sleepKey)))
   const sleep = spriteCell(keyBg(sleepRaw), { cellPx: CHAR_CELL_PX, anchor: 'centre' })
   cellPlans.push({ name: 'sleep', factor: sleep.plan.factor, figure: figureH(sleep.cell) })

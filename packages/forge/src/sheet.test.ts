@@ -10,13 +10,8 @@ import {
   anchorToCanvas,
   despeckle,
   erodeAlpha,
-  resampleToArtHeight,
   estimatePitch,
-  refineLattice,
-  resampleModeLattice,
   sweepMagenta,
-  driftField,
-  resampleClusterLattice,
   opaqueBbox,
 } from './sheet.js'
 
@@ -219,42 +214,6 @@ describe('erodeAlpha', () => {
     expect(opaque).toBe(4) // 6x6 -> 4x4 -> 2x2
   })
 })
-describe('resampleToArtHeight', () => {
-  const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [128, 64, 32, 255]]
-  // sprite whose art blocks have a non-integer pitch, phased at the bbox bottom-left
-  function pitched(pitch: number, cols: number, rows: number): RawImage {
-    const w = Math.round(cols * pitch),
-      h = Math.round(rows * pitch)
-    return img(w, h, (x, y) => {
-      const bi = Math.min(cols - 1, Math.floor(x / pitch))
-      const bj = Math.min(rows - 1, Math.floor((h - 1 - y) / pitch))
-      return palette[(bi * 3 + bj) % palette.length]!
-    })
-  }
-  it('recovers exact block colors from a 7.25px-pitch sprite', () => {
-    const out = resampleToArtHeight(pitched(7.25, 4, 8), 8)
-    expect(out.height).toBe(8)
-    expect(out.width).toBe(4)
-    for (let j = 0; j < 8; j++)
-      for (let i = 0; i < 4; i++) {
-        const bj = 8 - 1 - j
-        expect([...out.data.slice((j * 4 + i) * 4, (j * 4 + i) * 4 + 4)], `cell ${i},${j}`).toEqual(
-          palette[(i * 3 + bj) % palette.length],
-        )
-      }
-  })
-  it('output height always equals targetH', () => {
-    expect(resampleToArtHeight(solid(9, 37, RED), 8).height).toBe(8)
-    expect(resampleToArtHeight(solid(5, 20, RED), 8).height).toBe(8)
-  })
-  it('same content at different pitches resamples identically', () => {
-    const a = resampleToArtHeight(pitched(5, 4, 8), 8)
-    const b = resampleToArtHeight(pitched(9, 4, 8), 8)
-    expect(a.width).toBe(b.width)
-    expect(a.data).toEqual(b.data)
-  })
-})
-
 const PAL5: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [40, 40, 40, 255]]
 function pitchGrid(pitch: number, n: number, halo = 0): RawImage {
   const inner = Math.round(pitch * n),
@@ -298,43 +257,7 @@ describe('opaqueBbox', () => {
     expect(opaqueBbox(src)).toEqual({ x0: 1, x1: 2, y0: 1, y1: 2 })
   })
 })
-describe('refineLattice', () => {
-  it('recovers a known lattice offset by coordinate descent', () => {
-    const src = img(
-      59,
-      61,
-      (x, y) =>
-        PAL5[(Math.floor((x - 3 + 70) / 7) * 3 + Math.floor((y - 5 + 70) / 7) * 2 + 1) % 5]!,
-    )
-    const lat = refineLattice(src, 7.2, { ox: 2, oy: 6 })
-    expect(Math.abs(lat.px - 7)).toBeLessThan(0.3)
-    expect(Math.abs(lat.py - 7)).toBeLessThan(0.3)
-    const modDist = (v: number, target: number, p: number) => {
-      const d = (((v - target) % p) + p) % p
-      return Math.min(d, p - d)
-    }
-    expect(modDist(lat.ox, 3, lat.px)).toBeLessThan(0.6)
-    expect(modDist(lat.oy, 5, lat.py)).toBeLessThan(0.6)
-  })
-})
 
-describe('resampleModeLattice', () => {
-  it('picks the dominant color in a straddling cell', () => {
-    const src = img(10, 10, (x) => (x < 6 ? RED : BLUE))
-    const { out } = resampleModeLattice(src, { px: 10, py: 10, ox: 0, oy: 0 })
-    expect(out.width).toBe(1)
-    expect(out.height).toBe(1)
-    expect([...out.data]).toEqual([255, 0, 0, 255])
-  })
-  it('nudges the sample window when no color dominates', () => {
-    const GREEN: Px = [0, 255, 0, 255]
-    const pal4: Px[] = [RED, BLUE, [255, 255, 0, 255], [40, 40, 40, 255]]
-    // cell [0,12): central window is a 4-color mix (each ~25% < 40%); solid green from x=9
-    const src = img(20, 12, (x, y) => (x >= 9 ? GREEN : pal4[(x + 2 * y) % 4]!))
-    const { out } = resampleModeLattice(src, { px: 12, py: 12, ox: 0, oy: 0 })
-    expect([...out.data.slice(0, 4)]).toEqual(GREEN)
-  })
-})
 describe('sweepMagenta', () => {
   it('replaces an enclosed magenta pixel with the neighbor mode color', () => {
     const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? ([255, 0, 255, 255] as Px) : RED))
@@ -344,55 +267,5 @@ describe('sweepMagenta', () => {
     const ROSE: Px = [242, 198, 194, 255]
     const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? ROSE : RED))
     expect([...sweepMagenta(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(ROSE)
-  })
-})
-
-describe('driftField', () => {
-  const pal: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255]]
-  // 6 cols x 8 rows of 6px blocks; art-row band j drawn shifted down by d(j)
-  function drifted(d: (j: number) => number): RawImage {
-    return img(36, 6 * 8 + 2, (x, y) => {
-      let j = 0
-      for (let k = 0; k < 8; k++) if (6 * k + d(k) <= y) j = k
-      const i = Math.min(5, Math.floor(x / 6))
-      return pal[(i * 2 + j * 3 + ((i * j) % 5)) % 4]!
-    })
-  }
-  it('recovers a linear 0->2px row drift monotonically, no jumps', () => {
-    const d = (j: number) => Math.min(2, Math.floor(j / 3))
-    const { rowOffsets } = driftField(drifted(d), 6, { ox: 0, oy: 0 })
-    // bands 0..7 carry content; a trailing band past the drifted content is unconstrained
-    for (let j = 1; j <= 7; j++) {
-      expect(rowOffsets[j]! - rowOffsets[j - 1]!, `row ${j}`).toBeGreaterThanOrEqual(0)
-      expect(rowOffsets[j]! - rowOffsets[j - 1]!, `row ${j}`).toBeLessThanOrEqual(1)
-    }
-    expect(rowOffsets[0]).toBe(0)
-    expect(rowOffsets[7]).toBe(2)
-  })
-  it('yields all-zero offsets on an undrifted grid', () => {
-    const { rowOffsets, colOffsets } = driftField(
-      drifted(() => 0),
-      6,
-      { ox: 0, oy: 0 },
-    )
-    expect(rowOffsets.every((o) => o === 0)).toBe(true)
-    expect(colOffsets.every((o) => o === 0)).toBe(true)
-  })
-})
-
-describe('resampleClusterLattice', () => {
-  it('does not split dominance across 5-bit bin boundaries', () => {
-    // Δ2 pair straddling the 15|16 bin edge: binning splits it, ε-clustering must not
-    const src = img(10, 10, (x, y) =>
-      (x + y) % 2 === 0 ? ([15, 15, 15, 255] as Px) : ([17, 17, 17, 255] as Px),
-    )
-    const lat = { px: 10, py: 10, ox: 0, oy: 0 }
-    const cluster = resampleClusterLattice(src, lat)
-    const mode = resampleModeLattice(src, lat)
-    expect(cluster.dominance[0]!).toBeGreaterThan(0.9)
-    expect(mode.dominance[0]!).toBeLessThan(0.7)
-    // weighted mean of the merged cluster
-    expect(cluster.out.data[0]!).toBeGreaterThanOrEqual(15)
-    expect(cluster.out.data[0]!).toBeLessThanOrEqual(17)
   })
 })

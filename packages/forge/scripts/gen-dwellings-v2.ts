@@ -5,8 +5,6 @@ import { STRUCTURE_FACINGS, facingKind, type StructureFacing } from '../src/buil
 import { PALETTE_WORDS, runCells, type CellJob } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
-const CAP = Number(process.env.DWELL_CAP ?? '6.00')
-const MAX_ATTEMPTS = Number(process.env.DWELL_ATTEMPTS ?? '3')
 const ONLY = (process.env.DWELL_ONLY ?? '')
   .split(',')
   .map((s) => s.trim())
@@ -15,14 +13,6 @@ const FACINGS_ARG = (process.env.DWELL_FACINGS ?? STRUCTURE_FACINGS.join(','))
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean) as StructureFacing[]
-// A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
-// clean its numbers are. The eye is the gate the gates cannot be.
-const REJECTED = new Set(
-  (process.env.DWELL_REJECTED ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-)
 
 // ── the period ──────────────────────────────────────────────────────────────────────────────
 
@@ -176,10 +166,7 @@ await runCells({
   title: 'round 4 — four dwellings and a storehouse, in two facings',
   reportFile: 'dwellings-v2.md',
   scratch: scratch('r4'),
-  cap: CAP,
-  maxAttempts: MAX_ATTEMPTS,
-  rejected: REJECTED,
-  dry: process.env.DWELL_DRY === '1',
+  defaultCap: 6.0,
   envPrefix: 'DWELL',
   jobs,
 })

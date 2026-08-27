@@ -145,7 +145,6 @@ for (const item of items) {
     factor: number
     islands: number
     opaqueFrac: number
-    fails: string[]
     verdict: VisionVerdict | null
   }
   const cands: Cand[] = []
@@ -176,8 +175,7 @@ for (const item of items) {
       const icon = spriteCell(keyed, { cellPx: ICON_PX, anchor: 'centre' })
       const { islands, opaqueFrac } = silhouetteStats(sprite.cell)
       // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
-      // construction. The judge below is the gate; the palette distance is only reported.
-      const fails: string[] = []
+      // construction. The judge below is the only gate left.
       // The mechanical gates cannot tell a pail from a market stall. One vision call per
       // candidate can, and it is 6% of the cost of the generation it is judging.
       let verdict: VisionVerdict | null = null
@@ -202,7 +200,6 @@ for (const item of items) {
           factor: sprite.plan.factor,
           islands,
           opaqueFrac,
-          fails,
           verdict,
         })
       writeFileSync(`${S}/cells/items/${key}.png`, await encodePng(sprite.cell))
@@ -210,11 +207,10 @@ for (const item of items) {
         `${e.kind}: ${key} factor ${sprite.plan.factor}, islands ${islands}, ` +
         `opaque ${(opaqueFrac * 100).toFixed(1)}%, ` +
         `palette distance ${paletteDistance(sprite.cell).toFixed(1)}, ` +
-        (fails.length === 0 ? 'pixel bar clean' : fails.join('; ')) +
         `${verdict ? `, judge ${verdict.overall}` : ''}${refused ? ' — REFUSED BY EYE' : ''}`
       lines.push(msg)
       console.log(`  ${msg}`)
-      if (fails.length === 0 && !refused && verdict?.overall === 'pass') break
+      if (!refused && verdict?.overall === 'pass') break
       if (verdict && verdict.overall !== 'pass') extra = verdict.feedback
     } catch (err) {
       const msg = `${e.kind}: ${key} process FAILED — ${String(err).slice(0, 200)}`
@@ -230,14 +226,14 @@ for (const item of items) {
     c.verdict !== null && c.verdict.overall !== 'pass'
       ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`]
       : []
-  const clean = cands.filter((c) => c.fails.length === 0 && judgeFails(c).length === 0)
+  const clean = cands.filter((c) => judgeFails(c).length === 0)
   const rank = (c: Cand): number => candidateRank(c)
   const win = clean.slice().sort((a, b) => rank(a) - rank(b))[0]
   if (!win) {
     const why =
       refusalMessage(
         e.kind,
-        cands.map((c) => ({ key: c.key, failures: [...c.fails, ...judgeFails(c)] })),
+        cands.map((c) => ({ key: c.key, failures: judgeFails(c) })),
       ) || `${e.kind}: NO CANDIDATE`
     lines.push(why)
     console.log(`  ${why}`)

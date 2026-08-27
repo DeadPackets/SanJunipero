@@ -5,20 +5,10 @@ import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
 import { PALETTE_WORDS, runCells, type CellJob } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
-const CAP = Number(process.env.STRUCT_CAP ?? '4.00')
-const MAX_ATTEMPTS = Number(process.env.STRUCT_ATTEMPTS ?? '3')
 const ONLY = (process.env.STRUCT_ONLY ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
-// A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
-// clean its numbers are. The eye is the gate the gates cannot be.
-const REJECTED = new Set(
-  (process.env.STRUCT_REJECTED ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-)
 
 // The setting, positively and in detail — the anchor cottage is the medieval architecture the
 // user rejected, and naming the period is what stands between a swatch and six more old props.
@@ -230,10 +220,7 @@ await runCells({
   title: 'the eight bare kinds, in ten cells',
   reportFile: 'structures-v5.md',
   scratch: scratch('td', 'v5'),
-  cap: CAP,
-  maxAttempts: MAX_ATTEMPTS,
-  rejected: REJECTED,
-  dry: process.env.STRUCT_DRY === '1',
+  defaultCap: 4.0,
   envPrefix: 'STRUCT',
   jobs,
 })
