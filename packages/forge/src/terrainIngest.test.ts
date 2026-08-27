@@ -42,7 +42,6 @@ import {
   variantSpread,
 } from './terrainIngest.js'
 
-
 // A GRAINY palette-true material — a flat fill would collapse to one picture under variant
 // cohesion, and a real generated material never is flat. Grain is seeded per material.
 function material(hex: number, px = MATERIAL_PX, seed = hex): RawImage {

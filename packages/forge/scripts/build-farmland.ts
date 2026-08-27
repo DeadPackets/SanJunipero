@@ -42,7 +42,10 @@ const s = seamReport(farmland),
 const veto = materialVeto(farmland)
 // Palette MEMBERSHIP was the quantize's signature; the grade keeps the soil's own colours now.
 const dist = paletteDistance(farmland)
-const bar = dist <= PALETTE_DISTANCE_MAX ? [] : [`palette distance ${dist.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`]
+const bar =
+  dist <= PALETTE_DISTANCE_MAX
+    ? []
+    : [`palette distance ${dist.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`]
 console.log(`furrow pitch ${FURROW_PITCH_PX}, depth ${FURROW_DEPTH}, lip ${FURROW_LIP}`)
 console.log(
   `seam h=${s.horizontalDelta.toFixed(1)} v=${s.verticalDelta.toFixed(1)} ring=${b.ringDelta.toFixed(1)}`,

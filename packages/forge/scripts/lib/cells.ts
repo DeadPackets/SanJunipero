@@ -9,11 +9,7 @@ import { paletteSwatchPng } from '../../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell, type SpritePlan } from '../../src/reCell.js'
-import {
-  classDensityGate,
-  paletteDistance,
-  spriteDensity,
-} from '../../src/pixelGates.js'
+import { classDensityGate, paletteDistance, spriteDensity } from '../../src/pixelGates.js'
 import { TOWN_TILE } from '../../src/assetResolution.js'
 import { refusalMessage } from '../../src/gate.js'
 import { BUILDINGS_CONTENT_DIR } from '../../src/buildingArt.js'
@@ -61,7 +57,7 @@ export const GEN_MODEL = MODEL
 // was refused, and farmhouse (window 2304, overrunning by 256) came out 630x651 = exactly its
 // source subject divided by 3, binary alpha, feet on the last row. What can really go wrong is a
 // subject too SMALL for its canvas, so that is what refuses one now.
-export const CELL_FILL_MIN = 0.6
+const CELL_FILL_MIN = 0.6
 
 // The palette, in words, for the calls that carry no building reference.
 export const PALETTE_WORDS = [
@@ -172,7 +168,9 @@ export async function runCells(o: RunOptions): Promise<void> {
         const fails =
           fill >= CELL_FILL_MIN
             ? []
-            : [`subject fills ${(fill * 100).toFixed(1)}% of the cell, floor ${CELL_FILL_MIN * 100}%`]
+            : [
+                `subject fills ${(fill * 100).toFixed(1)}% of the cell, floor ${CELL_FILL_MIN * 100}%`,
+              ]
         const refused = rejected.has(candKey)
         if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails, dist })
         const msg =
