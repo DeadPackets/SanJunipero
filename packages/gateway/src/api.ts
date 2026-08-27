@@ -27,6 +27,24 @@ const TOP_MOMENTS = 5
  */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
+/** The only rows the fold below reads: `foldOne`'s six cases and `HEAT_WEIGHTS`' nine keys.
+ *  0.5% of a real log — `need_changed` alone is 56% of it — and `idx_events_type` serves the
+ *  filter. `heat.ts` reads the seq gaps this leaves as the events they were. */
+export const FOLD_TYPES: readonly string[] = [
+  'action_completed',
+  'action_started',
+  'agent_collapsed',
+  'agent_died',
+  'agent_injured',
+  'agent_spoke',
+  'crop_harvested',
+  'fire_ignited',
+  'fire_spread',
+  'item_moved',
+  'structure_completed',
+  'structure_planned',
+]
+
 /**
  * `/api/digest` builds one entry per day between the two ticks, and both are the stranger's
  * number: unclamped, `?toTick=1000000000` answers 4.75 MB to a 60-byte GET. Clamping into the
@@ -67,7 +85,8 @@ export type Footprint = {
   spokes: number
   started: number
   deaths: number
-  /** The highest seq folded. Present so a guard can prove the fold really consumed the log. */
+  /** The log head the fold has caught up to — NOT the SELECT's cursor, which stops at the last
+   *  row of a type `FOLD_TYPES` names. Present so a guard can prove the fold consumed the log. */
   seq: number
 }
 
@@ -81,7 +100,8 @@ const gerund = (verb: string): string =>
 export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
   const selEventsAfter = deps.db.prepare(
-    'SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq',
+    `SELECT seq, tick, type, payload FROM events
+     WHERE seq > ? AND type IN (${FOLD_TYPES.map(() => '?').join(', ')}) ORDER BY seq`,
   )
 
   /**
@@ -174,11 +194,14 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     foldGen = gen
     // `.iterate`, not `.all`: on a resumed town foldCursor is 0, and the rows and their parsed
     // payloads would both be fully materialised before a single event is folded.
-    for (const r of selEventsAfter.iterate(foldCursor) as Iterable<EventRow>) {
+    for (const r of selEventsAfter.iterate(foldCursor, ...FOLD_TYPES) as Iterable<EventRow>) {
       foldOne(toEvent(r))
       foldCursor = r.seq
     }
   }
+  // On a resumed town this is the whole log, and it runs on the boot thread rather than on the
+  // first stranger's GET — which would be the thread that ticks the town.
+  readFold()
   deps.onFootprint?.(() => ({
     provenance: planned.size + completedTick.size,
     heat: heat.size,
@@ -186,7 +209,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     spokes: spokes.length,
     started: started.size,
     deaths: deaths.length,
-    seq: foldCursor,
+    seq: foldGen,
   }))
 
   /**
