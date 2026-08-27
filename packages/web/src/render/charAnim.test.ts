@@ -959,9 +959,11 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
   })
 
   it('the canvas asks ONE owner, so no surface can be forgotten', () => {
-    const scene = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'scene.ts'), 'utf8')
-    expect(scene.split("matchMedia('(prefers-reduced-motion: reduce)')").length - 1).toBe(1)
-    expect(scene).toContain('wantsMotion,') // exported on the Scene, not re-derived
+    const here = dirname(fileURLToPath(import.meta.url))
+    const rig = readFileSync(join(here, 'cameraRig.ts'), 'utf8')
+    expect(rig.split("matchMedia('(prefers-reduced-motion: reduce)')").length - 1).toBe(1)
+    // exported on the Scene from the rig that owns it, never re-derived
+    expect(readFileSync(join(here, 'scene.ts'), 'utf8')).toContain('wantsMotion: rig.wantsMotion')
   })
 })
 

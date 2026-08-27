@@ -203,8 +203,8 @@ describe('9 · the cursor never lies about what is under it', () => {
   it('is not-allowed on a disabled one, and a grab hand on the town', () => {
     expect(decl(rulesFor(CSS, '.ctl-btn:disabled'), 'cursor')).toBe('not-allowed')
     // the canvas cursor is Pixi's, not the sheet's
-    expect(src('../render/scene.ts')).toContain("'grab'")
-    expect(src('../render/scene.ts')).toContain("'grabbing'")
+    expect(src('../render/cameraRig.ts')).toContain("'grab'")
+    expect(src('../render/cameraRig.ts')).toContain("'grabbing'")
   })
 })
 

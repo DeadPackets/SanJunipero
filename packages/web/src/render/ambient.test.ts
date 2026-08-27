@@ -103,9 +103,7 @@ describe('the effect sprites track the world, not the frame', () => {
   })
 
   type Kid = { destroyed: boolean }
-  const drive = (
-    first: S[],
-  ): { tick: () => void; setWorld: (list: S[]) => void; kids: Kid[] } => {
+  const drive = (first: S[]): { tick: () => void; setWorld: (list: S[]) => void; kids: Kid[] } => {
     const kids: Kid[] = []
     const scene = {
       app: {
