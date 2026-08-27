@@ -1,6 +1,6 @@
 import { DAYS_PER_YEAR, MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { BIRTH_NAMES } from '../data/names.js'
-import { mintId, type AgentBody, type WorldState } from '../state.js'
+import { mintId, pairKey, type AgentBody, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 export type Sex = 'f' | 'm'
@@ -15,10 +15,6 @@ export type PairRow = {
   lastNightDay: number
   formedTick: number | null
   dissolvedTick: number | null
-}
-
-export function pairKey(a: string, b: string): string {
-  return [a, b].sort().join('|')
 }
 
 // The read path the breakup detector uses, so nothing reaches into pairNights.

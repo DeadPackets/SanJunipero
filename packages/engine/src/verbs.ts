@@ -35,6 +35,7 @@ import {
   type TileId,
   type WorldState,
 } from './state.js'
+import { WalkParams } from './events.def.js'
 import type { RngStream } from './rng.js'
 import { doorTile, occupantsOf, roomIsFull, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
@@ -165,8 +166,6 @@ function adjacentLivingTarget(
   }
   return null
 }
-
-export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
 export function ticksPerTile(state: WorldState, config: SimConfig, agentId: string): number {
   const a = state.agents[agentId]!

@@ -149,6 +149,8 @@ export const FireExtinguished = z
   })
   .strict()
 
+export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
+
 export const ActionStarted = z
   .object({
     agentId: z.string(),

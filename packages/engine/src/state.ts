@@ -48,6 +48,9 @@ export type Affliction = {
   sourceId?: string
 }
 
+// An injury is healed the day it is this old; the row is dropped, never edited.
+export const INJURY_HEAL_DAYS = 3
+
 export type AgentBody = {
   id: string
   name: string
@@ -205,6 +208,21 @@ export type WorldState = {
   // and never removed: a picked node is a node at zero, not a node that stopped existing.
   forageables?: Record<string, Forageable>
   counters: { nextEntityId: number }
+}
+
+// The one spelling of a tile's name in the sparse traffic and sapling maps above: a 128x128
+// array of nothing is a hash of nothing.
+export function tileKey(x: number, y: number): string {
+  return `${x},${y}`
+}
+
+export function fromTileKey(key: string): { x: number; y: number } {
+  const comma = key.indexOf(',')
+  return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
+}
+
+export function pairKey(a: string, b: string): string {
+  return [a, b].sort().join('|')
 }
 
 export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldState {

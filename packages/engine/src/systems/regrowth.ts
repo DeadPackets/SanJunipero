@@ -1,5 +1,5 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
-import type { TileId, WorldState } from '../state.js'
+import { fromTileKey, type TileId, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Scarcity is a cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at
@@ -8,17 +8,6 @@ import type { TickCtx } from '../worldTick.js'
 const GRASS: TileId = 0
 const FOREST: TileId = 3
 const SAPLING: TileId = 9
-
-// The one spelling of a tile's name in the sparse sapling map — the same shape the
-// traffic map uses, for the same reason: a 128x128 array of nothing is a hash of nothing.
-export function saplingKey(x: number, y: number): string {
-  return `${x},${y}`
-}
-
-export function fromSaplingKey(key: string): { x: number; y: number } {
-  const comma = key.indexOf(',')
-  return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
-}
 
 const ORTHOGONAL: readonly (readonly [number, number])[] = [
   [0, -1],
@@ -43,7 +32,7 @@ export function regrowthSystem(ctx: TickCtx): void {
   // already forest when the seeds fall from it.
   for (const key of Object.keys(ctx.state().saplings ?? {}).sort()) {
     if (day - ctx.state().saplings![key]! < cfg.saplingDays) continue
-    const { x, y } = fromSaplingKey(key)
+    const { x, y } = fromTileKey(key)
     if (ctx.state().terrain[y]?.[x] !== SAPLING) continue
     ctx.emit('tile_changed', { x, y, from: SAPLING, to: FOREST, reason: 'grown' })
   }
