@@ -85,6 +85,30 @@ describe('endpoint', () => {
     expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
   })
 
+  it('★ settles a refused read to what the caller named, and wakes them on EVERY beat', async () => {
+    vi.useFakeTimers()
+    const NOTHING: number[] = []
+    vi.stubGlobal('fetch', answers([[1], null]))
+    const feed = endpoint<number[]>('/api/heat', undefined, 1000, NOTHING)
+    let woken = 0
+    feed.subscribe(() => {
+      woken++
+    })
+    await settle()
+    expect(feed.get()).toEqual({ data: [1], loaded: true })
+    expect(woken).toBe(1)
+
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get()).toEqual({ data: NOTHING, loaded: true })
+    expect(woken).toBe(2)
+
+    // ★ the round the director cuts on must keep turning for as long as the gateway is down
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(woken).toBe(3)
+  })
+
   it('★ settles `loaded` even when the FIRST read fails — an empty state must print', async () => {
     vi.stubGlobal('fetch', answers([null]))
     const feed = endpoint('/api/chronicle')

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CUT_MIN_MS,
@@ -75,5 +76,26 @@ describe('the televised town always has somebody in front of the camera', () => 
 
   it('never indexes off the end on a tick the world has not reached', () => {
     for (const t of [-1, 0, Number.NaN]) expect(TOWN).toContain(quietSubject(TOWN, t))
+  })
+})
+
+// ── ★ THE ROUND MUST KEEP TURNING WHILE /api/heat IS DOWN ────────────────────────────────
+//
+// The broadcast path has no operator. `endpoint()` keeps the last good answer by default, which
+// for a reader whose BEAT drives a state machine would freeze the caption on one face for as
+// long as the gateway was refusing — so DirectorMode names what a refused read means instead.
+describe('DirectorMode reads the heat window through the one endpoint layer', () => {
+  const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
+
+  it('★ hand-rolls no fetch of its own', () => {
+    expect(SRC).not.toContain('fetch(')
+    expect(SRC).toContain('usePolled<HeatWindow[]>(')
+  })
+
+  it('★ names an empty window as the refused answer, on the measured beat', () => {
+    expect(SRC).toContain('const NO_HEAT: HeatWindow[] = []')
+    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS,\s*NO_HEAT,\s*\)/)
+    // and an empty window is what turns the round over — the two halves of one guarantee
+    expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(quietSubject(['amara', 'omar'], 1000))
   })
 })

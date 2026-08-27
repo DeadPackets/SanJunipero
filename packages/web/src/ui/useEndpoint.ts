@@ -10,20 +10,24 @@ const UNREAD: Read<never> = { data: null, loaded: false }
 /**
  * One reader for one URL. It reads while somebody is subscribed and stops when the last of them
  * leaves; `everyMs` re-reads on that beat, and no `everyMs` reads once. A refused read, or a body
- * the parser rejects, keeps the last good answer rather than blanking the panel.
+ * the parser rejects, keeps the last good answer rather than blanking the panel — unless the
+ * caller names a `refused` answer, which a reader whose beat drives a state machine needs so the
+ * machine keeps turning while the gateway is down.
  */
 export function endpoint<T>(
   url: string | null,
   parse: (body: unknown) => T | null = (body) => body as T,
   everyMs?: number,
+  refused?: T,
 ): Endpoint<T> {
   let read = UNREAD as Read<T>
   const subs = new Set<() => void>()
   let timer: ReturnType<typeof setInterval> | null = null
 
   const settle = (data: T | null): void => {
-    if (data === null && read.loaded) return
-    read = { data, loaded: true }
+    const next = data ?? refused ?? null
+    if (next === null && read.loaded) return
+    read = { data: next, loaded: true }
     for (const fn of subs) fn()
   }
 
@@ -67,9 +71,11 @@ export function usePolled<T>(
   url: string | null,
   parse?: (body: unknown) => T | null,
   everyMs?: number,
+  refused?: T,
 ): Read<T> {
-  // `parse` is a parser, not a prop: re-keying on it would restart the read every render.
+  // `parse` and `refused` are constants, not props: re-keying on them would restart the read
+  // every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const feed = useMemo(() => endpoint<T>(url, parse, everyMs), [url, everyMs])
+  const feed = useMemo(() => endpoint<T>(url, parse, everyMs, refused), [url, everyMs])
   return useFeed(feed)
 }
