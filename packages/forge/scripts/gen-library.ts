@@ -10,12 +10,19 @@ import { openForgeDb } from '../src/db.js'
 import { AssetCodex } from '../src/codex.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
-import { makeImageClient, GEN_SIZE } from '../src/imageClient.js'
-import { makeVisionJudge, type VisionJudgeFn } from '../src/visionQa/visionJudge.js'
-import { runVisionGate } from '../src/visionQa/gate.js'
-import { recordVerdict } from '../src/visionQa/telemetry.js'
-import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
-import { planBatch, estimateBatchCost, LIBRARY_BATCHES } from '../src/library/plan.js'
+import {
+  makeImageClient,
+  GEN_SIZE,
+  makeVisionJudge,
+  runVisionGate,
+  recordVerdict,
+  CRITERIA,
+  planBatch,
+  estimateBatchCost,
+  LIBRARY_BATCHES,
+  type VisionJudgeFn,
+  type VisionVerdict,
+} from '@sj/forge/gen'
 import { candidateRank } from '../src/library/postItem.js'
 import { integralSpriteCell } from '../src/library/integralCell.js'
 import { pixelBarReport } from '../src/pixelGates.js'
