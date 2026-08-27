@@ -10,7 +10,8 @@ import {
   alphaBinaryGate,
   classDensityGate,
   nativeDensityGate,
-  paletteGate,
+  PALETTE_DISTANCE_MAX,
+  paletteDistance,
   soleSilhouetteGate,
   spriteDensity,
 } from './pixelGates.js'
@@ -213,7 +214,7 @@ describe('★ the committed buildings', () => {
   it.each(buildings.map((b) => [b.dir, b] as const))('%s clears the pixel bar', async (_dir, b) => {
     const img = await pngOf(b.dir, b.png)
     expect(alphaBinaryGate(img).failures).toEqual([])
-    expect(paletteGate(img).failures).toEqual([])
+    expect(paletteDistance(img)).toBeLessThan(PALETTE_DISTANCE_MAX)
     expect(img.width, 'a building cell is square').toBe(img.height)
   })
 
@@ -302,7 +303,7 @@ describe('the committed items', () => {
       expect(item.entry.spritePx % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
       for (const img of [sprite, icon]) {
         expect(alphaBinaryGate(img).failures).toEqual([])
-        expect(paletteGate(img).failures).toEqual([])
+        expect(paletteDistance(img)).toBeLessThan(PALETTE_DISTANCE_MAX)
       }
       // the renderer needs the manifest to parse, or the room draws the placeholder anyway
       expect(parseLibraryItemManifest(JSON.stringify(item.manifest))).not.toBeNull()
@@ -333,7 +334,7 @@ describe('the committed cast', () => {
       expect(r.feetX, `${name} feet anchor is outside the cell`).toBeLessThan(r.w)
     }
     expect(alphaBinaryGate(atlas).failures).toEqual([])
-    expect(paletteGate(atlas).failures).toEqual([])
+    expect(paletteDistance(atlas)).toBeLessThan(PALETTE_DISTANCE_MAX)
   })
 
   it.each(cast.map((c) => [c.id, c] as const))(

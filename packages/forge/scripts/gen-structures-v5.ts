@@ -1,4 +1,5 @@
 // LIVE — the EIGHT kinds the widened coverage gate found bare, in ten cells. Cap $STRUCT_CAP.
+import { footprintFor } from '@sj/shared'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
@@ -224,7 +225,9 @@ for (const s of SUBJECTS) {
     jobs.push({
       label: facingKind(s.id, facing).replace(':', '-'),
       kind: facingKind(s.kind, facing),
-      fp: s.fp,
+      // `s.fp` is the UNTURNED mass; an SE cell stands on it turned, and the manifest has to say
+      // the ground the object actually covers. `structureArt.test.ts` is what measures this.
+      fp: footprintFor(s.fp, facing),
       prompt: prompt(s, facing),
     })
 }

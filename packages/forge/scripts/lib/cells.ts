@@ -11,7 +11,6 @@ import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell, type SpritePlan } from '../../src/reCell.js'
 import {
   classDensityGate,
-  integerScaleGate,
   paletteDistance,
   spriteDensity,
 } from '../../src/pixelGates.js'
@@ -54,6 +53,15 @@ export async function imageGen(o: {
 }
 
 export const GEN_MODEL = MODEL
+
+// ★ `integerScaleGate(GEN_PX, cellPx)` used to stand here, and it refused cells that are provably
+// clean: `spriteCell` divides by `ceil(subjectPx / cellPx)`, so the divide is ALWAYS whole and the
+// window ALWAYS contains the subject — GEN_PX needing to be a multiple of cellPx was never the
+// property. Measured on the cached raws: cottage (cellPx 640, window 1920 INSIDE the 2048 source)
+// was refused, and farmhouse (window 2304, overrunning by 256) came out 630x651 = exactly its
+// source subject divided by 3, binary alpha, feet on the last row. What can really go wrong is a
+// subject too SMALL for its canvas, so that is what refuses one now.
+export const CELL_FILL_MIN = 0.6
 
 // The palette, in words, for the calls that carry no building reference.
 export const PALETTE_WORDS = [
@@ -136,9 +144,6 @@ export async function runCells(o: RunOptions): Promise<void> {
       dist: number
     }
     const cands: Cand[] = []
-    // No per-candidate input: a generation that does not divide by the cell cannot land on the
-    // grid at all, so decide it BEFORE the loop spends on attempts that cannot pass.
-    const fails = integerScaleGate({ w: GEN_PX, h: GEN_PX }, { w: cellPx, h: cellPx }).failures
 
     for (let i = 0; i < maxAttempts; i++) {
       const candKey = `${job.label}-c${i}`
@@ -163,11 +168,17 @@ export async function runCells(o: RunOptions): Promise<void> {
         const r = spriteCell(keyBg(await decodePng(buf)), { cellPx, anchor: 'feet' })
         // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
         const dist = paletteDistance(r.cell)
+        const fill = r.plan.subjectPx / r.plan.window
+        const fails =
+          fill >= CELL_FILL_MIN
+            ? []
+            : [`subject fills ${(fill * 100).toFixed(1)}% of the cell, floor ${CELL_FILL_MIN * 100}%`]
         const refused = rejected.has(candKey)
         if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails, dist })
         const msg =
           `${job.label}: ${candKey} subject ${r.plan.subjectPx}px, factor ${r.plan.factor}, ` +
-          `window ${r.plan.window}, palette distance ${dist.toFixed(1)}, ` +
+          `window ${r.plan.window}, fill ${(fill * 100).toFixed(1)}%, ` +
+          `palette distance ${dist.toFixed(1)}, ` +
           (fails.length === 0 ? 'gates clean' : fails.join('; ')) +
           (refused ? ' — REFUSED BY EYE' : '')
         lines.push(msg)

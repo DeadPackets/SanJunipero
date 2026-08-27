@@ -1,6 +1,7 @@
 // LIVE — the four dwellings and the storehouse, in BOTH facings the user chose. Cap $DWELL_CAP.
 // Reference is a MASTER_PALETTE swatch, never a building — a building overrides the prompt (A/B, $0.2053).
 import { STYLE_PROMPT } from '../src/styleBible.js'
+import { footprintFor } from '@sj/shared'
 import { STRUCTURE_FACINGS, facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { PALETTE_WORDS, runCells, type CellJob } from './lib/cells.js'
 import { scratch } from './scratch.js'
@@ -157,7 +158,9 @@ for (const s of SUBJECTS) {
     jobs.push({
       label: facingKind(s.id, facing).replace(':', '-'),
       kind: facingKind(s.kind, facing),
-      fp: s.fp,
+      // `s.fp` is the UNTURNED mass; an SE cell stands on it turned, and the manifest has to say
+      // the ground the building actually covers. `structureArt.test.ts` is what measures this.
+      fp: footprintFor(s.fp, facing),
       prompt: prompt(s, facing),
     })
 }
