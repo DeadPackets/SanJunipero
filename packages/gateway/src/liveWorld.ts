@@ -21,6 +21,7 @@ import {
   projectDailySpend,
   reportReconciliation,
   runPreflight,
+  wireBirths,
   FOUNDER_MINDS,
   type BootedMinds,
   type MindConfig,
@@ -373,10 +374,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let bridge: EngineBridge | null = null
   let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
+  let stopBirths: (() => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
+    stopBirths?.()
     booted?.stop()
     bridge?.drain('the moment passes')
   }
@@ -447,6 +450,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         dbFor,
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
+        dreamLlm: (id) => makeClient('dream', id),
         mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
@@ -454,6 +458,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         onThought: (t) => {
           if (!stopped) publishThought(db, t)
         },
+      })
+      stopBirths = wireBirths({
+        booted,
+        bridge,
+        store,
+        dbFor,
+        embedder,
+        opsDb,
+        namingLlm: makeClient('naming'),
+        homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
+        log,
       })
       saveRuntime = (tick: number): void => {
         for (const { agentId, snapshot } of booted?.snapshots() ?? []) {
