@@ -13,6 +13,7 @@ import {
   parseTerrainTileManifest,
   roadAutotileKind,
   tickToMoment,
+  T_ROAD,
   type ChronicleEntry,
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
@@ -20,7 +21,6 @@ import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import {
   PLAZA_TILE,
-  ROAD_TILE,
   makeShowcaseMap,
   roadReach,
   showcaseDoorTile,
@@ -160,7 +160,7 @@ describe('GATE G10 — automated half, gateway side', () => {
       const map = makeShowcaseMap()
       const reach = roadReach(map)
       expect(reach.size).toBeGreaterThan(0)
-      const roads = map.terrain.flat().filter((t) => t === ROAD_TILE).length
+      const roads = map.terrain.flat().filter((t) => t === T_ROAD).length
       expect(reach.size).toBe(roads) // every road tile, one lattice
       for (const s of map.structures) {
         const d = showcaseDoorTile(s)
@@ -170,7 +170,7 @@ describe('GATE G10 — automated half, gateway side', () => {
           [0, 1],
           [-1, 0],
           [0, 0],
-        ].some(([dx, dy]) => map.terrain[d.y + dy!]?.[d.x + dx!] === ROAD_TILE)
+        ].some(([dx, dy]) => map.terrain[d.y + dy!]?.[d.x + dx!] === T_ROAD)
         expect(touchesRoad, `${s.kind} at ${d.x},${d.y} has no road at its door`).toBe(true)
       }
     })
@@ -319,7 +319,7 @@ describe('GATE G10 — automated half, gateway side', () => {
     })
 
     it('leaves the plaza standing — the showcase map is genesis input, not a runtime edit', () => {
-      expect(makeShowcaseMap().terrain[PLAZA_TILE.y]![PLAZA_TILE.x]).toBe(ROAD_TILE)
+      expect(makeShowcaseMap().terrain[PLAZA_TILE.y]![PLAZA_TILE.x]).toBe(T_ROAD)
     })
   })
 })

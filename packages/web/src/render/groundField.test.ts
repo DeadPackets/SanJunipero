@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Matrix } from 'pixi.js'
-import { ROAD_AUTOTILE_KEYS, materialKind, type AssetRecord } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
+import { ROAD_AUTOTILE_KEYS, materialKind, T_ROAD, type AssetRecord, type TileId } from '@sj/shared'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
-import { ROAD_TILE_ID } from './tileset.js'
 import {
   CALM_ROAD_KIND,
   MATERIAL_REPEAT_PX,
@@ -95,7 +93,7 @@ describe('groundField', () => {
 
   it('gives a road tile BOTH the ground under it and its own ribbon silhouette', () => {
     const t = field(5, 0)
-    t[2]![2] = ROAD_TILE_ID
+    t[2]![2] = T_ROAD
     const f = groundField(t, records)
     const grass = f.layers.find((l) => l.kind === ROAD_UNDER)!
     const road = f.layers.find((l) => l.kind === 'road')!
@@ -107,7 +105,7 @@ describe('groundField', () => {
 
   it('draws road last, over the ground it runs through', () => {
     const t = field(5, 0)
-    t[2]![2] = ROAD_TILE_ID
+    t[2]![2] = T_ROAD
     const kinds = groundField(t, records).layers.map((l) => l.kind)
     expect(kinds.at(-1)).toBe('road')
   })
@@ -409,7 +407,7 @@ function reaches(
 
 const road = (n: number, cells: [number, number][]): TileId[][] => {
   const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
-  for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID
+  for (const [x, y] of cells) t[y]![x] = T_ROAD
   return t
 }
 const centreOf = (r: { off: number }, x: number, y: number): [number, number] => [
@@ -507,7 +505,7 @@ describe('a road run is CONNECTED', () => {
 describe('mass vs ribbon', () => {
   const grid = (n: number, cells: [number, number][]): TileId[][] => {
     const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
-    for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID
+    for (const [x, y] of cells) t[y]![x] = T_ROAD
     return t
   }
   const block = (x0: number, y0: number, w: number, h: number): [number, number][] => {
@@ -721,7 +719,7 @@ describe('the two-tone rim', () => {
 
   it('a straight 20-tile run keeps exactly two continuous rim bands and no interior wedge', () => {
     const t: TileId[][] = field(22, 0)
-    for (let x = 1; x <= 20; x++) t[10]![x] = ROAD_TILE_ID
+    for (let x = 1; x <= 20; x++) t[10]![x] = T_ROAD
     const road = groundField(t, []).layers.filter((l) => l.kind === 'road')
     const keys = road.flatMap((l) => l.shapes.map((s) => s.roadKey)).filter((k) => k !== null)
     expect(keys).toHaveLength(20)

@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { VERBS, workPenalty, type PendingEvent } from './verbs.js'
+import { VERBS, workPenalty, type PendingEvent } from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 

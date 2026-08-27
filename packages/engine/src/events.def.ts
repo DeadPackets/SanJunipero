@@ -149,6 +149,8 @@ export const FireExtinguished = z
   })
   .strict()
 
+export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
+
 export const ActionStarted = z
   .object({
     agentId: z.string(),
@@ -376,11 +378,8 @@ export const ForageableRegrown = z
   .object({ id: z.string(), stock: z.number().int().positive() })
   .strict()
 
-export const TerrainChanged = z
-  .object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) })
-  .strict()
-// The terrain event. `terrain_changed` stays folded so recorded logs replay; this one
-// carries where the cell came from and why, which is what a doctored log cannot fake.
+// The terrain event. It carries where the cell came from and why, which is what a
+// doctored log cannot fake.
 export const TileChanged = z
   .object({
     x: z.number(),

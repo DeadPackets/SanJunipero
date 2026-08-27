@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import type { AssetRecord } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
+import { T_ROAD, type AssetRecord, type TileId } from '@sj/shared'
 import { tilesetPlan } from './ground.js'
 import { tileToScreen } from './iso.js'
 import {
-  ROAD_TILE_ID,
   TERRAIN_VARIANTS,
   resolveTerrainTile,
   roadAutotileKind,
@@ -115,11 +113,11 @@ describe('resolveTerrainTile', () => {
   it('prefers an autotiled road strip record over the flat road variants (C13 seam)', () => {
     const flat = [0, 1, 2, 3].map((v) => terrainRecord('road', v))
     const strip = terrainRecord(roadAutotileKind('cross'), null)
-    expect(resolveTerrainTile([...flat, strip], ROAD_TILE_ID, 2, 2, 'cross').url).toBe(
+    expect(resolveTerrainTile([...flat, strip], T_ROAD, 2, 2, 'cross').url).toBe(
       `/assets/${strip.id}.png`,
     )
     // no strip in the codex → the flat variants still render (additive, no rework)
-    expect(resolveTerrainTile(flat, ROAD_TILE_ID, 2, 2, 'cross').url).toBe(
+    expect(resolveTerrainTile(flat, T_ROAD, 2, 2, 'cross').url).toBe(
       `/assets/asset_road_${tileVariant(2, 2)}.png`,
     )
   })

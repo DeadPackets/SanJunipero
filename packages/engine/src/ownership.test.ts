@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { RngStream } from './rng.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 
 // Ownership is a social fact the engine merely records. Nothing here blocks a hand.
 

@@ -118,10 +118,9 @@ describe('extraction helpers', () => {
 
   it('eventLocation returns numeric x/y or null', () => {
     expect(eventLocation(ev(1, 0, 'agent_moved', { id: 'a', x: 5, y: 6 }))).toEqual({ x: 5, y: 6 })
-    expect(eventLocation(ev(1, 0, 'terrain_changed', { x: 2, y: 3, tile: 1 }))).toEqual({
-      x: 2,
-      y: 3,
-    })
+    expect(
+      eventLocation(ev(1, 0, 'tile_changed', { x: 2, y: 3, from: 0, to: 1, reason: 'tilled' })),
+    ).toEqual({ x: 2, y: 3 })
     expect(eventLocation(ev(1, 0, 'structure_completed', { id: 's1' }))).toBeNull()
     expect(eventLocation(ev(1, 0, 'agent_died', { agentId: 'a', cause: 'age' }))).toBeNull()
   })

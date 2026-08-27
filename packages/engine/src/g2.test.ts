@@ -28,7 +28,7 @@ import {
 } from './scripted.js'
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
-import { nutritionOf } from './verbs.js'
+import { nutritionOf } from './verbs/index.js'
 // Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
 // witness, regrowth and desire paths are all live on the 3-day run.
 const G2_CONFIG = SimConfigSchema.parse({})

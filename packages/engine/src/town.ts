@@ -1,7 +1,10 @@
 import {
   CITY_GROUND,
+  T_CHANNEL,
+  T_FARMLAND,
   T_GRASS,
   T_ROAD,
+  T_WATER,
   TOWN_SQUARE,
   blockGroundOf,
   claimTownPlot,
@@ -60,7 +63,9 @@ export function standingRects(state: WorldState): WorldRect[] {
     .map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h }))
 }
 
-const WET: ReadonlySet<number> = new Set([2, 10]) // open water and a dug channel
+// Open water and a dug channel, named from the shared alphabet but kept as a local set: the
+// lattice search asks this per tile of every claim, and a cross-package call there is measurable.
+const WET: ReadonlySet<number> = new Set([T_WATER, T_CHANNEL])
 
 /** Unions the grammar's channel with the world's water: the fork reaches the lattice at ring 3,
  *  where blocks (0,-3) and (1,-3) would stand in it. Off-array reads DRY — absent is not wet. */
@@ -139,7 +144,7 @@ export function layBlock(
       if (from === undefined) return 'off the map'
       // A field and a street are somebody's work; a channel is not spared, because it is
       // impassable and a plot the town can never build on is worse than a lost ditch.
-      if (reason === 'levelled' && (from === 6 || from === T_ROAD)) continue
+      if (reason === 'levelled' && (from === T_FARMLAND || from === T_ROAD)) continue
       if (from !== to) out.push({ x: t.x, y: t.y, from, to, reason })
     }
   }

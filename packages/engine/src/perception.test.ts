@@ -4,7 +4,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
 import { composePerception, hears } from './perception.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
 

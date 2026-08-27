@@ -1,29 +1,18 @@
 import { z } from 'zod'
+import { FAUNA_YIELD, type FaunaKind } from '../data/faunaDefs.js'
+import { FORAGEABLE_YIELD } from '../data/forageables.js'
+import { WalkParams } from '../events.def.js'
 import {
-  CITY_HEARTH_KIND,
-  classMembers,
-  dayPhaseFromTick,
-  fertilityAt,
-  glowRadiusFor,
-  inputName,
-  isRoofedKind,
-  litSourceWithin,
-  MINUTES_PER_DAY,
-  sanitizeSpokenText,
-  simTimeFromTick,
-  SPEECH_INPUT_MAX_CHARS,
-  structureGlowRadius,
-  T_PATH,
-  T_ROAD,
-  WATER_TILES,
-  type RecipeDef,
-  type SimConfig,
-  type StructureRecipeDef,
-  type TownFacing,
-} from '@sj/shared'
-
-/** Absent means this. The same convention `forge/buildingArt.facingKind` uses for a cell id. */
-const DEFAULT_TOWN_FACING: TownFacing = 'sw'
+  FISH_KIND,
+  FORAGE_KIND,
+  HERB_KIND,
+  PALE_MUSHROOM,
+  isFoodKind,
+  nutritionOf,
+} from '../food.js'
+import { doorTile, occupantsOf, roomIsFull, sameInterior } from '../interiors.js'
+import { findPath, isPassable } from '../path.js'
+import { type RngStream } from '../rng.js'
 import {
   mintId,
   type Affliction,
@@ -31,18 +20,42 @@ import {
   type Structure,
   type TileId,
   type WorldState,
-} from './state.js'
-import type { RngStream } from './rng.js'
-import { doorTile, occupantsOf, roomIsFull, sameInterior } from './interiors.js'
-import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
-import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
-import { isSpoiling, spoilageFor } from './systems/spoilage.js'
-import { fleeTo } from './systems/fauna.js'
-import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from './systems/warmth.js'
-import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
-import { FORAGEABLE_YIELD } from './data/forageables.js'
+} from '../state.js'
+import { fleeTo } from '../systems/fauna.js'
+import { isSpoiling, spoilageFor } from '../systems/spoilage.js'
+import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from '../systems/warmth.js'
+import { buildIsPlotted, buildSiteOf, siteToRaise, words } from './build.js'
+import {
+  consumeHeld,
+  heldQty,
+  heldStacks,
+  isAdjacentToRect,
+  nearRect,
+  siteAt,
+  type PendingEvent,
+} from './common.js'
+import { buildTicks, buildableRecipe, craftRoutes, shortOf, type SeedRecipe } from './craft.js'
+import {
+  CITY_HEARTH_KIND,
+  MINUTES_PER_DAY,
+  SPEECH_INPUT_MAX_CHARS,
+  T_FOREST,
+  T_GRASS,
+  T_ROAD,
+  T_SAPLING,
+  classMembers,
+  fertilityAt,
+  glowRadiusFor,
+  isPaveable,
+  isRoofedKind,
+  isWet,
+  isWoody,
+  sanitizeSpokenText,
+  simTimeFromTick,
+  structureGlowRadius,
+  type SimConfig,
+} from '@sj/shared'
 
-export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk'
   | 'sleep'
@@ -130,18 +143,6 @@ function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'durat
 }
 
 // Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).
-export function isAdjacentToRect(
-  ax: number,
-  ay: number,
-  rect: { x: number; y: number; w: number; h: number },
-): boolean {
-  return ax >= rect.x - 1 && ax <= rect.x + rect.w && ay >= rect.y - 1 && ay <= rect.y + rect.h
-}
-
-export function isFoodKind(config: SimConfig, kind: string): boolean {
-  return FOOD_KINDS.has(kind) || config.crops[kind] !== undefined
-}
-
 // Shared validate block for verbs aimed at another agent. Reason strings are
 // per-verb; `busy` (teach) is checked between the alive and adjacency checks.
 function adjacentLivingTarget(
@@ -162,8 +163,6 @@ function adjacentLivingTarget(
   }
   return null
 }
-
-export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
 export function ticksPerTile(state: WorldState, config: SimConfig, agentId: string): number {
   const a = state.agents[agentId]!
@@ -207,47 +206,6 @@ export function walkIsCapped(state: WorldState, agentId: string): boolean {
 }
 
 export const EatParams = z.object({ itemId: z.string() }).strict()
-
-// Single food registry: eat validates against it, forage/fish/harvest spawn from it.
-export const FORAGE_KIND = 'berries'
-export const FISH_KIND = 'fish'
-// Both edible, and that is the point: from across the clearing they are the same mushroom, and
-// which one kills is knowledge the town has to earn. `rabbit_meat` is the hunt's smaller catch.
-export const PALE_MUSHROOM = 'pale_mushroom'
-export const MUSHROOM_KIND = 'mushroom'
-export const HERB_KIND = 'herb'
-export const STEW_KIND = 'stew'
-export const FOOD_KINDS: ReadonlySet<string> = new Set([
-  FORAGE_KIND,
-  FISH_KIND,
-  'venison',
-  'rabbit_meat',
-  'bread',
-  'wheat',
-  MUSHROOM_KIND,
-  PALE_MUSHROOM,
-  HERB_KIND,
-  STEW_KIND,
-])
-
-// A share of needs.eatRestoreHunger, a module const and not a dial: SimConfigSchema is closed.
-// An unlisted kind is a full meal; the herb's 0.05 is the point — chewing a remedy is not dinner.
-export const FOOD_NUTRITION: Readonly<Record<string, number>> = {
-  [HERB_KIND]: 0.05,
-  [MUSHROOM_KIND]: 0.4,
-  [PALE_MUSHROOM]: 0.4,
-  [FORAGE_KIND]: 0.5,
-  wheat: 0.5,
-  [FISH_KIND]: 0.75,
-  rabbit_meat: 0.75,
-  venison: 1,
-  bread: 1,
-  [STEW_KIND]: 1.5,
-}
-
-export function nutritionOf(_config: SimConfig, kind: string): number {
-  return FOOD_NUTRITION[kind] ?? 1
-}
 
 // The worst thing wrong with a body: highest severity, ties to the alphabetically first kind.
 // The list is already stored in kind order, so a strictly-greater scan is that tiebreak.
@@ -503,7 +461,6 @@ const tend: VerbDef = makeVerb({
   skill: { track: 'medicine', xp: 1 },
 })
 
-export { WATER_TILES }
 export const BUCKET_KIND = 'bucket'
 export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', BUCKET_KIND])
 export const WELL_KIND = 'well'
@@ -513,7 +470,7 @@ export function waterWithinReach(state: WorldState, agentId: string): 'water_til
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const t = state.terrain[a.y + dy]?.[a.x + dx]
-      if (t !== undefined && WATER_TILES.has(t)) return 'water_tile'
+      if (t !== undefined && isWet(t)) return 'water_tile'
     }
   }
   for (const id of Object.keys(state.structures).sort()) {
@@ -733,38 +690,6 @@ const stoke: VerbDef = makeVerb({
   },
 })
 
-// The five things hands do that eyes have to be part of. Speech, walking and everything else
-// cost the same in the dark as at noon — the night is a price change, not a curfew.
-export const NIGHT_WORK_VERBS: ReadonlySet<string> = new Set([
-  'build',
-  'craft',
-  'till',
-  'pave',
-  'dig_channel',
-])
-
-// Working blind: night, no flame within reach, and the light law switched on.
-export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: string): boolean {
-  if (!config.light.enabled) return false
-  if (dayPhaseFromTick(state.tick) !== 'night') return false
-  const a = state.agents[agentId]
-  if (a === undefined) return false
-  return !litSourceWithin(state, a.x, a.y, state.tick, config, config.light.workRadius)
-}
-
-// The one derivation of what the dark costs: submitIntent multiplies a duration by it,
-// and perception says so out loud. Never a refusal — burning fuel or burning time is a choice.
-export function workPenalty(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  verb: string,
-): number {
-  return NIGHT_WORK_VERBS.has(verb) && fumblesInTheDark(state, config, agentId)
-    ? config.light.nightWorkPenalty
-    : 1
-}
-
 export const TileParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 export const PlantParams = z
   .object({ x: z.number().int(), y: z.number().int(), kind: z.string() })
@@ -840,7 +765,7 @@ const digChannel: VerbDef = makeVerb({
       [0, 1],
     ].some(([dx, dy]) => {
       const t = tileAt(state, p.data.x + dx!, p.data.y + dy!)
-      return t !== null && WATER_TILES.has(t)
+      return t !== null && isWet(t)
     })
     if (!fed) return 'no water reaches here'
     return null
@@ -1198,418 +1123,6 @@ export const BuildParams = z
 export const CraftParams = z.object({ recipe: z.string() }).strict()
 export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
-function heldStacks(state: WorldState, agentId: string, kind: string) {
-  return Object.values(state.items)
-    .filter((i) => i.kind === kind && i.loc.t === 'agent' && i.loc.id === agentId)
-    .sort((a, b) => (a.id < b.id ? -1 : 1))
-}
-
-function heldQty(state: WorldState, agentId: string, kind: string): number {
-  return heldStacks(state, agentId, kind).reduce((sum, i) => sum + i.qty, 0)
-}
-
-function consumeHeld(
-  state: WorldState,
-  agentId: string,
-  kind: string,
-  qty: number,
-): PendingEvent[] {
-  const events: PendingEvent[] = []
-  let left = qty
-  for (const i of heldStacks(state, agentId, kind)) {
-    if (left <= 0) break
-    const take = Math.min(i.qty, left)
-    events.push({ type: 'item_qty_changed', payload: { id: i.id, delta: -take } })
-    left -= take
-  }
-  return events
-}
-
-function nearRect(
-  state: WorldState,
-  agentId: string,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): boolean {
-  const a = state.agents[agentId]!
-  return isAdjacentToRect(a.x, a.y, { x, y, w, h })
-}
-
-// The in-progress construction site at exactly (x, y), if any.
-function siteAt(state: WorldState, x: number, y: number) {
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
-    if (s.x === x && s.y === y && s.stage === 'construction') return s
-  }
-  return null
-}
-
-// What can be built at all: a row with materials on it. An empty `inputs` marks a kind the
-// world places and nobody raises — a grave is not a building project.
-export function buildableRecipe(config: SimConfig, kind: string): StructureRecipeDef | null {
-  const row = config.structures.recipes[kind]
-  return row !== undefined && Object.keys(row.inputs).length > 0 ? row : null
-}
-
-// The house keeps its own dial as the duration source; every other kind reads its row. The two
-// are asserted equal in config.test.ts, so this is one number under two names, not two numbers.
-export function buildTicks(config: SimConfig, kind: string): number {
-  return kind === 'house'
-    ? config.construction.houseTicks
-    : (config.structures.recipes[kind]?.durationTicks ?? 0)
-}
-
-function buildableGroundRefusal(
-  state: WorldState,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): string | null {
-  for (let dy = 0; dy < h; dy++) {
-    for (let dx = 0; dx < w; dx++) {
-      if (!isPassable(state, x + dx, y + dy)) return 'cannot build there'
-    }
-  }
-  return null
-}
-
-// A bank is anything that is not open water — or a deck already laid over it.
-function banked(state: WorldState, x: number, y: number): boolean {
-  const tile = state.terrain[y]?.[x]
-  if (tile === undefined) return false
-  return !WATER_TILES.has(tile) || bridgeAt(state, x, y)
-}
-
-// Two or three tiles of deck, every one over water, with a foot on solid ground at each end.
-// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped bridge is 1x2.
-const BRIDGE_SPAN = { min: 2, max: 3 }
-
-function bridgeSiteRefusal(
-  state: WorldState,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): string | null {
-  const span = w === 1 ? h : h === 1 ? w : 0
-  if (span < BRIDGE_SPAN.min || span > BRIDGE_SPAN.max) return 'no bridge that shape will stand'
-  for (let dy = 0; dy < h; dy++) {
-    for (let dx = 0; dx < w; dx++) {
-      const tile = state.terrain[y + dy]?.[x + dx]
-      if (tile === undefined || !WATER_TILES.has(tile)) return 'a bridge belongs over water'
-      if (bridgeAt(state, x + dx, y + dy)) return 'that spot is taken'
-    }
-  }
-  const ends =
-    w === 1
-      ? [
-          { x, y: y - 1 },
-          { x, y: y + h },
-        ]
-      : [
-          { x: x - 1, y },
-          { x: x + w, y },
-        ]
-  if (!ends.every((e) => banked(state, e.x, e.y))) return 'both ends must reach something solid'
-  return null
-}
-
-type BuildSite = { kind: string; x: number; y: number }
-
-// Every structure makes its tiles impassable, so a post raised in the street would close the
-// street. Only a sited kind can be aimed at a road, so only a sited one is asked.
-function roadBlockRefusal(
-  state: WorldState,
-  kind: string,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): string | null {
-  if (kind === BRIDGE_KIND) return null // a deck IS the way across; it opens ground, never closes it
-  for (let dy = 0; dy < h; dy++) {
-    for (let dx = 0; dx < w; dx++) {
-      const tile = state.terrain[y + dy]?.[x + dx]
-      if (tile === T_ROAD || tile === T_PATH) {
-        return `that would stand in the way — the ${words(kind)} goes on the ground beside the way, not on it`
-      }
-    }
-  }
-  return null
-}
-
-// Everything about a site that depends on how big the thing standing on it is.
-function footprintRefusal(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  d: BuildSite,
-  w: number,
-  h: number,
-): string | null {
-  const recipe = buildableRecipe(config, d.kind)!
-  if (!nearRect(state, agentId, d.x, d.y, w, h))
-    return `not close enough to build — stand within reach of (${d.x}, ${d.y})`
-  const site = siteAt(state, d.x, d.y)
-  if (site?.kind === d.kind) return null // resume: materials already spent
-  for (const s of Object.values(state.structures)) {
-    if (d.x < s.x + s.w && s.x < d.x + w && d.y < s.y + s.h && s.y < d.y + h)
-      return 'that spot is taken'
-  }
-  const ground =
-    d.kind === BRIDGE_KIND
-      ? bridgeSiteRefusal(state, d.x, d.y, w, h)
-      : buildableGroundRefusal(state, d.x, d.y, w, h)
-  if (ground) return ground
-  const blocked = roadBlockRefusal(state, d.kind, d.x, d.y, w, h)
-  if (blocked) return blocked
-  for (const a of Object.values(state.agents)) {
-    if (a.alive && a.x >= d.x && a.x < d.x + w && a.y >= d.y && a.y < d.y + h)
-      return 'someone is in the way'
-  }
-  for (const [kind, qty] of Object.entries(recipe.inputs)) {
-    if (heldQty(state, agentId, kind) < qty) return shortOf(kind)
-  }
-  return null
-}
-
-// A recipe's w and h are a shape, not a compass bearing. As written wins; the turned reading is
-// tried only when the written one refuses, and a refusal always uses the written one's words.
-export function buildFootprint(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  d: BuildSite,
-): { w: number; h: number; refusal: string | null } {
-  const { w, h } = buildableRecipe(config, d.kind)!
-  const written = footprintRefusal(state, config, agentId, d, w, h)
-  if (written === null || w === h) return { w, h, refusal: written }
-  const turned = footprintRefusal(state, config, agentId, d, h, w)
-  return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
-}
-
-/** A mass stands where the town decides; a sited thing belongs to a spot somebody picked and says
- *  so in its recipe. bridgeSiteRefusal stays the bridge's alone: the water rule is not every sited kind's. */
-export const isPlottedKind = (config: SimConfig, kind: string): boolean =>
-  config.structures.recipes[kind]?.sited !== true
-
-/** Whether THIS world seats THIS kind on a plot. It takes a town to seat one. */
-export function buildIsPlotted(state: WorldState, config: SimConfig, kind: string): boolean {
-  return isPlottedKind(config, kind) && townSquareOf(state) !== null
-}
-
-/** The site this agent already has half-raised, so an interrupted build goes back to the same
- *  walls. Keyed on the BUILDER, because on a plot there is no coordinate to look one up by. */
-function ownSite(state: WorldState, agentId: string, kind: string) {
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
-    if (s.stage === 'construction' && s.kind === kind && s.builtBy === agentId) return s
-  }
-  return null
-}
-
-/** Somebody else's walls, within reach, keyed on the GROUND — without it claimInWorld hands the
- *  second body the next FREE plot and five bodies raise five houses. Plots are four tiles apart, so there is never a choice. */
-function joinableSite(state: WorldState, agentId: string, kind: string): Structure | null {
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
-    if (
-      s.stage === 'construction' &&
-      s.kind === kind &&
-      nearRect(state, agentId, s.x, s.y, s.w, s.h)
-    )
-      return s
-  }
-  return null
-}
-
-/** Its own half-finished walls first, then a neighbour's within reach, and only then new ground.
- *  ownSite is asked first, so joinableSite is never looking at walls this body began. */
-function siteToRaise(state: WorldState, agentId: string, kind: string) {
-  return ownSite(state, agentId, kind) ?? joinableSite(state, agentId, kind)
-}
-
-export type BuildSiteAnswer = {
-  /** `facing` rides along ONLY when the plot turned the building — absent is `sw`, and a
-   *  bridge has no door and no facing at all. */
-  site: { x: number; y: number; w: number; h: number; facing?: TownFacing } | null
-  /** The standing construction this build continues, if any: its materials are already spent. */
-  resume: { id: string; progressTicks: number } | null
-  /** The ground the town must lay before anything can stand here — empty when it already has. */
-  lay: TileChange[]
-  refusal: string | null
-}
-
-const words = (kind: string): string => kind.replace(/_/g, ' ')
-
-/** On a plot, nothing about the asker reaches the site: claimInWorld decides it and params are
- *  not consulted. The refusal names the place to walk to rather than offering nothing. */
-export function buildSiteOf(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  params: { kind: string; x?: number | undefined; y?: number | undefined },
-): BuildSiteAnswer {
-  const key = `${agentId}|${params.kind}|${params.x ?? ''}|${params.y ?? ''}`
-  const hit = siteMemo.get(state)
-  if (hit?.config === config && hit.key === key) return hit.answer
-  const answer = computeBuildSite(state, config, agentId, params)
-  siteMemo.set(state, { config, key, answer })
-  return answer
-}
-
-// One build intent asks this from `validate`, `duration` and `onStart` over the same immutable
-// world, and each answer costs a claim search of the whole lattice.
-const siteMemo = new WeakMap<
-  WorldState,
-  { config: SimConfig; key: string; answer: BuildSiteAnswer }
->()
-
-function computeBuildSite(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  params: { kind: string; x?: number | undefined; y?: number | undefined },
-): BuildSiteAnswer {
-  const recipe = buildableRecipe(config, params.kind)!
-  if (!buildIsPlotted(state, config, params.kind)) {
-    if (params.x === undefined || params.y === undefined) {
-      return { site: null, resume: null, lay: [], refusal: `build needs {kind, x, y}` }
-    }
-    const d = { kind: params.kind, x: params.x, y: params.y }
-    const { w, h, refusal } = buildFootprint(state, config, agentId, d)
-    const at = siteAt(state, d.x, d.y)
-    return {
-      site: { x: d.x, y: d.y, w, h },
-      resume:
-        at !== null && at.kind === d.kind ? { id: at.id, progressTicks: at.progressTicks } : null,
-      lay: [],
-      refusal,
-    }
-  }
-  const square = townSquareOf(state)!
-  const mine = siteToRaise(state, agentId, params.kind)
-  const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const raising =
-    mine === null
-      ? null
-      : {
-          x: mine.x,
-          y: mine.y,
-          w: mine.w,
-          h: mine.h,
-          ...(mine.facing === undefined ? {} : { facing: mine.facing }),
-        }
-  if (claim === null) {
-    return {
-      site: raising,
-      resume: null,
-      lay: [],
-      refusal: `there is nowhere left in the town for a ${words(params.kind)}`,
-    }
-  }
-  const site = raising ?? {
-    ...claim.site,
-    ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }),
-  }
-  // The town lays the block the first time somebody builds on it; "off the map" is loud because a
-  // plot silently withheld for want of a bigger world is the ring-1 clamp all over again.
-  const lay = layBlock(state, square, claim.block)
-  if (lay === 'off the map') {
-    return {
-      site,
-      resume: null,
-      lay: [],
-      refusal: `the ground a ${words(params.kind)} needs is past the edge of the known country`,
-    }
-  }
-  const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
-  // The door tile, not the corner of the footprint: a road, passable, and adjacent to every mass
-  // the plot can hold. The same number groundForBuilding puts in the perception.
-  const go = `go and stand at (${claim.door.x}, ${claim.door.y})`
-  if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
-    return {
-      site,
-      resume,
-      lay,
-      refusal: `the town keeps ground for a ${words(params.kind)} — ${go}`,
-    }
-  }
-  return {
-    site,
-    resume,
-    lay,
-    refusal: resume !== null ? null : plottedRefusal(state, config, agentId, params.kind, site, go),
-  }
-}
-
-/** The next free plot's street corner; every plot holds every legal mass, so one answer serves
- *  every buildable kind. Free ground is only half of "where does work go" — unfinishedWork is the rest. */
-export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
-  return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
-}
-
-/** Walls that already stand, unfinished, and the tile a body reaches them from. Nearest first,
- *  ties by id. Only kinds a pair of hands can carry on: naming a wall nobody can finish is worse than silence. */
-export type StandingWalls = {
-  id: string
-  kind: string
-  at: { x: number; y: number }
-  done: number
-  needs: number
-}
-
-export function unfinishedWork(
-  state: WorldState,
-  config: SimConfig,
-  from: { x: number; y: number },
-): StandingWalls | null {
-  let best: StandingWalls | null = null
-  let bestDist = Infinity
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
-    if (s.stage !== 'construction' || buildableRecipe(config, s.kind) === null) continue
-    const needs = buildTicks(config, s.kind)
-    if (needs <= 0) continue
-    const door = doorTile(state, s)
-    const at = door ?? { x: s.x, y: s.y + s.h }
-    const d = Math.abs(at.x - from.x) + Math.abs(at.y - from.y)
-    if (d >= bestDist) continue
-    bestDist = d
-    best = { id: s.id, kind: s.kind, at, done: Math.min(s.progressTicks, needs), needs }
-  }
-  return best
-}
-
-/** Everything that can still be wrong once the town has named the ground. */
-function plottedRefusal(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  kind: string,
-  site: { x: number; y: number; w: number; h: number },
-  go: string,
-): string | null {
-  const ground = buildableGroundRefusal(state, site.x, site.y, site.w, site.h)
-  if (ground) return ground
-  for (const a of Object.values(state.agents)) {
-    if (!a.alive) continue
-    if (a.x < site.x || a.x >= site.x + site.w || a.y < site.y || a.y >= site.y + site.h) continue
-    // A body inside the footprint would be walled in by its own walls. Standing ON the ground
-    // is the near miss the door tile exists to prevent, so that refusal points at the door.
-    return a.id === agentId
-      ? `you are standing on the ground itself — ${go}`
-      : 'someone is in the way'
-  }
-  for (const [k, qty] of Object.entries(buildableRecipe(config, kind)!.inputs)) {
-    if (heldQty(state, agentId, k) < qty) return shortOf(k)
-  }
-  return null
-}
-
 const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
@@ -1675,83 +1188,6 @@ const build: VerbDef = makeVerb({
   skill: { track: 'carpentry', xp: 1 },
 })
 
-// Code and not a dial, because SimConfigSchema is closed — and it wants two things a config row
-// cannot say: a fire somebody is feeding, and a vessel with water in it.
-export type SeedRecipe = RecipeDef & { atFire?: true; water?: number }
-
-export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
-  [STEW_KIND]: {
-    inputs: { any_meat: 1, any_vegetable: 1 },
-    output: { kind: STEW_KIND, qty: 1 },
-    skill: 'cooking',
-    atFire: true,
-    water: 1,
-  },
-  // crafting.recipes holds the weaver's road (fiber → cloth → garment) and is closed, so the road
-  // that skips the loom lives here. The name has to differ from that row; the thing it makes does not.
-  hide_garment: {
-    inputs: { hide: 2 },
-    output: { kind: 'garment', qty: 1 },
-    skill: 'tailoring',
-  },
-  // A stick and a wrap of dry reed. Until this row the only flame in the world was the one
-  // the founders were given, and `kindle` had nothing to strike.
-  torch: {
-    inputs: { wood: 1, fiber: 1 },
-    output: { kind: 'torch', qty: 1 },
-    skill: 'carpentry',
-  },
-}
-
-export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefined {
-  return config.crafting.recipes[name] ?? SEED_RECIPES[name]
-}
-
-// A mind asks for the THING, not the road to it: "craft garment" with two hides in hand must not
-// be told there is no cloth. The row that owns the name is tried first; order is by key.
-export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
-  const named = recipeFor(config, name)
-  const product = named?.output.kind ?? name
-  const routes = named === undefined ? [] : [named]
-  for (const key of Object.keys(SEED_RECIPES).sort()) {
-    const seed = SEED_RECIPES[key]!
-    if (seed !== named && seed.output.kind === product) routes.push(seed)
-  }
-  return routes
-}
-
-// Off the same two tables build and craft already validate against. No new physics: the vocabulary
-// those verbs have always accepted, gathered in one place so somebody can be told it.
-export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
-export type Makeables = {
-  builds: { kind: string; inputs: Record<string, number> }[]
-  crafts: { name: string; roads: MakeableRoad[] }[]
-}
-
-export function makeables(config: SimConfig): Makeables {
-  const builds = Object.keys(config.structures.recipes)
-    .sort()
-    .flatMap((kind) => {
-      const row = buildableRecipe(config, kind)
-      return row === null ? [] : [{ kind, inputs: row.inputs }]
-    })
-  // One word per product, because `craftRoutes` already lets one word reach every road to it:
-  // "garment" finds the loom and the hide, where `hide_garment` would have found only the hide.
-  const products = new Set<string>()
-  for (const name of [...Object.keys(config.crafting.recipes), ...Object.keys(SEED_RECIPES)]) {
-    products.add(recipeFor(config, name)?.output.kind ?? name)
-  }
-  const crafts = [...products].sort().map((name) => ({
-    name,
-    roads: craftRoutes(config, name).map((r) => ({
-      inputs: r.inputs,
-      ...(r.atFire === true ? { atFire: true as const } : {}),
-      ...(r.water === undefined ? {} : { water: r.water }),
-    })),
-  }))
-  return { builds, crafts }
-}
-
 // How much of an input the hands hold, counting every member when the input is a canon class.
 function heldForInput(state: WorldState, agentId: string, input: string): number {
   const members = classMembers(input)
@@ -1802,27 +1238,6 @@ function keptFireInReach(state: WorldState, config: SimConfig, agentId: string):
     if (atTheFire(state, agentId, s)) return true
   }
   return false
-}
-
-// Where a material comes from, for the refusal that says a pair of hands is short of one: the
-// live gate answered "not enough meat" to a town that had never seen an animal.
-const MATERIAL_SOURCE: Readonly<Record<string, string>> = {
-  meat: 'meat comes off an animal you have hunted, or a fish out of the water',
-  vegetables:
-    'a vegetable comes from a berry patch, a mushroom ground or a field you have harvested',
-  fiber: 'fiber comes from cutting the reeds where the bank is wet',
-  cloth: 'cloth is woven from fiber',
-  hide: 'a hide comes off an animal you have killed',
-  wood: 'wood comes from felling a tree',
-  plank: 'planks are cut from wood',
-  stone: 'stone comes from the loose rock at the foot of an outcrop',
-  clay: 'clay comes from a bank where the ground has slumped',
-}
-
-export function shortOf(kind: string): string {
-  const name = inputName(kind)
-  const source = MATERIAL_SOURCE[name]
-  return source === undefined ? `not enough ${name}` : `not enough ${name} — ${source}`
 }
 
 // What stands between these hands and this recipe right now, or null when nothing does.
@@ -1932,8 +1347,6 @@ const extinguish: VerbDef = makeVerb({
 })
 
 export const STONE_KIND = 'stone'
-// Grass, bare earth and the dirt feet have already worn: all three take a road.
-const PAVEABLE: ReadonlySet<TileId> = new Set<TileId>([0, 1, 8])
 
 // A road is not something the map has; it is something somebody carried stone for.
 const pave: VerbDef = makeVerb({
@@ -1944,7 +1357,7 @@ const pave: VerbDef = makeVerb({
     const p = TileParams.safeParse(params)
     if (!p.success) return 'pave needs a tile {x, y}'
     const tile = tileAt(state, p.data.x, p.data.y)
-    if (tile === null || !PAVEABLE.has(tile)) return 'nothing to pave here'
+    if (tile === null || !isPaveable(tile)) return 'nothing to pave here'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to pave'
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return shortOf(STONE_KIND)
     return null
@@ -1952,13 +1365,13 @@ const pave: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
-    if (tile === null || !PAVEABLE.has(tile)) return []
+    if (tile === null || !isPaveable(tile)) return []
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return []
     return [
       ...consumeHeld(state, agentId, STONE_KIND, config.roads.stonePerTile),
       {
         type: 'tile_changed',
-        payload: { x: p.x, y: p.y, from: tile, to: 7, reason: 'paved', byId: agentId },
+        payload: { x: p.x, y: p.y, from: tile, to: T_ROAD, reason: 'paved', byId: agentId },
       },
     ]
   },
@@ -1967,8 +1380,6 @@ const pave: VerbDef = makeVerb({
 
 // A sapling is not timber yet: clearing one costs the swing and yields nothing. Either way the
 // ground goes back to grass, which is what makes the regrowth cycle a cycle and not an ornament.
-const SAPLING_TILE: TileId = 9
-const FOREST_TILE: TileId = 3
 export const CLEAR_TICKS = 4
 export const FELL_TICKS = 30
 export const TIMBER_PER_TREE = 2
@@ -1977,26 +1388,25 @@ const chop: VerbDef = makeVerb({
   kind: 'chop',
   duration(state, _config, _agentId, params) {
     const p = TileParams.parse(params)
-    return tileAt(state, p.x, p.y) === FOREST_TILE ? FELL_TICKS : CLEAR_TICKS
+    return tileAt(state, p.x, p.y) === T_FOREST ? FELL_TICKS : CLEAR_TICKS
   },
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'chop needs a tile {x, y}'
     const tile = tileAt(state, p.data.x, p.data.y)
-    if (tile !== SAPLING_TILE && tile !== FOREST_TILE)
-      return 'there is nothing standing there to cut'
+    if (tile === null || !isWoody(tile)) return 'there is nothing standing there to cut'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to cut'
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
-    if (tile !== SAPLING_TILE && tile !== FOREST_TILE) return []
+    if (tile === null || !isWoody(tile)) return []
     const cleared: PendingEvent = {
       type: 'tile_changed',
-      payload: { x: p.x, y: p.y, from: tile, to: 0, reason: 'cleared', byId: agentId },
+      payload: { x: p.x, y: p.y, from: tile, to: T_GRASS, reason: 'cleared', byId: agentId },
     }
-    if (tile === SAPLING_TILE) return [cleared]
+    if (tile === T_SAPLING) return [cleared]
     return [
       cleared,
       {
@@ -2536,3 +1946,19 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
     { type: 'agent_moved', payload: { id: agentId, x: nx, y: ny } },
   ]
 }
+
+// The four subsystems this file hosted but is not; their surface stays part of `verbs`.
+export * from '../food.js'
+export * from './craft.js'
+export * from './nightWork.js'
+export {
+  buildFootprint,
+  buildIsPlotted,
+  buildSiteOf,
+  groundForBuilding,
+  isPlottedKind,
+  unfinishedWork,
+  type BuildSiteAnswer,
+  type StandingWalls,
+} from './build.js'
+export { isAdjacentToRect, type PendingEvent } from './common.js'

@@ -7,7 +7,7 @@ import { submitIntent } from './intent.js'
 import { findPath, stepCostAt, terrainCostFor, BRIDGE_KIND } from './path.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
-import { BUCKET_KIND, STONE_KIND, type PendingEvent } from './verbs.js'
+import { BUCKET_KIND, STONE_KIND, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

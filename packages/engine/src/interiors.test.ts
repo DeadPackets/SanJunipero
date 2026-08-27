@@ -5,7 +5,7 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { doorTile, insideOf, sameInterior } from './interiors.js'
 import { RngStream } from './rng.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 
 const RNG = RngStream.seed('interiors-test', 'actions')
 

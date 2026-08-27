@@ -5,7 +5,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStream } from './rng.js'
-import { VERBS } from './verbs.js'
+import { VERBS } from './verbs/index.js'
 import { grid } from './testutil/world.js'
 
 // Inscription is `write` on a surface nobody can carry away: the town's first

@@ -5,9 +5,9 @@ import { submitIntent } from '../intent.js'
 import { stepCostAt, isPassable } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
-import { CLEAR_TICKS, FELL_TICKS, TIMBER_PER_TREE, VERBS } from '../verbs.js'
+import { CLEAR_TICKS, FELL_TICKS, TIMBER_PER_TREE, VERBS } from '../verbs/index.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { saplingKey } from './regrowth.js'
+import { tileKey } from '../state.js'
 import { ev } from '../testutil/world.js'
 
 const quiet = {
@@ -65,10 +65,10 @@ describe('seeding: the forest edge creeps back into the grass', () => {
   it('stamps the day it was seeded, sparsely, and nowhere else', () => {
     const s = tickOnce(wood(SURE, midnightOf(1)), SURE).state
     expect(s.saplings).toEqual({
-      [saplingKey(1, 2)]: 1,
-      [saplingKey(2, 1)]: 1,
-      [saplingKey(2, 3)]: 1,
-      [saplingKey(3, 2)]: 1,
+      [tileKey(1, 2)]: 1,
+      [tileKey(2, 1)]: 1,
+      [tileKey(2, 3)]: 1,
+      [tileKey(3, 2)]: 1,
     })
     expect(wood(SURE).saplings).toBeUndefined()
   })
@@ -193,13 +193,13 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
 
   it('clearing a sapling takes its stamp with it, so the ground forgets it was ever planted', () => {
     let s = tickOnce(wood(SURE, midnightOf(1)), SURE).state
-    expect(s.saplings?.[saplingKey(2, 1)]).toBe(1)
+    expect(s.saplings?.[tileKey(2, 1)]).toBe(1)
     s = fold(
       s,
       ev('tile_changed', { x: 2, y: 1, from: 9, to: 0, reason: 'cleared', byId: 'a1' }, s.tick),
       SURE,
     )
-    expect(s.saplings?.[saplingKey(2, 1)]).toBeUndefined()
+    expect(s.saplings?.[tileKey(2, 1)]).toBeUndefined()
   })
 })
 

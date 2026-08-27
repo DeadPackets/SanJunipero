@@ -1,24 +1,9 @@
-import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
-import type { TileId, WorldState } from '../state.js'
+import { MINUTES_PER_DAY, simTimeFromTick, T_FOREST, T_GRASS, T_SAPLING } from '@sj/shared'
+import { fromTileKey, type TileId, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Scarcity is a cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at
 // emission; the maturing is arithmetic on the day the seed was stamped, so the fold stays pure.
-
-const GRASS: TileId = 0
-const FOREST: TileId = 3
-const SAPLING: TileId = 9
-
-// The one spelling of a tile's name in the sparse sapling map — the same shape the
-// traffic map uses, for the same reason: a 128x128 array of nothing is a hash of nothing.
-export function saplingKey(x: number, y: number): string {
-  return `${x},${y}`
-}
-
-export function fromSaplingKey(key: string): { x: number; y: number } {
-  const comma = key.indexOf(',')
-  return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
-}
 
 const ORTHOGONAL: readonly (readonly [number, number])[] = [
   [0, -1],
@@ -43,17 +28,17 @@ export function regrowthSystem(ctx: TickCtx): void {
   // already forest when the seeds fall from it.
   for (const key of Object.keys(ctx.state().saplings ?? {}).sort()) {
     if (day - ctx.state().saplings![key]! < cfg.saplingDays) continue
-    const { x, y } = fromSaplingKey(key)
-    if (ctx.state().terrain[y]?.[x] !== SAPLING) continue
-    ctx.emit('tile_changed', { x, y, from: SAPLING, to: FOREST, reason: 'grown' })
+    const { x, y } = fromTileKey(key)
+    if (ctx.state().terrain[y]?.[x] !== T_SAPLING) continue
+    ctx.emit('tile_changed', { x, y, from: T_SAPLING, to: T_FOREST, reason: 'grown' })
   }
 
   const rng = ctx.rng.get('regrowth')
   for (let y = 0; y < ctx.state().terrain.length; y++) {
     for (let x = 0; x < ctx.state().terrain[y]!.length; x++) {
-      if (ctx.state().terrain[y]![x] !== GRASS || !beside(ctx.state(), x, y, FOREST)) continue
+      if (ctx.state().terrain[y]![x] !== T_GRASS || !beside(ctx.state(), x, y, T_FOREST)) continue
       if (rng.next() >= cfg.saplingChancePerDay) continue
-      ctx.emit('tile_changed', { x, y, from: GRASS, to: SAPLING, reason: 'seeded' })
+      ctx.emit('tile_changed', { x, y, from: T_GRASS, to: T_SAPLING, reason: 'seeded' })
     }
   }
 }

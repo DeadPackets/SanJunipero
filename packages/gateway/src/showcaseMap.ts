@@ -3,7 +3,12 @@ import {
   CITY_DWELLING_KINDS,
   RIVER_HALF,
   TOWN_RINGS_GENESIS,
+  T_FOREST,
+  T_GRASS,
   T_PATH,
+  T_ROAD,
+  T_ROCK,
+  T_SAND,
   doorFrontTile,
   makeCityTemplate,
   plazaCentreOf,
@@ -26,12 +31,6 @@ export const SHOWCASE_MARGIN = 8
 export const showcaseSpan = (rings: number): number => townSpan(rings) + 2 * SHOWCASE_MARGIN
 export const SHOWCASE_W = showcaseSpan(TOWN_RINGS_GENESIS)
 export const SHOWCASE_H = showcaseSpan(TOWN_RINGS_GENESIS)
-export const ROAD_TILE = 7
-export const GRASS_TILE = 0,
-  WATER_TILE = 2,
-  SAND_TILE = 5
-const FOREST_TILE = 3,
-  ROCK_TILE = 4
 
 export const SHOWCASE_ANCHOR = { x: SHOWCASE_MARGIN, y: SHOWCASE_MARGIN } as const
 
@@ -124,7 +123,7 @@ export type ShowcaseMap = z.infer<typeof ShowcaseMapSchema>
 // C11 §9's path tile (8) is not an engine TileId yet (TileId is 0..7), and a dev world folds
 // this grid for real. The riverfront path rasterises as road until the engine grows tile 8.
 export function toTileId(to: number): number {
-  return to === T_PATH ? ROAD_TILE : to
+  return to === T_PATH ? T_ROAD : to
 }
 
 function baseTerrain(rings: number): number[][] {
@@ -136,7 +135,7 @@ function baseTerrain(rings: number): number[][] {
     const row: number[] = []
     for (let x = 0; x < span; x++) {
       const rock = x >= hill.x0 && x <= hill.x1 && y >= hill.y0 && y <= hill.y1
-      row.push(rock ? ROCK_TILE : x >= forestX0 ? FOREST_TILE : GRASS_TILE)
+      row.push(rock ? T_ROCK : x >= forestX0 ? T_FOREST : T_GRASS)
     }
     rows.push(row)
   }
@@ -161,7 +160,7 @@ export function makeShowcaseMap(
   const ford = showcaseFord(anchor, rings)
   for (let y = ford.y0; y <= ford.y1; y++) {
     if (y < 0 || y >= span || ford.x < 0 || ford.x >= span) continue
-    terrain[y]![ford.x] = SAND_TILE
+    terrain[y]![ford.x] = T_SAND
   }
   const structures = template.structures.map((s: CityStructure) => ({
     kind: s.kind,
@@ -212,7 +211,7 @@ export function roadReach(
   from: { x: number; y: number } = plazaTile(TOWN_RINGS_GENESIS),
 ): Set<string> {
   const seen = new Set<string>()
-  const isRoad = (x: number, y: number): boolean => map.terrain[y]?.[x] === ROAD_TILE
+  const isRoad = (x: number, y: number): boolean => map.terrain[y]?.[x] === T_ROAD
   if (!isRoad(from.x, from.y)) return seen
   const queue = [from]
   seen.add(`${from.x},${from.y}`)

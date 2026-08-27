@@ -31,7 +31,7 @@ import {
   WEAPON_KINDS,
   weaponKindsFor,
   type VerbDef,
-} from './verbs.js'
+} from './verbs/index.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }

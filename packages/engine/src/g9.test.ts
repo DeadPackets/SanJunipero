@@ -24,7 +24,7 @@ import { ageBand } from './systems/aging.js'
 import { isPartnered, partnershipOf } from './systems/reproduction.js'
 import { spoilDeadline } from './systems/spoilage.js'
 import { TickLoop } from './tickLoop.js'
-import { VERBS, type PendingEvent } from './verbs.js'
+import { VERBS, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 

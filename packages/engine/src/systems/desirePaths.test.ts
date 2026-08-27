@@ -5,7 +5,7 @@ import { fold } from '../fold.js'
 import { stepCostAt, terrainCostFor } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { trafficKey } from './desirePaths.js'
+import { tileKey } from '../state.js'
 import { ev } from '../testutil/world.js'
 
 // Nothing else may speak at midnight: no weather turn, no rumour, no wider map.
@@ -66,7 +66,7 @@ const tileEvents = (r: WorldTickResult) => r.events.filter((e) => e.type === 'ti
 
 describe('traffic: the walk itself is the record', () => {
   it("counts a walker's steps, ignores a body that simply appears, and stays absent when the law is off", () => {
-    expect(cross(withWalker(meadow()), 3).traffic).toEqual({ [trafficKey(1, 1)]: 3 })
+    expect(cross(withWalker(meadow()), 3).traffic).toEqual({ [tileKey(1, 1)]: 3 })
     const teleported = fold(
       fold(meadow(), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG),
       ev('agent_moved', { id: 'a1', x: 1, y: 1 }),
@@ -118,17 +118,15 @@ describe('desirePathsSystem: wear', () => {
 
   it('every counter falls a tenth a night, floored', () => {
     const after = midnight(cross(withWalker(meadow()), 120), 1).state
-    expect(after.traffic).toEqual({ [trafficKey(1, 1)]: 108 })
-    expect(midnight(after, 2).state.traffic).toEqual({ [trafficKey(1, 1)]: 97 })
+    expect(after.traffic).toEqual({ [tileKey(1, 1)]: 108 })
+    expect(midnight(after, 2).state.traffic).toEqual({ [tileKey(1, 1)]: 97 })
     // And a counter the fall takes to zero leaves the map, rather than being carried at zero.
-    expect(
-      midnight({ ...after, traffic: { [trafficKey(1, 1)]: 1 } }, 2).state.traffic,
-    ).toBeUndefined()
+    expect(midnight({ ...after, traffic: { [tileKey(1, 1)]: 1 } }, 2).state.traffic).toBeUndefined()
   })
 })
 
 describe('desirePathsSystem: overgrowth', () => {
-  const QUIET_TILE = trafficKey(1, 1)
+  const QUIET_TILE = tileKey(1, 1)
   function quietPath(traffic: number): WorldState {
     return { ...meadow(['...', '.p.', '...']), traffic: { [QUIET_TILE]: traffic } }
   }
@@ -181,8 +179,8 @@ describe('world_grown moves the counters with the ground', () => {
   it('translates both sparse maps when the origin shifts', () => {
     const s = {
       ...meadow(['...', '.p.', '...']),
-      traffic: { [trafficKey(1, 1)]: 10 },
-      quietSince: { [trafficKey(1, 1)]: 4 },
+      traffic: { [tileKey(1, 1)]: 10 },
+      quietSince: { [tileKey(1, 1)]: 4 },
     }
     const grown = fold(
       s,
@@ -193,8 +191,8 @@ describe('world_grown moves the counters with the ground', () => {
       }),
       CFG,
     )
-    expect(grown.traffic).toEqual({ [trafficKey(3, 1)]: 10 })
-    expect(grown.quietSince).toEqual({ [trafficKey(3, 1)]: 4 })
+    expect(grown.traffic).toEqual({ [tileKey(3, 1)]: 10 })
+    expect(grown.quietSince).toEqual({ [tileKey(3, 1)]: 4 })
     const south = fold(
       s,
       ev('world_grown', {
@@ -204,6 +202,6 @@ describe('world_grown moves the counters with the ground', () => {
       }),
       CFG,
     )
-    expect(south.traffic).toEqual({ [trafficKey(1, 1)]: 10 })
+    expect(south.traffic).toEqual({ [tileKey(1, 1)]: 10 })
   })
 })

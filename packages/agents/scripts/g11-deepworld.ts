@@ -25,7 +25,6 @@ import {
   TickLoop,
   TOGGLABLE_PATHS,
   thirstOf,
-  WATER_TILES,
   type LawQueue,
   type TickHandler,
   type TileId,
@@ -35,6 +34,7 @@ import {
   chronicleLine,
   DEFAULT_CONFIG,
   DISCOVERY_EVENT,
+  isWet,
   MINUTES_PER_DAY,
   stateHash,
   WORLD_MARGIN,
@@ -1288,7 +1288,7 @@ async function main(): Promise<void> {
         if (findPath(s, s.agents[PROBE]!, { x, y }, config) === null) break
         edge = { x, y }
       }
-      const nextIsWater = edge !== null && WATER_TILES.has(s.terrain[edge.y]?.[edge.x - 1] ?? 0)
+      const nextIsWater = edge !== null && isWet(s.terrain[edge.y]?.[edge.x - 1] ?? 0)
       return {
         refused: !asked.ok,
         reason: asked.ok ? null : asked.reason,

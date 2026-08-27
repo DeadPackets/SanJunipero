@@ -3,7 +3,7 @@ import { SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
-import { VERBS } from '../verbs.js'
+import { VERBS } from '../verbs/index.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ev } from '../testutil/world.js'
@@ -109,14 +109,14 @@ describe('fold: crop and terrain events', () => {
     expect(Object.keys(s.crops).sort()).toEqual(['crop_1', 'crop_2'])
   })
 
-  it('terrain_changed rewrites exactly one tile; out of bounds throws', () => {
+  it('tile_changed rewrites exactly one tile; out of bounds throws', () => {
     let s = makeWorld(['..', '..'])
-    s = fold(s, ev('terrain_changed', { x: 0, y: 1, tile: 6 }), FAST)
+    s = fold(s, ev('tile_changed', { x: 0, y: 1, from: 0, to: 6, reason: 'tilled' }), FAST)
     expect(s.terrain[1]![0]).toBe(6)
     expect(s.terrain[0]![0]).toBe(0)
-    expect(() => fold(s, ev('terrain_changed', { x: 9, y: 0, tile: 6 }), FAST)).toThrow(
-      /out of bounds/i,
-    )
+    expect(() =>
+      fold(s, ev('tile_changed', { x: 9, y: 0, from: 0, to: 6, reason: 'tilled' }), FAST),
+    ).toThrow(/out of bounds/i)
   })
 })
 

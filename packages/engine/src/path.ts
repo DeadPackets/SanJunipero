@@ -5,6 +5,8 @@ export type Point = { x: number; y: number }
 
 // grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel.
 // A channel is impassable but drinkable; a sapling walks like the grass it grew from.
+// The keys stay literal rather than the T_* names: computed keys leave the object in
+// dictionary mode, and findPath reads this table once per neighbour per node.
 export function terrainCostFor(config: SimConfig): Record<TileId, number> {
   return {
     0: 1,

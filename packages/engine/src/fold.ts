@@ -3,10 +3,21 @@ import {
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
   SPAWN_AGE_YEARS,
+  T_SAPLING,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
-import { thirstOf, type Affliction, type AgentBody, type TileId, type WorldState } from './state.js'
+import {
+  fromTileKey,
+  INJURY_HEAL_DAYS,
+  pairKey,
+  thirstOf,
+  tileKey,
+  type Affliction,
+  type AgentBody,
+  type TileId,
+  type WorldState,
+} from './state.js'
 import {
   ActionCompleted,
   ActionInterrupted,
@@ -81,35 +92,21 @@ import {
   StructureInscribed,
   StructurePlanned,
   StructureProgressed,
-  TerrainChanged,
   TickAdvanced,
   TileChanged,
   TrafficDecayed,
+  WalkParams,
   WeatherChanged,
   WildlifeChanged,
   WorldGrown,
 } from './events.def.js'
-import {
-  countsAsFootfall,
-  decayTraffic,
-  fromTrafficKey,
-  quietPathsAt,
-  trafficKey,
-} from './systems/desirePaths.js'
-import { fromSaplingKey, saplingKey } from './systems/regrowth.js'
-import { INJURY_HEAL_DAYS } from './systems/illness.js'
+import { countsAsFootfall, decayTraffic, quietPathsAt } from './systems/desirePaths.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
-import { pairKey } from './systems/reproduction.js'
 import { findPath } from './path.js'
-import { WalkParams } from './verbs.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
-
-// The sapling tile id, named here because the fold is the only place outside the regrowth
-// system that has to recognise one.
-const SAPLING_TILE = 9
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.
 function bumpCounter(counters: WorldState['counters'], id: string): WorldState['counters'] {
@@ -186,7 +183,7 @@ export function fold(
       const agents = { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } }
       // A trail is worn by feet, not by arriving: only a body mid-walk marks the ground.
       if (!countsAsFootfall(state, p.id, config)) return { ...state, agents }
-      const key = trafficKey(p.x, p.y)
+      const key = tileKey(p.x, p.y)
       return {
         ...state,
         agents,
@@ -1041,16 +1038,6 @@ export function fold(
         forageables: { ...state.forageables, [p.id]: { ...node, stock: p.stock } },
       }
     }
-    case 'terrain_changed': {
-      const p = TerrainChanged.parse(event.payload)
-      const row = state.terrain[p.y]
-      if (!row || p.x < 0 || p.x >= row.length)
-        throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
-      const terrain = state.terrain.map((r, y) =>
-        y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r,
-      )
-      return { ...state, terrain }
-    }
     case 'tile_changed': {
       const p = TileChanged.parse(event.payload)
       const row = state.terrain[p.y]
@@ -1062,10 +1049,10 @@ export function fold(
       )
       // The maturity clock is stamped where the seed fell and dropped however the sapling
       // leaves — grown, chopped, paved or tilled. Nothing else is stored about it.
-      if (p.from !== SAPLING_TILE && p.to !== SAPLING_TILE) return { ...state, terrain }
-      const key = saplingKey(p.x, p.y)
+      if (p.from !== T_SAPLING && p.to !== T_SAPLING) return { ...state, terrain }
+      const key = tileKey(p.x, p.y)
       const saplings = { ...state.saplings }
-      if (p.to === SAPLING_TILE) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
+      if (p.to === T_SAPLING) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
       else delete saplings[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- key order is hashed
       const next: WorldState = { ...state, terrain }
       if (Object.keys(saplings).length > 0) next.saplings = saplings
@@ -1143,8 +1130,8 @@ export function fold(
       const shiftKeys = (m: Record<string, number>): Record<string, number> =>
         Object.fromEntries(
           Object.entries(m).map(([k, v]) => {
-            const at = fromTrafficKey(k)
-            return [trafficKey(at.x + dx, at.y + dy), v]
+            const at = fromTileKey(k)
+            return [tileKey(at.x + dx, at.y + dy), v]
           }),
         )
       const fauna =
@@ -1170,8 +1157,8 @@ export function fold(
       const shiftSaplings = (m: Record<string, number>): Record<string, number> =>
         Object.fromEntries(
           Object.entries(m).map(([k, v]) => {
-            const at = fromSaplingKey(k)
-            return [saplingKey(at.x + dx, at.y + dy), v]
+            const at = fromTileKey(k)
+            return [tileKey(at.x + dx, at.y + dy), v]
           }),
         )
       // The array's origin walked with everything else, so the AUTHORED frame is now that much

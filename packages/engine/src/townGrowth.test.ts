@@ -26,7 +26,7 @@ import { createWorldTick } from './worldTick.js'
 import { genesisState, type Structure, type TileId, type WorldState } from './state.js'
 import { makeGenesisWorld } from './genesis/world.js'
 import { submitIntent } from './intent.js'
-import { isAdjacentToRect } from './verbs.js'
+import { isAdjacentToRect } from './verbs/index.js'
 import { claimInWorld, standingRects, townGroundOf } from './town.js'
 
 // One declared fixture dial: a house takes four hours here instead of two days, so a town that

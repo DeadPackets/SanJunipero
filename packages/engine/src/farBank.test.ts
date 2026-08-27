@@ -27,7 +27,7 @@ import { createWorldTick } from './worldTick.js'
 import { genesisState, type Structure, type TileId, type WorldState } from './state.js'
 import { GENESIS_RIVER_X, makeGenesisWorld } from './genesis/world.js'
 import { submitIntent } from './intent.js'
-import { isAdjacentToRect } from './verbs.js'
+import { isAdjacentToRect } from './verbs/index.js'
 import { BRIDGE_KIND, bridgeAt } from './path.js'
 import { claimInWorld, standingRects, townGroundOf, townWalkOf, townSquareOf } from './town.js'
 

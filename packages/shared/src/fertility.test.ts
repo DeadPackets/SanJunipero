@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema } from './config.js'
-import { fertilityAt, WATER_TILES } from './fertility.js'
+import { fertilityAt } from './fertility.js'
+import { isWet } from './tiles.js'
 
 // Row 0 is water, everything below it is grass: the distance to the bank is the row index.
 const BANK = [
@@ -38,7 +39,7 @@ describe('fertilityAt', () => {
   it('counts a dug channel as water', () => {
     const channel = MEADOW.map((row, y) => (y === 0 ? [10, 10, 10] : [...row]))
     expect(fertilityAt(channel, 1, 1, DEFAULT_CONFIG)).toBe(1.375)
-    expect(WATER_TILES.has(10)).toBe(true)
-    expect(WATER_TILES.has(2)).toBe(true)
+    expect(isWet(10)).toBe(true)
+    expect(isWet(2)).toBe(true)
   })
 })

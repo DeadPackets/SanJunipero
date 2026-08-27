@@ -20,7 +20,7 @@ import { findPath, isPassable, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
-import { buildableRecipe, buildTicks, VERBS } from '../verbs.js'
+import { buildableRecipe, buildTicks, VERBS } from '../verbs/index.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import {
@@ -91,9 +91,7 @@ describe('makeGenesisWorld: the ground', () => {
     const t = makeCityTemplate()
     for (const tile of t.tiles)
       expect(terrain[t.anchor.y + tile.dy]![t.anchor.x + tile.dx]).toBe(tile.to)
-    expect(events.some((e) => e.type === 'tile_changed' || e.type === 'terrain_changed')).toBe(
-      false,
-    )
+    expect(events.some((e) => e.type === 'tile_changed')).toBe(false)
   })
 })
 

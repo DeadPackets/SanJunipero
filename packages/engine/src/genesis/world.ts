@@ -3,6 +3,12 @@ import {
   FOUNDER_IDS,
   isRoofedKind,
   makeCityTemplate,
+  T_EARTH,
+  T_FOREST,
+  T_GRASS,
+  T_ROCK,
+  T_SAND,
+  T_WATER,
   type CityStructure,
   type SimConfig,
 } from '@sj/shared'
@@ -10,17 +16,10 @@ import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
-import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs.js'
+import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
 
 // The world on the morning of day one, authored from (x, y) arithmetic alone. NO RNG anywhere:
 // two calls with the same config are deep-equal, which is what lets replay start here.
-
-const T_GRASS: TileId = 0,
-  T_EARTH: TileId = 1,
-  T_WATER: TileId = 2
-const T_FOREST: TileId = 3,
-  T_ROCK: TileId = 4,
-  T_SAND: TileId = 5
 
 // A straight main channel, because the city template lays its own bank and riverfront path
 // against x 48..50 — a meander here would leave the bank hanging over open water.

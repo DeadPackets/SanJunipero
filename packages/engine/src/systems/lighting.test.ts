@@ -4,7 +4,7 @@ import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
-import { VERBS } from '../verbs.js'
+import { VERBS } from '../verbs/index.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ev, grid, roundTrips } from '../testutil/world.js'
 

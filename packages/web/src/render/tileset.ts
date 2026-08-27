@@ -1,18 +1,18 @@
 import {
   parseTerrainTileManifest,
   roadAutotileKind,
+  T_ROAD,
   type AssetRecord,
   type RoadAutotileKey,
   type RoadNeighbors,
   type TerrainTileKind,
   type TerrainTileManifest,
+  type TileId,
 } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
 
 export { roadAutotileKind } from '@sj/shared'
 
 const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
-export const ROAD_TILE_ID = 7
 
 // Every TileId the engine can emit needs an entry, or it falls back to grass. 8/9/10
 // (path, sapling, channel) borrow the nearest existing art kind until they have their own.
@@ -49,7 +49,7 @@ export function tileVariant(x: number, y: number): number {
 }
 
 export function roadNeighborsAt(terrain: TileId[][], x: number, y: number): RoadNeighbors {
-  const isRoad = (nx: number, ny: number): boolean => terrain[ny]?.[nx] === ROAD_TILE_ID
+  const isRoad = (nx: number, ny: number): boolean => terrain[ny]?.[nx] === T_ROAD
   return { n: isRoad(x, y - 1), e: isRoad(x + 1, y), s: isRoad(x, y + 1), w: isRoad(x - 1, y) }
 }
 

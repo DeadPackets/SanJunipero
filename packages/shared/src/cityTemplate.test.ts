@@ -33,9 +33,6 @@ import {
   isRoadTile,
   PLAZA,
   PLAZA_CENTRE,
-  T_ROAD,
-  T_WATER,
-  T_EARTH,
   cityStructures,
   cityPlacements,
   cityBlocks,
@@ -52,7 +49,6 @@ import {
   makeCityTemplate,
   templateFits,
   growthPlots,
-  T_GRASS,
   footprintFor,
   WELL_AT,
   FIRE_PIT_AT,
@@ -63,6 +59,7 @@ import {
   DWELLING_FOOTPRINTS,
   isDwellingKind,
 } from './cityTemplate.js'
+import { T_EARTH, T_GRASS, T_ROAD, T_WATER } from './tiles.js'
 import type { CityTemplate } from './cityTemplate.js'
 import {
   BLOCK,

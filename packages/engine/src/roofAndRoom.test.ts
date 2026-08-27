@@ -14,7 +14,7 @@ import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
 import { doorTile, occupantsOf, roomCapacity, roomIsFull, shelterLedger } from './interiors.js'
 import { makeGenesisWorld } from './genesis/world.js'
-import { buildableRecipe } from './verbs.js'
+import { buildableRecipe } from './verbs/index.js'
 import { FOUNDER_IDS } from '@sj/shared'
 
 // Two abundance defects measured on a live night: the valley's cabins, cottages and farmhouses

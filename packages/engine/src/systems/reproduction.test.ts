@@ -12,7 +12,8 @@ import { RngStreams } from '../rng.js'
 import { createWorldTick } from '../worldTick.js'
 import { ageBand } from './aging.js'
 import { BIRTH_NAMES } from '../data/names.js'
-import { isPartnered, pairKey, partnershipOf, sexOf } from './reproduction.js'
+import { pairKey } from '../state.js'
+import { isPartnered, partnershipOf, sexOf } from './reproduction.js'
 import { ev } from '../testutil/world.js'
 
 // Partnership is inferred, never declared: the town reads it off who sleeps where.
