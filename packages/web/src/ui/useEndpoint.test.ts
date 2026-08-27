@@ -85,25 +85,25 @@ describe('endpoint', () => {
     expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
   })
 
-  it('★ settles a refused read to what the caller named, and wakes them on EVERY beat', async () => {
+  it('★ wakes its readers on EVERY settled read, refused ones included', async () => {
     vi.useFakeTimers()
-    const NOTHING: number[] = []
-    vi.stubGlobal('fetch', answers([[1], null]))
-    const feed = endpoint<number[]>('/api/heat', undefined, 1000, NOTHING)
+    vi.stubGlobal('fetch', answers([{ n: 1 }, null]))
+    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
     let woken = 0
     feed.subscribe(() => {
       woken++
     })
     await settle()
-    expect(feed.get()).toEqual({ data: [1], loaded: true })
     expect(woken).toBe(1)
 
+    // the last good answer is kept, and its identity with it — a memo over it must not restart
+    const good = feed.get().data
     vi.advanceTimersByTime(1000)
     await settle()
-    expect(feed.get()).toEqual({ data: NOTHING, loaded: true })
+    expect(feed.get().data).toBe(good)
     expect(woken).toBe(2)
 
-    // ★ the round the director cuts on must keep turning for as long as the gateway is down
+    // ★ but the beat still lands, so the round DirectorMode cuts on keeps turning while it is down
     vi.advanceTimersByTime(1000)
     await settle()
     expect(woken).toBe(3)

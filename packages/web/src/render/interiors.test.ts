@@ -37,6 +37,7 @@ import {
   INTERIOR_LAYOUTS,
   LIBRARY_TILE_PX,
   advanceInterior,
+  bedCells,
   bedSlots,
   contactShadow,
   furnishingDivisor,
@@ -260,8 +261,13 @@ describe('roomPlan', () => {
 })
 
 describe('bedSlots', () => {
+  // The plan a caller holds; `bedCells` is the room's half of the answer and `bedSlots` the
+  // sleepers' half, so the room's half is derived once per plan change.
+  const lay = (kind: InteriorKind, sleeping: string[], records: AssetRecord[] = []) =>
+    bedSlots(sleeping, bedCells(kind, roomPlan(kind, records)))
+
   it('lays two sleepers down on the house bed at distinct slots', () => {
-    const slots = bedSlots('house', ['amara', 'yusuf'])
+    const slots = lay('house', ['amara', 'yusuf'])
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
     expect(slots.amara).not.toEqual(slots.yusuf)
     // INTERIOR TILES, not template slots: `slotToTile` puts slot (2,1) on tile (9,2), and the
@@ -271,12 +277,12 @@ describe('bedSlots', () => {
   })
 
   it('maps nobody in a kind with no bed', () => {
-    expect(bedSlots('shed', ['amara'])).toEqual({})
-    expect(bedSlots('storehouse', ['amara', 'yusuf'])).toEqual({})
+    expect(lay('shed', ['amara'])).toEqual({})
+    expect(lay('storehouse', ['amara', 'yusuf'])).toEqual({})
   })
 
   it('leaves a sleeper past the last bed cell unmapped rather than stacking bodies', () => {
-    const slots = bedSlots('house', ['a', 'b', 'c'])
+    const slots = lay('house', ['a', 'b', 'c'])
     expect(Object.keys(slots)).toEqual(['a', 'b'])
     expect(BED_FOOTPRINT).toEqual({ w: 1, h: 2 })
   })
@@ -290,20 +296,20 @@ describe('bedSlots', () => {
         isBed: true,
       }),
     ]
-    const slots = bedSlots('house', ['a', 'b'], roomPlan('house', records))
+    const slots = lay('house', ['a', 'b'], records)
     expect(Object.keys(slots)).toEqual(['a']) // a one-cell bed sleeps one
   })
 
-  it('★ lays sleepers on the plan it is HANDED, and never derives one of its own', () => {
+  it('★ reads the bed off the plan it is HANDED, and never derives one of its own', () => {
     const plan = roomPlan('house', [])
     const moved = plan.map((p) => (p.kind === 'bed' ? { ...p, slot: { x: 0, y: 0 } } : p))
-    // A plan no codex could answer with. Same answer for both = bedSlots re-planned behind the
-    // caller's back, which is the per-frame `roomPlan` `layoutRoom` used to pay for.
-    expect(bedSlots('house', ['a'], moved).a).not.toEqual(bedSlots('house', ['a'], plan).a)
+    // A plan no codex could answer with. Same answer for both = the cells were re-derived behind
+    // the caller's back, which is the per-frame `roomPlan` `layoutRoom` used to pay for.
+    expect(bedCells('house', moved)).not.toEqual(bedCells('house', plan))
   })
 
   it('is pure — the same call twice returns the same mapping', () => {
-    expect(bedSlots('house', ['amara', 'yusuf'])).toEqual(bedSlots('house', ['amara', 'yusuf']))
+    expect(lay('house', ['amara', 'yusuf'])).toEqual(lay('house', ['amara', 'yusuf']))
   })
 })
 
@@ -726,7 +732,7 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     const kinds = mapFor('cabin').pieces.map((p) => p.kind)
     expect(kinds).toContain('hearth')
     expect(kinds).not.toContain('bed')
-    expect(bedSlots('cabin', ['amara'], roomPlan('cabin', RECORDS))).toEqual({}) // nowhere to lie down
+    expect(bedSlots(['amara'], bedCells('cabin', roomPlan('cabin', RECORDS)))).toEqual({}) // nowhere to lie down
     expect(mapFor('house').pieces.map((p) => p.kind)).toContain('bed')
   })
 })
@@ -788,7 +794,7 @@ describe('★ a shared room and a private room, and the difference is the ladder
     })
     for (const kind of INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))) {
       const sleepers = Array.from({ length: roomCapacity(planOf(kind)) }, (_, i) => `s${i}`)
-      const laid = bedSlots(kind, sleepers, roomPlan(kind, [bedRecord]))
+      const laid = bedSlots(sleepers, bedCells(kind, roomPlan(kind, [bedRecord])))
       expect(Object.keys(laid).sort(), `${kind} sleepers`).toEqual(sleepers.sort())
       // every sleeper in a cell of their own — nobody lies on anybody
       const cells = Object.values(laid).map((c) => `${c.x},${c.y}`)
@@ -800,19 +806,14 @@ describe('★ a shared room and a private room, and the difference is the ladder
 // ── ★ THE ROOM PLANS ONCE PER PLAN CHANGE, NOT ONCE A FRAME ──────────────────────────────
 //
 // `roomPlan` scans every asset record and runs `JSON.parse` + a zod parse per furnishing.
-// `replan()` already holds the answer under `plannedFor`/`plannedSeq`; nothing on the frame
-// path may ask for a second one.
+// `replan()` already holds the answer under `plannedFor`/`plannedSeq`, and the frame path
+// spends it rather than asking for a second one.
 describe('interiorScene builds one room plan per plan change', () => {
   const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
 
-  it('★ calls roomPlan exactly once, and only inside replan', () => {
-    const calls = SRC.match(/\broomPlan\(/g) ?? []
-    expect(calls).toHaveLength(1)
-    const replan = SRC.slice(SRC.indexOf('function replan('), SRC.indexOf('function hosts('))
-    expect(replan).toContain('roomPlan(')
-  })
-
-  it('★ lays sleepers down off the held plan, not off the codex', () => {
-    expect(SRC).toContain('bedSlots(room2.kind, sleeping, plan)')
+  it('★ derives the plan and its bed cells once, and spends them on the frame', () => {
+    expect(SRC.match(/\broomPlan\(/g) ?? []).toHaveLength(1)
+    expect(SRC.match(/\bbedCells\(/g) ?? []).toHaveLength(1)
+    expect(SRC).toContain('bedSlots(sleeping, bedTiles)')
   })
 })

@@ -81,21 +81,19 @@ describe('the televised town always has somebody in front of the camera', () => 
 
 // ── ★ THE ROUND MUST KEEP TURNING WHILE /api/heat IS DOWN ────────────────────────────────
 //
-// The broadcast path has no operator. `endpoint()` keeps the last good answer by default, which
-// for a reader whose BEAT drives a state machine would freeze the caption on one face for as
-// long as the gateway was refusing — so DirectorMode names what a refused read means instead.
+// The broadcast path has no operator to notice a caption stuck on one face. `endpoint()` wakes
+// its readers on every settled read (`useEndpoint.test.ts`); DirectorMode supplies the other
+// half by reading the refused answer as an empty window.
 describe('DirectorMode reads the heat window through the one endpoint layer', () => {
   const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
 
-  it('★ hand-rolls no fetch of its own', () => {
+  it('★ hand-rolls no fetch of its own, and beats at the measured interval', () => {
     expect(SRC).not.toContain('fetch(')
-    expect(SRC).toContain('usePolled<HeatWindow[]>(')
+    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS\)/)
   })
 
-  it('★ names an empty window as the refused answer, on the measured beat', () => {
-    expect(SRC).toContain('const NO_HEAT: HeatWindow[] = []')
-    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS,\s*NO_HEAT,\s*\)/)
-    // and an empty window is what turns the round over — the two halves of one guarantee
+  it('★ reads a refused window as an empty one, which is what turns the round over', () => {
+    expect(SRC).toContain('heat.data ?? NO_HEAT')
     expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(
       quietSubject(['amara', 'omar'], 1000),
     )

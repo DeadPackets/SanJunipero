@@ -8,6 +8,7 @@ import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior,
+  bedCells,
   bedSlots,
   contactShadow,
   furnishingId,
@@ -203,6 +204,7 @@ export function createInteriorScene(
   let plannedFor: string | null = null // the kind the furniture map was built for
   let plannedSeq = -1
   let plan: RoomItem[] = []
+  let bedTiles: Tile[] = []
   let map: RoomMap = roomMapOf([])
   let lightKinds: ReadonlySet<string> = new Set()
   let perches: Tile[] = []
@@ -597,6 +599,7 @@ export function createInteriorScene(
     floorMask.poly(floorPolyOf(roomTiles))
     floorMask.fill(0xffffff)
     plan = roomPlan(kind, records)
+    bedTiles = bedCells(kind, plan)
     lightKinds = new Set(plan.filter((p) => p.meta?.providesLight === true).map((p) => p.kind))
     map = mapOf(plan)
     // ★ AN AWAKE BODY STANDS BESIDE THE THING IT IS USING, NOT ON IT. There is floor to stand
@@ -649,7 +652,7 @@ export function createInteriorScene(
     if (plannedFor !== room2.kind || plannedSeq !== seq) replan(room2.kind, records, seq)
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
-    const beds = bedSlots(room2.kind, sleeping, plan)
+    const beds = bedSlots(sleeping, bedTiles)
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an

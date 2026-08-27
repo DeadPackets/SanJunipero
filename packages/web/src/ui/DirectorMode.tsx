@@ -8,8 +8,8 @@ import { usePolled } from './useEndpoint.js'
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
 
-/** A refused heat read IS an answer — no window scored — so the quiet round turns over on the
- *  beat even while the gateway is down. The broadcast path has no operator to notice. */
+/** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
+ *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
 const NO_HEAT: HeatWindow[] = []
 
 // `autoCut` is the LIVE town being televised; it must not fight a recorded day's playback.
@@ -32,12 +32,7 @@ export function DirectorMode({
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
 
-  const heat = usePolled<HeatWindow[]>(
-    autoCut ? '/api/heat' : null,
-    undefined,
-    HEAT_POLL_MS,
-    NO_HEAT,
-  )
+  const heat = usePolled<HeatWindow[]>(autoCut ? '/api/heat' : null, undefined, HEAT_POLL_MS)
 
   // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {
