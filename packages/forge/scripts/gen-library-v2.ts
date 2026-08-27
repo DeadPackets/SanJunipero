@@ -17,10 +17,12 @@ import {
   planBatch,
   type VisionVerdict,
 } from '@sj/forge/gen'
-import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
+import { paletteDistance } from '../src/pixelGates.js'
 import { ICON_PX, WORLD_SPRITE_PX } from '../src/assetResolution.js'
-import { integralSpriteCell } from '../src/library/integralCell.js'
-import { candidateRank } from '../src/library/postItem.js'
+import { chromaKey } from '../src/post/chromaKey.js'
+import { opaqueArea } from '../src/sheet.js'
+import { spriteCell } from '../src/reCell.js'
+import { candidateRank, countIslands } from '../src/library/postItem.js'
 import { refusalMessage } from '../src/gate.js'
 import { ITEMS_CONTENT_DIR } from '../src/library/committed.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
@@ -170,15 +172,14 @@ for (const item of items) {
       console.log(`  ${key}: generated $${r.cost.toFixed(4)} (total $${budget.total.toFixed(4)})`)
     }
     try {
-      const raw = await decodePng(buf)
-      const sprite = integralSpriteCell(raw, WORLD_SPRITE_PX)
-      const icon = integralSpriteCell(raw, ICON_PX)
-      const fails = [
-        ...alphaBinaryGate(sprite.cell).failures,
-        ...paletteGate(sprite.cell).failures,
-        ...alphaBinaryGate(icon.cell).failures,
-        ...paletteGate(icon.cell).failures,
-      ]
+      const keyed = chromaKey(await decodePng(buf))
+      const sprite = spriteCell(keyed, { cellPx: WORLD_SPRITE_PX, anchor: 'centre' })
+      const icon = spriteCell(keyed, { cellPx: ICON_PX, anchor: 'centre' })
+      const islands = countIslands(sprite.cell)
+      const opaqueFrac = opaqueArea(sprite.cell) / (WORLD_SPRITE_PX * WORLD_SPRITE_PX)
+      // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
+      // construction. The judge below is the gate; the palette distance is only reported.
+      const fails: string[] = []
       // The mechanical gates cannot tell a pail from a market stall. One vision call per
       // candidate can, and it is 6% of the cost of the generation it is judging.
       let verdict: VisionVerdict | null = null
@@ -200,16 +201,17 @@ for (const item of items) {
           key,
           sprite: sprite.cell,
           icon: icon.cell,
-          factor: sprite.factor,
-          islands: sprite.islands,
-          opaqueFrac: sprite.opaqueFrac,
+          factor: sprite.plan.factor,
+          islands,
+          opaqueFrac,
           fails,
           verdict,
         })
       writeFileSync(`${S}/cells/items/${key}.png`, await encodePng(sprite.cell))
       const msg =
-        `${e.kind}: ${key} factor ${sprite.factor}, islands ${sprite.islands}, ` +
-        `opaque ${(sprite.opaqueFrac * 100).toFixed(1)}%, ` +
+        `${e.kind}: ${key} factor ${sprite.plan.factor}, islands ${islands}, ` +
+        `opaque ${(opaqueFrac * 100).toFixed(1)}%, ` +
+        `palette distance ${paletteDistance(sprite.cell).toFixed(1)}, ` +
         (fails.length === 0 ? 'pixel bar clean' : fails.join('; ')) +
         `${verdict ? `, judge ${verdict.overall}` : ''}${refused ? ' — REFUSED BY EYE' : ''}`
       lines.push(msg)

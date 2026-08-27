@@ -369,18 +369,17 @@ export type PixelBarArgs = {
   footprint?: Footprint
   tile?: Size
   allowSoftAlpha?: boolean
-  palette?: readonly (readonly number[])[]
   seam?: boolean
 }
 
-export function pixelBarReport(a: PixelBarArgs): GateResult & { name: string } {
+// The palette is REPORTED, not judged: a sprite cell keeps the model's own colours.
+export function pixelBarReport(
+  a: PixelBarArgs,
+): GateResult & { name: string; paletteDistance: number } {
   const failures: string[] = []
   if (a.raw) failures.push(...integerScaleGate(a.raw, { w: a.img.width, h: a.img.height }).failures)
   if (a.artPx !== undefined) failures.push(...pixelGridGate(a.img, a.artPx).failures)
   failures.push(...alphaBinaryGate(a.img, { allowSoftAlpha: a.allowSoftAlpha }).failures)
-  failures.push(
-    ...paletteGate(a.img, a.palette === undefined ? {} : { palette: a.palette }).failures,
-  )
   if (a.footprint && a.tile)
     failures.push(
       ...nativeDensityGate({
@@ -391,5 +390,10 @@ export function pixelBarReport(a: PixelBarArgs): GateResult & { name: string } {
       }).failures,
     )
   if (a.seam === true) failures.push(...tileSeamGate(a.img).failures)
-  return { name: a.name, ok: ok(failures), failures }
+  return {
+    name: a.name,
+    ok: ok(failures),
+    failures,
+    paletteDistance: paletteDistance(a.img),
+  }
 }

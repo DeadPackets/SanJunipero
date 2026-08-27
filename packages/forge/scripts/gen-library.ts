@@ -23,8 +23,10 @@ import {
   type VisionJudgeFn,
   type VisionVerdict,
 } from '@sj/forge/gen'
-import { candidateRank } from '../src/library/postItem.js'
-import { integralSpriteCell } from '../src/library/integralCell.js'
+import { candidateRank, countIslands } from '../src/library/postItem.js'
+import { chromaKey } from '../src/post/chromaKey.js'
+import { opaqueArea } from '../src/sheet.js'
+import { spriteCell } from '../src/reCell.js'
 import { pixelBarReport } from '../src/pixelGates.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
 import { spriteGateStatus } from '../src/library/status.js'
@@ -146,7 +148,18 @@ async function main(): Promise<void> {
               cands.map(async (c, ix) => {
                 writeFileSync(join(dir, 'candidates', `a${n}-c${ix + 1}-raw.png`), c.png)
                 const raw = await decodePng(c.png)
-                return { c, ix, raw, ...integralSpriteCell(raw, e.spritePx) }
+                const { cell } = spriteCell(chromaKey(raw), {
+                  cellPx: e.spritePx,
+                  anchor: 'centre',
+                })
+                return {
+                  c,
+                  ix,
+                  raw,
+                  cell,
+                  islands: countIslands(cell),
+                  opaqueFrac: opaqueArea(cell) / (e.spritePx * e.spritePx),
+                }
               }),
             )
             // Pick the cleanest silhouette: one connected subject, no floating debris.
@@ -191,7 +204,7 @@ async function main(): Promise<void> {
         // Resample the icon from the paid generation at its own cell count: an integer
         // downscale of the 24 px sprite lands on 12 px of art, which the judge reads as mush.
         icon = chosenRaw.raw
-          ? integralSpriteCell(chosenRaw.raw, e.iconPx).cell
+          ? spriteCell(chromaKey(chosenRaw.raw), { cellPx: e.iconPx, anchor: 'centre' }).cell
           : deriveIcon(res.sprite, e.iconPx)
         const iv = await judge({
           assetId: `${assetId}#icon`,
@@ -225,7 +238,7 @@ async function main(): Promise<void> {
 
     if (chosen) {
       icon ??= chosenRaw.raw
-        ? integralSpriteCell(chosenRaw.raw, e.iconPx).cell
+        ? spriteCell(chromaKey(chosenRaw.raw), { cellPx: e.iconPx, anchor: 'centre' }).cell
         : deriveIcon(chosen, e.iconPx)
       // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
       // bar never ships, whatever the eye said about it.

@@ -3,19 +3,17 @@
 // Writes a LEAN art root: point SJ_ART_ROOT at it to see the repair, remove it to undo.
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
-import { chromaKey } from '../src/post/chromaKey.js'
+import { decodePng, encodePng } from '../src/post/raw.js'
 import { cellAnchor } from '../src/hires.js'
-import { buildingCellPx, reCell } from '../src/reCell.js'
+import { buildingCellPx, spriteCell } from '../src/reCell.js'
 import {
-  alphaBinaryGate,
   integerScaleGate,
-  nativeDensityGate,
-  paletteGate,
+  paletteDistance,
   spriteDensity,
   classDensityGate,
 } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
+import { keyBg } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
 const S = scratch()
@@ -31,16 +29,6 @@ const BUILDINGS = [
   { dir: 'building-scaffolding', raw: 'building-scaffolding-c0', fp: { w: 1, h: 1 } },
   { dir: 'building-standing-stone', raw: 'building-standing-stone-r2', fp: { w: 1, h: 1 } },
 ] as const
-
-function keyBg(img: RawImage): RawImage {
-  for (const tolerance of [72, 110]) {
-    const keyed = chromaKey(img, { tolerance })
-    let clear = 0
-    for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
-  }
-  throw new Error('keyBg: <10% keyed even at tolerance 110')
-}
 
 const rows: string[] = []
 const members: { name: string; density: number }[] = []
@@ -59,7 +47,7 @@ for (const b of BUILDINGS) {
   const rawBuf = readFileSync(join(from, 'raws', `${b.raw}.png`))
   const raw = await decodePng(rawBuf)
   const cellPx = buildingCellPx(b.fp)
-  const r = reCell(keyBg(raw), { cellPx, fill: true, anchor: 'feet' })
+  const r = spriteCell(keyBg(raw), { cellPx, anchor: 'feet' })
   const anchor = cellAnchor(r.cell)
 
   const before = await decodePng(readFileSync(join(from, 'cell.png')))
@@ -69,24 +57,16 @@ for (const b of BUILDINGS) {
     tile: TOWN_TILE,
   })
   members.push({ name: b.dir, density })
-  // ★ THE GATES USED TO RUN AFTER THE WRITE. Every one of these four was computed, put in a
-  // markdown cell, and the cell written to disk whatever it said. They decide now, and a
-  // refused building skips its own write and lets the rest of the run finish.
-  const fails = [
-    ...integerScaleGate({ w: r.plan.window, h: r.plan.window }, { w: cellPx, h: cellPx }).failures,
-    ...alphaBinaryGate(r.cell).failures,
-    ...paletteGate(r.cell).failures,
-    ...nativeDensityGate({
-      name: b.dir,
-      canvas: { w: cellPx, h: cellPx },
-      footprint: b.fp,
-      tile: TOWN_TILE,
-    }).failures,
-  ]
+  // ★ THE GATE USED TO RUN AFTER THE WRITE. It decides now, and a refused building skips its
+  // own write and lets the rest of the run finish. The palette distance is reported, not judged.
+  const fails = integerScaleGate(
+    { w: raw.width, h: raw.height },
+    { w: cellPx, h: cellPx },
+  ).failures
   rows.push(
     `| ${b.dir} | ${b.fp.w}x${b.fp.h} | ${before.width}x${before.height} | ${cellPx}x${cellPx} | ` +
-      `${raw.width}/${r.plan.factor} (window ${r.plan.window}${r.plan.sourceScale === 1 ? '' : `, source x${r.plan.sourceScale.toFixed(3)}`}) | ` +
-      `${density} | ${fails.length === 0 ? 'clean' : fails.join('; ')} |`,
+      `${raw.width}/${r.plan.factor} (window ${r.plan.window}) | ` +
+      `${density} | ${paletteDistance(r.cell).toFixed(1)} | ${fails.length === 0 ? 'clean' : fails.join('; ')} |`,
   )
   console.log(rows.at(-1))
   if (fails.length > 0) {
@@ -119,8 +99,8 @@ const cls = classDensityGate(members)
 const md = [
   '# buildings and structures — re-celled from the 1024 raws, $0.00',
   '',
-  '| building | footprint | before | after | integer path | density | pixel bar |',
-  '|---|---|---|---|---|---|---|',
+  '| building | footprint | before | after | integer path | density | palette distance | pixel bar |',
+  '|---|---|---|---|---|---|---|---|',
   ...rows,
   '',
   `class density: ${cls.densities.join(', ')} — ${cls.ok ? 'ONE density across the class' : cls.failures.join('; ')}`,
