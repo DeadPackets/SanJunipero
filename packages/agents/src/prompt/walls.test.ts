@@ -18,6 +18,7 @@ import {
   standingWallsLine,
   type PerceptionPacket,
 } from './prose.js'
+import { scanForDirective } from './glassScan.js'
 
 // Hands are the rate — `stepBuild` adds one per hand on the site — so a house is a night's work
 // for five. "Still being built" reads the same one hour short as four days short.
@@ -61,15 +62,8 @@ describe('howFarUp — where the work has got to, in words', () => {
   it('names no remedy', () => {
     for (let done = 0; done <= needs; done += 120) {
       const said = howFarUp({ done, needs }).toLowerCase()
-      for (const hint of [
-        'build',
-        'raise a',
-        'you should',
-        'you must',
-        'a roof would',
-        'go inside',
-        'help',
-      ]) {
+      expect(scanForDirective(said), `${done}: ${said}`).toEqual([])
+      for (const hint of ['build', 'raise a', 'a roof would', 'help']) {
         expect(said, `${done}: ${said}`).not.toContain(hint)
       }
     }
@@ -307,14 +301,8 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 
   it('names no remedy and gives no counsel', () => {
     const said = seeing({ full: true }).toLowerCase()
-    for (const hint of [
-      'build',
-      'raise a',
-      'you should',
-      'a roof would',
-      'go inside',
-      'wait for',
-    ]) {
+    expect(scanForDirective(said)).toEqual([])
+    for (const hint of ['build', 'raise a', 'a roof would', 'wait for']) {
       expect(said).not.toContain(hint)
     }
   })
@@ -390,7 +378,8 @@ describe('* walls already standing are a place the world can name', () => {
     const s = townWith([{ id: 'structure_1', kind: 'house', x: 2, y: 2, progress: 720 }])
     const said = standingWallsLine(unfinishedWork(s, CFG, { x: 1, y: 1 })).toLowerCase()
     expect(said.length).toBeGreaterThan(0)
-    for (const hint of ['build', 'raise', 'you should', 'you must', 'go and', 'help', 'join']) {
+    expect(scanForDirective(said), said).toEqual([])
+    for (const hint of ['build', 'raise', 'help', 'join']) {
       expect(said, said).not.toContain(hint)
     }
   })

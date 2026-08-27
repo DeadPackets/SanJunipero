@@ -17,6 +17,7 @@ import {
 import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
+import { scanForDirective } from './glassScan.js'
 
 // A roof is worth the whole of a body's warmth (57.4 -> 0.0 under the sky by midnight, 38.4 held
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
@@ -146,16 +147,10 @@ describe('the cold a body can feel, and the thing that answers it', () => {
   it('the sentence never tells a mind what to do about it', () => {
     const { bridge, loop } = town(COLD_HOUR - 1)
     loop.step()
-    const prose = proseFor(bridge, 'amara')
-    for (const hint of [
-      'build',
-      'raise a',
-      'you should',
-      'you must build',
-      'a roof would',
-      'go inside',
-    ]) {
-      expect(prose.toLowerCase()).not.toContain(hint)
+    const prose = proseFor(bridge, 'amara').toLowerCase()
+    expect(scanForDirective(prose)).toEqual([])
+    for (const hint of ['build', 'raise a', 'a roof would']) {
+      expect(prose).not.toContain(hint)
     }
   })
 })

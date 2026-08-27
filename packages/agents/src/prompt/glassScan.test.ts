@@ -5,6 +5,7 @@ import {
   assertQuotedName,
   CONSTRUCT_VOCABULARY,
   MID_RUN_ENFORCED,
+  scanForDirective,
   scanForLayoutLeak,
   scanPromptForGlassLeak,
   scanRulingForGlassLeak,
@@ -185,6 +186,17 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
     expect(CONSTRUCT_VOCABULARY.length).toBe(
       Object.keys(ordinaryPhrases).length + MID_RUN_ENFORCED.length,
     )
+  })
+})
+
+describe('the counsel a perception sentence may not hand over', () => {
+  it('★ names a planted remedy, and leaves a fact about now alone', () => {
+    expect(scanForDirective('You should go inside before the cold.')).toEqual([
+      'you should',
+      'go inside',
+    ])
+    expect(scanForDirective('Go and find Amara, you must hurry.')).toEqual(['go and', 'you must'])
+    expect(scanForDirective('Its walls are three quarters up.')).toEqual([])
   })
 })
 

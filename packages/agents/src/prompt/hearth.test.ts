@@ -16,7 +16,7 @@ import {
 } from '@sj/engine'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
+import { scanForDirective, scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 import { perceptionToProse } from './prose.js'
 
@@ -170,12 +170,10 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
+      expect(scanForDirective(said), said).toEqual([])
       for (const hint of [
         'stoke',
-        'you should',
-        'you must',
         'you could feed',
-        'go inside',
         'light it',
         'feed it',
         'sleep here',
@@ -243,13 +241,8 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
 
   it('names no remedy: it is a fact about now and promises nothing later', () => {
     const said = site('construction').toLowerCase()
-    for (const hint of [
-      'you should',
-      'you must',
-      'once the roof',
-      'when it is finished',
-      'come back',
-    ]) {
+    expect(scanForDirective(said), said).toEqual([])
+    for (const hint of ['once the roof', 'when it is finished', 'come back']) {
       expect(said, hint).not.toContain(hint)
     }
   })
