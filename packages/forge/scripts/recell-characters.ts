@@ -5,12 +5,12 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { keyBg } from '../src/post/chromaKey.js'
 import { sliceStrip, opaqueBbox } from '../src/sheet.js'
 import { buildManifestV4 } from '../src/hires.js'
 import { deriveSheet, CELL_NAMES_V4 } from '../src/mirror.js'
 import { CHAR_FIGURE_PX, spriteCell } from '../src/reCell.js'
 import { alphaBinaryGate, paletteDistance } from '../src/pixelGates.js'
-import { keyBg } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
 const S = scratch()
@@ -159,7 +159,7 @@ for (const c of CAST) {
   })
 
   // figureH is what the renderer divides CHAR_TARGET_PX by; the standing figure decides it
-  const standingH = figureH(idle.se.cell)
+  const standingH = cellPlans[0]!.figure
   const manifest = buildManifestV4(cells, standingH)
 
   const before = JSON.parse(readFileSync(join(c.src, 'manifest.json'), 'utf8')) as {

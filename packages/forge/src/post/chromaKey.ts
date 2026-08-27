@@ -13,3 +13,15 @@ export function chromaKey(img: RawImage, opts: { tolerance?: number } = {}): Raw
   }
   return { width: img.width, height: img.height, data: out }
 }
+
+// A generation that drifted off #FF00FF needs 110 where a clean one needs 72; under 10% keyed,
+// the image is not a subject on magenta at all.
+export function keyBg(img: RawImage): RawImage {
+  for (const tolerance of [72, 110]) {
+    const keyed = chromaKey(img, { tolerance })
+    let clear = 0
+    for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
+    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
+  }
+  throw new Error('keyBg: <10% keyed even at tolerance 110')
+}

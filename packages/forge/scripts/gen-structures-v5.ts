@@ -2,7 +2,7 @@
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
-import { PALETTE_WORDS, paletteSwatch, runCells, type CellJob } from './lib/cells.js'
+import { PALETTE_WORDS, runCells, type CellJob } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
 const CAP = Number(process.env.STRUCT_CAP ?? '4.00')
@@ -214,7 +214,6 @@ for (const s of SUBJECTS) {
   }
 }
 
-const swatch = await paletteSwatch()
 const jobs: CellJob[] = []
 for (const s of SUBJECTS) {
   if (ONLY.length && !ONLY.includes(s.id)) continue
@@ -224,7 +223,6 @@ for (const s of SUBJECTS) {
       kind: facingKind(s.kind, facing),
       fp: s.fp,
       prompt: prompt(s, facing),
-      reference: swatch,
     })
 }
 

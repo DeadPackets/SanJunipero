@@ -2,6 +2,7 @@
 // remains the only art gate. They enforce INTEGER DOWNSCALE ONLY, the rule that keeps the grid.
 import type { Footprint } from '@sj/shared'
 import { paletteRgb } from './palette.js'
+import { makeQuantizer } from './post/quantize.js'
 import type { RawImage } from './post/raw.js'
 
 export type Size = { w: number; h: number }
@@ -145,7 +146,7 @@ export function paletteGate(
 // the world's forty — mean Euclidean RGB distance over the opaque pixels, for the run report.
 export function paletteDistance(img: RawImage): number {
   const pal = paletteRgb()
-  const cache = new Map<number, number>()
+  const { nearest } = makeQuantizer(pal)
   let sum = 0,
     n = 0
   for (let i = 0; i < img.data.length; i += 4) {
@@ -153,18 +154,8 @@ export function paletteDistance(img: RawImage): number {
     const r = img.data[i]!,
       g = img.data[i + 1]!,
       b = img.data[i + 2]!
-    const key = (r << 16) | (g << 8) | b
-    let d = cache.get(key)
-    if (d === undefined) {
-      let best = Infinity
-      for (const p of pal) {
-        const q = (r - p[0]) ** 2 + (g - p[1]) ** 2 + (b - p[2]) ** 2
-        if (q < best) best = q
-      }
-      d = Math.sqrt(best)
-      cache.set(key, d)
-    }
-    sum += d
+    const p = pal[nearest(r, g, b)]!
+    sum += Math.hypot(r - p[0], g - p[1], b - p[2])
     n++
   }
   return n === 0 ? 0 : sum / n

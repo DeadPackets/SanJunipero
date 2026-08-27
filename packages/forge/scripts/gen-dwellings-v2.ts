@@ -2,7 +2,7 @@
 // Reference is a MASTER_PALETTE swatch, never a building — a building overrides the prompt (A/B, $0.2053).
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { STRUCTURE_FACINGS, facingKind, type StructureFacing } from '../src/buildingArt.js'
-import { PALETTE_WORDS, paletteSwatch, runCells, type CellJob } from './lib/cells.js'
+import { PALETTE_WORDS, runCells, type CellJob } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
 const CAP = Number(process.env.DWELL_CAP ?? '6.00')
@@ -160,7 +160,6 @@ function prompt(s: Subject, facing: StructureFacing): string {
   )
 }
 
-const swatch = await paletteSwatch()
 const jobs: CellJob[] = []
 for (const s of SUBJECTS) {
   if (ONLY.length && !ONLY.includes(s.id)) continue
@@ -170,7 +169,6 @@ for (const s of SUBJECTS) {
       kind: facingKind(s.kind, facing),
       fp: s.fp,
       prompt: prompt(s, facing),
-      reference: swatch,
     })
 }
 

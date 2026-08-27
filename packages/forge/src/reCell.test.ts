@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
-import { chromaKey } from './post/chromaKey.js'
+import { keyBg } from './post/chromaKey.js'
 import { opaqueBbox } from './sheet.js'
 import {
   integerScaleGate,
@@ -143,7 +143,7 @@ describe('keyBg → spriteCell on a real 2048 generation', () => {
     )
     expect([raw.width, raw.height]).toEqual([2048, 2048])
 
-    const r = spriteCell(chromaKey(raw, { tolerance: 72 }), { cellPx: 512, anchor: 'feet' })
+    const r = spriteCell(keyBg(raw), { cellPx: 512, anchor: 'feet' })
 
     expect(Number.isInteger(r.plan.factor)).toBe(true)
     expect(r.plan.factor).toBe(4)

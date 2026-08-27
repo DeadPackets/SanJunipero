@@ -1,4 +1,5 @@
 import type { RawImage } from '../post/raw.js'
+import { opaqueArea } from '../sheet.js'
 
 export function countIslands(img: RawImage): number {
   const seen = new Uint8Array(img.width * img.height)
@@ -28,6 +29,13 @@ export function countIslands(img: RawImage): number {
     }
   }
   return n
+}
+
+export function silhouetteStats(cell: RawImage): { islands: number; opaqueFrac: number } {
+  return {
+    islands: countIslands(cell),
+    opaqueFrac: opaqueArea(cell) / (cell.width * cell.height),
+  }
 }
 
 // Rank by silhouette cleanliness, lower is better. Pixel pitch cannot separate two candidates —

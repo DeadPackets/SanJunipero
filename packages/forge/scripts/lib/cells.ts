@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { Footprint } from '@sj/shared'
 import { BudgetGuard } from '../../src/budget.js'
 import { SpendLedger } from '../../src/spendLedger.js'
-import { MASTER_PALETTE, paletteRgb } from '../../src/palette.js'
-import { chromaKey } from '../../src/post/chromaKey.js'
+import { keyBg } from '../../src/post/chromaKey.js'
+import { paletteSwatchPng } from '../../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell } from '../../src/reCell.js'
@@ -32,45 +32,12 @@ export const PALETTE_WORDS = [
   'Flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
 ].join(' ')
 
-/** A code-painted MASTER_PALETTE chart: 40 flat swatches, no subject, no architecture. Free,
- *  deterministic, and the only reference these calls are allowed to see. */
-export async function paletteSwatch(): Promise<Buffer> {
-  const cols = 8,
-    rows = 5,
-    sw = 64
-  const w = cols * sw,
-    h = rows * sw
-  const data = new Uint8ClampedArray(w * h * 4)
-  const rgb = paletteRgb(MASTER_PALETTE)
-  for (let i = 0; i < rgb.length; i++) {
-    const [r, g, b] = rgb[i]!
-    const cx = (i % cols) * sw,
-      cy = Math.floor(i / cols) * sw
-    for (let y = cy; y < cy + sw; y++)
-      for (let x = cx; x < cx + sw; x++) {
-        data.set([r, g, b, 255], (y * w + x) * 4)
-      }
-  }
-  return encodePng({ width: w, height: h, data })
-}
-
-export function keyBg(img: RawImage): RawImage {
-  for (const tolerance of [72, 110]) {
-    const keyed = chromaKey(img, { tolerance })
-    let clear = 0
-    for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
-  }
-  throw new Error('keyBg: <10% keyed even at tolerance 110')
-}
-
 /** One cell to draw: a subject in one facing, already resolved to its prompt and reference. */
 export type CellJob = {
   label: string // the content directory and the report row, e.g. `house-sw`
   kind: string // what the manifest calls it, e.g. `house:sw`
   fp: Footprint
   prompt: string
-  reference: Buffer
 }
 
 export type RunOptions = {
@@ -125,6 +92,8 @@ export async function runCells(o: RunOptions): Promise<void> {
     return { raw: Buffer.from(b64, 'base64'), cost }
   }
 
+  // The ONLY reference any call here carries: a colour chart, never a building.
+  const swatch = await paletteSwatchPng()
   mkdirSync(RAWS, { recursive: true })
   mkdirSync(`${o.scratch}/cells`, { recursive: true })
 
@@ -143,8 +112,12 @@ export async function runCells(o: RunOptions): Promise<void> {
       cell: RawImage
       plan: ReturnType<typeof spriteCell>['plan']
       fails: string[]
+      dist: number
     }
     const cands: Cand[] = []
+    // No per-candidate input: a generation that does not divide by the cell cannot land on the
+    // grid at all, so decide it BEFORE the loop spends on attempts that cannot pass.
+    const fails = integerScaleGate({ w: GEN_PX, h: GEN_PX }, { w: cellPx, h: cellPx }).failures
 
     for (let i = 0; i < o.maxAttempts; i++) {
       const candKey = `${job.label}-c${i}`
@@ -158,7 +131,7 @@ export async function runCells(o: RunOptions): Promise<void> {
           console.log(`  ${candKey}: DRY, skipped`)
           continue
         }
-        const r = await generate(job.prompt, job.reference, job.label)
+        const r = await generate(job.prompt, swatch, job.label)
         writeFileSync(path, r.raw)
         buf = r.raw
         console.log(
@@ -167,14 +140,13 @@ export async function runCells(o: RunOptions): Promise<void> {
       }
       try {
         const r = spriteCell(keyBg(await decodePng(buf)), { cellPx, anchor: 'feet' })
-        // The one gate on this path: a generation that does not divide by the cell cannot land
-        // on the grid at all. The palette distance is REPORTED, never a refusal.
-        const fails = integerScaleGate({ w: GEN_PX, h: GEN_PX }, { w: cellPx, h: cellPx }).failures
+        // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
+        const dist = paletteDistance(r.cell)
         const refused = o.rejected.has(candKey)
-        if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails })
+        if (!refused) cands.push({ key: candKey, cell: r.cell, plan: r.plan, fails, dist })
         const msg =
           `${job.label}: ${candKey} subject ${r.plan.subjectPx}px, factor ${r.plan.factor}, ` +
-          `window ${r.plan.window}, palette distance ${paletteDistance(r.cell).toFixed(1)}, ` +
+          `window ${r.plan.window}, palette distance ${dist.toFixed(1)}, ` +
           (fails.length === 0 ? 'gates clean' : fails.join('; ')) +
           (refused ? ' — REFUSED BY EYE' : '')
         lines.push(msg)
@@ -234,7 +206,7 @@ export async function runCells(o: RunOptions): Promise<void> {
     members.push({ name: job.label, density })
     rows.push(
       `| ${job.label} | ${job.fp.w}x${job.fp.h} | ${cellPx} | ${GEN_PX}/${win.plan.factor} ` +
-        `(window ${win.plan.window}) | ${density} | ${paletteDistance(win.cell).toFixed(1)} | ${win.key} |`,
+        `(window ${win.plan.window}) | ${density} | ${win.dist.toFixed(1)} | ${win.key} |`,
     )
   }
 

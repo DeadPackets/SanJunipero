@@ -23,9 +23,8 @@ import {
   type VisionJudgeFn,
   type VisionVerdict,
 } from '@sj/forge/gen'
-import { candidateRank, countIslands } from '../src/library/postItem.js'
+import { candidateRank, silhouetteStats } from '../src/library/postItem.js'
 import { chromaKey } from '../src/post/chromaKey.js'
-import { opaqueArea } from '../src/sheet.js'
 import { spriteCell } from '../src/reCell.js'
 import { pixelBarReport } from '../src/pixelGates.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
@@ -115,7 +114,7 @@ async function main(): Promise<void> {
     let chosen: RawImage | null = null,
       icon: RawImage | null = null
     // Boxed: a closure-assigned `let` narrows to null, and no-unnecessary-condition calls the read dead.
-    const chosenRaw: { raw: RawImage | null } = { raw: null }
+    const chosenRaw: { keyed: RawImage | null } = { keyed: null }
     const spriteVerdicts: VisionVerdict[] = [],
       iconVerdicts: VisionVerdict[] = []
     let status: ItemResult['status'] = 'blocked'
@@ -147,19 +146,9 @@ async function main(): Promise<void> {
             const processed = await Promise.all(
               cands.map(async (c, ix) => {
                 writeFileSync(join(dir, 'candidates', `a${n}-c${ix + 1}-raw.png`), c.png)
-                const raw = await decodePng(c.png)
-                const { cell } = spriteCell(chromaKey(raw), {
-                  cellPx: e.spritePx,
-                  anchor: 'centre',
-                })
-                return {
-                  c,
-                  ix,
-                  raw,
-                  cell,
-                  islands: countIslands(cell),
-                  opaqueFrac: opaqueArea(cell) / (e.spritePx * e.spritePx),
-                }
+                const keyed = chromaKey(await decodePng(c.png))
+                const { cell } = spriteCell(keyed, { cellPx: e.spritePx, anchor: 'centre' })
+                return { c, ix, keyed, cell, ...silhouetteStats(cell) }
               }),
             )
             // Pick the cleanest silhouette: one connected subject, no floating debris.
@@ -176,7 +165,7 @@ async function main(): Promise<void> {
                 ),
                 await encodePng(p.cell),
               )
-            chosenRaw.raw = pick.raw
+            chosenRaw.keyed = pick.keyed
             return {
               sprite: pick.cell,
               model: pick.c.model,
@@ -203,8 +192,8 @@ async function main(): Promise<void> {
 
         // Resample the icon from the paid generation at its own cell count: an integer
         // downscale of the 24 px sprite lands on 12 px of art, which the judge reads as mush.
-        icon = chosenRaw.raw
-          ? spriteCell(chromaKey(chosenRaw.raw), { cellPx: e.iconPx, anchor: 'centre' }).cell
+        icon = chosenRaw.keyed
+          ? spriteCell(chosenRaw.keyed, { cellPx: e.iconPx, anchor: 'centre' }).cell
           : deriveIcon(res.sprite, e.iconPx)
         const iv = await judge({
           assetId: `${assetId}#icon`,
@@ -237,8 +226,8 @@ async function main(): Promise<void> {
     if (status !== 'error') status = spriteGateStatus(spriteVerdicts, status)
 
     if (chosen) {
-      icon ??= chosenRaw.raw
-        ? spriteCell(chromaKey(chosenRaw.raw), { cellPx: e.iconPx, anchor: 'centre' }).cell
+      icon ??= chosenRaw.keyed
+        ? spriteCell(chosenRaw.keyed, { cellPx: e.iconPx, anchor: 'centre' }).cell
         : deriveIcon(chosen, e.iconPx)
       // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
       // bar never ships, whatever the eye said about it.

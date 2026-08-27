@@ -4,6 +4,7 @@
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng } from '../src/post/raw.js'
+import { keyBg } from '../src/post/chromaKey.js'
 import { cellAnchor } from '../src/hires.js'
 import { buildingCellPx, spriteCell } from '../src/reCell.js'
 import {
@@ -13,7 +14,6 @@ import {
   classDensityGate,
 } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
-import { keyBg } from './lib/cells.js'
 import { scratch } from './scratch.js'
 
 const S = scratch()

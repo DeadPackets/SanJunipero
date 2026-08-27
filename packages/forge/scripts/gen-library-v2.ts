@@ -20,9 +20,8 @@ import {
 import { paletteDistance } from '../src/pixelGates.js'
 import { ICON_PX, WORLD_SPRITE_PX } from '../src/assetResolution.js'
 import { chromaKey } from '../src/post/chromaKey.js'
-import { opaqueArea } from '../src/sheet.js'
 import { spriteCell } from '../src/reCell.js'
-import { candidateRank, countIslands } from '../src/library/postItem.js'
+import { candidateRank, silhouetteStats } from '../src/library/postItem.js'
 import { refusalMessage } from '../src/gate.js'
 import { ITEMS_CONTENT_DIR } from '../src/library/committed.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
@@ -175,8 +174,7 @@ for (const item of items) {
       const keyed = chromaKey(await decodePng(buf))
       const sprite = spriteCell(keyed, { cellPx: WORLD_SPRITE_PX, anchor: 'centre' })
       const icon = spriteCell(keyed, { cellPx: ICON_PX, anchor: 'centre' })
-      const islands = countIslands(sprite.cell)
-      const opaqueFrac = opaqueArea(sprite.cell) / (WORLD_SPRITE_PX * WORLD_SPRITE_PX)
+      const { islands, opaqueFrac } = silhouetteStats(sprite.cell)
       // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
       // construction. The judge below is the gate; the palette distance is only reported.
       const fails: string[] = []
