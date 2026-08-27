@@ -4,7 +4,7 @@ import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { installFaces } from './textFaces.js'
 import { TextureBook } from './textures.js'
-import { syncEntities } from './entities.js'
+import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
@@ -19,6 +19,7 @@ export function StageMount({
   store,
   onScene,
   onInterior,
+  onPick,
 }: {
   store: WorldStore
   /** The live scene, and `null` the moment it is torn down — React must never be left
@@ -26,6 +27,8 @@ export function StageMount({
   onScene?: (scene: Scene | null) => void
   /** the interior sub-scene opened or closed — App draws the back-to-town chrome from it */
   onInterior?: (structureId: string | null) => void
+  /** what the pointer landed on — App draws the popover, the canvas draws nothing of the kind */
+  onPick?: (pick: WorldPick) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<Scene | null>(null)
@@ -33,6 +36,8 @@ export function StageMount({
   // read in the Pixi callbacks, never subscribed to — a follow change must not remount Pixi
   const onInteriorRef = useRef(onInterior)
   onInteriorRef.current = onInterior
+  const onPickRef = useRef(onPick)
+  onPickRef.current = onPick
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
     const s = sceneRef.current
@@ -81,12 +86,13 @@ export function StageMount({
         }
         landmarks = createLandmarkLayer(s, store)
         const marks = landmarks
+        const pick = (p: WorldPick): void => onPickRef.current?.(p)
         offSync = store.subscribe(() => {
-          syncEntities(s, book, store, openDoor)
+          syncEntities(s, book, store, openDoor, pick)
           marks.rebuild()
           marks.place()
         })
-        syncEntities(s, book, store, openDoor)
+        syncEntities(s, book, store, openDoor, pick)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
         offCamera = s.onCamera(() => {
           marks.place()

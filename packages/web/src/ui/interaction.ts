@@ -68,7 +68,9 @@ export function escapeStep(
   insideId: string | null,
   dockOpen: boolean,
   onOnePerson: boolean,
-): 'room' | 'dock' | 'roster' | null {
+  popoverOpen: boolean,
+): 'popover' | 'room' | 'dock' | 'roster' | null {
+  if (popoverOpen) return 'popover'
   if (insideId !== null) return 'room'
   if (dockOpen) return 'dock'
   return onOnePerson ? 'roster' : null

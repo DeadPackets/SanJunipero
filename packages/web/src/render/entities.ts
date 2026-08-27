@@ -1,8 +1,8 @@
 import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
-import { isRoofedKind, tickToMoment, type SimConfig } from '@sj/shared'
+import { isRoofedKind, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
+import { hoverLabel, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox } from './depth.js'
 import { depthKey, tileToScreen } from './iso.js'
@@ -115,10 +115,19 @@ type Entry = {
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
+/** What the pointer landed on, and where on screen — the chrome draws the popover. */
+export type WorldPick = {
+  kind: 'structure' | 'item' | 'crop'
+  id: string
+  screenX: number
+  screenY: number
+}
+
 type SyncState = {
   entries: Map<string, Entry>
   lastAssetsSeq: number
   onDoor: ((structureId: string) => void) | null
+  onPick: ((pick: WorldPick) => void) | null
   /** the camera scale every structure prism was last cut for */
   hitZoom: number
 }
@@ -216,59 +225,6 @@ function drawPips(g: Graphics, filled: number): void {
   }
 }
 
-async function provenanceText(structureId: string, state: WorldState | null): Promise<string> {
-  const res = await fetch(`/api/structure/${structureId}/provenance`)
-  if (!res.ok) return 'No one remembers who began this.'
-  const p = (await res.json()) as {
-    kind: string
-    plannedTick: number
-    builderId: string
-    completedTick: number | null
-  }
-  const begun = tickToMoment(p.plannedTick)
-  const name = state?.agents[p.builderId]?.name ?? p.builderId
-  const finish =
-    p.completedTick === null ? 'still rising' : `finished Day ${tickToMoment(p.completedTick).day}`
-  let text = `Begun by ${name} on Day ${begun.day} ${begun.time} — ${finish}`
-  // the "why" line: the builder's journal entry nearest plannedTick, omitted when the journal is empty
-  const jres = await fetch(`/api/agent/${p.builderId}/journal`)
-  if (jres.ok) {
-    const entries = (await jres.json()) as { tick: number; text: string }[]
-    const nearest = entries.reduce<{ tick: number; text: string } | null>(
-      (best, e) =>
-        best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick)
-          ? e
-          : best,
-      null,
-    )
-    if (nearest !== null) text += `\n"${nearest.text}"`
-  }
-  return text
-}
-
-let popEl: HTMLDivElement | null = null
-function showPopover(text: string, x: number, y: number): void {
-  if (popEl === null) {
-    popEl = document.createElement('div')
-    popEl.className = 'provenance-pop'
-    // A live region, so the detail reaches a reader who never sees the pointer; Escape
-    // dismisses it, so it is not a thing only a mouse can close.
-    popEl.setAttribute('role', 'status')
-    document.body.appendChild(popEl)
-    const hide = (): void => {
-      if (popEl !== null) popEl.style.display = 'none'
-    }
-    document.addEventListener('pointerdown', hide)
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') hide()
-    })
-  }
-  popEl.textContent = text
-  popEl.style.display = 'block'
-  popEl.style.left = `${Math.round(x)}px`
-  popEl.style.top = `${Math.round(y)}px`
-}
-
 // lookup for effect layers (placement bounce, fire glow anchoring)
 export function entitySpriteOf(
   scene: Scene,
@@ -284,6 +240,7 @@ export function syncEntities(
   book: TextureBook,
   store: WorldStore,
   onDoor?: (structureId: string) => void,
+  onPick?: (pick: WorldPick) => void,
 ): void {
   const state = store.getState()
   if (state === null) return
@@ -293,6 +250,7 @@ export function syncEntities(
       entries: new Map(),
       lastAssetsSeq: store.assetsSeq(),
       onDoor: null,
+      onPick: null,
       hitZoom: scene.getZoom(),
     }
     syncStates.set(scene, sync)
@@ -318,6 +276,7 @@ export function syncEntities(
     })
   }
   if (onDoor !== undefined) sync.onDoor = onDoor
+  if (onPick !== undefined) sync.onPick = onPick
   const tags = scene.tags
 
   // Everything on the map answers to the pointer: hover names it, click tells its story.
@@ -356,9 +315,7 @@ export function syncEntities(
           sync.onDoor?.(sid)
           return
         }
-        void provenanceText(sid, store.getState()).then((text) => {
-          showPopover(text, e.client.x, e.client.y)
-        })
+        sync.onPick?.({ kind: 'structure', id: sid, screenX: e.client.x, screenY: e.client.y })
       })
       entry = {
         sprite,
@@ -426,8 +383,7 @@ export function syncEntities(
       const iid = it.id
       nameOnHover(sprite, 'item', iid)
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
-        const text = itemCropDetail(store.getState(), 'item', iid)
-        if (text !== null) showPopover(text, e.client.x, e.client.y)
+        sync.onPick?.({ kind: 'item', id: iid, screenX: e.client.x, screenY: e.client.y })
       })
       entry = {
         sprite,
@@ -464,8 +420,7 @@ export function syncEntities(
       const cid = c.id
       nameOnHover(sprite, 'crop', cid)
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
-        const text = itemCropDetail(store.getState(), 'crop', cid)
-        if (text !== null) showPopover(text, e.client.x, e.client.y)
+        sync.onPick?.({ kind: 'crop', id: cid, screenX: e.client.x, screenY: e.client.y })
       })
       entry = {
         sprite,

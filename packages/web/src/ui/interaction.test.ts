@@ -191,21 +191,26 @@ describe('lensKeyAllowed', () => {
 // dock would also have stepped back to the roster, because stopPropagation cannot reach a
 // sibling listener on the same target.
 describe('escapeStep', () => {
+  it('closes the popover first — it is the last thing the viewer opened', () => {
+    expect(escapeStep('house-1', true, true, true)).toBe('popover')
+    expect(escapeStep(null, false, false, true)).toBe('popover')
+  })
+
   it('gives the room the first claim, whatever else is open', () => {
-    expect(escapeStep('house-1', true, true)).toBe('room')
-    expect(escapeStep('house-1', false, false)).toBe('room')
+    expect(escapeStep('house-1', true, true, false)).toBe('room')
+    expect(escapeStep('house-1', false, false, false)).toBe('room')
   })
 
   it('closes the controls menu before it leaves the person', () => {
-    expect(escapeStep(null, true, true)).toBe('dock')
-    expect(escapeStep(null, true, false)).toBe('dock')
+    expect(escapeStep(null, true, true, false)).toBe('dock')
+    expect(escapeStep(null, true, false, false)).toBe('dock')
   })
 
   it('steps back to the roster only when nothing else is open', () => {
-    expect(escapeStep(null, false, true)).toBe('roster')
+    expect(escapeStep(null, false, true, false)).toBe('roster')
   })
 
   it('takes no step when there is nothing to step out of', () => {
-    expect(escapeStep(null, false, false)).toBeNull()
+    expect(escapeStep(null, false, false, false)).toBeNull()
   })
 })
