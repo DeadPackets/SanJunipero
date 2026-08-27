@@ -6,7 +6,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { VERBS } from '../verbs.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev, grid } from '../testutil/world.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const quiet = {
   weather: { hourlyChangeChance: 0 },
@@ -293,11 +293,7 @@ describe('the lighting law', () => {
 
   it("folding the tick's own events reproduces the state it returned", () => {
     const lit = apply(holding(bodyAt(0), 'item_1', 'torch'), 'kindle', { itemId: 'item_1' })
-    const start = { ...lit, tick: BURN }
-    const out = tickOnce(start)
-    let replayed = fold(start, ev('tick_advanced', {}, start.tick + 1), CFG)
-    for (const e of out.events)
-      replayed = fold(replayed, ev(e.type, e.payload, start.tick + 1), CFG)
+    const { replayed, out } = roundTrips({ ...lit, tick: BURN }, CFG, 'li')
     expect(replayed.items).toEqual(out.state.items)
   })
 })

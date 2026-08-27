@@ -5,7 +5,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type AgentBody, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ambientTempAt, isExposed } from './warmth.js'
-import { ev, grid } from '../testutil/world.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 // The fixture law: nothing may speak at midnight but the law under test, and no weather rolls.
 // The EXCEPTION the Phase-F brief allows is used deliberately — these tests set the sky by hand.
@@ -295,10 +295,7 @@ describe('determinism', () => {
     const start = bodyAt(WINTER_NIGHT, CFG, {
       needs: { hunger: 100, energy: 80, warmth: 0, social: 100 },
     })
-    const out = tickOnce(start)
-    let replayed = fold(start, ev('tick_advanced', {}, start.tick + 1), CFG)
-    for (const e of out.events)
-      replayed = fold(replayed, ev(e.type, e.payload, start.tick + 1), CFG)
+    const { replayed, out } = roundTrips(start, CFG, 'wa')
     expect(replayed.agents.a1).toEqual(out.state.agents.a1)
   })
 })

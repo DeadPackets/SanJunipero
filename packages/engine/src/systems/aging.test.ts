@@ -5,7 +5,7 @@ import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ageBand } from './aging.js'
-import { ev } from '../testutil/world.js'
+import { ev, roundTrips } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const MIDNIGHT = 1440 // day 1, hour 0, minute 0
@@ -23,15 +23,6 @@ function tickTo(s: WorldState, tick: number, rng = new RngStreams('t')): WorldTi
   const wt = createWorldTick(CFG, rng)
   return wt(fold(s, ev('tick_advanced', {}, tick), CFG))
 }
-function applyAll(
-  s: WorldState,
-  events: { type: string; payload: unknown }[],
-  tick = s.tick,
-): WorldState {
-  for (const e of events) s = fold(s, ev(e.type, e.payload, tick), CFG)
-  return s
-}
-
 describe('ageBand', () => {
   it('bands child/adult/elder on the config year boundaries', () => {
     expect(ageBand(CFG, 0)).toBe('child')
@@ -137,10 +128,9 @@ describe('worldTick: natural death', () => {
   })
 
   it('folding the returned events over the input reproduces the returned state', () => {
-    let s = { ...makeWorld(70 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }
-    s = fold(s, ev('tick_advanced', {}, MIDNIGHT), CFG)
-    const out = createWorldTick(CFG, new RngStreams('ag5294'))(s)
+    const s = { ...makeWorld(70 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }
+    const { replayed, out } = roundTrips(s, CFG, 'ag5294')
     expect(out.events.length).toBeGreaterThan(0)
-    expect(applyAll(s, out.events, s.tick)).toEqual(out.state)
+    expect(replayed).toEqual(out.state)
   })
 })

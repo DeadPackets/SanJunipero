@@ -19,7 +19,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
 import { GROWABLE_FLOOR, authoredOrigin, builtBox, grownStrip, growthsSoFar } from './mapGrowth.js'
-import { ev, grid } from '../testutil/world.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 // A 32x32 world on a config whose world.size says 128 — the ordinary shape of a fixture, and
 // the case the plan's size-derived growth counter got wrong.
@@ -382,12 +382,8 @@ describe('fold: world_grown', () => {
 
 describe('world_grown: replay', () => {
   it("folding the tick's own events over the input reproduces the state it returned", () => {
-    const s = bigTown()
-    const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), CFG)
-    const out = createWorldTick(CFG, new RngStreams('grow'))(advanced)
+    const { replayed, out } = roundTrips({ ...bigTown(), tick: MIDNIGHT - 1 }, CFG, 'grow')
     expect(grown(out)).toHaveLength(1)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, MIDNIGHT), CFG)
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 

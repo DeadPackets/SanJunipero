@@ -4,7 +4,7 @@ import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev, grid } from '../testutil/world.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const MIDNIGHT = 1440
 const quiet = {
@@ -206,10 +206,7 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
       'a1',
       2,
     )
-    const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), SPREADS)
-    const out = createWorldTick(SPREADS, new RngStreams('ill'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, MIDNIGHT), SPREADS)
+    const { replayed, out } = roundTrips({ ...s, tick: MIDNIGHT - 1 }, SPREADS, 'ill')
     expect(replayed).toEqual(out.state)
   })
 })

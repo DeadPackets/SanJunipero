@@ -11,7 +11,7 @@ import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev } from '../testutil/world.js'
+import { ev, roundTrips } from '../testutil/world.js'
 
 const quiet = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
@@ -198,9 +198,7 @@ describe('drink: four ways to answer it', () => {
   })
 
   it("folding the tick's own events reproduces the state it returned", () => {
-    const out = tickOnce(parch(body(), 10))
-    let replayed = fold(parch(body(), 10), ev('tick_advanced', {}, 1), CFG)
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    const { replayed, out } = roundTrips(parch(body(), 10), CFG, 'th')
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 })

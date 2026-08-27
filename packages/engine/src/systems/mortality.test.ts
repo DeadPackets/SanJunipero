@@ -11,7 +11,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
 import { DEATH_CAUSES, dominantDrain, type DeathCause } from './mortality.js'
-import { ev, grid } from '../testutil/world.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -188,10 +188,7 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
 
   it("folding the tick's own events reproduces the state it returned", () => {
     const s = afflict(afflict(body(), 'illness', 1, 0), 'injury', 2, 0)
-    const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
-    const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    const { replayed, out } = roundTrips(s, CFG, 'm')
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 })
@@ -369,10 +366,7 @@ describe('a grave where the life ended', () => {
 
   it('folding the death tick reproduces the state it returned, grave and all', () => {
     const s = nearlyDead(afflict(body(), 'illness', 2, 0))
-    const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
-    const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    const { replayed, out } = roundTrips(s, CFG, 'm')
     expect(stateHash(replayed)).toBe(stateHash(out.state))
     expect(graveOf(out.state)).toBeDefined()
   })
