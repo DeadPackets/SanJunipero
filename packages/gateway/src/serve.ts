@@ -9,6 +9,7 @@
 //   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
 //   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
 //   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
+//   SJ_MAX_MINDS=15 …           how many minds the town may hold; a birth past it gets no mind
 //   SJ_ADMIN_TOKEN=… …          open the loopback law channel (POST /admin/laws) behind a bearer
 //
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
@@ -35,16 +36,20 @@ export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.
 /** The one instruction a person needs when the viewer has not been built yet. */
 export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 
-/** Dollars, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
+/** A number, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
  *  file may not import — a static import would pull `@sj/agents` onto the scripted path. */
-const usdEnv = (name: string): number | undefined => {
+const numEnv = (name: string, ok: (n: number) => boolean): number | undefined => {
   const raw = process.env[name]
   if (raw === undefined) return undefined
   const asked = Number(raw)
-  if (Number.isFinite(asked) && asked >= 0) return asked
+  if (ok(asked)) return asked
   console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
   return undefined
 }
+const usdEnv = (name: string): number | undefined =>
+  numEnv(name, (n) => Number.isFinite(n) && n >= 0)
+const countEnv = (name: string): number | undefined =>
+  numEnv(name, (n) => Number.isInteger(n) && n >= 1)
 
 export async function main(): Promise<void> {
   if (!existsSync(`${CLIENT_DIST}index.html`)) {
@@ -71,6 +76,7 @@ export async function main(): Promise<void> {
   const narratorDbPath = join(mindsDir, STREAM_NARRATOR_DB)
   const spendDaily = usdEnv('SJ_SPEND_DAILY_USD')
   const spendCap = usdEnv('SJ_SPEND_CAP_USD')
+  const maxMinds = countEnv('SJ_MAX_MINDS')
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
@@ -84,6 +90,7 @@ export async function main(): Promise<void> {
           : { modelsDir: process.env.SJ_MODELS_DIR }),
         ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
         ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
+        ...(maxMinds === undefined ? {} : { maxMinds }),
         // The cap kills the process: a stream that stops thinking and keeps serving is a town of
         // statues nobody would notice for hours.
         onSpendStop: () => {

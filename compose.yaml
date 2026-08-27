@@ -34,6 +34,7 @@ services:
       - SJ_ARBITER
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
+      - SJ_MAX_MINDS
       # Loopback INSIDE the container and never published: reach it with
       # `docker compose exec town`, never through Caddy.
       - SJ_ADMIN_TOKEN

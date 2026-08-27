@@ -52,6 +52,7 @@ block reach the container.
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. `pnpm stream` only. |
 | `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. One sim-day is one real hour, so this is the stream's running cost per day. `pnpm stream` only. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. Reaching it stops the minds and kills the process. `pnpm stream` only. |
+| `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is still folded into the world — the child has a body and no mind, and an alert row says so. `pnpm stream` only. |
 | `SJ_ADMIN_TOKEN` | unset | Set it to open the loopback law channel (`POST /admin/laws`) behind that bearer token. Unset, no write path into the world exists. `pnpm stream` only. |
 | `SJ_ADMIN_PORT` | `8788` | The port that channel listens on, on `127.0.0.1` only. Never proxy it. `pnpm stream` only. |
 | `SJ_MINDS_DIR` | `data/minds` under `packages/gateway` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |

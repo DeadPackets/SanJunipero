@@ -17,6 +17,7 @@ import { EngineBridge } from '../runtime/bridge.js'
 import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import { bootMinds, type MindSpec } from './liveMinds.js'
+import { resolveCast } from './resolveCast.js'
 import { wireBirths } from './newborn.js'
 
 const MOTHER = 'amara'
@@ -81,7 +82,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
-async function town(opts: { namingBudgetUsd?: number; startTick?: number } = {}) {
+async function town(opts: { namingBudgetUsd?: number; startTick?: number; maxMinds?: number } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'sj-births-'))
   dirs.push(dir)
   const config = SimConfigSchema.parse({})
@@ -140,32 +141,47 @@ async function town(opts: { namingBudgetUsd?: number; startTick?: number } = {})
         : {}),
     })
   const embedder = await FakeEmbedder.create()
-  const booted = bootMinds({
-    minds: [specFor(MOTHER, 'f'), specFor(FATHER, 'm')],
-    bridge,
-    embedder,
-    dbFor,
-    turnLlm: (id) => makeClient('turn', id),
-  })
-  const stopBirths = wireBirths({
-    booted,
-    bridge,
-    store,
-    dbFor,
-    embedder,
-    opsDb,
-    namingLlm: makeClient('naming'),
-    homeOf: () => '',
-  })
+  const FOUNDERS = [specFor(MOTHER, 'f'), specFor(FATHER, 'm')]
+  const maxMinds = opts.maxMinds ?? 10
+
+  // The one boot path: `resolveCast` decides who is in the town, and a restart is another call
+  // to it over the same log.
+  const boot = () => {
+    const booted = bootMinds({
+      minds: resolveCast(FOUNDERS, store, maxMinds),
+      bridge,
+      embedder,
+      dbFor,
+      turnLlm: (id) => makeClient('turn', id),
+    })
+    const stopBirths = wireBirths({
+      booted,
+      bridge,
+      store,
+      dbFor,
+      embedder,
+      opsDb,
+      namingLlm: makeClient('naming'),
+      homeOf: () => '',
+      maxMinds,
+    })
+    return { booted, stop: () => { stopBirths(); booted.stop() } }
+  }
+  let running = boot()
 
   return {
     dir,
-    booted,
+    get booted() {
+      return running.booted
+    },
     opsDb,
     dbFor,
+    reboot: () => {
+      running.stop()
+      running = boot()
+    },
     stop: () => {
-      stopBirths()
-      booted.stop()
+      running.stop()
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
@@ -212,10 +228,48 @@ const personalityDay = (db: Database.Database, agentId: string): number | undefi
       | undefined
   )?.day
 
+const birthAlerts = (db: Database.Database): { kind: string; detail: string }[] =>
+  db.prepare("SELECT kind, detail FROM alerts WHERE kind LIKE 'birth%' ORDER BY id").all() as {
+    kind: string
+    detail: string
+  }[]
+
 const callersIn = (db: Database.Database): string[] =>
   (db.prepare('SELECT DISTINCT caller FROM llm_calls').all() as { caller: string }[]).map(
     (r) => r.caller,
   )
+
+describe('★ a born mind survives a restart', () => {
+  it('rejoins the cast, with its memories, on a boot that only ever knew the founders', async () => {
+    const t = await town()
+    t.bear()
+    await t.settle(() => socialNames(t.opsDb).length > 0)
+    const before = memoryTexts(t.dbFor(CHILD), CHILD)
+    expect(before.length).toBeGreaterThan(0)
+
+    t.reboot()
+
+    expect([...t.booted.cast.keys()]).toContain(CHILD)
+    expect(t.booted.runtimes.has(CHILD)).toBe(true)
+    expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual(before)
+    // The same person, not a second one: the second boot must not re-stamp a personality.
+    expect(
+      t.dbFor(CHILD).prepare('SELECT COUNT(*) AS n FROM personality_versions').get(),
+    ).toEqual({ n: 1 })
+    t.stop()
+  })
+
+  it('a birth past the population ceiling is folded into the world and says so', async () => {
+    const t = await town({ maxMinds: 2 })
+    t.bear()
+    await t.settle(() => birthAlerts(t.opsDb).length > 0)
+
+    expect(t.booted.runtimes.has(CHILD)).toBe(false)
+    expect(birthAlerts(t.opsDb).map((a) => a.kind)).toEqual(['birth_over_max_minds'])
+    expect(birthAlerts(t.opsDb)[0]!.detail).toContain('2 minds')
+    t.stop()
+  })
+})
 
 describe('★ a child born in the town gets a mind, a database and a name', () => {
   it('spawns a runtime with its own db, a household memory, and the mother’s name for it', async () => {
