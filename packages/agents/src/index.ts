@@ -46,6 +46,7 @@ export {
   type BootMindsOpts,
   type MindSpec,
 } from './live/liveMinds.js'
+export { wireBirths, type BirthsOpts } from './live/newborn.js'
 export { type MindConfig } from './wake.js'
 export { FOUNDER_MINDS, type Mind } from './live/founderMinds.js'
 export {
