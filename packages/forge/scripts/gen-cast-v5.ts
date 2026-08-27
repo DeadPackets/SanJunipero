@@ -64,9 +64,9 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 // The figure is asked for at four fifths of the frame, so this decides the whole factor the cell
 // is cut on — and with it how far two generations' figures can land apart. See regen-probe.md.
-const GEN_PX = 1024
+const GEN_PX = 2048
 const SIZE = `${GEN_PX}x${GEN_PX}`
-const RESERVE = 0.08
+const RESERVE = 0.15
 
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)
