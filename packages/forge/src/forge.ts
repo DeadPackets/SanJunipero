@@ -48,7 +48,12 @@ export function createForge(deps: {
 
       let best: { png: Buffer; score: number } | null = null
       for (const cand of candidates) {
-        const png = await postProcess(cand.png, klass, target)
+        let png: Buffer
+        try {
+          png = await postProcess(cand.png, klass, target)
+        } catch {
+          continue
+        } // a generation the chain cannot cut is a failed candidate, not a failed commission
         if (!mechanicalGate(await decodePng(png), { w: target.w, h: target.h, requireAlpha }).ok)
           continue
         const verdict = await deps.judge(png)
