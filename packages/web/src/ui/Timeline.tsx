@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useSyncExternalStore } from 'react'
 import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
@@ -13,6 +13,7 @@ import {
   type Mark,
   type MarkSources,
 } from './timelineMarks.js'
+import { usePolled } from './useEndpoint.js'
 
 const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY
@@ -28,6 +29,19 @@ const EMPTY_SOURCES: MarkSources = {
   changes: [],
   events: [],
   discoveries: [],
+}
+
+/** Every list is optional on the wire; a source the gateway has nothing for is an empty one. */
+const markSources = (body: unknown): MarkSources => {
+  const b = body as Partial<MarkSources>
+  return {
+    chapters: b.chapters ?? [],
+    milestones: b.milestones ?? [],
+    moments: b.moments ?? [],
+    changes: b.changes ?? [],
+    events: b.events ?? [],
+    discoveries: b.discoveries ?? [],
+  }
 }
 
 function MarkGlyph({ mark }: { mark: Mark }) {
@@ -178,35 +192,9 @@ export function Timeline({
 }) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  const [sources, setSources] = useState<MarkSources>(EMPTY_SOURCES)
-
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch('/api/timeline/marks')
-        .then(async (r) => (r.ok ? ((await r.json()) as Partial<MarkSources>) : null))
-        .then((body) => {
-          if (!alive || body === null) return
-          setSources({
-            chapters: body.chapters ?? [],
-            milestones: body.milestones ?? [],
-            moments: body.moments ?? [],
-            changes: body.changes ?? [],
-            events: body.events ?? [],
-            discoveries: body.discoveries ?? [],
-          })
-        })
-        .catch(() => {
-          /* the scrubber still scrubs without its marks */
-        })
-    }
-    load()
-    const timer = setInterval(load, MARKS_REFETCH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
+  // The scrubber still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
+  const sources =
+    usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
 
   const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick

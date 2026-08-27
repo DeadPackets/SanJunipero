@@ -1,7 +1,8 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { BondsCountSchema, ChronicleCountSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, LENS_LABELS, type Lens } from './route.js'
+import { usePolled } from './useEndpoint.js'
 import {
   lensCountsFor,
   lensHints,
@@ -111,39 +112,6 @@ export function LensTabsView({
   )
 }
 
-/** Each badge reads its own panel's endpoint on that endpoint's own slow beat, so no count rides
- *  the world's clock. `null` until the first answer and after any failure: no badge beats a wrong one. */
-function useHistoryCount(
-  url: string,
-  rows: (body: unknown) => number | null,
-  everyMs: number,
-): number | null {
-  const [count, setCount] = useState<number | null>(null)
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch(url)
-        .then(async (r) => (r.ok ? rows(await r.json()) : null))
-        .then((n) => {
-          if (alive && n !== null) setCount(n)
-        })
-        .catch(() => {
-          /* no badge is better than a wrong one */
-        })
-    }
-    load()
-    const timer = setInterval(load, everyMs)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-    // `rows` is a module-level parser, not a prop — re-subscribing on it would restart the beat
-    // every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, everyMs])
-  return count
-}
-
 const bondRows = (body: unknown): number | null => {
   const p = BondsCountSchema.safeParse(body)
   return p.success ? p.data.count : null
@@ -168,14 +136,14 @@ export function LensTabs({
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   // A `Bond` carries its whole history, so counting by downloading cost 83.7 MB at sim-day 20 of
   // a talkative town — every 60 s, per viewer, for a two-digit badge.
-  const bonds = useHistoryCount('/api/bonds/count', bondRows, BOND_COUNT_REFETCH_MS)
+  const bonds = usePolled('/api/bonds/count', bondRows, BOND_COUNT_REFETCH_MS).data
   // Counted on the server rather than by downloading the ledger the panel lists from, so the
   // badge and the panel can never disagree.
-  const chronicle = useHistoryCount(
+  const chronicle = usePolled(
     '/api/chronicle/count',
     chronicleRows,
     CHRONICLE_COUNT_REFETCH_MS,
-  )
+  ).data
   const stats = townStats(state, tick)
   return (
     <LensTabsView

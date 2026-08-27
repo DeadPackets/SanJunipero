@@ -17,6 +17,12 @@ import {
   type PlayerState,
 } from './momentsPlayer.js'
 import { EMPTY_COPY } from './townStats.js'
+import { usePolled } from './useEndpoint.js'
+
+const momentRows = (body: unknown): Moment[] | null => {
+  const parsed = MomentsResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data.moments : null
+}
 
 const MOTIF_PX = 8
 
@@ -329,7 +335,8 @@ export function MomentsLens({
   onOpen: (id: number | null) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
-  const [moments, setMoments] = useState<Moment[] | null>(null)
+  // The town is still watchable without its record, so a refused read stays `null`.
+  const moments = usePolled('/api/moments', momentRows).data
   // The player belongs to the day it plays: opening another one is a new player, never this
   // one carried across, so nothing has to be reset after the fact.
   const [playerOf, setPlayerOf] = useState<{ id: number | null; state: PlayerState }>(() => ({
@@ -338,21 +345,6 @@ export function MomentsLens({
   }))
   const rootRef = useRef<HTMLDivElement>(null)
   const [bandW, setBandW] = useState(0)
-
-  useEffect(() => {
-    let alive = true
-    void fetch('/api/moments')
-      .then(async (r) => (r.ok ? MomentsResponseSchema.safeParse(await r.json()) : null))
-      .then((parsed) => {
-        if (alive && parsed?.success === true) setMoments(parsed.data.moments)
-      })
-      .catch(() => {
-        /* the town is still watchable without its record */
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
 
   // ResizeObserver rather than a window listener: the stage narrows when a side panel opens
   // without the window changing at all.

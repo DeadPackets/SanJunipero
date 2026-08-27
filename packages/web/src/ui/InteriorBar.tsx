@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { roomCard, type Provenance, type RoomCard } from './interiorModel.js'
+import { usePolled } from './useEndpoint.js'
 
 export function RoomCardView({
   card,
@@ -71,29 +72,6 @@ export function RoomCardView({
   )
 }
 
-/** The provenance endpoint, as a hook. A room the gateway has forgotten is `null`, which the
- *  card renders by omitting the line rather than by printing a blank. */
-function useProvenance(structureId: string | null): Provenance | null {
-  // held WITH the room it describes, so a new room reads as "nothing yet" in the same render
-  const [got, setGot] = useState<{ id: string; prov: Provenance | null } | null>(null)
-  useEffect(() => {
-    if (structureId === null) return
-    let live = true
-    void fetch(`/api/structure/${encodeURIComponent(structureId)}/provenance`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => {
-        if (live) setGot({ id: structureId, prov: p as Provenance | null })
-      })
-      .catch(() => {
-        /* a room with no recorded beginning still opens */
-      })
-    return () => {
-      live = false
-    }
-  }, [structureId])
-  return got?.id === structureId ? got.prov : null
-}
-
 // Escape leaves the room, so the interior is never a place a keyboard can walk into and not out
 // of. The card subscribes to a DERIVED string, so a tick that moved nobody re-renders nothing.
 export function InteriorBar({
@@ -106,7 +84,11 @@ export function InteriorBar({
   onBack: () => void
 }) {
   const backRef = useRef<HTMLButtonElement>(null)
-  const prov = useProvenance(structureId)
+  // A room the gateway has forgotten reads as `null`, which the card renders by omitting the
+  // line rather than by printing a blank.
+  const prov = usePolled<Provenance>(
+    structureId === null ? null : `/api/structure/${encodeURIComponent(structureId)}/provenance`,
+  ).data
   const signature = useSyncExternalStore(store.subscribe, () => {
     const c = roomCard(store.getState(), structureId, store.assetRecords(), null)
     return c === null ? '' : JSON.stringify(c)

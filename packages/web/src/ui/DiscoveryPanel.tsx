@@ -1,8 +1,15 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { kindWords } from './broadcastReady.js'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary, type Leaf } from './discoveryModel.js'
+import { usePolled } from './useEndpoint.js'
+
+const NO_RECORDS: DiscoveryRecord[] = []
+const discoveryRecords = (body: unknown): DiscoveryRecord[] | null => {
+  const parsed = DiscoveryResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data.discoveries : null
+}
 
 /**
  * The one place the agent's own words are printed. The chronicle never quotes them: a chronicle
@@ -91,38 +98,16 @@ export function DiscoveryPanel({
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  const [records, setRecords] = useState<DiscoveryRecord[]>([])
-  const [loaded, setLoaded] = useState(false)
-
   // The archive is history, not a stream: read on the same slow beat the Chronicle uses, so a
   // 2.5s world never re-renders the record underneath the reader's pointer.
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch('/api/discoveries')
-        .then(async (r) => (r.ok ? DiscoveryResponseSchema.safeParse(await r.json()) : null))
-        .then((parsed) => {
-          if (!alive) return
-          if (parsed?.success === true) setRecords(parsed.data.discoveries)
-          setLoaded(true)
-        })
-        .catch(() => {
-          if (alive) setLoaded(true)
-        })
-    }
-    load()
-    const timer = setInterval(load, DISCOVERY_REFETCH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
+  const read = usePolled('/api/discoveries', discoveryRecords, DISCOVERY_REFETCH_MS)
+  const records = read.data ?? NO_RECORDS
 
   return (
     <DiscoveryRecordView
       leaves={leavesOf(records, assets)}
       throughTick={state?.tick ?? 0}
-      loading={!loaded}
+      loading={!read.loaded}
       viewTick={mode.live ? null : mode.tick}
       onJump={(tick) => {
         onView(tick)

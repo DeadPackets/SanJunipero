@@ -1,5 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { BondsResponseSchema, type BondsResponse } from '@sj/shared'
+import { useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { RosterExpanded } from './roster/RosterExpanded.js'
 import { RosterRowView } from './roster/RosterRowView.js'
@@ -11,12 +10,15 @@ import {
   sortRoster,
   type RosterSort,
 } from './roster/rosterRow.js'
-import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
+import { EMPTY_LINEAGE } from './bondModel2.js'
 import { changeLog, type PersonalityRow } from './becoming.js'
+import { bondsFeed, lineageFeed } from './feeds.js'
+import { useFeed, usePolled } from './useEndpoint.js'
 import { EMPTY_COPY } from './townStats.js'
 
-const BONDS_REFETCH_MS = 30_000
 const NO_CHANGES: PersonalityRow[] = []
+const personalityRows = (body: unknown): PersonalityRow[] =>
+  Array.isArray(body) ? (body as PersonalityRow[]) : []
 
 /** The panel with the store taken out of it, so a test can render the markup without a fake
  *  store and without a DOM (the `StatusStripView` precedent). */
@@ -110,62 +112,16 @@ export function RosterPanel({
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   useSyncExternalStore(store.subscribe, store.assetsSeq) // faces re-resolve on codex pushes
   const [sort, setSort] = useState<RosterSort>('name')
-  const [bonds, setBonds] = useState<BondsResponse | null>(null)
-  const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
-  // held WITH the row it belongs to, so a newly opened row reads as empty in the same render
-  const [changesOf, setChangesOf] = useState<{ id: string; rows: PersonalityRow[] } | null>(null)
-  const changes = changesOf?.id === openId ? changesOf.rows : NO_CHANGES
-
-  // Who came from whom. A childless town answers with a typed empty, so this never fails.
-  useEffect(() => {
-    void fetch('/api/lineage')
-      .then(async (r) => (r.ok ? ((await r.json()) as LineageLike) : null))
-      .then((l) => {
-        if (l !== null && Array.isArray(l.parentOf)) setLineage(l)
-      })
-      .catch(() => {
-        /* ancestry is a nice-to-have, never a requirement */
-      })
-  }, [])
-
-  // Only the open row's document, and only while it is open — a roster does not fetch five.
-  useEffect(() => {
-    if (openId === null) return
-    let alive = true
-    void fetch(`/api/agent/${encodeURIComponent(openId)}/personality`)
-      .then(async (r) => (r.ok ? ((await r.json()) as PersonalityRow[]) : []))
-      .then((rows) => {
-        if (alive) setChangesOf({ id: openId, rows: Array.isArray(rows) ? rows : [] })
-      })
-      .catch(() => {
-        if (alive) setChangesOf({ id: openId, rows: [] })
-      })
-    return () => {
-      alive = false
-    }
-  }, [openId])
-
   // The ties are what turn "five strangers" into a town; they arrive on their own clock and
   // the roster is complete without them.
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch('/api/bonds')
-        .then(async (r) => (r.ok ? BondsResponseSchema.safeParse(await r.json()) : null))
-        .then((p) => {
-          if (alive && p?.success === true) setBonds(p.data)
-        })
-        .catch(() => {
-          /* the town keeps its ties whether or not we can read them */
-        })
-    }
-    load()
-    const timer = setInterval(load, BONDS_REFETCH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
+  const bonds = useFeed(bondsFeed).data
+  const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
+  // Only the open row's document, and only while it is open — a roster does not fetch five.
+  const changes =
+    usePolled(
+      openId === null ? null : `/api/agent/${encodeURIComponent(openId)}/personality`,
+      personalityRows,
+    ).data ?? NO_CHANGES
 
   // The veil covers the stage, not the aside: five slabs at the real row height say what is
   // coming and stop the panel jumping when it lands.

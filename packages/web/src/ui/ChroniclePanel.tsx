@@ -1,10 +1,11 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { ChronicleResponseSchema, tickToMoment, type ChronicleEntry } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
 import { describeEvent } from './chronicleFormat.js'
 import { chronicleGlyph } from './importantFeed.js'
 import { EMPTY_COPY } from './townStats.js'
+import { usePolled } from './useEndpoint.js'
 
 export const FEED_MAX = 120
 export const CHRONICLE_REFETCH_MS = 20_000
@@ -23,6 +24,12 @@ const GLYPH: Record<string, string> = {
   structure_completed: 'done',
   fire_ignited: 'fire',
   weather_changed: 'weather',
+}
+
+const NO_ENTRIES: ChronicleEntry[] = []
+const chronicleEntries = (body: unknown): ChronicleEntry[] | null => {
+  const parsed = ChronicleResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data.entries : null
 }
 
 const stamp = (tick: number): string => {
@@ -186,32 +193,10 @@ export function ChroniclePanel({
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
   const [view, setView] = useState<ChronicleView>('important')
-  const [entries, setEntries] = useState<ChronicleEntry[]>([])
-  const [loaded, setLoaded] = useState(false)
-
   // The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
   // every tick, so a 2.5s world never re-renders the panel underneath the reader's pointer.
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch('/api/chronicle')
-        .then(async (r) => (r.ok ? ChronicleResponseSchema.safeParse(await r.json()) : null))
-        .then((parsed) => {
-          if (!alive) return
-          if (parsed?.success === true) setEntries(parsed.data.entries)
-          setLoaded(true)
-        })
-        .catch(() => {
-          if (alive) setLoaded(true)
-        })
-    }
-    load()
-    const timer = setInterval(load, CHRONICLE_REFETCH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
+  const read = usePolled('/api/chronicle', chronicleEntries, CHRONICLE_REFETCH_MS)
+  const entries = read.data ?? NO_ENTRIES
 
   const lines: { key: number; tick: number; kind: string; text: string }[] = []
   for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
@@ -239,7 +224,7 @@ export function ChroniclePanel({
         {view === 'important' ? (
           <ImportantFeedView
             entries={[...entries].reverse()}
-            loading={!loaded}
+            loading={!read.loaded}
             viewTick={mode.live ? null : mode.tick}
             onJump={jump}
           />
