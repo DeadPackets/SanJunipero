@@ -31,20 +31,14 @@ export function provenanceLines(
 /** What the map says about the thing that was just clicked. One live region for the life of the
  *  app — a region mounted with its own announcement never announces it. */
 export function WorldPopover({ store, pick }: { store: WorldStore; pick: WorldPick | null }) {
-  const [text, setText] = useState('')
+  // held WITH the building it describes, so a new pick reads as empty in the same render
+  const [got, setGot] = useState<{ id: string; text: string } | null>(null)
 
   useEffect(() => {
-    if (pick === null) {
-      setText('')
-      return
-    }
-    if (pick.kind !== 'structure') {
-      setText(itemCropDetail(store.getState(), pick.kind, pick.id) ?? '')
-      return
-    }
+    if (pick?.kind !== 'structure') return
+    const id = pick.id
     let live = true
-    const id = encodeURIComponent(pick.id)
-    void fetch(`/api/structure/${id}/provenance`)
+    void fetch(`/api/structure/${encodeURIComponent(id)}/provenance`)
       .then((r) => (r.ok ? (r.json() as Promise<Provenance>) : null))
       .then(async (p) => {
         if (p === null) return { p, journal: [] as Journal[] }
@@ -52,17 +46,25 @@ export function WorldPopover({ store, pick }: { store: WorldStore; pick: WorldPi
         return { p, journal: jr.ok ? ((await jr.json()) as Journal[]) : [] }
       })
       .then(({ p, journal }) => {
-        if (live) setText(provenanceLines(store, p, journal))
+        if (live) setGot({ id, text: provenanceLines(store, p, journal) })
       })
       .catch(() => {
-        if (live) setText(NO_PROVENANCE)
+        if (live) setGot({ id, text: NO_PROVENANCE })
       })
     return () => {
       live = false
     }
   }, [pick, store])
 
-  const shown = pick !== null && text !== ''
+  const text =
+    pick === null
+      ? ''
+      : pick.kind === 'structure'
+        ? got?.id === pick.id
+          ? got.text
+          : ''
+        : (itemCropDetail(store.getState(), pick.kind, pick.id) ?? '')
+  const shown = text !== ''
   return (
     <div
       className="provenance-pop"

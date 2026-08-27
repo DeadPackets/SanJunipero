@@ -37,9 +37,7 @@ vi.mock('pixi.js', () => {
     get width(): number {
       return this.text.length * 6
     }
-    get height(): number {
-      return 12
-    }
+    readonly height = 12
   }
   class Graphics extends Container {
     clear(): this {

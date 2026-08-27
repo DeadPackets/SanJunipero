@@ -252,7 +252,9 @@ export function App() {
   // `pointerdown`, so clicking a second building replaces the popover rather than closing it.
   useEffect(() => {
     if (pick === null) return
-    const onDown = (): void => setPick(null)
+    const onDown = (): void => {
+      setPick(null)
+    }
     document.addEventListener('pointerdown', onDown)
     return () => {
       document.removeEventListener('pointerdown', onDown)

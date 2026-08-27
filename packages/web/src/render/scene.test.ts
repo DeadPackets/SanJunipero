@@ -139,7 +139,7 @@ describe('a glide is ended by anything that says where the camera should be', ()
   for (const mover of [
     'function fitTo(',
     'panBy: (dx, dy) =>',
-    'centerHome: () =>',
+    'centerHome: () => {',
     'setFollow: (target) =>',
     'travelTo: (sx, sy) =>',
   ]) {

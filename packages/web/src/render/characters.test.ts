@@ -297,7 +297,9 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 
   it('ignores a multiplier for a body it does not have', () => {
     layer.tick(1000)
-    expect(() => layer.setScaleMulY('nobody', 0.5)).not.toThrow()
+    expect(() => {
+      layer.setScaleMulY('nobody', 0.5)
+    }).not.toThrow()
   })
 
   it('getSprite returns the same registered sprite across ticks', () => {

@@ -691,7 +691,9 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
       store,
       book,
       records,
-      sync: () => syncEntities(scene, book, store, () => {}),
+      sync: () => {
+        syncEntities(scene, book, store, () => {})
+      },
       scale: () => entitySpriteOf(scene, 'structure', house.id)!.scale.x,
     }
   }

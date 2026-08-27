@@ -23,33 +23,33 @@ import { screenToTile, tileToScreen } from './iso.js'
 
 /** What the rig has to ask the scene: the box the camera may reach, and what is standing. */
 export type CameraRigDeps = {
-  reachable(): CameraBounds
-  structures(): { x: number; y: number; w: number; h: number }[]
+  reachable: () => CameraBounds
+  structures: () => { x: number; y: number; w: number; h: number }[]
 }
 
 /** Everything imperative about the camera. `place` is private on purpose: it is the ONE writer
  *  of `world.position`, so a mover added later cannot skip the clamp or the notification. */
 export type CameraRig = {
   /** Re-clamp where the camera already is — for a stage that changed size under it. */
-  onResize(): void
-  isFitted(): boolean
-  panBy(dx: number, dy: number): void
-  travelTo(sx: number, sy: number): void
-  centerHome(): void
-  centerOn(x: number, y: number): void
-  centerOnScreen(sx: number, sy: number): void
-  setZoom(stop: ZoomStop): void
-  setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
-  getZoom(): number
-  getZoomStop(): ZoomStop
-  wantsMotion(): boolean
-  fitToTown(): void
-  fitsWholeTown(): boolean
-  onCamera(cb: () => void): () => void
-  setFollow(target: (() => { x: number; y: number } | null) | null): void
-  onFollowEnd(cb: () => void): () => void
-  onTilePointer(cb: (t: { x: number; y: number }) => void): void
-  destroy(): void
+  onResize: () => void
+  isFitted: () => boolean
+  panBy: (dx: number, dy: number) => void
+  travelTo: (sx: number, sy: number) => void
+  centerHome: () => void
+  centerOn: (x: number, y: number) => void
+  centerOnScreen: (sx: number, sy: number) => void
+  setZoom: (stop: ZoomStop) => void
+  setZoomAt: (stop: ZoomStop, screenX: number, screenY: number) => void
+  getZoom: () => number
+  getZoomStop: () => ZoomStop
+  wantsMotion: () => boolean
+  fitToTown: () => void
+  fitsWholeTown: () => boolean
+  onCamera: (cb: () => void) => () => void
+  setFollow: (target: (() => { x: number; y: number } | null) | null) => void
+  onFollowEnd: (cb: () => void) => () => void
+  onTilePointer: (cb: (t: { x: number; y: number }) => void) => void
+  destroy: () => void
 }
 
 export function createCameraRig(

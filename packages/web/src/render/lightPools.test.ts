@@ -272,7 +272,7 @@ describe('the pool is priced by the world the store describes, not by the defaul
   }
 
   it('★ a law that widens a lamp’s glow widens the pool it paints', () => {
-    const r = DEFAULT_CONFIG.light.glowRadius['lamp_post']!
+    const r = DEFAULT_CONFIG.light.glowRadius.lamp_post
     const wider: SimConfig = {
       ...DEFAULT_CONFIG,
       light: {
@@ -285,7 +285,7 @@ describe('the pool is priced by the world the store describes, not by the defaul
   })
 
   it('falls back to the defaults for the frames before the snapshot lands', () => {
-    const r = DEFAULT_CONFIG.light.glowRadius['lamp_post']!
+    const r = DEFAULT_CONFIG.light.glowRadius.lamp_post
     expect(painted(null).width).toBeCloseTo(poolRadiusPx(r).rx * 2)
   })
 })

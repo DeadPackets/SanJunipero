@@ -136,7 +136,9 @@ describe('the effect sprites track the world, not the frame', () => {
       bubbles: quiet as unknown as BubbleLayer,
     })
     return {
-      tick: () => a.tick(16),
+      tick: () => {
+        a.tick(16)
+      },
       setWorld: (list) => {
         state = { terrain, structures: Object.fromEntries(list.map((s) => [s.id, s])), agents: {} }
       },
