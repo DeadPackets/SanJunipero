@@ -6,10 +6,12 @@ import {
   EventStore,
   RngStreams,
   TickLoop,
+  applyLaw,
   genesisState,
   makeFixtureMap,
   openDb,
   replayLatest,
+  type LawQueue,
   type TickHandler,
   type TileId,
 } from '@sj/engine'
@@ -81,6 +83,9 @@ export type DevWorld = {
   /** ONE WHOLE TICK the way the wall clock takes it: the loop step AND the observer scan that
    *  follows it. `loop.step()` is most of a tick and not all of it. */
   tick(): void
+  /** Enqueue a world law. It lands as one `config_changed` at the next tick boundary, hashed,
+   *  snapshotted and replayed like every other fact. See `adminLaws.ts` for the only caller. */
+  submitLaw(path: string, value: unknown): void
   stop(): Promise<void>
 }
 
@@ -316,7 +321,9 @@ export async function startDevWorld(
     },
   })
   // the founders showcase town
+  const lawQueue: LawQueue = []
   const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
+    laws: lawQueue,
     // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
     interiors: opts.interiors === true,
     structures,
@@ -400,6 +407,7 @@ export async function startDevWorld(
     resumedAtTick: resumed ? resumed.state.tick : null,
     live: cast !== null,
     tick: tickOnce,
+    submitLaw: (path, value) => applyLaw(lawQueue, path, value),
     stop: async () => {
       clearInterval(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a

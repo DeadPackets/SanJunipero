@@ -9,11 +9,13 @@
 //   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
 //   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
 //   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
+//   SJ_ADMIN_TOKEN=… …          open the loopback law channel (POST /admin/laws) behind a bearer
 //
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
 import { existsSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createLawsAdmin } from './adminLaws.js'
 import { startDevWorld, type LiveCast } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
@@ -21,6 +23,9 @@ export const STREAM_PORT = 8080
 export const STREAM_LAMPS = 8
 /** Per-mind memory, beside the world db so one volume and one `SJ_FRESH=1` cover both. */
 export const STREAM_MINDS_DIR = 'data/minds'
+/** The operator's law channel. LOOPBACK ONLY and off unless `SJ_ADMIN_TOKEN` is set: it is the
+ *  one write path into the world this process has, and Caddy must never proxy it. */
+export const STREAM_ADMIN_PORT = 8788
 export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 
 /** The one instruction a person needs when the viewer has not been built yet. */
@@ -124,10 +129,27 @@ export async function main(): Promise<void> {
   )
   console.log(`stream: the town is open at http://localhost:${running.gateway.port}/`)
 
+  // The only write path into the world. Loopback-bound, bearer-authed, and absent entirely
+  // unless an operator sets the token — see deploy/README.md.
+  const adminToken = process.env.SJ_ADMIN_TOKEN
+  const admin =
+    adminToken === undefined || adminToken === ''
+      ? null
+      : createLawsAdmin({ submitLaw: running.submitLaw, token: adminToken })
+  if (admin !== null) {
+    const adminPort = intEnv('SJ_ADMIN_PORT', STREAM_ADMIN_PORT, 1)
+    admin.listen(adminPort, '127.0.0.1', () => {
+      console.log(`stream: the law channel is open on http://127.0.0.1:${adminPort}/admin/laws`)
+    })
+  } else {
+    console.log('stream: no law channel — SJ_ADMIN_TOKEN opens one on loopback')
+  }
+
   // A stream is a long-running process and a container stops it with a signal; without this the
   // world dies mid-write and the next boot reads a half-flushed db.
   const stop = (signal: string): void => {
     console.log(`stream: ${signal} — closing the town`)
+    admin?.close()
     void running.stop().then(() => process.exit(0))
   }
   process.on('SIGTERM', () => {

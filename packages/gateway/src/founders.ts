@@ -16,6 +16,7 @@ import {
   claimInWorld,
   composePerception,
   createWorldTick,
+  type LawQueue,
   doorTile,
   findPath,
   isAdjacentToRect,
@@ -517,6 +518,10 @@ export type FoundersOnTick = (ctx: {
 }) => void
 
 export type FoundersOpts = {
+  /** The operator's law queue, drained at the tick boundary before physics. Absent, the world
+   *  has no channel a law can arrive on at all. */
+  laws?: LawQueue
+
   /** dev/demo only: a tired founder walks home, goes in, sleeps, and comes out again.
    *  OFF by default, so every existing gate folds exactly the events it always did. */
   interiors?: boolean
@@ -643,7 +648,7 @@ export function makeFoundersOnTick(
   const wright = opts.deck === undefined ? null : bridgewrightOf(cast)
   const lighter = opts.lamps === undefined || opts.lamps <= 0 ? null : lamplighterOf(cast)
   const policies = new Map(cast.map((f) => [f.id, makePatrolPolicy(f)]))
-  const worldTick = createWorldTick(config, rng)
+  const worldTick = createWorldTick(config, rng, opts.laws)
   const structures = opts.structures ?? SCRIPTED_STRUCTURES
   return ({ tick, emit }) => {
     if (tick === 1) {

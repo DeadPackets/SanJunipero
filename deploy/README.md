@@ -78,6 +78,8 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
 | `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |
+| `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback law channel. |
+| `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
 | `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
@@ -189,6 +191,23 @@ That is the intent — but it is also why `_ops.db` must be in your backup.
 **Before you set `SJ_LIVE=1`:** the scripted town is not a degraded mode. It is the same world,
 the same viewer, the same event log and the same port — only the deciding is scripted. Stream it
 scripted first and confirm the whole stack is right before attaching a card to it.
+
+## Turning a world law, mid-run
+
+`SJ_ADMIN_TOKEN` opens `POST /admin/laws` on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` **inside the
+container**. It is never published to the host and Caddy never proxies it, so the only way in is
+through the container itself:
+
+```
+docker compose exec town node -e "fetch('http://127.0.0.1:8788/admin/laws',{method:'POST',\
+  headers:{authorization:'Bearer '+process.env.SJ_ADMIN_TOKEN,'content-type':'application/json'},\
+  body:JSON.stringify({path:'mystery.enabled',value:false})}).then(r=>r.text()).then(console.log)"
+```
+
+A law is checked against the engine's whitelist before it is accepted, lands as one
+`config_changed` at the next tick boundary, and is hashed, snapshotted and replayed like every
+other fact. A path that is not on the whitelist is a 400, not a world that dies at the next tick.
+**Unset the token and no write path into the world exists at all** — which is the default.
 
 ## Where the logs go, and the one signal in them
 
