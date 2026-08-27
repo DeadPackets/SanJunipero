@@ -1,7 +1,7 @@
 // @slow — the recognition plane: the word a town buys once, the thing it keeps coming back to,
 // and the glass nothing said here may cross. Every model in this file is a script.
 import { describe, expect, it } from 'vitest'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   fold,

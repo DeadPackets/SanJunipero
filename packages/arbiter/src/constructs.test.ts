@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import {
   DEFAULT_CONFIG,

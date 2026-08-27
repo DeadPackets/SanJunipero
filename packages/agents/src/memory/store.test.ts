@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3'
 import { openAgentDb } from './schema.js'
 import { MemoryStore, type MemoryTags } from './store.js'
 import { FakeEmbedder } from '@sj/llm/testutil'
+
 const TAGS: MemoryTags = {
   people: ['tamar'],
   place: 'storehouse',

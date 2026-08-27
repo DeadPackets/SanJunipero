@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { RngStream } from '@sj/engine'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
 
 const FRAGMENT_COUNT = 6

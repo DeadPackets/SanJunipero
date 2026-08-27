@@ -2,6 +2,7 @@ import { generateText, Output, type LanguageModelUsage } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { PRICE_PER_M, servedProvider } from '@sj/llm'
+
 const MODEL = 'deepseek/deepseek-v4-flash-0731'
 const CAP_USD = 5.0
 let spentUsd = 0

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EMBEDDING_DIM, FORBIDDEN_FRAMING } from '@sj/shared'

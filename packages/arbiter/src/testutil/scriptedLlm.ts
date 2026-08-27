@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { type LlmClient, type LlmMessage, type LlmUsage } from '@sj/llm'
+import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { makeArbiter, type AgentCtx, type Arbiter } from '../adjudicate.js'
 import { CodexStore, type CodexEntry } from '../codex.js'

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { registerVerb, VERBS } from '@sj/engine'
 import {
   FORBIDDEN_FRAMING,

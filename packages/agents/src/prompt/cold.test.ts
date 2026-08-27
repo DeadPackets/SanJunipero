@@ -13,6 +13,7 @@ import { DEFAULT_CONFIG, MINUTES_PER_DAY, scanForDirective } from '@sj/shared'
 import { FLAT_WORLD, wireTown } from '../testutil/fixtures.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
+
 // A roof is worth the whole of a body's warmth (57.4 -> 0.0 under the sky by midnight, 38.4 held
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
 

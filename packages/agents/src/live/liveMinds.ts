@@ -1,7 +1,7 @@
 // Boots minds only; the arbiter arrives as an injected `SeamArbiter` because @sj/arbiter
 // depends on @sj/agents and the cycle is not negotiable.
 import type Database from 'better-sqlite3'
-import { type LlmClient } from '@sj/llm'
+import type { LlmClient } from '@sj/llm'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import type { IdentityCore } from '../prompt/assemble.js'
 import { makeDreamLlm } from '../dream.js'
