@@ -12,6 +12,7 @@ import {
   Embedder,
   EngineBridge,
   LlmClient,
+  insertAlert,
   MIND_MODEL,
   PREFLIGHT_ROUNDS,
   bootMinds,
@@ -120,8 +121,7 @@ export type LiveCastOpts = {
   onSpendStop?: (spent: number, cap: number) => void
   /** The rate tripwire's window. A test cannot wait fifteen real minutes to prove a flow. */
   rateWindowRealMinutes?: number
-  /** How many minds this town may hold. Default is the founding cast times
-   *  `LIVE_MAX_MINDS_PER_FOUNDER`; `SJ_MAX_MINDS` overrides it. */
+  /** How many minds this town may hold; never fewer than its founders. `SJ_MAX_MINDS`. */
   maxMinds?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
    *  client bills a different ledger proves nothing about the stop. */
@@ -182,9 +182,8 @@ export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
  *  that a runaway dies in minutes. */
 export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 
-/** The population ceiling, as a multiple of the founding cast: every mind is another live bill
- *  on the same daily budget, and nothing else in the world stops the town growing. Past it a
- *  birth is still folded into the world and no mind is booted for it. `SJ_MAX_MINDS`. */
+/** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
+ *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
 export const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
 export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
@@ -298,7 +297,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER
+  const maxMinds = Math.max(
+    opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER,
+    founders.length,
+  )
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -408,9 +410,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   return {
     attach({ loop, store, config, db, world }): TickHandler {
       const worldTick = loop.state.tick
-      // The founders plus everyone the log says was born since — a child that is not resolved
-      // here is a mind the restart forgets. A live birth adds to this same cast.
       const cast = resolveCast(founders, store, maxMinds)
+      if (cast.length >= maxMinds)
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'cast_at_max_minds',
+          detail: `this town is at its ${maxMinds}-mind ceiling; a birth past it gets a body and no mind`,
+        })
 
       // ── the guard, before a single mind is booted ──
       const remembering = cast

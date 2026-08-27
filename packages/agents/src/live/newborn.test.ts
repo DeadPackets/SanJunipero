@@ -82,7 +82,9 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
-async function town(opts: { namingBudgetUsd?: number; startTick?: number; maxMinds?: number } = {}) {
+async function town(
+  opts: { namingBudgetUsd?: number; startTick?: number; maxMinds?: number } = {},
+) {
   const dir = mkdtempSync(join(tmpdir(), 'sj-births-'))
   dirs.push(dir)
   const config = SimConfigSchema.parse({})
@@ -165,7 +167,13 @@ async function town(opts: { namingBudgetUsd?: number; startTick?: number; maxMin
       homeOf: () => '',
       maxMinds,
     })
-    return { booted, stop: () => { stopBirths(); booted.stop() } }
+    return {
+      booted,
+      stop: () => {
+        stopBirths()
+        booted.stop()
+      },
+    }
   }
   let running = boot()
 
@@ -185,18 +193,10 @@ async function town(opts: { namingBudgetUsd?: number; startTick?: number; maxMin
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
-    bear: () => {
+    bear: (id = CHILD, name = 'Mira') => {
       pending.push({
         type: 'agent_born',
-        payload: {
-          id: CHILD,
-          name: 'Mira',
-          sex: 'f',
-          motherId: MOTHER,
-          fatherId: FATHER,
-          x: 3,
-          y: 3,
-        },
+        payload: { id, name, sex: 'f', motherId: MOTHER, fatherId: FATHER, x: 3, y: 3 },
       })
     },
     settle: async (done: () => boolean, max = 200) => {
@@ -253,9 +253,21 @@ describe('★ a born mind survives a restart', () => {
     expect(t.booted.runtimes.has(CHILD)).toBe(true)
     expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual(before)
     // The same person, not a second one: the second boot must not re-stamp a personality.
-    expect(
-      t.dbFor(CHILD).prepare('SELECT COUNT(*) AS n FROM personality_versions').get(),
-    ).toEqual({ n: 1 })
+    expect(t.dbFor(CHILD).prepare('SELECT COUNT(*) AS n FROM personality_versions').get()).toEqual({
+      n: 1,
+    })
+    t.stop()
+  })
+
+  it('two births on one tick cannot both take the last slot', async () => {
+    const t = await town({ maxMinds: 3 })
+    t.bear('agent_3', 'Mira')
+    t.bear('agent_4', 'Idris')
+    await t.settle(() => birthAlerts(t.opsDb).length > 0)
+
+    expect(t.booted.runtimes.has('agent_3')).toBe(true)
+    expect(t.booted.runtimes.has('agent_4')).toBe(false)
+    expect(birthAlerts(t.opsDb).map((a) => a.kind)).toEqual(['birth_over_max_minds'])
     t.stop()
   })
 

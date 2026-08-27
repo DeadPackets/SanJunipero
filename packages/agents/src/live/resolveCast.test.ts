@@ -2,6 +2,7 @@
 // moment the process restarts.
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { PersonalityDoc } from '../personality.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { MindSpec } from './liveMinds.js'
@@ -31,8 +32,15 @@ function log() {
   const store = new EventStore(openDb(':memory:'))
   return {
     store,
-    bear: (id: string, name: string, motherId: string, fatherId: string, sex: 'f' | 'm' = 'f') => {
-      store.append(0, 'agent_born', { id, name, sex, motherId, fatherId, x: 3, y: 3 })
+    bear: (
+      id: string,
+      name: string,
+      motherId: string,
+      fatherId: string,
+      sex: 'f' | 'm' = 'f',
+      tick = 0,
+    ) => {
+      store.append(tick, 'agent_born', { id, name, sex, motherId, fatherId, x: 3, y: 3 })
     },
     noise: (n: number) => {
       for (let i = 0; i < n; i += 1) store.append(0, 'agent_moved', { id: MOTHER, x: i, y: 0 })
@@ -74,6 +82,13 @@ describe('resolveCast — the town at boot is the founders plus everyone born si
 
     expect(cast.map((m) => m.id)).toEqual([MOTHER, FATHER, 'agent_3', 'agent_4'])
     expect(cast[3]!.identity.backstory).toContain('Mira')
+  })
+
+  it('carries the day it was born, so a resume stamps the birth day and not the boot day', () => {
+    const l = log()
+    l.bear('agent_3', 'Mira', MOTHER, FATHER, 'f', 3 * MINUTES_PER_DAY + 60)
+    expect(resolveCast(FOUNDERS, l.store, 10)[2]!.bornDay).toBe(3)
+    expect(resolveCast(FOUNDERS, l.store, 10)[0]!.bornDay).toBeUndefined()
   })
 
   it('a birth whose parents this town never knew is skipped, not guessed at', () => {

@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { EventStore } from '@sj/engine/store'
 import { MINUTES_PER_DAY } from '@sj/shared'
+import { personaOf } from '../family/derivePersona.js'
 import { buildHouseholdSeed } from '../family/memorySeed.js'
 import { captureSocialName, migrateFamilyTables } from '../family/socialName.js'
 import { watchBirths, type AgentBornPayload } from '../family/watchBirths.js'
@@ -9,7 +10,7 @@ import type { LlmClient } from '../llm/client.js'
 import { MemoryStore } from '../memory/store.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import type { BootedMinds } from './liveMinds.js'
-import { childSpec, personaOf } from './resolveCast.js'
+import { childSpec } from './resolveCast.js'
 
 export type BirthsOpts = {
   booted: BootedMinds
@@ -23,8 +24,7 @@ export type BirthsOpts = {
   namingLlm: LlmClient
   /** The structure the child was born inside, '' when it was born under the sky. */
   homeOf: (agentId: string) => string
-  /** The population ceiling. Past it a birth is still folded into the world and no mind is
-   *  booted for it — every mind is another live bill on the same daily budget. */
+  /** Past this many minds a birth gets a body and no mind: every mind is another live bill. */
   maxMinds: number
   log?: (line: string) => void
 }
@@ -36,8 +36,12 @@ export type BirthsOpts = {
 export function wireBirths(opts: BirthsOpts): () => void {
   migrateFamilyTables(opts.opsDb)
 
+  // A child counts against the ceiling from the tick it is born, not from the moment its
+  // seeding finishes — two births in one tick must not both take the last slot.
+  const booting = new Set<string>()
+
   const spawn = (born: AgentBornPayload): void => {
-    if (opts.booted.cast.size >= opts.maxMinds) {
+    if (opts.booted.cast.size + booting.size >= opts.maxMinds) {
       insertAlert(opts.opsDb, {
         agentId: born.id,
         kind: 'birth_over_max_minds',
@@ -45,9 +49,9 @@ export function wireBirths(opts: BirthsOpts): () => void {
       })
       return
     }
-    const spec = childSpec(born, opts.booted.cast)
     const mother = opts.booted.cast.get(born.motherId)
-    if (spec === null || mother === undefined) {
+    const father = opts.booted.cast.get(born.fatherId)
+    if (mother === undefined || father === undefined) {
       insertAlert(opts.opsDb, {
         agentId: born.id,
         kind: 'birth_without_parents',
@@ -56,7 +60,14 @@ export function wireBirths(opts: BirthsOpts): () => void {
       return
     }
     const tick = opts.bridge.currentTick()
+    const spec = childSpec(
+      born,
+      personaOf(mother),
+      personaOf(father),
+      Math.floor(tick / MINUTES_PER_DAY),
+    )
     const db = opts.dbFor(born.id)
+    booting.add(born.id)
 
     // Off the tick: the household seed walks the whole world log, and the naming is a call.
     void (async () => {
@@ -78,20 +89,22 @@ export function wireBirths(opts: BirthsOpts): () => void {
           tags: { people: [], place: null, objects: [], topics: entry.tags },
         })
       }
-      opts.booted.add(spec, Math.floor(tick / MINUTES_PER_DAY))
+      opts.booted.add(spec)
       opts.log?.(`stream: ${born.name} was born, and has a mind and a memory of ${born.id}.db`)
       await captureSocialName(opts.namingLlm, opts.opsDb, {
         born,
         motherPersona: personaOf(mother),
         tick,
       })
-    })().catch((err: unknown) => {
-      insertAlert(opts.opsDb, {
-        agentId: born.id,
-        kind: 'birth_failed',
-        detail: err instanceof Error ? err.message : String(err),
+    })()
+      .catch((err: unknown) => {
+        insertAlert(opts.opsDb, {
+          agentId: born.id,
+          kind: 'birth_failed',
+          detail: err instanceof Error ? err.message : String(err),
+        })
       })
-    })
+      .finally(() => booting.delete(born.id))
   }
 
   return watchBirths(opts.bridge, opts.store, spawn)

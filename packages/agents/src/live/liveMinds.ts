@@ -18,6 +18,8 @@ export type MindSpec = {
   personality: PersonalityDoc
   ageDays: number
   sex: 'f' | 'm'
+  /** The sim day this person's first personality is stamped with. Founders have none. */
+  bornDay?: number
 }
 
 export type BootedMinds = {
@@ -25,9 +27,8 @@ export type BootedMinds = {
   /** Who is in the town, by id — the founders plus everyone born since. A newborn's parents
    *  are read from here, so it grows as `add` is called. */
   cast: ReadonlyMap<string, MindSpec>
-  /** Bring one more mind up on a town that is already running: a birth. `day` is the sim day
-   *  its first personality is stamped with; absent, the day the town booted. */
-  add(spec: MindSpec, day?: number): void
+  /** Bring one more mind up on a town that is already running: a birth. */
+  add(spec: MindSpec): void
   /** What each mind is carrying that is not in its database — the clock, the half-run plan,
    *  the turn counts. The only thing a resume has to write down itself. */
   snapshots(): { agentId: string; snapshot: RuntimeSnapshot }[]
@@ -78,10 +79,11 @@ export function hasPersonality(db: Database.Database, agentId: string): boolean 
 export function bootMinds(opts: BootMindsOpts): BootedMinds {
   const runtimes = new Map<string, AgentRuntime>()
   const cast = new Map<string, MindSpec>()
-  const boot = (spec: MindSpec, day = opts.day ?? 0): void => {
+  const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
-    if (!hasPersonality(db, spec.id)) personality.init(spec.personality, day)
+    if (!hasPersonality(db, spec.id))
+      personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
     const runtime = new AgentRuntime({
       db,
       llm: opts.turnLlm(spec.id),

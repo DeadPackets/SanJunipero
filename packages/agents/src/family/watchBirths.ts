@@ -17,7 +17,8 @@ export function watchBirths(
   bridge.onTick(() => {
     if (stopped) return
     const fresh = store.readTypeFrom(seq, 'agent_born')
-    seq = store.lastSeq()
+    // Past the last birth SEEN, not the last event written: a later birth still has a higher seq.
+    seq = fresh.at(-1)?.seq ?? seq
     for (const ev of fresh) spawn(AgentBorn.parse(ev.payload))
   })
   return () => {
