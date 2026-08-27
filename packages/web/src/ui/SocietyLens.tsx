@@ -5,6 +5,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 import { BondDetailPanel } from './BondDetailPanel.js'
 import { LegendChip } from './LegendChip.js'
+import { BondsVeil } from './StageVeil.js'
 import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
 import {
   toRelationGraph,
@@ -23,10 +24,6 @@ const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
 type PositionedNode = BondNode & { x?: number; y?: number }
 
 const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.size) * 5))
-
-/** About the READ, never about the town: an unanswered fetch and a tieless town draw the same
- *  field of unconnected people, so the wait has to name itself. */
-export const LOADING_COPY = 'Reading the town’s ties…'
 
 export function SocietyLens({
   store,
@@ -207,9 +204,7 @@ export function SocietyLens({
           in which nothing has passed between anyone yet — and a field of unconnected people is
           what BOTH a tieless town and an unanswered fetch look like, so the wait says so. */}
       {api === null ? (
-        <p className="society-empty" aria-busy="true">
-          {LOADING_COPY}
-        </p>
+        <BondsVeil />
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
         <p className="society-empty">{EMPTY_COPY.bonds}</p>
       ) : null}

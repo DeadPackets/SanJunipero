@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
@@ -20,10 +20,9 @@ import { RosterPanel } from './ui/RosterPanel.js'
 import { expandReducer } from './ui/roster/expand.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { DiscoveryPanel } from './ui/DiscoveryPanel.js'
-import { SocietyLens } from './ui/SocietyLens.js'
 import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
-import { StageVeil } from './ui/StageVeil.js'
+import { BondsVeil, StageVeil } from './ui/StageVeil.js'
 import { InteriorBar } from './ui/InteriorBar.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
 import { ControlBar } from './ui/ControlBarView.js'
@@ -51,6 +50,11 @@ import { WorldLaws } from './ui/WorldLaws.js'
 import { LawsDashboard } from './ui/LawsDashboard.js'
 import { adminToken } from './ui/lawsModel.js'
 import type { Scene } from './render/scene.js'
+
+// react-force-graph-2d is ~180 KB the map, the chronicle and every broadcast frame never reach.
+const SocietyLens = lazy(() =>
+  import('./ui/SocietyLens.js').then((m) => ({ default: m.SocietyLens })),
+)
 
 function ScrubBanner({ store }: { store: WorldStore }) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
@@ -415,7 +419,11 @@ export function App() {
             {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
               <Timeline store={store} handle={handle} onView={onView} />
             )}
-            {shownLens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
+            {shownLens === 'society' && (
+              <Suspense fallback={<BondsVeil />}>
+                <SocietyLens store={store} onPick={pickAgent} />
+              </Suspense>
+            )}
             {(shownLens === 'director' || directorLeaving) && (
               <MomentsLens
                 store={store}
