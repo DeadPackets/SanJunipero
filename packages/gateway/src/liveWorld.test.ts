@@ -23,6 +23,7 @@ import {
   amnesiaRefusal,
   capReachedRefusal,
   createLiveCast,
+  dailyReachedRefusal,
   ledgerTotalUsd,
   preflightCostUsd,
   restorableSnapshot,
@@ -179,6 +180,16 @@ const tmp = (): string => {
   return d
 }
 
+/** One ledger row at a chosen wall-clock time — the rolling day is the thing under test. */
+const billTo = (db: Database.Database, ts: number, usd: number): void => {
+  db.prepare(
+    `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+     VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
+  ).run(ts, usd)
+}
+
 afterEach(async () => {
   for (const w of worlds.splice(0)) await w.stop()
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
@@ -189,6 +200,7 @@ async function liveWorld(opts: {
   turn?: unknown
   minds?: MindSpec[]
   spendCapUsd?: number
+  spendDailyUsd?: number
   onSpendStop?: (spent: number, cap: number) => void
   rateWindowRealMinutes?: number
   fresh?: boolean
@@ -217,6 +229,7 @@ async function liveWorld(opts: {
         embedder: new FakeEmbedder(),
         mindConfig: EAGER,
         ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
+        ...(opts.spendDailyUsd === undefined ? {} : { spendDailyUsd: opts.spendDailyUsd }),
         ...(opts.onSpendStop === undefined ? {} : { onSpendStop: opts.onSpendStop }),
         ...(opts.rateWindowRealMinutes === undefined
           ? {}
@@ -226,7 +239,7 @@ async function liveWorld(opts: {
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
           // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
-          // billed anywhere else would spend outside the $5 stop, so the rig must not let it.
+          // billed anywhere else would spend outside the money guards, so the rig must not.
           const canned =
             caller === 'arbiter' && opts.verdict !== undefined
               ? opts.verdict
@@ -379,7 +392,7 @@ describe('★ the money, inside the served world', () => {
     expect(stops).toHaveLength(0)
 
     // TWO minds, so the ceiling is 2 x $0.21 = $0.42/sim-day. $0.19 inside a 15-minute window
-    // projects to $0.76/sim-day — over the flow ceiling and 3.8% of the $5 total.
+    // projects to $0.76/sim-day — over the flow ceiling and well under the $5 cap this row sets.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
@@ -398,6 +411,56 @@ describe('★ the money, inside the served world', () => {
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+
+  // The lifetime cap cannot be the running budget: at the measured 5-mind rate a $5 total kills a
+  // stream after 47 real hours. The budget that governs a weeks-long run is the rolling day.
+  it('★ stops a town over its DAILY budget while its lifetime cap is nowhere near', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 50,
+      // Under the rate tripwire's own ceiling (2 minds x $0.21/sim-day = $0.105 in 15 real
+      // minutes), so only the daily budget can be what stops this row.
+      spendDailyUsd: 0.05,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    await run(world, 4)
+    expect(stops).toHaveLength(0)
+
+    // Yesterday's spend, outside the window: it must not count against today.
+    billTo(opsDb, Date.now() - 26 * 60 * 60 * 1000, 40)
+    await run(world, 10)
+    expect(stops, 'a call a day old was billed to today').toHaveLength(0)
+
+    billTo(opsDb, Date.now(), 0.06)
+    await run(world, 10)
+    expect(stops).toHaveLength(1)
+    expect(ledgerTotalUsd(opsDb), 'and the lifetime total was never the trigger').toBeLessThan(50)
+
+    const atStop = eventsOf(dir, 'agent_spoke').length
+    await run(world, 10)
+    expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
+  }, 40_000)
+
+  it('refuses a boot that is already over the day, before the pre-flight spends a cent', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({ dir, spendDailyUsd: 0.25 })
+    await run(world, 2)
+    billTo(opsDb, Date.now(), 0.4)
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toThrow(/daily budget/)
+  }, 60_000)
+
+  it('names the amount, the budget and the way out', () => {
+    const msg = dailyReachedRefusal(3.1234, 3)
+    expect(msg).toContain('$3.1234')
+    expect(msg).toContain('$3.00')
+    expect(msg).toContain('SJ_SPEND_DAILY_USD')
+    expect(msg).toContain('Nothing was spent')
+  })
 
   it('leaves the measured rate alone — the real stream must not trip its own wire', async () => {
     const stops: { spent: number; cap: number }[] = []
@@ -473,6 +536,7 @@ describe('★ the cap is per town, not per process', () => {
     put(3000, 'preflight', 0.002) // THIS boot's pre-flight
     expect(preflightCostUsd(db, 2500)).toBeCloseTo(0.002, 6)
     expect(ledgerTotalUsd(db)).toBeCloseTo(0.903, 6)
+    expect(ledgerTotalUsd(db, 2500), 'the window the daily budget reads').toBeCloseTo(0.002, 6)
     db.close()
   })
 })

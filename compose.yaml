@@ -6,7 +6,7 @@
 #
 #   data/dev-world.db   the world + the forge's asset and vision_qa tables
 #   data/minds/*.db     one per mind: memories, journal, half-run plan
-#   data/minds/_ops.db  the call ledger the $5 anomaly stop is read off
+#   data/minds/_ops.db  the call ledger the daily budget and the lifetime cap are read off
 #
 # Cover the world and miss `minds/` and the town comes back healthy with every person blank —
 # announced on one stdout line, never an error, and invisible in the viewer.
@@ -29,6 +29,8 @@ services:
       - SJ_LAMPS
       - SJ_LIVE
       - SJ_ARBITER
+      - SJ_SPEND_DAILY_USD
+      - SJ_SPEND_CAP_USD
       - SJ_MINDS_DIR
       - SJ_MODELS_DIR
       - OPENROUTER_API_KEY

@@ -7,6 +7,8 @@
 //   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
 //   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money.
 //   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
+//   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
+//   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
 //
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
@@ -32,6 +34,17 @@ const intEnv = (name: string, fallback: number, min: number): number => {
   return fallback
 }
 
+/** Dollars, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
+ *  file may not import — a static import would pull `@sj/agents` onto the scripted path. */
+const usdEnv = (name: string): number | undefined => {
+  const raw = process.env[name]
+  if (raw === undefined) return undefined
+  const asked = Number(raw)
+  if (Number.isFinite(asked) && asked >= 0) return asked
+  console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
+  return undefined
+}
+
 export async function main(): Promise<void> {
   if (!existsSync(`${CLIENT_DIST}index.html`)) {
     console.error(`stream: no viewer at ${CLIENT_DIST}\nstream: build it first — ${BUILD_FIRST}`)
@@ -49,6 +62,8 @@ export async function main(): Promise<void> {
   // sentence-transformer, and a scripted stream should pay for neither.
   const live = process.env.SJ_LIVE === '1'
   const mindsDir = process.env.SJ_MINDS_DIR ?? STREAM_MINDS_DIR
+  const spendDaily = usdEnv('SJ_SPEND_DAILY_USD')
+  const spendCap = usdEnv('SJ_SPEND_CAP_USD')
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
@@ -59,13 +74,15 @@ export async function main(): Promise<void> {
         ...(process.env.SJ_MODELS_DIR === undefined
           ? {}
           : { modelsDir: process.env.SJ_MODELS_DIR }),
+        ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
+        ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
         // The cap kills the process: a stream that stops thinking and keeps serving is a town of
         // statues nobody would notice for hours.
         onSpendStop: () => {
           void world?.stop().then(() => process.exit(1))
         },
         // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
-        // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
+        // call, not a per-turn one. It bills the same ledger and dies on the same stops.
         useArbiter: process.env.SJ_ARBITER !== '0',
       }),
     )
