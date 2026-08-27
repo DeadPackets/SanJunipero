@@ -58,7 +58,7 @@ const sheets: [string, string, 'terrain' | 'building', { w: number; h: number }]
   ],
 ]
 for (const [id, desc, klass, fp] of sheets) {
-  const rec = await forge.commission(desc, fp, klass)
+  const rec = await forge.commission(desc, fp, klass, id)
   writeFileSync(`${OUT}/${id}.${rec.status}.png`, codex.get(rec.id)!.png)
   console.log(
     `${id}: ${rec.status} score=${rec.score} attempts=${rec.attempts} $${rec.costUsd.toFixed(3)}`,

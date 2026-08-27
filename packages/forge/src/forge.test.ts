@@ -56,7 +56,7 @@ describe('createForge().commission', () => {
       refs: [Buffer.from('r')],
     })
     forge.onAssetReady((r) => ready.push(r.status))
-    const rec = await forge.commission('a sage tent', { w: 1, h: 1 }, 'building')
+    const rec = await forge.commission('a sage tent', { w: 1, h: 1 }, 'building', 'tent')
     expect(rec.status).toBe('ready')
     expect(rec.score).toBe(8)
     expect(rec.attempts).toBe(1)
@@ -71,7 +71,7 @@ describe('createForge().commission', () => {
     // attempts 1+2: all 3 candidates score 5; attempt 3: scores 9
     const judge = scriptedJudge([5, 5, 5, 5, 5, 5, 9])
     const forge = createForge({ client: fakeClient(await goodPng(), gens), judge, codex, refs: [] })
-    const rec = await forge.commission('a stubborn barn', { w: 2, h: 1 }, 'building')
+    const rec = await forge.commission('a stubborn barn', { w: 2, h: 1 }, 'building', 'barn')
     expect(rec.status).toBe('ready')
     expect(rec.attempts).toBe(3)
     expect(gens).toEqual([3, 3, 3])
@@ -84,7 +84,7 @@ describe('createForge().commission', () => {
       codex,
       refs: [],
     })
-    const rec = await forge.commission('an impossible ask', { w: 1, h: 1 }, 'item')
+    const rec = await forge.commission('an impossible ask', { w: 1, h: 1 }, 'item', 'relic')
     expect(rec.status).toBe('placeholder')
     expect(rec.score).toBeNull()
     expect(rec.attempts).toBe(3)
@@ -100,7 +100,7 @@ describe('createForge().commission', () => {
       },
     }
     const forge = createForge({ client, judge: scriptedJudge([10]), codex, refs: [] })
-    const rec = await forge.commission('unreachable provider', { w: 1, h: 1 }, 'item')
+    const rec = await forge.commission('unreachable provider', { w: 1, h: 1 }, 'item', 'relic')
     expect(rec.status).toBe('placeholder')
     expect(rec.score).toBeNull()
     expect(rec.attempts).toBe(3)
@@ -119,7 +119,7 @@ describe('createForge().commission', () => {
       },
     }
     const forge = createForge({ client, judge: scriptedJudge([9]), codex, refs: [] })
-    const rec = await forge.commission('a resilient tent', { w: 1, h: 1 }, 'building')
+    const rec = await forge.commission('a resilient tent', { w: 1, h: 1 }, 'building', 'tent')
     expect(rec.status).toBe('ready')
     expect(rec.attempts).toBe(2)
   })
@@ -142,8 +142,36 @@ describe('createForge().commission', () => {
       return { score: 10, notes: '' }
     }
     const forge = createForge({ client: fakeClient(allMagenta, []), judge, codex, refs: [] })
-    const rec = await forge.commission('vapor', { w: 1, h: 1 }, 'item')
+    const rec = await forge.commission('vapor', { w: 1, h: 1 }, 'item', 'vapor')
     expect(rec.status).toBe('placeholder')
     expect(judgeCalls).toBe(0)
+  })
+  it('records the codex kind the renderer resolves on', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const forge = createForge({
+      client: fakeClient(await goodPng(), []),
+      judge: scriptedJudge([8]),
+      codex,
+      refs: [],
+    })
+    const rec = await forge.commission('a waterskin', { w: 1, h: 1 }, 'item', 'waterskin')
+    expect(rec.kind).toBe('waterskin')
+    // status 'ready' + class + kind is the whole of the renderer's resolution law; a null kind
+    // is art the viewer can never find.
+    expect(codex.listSince(0).map((r) => [r.class, r.kind, r.status])).toEqual([
+      ['item', 'waterskin', 'ready'],
+    ])
+  })
+  it('a placeholder carries the kind too, so the town commissions it once and not every boot', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const forge = createForge({
+      client: fakeClient(await goodPng(), []),
+      judge: scriptedJudge([2]),
+      codex,
+      refs: [],
+    })
+    const rec = await forge.commission('an impossible ask', { w: 1, h: 1 }, 'item', 'rope')
+    expect(rec.status).toBe('placeholder')
+    expect(rec.kind).toBe('rope')
   })
 })
