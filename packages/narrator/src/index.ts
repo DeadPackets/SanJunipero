@@ -30,6 +30,7 @@ export { renderChapter, renderEra, sceneDigests, verifyCitations } from './chron
 export {
   ChapterRenderError,
   MARKER_HEAT_THRESHOLD,
+  closeDay,
   narrateDay,
   narrateWeek,
   renderDigest,

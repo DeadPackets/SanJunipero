@@ -365,24 +365,34 @@ export class NarratorStore {
     title: string
     body: string
     citations: number[] | null
+    /** Who it is about. Only a biography has one — it is how a reader finds theirs. */
+    subjectId?: string | null
   }): number {
     return this.db
       .prepare(
-        'INSERT INTO publications (day, kind, title, body, citations) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO publications (day, kind, title, body, citations, subject_id) VALUES (?, ?, ?, ?, ?, ?)',
       )
-      .run(p.day, p.kind, p.title, p.body, p.citations === null ? null : arr(p.citations))
-      .lastInsertRowid as number
+      .run(
+        p.day,
+        p.kind,
+        p.title,
+        p.body,
+        p.citations === null ? null : arr(p.citations),
+        p.subjectId ?? null,
+      ).lastInsertRowid as number
   }
 
   publications(kind?: PublicationRow['kind']): PublicationRow[] {
     const rows = (
       kind === undefined
         ? this.db
-            .prepare('SELECT id, day, kind, title, body, citations FROM publications ORDER BY id')
+            .prepare(
+              'SELECT id, day, kind, title, body, citations, subject_id FROM publications ORDER BY id',
+            )
             .all()
         : this.db
             .prepare(
-              'SELECT id, day, kind, title, body, citations FROM publications WHERE kind = ? ORDER BY id',
+              'SELECT id, day, kind, title, body, citations, subject_id FROM publications WHERE kind = ? ORDER BY id',
             )
             .all(kind)
     ) as {
@@ -392,6 +402,7 @@ export class NarratorStore {
       title: string
       body: string
       citations: string | null
+      subject_id: string | null
     }[]
     return rows.map((r) => ({
       id: r.id,
@@ -400,6 +411,7 @@ export class NarratorStore {
       title: r.title,
       body: r.body,
       citations: r.citations === null ? null : parseArr<number>(r.citations),
+      subjectId: r.subject_id,
     }))
   }
 }

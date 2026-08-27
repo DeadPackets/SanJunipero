@@ -1,6 +1,8 @@
+import type Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine'
 import { renderChapter, renderEra } from './chronicle.js'
+import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
 import { detectFirsts } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
 import {
@@ -19,6 +21,7 @@ import type {
   HeatScores,
   Milestone,
   NarratorLlm,
+  PublicationRow,
   SceneSegment,
   SegmentConfig,
   TimelineMarker,
@@ -231,4 +234,101 @@ export async function narrateWeek(deps: {
     validEventIds: deps.validEventIds,
     alert: deps.alert,
   })
+}
+
+/** Which week `day` closes, or null on the other six. */
+const weekClosedBy = (day: number): { startDay: number; endDay: number } | null =>
+  day % 7 === 6 ? { startDay: day - 6, endDay: day } : null
+
+const seqsBetweenDays = (world: Database.Database, from: number, to: number): number[] =>
+  (
+    world
+      .prepare('SELECT seq FROM events WHERE tick >= ? AND tick <= ?')
+      .all(from * MINUTES_PER_DAY, (to + 1) * MINUTES_PER_DAY - 1) as { seq: number }[]
+  ).map((r) => r.seq)
+
+/**
+ * Everything the town publishes when a day closes: the chapter, that day's paper and its
+ * caption, one townsperson's life so far, and on the seventh day the week's arc. Only the
+ * chapter, the biography and the week cost a call; the paper and the caption are composed from
+ * what is already written down. Idempotent per day, like `narrateDay` under it.
+ */
+export async function closeDay(deps: {
+  store: NarratorStore
+  llm: NarratorLlm
+  /** The world db, for the public record a biography is allowed to read. */
+  worldDb: Database.Database
+  events: SimEvent[]
+  rulebookCount: number
+  privateCounts: { thoughts: number; journals: number }
+  /** Written up one a night in turn, so a cast of five is five nights and then a deeper record. */
+  cast: readonly { id: string; name: string }[]
+  world?: { config: SimConfig; state?: WorldState }
+  alert?: (d: string) => void
+}): Promise<ChapterRow> {
+  const { store, llm, cast } = deps
+  const { chapter, heat, milestones } = await narrateDay({
+    store,
+    llm,
+    events: deps.events,
+    rulebookCount: deps.rulebookCount,
+    privateCounts: deps.privateCounts,
+    ...(deps.world === undefined ? {} : { world: deps.world }),
+    ...(deps.alert === undefined ? {} : { alert: deps.alert }),
+  })
+  const day = chapter.day
+  const published = store.publications()
+  const alreadyOn = (kind: PublicationRow['kind']): boolean =>
+    published.some((p) => p.kind === kind && p.day === day)
+
+  if (!alreadyOn('newspaper')) {
+    const paper = renderNewspaper(day, chapter, heat, milestones, store.scenesForDay(day))
+    store.insertPublication({
+      day,
+      kind: 'newspaper',
+      title: paper.headline,
+      body: paper.body,
+      citations: paper.citations,
+    })
+    for (const c of timelapseCaptions([chapter]))
+      store.insertPublication({
+        day,
+        kind: 'timelapse_caption',
+        title: `Day ${c.day}`,
+        body: c.caption,
+        citations: null,
+      })
+  }
+
+  const subject = cast.length === 0 ? undefined : cast[day % cast.length]
+  if (subject !== undefined && !alreadyOn('biography')) {
+    try {
+      await writeBiography({
+        store,
+        llm,
+        world: deps.worldDb,
+        agentId: subject.id,
+        name: subject.name,
+        throughDay: day,
+        ...(deps.alert === undefined ? {} : { alert: deps.alert }),
+      })
+    } catch (err) {
+      // A life the roster refused twice is not written down; the day still stands.
+      deps.alert?.(`biography_skipped: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const week = weekClosedBy(day)
+  if (week !== null) {
+    const days = store.chaptersInRange(week.startDay, week.endDay)
+    if (days.length > 0)
+      await narrateWeek({
+        store,
+        llm,
+        days,
+        validEventIds: seqsBetweenDays(deps.worldDb, week.startDay, week.endDay),
+        ...(deps.alert === undefined ? {} : { alert: deps.alert }),
+      })
+  }
+  return chapter
 }
