@@ -1,4 +1,4 @@
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { LlmClient, migrateLlmTables, MIND_MODEL } from '@sj/agents'
 import { z } from 'zod'
 

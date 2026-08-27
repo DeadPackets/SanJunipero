@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Embedder, LlmClient, migrateLlmTables } from '@sj/agents'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { CodexStore, GENESIS_CODEX, makeArbiter, openArbiterDb } from '../src/index.js'
 import { FALLBACK_IMPOSSIBLE } from '../src/adjudicate.js'
 

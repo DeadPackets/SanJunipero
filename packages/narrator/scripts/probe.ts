@@ -1,6 +1,6 @@
 // LIVE — narrator call mechanics: structured ChapterSummary output, prefix cache on the
 // byte-stable NARRATOR_CANON, caller accounting. Hard cap $5.00, expected spend < $0.05.
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { LlmClient, migrateLlmTables, type LlmUsage } from '@sj/agents'
 import { z } from 'zod'
 import { NARRATOR_CANON } from '../src/canon.js'

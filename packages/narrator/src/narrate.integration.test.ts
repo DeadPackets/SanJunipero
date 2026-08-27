@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { EVENTFUL_DAY } from './fixtures/eventfulDay.js'
 import { renderChapter } from './chronicle.js'
 import { rankScenesForDirector } from './heat.js'

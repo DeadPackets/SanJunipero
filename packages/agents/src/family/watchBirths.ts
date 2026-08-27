@@ -1,4 +1,5 @@
-import { AgentBorn, type EventStore } from '@sj/engine'
+import { type EventStore } from '@sj/engine/store'
+import { AgentBorn } from '@sj/engine'
 import type { z } from 'zod'
 import type { EngineBridge } from '../runtime/bridge.js'
 

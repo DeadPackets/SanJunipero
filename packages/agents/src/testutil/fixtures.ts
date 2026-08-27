@@ -1,9 +1,9 @@
 import { DEFAULT_CONFIG, simTimeFromTick } from '@sj/shared'
+import { type EventStore } from '@sj/engine/store'
 import {
   createWorldTick,
   RngStreams,
   TickLoop,
-  type EventStore,
   type LawQueue,
   type TickHandler,
   type WorldState,

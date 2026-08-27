@@ -1,6 +1,7 @@
 // Fixture code shared by the gateway tests. Assertions live in the test files.
 import WebSocket from 'ws'
-import { EventStore, RngStreams, TickLoop, openDb, type WorldState } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, type WorldState } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import {
   type FoundersOpts,

@@ -1,14 +1,13 @@
 // $0 sanity for the motive probe's world: no roof anywhere, a spot the town keeps for one,
 // and a founder with wood in hand who can actually raise it. Prints the prose too.
+import { EventStore, openDb } from '@sj/engine/store'
 import {
   createWorldTick,
-  EventStore,
   fold,
   genesisState,
   groundForBuilding,
   isExposed,
   makeGenesisWorld,
-  openDb,
   RngStreams,
   TickLoop,
   type LawQueue,

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import * as sqliteVec from 'sqlite-vec'
-import { openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
 import { EMBEDDING_DIM } from './embedder.js'
 
 export function openAgentDb(path: string): Database.Database {

@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  EventStore,
-  RngStreams,
-  TickLoop,
-  fold,
-  genesisState,
-  openDb,
-  type TickHandler,
-  type TileId,
-} from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { RngStreams, TickLoop, fold, genesisState, type TickHandler, type TileId } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
 import { watchBirths, type AgentBornPayload } from './watchBirths.js'

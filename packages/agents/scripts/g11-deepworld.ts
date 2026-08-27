@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type Database from 'better-sqlite3'
+import { EventStore } from '@sj/engine/store'
 import {
   applyLaw,
   buildFootprint,
   BRIDGE_KIND,
   createWorldTick,
   doorTile,
-  EventStore,
   findPath,
   fold,
   genesisState,
