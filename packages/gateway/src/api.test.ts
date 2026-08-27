@@ -12,7 +12,7 @@ import { mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 
 // @sj/agents is frozen this chunk and does not export openAgentDb; DDL below is copied
-// verbatim from packages/agents/src/memory/schema.ts for the three tables the API reads.
+// verbatim from packages/agents/src/memory/schema.ts for the four tables the API reads.
 function openAgentFixtureDb(path: string): Database.Database {
   const db = new Database(path)
   db.exec(`
@@ -22,6 +22,16 @@ function openAgentFixtureDb(path: string): Database.Database {
       tick INTEGER NOT NULL,
       day INTEGER NOT NULL,
       text TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS memories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id TEXT NOT NULL,
+      tick INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      text TEXT NOT NULL,
+      importance INTEGER NOT NULL,
+      tags TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS ledgers (
       agent_id TEXT NOT NULL,
@@ -123,6 +133,18 @@ describe('observer data apis', () => {
       .prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, ?, ?, ?)')
       .run('alice', 2000, 1, 'Second entry')
     adb
+      .prepare(
+        'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
+          " VALUES (?, ?, ?, ?, ?, 6, '{}')",
+      )
+      .run('alice', 1439, 0, 'dream', 'the storehouse had no door')
+    adb
+      .prepare(
+        'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
+          " VALUES (?, ?, ?, ?, ?, 3, '{}')",
+      )
+      .run('alice', 200, 0, 'perception', 'bread, and the smell of it')
+    adb
       .prepare('INSERT INTO ledgers (agent_id, person_id, doc, updated_day) VALUES (?, ?, ?, ?)')
       .run('alice', 'bob', 'Steady neighbor.', 1)
     adb
@@ -175,9 +197,12 @@ describe('observer data apis', () => {
   })
 
   it('journal / ledgers / personality read the agent db; missing db → []', async () => {
+    // The journal feed is what a mind wrote down AND what it dreamed, in one order. Nothing
+    // else it remembers is a viewer's to read.
     expect(await (await fetch(`${base}/api/agent/alice/journal`)).json()).toEqual([
-      { tick: 100, day: 0, text: 'First entry' },
-      { tick: 2000, day: 1, text: 'Second entry' },
+      { tick: 100, day: 0, text: 'First entry', kind: 'journal' },
+      { tick: 1439, day: 0, text: 'the storehouse had no door', kind: 'dream' },
+      { tick: 2000, day: 1, text: 'Second entry', kind: 'journal' },
     ])
     expect(await (await fetch(`${base}/api/agent/alice/ledgers`)).json()).toEqual([
       { personId: 'bob', doc: 'Steady neighbor.', updatedDay: 1 },
@@ -317,11 +342,13 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
     adb.close()
 
     const api = mount()
-    expect(api.call('mira')).toEqual([{ tick: 5, day: 0, text: 'I banked the fire.' }])
+    expect(api.call('mira')).toEqual([
+      { tick: 5, day: 0, text: 'I banked the fire.', kind: 'journal' },
+    ])
     // The file is gone; `fileMustExist` means a per-request open would answer [] from here on.
     rmSync(join(dir, 'mira.db'))
     expect(api.call('mira'), 'the handle was dropped between two requests').toEqual([
-      { tick: 5, day: 0, text: 'I banked the fire.' },
+      { tick: 5, day: 0, text: 'I banked the fire.', kind: 'journal' },
     ])
     // …and a name with no file is still no handle and no answer.
     expect(api.call('nobody')).toEqual([])

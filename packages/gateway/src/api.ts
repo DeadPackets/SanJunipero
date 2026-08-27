@@ -292,12 +292,18 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     })
   })
 
+  // A dream is a memory row, not a journal row, so the feed is a union; `agent_id` is filtered
+  // once outside it so the one bound parameter still covers both halves.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
     sendJson(
       res,
       readAgentRows(
         params.id ?? '',
-        'SELECT tick, day, text FROM journal WHERE agent_id = ? ORDER BY id',
+        `SELECT tick, day, text, kind FROM (
+           SELECT agent_id, tick, day, text, 'journal' AS kind FROM journal
+           UNION ALL
+           SELECT agent_id, tick, day, text, 'dream' AS kind FROM memories WHERE kind = 'dream'
+         ) WHERE agent_id = ? ORDER BY tick`,
       ),
     )
   })
