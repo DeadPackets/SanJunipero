@@ -180,6 +180,11 @@ const tmp = (): string => {
   return d
 }
 
+const alertsOf = (db: Database.Database, kind: string): string[] =>
+  (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(
+    (r) => r.detail,
+  )
+
 /** One ledger row at a chosen wall-clock time — the rolling day is the thing under test. */
 const billTo = (db: Database.Database, ts: number, usd: number): void => {
   db.prepare(
@@ -453,6 +458,31 @@ describe('★ the money, inside the served world', () => {
 
     await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toThrow(/daily budget/)
   }, 60_000)
+
+  // A run that never reconciles is a run whose dollar figures have no second opinion. The stale
+  // pin this exists for read 2x.
+  it('★ reconciles the ledger against the provider bill when the town closes', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({ dir })
+    await run(world, 2)
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.01, 0.02, 0, 1, NULL, 'p')`,
+      )
+      .run(Date.now())
+    expect(alertsOf(opsDb, 'llm_price_reconciliation')).toHaveLength(0)
+
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    const closed = openAgentDb(join(dir, 'minds', LIVE_OPS_DB))
+    const alerts = alertsOf(closed, 'llm_price_reconciliation')
+    closed.close()
+    expect(alerts, 'the town closed without ever checking its own prices').toHaveLength(1)
+    expect(alerts[0]).toContain('2.00x out')
+  }, 40_000)
 
   it('names the amount, the budget and the way out', () => {
     const msg = dailyReachedRefusal(3.1234, 3)

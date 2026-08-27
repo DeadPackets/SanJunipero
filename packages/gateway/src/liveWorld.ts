@@ -19,6 +19,7 @@ import {
   openAgentDb,
   preflightRefusal,
   projectDailySpend,
+  reportReconciliation,
   runPreflight,
   FOUNDER_MINDS,
   type BootedMinds,
@@ -522,6 +523,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
+      // The run's last word on its own prices: says nothing when the ledger and the provider's
+      // bill agree, and writes an alert row when a pin has gone stale.
+      reportReconciliation(opsDb)
       opsDb.close()
     },
   }
