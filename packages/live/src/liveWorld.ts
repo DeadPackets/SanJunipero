@@ -1,7 +1,5 @@
-// SJ_LIVE=1 reaches minds only through a dynamic import — a static @sj/agents import here breaks
-// the scripted path (enforced by test).
-// The assembly lives in the gateway because @sj/arbiter and @sj/narrator both depend on
-// @sj/agents; wiring minds any lower closes a dependency cycle.
+// This is the whole live half. `@sj/town` reaches it only through serve.ts's dynamic import
+// behind SJ_LIVE=1, which is what keeps the mind stack off the scripted path.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'

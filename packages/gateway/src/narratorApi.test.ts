@@ -16,8 +16,8 @@ import { NARRATOR_DDL, NARRATOR_READ_TABLES } from '@sj/shared/narratorSchema'
 import { CHRONICLE_MAX } from './narratorApi.js'
 import { createGateway, type Gateway } from './server.js'
 
-// The narrator's own DDL, not a copy of it — importing @sj/narrator would drag @sj/agents
-// (onnxruntime, transformers) in.
+// The narrator's own DDL, not a copy of it — importing @sj/narrator would drag @sj/llm and
+// the `ai` SDK in.
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
   db.exec(NARRATOR_DDL)

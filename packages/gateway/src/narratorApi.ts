@@ -14,8 +14,8 @@ import {
   type ChronicleLookup,
   type Moment,
 } from '@sj/shared'
-// Plain SELECTs rather than @sj/narrator, which drags @sj/agents (onnxruntime, transformers)
-// behind it. The contract is declared once, in @sj/shared.
+// Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
+// The contract is declared once, in @sj/shared.
 import type { ChapterRow, MilestoneRow, SceneRow } from '@sj/shared/narratorSchema'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
