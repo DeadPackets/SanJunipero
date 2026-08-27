@@ -604,8 +604,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         // The cast, not the founders: a town that has borne children spends for all of them.
         const cast = booted?.cast.size ?? minds.length
         const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * cast
+        // Art is bursty and per discovery; it stays under the daily and lifetime caps, not the mind rate.
         const rate = projectDailySpend(opsDb, {
           windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
+          excludeCallers: ['forge'],
         }).usdPerSimDay
         if (rate <= ceiling) return
         console.error(rateStopMessage(rate, ceiling, cast))

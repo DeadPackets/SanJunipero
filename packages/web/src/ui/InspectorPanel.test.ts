@@ -109,6 +109,9 @@ describe('journalStamp', () => {
   it('marks a dream as a dream, and leaves a written entry alone', () => {
     expect(journalStamp({ tick: 5, day: 3, text: 'x', kind: 'journal' })).toBe('Day 3')
     expect(journalStamp({ tick: 5, day: 3, text: 'x', kind: 'dream' })).toBe('Day 3, a dream')
+  })
+})
+
 describe('what is written of them', () => {
   const withBio = (biography: { day: number; title: string; body: string } | null): string =>
     renderToStaticMarkup(

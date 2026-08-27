@@ -68,6 +68,26 @@ describe('projectDailySpend (T24)', () => {
     expect(p.usdPerSimDay).toBe(4)
   })
 
+  it('leaves an excluded caller out of the rate, but still in the ledger', () => {
+    const db = openDb()
+    seedCall(db, 1, 0.5)
+    db.prepare(
+      `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error)
+       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 0.5, 0, 1, NULL)`,
+    ).run(NOW - 60_000)
+
+    const all = projectDailySpend(db, { windowRealMinutes: 15, now: NOW })
+    const minds = projectDailySpend(db, {
+      windowRealMinutes: 15,
+      now: NOW,
+      excludeCallers: ['forge'],
+    })
+    expect(all).toEqual({ usdPerSimDay: 4, windowRealMinutes: 15, sampledCalls: 2 })
+    expect(minds).toEqual({ usdPerSimDay: 2, windowRealMinutes: 15, sampledCalls: 1 })
+  })
+
   it('an idle window projects zero, not NaN', () => {
     const db = openDb()
     seedCall(db, 500, 9)

@@ -114,7 +114,7 @@ describe('the popover reads both endpoints through the shared layer', () => {
   const PICK = { kind: 'structure', id: 'house-1', screenX: 0, screenY: 0 } as const
   const UNREAD = { data: null, loaded: false }
   const settled = <T>(data: T): Read<T> => ({ data, loaded: true })
-  const NEAR = [{ tick: RISING.plannedTick + 10, text: 'near' }]
+  const NEAR = [{ tick: RISING.plannedTick + 10, text: 'near', kind: 'journal' as const }]
 
   it('★ hand-rolls no fetch of its own', () => {
     expect(SRC).not.toContain('fetch(')

@@ -13,7 +13,11 @@ export type SpendProjection = {
   sampledCalls: number
 }
 
-export type SpendWindowOpts = { windowRealMinutes?: number; now?: number }
+export type SpendWindowOpts = {
+  windowRealMinutes?: number
+  now?: number
+  excludeCallers?: string[]
+}
 
 export function projectDailySpend(
   db: Database.Database,
@@ -21,11 +25,13 @@ export function projectDailySpend(
 ): SpendProjection {
   const windowRealMinutes = opts.windowRealMinutes ?? DEFAULT_SPEND_WINDOW_REAL_MINUTES
   const cutoff = (opts.now ?? Date.now()) - windowRealMinutes * 60_000
+  const excluded = opts.excludeCallers ?? []
+  const notIn = excluded.length ? ` AND caller NOT IN (${excluded.map(() => '?').join(',')})` : ''
   const row = db
     .prepare(
-      'SELECT COALESCE(SUM(cost_usd), 0) AS total, COUNT(*) AS n FROM llm_calls WHERE ts >= ?',
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total, COUNT(*) AS n FROM llm_calls WHERE ts >= ?${notIn}`,
     )
-    .get(cutoff) as { total: number; n: number }
+    .get(cutoff, ...excluded) as { total: number; n: number }
   return {
     usdPerSimDay: row.total * (REAL_MINUTES_PER_SIM_DAY / windowRealMinutes),
     windowRealMinutes,

@@ -245,7 +245,6 @@ async function liveWorld(opts: {
   const callers = new Set<string>()
   let seen: ReturnType<typeof openAgentDb> | null = null
   let cast: LiveCast | null = null
-  const callers = new Set<string>()
   // Through the factory, exactly as `serve.ts` does it: built out here the cast would already
   // hold the per-mind files open when `fresh` deleted them.
   const world = await startDevWorld({
