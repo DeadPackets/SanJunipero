@@ -90,6 +90,8 @@ export type Footprint = {
   seq: number
 }
 
+type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
+
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 
@@ -292,19 +294,23 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     })
   })
 
-  // A dream is a memory row, not a journal row, so the feed is a union; `agent_id` is filtered
-  // once outside it so the one bound parameter still covers both halves.
+  // A dream is a memory row and not a journal row, so the feed is two reads merged: a database
+  // missing either table still answers with the half it has.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
+    const id = params.id ?? ''
+    const rows = [
+      ...readAgentRows<JournalRow>(
+        id,
+        "SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ?",
+      ),
+      ...readAgentRows<JournalRow>(
+        id,
+        "SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream'",
+      ),
+    ]
     sendJson(
       res,
-      readAgentRows(
-        params.id ?? '',
-        `SELECT tick, day, text, kind FROM (
-           SELECT agent_id, tick, day, text, 'journal' AS kind FROM journal
-           UNION ALL
-           SELECT agent_id, tick, day, text, 'dream' AS kind FROM memories WHERE kind = 'dream'
-         ) WHERE agent_id = ? ORDER BY tick`,
-      ),
+      rows.sort((a, b) => a.tick - b.tick),
     )
   })
 
