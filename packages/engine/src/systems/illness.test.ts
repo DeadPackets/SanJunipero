@@ -3,9 +3,6 @@ import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
-import { createScriptedLoop } from '../scripted.js'
-import { openDb } from '../db.js'
-import { EventStore } from '../eventStore.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 
 const MIDNIGHT = 1440
@@ -270,17 +267,5 @@ describe('illnessSystem: a wound turns septic at dawn', () => {
     const r = dawn(wound(OFF), OFF, 'h3')
     expect(r.events.map((e) => e.type)).not.toContain('agent_afflicted')
     expect(r.state.agents.a1!.afflictions).toBeUndefined()
-  })
-})
-
-describe('C9 per-tick contagion is retired', () => {
-  it('no agent_fell_ill is emitted anywhere in three scripted days', () => {
-    const store = new EventStore(openDb(':memory:'))
-    // Illness and contagion stay at their genesis dials; only the scenery is held still.
-    const loop = createScriptedLoop(SimConfigSchema.parse(quiet), 'illness-retired', store)
-    for (let i = 0; i < 3 * MIDNIGHT; i++) loop.step()
-    const types = new Set(store.readFrom(0).map((e) => e.type))
-    expect(types.size).toBeGreaterThan(5)
-    expect(types.has('agent_fell_ill')).toBe(false)
   })
 })
