@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { roomCard, type Provenance } from './interiorModel.js'
-import { WorldPopover, provenanceLines } from './WorldPopover.js'
+import { WorldPopover, provenanceLines, textFor } from './WorldPopover.js'
+import type { Read } from './useEndpoint.js'
 
 const STATE = {
   agents: { yusuf: { id: 'yusuf', name: 'Yusuf', asleep: false, activity: null } },
@@ -91,6 +92,34 @@ describe('the popover is one live region, mounted for the life of the app', () =
     }
     expect(readFileSync(new URL('./InteriorBar.tsx', import.meta.url), 'utf8')).not.toContain(
       'keydown',
+    )
+  })
+})
+
+// ── ★ ONE FETCH MECHANISM, THE LAST TWO HAND-ROLLED READS INCLUDED ───────────────────────
+describe('the popover reads both endpoints through the shared layer', () => {
+  const SRC = readFileSync(new URL('./WorldPopover.tsx', import.meta.url), 'utf8')
+  const PICK = { kind: 'structure', id: 'house-1', screenX: 0, screenY: 0 } as const
+  const UNREAD = { data: null, loaded: false }
+  const settled = <T,>(data: T): Read<T> => ({ data, loaded: true })
+  const NEAR = [{ tick: RISING.plannedTick + 10, text: 'near' }]
+
+  it('★ hand-rolls no fetch of its own', () => {
+    expect(SRC).not.toContain('fetch(')
+    expect(SRC).toContain('usePolled')
+  })
+
+  it('★ says nothing until BOTH reads settle — the sentence and its line land together', () => {
+    expect(textFor(store, PICK, UNREAD, UNREAD)).toBe('')
+    expect(textFor(store, PICK, settled(RISING), UNREAD)).toBe('')
+    expect(textFor(store, PICK, settled(RISING), settled(NEAR))).toBe(
+      'Begun by Yusuf, Day 3 — still rising\n"near"',
+    )
+  })
+
+  it('a refused provenance read says so, without waiting on a journal nobody will ask for', () => {
+    expect(textFor(store, PICK, { data: null, loaded: true }, UNREAD)).toBe(
+      'No one remembers who began this.',
     )
   })
 })

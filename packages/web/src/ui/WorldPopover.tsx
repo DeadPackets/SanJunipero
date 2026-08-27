@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldPick } from '../render/entities.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { itemCropDetail } from './interaction.js'
 import { builtLine, type Provenance } from './interiorModel.js'
+import { usePolled, type Read } from './useEndpoint.js'
 
 const NO_PROVENANCE = 'No one remembers who began this.'
 
@@ -29,35 +29,21 @@ export function provenanceLines(
   return nearest === null ? built : `${built}\n"${nearest.text}"`
 }
 
-async function tellOf(store: WorldStore, structureId: string): Promise<string> {
-  const pr = await fetch(`/api/structure/${encodeURIComponent(structureId)}/provenance`)
-  if (!pr.ok) return NO_PROVENANCE
-  const p = (await pr.json()) as Provenance
-  const jr = await fetch(`/api/agent/${encodeURIComponent(p.builderId)}/journal`)
-  return provenanceLines(store.getState(), p, jr.ok ? ((await jr.json()) as Journal[]) : [])
-}
-
 /** What the map says about the thing that was just clicked. One live region for the life of the
  *  app — a region mounted with its own announcement never announces it. */
 export function WorldPopover({ store, pick }: { store: WorldStore; pick: WorldPick | null }) {
-  // held WITH the building it describes, so a new pick reads as empty in the same render
-  const [told, setTold] = useState<{ id: string; text: string } | null>(null)
+  // Keyed on the building, so a new pick is structurally a new read and the popover can never
+  // show one building's sentence under the next one's name.
+  const id = pick?.kind === 'structure' ? pick.id : null
+  const prov = usePolled<Provenance>(
+    id === null ? null : `/api/structure/${encodeURIComponent(id)}/provenance`,
+  )
+  const builderId = prov.data?.builderId ?? null
+  const journal = usePolled<Journal[]>(
+    builderId === null ? null : `/api/agent/${encodeURIComponent(builderId)}/journal`,
+  )
 
-  useEffect(() => {
-    if (pick?.kind !== 'structure') return
-    const id = pick.id
-    let live = true
-    void tellOf(store, id)
-      .catch(() => NO_PROVENANCE)
-      .then((text) => {
-        if (live) setTold({ id, text })
-      })
-    return () => {
-      live = false
-    }
-  }, [pick, store])
-
-  const text = textFor(store, pick, told)
+  const text = textFor(store, pick, prov, journal)
   return (
     <div
       className="provenance-pop"
@@ -74,12 +60,16 @@ export function WorldPopover({ store, pick }: { store: WorldStore; pick: WorldPi
   )
 }
 
-function textFor(
+/** Silent until both reads have settled: the sentence and the journal line under it arrive
+ *  together, or a viewer reads the same fact twice a beat apart. */
+export function textFor(
   store: WorldStore,
   pick: WorldPick | null,
-  told: { id: string; text: string } | null,
+  prov: Read<Provenance>,
+  journal: Read<Journal[]>,
 ): string {
   if (pick === null) return ''
   if (pick.kind !== 'structure') return itemCropDetail(store.getState(), pick.kind, pick.id) ?? ''
-  return told?.id === pick.id ? told.text : ''
+  if (!prov.loaded || (prov.data !== null && !journal.loaded)) return ''
+  return provenanceLines(store.getState(), prov.data, journal.data ?? [])
 }
