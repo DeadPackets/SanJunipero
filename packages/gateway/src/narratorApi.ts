@@ -14,6 +14,9 @@ import {
   type ChronicleLookup,
   type Moment,
 } from '@sj/shared'
+// Plain SELECTs rather than @sj/narrator, which drags @sj/agents (onnxruntime, transformers)
+// behind it. The contract is declared once, in @sj/shared.
+import type { ChapterRow, MilestoneRow, SceneRow } from '@sj/shared/narratorSchema'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './server.js'
@@ -22,14 +25,6 @@ import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { sendJson, toEvent } from './http.js'
 import { clampWindow } from './api.js'
 import { reportOnce } from './degraded.js'
-
-// Plain SELECTs rather than @sj/narrator, which drags @sj/agents (onnxruntime, transformers)
-// behind it. A test walks this map against the real narrator schema.
-export const NARRATOR_READ_TABLES: Readonly<Record<string, readonly string[]>> = {
-  chapters: ['day', 'title'],
-  milestones: ['kind', 'label', 'day', 'tick'],
-  scenes: ['day', 'start_tick', 'end_tick', '"cast"', 'location'],
-}
 
 export type NarratorApiDeps = {
   db: Database.Database // the world DB — events are the town's own record
@@ -170,17 +165,14 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   router.route('GET', '/api/chapters', (_req, res) => {
     sendJson(
       res,
-      readOrEmpty<{ day: number; title: string }>(
-        deps.narratorDb,
-        'SELECT day, title FROM chapters ORDER BY day',
-      ),
+      readOrEmpty<ChapterRow>(deps.narratorDb, 'SELECT day, title FROM chapters ORDER BY day'),
     )
   })
 
   router.route('GET', '/api/milestones', (_req, res) => {
     sendJson(
       res,
-      readOrEmpty<{ kind: string; label: string; day: number; tick: number }>(
+      readOrEmpty<MilestoneRow>(
         deps.narratorDb,
         'SELECT kind, label, day, tick FROM milestones ORDER BY id',
       ),
@@ -190,15 +182,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   // A recorded day, named by its chapter when C7 has written one and by its number when it
   // has not — the day exists either way, and the list must not wait on the prose.
   router.route('GET', '/api/moments', (_req, res) => {
-    const rows = readOrEmpty<{
-      id: number
-      day: number
-      start_tick: number
-      end_tick: number
-      cast: string
-      location: string | null
-      title: string | null
-    }>(
+    const rows = readOrEmpty<SceneRow & { id: number; title: string | null }>(
       deps.narratorDb,
       `
       SELECT s.id, s.day, s.start_tick, s.end_tick, s."cast", s.location, c.title
@@ -273,7 +257,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       res,
       cache.json('marks', () => ({
         throughTick: deps.mirror.state().tick,
-        chapters: readOrEmpty<{ day: number; title: string }>(
+        chapters: readOrEmpty<ChapterRow>(
           deps.narratorDb,
           'SELECT day, title FROM chapters ORDER BY day',
         ),

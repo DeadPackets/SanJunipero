@@ -1,7 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import {
@@ -13,24 +12,15 @@ import {
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
-import { CHRONICLE_MAX, NARRATOR_READ_TABLES } from './narratorApi.js'
+import { NARRATOR_DDL, NARRATOR_READ_TABLES } from '@sj/shared/narratorSchema'
+import { CHRONICLE_MAX } from './narratorApi.js'
 import { createGateway, type Gateway } from './server.js'
 
-// The DDL below is copied from packages/narrator/src/schema.ts — importing @sj/narrator would
-// drag @sj/agents (onnxruntime, transformers) in. The last test fails if those columns move.
+// The narrator's own DDL, not a copy of it — importing @sj/narrator would drag @sj/agents
+// (onnxruntime, transformers) in.
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS scenes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL, start_tick INTEGER NOT NULL,
-      end_tick INTEGER NOT NULL, event_ids TEXT NOT NULL, "cast" TEXT NOT NULL, location TEXT);
-    CREATE TABLE IF NOT EXISTS chapters (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL UNIQUE, title TEXT NOT NULL,
-      text TEXT NOT NULL, citations TEXT NOT NULL, scene_ids TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS milestones (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL UNIQUE, label TEXT NOT NULL,
-      event_seq INTEGER NOT NULL, day INTEGER NOT NULL, tick INTEGER NOT NULL);
-  `)
+  db.exec(NARRATOR_DDL)
   return db
 }
 
@@ -396,14 +386,16 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
 
 describe('the one-way glass the gateway reads through', () => {
   it('selects only columns the narrator schema actually declares', () => {
-    const schema = readFileSync(
-      fileURLToPath(new URL('../../narrator/src/schema.ts', import.meta.url)),
-      'utf8',
-    )
+    const db = new Database(':memory:')
+    db.exec(NARRATOR_DDL)
     for (const [table, columns] of Object.entries(NARRATOR_READ_TABLES)) {
-      expect(schema, table).toContain(`CREATE TABLE IF NOT EXISTS ${table}`)
-      for (const col of columns) expect(schema, `${table}.${col}`).toContain(col)
+      const have = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+        (c) => c.name,
+      )
+      expect(have, table).not.toEqual([])
+      for (const col of columns) expect(have, `${table}.${col}`).toContain(col.replaceAll('"', ''))
     }
+    db.close()
   })
 })
 
