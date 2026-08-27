@@ -76,10 +76,10 @@ export const SCRUB_MIN_MS = 100
  * at once stop the town ticking and DEFAULT_MAX_VIEWERS is 500. Over budget, a viewer is answered
  * at the live moment instead of being queued.
  */
-export const SCRUB_BUDGET_MS_PER_S = 40
+const SCRUB_BUDGET_MS_PER_S = 40
 
 /** Frames under this go out raw: a `thought` or an `asset` is smaller than the deflate header. */
-export const DEFLATE_THRESHOLD_BYTES = 512
+const DEFLATE_THRESHOLD_BYTES = 512
 
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG

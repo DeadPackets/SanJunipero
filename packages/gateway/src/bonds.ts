@@ -116,9 +116,7 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
   )
   // A filtered scan per CADENCE, not per generation; see seqCache.ts for why a public stream
   // cannot pay one per viewer, and BONDS_REBUILD_TICKS for why it cannot pay one per tick either.
-  const cache = makeSeqCache(() =>
-    Math.floor(deps.mirror.state().tick / BONDS_REBUILD_TICKS),
-  )
+  const cache = makeSeqCache(() => Math.floor(deps.mirror.state().tick / BONDS_REBUILD_TICKS))
 
   const bonds = (): BondsResponse =>
     cache.value('bonds', () => {

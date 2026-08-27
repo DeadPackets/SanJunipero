@@ -132,7 +132,11 @@ describe('dev world server', () => {
       // Published AFTER the socket joined: the pump above already consumed every thought the
       // world had said, and a viewer is only ever sent what is published while it is listening.
       const wdb = openDb(join(dir, 'dev.db'))
-      publishThought(wdb, { tick: dw.loop.state.tick, agentId: 'farmer', text: THOUGHT_LINES.walk! })
+      publishThought(wdb, {
+        tick: dw.loop.state.tick,
+        agentId: 'farmer',
+        text: THOUGHT_LINES.walk!,
+      })
       wdb.close()
       dw.gateway.pump()
 

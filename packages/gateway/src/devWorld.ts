@@ -85,7 +85,7 @@ export type DevWorld = {
   tick(): void
   /** Enqueue a world law. It lands as one `config_changed` at the next tick boundary, hashed,
    *  snapshotted and replayed like every other fact. See `adminLaws.ts` for the only caller. */
-  submitLaw(path: string, value: unknown): void
+  submitLaw: (path: string, value: unknown) => void
   stop(): Promise<void>
 }
 
@@ -407,7 +407,9 @@ export async function startDevWorld(
     resumedAtTick: resumed ? resumed.state.tick : null,
     live: cast !== null,
     tick: tickOnce,
-    submitLaw: (path, value) => applyLaw(lawQueue, path, value),
+    submitLaw: (path, value) => {
+      applyLaw(lawQueue, path, value)
+    },
     stop: async () => {
       clearInterval(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a

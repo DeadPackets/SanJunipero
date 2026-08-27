@@ -52,7 +52,7 @@ describe('GATE G6 — automated half', () => {
 
   it('dual-viewer byte parity over ~3 sim days, then a scrub parity sweep', async () => {
     const dbPath = join(dir, 'g6-run.db')
-// 5 ms, not 1: the socket is compressed, and zlib finishes on the event loop. A tick loop that
+    // 5 ms, not 1: the socket is compressed, and zlib finishes on the event loop. A tick loop that
     // never yields starves those callbacks, and the hub then reads the backlog as a lagging viewer
     // and drops the very deltas this gate compares. 500x production cadence is still 500x.
     const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath })

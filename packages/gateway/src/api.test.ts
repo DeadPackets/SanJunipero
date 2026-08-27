@@ -299,7 +299,7 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
           } as unknown as ServerResponse,
           { id },
         )
-        return JSON.parse(body)
+        return JSON.parse(body) as unknown
       },
       close: () => {
         close()

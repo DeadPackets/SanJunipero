@@ -276,7 +276,7 @@ describe('★ the socket is compressed', () => {
   const open: (Gateway | WebSocket)[] = []
   const deflateDir = mkdtempSync(join(tmpdir(), 'sj-deflate-'))
   afterAll(async () => {
-    for (const o of open) o.close()
+    for (const o of open) void o.close()
     await wait(50)
     rmSync(deflateDir, { recursive: true, force: true })
   })
@@ -301,7 +301,7 @@ describe('★ the scrub bar spends from one budget, not one per viewer', () => {
   const open: (Gateway | WebSocket)[] = []
   const scrubDir = mkdtempSync(join(tmpdir(), 'sj-scrub-'))
   afterAll(async () => {
-    for (const o of open) o.close()
+    for (const o of open) void o.close()
     await wait(50)
     rmSync(scrubDir, { recursive: true, force: true })
   })

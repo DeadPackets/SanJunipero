@@ -255,7 +255,10 @@ describe('★ the law channel reaches the served world', () => {
 
       // Exactly what `createLawsAdmin` calls after it has checked the token and the schema.
       dw.submitLaw('mystery.enabled', false)
-      expect(dw.loop.state.laws?.['mystery.enabled'], 'a law must not land mid-tick').toBeUndefined()
+      expect(
+        dw.loop.state.laws?.['mystery.enabled'],
+        'a law must not land mid-tick',
+      ).toBeUndefined()
 
       dw.tick()
       expect(dw.loop.state.laws?.['mystery.enabled']).toBe(false)
@@ -263,9 +266,7 @@ describe('★ the law channel reaches the served world', () => {
       dw.tick()
       await dw.stop()
       const wdb = openDb(join(dir, 'w.db'))
-      const changes = new EventStore(wdb)
-        .readFrom(0)
-        .filter((e) => e.type === 'config_changed')
+      const changes = new EventStore(wdb).readFrom(0).filter((e) => e.type === 'config_changed')
       wdb.close()
       expect(changes).toHaveLength(1)
     } finally {
