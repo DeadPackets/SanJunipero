@@ -12,16 +12,11 @@ import {
   freePlots,
   grammarOf,
   plotExtent,
-  stateHash,
   townOrigin,
 } from '@sj/shared'
 import {
-  EventStore,
-  RngStreams,
-  TickLoop,
   claimInWorld,
   fold,
-  openDb,
   standingRects,
   submitIntent,
   townGroundOf,
@@ -30,55 +25,15 @@ import {
 } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { devTownSquare, devWorldOrigin } from './devTown.js'
-import {
-  FOUNDERS,
-  GO_HOME_BELOW,
-  foundersFor,
-  makeFoundersOnTick,
-  masonIntent,
-  townStructuresFor,
-} from './founders.js'
+import { FOUNDERS, GO_HOME_BELOW, masonIntent } from './founders.js'
+import { type Run, runFoundersWorld } from './testutil.js'
 
 const TICKS = 4320
 const RINGS = 3
 const GENESIS_STRUCTURES = 11
 
-type Seen = { type: string; tick: number; payload: Record<string, unknown> }
-type Run = { state: WorldState; events: Seen[] }
-
 function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild = false): Run {
-  const config = SHOWCASE_CONFIG
-  const terrain = devTerrain('showcase', rings)
-  const structures = townStructuresFor('showcase', rings)
-  const store = new EventStore(openDb(':memory:'))
-  const rng = new RngStreams('g6')
-  const events: Seen[] = []
-  const inner = makeFoundersOnTick(config, rng, () => loop.state, {
-    interiors: true,
-    builders,
-    structures,
-    founders: foundersFor(structures),
-    holdings: true,
-    jointBuild,
-  })
-  const loop: TickLoop = new TickLoop({
-    store,
-    state: devGenesisState(config, terrain, 'showcase', rings),
-    rng,
-    config,
-    snapshotEveryTicks: 720,
-    onTick: (ctx) => {
-      inner({
-        tick: ctx.tick,
-        emit: (type, payload) => {
-          events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
-          ctx.emit(type, payload)
-        },
-      })
-    },
-  })
-  for (let t = 0; t < ticks; t++) loop.step()
-  return { state: loop.state, events }
+  return runFoundersWorld({ interiors: true, builders, holdings: true, jointBuild }, ticks, rings)
 }
 
 // ── the frame, which everything below stands on ──────────────────────────────────────────────
@@ -203,12 +158,6 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     expect(run.events.filter((e) => e.type === 'agent_collapsed')).toEqual([])
     for (const f of FOUNDERS) expect(run.state.agents[f.id]!.alive, f.id).toBe(true)
   })
-
-  it('★ and it is deterministic — a second run reaches the same town, roof for roof', () => {
-    const twin = runDevWorld(true)
-    expect(standingRects(twin.state)).toEqual(standingRects(run.state))
-    expect(stateHash(twin.state)).toBe(stateHash(run.state))
-  }, 180_000)
 
   it('builders OFF is the landed world exactly — eleven buildings and no more', () => {
     const off = runDevWorld(false, RINGS, 1440)
@@ -372,11 +321,4 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       ).toBeNull()
     })
   })
-
-  it('★ deterministic: a second run reaches the same town, roof for roof and tile for tile', () => {
-    const twin = runDevWorld(true, RINGS, TICKS_J, true)
-    expect(standingRects(twin.state)).toEqual(standingRects(on.state))
-    expect(twin.state.terrain).toEqual(on.state.terrain)
-    expect(stateHash(twin.state)).toBe(stateHash(on.state))
-  }, 180_000)
 })

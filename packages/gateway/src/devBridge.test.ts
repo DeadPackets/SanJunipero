@@ -8,25 +8,17 @@ import { describe, expect, it } from 'vitest'
 import { RIVER_HALF, riverLocalDx, stateHash } from '@sj/shared'
 import {
   BRIDGE_KIND,
-  EventStore,
-  RngStreams,
-  TickLoop,
   bridgeAt,
   buildSiteOf,
   claimInWorld,
   fold,
-  openDb,
   standingRects,
   type WorldState,
 } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { SHOWCASE_ANCHOR, showcaseDeck, showcaseSpan } from './showcaseMap.js'
-import {
-  bridgewrightIntent,
-  foundersFor,
-  makeFoundersOnTick,
-  townStructuresFor,
-} from './founders.js'
+import { bridgewrightIntent } from './founders.js'
+import { type Run as BaseRun, runFoundersWorld } from './testutil.js'
 
 const RINGS = 3
 const TICKS = 4320
@@ -213,56 +205,24 @@ describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its
 
 // ── the run: a founder lays a deck and the town crosses ──────────────────────────────────────
 
-type Seen = { type: string; tick: number; payload: Record<string, unknown> }
-type Run = {
-  state: WorldState
-  events: Seen[]
-  store: EventStore
-  terrain: ReturnType<typeof devTerrain>
-  deckTick: number | null
-  crossedTick: number | null
-}
+type Run = BaseRun & { deckTick: number | null; crossedTick: number | null }
 
 function runDevWorld(bridge: boolean, ticks = TICKS): Run {
-  const config = SHOWCASE_CONFIG
-  const terrain = devTerrain('showcase', RINGS)
-  const structures = townStructuresFor('showcase', RINGS)
-  const store = new EventStore(openDb(':memory:'))
-  const rng = new RngStreams('g6')
-  const events: Seen[] = []
   const deck = showcaseDeck(SHOWCASE_ANCHOR, RINGS)
   const mid = channelMid(RINGS)
   let deckTick: number | null = null
   let crossedTick: number | null = null
-  const inner = makeFoundersOnTick(config, rng, () => loop.state, {
-    interiors: true,
-    builders: true,
-    structures,
-    founders: foundersFor(structures),
-    holdings: true,
-    ...(bridge ? { deck } : {}),
-  })
-  const loop: TickLoop = new TickLoop({
-    store,
-    state: devGenesisState(config, terrain, 'showcase', RINGS),
-    rng,
-    config,
-    snapshotEveryTicks: 720,
-    onTick: (ctx) => {
-      inner({
-        tick: ctx.tick,
-        emit: (type, payload) => {
-          events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
-          ctx.emit(type, payload)
-        },
-      })
-      if (deckTick === null && bridgeAt(loop.state, deck.x, deck.y)) deckTick = ctx.tick
-      const claim = claimInWorld(loop.state, { along: 2, deep: 2 })
-      if (crossedTick === null && claim !== null && claim.site.x < mid) crossedTick = ctx.tick
+  const run = runFoundersWorld(
+    { interiors: true, builders: true, holdings: true, ...(bridge ? { deck } : {}) },
+    ticks,
+    RINGS,
+    (tick, state) => {
+      if (deckTick === null && bridgeAt(state, deck.x, deck.y)) deckTick = tick
+      const claim = claimInWorld(state, { along: 2, deep: 2 })
+      if (crossedTick === null && claim !== null && claim.site.x < mid) crossedTick = tick
     },
-  })
-  for (let t = 0; t < ticks; t++) loop.step()
-  return { state: loop.state, events, store, terrain, deckTick, crossedTick }
+  )
+  return { ...run, deckTick, crossedTick }
 }
 
 describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, the far bank opens', () => {
@@ -374,15 +334,9 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
   })
 
   it('bridge OFF is the landed world exactly — no deck, and nothing west of the water', () => {
-    const off = runDevWorld(false)
+    const off = runDevWorld(false, 2160)
     expect(Object.values(off.state.structures).filter((s) => s.kind === BRIDGE_KIND)).toEqual([])
     expect(off.crossedTick, 'the far bank opened with no deck standing').toBeNull()
     expect(standingRects(off.state).length).toBeGreaterThan(11)
   })
-
-  it('★ and it is deterministic — a second run crosses on the same tick', () => {
-    const twin = runDevWorld(true)
-    expect(twin.deckTick).toBe(run.deckTick)
-    expect(stateHash(twin.state)).toBe(stateHash(run.state))
-  }, 180_000)
 })

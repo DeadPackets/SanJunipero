@@ -6,54 +6,18 @@
 // same structures, same `makeFoundersOnTick`. Scripted policies only. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
 import { stateHash } from '@sj/shared'
-import { EventStore, RngStreams, TickLoop, fold, openDb, type WorldState } from '@sj/engine'
-import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
-import { FOUNDERS, foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
+import { fold } from '@sj/engine'
+import { SHOWCASE_CONFIG, devGenesisState } from './devWorld.js'
+import { FOUNDERS } from './founders.js'
+import { type Run, type Seen, runFoundersWorld } from './testutil.js'
 
 /** Three sim days, the far-bank lane's standard, so a night is a thing this test has seen
  *  three of rather than argued about once. */
 const TICKS = 4320
 const RINGS = 3
 
-type Seen = { type: string; tick: number; payload: Record<string, unknown> }
-type Run = {
-  state: WorldState
-  events: Seen[]
-  store: EventStore
-  terrain: ReturnType<typeof devTerrain>
-}
-
 function runDevWorld(interiors: boolean, ticks = TICKS): Run {
-  const config = SHOWCASE_CONFIG
-  const terrain = devTerrain('showcase', RINGS)
-  const structures = townStructuresFor('showcase', RINGS)
-  const store = new EventStore(openDb(':memory:'))
-  const rng = new RngStreams('g6')
-  const events: Seen[] = []
-  const inner = makeFoundersOnTick(config, rng, () => loop.state, {
-    interiors,
-    structures,
-    founders: foundersFor(structures),
-    holdings: true,
-  })
-  const loop: TickLoop = new TickLoop({
-    store,
-    state: devGenesisState(config, terrain, 'showcase', RINGS),
-    rng,
-    config,
-    snapshotEveryTicks: 720,
-    onTick: (ctx) => {
-      inner({
-        tick: ctx.tick,
-        emit: (type, payload) => {
-          events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
-          ctx.emit(type, payload)
-        },
-      })
-    },
-  })
-  for (let t = 0; t < ticks; t++) loop.step()
-  return { state: loop.state, events, store, terrain }
+  return runFoundersWorld({ interiors, holdings: true }, ticks, RINGS)
 }
 
 const of = (run: Run, type: string): Seen[] => run.events.filter((e) => e.type === type)
