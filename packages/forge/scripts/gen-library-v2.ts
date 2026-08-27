@@ -171,7 +171,9 @@ for (const item of items) {
     }
     try {
       const keyed = chromaKey(await decodePng(buf))
-      const sprite = spriteCell(keyed, { cellPx: WORLD_SPRITE_PX, anchor: 'centre' })
+      // The ENTRY's size, not the class default: a bed and a rug cover more ground than a knife
+      // and are authored at 192. `artCoverage.test.ts` measures the sprite against `e.spritePx`.
+      const sprite = spriteCell(keyed, { cellPx: e.spritePx, anchor: 'centre' })
       const icon = spriteCell(keyed, { cellPx: ICON_PX, anchor: 'centre' })
       const { islands, opaqueFrac } = silhouetteStats(sprite.cell)
       // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
