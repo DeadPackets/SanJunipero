@@ -22,9 +22,11 @@ const KEY_PAGE_TICKS = MINUTES_PER_DAY
  *  thing that already happened and re-folding it per frame would buy nothing. */
 const MARKS_REFETCH_MS = 30_000
 
-const EMPTY_SOURCES: MarkSources = {
+/** The firsts are `/api/milestones`' to serve; `/api/timeline/marks` carries the other five. */
+type WireSources = Omit<MarkSources, 'milestones'>
+
+const EMPTY_SOURCES: WireSources = {
   chapters: [],
-  milestones: [],
   moments: [],
   changes: [],
   events: [],
@@ -32,11 +34,10 @@ const EMPTY_SOURCES: MarkSources = {
 }
 
 /** Every list is optional on the wire; a source the gateway has nothing for is an empty one. */
-const markSources = (body: unknown): MarkSources => {
-  const b = body as Partial<MarkSources>
+const markSources = (body: unknown): WireSources => {
+  const b = body as Partial<WireSources>
   return {
     chapters: b.chapters ?? [],
-    milestones: [],
     moments: b.moments ?? [],
     changes: b.changes ?? [],
     events: b.events ?? [],
@@ -44,8 +45,6 @@ const markSources = (body: unknown): MarkSources => {
   }
 }
 
-/** The firsts ledger has its own endpoint — `/api/timeline/marks` used to carry a second copy
- *  of the same SELECT, and two copies of one query are two to keep right. */
 const NO_FIRSTS: MarkSources['milestones'] = []
 const firstRows = (body: unknown): MarkSources['milestones'] | null =>
   Array.isArray(body) ? (body as MarkSources['milestones']) : null
