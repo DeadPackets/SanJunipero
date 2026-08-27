@@ -8,7 +8,7 @@ import type { Scene } from './scene.js'
 import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
-import { entitySpriteOf } from './entities.js'
+import { setEntityScaleMul } from './entities.js'
 import { isGrave, toneReducer } from './tone.js'
 
 const SMOKE_PUFFS = 3
@@ -198,7 +198,6 @@ export function createAmbient(
   const glows = new Map<string, Sprite>()
   const fires = new Map<string, Sprite>()
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
-  const bounceBase = new Map<string, { x: number; y: number }>()
 
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
@@ -343,25 +342,10 @@ export function createAmbient(
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {
       const b = bounces[i]!
-      const sprite = entitySpriteOf(scene, b.kind, b.id)
-      if (sprite === null) {
-        bounces.splice(i, 1)
-        continue
-      }
-      let base = bounceBase.get(`${b.kind}:${b.id}`)
-      if (base === undefined) {
-        base = { x: sprite.scale.x, y: sprite.scale.y }
-        bounceBase.set(`${b.kind}:${b.id}`, base)
-      }
       const p = (t - b.at) / BOUNCE_MS
-      if (p >= 1 || p < 0) {
-        sprite.scale.set(base.x, base.y)
-        bounceBase.delete(`${b.kind}:${b.id}`)
-        bounces.splice(i, 1)
-      } else {
-        const k = 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
-        sprite.scale.set(base.x * k, base.y * k)
-      }
+      const done = p >= 1 || p < 0
+      const k = done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
+      if (!setEntityScaleMul(scene, b.kind, b.id, k) || done) bounces.splice(i, 1)
     }
 
     // squash-and-stretch while a work verb persists

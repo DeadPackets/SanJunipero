@@ -107,6 +107,9 @@ type Entry = {
   /** the ground this drawable stands on, rewritten every sync inside the one entry this
    *  drawable publishes to the frame's depth sort */
   depth: DepthEntry
+  /** the scale this layer owns, and the multiplier an effect is holding over it */
+  base: number
+  mul: number
 }
 
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
@@ -144,7 +147,7 @@ function applyBuildingArt(
     entry.url = NO_ART
     entry.sprite.texture = Texture.EMPTY
     entry.sprite.anchor.set(0.5, 1.0)
-    entry.sprite.scale.set(1)
+    writeScale(entry, 1)
     cutHitPrism(entry)
     if (entry.form === null) {
       entry.form = new Graphics()
@@ -170,10 +173,30 @@ function applyBuildingArt(
     if (swapping) fadeArtIn(entry.sprite) // finish line 8: art arrives, it does not pop in
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)
-    const scale = art.scale ?? 1
-    entry.sprite.scale.set(scale)
+    writeScale(entry, art.scale ?? 1)
     cutHitPrism(entry) // the prism is scaled with the sprite, so a new scale re-cuts it
   })
+}
+
+/** The layer's own scale, composed with whatever multiplier an effect is holding. */
+function writeScale(entry: Entry, base: number): void {
+  entry.base = base
+  entry.sprite.scale.set(base * entry.mul)
+}
+
+/** An effect publishes a multiplier and the owner applies it, so art landing mid-effect is not
+ *  reverted when the effect ends. False when the subject is gone and the effect should stop. */
+export function setEntityScaleMul(
+  scene: Scene,
+  kind: 'structure' | 'item' | 'crop',
+  id: string,
+  k: number,
+): boolean {
+  const entry = syncStates.get(scene)?.entries.get(`${kind}:${id}`)
+  if (entry === undefined) return false
+  entry.mul = k
+  entry.sprite.scale.set(entry.base * k)
+  return true
 }
 
 /** Re-cut the structure's hit prism: on the art's scale landing, on a footprint change and on the camera settling at a new zoom — never per frame. */
@@ -346,6 +369,8 @@ export function syncEntities(
         footprint: { w: s.w, h: s.h },
         hitZoom: sync.hitZoom,
         depth: { box: structureDepthBox(key, s), node: sprite },
+        base: 1,
+        mul: 1,
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -413,6 +438,8 @@ export function syncEntities(
         footprint: { w: 1, h: 1 },
         hitZoom: 1,
         depth: { box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX), node: sprite },
+        base: 1,
+        mul: 1,
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -449,6 +476,8 @@ export function syncEntities(
         footprint: { w: 1, h: 1 },
         hitZoom: 1,
         depth: { box: tileDepthBox(key, c.x, c.y), node: sprite },
+        base: 1,
+        mul: 1,
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -457,7 +486,7 @@ export function syncEntities(
     const ground = tileToScreen(c.x, c.y)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, c.x, c.y)
-    entry.sprite.scale.set(CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
+    writeScale(entry, CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
     entry.sprite.tint = c.withered ? WITHERED_TINT : 0xffffff
   }
 
