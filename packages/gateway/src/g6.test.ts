@@ -11,14 +11,7 @@ import { publishThought } from './observer.js'
 import { drawHouse, registerDemoHouse } from './hotswapDemo.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
-
-const until = async (cond: () => boolean, timeoutMs = 30_000): Promise<void> => {
-  const t0 = Date.now()
-  while (!cond()) {
-    if (Date.now() - t0 > timeoutMs) throw new Error('timed out waiting')
-    await new Promise((r) => setTimeout(r, 25))
-  }
-}
+import { until } from './testutil.js'
 
 type Client = { sock: WebSocket; frames: string[] }
 

@@ -21,6 +21,7 @@ import { AGENT_ID } from './api.js'
 import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 import { frameText } from './http.js'
+import { connect } from './testutil.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -68,15 +69,6 @@ function makeWorld(dbPath: string) {
   })
   return { db, loop }
 }
-
-const connect = (port: number): Promise<WebSocket> =>
-  new Promise((resolve, reject) => {
-    const s = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-    s.on('open', () => {
-      resolve(s)
-    })
-    s.on('error', reject)
-  })
 
 /** The close code, or 'open' if the socket is still up after `ms` — so "was not closed" is an
  *  assertion rather than a timeout. */

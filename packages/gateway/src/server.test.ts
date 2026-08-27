@@ -10,6 +10,7 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
+import { connect } from './testutil.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
@@ -29,16 +30,6 @@ function makeWorld(dbPath: string) {
     },
   })
   return { db, store, loop }
-}
-
-function connect(port: number): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-    sock.on('open', () => {
-      resolve(sock)
-    })
-    sock.on('error', reject)
-  })
 }
 
 function nextRaw(sock: WebSocket): Promise<string> {

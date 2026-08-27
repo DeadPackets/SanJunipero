@@ -7,14 +7,7 @@ import { startDevWorld } from './devWorld.js'
 import { FOUNDERS } from './founders.js'
 import { thoughtsSince } from './observer.js'
 import { readWorldMeta } from './worldMeta.js'
-
-const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => {
-  const t0 = Date.now()
-  while (!cond()) {
-    if (Date.now() - t0 > timeoutMs) throw new Error('timed out waiting')
-    await new Promise((r) => setTimeout(r, 5))
-  }
-}
+import { until } from './testutil.js'
 
 /** Boot, run to at least `toTick`, close cleanly. Returns what the town looked like at the end. */
 const runTo = async (

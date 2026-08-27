@@ -17,6 +17,7 @@ import {
 import { createLawsAdmin } from './adminLaws.js'
 import { createGateway, type Gateway } from './server.js'
 import { frameText } from './http.js'
+import { connect } from './testutil.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const TOKEN = 'a-shared-secret'
@@ -161,15 +162,6 @@ describe('laws in the viewer protocol (T25b)', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  function connect(port: number): Promise<WebSocket> {
-    return new Promise((resolve, reject) => {
-      const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-      sock.on('open', () => {
-        resolve(sock)
-      })
-      sock.on('error', reject)
-    })
-  }
   const nextRaw = (sock: WebSocket): Promise<string> =>
     new Promise((resolve) =>
       sock.once('message', (d) => {
