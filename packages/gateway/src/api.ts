@@ -97,7 +97,8 @@ const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 const gerund = (verb: string): string =>
   verb.endsWith('e') ? `${verb.slice(0, -1)}ing` : `${verb}ing`
 
-export function mountDataApi(router: Router, deps: DataApiDeps): void {
+/** Returns the closer for the per-mind handles it holds; the gateway calls it on `close()`. */
+export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   const cache = makeSeqCache(() => deps.mirror.seq())
   const selEventsAfter = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events
@@ -245,19 +246,24 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   }
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
+  // HELD, not reopened: three inspector tabs per viewer was an open+close per GET on the thread
+  // that ticks the town, each one throwing that file's page cache away. `fileMustExist` is the
+  // cap — only a mind that has a file gets a handle, so a stranger's slug opens nothing.
+  const agentDbs = new Map<string, Database.Database>()
   const readAgentRows = <T>(agentId: string, sql: string): T[] => {
     if (!deps.agentDbDir || !AGENT_ID.test(agentId)) return []
-    let adb: Database.Database | null = null
     try {
-      adb = new Database(join(deps.agentDbDir, `${agentId}.db`), {
-        readonly: true,
-        fileMustExist: true,
-      })
+      let adb = agentDbs.get(agentId)
+      if (adb === undefined) {
+        adb = new Database(join(deps.agentDbDir, `${agentId}.db`), {
+          readonly: true,
+          fileMustExist: true,
+        })
+        agentDbs.set(agentId, adb)
+      }
       return adb.prepare(sql).all(agentId) as T[]
     } catch {
       return []
-    } finally {
-      adb?.close()
     }
   }
 
@@ -446,4 +452,9 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
       }),
     )
   })
+
+  return () => {
+    for (const adb of agentDbs.values()) adb.close()
+    agentDbs.clear()
+  }
 }

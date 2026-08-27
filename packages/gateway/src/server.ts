@@ -122,7 +122,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     getCodex,
     knowsAgent: (id) => mirror.state().agents[id] !== undefined,
   })
-  mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
+  const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
@@ -390,6 +390,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     clearInterval(timer)
     wss.close()
     httpServer.close()
+    closeDataApi()
     if (ownsDb) db.close()
     narratorDb?.close()
     throw e
@@ -404,6 +405,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         for (const client of wss.clients) client.terminate()
         wss.close(() => {
           httpServer.close(() => {
+            closeDataApi()
             if (ownsDb) db.close()
             narratorDb?.close()
             resolve()
