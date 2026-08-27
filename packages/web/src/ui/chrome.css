@@ -882,7 +882,6 @@ body {
   font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-quiet);
 }
-.legend-swatch { width: 10px; height: 10px; border-radius: 0; box-shadow: 0 0 0 2px var(--ink); }
 .legend-stamp {
   font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.3rem;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;

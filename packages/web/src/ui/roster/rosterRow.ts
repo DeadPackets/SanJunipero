@@ -4,7 +4,7 @@ import { moodOf, portraitUrl, type Expression, type MoodView } from '../../rende
 import { substanceOf } from '../becoming.js'
 import { bondLevel, bondWarmth, LEVEL_RANK, type BondLevel } from '../bondModel2.js'
 import { placeOf, type Place } from '../place.js'
-import { bustStyle, type BustStyle } from '../rosterModel.js'
+import { bustStyle, type BustStyle } from '../bustStyle.js'
 import { STATE_WORD, conditionsOf, stateWord, type Condition } from '../status.js'
 
 // P22 shapes every field: on sim-day 0 a row is name + age band + status + place + a neutral mood —

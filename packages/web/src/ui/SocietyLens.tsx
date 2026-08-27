@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
-import { BondsResponseSchema, tickToMoment, type BondsResponse } from '@sj/shared'
+import { tickToMoment, type BondsResponse } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 import { BondDetailPanel } from './BondDetailPanel.js'
 import { LegendChip } from './LegendChip.js'
-import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
+import { BondsVeil } from './StageVeil.js'
+import { EMPTY_LINEAGE } from './bondModel2.js'
 import {
   toRelationGraph,
   relationLegend,
   type LegendRow,
   type RelationLink,
 } from './relationGraph.js'
-import type { BondNode, PeopleIndex } from './bondsModel.js'
+import type { BondNode, PeopleIndex } from './bondModel2.js'
+import { bondsFeed, lineageFeed } from './feeds.js'
+import { useFeed } from './useEndpoint.js'
 import { EMPTY_COPY } from './townStats.js'
 
-export const REFETCH_MS = 30_000
 const HALO_COLOR = '#F4E289'
 const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
 
@@ -23,10 +25,6 @@ const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
 type PositionedNode = BondNode & { x?: number; y?: number }
 
 const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.size) * 5))
-
-/** About the READ, never about the town: an unanswered fetch and a tieless town draw the same
- *  field of unconnected people, so the wait has to name itself. */
-export const LOADING_COPY = 'Reading the town’s ties…'
 
 export function SocietyLens({
   store,
@@ -36,8 +34,8 @@ export function SocietyLens({
   onPick: (agentId: string) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
-  const [api, setApi] = useState<BondsResponse | null>(null)
-  const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
+  const api = useFeed(bondsFeed).data
+  const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   // R6: the key is shut on arrival, so the graph is never explained by a card standing on it.
   const [keyOpen, setKeyOpen] = useState(false)
@@ -53,37 +51,6 @@ export function SocietyLens({
       | { distance: (f: (l: unknown) => number) => void }
       | undefined
     link?.distance((l: unknown) => (l as RelationLink).distance)
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    const load = (): void => {
-      void fetch('/api/bonds')
-        .then(async (r) => (r.ok ? BondsResponseSchema.safeParse(await r.json()) : null))
-        .then((parsed) => {
-          if (alive && parsed?.success === true) setApi(parsed.data)
-        })
-        .catch(() => {
-          /* the town keeps its ties whether or not we can read them */
-        })
-    }
-    load()
-    const timer = setInterval(load, REFETCH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
-
-  useEffect(() => {
-    void fetch('/api/lineage')
-      .then(async (r) => (r.ok ? ((await r.json()) as LineageLike) : null))
-      .then((l) => {
-        if (l !== null && Array.isArray(l.parentOf)) setLineage(l)
-      })
-      .catch(() => {
-        /* ancestry is a nice-to-have, never a requirement */
-      })
   }, [])
 
   useEffect(() => {
@@ -207,9 +174,7 @@ export function SocietyLens({
           in which nothing has passed between anyone yet — and a field of unconnected people is
           what BOTH a tieless town and an unanswered fetch look like, so the wait says so. */}
       {api === null ? (
-        <p className="society-empty" aria-busy="true">
-          {LOADING_COPY}
-        </p>
+        <BondsVeil />
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
         <p className="society-empty">{EMPTY_COPY.bonds}</p>
       ) : null}

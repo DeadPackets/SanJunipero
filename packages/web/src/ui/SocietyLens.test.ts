@@ -14,6 +14,23 @@ function propBody(src: string, name: string): string {
   return src.slice(at, end)
 }
 
+describe('the graph engine stays out of the first paint', () => {
+  const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
+
+  // A static import puts react-force-graph-2d (195 kB) in the entry chunk, which the map, the
+  // chronicle and every ?broadcast=1 frame download without ever having a route to the lens.
+  it('App reaches the lens through lazy(), never a static import', () => {
+    expect(APP).toContain("lazy(() =>\n  import('./ui/SocietyLens.js')")
+    expect(APP, 'a static import undoes the split').not.toMatch(
+      /^import .*from '\.\/ui\/SocietyLens\.js'/m,
+    )
+  })
+
+  it('waits behind copy that names the wait, not behind nothing', () => {
+    expect(APP).toContain('<Suspense fallback={<BondsVeil />}>')
+  })
+})
+
 describe('the bonds graph paints every slab before any name', () => {
   // force-graph runs nodeCanvasObject once per node in array order, so a name drawn there is
   // buried by the next node's opaque slab: five people, two names destroyed.

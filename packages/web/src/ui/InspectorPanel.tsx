@@ -3,7 +3,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
-import { bustStyle } from './rosterModel.js'
+import { bustStyle } from './bustStyle.js'
 import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from './status.js'
 import {
   CHANGE_EMPTY,

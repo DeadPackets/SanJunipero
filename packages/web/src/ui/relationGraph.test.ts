@@ -15,7 +15,7 @@ import {
   relationLegend,
   toRelationGraph,
 } from './relationGraph.js'
-import type { PeopleIndex } from './bondsModel.js'
+import type { PeopleIndex } from './bondModel2.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 const MASTER_PALETTE = [

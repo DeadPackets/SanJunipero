@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
+import { usePolled } from './useEndpoint.js'
 
 export type Digest = {
   days: number[]
@@ -17,6 +18,8 @@ export type Digest = {
 
 type Chapter = { tick: number; title: string }
 
+const NO_CHAPTERS: Chapter[] = []
+
 export function DigestModal({
   store,
   missedTicks,
@@ -28,28 +31,15 @@ export function DigestModal({
   onMoment: (tick: number) => void
   onClose: () => void
 }) {
-  const [digest, setDigest] = useState<Digest | null>(null)
-  const [chapters, setChapters] = useState<Chapter[]>([])
   const boxRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
+  // Pinned to the window the modal opened over: a later render must not re-ask for a wider one.
+  const digestUrl = useMemo(() => {
     const to = store.getTick()
-    const from = Math.max(0, to - missedTicks)
-    void fetch(`/api/digest?fromTick=${from}&toTick=${to}`)
-      .then(async (r) => (r.ok ? ((await r.json()) as Digest) : null))
-      .then((d) => {
-        setDigest(d)
-      })
-      .catch(() => {
-        /* the modal says what it can; a missing digest is not worth an error */
-      })
-    void fetch('/api/chapters')
-      .then(async (r) => (r.ok ? ((await r.json()) as Chapter[]) : []))
-      .then(setChapters)
-      .catch(() => {
-        /* chapters are a nicety on top of the digest */
-      })
+    return `/api/digest?fromTick=${Math.max(0, to - missedTicks)}&toTick=${to}`
   }, [store, missedTicks])
+  // The modal says what it can: a missing digest, or missing chapters, is not worth an error.
+  const digest = usePolled<Digest>(digestUrl).data
+  const chapters = usePolled<Chapter[]>('/api/chapters').data ?? NO_CHAPTERS
 
   useEffect(() => {
     boxRef.current?.focus()
