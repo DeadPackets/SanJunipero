@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures, simTimeFromTick } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
+import type { TileId, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen, TILE_H } from './iso.js'
 import { rectOnGround, type ScreenRect } from './ground.js'
@@ -197,7 +197,69 @@ export function createAmbient(
   const smoke = new Map<string, Sprite[]>()
   const glows = new Map<string, Sprite>()
   const fires = new Map<string, Sprite>()
+  /** where a structure's effects hang and whether it is alight — rewritten when the world
+   *  changes, so the frame loop below reads it instead of walking every structure again */
+  const anchors = new Map<string, { sx: number; sy: number; hasFire: boolean }>()
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
+  let fxState: WorldState | null = null
+
+  /** Create, place and destroy the effect sprites. Deltas arrive at most every 250 ms, so this
+   *  runs on a new world state rather than on every frame. */
+  const syncStructureFx = (state: WorldState): void => {
+    const live = new Set<string>()
+    for (const s of Object.values(state.structures)) {
+      live.add(s.id)
+      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+      const hasFire = s.stage === 'complete' && HEARTH_KINDS.has(s.kind)
+      anchors.set(s.id, { sx: anchor.sx, sy: anchor.sy, hasFire })
+      if (hasFire && !smoke.has(s.id)) {
+        const puffs: Sprite[] = []
+        for (let i = 0; i < SMOKE_PUFFS; i++) {
+          const p = new Sprite(puffTex)
+          p.anchor.set(0.5, 0.5)
+          p.eventMode = 'none'
+          scene.layers.overhead.addChild(p)
+          puffs.push(p)
+        }
+        smoke.set(s.id, puffs)
+      }
+      if (hasFire && !glows.has(s.id)) {
+        const g = new Sprite(glowTex)
+        g.anchor.set(0.5, 1)
+        g.blendMode = 'add'
+        g.eventMode = 'none'
+        scene.layers.overhead.addChild(g)
+        glows.set(s.id, g)
+      }
+      // the door face — "deep blue night, warm window glow"
+      glows.get(s.id)?.position.set(anchor.sx, anchor.sy - 2)
+      if (s.burning && !fires.has(s.id)) {
+        const f = new Sprite(fireTex)
+        f.anchor.set(0.5, 1)
+        f.blendMode = 'add'
+        f.eventMode = 'none'
+        scene.layers.overhead.addChild(f)
+        fires.set(s.id, f)
+      }
+      const fire = fires.get(s.id)
+      if (fire !== undefined) {
+        if (s.burning) fire.position.set(anchor.sx, anchor.sy - 8)
+        else {
+          fire.destroy()
+          fires.delete(s.id)
+        }
+      }
+    }
+    for (const map of [smoke, glows, fires] as const) {
+      for (const [id, v] of map) {
+        if (live.has(id)) continue
+        if (Array.isArray(v)) for (const p of v) p.destroy()
+        else v.destroy()
+        map.delete(id)
+      }
+    }
+    for (const id of anchors.keys()) if (!live.has(id)) anchors.delete(id)
+  }
 
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
@@ -258,79 +320,34 @@ export function createAmbient(
       sampledTerrain = state.terrain
       sampleTerrain(state.terrain)
     }
+    if (state !== fxState) {
+      fxState = state
+      syncStructureFx(state)
+    }
 
     const night = simTimeFromTick(store.getTick()).isNight
 
-    // structures: smoke (complete), night glow (complete), fire (burning)
-    const liveIds = new Set<string>()
-    for (const s of Object.values(state.structures)) {
-      liveIds.add(s.id)
-      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
-      const complete = s.stage === 'complete'
-      const hasFire = complete && HEARTH_KINDS.has(s.kind)
-      if (hasFire && !smoke.has(s.id)) {
-        const puffs: Sprite[] = []
-        for (let i = 0; i < SMOKE_PUFFS; i++) {
-          const p = new Sprite(puffTex)
-          p.anchor.set(0.5, 0.5)
-          p.eventMode = 'none'
-          scene.layers.overhead.addChild(p)
-          puffs.push(p)
-        }
-        smoke.set(s.id, puffs)
-      }
-      const puffs = smoke.get(s.id)
-      if (puffs !== undefined) {
-        puffs.forEach((p, i) => {
-          const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
-          p.position.set(anchor.sx + 8, anchor.sy - 34 - prog * SMOKE_RISE_PX)
-          p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
-          p.visible = hasFire
-        })
-      }
-      if (hasFire && !glows.has(s.id)) {
-        const g = new Sprite(glowTex)
-        g.anchor.set(0.5, 1)
-        g.blendMode = 'add'
-        g.eventMode = 'none'
-        scene.layers.overhead.addChild(g)
-        glows.set(s.id, g)
-      }
-      const glow = glows.get(s.id)
-      if (glow !== undefined) {
-        glow.position.set(anchor.sx, anchor.sy - 2) // the door face — "deep blue night, warm window glow"
-        glow.visible = hasFire && night
-        glow.alpha =
-          GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
-      }
-      if (s.burning && !fires.has(s.id)) {
-        const f = new Sprite(fireTex)
-        f.anchor.set(0.5, 1)
-        f.blendMode = 'add'
-        f.eventMode = 'none'
-        scene.layers.overhead.addChild(f)
-        fires.set(s.id, f)
-      }
-      const fire = fires.get(s.id)
-      if (fire !== undefined) {
-        if (!s.burning) {
-          fire.destroy()
-          fires.delete(s.id)
-        } else {
-          fire.position.set(anchor.sx, anchor.sy - 8)
-          if (!grave)
-            fire.alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
-        }
-      }
+    // structures: smoke (complete), night glow (complete), fire (burning). Only the sprites
+    // this director created are walked — the world itself is walked when it changes.
+    for (const [id, puffs] of smoke) {
+      const a = anchors.get(id)
+      if (a === undefined) continue
+      puffs.forEach((p, i) => {
+        const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
+        p.position.set(a.sx + 8, a.sy - 34 - prog * SMOKE_RISE_PX)
+        p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
+        p.visible = a.hasFire
+      })
     }
-    for (const map of [smoke, glows, fires] as const) {
-      for (const [id, v] of map) {
-        if (!liveIds.has(id)) {
-          if (Array.isArray(v)) for (const p of v) p.destroy()
-          else v.destroy()
-          map.delete(id)
-        }
-      }
+    const glowAlpha =
+      GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
+    for (const [id, glow] of glows) {
+      glow.visible = (anchors.get(id)?.hasFire ?? false) && night
+      glow.alpha = glowAlpha
+    }
+    if (!grave) {
+      const fireAlpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
+      for (const f of fires.values()) f.alpha = fireAlpha
     }
 
     // water shimmer + swaying trees
