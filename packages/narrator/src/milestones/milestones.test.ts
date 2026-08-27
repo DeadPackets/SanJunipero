@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEATH_CAUSES, fold, genesisState, type TileId, type WorldState } from '@sj/engine'
+import {
+  DEATH_CAUSES,
+  fold,
+  genesisState,
+  RngStreams,
+  VERBS,
+  type TileId,
+  type WorldState,
+} from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { detectFirsts } from '../firsts.js'
 import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '../glass.js'
@@ -222,6 +230,92 @@ describe('tier 1 — the engine firsts', () => {
       expect(scanPromptForGlassLeak(def.kind), def.kind).toEqual([def.kind])
     }
   })
+
+  it('a day that does everything three times leaves one row per kind', () => {
+    const thrice = (make: (n: number) => SimEvent[]): SimEvent[] =>
+      [0, 1, 2].flatMap((n) => make(n))
+    const events: SimEvent[] = [
+      ...thrice((n) => [
+        ev(day(n) + 10, 'agent_spoke', { agentId: 'ada', text: 'oi', x: 0, y: 0 }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n), 'structure_planned', { id: `house_${n}`, kind: 'house' }),
+        ev(day(n) + 20, 'structure_completed', { id: `house_${n}` }),
+      ]),
+      ...thrice((n) => [ev(day(n) + 30, 'action_completed', { agentId: 'ada', verb: 'eat' })]),
+      ...thrice((n) => [
+        ev(day(n) + 40, 'tile_changed', {
+          x: n,
+          y: 0,
+          from: 0,
+          to: 7,
+          reason: 'paved',
+          byId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 50, 'tile_changed', {
+          x: n,
+          y: 1,
+          from: 0,
+          to: 10,
+          reason: 'channel',
+          byId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 60, 'fauna_killed', { id: `f_${n}`, kind: 'deer', x: 1, y: 1, byId: 'ada' }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 70, 'fire_extinguished', {
+          structureId: 's1',
+          cause: 'doused',
+          agentId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 80, 'agent_expressed', {
+          agentId: 'ada',
+          verb: 'dance',
+          x: 0,
+          y: 0,
+          sense: 'sight',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 90, 'agent_afflicted', { agentId: 'ada', kind: 'illness', severity: 1 }),
+      ]),
+    ]
+    const found = detectFirsts(events, ctx())
+    const kinds = found.map((m) => m.kind)
+    expect(new Set(kinds).size).toBe(kinds.length) // once each, never twice
+    for (const want of [
+      'first_speech',
+      'first_structure',
+      'first_house',
+      'first_meal',
+      'first_road',
+      'first_channel',
+      'first_hunt',
+      'first_fire_out',
+      'first_expression',
+      'first_infection',
+    ])
+      expect(kinds).toContain(want)
+  })
+
+  it('two deaths of two causes are two firsts, and the generic grave is only the first one', () => {
+    const deaths = [
+      ev(day(1), 'agent_died', { agentId: 'ada', cause: 'hunger' }),
+      ev(day(2), 'agent_died', { agentId: 'bex', cause: 'thirst' }),
+      ev(day(3), 'agent_died', { agentId: 'cass', cause: 'hunger' }),
+    ]
+    const kinds = detectFirsts(deaths, ctx()).map((m) => m.kind)
+    expect(kinds.filter((k) => k === 'first_death')).toHaveLength(1)
+    expect(kinds).toContain('first_death_hunger')
+    expect(kinds).toContain('first_death_thirst')
+    expect(kinds.filter((k) => k === 'first_death_hunger')).toHaveLength(1)
+  })
 })
 
 // A world with two bodies and the pair rows the engine keeps for them.
@@ -350,5 +444,49 @@ describe('tier 2 — the patterns, and the parting that needs more than a gap', 
         config: DEFAULT_CONFIG,
       }).map((m) => m.kind),
     ).not.toContain('first_conversation')
+  })
+
+  it('a pass with no world in reach simply does not run the three that need one', () => {
+    const lapse = [ev(day(12) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 })]
+    expect(t2(lapse).map((m) => m.kind)).not.toContain('first_breakup')
+  })
+
+  // Both of these match on `agent_harmed{source:'attack'}`, so they are driven with the log
+  // the verb actually produces rather than a hand-written one.
+  it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
+    const s = pairWorld({})
+    const blow = VERBS.attack!.onComplete(
+      s,
+      DEFAULT_CONFIG,
+      'ada',
+      { targetId: 'bex' },
+      new RngStreams('c1').get('combat'),
+    )
+    const harmed = blow.find((e) => e.type === 'agent_harmed')
+    expect(harmed).toBeDefined()
+    expect(harmed!.payload).toMatchObject({ agentId: 'bex', source: 'attack', byId: 'ada' })
+    expect((harmed!.payload as { amount: number }).amount).toBeGreaterThan(0)
+
+    const log = [
+      ev(day(1) + 10, harmed!.type, harmed!.payload),
+      // Far enough after the blow that it is a peace and not the same argument continuing.
+      ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'enough of that', x: 4, y: 4 }),
+    ]
+    const found = t2(log, s)
+    const quarrel = found.find((m) => m.kind === 'first_quarrel')
+    const peace = found.find((m) => m.kind === 'first_reconciliation')
+    expect(quarrel).toBeDefined()
+    expect(quarrel!.agentIds).toEqual(['ada', 'bex'])
+    expect(peace).toBeDefined()
+    expect(peace!.agentIds).toEqual(['ada', 'bex'])
+  })
+
+  it('a hurt with no hand behind it is not a quarrel', () => {
+    const s = pairWorld({})
+    const log = [
+      ev(day(1) + 10, 'agent_harmed', { agentId: 'bex', amount: 5, source: 'fire' }),
+      ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'that was close', x: 4, y: 4 }),
+    ]
+    expect(t2(log, s).map((m) => m.kind)).not.toContain('first_quarrel')
   })
 })
