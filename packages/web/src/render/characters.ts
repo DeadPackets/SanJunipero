@@ -88,12 +88,16 @@ type CharEntry = {
   crowdFrom: CrowdOffset
   crowdTo: CrowdOffset
   crowdSinceMs: number
+  /** the vertical multiplier an effect is holding over this body's own scale */
+  mulY: number
 }
 
 export type CharacterLayer = {
   tick(nowMs: number): void
   setEmotesHidden(v: boolean): void
   getSprite(agentId: string): Sprite | null
+  /** An effect publishes a multiplier; this layer composes it with the scale it owns. */
+  setScaleMulY(agentId: string, k: number): void
   destroy(): void
 }
 
@@ -330,6 +334,7 @@ export function createCharacterLayer(
       crowdFrom: NO_OFFSET,
       crowdTo: NO_OFFSET,
       crowdSinceMs: now,
+      mulY: 1,
     }
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
@@ -478,6 +483,7 @@ export function createCharacterLayer(
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
+      e.sprite.scale.y = e.sprite.scale.x * e.mulY
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
       const tag = nameTagText(a.name)
@@ -531,6 +537,12 @@ export function createCharacterLayer(
       emotesHidden = v
     },
     getSprite: (agentId) => entries.get(agentId)?.sprite ?? null,
+    setScaleMulY: (agentId, k) => {
+      const e = entries.get(agentId)
+      if (e === undefined) return
+      e.mulY = k
+      e.sprite.scale.y = e.sprite.scale.x * k
+    },
     destroy: () => {
       offEvents()
       for (const e of entries.values()) {

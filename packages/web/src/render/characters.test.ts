@@ -277,6 +277,29 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
+  // An effect that wrote scale.y itself only held because chars ticked before ambient. The
+  // multiplier is re-applied by this layer, so tick order stops being load-bearing.
+  it('★ composes an effect multiplier with the scale it owns, and re-applies it every tick', () => {
+    layer.tick(1000)
+    const sprite = layer.getSprite('nadia')!
+    layer.setScaleMulY('nadia', 0.92)
+    expect(sprite.scale.y).toBeCloseTo(sprite.scale.x * 0.92)
+
+    sprite.scale.set(2) // the layer's own write when a new atlas cell lands mid-effect
+    layer.tick(1016)
+    expect(sprite.scale.y, 'the effect rides the NEW base, not the one it started on').toBeCloseTo(
+      2 * 0.92,
+    )
+
+    layer.setScaleMulY('nadia', 1)
+    expect(sprite.scale.y).toBeCloseTo(2)
+  })
+
+  it('ignores a multiplier for a body it does not have', () => {
+    layer.tick(1000)
+    expect(() => layer.setScaleMulY('nobody', 0.5)).not.toThrow()
+  })
+
   it('getSprite returns the same registered sprite across ticks', () => {
     layer.tick(1000)
     const first = layer.getSprite('nadia')
