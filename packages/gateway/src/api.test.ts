@@ -132,18 +132,12 @@ describe('observer data apis', () => {
     adb
       .prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, ?, ?, ?)')
       .run('alice', 2000, 1, 'Second entry')
-    adb
-      .prepare(
-        'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
-          " VALUES (?, ?, ?, ?, ?, 6, '{}')",
-      )
-      .run('alice', 1439, 0, 'dream', 'the storehouse had no door')
-    adb
-      .prepare(
-        'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
-          " VALUES (?, ?, ?, ?, ?, 3, '{}')",
-      )
-      .run('alice', 200, 0, 'perception', 'bread, and the smell of it')
+    const remember = adb.prepare(
+      'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
+        " VALUES (?, ?, ?, ?, ?, 5, '{}')",
+    )
+    remember.run('alice', 1439, 0, 'dream', 'the storehouse had no door')
+    remember.run('alice', 200, 0, 'perception', 'bread, and the smell of it')
     adb
       .prepare('INSERT INTO ledgers (agent_id, person_id, doc, updated_day) VALUES (?, ?, ?, ?)')
       .run('alice', 'bob', 'Steady neighbor.', 1)

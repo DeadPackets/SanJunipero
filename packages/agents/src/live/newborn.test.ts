@@ -7,14 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import { EventStore, openDb } from '@sj/engine/store'
-import {
-  fold,
-  genesisState,
-  RngStreams,
-  TickLoop,
-  type TickHandler,
-  type TileId,
-} from '@sj/engine'
+import { fold, genesisState, RngStreams, TickLoop, type TickHandler, type TileId } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { migrateLlmTables } from '../llm/callLog.js'
 import { LlmClient } from '../llm/client.js'
@@ -179,7 +172,15 @@ async function town(opts: { namingBudgetUsd?: number } = {}) {
     bear: () => {
       pending.push({
         type: 'agent_born',
-        payload: { id: CHILD, name: 'Mira', sex: 'f', motherId: MOTHER, fatherId: FATHER, x: 3, y: 3 },
+        payload: {
+          id: CHILD,
+          name: 'Mira',
+          sex: 'f',
+          motherId: MOTHER,
+          fatherId: FATHER,
+          x: 3,
+          y: 3,
+        },
       })
     },
     settle: async (done: () => boolean, max = 200) => {
@@ -199,9 +200,10 @@ const memoryTexts = (db: Database.Database, agentId: string): string[] =>
   ).map((r) => r.text)
 
 const socialNames = (db: Database.Database): { agentId: string; socialName: string }[] =>
-  db
-    .prepare('SELECT agent_id AS agentId, social_name AS socialName FROM social_names')
-    .all() as { agentId: string; socialName: string }[]
+  db.prepare('SELECT agent_id AS agentId, social_name AS socialName FROM social_names').all() as {
+    agentId: string
+    socialName: string
+  }[]
 
 const callersIn = (db: Database.Database): string[] =>
   (db.prepare('SELECT DISTINCT caller FROM llm_calls').all() as { caller: string }[]).map(

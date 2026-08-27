@@ -38,13 +38,25 @@ describe('the map and the room card say the same sentence about a building', () 
 
   it('adds the builder’s nearest journal line under it, and nothing when there is none', () => {
     const journal = [
-      { tick: RISING.plannedTick + 5000, text: 'far' },
-      { tick: RISING.plannedTick + 10, text: 'near' },
+      { tick: RISING.plannedTick + 5000, text: 'far', kind: 'journal' as const },
+      { tick: RISING.plannedTick + 10, text: 'near', kind: 'journal' as const },
     ]
     expect(provenanceLines(STATE, RISING, journal)).toBe(
       'Begun by Yusuf, Day 3 — still rising\n"near"',
     )
     expect(provenanceLines(STATE, RISING, [])).not.toContain('"')
+  })
+
+  // The same feed now carries dreams. Quoting one here would put a thing that never happened
+  // under a building, in the builder's voice.
+  it('never quotes a dream as what the builder wrote', () => {
+    const journal = [
+      { tick: RISING.plannedTick + 1, text: 'the walls went soft', kind: 'dream' as const },
+      { tick: RISING.plannedTick + 10, text: 'near', kind: 'journal' as const },
+    ]
+    expect(provenanceLines(STATE, RISING, journal)).toBe(
+      'Begun by Yusuf, Day 3 — still rising\n"near"',
+    )
   })
 
   it('says so plainly when nobody recorded a beginning', () => {

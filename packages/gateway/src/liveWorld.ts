@@ -510,12 +510,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
-        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * minds.length
+        // The cast, not the founders: a town that has borne children spends for all of them.
+        const cast = booted?.cast.size ?? minds.length
+        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * cast
         const rate = projectDailySpend(opsDb, {
           windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
         }).usdPerSimDay
         if (rate <= ceiling) return
-        console.error(rateStopMessage(rate, ceiling, minds.length))
+        console.error(rateStopMessage(rate, ceiling, cast))
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })

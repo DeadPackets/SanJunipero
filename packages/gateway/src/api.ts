@@ -294,18 +294,18 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     })
   })
 
-  // A dream is a memory row and not a journal row, so the feed is two reads merged: a database
-  // missing either table still answers with the half it has.
+  // A dream is a memory row and not a journal row, so the feed is two reads merged. `sort` is
+  // stable, so each half keeps its own written order within a tick.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
     const id = params.id ?? ''
     const rows = [
       ...readAgentRows<JournalRow>(
         id,
-        "SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ?",
+        "SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ? ORDER BY id",
       ),
       ...readAgentRows<JournalRow>(
         id,
-        "SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream'",
+        "SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream' ORDER BY id",
       ),
     ]
     sendJson(

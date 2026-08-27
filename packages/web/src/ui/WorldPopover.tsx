@@ -7,7 +7,7 @@ import { builtLine, type Provenance } from './interiorModel.js'
 
 const NO_PROVENANCE = 'No one remembers who began this.'
 
-type Journal = { tick: number; text: string }
+type Journal = { tick: number; text: string; kind: 'journal' | 'dream' }
 
 /** The provenance sentence and the builder's nearest journal line, from the one builder both
  *  the room card and this popover read — the two used to print the same fact differently. */
@@ -19,13 +19,16 @@ export function provenanceLines(
   if (state === null || p === null) return NO_PROVENANCE
   const built = builtLine(state, p)
   if (built === null) return NO_PROVENANCE
-  const nearest = journal.reduce<Journal | null>(
-    (best, e) =>
-      best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick)
-        ? e
-        : best,
-    null,
-  )
+  // Written entries only: a dream quoted under a building reads as what the builder saw.
+  const nearest = journal
+    .filter((e) => e.kind !== 'dream')
+    .reduce<Journal | null>(
+      (best, e) =>
+        best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick)
+          ? e
+          : best,
+      null,
+    )
   return nearest === null ? built : `${built}\n"${nearest.text}"`
 }
 

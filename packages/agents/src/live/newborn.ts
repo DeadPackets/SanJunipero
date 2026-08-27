@@ -5,6 +5,7 @@ import { derivePersona, type ParentPersona } from '../family/derivePersona.js'
 import { buildHouseholdSeed } from '../family/memorySeed.js'
 import { captureSocialName, migrateFamilyTables } from '../family/socialName.js'
 import { watchBirths, type AgentBornPayload } from '../family/watchBirths.js'
+import { insertAlert } from '../llm/callLog.js'
 import type { LlmClient } from '../llm/client.js'
 import { MemoryStore } from '../memory/store.js'
 import type { EngineBridge } from '../runtime/bridge.js'
@@ -43,21 +44,26 @@ export function wireBirths(opts: BirthsOpts): () => void {
     const mother = opts.booted.cast.get(born.motherId)
     const father = opts.booted.cast.get(born.fatherId)
     if (mother === undefined || father === undefined) {
-      opts.namingLlm.alert('birth_without_parents', `${born.id} was born to nobody this cast knows`)
+      insertAlert(opts.opsDb, {
+        agentId: born.id,
+        kind: 'birth_without_parents',
+        detail: `${born.id} was born to nobody this cast knows`,
+      })
       return
     }
     const tick = opts.bridge.currentTick()
-    const seed = buildHouseholdSeed(opts.store, {
-      childId: born.id,
-      motherId: born.motherId,
-      fatherId: born.fatherId,
-      homeStructureId: opts.homeOf(born.id),
-      upToTick: tick,
-    })
     const { identity, personality } = derivePersona(born, [personaOf(mother), personaOf(father)])
     const db = opts.dbFor(born.id)
 
+    // Off the tick: the household seed walks the whole world log, and the naming is a call.
     void (async () => {
+      const seed = buildHouseholdSeed(opts.store, {
+        childId: born.id,
+        motherId: born.motherId,
+        fatherId: born.fatherId,
+        homeStructureId: opts.homeOf(born.id),
+        upToTick: tick,
+      })
       const mem = new MemoryStore(db, born.id, opts.embedder)
       for (const entry of seed) {
         // The household reached this mind the way anything else does; nothing here is its own act.
@@ -83,7 +89,11 @@ export function wireBirths(opts: BirthsOpts): () => void {
         tick,
       })
     })().catch((err: unknown) => {
-      opts.namingLlm.alert('birth_failed', err instanceof Error ? err.message : String(err))
+      insertAlert(opts.opsDb, {
+        agentId: born.id,
+        kind: 'birth_failed',
+        detail: err instanceof Error ? err.message : String(err),
+      })
     })
   }
 
