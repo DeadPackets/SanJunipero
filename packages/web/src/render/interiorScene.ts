@@ -649,7 +649,7 @@ export function createInteriorScene(
     if (plannedFor !== room2.kind || plannedSeq !== seq) replan(room2.kind, records, seq)
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
-    const beds = bedSlots(room2.kind, sleeping, records)
+    const beds = bedSlots(room2.kind, sleeping, plan)
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an

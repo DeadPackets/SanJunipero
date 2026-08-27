@@ -164,11 +164,10 @@ export function interiorOf(state: WorldState, structureId: string): Interior | n
 // each and a third sleeper gets none rather than lying on someone. The cells are INTERIOR TILES.
 export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
-function bedCells(kind: InteriorKind, records: AssetRecord[]): { x: number; y: number }[] {
+function bedCells(kind: InteriorKind, plan: RoomItem[]): { x: number; y: number }[] {
   const cells: { x: number; y: number }[] = []
   // The same seating the room map uses, over the same list in the same order — a sleeper's
   // cell and the bed's own tiles are one answer or a body lies beside its bed.
-  const plan = roomPlan(kind, records)
   const slots = plan.map((p) => p.slot)
   for (const [i, f] of plan.entries()) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
@@ -186,13 +185,14 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): { x: number; y: n
   return cells
 }
 
-/** Which interior tile each sleeper lies in. */
+/** Which interior tile each sleeper lies in, off the room's ALREADY-BUILT plan — the caller
+ *  holds one per plan change, so a sleeping room does not re-read the codex every frame. */
 export function bedSlots(
   kind: InteriorKind,
   sleeping: string[],
-  records: AssetRecord[] = [],
+  plan: RoomItem[] = roomPlan(kind, []),
 ): Record<string, { x: number; y: number }> {
-  const cells = bedCells(kind, records)
+  const cells = bedCells(kind, plan)
   const out: Record<string, { x: number; y: number }> = {}
   sleeping.forEach((id, i) => {
     const cell = cells[i]
