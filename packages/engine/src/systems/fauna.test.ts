@@ -5,7 +5,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
@@ -13,6 +12,7 @@ import type { RngState, RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { FAUNA_SPAWN_CHANCE } from './fauna.js'
+import { ev } from '../testutil/world.js'
 
 // Nothing else may speak at dawn or midnight: no weather turn, no rumour, no wider map.
 const QUIET = {
@@ -38,13 +38,6 @@ function forced(values: number[]): RngStreams {
 
 // grass, forest, water — the three habitats, and dirt for a tile nothing wants.
 const CHAR_TILE: Record<string, TileId> = { '.': 0, f: 3, w: 2, d: 1 }
-let seq = 31000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function world(rows: string[], config = CFG): WorldState {
   return genesisState(

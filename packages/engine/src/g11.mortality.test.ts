@@ -7,7 +7,6 @@ import {
   SimConfigSchema,
   thirstDecayPerTick,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -18,6 +17,7 @@ import { genesisState, thirstOf, type TileId, type WorldState } from './state.js
 import { DEATH_CAUSES, type DeathCause } from './systems/mortality.js'
 import { PALE_MUSHROOM, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // A quiet sky, no mysteries and no fauna: every event this gate names is one a scripted actor
 // or a named system caused. Old age is switched off except in the one row that is about it.
@@ -32,16 +32,7 @@ const CFG: SimConfig = SimConfigSchema.parse({ ...QUIET, aging: { deathOfOldAgeE
 // Every cause this file actually produced, checked against DEATH_CAUSES in the last row.
 const CAUSES_SEEN = new Set<DeathCause>()
 
-let seq = 700000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 type Spawn = { id: string; x: number; y: number; ageDays?: number }
 

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { FOOD_KINDS, nutritionOf, VERBS } from './verbs.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
+import { ev } from './testutil/world.js'
 
 const FAST: SimConfig = SimConfigSchema.parse({
   needs: {
@@ -23,13 +24,6 @@ const FAST: SimConfig = SimConfigSchema.parse({
 })
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
-let seq = 1000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function makeWorld(
   config = FAST,

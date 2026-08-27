@@ -5,7 +5,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { FORAGEABLE_KINDS, FORAGEABLE_PROSE, FORAGEABLE_YIELD } from '../data/forageables.js'
 import { ForageableSpawned } from '../events.def.js'
@@ -16,6 +15,7 @@ import { genesisState, type TileId, type WorldState } from '../state.js'
 import { VERBS } from '../verbs.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { FORAGE_REGROW_CHANCE } from './forage.js'
+import { ev } from '../testutil/world.js'
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -36,13 +36,6 @@ function forced(values: number[]): RngStreams {
 }
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, f: 3 }
-let seq = 41000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 // A clearing with the wood at its southern edge, so forest-adjacency forage still works.
 const CLEARING = ['..', 'ff']

@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
-import { createScriptedLoop } from '../scripted.js'
-import { openDb } from '../db.js'
-import { EventStore } from '../eventStore.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const MIDNIGHT = 1440
 const quiet = {
@@ -23,15 +21,7 @@ const SPREADS = cfg({ dailyWorsenChance: 0, contagionChance: 1 })
 const NO_SPREAD = cfg({ dailyWorsenChance: 0, contagionChance: 1, contagionEnabled: false })
 const OFF = cfg({ enabled: false, dailyWorsenChance: 1, contagionChance: 1 })
 
-let seq = 91000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const map = (): TileId[][] => grid(16)
 
 function town(config: SimConfig, at: [string, number, number][]): WorldState {
   let s = genesisState(config, map())
@@ -216,10 +206,7 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
       'a1',
       2,
     )
-    const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), SPREADS)
-    const out = createWorldTick(SPREADS, new RngStreams('ill'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, MIDNIGHT), SPREADS)
+    const { replayed, out } = roundTrips({ ...s, tick: MIDNIGHT - 1 }, SPREADS, 'ill')
     expect(replayed).toEqual(out.state)
   })
 })
@@ -270,17 +257,5 @@ describe('illnessSystem: a wound turns septic at dawn', () => {
     const r = dawn(wound(OFF), OFF, 'h3')
     expect(r.events.map((e) => e.type)).not.toContain('agent_afflicted')
     expect(r.state.agents.a1!.afflictions).toBeUndefined()
-  })
-})
-
-describe('C9 per-tick contagion is retired', () => {
-  it('no agent_fell_ill is emitted anywhere in three scripted days', () => {
-    const store = new EventStore(openDb(':memory:'))
-    // Illness and contagion stay at their genesis dials; only the scenery is held still.
-    const loop = createScriptedLoop(SimConfigSchema.parse(quiet), 'illness-retired', store)
-    for (let i = 0; i < 3 * MIDNIGHT; i++) loop.step()
-    const types = new Set(store.readFrom(0).map((e) => e.type))
-    expect(types.size).toBeGreaterThan(5)
-    expect(types.has('agent_fell_ill')).toBe(false)
   })
 })

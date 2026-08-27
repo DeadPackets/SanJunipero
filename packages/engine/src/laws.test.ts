@@ -5,7 +5,6 @@ import {
   SimConfigSchema,
   stateHash,
   type SimConfig,
-  type SimEvent,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -16,6 +15,7 @@ import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { TickLoop } from './tickLoop.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // A law is a fact about the world, so it travels the only road facts travel:
 // one event, folded, hashed, snapshotted, replayed.
@@ -25,16 +25,7 @@ const CFG: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
 })
 
-let seq = 70000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-
-const MAP = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const MAP = (): TileId[][] => grid(16)
 
 function world(): WorldState {
   const s = genesisState(CFG, MAP())
@@ -79,6 +70,16 @@ describe('effectiveConfig', () => {
 
   // Driven from an explicit array, not from the table itself: a missing whitelist entry has to
   // fail loudly, and a table-derived loop would happily agree with its own omission.
+  const C9_LAW_PATHS = [
+    'reproduction.enabled',
+    'aging.deathOfOldAgeEnabled',
+    'spoilage.enabled',
+    'tools.wearEnabled',
+    'mystery.enabled',
+    'occlusion.enabled',
+    'ownership.enabled',
+    'inscription.enabled',
+  ]
   const C11_LAW_PATHS = [
     'mortality.enabled',
     'illness.enabled',
@@ -107,8 +108,9 @@ describe('effectiveConfig', () => {
     'regrowth.saplingChancePerDay',
   ]
 
-  it('every C11 flag and starred dial is a world law with a value schema', () => {
-    for (const path of C11_LAW_PATHS) expect(TOGGLABLE_PATHS[path]).toBeDefined()
+  it('every C9 and C11 flag and starred dial is a world law with a value schema', () => {
+    for (const path of [...C9_LAW_PATHS, ...C11_LAW_PATHS])
+      expect(TOGGLABLE_PATHS[path]).toBeDefined()
   })
 
   it('the C11 value schemas reject the wrong shape and the out-of-range value', () => {

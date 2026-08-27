@@ -15,7 +15,7 @@ import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { doorTile } from './interiors.js'
-import { applyLaw, effectiveConfig, TOGGLABLE_PATHS, type LawQueue } from './laws.js'
+import { applyLaw, effectiveConfig, type LawQueue } from './laws.js'
 import { composePerception } from './perception.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import { RngStream, RngStreams } from './rng.js'
@@ -26,6 +26,7 @@ import { spoilDeadline } from './systems/spoilage.js'
 import { TickLoop } from './tickLoop.js'
 import { VERBS, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 // A quiet sky and no mysteries by default: every event this gate names is one a
 // scripted actor or a named system caused, never weather noise.
@@ -39,16 +40,7 @@ const FERTILE: SimConfig = SimConfigSchema.parse({
 
 const RNG = RngStream.seed('g9a', 'actions')
 
-let seq = 900000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 } // door (4,6)
@@ -195,17 +187,6 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
     expect(child.sex).toBe(p.sex)
     expect(child.insideId).toBe(HOUSE.id) // born where the mother lay
     expect(delivery.state.agents.ada!.pregnant).toBeUndefined()
-  })
-
-  it('goes silent under the reproduction law, and the law travels as an event', () => {
-    const off = fold(
-      couple(FERTILE),
-      ev('config_changed', { path: 'reproduction.enabled', value: false }),
-      FERTILE,
-    )
-    const quiet = pass(off, FERTILE, 1)
-    expect(typed(quiet.events, 'co_slept')).toEqual([])
-    expect(quiet.state.pairNights).toBeUndefined()
   })
 })
 
@@ -364,11 +345,6 @@ describe('G9a-4: a wall stops sound', () => {
     expect(heardBy('doorway')).toEqual(['speaker'])
     expect(heardBy('outside')).toEqual([]) // three tiles out, well inside plain earshot of 8
   })
-
-  it('with occlusion off the wall stops being a wall, and plain earshot returns', () => {
-    const s = fold(room(), ev('config_changed', { path: 'occlusion.enabled', value: false }), CFG)
-    expect(composePerception(s, CFG, 'outside', [said(s)]).heard).toHaveLength(1)
-  })
 })
 
 describe('G9a-5: a shelf buys time', () => {
@@ -421,16 +397,6 @@ describe('G9a-5: a shelf buys time', () => {
       ['item_2'],
     )
     expect(day4.state.items.item_2).toBeUndefined()
-  })
-
-  it('with the spoilage law off nothing turns, and the deadline waits', () => {
-    const off = fold(
-      larder(),
-      ev('config_changed', { path: 'spoilage.enabled', value: false }),
-      CFG,
-    )
-    expect(typed(pass(off, CFG, 4).events, 'item_spoiled')).toEqual([])
-    expect(pass(off, CFG, 4).state.items.item_1).toBeDefined()
   })
 })
 
@@ -508,12 +474,6 @@ describe('G9a-7: what is carved can be read back', () => {
     expect(across.hasInscription).toBe(true)
     expect(across.inscription).toBeUndefined()
   })
-
-  it('with the inscription law off the hands find no way to mark it', () => {
-    const s = fold(wall(), ev('config_changed', { path: 'inscription.enabled', value: false }), CFG)
-    const r = submitIntent(s, CFG, 'carver', 'inscribe', { structureId: HOUSE.id, text: TEXT })
-    expect(r).toEqual({ ok: false, reason: 'your hands find no way to mark this' })
-  })
 })
 
 describe('G9a-8: the world keeps one hand hidden', () => {
@@ -550,15 +510,6 @@ describe('G9a-8: the world keeps one hand hidden', () => {
     expect(composePerception(s, CFG, 'distant', [here]).seen).toEqual([])
     expect(composePerception(s, CFG, 'indoors', [here]).seen).toEqual([])
   })
-
-  it('with the mystery law off the roll is not drawn at all', () => {
-    const off = fold(
-      watchers(CERTAIN),
-      ev('config_changed', { path: 'mystery.enabled', value: false }),
-      CERTAIN,
-    )
-    expect(typed(pass(off, CERTAIN, 1, 12).events, 'mystery_event')).toEqual([])
-  })
 })
 
 describe('G9a-9: death of old age, under a forced roll', () => {
@@ -593,21 +544,6 @@ describe('G9a-9: death of old age, under a forced roll', () => {
     expect(died.map((e) => e.payload)).toEqual([{ agentId: 'elder', cause: 'old_age' }])
     expect(midnight.state.agents.elder!.alive).toBe(false)
     expect(midnight.state.items.item_1!.loc).toEqual({ t: 'tile', x: 3, y: 3 })
-  })
-
-  it('with the old-age law off the body still ages and the roll is skipped', () => {
-    const off = fold(
-      elder(CERTAIN_DEATH),
-      ev('config_changed', {
-        path: 'aging.deathOfOldAgeEnabled',
-        value: false,
-      }),
-      CERTAIN_DEATH,
-    )
-    const midnight = pass(off, CERTAIN_DEATH, 1)
-    expect(typed(midnight.events, 'agent_aged')).toHaveLength(1)
-    expect(typed(midnight.events, 'agent_died')).toEqual([])
-    expect(midnight.state.agents.elder!.alive).toBe(true)
   })
 })
 
@@ -706,32 +642,5 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
     const forward = store.readFrom(preFlip.seq).reduce((s, e) => fold(s, e, CFG), preFlip.state)
     expect(stateHash(forward)).toBe(live)
     expect(forward.laws).toEqual(loop.state.laws)
-  })
-
-  it('refuses a path that is not a world law, and a value of the wrong shape', () => {
-    const s = genesisState(CFG, MAP())
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG),
-    ).toThrow(/not a world law/)
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'needs.eatRestoreHunger', value: 999 }), CFG),
-    ).toThrow(/not a world law/)
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG),
-    ).toThrow(/rejected/)
-  })
-
-  it('every C9 feature has a switch an operator can reach', () => {
-    for (const path of [
-      'reproduction.enabled',
-      'aging.deathOfOldAgeEnabled',
-      'spoilage.enabled',
-      'tools.wearEnabled',
-      'mystery.enabled',
-      'occlusion.enabled',
-      'ownership.enabled',
-      'inscription.enabled',
-    ])
-      expect(TOGGLABLE_PATHS[path]).toBeDefined()
   })
 })

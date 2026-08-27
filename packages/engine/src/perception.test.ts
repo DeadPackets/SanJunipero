@@ -6,14 +6,7 @@ import { doorTile } from './interiors.js'
 import { composePerception, hears } from './perception.js'
 import { VERBS } from './verbs.js'
 import { RngStream } from './rng.js'
-
-let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
+import { ev } from './testutil/world.js'
 
 // Noon by default: the witness radius scales with the light on the thing seen,
 // and every row below the night-witness block is about a horizon, not about the dark.
@@ -759,6 +752,7 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
   const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })
   const LIGHTLESS_CFG = SimConfigSchema.parse({ light: { enabled: false } })
   const MIDNIGHT = 0
+  const DUSK = 19 * 60
   const NIGHT_R = Math.round(CFG.movement.sightRadius * CFG.nightWitness.nightFactor)
 
   const night = (s: WorldState): WorldState => ({ ...s, tick: MIDNIGHT })
@@ -808,11 +802,11 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
   }
 
   // A taking at (x,y) that 'a' at the origin may or may not witness.
-  const takingAt = (x: number, y: number): SimEvent[] => [
+  const takingAt = (x: number, y: number, tick = MIDNIGHT): SimEvent[] => [
     ev(
       'item_taken',
       { itemId: 'item_5', kind: 'bread', takerId: 'thief', ownerId: 'a', x, y },
-      MIDNIGHT,
+      tick,
     ),
   ]
 
@@ -832,6 +826,12 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
       { id: 'thief', x: 6, y: 0 },
     ])
     expect(composePerception(byDay, CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+  })
+
+  it('at dusk the sight still reaches six paces, and the light band reads dim', () => {
+    const s = { ...world(), tick: DUSK }
+    expect(composePerception(s, CFG, 'a', takingAt(6, 0, DUSK)).seen).toHaveLength(1)
+    expect(composePerception(s, CFG, 'a', []).light).toBe('dim')
   })
 
   it('the same theft beside a fed fire is witnessed at full daylight range', () => {

@@ -6,16 +6,9 @@ import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { fireSystem } from './fire.js'
+import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
-
-let seq = 12000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function house(id: string, x: number, y: number, flammable = true): SimEvent[] {
   return [

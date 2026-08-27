@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import {
-  DAYS_PER_YEAR,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-  type SimEvent,
-} from '@sj/shared'
+import { DAYS_PER_YEAR, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
 import { DEATH_CAUSES, dominantDrain, type DeathCause } from './mortality.js'
+import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -28,15 +23,7 @@ const NO_GRAVE: SimConfig = SimConfigSchema.parse({
   mortality: { graveEnabled: false },
 })
 
-let seq = 80000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-const map = (): TileId[][] =>
-  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const map = (): TileId[][] => grid(16)
 
 function body(config = CFG): WorldState {
   return fold(
@@ -196,10 +183,7 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
 
   it("folding the tick's own events reproduces the state it returned", () => {
     const s = afflict(afflict(body(), 'illness', 1, 0), 'injury', 2, 0)
-    const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
-    const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    const { replayed, out } = roundTrips(s, CFG, 'm')
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 })
@@ -377,10 +361,7 @@ describe('a grave where the life ended', () => {
 
   it('folding the death tick reproduces the state it returned, grave and all', () => {
     const s = nearlyDead(afflict(body(), 'illness', 2, 0))
-    const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
-    const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
-    let replayed = advanced
-    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    const { replayed, out } = roundTrips(s, CFG, 'm')
     expect(stateHash(replayed)).toBe(stateHash(out.state))
     expect(graveOf(out.state)).toBeDefined()
   })

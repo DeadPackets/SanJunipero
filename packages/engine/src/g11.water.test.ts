@@ -1,13 +1,7 @@
 // @slow — GATE G11a, the water and the ground: the bucket line, the channel, the crossing, and
 // the roads feet make. Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
-import {
-  fertilityAt,
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  type SimConfig,
-  type SimEvent,
-} from '@sj/shared'
+import { fertilityAt, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { findPath, stepCostAt, terrainCostFor, BRIDGE_KIND } from './path.js'
@@ -15,6 +9,7 @@ import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { BUCKET_KIND, STONE_KIND, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
+import { ev, grid } from './testutil/world.js'
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -25,16 +20,7 @@ const QUIET = {
 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
-let seq = 710000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
-
-const MAP = (n = 24): TileId[][] =>
-  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] => grid(n)
 
 function spawn(s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState {
   return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)

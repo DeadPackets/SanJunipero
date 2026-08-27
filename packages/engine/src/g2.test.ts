@@ -1,11 +1,12 @@
 // @slow — GATE G2, ~4320 ticks (documentary marker per plan; no vitest tag support, runs in CI)
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { dayPhaseFromTick, SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
-import type { WorldState } from './state.js'
+import { genesisState, type WorldState } from './state.js'
 import { openDb } from './db.js'
+import { fold } from './fold.js'
 import { EventStore } from './eventStore.js'
 import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
@@ -53,8 +54,14 @@ function runScenario(seed = SEED): { state: WorldState; store: EventStore; evs: 
 }
 
 describe('GATE G2: 3-day scripted world run', () => {
+  // One run, read by every row below; only the determinism row builds a second, independent one.
+  let G2: ReturnType<typeof runScenario>
+  beforeAll(() => {
+    G2 = runScenario()
+  })
+
   it('survival, rescue, death, build, fire, and crops all land in 3 sim days', () => {
-    const { state, evs } = runScenario()
+    const { state, evs } = G2
 
     // 1. Neither the Farmer nor the Fisher ever runs the hunger clock down — an old line, and
     // still true. What takes them is in the death table below.
@@ -165,7 +172,7 @@ describe('GATE G2: 3-day scripted world run', () => {
   // If a later change quietly stops one of these laws firing, the hash row above would still
   // pass — so each law is named here as well as hashed.
   it('C9 is live in this run: things are owned, a body sleeps under a roof, food turns', () => {
-    const { state, evs } = runScenario()
+    const { state, evs } = G2
 
     // Ownership: the Builder owns the house he raised, and the Fisher owns what he pulled out.
     const house = Object.values(state.structures).find((s) => s.kind === 'house')!
@@ -201,7 +208,7 @@ describe('GATE G2: 3-day scripted world run', () => {
   // The same argument as the row above. The two that do not fire here — a desire-path tile
   // wearing through and a fauna kill — need a walker with a route and a hunter with a knife.
   it('C11 is live in this run: bodies thirst, wear out, are poisoned, and are buried', () => {
-    const { state, evs } = runScenario()
+    const { state, evs } = G2
     const types = evs.map((e) => e.type)
     const dead = evs
       .filter((e) => e.type === 'agent_died')
@@ -253,26 +260,28 @@ describe('GATE G2: 3-day scripted world run', () => {
   })
 
   it('is deterministic: two runs from the same seed hash identically', () => {
-    const a = runScenario()
     const b = runScenario()
-    expect(stateHash(a.state)).toBe(stateHash(b.state))
+    expect(stateHash(G2.state)).toBe(stateHash(b.state))
   })
 
   it('replayFromGenesis equals the live run, config threaded explicitly', () => {
-    const { state, store } = runScenario()
+    const { state, store } = G2
     expect(stateHash(replayFromGenesis(store, G2_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
   })
 
   // Two takings of the same knife off the same shelf by the same pair of hands, watched from the
   // same six tiles — the only difference between them is the light.
   it('the same theft is invisible at night and plain at noon (§19)', () => {
+    // Folded from the shared log, not re-simulated: replayFromGenesis above pins that the fold
+    // lands on the live state.
     const seen = (tick: number) => {
-      const store = new EventStore(openDb(':memory:'))
-      const loop = createScriptedLoop(G2_CONFIG, SEED, store)
-      runTicks(loop, tick)
-      const taken = allEvents(store).filter((e) => e.type === 'item_taken')
-      const last = taken.slice(-1)
-      return { taken, watched: composePerception(loop.state, G2_CONFIG, KEEPER, last).seen }
+      const upTo = G2.evs.filter((e) => e.tick <= tick)
+      const taken = upTo.filter((e) => e.type === 'item_taken')
+      const state = upTo.reduce(
+        (s, e) => fold(s, e, G2_CONFIG),
+        genesisState(G2_CONFIG, makeFixtureMap()),
+      )
+      return { taken, watched: composePerception(state, G2_CONFIG, KEEPER, taken.slice(-1)).seen }
     }
 
     const night = seen(NIGHT_THEFT_TICK + 1)
@@ -297,7 +306,7 @@ describe('GATE G2: 3-day scripted world run', () => {
   })
 
   it('crash at tick 2000: recover, continue to 4320, hash equals uninterrupted run', () => {
-    const ref = runScenario()
+    const ref = G2
 
     const dir = mkdtempSync(join(tmpdir(), 'sj-g2-'))
     const dbPath = join(dir, 'town.db')

@@ -31,14 +31,6 @@ describe('C11 finding 1 — the energy budget spends more than a day holds', () 
   })
 
   it('nothing code-side can close it: every term is a frozen dial', () => {
-    // The four numbers the shortfall is made of, and all four live in the frozen schema.
-    for (const n of [
-      C.needs.energyDecayAwakePerTick,
-      C.needs.energyRegenAsleepPerTick,
-      C.aging.elderEnergyDecayMultiplier,
-      C.needs.collapseThreshold,
-    ])
-      expect(typeof n).toBe('number')
     expect(C.needs.collapseThreshold).toBe(5)
     expect(C.needs.debuffThreshold).toBe(30)
   })

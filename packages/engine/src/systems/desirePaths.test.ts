@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import {
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-  type SimEvent,
-} from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { stepCostAt, terrainCostFor } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { trafficKey } from './desirePaths.js'
+import { ev } from '../testutil/world.js'
 
 // Nothing else may speak at midnight: no weather turn, no rumour, no wider map.
 const CFG: SimConfig = SimConfigSchema.parse({
@@ -27,13 +22,6 @@ const OFF: SimConfig = SimConfigSchema.parse({
 })
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, p: 8 }
-let seq = 21000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
-  seq: seq++,
-  tick,
-  type,
-  payload,
-})
 
 function meadow(rows: string[] = ['...', '...', '...'], config = CFG): WorldState {
   return genesisState(
