@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cosine } from '@sj/shared'
 import { Embedder } from './embedder.js'
-import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
+import { FakeEmbedder } from './testutil/fakeEmbedder.js'
 
 describe('Embedder (real bge-small-en-v1.5)', () => {
   it('embeds to a deterministic 384-dim unit vector with sane semantics', {

@@ -1,5 +1,4 @@
-import type { LlmMessage } from '@sj/agents'
-
+import type { LlmMessage } from '@sj/llm'
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
   // The unearned rungs `withinAdjacency` accepts; without it the arbiter judges blind.

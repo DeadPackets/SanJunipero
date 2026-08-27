@@ -1,5 +1,5 @@
 import { openDb } from '@sj/engine/store'
-import { LlmClient, migrateLlmTables, MIND_MODEL } from '@sj/agents'
+import { LlmClient, migrateLlmTables, MIND_MODEL } from '@sj/llm'
 import { z } from 'zod'
 
 // The never-changing canon block, repeated to ~1.5k tokens so DeepSeek's

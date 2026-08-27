@@ -9,17 +9,11 @@ import type Database from 'better-sqlite3'
 import { DISCOVERY_EVENT, MINUTES_PER_DAY } from '@sj/shared'
 import type { TickHandler } from '@sj/engine'
 import {
-  Embedder,
   EngineBridge,
-  LlmClient,
-  MIND_MODEL,
   PREFLIGHT_ROUNDS,
   bootMinds,
-  migrateLlmTables,
   openAgentDb,
   preflightRefusal,
-  projectDailySpend,
-  reportReconciliation,
   runPreflight,
   wireBirths,
   FOUNDER_MINDS,
@@ -29,6 +23,14 @@ import {
   type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
+import {
+  Embedder,
+  LlmClient,
+  MIND_MODEL,
+  migrateLlmTables,
+  projectDailySpend,
+  reportReconciliation,
+} from '@sj/llm'
 import {
   CodexStore,
   GENESIS_CODEX,

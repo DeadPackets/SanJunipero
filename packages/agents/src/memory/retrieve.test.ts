@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { openAgentDb } from './schema.js'
 import { MemoryStore, type MemoryTags } from './store.js'
-import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   DEFAULT_WEIGHTS,
   MISS_MIN_RESULTS,

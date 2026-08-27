@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, type LlmClient } from '@sj/agents'
+import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '@sj/agents'
+import { type LlmClient } from '@sj/llm'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
 import {

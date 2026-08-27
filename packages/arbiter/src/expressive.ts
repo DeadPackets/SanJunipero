@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LlmMessage } from '@sj/agents'
+import type { LlmMessage } from '@sj/llm'
 import type { PendingEvent, VerbDef } from '@sj/engine'
 import { normalizeIntent } from './rulebook.js'
 

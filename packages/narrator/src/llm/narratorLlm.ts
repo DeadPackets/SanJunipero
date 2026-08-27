@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LlmClient } from '@sj/agents'
+import type { LlmClient } from '@sj/llm'
 import { NARRATOR_CANON } from '../canon.js'
 import { NARRATOR_VOCABULARY_NOTES } from '../chronicle.js'
 import type {

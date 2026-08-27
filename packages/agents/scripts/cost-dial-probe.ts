@@ -3,9 +3,7 @@
 import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
-import { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS } from '../src/llm/pins.js'
-import { servedProvider } from '../src/llm/client.js'
-
+import { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, servedProvider } from '@sj/llm'
 const CAP_USD = 0.5
 const REPS = Number(process.env.DIAL_REPS ?? 10)
 

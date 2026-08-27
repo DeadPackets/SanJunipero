@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryTags } from './memory/store.js'
-import { FakeEmbedder } from './testutil/fakeEmbedder.js'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 
 const TAGS: MemoryTags = {

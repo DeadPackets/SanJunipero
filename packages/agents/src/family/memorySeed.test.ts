@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore } from '../memory/store.js'
-import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { buildHouseholdSeed } from './memorySeed.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 

@@ -69,12 +69,17 @@ import {
 } from '../src/runtime/arbiterSeam.js'
 import { openAgentDb } from '../src/memory/schema.js'
 import { PersonalityStore, type PersonalityDoc } from '../src/personality.js'
-import { insertAlert, migrateLlmTables } from '../src/llm/callLog.js'
-import { LlmClient } from '../src/llm/client.js'
-import { checkSpend, reportDeadCalls, reportProviders } from '../src/llm/spendMonitor.js'
-import { Embedder } from '../src/memory/embedder.js'
+import {
+  insertAlert,
+  migrateLlmTables,
+  LlmClient,
+  checkSpend,
+  reportDeadCalls,
+  reportProviders,
+  Embedder,
+  MIND_MODEL,
+} from '@sj/llm'
 import { makeReflectionLlm } from '../src/reflection.js'
-import { MIND_MODEL } from '../src/llm/pins.js'
 import type { IdentityCore } from '../src/prompt/assemble.js'
 import {
   FullNeedTally,

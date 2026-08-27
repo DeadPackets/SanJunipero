@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
-import { scanRulingForGlassLeak, type LlmClient, type RulingVocabulary } from '@sj/agents'
+import { scanRulingForGlassLeak, type RulingVocabulary } from '@sj/agents'
+import { type LlmClient } from '@sj/llm'
 import { registerVerb, VERBS } from '@sj/engine'
 import { FORBIDDEN_FRAMING, type DiscoveryCredit, type DiscoveryKind } from '@sj/shared'
 import { CANON } from './canon.js'

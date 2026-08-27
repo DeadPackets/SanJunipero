@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { type LlmClient } from '@sj/agents'
+import { type LlmClient } from '@sj/llm'
 import { effectiveConfig, TOGGLABLE_PATHS } from '@sj/engine'
 import { MINUTES_PER_DAY, assertQuotedName, type SimConfig, type SimEvent } from '@sj/shared'
 import type { ConstructStore } from './constructStore.js'

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
-import { FakeEmbedder } from '@sj/agents'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { openArbiterDb } from './schema.js'
 import { RulingsStore } from './rulings.js'
 import type { Verdict } from './verdict.js'

@@ -1,7 +1,7 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
-import type { LlmClient } from '../llm/client.js'
+import { type LlmClient } from '@sj/llm'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
 import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
 import {
