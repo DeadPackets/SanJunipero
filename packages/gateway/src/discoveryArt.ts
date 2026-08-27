@@ -1,23 +1,4 @@
-// LIVE ONLY. `@sj/forge/gen` carries the LLM SDK the free scripted stream must never load, so
-// nothing on the scripted path may import this file (enforced by test).
-import type Database from 'better-sqlite3'
-import { insertLlmCall } from '@sj/agents'
-import {
-  ANOMALY_STOP_USD,
-  BudgetExceededError,
-  BudgetGuard,
-  loadReferenceSheet,
-  type AssetCodex,
-  type Forge,
-} from '@sj/forge'
-import {
-  EST_COST_PER_JUDGE,
-  JUDGE_MODEL,
-  createForge,
-  makeImageClient,
-  makeVlmJudge,
-  type JudgeFn,
-} from '@sj/forge/gen'
+import type { AssetCodex, Forge } from '@sj/forge'
 
 /**
  * Commissioning writes the `assets` table — not the event log, not folded — so it runs off the
@@ -82,83 +63,6 @@ export function watchDiscoveryArt(deps: {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
   }
-}
-
-/** The ledger name art bills under, beside the minds' `turn`, `reflection` and `arbiter`. */
-export const FORGE_CALLER = 'forge'
-
-export type CommissionArtOpts = {
-  codex: AssetCodex
-  /** The minds' own ops db. Art is read out of the same daily budget and booked into the same
-   *  `llm_calls` table, so one wallet answers for a thought and a picture alike. */
-  opsDb: Database.Database
-  dailyBudgetUsd: number
-  spentTodayUsd: () => number
-  apiKey: string
-  onError?: (kind: string, err: unknown) => void
-  /** The rehearsal's provider: the real client and judge run, the network does not. */
-  fetchFn?: typeof fetch
-  judge?: JudgeFn
-}
-
-/** Discoveries drawn for real, on the minds' budget. */
-export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher {
-  let refs: Promise<Buffer[]> | null = null
-  const book = (model: string, costUsd: number): void => {
-    insertLlmCall(opts.opsDb, {
-      agentId: null,
-      caller: FORGE_CALLER,
-      model,
-      provider: null,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      reasoningTokens: 0,
-      costUsd,
-      reportedCostUsd: null,
-      latencyMs: 0,
-      ok: true,
-      error: null,
-    })
-  }
-
-  const commission: Forge['commission'] = async (desc, footprint, klass, kind) => {
-    const left = opts.dailyBudgetUsd - opts.spentTodayUsd()
-    if (left <= 0) throw new BudgetExceededError(opts.dailyBudgetUsd, opts.spentTodayUsd())
-    // One guard per commission: its cap is what the rolling day has left, never past the
-    // per-asset anomaly stop, and it is re-read because the day rolls and the minds spend too.
-    const budget = new BudgetGuard(Math.min(ANOMALY_STOP_USD, left))
-    const client = makeImageClient({
-      apiKey: opts.apiKey,
-      budget,
-      ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
-    })
-    const sheet = await (refs ??= loadReferenceSheet())
-    const judge = opts.judge ?? makeVlmJudge({ apiKey: opts.apiKey, refSheets: sheet })
-    return createForge({
-      codex: opts.codex,
-      refs: sheet,
-      client: {
-        async generateCandidates(prompt, candidateRefs, n) {
-          const out = await client.generateCandidates(prompt, candidateRefs, n)
-          for (const c of out) book(c.model, c.costUsd)
-          return out
-        },
-      },
-      judge: async (png) => {
-        budget.spend(EST_COST_PER_JUDGE)
-        const verdict = await judge(png)
-        book(JUDGE_MODEL, EST_COST_PER_JUDGE)
-        return verdict
-      },
-    }).commission(desc, footprint, klass, kind)
-  }
-
-  return watchDiscoveryArt({
-    forge: { commission },
-    codex: opts.codex,
-    ...(opts.onError === undefined ? {} : { onError: opts.onError }),
-  })
 }
 
 /** A watcher that draws nothing: a run with no image budget must still record every discovery. */

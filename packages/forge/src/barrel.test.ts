@@ -9,7 +9,12 @@ import { describe, expect, it } from 'vitest'
 const SDK = ['ai', '@openrouter/ai-sdk-provider']
 const HERE = dirname(fileURLToPath(import.meta.url))
 
-const SPEC_RE = /(?:^|\n)\s*(?:import|export)\b[^;\n]*?from\s*['"]([^'"]+)['"]/g
+// `from 'x'` (minus the type-only forms tsc erases), bare `import 'x'`, and `import('x')`.
+const SPEC_RES = [
+  /(?:^|\n)\s*(?:import|export)(?!\s+type\b)\b[^;\n]*?from\s*['"]([^'"]+)['"]/g,
+  /(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g,
+  /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+]
 
 function resolveRelative(spec: string, fromFile: string): string | null {
   const stem = resolve(dirname(fromFile), spec).replace(/\.js$/, '')
@@ -17,41 +22,35 @@ function resolveRelative(spec: string, fromFile: string): string | null {
   return null
 }
 
-/** Every module a `from '<entry>'` actually loads, plus the bare specifiers they reach for. */
-function walk(entry: string): Set<string> {
-  const files = new Set<string>()
-  const externals = new Set<string>()
+/** The SDK packages a `from '<entry>'` actually loads, walking every module it reaches. */
+function sdkReachedFrom(entry: string): string[] {
+  const seen = new Set<string>()
+  const sdk = new Set<string>()
   const queue = [entry]
   while (queue.length > 0) {
     const file = queue.shift()!
-    if (files.has(file)) continue
-    files.add(file)
+    if (seen.has(file)) continue
+    seen.add(file)
     const src = readFileSync(file, 'utf8')
-    SPEC_RE.lastIndex = 0
-    for (let m = SPEC_RE.exec(src); m !== null; m = SPEC_RE.exec(src)) {
-      // A `import type` / `export type` line is erased by tsc and loads nothing at run time.
-      if (/^\s*(?:import|export)\s+type\b/.test(m[0])) continue
-      const spec = m[1]!
-      if (!spec.startsWith('.')) {
-        externals.add(spec)
-        continue
+    for (const re of SPEC_RES)
+      for (const m of src.matchAll(re)) {
+        const spec = m[1]!
+        if (SDK.includes(spec)) sdk.add(spec)
+        if (!spec.startsWith('.')) continue
+        const next = resolveRelative(spec, file)
+        if (next !== null) queue.push(next)
       }
-      const next = resolveRelative(spec, file)
-      if (next !== null) queue.push(next)
-    }
   }
-  return externals
+  return [...sdk].sort()
 }
 
 describe('the forge root barrel', () => {
   it('loads no LLM SDK — the free stream imports it and must stay free', () => {
-    expect([...walk(join(HERE, 'index.ts'))].filter((e) => SDK.includes(e))).toEqual([])
+    expect(sdkReachedFrom(join(HERE, 'index.ts'))).toEqual([])
   })
 
   it('and the generation subpath is where the SDK does live', () => {
     // Without this the test above passes just as well on a barrel that exports nothing.
-    expect([...walk(join(HERE, 'gen.ts'))].filter((e) => SDK.includes(e)).sort()).toEqual(
-      [...SDK].sort(),
-    )
+    expect(sdkReachedFrom(join(HERE, 'gen.ts'))).toEqual([...SDK].sort())
   })
 })

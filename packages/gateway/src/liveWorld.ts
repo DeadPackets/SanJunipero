@@ -38,7 +38,7 @@ import {
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import type { LiveCast } from './devWorld.js'
-import { createDiscoveryArt, noDiscoveryArt } from './discoveryArt.js'
+import { createDiscoveryArt } from './discoveryCommission.js'
 import { publishThought } from './observer.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
@@ -409,24 +409,21 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (snap !== null) restoring.set(m.id, snap)
       }
 
-      // A discovered item is drawn once, out of the same daily budget and into the same ledger
-      // the minds bill; until it lands the viewer keeps serving the placeholder.
-      const apiKey = process.env.OPENROUTER_API_KEY
-      const art =
-        apiKey === undefined
-          ? noDiscoveryArt()
-          : createDiscoveryArt({
-              codex: new AssetCodex(db),
-              opsDb,
-              dailyBudgetUsd: dailyBudget,
-              spentTodayUsd: spentToday,
-              apiKey,
-              onError: (kind, err) => {
-                log(
-                  `stream: no art for ${kind} — ${err instanceof Error ? err.message : String(err)}`,
-                )
-              },
-            })
+      // A discovered item is drawn once, out of the same budget and into the same ledger the
+      // minds bill; until it lands the viewer keeps serving the placeholder.
+      const art = createDiscoveryArt({
+        codex: new AssetCodex(db),
+        opsDb,
+        spendableUsd: () =>
+          Math.min(
+            dailyBudget - spentToday(),
+            cap > 0 ? cap - ledgerTotalUsd(opsDb) : Number.POSITIVE_INFINITY,
+          ),
+        apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
+        onError: (kind, err) => {
+          log(`stream: no art for ${kind} — ${String(err)}`)
+        },
+      })
 
       // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
       // `onCodified` needs the bridge, and neither exists until a loop does. `makeClient` points

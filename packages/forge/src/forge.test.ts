@@ -58,6 +58,8 @@ describe('createForge().commission', () => {
     forge.onAssetReady((r) => ready.push(r.status))
     const rec = await forge.commission('a sage tent', { w: 1, h: 1 }, 'building', 'tent')
     expect(rec.status).toBe('ready')
+    // class + kind + ready is the whole of the renderer's lookup; a null kind is art nobody finds
+    expect([rec.class, rec.kind]).toEqual(['building', 'tent'])
     expect(rec.score).toBe(8)
     expect(rec.attempts).toBe(1)
     expect(rec.widthPx).toBe(64) // 1x1 building = 64px per Style Bible
@@ -88,6 +90,7 @@ describe('createForge().commission', () => {
     expect(rec.status).toBe('placeholder')
     expect(rec.score).toBeNull()
     expect(rec.attempts).toBe(3)
+    expect(rec.kind).toBe('relic') // the kind is recorded, so the town does not pay again on the next boot
     expect(codex.get(rec.id)).not.toBeNull() // placeholder is registered and hot-loadable
   })
   it('a generateCandidates throw on every attempt still yields a placeholder, never a rejection', async () => {
@@ -145,33 +148,5 @@ describe('createForge().commission', () => {
     const rec = await forge.commission('vapor', { w: 1, h: 1 }, 'item', 'vapor')
     expect(rec.status).toBe('placeholder')
     expect(judgeCalls).toBe(0)
-  })
-  it('records the codex kind the renderer resolves on', async () => {
-    const codex = new AssetCodex(openForgeDb(':memory:'))
-    const forge = createForge({
-      client: fakeClient(await goodPng(), []),
-      judge: scriptedJudge([8]),
-      codex,
-      refs: [],
-    })
-    const rec = await forge.commission('a waterskin', { w: 1, h: 1 }, 'item', 'waterskin')
-    expect(rec.kind).toBe('waterskin')
-    // status 'ready' + class + kind is the whole of the renderer's resolution law; a null kind
-    // is art the viewer can never find.
-    expect(codex.listSince(0).map((r) => [r.class, r.kind, r.status])).toEqual([
-      ['item', 'waterskin', 'ready'],
-    ])
-  })
-  it('a placeholder carries the kind too, so the town commissions it once and not every boot', async () => {
-    const codex = new AssetCodex(openForgeDb(':memory:'))
-    const forge = createForge({
-      client: fakeClient(await goodPng(), []),
-      judge: scriptedJudge([2]),
-      codex,
-      refs: [],
-    })
-    const rec = await forge.commission('an impossible ask', { w: 1, h: 1 }, 'item', 'rope')
-    expect(rec.status).toBe('placeholder')
-    expect(rec.kind).toBe('rope')
   })
 })
