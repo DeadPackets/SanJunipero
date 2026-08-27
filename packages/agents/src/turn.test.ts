@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { dayPhaseFromTick, FORBIDDEN_FRAMING, MINUTES_PER_DAY } from '@sj/shared'
 import { z } from 'zod'
 import * as engine from '@sj/engine'
+import { IntentParamsSchema } from '@sj/engine/verbs'
 import {
   FALLBACK_TURN,
-  IntentParamsSchema,
   IntentSchema,
   TurnSchema,
   parseTurnWithRepair,

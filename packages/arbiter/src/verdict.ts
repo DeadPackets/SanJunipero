@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IntentParamsSchema } from '@sj/agents'
+import { IntentParamsSchema } from '@sj/engine/verbs'
 
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MINUTES_PER_DAY, type DayPhase } from '@sj/shared'
+import { IntentParamsSchema } from '@sj/engine/verbs'
 
 // An hour of the day is a plan for today; a day and a phase is an appointment. Without the
 // second shape nothing can be arranged in advance, only remembered or improvised.
@@ -9,23 +10,6 @@ const ReconsiderAtSchema = z.union([
 ])
 export type ReconsiderAt = z.infer<typeof ReconsiderAtSchema>
 
-// Named rather than an open `z.record`, whose `propertyNames` a grammar-constrained decoder
-// refuses. Loose, so a verb minted at runtime can still be handed a parameter nobody listed.
-export const IntentParamsSchema = z.looseObject({
-  x: z.number().optional(),
-  y: z.number().optional(),
-  itemId: z.string().optional(),
-  structureId: z.string().optional(),
-  targetId: z.string().optional(),
-  cropId: z.string().optional(),
-  nodeId: z.string().optional(),
-  faunaId: z.string().optional(),
-  kind: z.string().optional(),
-  recipe: z.string().optional(),
-  track: z.string().optional(),
-  text: z.string().optional(),
-  description: z.string().optional(),
-})
 export const IntentSchema = z
   .object({
     verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),

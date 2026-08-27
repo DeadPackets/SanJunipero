@@ -1,5 +1,4 @@
 export {
-  IntentParamsSchema,
   IntentSchema,
   TurnSchema,
   FALLBACK_TURN,
@@ -15,7 +14,7 @@ export {
   type RuntimeSnapshot,
   type RuntimeStats,
 } from './runtime/agentRuntime.js'
-export { heardLine, heardProse } from './prompt/prose.js'
+export { heardProse } from './prompt/prose.js'
 export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
 export {
   wireArbiter,
