@@ -15,8 +15,8 @@ import {
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { DREAM_PROMPT } from '../dream.js'
-import { migrateLlmTables } from '../llm/callLog.js'
-import { LlmClient } from '../llm/client.js'
+import { migrateLlmTables, LlmClient } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { openAgentDb } from '../memory/schema.js'
 import type { PersonalityDoc } from '../personality.js'
 import {
@@ -28,7 +28,6 @@ import {
   updateLedgerPrompt,
 } from '../reflection.js'
 import { EngineBridge } from '../runtime/bridge.js'
-import { FakeEmbedder } from '../testutil/fakeEmbedder.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import { bootMinds, type MindSpec } from './liveMinds.js'
 

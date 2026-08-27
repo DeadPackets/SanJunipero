@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
-import { migrateLlmTables } from '@sj/agents'
+import { migrateLlmTables } from '@sj/llm'
 
 export const NARRATOR_TABLES = [
   'scenes',

@@ -12,7 +12,7 @@ import {
   timelineMarkers,
 } from './narrate.js'
 import type { ChapterRow, NarratorLlm } from './types.js'
-import type { LlmClient, LlmUsage } from '@sj/agents'
+import type { LlmClient, LlmUsage } from '@sj/llm'
 
 const memStore = (): NarratorStore => {
   const db = new Database(':memory:')

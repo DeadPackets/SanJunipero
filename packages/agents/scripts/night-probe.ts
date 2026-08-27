@@ -35,9 +35,7 @@ import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import { openAgentDb } from '../src/memory/schema.js'
 import { PersonalityStore } from '../src/personality.js'
 import { FOUNDER_MINDS } from '../src/live/founderMinds.js'
-import { migrateLlmTables } from '../src/llm/callLog.js'
-import { LlmClient } from '../src/llm/client.js'
-import { Embedder } from '../src/memory/embedder.js'
+import { migrateLlmTables, LlmClient, Embedder } from '@sj/llm'
 import { makeReflectionLlm } from '../src/reflection.js'
 
 const ARM = (process.env.NIGHT_ARM ?? 'b').toLowerCase()

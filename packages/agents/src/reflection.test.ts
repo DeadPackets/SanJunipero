@@ -4,7 +4,8 @@ import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
-import { FakeEmbedder } from './testutil/fakeEmbedder.js'
+import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
@@ -21,10 +22,7 @@ import {
   FALLBACK_DIGEST_CHARS,
   type ReflectionLlm,
 } from './reflection.js'
-import { BudgetExceededError } from './llm/client.js'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
-import type { LlmClient, LlmMessage } from './llm/client.js'
+import { FORBIDDEN_FRAMING, scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
 
 const AGENT = 'tamar'
 const DAY = 3

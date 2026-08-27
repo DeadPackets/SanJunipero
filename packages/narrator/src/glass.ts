@@ -4,8 +4,12 @@ export { NARRATOR_TABLES, openNarratorDb } from './schema.js'
 
 // Two rules, one door each: the narrator may not own a world table, and nothing it names may
 // reach a mind. Neither enforcement point is declared here — both are re-exported.
-export { assertQuotedName } from '@sj/shared'
-export { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY } from '@sj/agents'
+export {
+  assertQuotedName,
+  CONSTRUCT_VOCABULARY,
+  scanPromptForGlassLeak,
+  UNNAMED_CONSTRUCT_COPY,
+} from '@sj/shared'
 
 // Every world+agent table the narrator must not own (asserted absent from narrator.db).
 export const WORLD_TABLES = [

@@ -1,8 +1,13 @@
 // Every row measures a delta (`f.before` vs `f`), not a clean bill of health: a row that only
 // says "no forgery today" cannot tell a fix from a deleted test.
 import { describe, expect, it } from 'vitest'
-import { sanitizeSpokenText, SPEECH_INPUT_MAX_CHARS, SPEECH_MAX_CHARS } from '@sj/shared'
-import { assertNoGlassLeak, scanPromptForGlassLeak } from '@sj/agents'
+import {
+  sanitizeSpokenText,
+  SPEECH_INPUT_MAX_CHARS,
+  SPEECH_MAX_CHARS,
+  assertNoGlassLeak,
+  scanPromptForGlassLeak,
+} from '@sj/shared'
 import { assembleAdjudicationPrompt, INTENT_MAX_CHARS } from '../prompt.js'
 import {
   INJECTION_CORPUS,

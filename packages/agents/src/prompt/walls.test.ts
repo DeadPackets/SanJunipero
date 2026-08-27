@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, type SimEvent, scanForDirective } from '@sj/shared'
 import {
   buildTicks,
   composePerception,
@@ -18,7 +18,6 @@ import {
   standingWallsLine,
   type PerceptionPacket,
 } from './prose.js'
-import { scanForDirective } from './glassScan.js'
 
 // Hands are the rate — `stepBuild` adds one per hand on the site — so a house is a night's work
 // for five. "Still being built" reads the same one hour short as four days short.

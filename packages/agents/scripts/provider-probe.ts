@@ -4,9 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { openAgentDb } from '../src/memory/schema.js'
-import { migrateLlmTables } from '../src/llm/callLog.js'
-import { LlmClient } from '../src/llm/client.js'
-import { MIND_MODEL, PROVIDER_ORDER } from '../src/llm/pins.js'
+import { migrateLlmTables, LlmClient, MIND_MODEL, PROVIDER_ORDER } from '@sj/llm'
 import {
   runPreflight,
   type PreflightAnswer,

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type Database from 'better-sqlite3'
-import { insertAlert, type LlmClient } from '@sj/agents'
+import { insertAlert, type LlmClient } from '@sj/llm'
 import type { NarratorStore } from './store.js'
 import type { Milestone } from './types.js'
 

@@ -3,7 +3,7 @@ import {
   DAYS_PER_SEASON,
   inputName,
   MINUTES_PER_DAY,
-  sanitizeSpokenText,
+  heardLine,
   type SimTime,
 } from '@sj/shared'
 import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
@@ -382,12 +382,6 @@ function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
 
 // Renders mechanics as fiction. Every clause here states a fact and names no act — no remedy,
 // no counsel, no comparison; the inference is the mind's.
-/** One utterance, as a listener reads it. The only untrusted string in a prompt; sanitized here
- *  as well as at the verb, because a world resumed from an older log carries raw text. */
-export function heardLine(name: string, text: string): string {
-  return `You hear ${name} say: "${sanitizeSpokenText(text)}" (from nearby)`
-}
-
 /** Every utterance in earshot, one per line. Kept out of the perception prose: a delimiter a
  *  speaker cannot write stops a forged attribution, and only separation stops a forged voice. */
 export function heardProse(packet: PerceptionPacket): string {

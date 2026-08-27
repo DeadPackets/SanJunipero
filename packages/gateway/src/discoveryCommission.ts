@@ -1,7 +1,7 @@
 // LIVE ONLY. `@sj/forge/gen` is 9.7 MB of LLM SDK, so this file is reachable from `liveWorld.ts`
 // and nothing else — `discoveryArt.ts` beside it stays free of it for the scripted path.
 import type Database from 'better-sqlite3'
-import { insertLlmCall } from '@sj/agents'
+import { insertLlmCall } from '@sj/llm'
 import {
   ANOMALY_STOP_USD,
   BudgetGuard,

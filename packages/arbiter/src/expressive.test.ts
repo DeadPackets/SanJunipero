@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
-import { FakeEmbedder, type LlmClient } from '@sj/agents'
+import type { LlmClient } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   composePerception,
   fold,

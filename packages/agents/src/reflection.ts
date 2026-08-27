@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { NoObjectGeneratedError } from 'ai'
-import { BudgetExceededError, type LlmClient, type LlmMessage } from './llm/client.js'
+import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 

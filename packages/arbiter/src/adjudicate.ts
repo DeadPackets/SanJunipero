@@ -1,7 +1,13 @@
 import type Database from 'better-sqlite3'
-import { scanRulingForGlassLeak, type LlmClient, type RulingVocabulary } from '@sj/agents'
+import type { LlmClient } from '@sj/llm'
 import { registerVerb, VERBS } from '@sj/engine'
-import { FORBIDDEN_FRAMING, type DiscoveryCredit, type DiscoveryKind } from '@sj/shared'
+import {
+  FORBIDDEN_FRAMING,
+  type DiscoveryCredit,
+  type DiscoveryKind,
+  scanRulingForGlassLeak,
+  type RulingVocabulary,
+} from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'

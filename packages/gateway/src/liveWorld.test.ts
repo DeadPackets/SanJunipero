@@ -7,14 +7,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import {
-  FakeEmbedder,
-  insertAlert,
-  OPAQUE_REFUSAL,
-  openAgentDb,
-  type LlmClient,
-  type MindSpec,
-} from '@sj/agents'
+import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
+import { insertAlert, type LlmClient } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'

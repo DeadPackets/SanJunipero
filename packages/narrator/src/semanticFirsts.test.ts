@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'
+import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { scanPromptForGlassLeak } from './glass.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'

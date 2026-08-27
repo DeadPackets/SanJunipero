@@ -44,6 +44,14 @@
         "src/**/*.ts"
       ]
     },
+    "packages/llm": {
+      "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     "packages/gateway": {
       "entry": [
         "src/**/*.test.ts",

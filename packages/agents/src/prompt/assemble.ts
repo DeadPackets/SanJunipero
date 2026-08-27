@@ -1,6 +1,6 @@
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
-import { assertNoGlassLeak } from './glassScan.js'
+import { assertNoGlassLeak } from '@sj/shared'
 import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
 
 export type IdentityCore = {

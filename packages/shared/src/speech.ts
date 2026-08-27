@@ -20,3 +20,9 @@ export function sanitizeSpokenText(text: string): string {
   if (flat.length <= SPEECH_MAX_CHARS) return flat
   return `${flat.slice(0, SPEECH_MAX_CHARS - 1).trimEnd()}…`
 }
+
+/** One utterance, as a listener reads it. The only untrusted string in a prompt; sanitized here
+ *  as well as at the verb, because a world resumed from an older log carries raw text. */
+export function heardLine(name: string, text: string): string {
+  return `You hear ${name} say: "${sanitizeSpokenText(text)}" (from nearby)`
+}

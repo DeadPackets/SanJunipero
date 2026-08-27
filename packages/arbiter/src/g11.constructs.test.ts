@@ -1,12 +1,8 @@
 // @slow — the recognition plane: the word a town buys once, the thing it keeps coming back to,
 // and the glass nothing said here may cross. Every model in this file is a script.
 import { describe, expect, it } from 'vitest'
-import {
-  FakeEmbedder,
-  scanPromptForGlassLeak,
-  UNNAMED_CONSTRUCT_COPY,
-  type LlmClient,
-} from '@sj/agents'
+import type { LlmClient } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   fold,
   genesisState,
@@ -15,7 +11,14 @@ import {
   VERBS,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimEvent,
+  scanPromptForGlassLeak,
+  UNNAMED_CONSTRUCT_COPY,
+} from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import {

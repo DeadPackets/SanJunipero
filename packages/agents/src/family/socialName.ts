@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import type { LlmClient } from '../llm/client.js'
+import type { LlmClient } from '@sj/llm'
 import type { ParentPersona } from './derivePersona.js'
 import type { AgentBornPayload } from './watchBirths.js'
 

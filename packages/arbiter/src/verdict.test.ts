@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { IntentParamsSchema } from '@sj/agents'
+import { IntentParamsSchema } from '@sj/engine/verbs'
 import { ExpressiveParams } from './expressive.js'
 import {
   OutcomeEffectSchema,

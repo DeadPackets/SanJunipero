@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { assemblePrompt } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from '../prompt/glassScan.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
 import { FOUNDER_MINDS } from './founderMinds.js'
 
 const promptFor = (mind: (typeof FOUNDER_MINDS)[number]): string => {
