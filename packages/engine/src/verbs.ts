@@ -165,10 +165,21 @@ function adjacentLivingTarget(
 
 export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
+/** The walk's whole rule, free of world state so the viewer can animate on it too. */
+export function ticksPerTileFor(
+  needs: Readonly<Record<string, number>>,
+  cfg: { debuffThreshold: number; base: number; debuff: number },
+): number {
+  const debuffed = Object.values(needs).some((v) => v < cfg.debuffThreshold)
+  return debuffed ? cfg.debuff : cfg.base
+}
+
 export function ticksPerTile(state: WorldState, config: SimConfig, agentId: string): number {
-  const a = state.agents[agentId]!
-  const debuffed = Object.values(a.needs).some((v) => v < config.needs.debuffThreshold)
-  return debuffed ? config.movement.debuffTicksPerTile : config.movement.baseTicksPerTile
+  return ticksPerTileFor(state.agents[agentId]!.needs, {
+    debuffThreshold: config.needs.debuffThreshold,
+    base: config.movement.baseTicksPerTile,
+    debuff: config.movement.debuffTicksPerTile,
+  })
 }
 
 const walk: VerbDef = makeVerb({

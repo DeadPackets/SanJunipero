@@ -1,5 +1,6 @@
 import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
+import { ticksPerTileFor } from '@sj/engine/verbs'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { bodyDepthBox } from './depth.js'
@@ -39,7 +40,6 @@ import {
   prunePath,
   scheduleLeg,
   strideFrameMs,
-  ticksPerTileOf,
   type Gait,
   type TickClock,
   type Waypoint,
@@ -360,9 +360,9 @@ export function createCharacterLayer(
       const dx = p.x - last.x
       const dy = p.y - last.y
       e.facing = facingFrom(dx, dy) ?? e.facing // a body that has not moved keeps its facing
-      // The leg's length comes from the record: `ticksPerTileOf` is the engine's own rule, where
+      // The leg's length comes from the record: `ticksPerTileFor` is the engine's own rule, where
       // a body under the debuff threshold takes twice as many ticks per tile.
-      const perTile = ticksPerTileOf(state.agents[p.id]?.needs ?? {}, cfg)
+      const perTile = ticksPerTileFor(state.agents[p.id]?.needs ?? {}, cfg)
       e.legMs = clock.periodMs * perTile
       e.path = scheduleLeg(e.path, p.x, p.y, {
         nowMs: now,

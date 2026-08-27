@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
+import { ticksPerTileFor } from '@sj/engine/verbs'
 import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
 import {
   BOB_PX,
@@ -34,7 +35,6 @@ import {
   prunePath,
   scheduleLeg,
   strideFrameMs,
-  ticksPerTileOf,
   type Waypoint,
 } from './charAnim.js'
 import { MOVEMENT_FALLBACK } from './characters.js'
@@ -397,10 +397,6 @@ describe('character hit area + name tag', () => {
 // THE WALK
 // ══════════════════════════════════════════════════════════════════════════════════════════
 
-const ENGINE_SRC = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'engine', 'src', 'verbs.ts'),
-  'utf8',
-)
 const SHARED_CONFIG_SRC = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'shared', 'src', 'config.ts'),
   'utf8',
@@ -864,28 +860,12 @@ describe('★ gait follows what a person is DOING, from state that already exist
     const well = { hunger: 90, energy: 90, warmth: 90, social: 90 }
     const hungry = { hunger: 5, energy: 90, warmth: 90, social: 90 }
     const cfg = { debuffThreshold: 30, base: 1, debuff: 2 }
-    expect(ticksPerTileOf(well, cfg)).toBe(1)
-    expect(ticksPerTileOf(hungry, cfg)).toBe(2)
+    expect(ticksPerTileFor(well, cfg)).toBe(1)
+    expect(ticksPerTileFor(hungry, cfg)).toBe(2)
     // so a hurrying body's legs cycle twice as fast as an ailing one's, on the same clock
-    expect(strideFrameMs(400 * ticksPerTileOf(well, cfg))).toBeLessThan(
-      strideFrameMs(400 * ticksPerTileOf(hungry, cfg)),
+    expect(strideFrameMs(400 * ticksPerTileFor(well, cfg))).toBeLessThan(
+      strideFrameMs(400 * ticksPerTileFor(hungry, cfg)),
     )
-  })
-
-  it('★ and it is the SAME EXPRESSION the engine uses — read off verbs.ts, not remembered', () => {
-    const engine = /export function ticksPerTile\([\s\S]*?\n\}/.exec(ENGINE_SRC)?.[0] ?? ''
-    expect(engine, 'engine/src/verbs.ts no longer declares ticksPerTile').not.toBe('')
-    // the two halves of the rule, quoted from the engine's own body
-    expect(engine).toMatch(
-      /Object\.values\(a\.needs\)\.some\(\(v\) => v < config\.needs\.debuffThreshold\)/,
-    )
-    expect(engine).toMatch(
-      /debuffed \? config\.movement\.debuffTicksPerTile : config\.movement\.baseTicksPerTile/,
-    )
-    // and the renderer's restatement, normalised to the same shape
-    const mine = ticksPerTileOf.toString().replace(/\s+/g, ' ')
-    expect(mine).toContain('Object.values(needs).some((v) => v < cfg.debuffThreshold)')
-    expect(mine).toContain('debuffed ? cfg.debuff : cfg.base')
   })
 
   it("the fallback numbers are the schema's own defaults, read off config.ts", () => {
@@ -951,7 +931,7 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
       ).toBe(true)
     }
     // the schedule is not one of them: nothing that decides WHERE a body is asks the flag
-    for (const call of ['scheduleLeg(', 'interpolatePos(', 'prunePath(', 'ticksPerTileOf(']) {
+    for (const call of ['scheduleLeg(', 'interpolatePos(', 'prunePath(', 'ticksPerTileFor(']) {
       for (const l of src.split('\n')) {
         if (l.includes(call)) expect(l).not.toContain('wantsMotion')
       }
