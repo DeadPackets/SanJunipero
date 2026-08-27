@@ -197,7 +197,7 @@ function writeScale(entry: Entry, base: number): void {
  *  reverted when the effect ends. False when the subject is gone and the effect should stop. */
 export function setEntityScaleMul(
   scene: Scene,
-  kind: 'structure' | 'item' | 'crop',
+  kind: WorldPick['kind'],
   id: string,
   k: number,
 ): boolean {
@@ -225,12 +225,8 @@ function drawPips(g: Graphics, filled: number): void {
   }
 }
 
-// lookup for effect layers (placement bounce, fire glow anchoring)
-export function entitySpriteOf(
-  scene: Scene,
-  kind: 'structure' | 'item' | 'crop',
-  id: string,
-): Sprite | null {
+/** The sprite this layer drew for a subject — the layer's own read-back. */
+export function entitySpriteOf(scene: Scene, kind: WorldPick['kind'], id: string): Sprite | null {
   return syncStates.get(scene)?.entries.get(`${kind}:${id}`)?.sprite ?? null
 }
 

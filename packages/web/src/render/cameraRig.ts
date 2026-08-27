@@ -3,7 +3,6 @@ import {
   boundsCentre,
   type CameraBounds,
   clampCamera,
-  drawnBoundsOf,
   fitStop,
   initialZoom,
   resizeIntent,
@@ -24,15 +23,14 @@ import { screenToTile, tileToScreen } from './iso.js'
 /** What the rig has to ask the scene: the box the camera may reach, and what is standing. */
 export type CameraRigDeps = {
   reachable: () => CameraBounds
-  structures: () => { x: number; y: number; w: number; h: number }[]
+  /** the settlement AS DRAWN, or the reachable box when nothing has been built yet */
+  town: () => CameraBounds
 }
 
-/** Everything imperative about the camera. `place` is private on purpose: it is the ONE writer
- *  of `world.position`, so a mover added later cannot skip the clamp or the notification. */
+/** Everything imperative about the camera. `place` is deliberately not on this surface. */
 export type CameraRig = {
   /** Re-clamp where the camera already is — for a stage that changed size under it. */
   onResize: () => void
-  isFitted: () => boolean
   panBy: (dx: number, dy: number) => void
   travelTo: (sx: number, sy: number) => void
   centerHome: () => void
@@ -82,20 +80,13 @@ export function createCameraRig(
     centerOnScreen(sx, sy)
   }
 
-  /** The settlement AS DRAWN, or the whole map when nothing has been built yet. Drawn, not
-   *  footprint: a sprite overhangs its own ground, and fitting the ground cuts the roofs off. */
-  function townBox(): CameraBounds {
-    const list = deps.structures()
-    return list.length === 0 ? deps.reachable() : drawnBoundsOf(list)
-  }
-
   /** True while the camera shows the whole town, so a resize refits rather than reclamping. */
   let fitted = false
 
   function fitTo(stop: ZoomStop): void {
     stopGlide()
     breakFollow()
-    const c = boundsCentre(townBox())
+    const c = boundsCentre(deps.town())
     anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
     fitted = true
     if (stop === zoom.stop) {
@@ -107,10 +98,10 @@ export function createCameraRig(
   }
 
   function fitToTown(): void {
-    fitTo(fitStop(townBox(), screenBox()))
+    fitTo(fitStop(deps.town(), screenBox()))
   }
 
-  const fitsWholeTown = (): boolean => !tooBigToFit(townBox(), screenBox())
+  const fitsWholeTown = (): boolean => !tooBigToFit(deps.town(), screenBox())
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
@@ -236,7 +227,6 @@ export function createCameraRig(
     const before = { x: world.position.x, y: world.position.y }
     place(before.x + step.dx, before.y + step.dy)
     if (world.position.x === before.x && world.position.y === before.y) stopGlide()
-    else notifyCamera()
   }
   app.ticker.add(glideTick)
 
@@ -261,11 +251,10 @@ export function createCameraRig(
 
   return {
     onResize: () => {
-      const intent = resizeIntent(fitted, townBox(), screenBox())
+      const intent = resizeIntent(fitted, deps.town(), screenBox())
       if (intent.kind === 'refit') fitTo(intent.stop)
       else place(world.position.x, world.position.y)
     },
-    isFitted: () => fitted,
     panBy: (dx, dy) => {
       stopGlide()
       fitted = false
@@ -283,7 +272,7 @@ export function createCameraRig(
       stopGlide()
       fitted = false
       breakFollow()
-      const c = boundsCentre(townBox())
+      const c = boundsCentre(deps.town())
       centerOnScreen(c.sx, c.sy)
       notifyCamera()
     },

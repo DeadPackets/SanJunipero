@@ -225,7 +225,7 @@ export function App() {
   // reach a sibling on the same target, so the order would be registration luck.
   useEffect(() => {
     const step = escapeStep(insideId, dockOpen, isSingleAgentView(route), pick !== null)
-    if (step !== 'popover' && step !== 'dock' && step !== 'roster') return
+    if (step === null) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       const t = e.target as HTMLElement | null
@@ -233,6 +233,10 @@ export function App() {
       e.preventDefault()
       if (step === 'popover') {
         setPick(null)
+        return
+      }
+      if (step === 'room') {
+        scene?.interior?.setActive(null)
         return
       }
       if (step === 'dock') {
@@ -246,12 +250,11 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKey)
     }
-  }, [route, insideId, dockOpen, pick])
+  }, [route, insideId, dockOpen, pick, scene])
 
   // The next press dismisses it, wherever it lands. Pixi's `pointertap` fires after
   // `pointerdown`, so clicking a second building replaces the popover rather than closing it.
   useEffect(() => {
-    if (pick === null) return
     const onDown = (): void => {
       setPick(null)
     }
@@ -259,7 +262,7 @@ export function App() {
     return () => {
       document.removeEventListener('pointerdown', onDown)
     }
-  }, [pick])
+  }, [])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
   // panning, a text field owns them for typing, and a toolbar or scrubber that already

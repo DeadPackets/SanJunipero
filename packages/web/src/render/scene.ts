@@ -6,6 +6,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import {
   type CameraBounds,
   cameraBoundsOf,
+  drawnBoundsOf,
   reachableBoundsOf,
   ZOOM_STOPS,
   type ZoomStop,
@@ -182,15 +183,23 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // Every write to `world.position` goes through the clamp against this box, which is the
   // ground that exists UNION the town as drawn — a building can stand past the tile array.
   let bounds: CameraBounds = cameraBoundsOf([])
+  let townBounds: CameraBounds = bounds
 
   const structureList = (): { x: number; y: number; w: number; h: number }[] => {
     const s = store.getState()
     return s === null ? [] : Object.values(s.structures)
   }
   const recomputeBounds = (terrain: TileId[][]): void => {
-    bounds = reachableBoundsOf(terrain, structureList())
+    const list = structureList()
+    bounds = reachableBoundsOf(terrain, list)
+    // Drawn, not footprint: a sprite overhangs its own ground, and fitting the ground cuts the
+    // roofs off. Derived here so the camera does not re-walk the town on every notify.
+    townBounds = list.length === 0 ? bounds : drawnBoundsOf(list)
   }
-  const rig = createCameraRig(app, world, { reachable: () => bounds, structures: structureList })
+  const rig = createCameraRig(app, world, {
+    reachable: () => bounds,
+    town: () => townBounds,
+  })
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null

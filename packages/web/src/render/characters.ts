@@ -541,6 +541,8 @@ export function createCharacterLayer(
       const e = entries.get(agentId)
       if (e === undefined) return
       e.mulY = k
+      // written now as well as in `tick`: the character layer ticks BEFORE the effects do, so
+      // waiting for the next frame would show the squash one frame late.
       e.sprite.scale.y = e.sprite.scale.x * k
     },
     destroy: () => {

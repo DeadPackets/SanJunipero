@@ -113,20 +113,15 @@ export function InteriorBar({
   })
   const open = signature !== ''
 
+  // Escape is App's single `escapeStep` reducer — a listener here would leave the room even
+  // when the step belonged to something on top of it.
   useEffect(() => {
     if (!open) return
     backRef.current?.focus()
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      onBack()
-    }
-    window.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('keydown', onKey)
       document.querySelector<HTMLElement>('.stage-mount')?.focus()
     }
-  }, [open, onBack])
+  }, [open])
 
   if (!open) return null
   // the signature carries everything but the provenance line, which arrives on its own clock

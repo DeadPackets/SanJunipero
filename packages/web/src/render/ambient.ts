@@ -202,10 +202,21 @@ export function createAmbient(
   const anchors = new Map<string, { sx: number; sy: number; hasFire: boolean }>()
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
   let fxState: WorldState | null = null
+  const working: string[] = [] // the bodies a work verb is squashing, refreshed with the world
 
   /** Create, place and destroy the effect sprites. Deltas arrive at most every 250 ms, so this
    *  runs on a new world state rather than on every frame. */
   const syncStructureFx = (state: WorldState): void => {
+    working.length = 0
+    for (const a of Object.values(state.agents)) {
+      if (
+        a.alive &&
+        a.activity !== null &&
+        (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
+      )
+        working.push(a.id)
+      else layers.chars?.setScaleMulY(a.id, 1)
+    }
     const live = new Set<string>()
     for (const s of Object.values(state.structures)) {
       live.add(s.id)
@@ -327,8 +338,7 @@ export function createAmbient(
 
     const night = simTimeFromTick(store.getTick()).isNight
 
-    // structures: smoke (complete), night glow (complete), fire (burning). Only the sprites
-    // this director created are walked — the world itself is walked when it changes.
+    // structures: smoke (complete), night glow (complete), fire (burning)
     for (const [id, puffs] of smoke) {
       const a = anchors.get(id)
       if (a === undefined) continue
@@ -362,25 +372,14 @@ export function createAmbient(
       const p = (t - b.at) / BOUNCE_MS
       const done = p >= 1 || p < 0
       const k = done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
-      if (!setEntityScaleMul(scene, b.kind, b.id, k) || done) bounces.splice(i, 1)
+      const subject = setEntityScaleMul(scene, b.kind, b.id, k)
+      if (done || !subject) bounces.splice(i, 1)
     }
 
-    // squash-and-stretch while a work verb persists
-    const chars = layers.chars
-    if (chars !== undefined) {
-      for (const a of Object.values(state.agents)) {
-        const working =
-          a.alive &&
-          a.activity !== null &&
-          (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
-        if (working && grave) continue // a grave town stills mid-squash rather than springing back
-        chars.setScaleMulY(
-          a.id,
-          working
-            ? 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
-            : 1,
-        )
-      }
+    // squash-and-stretch while a work verb persists — a grave town stills mid-squash
+    if (!grave && layers.chars !== undefined) {
+      const k = 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
+      for (const id of working) layers.chars.setScaleMulY(id, k)
     }
 
     // birds across the sky band

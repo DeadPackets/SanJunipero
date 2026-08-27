@@ -33,7 +33,7 @@ describe('the map and the room card say the same sentence about a building', () 
   it('★ prints the ONE builder both surfaces read, not a second phrasing of it', () => {
     const card = roomCard(STATE, 'house-1', [], RISING)
     expect(card?.built).toBe('Begun by Yusuf, Day 3 — still rising')
-    expect(provenanceLines(store, RISING, [])).toBe(card?.built)
+    expect(provenanceLines(STATE, RISING, [])).toBe(card?.built)
   })
 
   it('adds the builder’s nearest journal line under it, and nothing when there is none', () => {
@@ -41,14 +41,14 @@ describe('the map and the room card say the same sentence about a building', () 
       { tick: RISING.plannedTick + 5000, text: 'far' },
       { tick: RISING.plannedTick + 10, text: 'near' },
     ]
-    expect(provenanceLines(store, RISING, journal)).toBe(
+    expect(provenanceLines(STATE, RISING, journal)).toBe(
       'Begun by Yusuf, Day 3 — still rising\n"near"',
     )
-    expect(provenanceLines(store, RISING, [])).not.toContain('"')
+    expect(provenanceLines(STATE, RISING, [])).not.toContain('"')
   })
 
   it('says so plainly when nobody recorded a beginning', () => {
-    expect(provenanceLines(store, null, [])).toBe('No one remembers who began this.')
+    expect(provenanceLines(STATE, null, [])).toBe('No one remembers who began this.')
   })
 })
 
@@ -80,5 +80,17 @@ describe('the popover is one live region, mounted for the life of the app', () =
     const src = readFileSync(new URL('../render/entities.ts', import.meta.url), 'utf8')
     expect(src).not.toContain('document.createElement')
     expect(src).not.toContain('document.addEventListener')
+  })
+
+  // Ranking the popover above the room only means something if one reducer settles both. A
+  // second window listener would have left the room as well as closing the popover.
+  it('★ Escape is settled in one place — no surface keeps a keydown of its own', () => {
+    const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
+    for (const step of ['popover', 'room', 'dock']) {
+      expect(app, `App does not act on the '${step}' step`).toContain(`step === '${step}'`)
+    }
+    expect(readFileSync(new URL('./InteriorBar.tsx', import.meta.url), 'utf8')).not.toContain(
+      'keydown',
+    )
   })
 })

@@ -239,20 +239,23 @@ export function placeLandmarks(
   view: Rect,
 ): { id: string; sx: number; sy: number; rect: Rect }[] {
   const m0 = LANDMARK_CULL_MARGIN_PX
-  const places = marks.flatMap((m) => m.of)
-  const taken: Rect[] = []
+  // every named place, and every plate already put down — one list, so `placeTag` is not
+  // handed a fresh concatenation of the two per mark
+  const avoid: Rect[] = marks.flatMap((m) => m.of)
   const out: { id: string; sx: number; sy: number; rect: Rect }[] = []
   for (const m of marks) {
     if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
     if (m.sy < view.y - m0 || m.sy > view.y + view.h + m0) continue
-    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, [
-      ...places,
-      ...taken,
-    ])
+    const at = placeTag(
+      { sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy },
+      m.size,
+      view,
+      avoid,
+    )
     const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
-    if (places.some((p) => hits(rect, p)) || taken.some((t) => hits(rect, t))) continue
+    if (avoid.some((p) => hits(rect, p))) continue
     if (!hits(rect, leashOf(m.of, m.size))) continue
-    taken.push(rect)
+    avoid.push(rect)
     out.push({ id: m.id, sx: at.sx, sy: at.sy, rect })
   }
   return out

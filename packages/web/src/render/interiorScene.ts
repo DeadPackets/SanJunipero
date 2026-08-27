@@ -1,5 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import { CITY_INTERIOR_SLOTS, type AssetRecord, type SimEvent } from '@sj/shared'
+import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
@@ -207,11 +208,13 @@ export function createInteriorScene(
   let perches: Tile[] = []
   /** The kinds the wall itself draws this room, so no object is drawn for them as well. */
   let elevated: ReadonlySet<string> = new Set()
-  /** What is on the floor, what the painter's order sorts, and which piece covers each tile.
-   *  Furniture cannot move, so all three are derived when the plan is, not when a body walks. */
+  /** What is on the floor and what the painter's order sorts. Furniture cannot move, so both
+   *  are derived when the plan is, not when a body walks. */
+  let roomState: WorldState | null = null
+  let roomFor: string | null = null
+  let room2: ReturnType<typeof interiorOf> = null
   let standing: MapPiece[] = []
   let items: { kind: string; tile: Tile; meta: RoomItem['meta'] | null }[] = []
-  const hostAt = new Map<string, MapPiece>()
   /** Where each body is on the room map, and the tiles it still has to cross to get where it
    *  is going. The engine has no interior position, so this is the renderer's own. */
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
@@ -617,20 +620,28 @@ export function createInteriorScene(
       tile: p.tile,
       meta: plan.find((i) => i.kind === p.kind)?.meta ?? null,
     }))
-    // First writer wins, which is the piece the linear scan this replaces used to return.
-    hostAt.clear()
-    for (const p of standing)
-      for (let dy = 0; dy < p.size.h; dy++)
-        for (let dx = 0; dx < p.size.w; dx++) {
-          const key = `${p.tile.x + dx},${p.tile.y + dy}`
-          if (!hostAt.has(key)) hostAt.set(key, p)
-        }
+  }
+
+  /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */
+  function hosts(piece: MapPiece, tile: Tile): boolean {
+    return (
+      tile.x >= piece.tile.x &&
+      tile.x < piece.tile.x + piece.size.w &&
+      tile.y >= piece.tile.y &&
+      tile.y < piece.tile.y + piece.size.h
+    )
   }
 
   function layoutRoom(dtMs: number): void {
     const state = store.getState()
     if (activeId === null || state === null) return
-    const room2 = interiorOf(state, activeId)
+    // `interiorOf` walks every agent and every item; the world it reads changes at most every
+    // 250 ms, so it is asked on a new state rather than on a new frame.
+    if (state !== roomState || activeId !== roomFor) {
+      roomState = state
+      roomFor = activeId
+      room2 = interiorOf(state, activeId)
+    }
     if (room2 === null) return
     const records = store.assetRecords()
     const seq = store.assetsSeq()
@@ -654,7 +665,7 @@ export function createInteriorScene(
         : (perches[awakeIdx++ % Math.max(1, perches.length)] ?? spareTile(roomTiles))
       retarget(id, goal, map)
       const own = asleep ? goal : (walking.get(id)?.at ?? goal)
-      const host = hostAt.get(`${own.x},${own.y}`) ?? null
+      const host = standing.find((p) => hosts(p, own)) ?? null
       placed.push({
         id,
         tile: own,
