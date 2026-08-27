@@ -10,7 +10,6 @@ import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
-
 function house(id: string, x: number, y: number, flammable = true): SimEvent[] {
   return [
     ev('structure_planned', {

@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-} from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { MYSTERIES, MYSTERY_BY_KIND } from '../data/mysteries.js'
 import { composePerception } from '../perception.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
@@ -19,7 +14,6 @@ import { ev } from '../testutil/world.js'
 
 const CERTAIN: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 1 } })
 const NEVER: SimConfig = SimConfigSchema.parse({ mystery: { chancePerDay: 0 } })
-
 
 function world(config: SimConfig): WorldState {
   const s = genesisState(

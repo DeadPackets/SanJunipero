@@ -25,7 +25,6 @@ const CFG: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
 })
 
-
 const MAP = (): TileId[][] => grid(16)
 
 function world(): WorldState {

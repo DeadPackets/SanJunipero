@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  DEFAULT_CONFIG,
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  type SimConfig,
-} from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
@@ -21,7 +16,6 @@ const RNG = RngStream.seed('spoilage-test', 'actions')
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, '#': 3 }
 const ROWS = ['..###...', '........', '........', '..~~....', '........', '........']
-
 
 function world(config = DEFAULT_CONFIG): WorldState {
   const s = genesisState(

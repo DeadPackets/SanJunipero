@@ -13,7 +13,6 @@ const DAWN = 360 // hour 6, minute 0
 const WINTER = 273 * 1440 // first winter day
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, f: 3 }
 
-
 function makeWorld(rows: string[] = ['.~', '..'], config = CFG): WorldState {
   const s = genesisState(
     config,

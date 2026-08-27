@@ -8,7 +8,6 @@ import { VERBS } from './verbs.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
 
-
 // Noon by default: the witness radius scales with the light on the thing seen,
 // and every row below the night-witness block is about a horizon, not about the dark.
 const NOON = 720
@@ -804,7 +803,11 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
 
   // A taking at (x,y) that 'a' at the origin may or may not witness.
   const takingAt = (x: number, y: number, tick = MIDNIGHT): SimEvent[] => [
-    ev('item_taken', { itemId: 'item_5', kind: 'bread', takerId: 'thief', ownerId: 'a', x, y }, tick),
+    ev(
+      'item_taken',
+      { itemId: 'item_5', kind: 'bread', takerId: 'thief', ownerId: 'a', x, y },
+      tick,
+    ),
   ]
 
   const world = (): WorldState =>

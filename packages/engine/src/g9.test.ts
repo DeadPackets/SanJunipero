@@ -40,7 +40,6 @@ const FERTILE: SimConfig = SimConfigSchema.parse({
 
 const RNG = RngStream.seed('g9a', 'actions')
 
-
 const MAP = (n = 24): TileId[][] => grid(n)
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }

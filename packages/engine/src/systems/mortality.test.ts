@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  DAYS_PER_YEAR,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-} from '@sj/shared'
+import { DAYS_PER_YEAR, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'

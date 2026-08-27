@@ -34,7 +34,6 @@ const QUIET = {
 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
-
 const MAP = (n = 24): TileId[][] => grid(n)
 
 function pass(

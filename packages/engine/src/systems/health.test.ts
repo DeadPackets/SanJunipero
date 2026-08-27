@@ -11,7 +11,6 @@ import { ev, roundTrips } from '../testutil/world.js'
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DAWN = 360 // hour 6, minute 0
 
-
 function makeWorld(
   config = CFG,
   agents: { id: string; x: number; y: number }[] = [{ id: 'a1', x: 0, y: 0 }],

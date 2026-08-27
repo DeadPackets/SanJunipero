@@ -10,7 +10,6 @@ import { ev, roundTrips } from '../testutil/world.js'
 const CFG: SimConfig = SimConfigSchema.parse({})
 const MIDNIGHT = 1440 // day 1, hour 0, minute 0
 
-
 function makeWorld(ageDays: number): WorldState {
   let s = genesisState(
     CFG,

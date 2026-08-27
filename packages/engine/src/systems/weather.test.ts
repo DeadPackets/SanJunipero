@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  SEASONS,
-  SimConfigSchema,
-  simTimeFromTick,
-  type SimConfig,
-} from '@sj/shared'
+import { SEASONS, SimConfigSchema, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStream, RngStreams } from '../rng.js'
@@ -13,7 +8,6 @@ import { allowedKinds, rollWeatherKind, weatherTemperature } from './weather.js'
 import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
-
 
 function tickTo(s: WorldState, tick: number, rng: RngStreams): WorldTickResult {
   const wt = createWorldTick(CFG, rng)

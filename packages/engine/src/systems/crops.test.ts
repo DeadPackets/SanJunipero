@@ -18,7 +18,6 @@ const DAWN = 360 // hour 6, minute 0
 const NOON = 720 // hour 12: daylight, so the night-work penalty is not what is being measured
 const CHAR_TILE: Record<string, TileId> = { '.': 0, ',': 1, '~': 2, '#': 6, c: 10 }
 
-
 function makeWorld(rows: string[] = ['.#', '..'], config = FAST): WorldState {
   const s = genesisState(
     config,

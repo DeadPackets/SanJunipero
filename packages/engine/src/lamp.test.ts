@@ -41,7 +41,6 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const NIGHT = 22 * 60
 const NOON = 12 * 60
 
-
 const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, id: string, x: number, y: number): WorldState =>

@@ -23,7 +23,6 @@ const OFF: SimConfig = SimConfigSchema.parse({
   reproduction: { enabled: false },
 })
 
-
 const HOUSE = { id: 'structure_1', kind: 'house', x: 2, y: 2, w: 3, h: 3 }
 const STORE = { id: 'structure_2', kind: 'storehouse', x: 8, y: 2, w: 3, h: 3 }
 

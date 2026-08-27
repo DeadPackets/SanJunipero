@@ -26,9 +26,6 @@ export function roundTrips(
   const at = state.tick + 1
   const advanced = fold(state, ev('tick_advanced', {}, at), config)
   const out = createWorldTick(config, new RngStreams(seed))(advanced)
-  const replayed = out.events.reduce(
-    (s, e) => fold(s, ev(e.type, e.payload, at), config),
-    advanced,
-  )
+  const replayed = out.events.reduce((s, e) => fold(s, ev(e.type, e.payload, at), config), advanced)
   return { replayed, out }
 }

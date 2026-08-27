@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-} from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { stepCostAt, isPassable } from '../path.js'
@@ -26,7 +21,6 @@ const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const SURE: SimConfig = SimConfigSchema.parse({ ...quiet, regrowth: { saplingChancePerDay: 1 } })
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, regrowth: { enabled: false } })
 const DAYS = CFG.regrowth.saplingDays
-
 
 // One forest tile at (2,2). Its orthogonal neighbours are grass; (1,1) is diagonal only.
 function wood(config = CFG, tick = 0): WorldState {

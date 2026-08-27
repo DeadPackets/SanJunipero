@@ -32,7 +32,6 @@ const CFG: SimConfig = SimConfigSchema.parse({ ...QUIET, aging: { deathOfOldAgeE
 // Every cause this file actually produced, checked against DEATH_CAUSES in the last row.
 const CAUSES_SEEN = new Set<DeathCause>()
 
-
 const MAP = (n = 24): TileId[][] => grid(n)
 
 type Spawn = { id: string; x: number; y: number; ageDays?: number }

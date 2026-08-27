@@ -19,7 +19,6 @@ const cfg = (over: Record<string, unknown> = {}): SimConfig =>
 const ON = cfg()
 const ACTIONS = RngStream.seed('offstate', 'actions')
 
-
 const MAP = (): TileId[][] => grid(24)
 
 // Fold the law straight in: the same shape the tick-boundary drain produces.

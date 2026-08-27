@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  SimConfigSchema,
-  stateHash,
-  thirstDecayPerTick,
-  type SimConfig,
-} from '@sj/shared'
+import { SimConfigSchema, stateHash, thirstDecayPerTick, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { submitIntent } from '../intent.js'

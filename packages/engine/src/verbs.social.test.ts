@@ -10,7 +10,6 @@ import { ev } from './testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
-
 function makeWorld(
   config = CFG,
   agents: { id: string; x: number; y: number }[] = [

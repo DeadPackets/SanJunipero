@@ -35,7 +35,6 @@ const QUIET = {
 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 
-
 const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState =>

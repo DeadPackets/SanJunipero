@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  MINUTES_PER_DAY,
-  SimConfigSchema,
-  stateHash,
-  type SimConfig,
-} from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { stepCostAt, terrainCostFor } from '../path.js'
