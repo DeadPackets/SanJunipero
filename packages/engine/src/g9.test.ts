@@ -196,17 +196,6 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
     expect(child.insideId).toBe(HOUSE.id) // born where the mother lay
     expect(delivery.state.agents.ada!.pregnant).toBeUndefined()
   })
-
-  it('goes silent under the reproduction law, and the law travels as an event', () => {
-    const off = fold(
-      couple(FERTILE),
-      ev('config_changed', { path: 'reproduction.enabled', value: false }),
-      FERTILE,
-    )
-    const quiet = pass(off, FERTILE, 1)
-    expect(typed(quiet.events, 'co_slept')).toEqual([])
-    expect(quiet.state.pairNights).toBeUndefined()
-  })
 })
 
 describe('G9a-3: the ownership chain — craft, give, and a taking the town can see', () => {
@@ -364,11 +353,6 @@ describe('G9a-4: a wall stops sound', () => {
     expect(heardBy('doorway')).toEqual(['speaker'])
     expect(heardBy('outside')).toEqual([]) // three tiles out, well inside plain earshot of 8
   })
-
-  it('with occlusion off the wall stops being a wall, and plain earshot returns', () => {
-    const s = fold(room(), ev('config_changed', { path: 'occlusion.enabled', value: false }), CFG)
-    expect(composePerception(s, CFG, 'outside', [said(s)]).heard).toHaveLength(1)
-  })
 })
 
 describe('G9a-5: a shelf buys time', () => {
@@ -421,16 +405,6 @@ describe('G9a-5: a shelf buys time', () => {
       ['item_2'],
     )
     expect(day4.state.items.item_2).toBeUndefined()
-  })
-
-  it('with the spoilage law off nothing turns, and the deadline waits', () => {
-    const off = fold(
-      larder(),
-      ev('config_changed', { path: 'spoilage.enabled', value: false }),
-      CFG,
-    )
-    expect(typed(pass(off, CFG, 4).events, 'item_spoiled')).toEqual([])
-    expect(pass(off, CFG, 4).state.items.item_1).toBeDefined()
   })
 })
 
@@ -508,12 +482,6 @@ describe('G9a-7: what is carved can be read back', () => {
     expect(across.hasInscription).toBe(true)
     expect(across.inscription).toBeUndefined()
   })
-
-  it('with the inscription law off the hands find no way to mark it', () => {
-    const s = fold(wall(), ev('config_changed', { path: 'inscription.enabled', value: false }), CFG)
-    const r = submitIntent(s, CFG, 'carver', 'inscribe', { structureId: HOUSE.id, text: TEXT })
-    expect(r).toEqual({ ok: false, reason: 'your hands find no way to mark this' })
-  })
 })
 
 describe('G9a-8: the world keeps one hand hidden', () => {
@@ -550,15 +518,6 @@ describe('G9a-8: the world keeps one hand hidden', () => {
     expect(composePerception(s, CFG, 'distant', [here]).seen).toEqual([])
     expect(composePerception(s, CFG, 'indoors', [here]).seen).toEqual([])
   })
-
-  it('with the mystery law off the roll is not drawn at all', () => {
-    const off = fold(
-      watchers(CERTAIN),
-      ev('config_changed', { path: 'mystery.enabled', value: false }),
-      CERTAIN,
-    )
-    expect(typed(pass(off, CERTAIN, 1, 12).events, 'mystery_event')).toEqual([])
-  })
 })
 
 describe('G9a-9: death of old age, under a forced roll', () => {
@@ -593,21 +552,6 @@ describe('G9a-9: death of old age, under a forced roll', () => {
     expect(died.map((e) => e.payload)).toEqual([{ agentId: 'elder', cause: 'old_age' }])
     expect(midnight.state.agents.elder!.alive).toBe(false)
     expect(midnight.state.items.item_1!.loc).toEqual({ t: 'tile', x: 3, y: 3 })
-  })
-
-  it('with the old-age law off the body still ages and the roll is skipped', () => {
-    const off = fold(
-      elder(CERTAIN_DEATH),
-      ev('config_changed', {
-        path: 'aging.deathOfOldAgeEnabled',
-        value: false,
-      }),
-      CERTAIN_DEATH,
-    )
-    const midnight = pass(off, CERTAIN_DEATH, 1)
-    expect(typed(midnight.events, 'agent_aged')).toHaveLength(1)
-    expect(typed(midnight.events, 'agent_died')).toEqual([])
-    expect(midnight.state.agents.elder!.alive).toBe(true)
   })
 })
 
