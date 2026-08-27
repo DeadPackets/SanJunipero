@@ -23,6 +23,38 @@ const MODEL = 'google/gemini-3.1-flash-image'
 const GEN_PX = 2048
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 
+/** ONE provider call. Shared so a second producer cannot drift from this one's request shape. */
+export async function imageGen(o: {
+  key: string
+  prompt: string
+  size: string
+  refs: readonly Buffer[]
+}): Promise<{ raw: Buffer; cost: number | undefined; width: number; height: number }> {
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${o.key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      prompt: o.prompt,
+      size: o.size,
+      response_format: 'b64_json',
+      input_references: o.refs.map((r) => ({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+      })),
+      usage: { include: true },
+    }),
+  })
+  if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
+  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
+  const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
+  if (!b64) throw new Error(`${MODEL}: no b64_json`)
+  const [w, h] = o.size.split('x').map(Number)
+  return { raw: Buffer.from(b64, 'base64'), cost: json.usage?.cost, width: w!, height: h! }
+}
+
+export const GEN_MODEL = MODEL
+
 // The palette, in words, for the calls that carry no building reference.
 export const PALETTE_WORDS = [
   'Colour it from a warm cozy pastel palette ONLY: cream stone (#FFF6E9 #F6E8D5 #E8D5BC',
@@ -73,32 +105,12 @@ export async function runCells(o: RunOptions): Promise<void> {
     const reserve = 0.15
     if (budget.total + reserve > cap)
       throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${cap})`)
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        prompt,
-        size: `${GEN_PX}x${GEN_PX}`,
-        response_format: 'b64_json',
-        input_references: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${ref.toString('base64')}` },
-          },
-        ],
-        usage: { include: true },
-      }),
-    })
-    if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
-    const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-    const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
-    if (!b64) throw new Error(`${MODEL}: no b64_json`)
-    const cost = json.usage?.cost ?? reserve
+    const r = await imageGen({ key: key!, prompt, size: `${GEN_PX}x${GEN_PX}`, refs: [ref] })
+    const cost = r.cost ?? reserve
     budget.spend(cost)
     ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost }) // throws past the $5 anomaly stop
     ledger.flush()
-    return { raw: Buffer.from(b64, 'base64'), cost }
+    return { raw: r.raw, cost }
   }
 
   // The ONLY reference any call here carries: a colour chart, never a building.

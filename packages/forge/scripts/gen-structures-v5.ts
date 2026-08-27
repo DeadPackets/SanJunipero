@@ -160,6 +160,19 @@ const SUBJECTS: readonly Subject[] = [
       'the ground. It is noticeably LONGER than it is wide. Parked, weathered, nobody in it',
   },
   {
+    id: 'lamp-post',
+    kind: 'lamp_post',
+    fp: { w: 1, h: 1 },
+    cells: 'one',
+    clause: 'symmetric',
+    desc:
+      'a single village LAMP POST standing on the verge. One slim upright post of dark painted ' +
+      'iron, about three times a person’s height, set in a small square warm-grey stone base. ' +
+      'At the top, a short curved arm carries ONE four-sided lantern of clear glass in a dark ' +
+      'metal frame with a small peaked cap, lit a soft honey-cream. The post is plain: no ' +
+      'ladder bar, no banner, no sign, no wires, no second lamp. Nothing else stands with it',
+  },
+  {
     id: 'bridge',
     kind: 'bridge',
     fp: { w: 1, h: 2 },

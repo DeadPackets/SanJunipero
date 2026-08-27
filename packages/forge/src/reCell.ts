@@ -9,6 +9,8 @@ export const BUILDING_ZOOM_STOP = 4
 // packages/web/src/render/charAnim.ts — CHAR_TARGET_PX 52; characters.ts scales the whole
 // cell by CHAR_TARGET_PX / figureH, so this height makes that scale 1/4 and the 4x stop 1:1.
 export const CHAR_FIGURE_PX = 52 * BUILDING_ZOOM_STOP
+// The cell canvas: 208 px of figure needs headroom for hair and a lying pose's length.
+export const CHAR_CELL_PX = 256
 
 // The chroma blend band is this many source pixels wide whatever the art pitch is.
 const CHROMA_BAND_PX = 4
