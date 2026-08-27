@@ -92,7 +92,6 @@ import {
   StructureInscribed,
   StructurePlanned,
   StructureProgressed,
-  TerrainChanged,
   TickAdvanced,
   TileChanged,
   TrafficDecayed,
@@ -1038,16 +1037,6 @@ export function fold(
         ...state,
         forageables: { ...state.forageables, [p.id]: { ...node, stock: p.stock } },
       }
-    }
-    case 'terrain_changed': {
-      const p = TerrainChanged.parse(event.payload)
-      const row = state.terrain[p.y]
-      if (!row || p.x < 0 || p.x >= row.length)
-        throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
-      const terrain = state.terrain.map((r, y) =>
-        y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r,
-      )
-      return { ...state, terrain }
     }
     case 'tile_changed': {
       const p = TileChanged.parse(event.payload)

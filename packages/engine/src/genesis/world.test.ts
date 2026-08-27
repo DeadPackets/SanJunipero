@@ -91,9 +91,7 @@ describe('makeGenesisWorld: the ground', () => {
     const t = makeCityTemplate()
     for (const tile of t.tiles)
       expect(terrain[t.anchor.y + tile.dy]![t.anchor.x + tile.dx]).toBe(tile.to)
-    expect(events.some((e) => e.type === 'tile_changed' || e.type === 'terrain_changed')).toBe(
-      false,
-    )
+    expect(events.some((e) => e.type === 'tile_changed')).toBe(false)
   })
 })
 

@@ -111,7 +111,7 @@ export function Minimap({
     // The bake is gated on the terrain array; a tile that changed under an unchanged array is
     // announced instead. `scene.ts` reads both for exactly this reason, and so does the map.
     const offEvents = store.onEvents((evts) => {
-      if (!evts.some((e) => e.type === 'terrain_changed' || e.type === 'tile_changed')) return
+      if (!evts.some((e) => e.type === 'tile_changed')) return
       rebuild(true)
       paint()
     })

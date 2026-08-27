@@ -114,7 +114,6 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'crop_grew',
   'crop_withered',
   'crop_harvested',
-  'terrain_changed',
   'weather_changed',
   'wildlife_changed',
   'config_changed',
