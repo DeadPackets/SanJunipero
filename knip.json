@@ -20,23 +20,8 @@
     "packages/forge": {
       "entry": [
         "src/**/*.test.ts",
-        "scripts/build-farmland.ts",
-        "scripts/gen-cast-v4.ts",
-        "scripts/gen-cast-v5.ts",
-        "scripts/gen-character-v4.ts",
-        "scripts/gen-dwellings-v2.ts",
-        "scripts/gen-dwellings.ts",
-        "scripts/gen-library-v2.ts",
-        "scripts/gen-library.ts",
-        "scripts/gen-structures-v5.ts",
-        "scripts/gen-terrain-textures.ts",
-        "scripts/recell-buildings.ts",
-        "scripts/recell-characters.ts",
-        "scripts/repair-sleep-cell.ts",
-        "scripts/requantize-portraits.ts",
-        "scripts/write-autotile-set.ts",
-        "scripts/write-generated-terrain.ts",
-        "scripts/write-terrain-tileset.ts"
+        "scripts/*.ts",
+        "!scripts/{scratch,character,cast,cast-v5}.ts"
       ],
       "project": [
         "src/**/*.ts",

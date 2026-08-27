@@ -164,7 +164,7 @@ SUPERSEDES the v1 3-pose standard (below) after the v1 sheet failed human review
 ### Identity
 
 - ~~Identity asymmetry LAW: every character design carries left-right asymmetric markers (e.g. satchel on the left hip, cap brim tilted right) so no facing can be a mirror of another. The markers live in CHAR_DESC and every prompt.~~ **RESCINDED for characters by standard v3 (asymmetry law is buildings-only; characters mirror).**
-- Every character's identity root is its CONCEPT image (`scripts/gen-concept.ts`: one high-detail box-art style image establishing costume, palette, accessories — not a sprite, no pixel constraints). Sprites and portraits both derive from it: when a concept exists it is inserted as an input_reference immediately after the style anchor.
+- Every character's identity root is its CONCEPT image (one high-detail box-art style image establishing costume, palette, accessories — not a sprite, no pixel constraints). Sprites and portraits both derive from it: when a concept exists it is inserted as an input_reference immediately after the style anchor.
 - Re-examined against an external workflow and deliberately KEPT: east-mirroring stays banned (NW-light law unchanged) and chroma stays magenta (green would collide with the sage palette).
 
 ### Hard QA gates (exported from `sheet.ts`; fail → regen that strip, max 2 retries, then BLOCKED — never ship a flagged sheet)
