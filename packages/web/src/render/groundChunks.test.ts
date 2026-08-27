@@ -16,11 +16,12 @@ import {
   chunksInView,
   createChunkResidency,
   groundGrid,
+  type ChunkGrid,
   wholeMapTextureBytes,
 } from './groundChunks.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CULL_MARGIN_PX, boxInView, rectInView, type ViewRect } from './cull.js'
-import { groundField } from './groundField.js'
+import { groundField, type GroundField } from './groundField.js'
 import { bigTownTerrain } from './bigTown.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { createGroundBaker } from './scene.js'
@@ -38,10 +39,21 @@ const MB = 1024 * 1024
 const STAGE = { w: 1728, h: 824 }
 const RINGS = [1, 3, 5, 10] as const
 
-const fieldFor = (rings: number) => groundField(bigTownTerrain(rings) as never, [])
-const gridFor = (rings: number) => {
-  const f = fieldFor(rings)
-  return groundGrid(f.widthPx, f.heightPx, f.offsetX)
+// Both builders are pure, so one field and one grid per ring count serves the whole file.
+const FIELDS = new Map<number, GroundField>()
+const GRIDS = new Map<number, ChunkGrid>()
+const fieldFor = (rings: number): GroundField => {
+  let f = FIELDS.get(rings)
+  if (f === undefined) FIELDS.set(rings, (f = groundField(bigTownTerrain(rings) as never, [])))
+  return f
+}
+const gridFor = (rings: number): ChunkGrid => {
+  let g = GRIDS.get(rings)
+  if (g === undefined) {
+    const f = fieldFor(rings)
+    GRIDS.set(rings, (g = groundGrid(f.widthPx, f.heightPx, f.offsetX)))
+  }
+  return g
 }
 
 /** The view a camera at `z` shows, placed at a bake-space offset. World space, as `viewRect()`. */
