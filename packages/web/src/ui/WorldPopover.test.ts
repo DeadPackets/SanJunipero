@@ -101,7 +101,7 @@ describe('the popover reads both endpoints through the shared layer', () => {
   const SRC = readFileSync(new URL('./WorldPopover.tsx', import.meta.url), 'utf8')
   const PICK = { kind: 'structure', id: 'house-1', screenX: 0, screenY: 0 } as const
   const UNREAD = { data: null, loaded: false }
-  const settled = <T,>(data: T): Read<T> => ({ data, loaded: true })
+  const settled = <T>(data: T): Read<T> => ({ data, loaded: true })
   const NEAR = [{ tick: RISING.plannedTick + 10, text: 'near' }]
 
   it('★ hand-rolls no fetch of its own', () => {

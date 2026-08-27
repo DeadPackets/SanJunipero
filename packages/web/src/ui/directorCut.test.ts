@@ -96,6 +96,8 @@ describe('DirectorMode reads the heat window through the one endpoint layer', ()
     expect(SRC).toContain('const NO_HEAT: HeatWindow[] = []')
     expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS,\s*NO_HEAT,\s*\)/)
     // and an empty window is what turns the round over — the two halves of one guarantee
-    expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(quietSubject(['amara', 'omar'], 1000))
+    expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(
+      quietSubject(['amara', 'omar'], 1000),
+    )
   })
 })
