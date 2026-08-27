@@ -1589,7 +1589,7 @@ async function main(): Promise<void> {
         ticksRun: loop.tick - START_TICK,
         crashAlerts: qInt(
           db,
-          `SELECT COUNT(*) FROM alerts WHERE kind IN ('turn_crash', 'reflection_failed')`,
+          `SELECT COUNT(*) FROM alerts WHERE kind IN ('turn_crash', 'reflection_failed', 'dream_failed')`,
         ),
         drainedIntents: opts.drainedIntents,
         drainedAgainCount: opts.drainedAgainCount,
