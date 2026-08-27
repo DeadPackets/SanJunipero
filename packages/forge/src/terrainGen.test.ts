@@ -35,6 +35,21 @@ import { paintRoadAutotile } from './roadTiles.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
+// one assertion per image, not per pixel: names the first five offending offsets
+function offenders(img: RawImage, opaque: boolean): string[] {
+  const bad: string[] = []
+  for (let i = 0; i < img.data.length; i += 4) {
+    const a = img.data[i + 3]!
+    if (opaque && a !== 255) bad.push(`alpha@${i}`)
+    if (
+      a !== 0 &&
+      !PALETTE_HEXES.has((img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!)
+    )
+      bad.push(`hex@${i}`)
+  }
+  return bad.slice(0, 5)
+}
+
 // A HOMOGENEOUS stochastic material — what an image model actually returns. A synthetic torus
 // (f(0) === f(px)) would also pass, but it cannot survive the margin crop real output requires.
 function seamlessSquare(px = MATERIAL_PX): RawImage {
@@ -125,10 +140,7 @@ describe('materialFromCandidate', () => {
   it('lands a 512 generation on the material grid, palette-true and fully opaque', () => {
     const m = materialFromCandidate(bigCandidate(seamlessSquare))
     expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])
-    for (let i = 0; i < m.data.length; i += 4) {
-      expect(m.data[i + 3]).toBe(255) // ground is never see-through
-      expect(PALETTE_HEXES).toContain((m.data[i]! << 16) | (m.data[i + 1]! << 8) | m.data[i + 2]!)
-    }
+    expect(offenders(m, true)).toEqual([]) // ground is never see-through
   })
 
   it('is deterministic — the same candidate twice is byte-identical', () => {
@@ -211,10 +223,7 @@ describe('seamlessMaterial', () => {
   it('keeps the material palette-true, opaque and the same size', async () => {
     const m = seamlessMaterial(await offender('farmland'))
     expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])
-    for (let i = 0; i < m.data.length; i += 4) {
-      expect(m.data[i + 3]).toBe(255)
-      expect(PALETTE_HEXES).toContain((m.data[i]! << 16) | (m.data[i + 1]! << 8) | m.data[i + 2]!)
-    }
+    expect(offenders(m, true)).toEqual([])
   })
 
   it('is deterministic', async () => {
@@ -279,12 +288,7 @@ describe('diamondFromMaterial', () => {
   })
 
   it('stays palette-true through the cut', () => {
-    for (let i = 0; i < tile.data.length; i += 4) {
-      if (tile.data[i + 3] === 0) continue
-      expect(PALETTE_HEXES).toContain(
-        (tile.data[i]! << 16) | (tile.data[i + 1]! << 8) | tile.data[i + 2]!,
-      )
-    }
+    expect(offenders(tile, false)).toEqual([])
   })
 
   it('is deterministic', () => {
@@ -349,14 +353,19 @@ describe('stencilRoadTile', () => {
   it('fills every shape from the SAME surface, so the lattice is one road', () => {
     const a = stencilRoadTile(material, 'cross')
     const b = stencilRoadTile(material, 'straight-ns')
+    const bad: string[] = []
     let compared = 0
     for (let i = 0; i < a.data.length; i += 4) {
       if (a.data[i + 3] === 0 || b.data[i + 3] === 0) continue
-      expect(a.data[i], `px ${i}`).toBe(b.data[i])
-      expect(a.data[i + 1]).toBe(b.data[i + 1])
-      expect(a.data[i + 2]).toBe(b.data[i + 2])
+      if (
+        a.data[i] !== b.data[i] ||
+        a.data[i + 1] !== b.data[i + 1] ||
+        a.data[i + 2] !== b.data[i + 2]
+      )
+        bad.push(`px ${i}`)
       compared++
     }
+    expect(bad.slice(0, 5)).toEqual([])
     expect(compared).toBeGreaterThan(50)
   })
 
