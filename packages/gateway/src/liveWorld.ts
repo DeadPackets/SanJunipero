@@ -346,8 +346,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   }
 
   // Opened before the gateway, which reads this same file and will not create it.
-  const narratorDb =
-    opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
+  const narratorDb = opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
   const narratorStore = narratorDb === null ? null : new NarratorStore(narratorDb)
   let narrating = false
 

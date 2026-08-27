@@ -15,9 +15,7 @@ const store = (): NarratorStore => {
 // The world db a biography reads: only `events`, because only `events` is public.
 const worldDb = (evs: SimEvent[]): Database.Database => {
   const db = new Database(':memory:')
-  db.exec(
-    'CREATE TABLE events (seq INTEGER PRIMARY KEY, tick INTEGER, type TEXT, payload TEXT)',
-  )
+  db.exec('CREATE TABLE events (seq INTEGER PRIMARY KEY, tick INTEGER, type TEXT, payload TEXT)')
   const ins = db.prepare('INSERT INTO events (seq, tick, type, payload) VALUES (?, ?, ?, ?)')
   for (const e of evs) ins.run(e.seq, e.tick, e.type, JSON.stringify(e.payload))
   return db
@@ -27,7 +25,12 @@ const dayEvents = (day: number, from: number): SimEvent[] => {
   const t = day * MINUTES_PER_DAY
   return [
     { seq: from, tick: t + 10, type: 'agent_spoke', payload: { agentId: 'amara', text: 'Rain.' } },
-    { seq: from + 1, tick: t + 11, type: 'agent_spoke', payload: { agentId: 'omar', text: 'Aye.' } },
+    {
+      seq: from + 1,
+      tick: t + 11,
+      type: 'agent_spoke',
+      payload: { agentId: 'omar', text: 'Aye.' },
+    },
     {
       seq: from + 2,
       tick: t + 60,
@@ -39,7 +42,11 @@ const dayEvents = (day: number, from: number): SimEvent[] => {
 
 const llm = (): NarratorLlm => ({
   summarizeChapter: vi.fn(async () => ({ title: 'Rain', text: 'It rained.', citations: [] })),
-  summarizeEra: vi.fn(async () => ({ title: 'The First Week', text: 'Seven days.', citations: [] })),
+  summarizeEra: vi.fn(async () => ({
+    title: 'The First Week',
+    text: 'Seven days.',
+    citations: [],
+  })),
   newspaperCopy: vi.fn(),
   biography: vi.fn(async () => ({ title: 'Amara of the tally', body: 'She was seen counting.' })),
 })

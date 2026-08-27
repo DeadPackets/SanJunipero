@@ -26,7 +26,7 @@ export const bondsFeed = endpoint('/api/bonds', parseBonds, BONDS_REFETCH_MS)
 export const lineageFeed = endpoint('/api/lineage', parseLineage)
 
 /** The narrator publishes once a sim-day, which is once a real hour, so a minute is generous. */
-export const DISPATCHES_REFETCH_MS = 60_000
+const DISPATCHES_REFETCH_MS = 60_000
 
 /** The town's paper, its captions, its weeks and its written lives, read once for the whole
  *  page: the Chronicle's paper tab and every open Inspector are looking at the same six lists. */

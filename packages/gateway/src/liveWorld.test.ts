@@ -183,7 +183,6 @@ const SPEAKING_TURN = {
 }
 const SILENT_TURN = { thought: THOUGHT, importance: 2 }
 
-
 // Every mind turns on the tick it is asked to, so a row does not have to step out the 120-tick
 // boredom floor five times over.
 const EAGER = {
@@ -1040,20 +1039,22 @@ describe('★ the chronicle, written on the day boundary', () => {
     // day 0 closes at tick 1440; the tick after it is what the world reaches next
     await sprint(world, MINUTES_PER_DAY + 1)
     // The write is dispatched off the tick handler, so the world is a tick ahead of the prose.
-    expect(await settle(() => narratorRows(dir, 'SELECT day FROM chapters').length === 0, 5_000))
-      .toBe(true)
+    expect(
+      await settle(() => narratorRows(dir, 'SELECT day FROM chapters').length === 0, 5_000),
+    ).toBe(true)
 
     expect(narratorRows(dir, 'SELECT day, title FROM chapters')).toEqual([
       { day: 0, title: NARRATED_CHAPTER.title },
     ])
     // and the two thirds nothing used to read: the paper, its caption, and one life
-    expect(narratorRows(dir, "SELECT kind, day FROM publications ORDER BY kind")).toEqual([
+    expect(narratorRows(dir, 'SELECT kind, day FROM publications ORDER BY kind')).toEqual([
       { kind: 'biography', day: 0 },
       { kind: 'newspaper', day: 0 },
       { kind: 'timelapse_caption', day: 0 },
     ])
-    expect(narratorRows(dir, "SELECT subject_id FROM publications WHERE kind = 'biography'"))
-      .toEqual([{ subject_id: 'amara' }])
+    expect(
+      narratorRows(dir, "SELECT subject_id FROM publications WHERE kind = 'biography'"),
+    ).toEqual([{ subject_id: 'amara' }])
 
     // Through the cast's own client seam, which bills the ops db the cap is read off: a
     // chronicler billing anywhere else would spend outside the anomaly stop.

@@ -40,7 +40,7 @@ export const CHRONICLE_MAX = 200
 
 /** How many days of the town's own paper `/api/dispatches` sends. The record grows one row a
  *  day forever and every open panel refetches it, so the panel reads the recent run. */
-export const DISPATCH_MAX = 30
+const DISPATCH_MAX = 30
 
 /** The five things the world's own log records that the town would remember. Anything else is
  *  the everyday, and a scrub bar covered in the everyday points nowhere. */

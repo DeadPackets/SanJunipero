@@ -14,12 +14,7 @@ import {
   type RelationLink,
 } from './relationGraph.js'
 import type { BondNode, PeopleIndex } from './bondModel2.js'
-import {
-  EMPTY_SOCIETY,
-  societyFrom,
-  trafficGraph,
-  trafficLegend,
-} from './societyGraph.js'
+import { EMPTY_SOCIETY, societyFrom, trafficGraph, trafficLegend } from './societyGraph.js'
 import { bondsFeed, lineageFeed } from './feeds.js'
 import { useFeed, usePolled } from './useEndpoint.js'
 import { EMPTY_COPY } from './townStats.js'
@@ -234,9 +229,7 @@ export function SocietyLens({
       {(view === 'ties' ? api : traffic.data) === null ? (
         <BondsVeil />
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-        <p className="society-empty">
-          {view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}
-        </p>
+        <p className="society-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
       ) : null}
 
       {view === 'ties' && selected !== null && api !== null && (
