@@ -41,7 +41,7 @@ import {
 import { CHUNK_PX_H, CHUNK_PX_W } from './groundChunks.js'
 import { boxInView, type ViewRect } from './cull.js'
 import { structureDepthBox, type DepthBox } from './depth.js'
-import { bigTown } from './bigTown.js'
+import { bigTown, bigTownScreenSize } from './bigTown.js'
 
 /** The AABB the renderer will actually paint, margin excluded — the same predicate `cull.test.ts` sweeps with. */
 function drawnIntersectsView(b: DepthBox, v: ViewRect): boolean {
@@ -606,6 +606,59 @@ describe('fitStop — a view of the whole thing, with a margin', () => {
         )
       }
     }
+  })
+})
+
+describe('fitsAt — the predicate the fit and the refusal both read', () => {
+  it('keeps FIT_MARGIN_PX on every side', () => {
+    const box = drawnBoundsOf(bigTown(1))
+    // whichever axis binds first is the one the margin is measured on
+    const exact = Math.min(
+      (STAGE.w - 2 * FIT_MARGIN_PX) / (box.maxX - box.minX),
+      (STAGE.h - 2 * FIT_MARGIN_PX) / (box.maxY - box.minY),
+    )
+    expect(fitsAt(box, STAGE, exact)).toBe(true)
+    expect(fitsAt(box, STAGE, exact * 1.001)).toBe(false)
+  })
+})
+
+describe('★ how far out the camera goes, said in ring counts', () => {
+  const fitsWhole = (rings: number): boolean => {
+    const b = drawnBoundsOf(bigTown(rings))
+    return fitsAt(b, STAGE, fitStop(b, STAGE))
+  }
+
+  it('holds a four-ring town — 640 buildings — in one view, and not a five-ring one', () => {
+    expect(bigTown(4)).toHaveLength(640)
+    expect(fitsWhole(4)).toBe(true)
+    expect(fitsWhole(5)).toBe(false)
+  })
+
+  it('★ says so honestly when a town has outgrown the widest stop', () => {
+    // ten rings: 3520 buildings over 12 768 × 6384 px. A quarter of that is 3192 × 1596
+    // against 1680 × 832 — it does not fit and no stop on this ladder can make it.
+    const ten = drawnBoundsOf(bigTown(10))
+    expect(bigTownScreenSize(10).w).toBeGreaterThan(12_000)
+    expect(tooBigToFit(ten, STAGE)).toBe(true)
+    expect(fitStop(ten, STAGE)).toBe(ZOOM_STOPS[0])
+  })
+
+  it('says nothing of the sort about a town that does fit', () => {
+    expect(tooBigToFit(drawnBoundsOf(bigTown(1)), STAGE)).toBe(false)
+    expect(tooBigToFit(drawnBoundsOf(bigTown(4)), STAGE)).toBe(false)
+  })
+
+  it('the refusal and the fit can never disagree — one predicate, both answers', () => {
+    for (const rings of [1, 2, 3, 4, 5, 6, 10]) {
+      const b = drawnBoundsOf(bigTown(rings))
+      expect(tooBigToFit(b, STAGE), `${rings} rings`).toBe(!fitsAt(b, STAGE, fitStop(b, STAGE)))
+    }
+  })
+
+  it('never throws on a town of no size at all', () => {
+    const empty = drawnBoundsOf([])
+    expect(tooBigToFit(empty, STAGE)).toBe(false)
+    expect(fitsAt(empty, STAGE, 1)).toBe(true)
   })
 })
 

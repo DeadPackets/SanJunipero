@@ -42,6 +42,7 @@ import { LAW_COPY } from './lawCopy.js'
 import { EMPTY_COPY } from './townStats.js'
 import { controlItems } from './controlBar.js'
 import { stateWord, conditionsOf, CONDITION_WORD } from './status.js'
+import { BROADCAST_CAPTIONS } from './broadcast.js'
 
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
   /\/\*[\s\S]*?\*\//g,
@@ -249,6 +250,18 @@ const CAPTIONS: readonly { what: string; px: number }[] = [
   { what: 'filmstrip title', px: 14 },
 ]
 
+/** The broadcast frame's captions come off the shipped sheet, so a token change moves them. */
+function broadcastSheetPx(selector: string): number {
+  const hits: number[] = []
+  for (const [, list, body] of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!(list ?? '').split(',').some((x) => x.trim() === selector)) continue
+    const raw = /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim()
+    if (raw !== undefined) hits.push(Number.parseFloat(raw) * (raw.endsWith('rem') ? 16 : 1))
+  }
+  if (hits.length === 0) throw new Error(`no font-size for ${selector}`)
+  return hits.at(-1)!
+}
+
 describe('R2 · every caption survives the downscale to a 480px mobile player', () => {
   it('computes the scale and the floor from the frame, never from a fixed pixel count', () => {
     // the plan's 0.44 treats 1080 as the source WIDTH. 1080p is 1920 wide.
@@ -281,6 +294,15 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
   it('says what would close it, in one number', () => {
     expect(captionReads(captionFloorPx())).toBe(true)
     expect(captionReads(captionFloorPx() - 1)).toBe(false)
+  })
+
+  it('reports R2 as CLOSED by the broadcast layout', () => {
+    const broadcast = BROADCAST_CAPTIONS.map((c) => ({
+      what: c.what,
+      px: c.from === 'canvas' ? c.px : broadcastSheetPx(c.selector),
+    }))
+    expect(captionShortfall(broadcast)).toEqual([])
+    for (const c of broadcast) expect(c.px, c.what).toBeGreaterThanOrEqual(captionFloorPx())
   })
 })
 

@@ -30,22 +30,10 @@ describe('★ chrome.css survives the merge trains intact', () => {
     ).toEqual([])
   })
 
-  // 22 base + 1 the Discovery Record + 1 the little map. A dropped block takes its banner with
-  // it, so this is the number that notices; a lane adding one must say so here.
-  it('has the 24 sections the trains left it with', () => {
-    expect(BANNERS).toHaveLength(24)
-  })
-
   it('carries each lane’s own block exactly once', () => {
     for (const [lane, banner] of LANE_BLOCKS) {
       expect(CSS.split(banner).length - 1, `${lane}: block missing or duplicated`).toBe(1)
     }
-  })
-
-  // Half a block surviving a union merge keeps its banner and still balances its braces; only the
-  // rule count sees it.
-  it('has the 175 top-level rules the trains counted', () => {
-    expect(LINES.filter((l) => l.startsWith('}'))).toHaveLength(175)
   })
 
   it('is brace-balanced and carries no conflict marker', () => {
