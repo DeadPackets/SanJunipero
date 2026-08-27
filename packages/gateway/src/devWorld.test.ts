@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
-import { RngStreams, createWorldTick, genesisState, openDb } from '@sj/engine'
+import { openDb } from '@sj/engine/store'
+import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
 import {
   DEV_MAP_DEFAULT,
   SHOWCASE_CONFIG,
