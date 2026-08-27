@@ -74,7 +74,7 @@ describe('worldStore', () => {
       type: 'agent_moved',
       payload: { id: 'walker', x: 1, y: 2 },
     }
-    store.applyServer({ t: 'tick', tick: 2, events: [adv, ev] })
+    store.applyServer({ t: 'tick', tick: 2, seq: ev.seq, events: [adv, ev] })
     const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
     expect(stateHash(store.getState())).toBe(stateHash(clone(reference)))
     expect(store.getTick()).toBe(2)
@@ -103,12 +103,17 @@ describe('worldStore', () => {
     expect(store.thoughtsLog()[0]!.text).toBe('t5') // oldest 7 dropped (2 walker + t0..t4)
   })
 
-  it('asset pushes bump assetsSeq and accumulate records', () => {
+  it('asset frames bump assetsSeq and accumulate records', () => {
     const store = createWorldStore()
     expect(store.assetsSeq()).toBe(0)
-    store.applyServer({ t: 'asset', record })
+    store.applyServer({ t: 'assets', records: [record] })
     expect(store.assetsSeq()).toBe(1)
     expect(store.assetRecords()).toEqual([record])
+
+    // The catch-up is ONE frame carrying the whole codex, not one send per record.
+    store.applyServer({ t: 'assets', records: [record, record] })
+    expect(store.assetsSeq()).toBe(3)
+    expect(store.assetRecords()).toHaveLength(3)
   })
 
   it('onEvents fires per delta and recentEvents keeps the last 400', () => {
@@ -122,7 +127,7 @@ describe('worldStore', () => {
       type: 'agent_spoke',
       payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 },
     }))
-    store.applyServer({ t: 'tick', tick: 2, events })
+    store.applyServer({ t: 'tick', tick: 2, seq: 402, events })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toHaveLength(401)
     expect(store.recentEvents()).toHaveLength(400)
@@ -149,7 +154,7 @@ describe('worldStore', () => {
       payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 },
     } as SimEvent
     const advanced = { seq: 41, tick: 3, type: 'tick_advanced', payload: {} } as SimEvent
-    store.applyServer({ t: 'tick', tick: 3, events: [advanced, ...noise, spoke] })
+    store.applyServer({ t: 'tick', tick: 3, seq: 41, events: [advanced, ...noise, spoke] })
 
     expect(seen[0]).toHaveLength(22) // the raw delta is untouched
     expect(store.recentEvents().map((e) => e.type)).toEqual(['agent_spoke'])

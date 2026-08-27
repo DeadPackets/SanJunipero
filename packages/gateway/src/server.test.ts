@@ -134,9 +134,11 @@ describe('gateway server', () => {
     })
     gw.pump()
     await wait(80)
-    const assets = aFrames.map((f) => ServerMsg.parse(JSON.parse(f))).filter((m) => m.t === 'asset')
+    const assets = aFrames
+      .map((f) => ServerMsg.parse(JSON.parse(f)))
+      .filter((m) => m.t === 'assets')
     expect(assets).toHaveLength(1)
-    expect(assets[0]!.record.status).toBe('placeholder')
+    expect(assets[0]!.records[0]!.status).toBe('placeholder')
 
     // asset catch-up: a late joiner receives existing codex records right after its snapshot
     const late = await connect(gw.port)
@@ -147,8 +149,10 @@ describe('gateway server', () => {
     await wait(80)
     const lateAssets = lateFrames
       .map((f) => ServerMsg.parse(JSON.parse(f)))
-      .filter((m) => m.t === 'asset')
+      .filter((m) => m.t === 'assets')
+    // ONE frame, whatever the codex holds: the catch-up used to be one send per record.
     expect(lateAssets).toHaveLength(1)
+    expect(lateAssets[0]!.records).toHaveLength(1)
 
     // scrub goes only to the requester and matches mirror.stateAt
     const mirror = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS })

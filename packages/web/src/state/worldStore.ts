@@ -32,6 +32,9 @@ export type WorldStore = {
   recentEvents: () => SimEvent[]
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
+  /** The world log's head as the server last reported it — the signal a read model refetches on,
+   *  instead of on a wall-clock timer. */
+  logSeq: () => number
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
   lawHistory: () => LawChange[]
@@ -46,6 +49,7 @@ export function createWorldStore(): WorldStore {
   let mode: ViewMode = { live: true }
   let liveEdge = 0
   let assetsSeq = 0
+  let logSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
   const latest = new Map<string, { tick: number; text: string }>()
@@ -81,6 +85,7 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     recentEvents: () => events,
     assetsSeq: () => assetsSeq,
+    logSeq: () => logSeq,
     assetRecords: () => records,
     getConfig: () => config,
     getLaws: () => laws,
@@ -89,12 +94,14 @@ export function createWorldStore(): WorldStore {
     applyServer(msg) {
       switch (msg.t) {
         case 'snapshot':
+          logSeq = msg.seq
           config = SimConfigSchema.parse(msg.config) // strict: live view must fold with the engine's exact config
           state = msg.state as WorldState
           laws = msg.laws
           mode = { live: true }
           break
         case 'tick':
+          logSeq = msg.seq
           // deltas only advance the live view; while scrubbed the past moment stays still
           if (mode.live && state !== null && config !== null) {
             for (const ev of msg.events) state = fold(state, ev, config)
@@ -123,9 +130,9 @@ export function createWorldStore(): WorldStore {
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
           latest.set(msg.agentId, { tick: msg.tick, text: msg.text })
           break
-        case 'asset':
-          records.push(msg.record)
-          assetsSeq += 1
+        case 'assets':
+          records.push(...msg.records)
+          assetsSeq += msg.records.length
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

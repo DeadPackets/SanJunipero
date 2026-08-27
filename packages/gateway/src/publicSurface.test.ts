@@ -6,12 +6,11 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
+import { CLOSE_BAD_HELLO, DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import {
   createGateway,
-  CLOSE_BAD_HELLO,
   CLOSE_TOO_MANY,
   HELLO_DEADLINE_MS,
   SCRUB_MIN_MS,

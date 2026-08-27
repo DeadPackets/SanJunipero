@@ -1,7 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
-import { ClientMsg, DEFAULT_CONFIG, PROTOCOL_VERSION, type SimConfig } from '@sj/shared'
+import {
+  ClientMsg,
+  CLOSE_BAD_HELLO,
+  DEFAULT_CONFIG,
+  PROTOCOL_VERSION,
+  type AssetRecord,
+  type SimConfig,
+} from '@sj/shared'
 import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
@@ -41,7 +48,6 @@ export type Router = { route(method: string, pattern: string, fn: RouteHandler):
 
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
-export const CLOSE_BAD_HELLO = 4400
 export const CLOSE_TOO_MANY = 4429
 
 /** How long a socket may hold a seat without greeting. A viewer sends `hello` on open, so this
@@ -169,9 +175,12 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── snapshot string, cached per pump generation ──
   let snapJson: string | null = null
-  // Asset catch-up frames, built once for the process. Topped up from the codex's own seq rather
-  // than the pump's: a hello landing between two pumps must still see a just-registered sheet.
-  const catchUp: string[] = []
+  // The asset catch-up, built once for the process as ONE frame: a greeted socket used to take
+  // one send per record — 189 of them on the dev codex, inside the connection handler. Topped up
+  // from the codex's own seq rather than the pump's: a hello landing between two pumps must still
+  // see a just-registered sheet.
+  const catchUp: AssetRecord[] = []
+  let catchUpJson: string | null = null
   let catchUpSeq = 0
   // The over-budget scrub answer: the live moment in the shape a scrub is already answered in,
   // stringified once per generation, because only `reqId` differs between the sockets turned away.
@@ -291,9 +300,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         if (cdx) {
           for (const record of cdx.listSince(catchUpSeq)) {
             catchUpSeq = record.seq
-            catchUp.push(JSON.stringify({ t: 'asset', record }))
+            catchUp.push(record)
+            catchUpJson = null
           }
-          for (const frame of catchUp) sock.send(frame)
+          if (catchUp.length > 0) {
+            catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
+            sock.send(catchUpJson)
+          }
         }
         return
       }
@@ -338,7 +351,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       busyHead = null
     }
     for (const g of groups) {
-      hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, events: g.events }))
+      const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
+      hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {
@@ -351,9 +365,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }
     const cdx = getCodex()
     if (cdx) {
-      for (const record of cdx.listSince(lastAssetSeq)) {
-        lastAssetSeq = record.seq
-        hub.broadcast(JSON.stringify({ t: 'asset', record }))
+      const fresh = cdx.listSince(lastAssetSeq)
+      if (fresh.length > 0) {
+        lastAssetSeq = fresh[fresh.length - 1]!.seq
+        hub.broadcast(JSON.stringify({ t: 'assets', records: fresh }))
       }
     }
   }
