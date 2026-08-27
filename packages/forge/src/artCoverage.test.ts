@@ -5,7 +5,7 @@ import { BUILDINGS_CONTENT_DIR, STRUCTURE_FACINGS, listCommittedBuildings } from
 import { loadReferenceSheet, paletteSwatchPng } from './referenceSheet.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
-import { decodePng } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
 import {
   alphaBinaryGate,
   classDensityGate,
@@ -41,6 +41,17 @@ import {
 
 // Reads the CODEX, not the renderer: `makePlaceholder` answers every class, so a gate that asks
 // "did something draw?" passes forever.
+
+// One decode per PNG for the whole file: the 21 building cells and the 5 atlases are each read
+// by several rows below.
+const DECODED = new Map<string, Promise<RawImage>>()
+function pngOf(key: string, bytes: Buffer): Promise<RawImage> {
+  const hit = DECODED.get(key)
+  if (hit) return hit
+  const decoded = decodePng(bytes)
+  DECODED.set(key, decoded)
+  return decoded
+}
 
 /** The registration the dev world does at boot, against a real codex. */
 function registeredKinds(klass: 'item' | 'rig-part'): string[] {
@@ -200,7 +211,7 @@ describe('★ the committed buildings', () => {
   })
 
   it.each(buildings.map((b) => [b.dir, b] as const))('%s clears the pixel bar', async (_dir, b) => {
-    const img = await decodePng(b.png)
+    const img = await pngOf(b.dir, b.png)
     expect(alphaBinaryGate(img).failures).toEqual([])
     expect(paletteGate(img).failures).toEqual([])
     expect(img.width, 'a building cell is square').toBe(img.height)
@@ -209,8 +220,8 @@ describe('★ the committed buildings', () => {
   // A turned building is not a flipped one: flipping moves the door to the other wall and gets
   // the light wrong, because the sun does not flip with the building.
   it('★ no SE cell is its SW cell mirrored — the gate that had no caller', async () => {
-    const img = new Map<string, Awaited<ReturnType<typeof decodePng>>>()
-    for (const b of buildings) img.set(b.dir, await decodePng(b.png))
+    const img = new Map<string, RawImage>()
+    for (const b of buildings) img.set(b.dir, await pngOf(b.dir, b.png))
     const pairs = buildings
       .filter((b) => b.facing === 'se')
       .map((b) => {
@@ -235,7 +246,7 @@ describe('★ the committed buildings', () => {
   it('★ one density across the whole class — computed by three generators, read by none', async () => {
     const members = await Promise.all(
       buildings.map(async (b) => {
-        const img = await decodePng(b.png)
+        const img = await pngOf(b.dir, b.png)
         return {
           name: b.dir,
           density: spriteDensity({
@@ -254,7 +265,7 @@ describe('★ the committed buildings', () => {
   it('and every cell carries the native density its footprint asks for', async () => {
     const bad: string[] = []
     for (const b of buildings) {
-      const img = await decodePng(b.png)
+      const img = await pngOf(b.dir, b.png)
       bad.push(
         ...nativeDensityGate({
           name: b.dir,
@@ -312,7 +323,7 @@ describe('the committed cast', () => {
   it.each(cast.map((c) => [c.id, c] as const))('%s addresses all 24 cells', async (_id, c) => {
     expect(Object.keys(c.manifest.cells).sort()).toEqual([...CELL_NAMES_V4].sort())
     expect(parseCharacterAtlasManifest(JSON.stringify(c.manifest))).not.toBeNull()
-    const atlas = await decodePng(c.atlas)
+    const atlas = await pngOf(`cast:${c.id}`, c.atlas)
     // Every rect the manifest promises must be inside the atlas it promises it in: a rect
     // that overhangs draws garbage or nothing, and neither fails any other test.
     for (const [name, r] of Object.entries(c.manifest.cells)) {
@@ -328,7 +339,7 @@ describe('the committed cast', () => {
   it.each(cast.map((c) => [c.id, c] as const))(
     '%s draws one body per cell and nothing else',
     async (id, c) => {
-      const atlas = await decodePng(c.atlas)
+      const atlas = await pngOf(`cast:${c.id}`, c.atlas)
       const bad: string[] = []
       for (const [name, r] of Object.entries(c.manifest.cells)) {
         const cell = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }

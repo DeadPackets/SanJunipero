@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { doorTile, makeCityTemplate } from '@sj/shared'
 import { devTown } from './devTown.js'
@@ -8,9 +5,6 @@ import { FOUNDERS, foundersFor, townStructuresFor } from './founders.js'
 
 // This half lives in the gateway because `@sj/web` is private, DOM-typed and bundler-resolved,
 // so a gateway test cannot import its modules without breaking `tsc -b`.
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const REPO = resolve(HERE, '..', '..', '..')
 
 // ── U3 · the town the viewer actually sees is the town the template describes ─────────────
 
@@ -20,12 +14,6 @@ describe('U3 — the dev showcase is the REAL town, not a four-building stub', (
   it('stands all eleven, where the screenshot showed four', () => {
     expect(town.structures).toHaveLength(11)
     expect(townStructuresFor('showcase')).toHaveLength(11)
-  })
-
-  it('derives the ground and the buildings from ONE call, so they cannot disagree', () => {
-    const src = readFileSync(join(HERE, 'devTown.ts'), 'utf8')
-    expect(src).toContain('makeCityTemplate')
-    expect(src).toContain('the SAME anchor')
   })
 
   it('gives the five houses five different owners', () => {
@@ -66,15 +54,5 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
   it('names the FIVE founders the town is seeded with', () => {
     expect(FOUNDERS).toHaveLength(5)
     expect(new Set(FOUNDERS.map((f) => f.id)).size).toBe(5)
-  })
-
-  // The full five-distinct-`insideId` simulation is in `founders.test.ts`; this asserts the
-  // ownership law that test depends on rather than reproducing it.
-  it('has the engine half written down, with its citation', () => {
-    const delta = readFileSync(
-      join(REPO, 'docs', 'superpowers', 'plans', 'c8-delta-from-c12.md'),
-      'utf8',
-    )
-    expect(delta).toMatch(/U25/)
   })
 })

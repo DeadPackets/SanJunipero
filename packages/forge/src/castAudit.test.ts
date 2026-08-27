@@ -123,11 +123,31 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
 
 const cast = listCommittedCast()
 
+// One decode and one gate sweep per character for the whole file: 5 MB of atlases, and the
+// sweep is a pure function of their bytes.
+const ATLAS = new Map<string, Promise<RawImage>>()
+function atlasOf(c: CommittedCharacter): Promise<RawImage> {
+  const hit = ATLAS.get(c.id)
+  if (hit) return hit
+  const decoded = decodePng(c.atlas)
+  ATLAS.set(c.id, decoded)
+  return decoded
+}
+
+const FAILS = new Map<string, Promise<string[]>>()
+function failsOf(c: CommittedCharacter): Promise<string[]> {
+  const hit = FAILS.get(c.id)
+  if (hit) return hit
+  const found = atlasOf(c).then((atlas) => failuresOf(c, atlas))
+  FAILS.set(c.id, found)
+  return found
+}
+
 describe('★ the committed cast against the gates as they now behave', () => {
   it.each(cast.map((c) => [c.id, c] as const))(
     '%s: nothing fails that is not written down',
     async (_id, c) => {
-      const found = failuresOf(c, await decodePng(c.atlas))
+      const found = await failsOf(c)
       expect(
         found.filter((k) => KNOWN_GATE_DEBT[k] === undefined),
         'a cast cell fails a gate and nobody wrote down why',
@@ -139,7 +159,7 @@ describe('★ the committed cast against the gates as they now behave', () => {
   // stops being a measurement and becomes folklore.
   it('★ the debt list has no fossils — every entry still fails today', async () => {
     const live = new Set<string>()
-    for (const c of cast) for (const k of failuresOf(c, await decodePng(c.atlas))) live.add(k)
+    for (const c of cast) for (const k of await failsOf(c)) live.add(k)
     expect(
       Object.keys(KNOWN_GATE_DEBT).filter((k) => !live.has(k)),
       'this entry passes now — delete it from KNOWN_GATE_DEBT',
@@ -156,7 +176,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
   it.each(cast.map((c) => [c.id, c] as const))(
     '%s: sw is flip(se) and nw is flip(ne), to the pixel',
     async (_id, c) => {
-      const crop = cropper(c, await decodePng(c.atlas))
+      const crop = cropper(c, await atlasOf(c))
       for (const [authored, derived] of [
         ['se', 'sw'],
         ['ne', 'nw'],
@@ -179,7 +199,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
   it('★ every measured value is identical on a facing and on its mirror', async () => {
     const disagreements: string[] = []
     for (const c of cast) {
-      const crop = cropper(c, await decodePng(c.atlas))
+      const crop = cropper(c, await atlasOf(c))
       // every term of every frame, not only the ones over threshold: a verdict-level check
       // goes on passing while the numbers drift up to the bar, which is how this hid.
       const values = (f: string): string => {
@@ -208,7 +228,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
   // An ODD opaque-bbox width has no centred placement that is its own mirror, so the sprite lands
   // one column off between an image and its flip — which is why `strideGateV4` stays authored-only.
   it('the residual is the anchor, it is exactly one column, and only cellDistance sees it', async () => {
-    const crop = cropper(cast[0]!, await decodePng(cast[0]!.atlas))
+    const crop = cropper(cast[0]!, await atlasOf(cast[0]!))
     let odd = 0
     for (const p of ['idle', ...WALK]) {
       const fitted = fitForGate(crop(`${p}-se`))
@@ -235,7 +255,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
 // prose: every committed sleeper lies along the ground diagonal, head up-right.
 describe('every committed sleep cell lies along the ground, not across the screen', () => {
   it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
-    const atlas = await decodePng(c.atlas)
+    const atlas = await atlasOf(c)
     const deg = sleepAxisDeg(cropper(c, atlas)('sleep-se'))
     expect(deg, `${id} sleeps at ${deg.toFixed(1)} deg`).toBeGreaterThanOrEqual(-50)
     expect(deg, `${id} sleeps at ${deg.toFixed(1)} deg`).toBeLessThanOrEqual(-20)
