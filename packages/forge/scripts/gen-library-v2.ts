@@ -10,11 +10,15 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
-import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
-import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
+import {
+  makeVisionJudge,
+  CRITERIA,
+  LIBRARY_BATCHES,
+  planBatch,
+  type VisionVerdict,
+} from '@sj/forge/gen'
 import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
 import { ICON_PX, WORLD_SPRITE_PX } from '../src/assetResolution.js'
-import { LIBRARY_BATCHES, planBatch } from '../src/library/plan.js'
 import { integralSpriteCell } from '../src/library/integralCell.js'
 import { candidateRank } from '../src/library/postItem.js'
 import { refusalMessage } from '../src/gate.js'

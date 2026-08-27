@@ -7,7 +7,7 @@ import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
-import { PALETTE_WORDS, SWATCH_CLAUSE } from '../src/library/plan.js'
+import { PALETTE_WORDS, SWATCH_CLAUSE } from '@sj/forge/gen'
 import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {

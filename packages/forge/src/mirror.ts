@@ -153,8 +153,8 @@ export function coherenceGateV4(label: string, master: RawImage, cell: RawImage)
 
 // A body asleep on a 2:1 dimetric ground plane lies ALONG the ground diagonal, so its long axis
 // tilts up to the right. The band is SIGNED, so it also catches a head pointing the wrong way.
-export const SLEEP_AXIS_DEG_MIN = -50
-export const SLEEP_AXIS_DEG_MAX = -20
+const SLEEP_AXIS_DEG_MIN = -50
+const SLEEP_AXIS_DEG_MAX = -20
 
 // Principal axis of the opaque mass, degrees, in image coordinates (y down): negative means
 // the right-hand end of the body sits higher up the screen, which is where the head belongs.

@@ -8,14 +8,16 @@ import { decodePng, encodePng } from '../src/post/raw.js'
 import { BudgetGuard } from '../src/budget.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
-import { makeImageClient, EST_COST_PER_IMAGE } from '../src/imageClient.js'
 import {
+  makeImageClient,
+  EST_COST_PER_IMAGE,
   makeVisionJudge,
   EST_COST_PER_VISION_CALL,
+  runVisionGate,
+  CRITERIA,
   type VisionJudgeFn,
-} from '../src/visionQa/visionJudge.js'
-import { runVisionGate } from '../src/visionQa/gate.js'
-import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
+  type VisionVerdict,
+} from '@sj/forge/gen'
 import {
   generationItems,
   materialFromCandidate,

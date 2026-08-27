@@ -17,6 +17,17 @@
         "scripts/**/*.ts"
       ]
     },
+    "packages/forge": {
+      "entry": [
+        "src/**/*.test.ts",
+        "scripts/*.ts",
+        "!scripts/{scratch,character,cast,cast-v5}.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts"
+      ]
+    },
     "packages/engine": {
       "entry": [
         "src/**/*.test.ts"

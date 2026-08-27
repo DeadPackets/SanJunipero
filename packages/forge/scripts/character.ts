@@ -1,14 +1,4 @@
-// Shared identity for the character v3 pipeline scripts (v3 sheet, portraits, concept).
-// Identity asymmetry LAW: every character design carries left-right asymmetric markers
-// so no facing can pass as a mirror of another (see style-bible.md, Character standard v2).
-export const CHAR_DESC =
-  'a friendly young villager in a sage-green cap with the brim tilted toward their right ear, ' +
-  'honey-brown overalls, and a small brown satchel worn on their LEFT hip'
-
-export const ASYMMETRY_CLAUSE =
-  'The cap-brim tilt and the left-hip satchel are asymmetric identity markers: they must sit on ' +
-  'the same body side in every view, so no two facings can look like mirror images.'
-
+// Shared identity for the character generator scripts.
 // Character standard v3 (mirror standard): simplified identity, 3 signature features MAX.
 // Symmetric-enough silhouette; the satchel may jump hips on mirrored facings (accepted).
 export const CHAR_DESC_V4 =
