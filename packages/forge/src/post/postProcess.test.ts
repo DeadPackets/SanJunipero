@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { postProcess } from './postProcess.js'
 import { decodePng, type RawImage } from './raw.js'
+import { opaqueBbox } from '../sheet.js'
 
 function uniqueColours(img: RawImage): number {
   const seen = new Set<number>()
@@ -16,22 +17,6 @@ function alphaValues(img: RawImage): number[] {
   const seen = new Set<number>()
   for (let i = 3; i < img.data.length; i += 4) seen.add(img.data[i]!)
   return [...seen].sort((a, b) => a - b)
-}
-
-function opaqueBox(img: RawImage): { w: number; h: number } {
-  let x0 = img.width,
-    x1 = -1,
-    y0 = img.height,
-    y1 = -1
-  for (let y = 0; y < img.height; y++)
-    for (let x = 0; x < img.width; x++)
-      if (img.data[(y * img.width + x) * 4 + 3] !== 0) {
-        x0 = Math.min(x0, x)
-        x1 = Math.max(x1, x)
-        y0 = Math.min(y0, y)
-        y1 = Math.max(y1, y)
-      }
-  return { w: x1 - x0 + 1, h: y1 - y0 + 1 }
 }
 
 /** A block no two pixels of which share a colour, so a palette snap is visible as a colour count. */
@@ -90,9 +75,9 @@ describe('postProcess — keyed classes', () => {
     const gen = await onMagenta(512, await manyColoured(256, 64), 256, 64)
     const out = await decodePng(await postProcess(gen, 'crop', { w: 128, h: 32 }))
     expect([out.width, out.height]).toEqual([128, 32])
-    const box = opaqueBox(out)
+    const b = opaqueBbox(out)!
     // one whole factor on both axes: 248x56 eroded source ÷ 2, so the aspect is untouched
-    expect(box.w / box.h).toBeCloseTo(248 / 56, 1)
+    expect((b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)).toBeCloseTo(248 / 56, 1)
   })
 
   it('a generation with no magenta to key is a failed candidate, not a silent bad sprite', async () => {
