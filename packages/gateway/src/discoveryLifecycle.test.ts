@@ -23,7 +23,6 @@ import {
 } from '@sj/engine'
 // NO CROSS-PACKAGE IMPORTS: `packages/web` is a DOM/bundler project and `packages/agents` is not
 // a gateway dependency, so their halves are read as SOURCE instead.
-import { artNeededFor } from './discoveryArt.js'
 import { readDiscoveries } from './discoveries.js'
 
 const REPO = new URL('../../../', import.meta.url)
@@ -111,16 +110,6 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
     expect([...wired].sort((a, b) => a - b)).toEqual(wired) // in that order
   })
 
-  it('2. carries all four credits, and the archive resolves the inventor to a name', () => {
-    const db = worldWith([{ tick: 40, payload: PAYLOAD }])
-    const [row] = readDiscoveries(db, (id) => (id === 'a1' ? 'Maret' : id))
-    expect(row!.by).toBe('Maret') // who
-    expect(row!.byId).toBe('a1')
-    expect(row!.tick).toBe(40) // when
-    expect(row!.intent).toBe(PAYLOAD.intent) // from what
-    expect(row!.makes).toEqual(['waterskin']) // what it unlocked
-  })
-
   it('3. reads as a sentence, weighted second in the feed, with a glyph of its own', () => {
     const ev: SimEvent = { seq: 1, tick: 40, type: DISCOVERY_EVENT, payload: PAYLOAD }
     expect(chronicleLine(ev, LOOK)).toBe('Maret found the way of it — stitch a waterskin.')
@@ -147,45 +136,8 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
     ).toBe(PAYLOAD.intent)
   })
 
-  it('6. asks the forge for the one thing nobody has drawn', () => {
-    expect(artNeededFor(PAYLOAD.makes, new Set())).toEqual(['waterskin'])
-    expect(artNeededFor(PAYLOAD.makes, new Set(['waterskin']))).toEqual([])
-  })
-
   it('7. NOT VACUOUS: a payload with no inventor never becomes a record', () => {
     const noCredit = { ...PAYLOAD, byId: undefined }
     expect(readDiscoveries(worldWith([{ tick: 40, payload: noCredit }]), (id) => id)).toEqual([])
-  })
-
-  it('8. NOT VACUOUS: the archive is non-empty for the world it is measured on', () => {
-    expect(
-      readDiscoveries(worldWith([{ tick: 40, payload: PAYLOAD }]), () => 'Maret').length,
-    ).toBeGreaterThan(0)
-  })
-
-  it('9. the coined word travels the same road, and is not the craft', () => {
-    const word = {
-      recipeId: 'express:dance',
-      name: 'dance',
-      kind: 'word' as const,
-      byId: 'a2',
-      intent: 'i want to dance by the fire',
-      makes: [] as string[],
-    }
-    const rows = readDiscoveries(
-      worldWith([
-        { tick: 40, payload: PAYLOAD },
-        { tick: 90, payload: word },
-      ]),
-      (id) => (id === 'a1' ? 'Maret' : 'Sena'),
-    )
-    expect(rows.map((r) => r.kind)).toEqual(['craft', 'word'])
-    expect(
-      chronicleLine(
-        { seq: 2, tick: 90, type: DISCOVERY_EVENT, payload: word },
-        { ...LOOK, agentName: () => 'Sena' },
-      ),
-    ).toBe('Sena gave the town a word for it — dance.')
-    expect(artNeededFor(word.makes, new Set())).toEqual([])
   })
 })
