@@ -2,12 +2,11 @@ import type Database from 'better-sqlite3'
 import type { EventStore } from '@sj/engine/store'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { personaOf } from '../family/derivePersona.js'
-import { buildHouseholdSeed } from '../family/memorySeed.js'
-import { captureSocialName, migrateFamilyTables } from '../family/socialName.js'
+import { captureSocialName, hasSocialName, migrateFamilyTables } from '../family/socialName.js'
 import { watchBirths, type AgentBornPayload } from '../family/watchBirths.js'
 import { insertAlert, type LlmClient } from '@sj/llm'
-import { MemoryStore } from '../memory/store.js'
 import type { EngineBridge } from '../runtime/bridge.js'
+import { ensureHousehold } from './ensureChild.js'
 import type { BootedMinds } from './liveMinds.js'
 import { childSpec } from './resolveCast.js'
 
@@ -69,32 +68,21 @@ export function wireBirths(opts: BirthsOpts): () => void {
     booting.add(born.id)
 
     // Off the tick: the household seed walks the whole world log, and the naming is a call.
+    // The same two writes a boot repairs, in the same order — see `ensureChildren`.
     void (async () => {
-      const seed = buildHouseholdSeed(opts.store, {
-        childId: born.id,
-        motherId: born.motherId,
-        fatherId: born.fatherId,
-        homeStructureId: opts.homeOf(born.id),
-        upToTick: tick,
-      })
-      const mem = new MemoryStore(db, born.id, opts.embedder)
-      for (const entry of seed) {
-        // The household reached this mind the way anything else does; nothing here is its own act.
-        await mem.insertMemory({
-          tick,
-          kind: 'perception',
-          text: entry.text,
-          importance: entry.importance,
-          tags: { people: [], place: null, objects: [], topics: entry.tags },
-        })
-      }
+      await ensureHousehold(
+        { store: opts.store, db, embedder: opts.embedder, homeOf: opts.homeOf },
+        born,
+        tick,
+      )
       opts.booted.add(spec)
       opts.log?.(`stream: ${born.name} was born, and has a mind and a memory of ${born.id}.db`)
-      await captureSocialName(opts.namingLlm, opts.opsDb, {
-        born,
-        motherPersona: personaOf(mother),
-        tick,
-      })
+      if (!hasSocialName(opts.opsDb, born.id))
+        await captureSocialName(opts.namingLlm, opts.opsDb, {
+          born,
+          motherPersona: personaOf(mother),
+          tick,
+        })
     })()
       .catch((err: unknown) => {
         insertAlert(opts.opsDb, {

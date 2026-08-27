@@ -12,6 +12,8 @@ import {
   EngineBridge,
   PREFLIGHT_ROUNDS,
   bootMinds,
+  ensureChildren,
+  hasPersonality,
   openAgentDb,
   preflightRefusal,
   runPreflight,
@@ -491,8 +493,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               }
             })())
 
+      // A child whose seeding a crash cut short has no personality yet. It comes up the way a
+      // live birth does — household first, then the mind — so this boot can finish it.
+      const unseeded = cast.filter(
+        (m) => m.bornDay !== undefined && !hasPersonality(dbFor(m.id), m.id),
+      )
       booted = bootMinds({
-        minds: cast,
+        minds: cast.filter((m) => !unseeded.includes(m)),
         bridge,
         embedder,
         dbFor,
@@ -506,6 +513,26 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         onThought: (t) => {
           if (!stopped) publishThought(db, t)
         },
+      })
+      // What a birth writes outside the world log — the household and the mother's name — is
+      // finished here when a crash left it half done. Idempotent, so a whole town costs nothing.
+      void ensureChildren({
+        cast: new Map(cast.map((m) => [m.id, m])),
+        store,
+        dbFor,
+        opsDb,
+        embedder,
+        namingLlm: makeClient('naming'),
+        homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
+        boot: (spec) => {
+          booted?.add(spec)
+        },
+      }).catch((err: unknown) => {
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'birth_failed',
+          detail: err instanceof Error ? err.message : String(err),
+        })
       })
       stopBirths = wireBirths({
         booted,
