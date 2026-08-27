@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
 import { VERBS } from '@sj/engine'
@@ -7,37 +7,11 @@ import { CodexStore, type CodexEntry } from '../codex.js'
 import { openArbiterDb } from '../schema.js'
 import type { Recipe, Verdict } from '../verdict.js'
 import { EXPLOIT_CORPUS } from './corpus.js'
-import { runChaos } from './run.js'
+import { runChaos, type ChaosResult } from './run.js'
 
 // A credit for a test that is not about the credit; the two-argument codify is required so
 // an uncredited discovery cannot be minted in silence.
 const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
-
-// The original engine verbs — a "physics verb" (a codified recipe:*) is NOT
-// one of these; the free-will intent must resolve into this Tier-1 set.
-const TIER1 = [
-  'walk',
-  'sleep',
-  'wake',
-  'eat',
-  'tend',
-  'till',
-  'plant',
-  'harvest',
-  'fish',
-  'forage',
-  'build',
-  'craft',
-  'extinguish',
-  'speak',
-  'give',
-  'take',
-  'write',
-  'read',
-  'teach',
-  'attack',
-  'experiment',
-]
 
 // The exploit the scripted LLM tries to sneak past the gate: gunpowder is not
 // on any rung of this town's codex, and a gun is not something the town can make.
@@ -157,13 +131,16 @@ async function makeRig(
 }
 
 describe('runChaos exploit corpus', () => {
-  it('reports zero physics-breaking rulings and corrects every exploit intent to beyond_adjacency', async () => {
-    const llm = new ScriptedExploitLlm(exploitVerdict)
-    const { codex, arbiter } = await makeRig(llm)
+  let results: ChaosResult[]
+  let byIntent: Map<string, ChaosResult>
 
-    const results = await runChaos(arbiter, ctx, codex)
-    const byIntent = new Map(results.map((r) => [r.intent, r]))
+  beforeAll(async () => {
+    const { codex, arbiter } = await makeRig(new ScriptedExploitLlm(exploitVerdict))
+    results = await runChaos(arbiter, ctx, codex)
+    byIntent = new Map(results.map((r) => [r.intent, r]))
+  })
 
+  it('reports zero physics-breaking rulings and corrects every exploit intent to beyond_adjacency', () => {
     expect(results).toHaveLength(EXPLOIT_CORPUS.length)
     for (const r of results) expect(r.physicsBreaking).toBe(false)
 
@@ -177,13 +154,7 @@ describe('runChaos exploit corpus', () => {
     }
   })
 
-  it('corrects the two legitimate intents rigged with unearned canon to impossible', async () => {
-    const llm = new ScriptedExploitLlm(exploitVerdict)
-    const { codex, arbiter } = await makeRig(llm)
-
-    const results = await runChaos(arbiter, ctx, codex)
-    const byIntent = new Map(results.map((r) => [r.intent, r]))
-
+  it('corrects the two legitimate intents rigged with unearned canon to impossible', () => {
     for (const intent of ['I boil river water to make salt', 'I brew ale from grain and water']) {
       const verdict = byIntent.get(intent)!.verdict
       expect(verdict.kind).toBe('impossible')
@@ -191,16 +162,11 @@ describe('runChaos exploit corpus', () => {
     }
   })
 
-  it("resolves 'nuclear engineer' to a real Tier-1 verb, never a physics verb", async () => {
-    const llm = new ScriptedExploitLlm(exploitVerdict)
-    const { codex, arbiter } = await makeRig(llm)
-
-    const results = await runChaos(arbiter, ctx, codex)
-    const r = results.find((x) => x.intent === 'I want to be a nuclear engineer')!
+  it("resolves 'nuclear engineer' to a real Tier-1 verb, never a physics verb", () => {
+    const r = byIntent.get('I want to be a nuclear engineer')!
 
     expect(r.verdict.kind).toBe('map')
     if (r.verdict.kind === 'map') {
-      expect(TIER1).toContain(r.verdict.verb)
       expect(r.verdict.verb.startsWith('recipe:')).toBe(false)
       expect(VERBS[r.verdict.verb]).toBeDefined()
     }

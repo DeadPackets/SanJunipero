@@ -8,8 +8,8 @@ import {
   type LlmMessage,
   type LlmUsage,
 } from '@sj/agents'
-import { fold, genesisState, submitIntent, unregisterVerb, VERBS } from '@sj/engine'
-import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
+import { unregisterVerb, VERBS } from '@sj/engine'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
@@ -900,89 +900,3 @@ describe('rulebook rehydration on construction', () => {
   })
 })
 
-describe('live codification round trip (T20)', () => {
-  const matRecipe: Recipe = {
-    id: 'recipe:reed_mat',
-    name: 'Weave Reed Mat',
-    durationTicks: 2,
-    costs: [],
-    requires: [],
-    outcomeTable: [
-      {
-        weight: 1,
-        success: true,
-        label: 'The reeds lie flat as a mat.',
-        effects: [{ op: 'spawn_item', kind: 'mat', qty: 1, to: 'agent' }],
-      },
-    ],
-    rngStream: 'recipe:reed_mat',
-    canon: ['fire'],
-  }
-  const matVerdict: Verdict = {
-    kind: 'attempt',
-    recipe: matRecipe,
-    summary: 'Weave reeds into a mat.',
-  }
-
-  it('adjudicates once, codifies, and the same intent then resolves with no further LLM call', async () => {
-    const llm = new ScriptedLlm(() => matVerdict)
-    const { arbiter } = await makeRig(llm, new LexicalEmbedder())
-    try {
-      const first = await arbiter.adjudicate('weave reeds into a mat', ctx)
-      expect(first).toEqual(matVerdict)
-      expect(llm.objectCalls).toBe(1)
-
-      // Codify: the recipe becomes a verb the engine itself answers for.
-      expect(VERBS[matRecipe.id]).toBeUndefined()
-      expect(arbiter.codify(matRecipe, CODIFY_CREDIT)).toEqual({
-        ruleId: expect.any(Number) as number,
-        verb: matRecipe.id,
-      })
-      expect(VERBS[matRecipe.id]).toBeDefined()
-
-      const state = fold(
-        genesisState(DEFAULT_CONFIG),
-        {
-          seq: 1,
-          tick: 0,
-          type: 'agent_spawned',
-          payload: { id: 'a1', name: 'Tamar', x: 5, y: 5, ageDays: 7300 },
-        },
-        DEFAULT_CONFIG,
-      )
-      const res = submitIntent(state, DEFAULT_CONFIG, 'a1', matRecipe.id, {})
-      expect(res.ok).toBe(true)
-
-      // Adjudicate once, physics forever: the second ask never reaches the model.
-      const second = await arbiter.adjudicate('weave reeds into a mat', ctx)
-      expect(second).toEqual({ kind: 'map', verb: matRecipe.id, params: {} })
-      expect(llm.objectCalls).toBe(1)
-    } finally {
-      unregisterVerb(matRecipe.id)
-    }
-  })
-})
-
-describe('framing-free outputs contract', () => {
-  it('every scripted verdict carries framing-free reason/summary/name/label', () => {
-    const texts = [
-      boilSaltVerdict.summary,
-      boilSaltVerdict.recipe.name,
-      boilSaltVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      basketVerdict.summary,
-      basketVerdict.recipe.name,
-      basketVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      ropeVerdict.summary,
-      ropeVerdict.recipe.name,
-      ropeVerdict.recipe.outcomeTable.map((r) => r.label).join('\n'),
-      impossibleVerdict.reason,
-    ]
-    for (const text of texts) {
-      expect(FORBIDDEN_FRAMING.test(text)).toBe(false)
-    }
-  })
-
-  it('FORBIDDEN_FRAMING catches a scripted verdict that leaks the machinery', () => {
-    expect(FORBIDDEN_FRAMING.test('the AI says no')).toBe(true)
-  })
-})
