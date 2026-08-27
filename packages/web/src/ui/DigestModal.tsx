@@ -16,7 +16,7 @@ export type Digest = {
   agentLines: { agentId: string; line: string }[]
 }
 
-type Chapter = { tick: number; title: string }
+type Chapter = { day: number; title: string; text: string }
 
 const NO_CHAPTERS: Chapter[] = []
 
@@ -71,11 +71,20 @@ export function DigestModal({
         <section className="block">
           <h3>Chapters</h3>
           {chapters.length > 0 ? (
-            <ul>
-              {chapters.map((c, i) => (
-                <li key={i}>{c.title}</li>
-              ))}
-            </ul>
+            // The prose, not the index: a list of titles is the table of contents of a book
+            // nobody printed. Newest first, because that is the day you missed most recently.
+            <div className="chapter-run">
+              {[...chapters]
+                .sort((a, b) => b.day - a.day)
+                .map((c) => (
+                  <article key={c.day} className="chapter">
+                    <p className="chapter-head">
+                      <span className="stamp">Day {c.day}</span> {c.title}
+                    </p>
+                    <p className="chapter-text">{c.text}</p>
+                  </article>
+                ))}
+            </div>
           ) : digest !== null && digest.days.length > 0 ? (
             <p>
               Days {digest.days[0]}–{digest.days.at(-1)} unfolded quietly.
@@ -132,7 +141,7 @@ export function DigestModal({
           </section>
         )}
 
-        <p className="digest-footer">The town newspaper arrives with the narrator.</p>
+        <p className="digest-footer">The whole record is under Chronicle → The paper.</p>
         <button className="tab active digest-close" onClick={onClose}>
           Back to town
         </button>

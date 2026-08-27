@@ -36,13 +36,19 @@ const markSources = (body: unknown): MarkSources => {
   const b = body as Partial<MarkSources>
   return {
     chapters: b.chapters ?? [],
-    milestones: b.milestones ?? [],
+    milestones: [],
     moments: b.moments ?? [],
     changes: b.changes ?? [],
     events: b.events ?? [],
     discoveries: b.discoveries ?? [],
   }
 }
+
+/** The firsts ledger has its own endpoint — `/api/timeline/marks` used to carry a second copy
+ *  of the same SELECT, and two copies of one query are two to keep right. */
+const NO_FIRSTS: MarkSources['milestones'] = []
+const firstRows = (body: unknown): MarkSources['milestones'] | null =>
+  Array.isArray(body) ? (body as MarkSources['milestones']) : null
 
 function MarkGlyph({ mark }: { mark: Mark }) {
   return (
@@ -195,10 +201,14 @@ export function Timeline({
   // The scrubber still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
     usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
+  const firsts = usePolled('/api/milestones', firstRows, MARKS_REFETCH_MS).data ?? NO_FIRSTS
 
   const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick
-  const marks = useMemo(() => coalesceMarks(marksFrom(sources), edge), [sources, edge])
+  const marks = useMemo(
+    () => coalesceMarks(marksFrom({ ...sources, milestones: firsts }), edge),
+    [sources, firsts, edge],
+  )
 
   const scrubTo = (tick: number): void => {
     const t = Math.max(0, Math.min(edge, Math.round(tick)))

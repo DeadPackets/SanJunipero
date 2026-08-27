@@ -112,6 +112,12 @@ export const EMPTY_COPY = {
     'record here.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
   discoveries: 'The town has not worked anything out yet.',
+  // Describes rather than promises: on a scripted stream nobody is writing, and this panel is
+  // correctly and permanently empty.
+  // The read fold counts these four acts and nothing else, so a town of walkers is honestly empty.
+  traffic:
+    'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
+  paper: 'Nothing printed yet. The chronicler writes a day up once it has closed.',
 } as const
 
 // ------------------------------------------------------------------ weather glyphs

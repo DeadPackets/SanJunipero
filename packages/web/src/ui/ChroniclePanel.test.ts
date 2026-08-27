@@ -9,8 +9,10 @@ import {
   ChronicleViewTabs,
   EverythingFeedView,
   ImportantFeedView,
+  PaperFeedView,
   tabFromKey,
 } from './ChroniclePanel.js'
+import { editions } from './dispatches.js'
 import { EMPTY_COPY, GAMIFICATION_BAN } from './townStats.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
@@ -104,7 +106,7 @@ describe('EverythingFeedView', () => {
 describe('ChronicleViewTabs', () => {
   const html = render(createElement(ChronicleViewTabs, { view: 'important', onView: () => {} }))
 
-  it('offers both readings of the chronicle as real tabs', () => {
+  it('offers every reading of the chronicle as a real tab', () => {
     expect(html).toContain('role="tablist"')
     expect(html.match(/role="tab"/g)).toHaveLength(CHRONICLE_VIEWS.length)
     expect(html).toContain('aria-selected="true"')
@@ -122,14 +124,17 @@ describe('ChronicleViewTabs', () => {
   })
 
   // A roving tabindex without a walk is a tab nothing can reach: 'Everything' was pointer-only.
-  it('walks the tablist with the arrows, so the other reading is reachable', () => {
+  it('walks the tablist with the arrows, so every other reading is reachable', () => {
     expect(SRC, 'the tablist has no keyboard handler').toMatch(
       /role="tablist"[\s\S]{0,120}onKeyDown=\{onKeyDown\}/,
     )
-    expect(tabFromKey('ArrowRight', 'important')).toBe('everything')
-    expect(tabFromKey('ArrowRight', 'everything')).toBe('important')
-    expect(tabFromKey('ArrowLeft', 'everything')).toBe('important')
-    expect(tabFromKey('ArrowLeft', 'important')).toBe('everything')
+    // the whole ring, both ways, wrapping at each end
+    CHRONICLE_VIEWS.forEach((v, i) => {
+      expect(tabFromKey('ArrowRight', v), v).toBe(CHRONICLE_VIEWS[(i + 1) % CHRONICLE_VIEWS.length])
+      expect(tabFromKey('ArrowLeft', v), v).toBe(
+        CHRONICLE_VIEWS[(i - 1 + CHRONICLE_VIEWS.length) % CHRONICLE_VIEWS.length],
+      )
+    })
   })
 
   it('jumps to the ends with Home and End', () => {
@@ -141,5 +146,54 @@ describe('ChronicleViewTabs', () => {
     for (const key of ['ArrowUp', 'ArrowDown', 'Enter', ' ', 'a', 'Escape']) {
       expect(tabFromKey(key, 'important'), key).toBeNull()
     }
+  })
+})
+
+describe('PaperFeedView', () => {
+  const days = editions({
+    papers: [
+      { day: 0, title: 'They woke', body: 'The first morning.' },
+      { day: 6, title: 'The well ran dry', body: 'Nobody drank.' },
+    ],
+    captions: [{ day: 6, caption: 'Day 6: The well ran dry' }],
+    biographies: [],
+    eras: [{ startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.' }],
+    institutions: [
+      { day: 6, kind: 'group', name: 'the morning watch', description: 'They rose together.' },
+    ],
+    heat: [{ day: 6, total: 8 }],
+  })
+  const html = render(createElement(PaperFeedView, { days }))
+
+  it('prints the prose, not an index of titles', () => {
+    expect(html).toContain('Nobody drank.')
+    expect(html).toContain('The first morning.')
+  })
+
+  it('leads each edition with its day and what the day felt like', () => {
+    expect(html).toContain('Day 6')
+    expect(html).toContain('a loud day')
+  })
+
+  it('bands the week over the day that closed it, and over no other', () => {
+    expect(html.match(/class="era-band"/g)).toHaveLength(1)
+    expect(html).toContain('The First Week')
+  })
+
+  it('names what the town formed, and what the day was captioned', () => {
+    expect(html).toContain('the morning watch')
+    expect(html).toContain('Day 6: The well ran dry')
+  })
+
+  it('says the record is empty rather than that a paper is coming', () => {
+    const empty = render(createElement(PaperFeedView, { days: [] }))
+    expect(empty).toContain(EMPTY_COPY.paper)
+    expect(EMPTY_COPY.paper).not.toMatch(GAMIFICATION_BAN)
+  })
+
+  it('waits visibly rather than claiming nothing was printed', () => {
+    const loading = render(createElement(PaperFeedView, { days: [], loading: true }))
+    expect(loading).toContain('aria-busy="true"')
+    expect(loading).not.toContain(EMPTY_COPY.paper)
   })
 })

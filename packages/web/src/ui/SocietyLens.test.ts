@@ -55,7 +55,7 @@ describe('the force layout keeps the positions it computed', () => {
 
   it('re-seeds the graph on the bonds beat, never on the world clock', () => {
     const memo =
-      /const graph = useMemo\(\s*\(\) => toRelationGraph\(([^)]*)\),\s*\[([^\]]*)\]/.exec(SRC)
+      /const ties = useMemo\(\s*\(\) => toRelationGraph\(([^)]*)\),\s*\[([^\]]*)\]/.exec(SRC)
     expect(memo, 'no graph memo').not.toBeNull()
     expect(memo![1], 'warmth must read the tick the bonds answer was taken at').toContain(
       'api?.asOfTick ?? 0',

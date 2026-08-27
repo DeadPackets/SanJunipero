@@ -14,12 +14,39 @@ import {
   type RelationLink,
 } from './relationGraph.js'
 import type { BondNode, PeopleIndex } from './bondModel2.js'
+import {
+  EMPTY_SOCIETY,
+  societyFrom,
+  trafficGraph,
+  trafficLegend,
+} from './societyGraph.js'
 import { bondsFeed, lineageFeed } from './feeds.js'
-import { useFeed } from './useEndpoint.js'
+import { useFeed, usePolled } from './useEndpoint.js'
 import { EMPTY_COPY } from './townStats.js'
+
+/** Two readings of one town: how close people are, and what has actually passed between them.
+ *  They answer different questions, so they are views rather than layers on one picture. */
+export const SOCIETY_VIEWS = ['ties', 'traffic'] as const
+export type SocietyView = (typeof SOCIETY_VIEWS)[number]
+export const SOCIETY_VIEW_LABEL: Record<SocietyView, string> = {
+  ties: 'How close',
+  traffic: 'What passed',
+}
+/** The fold behind `/api/society` changes about once a tick; the picture is history either way. */
+const SOCIETY_REFETCH_MS = 30_000
 
 const HALO_COLOR = '#F4E289'
 const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
+
+/** What the canvas needs of a line, whichever view drew it. */
+type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
+
+const AXIS_NAME: Readonly<Record<LegendRow['axis'], string>> = {
+  level: 'How close',
+  type: 'Family',
+  arc: 'Which way',
+  kind: 'What passed',
+}
 
 /** A node once the simulation has placed it. `x`/`y` are absent until the first tick. */
 type PositionedNode = BondNode & { x?: number; y?: number }
@@ -36,6 +63,13 @@ export function SocietyLens({
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const api = useFeed(bondsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
+  const [view, setView] = useState<SocietyView>('ties')
+  // Not fetched until somebody asks for it: `null` is the endpoint layer's own "do not read".
+  const traffic = usePolled(
+    view === 'traffic' ? '/api/society' : null,
+    societyFrom,
+    SOCIETY_REFETCH_MS,
+  )
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   // R6: the key is shut on arrival, so the graph is never explained by a card standing on it.
   const [keyOpen, setKeyOpen] = useState(false)
@@ -50,7 +84,7 @@ export function SocietyLens({
     const link = fgRef.current?.d3Force('link') as
       | { distance: (f: (l: unknown) => number) => void }
       | undefined
-    link?.distance((l: unknown) => (l as RelationLink).distance)
+    link?.distance((l: unknown) => (l as Drawn).distance)
   }, [])
 
   useEffect(() => {
@@ -86,21 +120,29 @@ export function SocietyLens({
 
   // The warmth an edge is drawn at reads the tick the BONDS answer was taken at, not the live
   // clock, so the picture and the `legend-stamp` beside it name the same moment.
-  const graph = useMemo(
+  const ties = useMemo(
     () => toRelationGraph(api ?? EMPTY_API, lineage, people, api?.asOfTick ?? 0),
     [api, lineage, people],
   )
-  const legend = useMemo(() => relationLegend(), [])
+  const passed = useMemo(
+    () => trafficGraph(traffic.data ?? EMPTY_SOCIETY, people),
+    [traffic.data, people],
+  )
+  const graph = view === 'ties' ? ties : passed
+  const legend = useMemo(() => (view === 'ties' ? relationLegend() : trafficLegend()), [view])
+  const axes = view === 'ties' ? (['level', 'type', 'arc'] as const) : (['kind'] as const)
   const key = (r: LegendRow): string => `${r.axis}:${r.key}`
   const links = useMemo(
     () =>
-      graph.links.filter(
-        (l) =>
-          !hidden.has(`level:${l.level}`) &&
-          !hidden.has(`type:${l.type}`) &&
-          !hidden.has(`arc:${l.arc.direction}`),
-      ),
-    [graph, hidden],
+      view === 'ties'
+        ? ties.links.filter(
+            (l) =>
+              !hidden.has(`level:${l.level}`) &&
+              !hidden.has(`type:${l.type}`) &&
+              !hidden.has(`arc:${l.arc.direction}`),
+          )
+        : passed.links.filter((l) => !hidden.has(`kind:${l.kind}`)),
+    [view, ties, passed, hidden],
   )
 
   // The simulation writes x/y onto these very objects, so they are handed over uncloned and
@@ -122,6 +164,24 @@ export function SocietyLens({
 
   return (
     <div className="society-lens" ref={boxRef}>
+      <div className="society-views" role="tablist" aria-label="What the picture shows">
+        {SOCIETY_VIEWS.map((v) => (
+          <button
+            key={v}
+            role="tab"
+            id={`society-tab-${v}`}
+            aria-selected={v === view}
+            tabIndex={v === view ? 0 : -1}
+            className={v === view ? 'feed-tab active' : 'feed-tab'}
+            onClick={() => {
+              setView(v)
+              setHidden(new Set())
+            }}
+          >
+            {SOCIETY_VIEW_LABEL[v]}
+          </button>
+        ))}
+      </div>
       <div className="society-key" data-open={keyOpen ? 'yes' : 'no'}>
         <button
           type="button"
@@ -142,11 +202,9 @@ export function SocietyLens({
             role="group"
             aria-label="How to read this"
           >
-            {(['level', 'type', 'arc'] as const).map((axis) => (
+            {axes.map((axis) => (
               <div className="legend-axis" key={axis} data-axis={axis}>
-                <span className="legend-axis-name">
-                  {axis === 'level' ? 'How close' : axis === 'type' ? 'Family' : 'Which way'}
-                </span>
+                <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
                 {legend
                   .filter((r) => r.axis === axis)
                   .map((r) => (
@@ -173,13 +231,15 @@ export function SocietyLens({
       {/* Nobody is missing from the picture any more, so the only honest empty state is a town
           in which nothing has passed between anyone yet — and a field of unconnected people is
           what BOTH a tieless town and an unanswered fetch look like, so the wait says so. */}
-      {api === null ? (
+      {(view === 'ties' ? api : traffic.data) === null ? (
         <BondsVeil />
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-        <p className="society-empty">{EMPTY_COPY.bonds}</p>
+        <p className="society-empty">
+          {view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}
+        </p>
       ) : null}
 
-      {selected !== null && api !== null && (
+      {view === 'ties' && selected !== null && api !== null && (
         <BondDetailPanel
           bond={api.bonds.find((b) => b.id === selected.id)!}
           people={people}
@@ -250,12 +310,13 @@ export function SocietyLens({
           }
         }}
         nodeColor={(n) => (n as BondNode).color}
-        linkColor={(l) => (l as RelationLink).color}
-        linkWidth={(l) => ((l as RelationLink).strokeCount === 2 ? 3 : 1.5)}
-        linkLineDash={(l) => (l as RelationLink).dash as number[] | null}
-        linkLabel={(l) => (l as RelationLink).words}
+        linkColor={(l) => (l as Drawn).color}
+        linkWidth={(l) => ((l as Drawn).strokeCount === 2 ? 3 : 1.5)}
+        linkLineDash={(l) => (l as Drawn).dash as number[] | null}
+        linkLabel={(l) => (l as Drawn).words}
         onLinkClick={(l) => {
-          setSelected(l as unknown as RelationLink)
+          // Only a tie has a bond behind it to open; a traffic line IS its own whole answer.
+          if (view === 'ties') setSelected(l as unknown as RelationLink)
         }}
         onNodeClick={(n) => {
           onPick((n as BondNode).id)

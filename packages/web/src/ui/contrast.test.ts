@@ -89,6 +89,10 @@ const QUIET_SITES = [
   '.veil-sub',
   '.feed-line .stamp',
   '.feed-empty',
+  '.edition-temper',
+  '.edition-caption',
+  '.chapter-head .stamp',
+  '.biography-head .stamp',
   '.room-who',
   '.legend-chip.off',
   '.legend-stamp',
@@ -226,5 +230,17 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
   it('records the pair it rejected, so it cannot come back', () => {
     expect(contrast(T.sand!, T.parchment!)).toBeCloseTo(1.19, 2)
     expect(contrast(T.sand!, T.cream!)).toBeCloseTo(1.34, 2)
+  })
+})
+
+// ── the paper's one loud thing: the week banner ───────────────────────────────────────────
+describe('the week band is read on the honey it is printed on', () => {
+  it('clears AA, and paints both halves of the pair rather than inheriting one', () => {
+    const body = ruleBody(CSS, '.era-band')
+    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(fg, '.era-band paints no text token').toBeDefined()
+    expect(bg, '.era-band paints no ground token').toBeDefined()
+    expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
   })
 })

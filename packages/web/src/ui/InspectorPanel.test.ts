@@ -96,3 +96,30 @@ describe('fetchTab', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('what is written of them', () => {
+  const withBio = (biography: { day: number; title: string; body: string } | null): string =>
+    renderToStaticMarkup(
+      createElement(InspectorBodyView, {
+        agent: person(),
+        tick: 0,
+        thought: null,
+        carrying: [],
+        changes: [],
+        biography,
+      }),
+    )
+
+  it('prints the chronicler’s write-up under the day it was written', () => {
+    const html = withBio({ day: 6, title: 'Amara, who keeps the tally', body: 'She counted.' })
+    expect(html).toContain('Amara, who keeps the tally')
+    expect(html).toContain('She counted.')
+    expect(html).toContain('Day 6')
+  })
+
+  it('says the record is empty rather than that one is coming', () => {
+    const html = withBio(null)
+    expect(html).toContain('Nobody has written of them yet.')
+    expect(html).not.toMatch(EMOJI)
+  })
+})
