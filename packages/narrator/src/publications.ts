@@ -174,6 +174,15 @@ export async function writeBiography(deps: {
     title,
     body,
     citations: null,
+    subjectId: deps.agentId,
   })
-  return { id, day: deps.throughDay, kind: 'biography', title, body, citations: null }
+  return {
+    id,
+    day: deps.throughDay,
+    kind: 'biography',
+    title,
+    body,
+    citations: null,
+    subjectId: deps.agentId,
+  }
 }

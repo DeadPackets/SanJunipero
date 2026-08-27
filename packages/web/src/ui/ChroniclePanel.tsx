@@ -1,22 +1,25 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { ChronicleResponseSchema, tickToMoment, type ChronicleEntry } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
 import { describeEvent } from './chronicleFormat.js'
 import { chronicleGlyph } from './importantFeed.js'
 import { EMPTY_COPY } from './townStats.js'
-import { usePolled } from './useEndpoint.js'
+import { editions, type Edition } from './dispatches.js'
+import { dispatchesFeed } from './feeds.js'
+import { useFeed, usePolled } from './useEndpoint.js'
 
 export const FEED_MAX = 120
 export const CHRONICLE_REFETCH_MS = 20_000
 export const GLYPH_PX = 8
 
-export const CHRONICLE_VIEWS = ['important', 'everything'] as const
+export const CHRONICLE_VIEWS = ['important', 'everything', 'paper'] as const
 export type ChronicleView = (typeof CHRONICLE_VIEWS)[number]
 // Observation, never achievement: "what mattered" is the editor's word, not the town's score.
 export const CHRONICLE_VIEW_LABEL: Record<ChronicleView, string> = {
   important: 'What mattered',
   everything: 'Everything',
+  paper: 'The paper',
 }
 
 const GLYPH: Record<string, string> = {
@@ -27,6 +30,7 @@ const GLYPH: Record<string, string> = {
 }
 
 const NO_ENTRIES: ChronicleEntry[] = []
+const NO_EDITIONS: Edition[] = []
 const chronicleEntries = (body: unknown): ChronicleEntry[] | null => {
   const parsed = ChronicleResponseSchema.safeParse(body)
   return parsed.success ? parsed.data.entries : null
@@ -180,6 +184,61 @@ export function EverythingFeedView({
   )
 }
 
+/** The town's own paper, one edition per recorded day, newest first. The chronicler writes a
+ *  day up when it closes, so a town mid-day has one fewer edition than it has days. */
+export function PaperFeedView({
+  days,
+  loading = false,
+}: {
+  days: readonly Edition[]
+  /** the first fetch has not answered yet — which is NOT the same thing as "nothing printed" */
+  loading?: boolean
+}) {
+  if (days.length === 0 && loading) {
+    return (
+      <div className="paper" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton-row" />
+        ))}
+      </div>
+    )
+  }
+  if (days.length === 0) return <p className="feed-empty">{EMPTY_COPY.paper}</p>
+  return (
+    <ol className="paper">
+      {days.map((e) => (
+        <li key={e.day} className="edition-slot">
+          {e.era !== null && (
+            <aside className="era-band">
+              <p className="era-label">The week that turned</p>
+              <h3 className="era-title">{e.era.title}</h3>
+              <p className="era-text">{e.era.text}</p>
+            </aside>
+          )}
+          <article className="edition">
+            <p className="edition-head">
+              <span className="edition-day">Day {e.day}</span>
+              {e.temper !== null && <span className="edition-temper">{e.temper}</span>}
+            </p>
+            <h3 className="edition-title">{e.title}</h3>
+            <p className="edition-body">{e.body}</p>
+            {e.formed.length > 0 && (
+              <ul className="edition-formed">
+                {e.formed.map((f) => (
+                  <li key={f.name}>
+                    <b>{f.name}</b> — {f.description}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {e.caption !== null && <p className="edition-caption">{e.caption}</p>}
+          </article>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 export function ChroniclePanel({
   store,
   handle,
@@ -197,6 +256,11 @@ export function ChroniclePanel({
   // every tick, so a 2.5s world never re-renders the panel underneath the reader's pointer.
   const read = usePolled('/api/chronicle', chronicleEntries, CHRONICLE_REFETCH_MS)
   const entries = read.data ?? NO_ENTRIES
+  const paper = useFeed(dispatchesFeed)
+  const days = useMemo(
+    () => (paper.data === null ? NO_EDITIONS : editions(paper.data)),
+    [paper.data],
+  )
 
   const lines: { key: number; tick: number; kind: string; text: string }[] = []
   for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
@@ -228,8 +292,10 @@ export function ChroniclePanel({
             viewTick={mode.live ? null : mode.tick}
             onJump={jump}
           />
-        ) : (
+        ) : view === 'everything' ? (
           <EverythingFeedView lines={lines} tick={store.getTick()} />
+        ) : (
+          <PaperFeedView days={days} loading={!paper.loaded} />
         )}
       </div>
     </div>

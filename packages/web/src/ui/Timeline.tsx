@@ -22,9 +22,11 @@ const KEY_PAGE_TICKS = MINUTES_PER_DAY
  *  thing that already happened and re-folding it per frame would buy nothing. */
 const MARKS_REFETCH_MS = 30_000
 
-const EMPTY_SOURCES: MarkSources = {
+/** The firsts are `/api/milestones`' to serve; `/api/timeline/marks` carries the other five. */
+type WireSources = Omit<MarkSources, 'milestones'>
+
+const EMPTY_SOURCES: WireSources = {
   chapters: [],
-  milestones: [],
   moments: [],
   changes: [],
   events: [],
@@ -32,17 +34,20 @@ const EMPTY_SOURCES: MarkSources = {
 }
 
 /** Every list is optional on the wire; a source the gateway has nothing for is an empty one. */
-const markSources = (body: unknown): MarkSources => {
-  const b = body as Partial<MarkSources>
+const markSources = (body: unknown): WireSources => {
+  const b = body as Partial<WireSources>
   return {
     chapters: b.chapters ?? [],
-    milestones: b.milestones ?? [],
     moments: b.moments ?? [],
     changes: b.changes ?? [],
     events: b.events ?? [],
     discoveries: b.discoveries ?? [],
   }
 }
+
+const NO_FIRSTS: MarkSources['milestones'] = []
+const firstRows = (body: unknown): MarkSources['milestones'] | null =>
+  Array.isArray(body) ? (body as MarkSources['milestones']) : null
 
 function MarkGlyph({ mark }: { mark: Mark }) {
   return (
@@ -195,10 +200,14 @@ export function Timeline({
   // The scrubber still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
     usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
+  const firsts = usePolled('/api/milestones', firstRows, MARKS_REFETCH_MS).data ?? NO_FIRSTS
 
   const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick
-  const marks = useMemo(() => coalesceMarks(marksFrom(sources), edge), [sources, edge])
+  const marks = useMemo(
+    () => coalesceMarks(marksFrom({ ...sources, milestones: firsts }), edge),
+    [sources, firsts, edge],
+  )
 
   const scrubTo = (tick: number): void => {
     const t = Math.max(0, Math.min(edge, Math.round(tick)))

@@ -4,6 +4,9 @@ import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
 import { bustStyle } from './bustStyle.js'
+import { biographyOf, EMPTY_DISPATCHES } from './dispatches.js'
+import { dispatchesFeed } from './feeds.js'
+import { useFeed } from './useEndpoint.js'
 import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from './status.js'
 import {
   CHANGE_EMPTY,
@@ -17,6 +20,8 @@ import {
 const TAB_CACHE_MS = 30_000
 const NEED_LOW = 30
 const EMPTY_COPY = 'Nothing written yet.'
+/** Describes rather than promises: on a scripted stream nobody is writing at all. */
+const BIOGRAPHY_EMPTY = 'Nobody has written of them yet.'
 
 /** Two tabs a viewer picks between, plus the personality feed the panel always reads. */
 export type Tab = 'ledger' | 'journal' | 'personality'
@@ -98,12 +103,15 @@ export function InspectorBodyView({
   thought,
   carrying,
   changes,
+  biography = null,
 }: {
   agent: InspectorAgent
   tick: number
   thought: { text: string } | null
   carrying: readonly { id: string; kind: string; qty: number }[]
   changes: readonly ChangeEntry[]
+  /** The chronicler's write-up, from the PUBLIC record alone. Null until one is written. */
+  biography?: { day: number; title: string; body: string } | null
 }) {
   const moved = hasChanged(changes)
   return (
@@ -167,6 +175,22 @@ export function InspectorBodyView({
         )}
       </section>
 
+      {/* What is known of them from the outside: the chronicler reads the public log and
+          nothing else, so this section can never say what the person privately thought. */}
+      <section className="block">
+        <h3>What is written of them</h3>
+        {biography === null ? (
+          <p className="doc">{BIOGRAPHY_EMPTY}</p>
+        ) : (
+          <article className="biography">
+            <p className="biography-head">
+              <span className="stamp">Day {biography.day}</span> {biography.title}
+            </p>
+            <p className="biography-body">{biography.body}</p>
+          </article>
+        )}
+      </section>
+
       {/* The one legitimate identity surface in the product, re-framed. It leads with the
           LATEST document and the most recent edit; a person with one version has moved
           nothing yet and is told so, rather than handed v1 as a character sheet. */}
@@ -221,6 +245,7 @@ export function InspectorPanel({
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
+  const dispatches = useFeed(dispatchesFeed).data
   const [tab, setTab] = useState<Tab>('ledger')
   // Rows are held WITH the person they were fetched for, so a new subject reads as "nothing
   // loaded" in the same render — the panel can never show the previous person's ledger.
@@ -288,6 +313,7 @@ export function InspectorPanel({
     (it) => it.loc.t === 'agent' && it.loc.id === agentId,
   )
   const records = store.assetRecords()
+  const biography = biographyOf(dispatches ?? EMPTY_DISPATCHES, agentId)
   const portraitId = resolveAssetId(records, 'portrait', agentId)
   // no painted portrait yet → the v4 sprite bust stands in (smooth hi-res crop, not pixelated)
   const bust = portraitId === null ? bustStyle(records, agentId, 52) : null
@@ -338,6 +364,7 @@ export function InspectorPanel({
         thought={thought}
         carrying={carrying}
         changes={personality === null ? [] : changeLog(personality)}
+        biography={biography}
       />
 
       <nav className="lens-tabs">

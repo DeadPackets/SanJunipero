@@ -38,6 +38,7 @@ import {
   type Recipe,
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
+import { NarratorStore, closeDay, makeNarratorLlm, openNarratorDb } from '@sj/narrator'
 import type { LiveCast } from './devWorld.js'
 import { createDiscoveryArt } from './discoveryCommission.js'
 import { publishThought } from './observer.js'
@@ -105,6 +106,9 @@ export const DEFAULT_MODELS_DIR = fileURLToPath(new URL('../../../data/models/',
 export type LiveCastOpts = {
   /** Directory of `<id>.db` files. Created if absent; wiped with the world on `SJ_FRESH=1`. */
   agentDbDir: string
+  /** Where the chronicle is written. Absent, no day is narrated and the stream costs two fewer
+   *  calls an hour. The gateway reads the same file, so both are handed one path. */
+  narratorDbPath?: string
   minds?: readonly MindSpec[]
   /** Dollars over the town's life; 0 is none. Reaching it stops the minds and calls `onSpendStop`. */
   spendCapUsd?: number
@@ -344,6 +348,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     if (!result.passed) throw new Error(preflightRefusal(result))
   }
 
+  // Opened before the gateway, which reads this same file and will not create it.
+  const narratorDb = opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
+  const narratorStore = narratorDb === null ? null : new NarratorStore(narratorDb)
+  let narrating = false
+
   const embedder = opts.embedder ?? (await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR))
 
   const mindDbs = new Map<string, Database.Database>()
@@ -510,9 +519,72 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`,
       )
 
+      // ── the chronicle, on the day boundary ──
+      // Dispatched OFF this handler: awaiting two provider calls here would stall the socket
+      // for as long as they take. The day just ended is the one being written.
+      let narratedThroughSeq = store.lastSeq()
+      const rulebookCount = (): number =>
+        arbiterDb === null
+          ? 0
+          : (arbiterDb.prepare('SELECT COUNT(*) AS n FROM rulebook').get() as { n: number }).n
+      const thoughtsOn = (day: number): number =>
+        (
+          db
+            .prepare('SELECT COUNT(*) AS n FROM observer_thoughts WHERE tick >= ? AND tick < ?')
+            .get(day * MINUTES_PER_DAY, (day + 1) * MINUTES_PER_DAY) as { n: number }
+        ).n
+
+      const writeTheDay = (chronicle: NarratorStore, tick: number): void => {
+        const day = tick / MINUTES_PER_DAY - 1
+        const from = narratedThroughSeq
+        narratedThroughSeq = store.lastSeq()
+        if (stopped || spentToday() >= dailyBudget) {
+          log(`stream: day ${day} goes unwritten — the chronicle is outside today's budget`)
+          return
+        }
+        narrating = true
+        // Reading the day back is a whole sim-day of rows, so even that waits for the next turn
+        // of the loop: this handler returns to the socket first.
+        setImmediate(() => {
+          const events = store
+            .readFrom(from)
+            .filter((e) => Math.floor(e.tick / MINUTES_PER_DAY) === day)
+          if (events.length === 0) {
+            narrating = false
+            return
+          }
+          void closeDay({
+            store: chronicle,
+            llm: makeNarratorLlm(makeClient('narrator')),
+            worldDb: db,
+            events,
+            rulebookCount: rulebookCount(),
+            privateCounts: { thoughts: thoughtsOn(day), journals: 0 },
+            cast: minds.map((m) => ({ id: m.id, name: m.identity.name })),
+            world: { config, state: loop.state },
+            alert: (d) => {
+              log(`stream: chronicle — ${d}`)
+            },
+          })
+            .then((c) => {
+              log(`stream: day ${day} is written — "${c.title}"`)
+            })
+            .catch((e: unknown) => {
+              log(
+                `stream: day ${day} went unwritten — ${e instanceof Error ? e.message : String(e)}`,
+              )
+            })
+            .finally(() => {
+              narrating = false
+            })
+        })
+      }
+
       // ── the money, on the world's own clock ──
       bridge.onTick((tick) => {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
+        if (narratorStore !== null && tick > 0 && tick % MINUTES_PER_DAY === 0)
+          writeTheDay(narratorStore, tick)
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
@@ -548,7 +620,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       stopMinds()
       // Closing a mind's db while `runSleepReflection` is in flight throws out of a promise
       // nobody awaits, so this waits a bounded five seconds and then closes anyway.
-      const settled = await settle(() => booted?.reflecting() === true, REFLECTION_SETTLE_MS)
+      const settled = await settle(
+        () => booted?.reflecting() === true || narrating,
+        REFLECTION_SETTLE_MS,
+      )
       if (!settled) log('stream: a night was still being reflected on when the town closed')
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
@@ -559,6 +634,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
+      narratorDb?.close()
       // The run's last word on its own prices: says nothing when the ledger and the provider's
       // bill agree, and writes an alert row when a pin has gone stale.
       reportReconciliation(opsDb)

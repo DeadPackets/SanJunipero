@@ -130,7 +130,8 @@ export function toRelationGraph(
 }
 
 export type LegendRow = {
-  axis: 'level' | 'type' | 'arc'
+  // 'kind' is the traffic view's one axis — see `societyGraph.ts`.
+  axis: 'level' | 'type' | 'arc' | 'kind'
   /** what identifies this row: a colour for the arc axis, a level id or a type id otherwise */
   key: string
   swatch: string

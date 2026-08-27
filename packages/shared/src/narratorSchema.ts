@@ -38,18 +38,22 @@ CREATE TABLE IF NOT EXISTS semantic_candidates (
 CREATE TABLE IF NOT EXISTS publications (
   id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('newspaper','biography','timelapse_caption','share_card')),
-  title TEXT NOT NULL, body TEXT NOT NULL, citations TEXT,
+  title TEXT NOT NULL, body TEXT NOT NULL, citations TEXT, subject_id TEXT,
   rendered_at TEXT NOT NULL DEFAULT (datetime('now')));
 `
 
 /** Everything the gateway is allowed to SELECT out of narrator.db. */
 export const NARRATOR_READ_TABLES: Readonly<Record<string, readonly string[]>> = {
-  chapters: ['day', 'title'],
+  chapters: ['day', 'title', 'text'],
   milestones: ['kind', 'label', 'day', 'tick'],
   scenes: ['day', 'start_tick', 'end_tick', '"cast"', 'location'],
+  publications: ['day', 'kind', 'title', 'body', 'subject_id'],
+  eras: ['start_day', 'end_day', 'title', 'text'],
+  institutions: ['kind', 'name', 'description', 'founding_scene_id'],
+  heat_scores: ['scene_id', 'total'],
 }
 
-export type ChapterRow = { day: number; title: string }
+export type ChapterRow = { day: number; title: string; text: string }
 export type MilestoneRow = { kind: string; label: string; day: number; tick: number }
 export type SceneRow = {
   day: number

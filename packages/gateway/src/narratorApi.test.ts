@@ -115,6 +115,30 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     scene.run(0, 10, 60, '[1,2]', '["alice","bob"]', 'the plaza')
     scene.run(1, 1440, 1500, '[3]', '["cara"]', null)
     scene.run(2, 2880, 2900, '[]', '[]', 'the riverbank') // a day with no chapter written
+    const publish = ndb.prepare(
+      'INSERT INTO publications (day, kind, title, body, citations, subject_id) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    publish.run(0, 'newspaper', 'The Fire', 'It burned all night.', null, null)
+    publish.run(0, 'timelapse_caption', 'Day 0', 'Day 0: The First Morning', null, null)
+    publish.run(0, 'biography', 'Alice', 'A first draft.', null, 'alice')
+    publish.run(1, 'biography', 'Alice, who woke first', 'She was seen early.', null, 'alice')
+    ndb
+      .prepare(
+        'INSERT INTO eras (start_day, end_day, title, text, citations, chapter_ids) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(0, 6, 'The First Week', 'Seven days.', '[]', '[]')
+    ndb
+      .prepare(
+        `INSERT INTO institutions (kind, name, description, founding_scene_id, member_ids, source_event_ids)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run('group', 'the morning watch', 'They rose together.', 1, '[]', '[]')
+    ndb
+      .prepare(
+        `INSERT INTO heat_scores (scene_id, conflict, novelty, firsts, stakes, dramatic_irony, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(1, 1, 2, 3, 2, 1, 9)
     ndb.close()
 
     gw = await createGateway({
@@ -224,11 +248,34 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(await chronicle('?fromTick=1000&toTick=2000')).toEqual([])
   })
 
-  it('reads the real chapters C7 wrote, not the empty stub it replaces', async () => {
+  // The TEXT is the point of the endpoint: a viewer handed only titles has the index of a
+  // book nobody printed.
+  it('reads the real chapters C7 wrote, prose and all', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([
-      { day: 0, title: 'The First Morning' },
-      { day: 1, title: 'What the Fire Took' },
+      { day: 0, title: 'The First Morning', text: 'They woke.' },
+      { day: 1, title: 'What the Fire Took', text: 'It burned.' },
     ])
+  })
+
+  it('sends the town its own paper, its captions, its lives and its weeks', async () => {
+    const body = (await (await fetch(`${base}/api/dispatches`)).json()) as Record<
+      string,
+      { day: number }[]
+    >
+    expect(body.papers).toEqual([{ day: 0, title: 'The Fire', body: 'It burned all night.' }])
+    expect(body.captions).toEqual([{ day: 0, caption: 'Day 0: The First Morning' }])
+    // only the newest of a life, so an older draft never stands beside the one that replaced it
+    expect(body.biographies).toEqual([
+      { subjectId: 'alice', day: 1, title: 'Alice, who woke first', body: 'She was seen early.' },
+    ])
+    expect(body.eras).toEqual([
+      { startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.' },
+    ])
+    expect(body.institutions).toEqual([
+      { day: 0, kind: 'group', name: 'the morning watch', description: 'They rose together.' },
+    ])
+    // one reading a day: the hottest scene the narrator scored is what the day felt like
+    expect(body.heat).toEqual([{ day: 0, total: 9 }])
   })
 
   it('reads the firsts ledger', async () => {
@@ -279,17 +326,18 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     const body = (await res.json()) as {
       throughTick: number
       chapters: { day: number; title: string }[]
-      milestones: { label: string; day: number; tick: number }[]
       moments: { day: number; startTick: number }[]
       changes: { tick: number }[]
       events: { tick: number; type: string }[]
     }
     expect(body.throughTick).toBeGreaterThanOrEqual(60)
+    // a mark is a label on a track: the titles, never the prose `/api/chapters` carries
     expect(body.chapters).toEqual([
       { day: 0, title: 'The First Morning' },
       { day: 1, title: 'What the Fire Took' },
     ])
-    expect(body.milestones).toEqual([{ label: 'The first death', day: 0, tick: 50 }])
+    // the firsts are `/api/milestones`' to serve; a second copy here is a second one to keep right
+    expect(body).not.toHaveProperty('milestones')
     expect(body.moments).toEqual([
       { day: 0, startTick: 10 },
       { day: 1, startTick: 1440 },
@@ -354,6 +402,10 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
       expect(res.status, path).toBe(200)
       expect(await res.json(), path).toEqual([])
     }
+    const dispatches = await fetch(`${base}/api/dispatches`)
+    expect(dispatches.status).toBe(200)
+    for (const list of Object.values((await dispatches.json()) as Record<string, unknown>))
+      expect(list).toEqual([])
     const moments = await fetch(`${base}/api/moments`)
     expect(moments.status).toBe(200)
     expect(MomentsResponseSchema.parse(await moments.json()).moments).toEqual([])
@@ -364,7 +416,6 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     expect(res.status).toBe(200)
     const body = (await res.json()) as Record<string, unknown>
     expect(body.chapters).toEqual([])
-    expect(body.milestones).toEqual([])
     expect(body.moments).toEqual([])
     expect(body.changes).toEqual([])
     // the world's own log survives the narrator's absence — those are the town's, not C7's

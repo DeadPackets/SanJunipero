@@ -139,4 +139,6 @@ export type PublicationRow = {
   title: string
   body: string
   citations: number[] | null
+  /** Who it is about; only a biography has one. */
+  subjectId: string | null
 }
