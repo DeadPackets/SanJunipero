@@ -42,7 +42,7 @@ export default tseslint.config(
   },
   {
     // The project service only ever looks for tsconfig.json, and the scripts live in a sibling one.
-    files: ['packages/{agents,arbiter,forge,gateway,narrator}/scripts/**/*.ts'],
+    files: ['packages/{agents,arbiter,forge,narrator,town}/scripts/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -50,9 +50,21 @@ export default tseslint.config(
           'packages/agents/tsconfig.scripts.json',
           'packages/arbiter/tsconfig.scripts.json',
           'packages/forge/tsconfig.scripts.json',
-          'packages/gateway/tsconfig.scripts.json',
           'packages/narrator/tsconfig.scripts.json',
+          'packages/town/tsconfig.scripts.json',
         ],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    // This one test composes the town that loads it, so it is checked by a project of its own —
+    // the src project may not reference `@sj/town` without a reference cycle.
+    files: ['packages/live/src/liveWorld.test.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['packages/live/tsconfig.test.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

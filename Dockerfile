@@ -1,4 +1,4 @@
-# The whole workspace is copied: pnpm links @sj/* by symlink and the gateway runs from TS source
+# The whole workspace is copied: pnpm links @sj/* by symlink and the town runs from TS source
 # under tsx, so there is nothing to prune to. Two stages only to leave vite/react/pixi behind.
 
 FROM node:24-slim AS build
@@ -21,10 +21,10 @@ ENV NODE_ENV=production
 COPY --from=build /app /app
 
 # Without a volume the town dies with the container — see compose.yaml.
-RUN mkdir -p /app/packages/gateway/data
-VOLUME ["/app/packages/gateway/data"]
+RUN mkdir -p /app/packages/town/data
+VOLUME ["/app/packages/town/data"]
 
 ENV PORT=8080
 EXPOSE 8080
 # `serve.ts` traps SIGTERM and closes the world, so `docker stop` never truncates a write.
-CMD ["pnpm", "--filter", "@sj/gateway", "serve"]
+CMD ["pnpm", "--filter", "@sj/town", "serve"]

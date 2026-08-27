@@ -16,6 +16,7 @@ import type { PersonalityDoc } from '../personality.js'
 import { EngineBridge } from '../runtime/bridge.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import { bootMinds, type MindSpec } from './liveMinds.js'
+import { ensureChildren, needsHousehold } from './ensureChild.js'
 import { resolveCast } from './resolveCast.js'
 import { wireBirths } from './newborn.js'
 
@@ -130,6 +131,8 @@ async function town(
     return db
   }
   const model = scriptedModel()
+  // A budget the run can lift: a name lost to a spent budget is asked for again on a later boot.
+  let namingBudgetUsd = opts.namingBudgetUsd
   const makeClient = (caller: string, agentId?: string): LlmClient =>
     new LlmClient({
       model,
@@ -137,23 +140,44 @@ async function town(
       caller,
       ...(agentId === undefined ? {} : { agentId }),
       maxRetries: 0,
-      ...(caller === 'naming' && opts.namingBudgetUsd !== undefined
-        ? { budgetUsd: opts.namingBudgetUsd }
+      ...(caller === 'naming' && namingBudgetUsd !== undefined
+        ? { budgetUsd: namingBudgetUsd }
         : {}),
     })
-  const embedder = await FakeEmbedder.create()
+  const real = await FakeEmbedder.create()
+  // A crash mid-seeding, which is the one window a birth cannot survive on its own.
+  let crashSeeding = false
+  const embedder = {
+    embed: async (t: string): Promise<Float32Array> => {
+      if (crashSeeding) throw new Error('the process died mid-seeding')
+      return real.embed(t)
+    },
+  }
   const FOUNDERS = [specFor(MOTHER, 'f'), specFor(FATHER, 'm')]
   const maxMinds = opts.maxMinds ?? 10
 
   // The one boot path: `resolveCast` decides who is in the town, and a restart is another call
   // to it over the same log.
   const boot = () => {
+    const cast = resolveCast(FOUNDERS, store, maxMinds)
     const booted = bootMinds({
-      minds: resolveCast(FOUNDERS, store, maxMinds),
+      minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
       bridge,
       embedder,
       dbFor,
       turnLlm: (id) => makeClient('turn', id),
+    })
+    const repairing = ensureChildren({
+      cast: new Map(cast.map((m) => [m.id, m])),
+      store,
+      dbFor,
+      opsDb,
+      embedder,
+      namingLlm: makeClient('naming'),
+      homeOf: () => '',
+      boot: (spec) => {
+        booted.add(spec)
+      },
     })
     const stopBirths = wireBirths({
       booted,
@@ -168,6 +192,7 @@ async function town(
     })
     return {
       booted,
+      repairing,
       stop: () => {
         stopBirths()
         booted.stop()
@@ -183,9 +208,16 @@ async function town(
     },
     opsDb,
     dbFor,
-    reboot: () => {
+    crash: (on: boolean) => {
+      crashSeeding = on
+    },
+    fundNaming: () => {
+      namingBudgetUsd = undefined
+    },
+    reboot: async () => {
       running.stop()
       running = boot()
+      await running.repairing
     },
     stop: () => {
       running.stop()
@@ -246,7 +278,7 @@ describe('★ a born mind survives a restart', () => {
     const before = memoryTexts(t.dbFor(CHILD), CHILD)
     expect(before.length).toBeGreaterThan(0)
 
-    t.reboot()
+    await t.reboot()
 
     expect([...t.booted.cast.keys()]).toContain(CHILD)
     expect(t.booted.runtimes.has(CHILD)).toBe(true)
@@ -255,6 +287,44 @@ describe('★ a born mind survives a restart', () => {
     expect(t.dbFor(CHILD).prepare('SELECT COUNT(*) AS n FROM personality_versions').get()).toEqual({
       n: 1,
     })
+    t.stop()
+  })
+
+  it('★ a child caught mid-seeding by a crash comes back with its household and its name', async () => {
+    const t = await town()
+    t.crash(true)
+    t.bear()
+    await t.settle(() => birthAlerts(t.opsDb).some((a) => a.kind === 'birth_failed'))
+
+    // The window the concern names: a body in the world, and a person with no origin.
+    expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual([])
+    expect(socialNames(t.opsDb)).toEqual([])
+    expect(t.booted.runtimes.has(CHILD)).toBe(false)
+
+    t.crash(false)
+    await t.reboot()
+
+    expect(memoryTexts(t.dbFor(CHILD), CHILD)).toContain(
+      'You were born to your mother and your father, in this town.',
+    )
+    expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
+    expect(t.booted.runtimes.has(CHILD)).toBe(true)
+    t.stop()
+  })
+
+  it('★ and a name lost on its own is written on the next boot, without a second household', async () => {
+    const t = await town({ namingBudgetUsd: 0 })
+    t.bear()
+    await t.settle(() => t.booted.runtimes.has(CHILD))
+    const seeded = memoryTexts(t.dbFor(CHILD), CHILD)
+    expect(seeded.length).toBeGreaterThan(0)
+    expect(socialNames(t.opsDb)).toEqual([])
+
+    t.fundNaming()
+    await t.reboot()
+
+    expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
+    expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual(seeded)
     t.stop()
   })
 

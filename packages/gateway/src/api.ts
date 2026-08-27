@@ -1,7 +1,13 @@
 import { join } from 'node:path'
 import type { IncomingMessage } from 'node:http'
 import Database from 'better-sqlite3'
-import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  tickToMoment,
+  type HeatWindow,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
@@ -12,7 +18,6 @@ import {
   heatSince,
   scoreEvent,
   type HeatScores,
-  type HeatWindow,
 } from './heat.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
@@ -91,6 +96,10 @@ export type Footprint = {
 }
 
 type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
+
+/** How much of one mind's feed `/api/agent/:id/journal` sends. A mind writes a line most nights
+ *  forever and the panel refetches the lot on every open, so it reads the recent run. */
+export const JOURNAL_MAX = 200
 
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
@@ -294,24 +303,23 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     })
   })
 
-  // A dream is a memory row and not a journal row, so the feed is two reads merged. `sort` is
-  // stable, so each half keeps its own written order within a tick.
+  // A dream is a memory row and not a journal row, so the feed is two reads merged. Each half
+  // reads its newest `JOURNAL_MAX` and is turned back the right way up before the merge.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
     const id = params.id ?? ''
     const rows = [
       ...readAgentRows<JournalRow>(
         id,
-        "SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ? ORDER BY id",
-      ),
+        `SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ?
+         ORDER BY id DESC LIMIT ${JOURNAL_MAX}`,
+      ).reverse(),
       ...readAgentRows<JournalRow>(
         id,
-        "SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream' ORDER BY id",
-      ),
+        `SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream'
+         ORDER BY id DESC LIMIT ${JOURNAL_MAX}`,
+      ).reverse(),
     ]
-    sendJson(
-      res,
-      rows.sort((a, b) => a.tick - b.tick),
-    )
+    sendJson(res, rows.sort((a, b) => a.tick - b.tick).slice(-JOURNAL_MAX))
   })
 
   router.route('GET', '/api/agent/:id/ledgers', (_req, res, params) => {

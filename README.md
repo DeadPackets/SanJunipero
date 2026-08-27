@@ -21,7 +21,9 @@ internet, see [deploy/README.md](deploy/README.md).
 | `@sj/arbiter` | The god layer: adjudication, canon, and the codex of rulings. |
 | `@sj/forge` | Asset generation and its budget, spend ledger, and vision QA. |
 | `@sj/narrator` | Chronicle, newspaper, biography — the town told back to itself. |
-| `@sj/gateway` | The server: world boot, socket hub, HTTP API, and the built viewer. |
+| `@sj/gateway` | The observatory: socket hub, HTTP API, asset routes, and the built viewer. |
+| `@sj/town` | The scripted composition root: world boot, founders, the `pnpm stream` entrypoint. |
+| `@sj/live` | The LLM cast behind the bodies. Loaded only by `SJ_LIVE=1`, through one dynamic import. |
 | `@sj/web` | The React + PixiJS viewer. |
 
 ## The two entrypoints
@@ -29,7 +31,7 @@ internet, see [deploy/README.md](deploy/README.md).
 | | Command | Port | Serves |
 |---|---|---|---|
 | Streamed town | `pnpm stream` | 8080 | The built viewer from `packages/web/dist`. |
-| Frontend dev loop | `pnpm --filter @sj/gateway dev:world` + `pnpm --filter @sj/web dev` | 5173 | Vite HMR; `/ws`, `/api` and `/assets` proxy to the gateway on 8787. |
+| Frontend dev loop | `pnpm --filter @sj/town dev:world` + `pnpm --filter @sj/web dev` | 5173 | Vite HMR; `/ws`, `/api` and `/assets` proxy to the gateway on 8787. |
 
 Both boot the same world through `startDevWorld`; they differ only in who serves the client and in
 a few defaults below.
@@ -55,7 +57,7 @@ block reach the container.
 | `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is still folded into the world — the child has a body and no mind, and an alert row says so. `pnpm stream` only. |
 | `SJ_ADMIN_TOKEN` | unset | Set it to open the loopback law channel (`POST /admin/laws`) behind that bearer token. Unset, no write path into the world exists. `pnpm stream` only. |
 | `SJ_ADMIN_PORT` | `8788` | The port that channel listens on, on `127.0.0.1` only. Never proxy it. `pnpm stream` only. |
-| `SJ_MINDS_DIR` | `data/minds` under `packages/gateway` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
+| `SJ_MINDS_DIR` | `data/minds` under `packages/town` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
 | `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
 | `SJ_BUILDERS` | on | `0` stops the founders raising houses. |
 | `SJ_BRIDGE` | off on `pnpm stream`, on in `dev:world` | `1` lets one founder deck the ford. |

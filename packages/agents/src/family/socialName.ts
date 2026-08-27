@@ -19,6 +19,13 @@ export function migrateFamilyTables(db: Database.Database): void {
   `)
 }
 
+/** The mother has already answered for this child; the name is written once and never re-asked. */
+export function hasSocialName(db: Database.Database, agentId: string): boolean {
+  return (
+    db.prepare('SELECT 1 FROM social_names WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined
+  )
+}
+
 export const MAX_SOCIAL_NAME_CHARS = 40
 
 const SocialNameAnswer = z.object({ name: z.string() }).strict()

@@ -1,10 +1,9 @@
 // Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
 // behind the body proves nothing about the seam.
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
@@ -12,8 +11,8 @@ import { insertAlert, type LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
-import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
-import { foundersFor, townStructuresFor } from './founders.js'
+import { thoughtsSince, type LiveCast } from '@sj/gateway'
+import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
   LIVE_OPS_DB,
   amnesiaRefusal,
@@ -25,7 +24,6 @@ import {
   restorableSnapshot,
   settle,
 } from './liveWorld.js'
-import { thoughtsSince } from './observer.js'
 
 // What no puppet in `founders.ts` will ever say, because `founders.ts` cannot speak at all.
 const SPOKEN = 'A mind said this and no script could have.'
@@ -997,55 +995,8 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
   }, 30_000)
 })
 
-describe('★ the default stays scripted and free', () => {
-  const here = dirname(fileURLToPath(import.meta.url))
-  const src = (name: string): string => readFileSync(join(here, name), 'utf8')
-
-  it('nothing on the scripted path can reach an LLM: no static @sj/agents import', () => {
-    // The prose in `devWorld.ts` NAMES the package while arguing why it must not import it, so
-    // this reads the import statements and not the file.
-    const imports = (name: string): string[] =>
-      src(name)
-        .split('\n')
-        .filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
-    for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts']) {
-      expect(imports(file).join('\n')).not.toContain('@sj/agents')
-    }
-    // And the one file that does import it is the one that is allowed to.
-    expect(imports('liveWorld.ts').join('\n')).toContain('@sj/agents')
-  })
-
-  it('and the arbiter is inside the same quarantine, not beside it', () => {
-    // `@sj/arbiter` depends on `@sj/agents`, so a static import of it drags the whole mind stack
-    // in just as directly. The guard above names one package and would not have caught that.
-    const imports = (name: string): string[] =>
-      src(name)
-        .split('\n')
-        .filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
-    for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {
-      expect(imports(file).join('\n'), file).not.toContain('@sj/arbiter')
-      expect(imports(file).join('\n'), file).not.toContain('@sj/narrator')
-    }
-    expect(imports('liveWorld.ts').join('\n')).toContain('@sj/arbiter')
-    expect(imports('liveWorld.ts').join('\n')).toContain('@sj/narrator')
-  })
-
-  it('★ turning the god layer off is a flag, and it does not touch the scripted default', () => {
-    // `SJ_ARBITER` may only ever be read on the live path. Read in `devWorld.ts` it would be a
-    // switch that appears to do something on a stream that has no minds to rule over.
-    const s = src('serve.ts')
-    expect(s).toMatch(/process\.env(\.SJ_ARBITER|\['SJ_ARBITER'\]) !== '0'/)
-    expect(src('devWorld.ts')).not.toContain('SJ_ARBITER')
-  })
-
-  it('serve.ts reaches the live world only through a dynamic import behind the flag', () => {
-    const s = src('serve.ts')
-    expect(s).not.toMatch(/^import .*liveWorld/m)
-    expect(s).toContain("import('./liveWorld.js')")
-    expect(s).toMatch(/process\.env(\.SJ_LIVE|\['SJ_LIVE'\]) === '1'/)
-  })
-
-  it('the ops db sits inside the minds directory, so the fresh wipe takes the ledger too', () => {
+describe('the ops db sits inside the minds directory', () => {
+  it('so the fresh wipe takes the ledger too', () => {
     // `wipeAgentMemory` deletes `*.db` under agentDbDir. A ledger kept anywhere else would
     // survive a fresh boot and the next run's cap would start half spent.
     expect(LIVE_OPS_DB.endsWith('.db')).toBe(true)

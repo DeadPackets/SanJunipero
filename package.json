@@ -6,9 +6,9 @@
     "node": ">=24"
   },
   "scripts": {
-    "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/gateway serve",
+    "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/town serve",
     "test": "vitest run",
-    "typecheck": "tsc -b packages/shared packages/engine packages/llm packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && for p in agents arbiter forge gateway narrator; do tsc -p packages/$p/tsconfig.scripts.json || exit 1; done",
+    "typecheck": "tsc -b packages/shared packages/engine packages/llm packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator packages/live packages/town && for p in agents arbiter forge narrator town; do tsc -p packages/$p/tsconfig.scripts.json || exit 1; done && tsc -p packages/live/tsconfig.test.json",
     "lint": "for p in packages/*; do node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js $p || exit 1; done && node node_modules/eslint/bin/eslint.js *.js *.ts",
     "format": "biome format --write .",
     "format:check": "biome format .",

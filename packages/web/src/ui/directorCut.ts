@@ -1,4 +1,4 @@
-export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
+import type { HeatWindow } from '@sj/shared'
 
 export const CUT_MIN_MS = 8000 // never cut faster — letterboxed TV pacing
 const RECENT_TICKS = 120

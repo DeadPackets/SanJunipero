@@ -2,7 +2,7 @@
 # is a second town, not more capacity.
 #
 # The mount must be the PARENT `data` directory, not the world file: these paths are relative in
-# the code (DEV_DB_PATH, STREAM_MINDS_DIR) and resolve against /app/packages/gateway.
+# the code (DEV_DB_PATH, STREAM_MINDS_DIR) and resolve against /app/packages/town.
 #
 #   data/dev-world.db   the world + the forge's asset and vision_qa tables
 #   data/minds/*.db     one per mind: memories, journal, half-run plan
@@ -50,7 +50,7 @@ services:
     volumes:
       # The whole `data` directory, not the world file inside it — see the header.
       # `docker compose down -v` is the deliberate way to end a town.
-      - town-data:/app/packages/gateway/data
+      - town-data:/app/packages/town/data
     restart: unless-stopped
     stop_grace_period: 20s
     # There is no metrics endpoint: a lagging viewer is reported only as a stderr line. Rotation

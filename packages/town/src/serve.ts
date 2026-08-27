@@ -17,8 +17,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { createLawsAdmin } from './adminLaws.js'
-import { startDevWorld, type LiveCast } from './devWorld.js'
+import { createLawsAdmin, type LiveCast } from '@sj/gateway'
+import { startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
 export const STREAM_PORT = 8080
@@ -37,7 +37,7 @@ export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.
 export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 
 /** A number, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
- *  file may not import — a static import would pull `@sj/agents` onto the scripted path. */
+ *  file may not import — a static import would pull the mind stack onto the scripted path. */
 const numEnv = (name: string, ok: (n: number) => boolean): number | undefined => {
   const raw = process.env[name]
   if (raw === undefined) return undefined
@@ -68,8 +68,8 @@ export async function main(): Promise<void> {
     jointBuild: false,
   })
 
-  // The import itself is behind the flag: `@sj/agents` pulls in onnxruntime and a 128 MB
-  // sentence-transformer, and a scripted stream should pay for neither.
+  // The import itself is behind the flag: `@sj/live` pulls in the mind stack and the `ai` SDK,
+  // and a scripted stream should pay for neither.
   const live = process.env.SJ_LIVE === '1'
   const mindsDir = process.env.SJ_MINDS_DIR ?? STREAM_MINDS_DIR
   // One path, two readers: the live cast writes the day's chapter, the gateway serves it.
@@ -81,7 +81,7 @@ export async function main(): Promise<void> {
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
   const castFactory = (): Promise<LiveCast> =>
-    import('./liveWorld.js').then(({ createLiveCast }) =>
+    import('@sj/live').then(({ createLiveCast }) =>
       createLiveCast({
         agentDbDir: mindsDir,
         narratorDbPath,

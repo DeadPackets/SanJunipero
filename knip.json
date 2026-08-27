@@ -54,6 +54,22 @@
     },
     "packages/gateway": {
       "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/live": {
+      "entry": [
+        "src/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/town": {
+      "entry": [
         "src/**/*.test.ts",
         "scripts/*.ts"
       ],

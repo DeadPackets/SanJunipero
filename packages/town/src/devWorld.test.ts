@@ -16,9 +16,8 @@ import {
 } from './devWorld.js'
 import { DEV_MAP_HUMAN } from './worldEnv.js'
 import { townStructuresFor } from './founders.js'
-import { publishThought } from './observer.js'
-import { frameText } from './http.js'
-import { until } from './testutil.js'
+import { frameText, publishThought } from '@sj/gateway'
+import { until } from '@sj/gateway/testutil'
 
 describe('showcase weather', () => {
   it('freezes the weather system so the town never greys out', () => {

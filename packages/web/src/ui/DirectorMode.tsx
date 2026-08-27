@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
-import { CUT_MIN_MS, subjectFor, type HeatWindow } from './directorCut.js'
+import type { HeatWindow } from '@sj/shared'
+import { CUT_MIN_MS, subjectFor } from './directorCut.js'
 import { usePolled } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000

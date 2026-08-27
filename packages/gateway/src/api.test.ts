@@ -8,7 +8,7 @@ import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createGateway, type Gateway, type RouteHandler } from './server.js'
-import { mountDataApi } from './api.js'
+import { JOURNAL_MAX, mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 
 // @sj/agents is frozen this chunk and does not export openAgentDb; DDL below is copied
@@ -208,6 +208,33 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/agent/bob/journal`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/ledgers`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/personality`)).json()).toEqual([])
+  })
+
+  it('the journal feed is capped, and the cap keeps the newest of both halves', async () => {
+    // A mind writes a line most nights forever and the panel refetches the lot on every open.
+    const over = JOURNAL_MAX + 50
+    const cdb = openAgentFixtureDb(join(dir, 'carl.db'))
+    const wrote = cdb.prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, ?, ?, ?)')
+    const dreamt = cdb.prepare(
+      'INSERT INTO memories (agent_id, tick, day, kind, text, importance, tags)' +
+        " VALUES (?, ?, ?, 'dream', ?, 5, '{}')",
+    )
+    for (let i = 0; i < over; i++) {
+      wrote.run('carl', i, 0, `entry ${i}`)
+      dreamt.run('carl', i, 0, `dream ${i}`)
+    }
+    cdb.close()
+
+    const rows = (await (await fetch(`${base}/api/agent/carl/journal`)).json()) as {
+      tick: number
+      kind: string
+    }[]
+    expect(rows).toHaveLength(JOURNAL_MAX)
+    // The newest of the MERGE, not of each half: one row of each kind per tick, so the cap
+    // reaches half as far back and still ends at the last thing this mind wrote.
+    expect(rows[0]!.tick).toBe(over - JOURNAL_MAX / 2)
+    expect(rows.at(-1)!.tick).toBe(over - 1)
+    expect(new Set(rows.map((r) => r.kind))).toEqual(new Set(['journal', 'dream']))
   })
 
   it('provenance from the events scan, completedTick null while building', async () => {

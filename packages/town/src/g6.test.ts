@@ -8,11 +8,9 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, makeFixtureMap } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import { startDevWorld } from './devWorld.js'
-import { publishThought } from './observer.js'
 import { drawHouse, registerDemoHouse } from './hotswapDemo.js'
-import { WorldMirror } from './worldMirror.js'
-import { frameText } from './http.js'
-import { until } from './testutil.js'
+import { WorldMirror, frameText, publishThought } from '@sj/gateway'
+import { until } from '@sj/gateway/testutil'
 
 type Client = { sock: WebSocket; frames: string[] }
 

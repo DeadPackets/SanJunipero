@@ -138,24 +138,12 @@ importers:
 
   packages/gateway:
     dependencies:
-      '@sj/agents':
-        specifier: workspace:*
-        version: link:../agents
-      '@sj/arbiter':
-        specifier: workspace:*
-        version: link:../arbiter
       '@sj/engine':
         specifier: workspace:*
         version: link:../engine
       '@sj/forge':
         specifier: workspace:*
         version: link:../forge
-      '@sj/llm':
-        specifier: workspace:*
-        version: link:../llm
-      '@sj/narrator':
-        specifier: workspace:*
-        version: link:../narrator
       '@sj/shared':
         specifier: workspace:*
         version: link:../shared
@@ -175,6 +163,43 @@ importers:
       '@types/ws':
         specifier: ^8.5.0
         version: 8.18.1
+
+  packages/live:
+    dependencies:
+      '@sj/agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@sj/arbiter':
+        specifier: workspace:*
+        version: link:../arbiter
+      '@sj/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@sj/forge':
+        specifier: workspace:*
+        version: link:../forge
+      '@sj/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@sj/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@sj/narrator':
+        specifier: workspace:*
+        version: link:../narrator
+      '@sj/shared':
+        specifier: workspace:*
+        version: link:../shared
+      better-sqlite3:
+        specifier: ^13.0.0
+        version: 13.0.3
+    devDependencies:
+      '@sj/town':
+        specifier: workspace:*
+        version: link:../town
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
 
   packages/llm:
     dependencies:
@@ -228,6 +253,40 @@ importers:
       zod:
         specifier: ^4.4.0
         version: 4.4.3
+
+  packages/town:
+    dependencies:
+      '@sj/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@sj/forge':
+        specifier: workspace:*
+        version: link:../forge
+      '@sj/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@sj/live':
+        specifier: workspace:*
+        version: link:../live
+      '@sj/shared':
+        specifier: workspace:*
+        version: link:../shared
+      better-sqlite3:
+        specifier: ^13.0.0
+        version: 13.0.3
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
+      zod:
+        specifier: ^4.4.0
+        version: 4.4.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
+      '@types/ws':
+        specifier: ^8.5.0
+        version: 8.18.1
 
   packages/web:
     dependencies:

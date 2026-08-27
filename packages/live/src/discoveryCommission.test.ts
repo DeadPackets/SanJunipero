@@ -12,7 +12,7 @@ import { AssetCodex, encodePng, openForgeDb, type RawImage } from '@sj/forge'
 import type { JudgeFn } from '@sj/forge/gen'
 import { FORGE_CALLER, createDiscoveryArt } from './discoveryCommission.js'
 import { ledgerTotalUsd } from './liveWorld.js'
-import { createGateway } from './server.js'
+import { createGateway } from '@sj/gateway'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const WATERSKIN = { name: 'stitch a waterskin', makes: ['waterskin'] }
@@ -202,13 +202,9 @@ describe('the commission path is live-only, and it IS wired', () => {
       .filter((l) => /^\s*import\b/.test(l) || /\bfrom '[.@]/.test(l))
       .join('\n')
 
-  it('nothing but liveWorld reaches the commission path, or the SDK behind it', () => {
-    // `discoveryCommission.ts` imports `@sj/forge/gen`, 9.7 MB of LLM SDK. The free stream must
-    // not load it; `discoveryArt.ts` beside it stays scripted-safe and is what g11 imports.
-    for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {
-      expect(importsOf(file), file).not.toContain('discoveryCommission')
-      expect(importsOf(file), file).not.toContain('@sj/forge/gen')
-    }
+  it('the watcher g11 imports stays clear of the SDK the commission loads', () => {
+    // `discoveryCommission.ts` imports `@sj/forge/gen`, 9.7 MB of LLM SDK; the free stream must
+    // not load it, which `town/src/liveSeam.test.ts` walks the package graph for.
     expect(importsOf('discoveryArt.ts')).not.toContain('@sj/forge/gen')
     expect(importsOf('liveWorld.ts')).toContain('discoveryCommission')
   })

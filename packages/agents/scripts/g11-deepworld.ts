@@ -45,8 +45,8 @@ import {
 // @sj/agents, so a package-level dependency here would close a cycle.
 import { makeArbiter, type Codified } from '../../arbiter/src/adjudicate.js'
 // Same relative-path convention as the arbiter imports above. The discovery-art watcher lives
-// on the gateway side because `packages/forge` belongs to another lane (controller ruling).
-import { noDiscoveryArt } from '../../gateway/src/discoveryArt.js'
+// in `@sj/live` because `packages/forge` belongs to another lane (controller ruling).
+import { noDiscoveryArt } from '../../live/src/discoveryArt.js'
 import { GENESIS_CODEX } from '../../arbiter/src/canon.js'
 import { CodexStore } from '../../arbiter/src/codex.js'
 import { ConstructStore } from '../../arbiter/src/constructStore.js'

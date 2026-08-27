@@ -1,4 +1,4 @@
-import type { SimEvent } from '@sj/shared'
+import type { HeatWindow, SimEvent } from '@sj/shared'
 
 // Deterministic drama scorer.
 export const HEAT_WINDOW_TICKS = 60
@@ -13,8 +13,6 @@ export const HEAT_WEIGHTS: Record<string, number> = {
   agent_spoke: 2,
   item_moved: 1,
 }
-
-export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
 
 /** One sim-day, not the 120 ticks the only caller reads: `/api/heat` is a public contract and a
  *  legible unit survives a second reader better than a number tuned to the first. */

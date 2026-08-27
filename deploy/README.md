@@ -105,7 +105,7 @@ Three lines decide whether the thing that came back is the thing you had. Grep f
 Everything the stream writes is under one directory, and one mount covers all of it:
 
 ```
-/app/packages/gateway/data/
+/app/packages/town/data/
 ├── dev-world.db          the world + the forge's asset and job tables
 └── minds/                ★ only exists once SJ_LIVE=1 has run
     ├── amara.db  nadia.db  salma.db  omar.db  yusuf.db     memories, journals, half-run plans

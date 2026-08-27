@@ -5,9 +5,9 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { openDb } from '@sj/engine/store'
 import { startDevWorld } from './devWorld.js'
 import { FOUNDERS } from './founders.js'
-import { thoughtsSince } from './observer.js'
+import { thoughtsSince } from '@sj/gateway'
 import { readWorldMeta } from './worldMeta.js'
-import { until } from './testutil.js'
+import { until } from '@sj/gateway/testutil'
 
 /** Boot, run to at least `toTick`, close cleanly. Returns what the town looked like at the end. */
 const runTo = async (
