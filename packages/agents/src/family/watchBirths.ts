@@ -16,11 +16,9 @@ export function watchBirths(
   let stopped = false
   bridge.onTick(() => {
     if (stopped) return
-    const fresh = store.readFrom(seq)
+    const fresh = store.readTypeFrom(seq, 'agent_born')
     seq = store.lastSeq()
-    for (const ev of fresh) {
-      if (ev.type === 'agent_born') spawn(AgentBorn.parse(ev.payload))
-    }
+    for (const ev of fresh) spawn(AgentBorn.parse(ev.payload))
   })
   return () => {
     stopped = true

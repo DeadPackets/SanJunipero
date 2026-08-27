@@ -108,6 +108,19 @@ describe('watchBirths (T25)', () => {
     expect(born).toEqual([])
   })
 
+  it('never walks the whole log — a tick of ordinary events costs no parse', () => {
+    const w = buildWorld()
+    w.store.readFrom = () => {
+      throw new Error('the whole log was read to find one birth')
+    }
+    const born: AgentBornPayload[] = []
+    watchBirths(w.bridge, w.store, (b) => born.push(b))
+    w.step()
+    w.bear('agent_3', 'Mira')
+    w.step()
+    expect(born.map((b) => b.id)).toEqual(['agent_3'])
+  })
+
   it('the returned stop function ends the watch', () => {
     const w = buildWorld()
     const born: AgentBornPayload[] = []
