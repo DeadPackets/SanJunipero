@@ -14,8 +14,8 @@
 // (dynamic import below).
 import { existsSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { TOWN_RINGS_GENESIS } from '@sj/shared'
-import { startDevWorld, type DevMapKind, type LiveCast } from './devWorld.js'
+import { startDevWorld, type LiveCast } from './devWorld.js'
+import { intEnv, parseWorldEnv } from './worldEnv.js'
 
 export const STREAM_PORT = 8080
 export const STREAM_LAMPS = 8
@@ -25,14 +25,6 @@ export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.
 
 /** The one instruction a person needs when the viewer has not been built yet. */
 export const BUILD_FIRST = 'pnpm --filter @sj/web build'
-
-const intEnv = (name: string, fallback: number, min: number): number => {
-  const asked = Number(process.env[name] ?? fallback)
-  if (Number.isInteger(asked) && asked >= min) return asked
-  if (process.env[name] !== undefined)
-    console.log(`stream: ${name}=${process.env[name]} ignored; using ${fallback}`)
-  return fallback
-}
 
 /** Dollars, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
  *  file may not import — a static import would pull `@sj/agents` onto the scripted path. */
@@ -52,11 +44,15 @@ export async function main(): Promise<void> {
     return
   }
   const port = intEnv('PORT', STREAM_PORT, 1)
-  const rings = intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1)
-  const map: DevMapKind = process.env.SJ_MAP === 'scripted' ? 'scripted' : 'showcase'
-  const interiors = process.env.SJ_INTERIORS === '1'
-  const fresh = process.env.SJ_FRESH === '1'
   const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
+  // The served town's answers to the four the dev loop answers differently. Turning any of them
+  // on changes what the world folds, so each is a product decision and not a parse.
+  const env = parseWorldEnv({
+    interiors: false,
+    builders: true,
+    bridge: false,
+    jointBuild: false,
+  })
 
   // The import itself is behind the flag: `@sj/agents` pulls in onnxruntime and a 128 MB
   // sentence-transformer, and a scripted stream should pay for neither.
@@ -89,13 +85,9 @@ export async function main(): Promise<void> {
 
   try {
     world = await startDevWorld({
+      ...env,
       ingest: true,
-      map,
-      rings,
-      interiors,
       port,
-      fresh,
-      builders: true,
       lamps,
       staticDir: CLIENT_DIST,
       // `agentDbDir` is what makes `SJ_FRESH=1` delete the minds in the same breath as the town;

@@ -5,16 +5,17 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
-import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
+import { RngStreams, createWorldTick, genesisState, openDb } from '@sj/engine'
 import {
   DEV_MAP_DEFAULT,
-  DEV_MAP_HUMAN,
   SHOWCASE_CONFIG,
   THOUGHT_LINES,
   devTerrain,
   startDevWorld,
 } from './devWorld.js'
+import { DEV_MAP_HUMAN } from './worldEnv.js'
 import { townStructuresFor } from './founders.js'
+import { publishThought } from './observer.js'
 import { frameText } from './http.js'
 import { until } from './testutil.js'
 
@@ -39,7 +40,7 @@ describe('showcase weather', () => {
 // The two defaults must differ, and the difference must not be a silence: the gates hash the
 // fixture world, so the LIBRARY default cannot become the product town.
 describe('★ the fixture world must be asked for by name, never received by silence', () => {
-  const CLI = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'devWorld.ts'), 'utf8')
+  const CLI = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'worldEnv.ts'), 'utf8')
 
   it('keeps the LIBRARY default on the fixture, because the gates hash that world', () => {
     expect(DEV_MAP_DEFAULT).toBe('scripted')
@@ -49,8 +50,8 @@ describe('★ the fixture world must be asked for by name, never received by sil
   it('★ points the HUMAN path at the product town instead', () => {
     expect(DEV_MAP_HUMAN).toBe('showcase')
     expect(DEV_MAP_HUMAN).not.toBe(DEV_MAP_DEFAULT)
-    // and the CLI at the bottom of the module reads the human one, with the fixture opt-IN
-    expect(CLI).toMatch(/SJ_MAP('\])? === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
+    // and the one env parse both entrypoints call reads the human one, with the fixture opt-IN
+    expect(CLI).toMatch(/SJ_MAP === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
   })
 
   it('the two worlds really are different towns, and the fixture is the one with no art', () => {
@@ -87,7 +88,9 @@ describe('dev world server', () => {
   })
 
   it('serves the founders town live with observer thoughts', async () => {
-    const dw = await startDevWorld({ realMsPerTick: 1, port: 0, dbPath: join(dir, 'dev.db') })
+    // 5 ms, not 1: the socket is compressed and zlib finishes on the event loop, so a tick loop
+    // that never yields starves those callbacks and the hub reads the backlog as a lagging viewer.
+    const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath: join(dir, 'dev.db') })
     try {
       await until(() => dw.loop.state.tick >= 2, 12_000)
       dw.gateway.pump() // fold the first ticks into the mirror before the snapshot
@@ -126,6 +129,13 @@ describe('dev world server', () => {
       for (const s of Object.values(state.structures)) expect(s.stage).toBe('complete')
 
       await until(() => dw.loop.state.tick >= 40, 12_000)
+      // Published AFTER the socket joined: the pump above already consumed every thought the
+      // world had said, and a viewer is only ever sent what is published while it is listening.
+      const wdb = openDb(join(dir, 'dev.db'))
+      publishThought(wdb, { tick: dw.loop.state.tick, agentId: 'farmer', text: THOUGHT_LINES.walk! })
+      wdb.close()
+      dw.gateway.pump()
+
       const parsed = (): ServerMsg[] => frames.map((f) => ServerMsg.parse(JSON.parse(f)))
       await until(
         () =>

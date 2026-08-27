@@ -54,9 +54,9 @@ block reach the container.
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. Reaching it stops the minds and kills the process. `pnpm stream` only. |
 | `SJ_MINDS_DIR` | `data/minds` under `packages/gateway` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
 | `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
-| `SJ_BUILDERS` | on | `0` stops the founders raising houses. `dev:world` only. |
-| `SJ_BRIDGE` | on | `0` leaves the river uncrossed. `dev:world` only. |
-| `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. `dev:world` only. |
+| `SJ_BUILDERS` | on | `0` stops the founders raising houses. |
+| `SJ_BRIDGE` | off on `pnpm stream`, on in `dev:world` | `1` lets one founder deck the ford. |
+| `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. |
 | `DEV_FAST_FORWARD` | `0` | Step the world synchronously to that tick before the real-time cadence starts. Screenshot and QA convenience — it fast-forwards a resumed town too. |
 
 Deployment adds `SJ_SITE_ADDRESS` (the Caddy hostname) and the `LITESTREAM_*` backup credentials —

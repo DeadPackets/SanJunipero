@@ -13,8 +13,8 @@ const DEPLOY_README = read('deploy/README.md')
 const ENV_EXAMPLE = read('deploy/.env.example')
 const COMPOSE = read('compose.yaml')
 
-/** The env table in README.md: one row per knob, `dev:world`-only rows excluded because they
- *  belong to `pnpm dev:world`, which no container runs. */
+/** The env table in README.md: one row per knob. `dev:world`-only rows would be excluded, but
+ *  one env parse means there are none left — every knob reaches the container. */
 function documentedKnobs(): string[] {
   const names = new Set<string>()
   for (const line of README.split('\n')) {
@@ -63,7 +63,8 @@ describe('★ every knob the docs promise reaches the container', () => {
     expect(knobs.length).toBeGreaterThan(6)
     expect(knobs).toContain('SJ_LIVE')
     expect(knobs).toContain('SJ_LAMPS')
-    expect(knobs).not.toContain('SJ_BUILDERS') // `dev:world` only, per the table itself
+    // One env parse: a knob a person can set on `dev:world` is a knob the container answers too.
+    expect(knobs).toContain('SJ_BUILDERS')
   })
 
   it('passes every documented SJ_* knob through compose.yaml', () => {
