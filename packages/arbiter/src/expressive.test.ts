@@ -273,19 +273,7 @@ describe('F-C — a coined word is held to the framing law, like a recipe name',
   }
 
   it('refuses every machinery word the schema would otherwise admit', () => {
-    for (const w of [
-      'ai',
-      'model',
-      'models',
-      'token',
-      'tokens',
-      'tool',
-      'tools',
-      'prompt',
-      'neural',
-      'chatbot',
-      'simulation',
-    ]) {
+    for (const w of ['ai', 'token', 'tokens', 'prompt', 'neural', 'chatbot', 'simulation']) {
       expect(wordTainted(w), w).toBe(true)
     }
   })
@@ -294,10 +282,11 @@ describe('F-C — a coined word is held to the framing law, like a recipe name',
     for (const w of ['dance', 'sing', 'mourn', 'salute', 'bow', 'keen', 'hum']) {
       expect(wordTainted(w), w).toBe(false)
     }
+    for (const w of ['tool', 'model']) expect(wordTainted(w), w).toBe(false)
   })
 
   it('does not codify a tainted word — no rulebook row, no verb, no ruling', async () => {
-    const tainted: ExpressiveRuling = { ...DANCE, word: 'model' }
+    const tainted: ExpressiveRuling = { ...DANCE, word: 'prompt' }
     const llm = new ScriptedLlm(script(tainted))
     const { arbiter, db } = await riggedDb(llm)
     try {

@@ -126,8 +126,8 @@ describe('closeDay', () => {
     const s = store()
     const evs = dayEvents(0, 1)
     const model = llm()
-    // "model" is machinery, which no viewer-facing string may name: refused twice, then dropped.
-    model.biography = vi.fn(async () => ({ title: 'Amara', body: 'She was a model of care.' }))
+    // "prompt" is machinery, which no viewer-facing string may name: refused twice, then dropped.
+    model.biography = vi.fn(async () => ({ title: 'Amara', body: 'She was the prompt of care.' }))
     const alert = vi.fn()
     const chapter = await closeDay({
       store: s,
