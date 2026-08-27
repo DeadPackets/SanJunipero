@@ -3,9 +3,14 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { CUT_MIN_MS, subjectFor, type HeatWindow } from './directorCut.js'
+import { usePolled } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
+
+/** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
+ *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
+const NO_HEAT: HeatWindow[] = []
 
 // `autoCut` is the LIVE town being televised; it must not fight a recorded day's playback.
 export function DirectorMode({
@@ -27,50 +32,32 @@ export function DirectorMode({
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
 
-  // heat poll → sticky cut, never faster than CUT_MIN_MS
+  const heat = usePolled<HeatWindow[]>(autoCut ? '/api/heat' : null, undefined, HEAT_POLL_MS)
+
+  // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {
     if (!autoCut) {
       followedRef.current = null
       return
     }
-    let alive = true
-    const poll = (): void => {
-      void fetch('/api/heat')
-        .then(async (r) => (r.ok ? ((await r.json()) as HeatWindow[]) : []))
-        .then((heat) => {
-          if (!alive) return
-          // read here, never subscribed to — the town changing must not restart the timer
-          const living = Object.values(store.getState()?.agents ?? {})
-            .filter((a) => a.alive)
-            .map((a) => a.id)
-            .sort()
-          const next = subjectFor(heat, followedRef.current, store.getTick(), living)
-          const now = performance.now()
-          if (
-            next !== null &&
-            next !== followedRef.current &&
-            now - lastCutRef.current >= CUT_MIN_MS
-          ) {
-            followedRef.current = next
-            lastCutRef.current = now
-            setCut(next)
-          } else if (followedRef.current === null && next !== null) {
-            followedRef.current = next
-            lastCutRef.current = now
-            setCut(next)
-          }
-        })
-        .catch(() => {
-          /* the cut keeps its subject whether or not the heat window arrives */
-        })
+    if (!heat.loaded) return
+    // read here, never subscribed to — the town changing must not turn the round
+    const living = Object.values(store.getState()?.agents ?? {})
+      .filter((a) => a.alive)
+      .map((a) => a.id)
+      .sort()
+    const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
+    const now = performance.now()
+    if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
+      followedRef.current = next
+      lastCutRef.current = now
+      setCut(next)
+    } else if (followedRef.current === null && next !== null) {
+      followedRef.current = next
+      lastCutRef.current = now
+      setCut(next)
     }
-    poll()
-    const timer = setInterval(poll, HEAT_POLL_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [store, autoCut])
+  }, [store, autoCut, heat])
 
   // camera: the scene's follow rig eases toward the followed agent's SPRITE
   // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it

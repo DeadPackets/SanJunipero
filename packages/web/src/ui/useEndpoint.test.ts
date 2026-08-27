@@ -85,6 +85,30 @@ describe('endpoint', () => {
     expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
   })
 
+  it('★ wakes its readers on EVERY settled read, refused ones included', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', answers([{ n: 1 }, null]))
+    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    let woken = 0
+    feed.subscribe(() => {
+      woken++
+    })
+    await settle()
+    expect(woken).toBe(1)
+
+    // the last good answer is kept, and its identity with it — a memo over it must not restart
+    const good = feed.get().data
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get().data).toBe(good)
+    expect(woken).toBe(2)
+
+    // ★ but the beat still lands, so the round DirectorMode cuts on keeps turning while it is down
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(woken).toBe(3)
+  })
+
   it('★ settles `loaded` even when the FIRST read fails — an empty state must print', async () => {
     vi.stubGlobal('fetch', answers([null]))
     const feed = endpoint('/api/chronicle')

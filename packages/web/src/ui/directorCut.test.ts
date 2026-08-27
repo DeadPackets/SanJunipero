@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CUT_MIN_MS,
@@ -75,5 +76,26 @@ describe('the televised town always has somebody in front of the camera', () => 
 
   it('never indexes off the end on a tick the world has not reached', () => {
     for (const t of [-1, 0, Number.NaN]) expect(TOWN).toContain(quietSubject(TOWN, t))
+  })
+})
+
+// ── ★ THE ROUND MUST KEEP TURNING WHILE /api/heat IS DOWN ────────────────────────────────
+//
+// The broadcast path has no operator to notice a caption stuck on one face. `endpoint()` wakes
+// its readers on every settled read (`useEndpoint.test.ts`); DirectorMode supplies the other
+// half by reading the refused answer as an empty window.
+describe('DirectorMode reads the heat window through the one endpoint layer', () => {
+  const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
+
+  it('★ hand-rolls no fetch of its own, and beats at the measured interval', () => {
+    expect(SRC).not.toContain('fetch(')
+    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS\)/)
+  })
+
+  it('★ reads a refused window as an empty one, which is what turns the round over', () => {
+    expect(SRC).toContain('heat.data ?? NO_HEAT')
+    expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(
+      quietSubject(['amara', 'omar'], 1000),
+    )
   })
 })

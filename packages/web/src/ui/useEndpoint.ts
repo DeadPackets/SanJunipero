@@ -10,7 +10,9 @@ const UNREAD: Read<never> = { data: null, loaded: false }
 /**
  * One reader for one URL. It reads while somebody is subscribed and stops when the last of them
  * leaves; `everyMs` re-reads on that beat, and no `everyMs` reads once. A refused read, or a body
- * the parser rejects, keeps the last good answer rather than blanking the panel.
+ * the parser rejects, keeps the last good answer rather than blanking the panel — and still wakes
+ * its readers, so a reader whose BEAT drives a state machine keeps turning while the gateway is
+ * down.
  */
 export function endpoint<T>(
   url: string | null,
@@ -22,8 +24,7 @@ export function endpoint<T>(
   let timer: ReturnType<typeof setInterval> | null = null
 
   const settle = (data: T | null): void => {
-    if (data === null && read.loaded) return
-    read = { data, loaded: true }
+    read = { data: data ?? read.data, loaded: true }
     for (const fn of subs) fn()
   }
 
