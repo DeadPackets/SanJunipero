@@ -72,6 +72,9 @@ export const SCRUB_MIN_MS = 100
  */
 export const SCRUB_BUDGET_MS_PER_S = 40
 
+/** Frames under this go out raw: a `thought` or an `asset` is smaller than the deflate header. */
+export const DEFLATE_THRESHOLD_BYTES = 512
+
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG
   const ownsDb = opts.db === undefined
@@ -196,7 +199,21 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── ws protocol ──
   let listening = false
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_CLIENT_FRAME })
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/ws',
+    maxPayload: MAX_CLIENT_FRAME,
+    // Caddy's `encode` covers HTTP and never a proxied socket, so without this every frame goes
+    // out raw. `memLevel`/`windowBits` are the memory lever: a shared dictionary per socket is
+    // what 500 viewers cannot afford, and no-context-takeover plus a small window bounds it.
+    perMessageDeflate: {
+      serverNoContextTakeover: true,
+      clientNoContextTakeover: true,
+      threshold: DEFLATE_THRESHOLD_BYTES,
+      concurrencyLimit: 10,
+      zlibDeflateOptions: { level: 6, memLevel: 5, windowBits: 13 },
+    },
+  })
   // An EventEmitter with no 'error' listener THROWS, and ws re-emits every failure of the http
   // server it is attached to — a busy port would take the whole process down.
   wss.on('error', (e) => {

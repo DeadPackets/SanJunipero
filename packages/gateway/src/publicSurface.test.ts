@@ -271,6 +271,31 @@ describe('the public surface a stranger reaches', () => {
   })
 })
 
+/** Caddy's `encode` covers HTTP responses and never a proxied socket, so without this every tick
+ *  frame ships raw to every viewer, forever — measured 3,640 B against 514 B deflated. */
+describe('★ the socket is compressed', () => {
+  const open: (Gateway | WebSocket)[] = []
+  const deflateDir = mkdtempSync(join(tmpdir(), 'sj-deflate-'))
+  afterAll(async () => {
+    for (const o of open) o.close()
+    await wait(50)
+    rmSync(deflateDir, { recursive: true, force: true })
+  })
+
+  it('negotiates permessage-deflate with a viewer', async () => {
+    const dbPath = join(deflateDir, 'w.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 12; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    // The memory levers — no-context-takeover, memLevel 5, windowBits 13 — are not visible to the
+    // client; what is visible, and what fails if the option is dropped, is that it negotiated.
+    expect(sock.extensions, 'every frame goes out raw').toContain('permessage-deflate')
+  })
+})
+
 /** The per-socket floor is per SOCKET. Ten viewers dragging at once is the whole tick thread, and
  *  the cap is 500 — so the budget the scrub bar spends from has to be one budget. */
 describe('★ the scrub bar spends from one budget, not one per viewer', () => {
