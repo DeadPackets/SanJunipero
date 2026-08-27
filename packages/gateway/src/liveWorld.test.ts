@@ -15,6 +15,7 @@ import {
   type LlmClient,
   type MindSpec,
 } from '@sj/agents'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
@@ -36,6 +37,13 @@ const SPOKEN = 'A mind said this and no script could have.'
 const THOUGHT = 'A mind thought this and no script could have.'
 
 const NO_USAGE = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
+// What the chronicler answers. No scripted cast can produce either: `founders.ts` has no words.
+const NARRATED_CHAPTER = {
+  title: 'The day the well was watched',
+  text: 'They kept to the well and said little.',
+  citations: [],
+}
+const NARRATED_BIOGRAPHY = { title: 'Amara, who keeps the tally', body: 'She was seen counting.' }
 
 // Two of the five, so a row costs two runtimes rather than five. Ids match the town's bodies.
 const TWO: MindSpec[] = [
@@ -94,7 +102,18 @@ const TWO: MindSpec[] = [
 /** A model that never leaves the process: it answers each schema with the first canned value that
  *  parses. `LlmClient`'s real cost accounting is covered by `agents/src/llm/client.test.ts`. */
 function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): LlmClient {
-  const canned = [turn, { facts: [] }, { scenes: [] }, { summary: '' }, { edits: [] }, {}]
+  // The narrator's two schemas sit in the same list: both are `.strict()`, so neither can be
+  // mistaken for a mind's turn and the order does not matter.
+  const canned = [
+    turn,
+    { facts: [] },
+    { scenes: [] },
+    { summary: '' },
+    { edits: [] },
+    NARRATED_CHAPTER,
+    NARRATED_BIOGRAPHY,
+    {},
+  ]
   return {
     async object<T>(o: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }) {
       for (const c of canned) {
@@ -164,6 +183,7 @@ const SPEAKING_TURN = {
 }
 const SILENT_TURN = { thought: THOUGHT, importance: 2 }
 
+
 // Every mind turns on the tick it is asked to, so a row does not have to step out the 120-tick
 // boredom floor five times over.
 const EAGER = {
@@ -213,8 +233,17 @@ async function liveWorld(opts: {
    *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
   verdict?: unknown
   useArbiter?: boolean
-}): Promise<{ world: DevWorld; cast: LiveCast; opsDb: ReturnType<typeof openAgentDb> }> {
+  /** Where the day's chapter is written. Absent, no day is narrated. */
+  narratorDbPath?: string
+}): Promise<{
+  world: DevWorld
+  cast: LiveCast
+  opsDb: ReturnType<typeof openAgentDb>
+  /** Every `caller` the cast asked for a client under — the one seam every spend goes through. */
+  callers: Set<string>
+}> {
   const agentDbDir = join(opts.dir, 'minds')
+  const callers = new Set<string>()
   let seen: ReturnType<typeof openAgentDb> | null = null
   let cast: LiveCast | null = null
   // Through the factory, exactly as `serve.ts` does it: built out here the cast would already
@@ -230,6 +259,7 @@ async function liveWorld(opts: {
       cast = await createLiveCast({
         agentDbDir,
         minds: opts.minds ?? TWO,
+        ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
         preflight: false,
         embedder: new FakeEmbedder(),
         mindConfig: EAGER,
@@ -243,6 +273,7 @@ async function liveWorld(opts: {
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
+          callers.add(caller)
           // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
           // billed anywhere else would spend outside the money guards, so the rig must not.
           const canned =
@@ -256,7 +287,7 @@ async function liveWorld(opts: {
     },
   })
   worlds.push(world)
-  return { world, cast: cast!, opsDb: seen! }
+  return { world, cast: cast!, opsDb: seen!, callers }
 }
 
 /** Take WHOLE ticks — `world.tick()`, not `loop.step()`. The observer scan runs inside a whole
@@ -950,8 +981,10 @@ describe('★ the default stays scripted and free', () => {
         .filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
     for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {
       expect(imports(file).join('\n'), file).not.toContain('@sj/arbiter')
+      expect(imports(file).join('\n'), file).not.toContain('@sj/narrator')
     }
     expect(imports('liveWorld.ts').join('\n')).toContain('@sj/arbiter')
+    expect(imports('liveWorld.ts').join('\n')).toContain('@sj/narrator')
   })
 
   it('★ turning the god layer off is a flag, and it does not touch the scripted default', () => {
@@ -974,4 +1007,74 @@ describe('★ the default stays scripted and free', () => {
     // survive a fresh boot and the next run's cap would start half spent.
     expect(LIVE_OPS_DB.endsWith('.db')).toBe(true)
   })
+})
+
+// One sim-day IS one real hour here, so this rehearsal is the whole of what a live stream does
+// at the top of every hour — with a scripted client, and for $0.00.
+describe('★ the chronicle, written on the day boundary', () => {
+  /** A day of ticks without `run`'s per-tick microtask drain: this rehearsal is about the day
+   *  boundary, not about what a mind managed between two of them. */
+  const sprint = async (world: DevWorld, ticks: number): Promise<void> => {
+    for (let i = 0; i < ticks; i++) {
+      world.tick()
+      if (i % 60 === 0) await new Promise((r) => setImmediate(r))
+    }
+    // A turn still in flight when the town closes writes to a database that is already shut.
+    for (let k = 0; k < 24; k++) await new Promise((r) => setImmediate(r))
+  }
+
+  const narratorRows = (dir: string, sql: string): Record<string, unknown>[] => {
+    const db = new Database(join(dir, 'minds', '_narrator.db'), { readonly: true })
+    const rows = db.prepare(sql).all() as Record<string, unknown>[]
+    db.close()
+    return rows
+  }
+
+  it('writes the day that just closed, and bills it to the same ledger the minds spend from', async () => {
+    const dir = tmp()
+    const { world, callers } = await liveWorld({
+      dir,
+      turn: SILENT_TURN,
+      narratorDbPath: join(dir, 'minds', '_narrator.db'),
+    })
+    // day 0 closes at tick 1440; the tick after it is what the world reaches next
+    await sprint(world, MINUTES_PER_DAY + 1)
+    // The write is dispatched off the tick handler, so the world is a tick ahead of the prose.
+    expect(await settle(() => narratorRows(dir, 'SELECT day FROM chapters').length === 0, 5_000))
+      .toBe(true)
+
+    expect(narratorRows(dir, 'SELECT day, title FROM chapters')).toEqual([
+      { day: 0, title: NARRATED_CHAPTER.title },
+    ])
+    // and the two thirds nothing used to read: the paper, its caption, and one life
+    expect(narratorRows(dir, "SELECT kind, day FROM publications ORDER BY kind")).toEqual([
+      { kind: 'biography', day: 0 },
+      { kind: 'newspaper', day: 0 },
+      { kind: 'timelapse_caption', day: 0 },
+    ])
+    expect(narratorRows(dir, "SELECT subject_id FROM publications WHERE kind = 'biography'"))
+      .toEqual([{ subject_id: 'amara' }])
+
+    // Through the cast's own client seam, which bills the ops db the cap is read off: a
+    // chronicler billing anywhere else would spend outside the anomaly stop.
+    expect([...callers]).toContain('narrator')
+  }, 120_000)
+
+  it('leaves the day unwritten when the daily budget is already spent', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      turn: SILENT_TURN,
+      spendDailyUsd: 1,
+      onSpendStop: () => {},
+      narratorDbPath: join(dir, 'minds', '_narrator.db'),
+    })
+    // Billed BETWEEN two watchdog reads, so the cast is still running when the boundary lands:
+    // this is the chronicle's own budget check, not the stop the watchdog would reach a tick later.
+    await sprint(world, MINUTES_PER_DAY - 5)
+    billTo(opsDb, Date.now(), 2)
+    await sprint(world, 6)
+    expect(narratorRows(dir, 'SELECT day FROM chapters')).toEqual([])
+    expect(narratorRows(dir, 'SELECT day FROM publications')).toEqual([])
+  }, 120_000)
 })

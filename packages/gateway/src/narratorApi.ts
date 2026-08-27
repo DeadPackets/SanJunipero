@@ -38,6 +38,10 @@ export type NarratorApiDeps = {
  *  counts the whole record, so the badge does not shrink with the page. */
 export const CHRONICLE_MAX = 200
 
+/** How many days of the town's own paper `/api/dispatches` sends. The record grows one row a
+ *  day forever and every open panel refetches it, so the panel reads the recent run. */
+export const DISPATCH_MAX = 30
+
 /** The five things the world's own log records that the town would remember. Anything else is
  *  the everyday, and a scrub bar covered in the everyday points nowhere. */
 const MARK_EVENT_TYPES: readonly string[] = [
@@ -165,8 +169,61 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   router.route('GET', '/api/chapters', (_req, res) => {
     sendJson(
       res,
-      readOrEmpty<ChapterRow>(deps.narratorDb, 'SELECT day, title FROM chapters ORDER BY day'),
+      readOrEmpty<ChapterRow>(
+        deps.narratorDb,
+        'SELECT day, title, text FROM chapters ORDER BY day',
+      ),
     )
+  })
+
+  // The town's own paper and everything written beside it. Memoised on the world DAY, not on
+  // `mirror.seq()`: nothing here changes between day boundaries, and a seq-keyed memo would
+  // rescan six tables on every pump.
+  let dispatchedDay = -1
+  let dispatched: unknown = null
+  router.route('GET', '/api/dispatches', (_req, res) => {
+    const day = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
+    if (day !== dispatchedDay || dispatched === null) {
+      dispatchedDay = day
+      const db = deps.narratorDb
+      dispatched = {
+        papers: readOrEmpty(
+          db,
+          `SELECT day, title, body FROM publications WHERE kind = 'newspaper'
+           ORDER BY day DESC LIMIT ${DISPATCH_MAX}`,
+        ),
+        captions: readOrEmpty(
+          db,
+          `SELECT day, body AS caption FROM publications WHERE kind = 'timelapse_caption'
+           ORDER BY day DESC LIMIT ${DISPATCH_MAX}`,
+        ),
+        // Only the newest of each life: a biography is rewritten as its subject lives longer,
+        // and the older drafts are superseded rather than news.
+        biographies: readOrEmpty(
+          db,
+          `SELECT subject_id AS subjectId, MAX(day) AS day, title, body FROM publications
+           WHERE kind = 'biography' AND subject_id IS NOT NULL GROUP BY subject_id`,
+        ),
+        eras: readOrEmpty(
+          db,
+          `SELECT start_day AS startDay, end_day AS endDay, title, text FROM eras
+           ORDER BY start_day DESC LIMIT ${DISPATCH_MAX}`,
+        ),
+        institutions: readOrEmpty(
+          db,
+          `SELECT s.day AS day, i.kind, i.name, i.description FROM institutions i
+           JOIN scenes s ON s.id = i.founding_scene_id ORDER BY s.day DESC LIMIT ${DISPATCH_MAX}`,
+        ),
+        // One reading a day: the hottest scene the narrator scored is what the day felt like.
+        heat: readOrEmpty(
+          db,
+          `SELECT s.day AS day, MAX(h.total) AS total FROM heat_scores h
+           JOIN scenes s ON s.id = h.scene_id GROUP BY s.day ORDER BY s.day DESC
+           LIMIT ${DISPATCH_MAX}`,
+        ),
+      }
+    }
+    sendJson(res, dispatched)
   })
 
   router.route('GET', '/api/milestones', (_req, res) => {
@@ -260,10 +317,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
         chapters: readOrEmpty<ChapterRow>(
           deps.narratorDb,
           'SELECT day, title FROM chapters ORDER BY day',
-        ),
-        milestones: readOrEmpty<{ label: string; day: number; tick: number }>(
-          deps.narratorDb,
-          'SELECT label, day, tick FROM milestones ORDER BY tick, id',
         ),
         moments: readOrEmpty<{ day: number; startTick: number }>(
           deps.narratorDb,

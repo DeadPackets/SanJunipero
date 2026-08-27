@@ -14,6 +14,7 @@
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createLawsAdmin } from './adminLaws.js'
 import { startDevWorld, type LiveCast } from './devWorld.js'
@@ -23,6 +24,9 @@ export const STREAM_PORT = 8080
 export const STREAM_LAMPS = 8
 /** Per-mind memory, beside the world db so one volume and one `SJ_FRESH=1` cover both. */
 export const STREAM_MINDS_DIR = 'data/minds'
+/** The chronicle. Inside the minds directory, so `SJ_FRESH=1` throws the town's story away with
+ *  the town; underscore-prefixed to stay out of the `<mindId>.db` namespace. */
+export const STREAM_NARRATOR_DB = '_narrator.db'
 /** The operator's law channel. LOOPBACK ONLY and off unless `SJ_ADMIN_TOKEN` is set: it is the
  *  one write path into the world this process has, and Caddy must never proxy it. */
 export const STREAM_ADMIN_PORT = 8788
@@ -63,6 +67,8 @@ export async function main(): Promise<void> {
   // sentence-transformer, and a scripted stream should pay for neither.
   const live = process.env.SJ_LIVE === '1'
   const mindsDir = process.env.SJ_MINDS_DIR ?? STREAM_MINDS_DIR
+  // One path, two readers: the live cast writes the day's chapter, the gateway serves it.
+  const narratorDbPath = join(mindsDir, STREAM_NARRATOR_DB)
   const spendDaily = usdEnv('SJ_SPEND_DAILY_USD')
   const spendCap = usdEnv('SJ_SPEND_CAP_USD')
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
@@ -72,6 +78,7 @@ export async function main(): Promise<void> {
     import('./liveWorld.js').then(({ createLiveCast }) =>
       createLiveCast({
         agentDbDir: mindsDir,
+        narratorDbPath,
         ...(process.env.SJ_MODELS_DIR === undefined
           ? {}
           : { modelsDir: process.env.SJ_MODELS_DIR }),
@@ -97,7 +104,7 @@ export async function main(): Promise<void> {
       staticDir: CLIENT_DIST,
       // `agentDbDir` is what makes `SJ_FRESH=1` delete the minds in the same breath as the town;
       // without it a fresh boot is the one state worse than either a reset or a resume.
-      ...(live ? { cast: castFactory, agentDbDir: mindsDir } : {}),
+      ...(live ? { cast: castFactory, agentDbDir: mindsDir, narratorDbPath } : {}),
     })
   } catch (e) {
     // A raw EADDRINUSE stack says nothing an operator can act on. The pre-flight and amnesia
