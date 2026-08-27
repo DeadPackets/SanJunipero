@@ -13,7 +13,7 @@ import {
 // Geometry for a room's floor and its two visible walls, in interior pixels on the 128×64
 // interior tile `interiorMap.ts` owns. Pure functions, so every number here measures offline.
 
-export { ROOM_TILES, WALL_H_PX, type WallKind } from './interiorMap.js'
+export { WALL_H_PX, type WallKind } from './interiorMap.js'
 
 /** The room's size, in interior tiles. */
 export type RoomSize = { w: number; h: number }
