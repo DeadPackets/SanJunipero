@@ -571,6 +571,26 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.dayLogSnapshot().length).toBeLessThanOrEqual(1)
   })
 
+  it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const dream = new ScriptedDreamLlm()
+    dream.composeDream = () => Promise.reject(new Error('the dream is over budget'))
+    const { loop, mem, agentDb } = await setup({
+      model: turnModel([
+        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      ]),
+      mindConfig: { ...FAST_MIND, dreamChance: 1 },
+      reflectionLlm: reflection,
+      dreamLlm: dream,
+    })
+    await stepUntil(loop, () => alertKinds(agentDb).includes('dream_failed'), 100)
+
+    expect(alertKinds(agentDb)).not.toContain('reflection_failed')
+    expect(alertDetails(agentDb, 'dream_failed')).toEqual(['the dream is over budget'])
+    // The night's own work was already written when the dream was refused.
+    expect(mem.summaryNodes('day', 0).length).toBe(1)
+  })
+
   it('a direct action preempts a running plan and is held until the body is free', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([

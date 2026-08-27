@@ -21,6 +21,15 @@ describe('EventStore', () => {
     expect(evs).toHaveLength(1)
     expect(evs[0]).toMatchObject({ seq: 2, tick: 1, type: 'b', payload: [1, 2] })
   })
+  it('readTypeFrom returns only the events of that type, after the given seq', () => {
+    const s = store()
+    s.append(0, 'a', { x: 1 })
+    s.append(1, 'b', { x: 2 })
+    s.append(2, 'a', { x: 3 })
+    expect(s.readTypeFrom(0, 'a').map((e) => e.seq)).toEqual([1, 3])
+    expect(s.readTypeFrom(1, 'a').map((e) => e.seq)).toEqual([3])
+    expect(s.readTypeFrom(0, 'c')).toEqual([])
+  })
   it('snapshot round-trips state and rng', () => {
     const s = store()
     s.append(0, 'a', null)

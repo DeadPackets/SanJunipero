@@ -756,6 +756,10 @@ export class AgentRuntime {
           this.#llm.alert(kind, detail)
         },
       })
+    } catch (err) {
+      this.#llm.alert('reflection_failed', messageOf(err))
+    }
+    try {
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({
           mem: this.#mem!,
@@ -767,7 +771,7 @@ export class AgentRuntime {
         if (dream.dreamed) this.#pendingDreamMood = dream.mood
       }
     } catch (err) {
-      this.#llm.alert('reflection_failed', messageOf(err))
+      this.#llm.alert('dream_failed', messageOf(err))
     } finally {
       this.#reflectionInFlight = false
     }

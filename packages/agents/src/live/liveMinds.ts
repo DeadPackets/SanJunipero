@@ -18,6 +18,8 @@ export type MindSpec = {
   personality: PersonalityDoc
   ageDays: number
   sex: 'f' | 'm'
+  /** The sim day this person's first personality is stamped with. Founders have none. */
+  bornDay?: number
 }
 
 export type BootedMinds = {
@@ -80,7 +82,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
-    if (!hasPersonality(db, spec.id)) personality.init(spec.personality, opts.day ?? 0)
+    if (!hasPersonality(db, spec.id))
+      personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
     const runtime = new AgentRuntime({
       db,
       llm: opts.turnLlm(spec.id),

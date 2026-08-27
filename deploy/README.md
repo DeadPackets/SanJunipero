@@ -82,6 +82,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
 | `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
+| `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is folded into the world with no mind booted for it. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
 | `SJ_MODELS_DIR` | baked into the image | Where the memory embedder's model is cached. |
 | `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |

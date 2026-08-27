@@ -12,6 +12,7 @@ import {
   Embedder,
   EngineBridge,
   LlmClient,
+  insertAlert,
   MIND_MODEL,
   PREFLIGHT_ROUNDS,
   bootMinds,
@@ -20,6 +21,7 @@ import {
   preflightRefusal,
   projectDailySpend,
   reportReconciliation,
+  resolveCast,
   runPreflight,
   wireBirths,
   FOUNDER_MINDS,
@@ -119,6 +121,8 @@ export type LiveCastOpts = {
   onSpendStop?: (spent: number, cap: number) => void
   /** The rate tripwire's window. A test cannot wait fifteen real minutes to prove a flow. */
   rateWindowRealMinutes?: number
+  /** How many minds this town may hold; never fewer than its founders. `SJ_MAX_MINDS`. */
+  maxMinds?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
    *  client bills a different ledger proves nothing about the stop. */
   makeClient?: (opsDb: Database.Database, caller: string, agentId?: string) => LlmClient
@@ -177,6 +181,10 @@ export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
+
+/** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
+ *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
+export const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
 export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
   return [
@@ -288,7 +296,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     ((line: string) => {
       console.log(line)
     })
-  const minds = opts.minds ?? FOUNDER_MINDS
+  const founders = opts.minds ?? FOUNDER_MINDS
+  const maxMinds = Math.max(
+    opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER,
+    founders.length,
+  )
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -335,8 +347,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       provider: 'default',
       hardAllowList: false,
       model: MIND_MODEL,
-      identity: minds[0]?.identity,
-      personality: minds[0]?.personality,
+      identity: founders[0]?.identity,
+      personality: founders[0]?.personality,
       rounds: PREFLIGHT_ROUNDS,
       costUsd: () => preflightCostUsd(opsDb, startedAt),
     })
@@ -398,9 +410,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   return {
     attach({ loop, store, config, db, world }): TickHandler {
       const worldTick = loop.state.tick
+      const cast = resolveCast(founders, store, maxMinds)
+      if (cast.length >= maxMinds)
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'cast_at_max_minds',
+          detail: `this town is at its ${maxMinds}-mind ceiling; a birth past it gets a body and no mind`,
+        })
 
       // ── the guard, before a single mind is booted ──
-      const remembering = minds
+      const remembering = cast
         .map((m) => ({ id: m.id, memories: countMemories(dbFor(m.id)) }))
         .filter((r) => r.memories > 0)
       if (worldTick === 0 && remembering.length > 0) throw new Error(amnesiaRefusal(remembering))
@@ -413,7 +432,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
       const restoring = new Map<string, RuntimeSnapshot>()
-      for (const m of minds) {
+      for (const m of cast) {
         const row = dbFor(m.id)
           .prepare('SELECT tick, snapshot FROM mind_runtime WHERE agent_id = ?')
           .get(m.id) as { tick: number; snapshot: string } | undefined
@@ -472,7 +491,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             })())
 
       booted = bootMinds({
-        minds,
+        minds: cast,
         bridge,
         embedder,
         dbFor,
@@ -496,6 +515,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         opsDb,
         namingLlm: makeClient('naming'),
         homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
+        maxMinds,
         log,
       })
       saveRuntime = (tick: number): void => {
@@ -510,7 +530,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       log(
-        `stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, $${dailyBudget.toFixed(2)}/day` +
+        `stream: LIVE — ${cast.length} of at most ${maxMinds} minds on ${MIND_MODEL},` +
+          ` $${dailyBudget.toFixed(2)}/day` +
           `${cap > 0 ? ` under a $${cap.toFixed(2)} lifetime cap` : ''}, memory in ${opts.agentDbDir}`,
       )
       log(
@@ -560,7 +581,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             events,
             rulebookCount: rulebookCount(),
             privateCounts: { thoughts: thoughtsOn(day), journals: 0 },
-            cast: minds.map((m) => ({ id: m.id, name: m.identity.name })),
+            cast: [...(booted?.cast.values() ?? cast)].map((m) => ({
+              id: m.id,
+              name: m.identity.name,
+            })),
             world: { config, state: loop.state },
             alert: (d) => {
               log(`stream: chronicle — ${d}`)
@@ -602,15 +626,15 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
         // The cast, not the founders: a town that has borne children spends for all of them.
-        const cast = booted?.cast.size ?? minds.length
-        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * cast
+        const castSize = booted?.cast.size ?? cast.length
+        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * castSize
         // Art is bursty and per discovery; it stays under the daily and lifetime caps, not the mind rate.
         const rate = projectDailySpend(opsDb, {
           windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
           excludeCallers: ['forge'],
         }).usdPerSimDay
         if (rate <= ceiling) return
-        console.error(rateStopMessage(rate, ceiling, cast))
+        console.error(rateStopMessage(rate, ceiling, castSize))
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })

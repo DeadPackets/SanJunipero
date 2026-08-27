@@ -6,6 +6,7 @@ export class EventStore {
   private insertEv
   private selFrom
   private selRange
+  private selTypeFrom
   private selLast
   private insertSnap
   private selSnap
@@ -18,6 +19,9 @@ export class EventStore {
     )
     this.selRange = db.prepare(
       'SELECT seq, tick, type, payload FROM events WHERE seq >= ? AND seq <= ? ORDER BY seq',
+    )
+    this.selTypeFrom = db.prepare(
+      'SELECT seq, tick, type, payload FROM events WHERE seq > ? AND type = ? ORDER BY seq',
     )
     this.selLast = db.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM events')
     this.insertSnap = db.prepare(
@@ -52,6 +56,10 @@ export class EventStore {
 
   readFrom(seqExclusive: number): SimEvent[] {
     return (this.selFrom.all(seqExclusive) as never[]).map(this.parseRow)
+  }
+  /** Only one kind of event. A tail that wants one rare type pays nothing to parse the rest. */
+  readTypeFrom(seqExclusive: number, type: string): SimEvent[] {
+    return (this.selTypeFrom.all(seqExclusive, type) as never[]).map(this.parseRow)
   }
   readRange(from: number, to: number): SimEvent[] {
     return (this.selRange.all(from, to) as never[]).map(this.parseRow)

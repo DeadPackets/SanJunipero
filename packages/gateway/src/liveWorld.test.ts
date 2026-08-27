@@ -675,6 +675,46 @@ describe("★ a mind's memory across a resume", () => {
     again.close()
   }, 60_000)
 
+  it('★ A CHILD BORN INTO THIS TOWN IS STILL IN IT AFTER A RESTART', async () => {
+    const dir = tmp()
+    const first = await liveWorld({ dir })
+    await run(first.world, 2)
+    const bornTick = first.world.loop.tick
+    await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
+
+    // The birth by hand: gestation is the engine's business and is not what is under test.
+    const wdb = new Database(join(dir, 'world.db'))
+    wdb.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)').run(
+      bornTick,
+      'agent_born',
+      JSON.stringify({
+        id: 'agent_born_1',
+        name: 'Mira',
+        sex: 'f',
+        motherId: 'amara',
+        fatherId: 'omar',
+        x: 3,
+        y: 3,
+      }),
+    )
+    wdb.close()
+
+    // A boot that was handed the two FOUNDERS and nothing else.
+    const second = await liveWorld({ dir })
+    await run(second.world, 2)
+    expect(second.world.loop.state.agents.agent_born_1).toBeDefined()
+    expect(existsSync(join(dir, 'minds', 'agent_born_1.db'))).toBe(true)
+    const child = openAgentDb(join(dir, 'minds', 'agent_born_1.db'))
+    expect(
+      (
+        child
+          .prepare('SELECT COUNT(*) AS n FROM personality_versions WHERE agent_id = ?')
+          .get('agent_born_1') as { n: number }
+      ).n,
+    ).toBe(1)
+    child.close()
+  }, 60_000)
+
   it('SJ_FRESH takes the minds with the world, in one breath', async () => {
     const dir = tmp()
     const first = await liveWorld({ dir })

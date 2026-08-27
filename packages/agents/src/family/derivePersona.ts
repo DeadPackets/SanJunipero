@@ -5,6 +5,16 @@ import { SPAWN_AGE_YEARS } from '@sj/shared'
 
 export type ParentPersona = { agentId: string; identity: IdentityCore; personality: PersonalityDoc }
 
+export const personaOf = (spec: {
+  id: string
+  identity: IdentityCore
+  personality: PersonalityDoc
+}): ParentPersona => ({
+  agentId: spec.id,
+  identity: spec.identity,
+  personality: spec.personality,
+})
+
 // parents[0] is the mother, parents[1] the father — the order of `agent_born`.
 export type Parents = [ParentPersona, ParentPersona]
 
