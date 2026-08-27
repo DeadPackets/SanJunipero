@@ -141,6 +141,35 @@ export function paletteGate(
   return { ok: ok(failures), failures, offPalette, offenders }
 }
 
+// NOT a gate. A sprite cell keeps the model's own colours, so this is only how far they sit from
+// the world's forty — mean Euclidean RGB distance over the opaque pixels, for the run report.
+export function paletteDistance(img: RawImage): number {
+  const pal = paletteRgb()
+  const cache = new Map<number, number>()
+  let sum = 0,
+    n = 0
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue
+    const r = img.data[i]!,
+      g = img.data[i + 1]!,
+      b = img.data[i + 2]!
+    const key = (r << 16) | (g << 8) | b
+    let d = cache.get(key)
+    if (d === undefined) {
+      let best = Infinity
+      for (const p of pal) {
+        const q = (r - p[0]) ** 2 + (g - p[1]) ** 2 + (b - p[2]) ** 2
+        if (q < best) best = q
+      }
+      d = Math.sqrt(best)
+      cache.set(key, d)
+    }
+    sum += d
+    n++
+  }
+  return n === 0 ? 0 : sum / n
+}
+
 // ---------------------------------------------------------------- 5. density within a sprite
 
 // A sprite's density is how many art pixels it spends per world pixel of the ground it covers.

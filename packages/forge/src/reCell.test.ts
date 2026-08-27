@@ -1,15 +1,17 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import type { RawImage } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
+import { chromaKey } from './post/chromaKey.js'
+import { opaqueBbox } from './sheet.js'
 import {
   integerScaleGate,
   alphaBinaryGate,
-  paletteGate,
   nativeDensityGate,
   classDensityGate,
   spriteDensity,
 } from './pixelGates.js'
 import { TOWN_TILE } from './assetResolution.js'
-import { BUILDING_ZOOM_STOP, CHAR_FIGURE_PX, buildingCellPx, planReCell, reCell } from './reCell.js'
+import { BUILDING_ZOOM_STOP, CHAR_FIGURE_PX, buildingCellPx, spriteCell } from './reCell.js'
 
 // ---------------------------------------------------------------- the sizes
 
@@ -69,140 +71,95 @@ describe('CHAR_FIGURE_PX', () => {
   })
 })
 
-// ---------------------------------------------------------------- the plan
+// ---------------------------------------------------------------- the cell
 
-describe('planReCell', () => {
-  it('divides by a whole number and takes the window straight out of the source', () => {
-    // a 1x1 building: 874 px of subject into a 256 cell wants a 4x window, and 1024 has it
-    const p = planReCell({ subjectPx: 874, cellPx: 256, sourcePx: 1024 })
-    expect(p).toEqual({ factor: 4, window: 1024, sourceScale: 1, scaledSourcePx: 1024 })
-    expect(integerScaleGate({ w: p.window, h: p.window }, { w: 256, h: 256 })).toMatchObject({
+const CREAM = [0xff, 0xf6, 0xe9, 255] as const
+
+// spriteCell takes an already-keyed generation: clear background, one solid subject
+function fakeGeneration(size: number, subject: number, top = -1): RawImage {
+  const data = new Uint8ClampedArray(size * size * 4)
+  const ox = Math.floor((size - subject) / 2)
+  const oy = top < 0 ? ox : top
+  for (let y = oy; y < oy + subject; y++)
+    for (let x = ox; x < ox + subject; x++) data.set(CREAM, (y * size + x) * 4)
+  return { width: size, height: size, data }
+}
+
+const bbox = (img: RawImage) => opaqueBbox(img)!
+
+describe('spriteCell', () => {
+  it('divides by a WHOLE factor and never resamples the source', () => {
+    const r = spriteCell(fakeGeneration(1024, 800), { cellPx: 256, anchor: 'centre' })
+    expect(r.cell.width).toBe(256)
+    expect(r.cell.height).toBe(256)
+    expect(r.plan).toMatchObject({ factor: 4, window: 1024 })
+    expect(integerScaleGate({ w: 1024, h: 1024 }, { w: 256, h: 256 })).toMatchObject({
       ok: true,
       factor: 4,
     })
   })
 
-  it('drops a factor and shrinks the source when the window it wants overruns the generation', () => {
-    // the wagon: 882 px of subject into a 384 cell wants 3x = 1152, and the raw is 1024
-    const p = planReCell({ subjectPx: 882, cellPx: 384, sourcePx: 1024 })
-    expect(p.factor).toBe(2)
-    expect(p.window).toBe(768)
-    expect(p.sourceScale).toBeLessThan(1)
-    // the subject must actually fit the window after the correction, with nothing cropped
-    expect(882 * p.sourceScale).toBeLessThanOrEqual(768)
-    expect(p.scaledSourcePx).toBe(Math.round(1024 * p.sourceScale))
-  })
-
-  it('fill takes the factor DOWN so the subject reaches the cell edge', () => {
-    // the shed: 866 px of subject, 256 cell. Contain leaves 15% of the window empty and the
-    // renderer draws the building 15% smaller than the cell that was signed off.
-    const contain = planReCell({ subjectPx: 866, cellPx: 256, sourcePx: 1024 })
-    expect(contain).toMatchObject({ factor: 4, window: 1024, sourceScale: 1 })
-    expect(866 / contain.window).toBeLessThan(0.86)
-
-    const fill = planReCell({ subjectPx: 866, cellPx: 256, sourcePx: 1024, fill: true })
-    expect(fill.factor).toBe(3)
-    expect(fill.window).toBe(768)
-    expect(866 * fill.sourceScale).toBeCloseTo(768, 5)
-    expect(integerScaleGate({ w: fill.window, h: fill.window }, { w: 256, h: 256 })).toMatchObject({
-      ok: true,
-      factor: 3,
-    })
-  })
-
-  it('fill still refuses to enlarge: a subject under two cells keeps its margin', () => {
-    // the storehouse: 866 px of subject into a 512 cell cannot fill without upscaling
-    const p = planReCell({ subjectPx: 866, cellPx: 512, sourcePx: 1024, fill: true })
-    expect(p).toMatchObject({ factor: 2, window: 1024, sourceScale: 1 })
-  })
-
-  it('never enlarges a source: a correction throws information away, it does not invent it', () => {
-    for (const subjectPx of [200, 500, 874, 882, 1000])
-      for (const cellPx of [128, 256, 384, 512])
-        expect(planReCell({ subjectPx, cellPx, sourcePx: 1024 }).sourceScale).toBeLessThanOrEqual(1)
-  })
-
-  it('holds a target figure height exactly, which is what a walk cycle needs', () => {
-    // the two generation families this cast came back in: 840 px of figure in a 1024 frame
-    // and 2100 px in a 2528 one. Both must land on the same figure height.
-    const a = planReCell({
-      subjectPx: 840,
-      cellPx: 256,
-      sourcePx: 1024,
-      figurePx: 840,
-      targetFigurePx: 208,
-    })
-    const b = planReCell({
-      subjectPx: 2100,
-      cellPx: 256,
-      sourcePx: 2528,
-      figurePx: 2100,
-      targetFigurePx: 208,
-    })
-    expect(a.factor).toBe(4)
-    expect(b.factor).toBe(10)
-    expect(Math.round((840 * a.sourceScale) / a.factor)).toBe(208)
-    expect(Math.round((2100 * b.sourceScale) / b.factor)).toBe(208)
-    // the correction is a nudge, not a resample: both are within 6% of 1
-    expect(Math.abs(1 - a.sourceScale)).toBeLessThan(0.06)
-    expect(Math.abs(1 - b.sourceScale)).toBeLessThan(0.06)
-  })
-})
-
-// ---------------------------------------------------------------- the cell
-
-const CREAM = [0xff, 0xf6, 0xe9, 255] as const
-
-// reCell takes an already-keyed generation: clear background, one solid subject in the middle
-function fakeGeneration(size: number, subject: number): RawImage {
-  const data = new Uint8ClampedArray(size * size * 4)
-  const o = Math.floor((size - subject) / 2)
-  for (let y = o; y < o + subject; y++)
-    for (let x = o; x < o + subject; x++) data.set(CREAM, (y * size + x) * 4)
-  return { width: size, height: size, data }
-}
-
-describe('reCell', () => {
-  it('lands on the cell size by a whole-number division and clears the pixel bar', () => {
-    const r = reCell(fakeGeneration(1024, 800), { cellPx: 256 })
-    expect(r.cell.width).toBe(256)
-    expect(r.cell.height).toBe(256)
-    expect(Number.isInteger(r.plan.factor)).toBe(true)
-    expect(integerScaleGate({ w: r.plan.window, h: r.plan.window }, { w: 256, h: 256 }).ok).toBe(
-      true,
-    )
-    expect(alphaBinaryGate(r.cell).failures).toEqual([])
-    expect(paletteGate(r.cell).failures).toEqual([])
-  })
-
-  it('normalises the figure to the target height across two generation scales', () => {
-    const small = reCell(fakeGeneration(1024, 840), { cellPx: 256, targetFigurePx: 208 })
-    const big = reCell(fakeGeneration(2528, 2100), { cellPx: 256, targetFigurePx: 208 })
-    const figureH = (img: RawImage): number => {
-      let y0 = -1,
-        y1 = -1
-      for (let y = 0; y < img.height; y++)
-        for (let x = 0; x < img.width; x++)
-          if (img.data[(y * img.width + x) * 4 + 3] !== 0) {
-            if (y0 < 0) y0 = y
-            y1 = y
-            break
-          }
-      return y1 - y0 + 1
-    }
-    expect(Math.abs(figureH(small.cell) - 208)).toBeLessThanOrEqual(1)
-    expect(Math.abs(figureH(big.cell) - 208)).toBeLessThanOrEqual(1)
+  it('takes the next whole factor up rather than shrinking a subject that overruns', () => {
+    // 882 px of subject into a 384 cell: factor 2 would clip it, so the factor is 3 and the
+    // subject sits smaller in a 1152 window that overhangs the 1024 generation.
+    const r = spriteCell(fakeGeneration(1024, 882), { cellPx: 384, anchor: 'centre' })
+    expect(r.plan.factor).toBe(3)
+    expect(r.plan.window).toBe(1152)
+    const b = bbox(r.cell)
+    expect(b.x1 - b.x0 + 1).toBeLessThan(384)
   })
 
   it('keeps the whole subject: nothing is cropped away by the window', () => {
-    const r = reCell(fakeGeneration(1024, 1000), { cellPx: 256 })
-    // 1000 px of subject can only reach a 256 cell through a source correction; whatever
-    // route it takes, the finished cell must still hold the whole square
-    let opaqueRows = 0
-    for (let y = 0; y < 256; y++)
-      if (r.cell.data[y * 256 * 4 + 3] !== 0 || r.cell.data[(y * 256 + 128) * 4 + 3] !== 0)
-        opaqueRows++
-    expect(opaqueRows).toBeGreaterThan(200)
-    expect(opaqueRows).toBeLessThanOrEqual(256)
+    const r = spriteCell(fakeGeneration(1024, 1000), { cellPx: 256, anchor: 'centre' })
+    const b = bbox(r.cell)
+    // 1000 px of subject minus the 4 px chroma band, divided by the factor of 4
+    expect(b.x1 - b.x0 + 1).toBeGreaterThan(240)
+    expect(b.y1 - b.y0 + 1).toBeGreaterThan(240)
+  })
+
+  it('anchors feet on the last row and centre in the middle', () => {
+    const high = fakeGeneration(1024, 400, 100)
+    expect(bbox(spriteCell(high, { cellPx: 256, anchor: 'feet' }).cell).y1).toBe(255)
+    const centred = bbox(spriteCell(high, { cellPx: 256, anchor: 'centre' }).cell)
+    expect(Math.abs(255 - centred.y1 - centred.y0)).toBeLessThanOrEqual(2)
+  })
+
+  it('is deterministic', () => {
+    const src = fakeGeneration(1024, 800)
+    const a = spriteCell(src, { cellPx: 256, anchor: 'feet' })
+    const b = spriteCell(src, { cellPx: 256, anchor: 'feet' })
+    expect([...a.cell.data]).toEqual([...b.cell.data])
+  })
+})
+
+// ------------------------------------------------- the chain, on one real provider generation
+
+// `stages/00-raw.png` from the 2026-08-27 sprite-chain trace: the house/sw generation that cost
+// $0.1027, untouched provider bytes. The only fixture in this package that a model actually drew.
+describe('keyBg → spriteCell on a real 2048 generation', () => {
+  it('lands a 512 cell on a whole factor, binary alpha and the model’s own colours', async () => {
+    const raw = await decodePng(
+      readFileSync(new URL('./fixtures/house-sw-raw.png', import.meta.url)),
+    )
+    expect([raw.width, raw.height]).toEqual([2048, 2048])
+
+    const r = spriteCell(chromaKey(raw, { tolerance: 72 }), { cellPx: 512, anchor: 'feet' })
+
+    expect(Number.isInteger(r.plan.factor)).toBe(true)
+    expect(r.plan.factor).toBe(4)
+    expect([r.cell.width, r.cell.height]).toEqual([512, 512])
+    // the GENERATION divides by the cell, which is what the gate on this path now measures
+    expect(integerScaleGate({ w: raw.width, h: raw.height }, { w: 512, h: 512 }).ok).toBe(true)
+    expect(alphaBinaryGate(r.cell).softPixels).toBe(0)
+
+    const colours = new Set<number>()
+    for (let i = 0; i < r.cell.data.length; i += 4) {
+      if (r.cell.data[i + 3] === 0) continue
+      colours.add((r.cell.data[i]! << 16) | (r.cell.data[i + 1]! << 8) | r.cell.data[i + 2]!)
+    }
+    // the old chain quantized this same cell to 29 colours, which is what the user saw as mush
+    expect(colours.size).toBeGreaterThan(1000)
+
+    expect(bbox(r.cell).y1).toBe(511)
   })
 })
