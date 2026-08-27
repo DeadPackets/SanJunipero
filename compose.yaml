@@ -98,16 +98,7 @@ services:
       - town
     # The credential check runs in the container, not as `${LITESTREAM_BUCKET:?...}`: compose
     # interpolates every service before applying profiles, so that form breaks a plain `up`.
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        if [ -z "$$LITESTREAM_BUCKET" ] || [ -z "$$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$$LITESTREAM_SECRET_ACCESS_KEY" ]; then
-          echo "litestream: NOT BACKING ANYTHING UP — no S3 credentials." >&2
-          echo "            Set LITESTREAM_BUCKET, LITESTREAM_ACCESS_KEY_ID and" >&2
-          echo "            LITESTREAM_SECRET_ACCESS_KEY in .env — see deploy/.env.example." >&2
-          exit 1
-        fi
-        exec litestream replicate -config /etc/litestream.yml
+    entrypoint: ["/bin/sh", "/etc/litestream.sh"]
     environment:
       # Never written into this file or the image — see deploy/.env.example.
       LITESTREAM_ACCESS_KEY_ID: "${LITESTREAM_ACCESS_KEY_ID:-}"
@@ -116,7 +107,7 @@ services:
       LITESTREAM_REGION: "${LITESTREAM_REGION:-us-east-1}"
       LITESTREAM_ENDPOINT: "${LITESTREAM_ENDPOINT:-}"
     volumes:
-      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+      - ./deploy/litestream.sh:/etc/litestream.sh:ro
       # Not `:ro` on purpose: litestream writes a shadow WAL beside each database, and read-only
       # it replicates nothing while looking healthy.
       - town-data:/data

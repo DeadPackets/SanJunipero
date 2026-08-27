@@ -211,21 +211,26 @@ if you want them to survive the box, ship them somewhere yourself; nothing here 
 Litestream restores one database at a time and **you must restore all of them or none**. A world
 restored without its minds is the blank-minds case above.
 
+The running container writes its config to `/tmp/litestream.yml`; copy it out first so a restore
+uses the same S3 keys the backup was written under.
+
 ```
+docker compose --profile backup cp litestream:/tmp/litestream.yml ./litestream.yml
 docker compose down
 docker run --rm -v san-junipero_town-data:/data \
   -e LITESTREAM_ACCESS_KEY_ID=... -e LITESTREAM_SECRET_ACCESS_KEY=... \
-  -v ./deploy/litestream.yml:/etc/litestream.yml:ro \
+  -v ./litestream.yml:/etc/litestream.yml:ro \
   litestream/litestream:0.3.13 restore -config /etc/litestream.yml /data/dev-world.db
 # then repeat for /data/minds/_ops.db and each /data/minds/<name>.db
 docker compose up -d
 ```
 
-**★ A mind born in play is not backed up.** Litestream's config takes one literal path per
-database and has no wildcard, so `deploy/litestream.yml` names the five founders explicitly. A
-child born after genesis gets a `.db` that no block covers. Add a block for it, or accept that a
-restore returns the founders and not the generation after them. This is the one hole in the backup
-story and it is written down rather than left to be discovered.
+**Why the config is generated rather than checked in.** `dbs[].path` takes no wildcard in
+litestream 0.3.13 — a `/data/minds/*.db` entry is taken literally and backs up nothing while
+reporting itself healthy — and a named roster puts every child born in play outside the backup
+with nothing to say so. `deploy/litestream.sh` therefore writes one block per `.db` under `/data`
+at boot, and exits when that set changes so `restart: unless-stopped` brings it back with the new
+mind in it. A birth is outside the backup for at most one minute.
 
 ## Scaling
 
