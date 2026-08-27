@@ -18,7 +18,7 @@ export {
   type RulingVocabulary,
 } from './prompt/glassScan.js'
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/pins.js'
-export { migrateLlmTables, insertAlert, sumCostUsd } from './llm/callLog.js'
+export { migrateLlmTables, insertAlert, insertLlmCall, sumCostUsd } from './llm/callLog.js'
 // The live seam's public face: what a caller outside this package needs to boot a mind,
 // exported by package name so a served world does not have to reach in by relative path.
 export {

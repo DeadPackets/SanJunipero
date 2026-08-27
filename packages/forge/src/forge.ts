@@ -10,7 +10,12 @@ import type { AssetCodex } from './codex.js'
 import type { AssetClass, AssetRecord, Footprint } from '@sj/shared'
 
 export type Forge = {
-  commission(desc: string, footprint: Footprint, klass: AssetClass): Promise<AssetRecord>
+  commission(
+    desc: string,
+    footprint: Footprint,
+    klass: AssetClass,
+    kind: string,
+  ): Promise<AssetRecord>
   onAssetReady(cb: (rec: AssetRecord) => void): void
 }
 
@@ -24,6 +29,7 @@ export function createForge(deps: {
     desc: string,
     footprint: Footprint,
     klass: AssetClass,
+    kind: string,
   ): Promise<AssetRecord> {
     const target = targetSize(klass, footprint)
     const prompt = buildAssetPrompt(desc, footprint, klass)
@@ -54,6 +60,7 @@ export function createForge(deps: {
         return deps.codex.register({
           class: klass,
           desc,
+          kind,
           footprint,
           png: best.png,
           widthPx: target.w,
@@ -70,6 +77,7 @@ export function createForge(deps: {
     return deps.codex.register({
       class: klass,
       desc,
+      kind,
       footprint,
       png,
       widthPx: target.w,

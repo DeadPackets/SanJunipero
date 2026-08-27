@@ -46,7 +46,7 @@ export function watchDiscoveryArt(deps: {
         // breath does not pay for it twice.
         known.add(kind)
         const p: Promise<unknown> = deps.forge
-          .commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item')
+          .commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item', kind)
           .catch((err: unknown) => {
             // commission() contracts never to reject; if it somehow does, the kind goes back
             // so a later discovery can try again, and the run does not stop for a picture.
