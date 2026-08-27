@@ -43,6 +43,12 @@ export const BOND_TYPE_WORD: Readonly<Record<BondType, string>> = {
   none: '',
 }
 
+export const NODE_ALIVE = '#93B573'
+export const NODE_DEAD = '#857D75'
+
+export type PeopleIndex = Readonly<Record<string, { name: string; alive: boolean }>>
+export type BondNode = { id: string; name: string; size: number; color: string; alive: boolean }
+
 /** What the lineage endpoint returns. Structural, so the viewer needs no import from the
  *  gateway (P1) and a typed empty is a perfectly good answer. */
 export type LineageLike = {

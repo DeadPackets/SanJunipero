@@ -1,5 +1,5 @@
 import type { Moment } from '@sj/shared'
-import type { PeopleIndex } from './bondsModel.js'
+import type { PeopleIndex } from './bondModel2.js'
 
 export const THUMB_CAST_MAX = 2
 

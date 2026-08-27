@@ -14,7 +14,7 @@ import {
   type BondType,
   type LineageLike,
 } from './bondModel2.js'
-import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondsModel.js'
+import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
 
 // Four channels, one meaning each: EVERY LIVING PERSON IS A NODE, so strangers are visible; edge
 // length is LEVEL, edge mark is TYPE, edge colour is the ARC — colour is never the only signal.

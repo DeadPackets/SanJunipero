@@ -13,7 +13,7 @@ import {
   type LegendRow,
   type RelationLink,
 } from './relationGraph.js'
-import type { BondNode, PeopleIndex } from './bondsModel.js'
+import type { BondNode, PeopleIndex } from './bondModel2.js'
 import { bondsFeed, lineageFeed } from './feeds.js'
 import { useFeed } from './useEndpoint.js'
 import { EMPTY_COPY } from './townStats.js'

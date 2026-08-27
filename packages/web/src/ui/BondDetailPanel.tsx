@@ -8,7 +8,7 @@ import {
   type BondType,
 } from './bondModel2.js'
 import { ARC_COLOR } from './relationGraph.js'
-import type { PeopleIndex } from './bondsModel.js'
+import type { PeopleIndex } from './bondModel2.js'
 
 // The bar is gone: it filled toward the closest pair in town, which makes a relationship a
 // meter with a leader. The level word plus the dated history can also go DOWN.
