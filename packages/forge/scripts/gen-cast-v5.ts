@@ -31,6 +31,7 @@ import {
   type StripPoseV4,
 } from '../src/mirror.js'
 import { CHAR_CELL_PX, spriteCell } from '../src/reCell.js'
+import { trimToFigure } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
 import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pixelGates.js'
 import { quantize } from '../src/post/quantize.js'
@@ -274,7 +275,11 @@ const figureHeight = (img: RawImage): number => {
 }
 
 const MAX_ART_H = FEET_Y_V2 + 1
-function gateView(img: RawImage): RawImage {
+// TRIMMED first, and that is what makes the fit below NORMALISE scale. The old chain trimmed
+// every cell to its figure, so this got it for free; a 256 canvas with the figure somewhere
+// inside does not, and the gates read the size difference as a broken head and a broken palette.
+function gateView(cell: RawImage): RawImage {
+  const img = trimToFigure(cell)
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
   const fitted =
     k === 1
