@@ -1,7 +1,5 @@
 // The model supplies the soil and the code supplies the furrow: an image model does not draw a
 // texture that closes itself, and a ploughed field is PERIODIC — arithmetic, not painting.
-import { paletteRgb } from './palette.js'
-import { quantize } from './post/quantize.js'
 import type { RawImage } from './post/raw.js'
 
 // The material repeats every 256 px of SCREEN space and a town tile is 32 px wide. 64 puts a
@@ -45,7 +43,5 @@ export function ploughFurrows(
       out.data[i + 3] = 255
     }
   }
-  const q = quantize(out, paletteRgb())
-  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255
-  return q
+  return out
 }
