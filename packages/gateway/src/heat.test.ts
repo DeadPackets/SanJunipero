@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SimEvent } from '@sj/shared'
+import type { HeatWindow, SimEvent } from '@sj/shared'
 import { FOLD_TYPES } from './api.js'
 import {
   HEAT_WEIGHTS,
@@ -8,7 +8,6 @@ import {
   heatFromScores,
   scoreEvent,
   type HeatScores,
-  type HeatWindow,
 } from './heat.js'
 
 const ev = (
