@@ -56,18 +56,15 @@ function declaredCopies(): Copy[] {
 describe('★ a renderer constant that copies a config field still equals it', () => {
   const copies = declaredCopies()
 
-  it('publishes the sweep', () => {
-    console.log(
-      `CONFIG COPIES IN THE RENDERER — ${copies.length}\n` +
-        copies
-          .map(
-            (c) =>
-              `  ${c.file}  ${c.name} = ${c.value}   DEFAULT_CONFIG.${c.path} = ${String(leafAt(c.path))}`,
-          )
-          .join('\n'),
-    )
-    expect(copies.length).toBeGreaterThan(0)
-  })
+  console.log(
+    `CONFIG COPIES IN THE RENDERER — ${copies.length}\n` +
+      copies
+        .map(
+          (c) =>
+            `  ${c.file}  ${c.name} = ${c.value}   DEFAULT_CONFIG.${c.path} = ${String(leafAt(c.path))}`,
+        )
+        .join('\n'),
+  )
 
   // The whole set, named. A third copy arriving is a thing somebody has to decide about, not a
   // thing that slips in behind these two — which is how `BUILD_TICKS_FULL` went stale.
@@ -78,7 +75,7 @@ describe('★ a renderer constant that copies a config field still equals it', (
     ])
   })
 
-  for (const c of declaredCopies()) {
+  for (const c of copies) {
     it(`${c.name} = ${c.value} is still DEFAULT_CONFIG.${c.path}`, () => {
       expect(leafAt(c.path), `DEFAULT_CONFIG.${c.path} no longer exists`).toBeTypeOf('number')
       expect(c.value, `${c.file}: ${c.name} has drifted from the field it copies`).toBe(
