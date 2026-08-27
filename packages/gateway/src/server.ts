@@ -28,6 +28,7 @@ export type GatewayOpts = {
   narratorDbPath?: string // C7's narrator.db; absent or unwritten → typed empties
   staticDir?: string // built @sj/web; absent → API/socket only (the dev split)
   maxViewers?: number // default DEFAULT_MAX_VIEWERS
+  scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
 
@@ -62,6 +63,14 @@ const DEFAULT_MAX_VIEWERS = 500
  * stopped at is worth answering.
  */
 export const SCRUB_MIN_MS = 100
+
+/**
+ * Milliseconds of scrub work the whole process will do per second of wall clock — 4% of one core.
+ * The per-socket floor above is per SOCKET: at a measured 6-11 ms a scrub, ten viewers dragging
+ * at once stop the town ticking and DEFAULT_MAX_VIEWERS is 500. Over budget, a viewer is answered
+ * at the live moment instead of being queued.
+ */
+export const SCRUB_BUDGET_MS_PER_S = 40
 
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG
@@ -161,6 +170,17 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   // than the pump's: a hello landing between two pumps must still see a just-registered sheet.
   const catchUp: string[] = []
   let catchUpSeq = 0
+  // The over-budget scrub answer: the live moment in the shape a scrub is already answered in,
+  // stringified once per generation, because only `reqId` differs between the sockets turned away.
+  let busyHead: string | null = null
+  const busyScrubJson = (reqId: number): string => {
+    busyHead ??= JSON.stringify({
+      t: 'scrubbed',
+      tick: mirror.state().tick,
+      state: mirror.state(),
+    }).slice(0, -1)
+    return `${busyHead},"reqId":${reqId}}`
+  }
   const snapshotJson = (): string => {
     snapJson ??= JSON.stringify({
       t: 'snapshot',
@@ -182,6 +202,21 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   wss.on('error', (e) => {
     if (listening) console.error(`gateway: socket server error — ${e.message}`)
   })
+  // One bucket for every socket: scrub work is paid for out of the thread that ticks the town, and
+  // a stranger's drag must not be able to spend more of it than the town can spare.
+  const scrubBudgetMsPerS = opts.scrubBudgetMsPerS ?? SCRUB_BUDGET_MS_PER_S
+  let scrubTokens = scrubBudgetMsPerS
+  let scrubFilledAt = Date.now()
+  const takeScrubBudget = (): boolean => {
+    const now = Date.now()
+    scrubTokens = Math.min(
+      scrubBudgetMsPerS,
+      scrubTokens + ((now - scrubFilledAt) * scrubBudgetMsPerS) / 1000,
+    )
+    scrubFilledAt = now
+    return scrubTokens > 0
+  }
+
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
@@ -201,6 +236,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
+      if (!takeScrubBudget()) {
+        sock.send(busyScrubJson(req.reqId))
+        return
+      }
+      const startedAt = performance.now()
       let tick = req.tick
       let state
       try {
@@ -210,6 +250,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         state = mirror.state()
       }
       sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
+      scrubTokens -= performance.now() - startedAt
     }
 
     sock.on('message', (data) => {
@@ -275,7 +316,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let observerSeen = false
   const pump = (): void => {
     const groups = mirror.poll()
-    if (groups.length > 0) snapJson = null
+    if (groups.length > 0) {
+      snapJson = null
+      busyHead = null
+    }
     for (const g of groups) {
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, events: g.events }))
     }
