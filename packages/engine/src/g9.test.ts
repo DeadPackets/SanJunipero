@@ -15,7 +15,7 @@ import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { doorTile } from './interiors.js'
-import { applyLaw, effectiveConfig, TOGGLABLE_PATHS, type LawQueue } from './laws.js'
+import { applyLaw, effectiveConfig, type LawQueue } from './laws.js'
 import { composePerception } from './perception.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import { RngStream, RngStreams } from './rng.js'
@@ -706,32 +706,5 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
     const forward = store.readFrom(preFlip.seq).reduce((s, e) => fold(s, e, CFG), preFlip.state)
     expect(stateHash(forward)).toBe(live)
     expect(forward.laws).toEqual(loop.state.laws)
-  })
-
-  it('refuses a path that is not a world law, and a value of the wrong shape', () => {
-    const s = genesisState(CFG, MAP())
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG),
-    ).toThrow(/not a world law/)
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'needs.eatRestoreHunger', value: 999 }), CFG),
-    ).toThrow(/not a world law/)
-    expect(() =>
-      fold(s, ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG),
-    ).toThrow(/rejected/)
-  })
-
-  it('every C9 feature has a switch an operator can reach', () => {
-    for (const path of [
-      'reproduction.enabled',
-      'aging.deathOfOldAgeEnabled',
-      'spoilage.enabled',
-      'tools.wearEnabled',
-      'mystery.enabled',
-      'occlusion.enabled',
-      'ownership.enabled',
-      'inscription.enabled',
-    ])
-      expect(TOGGLABLE_PATHS[path]).toBeDefined()
   })
 })

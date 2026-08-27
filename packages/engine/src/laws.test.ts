@@ -79,6 +79,16 @@ describe('effectiveConfig', () => {
 
   // Driven from an explicit array, not from the table itself: a missing whitelist entry has to
   // fail loudly, and a table-derived loop would happily agree with its own omission.
+  const C9_LAW_PATHS = [
+    'reproduction.enabled',
+    'aging.deathOfOldAgeEnabled',
+    'spoilage.enabled',
+    'tools.wearEnabled',
+    'mystery.enabled',
+    'occlusion.enabled',
+    'ownership.enabled',
+    'inscription.enabled',
+  ]
   const C11_LAW_PATHS = [
     'mortality.enabled',
     'illness.enabled',
@@ -107,8 +117,9 @@ describe('effectiveConfig', () => {
     'regrowth.saplingChancePerDay',
   ]
 
-  it('every C11 flag and starred dial is a world law with a value schema', () => {
-    for (const path of C11_LAW_PATHS) expect(TOGGLABLE_PATHS[path]).toBeDefined()
+  it('every C9 and C11 flag and starred dial is a world law with a value schema', () => {
+    for (const path of [...C9_LAW_PATHS, ...C11_LAW_PATHS])
+      expect(TOGGLABLE_PATHS[path]).toBeDefined()
   })
 
   it('the C11 value schemas reject the wrong shape and the out-of-range value', () => {
