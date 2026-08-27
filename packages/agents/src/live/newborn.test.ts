@@ -8,7 +8,7 @@ import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, RngStreams, TickLoop, type TickHandler, type TileId } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { MINUTES_PER_DAY, SimConfigSchema } from '@sj/shared'
 import { migrateLlmTables } from '../llm/callLog.js'
 import { LlmClient } from '../llm/client.js'
 import { openAgentDb } from '../memory/schema.js'
@@ -81,7 +81,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
-async function town(opts: { namingBudgetUsd?: number } = {}) {
+async function town(opts: { namingBudgetUsd?: number; startTick?: number } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'sj-births-'))
   dirs.push(dir)
   const config = SimConfigSchema.parse({})
@@ -101,7 +101,7 @@ async function town(opts: { namingBudgetUsd?: number } = {}) {
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
-    state,
+    state: { ...state, tick: opts.startTick ?? state.tick },
     rng,
     config,
     onTick: (ctx) => {
@@ -205,6 +205,13 @@ const socialNames = (db: Database.Database): { agentId: string; socialName: stri
     socialName: string
   }[]
 
+const personalityDay = (db: Database.Database, agentId: string): number | undefined =>
+  (
+    db.prepare('SELECT day FROM personality_versions WHERE agent_id = ?').get(agentId) as
+      | { day: number }
+      | undefined
+  )?.day
+
 const callersIn = (db: Database.Database): string[] =>
   (db.prepare('SELECT DISTINCT caller FROM llm_calls').all() as { caller: string }[]).map(
     (r) => r.caller,
@@ -225,6 +232,15 @@ describe('★ a child born in the town gets a mind, a database and a name', () =
 
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(callersIn(t.opsDb)).toContain('naming')
+    t.stop()
+  })
+
+  it('stamps the first personality with the day it was born, not the day the town booted', async () => {
+    const t = await town({ startTick: 3 * MINUTES_PER_DAY + 60 })
+    t.bear()
+    await t.settle(() => t.booted.runtimes.has(CHILD))
+
+    expect(personalityDay(t.dbFor(CHILD), CHILD)).toBe(3)
     t.stop()
   })
 

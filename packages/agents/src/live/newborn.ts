@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { EventStore } from '@sj/engine/store'
-import { DAYS_PER_YEAR, SPAWN_AGE_YEARS } from '@sj/shared'
+import { DAYS_PER_YEAR, MINUTES_PER_DAY, SPAWN_AGE_YEARS } from '@sj/shared'
 import { derivePersona, type ParentPersona } from '../family/derivePersona.js'
 import { buildHouseholdSeed } from '../family/memorySeed.js'
 import { captureSocialName, migrateFamilyTables } from '../family/socialName.js'
@@ -75,13 +75,16 @@ export function wireBirths(opts: BirthsOpts): () => void {
           tags: { people: [], place: null, objects: [], topics: entry.tags },
         })
       }
-      opts.booted.add({
-        id: born.id,
-        identity,
-        personality,
-        ageDays: SPAWN_AGE_YEARS * DAYS_PER_YEAR,
-        sex: born.sex,
-      })
+      opts.booted.add(
+        {
+          id: born.id,
+          identity,
+          personality,
+          ageDays: SPAWN_AGE_YEARS * DAYS_PER_YEAR,
+          sex: born.sex,
+        },
+        Math.floor(tick / MINUTES_PER_DAY),
+      )
       opts.log?.(`stream: ${born.name} was born, and has a mind and a memory of ${born.id}.db`)
       await captureSocialName(opts.namingLlm, opts.opsDb, {
         born,
