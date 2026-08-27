@@ -141,6 +141,13 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     await art.settle()
     expect(calls.length).toBe(spent)
     expect(codex.listSince(0)).toHaveLength(1)
+
+    // Once per TOWN, not once per process: a restarted watcher reads the kind off the codex.
+    const resumed = artFor()
+    resumed.onDiscovery(WATERSKIN)
+    await resumed.settle()
+    expect(calls.length).toBe(spent)
+    expect(codex.listSince(0)).toHaveLength(1)
   }, 30_000)
 
   it('★ the budget is consulted per image: a day with $0.05 left buys one, not three', async () => {
