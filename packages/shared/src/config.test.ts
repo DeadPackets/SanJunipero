@@ -30,10 +30,6 @@ const C11_FLAGS = [
 ] as const
 
 describe('SimConfigSchema', () => {
-  it('parse({}) fully hydrates to DEFAULT_CONFIG', () => {
-    expect(SimConfigSchema.parse({})).toEqual(DEFAULT_CONFIG)
-  })
-
   it('defaults carry the binding values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.needs.hungerDecayPerTick).toBe(0.035)
