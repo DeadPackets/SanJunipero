@@ -7,11 +7,9 @@ import WebSocket from 'ws'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, createWorldTick, genesisState, type TileId } from '@sj/engine'
-import { createLawsAdmin } from './adminLaws.js'
+import { createLawsAdmin, createGateway, frameText, type Gateway } from '@sj/gateway'
 import { startDevWorld } from './devWorld.js'
-import { createGateway, type Gateway } from './server.js'
-import { frameText } from './http.js'
-import { connect } from './testutil.js'
+import { connect } from '@sj/gateway/testutil'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const TOKEN = 'a-shared-secret'

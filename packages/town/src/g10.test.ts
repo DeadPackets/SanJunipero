@@ -20,7 +20,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
 import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
-import { createGateway, type Gateway } from './server.js'
+import { WorldMirror, createGateway, type Gateway } from '@sj/gateway'
 import {
   PLAZA_TILE,
   makeShowcaseMap,
@@ -29,7 +29,6 @@ import {
   showcaseTerrain,
 } from './showcaseMap.js'
 import { ingestTerrainArt } from './ingestArt.js'
-import { WorldMirror } from './worldMirror.js'
 
 // The renderer-side half lives in packages/web/src/render/g10.test.ts: the web package is
 // DOM-typed and bundler-resolved, so a gateway test cannot import from it without breaking `tsc -b`.

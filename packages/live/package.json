@@ -1,0 +1,7 @@
+{ "name": "@sj/live", "version": "0.0.1", "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@sj/shared": "workspace:*", "@sj/engine": "workspace:*", "@sj/forge": "workspace:*",
+    "@sj/gateway": "workspace:*", "@sj/agents": "workspace:*", "@sj/llm": "workspace:*",
+    "@sj/arbiter": "workspace:*", "@sj/narrator": "workspace:*",
+    "better-sqlite3": "^13.0.0" },
+  "devDependencies": { "@sj/town": "workspace:*", "@types/better-sqlite3": "^7.6.0" } }

@@ -43,38 +43,37 @@ import {
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import { NarratorStore, closeDay, makeNarratorLlm, openNarratorDb } from '@sj/narrator'
-import type { LiveCast } from './devWorld.js'
+import { publishThought, type LiveCast } from '@sj/gateway'
 import { createDiscoveryArt } from './discoveryCommission.js'
-import { publishThought } from './observer.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
  *  sim-day IS one real hour here, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
-export const LIVE_SPEND_DAILY_USD = 3
+const LIVE_SPEND_DAILY_USD = 3
 /** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
  *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
-export const LIVE_SPEND_STOP_USD = 50
+const LIVE_SPEND_STOP_USD = 50
 /** The daily budget's window. */
-export const SPEND_DAY_MS = 24 * 60 * 60 * 1000
+const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's 2.5 s tick this is every
  *  25 s of wall clock — far tighter than one turn, so nothing can outrun it. */
-export const LIVE_SPEND_CHECK_TICKS = 10
+const LIVE_SPEND_CHECK_TICKS = 10
 /** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
-export const LIVE_RUNTIME_SAVE_TICKS = 48
+const LIVE_RUNTIME_SAVE_TICKS = 48
 /** A container gives about ten seconds before SIGKILL; losing a night's reflection is survivable
  *  and hanging the shutdown is not. */
-export const REFLECTION_SETTLE_MS = 5_000
+const REFLECTION_SETTLE_MS = 5_000
 /** `dozeTicks` is the one `MIND_CONFIG` dial denominated in real seconds — it is an HTTP retry
  *  backoff — so it is the only one this world's 2 500 ms tick may rescale. */
-export const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
+const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** Rulings and the codex, never in the world db: the gateway serves that one to strangers. In
  *  `agentDbDir` so `SJ_FRESH=1` resets the town's laws with the town, underscore-prefixed to stay
  *  out of the `<mindId>.db` namespace the amnesia guard walks. */
-export const LIVE_ARBITER_DB = '_arbiter.db'
+const LIVE_ARBITER_DB = '_arbiter.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
  *  mint a recipe out of a material nobody has a word for. */
-export const STREAM_VOCABULARY = {
+const STREAM_VOCABULARY = {
   itemKinds: [
     'wood',
     'stone',
@@ -105,7 +104,7 @@ export const STREAM_VOCABULARY = {
   structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
 } as const
 /** The sentence-transformer cache. `SJ_MODELS_DIR` moves it; nothing downloads at run time. */
-export const DEFAULT_MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.url))
+const DEFAULT_MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.url))
 
 export type LiveCastOpts = {
   /** Directory of `<id>.db` files. Created if absent; wiped with the world on `SJ_FRESH=1`. */
@@ -179,16 +178,16 @@ export async function settle(
  * false-fire the day somebody streams ten people.
  * 0.21 is 9.9x the measured 0.0212 $/mind/sim-day and 6.8x the worst measured 15-minute window.
  */
-export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
+const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
-export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
+const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 
 /** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
  *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
-export const LIVE_MAX_MINDS_PER_FOUNDER = 3
+const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
-export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
+function rateStopMessage(rate: number, ceiling: number, minds: number): string {
   return [
     `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/hour, over its` +
       ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x` +
@@ -199,7 +198,7 @@ export function rateStopMessage(rate: number, ceiling: number, minds: number): s
   ].join('\n')
 }
 
-export function spendStopMessage(spent: number, cap: number): string {
+function spendStopMessage(spent: number, cap: number): string {
   return [
     `STREAM STOPPED: the live cast has spent $${spent.toFixed(4)} of its $${cap.toFixed(2)} cap.`,
     '        Every mind is stopped and no further call will be made. The town on disk is intact',
@@ -207,7 +206,7 @@ export function spendStopMessage(spent: number, cap: number): string {
   ].join('\n')
 }
 
-export function dailyStopMessage(spent: number, budget: number): string {
+function dailyStopMessage(spent: number, budget: number): string {
   return [
     `STREAM STOPPED: the live cast has spent $${spent.toFixed(4)} of its` +
       ` $${budget.toFixed(2)} daily budget.`,

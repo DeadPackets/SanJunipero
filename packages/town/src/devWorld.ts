@@ -15,8 +15,13 @@ import {
   type TileId,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
-import { createGateway, type Gateway } from './server.js'
-import { ensureObserverTables, publishThought } from './observer.js'
+import {
+  createGateway,
+  ensureObserverTables,
+  publishThought,
+  type Gateway,
+  type LiveCast,
+} from '@sj/gateway'
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
@@ -85,25 +90,6 @@ export type DevWorld = {
   /** Enqueue a world law. It lands as one `config_changed` at the next tick boundary, hashed,
    *  snapshotted and replayed like every other fact. See `adminLaws.ts` for the only caller. */
   submitLaw: (path: string, value: unknown) => void
-  stop(): Promise<void>
-}
-
-/**
- * A port, not an import: this file stays free of `@sj/agents` and its onnxruntime. `attach` runs
- * after the loop exists and before the first tick — each needs the other first.
- */
-export type LiveCast = {
-  attach(deps: {
-    loop: TickLoop
-    store: EventStore
-    config: SimConfig
-    /** The world db, in process. A live cast publishes what its minds actually thought into
-     *  `observer_thoughts`, which is the same channel the scripted canned lines used. */
-    db: ReturnType<typeof openDb>
-    /** The scripted handler: the tick-1 town, the world systems, and nothing else when the
-     *  cast is attached (`FoundersOpts.minds`). A live cast wraps it, never replaces it. */
-    world: TickHandler
-  }): TickHandler
   stop(): Promise<void>
 }
 

@@ -17,8 +17,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { createLawsAdmin } from './adminLaws.js'
-import { startDevWorld, type LiveCast } from './devWorld.js'
+import { createLawsAdmin, type LiveCast } from '@sj/gateway'
+import { startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
 export const STREAM_PORT = 8080
@@ -81,7 +81,7 @@ export async function main(): Promise<void> {
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
   const castFactory = (): Promise<LiveCast> =>
-    import('./liveWorld.js').then(({ createLiveCast }) =>
+    import('@sj/live').then(({ createLiveCast }) =>
       createLiveCast({
         agentDbDir: mindsDir,
         narratorDbPath,
