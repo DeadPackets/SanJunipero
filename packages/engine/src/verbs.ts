@@ -7,6 +7,7 @@ import {
   glowRadiusFor,
   inputName,
   isRoofedKind,
+  isPaveable,
   isTravelled,
   isWet,
   isWoody,
@@ -18,6 +19,7 @@ import {
   structureGlowRadius,
   T_FOREST,
   T_GRASS,
+  T_ROAD,
   T_SAPLING,
   type RecipeDef,
   type SimConfig,
@@ -1933,8 +1935,6 @@ const extinguish: VerbDef = makeVerb({
 })
 
 export const STONE_KIND = 'stone'
-// Grass, bare earth and the dirt feet have already worn: all three take a road.
-const PAVEABLE: ReadonlySet<TileId> = new Set<TileId>([0, 1, 8])
 
 // A road is not something the map has; it is something somebody carried stone for.
 const pave: VerbDef = makeVerb({
@@ -1945,7 +1945,7 @@ const pave: VerbDef = makeVerb({
     const p = TileParams.safeParse(params)
     if (!p.success) return 'pave needs a tile {x, y}'
     const tile = tileAt(state, p.data.x, p.data.y)
-    if (tile === null || !PAVEABLE.has(tile)) return 'nothing to pave here'
+    if (tile === null || !isPaveable(tile)) return 'nothing to pave here'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to pave'
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return shortOf(STONE_KIND)
     return null
@@ -1953,13 +1953,13 @@ const pave: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
-    if (tile === null || !PAVEABLE.has(tile)) return []
+    if (tile === null || !isPaveable(tile)) return []
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return []
     return [
       ...consumeHeld(state, agentId, STONE_KIND, config.roads.stonePerTile),
       {
         type: 'tile_changed',
-        payload: { x: p.x, y: p.y, from: tile, to: 7, reason: 'paved', byId: agentId },
+        payload: { x: p.x, y: p.y, from: tile, to: T_ROAD, reason: 'paved', byId: agentId },
       },
     ]
   },

@@ -1,12 +1,9 @@
-import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
-import { fromTileKey, tileKey, type TileId, type WorldState } from '../state.js'
+import { MINUTES_PER_DAY, simTimeFromTick, T_GRASS, T_PATH, type SimConfig } from '@sj/shared'
+import { fromTileKey, tileKey, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Nobody plans a desire path. Feet wear grass to dirt where the town actually goes, and grass
 // takes it back where the town stopped going. Zero RNG anywhere in this law.
-
-const GRASS: TileId = 0
-const PATH: TileId = 8
 
 // A step counts only when it is a step: a body mid-walk, on a world that wears.
 export function countsAsFootfall(state: WorldState, agentId: string, config: SimConfig): boolean {
@@ -29,7 +26,7 @@ export function quietPathsAt(
   for (let y = 0; y < state.terrain.length; y++) {
     const row = state.terrain[y]!
     for (let x = 0; x < row.length; x++) {
-      if (row[x] !== PATH) continue
+      if (row[x] !== T_PATH) continue
       const key = tileKey(x, y)
       if ((traffic[key] ?? 0) >= config.desirePaths.regrowThreshold) continue
       out[key] = state.quietSince?.[key] ?? day
@@ -48,15 +45,15 @@ export function desirePathsSystem(ctx: TickCtx): void {
   for (const key of Object.keys(ctx.state().traffic ?? {}).sort()) {
     if ((ctx.state().traffic?.[key] ?? 0) < cfg.wearThreshold) continue
     const { x, y } = fromTileKey(key)
-    if (ctx.state().terrain[y]?.[x] !== GRASS) continue
-    ctx.emit('tile_changed', { x, y, from: GRASS, to: PATH, reason: 'worn' })
+    if (ctx.state().terrain[y]?.[x] !== T_GRASS) continue
+    ctx.emit('tile_changed', { x, y, from: T_GRASS, to: T_PATH, reason: 'worn' })
   }
 
   for (const key of Object.keys(ctx.state().quietSince ?? {}).sort()) {
     if (day - ctx.state().quietSince![key]! < cfg.overgrowDays) continue
     const { x, y } = fromTileKey(key)
-    if (ctx.state().terrain[y]?.[x] !== PATH) continue
-    ctx.emit('tile_changed', { x, y, from: PATH, to: GRASS, reason: 'overgrown' })
+    if (ctx.state().terrain[y]?.[x] !== T_PATH) continue
+    ctx.emit('tile_changed', { x, y, from: T_PATH, to: T_GRASS, reason: 'overgrown' })
   }
 
   ctx.emit('traffic_decayed', {})

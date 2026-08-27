@@ -20,5 +20,8 @@ export const isWet = (t: number): boolean => t === T_WATER || t === T_CHANNEL
 /** Road and worn path both — the move cost roads changed is already real. */
 export const isTravelled = (t: number): boolean => t === T_ROAD || t === T_PATH
 
+/** Ground a street may be laid over: grass, bare earth, and the dirt feet already wore. */
+export const isPaveable = (t: number): boolean => t === T_GRASS || t === T_EARTH || t === T_PATH
+
 /** Something standing that a swing can take down. */
 export const isWoody = (t: number): boolean => t === T_FOREST || t === T_SAPLING

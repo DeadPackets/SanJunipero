@@ -1,13 +1,9 @@
-import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { MINUTES_PER_DAY, simTimeFromTick, T_FOREST, T_GRASS, T_SAPLING } from '@sj/shared'
 import { fromTileKey, type TileId, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Scarcity is a cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at
 // emission; the maturing is arithmetic on the day the seed was stamped, so the fold stays pure.
-
-const GRASS: TileId = 0
-const FOREST: TileId = 3
-const SAPLING: TileId = 9
 
 const ORTHOGONAL: readonly (readonly [number, number])[] = [
   [0, -1],
@@ -33,16 +29,16 @@ export function regrowthSystem(ctx: TickCtx): void {
   for (const key of Object.keys(ctx.state().saplings ?? {}).sort()) {
     if (day - ctx.state().saplings![key]! < cfg.saplingDays) continue
     const { x, y } = fromTileKey(key)
-    if (ctx.state().terrain[y]?.[x] !== SAPLING) continue
-    ctx.emit('tile_changed', { x, y, from: SAPLING, to: FOREST, reason: 'grown' })
+    if (ctx.state().terrain[y]?.[x] !== T_SAPLING) continue
+    ctx.emit('tile_changed', { x, y, from: T_SAPLING, to: T_FOREST, reason: 'grown' })
   }
 
   const rng = ctx.rng.get('regrowth')
   for (let y = 0; y < ctx.state().terrain.length; y++) {
     for (let x = 0; x < ctx.state().terrain[y]!.length; x++) {
-      if (ctx.state().terrain[y]![x] !== GRASS || !beside(ctx.state(), x, y, FOREST)) continue
+      if (ctx.state().terrain[y]![x] !== T_GRASS || !beside(ctx.state(), x, y, T_FOREST)) continue
       if (rng.next() >= cfg.saplingChancePerDay) continue
-      ctx.emit('tile_changed', { x, y, from: GRASS, to: SAPLING, reason: 'seeded' })
+      ctx.emit('tile_changed', { x, y, from: T_GRASS, to: T_SAPLING, reason: 'seeded' })
     }
   }
 }
