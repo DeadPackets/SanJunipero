@@ -11,10 +11,10 @@ import {
   roadAutotileKind,
   type AssetRecord,
   type TerrainTileKind,
+  type TileId,
 } from '@sj/shared'
-import { type TileId } from '@sj/engine/state'
 import { tilesetPlan } from './ground.js'
-import { ROAD_TILE_ID, TERRAIN_VARIANTS, roadNeighborsAt, tileVariant } from './tileset.js'
+import { TERRAIN_VARIANTS, roadNeighborsAt, tileVariant } from './tileset.js'
 
 // The renderer side. A gateway test cannot import `tilesetPlan` without
 // breaking `tsc -b`: the web package is DOM-typed and bundler-resolved.
@@ -77,7 +77,7 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
 
   it('has roads and grass to draw in the first place', () => {
     const flat = terrain.flat()
-    expect(flat.filter((t) => t === ROAD_TILE_ID).length).toBeGreaterThan(50)
+    expect(flat.filter((t) => t === T_ROAD).length).toBeGreaterThan(50)
     expect(flat.filter((t) => t === 0).length).toBeGreaterThan(50)
   })
 
@@ -100,7 +100,7 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
     let checked = 0
     for (let y = 0; y < terrain.length; y++) {
       for (let x = 0; x < terrain[y]!.length; x++) {
-        if (terrain[y]![x] !== ROAD_TILE_ID) continue
+        if (terrain[y]![x] !== T_ROAD) continue
         const key = roadAutotile(roadNeighborsAt(terrain, x, y))
         const cell = plan[y * CITY_W + x]!
         expect(cell.url, `${x},${y}`).toBe(byKey.get(roadAutotileKind(key)))
@@ -134,7 +134,7 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
     let checked = 0
     for (let y = 0; y < terrain.length; y++) {
       for (let x = 0; x < terrain[y]!.length; x++) {
-        if (terrain[y]![x] !== ROAD_TILE_ID) continue
+        if (terrain[y]![x] !== T_ROAD) continue
         expect(plan[y * CITY_W + x]!.tex).toEqual({
           version: 'v1-terrain-tile',
           kind: 'road',

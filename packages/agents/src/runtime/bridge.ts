@@ -13,7 +13,6 @@ import {
   recipeTileKind,
   submitIntent,
   waterWithinReach,
-  WATER_TILES,
   WELL_KIND,
   type EventStore,
   type TickHandler,
@@ -21,7 +20,7 @@ import {
   type WorldState,
 } from '@sj/engine'
 import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
-import type { SimConfig, SimEvent } from '@sj/shared'
+import { isWet, type SimConfig, type SimEvent } from '@sj/shared'
 import type { PerceptionPacket } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
@@ -276,7 +275,7 @@ export class EngineBridge {
     for (let py = y - radius; py <= y + radius; py++) {
       for (let px = x - radius; px <= x + radius; px++) {
         const tile = state.terrain[py]?.[px]
-        if (tile !== undefined && WATER_TILES.has(tile)) offer(px, py)
+        if (tile !== undefined && isWet(tile)) offer(px, py)
       }
     }
     for (const id of Object.keys(state.structures).sort()) {

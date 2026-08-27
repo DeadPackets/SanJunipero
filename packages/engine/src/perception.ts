@@ -2,6 +2,7 @@ import {
   isBeddedKind,
   isHearthKind,
   isRoofedKind,
+  isTravelled,
   lightBandAt,
   simTimeFromTick,
   visionRadiusAt,
@@ -211,10 +212,6 @@ export type PerceptionPacket = {
   feltEvents: string[]
 }
 
-// Road and worn path both. The advantage is already real — it is the move cost roads
-// changed — and this only says so out loud.
-const TRAVELLED_TILES: ReadonlySet<number> = new Set([7, 8])
-
 function groundUnderfoot(
   state: WorldState,
   config: SimConfig,
@@ -225,7 +222,7 @@ function groundUnderfoot(
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const tile = state.terrain[y + dy]?.[x + dx]
-      if (tile !== undefined && TRAVELLED_TILES.has(tile)) return { wellTravelled: true }
+      if (tile !== undefined && isTravelled(tile)) return { wellTravelled: true }
     }
   }
   return undefined

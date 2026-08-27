@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { FOUNDER_IDS, cityStructures } from '@sj/shared'
+import { FOUNDER_IDS, T_EARTH, T_GRASS, cityStructures } from '@sj/shared'
 import { TOWN_STRUCTURES, townStructuresFor } from './founders.js'
 import { devStructureId, devTown, type DevStructure } from './devTown.js'
-import { GRASS_TILE, SHOWCASE_ANCHOR, SHOWCASE_H, SHOWCASE_W } from './showcaseMap.js'
+import { SHOWCASE_ANCHOR, SHOWCASE_H, SHOWCASE_W } from './showcaseMap.js'
 
 // Same footprint rule as showcaseStructureTiles, over DevStructure's open `kind`.
 const tilesOf = (s: DevStructure): { x: number; y: number }[] => {
@@ -24,7 +24,6 @@ const FROZEN_TOWN_STRUCTURES = [
 
 // EARTH is the template's bank tile; a structure may stand on cleared earth or on grass, and on
 // nothing else. By value, because showcaseMap exports the ids it rasterises, not the T_ names.
-const EARTH_TILE = 1
 
 const town = devTown()
 
@@ -79,7 +78,7 @@ describe('devTown — one town, not two', () => {
       for (const t of tilesOf(s)) {
         const tile = town.terrain[t.y]![t.x]!
         expect(
-          tile === GRASS_TILE || tile === EARTH_TILE,
+          tile === T_GRASS || tile === T_EARTH,
           `${s.id} stands on tile ${tile} at ${t.x},${t.y}`,
         ).toBe(true)
       }

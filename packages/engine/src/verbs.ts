@@ -7,15 +7,18 @@ import {
   glowRadiusFor,
   inputName,
   isRoofedKind,
+  isTravelled,
+  isWet,
+  isWoody,
   litSourceWithin,
   MINUTES_PER_DAY,
   sanitizeSpokenText,
   simTimeFromTick,
   SPEECH_INPUT_MAX_CHARS,
   structureGlowRadius,
-  T_PATH,
-  T_ROAD,
-  WATER_TILES,
+  T_FOREST,
+  T_GRASS,
+  T_SAPLING,
   type RecipeDef,
   type SimConfig,
   type StructureRecipeDef,
@@ -503,7 +506,6 @@ const tend: VerbDef = makeVerb({
   skill: { track: 'medicine', xp: 1 },
 })
 
-export { WATER_TILES }
 export const BUCKET_KIND = 'bucket'
 export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', BUCKET_KIND])
 export const WELL_KIND = 'well'
@@ -513,7 +515,7 @@ export function waterWithinReach(state: WorldState, agentId: string): 'water_til
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const t = state.terrain[a.y + dy]?.[a.x + dx]
-      if (t !== undefined && WATER_TILES.has(t)) return 'water_tile'
+      if (t !== undefined && isWet(t)) return 'water_tile'
     }
   }
   for (const id of Object.keys(state.structures).sort()) {
@@ -840,7 +842,7 @@ const digChannel: VerbDef = makeVerb({
       [0, 1],
     ].some(([dx, dy]) => {
       const t = tileAt(state, p.data.x + dx!, p.data.y + dy!)
-      return t !== null && WATER_TILES.has(t)
+      return t !== null && isWet(t)
     })
     if (!fed) return 'no water reaches here'
     return null
@@ -1280,7 +1282,7 @@ function buildableGroundRefusal(
 function banked(state: WorldState, x: number, y: number): boolean {
   const tile = state.terrain[y]?.[x]
   if (tile === undefined) return false
-  return !WATER_TILES.has(tile) || bridgeAt(state, x, y)
+  return !isWet(tile) || bridgeAt(state, x, y)
 }
 
 // Two or three tiles of deck, every one over water, with a foot on solid ground at each end.
@@ -1299,7 +1301,7 @@ function bridgeSiteRefusal(
   for (let dy = 0; dy < h; dy++) {
     for (let dx = 0; dx < w; dx++) {
       const tile = state.terrain[y + dy]?.[x + dx]
-      if (tile === undefined || !WATER_TILES.has(tile)) return 'a bridge belongs over water'
+      if (tile === undefined || !isWet(tile)) return 'a bridge belongs over water'
       if (bridgeAt(state, x + dx, y + dy)) return 'that spot is taken'
     }
   }
@@ -1333,7 +1335,7 @@ function roadBlockRefusal(
   for (let dy = 0; dy < h; dy++) {
     for (let dx = 0; dx < w; dx++) {
       const tile = state.terrain[y + dy]?.[x + dx]
-      if (tile === T_ROAD || tile === T_PATH) {
+      if (tile !== undefined && isTravelled(tile)) {
         return `that would stand in the way — the ${words(kind)} goes on the ground beside the way, not on it`
       }
     }
@@ -1967,8 +1969,6 @@ const pave: VerbDef = makeVerb({
 
 // A sapling is not timber yet: clearing one costs the swing and yields nothing. Either way the
 // ground goes back to grass, which is what makes the regrowth cycle a cycle and not an ornament.
-const SAPLING_TILE: TileId = 9
-const FOREST_TILE: TileId = 3
 export const CLEAR_TICKS = 4
 export const FELL_TICKS = 30
 export const TIMBER_PER_TREE = 2
@@ -1977,26 +1977,25 @@ const chop: VerbDef = makeVerb({
   kind: 'chop',
   duration(state, _config, _agentId, params) {
     const p = TileParams.parse(params)
-    return tileAt(state, p.x, p.y) === FOREST_TILE ? FELL_TICKS : CLEAR_TICKS
+    return tileAt(state, p.x, p.y) === T_FOREST ? FELL_TICKS : CLEAR_TICKS
   },
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'chop needs a tile {x, y}'
     const tile = tileAt(state, p.data.x, p.data.y)
-    if (tile !== SAPLING_TILE && tile !== FOREST_TILE)
-      return 'there is nothing standing there to cut'
+    if (tile === null || !isWoody(tile)) return 'there is nothing standing there to cut'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to cut'
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
-    if (tile !== SAPLING_TILE && tile !== FOREST_TILE) return []
+    if (tile === null || !isWoody(tile)) return []
     const cleared: PendingEvent = {
       type: 'tile_changed',
-      payload: { x: p.x, y: p.y, from: tile, to: 0, reason: 'cleared', byId: agentId },
+      payload: { x: p.x, y: p.y, from: tile, to: T_GRASS, reason: 'cleared', byId: agentId },
     }
-    if (tile === SAPLING_TILE) return [cleared]
+    if (tile === T_SAPLING) return [cleared]
     return [
       cleared,
       {

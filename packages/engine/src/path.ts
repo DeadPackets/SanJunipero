@@ -1,23 +1,36 @@
-import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  T_CHANNEL,
+  T_EARTH,
+  T_FARMLAND,
+  T_FOREST,
+  T_GRASS,
+  T_PATH,
+  T_ROAD,
+  T_ROCK,
+  T_SAND,
+  T_SAPLING,
+  T_WATER,
+  type SimConfig,
+} from '@sj/shared'
 import type { TileId, WorldState } from './state.js'
 
 export type Point = { x: number; y: number }
 
-// grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel.
 // A channel is impassable but drinkable; a sapling walks like the grass it grew from.
 export function terrainCostFor(config: SimConfig): Record<TileId, number> {
   return {
-    0: 1,
-    1: 1,
-    2: Infinity,
-    3: 2,
-    4: 3,
-    5: 1.2,
-    6: 1,
-    7: config.pathing.roadCost,
-    8: config.desirePaths.pathCost,
-    9: 1,
-    10: Infinity,
+    [T_GRASS]: 1,
+    [T_EARTH]: 1,
+    [T_WATER]: Infinity,
+    [T_FOREST]: 2,
+    [T_ROCK]: 3,
+    [T_SAND]: 1.2,
+    [T_FARMLAND]: 1,
+    [T_ROAD]: config.pathing.roadCost,
+    [T_PATH]: config.desirePaths.pathCost,
+    [T_SAPLING]: 1,
+    [T_CHANNEL]: Infinity,
   }
 }
 

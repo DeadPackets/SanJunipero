@@ -3,6 +3,7 @@ import {
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
   SPAWN_AGE_YEARS,
+  T_SAPLING,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -106,10 +107,6 @@ import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
-
-// The sapling tile id, named here because the fold is the only place outside the regrowth
-// system that has to recognise one.
-const SAPLING_TILE = 9
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.
 function bumpCounter(counters: WorldState['counters'], id: string): WorldState['counters'] {
@@ -1062,10 +1059,10 @@ export function fold(
       )
       // The maturity clock is stamped where the seed fell and dropped however the sapling
       // leaves — grown, chopped, paved or tilled. Nothing else is stored about it.
-      if (p.from !== SAPLING_TILE && p.to !== SAPLING_TILE) return { ...state, terrain }
+      if (p.from !== T_SAPLING && p.to !== T_SAPLING) return { ...state, terrain }
       const key = saplingKey(p.x, p.y)
       const saplings = { ...state.saplings }
-      if (p.to === SAPLING_TILE) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
+      if (p.to === T_SAPLING) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
       else delete saplings[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- key order is hashed
       const next: WorldState = { ...state, terrain }
       if (Object.keys(saplings).length > 0) next.saplings = saplings

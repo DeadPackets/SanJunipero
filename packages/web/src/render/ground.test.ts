@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { ROAD_AUTOTILE_KEYS, roadAutotileKind, type AssetRecord } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
-import { GRASS_TILE_ID, TILE_COLORS, groundPlan, tilesetPlan } from './ground.js'
-import { ROAD_TILE_ID } from './tileset.js'
+import {
+  ROAD_AUTOTILE_KEYS,
+  roadAutotileKind,
+  T_GRASS,
+  T_ROAD,
+  type AssetRecord,
+  type TileId,
+} from '@sj/shared'
+import { TILE_COLORS, groundPlan, tilesetPlan } from './ground.js'
 
 describe('groundPlan', () => {
   it('maps a 2x2 terrain to diamonds at exact screen points with alternating shade', () => {
@@ -65,7 +70,7 @@ function codexWithStrip(): AssetRecord[] {
 // a 3-tile straight north-south road down the middle of a grass field
 function roadStrip(): TileId[][] {
   const g: TileId[][] = Array.from({ length: 5 }, () => Array.from({ length: 3 }, () => 0))
-  for (let y = 1; y <= 3; y++) g[y]![1] = ROAD_TILE_ID
+  for (let y = 1; y <= 3; y++) g[y]![1] = T_ROAD
   return g
 }
 
@@ -95,7 +100,7 @@ describe('tilesetPlan over a 3-tile straight road', () => {
       expect(cell.overlay, 'a ribbon tile must be an overlay').toBe(true)
       expect(cell.base, 'a ribbon tile with no base is a hole onto the background').not.toBeNull()
       // the ground under a road is the field it runs through, painted grass-side
-      expect(cell.base!.fallback).toBe(TILE_COLORS[GRASS_TILE_ID])
+      expect(cell.base!.fallback).toBe(TILE_COLORS[T_GRASS])
       expect(cell.base!.url).not.toBeNull()
       expect(cell.base!.tex?.kind).toBe('grass')
     }

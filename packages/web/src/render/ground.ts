@@ -1,8 +1,13 @@
-import type { AssetRecord, TerrainTileManifest } from '@sj/shared'
-import type { TileId } from '@sj/engine/state'
+import {
+  T_GRASS,
+  T_ROAD,
+  type AssetRecord,
+  type TerrainTileManifest,
+  type TileId,
+} from '@sj/shared'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { roadAutotile } from '@sj/shared'
-import { ROAD_TILE_ID, resolveTerrainTile, roadNeighborsAt } from './tileset.js'
+import { resolveTerrainTile, roadNeighborsAt } from './tileset.js'
 
 // Not the cull's AABB: that is a DIAMOND's bounding box, whose corners are void by construction,
 // and its question is "does this reach the VIEW". `tileToScreen` returns a tile's TOP vertex, so
@@ -74,7 +79,6 @@ export function groundPlan(terrain: TileId[][]): GroundCell[] {
 }
 
 export const GROUND_FALLBACK_COLOR = 0x93b573
-export const GRASS_TILE_ID = 0
 
 const COLOR_BY_ID: Partial<Record<number, number>> = TILE_COLORS
 /** The palette colour for any id a terrain array carries — grass for one this build has no
@@ -106,14 +110,14 @@ export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePl
       const { sx, sy } = tileToScreen(x, y)
       // AMENDMENT (C13 §4): a road tile asks the shared autotiler for its shape first; the
       // flat road variants stay the fallback when no autotiled strip is in the codex.
-      const autotile = id === ROAD_TILE_ID ? roadAutotile(roadNeighborsAt(terrain, x, y)) : null
+      const autotile = id === T_ROAD ? roadAutotile(roadNeighborsAt(terrain, x, y)) : null
       const { manifest, url, overlay } = resolveTerrainTile(records, id, x, y, autotile)
       // A ribbon drawn INSTEAD of the ground shows the stage through its own transparency. The
       // road is painted to meet GRASS at its edges, so grass is what goes underneath it.
       let base: TileLayer | null = null
       if (overlay) {
-        const under = resolveTerrainTile(records, GRASS_TILE_ID, x, y)
-        base = { tex: under.manifest, url: under.url, fallback: TILE_COLORS[GRASS_TILE_ID] }
+        const under = resolveTerrainTile(records, T_GRASS, x, y)
+        base = { tex: under.manifest, url: under.url, fallback: TILE_COLORS[T_GRASS] }
       }
       cells.push({
         sx,

@@ -4,13 +4,14 @@ import {
   roadAutotile,
   type AssetRecord,
   type RoadAutotileKey,
+  T_ROAD,
   type TerrainTileKind,
+  type TileId,
 } from '@sj/shared'
 import { Matrix } from 'pixi.js'
-import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
-import { ROAD_TILE_ID, TILE_KIND, roadNeighborsAt, tileKind } from './tileset.js'
+import { TILE_KIND, roadNeighborsAt, tileKind } from './tileset.js'
 
 // First id wins: C11's path/sapling/channel (8/9/10) alias onto earth/forest/water, and a
 // later duplicate would hand the kind its alias's palette colour instead of its own.
@@ -171,7 +172,7 @@ export const ROAD_UNDER: TerrainTileKind = 'grass'
 export const CALM_ROAD_KIND = 'road-calm'
 
 export function isRoadMass(terrain: TileId[][], x: number, y: number): boolean {
-  const isRoad = (px: number, py: number): boolean => terrain[py]?.[px] === ROAD_TILE_ID
+  const isRoad = (px: number, py: number): boolean => terrain[py]?.[px] === T_ROAD
   for (const [ox, oy] of [
     [0, 0],
     [-1, 0],
@@ -211,7 +212,7 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
       const id = row[x]!
       const { sx, sy } = tileToScreen(x, y)
       const kind = tileKind(id)
-      if (id === ROAD_TILE_ID) {
+      if (id === T_ROAD) {
         // the diamond under the ribbon belongs to the ground the road runs through, and the
         // ribbon itself is a shaped mask over one of the two road materials
         push(ROAD_UNDER, { sx, sy, roadKey: null })
@@ -238,7 +239,7 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
   }
   // road last, over the ground it runs through; calm ribbons and cobbled mass are disjoint
   // sets of tiles, so their order relative to each other never matters
-  const roadFallback = TILE_COLORS[ROAD_TILE_ID]
+  const roadFallback = TILE_COLORS[T_ROAD]
   if (ribbon.length > 0) {
     layers.push({
       id: CALM_ROAD_KIND,

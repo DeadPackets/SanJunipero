@@ -1,8 +1,5 @@
 import type { SimConfig } from './config.js'
-
-// Standing water and a dug channel are the same thing to a root, a mouth and a bucket:
-// one definition site for the whole world.
-export const WATER_TILES: ReadonlySet<number> = new Set([2, 10])
+import { isWet } from './tiles.js'
 
 // A distance function, never a stored gradient: the harvest and the overlay call this same
 // function, so the ground the farmer feels and the ground the viewer draws cannot disagree.
@@ -14,7 +11,7 @@ export function fertilityAt(terrain: number[][], x: number, y: number, config: S
   for (let dy = -reach; dy <= reach; dy++) {
     for (let dx = -reach; dx <= reach; dx++) {
       const tile = terrain[y + dy]?.[x + dx]
-      if (tile === undefined || !WATER_TILES.has(tile)) continue
+      if (tile === undefined || !isWet(tile)) continue
       nearest = Math.min(nearest, Math.max(Math.abs(dx), Math.abs(dy)))
     }
   }

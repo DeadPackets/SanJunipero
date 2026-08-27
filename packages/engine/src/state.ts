@@ -1,20 +1,30 @@
-import type { SimConfig, TownFacing } from '@sj/shared'
+import {
+  T_EARTH,
+  T_FARMLAND,
+  T_FOREST,
+  T_GRASS,
+  T_ROCK,
+  T_SAND,
+  T_WATER,
+  type SimConfig,
+  type TileId,
+  type TownFacing,
+} from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
 
-// grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel
-export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+export type { TileId }
 
 // The ground a recipe is allowed to name, and the one table for it. Road, path, sapling and
 // channel are deliberately absent — a rule may not ask for ground the town has no word for.
 export const RECIPE_TILE_IDS: Readonly<Record<string, TileId>> = {
-  grass: 0,
-  dirt: 1,
-  water: 2,
-  forest: 3,
-  rock: 4,
-  sand: 5,
-  farmland: 6,
+  grass: T_GRASS,
+  dirt: T_EARTH,
+  water: T_WATER,
+  forest: T_FOREST,
+  rock: T_ROCK,
+  sand: T_SAND,
+  farmland: T_FARMLAND,
 }
 
 const RECIPE_TILE_KIND_BY_ID: ReadonlyMap<TileId, string> = new Map(

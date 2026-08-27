@@ -14,6 +14,7 @@ import {
   type PlacedStructure,
 } from './townGrammar.js'
 import { claimAll, plotKey, takenPlots, type Wanted } from './townClaim.js'
+import { isTravelled, T_EARTH, T_GRASS, T_ROAD, T_WATER } from './tiles.js'
 
 // Plats blocks on the 19-tile pitch and stands buildings on plots, so the genesis town and a
 // town thirty builds later come out of one function. In shared: genesis (engine/gateway) reads it.
@@ -87,12 +88,6 @@ export function edgesOwed(
     .map((edge) => ({ edge, owed: margin - clearance[edge] }))
     .filter((x) => x.owed > 0)
 }
-
-export const T_GRASS = 0,
-  T_EARTH = 1,
-  T_WATER = 2,
-  T_ROAD = 7,
-  T_PATH = 8
 
 export type Rect = { dx0: number; dy0: number; dx1: number; dy1: number }
 
@@ -262,7 +257,7 @@ export function cityRoadTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[] {
   return out
 }
 
-export const isRoadTile = (t: CityTile): boolean => t.to === T_ROAD || t.to === T_PATH
+export const isRoadTile = (t: CityTile): boolean => isTravelled(t.to)
 
 // ---------------------------------------------------------------- structures
 

@@ -1,5 +1,7 @@
 import {
   CITY_GROUND,
+  isWet,
+  T_FARMLAND,
   T_GRASS,
   T_ROAD,
   TOWN_SQUARE,
@@ -60,8 +62,6 @@ export function standingRects(state: WorldState): WorldRect[] {
     .map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h }))
 }
 
-const WET: ReadonlySet<number> = new Set([2, 10]) // open water and a dug channel
-
 /** Unions the grammar's channel with the world's water: the fork reaches the lattice at ring 3,
  *  where blocks (0,-3) and (1,-3) would stand in it. Off-array reads DRY — absent is not wet. */
 export function townGroundOf(state: WorldState, square: WorldXY): Ground {
@@ -69,7 +69,7 @@ export function townGroundOf(state: WorldState, square: WorldXY): Ground {
     const g = CITY_GROUND(dx, dy)
     if (g !== 'dry') return g
     const tile = state.terrain[square.y + dy]?.[square.x + dx]
-    return tile !== undefined && WET.has(tile) ? 'water' : 'dry'
+    return tile !== undefined && isWet(tile) ? 'water' : 'dry'
   }
 }
 
@@ -82,7 +82,7 @@ export function townWalkOf(state: WorldState, square: WorldXY): Walk {
       y = square.y + dy
     const tile = state.terrain[y]?.[x]
     if (tile === undefined) return false
-    return !WET.has(tile) || bridgeAt(state, x, y)
+    return !isWet(tile) || bridgeAt(state, x, y)
   }
 }
 
@@ -139,7 +139,7 @@ export function layBlock(
       if (from === undefined) return 'off the map'
       // A field and a street are somebody's work; a channel is not spared, because it is
       // impassable and a plot the town can never build on is worse than a lost ditch.
-      if (reason === 'levelled' && (from === 6 || from === T_ROAD)) continue
+      if (reason === 'levelled' && (from === T_FARMLAND || from === T_ROAD)) continue
       if (from !== to) out.push({ x: t.x, y: t.y, from, to, reason })
     }
   }
