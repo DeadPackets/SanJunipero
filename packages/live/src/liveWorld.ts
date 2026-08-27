@@ -11,7 +11,7 @@ import {
   PREFLIGHT_ROUNDS,
   bootMinds,
   ensureChildren,
-  hasPersonality,
+  needsHousehold,
   openAgentDb,
   preflightRefusal,
   runPreflight,
@@ -491,13 +491,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               }
             })())
 
-      // A child whose seeding a crash cut short has no personality yet. It comes up the way a
-      // live birth does — household first, then the mind — so this boot can finish it.
-      const unseeded = cast.filter(
-        (m) => m.bornDay !== undefined && !hasPersonality(dbFor(m.id), m.id),
-      )
+      // A child still owed its household comes up the way a live birth does — household
+      // first, then the mind — so `ensureChildren` below is what boots it.
       booted = bootMinds({
-        minds: cast.filter((m) => !unseeded.includes(m)),
+        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
         bridge,
         embedder,
         dbFor,

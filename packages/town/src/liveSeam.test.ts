@@ -1,6 +1,5 @@
 // The live seam is a fact of the package graph, not a list of filenames: `@sj/town` declares
 // none of the mind packages, and a static-import walk from `serve.ts` reaches none of them.
-// A sixth file added to this package is guarded on the day it lands.
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,14 +19,22 @@ const BANNED = [
   '@openrouter/ai-sdk-provider',
   '@huggingface/transformers',
 ]
+/** All but the transformer, which `Embedder.create` await-imports — see `followDynamic` below. */
+const BANNED_STATICALLY = BANNED.filter((b) => b !== '@huggingface/transformers').sort()
 
-// `from 'x'` on one line and across a braced list (minus the type-only forms tsc erases), and a
-// bare `import 'x'`. `import('x')` is deliberately absent: the seam IS a dynamic import.
+// `[^;'"]` crosses newlines but not another statement's specifier, so every multi-line form is
+// seen. `import('x')` is deliberately absent: the seam IS a dynamic import.
 const STATIC_RES = [
-  /(?:^|\n)\s*(?:import|export)(?!\s+type\b)\b[^;\n]*?from\s*'([^']+)'/g,
-  /(?:^|\n)\s*(?:import|export)(?!\s+type\b)\s*\{[^}]*\}\s*from\s*'([^']+)'/g,
+  /(?:^|\n)\s*(?:import|export)(?!\s+type\b)\b[^;'"]*?\bfrom\s*'([^']+)'/g,
   /(?:^|\n)\s*import\s*'([^']+)'/g,
 ]
+
+const exportsOf = new Map<string, Record<string, string> | undefined>()
+const manifest = (pkg: string): Record<string, unknown> =>
+  JSON.parse(readFileSync(join(REPO, 'packages', pkg, 'package.json'), 'utf8')) as Record<
+    string,
+    unknown
+  >
 
 /** The file a specifier loads: relative by path, workspace by the package's `exports` map. */
 function resolveSpec(spec: string, fromFile: string): string | null {
@@ -37,22 +44,25 @@ function resolveSpec(spec: string, fromFile: string): string | null {
     return null
   }
   if (!spec.startsWith('@sj/')) return null
-  const [, name, ...rest] = spec.split('/')
-  const dir = join(REPO, 'packages', name ?? '')
-  if (!existsSync(join(dir, 'package.json'))) return null
-  const map = (
-    JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as
-      | { exports?: Record<string, string> }
-      | undefined
-  )?.exports
-  const target = map?.[rest.length === 0 ? '.' : `./${rest.join('/')}`]
-  return target === undefined ? null : join(dir, target)
+  const [, name = '', ...rest] = spec.split('/')
+  if (!exportsOf.has(name))
+    exportsOf.set(
+      name,
+      existsSync(join(REPO, 'packages', name, 'package.json'))
+        ? (manifest(name).exports as Record<string, string> | undefined)
+        : undefined,
+    )
+  const target = exportsOf.get(name)?.[rest.length === 0 ? '.' : `./${rest.join('/')}`]
+  return target === undefined ? null : join(REPO, 'packages', name, target)
 }
 
+type Walk = { banned: string[]; unresolved: string[] }
+
 /** Every banned specifier a `from '<entry>'` actually loads, walking the whole static graph. */
-function bannedReachedFrom(entry: string): string[] {
+function walkFrom(entry: string): Walk {
   const seen = new Set<string>()
-  const hits = new Set<string>()
+  const banned = new Set<string>()
+  const unresolved = new Set<string>()
   const queue = [entry]
   while (queue.length > 0) {
     const file = queue.shift()!
@@ -62,45 +72,43 @@ function bannedReachedFrom(entry: string): string[] {
     for (const re of STATIC_RES)
       for (const m of src.matchAll(re)) {
         const spec = m[1]!
-        if (BANNED.includes(spec)) hits.add(spec)
+        if (BANNED.includes(spec)) banned.add(spec)
         const next = resolveSpec(spec, file)
-        if (next !== null) queue.push(next)
+        // An `@sj/*` the walk cannot open is a hole in the walk, not a clean subtree.
+        if (next === null) {
+          if (spec.startsWith('@sj/')) unresolved.add(spec)
+        } else queue.push(next)
       }
   }
-  return [...hits].sort()
+  return { banned: [...banned].sort(), unresolved: [...unresolved].sort() }
 }
-
-const manifest = (
-  pkg: string,
-): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } =>
-  JSON.parse(readFileSync(join(REPO, 'packages', pkg, 'package.json'), 'utf8')) as never
 
 describe('★ the default stays scripted and free', () => {
   it('the town declares none of the mind packages', () => {
-    const { dependencies = {}, devDependencies = {} } = manifest('town')
-    const declared = [...Object.keys(dependencies), ...Object.keys(devDependencies)]
+    const deps = manifest('town') as {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const declared = [
+      ...Object.keys(deps.dependencies ?? {}),
+      ...Object.keys(deps.devDependencies ?? {}),
+    ]
     expect(declared.filter((d) => BANNED.includes(d))).toEqual([])
     // …and it does declare the live half, or the seam below would be vacuous.
     expect(declared).toContain('@sj/live')
   })
 
   it('nothing static from serve.ts reaches an LLM, its SDK or the mind packages', () => {
-    expect(bannedReachedFrom(join(HERE, 'serve.ts'))).toEqual([])
+    expect(walkFrom(join(HERE, 'serve.ts'))).toEqual({ banned: [], unresolved: [] })
   })
 
   it('NOT VACUOUS: the same walk from @sj/live reaches all of them', () => {
-    // Without this the walk above passes just as well on a walker that resolves nothing. The
-    // transformer is the one exception: `Embedder.create` await-imports it, and this walk does
-    // not follow dynamic imports.
-    expect(bannedReachedFrom(join(REPO, 'packages/live/src/index.ts'))).toEqual(
-      BANNED.filter((b) => b !== '@huggingface/transformers').sort(),
-    )
-  })
-
-  it('and it sees a multi-line import, which is how liveWorld.ts writes them', () => {
-    // `[^;\n]*?` cannot cross the newline in `import {\n  bootMinds,\n} from '@sj/agents'`, and
-    // that is exactly the form the live file uses.
-    expect(bannedReachedFrom(join(REPO, 'packages/live/src/liveWorld.ts'))).toContain('@sj/agents')
+    // Without this the walk above passes just as well on a walker that resolves nothing —
+    // including through `liveWorld.ts`'s multi-line `import {\n …\n} from '@sj/agents'`.
+    expect(walkFrom(join(REPO, 'packages/live/src/index.ts'))).toEqual({
+      banned: BANNED_STATICALLY,
+      unresolved: [],
+    })
   })
 
   it('serve.ts reaches the live world only through a dynamic import behind the flag', () => {

@@ -15,8 +15,8 @@ import { openAgentDb } from '../memory/schema.js'
 import type { PersonalityDoc } from '../personality.js'
 import { EngineBridge } from '../runtime/bridge.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
-import { bootMinds, hasPersonality, type MindSpec } from './liveMinds.js'
-import { ensureChildren } from './ensureChild.js'
+import { bootMinds, type MindSpec } from './liveMinds.js'
+import { ensureChildren, needsHousehold } from './ensureChild.js'
 import { resolveCast } from './resolveCast.js'
 import { wireBirths } from './newborn.js'
 
@@ -160,10 +160,8 @@ async function town(
   // to it over the same log.
   const boot = () => {
     const cast = resolveCast(FOUNDERS, store, maxMinds)
-    const seeded = (m: MindSpec): boolean =>
-      m.bornDay === undefined || hasPersonality(dbFor(m.id), m.id)
     const booted = bootMinds({
-      minds: cast.filter(seeded),
+      minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
       bridge,
       embedder,
       dbFor,

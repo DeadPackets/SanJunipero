@@ -227,11 +227,14 @@ describe('observer data apis', () => {
 
     const rows = (await (await fetch(`${base}/api/agent/carl/journal`)).json()) as {
       tick: number
-      text: string
+      kind: string
     }[]
-    expect(rows).toHaveLength(2 * JOURNAL_MAX)
-    expect(rows[0]!.tick).toBe(over - JOURNAL_MAX)
+    expect(rows).toHaveLength(JOURNAL_MAX)
+    // The newest of the MERGE, not of each half: one row of each kind per tick, so the cap
+    // reaches half as far back and still ends at the last thing this mind wrote.
+    expect(rows[0]!.tick).toBe(over - JOURNAL_MAX / 2)
     expect(rows.at(-1)!.tick).toBe(over - 1)
+    expect(new Set(rows.map((r) => r.kind))).toEqual(new Set(['journal', 'dream']))
   })
 
   it('provenance from the events scan, completedTick null while building', async () => {

@@ -304,7 +304,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   })
 
   // A dream is a memory row and not a journal row, so the feed is two reads merged. Each half
-  // reads its newest `JOURNAL_MAX`; the sort below puts the merge back in written order.
+  // reads its newest `JOURNAL_MAX` and is turned back the right way up before the merge.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
     const id = params.id ?? ''
     const rows = [
@@ -312,17 +312,14 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
         id,
         `SELECT tick, day, text, 'journal' AS kind FROM journal WHERE agent_id = ?
          ORDER BY id DESC LIMIT ${JOURNAL_MAX}`,
-      ),
+      ).reverse(),
       ...readAgentRows<JournalRow>(
         id,
         `SELECT tick, day, text, 'dream' AS kind FROM memories WHERE agent_id = ? AND kind = 'dream'
          ORDER BY id DESC LIMIT ${JOURNAL_MAX}`,
-      ),
+      ).reverse(),
     ]
-    sendJson(
-      res,
-      rows.sort((a, b) => a.tick - b.tick),
-    )
+    sendJson(res, rows.sort((a, b) => a.tick - b.tick).slice(-JOURNAL_MAX))
   })
 
   router.route('GET', '/api/agent/:id/ledgers', (_req, res, params) => {

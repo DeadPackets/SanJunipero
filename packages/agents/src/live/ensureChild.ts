@@ -18,18 +18,28 @@ export type HouseholdDeps = {
   homeOf: (agentId: string) => string
 }
 
-const countMemories = (db: Database.Database, agentId: string): number =>
-  (
-    db.prepare('SELECT COUNT(*) AS n FROM memories WHERE agent_id = ?').get(agentId) as {
-      n: number
-    }
-  ).n
+/** A child still owed its household: booting stamps the personality, so no personality means
+ *  the seeding never finished. Founders have no `bornDay` and are never owed one. */
+export const needsHousehold = (spec: MindSpec, db: Database.Database): boolean =>
+  spec.bornDay !== undefined && !hasPersonality(db, spec.id)
 
-/**
- * The household a child was born into, written down as its first memories. Call it before the
- * mind is booted: booting stamps the personality, and until that row exists nothing but a seed
- * can have written to this database — which is what lets a half-written one resume in place.
- */
+/** Every seed entry carries the `event:<seq>` it was made from, which is what a repair reads. */
+const seedTag = (tags: readonly string[]): string => tags.find((t) => t.startsWith('event:')) ?? ''
+
+const writtenSeedTags = (db: Database.Database, agentId: string): Set<string> =>
+  new Set(
+    (
+      db
+        .prepare(
+          `SELECT t.tag FROM memory_tags t JOIN memories m ON m.id = t.memory_id
+           WHERE m.agent_id = ? AND t.kind = 'topic' AND t.tag LIKE 'event:%'`,
+        )
+        .all(agentId) as { tag: string }[]
+    ).map((r) => r.tag),
+  )
+
+/** The household a child was born into, written down as its first memories. Idempotent by the
+ *  event each entry came from, so a seeding a crash cut short resumes without repeating one. */
 export async function ensureHousehold(
   deps: HouseholdDeps,
   born: AgentBornPayload,
@@ -42,8 +52,9 @@ export async function ensureHousehold(
     homeStructureId: deps.homeOf(born.id),
     upToTick: tick,
   })
+  const written = writtenSeedTags(deps.db, born.id)
   const mem = new MemoryStore(deps.db, born.id, deps.embedder)
-  for (const entry of seed.slice(countMemories(deps.db, born.id))) {
+  for (const entry of seed.filter((e) => !written.has(seedTag(e.tags)))) {
     // The household reached this mind the way anything else does; nothing here is its own act.
     await mem.insertMemory({
       tick,
@@ -68,32 +79,37 @@ export type EnsureChildrenOpts = {
   boot: (spec: MindSpec) => void
 }
 
-/**
- * A birth writes two things outside the world log: the household it was born into, and what its
- * mother calls it. A crash between them leaves a child with a mind and no origin and nothing
- * retries, so every boot finishes what the last one started. Both halves are idempotent.
- */
+type ResolvedBirth = { spec: MindSpec; born: AgentBornPayload; mother: MindSpec; tick: number }
+
+/** A birth writes two things outside the world log — the household it was born into and what
+ *  its mother calls it — and a crash between them leaves a child with a mind and no origin. */
 export async function ensureChildren(opts: EnsureChildrenOpts): Promise<void> {
   migrateFamilyTables(opts.opsDb)
+  const births: ResolvedBirth[] = []
   for (const ev of opts.store.readTypeFrom(0, 'agent_born')) {
     const born = AgentBorn.parse(ev.payload)
     const spec = opts.cast.get(born.id)
     const mother = opts.cast.get(born.motherId)
-    if (spec === undefined || mother === undefined) continue
-    const db = opts.dbFor(born.id)
-    if (!hasPersonality(db, born.id)) {
-      await ensureHousehold(
-        { store: opts.store, db, embedder: opts.embedder, homeOf: opts.homeOf },
-        born,
-        ev.tick,
-      )
-      opts.boot(spec)
-    }
-    if (!hasSocialName(opts.opsDb, born.id))
-      await captureSocialName(opts.namingLlm, opts.opsDb, {
-        born,
-        motherPersona: personaOf(mother),
-        tick: ev.tick,
-      })
+    if (spec !== undefined && mother !== undefined)
+      births.push({ spec, born, mother, tick: ev.tick })
+  }
+  // Households first: no child's mind waits behind another child's naming call.
+  for (const b of births) {
+    const db = opts.dbFor(b.born.id)
+    if (!needsHousehold(b.spec, db)) continue
+    await ensureHousehold(
+      { store: opts.store, db, embedder: opts.embedder, homeOf: opts.homeOf },
+      b.born,
+      b.tick,
+    )
+    opts.boot(b.spec)
+  }
+  for (const b of births) {
+    if (hasSocialName(opts.opsDb, b.born.id)) continue
+    await captureSocialName(opts.namingLlm, opts.opsDb, {
+      born: b.born,
+      motherPersona: personaOf(b.mother),
+      tick: b.tick,
+    })
   }
 }

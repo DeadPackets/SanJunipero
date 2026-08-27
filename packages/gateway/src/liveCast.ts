@@ -2,12 +2,10 @@ import type { SimConfig } from '@sj/shared'
 import type { EventStore, openDb } from '@sj/engine/store'
 import type { TickHandler, TickLoop } from '@sj/engine'
 
-/**
- * A port, not an import: `@sj/town` hands the bodies to whatever satisfies this, and only
- * `@sj/live` does. It is declared here because the observatory is the floor both halves stand
- * on. `attach` runs after the loop exists and before the first tick — each needs the other first.
- */
+/** A port, not an import: `@sj/town` hands the bodies to whatever satisfies this and only
+ *  `@sj/live` does. Declared here because the observatory is the floor both halves stand on. */
 export type LiveCast = {
+  /** Runs after the loop exists and before the first tick — each needs the other first. */
   attach(deps: {
     loop: TickLoop
     store: EventStore

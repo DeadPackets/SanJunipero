@@ -58,9 +58,9 @@ export default tseslint.config(
     },
   },
   {
-    // `@sj/live`'s tests compose the town that loads it, so they are checked by a project of
-    // their own — the src project may not reference `@sj/town` without a reference cycle.
-    files: ['packages/live/src/**/*.test.ts'],
+    // This one test composes the town that loads it, so it is checked by a project of its own —
+    // the src project may not reference `@sj/town` without a reference cycle.
+    files: ['packages/live/src/liveWorld.test.ts'],
     languageOptions: {
       parserOptions: {
         projectService: false,
