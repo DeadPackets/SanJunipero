@@ -22,8 +22,7 @@ import {
   FALLBACK_DIGEST_CHARS,
   type ReflectionLlm,
 } from './reflection.js'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
+import { FORBIDDEN_FRAMING, scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
 const AGENT = 'tamar'
 const DAY = 3
 const TICKS_PER_DAY = 1440

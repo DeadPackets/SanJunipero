@@ -7,16 +7,6 @@ export {
   reconsiderTick,
   type Turn,
 } from './turn.js'
-export {
-  assertNoGlassLeak,
-  CONSTRUCT_VOCABULARY,
-  scanForLayoutLeak,
-  scanPromptForGlassLeak,
-  scanRulingForGlassLeak,
-  TOWN_LAYOUT_VOCABULARY,
-  UNNAMED_CONSTRUCT_COPY,
-  type RulingVocabulary,
-} from './prompt/glassScan.js'
 // The live seam's public face: what a caller outside this package needs to boot a mind,
 // exported by package name so a served world does not have to reach in by relative path.
 export {

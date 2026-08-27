@@ -213,6 +213,3 @@ export function assertNoGlassLeak(text: string, where: string): void {
   const leaks = scan(fold(text), OPS_ONLY_PATTERNS)
   if (leaks.length > 0) throw new Error(`one-way glass leak in ${where}: ${leaks.join(', ')}`)
 }
-
-// One declaration, in @sj/shared, so the viewer copy and the glass-side copy cannot drift.
-export { UNNAMED_CONSTRUCT_COPY } from '@sj/shared'

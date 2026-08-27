@@ -1,8 +1,7 @@
 // San Junipero is contemporary rural and hands-on. These assertions keep the canon and the
 // era ladder in that century.
 import { describe, expect, it } from 'vitest'
-import { scanPromptForGlassLeak } from '@sj/agents'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
 import { CANON, ERAS, ERA_ORDER, GENESIS_CODEX } from './canon.js'
 import { CodexStore } from './codex.js'
 import { openArbiterDb } from './schema.js'

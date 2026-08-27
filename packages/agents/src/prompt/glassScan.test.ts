@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { MINUTES_PER_DAY, assertQuotedName, simTimeFromTick } from '@sj/shared'
-import { assemblePrompt } from './assemble.js'
 import {
+  MINUTES_PER_DAY,
+  assertQuotedName,
+  simTimeFromTick,
   CONSTRUCT_VOCABULARY,
   MID_RUN_ENFORCED,
   scanForDirective,
@@ -10,7 +11,8 @@ import {
   scanRulingForGlassLeak,
   TOWN_LAYOUT_VOCABULARY,
   UNNAMED_CONSTRUCT_COPY,
-} from './glassScan.js'
+} from '@sj/shared'
+import { assemblePrompt } from './assemble.js'
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'

@@ -1,5 +1,5 @@
-import { SPEECH_MAX_CHARS } from '@sj/shared'
-import { heardLine, scanPromptForGlassLeak, scanRulingForGlassLeak } from '@sj/agents'
+import { SPEECH_MAX_CHARS, scanPromptForGlassLeak, scanRulingForGlassLeak } from '@sj/shared'
+import { heardLine } from '@sj/agents'
 
 // Prompt-injection payloads at both untrusted-speech surfaces: the arbiter (`fenceIntent`) and
 // a mind's prose render (`sanitizeSpokenText`). Every row is a delta against the pre-fix render.

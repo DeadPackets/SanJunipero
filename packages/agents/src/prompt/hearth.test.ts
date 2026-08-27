@@ -10,10 +10,15 @@ import {
   warmthTargetFor,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  type SimEvent,
+  scanForDirective,
+  scanForLayoutLeak,
+  scanPromptForGlassLeak,
+} from '@sj/shared'
 import { FLAT_WORLD, wireTown } from '../testutil/fixtures.js'
 import { EngineBridge } from '../runtime/bridge.js'
-import { scanForDirective, scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 import { perceptionToProse } from './prose.js'
 

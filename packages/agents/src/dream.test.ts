@@ -5,7 +5,7 @@ import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
 import { insertLlmCall, migrateLlmTables, BudgetExceededError, LlmClient } from '@sj/llm'
 import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
-import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
 import { DREAM_PROMPT, dreamFragmentsMessage, makeDreamLlm, rollDream } from './dream.js'
 
 const TICKS_PER_DAY = 1440
