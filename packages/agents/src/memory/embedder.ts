@@ -1,4 +1,4 @@
-import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers'
+import type { FeatureExtractionPipeline } from '@huggingface/transformers'
 
 const MODEL = 'Xenova/bge-small-en-v1.5'
 export const EMBEDDING_DIM = 384
@@ -6,7 +6,9 @@ export const EMBEDDING_DIM = 384
 export class Embedder {
   private constructor(private readonly extractor: FeatureExtractionPipeline) {}
 
+  // Imported here, not at module scope: onnxruntime is ~128 MB and only an embed needs it.
   static async create(cacheDir = 'data/models'): Promise<Embedder> {
+    const { env, pipeline } = await import('@huggingface/transformers')
     env.cacheDir = cacheDir
     const extractor = await pipeline('feature-extraction', MODEL)
     return new Embedder(extractor)
