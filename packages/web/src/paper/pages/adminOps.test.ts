@@ -139,6 +139,8 @@ describe('★ the whole page is the operator’s, and a viewer without a key see
       createElement(LawsPage, {
         tab: 'Admin',
         subject: null,
+        thing: null,
+        momentId: null,
         store: createWorldStore(),
         scene: null,
         operatorToken,
@@ -148,6 +150,7 @@ describe('★ the whole page is the operator’s, and a viewer without a key see
         onInside: () => {},
         onJump: () => {},
         onLive: () => {},
+        onMoment: () => {},
       }),
     )
 
