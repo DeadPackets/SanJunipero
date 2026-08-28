@@ -930,6 +930,14 @@ body {
    PER-BAND COLOUR: no palette token clears AA on both a light ground and a dark one — the dual-band
    set is EMPTY. Opacity is never the strategy. */
 
+/* what the viewer just clicked on the ground, over the record that answers for it */
+.found-clicked {
+  margin: 0 0 0.5rem; padding: 0.35rem 0.5rem;
+  font-size: 0.875rem; color: var(--ink);
+  background: var(--cream); box-shadow: var(--frame-tight);
+  border-left: 4px solid var(--honey);
+}
+
 .discovery-chain {
   /* --sand on --parchment is 1.19:1: the rule meant to bind the panel into one history was
      invisible. --ink-quiet is 5.83 on parchment. */
@@ -997,6 +1005,19 @@ body {
   animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
 }
 @keyframes stage-plate-in { to { opacity: 1; } }
+
+/* ── the figures, for the keyboard: one focus box over each person the camera can see.
+   They take no clicks — the canvas owns the pointer — and show nothing but their focus ring. ── */
+.stage-figures { position: absolute; inset: 0; pointer-events: none; }
+/* The box is sized and placed by the stage loop, which is the only thing that knows how big a
+   body is drawn at this zoom. */
+.stage-figure {
+  position: absolute; left: 0; top: 0; padding: 0;
+  background: none; border: 0; border-radius: 2px;
+  pointer-events: none;
+  visibility: hidden;   /* until anchor.ts has a camera to place it against */
+}
+.stage-figure:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
 
 /* ── the subject ring: four things to ask, standing round the person you asked ── */
 .stage-ring {
@@ -1267,10 +1288,24 @@ body {
 }
 
 /* ── the bonds graph, inside the sheet ── */
-.bonds-graph { position: relative; display: grid; gap: 0.4rem; min-height: 20rem; }
+.bonds-graph {
+  position: relative; display: flex; flex-direction: column; gap: 0.4rem; height: 30rem;
+}
+/* The canvas's own cell, with a size that does NOT come from the canvas: `flex-basis: 0` and
+   `overflow: hidden` are what stop force-graph measuring itself bigger every frame. The night
+   ground is the CELL's, not the canvas's — force-graph writes the canvas's own background. */
+.bonds-canvas {
+  position: relative; flex: 1 1 0; min-height: 14rem; overflow: hidden;
+  background: var(--night);
+}
 .bonds-views { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
-.bonds-graph canvas { background: var(--night); }
 .bond-detail { position: static; width: auto; max-height: 18rem; overflow-y: auto; }
+/* the institution key: a ring, not a line — the mark it explains is drawn round a person */
+.legend-halo {
+  display: inline-flex; align-items: center; gap: 0.3rem; flex: none;
+  font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase; color: var(--ink);
+}
+.legend-halo svg { flex: none; }
 
 /* ── the laws, read and written ── */
 .laws, .laws-admin { display: grid; gap: 0.4rem; font-size: 0.875rem; }
@@ -1279,3 +1314,61 @@ body {
 [data-broadcast='on'] .paper,
 [data-broadcast='on'] .town-dim,
 [data-broadcast='on'] .fps-overlay { display: none; }
+
+/* ══ THE BROADCAST FRAME ══════════════════════════════════════════════════════════════════
+   1080p into a 480px player is a quarter scale, so every size below is FOUR TIMES the desk
+   chrome's. `broadcast.ts`'s BROADCAST_CAPTIONS names each of these and its test measures them
+   against the 5.4px subtitle floor. Only the two marks the stream adds are styled here; the
+   stamp and the cue are the stage's own, enlarged. */
+
+[data-broadcast='on'] .stage-stamp { font-size: 24px; }
+[data-broadcast='on'] .stage-cue { font-size: 24px; bottom: 88px; }
+
+/* ── the lower third: who is talking, on a plate of the town's own parchment ── */
+[data-broadcast='on'] .lower-third {
+  position: absolute; left: 4%; bottom: 88px; z-index: 26;
+  display: flex; align-items: stretch; gap: 12px;
+  max-width: 64%;
+  padding: 12px;
+  background: var(--parchment); color: var(--ink);
+  box-shadow: var(--frame);
+  border-bottom: 6px solid var(--honey);
+}
+[data-broadcast='on'] .lower-third-bust {
+  flex: 0 0 auto; width: 96px; height: 96px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;   /* the bust IS world art */
+  box-shadow: var(--frame-tight);
+}
+[data-broadcast='on'] .lower-third-bust.none { background-color: var(--sand); }
+[data-broadcast='on'] .lower-third-body {
+  display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0;
+}
+[data-broadcast='on'] .lower-third-name {
+  font-family: var(--font-px); font-size: 24px; line-height: 1.1;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+  align-self: flex-start; padding: 4px 10px;
+}
+[data-broadcast='on'] .lower-third-words {
+  font-family: var(--font-body); font-size: 32px; font-weight: 500; line-height: 1.25;
+  color: var(--ink);
+}
+
+/* ── the ticker: the town's own record along the bottom letterbox edge ── */
+[data-broadcast='on'] .stage-ticker {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
+  display: flex; align-items: center; height: 56px;
+  overflow: hidden; white-space: nowrap;
+  background: var(--ink);
+  border-top: 4px solid var(--honey);
+}
+/* NO padding: the line is written twice and the crawl wraps on half its own width, so padding
+   here is both a blank bar at the top of a stream and a gap at every wrap. */
+[data-broadcast='on'] .ticker-line {
+  display: inline-block; padding: 0;
+  font-family: var(--font-px); font-size: 24px; line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  will-change: transform;
+}

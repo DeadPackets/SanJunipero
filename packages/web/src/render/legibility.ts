@@ -48,6 +48,9 @@ export const WORLD_TEXT_PAIRS: readonly WorldTextPair[] = [
   { what: 'speech bubble', ink: SPEECH_INK, paper: SPEECH_FILL },
   { what: 'thought bubble', ink: THOUGHT_INK, paper: THOUGHT_FILL },
   { what: 'landmark name', ink: LANDMARK_INK, paper: LANDMARK_PLATE },
+  // A carved name brings no paper of its own: its ink halo IS its paper, which is the
+  // landmark pair turned over.
+  { what: 'toponym', ink: LANDMARK_PLATE, paper: LANDMARK_INK },
   // a hover tag and a name tag are drawn on the speech material (tooltip.ts, characters.ts)
   { what: 'hover tag', ink: SPEECH_INK, paper: SPEECH_FILL },
 ]

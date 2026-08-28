@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
-import { PageBody } from './pages/index.js'
+import { PageBody, type Thing } from './pages/index.js'
 import {
   GRIP_CLOSE_PX,
   PAGE_TABS,
@@ -18,6 +18,8 @@ export function Paper({
   page,
   tab,
   subject,
+  thing,
+  momentId,
   store,
   scene,
   operatorToken,
@@ -29,10 +31,13 @@ export function Paper({
   onInside,
   onJump,
   onLive,
+  onMoment,
 }: {
   page: PageKey | null
   tab: string
   subject: Subject | null
+  thing: Thing | null
+  momentId: number | null
   store: WorldStore
   scene: Scene | null
   operatorToken: string | null
@@ -44,6 +49,7 @@ export function Paper({
   onInside: (structureId: string | null) => void
   onJump: (tick: number) => void
   onLive: () => void
+  onMoment: (id: number | null) => void
 }) {
   const open = page !== null
   const tabsRef = useRef<HTMLDivElement>(null)
@@ -148,6 +154,8 @@ export function Paper({
               page={key}
               tab={current}
               subject={subject}
+              thing={thing}
+              momentId={momentId}
               store={store}
               scene={scene}
               operatorToken={operatorToken}
@@ -157,6 +165,7 @@ export function Paper({
               onInside={onInside}
               onJump={onJump}
               onLive={onLive}
+              onMoment={onMoment}
             />
           ) : null}
         </div>

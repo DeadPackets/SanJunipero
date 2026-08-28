@@ -194,8 +194,9 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
         ),
         institutions: readOrEmpty(
           db,
-          `SELECT s.day AS day, i.kind, i.name, i.description FROM institutions i
-           JOIN scenes s ON s.id = i.founding_scene_id ORDER BY s.day DESC LIMIT ${DISPATCH_MAX}`,
+          `SELECT s.day AS day, i.kind, i.name, i.description, i.member_ids AS memberIds
+           FROM institutions i JOIN scenes s ON s.id = i.founding_scene_id
+           ORDER BY s.day DESC LIMIT ${DISPATCH_MAX}`,
         ),
         // One reading a day: the hottest scene the narrator scored is what the day felt like.
         heat: readOrEmpty(

@@ -9,9 +9,16 @@ import { FoundPage } from './Found.js'
 import { LawsPage } from './Laws.js'
 import { PersonPage } from './Person.js'
 
+/** A thing on the ground the viewer clicked. A structure is a `Subject`; these are not. */
+export type Thing = { kind: 'item' | 'crop'; id: string }
+
 export type PageProps = {
   tab: string
   subject: Subject | null
+  /** the item or crop the viewer last clicked on the town, for Found › Things to open at */
+  thing: Thing | null
+  /** the recorded day the address bar names, for Chronicle › Moments to open at */
+  momentId: number | null
   store: WorldStore
   scene: Scene | null
   operatorToken: string | null
@@ -25,6 +32,8 @@ export type PageProps = {
   onJump: (tick: number) => void
   /** Back to the live edge. */
   onLive: () => void
+  /** The recorded day the filmstrip has open, so the address bar names it. */
+  onMoment: (id: number | null) => void
 }
 
 export function PageBody({ page, ...props }: PageProps & { page: PageKey }) {

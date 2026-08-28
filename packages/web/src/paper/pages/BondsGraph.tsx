@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import { tickToMoment, type BondsResponse } from '@sj/shared'
 import type { WorldStore } from '../../state/worldStore.js'
@@ -13,8 +13,19 @@ import {
   type LegendRow,
   type RelationLink,
 } from '../../ui/relationGraph.js'
-import { EMPTY_SOCIETY, societyFrom, trafficGraph, trafficLegend } from '../../ui/societyGraph.js'
-import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
+import {
+  EMPTY_SOCIETY,
+  GONE_RING,
+  INSTITUTION_RING,
+  halosOf,
+  institutionLegend,
+  societyFrom,
+  trafficGraph,
+  trafficLegend,
+  type Halo,
+} from '../../ui/societyGraph.js'
+import { EMPTY_DISPATCHES } from '../../ui/dispatches.js'
+import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 
@@ -29,8 +40,12 @@ export const SOCIETY_VIEW_LABEL: Record<SocietyView, string> = {
 /** The fold behind `/api/society` changes about once a tick; the picture is history either way. */
 const SOCIETY_REFETCH_MS = 30_000
 
-const HALO_COLOR = '#F4E289'
 const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
+/** How far out the first institution ring sits, and how far apart the rings are — clear of the
+ *  4px ring a person who is no longer living already wears. */
+const HALO_STEP = 4
+const HALO_FIRST = 8
+const NO_HALO: Halo = { kinds: [], names: [] }
 
 /** What the canvas needs of a line, whichever view drew it. */
 type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
@@ -57,6 +72,10 @@ export function BondsGraph({
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const api = useFeed(bondsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
+  // What the town has FORMED, from the record the narrator already serves.
+  const paper = useFeed(dispatchesFeed).data ?? EMPTY_DISPATCHES
+  const halos = useMemo(() => halosOf(paper.institutions), [paper.institutions])
+  const haloKinds = useMemo(() => institutionLegend(halos), [halos])
   const [view, setView] = useState<SocietyView>('ties')
   // Not fetched until somebody asks for it: `null` is the endpoint layer's own "do not read".
   const traffic = usePolled(
@@ -80,6 +99,9 @@ export function BondsGraph({
     link?.distance((l: unknown) => (l as Drawn).distance)
   }, [])
 
+  // The box measured is the canvas's OWN cell, never the block around it: force-graph sizes the
+  // canvas from `dims`, and a canvas that can grow its own container measures itself bigger every
+  // frame — this block reached 7 946px before the cell was given a size of its own.
   useEffect(() => {
     const el = boxRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
@@ -139,6 +161,101 @@ export function BondsGraph({
   // clone would discard the layout on every render.
   const graphData = useMemo(() => ({ nodes: graph.nodes, links }), [graph, links])
 
+  // force-graph reads every one of these once a frame, so a fresh closure a tick is a prop
+  // diff a tick over a picture that has not changed.
+  const nodeVal = useCallback((n: object) => (n as BondNode).size, [])
+  const nodeColor = useCallback((n: object) => (n as BondNode).color, [])
+  const nodeLabel = useCallback(
+    (n: object) => {
+      const node = n as BondNode
+      const halo = halos.get(node.id)
+      return halo === undefined ? node.name : `${node.name} — ${halo.names.join(', ')}`
+    },
+    [halos],
+  )
+  const linkColor = useCallback((l: object) => (l as Drawn).color, [])
+  const linkWidth = useCallback((l: object) => ((l as Drawn).strokeCount === 2 ? 3 : 1.5), [])
+  const linkLineDash = useCallback((l: object) => (l as Drawn).dash as number[] | null, [])
+  const linkLabel = useCallback((l: object) => (l as Drawn).words, [])
+  const nodeMode = useCallback(() => 'replace' as const, [])
+  const onLinkClick = useCallback(
+    (l: object) => {
+      // Only a tie has a bond behind it to open; a traffic line IS its own whole answer.
+      if (view === 'ties') setSelected(l as unknown as RelationLink)
+    },
+    [view],
+  )
+  const onNodeClick = useCallback(
+    (n: object) => {
+      const node = n as BondNode
+      onSubject({ id: node.id, kind: 'agent', name: node.name })
+    },
+    [onSubject],
+  )
+  const drawNode = useCallback(
+    (node: object, ctx: CanvasRenderingContext2D) => {
+      // pixel token: integer-snapped square slab with ink ring, ledge, and bevel. The NAME
+      // is not painted here: force-graph runs this once per node in array order, so a later
+      // slab would bury an earlier neighbour's name. See onRenderFramePost.
+      const n = node as PositionedNode
+      if (n.x === undefined || n.y === undefined) return
+      ctx.imageSmoothingEnabled = false
+      const side = slabSide(n)
+      const x = Math.round(n.x) - Math.round(side / 2)
+      const y = Math.round(n.y) - Math.round(side / 2)
+      ctx.fillStyle = '#241F2B'
+      ctx.fillRect(x + 2, y + 2, side, side)
+      ctx.fillStyle = n.color
+      ctx.fillRect(x, y, side, side)
+      ctx.strokeStyle = '#43394A'
+      ctx.lineWidth = 2
+      ctx.strokeRect(x + 1, y + 1, side - 2, side - 2)
+      ctx.fillStyle = 'rgba(255,246,233,0.35)'
+      ctx.fillRect(x + 2, y + 2, side - 4, 2)
+      ctx.fillRect(x + 2, y + 2, 2, side - 4)
+      if (!n.alive) {
+        ctx.strokeStyle = GONE_RING
+        ctx.lineWidth = 2
+        ctx.setLineDash([])
+        ctx.strokeRect(x - HALO_STEP, y - HALO_STEP, side + HALO_STEP * 2, side + HALO_STEP * 2)
+      }
+      // A ring for each kind of thing this person belongs to, outermost last.
+      const halo = halos.get(n.id) ?? NO_HALO
+      halo.kinds.forEach((kind, i) => {
+        const out = HALO_FIRST + i * HALO_STEP
+        const ring = INSTITUTION_RING[kind]
+        ctx.strokeStyle = ring.color
+        ctx.lineWidth = 2
+        ctx.setLineDash(ring.dash === null ? [] : [...ring.dash])
+        ctx.strokeRect(x - out, y - out, side + out * 2, side + out * 2)
+      })
+      ctx.setLineDash([])
+    },
+    [halos],
+  )
+  const drawNames = useCallback(
+    (ctx: CanvasRenderingContext2D, globalScale: number) => {
+      // Every slab is down by now, so no name can be buried by a neighbour drawn later.
+      const fontSize = Math.max(TEXT_MIN_PX / globalScale, 4)
+      ctx.imageSmoothingEnabled = false
+      ctx.font = `${fontSize}px Silkscreen, monospace`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      const nodes: PositionedNode[] = graphData.nodes
+      for (const n of nodes) {
+        if (n.x === undefined || n.y === undefined) continue
+        const side = slabSide(n)
+        const lx = Math.round(n.x)
+        const ly = Math.round(n.y) - Math.round(side / 2) + side + 4
+        ctx.fillStyle = '#241F2B'
+        ctx.fillText(n.name, lx + 1, ly + 1)
+        ctx.fillStyle = '#FFF6E9'
+        ctx.fillText(n.name, lx, ly)
+      }
+    },
+    [graphData],
+  )
+
   const toggle = (k: string): void => {
     setHidden((prev) => {
       const next = new Set(prev)
@@ -149,7 +266,7 @@ export function BondsGraph({
   }
 
   return (
-    <div className="bonds-graph" ref={boxRef}>
+    <div className="bonds-graph">
       {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow keys,
           and a second tablist nested in its panel would be one the keyboard cannot walk. */}
       <div className="bonds-views" role="group" aria-label="What the picture shows">
@@ -199,6 +316,31 @@ export function BondsGraph({
                 ))}
             </div>
           ))}
+          {haloKinds.length > 0 && (
+            <div className="legend-axis" data-axis="formed">
+              <span className="legend-axis-name">What they formed</span>
+              {haloKinds.map((kind) => (
+                <span className="legend-halo" key={kind}>
+                  {/* a ring, drawn at the size the graph draws it, so a dotted one is not a
+                      solid one at swatch scale */}
+                  <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+                    <rect x="4" y="4" width="14" height="14" fill="var(--night)" />
+                    <rect
+                      x="2"
+                      y="2"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke={INSTITUTION_RING[kind].color}
+                      strokeWidth="2"
+                      strokeDasharray={INSTITUTION_RING[kind].dash?.join(' ')}
+                    />
+                  </svg>
+                  <span className="legend-word">{INSTITUTION_RING[kind].words}</span>
+                </span>
+              ))}
+            </div>
+          )}
           {api !== null && (
             <span className="legend-stamp">
               as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
@@ -231,74 +373,27 @@ export function BondsGraph({
         />
       )}
 
-      <ForceGraph2D
-        width={dims.w}
-        height={dims.h}
-        backgroundColor="rgba(0,0,0,0)"
-        graphData={graphData}
-        nodeVal={(n) => (n as BondNode).size}
-        nodeLabel={(n) => (n as BondNode).name}
-        ref={fgRef}
-        nodeCanvasObjectMode={() => 'replace'}
-        nodeCanvasObject={(node, ctx) => {
-          // pixel token: integer-snapped square slab with ink ring, ledge, and bevel. The NAME
-          // is not painted here: force-graph runs this once per node in array order, so a later
-          // slab would bury an earlier neighbour's name. See onRenderFramePost.
-          const n = node as PositionedNode
-          if (n.x === undefined || n.y === undefined) return
-          ctx.imageSmoothingEnabled = false
-          const side = slabSide(n)
-          const x = Math.round(n.x) - Math.round(side / 2)
-          const y = Math.round(n.y) - Math.round(side / 2)
-          ctx.fillStyle = '#241F2B'
-          ctx.fillRect(x + 2, y + 2, side, side)
-          ctx.fillStyle = n.color
-          ctx.fillRect(x, y, side, side)
-          ctx.strokeStyle = '#43394A'
-          ctx.lineWidth = 2
-          ctx.strokeRect(x + 1, y + 1, side - 2, side - 2)
-          ctx.fillStyle = 'rgba(255,246,233,0.35)'
-          ctx.fillRect(x + 2, y + 2, side - 4, 2)
-          ctx.fillRect(x + 2, y + 2, 2, side - 4)
-          if (!n.alive) {
-            ctx.strokeStyle = HALO_COLOR
-            ctx.lineWidth = 2
-            ctx.strokeRect(x - 4, y - 4, side + 8, side + 8)
-          }
-        }}
-        onRenderFramePost={(ctx, globalScale) => {
-          // Every slab is down by now, so no name can be buried by a neighbour drawn later.
-          const fontSize = Math.max(TEXT_MIN_PX / globalScale, 4)
-          ctx.imageSmoothingEnabled = false
-          ctx.font = `${fontSize}px Silkscreen, monospace`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'top'
-          const nodes: PositionedNode[] = graphData.nodes
-          for (const n of nodes) {
-            if (n.x === undefined || n.y === undefined) continue
-            const side = slabSide(n)
-            const lx = Math.round(n.x)
-            const ly = Math.round(n.y) - Math.round(side / 2) + side + 4
-            ctx.fillStyle = '#241F2B'
-            ctx.fillText(n.name, lx + 1, ly + 1)
-            ctx.fillStyle = '#FFF6E9'
-            ctx.fillText(n.name, lx, ly)
-          }
-        }}
-        nodeColor={(n) => (n as BondNode).color}
-        linkColor={(l) => (l as Drawn).color}
-        linkWidth={(l) => ((l as Drawn).strokeCount === 2 ? 3 : 1.5)}
-        linkLineDash={(l) => (l as Drawn).dash as number[] | null}
-        linkLabel={(l) => (l as Drawn).words}
-        onLinkClick={(l) => {
-          // Only a tie has a bond behind it to open; a traffic line IS its own whole answer.
-          if (view === 'ties') setSelected(l as unknown as RelationLink)
-        }}
-        onNodeClick={(n) => {
-          const node = n as BondNode
-          onSubject({ id: node.id, kind: 'agent', name: node.name })
-        }}
-      />
+      <div className="bonds-canvas" ref={boxRef}>
+        <ForceGraph2D
+          width={dims.w}
+          height={dims.h}
+          backgroundColor="rgba(0,0,0,0)"
+          graphData={graphData}
+          nodeVal={nodeVal}
+          nodeLabel={nodeLabel}
+          ref={fgRef}
+          nodeCanvasObjectMode={nodeMode}
+          nodeCanvasObject={drawNode}
+          onRenderFramePost={drawNames}
+          nodeColor={nodeColor}
+          linkColor={linkColor}
+          linkWidth={linkWidth}
+          linkLineDash={linkLineDash}
+          linkLabel={linkLabel}
+          onLinkClick={onLinkClick}
+          onNodeClick={onNodeClick}
+        />
+      </div>
     </div>
   )
 }

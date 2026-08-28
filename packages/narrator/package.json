@@ -1,5 +1,5 @@
 { "name": "@sj/narrator", "version": "0.0.1", "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": { ".": "./src/index.ts", "./shareCard": "./src/shareCard.ts" },
   "scripts": { "probe": "tsx scripts/probe.ts" },
   "dependencies": {
     "@sj/shared": "workspace:*", "@sj/engine": "workspace:*", "@sj/llm": "workspace:*",

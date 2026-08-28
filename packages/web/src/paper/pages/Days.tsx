@@ -6,6 +6,7 @@ import {
   MARK_GLYPH_SCALE,
   coalesceMarks,
   markLeft,
+  markWindow,
   marksFrom,
   tipSide,
   type Mark,
@@ -196,9 +197,12 @@ export function Days({ store, onJump, onLive }: PageProps) {
 
   const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick
+  // The live edge moves every tick and the fold only reads it through `markWindow`, so that is
+  // the key: the marks are re-folded when the track's own spacing changes, not once a minute.
+  const gap = markWindow(edge)
   const marks = useMemo(
-    () => coalesceMarks(marksFrom({ ...sources, milestones: firsts }), edge),
-    [sources, firsts, edge],
+    () => coalesceMarks(marksFrom({ ...sources, milestones: firsts }), gap),
+    [sources, firsts, gap],
   )
 
   return (

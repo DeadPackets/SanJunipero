@@ -5,6 +5,7 @@ describe('route', () => {
   it('parses a deep link with the picked person', () => {
     expect(parseRoute('/moment/41/14:30', '?agent=farmer')).toEqual({
       moment: { day: 41, time: '14:30' },
+      momentId: null,
       agentId: 'farmer',
       broadcast: false,
     })
@@ -13,6 +14,7 @@ describe('route', () => {
   it('accepts the day-prefixed form', () => {
     expect(parseRoute('/moment/day41/14:30', '')).toEqual({
       moment: { day: 41, time: '14:30' },
+      momentId: null,
       agentId: null,
       broadcast: false,
     })
@@ -24,7 +26,12 @@ describe('route', () => {
   })
 
   it('defaults to the live town at the root path', () => {
-    expect(parseRoute('/', '')).toEqual({ moment: null, agentId: null, broadcast: false })
+    expect(parseRoute('/', '')).toEqual({
+      moment: null,
+      momentId: null,
+      agentId: null,
+      broadcast: false,
+    })
   })
 
   // The canvas picks a figure by writing `?agent=` and firing popstate, and the lens words the
@@ -32,9 +39,27 @@ describe('route', () => {
   it('ignores every parameter but the person and the stream flag', () => {
     expect(parseRoute('/', '?lens=inspector&open=amara&agent=amara')).toEqual({
       moment: null,
+      momentId: null,
       agentId: 'amara',
       broadcast: false,
     })
+  })
+
+  it('parses /moment/:id — the recorded day a link names', () => {
+    expect(parseRoute('/moment/12', '').momentId).toBe(12)
+    expect(parseRoute('/moment/12', '').moment).toBeNull()
+    // the day/time form is not an id, and neither is a word or a zero
+    expect(parseRoute('/moment/41/14:30', '').momentId).toBeNull()
+    expect(parseRoute('/moment/nonsense', '').momentId).toBeNull()
+    expect(parseRoute('/moment/0', '').momentId).toBeNull()
+  })
+
+  it('writes the open recorded day rather than the minute inside it', () => {
+    const r = parseRoute('/moment/12', '')
+    expect(routeToPath({ ...r, moment: { day: 3, time: '06:00' } })).toBe('/moment/12')
+    expect(routeToPath({ ...r, momentId: null, moment: { day: 3, time: '06:00' } })).toBe(
+      '/moment/3/06:00',
+    )
   })
 
   it('a broadcast address carries no picked person', () => {
@@ -45,11 +70,13 @@ describe('route', () => {
 
   it('routeToPath round-trips', () => {
     const routes: Route[] = [
-      { moment: null, agentId: null, broadcast: false },
-      { moment: { day: 41, time: '14:30' }, agentId: 'farmer', broadcast: false },
-      { moment: { day: 0, time: '00:05' }, agentId: null, broadcast: false },
-      { moment: null, agentId: 'fisher', broadcast: false },
-      { moment: null, agentId: null, broadcast: true },
+      { moment: null, momentId: null, agentId: null, broadcast: false },
+      { moment: { day: 41, time: '14:30' }, momentId: null, agentId: 'farmer', broadcast: false },
+      { moment: { day: 0, time: '00:05' }, momentId: null, agentId: null, broadcast: false },
+      { moment: null, momentId: null, agentId: 'fisher', broadcast: false },
+      { moment: null, momentId: null, agentId: null, broadcast: true },
+      { moment: null, momentId: 12, agentId: null, broadcast: false },
+      { moment: null, momentId: 3, agentId: null, broadcast: true },
     ]
     for (const r of routes) {
       const full = routeToPath(r)

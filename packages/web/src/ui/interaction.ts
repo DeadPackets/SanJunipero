@@ -57,3 +57,32 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
     }
   }
 }
+
+/** What a thing on the ground is, in full: the click line the Found page prints over the record.
+ *  A structure is not here — it has a place of its own, with its whole provenance on it. */
+export function itemCropDetail(
+  state: WorldState | null,
+  thing: { kind: 'item' | 'crop'; id: string },
+): string | null {
+  if (state === null) return null
+  if (thing.kind === 'item') {
+    const it = state.items[thing.id]
+    if (it === undefined) return null
+    const owner =
+      it.owner === undefined ? 'claimed by no one' : `owned by ${agentName(state, it.owner)}`
+    return `${kindWords(it.kind)} ×${it.qty}, ${owner}`
+  }
+  const c = state.crops[thing.id]
+  if (c === undefined) return null
+  const growth = c.withered ? 'withered' : `stage ${c.stage} of ${CROP_STAGES}`
+  return `${kindWords(c.kind)}, planted on day ${c.plantedDay}, ${growth}`
+}
+
+/** The engine kind behind a clicked thing, which is what the record names it by. */
+export function thingKind(
+  state: WorldState | null,
+  thing: { kind: 'item' | 'crop'; id: string },
+): string | null {
+  if (state === null) return null
+  return (thing.kind === 'item' ? state.items[thing.id]?.kind : state.crops[thing.id]?.kind) ?? null
+}

@@ -11,6 +11,7 @@ import {
   MARK_WEIGHT,
   MARK_WORDS,
   coalesceMarks,
+  markWindow,
   marksFrom,
   type Mark,
   type MarkKind,
@@ -121,7 +122,7 @@ describe('P22.5 — a day somebody changed outranks a thing that merely happened
       words: 'A building was finished',
       weight: MARK_WEIGHT.built,
     }
-    const out = coalesceMarks([built, changed], 1440)
+    const out = coalesceMarks([built, changed], markWindow(1440))
     expect(out).toHaveLength(1)
     expect(out[0]!.kind).toBe('changed')
   })
@@ -129,8 +130,8 @@ describe('P22.5 — a day somebody changed outranks a thing that merely happened
   it('decides by weight and not by the order the marks arrived in', () => {
     const a: Mark = { tick: 10, kind: 'built', words: 'x', weight: MARK_WEIGHT.built }
     const b: Mark = { tick: 10, kind: 'death', words: 'y', weight: MARK_WEIGHT.death }
-    expect(coalesceMarks([a, b], 1440)[0]!.kind).toBe('death')
-    expect(coalesceMarks([b, a], 1440)[0]!.kind).toBe('death')
+    expect(coalesceMarks([a, b], markWindow(1440))[0]!.kind).toBe('death')
+    expect(coalesceMarks([b, a], markWindow(1440))[0]!.kind).toBe('death')
   })
 })
 
@@ -145,39 +146,42 @@ describe('coalesceMarks — a busy day is a mark, not a smear', () => {
   // A day-long span is where MARK_COALESCE_TICKS is the whole rule: on a longer one the track
   // runs out of room first and the window widens, which the next case measures.
   it('collapses three deaths inside the window into one mark that says how many', () => {
-    const out = coalesceMarks([death(0), death(30), death(59)], DAY)
+    const out = coalesceMarks([death(0), death(30), death(59)], markWindow(DAY))
     expect(out).toHaveLength(1)
     expect(out[0]!.words).toBe('3 people died')
     expect(out[0]!.tick).toBe(0)
   })
 
   it('keeps two deaths past the window as two', () => {
-    const out = coalesceMarks([death(0), death(61)], DAY)
+    const out = coalesceMarks([death(0), death(61)], markWindow(DAY))
     expect(out).toHaveLength(2)
     expect(out.map((m) => m.words)).toEqual(['Someone died', 'Someone died'])
   })
 
-  it('names the window it is coalescing over', () => {
+  it('names the window it is coalescing over, and widens it when the track runs out', () => {
     expect(MARK_COALESCE_TICKS).toBe(60)
+    expect(markWindow(DAY)).toBe(MARK_COALESCE_TICKS)
+    expect(markWindow(0)).toBe(MARK_COALESCE_TICKS)
+    expect(markWindow(400 * DAY)).toBeGreaterThan(MARK_COALESCE_TICKS)
   })
 
   it('widens the window on a long span, so a year does not draw a solid bar', () => {
     const span = 400 * DAY
     const many = Array.from({ length: 40 }, (_, i) => death(i * 200))
-    expect(coalesceMarks(many, span).length).toBeLessThan(many.length)
-    expect(coalesceMarks(many, 1440).length).toBe(many.length)
+    expect(coalesceMarks(many, markWindow(span)).length).toBeLessThan(many.length)
+    expect(coalesceMarks(many, markWindow(1440)).length).toBe(many.length)
   })
 
   it('never draws more marks than the track has room for', () => {
     const span = 30 * DAY
     const crowd: Mark[] = []
     for (let t = 0; t < span; t += 7) crowd.push(death(t))
-    expect(coalesceMarks(crowd, span).length).toBeLessThanOrEqual(MARK_SLOTS)
+    expect(coalesceMarks(crowd, markWindow(span)).length).toBeLessThanOrEqual(MARK_SLOTS)
   })
 
   it('takes an empty record without throwing', () => {
-    expect(coalesceMarks([], 1440)).toEqual([])
-    expect(coalesceMarks([death(0)], 0)).toHaveLength(1)
+    expect(coalesceMarks([], markWindow(1440))).toEqual([])
+    expect(coalesceMarks([death(0)], markWindow(0))).toHaveLength(1)
   })
 })
 
@@ -337,7 +341,7 @@ describe('the ninth mark — a discovery', () => {
       ],
     })
     expect(crowded.map((m) => m.kind).sort()).toEqual(['built', 'death', 'discovery'])
-    const kept = coalesceMarks(crowded, 5000)
+    const kept = coalesceMarks(crowded, markWindow(5000))
     expect(kept.map((m) => m.kind)).toEqual(['discovery'])
   })
 

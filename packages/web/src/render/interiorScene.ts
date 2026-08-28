@@ -205,6 +205,8 @@ export function createInteriorScene(
   let plannedSeq = -1
   let plan: RoomItem[] = []
   let bedTiles: Tile[] = []
+  /** Who is lying in which bed cell. Follows the world and the plan, never the frame. */
+  let beds: Record<string, Tile> = {}
   let map: RoomMap = roomMapOf([])
   let lightKinds: ReadonlySet<string> = new Set()
   let perches: Tile[] = []
@@ -640,19 +642,27 @@ export function createInteriorScene(
     if (activeId === null || state === null) return
     // `interiorOf` walks every agent and every item; the world it reads changes at most every
     // 250 ms, so it is asked on a new state rather than on a new frame.
+    let laidDown = false
     if (state !== roomState || activeId !== roomFor) {
       roomState = state
       roomFor = activeId
       room2 = interiorOf(state, activeId)
+      laidDown = true
     }
     if (room2 === null) return
     const records = store.assetRecords()
     const seq = store.assetsSeq()
     // The plan only moves when the room or the codex does — this runs every frame.
-    if (plannedFor !== room2.kind || plannedSeq !== seq) replan(room2.kind, records, seq)
-
-    const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
-    const beds = bedSlots(sleeping, bedTiles)
+    if (plannedFor !== room2.kind || plannedSeq !== seq) {
+      replan(room2.kind, records, seq)
+      laidDown = true
+    }
+    // Who is asleep follows the world, and which cell they lie in follows `replan`'s plan.
+    // Neither is a thing a frame changes.
+    if (laidDown) {
+      const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
+      beds = bedSlots(sleeping, bedTiles)
+    }
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an

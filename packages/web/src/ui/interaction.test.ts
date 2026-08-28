@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { readFileSync } from 'node:fs'
-import { CROP_STAGES, escapeStep, hoverLabel, type StageUp } from './interaction.js'
+import {
+  CROP_STAGES,
+  escapeStep,
+  hoverLabel,
+  itemCropDetail,
+  thingKind,
+  type StageUp,
+} from './interaction.js'
 
 function fixture(): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
@@ -144,5 +151,31 @@ describe('escape puts down one thing at a time, topmost first', () => {
     for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx'])
       expect(src(f), f).not.toContain('Escape')
     expect(src('../App.tsx')).toContain('escapeStep(')
+  })
+})
+
+describe('itemCropDetail — the click line the record answers with', () => {
+  const state = fixture()
+
+  it('says what a thing is, how many, and whose', () => {
+    expect(itemCropDetail(state, { kind: 'item', id: 'i2' })).toBe('bread ×3, owned by Rahel')
+    expect(itemCropDetail(state, { kind: 'item', id: 'i1' })).toBe('bread ×3, claimed by no one')
+  })
+
+  it('says how far along a crop is, and when it went in', () => {
+    expect(itemCropDetail(state, { kind: 'crop', id: 'c1' })).toBe(
+      `wheat, planted on day 2, stage 3 of ${CROP_STAGES}`,
+    )
+  })
+
+  it('has nothing to say about a thing that is gone', () => {
+    expect(itemCropDetail(state, { kind: 'item', id: 'gone' })).toBeNull()
+    expect(itemCropDetail(null, { kind: 'crop', id: 'c1' })).toBeNull()
+  })
+
+  it('names the engine kind the record indexes by, and nothing for a thing that is gone', () => {
+    expect(thingKind(state, { kind: 'item', id: 'i3' })).toBe('axe')
+    expect(thingKind(state, { kind: 'crop', id: 'c1' })).toBe('wheat')
+    expect(thingKind(state, { kind: 'item', id: 'gone' })).toBeNull()
   })
 })

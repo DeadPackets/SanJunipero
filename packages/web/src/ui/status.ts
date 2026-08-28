@@ -32,7 +32,6 @@ export const STATES = [
   'idle',
 ] as const
 export type State = (typeof STATES)[number]
-export const STATE_PRIORITY: readonly State[] = STATES
 
 export const STATE_WORD: Readonly<Record<State, string>> = {
   gone: 'No longer living',

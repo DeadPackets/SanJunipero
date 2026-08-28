@@ -16,7 +16,6 @@ import {
   MACHINE_STATUS_IDS,
   NEED_LOW,
   STATES,
-  STATE_PRIORITY,
   STATE_WORD,
   TALK_RECENT_TICKS,
   conditionsOf,
@@ -122,11 +121,7 @@ describe('the duplicate, as a test', () => {
 })
 
 describe('STATES — one state per person, and the array IS the priority', () => {
-  it('the priority table is the state list itself, not a second copy of it', () => {
-    expect(STATE_PRIORITY).toEqual(STATES)
-  })
-
-  it('fires each state exactly once, one fixture per row', () => {
+  it('fires each state exactly once, one fixture per row, in the order the array names', () => {
     const fixtures: Record<State, AgentView> = {
       gone: body({ alive: false }),
       collapsed: body({ collapsedSinceTick: 100 }),

@@ -1,9 +1,9 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { ChronicleResponseSchema, tickToMoment, type ChronicleEntry } from '@sj/shared'
+import { tickToMoment, type ChronicleEntry } from '@sj/shared'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
-import { dispatchesFeed } from '../../ui/feeds.js'
+import { chronicleFeed, dispatchesFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
@@ -11,7 +11,6 @@ import { Days } from './Days.js'
 import { Moments } from './Moments.js'
 import type { PageProps } from './index.js'
 
-const CHRONICLE_REFETCH_MS = 20_000
 const FEED_MAX = 120
 const GLYPH_PX = 8
 
@@ -24,10 +23,6 @@ const GLYPH: Record<string, string> = {
 
 const NO_ENTRIES: ChronicleEntry[] = []
 const NO_EDITIONS: Edition[] = []
-const chronicleEntries = (body: unknown): ChronicleEntry[] | null => {
-  const parsed = ChronicleResponseSchema.safeParse(body)
-  return parsed.success ? parsed.data.entries : null
-}
 
 type Chapter = { day: number; title: string; text: string }
 const NO_CHAPTERS: Chapter[] = []
@@ -86,10 +81,8 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
-  // The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
-  // every tick, so a 2.5s world never re-renders the sheet underneath the reader's pointer.
-  const read = usePolled('/api/chronicle', chronicleEntries, CHRONICLE_REFETCH_MS)
-  const entries = read.data ?? NO_ENTRIES
+  const record = useFeed(chronicleFeed)
+  const entries = record.data ?? NO_ENTRIES
   const paper = useFeed(dispatchesFeed)
   const days = useMemo(
     () => (paper.data === null ? NO_EDITIONS : editions(paper.data)),
@@ -99,13 +92,18 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   const daysAway = gapTicks === null ? 0 : Math.floor(gapTicks / 1440)
   const viewTick = mode.live ? null : mode.tick
 
-  const lines: { key: number; tick: number; kind: string; text: string }[] = []
-  for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
-    const ev = events[i]!
-    const text = describeEvent(ev, state)
-    if (text !== null)
-      lines.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
-  }
+  // A poll landing, a scrub, or the gap notice re-renders this page; the fold behind the feed
+  // only changes when the events or the world do.
+  const lines = useMemo(() => {
+    const out: { key: number; tick: number; kind: string; text: string }[] = []
+    for (let i = events.length - 1; i >= 0 && out.length < FEED_MAX; i--) {
+      const ev = events[i]!
+      const text = describeEvent(ev, state)
+      if (text !== null)
+        out.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
+    }
+    return out
+  }, [events, state])
 
   return (
     <>
@@ -126,7 +124,7 @@ function Today({ store, gapTicks, onJump }: PageProps) {
 
       <section className="block">
         <h3 className="feed-head">What mattered</h3>
-        {entries.length === 0 && !read.loaded ? (
+        {entries.length === 0 && !record.loaded ? (
           <div aria-busy="true">
             {[0, 1, 2].map((i) => (
               <div key={i} className="skeleton-row" />

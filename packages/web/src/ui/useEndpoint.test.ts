@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import { endpoint } from './useEndpoint.js'
+import { endpoint, feedFor } from './useEndpoint.js'
 
 /** One reply per read, the last one repeating; `null` is a read the gateway refused. */
 const answers = (bodies: unknown[]): ReturnType<typeof vi.fn> => {
@@ -141,5 +141,17 @@ describe('endpoint', () => {
     feed.subscribe(() => {})
     await settle()
     expect(feed.get()).toBe(feed.get())
+  })
+})
+
+describe('feedFor — one reader per url, for the life of the session', () => {
+  it('hands the same reader back, so an unmounted page does not lose its answer', () => {
+    expect(feedFor('/api/x')).toBe(feedFor('/api/x'))
+    expect(feedFor('/api/x')).not.toBe(feedFor('/api/y'))
+  })
+
+  it('is keyed on the beat too — two beats over one url are two readers', () => {
+    expect(feedFor('/api/z', undefined, 1000)).not.toBe(feedFor('/api/z', undefined, 2000))
+    expect(feedFor('/api/z', undefined, 1000)).toBe(feedFor('/api/z', undefined, 1000))
   })
 })

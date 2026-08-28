@@ -6,6 +6,6 @@ export const TEXT_MIN_PX = 12
 /** Prose — sentences a viewer reads, as opposed to chips, stamps and counts — starts here. */
 export const BODY_MIN_PX = 14
 
-/** World-space text. World scale is 1 at ZOOM_MIN, so a world px IS a CSS px on arrival. */
-export const WORLD_TEXT_PX = TEXT_MIN_PX
+/** World-space text. World scale is 1 at ZOOM_MIN, so a world px IS a CSS px on arrival, and
+ *  the floor is the same one — `TEXT_MIN_PX`. */
 export const WORLD_TEXT_LINE_H = 14
