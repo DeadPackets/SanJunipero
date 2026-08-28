@@ -26,6 +26,20 @@ function who(ctx: Ctx, id: string, capital: boolean): string {
 
 type Phrased = { text: string; importance: number; tags: string[] }
 
+/** Exactly the cases `phrase` answers. The log is read one type at a time so a seeding never
+ *  parses the 99.5% of it — `agent_moved`, `need_changed` — that has no words here. */
+export const SEED_TYPES: readonly string[] = [
+  'structure_planned',
+  'structure_completed',
+  'structure_inscribed',
+  'agent_spoke',
+  'item_spawned',
+  'item_moved',
+  'item_taken',
+  'agent_born',
+  'agent_died',
+]
+
 // The authored table. An event type absent from it is simply not part of what a
 // newborn is told; nothing here invents a happening the log does not carry.
 function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
@@ -133,9 +147,11 @@ export function buildHouseholdSeed(store: EventStore, opts: HouseholdSeedOpts): 
     ...opts,
     relation: (id) => (id === opts.motherId ? 'mother' : id === opts.fatherId ? 'father' : null),
   }
+  const window = SEED_TYPES.flatMap((t) => store.readTypeFrom(0, t))
+    .filter((ev) => ev.tick <= opts.upToTick)
+    .sort((a, b) => a.seq - b.seq)
   const out: SeedEntry[] = []
-  for (const ev of store.readFrom(0)) {
-    if (ev.tick > opts.upToTick) break
+  for (const ev of window) {
     const said = phrase(ev, ctx)
     if (said === null) continue
     out.push({
