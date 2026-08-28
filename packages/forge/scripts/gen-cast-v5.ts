@@ -526,6 +526,10 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       if (two) throw new Error('slices into 2 figure clusters')
       const hi = cutCell(keyed, 'centre')
+      // The same hard reject the walk frames get: `sliceStrip` sees a second FIGURE, not a
+      // caption, and a sleeping villager is where the model likes to draw floating "z"s.
+      const sole = soleSilhouetteGate(hi)
+      if (!sole.ok) throw new Error(sole.failures.join('; '))
       const failures = sleepCoherenceGateV4(gateView(hi))
       push(
         `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,

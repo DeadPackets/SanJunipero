@@ -249,6 +249,19 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
   })
 })
 
+// A sleeping villager is where the model likes to draw floating "z"s, and nadia shipped with two:
+// 145 px over 3 islands, which is 0.748% and passes the 1% detached bound. ONE island is the
+// property that has no threshold to slip under, and every other cell in the cast already had it.
+describe('every committed sleep cell is ONE shape — no captions, no props', () => {
+  it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
+    const crop = cropper(c, await atlasOf(c))
+    for (const f of FACINGS) {
+      const g = soleSilhouetteGate(crop(`sleep-${f}`))
+      expect(g.islands, `${id} sleep-${f} has ${g.islands} islands`).toBe(1)
+    }
+  })
+})
+
 // ★ THE OTHER HALF OF "THE TWO GATES ASK THE SAME SET", stated as a number rather than left in
 // prose: every committed sleeper lies along the ground diagonal, head up-right.
 describe('every committed sleep cell lies along the ground, not across the screen', () => {
