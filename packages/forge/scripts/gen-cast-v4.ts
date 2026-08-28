@@ -274,7 +274,6 @@ function gateView(img: RawImage): RawImage {
 }
 
 const CALIBRATED_MEDIAN = 0.31
-// A palette jaccard far below the 0.80 gate means the character's identity broke.
 
 const globalReport: string[] = []
 
@@ -472,7 +471,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       let best = bestOf(frameCands[f][p])
       if (!best) throw new Error(`${m.id} ${f}/${p}: every candidate failed processing`)
-      // An identity-broken frame (concept bleed, wrong costume) inside the walk cycle is
+      // An identity-broken frame (concept bleed) inside the walk cycle is
       // worse than one more call: fund a 3rd candidate before accepting it.
       if (identityBroken(best)) {
         const extra = await genFrame(f, p, 2)

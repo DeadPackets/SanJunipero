@@ -277,7 +277,7 @@ const figureHeight = (img: RawImage): number => {
 const MAX_ART_H = FEET_Y_V2 + 1
 // TRIMMED first, and that is what makes the fit below NORMALISE scale. The old chain trimmed
 // every cell to its figure, so this got it for free; a 256 canvas with the figure somewhere
-// inside does not, and the gates read the size difference as a broken head and a broken palette.
+// inside does not, and the gates read the size difference as a broken head.
 function gateView(cell: RawImage): RawImage {
   const img = trimToFigure(cell)
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)

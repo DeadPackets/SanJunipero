@@ -19,6 +19,7 @@ import {
   coherenceGateV4,
   deriveSheet,
   sleepAxisDeg,
+  sleepCoherenceGateV4,
   sleepAxisGate,
   stanceGate,
   strideGateV4,
@@ -113,6 +114,15 @@ describe('sleepAxisDeg', () => {
     expect(sleepAxisDeg(await sleeper('nadia'))).toBeCloseTo(-11.8, 0)
     // flat AND mirrored
     expect(sleepAxisDeg(await sleeper('yusuf'))).toBeCloseTo(6.6, 0)
+  })
+})
+
+describe('sleepCoherenceGateV4', () => {
+  it('passes an approved sleeper and is RED on a body still standing up', async () => {
+    expect(sleepCoherenceGateV4(await sleeper('omar'))).toEqual([])
+    const upright: RawImage = { width: 10, height: 20, data: new Uint8ClampedArray(10 * 20 * 4) }
+    upright.data.fill(255)
+    expect(sleepCoherenceGateV4(upright).map((x) => x.gate)).toContain('lying')
   })
 })
 

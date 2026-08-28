@@ -270,9 +270,6 @@ async function genFrame(f: AuthoredFacing, p: WalkPose, i: number): Promise<Fram
   }
 }
 
-// A palette jaccard far below the 0.80 gate means the character's identity broke
-// (wrong cap/costume colors), which is worse than any count of soft flags: such a
-// candidate loses to ANY candidate above the floor regardless of failure counts.
 function bestOf(cands: FrameCand[]): FrameCand | null {
   return cands.reduce<FrameCand | null>((a, c) => {
     if (!a) return c

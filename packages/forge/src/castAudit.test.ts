@@ -15,9 +15,8 @@ import {
   mirrorX,
   opaqueArea,
   opaqueBbox,
-  sleepGate,
 } from './sheet.js'
-import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
+import { sleepAxisDeg, sleepCoherenceGateV4, stanceGate, strideGateV4 } from './mirror.js'
 import {
   alphaBinaryGate,
   PALETTE_DISTANCE_MAX,
@@ -65,15 +64,13 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     for (const p of POSES_V2) {
       const native = crop(`${p}-${f}`)
       view.set(`${p}-${f}`, gateView(native))
-      const distance = paletteDistance(native)
-      for (const s of [
-        ...alphaBinaryGate(native).failures,
-        ...soleSilhouetteGate(native).failures,
-        ...(distance < PALETTE_DISTANCE_MAX
-          ? []
-          : [`palette distance ${distance.toFixed(1)} against ${PALETTE_DISTANCE_MAX}`]),
-      ])
+      for (const s of [...alphaBinaryGate(native).failures, ...soleSilhouetteGate(native).failures])
         found.push(`${c.id} ${p}-${f} pixel: ${s}`)
+      const distance = paletteDistance(native)
+      if (distance >= PALETTE_DISTANCE_MAX)
+        found.push(
+          `${c.id} ${p}-${f} pixel: palette distance ${distance.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`,
+        )
     }
   for (const f of AUTHORED) {
     const idle = view.get(`idle-${f}`)!
@@ -112,18 +109,16 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     ))
       found.push(`${c.id} ${p} ${x.gate} ${x.a}~${x.b}`)
   }
-  for (const x of sleepGate('sleep', view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
-  // `sleepGate` checks wider-than-tall only, and a body drawn flat across the screen still
-  // passes `aspect > 1`, so the ground-diagonal axis is asked separately.
-  for (const x of sleepAxisGate(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
+  for (const x of sleepCoherenceGateV4(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
   return found
 }
 
 /** One pinned cell remains; adding an entry requires a written reason. */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // 0.2235 against 0.2000. The generator measures the same pair at 0.1770 because its gate view
-  // TRIMS to the figure first and this one does not — the gap is scale, not a drifted head.
-  'amara se head contact-a': '0.2235 against 0.2000 — an untrimmed gate view, not a broken head',
+  // NO REDRAW CAN CLEAR THIS: `gen-cast-v5` scores the same pair 0.1770 and ships it, because its
+  // gate view trims to the figure and this one keeps the 256 canvas. Retiring it is a ruling on
+  // which of the two views the 0.20 bar was calibrated for, not a request for better art.
+  'amara se head contact-a': '0.2235 against 0.2000 — audit view 0.2235, generator view 0.1770',
 }
 
 const cast = listCommittedCast()

@@ -388,7 +388,6 @@ export const NEAR_DUPE_RATIO = 0.55
 export const MIRROR_DUPE_RATIO = 0.35
 export const STRIDE_MIN_RATIO = 0.35
 export const CONTACT_PASSING_MIN_RATIO = 0.25
-const SPECKLE_MIN_SHARE = 0.01 // column runs under 1% of opaque pixels are speckle, not a figure
 export const SILHOUETTE_AREA_TOL = 0.18
 
 // `limit` IS THE BOUND THE VALUE CROSSED, NOT THE TOLERANCE: silhouette is the one gate whose
@@ -438,6 +437,7 @@ export function footSpan(img: RawImage, frac = STANCE_FRAC): number {
   return x1 < 0 ? 0 : x1 - x0 + 1
 }
 
+const SPECKLE_MIN_SHARE = 0.01 // a column run under 1% of the opaque pixels is speckle, not a figure
 // Slices a 1×n phase strip by clustering opaque columns, dropping speckle runs and merging the
 // smallest gaps down to n. Robust to uneven spacing — it NEVER assumes equal fifths.
 export function sliceStrip(img: RawImage, n = 5): RawImage[] {
@@ -583,18 +583,5 @@ export function frameCoherenceGate(
     if (head > HEAD_DIFF_MAX)
       failures.push({ gate: 'head', a, b: idleLabel, value: head, limit: HEAD_DIFF_MAX })
   }
-  return failures
-}
-
-// Sleep-cell QA: a lying body voids the area/head checks, so all that is left is the
-// lying-silhouette sanity check — opaque bbox wider than tall.
-export function sleepGate(facing: string, sleep: RawImage): GateFailure[] {
-  const failures: GateFailure[] = []
-  const a = `${facing}/sleep`,
-    b = `${facing}/idle`
-  const bb = opaqueBbox(sleep)
-  if (!bb) throw new Error('sleepGate: sleep cell has no opaque pixels')
-  const aspect = (bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1)
-  if (aspect <= 1) failures.push({ gate: 'lying', a, b, value: aspect, limit: 1 })
   return failures
 }

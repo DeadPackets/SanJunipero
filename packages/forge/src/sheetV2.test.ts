@@ -21,7 +21,6 @@ import {
   headRegionDiff,
   crossFacingDupeGate,
   frameCoherenceGate,
-  sleepGate,
   pairwiseMedian,
   cellDistance,
   opaqueBbox,
@@ -267,27 +266,6 @@ describe('frameCoherenceGate — tuned to pass every real v1 within-facing frame
     // restore one pixel at the original bbox top-right so the bbox top row survives
     const failures = frameCoherenceGate('sw', idle, [{ label: 'contact-a', img: mod }])
     expect(failures.some((f) => f.gate === 'head')).toBe(true)
-  })
-})
-
-describe('sleepGate', () => {
-  // rotate 90°: same palette as idle, bbox flips to wider-than-tall — a valid lying pose
-  const rotate90 = (src: RawImage): RawImage => {
-    const out = new Uint8ClampedArray(src.data.length)
-    for (let y = 0; y < src.height; y++)
-      for (let x = 0; x < src.width; x++) {
-        const s = (y * src.width + x) * 4,
-          d = (x * src.height + (src.height - 1 - y)) * 4
-        out.set(src.data.subarray(s, s + 4), d)
-      }
-    return { width: src.height, height: src.width, data: out }
-  }
-  it('passes a lying sleep cell', () => {
-    expect(sleepGate('sw', rotate90(v1.get('sw/idle')!))).toEqual([])
-  })
-  it('FAILS an upright sleep cell (lying check)', () => {
-    const failures = sleepGate('sw', v1.get('sw/idle')!)
-    expect(failures.some((f) => f.gate === 'lying')).toBe(true)
   })
 })
 
