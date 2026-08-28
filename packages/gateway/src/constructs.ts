@@ -13,7 +13,7 @@ import { reportOnce } from './degraded.js'
  *  the gateway may not import the live half. */
 const ARBITER_DB = '_arbiter.db'
 
-export type ConstructRow = {
+type ConstructRow = {
   id: string
   type: string
   /** The town's own word for it, quoted from a mouth, or null while it has none. */
