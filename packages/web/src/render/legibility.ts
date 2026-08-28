@@ -40,6 +40,11 @@ export const LANDMARK_INK = 0x241f2b // --deep:  15.02:1 day / 5.19:1 night
 export const LANDMARK_PLATE = 0xfff6e9 // --cream
 export const LANDMARK_EDGE = 0x241f2b // the stepped ledge every slab in the town wears
 
+/** A carved name brings no paper of its own: the halo IS its paper, which is the landmark
+ *  pair turned over. */
+export const TOPONYM_FACE = LANDMARK_PLATE
+export const TOPONYM_HALO = LANDMARK_INK
+
 export type WorldTextPair = { what: string; ink: number; paper: number }
 
 /** Every surface the world writes words on. A new one that is not on this list is not
@@ -48,6 +53,7 @@ export const WORLD_TEXT_PAIRS: readonly WorldTextPair[] = [
   { what: 'speech bubble', ink: SPEECH_INK, paper: SPEECH_FILL },
   { what: 'thought bubble', ink: THOUGHT_INK, paper: THOUGHT_FILL },
   { what: 'landmark name', ink: LANDMARK_INK, paper: LANDMARK_PLATE },
+  { what: 'toponym', ink: TOPONYM_FACE, paper: TOPONYM_HALO },
   // a hover tag and a name tag are drawn on the speech material (tooltip.ts, characters.ts)
   { what: 'hover tag', ink: SPEECH_INK, paper: SPEECH_FILL },
 ]

@@ -13,6 +13,7 @@ import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
+import { createToponymLayer, type ToponymLayer } from './toponyms.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({
@@ -65,6 +66,7 @@ export function StageMount({
     let lightPools: LightPools | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
+    let toponyms: ToponymLayer | null = null
     let offCamera: (() => void) | null = null
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
@@ -85,20 +87,27 @@ export function StageMount({
           interiorRef.current?.setActive(structureId)
         }
         landmarks = createLandmarkLayer(s, store)
+        toponyms = createToponymLayer(s, store)
         const marks = landmarks
+        const carved = toponyms
+        const nameTown = (): void => {
+          marks.rebuild()
+          marks.place()
+          carved.rebuild()
+          carved.place()
+        }
         const pick = (p: WorldPick): void => onPickRef.current?.(p)
         offSync = store.subscribe(() => {
           syncEntities(s, book, store, openDoor, pick)
-          marks.rebuild()
-          marks.place()
+          nameTown()
         })
         syncEntities(s, book, store, openDoor, pick)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
         offCamera = s.onCamera(() => {
           marks.place()
+          carved.place()
         })
-        marks.rebuild()
-        marks.place()
+        nameTown()
         chars = createCharacterLayer(s, book, store, (agentId) => {
           // click-to-inspect: the G6 check — route change only, React owns the chrome
           const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`
@@ -170,6 +179,7 @@ export function StageMount({
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
       interiorRef.current = null
       landmarks?.destroy()
+      toponyms?.destroy()
       interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()
