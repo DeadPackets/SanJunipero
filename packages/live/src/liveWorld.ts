@@ -37,6 +37,7 @@ import {
   CodexStore,
   ConstructStore,
   GENESIS_CODEX,
+  ReviewStore,
   makeArbiter,
   openArbiterDb,
   runConstructPass,
@@ -51,7 +52,7 @@ import {
   openNarratorDb,
   type TranscriptRecord,
 } from '@sj/narrator'
-import { publishThought, type LiveCast } from '@sj/gateway'
+import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
 import { createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
@@ -323,6 +324,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const opsDb = openAgentDb(join(opts.agentDbDir, LIVE_OPS_DB))
   migrateLlmTables(opsDb)
   opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts)')
+  opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_agent ON llm_calls(agent_id)')
   const spentToday = (): number => ledgerTotalUsd(opsDb, Date.now() - SPEND_DAY_MS)
 
   // Before the pre-flight, because the pre-flight spends and a town that is already over either
@@ -423,7 +425,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     bridge?.drain('the moment passes')
   }
 
+  // The operator's read of this run: the ledger the caps are enforced against and the queue of
+  // rulings awaiting a person. Nothing here is ever rendered into a prompt.
+  const ops: LiveOps = {
+    opsDb,
+    caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
+    rulings: arbiterDb === null ? null : new ReviewStore(arbiterDb),
+  }
+
   return {
+    ops,
     attach({ loop, store, config, db, world }): TickHandler {
       const worldTick = loop.state.tick
       const cast = resolveCast(founders, store, maxMinds)

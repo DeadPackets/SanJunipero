@@ -24,6 +24,8 @@ type LawChange = { tick: number; path: string; value: unknown }
 export type WorldStore = {
   getState: () => WorldState | null
   getMode: () => ViewMode
+  /** The operator has stopped the world clock. The town is still served; it is not moving. */
+  getPaused: () => boolean
   getTick: () => number
   /** the furthest tick the LIVE town has reached — scrubbing back must not walk it in */
   liveEdge: () => number
@@ -47,6 +49,7 @@ export function createWorldStore(): WorldStore {
   let state: WorldState | null = null
   let config: SimConfig | null = null // arrives inside the snapshot message — never assumed
   let mode: ViewMode = { live: true }
+  let paused = false
   let liveEdge = 0
   let assetsSeq = 0
   let logSeq = 0
@@ -79,6 +82,7 @@ export function createWorldStore(): WorldStore {
   return {
     getState: () => state,
     getMode: () => mode,
+    getPaused: () => paused,
     getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
     liveEdge: () => liveEdge,
     latestThought: (agentId) => latest.get(agentId) ?? null,
@@ -98,7 +102,11 @@ export function createWorldStore(): WorldStore {
           config = SimConfigSchema.parse(msg.config) // strict: live view must fold with the engine's exact config
           state = msg.state as WorldState
           laws = msg.laws
+          paused = msg.paused ?? false
           mode = { live: true }
+          break
+        case 'paused':
+          paused = msg.paused
           break
         case 'tick':
           logSeq = msg.seq

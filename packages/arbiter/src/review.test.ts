@@ -131,6 +131,19 @@ describe('ReviewStore', () => {
     expect(res).toEqual({ ok: false, reason: 'unknown verb: recipe:boil_salt' })
   })
 
+  it('★ and a restart does not bring it back: the boot loop reads only what is still active', () => {
+    const { review, rulebook, codex } = makeReview()
+    const { ruleId } = codify(
+      boilSaltRecipe,
+      { agentId: 'a1', intent: 'i try to boil the river water down' },
+      { rulebook, review, codex, tick: 200 },
+    )
+    expect(rulebook.allActive().map((r) => r.recipeId)).toContain('recipe:boil_salt')
+    review.revert(ruleId, 'physics wrong', 500)
+    // `makeArbiter` re-registers every row this returns; a reverted verb must not be one.
+    expect(rulebook.allActive().map((r) => r.recipeId)).not.toContain('recipe:boil_salt')
+  })
+
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(

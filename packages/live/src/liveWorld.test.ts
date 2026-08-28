@@ -800,6 +800,7 @@ describe('★ what the first live boot broke', () => {
           agentDbDir: join(dir, 'minds'),
           cast: async () => ({
             attach: ({ world }) => world,
+            ops: null,
             stop: async () => {
               stopped += 1
             },

@@ -181,3 +181,55 @@ describe('TickLoop', () => {
     expect(stateHash(replayFromGenesis(store, custom))).toBe(stateHash(l.state))
   })
 })
+
+describe('the operator stops the clock', () => {
+  it('★ the cadence stops, and step() stays the primitive every counted advance relies on', () => {
+    vi.useFakeTimers()
+    try {
+      const { store, loop: l } = loop(({ tick, emit }) => {
+        if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+      })
+      l.start()
+      vi.advanceTimersByTime(5000)
+      const atPause = { tick: l.tick, seq: store.lastSeq(), hash: stateHash(l.state) }
+      expect(atPause.tick).toBeGreaterThan(0)
+
+      l.pause()
+      expect(l.paused).toBe(true)
+      vi.advanceTimersByTime(60_000)
+      expect(l.tick, 'a paused world must not move on the wall clock').toBe(atPause.tick)
+      expect(store.lastSeq()).toBe(atPause.seq)
+      expect(stateHash(l.state)).toBe(atPause.hash)
+
+      // A pause that made `step()` a no-op would turn every `while (tick < n) step()` in the
+      // repo into a spin. It is the CADENCE that stops.
+      l.step()
+      expect(l.tick).toBe(atPause.tick + 1)
+
+      l.resume()
+      vi.advanceTimersByTime(5000)
+      expect(l.paused).toBe(false)
+      expect(l.tick).toBeGreaterThan(atPause.tick + 1)
+      l.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('speed re-times the loop’s own timer while it is running', () => {
+    vi.useFakeTimers()
+    try {
+      const { loop: l } = loop(() => {})
+      l.start()
+      vi.advanceTimersByTime(10_000)
+      const atOne = l.tick
+      l.setSpeed(4)
+      expect(l.speed).toBe(4)
+      vi.advanceTimersByTime(10_000)
+      expect(l.tick - atOne).toBeGreaterThan(atOne)
+      l.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

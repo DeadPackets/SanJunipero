@@ -6,7 +6,7 @@ import type { WorldStore } from '../state/worldStore.js'
 /** How long the stamp stays after the last input, and how long it takes to go (chrome.css). */
 export const STAMP_HOLD_MS = 3000
 
-export type StampWord = 'LIVE' | 'REPLAY' | 'OFFLINE'
+export type StampWord = 'LIVE' | 'REPLAY' | 'OFFLINE' | 'PAUSED'
 
 /** The badge's four states said in three words: R8's law is one law, and the stamp is not a
  *  second answer to it. A clock nobody can know is stale reads OFFLINE rather than a time. */
@@ -17,8 +17,15 @@ const STAMP_OF: Readonly<Record<BadgeState, StampWord>> = {
   waking: 'OFFLINE',
 }
 
-export function stampWord(live: boolean, awake: boolean, link: LinkState = 'online'): StampWord {
-  return STAMP_OF[tickBadgeState(link, live, awake)]
+export function stampWord(
+  live: boolean,
+  awake: boolean,
+  link: LinkState = 'online',
+  paused = false,
+): StampWord {
+  const word = STAMP_OF[tickBadgeState(link, live, awake)]
+  // Only over LIVE: a stopped clock behind a scrub or a dropped socket is the lesser fact.
+  return paused && word === 'LIVE' ? 'PAUSED' : word
 }
 
 export function stampText(tick: number, word: StampWord): string {
@@ -33,6 +40,7 @@ export function QuietStamp({ store, link }: { store: WorldStore; link?: LinkStat
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
+  const paused = useSyncExternalStore(store.subscribe, store.getPaused)
   const [shown, setShown] = useState(false)
 
   useEffect(() => {
@@ -57,7 +65,7 @@ export function QuietStamp({ store, link }: { store: WorldStore; link?: LinkStat
   // listen past. It stays in the tree to be read on demand.
   return (
     <div className={shown ? 'stage-stamp shown' : 'stage-stamp'}>
-      {stampText(tick, stampWord(live, awake, link))}
+      {stampText(tick, stampWord(live, awake, link, paused))}
     </div>
   )
 }

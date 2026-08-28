@@ -19,6 +19,7 @@ export class TickLoop {
   #snapEvery: number
   #onTick: TickHandler
   #timer: NodeJS.Timeout | null = null
+  #paused = false
   #nextAt = 0
   #config: SimConfig
   #onError: ((err: unknown) => void) | undefined
@@ -52,6 +53,31 @@ export class TickLoop {
   }
   get tick(): number {
     return this.#tick
+  }
+  get paused(): boolean {
+    return this.#paused
+  }
+  get speed(): number {
+    return this.#speed
+  }
+
+  /** The world clock stops. Nothing else does: the store, the socket and the viewer keep going.
+   *  The CADENCE honours this, never `step()` — a primitive that sometimes does nothing turns
+   *  every counted advance in the repo into a spin. */
+  pause(): void {
+    this.#paused = true
+  }
+  resume(): void {
+    this.#paused = false
+  }
+  /** Ticks per unit of real time, as a multiplier on `realMsPerTick`. A cadence the loop does
+   *  not own reads `speed` itself; the loop's own timer is re-armed here. */
+  setSpeed(speed: number): void {
+    this.#speed = speed
+    if (this.#timer !== null) {
+      this.stop()
+      this.start()
+    }
   }
 
   step(): void {
@@ -95,7 +121,7 @@ export class TickLoop {
     this.#nextAt = Date.now() + this.#realMs / this.#speed
     const run = () => {
       try {
-        this.step()
+        if (!this.#paused) this.step()
       } catch (err) {
         this.#timer = null
         if (this.#onError) {
