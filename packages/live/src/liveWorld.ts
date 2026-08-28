@@ -749,10 +749,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         const castSize = booted?.cast.size ?? cast.length
         const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * castSize
         // Art is bursty and per discovery; it stays under the daily and lifetime caps, not the mind rate.
-        const rate = projectDailySpend(opsDb, {
-          windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
-          excludeCallers: ['forge'],
-        }).usdPerSimDay
+        // The projection counts one real hour as one sim-day; the operator's dial changes that.
+        const rate =
+          projectDailySpend(opsDb, {
+            windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
+            excludeCallers: ['forge'],
+          }).usdPerSimDay / loop.speed
         if (rate <= ceiling) return
         console.error(rateStopMessage(rate, ceiling, castSize))
         stopMinds()
