@@ -166,6 +166,21 @@ export function paletteDistance(img: RawImage): number {
   return n === 0 ? 0 : sum / n
 }
 
+// NOT a gate either. Opaque pixels still on the #FF00FF field the chroma key was meant to take
+// out — a cut that took the frame in with the subject, which no other measurement here catches.
+export function magentaPixels(img: RawImage): number {
+  let n = 0
+  for (let i = 0; i < img.data.length; i += 4)
+    if (
+      img.data[i + 3] === 255 &&
+      img.data[i]! > 200 &&
+      img.data[i + 1]! < 70 &&
+      img.data[i + 2]! > 200
+    )
+      n++
+  return n
+}
+
 // ---------------------------------------------------------------- 5. density within a sprite
 
 // A sprite's density is how many art pixels it spends per world pixel of the ground it covers.

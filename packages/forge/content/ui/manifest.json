@@ -1,0 +1,92 @@
+{
+  "version": "v1-signpost-ui",
+  "pieces": {
+    "signpost-arm": {
+      "file": "signpost-arm.png",
+      "w": 128,
+      "h": 32,
+      "slice": null,
+      "note": "the four signpost arms; the label is rendered text, never baked in",
+      "provenance": {
+        "source": "generated",
+        "model": "google/gemini-3.1-flash-image",
+        "genPx": 1024,
+        "factor": 9,
+        "promptSha256": "87e5027b7de76ed4ce23db8adb324a0b19c90b053b88e8323bca3583c27a7939",
+        "usd": 0.1382,
+        "candidate": "signpost-arm-c0"
+      }
+    },
+    "signpost-post": {
+      "file": "signpost-post.png",
+      "w": 16,
+      "h": 96,
+      "slice": null,
+      "note": "the post the arms hang from",
+      "provenance": {
+        "source": "generated",
+        "model": "google/gemini-3.1-flash-image",
+        "genPx": 1024,
+        "factor": 9,
+        "promptSha256": "d38867d0c0b8b1764ab405c23200e960fe246000fb39ead738a439e2aa6b3560",
+        "usd": 0.207,
+        "candidate": "signpost-post-c0"
+      }
+    },
+    "paper": {
+      "file": "paper.png",
+      "w": 96,
+      "h": 96,
+      "slice": 24,
+      "note": "the sheet that rises; stretch, never tile",
+      "provenance": {
+        "source": "code-painted",
+        "painter": "gen-ui.ts"
+      }
+    },
+    "nameplate": {
+      "file": "nameplate.png",
+      "w": 32,
+      "h": 16,
+      "slice": 4,
+      "note": "under a hovered or selected figure",
+      "provenance": {
+        "source": "code-painted",
+        "painter": "gen-ui.ts"
+      }
+    },
+    "speech": {
+      "file": "speech.png",
+      "w": 24,
+      "h": 24,
+      "slice": 6,
+      "note": "the bubble box; tint it for the speaker",
+      "provenance": {
+        "source": "code-painted",
+        "painter": "gen-ui.ts"
+      }
+    },
+    "speech-tail": {
+      "file": "speech-tail.png",
+      "w": 8,
+      "h": 8,
+      "slice": null,
+      "note": "rotate for the side the bubble sits on",
+      "provenance": {
+        "source": "code-painted",
+        "painter": "gen-ui.ts"
+      }
+    },
+    "ring-pip": {
+      "file": "ring-pip.png",
+      "w": 24,
+      "h": 24,
+      "slice": null,
+      "note": "optional: the subject ring marker",
+      "provenance": {
+        "source": "code-painted",
+        "painter": "gen-ui.ts"
+      }
+    }
+  }
+}
