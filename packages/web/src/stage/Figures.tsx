@@ -24,7 +24,14 @@ export function figuresInView(scene: Scene, state: WorldState | null): Subject[]
   return found.map((f) => f.subject)
 }
 
-type Placed = { x: number; y: number; shown: boolean }
+/** The box a body fills at zoom 1, and the smallest the ring may get: at the overview stop a
+ *  figure is a few pixels tall, and a ring nobody can see is not a focus ring. */
+const FIGURE_W = 28,
+  FIGURE_H = 44
+const RING_MIN_W = 14,
+  RING_MIN_H = 22
+
+type Placed = { x: number; y: number; w: number; shown: boolean }
 
 /**
  * The keyboard's way to a figure: one focusable box over each person the camera can see, in
@@ -56,14 +63,21 @@ export function Figures({
     return joinStageLoop(() => {
       const view = scene.viewRect()
       const zoom = scene.getZoom()
+      // The ring frames the body, so it is the size the body is DRAWN, not a fixed CSS box.
+      const w = Math.max(RING_MIN_W, Math.round(FIGURE_W * zoom))
+      const h = Math.max(RING_MIN_H, Math.round(FIGURE_H * zoom))
       for (const [id, node] of nodes.current) {
         const at = scene.pointOf('agent', id)
         const a =
           at === null ? { x: 0, y: 0, onScreen: false } : screenAnchor(view, zoom, at.sx, at.sy)
         const was = placed.current.get(id)
-        if (was?.x === a.x && was.y === a.y && was.shown === a.onScreen) continue
-        placed.current.set(id, { x: a.x, y: a.y, shown: a.onScreen })
+        if (was?.x === a.x && was.y === a.y && was.w === w && was.shown === a.onScreen) continue
+        placed.current.set(id, { x: a.x, y: a.y, w, shown: a.onScreen })
         node.style.transform = `translate(${a.x}px, ${a.y}px)`
+        node.style.width = `${w}px`
+        node.style.height = `${h}px`
+        // the anchor is where a body stands, so the box rises from its feet
+        node.style.margin = `${-h}px 0 0 ${-Math.round(w / 2)}px`
         // A body that has walked out of the picture is not a stop on the way to the signpost.
         node.style.visibility = a.onScreen ? 'visible' : 'hidden'
         node.tabIndex = a.onScreen ? 0 : -1

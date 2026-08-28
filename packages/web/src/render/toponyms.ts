@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 // the deep path, never the package root: @sj/engine's index reaches better-sqlite3
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -39,46 +39,55 @@ export function toponymAlpha(scale: number): number {
 /** The chrome type floor is 12px and a carved name is chrome. */
 export const TOPONYM_LABEL_PX = faceFor('label').size
 
-/** The halo: the same glyph in ink, one pixel out on each side, so the name reads over grass,
- *  sand, road or water without a plate of its own. Ink on cream is the landmark pair turned
- *  over, and `legibility.ts` proves the ratio holds in both halves of the day. */
-const HALO_AT = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1],
-] as const
+/** The ink the name is cut into, around the glyphs. */
+export const TOPONYM_PAD_X = 4,
+  TOPONYM_PAD_Y = 2
 
-type Cut = { node: Container; faces: WorldLabel[]; drawn: string }
+type Cut = { node: Container; plate: Graphics; face: WorldLabel; drawn: string; plateW: number }
 
+/**
+ * A cream name on a slab of ink — the landmark plate turned over, so a carved name reads as a
+ * different kind of mark from a district's legend. It is a PLATE and not a glyph halo because
+ * a halo is drawn in glyphs, and a glyph's own colour is the one channel this renderer is
+ * measured to drop: see the open canvas-text defect in the stage 7 integration report.
+ */
 function cutName(text: string): Cut {
   const node = new Container()
   node.eventMode = 'none'
-  const faces: WorldLabel[] = []
-  const family = faceFor('label').family
-  for (const [dx, dy] of HALO_AT) {
-    const l = createWorldLabel(text, {
-      fontFamily: family,
-      fontSize: TOPONYM_LABEL_PX,
-      fill: LANDMARK_INK,
-    })
-    l.anchor.set(0.5, 0)
-    l.eventMode = 'none'
-    l.position.set(dx, dy)
-    faces.push(l)
-    node.addChild(l)
-  }
-  const top = createWorldLabel(text, {
-    fontFamily: family,
+  const plate = new Graphics()
+  plate.eventMode = 'none'
+  const face = createWorldLabel(text, {
+    fontFamily: faceFor('label').family,
     fontSize: TOPONYM_LABEL_PX,
     fill: LANDMARK_PLATE,
   })
-  top.anchor.set(0.5, 0)
-  top.eventMode = 'none'
-  faces.push(top)
-  node.addChild(top)
-  return { node, faces, drawn: text }
+  face.anchor.set(0.5, 0)
+  face.eventMode = 'none'
+  node.addChild(plate, face)
+  return { node, plate, face, drawn: '', plateW: -1 }
 }
+
+/** The slab under one name, cut to what the glyphs actually measure. */
+function drawPlate(cut: Cut): void {
+  const w = cut.plateW,
+    h = cut.face.height + TOPONYM_PAD_Y * 2
+  cut.plate.clear()
+  cut.plate.rect(-w / 2, -TOPONYM_PAD_Y, w, h)
+  cut.plate.fill(LANDMARK_INK)
+}
+
+/** Do two boxes touch. */
+const hits = (a: Rect, b: Rect): boolean =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+/** How far a carved name may wander from the thing it is cut into: its own size. A name pinned
+ *  to the edge of the screen by a subject that has left it is not a name of anywhere. */
+const leashAt = (sx: number, sy: number, size: { w: number; h: number }): Rect => ({
+  x: sx - size.w,
+  y: sy - size.h,
+  w: size.w * 2,
+  h: size.h * 2,
+})
 
 export type ToponymLayer = { rebuild(): void; place(): void; destroy(): void }
 
@@ -102,13 +111,26 @@ export function createToponymLayer(scene: Scene, store: WorldStore): ToponymLaye
         cut = cutName(m.name)
         node.addChild(cut.node)
         cuts.set(m.id, cut)
-      } else if (cut.drawn !== m.name) {
+      }
+      if (cut.drawn !== m.name) {
         cut.drawn = m.name
-        for (const f of cut.faces) f.text = m.name
+        cut.face.text = m.name
+      }
+      // A glyph measures 0 wide until its font atlas is up, so the slab is cut against the
+      // MEASUREMENT and not against the words: the first frame's plate is not the last word.
+      const w = cut.face.width + TOPONYM_PAD_X * 2
+      if (cut.plateW !== w) {
+        cut.plateW = w
+        drawPlate(cut)
       }
       const at = tileToScreen(m.x, m.y)
-      const top = cut.faces[cut.faces.length - 1]!
-      built.push({ id: m.id, sx: at.sx, sy: at.sy, w: top.width, h: top.height })
+      built.push({
+        id: m.id,
+        sx: at.sx,
+        sy: at.sy,
+        w,
+        h: cut.face.height + TOPONYM_PAD_Y * 2,
+      })
     }
     for (const [id, cut] of cuts) {
       if (seen.has(id)) continue
@@ -147,8 +169,15 @@ export function createToponymLayer(scene: Scene, store: WorldStore): ToponymLaye
         ...avoid,
         ...mine,
       ])
-      cut.node.position.set(Math.round(at.sx), Math.round(at.sy))
-      mine.push({ x: at.sx - size.w / 2, y: at.sy, w: size.w, h: size.h })
+      const rect = { x: at.sx - size.w / 2, y: at.sy, w: size.w, h: size.h }
+      // `placeTag` clamps into the view, so a name whose subject has left the screen would be
+      // pinned to an edge with nothing under it. Off its leash, it is not drawn.
+      if (!hits(rect, leashAt(b.sx, b.sy, size))) {
+        cut.node.visible = false
+        continue
+      }
+      cut.node.position.set(Math.round(at.sx), Math.round(at.sy + TOPONYM_PAD_Y * inv))
+      mine.push(rect)
     }
     scene.tags.setOccupied('toponyms', mine)
   }

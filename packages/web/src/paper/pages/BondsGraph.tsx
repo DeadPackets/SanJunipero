@@ -99,6 +99,9 @@ export function BondsGraph({
     link?.distance((l: unknown) => (l as Drawn).distance)
   }, [])
 
+  // The box measured is the canvas's OWN cell, never the block around it: force-graph sizes the
+  // canvas from `dims`, and a canvas that can grow its own container measures itself bigger every
+  // frame — this block reached 7 946px before the cell was given a size of its own.
   useEffect(() => {
     const el = boxRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
@@ -263,7 +266,7 @@ export function BondsGraph({
   }
 
   return (
-    <div className="bonds-graph" ref={boxRef}>
+    <div className="bonds-graph">
       {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow keys,
           and a second tablist nested in its panel would be one the keyboard cannot walk. */}
       <div className="bonds-views" role="group" aria-label="What the picture shows">
@@ -318,12 +321,15 @@ export function BondsGraph({
               <span className="legend-axis-name">What they formed</span>
               {haloKinds.map((kind) => (
                 <span className="legend-halo" key={kind}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  {/* a ring, drawn at the size the graph draws it, so a dotted one is not a
+                      solid one at swatch scale */}
+                  <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+                    <rect x="4" y="4" width="14" height="14" fill="var(--night)" />
                     <rect
                       x="2"
                       y="2"
-                      width="12"
-                      height="12"
+                      width="18"
+                      height="18"
                       fill="none"
                       stroke={INSTITUTION_RING[kind].color}
                       strokeWidth="2"
@@ -367,25 +373,27 @@ export function BondsGraph({
         />
       )}
 
-      <ForceGraph2D
-        width={dims.w}
-        height={dims.h}
-        backgroundColor="rgba(0,0,0,0)"
-        graphData={graphData}
-        nodeVal={nodeVal}
-        nodeLabel={nodeLabel}
-        ref={fgRef}
-        nodeCanvasObjectMode={nodeMode}
-        nodeCanvasObject={drawNode}
-        onRenderFramePost={drawNames}
-        nodeColor={nodeColor}
-        linkColor={linkColor}
-        linkWidth={linkWidth}
-        linkLineDash={linkLineDash}
-        linkLabel={linkLabel}
-        onLinkClick={onLinkClick}
-        onNodeClick={onNodeClick}
-      />
+      <div className="bonds-canvas" ref={boxRef}>
+        <ForceGraph2D
+          width={dims.w}
+          height={dims.h}
+          backgroundColor="rgba(0,0,0,0)"
+          graphData={graphData}
+          nodeVal={nodeVal}
+          nodeLabel={nodeLabel}
+          ref={fgRef}
+          nodeCanvasObjectMode={nodeMode}
+          nodeCanvasObject={drawNode}
+          onRenderFramePost={drawNames}
+          nodeColor={nodeColor}
+          linkColor={linkColor}
+          linkWidth={linkWidth}
+          linkLineDash={linkLineDash}
+          linkLabel={linkLabel}
+          onLinkClick={onLinkClick}
+          onNodeClick={onNodeClick}
+        />
+      </div>
     </div>
   )
 }

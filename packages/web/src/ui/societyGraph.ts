@@ -147,7 +147,7 @@ export const INSTITUTION_RING: Readonly<
 > = {
   group: { color: '#7FB0C9', dash: null, words: 'Belongs to a group' }, // water
   role: { color: '#C47876', dash: [5, 3], words: 'Keeps a role' }, // rose
-  rule: { color: '#F6E8D5', dash: [1, 3], words: 'Holds to a rule' }, // parchment
+  rule: { color: '#F6E8D5', dash: [2, 3], words: 'Holds to a rule' }, // parchment
 }
 
 export type Institution = {

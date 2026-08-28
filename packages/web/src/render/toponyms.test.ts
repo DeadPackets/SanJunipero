@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
@@ -83,9 +84,26 @@ describe('a carved name is readable where it is cut', () => {
     expect(TOPONYM_LABEL_PX).toBeGreaterThanOrEqual(TEXT_MIN_PX)
   })
 
-  it('clears AA against its own halo in both halves of the day', () => {
+  it('clears AA against the ink it is cut into, in both halves of the day', () => {
     const r = bandRatios(LANDMARK_PLATE, LANDMARK_INK)
     expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
     expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
+  })
+})
+
+describe('a name stays with the thing it is cut into', () => {
+  const src = readFileSync(new URL('./toponyms.ts', import.meta.url), 'utf8')
+
+  // `placeTag` clamps into the view, so an anchor that has left the screen would drag its name
+  // to an edge and leave it there with nothing under it.
+  it('is not drawn once it is off its own leash', () => {
+    expect(src).toContain('leashAt')
+    expect(src).toMatch(/if \(!hits\(rect, leashAt\([\s\S]{0,80}cut\.node\.visible = false/)
+  })
+
+  // The glyph's own colour is the one channel this renderer is measured to drop (stage 7 I7).
+  it('carries its ink as a drawn slab, never as a halo of glyphs', () => {
+    expect(src).toContain('plate.fill(LANDMARK_INK)')
+    expect(src).not.toContain('HALO')
   })
 })

@@ -100,6 +100,12 @@ describe('the focus box is a keyboard stop and nothing else', () => {
     expect(rule('.stage-figure')).toMatch(/background:\s*none/)
   })
 
+  it('is the size the body is DRAWN, so the ring frames the figure at every stop', () => {
+    expect(rule('.stage-figure')).not.toMatch(/width:/)
+    expect(src('./Figures.tsx')).toContain('Math.round(FIGURE_W * zoom)')
+    expect(src('./Figures.tsx')).toContain('RING_MIN_W')
+  })
+
   it('is off the tab order until the loop has seen it on screen', () => {
     expect(rule('.stage-figure')).toMatch(/visibility:\s*hidden/)
     expect(src('./Figures.tsx')).toContain('node.tabIndex = a.onScreen ? 0 : -1')

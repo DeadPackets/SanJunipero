@@ -931,11 +931,10 @@ body {
 /* ── the figures, for the keyboard: one focus box over each person the camera can see.
    They take no clicks — the canvas owns the pointer — and show nothing but their focus ring. ── */
 .stage-figures { position: absolute; inset: 0; pointer-events: none; }
+/* The box is sized and placed by the stage loop, which is the only thing that knows how big a
+   body is drawn at this zoom. */
 .stage-figure {
-  position: absolute; left: 0; top: 0;
-  /* the anchor is where a body stands, so the box rises from its feet */
-  margin: -44px 0 0 -14px;
-  width: 28px; height: 44px; padding: 0;
+  position: absolute; left: 0; top: 0; padding: 0;
   background: none; border: 0; border-radius: 2px;
   pointer-events: none;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
@@ -1211,12 +1210,24 @@ body {
 }
 
 /* ── the bonds graph, inside the sheet ── */
-.bonds-graph { position: relative; display: grid; gap: 0.4rem; min-height: 20rem; }
+.bonds-graph {
+  position: relative; display: flex; flex-direction: column; gap: 0.4rem; height: 30rem;
+}
+/* The canvas's own cell, with a size that does NOT come from the canvas: `flex-basis: 0` and
+   `overflow: hidden` are what stop force-graph measuring itself bigger every frame. The night
+   ground is the CELL's, not the canvas's — force-graph writes the canvas's own background. */
+.bonds-canvas {
+  position: relative; flex: 1 1 0; min-height: 14rem; overflow: hidden;
+  background: var(--night);
+}
 .bonds-views { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
-.bonds-graph canvas { background: var(--night); }
 .bond-detail { position: static; width: auto; max-height: 18rem; overflow-y: auto; }
 /* the institution key: a ring, not a line — the mark it explains is drawn round a person */
-.legend-halo { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; }
+.legend-halo {
+  display: inline-flex; align-items: center; gap: 0.3rem; flex: none;
+  font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase; color: var(--ink);
+}
+.legend-halo svg { flex: none; }
 
 /* ── the laws, read and written ── */
 .laws, .laws-admin { display: grid; gap: 0.4rem; font-size: 0.875rem; }
@@ -1274,8 +1285,10 @@ body {
   background: var(--ink);
   border-top: 4px solid var(--honey);
 }
+/* NO padding: the line is written twice and the crawl wraps on half its own width, so padding
+   here is both a blank bar at the top of a stream and a gap at every wrap. */
 [data-broadcast='on'] .ticker-line {
-  display: inline-block; padding-left: 100%;
+  display: inline-block; padding: 0;
   font-family: var(--font-px); font-size: 24px; line-height: 1;
   letter-spacing: 0.04em;
   color: var(--cream);
