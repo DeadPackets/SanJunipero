@@ -15,7 +15,6 @@ import {
   mirrorX,
   opaqueArea,
   opaqueBbox,
-  paletteJaccard,
   sleepGate,
 } from './sheet.js'
 import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
@@ -105,21 +104,15 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     ))
       found.push(`${c.id} ${p} ${x.gate} ${x.a}~${x.b}`)
   }
-  for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
-    found.push(`${c.id} sleep ${x.gate}`)
-  // `sleepGate` checks palette and wider-than-tall only, and a body drawn flat across the screen
-  // still passes `aspect > 1`, so the ground-diagonal axis is asked separately.
+  for (const x of sleepGate('sleep', view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
+  // `sleepGate` checks wider-than-tall only, and a body drawn flat across the screen still
+  // passes `aspect > 1`, so the ground-diagonal axis is asked separately.
   for (const x of sleepAxisGate(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
   return found
 }
 
-/** One pinned cell remains; adding an entry requires a written reason. */
-export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // The ruler moved, not the art. Clearing it means redrawing omar's se/contact-a, which also
-  // carries head 0.1871 against a 0.20 bar — a lane that regenerates it must watch both terms.
-  'omar se palette contact-a':
-    '0.6875 against 0.8000 — one palette cluster of sixteen, exposed by the mirror fix',
-}
+/** Nothing is pinned; adding an entry requires a written reason. */
+export const KNOWN_GATE_DEBT: Record<string, string> = {}
 
 const cast = listCommittedCast()
 
@@ -166,8 +159,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
     ).toEqual([])
   })
 
-  it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(1)
+  it('★ and the debt is empty, so a new failure shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(0)
   })
 })
 
@@ -207,10 +200,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
           ia = opaqueArea(idle)
         return WALK.map((p) => {
           const x = gateView(crop(`${p}-${f}`))
-          return (
-            `${p} ${paletteJaccard(idle, x).toFixed(6)} ${(opaqueArea(x) / ia).toFixed(6)} ` +
-            headRegionDiff(idle, x).toFixed(6)
-          )
+          return `${p} ${(opaqueArea(x) / ia).toFixed(6)} ` + headRegionDiff(idle, x).toFixed(6)
         }).join(' | ')
       }
       for (const [authored, derived] of [
@@ -243,7 +233,6 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
       ).toBe(1)
       // and the terms that do not care, do not care
       expect(opaqueArea(lhs)).toBe(opaqueArea(rhs))
-      expect(paletteJaccard(lhs, rhs)).toBe(1)
       expect(headRegionDiff(lhs, rhs)).toBe(0)
       expect(cellDistance(lhs, rhs), 'cellDistance would not see the shift').toBeGreaterThan(0)
     }

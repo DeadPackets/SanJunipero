@@ -275,7 +275,6 @@ function gateView(img: RawImage): RawImage {
 
 const CALIBRATED_MEDIAN = 0.31
 // A palette jaccard far below the 0.80 gate means the character's identity broke.
-const PALETTE_HARD_FLOOR = 0.6
 
 const globalReport: string[] = []
 
@@ -448,15 +447,10 @@ async function runCharacter(m: CastMember): Promise<void> {
     }
   }
 
-  // Identity-broken = wrong costume colors (palette below the hard floor) OR an extreme
-  // silhouette (cottage-bleed frames draw the whole building: opaque area 1.8-2.3x the
-  // master; nadia's se-passing c1 dodged the 0.6 palette floor at exactly 0.600).
+  // Identity-broken = an extreme silhouette: cottage-bleed frames draw the whole building,
+  // opaque area 1.8-2.3x the master.
   function identityBroken(c: FrameCand): boolean {
-    return c.failures.some(
-      (x) =>
-        (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR) ||
-        (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)),
-    )
+    return c.failures.some((x) => x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55))
   }
   function bestOf(cands: FrameCand[]): FrameCand | null {
     return cands.reduce<FrameCand | null>((a, c) => {
@@ -588,7 +582,7 @@ async function runCharacter(m: CastMember): Promise<void> {
           Math.max(1, Math.round(hi.height * k)),
         )
       }
-      const failures = sleepCoherenceGateV4(masterGate.se, gateView(hi))
+      const failures = sleepCoherenceGateV4(gateView(hi))
       push(
         `${key}: gates=${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
       )

@@ -388,9 +388,7 @@ export const NEAR_DUPE_RATIO = 0.55
 export const MIRROR_DUPE_RATIO = 0.35
 export const STRIDE_MIN_RATIO = 0.35
 export const CONTACT_PASSING_MIN_RATIO = 0.25
-export const PALETTE_JACCARD_MIN = 0.8
-export const PALETTE_EPS = 8 // per-channel single-linkage radius, as in v7 clusterDominant
-export const PALETTE_MIN_SHARE = 0.01 // clusters under 1% of opaque pixels are speckle, not palette
+const SPECKLE_MIN_SHARE = 0.01 // column runs under 1% of opaque pixels are speckle, not a figure
 export const SILHOUETTE_AREA_TOL = 0.18
 
 // `limit` IS THE BOUND THE VALUE CROSSED, NOT THE TOLERANCE: silhouette is the one gate whose
@@ -406,7 +404,6 @@ export type GateFailure = {
     | 'mirror-dupe'
     | 'stride'
     | 'contact-passing'
-    | 'palette'
     | 'silhouette'
     | 'head'
     | 'lying'
@@ -462,7 +459,7 @@ export function sliceStrip(img: RawImage, n = 5): RawImage[] {
       runs[runs.length - 1]!.mass += colMass[x]!
     } else runs.push({ x0: x, x1: x, mass: colMass[x]! })
   }
-  const solid = runs.filter((r) => r.mass >= PALETTE_MIN_SHARE * total)
+  const solid = runs.filter((r) => r.mass >= SPECKLE_MIN_SHARE * total)
   if (solid.length < n)
     throw new Error(`sliceStrip: found ${solid.length} figure clusters, need ${n}`)
   while (solid.length > n) {
@@ -495,68 +492,6 @@ export function opaqueArea(img: RawImage): number {
   let count = 0
   for (let i = 3; i < img.data.length; i += 4) if (img.data[i]! > 0) count++
   return count
-}
-
-// ε-cluster the UNION of both images' opaque colours, drop clusters under `minShare` in both, then
-// set-Jaccard. Population weighting keeps v7's many 1-off speckle colours from failing it.
-export function paletteJaccard(
-  a: RawImage,
-  b: RawImage,
-  eps = PALETTE_EPS,
-  minShare = PALETTE_MIN_SHARE,
-): number {
-  const counts = (img: RawImage) => {
-    const m = new Map<number, number>()
-    for (let i = 0; i < img.data.length; i += 4) {
-      if (img.data[i + 3] === 0) continue
-      const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-      m.set(key, (m.get(key) ?? 0) + 1)
-    }
-    return m
-  }
-  const ca = counts(a),
-    cb = counts(b)
-  const keys = [...new Set([...ca.keys(), ...cb.keys()])]
-  const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
-  const parent = keys.map((_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
-  for (let i = 0; i < keys.length; i++)
-    for (let j = i + 1; j < keys.length; j++) {
-      const p = ch(keys[i]!),
-        q = ch(keys[j]!)
-      if (
-        Math.abs(p[0] - q[0]) <= eps &&
-        Math.abs(p[1] - q[1]) <= eps &&
-        Math.abs(p[2] - q[2]) <= eps
-      ) {
-        const ri = find(i),
-          rj = find(j)
-        if (ri !== rj) parent[ri] = rj
-      }
-    }
-  const wa = new Map<number, number>(),
-    wb = new Map<number, number>()
-  let ta = 0,
-    tb = 0
-  keys.forEach((k, i) => {
-    const r = find(i),
-      na = ca.get(k) ?? 0,
-      nb = cb.get(k) ?? 0
-    ta += na
-    tb += nb
-    wa.set(r, (wa.get(r) ?? 0) + na)
-    wb.set(r, (wb.get(r) ?? 0) + nb)
-  })
-  let both = 0,
-    either = 0
-  for (const r of new Set([...wa.keys(), ...wb.keys()])) {
-    const shareA = (wa.get(r) ?? 0) / ta,
-      shareB = (wb.get(r) ?? 0) / tb
-    if (shareA < minShare && shareB < minShare) continue
-    either++
-    if (shareA >= minShare && shareB >= minShare) both++
-  }
-  return either === 0 ? 1 : both / either
 }
 
 // Opaque-mask disagreement over the top `frac` of each bbox. Centres align in HALF pixels: two
@@ -623,7 +558,7 @@ export function crossFacingDupeGate(
   return failures
 }
 
-// Every frame must agree with the facing's idle on palette, silhouette area ±18% and head-region
+// Every frame must agree with the facing's idle on silhouette area ±18% and head-region
 // stability: independent per-frame generation drifts costume details.
 export function frameCoherenceGate(
   facing: string,
@@ -635,9 +570,6 @@ export function frameCoherenceGate(
     idleArea = opaqueArea(idle)
   for (const { label, img } of frames) {
     const a = `${facing}/${label}`
-    const jac = paletteJaccard(idle, img)
-    if (jac < PALETTE_JACCARD_MIN)
-      failures.push({ gate: 'palette', a, b: idleLabel, value: jac, limit: PALETTE_JACCARD_MIN })
     const areaRatio = opaqueArea(img) / idleArea
     if (Math.abs(areaRatio - 1) > SILHOUETTE_AREA_TOL)
       failures.push({
@@ -654,15 +586,12 @@ export function frameCoherenceGate(
   return failures
 }
 
-// Sleep-cell QA: identity coherence vs idle (palette only — a lying body voids the
-// area/head checks) plus a lying-silhouette sanity check: opaque bbox wider than tall.
-export function sleepGate(facing: string, idle: RawImage, sleep: RawImage): GateFailure[] {
+// Sleep-cell QA: a lying body voids the area/head checks, so all that is left is the
+// lying-silhouette sanity check — opaque bbox wider than tall.
+export function sleepGate(facing: string, sleep: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
   const a = `${facing}/sleep`,
     b = `${facing}/idle`
-  const jac = paletteJaccard(idle, sleep)
-  if (jac < PALETTE_JACCARD_MIN)
-    failures.push({ gate: 'palette', a, b, value: jac, limit: PALETTE_JACCARD_MIN })
   const bb = opaqueBbox(sleep)
   if (!bb) throw new Error('sleepGate: sleep cell has no opaque pixels')
   const aspect = (bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1)

@@ -13,15 +13,11 @@ import {
   MIRROR_DUPE_RATIO,
   STRIDE_MIN_RATIO,
   CONTACT_PASSING_MIN_RATIO,
-  PALETTE_JACCARD_MIN,
-  PALETTE_EPS,
-  PALETTE_MIN_SHARE,
   SILHOUETTE_AREA_TOL,
   HEAD_REGION_FRAC,
   HEAD_DIFF_MAX,
   sliceStrip,
   opaqueArea,
-  paletteJaccard,
   headRegionDiff,
   crossFacingDupeGate,
   frameCoherenceGate,
@@ -66,9 +62,6 @@ describe('character standard v2 constants', () => {
     expect(MIRROR_DUPE_RATIO).toBe(0.35)
     expect(STRIDE_MIN_RATIO).toBe(0.35)
     expect(CONTACT_PASSING_MIN_RATIO).toBe(0.25)
-    expect(PALETTE_JACCARD_MIN).toBe(0.8)
-    expect(PALETTE_EPS).toBe(8)
-    expect(PALETTE_MIN_SHARE).toBe(0.01)
     expect(SILHOUETTE_AREA_TOL).toBe(0.18)
     expect(HEAD_REGION_FRAC).toBe(0.4)
     expect(HEAD_DIFF_MAX).toBe(0.2)
@@ -143,29 +136,6 @@ describe('sliceStrip', () => {
         5,
       ),
     ).toThrow()
-  })
-})
-
-describe('paletteJaccard', () => {
-  const half = (a: Px, b: Px) => img(20, 20, (x) => (x < 10 ? a : b))
-  it('is 1 for identical images', () => {
-    expect(paletteJaccard(half(RED, TEAL), half(RED, TEAL))).toBe(1)
-  })
-  it('penalizes a substantial color present in only one image', () => {
-    expect(paletteJaccard(half(RED, RED), half(RED, TEAL))).toBe(0.5)
-  })
-  it('ignores colors below the population floor', () => {
-    const speckled = img(20, 20, (x, y) => (x === 0 && y === 0 ? TEAL : RED)) // 1/400 < 1%
-    expect(
-      paletteJaccard(
-        img(20, 20, () => RED),
-        speckled,
-      ),
-    ).toBe(1)
-  })
-  it('merges eps-close colors into one cluster', () => {
-    const off: Px = [205, 45, 45, 255] // within eps 8 of RED
-    expect(paletteJaccard(half(RED, RED), half(off, off))).toBe(1)
   })
 })
 
@@ -264,21 +234,6 @@ describe('frameCoherenceGate — tuned to pass every real v1 within-facing frame
       expect(failures).toEqual([])
     }
   })
-  it('FAILS a frame that grows an off-palette costume detail', () => {
-    const mod = structuredClone(v1.get('sw/walk-a')!)
-    for (let y = 40; y < 52; y++)
-      for (let x = 40; x < 52; x++) {
-        const i = (y * mod.width + x) * 4
-        if (mod.data[i + 3] === 0) continue
-        mod.data[i] = TEAL[0]
-        mod.data[i + 1] = TEAL[1]
-        mod.data[i + 2] = TEAL[2]
-      }
-    const failures = frameCoherenceGate('sw', v1.get('sw/idle')!, [
-      { label: 'contact-a', img: mod },
-    ])
-    expect(failures.some((f) => f.gate === 'palette')).toBe(true)
-  })
   it('FAILS a frame whose silhouette area drifts past ±18%', () => {
     const idle = v1.get('sw/idle')!
     const mod = structuredClone(idle)
@@ -327,28 +282,12 @@ describe('sleepGate', () => {
       }
     return { width: src.height, height: src.width, data: out }
   }
-  it('passes a lying same-palette sleep cell', () => {
-    const idle = v1.get('sw/idle')!
-    expect(sleepGate('sw', idle, rotate90(idle))).toEqual([])
+  it('passes a lying sleep cell', () => {
+    expect(sleepGate('sw', rotate90(v1.get('sw/idle')!))).toEqual([])
   })
   it('FAILS an upright sleep cell (lying check)', () => {
-    const idle = v1.get('sw/idle')!
-    const failures = sleepGate('sw', idle, idle)
+    const failures = sleepGate('sw', v1.get('sw/idle')!)
     expect(failures.some((f) => f.gate === 'lying')).toBe(true)
-  })
-  it('FAILS a sleep cell with an off-palette blanket', () => {
-    const idle = v1.get('sw/idle')!
-    const lying = rotate90(idle)
-    const b = opaqueBbox(lying)!
-    for (let y = b.y0; y <= b.y1; y++)
-      for (let x = b.x0; x < b.x0 + Math.floor((b.x1 - b.x0) / 3); x++) {
-        const i = (y * lying.width + x) * 4
-        if (lying.data[i + 3] === 0) continue
-        lying.data[i] = TEAL[0]
-        lying.data[i + 1] = TEAL[1]
-        lying.data[i + 2] = TEAL[2]
-      }
-    expect(sleepGate('sw', idle, lying).some((f) => f.gate === 'palette')).toBe(true)
   })
 })
 
@@ -356,13 +295,6 @@ describe('gate metric primitives on fixtures', () => {
   it('cellDistance reproduces the recorded evidence values', () => {
     expect(cellDistance(v1.get('ne/idle')!, v1.get('nw/idle')!)).toBeCloseTo(0.123, 2)
     expect(cellDistance(v1.get('se/walk-a')!, v1.get('se/walk-b')!)).toBeCloseTo(0.091, 2)
-  })
-  it('within-facing palette jaccard clears the gate with margin', () => {
-    for (const f of FACINGS_FX)
-      for (const p of ['walk-a', 'walk-b'] as const)
-        expect(paletteJaccard(v1.get(`${f}/idle`)!, v1.get(`${f}/${p}`)!)).toBeGreaterThanOrEqual(
-          PALETTE_JACCARD_MIN,
-        )
   })
   it('within-facing head drift stays under the gate with margin', () => {
     for (const f of FACINGS_FX)

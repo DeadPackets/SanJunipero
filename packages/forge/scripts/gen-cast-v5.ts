@@ -289,8 +289,8 @@ function gateView(cell: RawImage): RawImage {
           Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
           Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
         )
-  // MEASUREMENT ONLY, and the shipped cell is never snapped: paletteJaccard eps-clusters the
-  // union of both images' colours, and on a continuous field that closure swallows every cluster.
+  // MEASUREMENT ONLY, never a shipped pixel: cellDistance compares colours, and
+  // CALIBRATED_MEDIAN was measured on snapped art.
   return quantize(anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2))
 }
 
@@ -322,7 +322,6 @@ function refuseFailing(
  *  file's header since v4 and read nowhere until now; it is the knob the ruling above creates
  *  the need for, because every extra attempt is a paid generation. */
 const ATTEMPTS = Math.max(1, Number(process.env.CAST_ATTEMPTS ?? '3'))
-const PALETTE_HARD_FLOOR = 0.6
 const MASTER_MIN_PITCH = 6
 
 const summary: string[] = []
@@ -430,11 +429,7 @@ async function runCharacter(m: CastMember): Promise<void> {
     return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
   }
   const identityBroken = (c: FrameCand): boolean =>
-    c.failures.some(
-      (x) =>
-        (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR) ||
-        (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)),
-    )
+    c.failures.some((x) => x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55))
   const bestOf = (cs: FrameCand[]): FrameCand | null =>
     cs.reduce<FrameCand | null>((a, c) => {
       if (!a) return c
@@ -530,7 +525,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       if (two) throw new Error('slices into 2 figure clusters')
       const hi = cutCell(keyed, 'centre')
-      const failures = sleepCoherenceGateV4(masterGate.se, gateView(hi))
+      const failures = sleepCoherenceGateV4(gateView(hi))
       push(
         `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
       )

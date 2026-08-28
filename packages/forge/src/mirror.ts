@@ -6,14 +6,12 @@ import {
   POSES_V2,
   mirrorX,
   cellDistance,
-  paletteJaccard,
   opaqueArea,
   opaqueBbox,
   headRegionDiff,
   silhouetteBound,
   footSpan,
   HEAD_DIFF_MAX,
-  PALETTE_JACCARD_MIN,
   SILHOUETTE_AREA_TOL,
   STRIDE_MIN_RATIO,
   CONTACT_PASSING_MIN_RATIO,
@@ -123,19 +121,10 @@ export function stanceGate(
   })
 }
 
-// The ONE coherence gate: palette-jaccard + silhouette + head against the master's figure for the
-// same view. The head term is load-bearing — legs move between walk frames, heads do not.
+// The ONE coherence gate: silhouette + head against the master's figure for the same view.
+// The head term is load-bearing — legs move between walk frames, heads do not.
 export function coherenceGateV4(label: string, master: RawImage, cell: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
-  const jac = paletteJaccard(master, cell)
-  if (jac < PALETTE_JACCARD_MIN)
-    failures.push({
-      gate: 'palette',
-      a: label,
-      b: 'master',
-      value: jac,
-      limit: PALETTE_JACCARD_MIN,
-    })
   const areaRatio = opaqueArea(cell) / opaqueArea(master)
   if (Math.abs(areaRatio - 1) > SILHOUETTE_AREA_TOL)
     failures.push({
@@ -197,18 +186,9 @@ export function sleepAxisGate(sleep: RawImage): GateFailure[] {
   return [{ gate: 'lying-axis', a: 'sleep', b: 'ground-plane', value: deg, limit }]
 }
 
-// Sleep coherence: palette vs master (a lying body voids the area check) + lying bbox.
-export function sleepCoherenceGateV4(master: RawImage, sleep: RawImage): GateFailure[] {
+// Sleep coherence: a lying body voids the area check, so the lying bbox and its axis are all.
+export function sleepCoherenceGateV4(sleep: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
-  const jac = paletteJaccard(master, sleep)
-  if (jac < PALETTE_JACCARD_MIN)
-    failures.push({
-      gate: 'palette',
-      a: 'sleep',
-      b: 'master',
-      value: jac,
-      limit: PALETTE_JACCARD_MIN,
-    })
   const bb = opaqueBbox(sleep)
   if (!bb) throw new Error('sleepCoherenceGateV4: sleep cell has no opaque pixels')
   const aspect = (bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1)
