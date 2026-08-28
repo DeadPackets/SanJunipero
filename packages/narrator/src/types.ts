@@ -94,7 +94,8 @@ export type SceneDigest = {
 }
 export type ChapterDigest = { day: number; title: string; text: string; citations: number[] }
 
-export type PublicRecord = { eventSeq: number; tick: number; day: number; text: string }
+// No tick: this goes to the roster verbatim, and a tick in it comes back as a tick in the prose.
+export type PublicRecord = { eventSeq: number; day: number; text: string }
 
 export type NarratorLlm = {
   summarizeChapter(scenes: SceneDigest[]): Promise<ChapterSummary>

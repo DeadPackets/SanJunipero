@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { applyFootnotes } from './chronicle.js'
 import type { NarratorStore } from './store.js'
 import type {
   ChapterRow,
@@ -130,7 +131,6 @@ export function collectPublicRecord(
     if (publicAgentOf(r.type, payload) !== agentId) continue
     out.push({
       eventSeq: r.seq,
-      tick: r.tick,
       day: Math.floor(r.tick / MINUTES_PER_DAY),
       text: publicRecordText({ seq: r.seq, tick: r.tick, type: r.type, payload }),
     })
@@ -165,8 +165,15 @@ export async function writeBiography(deps: {
       )
       throw new Error(`framing_violation: biography of ${deps.agentId} rejected`)
     }
+    // A life cites the same way a chapter does: the footnote line, checked against the record
+    // it was written from.
+    const seen = applyFootnotes(bio.body, [], new Set(record.map((r) => r.eventSeq)))
+    if (seen.dangling.length > 0)
+      deps.alert?.(
+        `dangling_citation: biography of ${deps.agentId} cited unknown ledger numbers ${seen.dangling.join(', ')}`,
+      )
     title = bio.title
-    body = bio.body
+    body = seen.text
   }
   const id = deps.store.insertPublication({
     day: deps.throughDay,

@@ -41,7 +41,7 @@ const chapterDigests: ChapterDigest[] = [
 ]
 
 const record: PublicRecord[] = [
-  { eventSeq: 4, tick: 100, day: 0, text: 'was heard to say: "the river turns"' },
+  { eventSeq: 4, day: 0, text: 'was heard to say: "the river turns"' },
 ]
 
 describe('makeNarratorLlm', () => {
