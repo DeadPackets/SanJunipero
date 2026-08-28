@@ -67,6 +67,9 @@ const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 const LIVE_SPEND_CHECK_TICKS = 10
 /** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
 const LIVE_RUNTIME_SAVE_TICKS = 48
+/** The only event types `detectCandidates` reads. `events(type)` is indexed, so four narrow
+ *  reads beat one full-log read whose rows the recognizer then drops. */
+const RECOGNIZER_EVENTS = ['agent_moved', 'agent_spoke', 'agent_expressed', 'item_taken']
 /** How many of a day's words the tier-2.5 pass is shown. A very loud day must not build an
  *  unbounded prompt; the most recent words are the ones a first is most likely to be in. */
 const SEMANTIC_RECORD_CAP = 300
@@ -635,10 +638,15 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           log(`stream: day ${day} goes unrecognized — the recognizer is outside today's budget`)
           return
         }
+        // A pass still in flight at the next boundary would re-read the whole log and pay a
+        // second classification call for the same candidates.
+        if (recognizing) return
         recognizing = true
         setImmediate(() => {
           void runConstructPass({
-            events: store.readFrom(0),
+            events: RECOGNIZER_EVENTS.flatMap((t) => store.readTypeFrom(0, t)).sort(
+              (a, b) => a.seq - b.seq,
+            ),
             baseConfig: config,
             store: new ConstructStore(arb),
             llm: makeClient('constructs', 'town'),

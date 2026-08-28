@@ -58,38 +58,44 @@ function toRow(r: RawRow): ConstructRow {
   }
 }
 
-/** Opened and closed per request: the file does not exist until the arbiter writes it, and the
- *  panel behind this reads once a minute. */
-function readConstructs(agentDbDir: string | undefined): ConstructRow[] {
-  if (agentDbDir === undefined) return []
-  let db: Database.Database
-  try {
-    db = new Database(join(agentDbDir, ARBITER_DB), { readonly: true, fileMustExist: true })
-  } catch {
-    return [] // a scripted town, or one whose first day is still unrecognized
-  }
-  try {
-    return (db.prepare('SELECT * FROM constructs ORDER BY first_tick, id').all() as RawRow[]).map(
-      toRow,
-    )
-  } catch (e) {
-    reportOnce(
-      'arbiter.constructs',
-      () =>
-        `the arbiter db is open but its constructs table could not be read, so /api/constructs` +
-        ` is answering empty — ${e instanceof Error ? e.message : String(e)}`,
-    )
-    return []
-  } finally {
-    db.close()
-  }
-}
-
 export function mountConstructsApi(
   router: Router,
   deps: { agentDbDir?: string | undefined },
 ): void {
+  // Opened on the first request that finds it rather than at boot: the arbiter creates the file
+  // on the first night, which is an hour after the gateway starts serving.
+  let db: Database.Database | null = null
+  const open = (): Database.Database | null => {
+    if (db !== null || deps.agentDbDir === undefined) return db
+    try {
+      db = new Database(join(deps.agentDbDir, ARBITER_DB), { readonly: true, fileMustExist: true })
+    } catch {
+      db = null // a scripted town, or one whose first day is still unrecognized
+    }
+    return db
+  }
+
   router.route('GET', '/api/constructs', (_req, res) => {
-    sendJson(res, readConstructs(deps.agentDbDir))
+    const arbiter = open()
+    if (arbiter === null) {
+      sendJson(res, [])
+      return
+    }
+    try {
+      sendJson(
+        res,
+        (arbiter.prepare('SELECT * FROM constructs ORDER BY first_tick, id').all() as RawRow[]).map(
+          toRow,
+        ),
+      )
+    } catch (e) {
+      reportOnce(
+        'arbiter.constructs',
+        () =>
+          `the arbiter db is open but its constructs table could not be read, so /api/constructs` +
+          ` is answering empty — ${e instanceof Error ? e.message : String(e)}`,
+      )
+      sendJson(res, [])
+    }
   })
 }

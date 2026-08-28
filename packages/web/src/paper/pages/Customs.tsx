@@ -40,7 +40,16 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
   const rows = read.data ?? NO_CUSTOMS
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
 
-  if (rows.length === 0) return <p className="feed-empty">{read.loaded ? EMPTY : '…'}</p>
+  if (rows.length === 0)
+    return read.loaded ? (
+      <p className="feed-empty">{EMPTY}</p>
+    ) : (
+      <div aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton-row" />
+        ))}
+      </div>
+    )
   return (
     <ul className="families">
       {rows.map((c) => (
@@ -49,7 +58,7 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
           <ul className="family-children">
             <li>
               <span className="stamp">Day {c.firstDay}</span>
-              {KIND_LINE[c.type] ?? 'Something they keep doing.'}
+              {KIND_LINE[c.type] ?? KIND_LINE.custom}
             </li>
             <li>
               <span className="stamp">×{c.gatherings}</span>

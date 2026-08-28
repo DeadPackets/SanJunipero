@@ -5,11 +5,7 @@ import { renderChapter, renderEra } from './chronicle.js'
 import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
 import { detectFirsts } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
-import {
-  detectSemanticFirsts,
-  type SemanticPassDeps,
-  type TranscriptRecord,
-} from './semanticFirsts.js'
+import { detectSemanticFirsts, type SemanticDeps } from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
@@ -55,7 +51,7 @@ export async function narrateDay(deps: {
   world?: { config: SimConfig; state?: WorldState }
   // The tier-2.5 pass, run after the chapter is written. Absent, the night has no semantic
   // firsts and costs nothing — the detector is never called speculatively.
-  semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
+  semantic?: SemanticDeps
 }): Promise<{
   chapter: ChapterRow
   heat: HeatScores[]
@@ -227,7 +223,7 @@ export async function closeDay(deps: {
   world?: { config: SimConfig; state?: WorldState }
   /** The tier-2.5 pass, passed straight through to `narrateDay`. Absent, the night has no
    *  semantic firsts and costs nothing. */
-  semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
+  semantic?: SemanticDeps
   alert?: (d: string) => void
 }): Promise<ChapterRow> {
   const { store, llm, cast } = deps

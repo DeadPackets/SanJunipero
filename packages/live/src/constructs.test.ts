@@ -44,28 +44,15 @@ const TRANSCRIPT: SimEvent[] = [...gathering(0), ...gathering(1), ...gathering(2
 
 const NO_USAGE: LlmUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
 
-/** Rules every candidate it is shown a festival, and keeps what it was shown. */
-class ScriptedLlm {
-  systems: string[] = []
-  users: string[] = []
-  async object(opts: { system: string; messages: LlmMessage[] }) {
-    const user = opts.messages.at(-1)?.content ?? ''
-    this.systems.push(opts.system)
-    this.users.push(user)
-    const keys = [...user.matchAll(/^- (\S+)$/gm)].map((m) => m[1]!)
-    return {
-      value: { rulings: keys.map((key) => ({ key, type: 'festival' })) },
-      usage: NO_USAGE,
-    }
-  }
-  async text() {
-    return { text: '', usage: NO_USAGE }
-  }
-  totalCostUsd(): number {
-    return 0
-  }
-  alert(): void {}
-}
+/** Rules every candidate it is shown a festival. Never leaves the process. */
+const scriptedLlm = () =>
+  ({
+    async object(opts: { messages: LlmMessage[] }) {
+      const user = opts.messages.at(-1)?.content ?? ''
+      const keys = [...user.matchAll(/^- (\S+)$/gm)].map((m) => m[1]!)
+      return { value: { rulings: keys.map((key) => ({ key, type: 'festival' })) }, usage: NO_USAGE }
+    },
+  }) as unknown as LlmClient
 
 describe('★ the recognizer, from a repeated gathering to the observatory', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-constructs-'))
@@ -74,7 +61,6 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
   let worldDb: Database.Database
   let gw: Gateway
   let base: string
-  const llm = new ScriptedLlm()
 
   beforeAll(async () => {
     // The arbiter's own file, in the minds directory, exactly where the live cast opens it.
@@ -84,7 +70,7 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
       events: TRANSCRIPT,
       baseConfig: DEFAULT_CONFIG,
       store: new ConstructStore(arbiterDb),
-      llm: llm as unknown as LlmClient,
+      llm: scriptedLlm(),
     })
 
     worldDb = openDb(join(dir, 'world.db'))

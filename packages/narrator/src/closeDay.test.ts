@@ -4,7 +4,7 @@ import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { closeDay } from './narrate.js'
-import type { LlmClient, LlmUsage } from '@sj/llm'
+import { migrateLlmTables, type LlmClient, type LlmUsage } from '@sj/llm'
 import type { NarratorLlm } from './types.js'
 
 const store = (): NarratorStore => {
@@ -52,12 +52,10 @@ const llm = (): NarratorLlm => ({
   biography: vi.fn(async () => ({ title: 'Amara of the tally', body: 'She was seen counting.' })),
 })
 
-// The world db above carries no `alerts`; the semantic pass writes one there when a verdict
-// will not parse, so a rig that runs the pass has to have the table.
+// The ledger the semantic pass writes an alert into when a verdict will not parse.
 const opsDb = (): Database.Database => {
   const db = new Database(':memory:')
-  db.exec(`CREATE TABLE alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
-    agent_id TEXT, kind TEXT NOT NULL, detail TEXT NOT NULL)`)
+  migrateLlmTables(db)
   return db
 }
 

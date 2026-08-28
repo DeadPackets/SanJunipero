@@ -170,6 +170,9 @@ export type SemanticPassDeps = {
   config?: Partial<SemanticConfig>
 }
 
+/** What a caller supplies; `store` and `day` come from the night being closed. */
+export type SemanticDeps = Omit<SemanticPassDeps, 'store' | 'day'>
+
 // One batched pass per night, after the chapters. Cost decays toward nothing on its own: a
 // concept already found is never scanned for again.
 export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Milestone[]> {

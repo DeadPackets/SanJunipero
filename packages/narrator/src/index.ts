@@ -15,6 +15,7 @@ export {
   detectSemanticFirsts,
   semanticInstruction,
   type SemanticConfig,
+  type SemanticDeps,
   type SemanticCandidateRow,
   type SemanticFirstRow,
   type TranscriptRecord,
