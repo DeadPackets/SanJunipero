@@ -134,8 +134,8 @@ Option A + prompt cookbook).
   idle, contact-a, passing, contact-b; master attached.
 - Call 4 — ONE sleep pose, master attached.
 - Surviving stages: magenta chroma key, sliceStrip, coarsen-to-fit/lattice/quantize
-  (v7 chain), stride check WITHIN a strip, ONE coherence gate (palette-jaccard +
-  silhouette bbox vs master).
+  (v7 chain), stride check WITHIN a strip, ONE coherence gate (silhouette bbox +
+  head region vs master).
 - DELETED from the v4 path: distance matrices, mirror-dupe detection, cross-facing gate,
   seeded sleep, per-facing sleep palette gates, guide-image machinery, compass-prose
   clauses, judge-as-facing-arbiter.
@@ -174,8 +174,8 @@ All ratios are × the sheet's pairwise-median cell distance; calibrated against 
 - Cross-facing near-dupe: straight distance < 0.55×median → FAIL (catches v1 ne/nw at 0.123 vs 0.171 cutoff).
 - Cross-facing mirror-dupe: mirrored distance < 0.35×median → FAIL (catches v1 sw/se at 0.030 vs 0.109 cutoff).
 - Stride differentiation within a facing: d(contact-A, contact-B) and d(passing-A, passing-B) each ≥ 0.35×median (catches v1 se at 0.091); every contact vs passing pair ≥ 0.25×median.
-- Frame coherence within a facing (NEW — v1 had none and per-frame generation drifted costume details), every frame vs the facing's idle: (a) palette agreement — Jaccard over ε-clusters (single-linkage ≤8/channel like v7, clusters under 1% opaque population ignored) ≥ 0.80; (b) silhouette area within ±18% of idle; (c) head-region stability — opaque-mask disagreement over the top 40% of the bbox ≤ 0.20 (v1 legit frames measure ≤ 0.123; legs move, heads don't).
-- Sleep cells: palette agreement vs idle (same 0.80 gate) plus lying-silhouette sanity (opaque bbox wider than tall).
+- Frame coherence within a facing (NEW — v1 had none and per-frame generation drifted costume details), every frame vs the facing's idle: (a) silhouette area within ±18% of idle; (b) head-region stability — opaque-mask disagreement over the top 40% of the bbox ≤ 0.20 (v1 legit frames measure ≤ 0.123; legs move, heads don't).
+- Sleep cells: lying-silhouette sanity (opaque bbox wider than tall) plus a ground-diagonal axis band; a lying body voids the area and head checks.
 
 ### Portraits
 

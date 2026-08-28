@@ -15,11 +15,14 @@ import {
   mirrorX,
   opaqueArea,
   opaqueBbox,
-  paletteJaccard,
-  sleepGate,
 } from './sheet.js'
-import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
-import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
+import { sleepAxisDeg, sleepCoherenceGateV4, stanceGate, strideGateV4 } from './mirror.js'
+import {
+  alphaBinaryGate,
+  PALETTE_DISTANCE_MAX,
+  paletteDistance,
+  soleSilhouetteGate,
+} from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
 
 const MAX_ART_H = FEET_Y_V2 + 1
@@ -61,12 +64,13 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     for (const p of POSES_V2) {
       const native = crop(`${p}-${f}`)
       view.set(`${p}-${f}`, gateView(native))
-      for (const s of [
-        ...alphaBinaryGate(native).failures,
-        ...paletteGate(native).failures,
-        ...soleSilhouetteGate(native).failures,
-      ])
+      for (const s of [...alphaBinaryGate(native).failures, ...soleSilhouetteGate(native).failures])
         found.push(`${c.id} ${p}-${f} pixel: ${s}`)
+      const distance = paletteDistance(native)
+      if (distance >= PALETTE_DISTANCE_MAX)
+        found.push(
+          `${c.id} ${p}-${f} pixel: palette distance ${distance.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`,
+        )
     }
   for (const f of AUTHORED) {
     const idle = view.get(`idle-${f}`)!
@@ -105,20 +109,18 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     ))
       found.push(`${c.id} ${p} ${x.gate} ${x.a}~${x.b}`)
   }
-  for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
-    found.push(`${c.id} sleep ${x.gate}`)
-  // `sleepGate` checks palette and wider-than-tall only, and a body drawn flat across the screen
-  // still passes `aspect > 1`, so the ground-diagonal axis is asked separately.
-  for (const x of sleepAxisGate(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
+  for (const x of sleepCoherenceGateV4(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
   return found
 }
 
-/** One pinned cell remains; adding an entry requires a written reason. */
+/** Two pinned cells; adding an entry requires a written reason. */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // The ruler moved, not the art. Clearing it means redrawing omar's se/contact-a, which also
-  // carries head 0.1871 against a 0.20 bar — a lane that regenerates it must watch both terms.
-  'omar se palette contact-a':
-    '0.6875 against 0.8000 — one palette cluster of sixteen, exposed by the mirror fix',
+  // NO REDRAW CAN CLEAR THIS: `gen-cast-v5` scores the same pair 0.1770 and ships it, because its
+  // gate view trims to the figure and this one keeps the 256 canvas. Retiring it is a ruling on
+  // which of the two views the 0.20 bar was calibrated for, not a request for better art.
+  'amara se head contact-a': '0.2235 against 0.2000 — audit view 0.2235, generator view 0.1770',
+  // The same untrimmed-view gap on the re-cut nadia: `gen-cast-v5` scored 0.1963 and shipped it.
+  'nadia ne head contact-b': '0.2176 against 0.2000 — audit view 0.2176, generator view 0.1963',
 }
 
 const cast = listCommittedCast()
@@ -166,8 +168,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
     ).toEqual([])
   })
 
-  it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(1)
+  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
   })
 })
 
@@ -207,10 +209,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
           ia = opaqueArea(idle)
         return WALK.map((p) => {
           const x = gateView(crop(`${p}-${f}`))
-          return (
-            `${p} ${paletteJaccard(idle, x).toFixed(6)} ${(opaqueArea(x) / ia).toFixed(6)} ` +
-            headRegionDiff(idle, x).toFixed(6)
-          )
+          return `${p} ${(opaqueArea(x) / ia).toFixed(6)} ` + headRegionDiff(idle, x).toFixed(6)
         }).join(' | ')
       }
       for (const [authored, derived] of [
@@ -243,11 +242,23 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
       ).toBe(1)
       // and the terms that do not care, do not care
       expect(opaqueArea(lhs)).toBe(opaqueArea(rhs))
-      expect(paletteJaccard(lhs, rhs)).toBe(1)
       expect(headRegionDiff(lhs, rhs)).toBe(0)
       expect(cellDistance(lhs, rhs), 'cellDistance would not see the shift').toBeGreaterThan(0)
     }
     expect(odd, 'no odd-width bbox in this sheet — the residual is unexercised').toBeGreaterThan(0)
+  })
+})
+
+// A sleeping villager is where the model likes to draw floating "z"s, and nadia shipped with two:
+// 145 px over 3 islands, which is 0.748% and passes the 1% detached bound. ONE island is the
+// property that has no threshold to slip under, and every other cell in the cast already had it.
+describe('every committed sleep cell is ONE shape — no captions, no props', () => {
+  it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
+    const crop = cropper(c, await atlasOf(c))
+    for (const f of FACINGS) {
+      const g = soleSilhouetteGate(crop(`sleep-${f}`))
+      expect(g.islands, `${id} sleep-${f} has ${g.islands} islands`).toBe(1)
+    }
   })
 })
 

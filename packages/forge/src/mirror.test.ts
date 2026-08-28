@@ -19,6 +19,7 @@ import {
   coherenceGateV4,
   deriveSheet,
   sleepAxisDeg,
+  sleepCoherenceGateV4,
   sleepAxisGate,
   stanceGate,
   strideGateV4,
@@ -116,6 +117,15 @@ describe('sleepAxisDeg', () => {
   })
 })
 
+describe('sleepCoherenceGateV4', () => {
+  it('passes an approved sleeper and is RED on a body still standing up', async () => {
+    expect(sleepCoherenceGateV4(await sleeper('omar'))).toEqual([])
+    const upright: RawImage = { width: 10, height: 20, data: new Uint8ClampedArray(10 * 20 * 4) }
+    upright.data.fill(255)
+    expect(sleepCoherenceGateV4(upright).map((x) => x.gate)).toContain('lying')
+  })
+})
+
 describe('sleepAxisGate', () => {
   it('passes the two the user approved', async () => {
     for (const id of ['omar', 'salma']) expect(sleepAxisGate(await sleeper(id))).toEqual([])
@@ -146,8 +156,8 @@ describe('sleepAxisGate', () => {
 
 // ── ★ THE PRE-SPEND GATE MUST NOT BE WEAKER THAN THE POST-HOC AUDIT ───────────────────────
 describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
-  // Two bodies, same palette and same area, DIFFERENT HEADS: a 16-wide torso with a head
-  // block that moves. Area is equal to the pixel, so silhouette and palette cannot see it.
+  // Two bodies, same area, DIFFERENT HEADS: a 16-wide torso with a head block that moves.
+  // Area is equal to the pixel, so silhouette cannot see it.
   const body = (headX: number): RawImage => {
     const w = 24,
       h = 24
@@ -167,7 +177,7 @@ describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
   const master = body(9)
   const drifted = body(2)
 
-  it('★ RED on a head that moved, with the silhouette and the palette identical', () => {
+  it('★ RED on a head that moved, with the silhouette identical', () => {
     const f = coherenceGateV4('cell', master, drifted)
     expect(
       f.map((x) => x.gate),

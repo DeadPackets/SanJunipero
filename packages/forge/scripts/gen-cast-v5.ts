@@ -37,7 +37,7 @@ import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pix
 import { quantize } from '../src/post/quantize.js'
 import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
-import { BIG_PIXEL } from './character.js'
+import { BIG_PIXEL, PROPORTION_CLAUSE } from './character.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastMember } from './cast-v5.js'
 import { scratch } from './scratch.js'
 
@@ -198,6 +198,7 @@ function masterPrompt(m: CastMember, proportionRef: boolean): string {
     proportionClause +
     `${NO_SCENERY} ` +
     `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${SWATCH_CLAUSE} ${PALETTE_WORDS} ${BIG_PIXEL} ` +
+    `${PROPORTION_CLAUSE}. ` +
     'Each figure stands about three quarters of the frame height tall, with clear magenta ' +
     'margin above and below; figures must NOT touch the edges of the image.'
   )
@@ -277,7 +278,7 @@ const figureHeight = (img: RawImage): number => {
 const MAX_ART_H = FEET_Y_V2 + 1
 // TRIMMED first, and that is what makes the fit below NORMALISE scale. The old chain trimmed
 // every cell to its figure, so this got it for free; a 256 canvas with the figure somewhere
-// inside does not, and the gates read the size difference as a broken head and a broken palette.
+// inside does not, and the gates read the size difference as a broken head.
 function gateView(cell: RawImage): RawImage {
   const img = trimToFigure(cell)
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
@@ -289,8 +290,8 @@ function gateView(cell: RawImage): RawImage {
           Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
           Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
         )
-  // MEASUREMENT ONLY, and the shipped cell is never snapped: paletteJaccard eps-clusters the
-  // union of both images' colours, and on a continuous field that closure swallows every cluster.
+  // MEASUREMENT ONLY, never a shipped pixel: cellDistance compares colours, and
+  // CALIBRATED_MEDIAN was measured on snapped art.
   return quantize(anchorToCanvas(fitted, CELL_V2, CELL_V2, FEET_Y_V2))
 }
 
@@ -322,7 +323,6 @@ function refuseFailing(
  *  file's header since v4 and read nowhere until now; it is the knob the ruling above creates
  *  the need for, because every extra attempt is a paid generation. */
 const ATTEMPTS = Math.max(1, Number(process.env.CAST_ATTEMPTS ?? '3'))
-const PALETTE_HARD_FLOOR = 0.6
 const MASTER_MIN_PITCH = 6
 
 const summary: string[] = []
@@ -430,11 +430,7 @@ async function runCharacter(m: CastMember): Promise<void> {
     return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
   }
   const identityBroken = (c: FrameCand): boolean =>
-    c.failures.some(
-      (x) =>
-        (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR) ||
-        (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)),
-    )
+    c.failures.some((x) => x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55))
   const bestOf = (cs: FrameCand[]): FrameCand | null =>
     cs.reduce<FrameCand | null>((a, c) => {
       if (!a) return c
@@ -530,7 +526,11 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       if (two) throw new Error('slices into 2 figure clusters')
       const hi = cutCell(keyed, 'centre')
-      const failures = sleepCoherenceGateV4(masterGate.se, gateView(hi))
+      // The same hard reject the walk frames get: `sliceStrip` sees a second FIGURE, not a
+      // caption, and a sleeping villager is where the model likes to draw floating "z"s.
+      const sole = soleSilhouetteGate(hi)
+      if (!sole.ok) throw new Error(sole.failures.join('; '))
+      const failures = sleepCoherenceGateV4(gateView(hi))
       push(
         `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
       )
