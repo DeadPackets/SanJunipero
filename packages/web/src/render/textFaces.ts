@@ -100,70 +100,75 @@ export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
   }
 }
 
-// ── the bubble frame ──────────────────────────────────────────────────────────────────────
+// ── the bubble box ────────────────────────────────────────────────────────────────────────
 
-/** `ui/px/frame-cream.png` and its siblings are 30 x 30 with a 10px border. */
-export const BUBBLE_SLICE = 10
-export const BUBBLE_FRAME_PX = 30
+/** World pixels. The box is drawn with Graphics, not nine-sliced art: 2px of ink on a 4px
+ *  radius, so one shape tints to whoever is speaking. */
+export const BUBBLE_PAD = 6
+export const BUBBLE_RADIUS = 4
+export const BUBBLE_STROKE = 2
 
-export type SliceRect = {
-  sx: number
-  sy: number
-  sw: number
-  sh: number
-  dx: number
-  dy: number
-  dw: number
-  dh: number
-}
+/** The rim a thought wears instead of a drawn edge — a different SHAPE, never a thinner ink.
+ *  Dots walk the box perimeter clockwise from the top-left corner. */
+export const RIM_DOT_R = 1
+const RIM_STEP_PX = 5
 
-/** Nine rects from one frame texture, so a slab stretches without smearing at any length.
- *  The four corners are never scaled; the edges stretch on one axis and the middle on both. */
-export function nineSlice(w: number, h: number, slice: number): SliceRect[] {
-  const dw = Math.max(2 * slice, Math.round(w))
-  const dh = Math.max(2 * slice, Math.round(h))
-  const midW = dw - 2 * slice
-  const midH = dh - 2 * slice
-  const cols = [
-    { s: 0, sw: slice, d: 0, dw: slice },
-    { s: slice, sw: slice, d: slice, dw: midW },
-    { s: 2 * slice, sw: slice, d: slice + midW, dw: slice },
-  ]
-  const rows = [
-    { s: 0, sh: slice, d: 0, dh: slice },
-    { s: slice, sh: slice, d: slice, dh: midH },
-    { s: 2 * slice, sh: slice, d: slice + midH, dh: slice },
-  ]
-  const out: SliceRect[] = []
-  for (const r of rows) {
-    for (const c of cols) {
-      out.push({ sx: c.s, sy: r.s, sw: c.sw, sh: r.sh, dx: c.d, dy: r.d, dw: c.dw, dh: r.dh })
+export function rimDots(w: number, h: number, step = RIM_STEP_PX): { cx: number; cy: number }[] {
+  const out: { cx: number; cy: number }[] = []
+  const along = (x0: number, y0: number, x1: number, y1: number): void => {
+    const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / step))
+    for (let i = 0; i < n; i++) {
+      out.push({ cx: x0 + ((x1 - x0) * i) / n, cy: y0 + ((y1 - y0) * i) / n })
     }
   }
+  const r = BUBBLE_RADIUS
+  along(r, 0, w - r, 0)
+  along(w, r, w, h - r)
+  along(w - r, h, r, h)
+  along(0, h - r, 0, r)
   return out
 }
 
 // ── the tail ──────────────────────────────────────────────────────────────────────────────
 
 export type BubbleSide = 'above' | 'below' | 'left' | 'right'
-export const TAIL_PX = 5
+export const TAIL_STEPS = 3
+export const TAIL_STEP_PX = 3
 
-/** The tail points AT the speaker, from whichever side the bubble was placed on (Task 74's
- *  `Placed['side']`). Local coordinates: the box is (0, 0) to (w, h). */
-export function tailPoly(side: BubbleSide, w: number, h: number): number[] {
-  const t = TAIL_PX
-  const cx = Math.round(w / 2)
-  const cy = Math.round(h / 2)
-  switch (side) {
-    case 'above':
-      return [cx - t, h, cx + t, h, cx, h + t]
-    case 'below':
-      return [cx - t, 0, cx + t, 0, cx, -t]
-    case 'left':
-      return [w, cy - t, w, cy + t, w + t, cy]
-    case 'right':
-      return [0, cy - t, 0, cy + t, -t, cy]
+/** A stair-stepped tail in the same pixel grammar as the art, never a smooth triangle. It
+ *  leaves the edge FACING the speaker (`Placed['side']`), so a de-conflicted bubble still
+ *  points at its own mouth. Box local space is (0, 0) to (w, h). */
+export function stairTail(side: BubbleSide, w: number, h: number): number[] {
+  const s = TAIL_STEP_PX
+  const span = TAIL_STEPS * s
+  // (u, v): u runs along the edge, v away from the box. One staircase, mapped four ways.
+  const uv: [number, number][] = [
+    [0, 0],
+    [span, 0],
+  ]
+  for (let i = 1; i <= TAIL_STEPS; i++) {
+    uv.push([span - (i - 1) * s, i * s], [span - i * s, i * s])
   }
+  const u0 = Math.round(w / 2) - span / 2
+  const v0 = Math.round(h / 2) - span / 2
+  const out: number[] = []
+  for (const [u, v] of uv) {
+    switch (side) {
+      case 'above':
+        out.push(u0 + u, h + v)
+        break
+      case 'below':
+        out.push(u0 + u, -v)
+        break
+      case 'left':
+        out.push(w + v, v0 + u)
+        break
+      case 'right':
+        out.push(-v, v0 + u)
+        break
+    }
+  }
+  return out
 }
 
 // ── the two materials ─────────────────────────────────────────────────────────────────────
@@ -175,37 +180,10 @@ export const SPEECH_INK = 0x241f2b // --deep
 export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
-/** The cloud edge on a thought: a different SHAPE, which is the channel alpha was misusing. */
-const THOUGHT_SCALLOP_R = 3
-export const SCALLOP_COUNT = 3
 
-/** The three shrinking dots that trail from a thought toward its thinker, pointing the same
- *  four ways the speech tail does — a de-conflicted bubble can sit on any side of the head. */
-export function scallopTrail(
-  side: BubbleSide,
-  w: number,
-  h: number,
-): { cx: number; cy: number; r: number }[] {
-  const cx = Math.round(w / 2),
-    cy = Math.round(h / 2)
-  const out: { cx: number; cy: number; r: number }[] = []
-  for (let i = 0; i < SCALLOP_COUNT; i++) {
-    const r = Math.max(1, THOUGHT_SCALLOP_R - i)
-    const step = 3 + i * (THOUGHT_SCALLOP_R + 2)
-    switch (side) {
-      case 'above':
-        out.push({ cx: cx - i * 2, cy: h + step, r })
-        break
-      case 'below':
-        out.push({ cx: cx - i * 2, cy: -step, r })
-        break
-      case 'left':
-        out.push({ cx: w + step, cy: cy - i * 2, r })
-        break
-      case 'right':
-        out.push({ cx: -step, cy: cy - i * 2, r })
-        break
-    }
-  }
-  return out
-}
+/** What a bubble collapses to when it is not one of the nearest, or the town is a map: a
+ *  three-dot pill on the speaker's own paper, so a thought stays a thought at every stop. */
+export const GLYPH_W = 15
+export const GLYPH_H = 9
+export const GLYPH_DOT_R = 1
+export const GLYPH_DOTS = 3
