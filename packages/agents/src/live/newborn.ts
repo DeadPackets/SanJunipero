@@ -36,7 +36,7 @@ export function wireBirths(opts: BirthsOpts): () => void {
   // seeding finishes — two births in one tick must not both take the last slot.
   const booting = new Set<string>()
 
-  const spawn = (born: AgentBornPayload, seq: number): void => {
+  const spawn = (born: AgentBornPayload, birth: { seq: number; tick: number }): void => {
     if (opts.booted.cast.size + booting.size >= opts.maxMinds) {
       insertAlert(opts.opsDb, {
         agentId: born.id,
@@ -55,12 +55,13 @@ export function wireBirths(opts: BirthsOpts): () => void {
       })
       return
     }
-    const tick = opts.bridge.currentTick()
+    // The BIRTH's tick, not `currentTick()`: `resolveCast` derives a repaired child's day from
+    // the same event, and the two paths must build the same person.
     const spec = childSpec(
       born,
       personaOf(mother),
       personaOf(father),
-      Math.floor(tick / MINUTES_PER_DAY),
+      Math.floor(birth.tick / MINUTES_PER_DAY),
     )
     const db = opts.dbFor(born.id)
     booting.add(born.id)
@@ -68,14 +69,14 @@ export function wireBirths(opts: BirthsOpts): () => void {
     // Off the tick: the household seed reads the log and the naming is a call.
     // The same two writes a boot repairs, in the same order — see `ensureChildren`.
     void (async () => {
-      await ensureHousehold({ store: opts.store, db, embedder: opts.embedder }, born, { seq, tick })
+      await ensureHousehold({ store: opts.store, db, embedder: opts.embedder }, born, birth)
       opts.booted.add(spec)
       opts.log?.(`stream: ${born.name} was born, and has a mind and a memory of ${born.id}.db`)
       if (!hasSocialName(opts.opsDb, born.id))
         await captureSocialName(opts.namingLlm, opts.opsDb, {
           born,
           motherPersona: personaOf(mother),
-          tick,
+          tick: birth.tick,
         })
     })()
       .catch((err: unknown) => {

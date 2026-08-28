@@ -24,7 +24,7 @@ export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot �
  */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
-/** The only rows the fold below reads: `foldOne`'s six cases and `HEAT_WEIGHTS`' nine keys.
+/** The only rows the fold below reads: `foldOne`'s five cases and `HEAT_WEIGHTS`' nine keys.
  *  0.5% of a real log — `need_changed` alone is 56% of it — and `idx_events_type` serves the
  *  filter. `heat.ts` reads the seq gaps this leaves as the events they were. */
 export const FOLD_TYPES: readonly string[] = [
@@ -41,28 +41,6 @@ export const FOLD_TYPES: readonly string[] = [
   'structure_completed',
   'structure_planned',
 ]
-
-/**
- * A windowed route's two ticks are the stranger's numbers: unclamped, `?toTick=1000000000` is a
- * multi-megabyte answer to a 60-byte GET. Clamping into the world that exists also collapses the
- * cache key space — every over-long window is one window. `narratorApi.ts` is the caller.
- */
-export function clampWindow(
-  from: string | null,
-  to: string | null,
-  liveTick: number,
-): {
-  fromTick: number
-  toTick: number
-} {
-  const pin = (raw: string | null, fallback: number): number => {
-    const n = Number(raw ?? fallback)
-    if (!Number.isFinite(n)) return fallback
-    return Math.min(Math.max(Math.trunc(n), 0), liveTick)
-  }
-  const fromTick = pin(from, 0)
-  return { fromTick, toTick: Math.max(fromTick, pin(to, liveTick)) }
-}
 
 export type DataApiDeps = {
   db: Database.Database
