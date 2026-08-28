@@ -1,5 +1,5 @@
 export { screenAnchor, subjectPoint, useStageAnchor, useSubjectAnchor } from './anchor.js'
-export type { StageAnchor, StageSubject, WorldPoint } from './anchor.js'
+export type { StageAnchor, Subject, WorldPoint } from './anchor.js'
 export { DirectorCue } from './DirectorCue.js'
 export { Nameplate } from './Nameplate.js'
 export { QuietStamp, STAMP_HOLD_MS, stampText, stampWord } from './QuietStamp.js'

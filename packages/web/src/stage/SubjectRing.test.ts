@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { RING_LABEL, RING_VERBS, SubjectRing, cycleVerb } from './SubjectRing.js'
-import type { StageSubject } from './anchor.js'
+import type { Subject } from './anchor.js'
 
-const AMARA: StageSubject = { id: 'a1', kind: 'agent', name: 'Amara' }
+const AMARA: Subject = { id: 'a1', kind: 'agent', name: 'Amara' }
 
-const markup = (subject: StageSubject | null): string =>
+const markup = (subject: Subject | null): string =>
   renderToStaticMarkup(
     createElement(SubjectRing, {
       subject,

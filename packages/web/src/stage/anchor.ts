@@ -5,7 +5,7 @@ import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 
 /** Who a stage mark is about. */
-export type StageSubject = { id: string; kind: 'agent' | 'structure'; name: string }
+export type Subject = { id: string; kind: 'agent' | 'structure'; name: string }
 
 /** A point in the space `tileToScreen` returns. */
 export type WorldPoint = { sx: number; sy: number }
@@ -31,7 +31,7 @@ export function screenAnchor(
  *  tile), and a building's site. A structure needs the store — `Scene.anchorOf` is bodies only. */
 export function subjectPoint(
   scene: Scene,
-  subject: StageSubject,
+  subject: Subject,
   store?: WorldStore,
 ): WorldPoint | null {
   if (subject.kind === 'structure') {
@@ -86,7 +86,7 @@ export function useStageAnchor(
 /** The anchor every mark about a person or a building uses. */
 export function useSubjectAnchor(
   scene: Scene | null,
-  subject: StageSubject | null,
+  subject: Subject | null,
   store?: WorldStore,
 ): RefObject<HTMLDivElement | null> {
   return useStageAnchor(

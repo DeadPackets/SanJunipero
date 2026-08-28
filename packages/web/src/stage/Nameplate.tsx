@@ -1,6 +1,6 @@
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
-import { useSubjectAnchor, type StageSubject } from './anchor.js'
+import { useSubjectAnchor, type Subject } from './anchor.js'
 
 /** A plate nailed under the figure, the way a name is written on a thing in the town — not a
  *  tooltip about it. */
@@ -10,7 +10,7 @@ export function Nameplate({
   store,
   selected = false,
 }: {
-  subject: StageSubject | null
+  subject: Subject | null
   scene: Scene | null
   /** only a `structure` subject needs it — a body carries its own sprite anchor */
   store?: WorldStore

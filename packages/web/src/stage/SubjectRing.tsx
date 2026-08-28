@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
-import { useSubjectAnchor, type StageSubject } from './anchor.js'
+import { useSubjectAnchor, type Subject } from './anchor.js'
 
 export const RING_VERBS = ['follow', 'story', 'bonds', 'home'] as const
 export type RingVerb = (typeof RING_VERBS)[number]
@@ -42,7 +42,7 @@ export function SubjectRing({
   onClose,
   store,
 }: {
-  subject: StageSubject | null
+  subject: Subject | null
   scene: Scene | null
   onVerb: (verb: RingVerb) => void
   /** Escape, when the caller wants the ring to close itself rather than the whole stage */
