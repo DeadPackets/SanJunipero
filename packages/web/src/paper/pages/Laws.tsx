@@ -9,6 +9,7 @@ import {
   type EditRow,
   type LawRow,
 } from '../../ui/lawsModel.js'
+import { EMPTY_COPY } from '../../ui/townStats.js'
 import type { PageProps } from './index.js'
 
 // The admin channel is a separate localhost server, not the viewer's origin.
@@ -19,7 +20,7 @@ export function LawsPage(props: PageProps) {
 }
 
 /** Every law of this town and every time it changed. Read-only: there is no write path. */
-export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
+function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
   const byGroup = LAW_GROUPS.map((group) => ({
     group,
     rows: rows
@@ -90,13 +91,7 @@ function Admin({ store, operatorToken }: PageProps) {
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
 
-  if (operatorToken === null)
-    return (
-      <p className="feed-empty">
-        The operator’s page. Nothing here is shown to a mind, and nothing here can be changed
-        without the channel’s token.
-      </p>
-    )
+  if (operatorToken === null) return <p className="feed-empty">{EMPTY_COPY.admin}</p>
 
   const rows = editRows(
     lawRows(store.getConfig(), store.getLaws(), store.lawHistory()),

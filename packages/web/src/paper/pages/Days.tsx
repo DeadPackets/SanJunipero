@@ -66,7 +66,7 @@ function MarkGlyph({ mark }: { mark: Mark }) {
   )
 }
 
-export function DayStripView({
+function DayStripView({
   edge,
   viewTick,
   live,
@@ -186,7 +186,7 @@ export function DayStripView({
   )
 }
 
-export function Days({ store, handle, onView }: PageProps) {
+export function Days({ store, onJump, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
@@ -208,14 +208,9 @@ export function Days({ store, handle, onView }: PageProps) {
       live={mode.live}
       marks={marks}
       onScrub={(tick) => {
-        const t = Math.max(0, Math.min(edge, Math.round(tick)))
-        handle?.scrub(t)
-        onView(t)
+        onJump(Math.max(0, Math.min(edge, Math.round(tick))))
       }}
-      onLive={() => {
-        handle?.goLive()
-        onView(null)
-      }}
+      onLive={onLive}
     />
   )
 }

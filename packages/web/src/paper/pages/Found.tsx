@@ -20,7 +20,7 @@ export function FoundPage(props: PageProps) {
  * The one place the agent's own words are printed. The chronicle never quotes them: a chronicle
  * line is agent-visible and this page is not.
  */
-function Things({ store, handle, onView }: PageProps) {
+function Things({ store, onJump }: PageProps) {
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -42,7 +42,9 @@ function Things({ store, handle, onView }: PageProps) {
         </div>
       )}
       {leaves.length === 0 ? (
-        read.loaded && <p className="feed-empty">{EMPTY_COPY.discoveries}</p>
+        read.loaded ? (
+          <p className="feed-empty">{EMPTY_COPY.discoveries}</p>
+        ) : null
       ) : (
         <ol className="discovery-chain">
           {leaves.map((leaf) => (
@@ -53,8 +55,7 @@ function Things({ store, handle, onView }: PageProps) {
                 aria-current={viewTick === leaf.record.tick ? 'true' : undefined}
                 aria-label={`${leaf.headline}, ${leaf.when}. Go to this moment.`}
                 onClick={() => {
-                  handle?.scrub(leaf.record.tick)
-                  onView(leaf.record.tick)
+                  onJump(leaf.record.tick)
                 }}
               >
                 {leaf.assetId === null ? (
@@ -94,7 +95,7 @@ function Places({ store, onSubject }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const standing = Object.values(state?.structures ?? {}).filter((s) => s.stage === 'complete')
 
-  if (standing.length === 0) return <p className="feed-empty">Nothing stands here yet.</p>
+  if (standing.length === 0) return <p className="feed-empty">{EMPTY_COPY.places}</p>
   return (
     <ul className="places">
       {standing.map((s) => {
@@ -111,7 +112,7 @@ function Places({ store, onSubject }: PageProps) {
             >
               <span className="place-name">{words}</span>
               <span className="place-by">
-                {builder === null ? 'No one remembers who began this.' : `Built by ${builder}`}
+                {builder === null ? EMPTY_COPY.provenance : `Built by ${builder}`}
               </span>
             </button>
           </li>

@@ -2,23 +2,22 @@ import { useSyncExternalStore } from 'react'
 import type { WorldState } from '@sj/engine/state'
 import { kindWords } from '../../ui/broadcastReady.js'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
+import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './index.js'
-
-const NO_PROVENANCE = 'No one remembers who began this.'
 
 type Journal = { tick: number; text: string; kind: 'journal' | 'dream' }
 
 /** The provenance sentence and the builder's nearest journal line, from the one builder both
  *  the room card and this page read — the two used to print the same fact differently. */
-export function provenanceLines(
+function provenanceLines(
   state: WorldState | null,
   p: Provenance | null,
   journal: Journal[],
 ): string {
-  if (state === null || p === null) return NO_PROVENANCE
+  if (state === null || p === null) return EMPTY_COPY.provenance
   const built = builtLine(state, p)
-  if (built === null) return NO_PROVENANCE
+  if (built === null) return EMPTY_COPY.provenance
   // Written entries only: a dream quoted under a building reads as what the builder saw.
   const nearest = journal
     .filter((e) => e.kind !== 'dream')
@@ -46,7 +45,7 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
     builderId === null ? null : `/api/agent/${encodeURIComponent(builderId)}/journal`,
   )
 
-  if (id === null || state === null) return <p className="feed-empty">Nothing is picked.</p>
+  if (id === null || state === null) return <p className="feed-empty">{EMPTY_COPY.noPlace}</p>
   const structure = state.structures[id]
   if (structure === undefined) return <p className="feed-empty">Nothing stands here now.</p>
 
@@ -94,7 +93,7 @@ function Inside({
   onEnter: () => void
   onLeave: () => void
 }) {
-  if (card === null) return <p className="feed-empty">There is no room in this to stand in.</p>
+  if (card === null) return <p className="feed-empty">{EMPTY_COPY.room}</p>
   return (
     <div className="room" aria-label={`Inside ${card.title}`}>
       <button

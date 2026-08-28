@@ -9,16 +9,12 @@ import {
   type PeopleIndex,
 } from '../../ui/bondModel2.js'
 import { ARC_COLOR } from '../../ui/relationGraph.js'
+import { momentStamp } from '../stamp.js'
 
 const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
   warming: 'Getting closer',
   cooling: 'Drifting apart',
   steady: 'Holding steady',
-}
-
-const moment = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
 }
 
 /** One tie, opened. The bar is gone: it filled toward the closest pair in town, which makes a
@@ -75,9 +71,9 @@ export function BondDetail({
 
       <dl className="bond-dates">
         <dt>First</dt>
-        <dd>{moment(bond.formedTick)}</dd>
+        <dd>{momentStamp(bond.formedTick)}</dd>
         <dt>Last</dt>
-        <dd>{moment(bond.lastUpdatedTick)}</dd>
+        <dd>{momentStamp(bond.lastUpdatedTick)}</dd>
       </dl>
 
       {/* The counts are the whole history; the column below is the last few acts of it. */}
@@ -95,7 +91,7 @@ export function BondDetail({
       <ol className="bond-history">
         {newestFirst.map((h, i) => (
           <li key={`${h.tick}:${i}`}>
-            <span className="stamp">{moment(h.tick)}</span>
+            <span className="stamp">{momentStamp(h.tick)}</span>
             <span className="feed-text">They {bondNote(h.kind)}.</span>
           </li>
         ))}

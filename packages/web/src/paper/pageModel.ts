@@ -9,7 +9,6 @@ export const PAGE_TABS = {
 } as const
 
 export type PageKey = keyof typeof PAGE_TABS
-export type Tab = (typeof PAGE_TABS)[PageKey][number]
 
 /** The four arms of the signpost, in the order they hang. */
 export const ARMS = ['folk', 'chronicle', 'found', 'laws'] as const

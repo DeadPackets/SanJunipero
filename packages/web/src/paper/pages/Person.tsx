@@ -1,10 +1,10 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
-import { useFeed } from '../../ui/useEndpoint.js'
+import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from '../../ui/status.js'
 import {
   CHANGE_EMPTY,
@@ -13,41 +13,29 @@ import {
   changeLog,
   hasChanged,
   type ChangeEntry,
+  type PersonalityRow,
 } from '../../ui/becoming.js'
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
+import { EMPTY_COPY } from '../../ui/townStats.js'
 import type { PageProps } from './index.js'
 
-const DOC_CACHE_MS = 30_000
 const NEED_LOW = 30
-const NOTHING_WRITTEN = 'Nothing written yet.'
-/** Describes rather than promises: on a scripted stream nobody is writing at all. */
-const BIOGRAPHY_EMPTY = 'Nobody has written of them yet.'
-
-type Doc = 'ledgers' | 'journal' | 'personality'
 export type LedgerRow = { personId: string; doc: string; updatedDay: number }
 export type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
-type PersonalityRow = { version: number; day: number; doc: string; edit: string }
 
-const cache = new Map<string, { at: number; rows: unknown[] }>()
-/** A read that failed is NOT an empty record: caching it turns one 500 into 30 seconds of
- *  "Nothing written yet." about a person. Only an answer is cached. */
-export async function fetchDoc<T>(
-  agentId: string,
-  doc: Doc,
-  fetchFn: typeof fetch = fetch,
-): Promise<T[]> {
-  const key = `${agentId}:${doc}`
-  const hit = cache.get(key)
-  if (hit !== undefined && performance.now() - hit.at < DOC_CACHE_MS) return hit.rows as T[]
-  const res = await fetchFn(`/api/agent/${encodeURIComponent(agentId)}/${doc}`)
-  if (!res.ok) return []
-  const rows = (await res.json()) as T[]
-  cache.set(key, { at: performance.now(), rows })
-  return rows
-}
+/** A document of one person's, read only while the tab that prints it is the open one. */
+const docUrl = (agentId: string | null, doc: string): string | null =>
+  agentId === null ? null : `/api/agent/${encodeURIComponent(agentId)}/${doc}`
+
+const journalRows = (b: unknown): JournalRow[] | null =>
+  Array.isArray(b) ? (b as JournalRow[]) : null
+const ledgerRows = (b: unknown): LedgerRow[] | null =>
+  Array.isArray(b) ? (b as LedgerRow[]) : null
+const changeRows = (b: unknown): PersonalityRow[] | null =>
+  Array.isArray(b) ? (b as PersonalityRow[]) : null
 
 /** A dream is the mind's, but it is not something the mind wrote down — say which is which. */
-export const journalStamp = (row: JournalRow): string =>
+const journalStamp = (row: JournalRow): string =>
   row.kind === 'dream' ? `Day ${row.day}, a dream` : `Day ${row.day}`
 
 function ageBand(ageDays: number): string {
@@ -111,7 +99,7 @@ export function PersonStoryView({
         {journal === null ? (
           <Skeleton />
         ) : journal.length === 0 ? (
-          <p className="feed-empty">{NOTHING_WRITTEN}</p>
+          <p className="feed-empty">{EMPTY_COPY.written}</p>
         ) : (
           journal.map((row, i) => (
             <p key={i} className="doc">
@@ -126,7 +114,7 @@ export function PersonStoryView({
       <section className="block">
         <h3 className="feed-head">What is written of them</h3>
         {biography === null ? (
-          <p className="doc">{BIOGRAPHY_EMPTY}</p>
+          <p className="doc">{EMPTY_COPY.biography}</p>
         ) : (
           <article className="biography">
             <p className="biography-head">
@@ -241,7 +229,7 @@ export function PersonLedgerView({
         {ledger === null ? (
           <Skeleton />
         ) : ledger.length === 0 ? (
-          <p className="feed-empty">{NOTHING_WRITTEN}</p>
+          <p className="feed-empty">{EMPTY_COPY.written}</p>
         ) : (
           ledger.map((row) => (
             <article key={row.personId}>
@@ -261,29 +249,15 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const dispatches = useFeed(dispatchesFeed).data
   const agentId = subject?.kind === 'agent' ? subject.id : null
-  // Rows are held WITH the person they were fetched for, so a new subject reads as "nothing
-  // loaded" in the same render — the page can never show the previous person's ledger.
-  const [docsOf, setDocsOf] = useState<{
-    id: string
-    journal: JournalRow[]
-    ledger: LedgerRow[]
-    personality: PersonalityRow[]
-  } | null>(null)
-  const docs = docsOf?.id === agentId ? docsOf : null
-
-  useEffect(() => {
-    if (agentId === null || docs !== null) return
-    void Promise.all([
-      fetchDoc<JournalRow>(agentId, 'journal'),
-      fetchDoc<LedgerRow>(agentId, 'ledgers'),
-      fetchDoc<PersonalityRow>(agentId, 'personality'),
-    ]).then(([journal, ledger, personality]) => {
-      setDocsOf({ id: agentId, journal, ledger, personality })
-    })
-  }, [agentId, docs])
+  // A changed URL is a new read, so the page can never show the previous person's documents,
+  // and a tab nobody opened reads `null` — the endpoint layer's own "do not read".
+  const story = tab !== 'Bonds' && tab !== 'Ledger'
+  const journal = usePolled(story ? docUrl(agentId, 'journal') : null, journalRows)
+  const personality = usePolled(story ? docUrl(agentId, 'personality') : null, changeRows)
+  const ledger = usePolled(tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null, ledgerRows)
 
   const a = agentId === null ? undefined : state?.agents[agentId]
-  if (a === undefined) return <p className="feed-empty">No such townsfolk.</p>
+  if (a === undefined) return <p className="feed-empty">{EMPTY_COPY.noPerson}</p>
 
   const records = store.assetRecords()
   const portraitId = resolveAssetId(records, 'portrait', a.id)
@@ -323,14 +297,14 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           agent={a}
           tick={tick}
           carrying={carrying}
-          ledger={docs?.ledger ?? null}
+          ledger={ledger.data}
           nameOf={(id) => state?.agents[id]?.name ?? id}
         />
       ) : (
         <PersonStoryView
           thought={store.latestThought(a.id)}
-          journal={docs?.journal ?? null}
-          changes={docs === null ? null : changeLog(docs.personality)}
+          journal={journal.data}
+          changes={personality.data === null ? null : changeLog(personality.data)}
           biography={biographyOf(dispatches ?? EMPTY_DISPATCHES, a.id)}
         />
       )}
@@ -348,7 +322,7 @@ function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] 
 
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
   const mine = api.bonds.filter((b) => b.aId === agentId || b.bId === agentId)
-  if (mine.length === 0) return <p className="feed-empty">No ties yet.</p>
+  if (mine.length === 0) return <p className="feed-empty">{EMPTY_COPY.ties}</p>
 
   return (
     <ul className="edges">

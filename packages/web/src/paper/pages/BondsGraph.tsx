@@ -150,14 +150,14 @@ export function BondsGraph({
 
   return (
     <div className="bonds-graph" ref={boxRef}>
-      <div className="bonds-views" role="tablist" aria-label="What the picture shows">
+      {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow keys,
+          and a second tablist nested in its panel would be one the keyboard cannot walk. */}
+      <div className="bonds-views" role="group" aria-label="What the picture shows">
         {SOCIETY_VIEWS.map((v) => (
           <button
             key={v}
-            role="tab"
-            id={`bonds-view-${v}`}
-            aria-selected={v === view}
-            tabIndex={v === view ? 0 : -1}
+            type="button"
+            aria-pressed={v === view}
             className={v === view ? 'feed-tab active' : 'feed-tab'}
             onClick={() => {
               setView(v)

@@ -13,13 +13,8 @@ export const DIRECTOR_ZOOM = 3 as const
  *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
 const NO_HEAT: HeatWindow[] = []
 
-/**
- * The camera, driven. It draws nothing: the word under the town is `DirectorCue`'s, and this
- * hands it the subject through `onCue`.
- *
- * `autoCut` is the live town being televised; `pinned` is a viewer who asked to follow one
- * person, which outranks the heat.
- */
+/** `autoCut` is the live town being televised; `pinned` is a viewer who asked to follow one
+ *  person, which outranks the heat. It draws nothing — `DirectorCue` prints the word. */
 export function DirectorMode({
   store,
   scene,
@@ -58,12 +53,14 @@ export function DirectorMode({
       .map((a) => a.id)
       .sort()
     const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
+    // The first subject arrives at once; every later cut waits out CUT_MIN_MS.
     const now = performance.now()
-    if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
-      followedRef.current = next
-      lastCutRef.current = now
-      setCut(next)
-    } else if (followedRef.current === null && next !== null) {
+    const first = followedRef.current === null
+    if (
+      next !== null &&
+      next !== followedRef.current &&
+      (first || now - lastCutRef.current >= CUT_MIN_MS)
+    ) {
       followedRef.current = next
       lastCutRef.current = now
       setCut(next)

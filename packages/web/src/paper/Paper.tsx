@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
-import type { ObservatoryHandle } from '../net/socket.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
 import { PageBody } from './pages/index.js'
-import { GRIP_CLOSE_PX, PAGE_TABS, PAGE_TITLE, tabFromKey, type PageKey } from './pageModel.js'
+import {
+  GRIP_CLOSE_PX,
+  PAGE_TABS,
+  PAGE_TITLE,
+  hasTab,
+  tabFromKey,
+  type PageKey,
+} from './pageModel.js'
 
 /** A sheet of paper the town hands up when you ask it something. Non-modal on purpose: the
  *  town keeps living above it, and a click on the town puts it away. */
@@ -14,7 +20,6 @@ export function Paper({
   subject,
   store,
   scene,
-  handle,
   operatorToken,
   insideId,
   gapTicks,
@@ -22,14 +27,14 @@ export function Paper({
   onClose,
   onSubject,
   onInside,
-  onView,
+  onJump,
+  onLive,
 }: {
   page: PageKey | null
   tab: string
   subject: Subject | null
   store: WorldStore
   scene: Scene | null
-  handle: ObservatoryHandle | null
   operatorToken: string | null
   insideId: string | null
   gapTicks: number | null
@@ -37,20 +42,19 @@ export function Paper({
   onClose: () => void
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
-  onView: (tick: number | null) => void
+  onJump: (tick: number) => void
+  onLive: () => void
 }) {
   const open = page !== null
   const tabsRef = useRef<HTMLDivElement>(null)
-  const openerRef = useRef<HTMLElement | null>(null)
   // The page is held for the 300 ms it takes to slide out, so the sheet is never blank in flight.
   const [shown, setShown] = useState<PageKey | null>(page)
   if (page !== null && page !== shown) setShown(page)
 
   useEffect(() => {
     if (!open) return
-    openerRef.current = document.activeElement as HTMLElement | null
+    const opener = document.activeElement as HTMLElement | null
     tabsRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
-    const opener = openerRef.current
     return () => {
       opener?.focus()
     }
@@ -85,7 +89,7 @@ export function Paper({
 
   const key = shown ?? 'folk'
   const tabs = PAGE_TABS[key] as readonly string[]
-  const current = tabs.includes(tab) ? tab : tabs[0]!
+  const current = hasTab(key, tab) ? tab : tabs[0]!
   const title =
     key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
 
@@ -152,22 +156,22 @@ export function Paper({
           </button>
         </header>
         <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
-          {open && (
+          {open ? (
             <PageBody
               page={key}
               tab={current}
               subject={subject}
               store={store}
               scene={scene}
-              handle={handle}
               operatorToken={operatorToken}
               insideId={insideId}
               gapTicks={gapTicks}
               onSubject={onSubject}
               onInside={onInside}
-              onView={onView}
+              onJump={onJump}
+              onLive={onLive}
             />
-          )}
+          ) : null}
         </div>
       </section>
     </>

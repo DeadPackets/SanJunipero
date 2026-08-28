@@ -6,13 +6,14 @@ import { editions, type Edition } from '../../ui/dispatches.js'
 import { dispatchesFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
 import { Moments } from './Moments.js'
 import type { PageProps } from './index.js'
 
-export const CHRONICLE_REFETCH_MS = 20_000
-export const FEED_MAX = 120
-export const GLYPH_PX = 8
+const CHRONICLE_REFETCH_MS = 20_000
+const FEED_MAX = 120
+const GLYPH_PX = 8
 
 const GLYPH: Record<string, string> = {
   agent_died: 'death',
@@ -30,11 +31,6 @@ const chronicleEntries = (body: unknown): ChronicleEntry[] | null => {
 
 type Chapter = { day: number; title: string; text: string }
 const NO_CHAPTERS: Chapter[] = []
-
-const stamp = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
-}
 
 // Decorative: the sentence beside it carries the meaning, so the glyph stays out of the
 // accessibility tree instead of being read twice.
@@ -86,7 +82,7 @@ function EditionView({ e }: { e: Edition }) {
   )
 }
 
-function Today({ store, handle, gapTicks, onView }: PageProps) {
+function Today({ store, gapTicks, onJump }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
@@ -109,11 +105,6 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
     const text = describeEvent(ev, state)
     if (text !== null)
       lines.push({ key: ev.seq, tick: ev.tick, kind: GLYPH[ev.type] ?? 'plain', text })
-  }
-
-  const jump = (tick: number): void => {
-    handle?.scrub(tick)
-    onView(tick)
   }
 
   return (
@@ -150,13 +141,13 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
                 <button
                   className="feed-jump"
                   aria-current={viewTick === e.tick ? 'true' : undefined}
-                  aria-label={`${e.label} ${stamp(e.tick)}. Go to this moment.`}
+                  aria-label={`${e.label} ${momentStamp(e.tick)}. Go to this moment.`}
                   onClick={() => {
-                    jump(e.tick)
+                    onJump(e.tick)
                   }}
                 >
                   <Glyph icon={e.icon} />
-                  <span className="stamp">{stamp(e.tick)}</span>
+                  <span className="stamp">{momentStamp(e.tick)}</span>
                   <span className="feed-text">{e.label}</span>
                 </button>
               </li>
@@ -177,7 +168,7 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
           <ol className="feed" aria-live="polite">
             {lines.map((l) => (
               <li key={l.key} className={`feed-line ${l.kind}`}>
-                <span className="stamp">{stamp(l.tick)}</span>
+                <span className="stamp">{momentStamp(l.tick)}</span>
                 <span className="feed-text">{l.text}</span>
               </li>
             ))}

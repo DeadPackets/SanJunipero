@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { MomentsResponseSchema, tickToMoment, type Moment } from '@sj/shared'
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { MomentsResponseSchema, type Moment } from '@sj/shared'
 import type { PeopleIndex } from '../../ui/bondModel2.js'
 import { thumbLabel, thumbMotif, thumbTitle } from '../../ui/momentThumb.js'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../ui/momentsPlayer.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
+import { momentStamp } from '../stamp.js'
 import type { PageProps } from './index.js'
 
 const momentRows = (body: unknown): Moment[] | null => {
@@ -22,11 +23,6 @@ const momentRows = (body: unknown): Moment[] | null => {
 
 const MOTIF_PX = 8
 const CREAM = '#FFF6E9'
-
-const clock = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
-}
 
 // Drawn, not typed: ▶ and ❙❙ are pictographic characters whose shape belongs to the reader's
 // font. The town draws its own controls, in its own pixels.
@@ -92,7 +88,7 @@ function Motif({ moment }: { moment: Moment }) {
   )
 }
 
-export function MomentCardView({
+const MomentCardView = memo(function MomentCardView({
   moment,
   people,
   open,
@@ -127,9 +123,9 @@ export function MomentCardView({
       </button>
     </li>
   )
-}
+})
 
-export function PlayerStripView({
+function PlayerStripView({
   moment,
   player,
   onToggle,
@@ -191,7 +187,7 @@ export function PlayerStripView({
         aria-valuemin={moment.startTick}
         aria-valuemax={moment.endTick}
         aria-valuenow={player.tick}
-        aria-valuetext={clock(player.tick)}
+        aria-valuetext={momentStamp(player.tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
           ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -203,7 +199,7 @@ export function PlayerStripView({
       >
         <span className="player-head" style={{ left: `${frac * 100}%` }} />
       </div>
-      <span className="player-clock">{clock(player.tick)}</span>
+      <span className="player-clock">{momentStamp(player.tick)}</span>
       <button
         className="player-btn speed"
         aria-label={`Speed ${player.speed} times. Change speed.`}
@@ -219,7 +215,7 @@ export function PlayerStripView({
 }
 
 /** The filmstrip and its player, on the page instead of across the bottom of the town. */
-export function Moments({ store, handle, onView }: PageProps) {
+export function Moments({ store, onJump, onLive }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
   const moments = usePolled('/api/moments', momentRows).data
@@ -249,8 +245,8 @@ export function Moments({ store, handle, onView }: PageProps) {
   // Opening a day parks the view at its first minute.
   useEffect(() => {
     if (open === null) return
-    handle?.scrub(open.startTick)
-  }, [open, handle])
+    onJump(open.startTick)
+  }, [open, onJump])
 
   // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
   // socket messages.
@@ -266,7 +262,7 @@ export function Moments({ store, handle, onView }: PageProps) {
         const next = tickPlayer(prev, dt, open.startTick, open.endTick)
         if (next.tick !== scrubbedRef.current) {
           scrubbedRef.current = next.tick
-          handle?.scrub(next.tick)
+          onJump(next.tick)
         }
         return next
       })
@@ -276,14 +272,14 @@ export function Moments({ store, handle, onView }: PageProps) {
     return () => {
       cancelAnimationFrame(raf)
     }
-  }, [open, player.status, handle])
+  }, [open, player.status, onJump])
 
   const seek = (frac: number): void => {
     if (open === null) return
     setPlayer((prev) => {
       const next = seekPlayer(prev, frac, open.startTick, open.endTick)
       scrubbedRef.current = next.tick
-      handle?.scrub(next.tick)
+      onJump(next.tick)
       return next
     })
   }
@@ -292,8 +288,7 @@ export function Moments({ store, handle, onView }: PageProps) {
     scrubbedRef.current = null
     setPlayerOf({ id: null, state: idlePlayer(0) })
     setOpenId(null)
-    handle?.goLive()
-    onView(null)
+    onLive()
   }
 
   return (

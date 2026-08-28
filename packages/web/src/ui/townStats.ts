@@ -50,6 +50,17 @@ export const EMPTY_COPY = {
     'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
   paper: 'Nothing printed yet. The chronicler writes a day up once it has closed.',
   families: 'No families yet — nobody walking the town was born to anyone in it.',
+  places: 'Nothing stands here yet.',
+  ties: 'No ties yet.',
+  written: 'Nothing written yet.',
+  biography: 'Nobody has written of them yet.',
+  provenance: 'No one remembers who began this.',
+  room: 'This one has no room to stand in.',
+  noPlace: 'No place is picked.',
+  noPerson: 'No such townsfolk.',
+  admin:
+    'The operator’s page. Nothing here is shown to a mind, and nothing here opens without ' +
+    'the law channel’s key.',
 } as const
 
 // ------------------------------------------------------------------ weather glyphs

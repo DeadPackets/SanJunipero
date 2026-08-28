@@ -1,5 +1,4 @@
 import type { Scene } from '../../render/scene.js'
-import type { ObservatoryHandle } from '../../net/socket.js'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import type { PageKey } from '../pageModel.js'
@@ -15,7 +14,6 @@ export type PageProps = {
   subject: Subject | null
   store: WorldStore
   scene: Scene | null
-  handle: ObservatoryHandle | null
   operatorToken: string | null
   /** which interior the camera is standing in, so the Inside page knows which way the door goes */
   insideId: string | null
@@ -23,7 +21,10 @@ export type PageProps = {
   gapTicks: number | null
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
-  onView: (tick: number | null) => void
+  /** Go to one minute of the town's history: the socket scrubs and the address bar follows. */
+  onJump: (tick: number) => void
+  /** Back to the live edge. */
+  onLive: () => void
 }
 
 export function PageBody({ page, ...props }: PageProps & { page: PageKey }) {

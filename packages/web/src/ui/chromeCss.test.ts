@@ -36,6 +36,15 @@ describe('★ chrome.css survives the merge trains intact', () => {
     }
   })
 
+  // A sweep that takes a rule can take its @keyframes with it and leave the `animation:` line
+  // behind: the CSS still parses and the surface simply stops moving.
+  it('names no animation the sheet has no keyframes for', () => {
+    const declared = new Set([...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]!))
+    const used = [...CSS.matchAll(/animation:\s*([\w-]+)/g)].map((m) => m[1]!)
+    expect(used.filter((n) => !declared.has(n))).toEqual([])
+    expect(used.length, 'the sheet animates nothing at all').toBeGreaterThan(0)
+  })
+
   it('is brace-balanced and carries no conflict marker', () => {
     expect(CSS.match(/{/g) ?? []).toHaveLength((CSS.match(/}/g) ?? []).length)
     expect(

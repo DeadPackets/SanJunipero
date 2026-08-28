@@ -19,6 +19,7 @@ import {
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
+import { kindWords } from './ui/broadcastReady.js'
 import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -29,7 +30,6 @@ type Sheet = { page: PageKey; tab: string }
 
 export function App() {
   const [store] = useState(createWorldStore)
-  const sockRef = useRef<ObservatoryHandle | null>(null)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
@@ -55,7 +55,6 @@ export function App() {
         /* the stamp reads the link; nothing here has to */
       },
     })
-    sockRef.current = sock
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(sock)
 
@@ -89,12 +88,29 @@ export function App() {
     setSubject({ id: agentId, kind: 'agent', name })
   }, [agentId, store])
 
-  // every viewed moment is shareable: scrubs rewrite the address bar in place
-  const onView = (tick: number | null): void => {
-    const next: Route = { ...route, moment: tick === null ? null : tickToMoment(tick) }
-    history.replaceState(null, '', routeToPath(next))
-    setRoute(next)
-  }
+  // Every viewed moment is shareable: the socket and the address bar move together, so a link
+  // a viewer copies mid-playback reopens the minute they were watching.
+  const goTo = useCallback(
+    (tick: number | null): void => {
+      if (tick === null) handle?.goLive()
+      else handle?.scrub(tick)
+      setRoute((prev) => {
+        const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
+        history.replaceState(null, '', routeToPath(next))
+        return next
+      })
+    },
+    [handle],
+  )
+  const onJump = useCallback(
+    (tick: number) => {
+      goTo(tick)
+    },
+    [goTo],
+  )
+  const onLive = useCallback(() => {
+    goTo(null)
+  }, [goTo])
 
   const openPage = (page: PageKey, tab?: string): void => {
     setSheet({ page, tab: tab ?? firstTab(page) })
@@ -141,7 +157,7 @@ export function App() {
           (s) => s.owner === subject.id,
         )
         if (home === undefined) return
-        setSubject({ id: home.id, kind: 'structure', name: home.kind.replace(/_/g, ' ') })
+        setSubject({ id: home.id, kind: 'structure', name: kindWords(home.kind) })
         openPage('building', 'Provenance')
         scene?.centerOn(home.x, home.y)
       }
@@ -182,7 +198,7 @@ export function App() {
           if (pick.kind !== 'structure') return
           const s = store.getState()?.structures[pick.id]
           if (s === undefined) return
-          setSubject({ id: s.id, kind: 'structure', name: s.kind.replace(/_/g, ' ') })
+          setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
         }}
       />
       <SpeechLive store={store} />
@@ -204,7 +220,6 @@ export function App() {
         subject={subject}
         store={store}
         scene={scene}
-        handle={handle}
         operatorToken={operatorToken}
         insideId={insideId}
         gapTicks={gapTicks}
@@ -214,7 +229,8 @@ export function App() {
         onClose={closePaper}
         onSubject={pickSubject}
         onInside={enterInterior}
-        onView={onView}
+        onJump={onJump}
+        onLive={onLive}
       />
       <FpsOverlay />
     </div>

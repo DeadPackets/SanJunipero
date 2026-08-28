@@ -53,17 +53,16 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       </div>
     )
 
-  const rows = sortRoster(
-    rosterRows2(
-      state,
-      store.assetRecords(),
-      bonds,
-      tick,
-      store.recentEvents(),
-      store.getConfig()?.movement.earshotRadius,
-    ),
-    sort,
+  // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
+  const byName = rosterRows2(
+    state,
+    store.assetRecords(),
+    bonds,
+    tick,
+    store.recentEvents(),
+    store.getConfig()?.movement.earshotRadius,
   )
+  const rows = sort === 'name' ? byName : sortRoster(byName, sort)
   const people = Object.fromEntries(Object.values(state.agents).map((a) => [a.id, a.name]))
   const events = store.recentEvents()
 

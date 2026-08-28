@@ -28,7 +28,6 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
       subject: null,
       store: createWorldStore(),
       scene: null,
-      handle: null,
       operatorToken: null,
       insideId: null,
       gapTicks: null,
@@ -36,7 +35,8 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
       onClose: () => {},
       onSubject: () => {},
       onInside: () => {},
-      onView: () => {},
+      onJump: () => {},
+      onLive: () => {},
       ...over,
     }),
   )
@@ -164,6 +164,26 @@ describe('the paper', () => {
   })
 })
 
+// ANTI-DRIFT. The table names the tabs; every page then picks its body by string. Rename a tab
+// in the table and the page renders its fallback forever, with no type error to catch it — so
+// the sheet is rendered on every tab of every page and the bodies must differ.
+describe('★ every tab of every arm reaches its own body', () => {
+  // The two subject pages are not here: with nobody picked they correctly render one empty
+  // state on every tab. `becoming.test.ts` renders their bodies directly instead.
+  it('renders something different on each', () => {
+    for (const page of ARMS) {
+      const seen = new Map<string, string>()
+      for (const tab of PAGE_TABS[page] as readonly string[]) {
+        const html = paper({ page, tab })
+        const body = html.slice(html.indexOf('id="paper-sheet"'))
+        const twin = [...seen].find(([, m]) => m === body)?.[0]
+        expect(twin, `${page}: ${tab} renders the same body as ${twin}`).toBeUndefined()
+        seen.set(tab, body)
+      }
+    }
+  })
+})
+
 // The four ways down and the two focus moves are effects: no DOM runs in this suite, so they are
 // pinned where they are written instead of left unasserted.
 describe('★ every way the paper goes down, and where focus lands', () => {
@@ -185,7 +205,7 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   })
 
   it('moves focus to the first tab on the way up, and back to the opener on the way down', () => {
-    expect(code).toMatch(/openerRef\.current = document\.activeElement/)
+    expect(code).toMatch(/const opener = document\.activeElement/)
     expect(code).toMatch(
       /tabsRef\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\)/,
     )
