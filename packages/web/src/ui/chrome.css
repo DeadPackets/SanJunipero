@@ -1225,3 +1225,59 @@ body {
 [data-broadcast='on'] .paper,
 [data-broadcast='on'] .town-dim,
 [data-broadcast='on'] .fps-overlay { display: none; }
+
+/* ══ THE BROADCAST FRAME ══════════════════════════════════════════════════════════════════
+   1080p into a 480px player is a quarter scale, so every size below is FOUR TIMES the desk
+   chrome's. `broadcast.ts`'s BROADCAST_CAPTIONS names each of these and its test measures them
+   against the 5.4px subtitle floor. Only the two marks the stream adds are styled here; the
+   stamp and the cue are the stage's own, enlarged. */
+
+[data-broadcast='on'] .stage-stamp { font-size: 24px; }
+[data-broadcast='on'] .stage-cue { font-size: 24px; bottom: 88px; }
+
+/* ── the lower third: who is talking, on a plate of the town's own parchment ── */
+[data-broadcast='on'] .lower-third {
+  position: absolute; left: 4%; bottom: 88px; z-index: 26;
+  display: flex; align-items: stretch; gap: 12px;
+  max-width: 64%;
+  padding: 12px;
+  background: var(--parchment); color: var(--ink);
+  box-shadow: var(--frame);
+  border-bottom: 6px solid var(--honey);
+}
+[data-broadcast='on'] .lower-third-bust {
+  flex: 0 0 auto; width: 96px; height: 96px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;   /* the bust IS world art */
+  box-shadow: var(--frame-tight);
+}
+[data-broadcast='on'] .lower-third-bust.none { background-color: var(--sand); }
+[data-broadcast='on'] .lower-third-body {
+  display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0;
+}
+[data-broadcast='on'] .lower-third-name {
+  font-family: var(--font-px); font-size: 24px; line-height: 1.1;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+  align-self: flex-start; padding: 4px 10px;
+}
+[data-broadcast='on'] .lower-third-words {
+  font-family: var(--font-body); font-size: 32px; font-weight: 500; line-height: 1.25;
+  color: var(--ink);
+}
+
+/* ── the ticker: the town's own record along the bottom letterbox edge ── */
+[data-broadcast='on'] .stage-ticker {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
+  display: flex; align-items: center; height: 56px;
+  overflow: hidden; white-space: nowrap;
+  background: var(--ink);
+  border-top: 4px solid var(--honey);
+}
+[data-broadcast='on'] .ticker-line {
+  display: inline-block; padding-left: 100%;
+  font-family: var(--font-px); font-size: 24px; line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  will-change: transform;
+}

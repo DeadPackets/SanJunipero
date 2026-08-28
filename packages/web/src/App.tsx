@@ -9,7 +9,9 @@ import type { Scene } from './render/scene.js'
 import {
   DirectorCue,
   Figures,
+  LowerThird,
   Nameplate,
+  Ticker,
   SpeechLive,
   SubjectRing,
   QuietStamp,
@@ -239,6 +241,8 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
       <QuietStamp store={store} />
       <DirectorCue text={cue} />
+      {route.broadcast && <LowerThird store={store} />}
+      {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
         store={store}
         scene={scene}

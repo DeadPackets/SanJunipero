@@ -250,13 +250,13 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
     expect(captionReads(captionFloorPx() - 1)).toBe(false)
   })
 
+  // The `sheet` rows are resolved against chrome.css by `broadcast.test.ts`, which is the file
+  // that can read the sheet. The canvas row is the one this module owns a number for.
   it('reports R2 as CLOSED by the broadcast layout', () => {
-    const broadcast = BROADCAST_CAPTIONS.map((c) => ({
-      what: c.what,
-      px: c.from === 'canvas' ? c.px : 0,
-    }))
-    expect(captionShortfall(broadcast)).toEqual([])
-    for (const c of broadcast) expect(c.px, c.what).toBeGreaterThanOrEqual(captionFloorPx())
+    const drawn = BROADCAST_CAPTIONS.filter((c) => c.from === 'canvas')
+    expect(drawn.length).toBeGreaterThan(0)
+    expect(captionShortfall(drawn)).toEqual([])
+    for (const c of drawn) expect(c.px, c.what).toBeGreaterThanOrEqual(captionFloorPx())
   })
 })
 

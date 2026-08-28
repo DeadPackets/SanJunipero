@@ -4,7 +4,14 @@ import {
   BROADCAST_CAPTIONS,
   BROADCAST_PARAM,
   BROADCAST_REMOVED,
+  CAPTION_HOLD_MS,
+  CAPTION_MAX_CHARS,
+  TICKER_MAX,
+  TICKER_SEP,
   broadcastFromSearch,
+  captionClip,
+  lowerThirdLine,
+  tickerText,
   type BroadcastCaption,
 } from './broadcast.js'
 import { captionAtScale, captionFloorPx, captionMinPx, captionShortfall } from './broadcastReady.js'
@@ -123,8 +130,23 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
   it('states what each one is worth to a viewer on a 480px phone', () => {
     expect(
       measured(BROADCAST_CAPTIONS).map((c) => `${c.what} — ${captionAtScale(c.px).toFixed(2)}px`),
-    ).toEqual(['a speech bubble — 8.00px'])
+    ).toEqual([
+      'a speech bubble — 8.00px',
+      'the speaker’s name — 6.00px',
+      'the caption — 8.00px',
+      'the chronicle ticker — 6.00px',
+      'the quiet stamp — 6.00px',
+      'the director’s cue — 6.00px',
+    ])
     expect(captionMinPx()).toBeCloseTo(5.4, 3)
+  })
+
+  // The comment on the table promised the stamp and the cue would join it once they landed.
+  it('★ measures every caption the frame draws, not only the one it added', () => {
+    const promised = ['the quiet stamp', 'the director’s cue', 'the chronicle ticker']
+    for (const what of promised) {
+      expect(BROADCAST_CAPTIONS.map((c) => c.what)).toContain(what)
+    }
   })
 
   it('clears the floor with room, rather than landing on it', () => {
@@ -151,5 +173,66 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
     const app = src('../App.tsx')
     expect(app).toContain("data-broadcast={route.broadcast ? 'on' : undefined}")
     expect(app).toMatch(/scene\.textScale = route\.broadcast \? BROADCAST_TEXT_SCALE : 1/)
+  })
+})
+
+// ── the lower third ───────────────────────────────────────────────────────────────────────
+
+describe('what the lower third carries', () => {
+  const spoken = { agentId: 'omar', name: 'Omar', words: 'The well is dry.', atMs: 1000 }
+  const paper = { title: 'What the Fire Took', body: 'It burned all night.' }
+
+  it('gives a fresh line to whoever said it, and asks for their face', () => {
+    expect(lowerThirdLine(spoken, paper, 1500)).toEqual({
+      kind: 'speech',
+      agentId: 'omar',
+      name: 'Omar',
+      words: 'The well is dry.',
+    })
+  })
+
+  it('lets the town’s own paper back in once the line has been up long enough', () => {
+    expect(lowerThirdLine(spoken, paper, 1000 + CAPTION_HOLD_MS)).toEqual({
+      kind: 'dispatch',
+      name: 'What the Fire Took',
+      words: 'It burned all night.',
+    })
+  })
+
+  it('carries the paper when nobody has spoken, and nothing when there is neither', () => {
+    expect(lowerThirdLine(null, paper, 0)?.kind).toBe('dispatch')
+    expect(lowerThirdLine(null, null, 0)).toBeNull()
+    expect(lowerThirdLine(spoken, null, 1000 + CAPTION_HOLD_MS)).toBeNull()
+  })
+
+  it('is a caption, not a paragraph', () => {
+    const long = 'a '.repeat(200)
+    expect(captionClip(long).length).toBe(CAPTION_MAX_CHARS)
+    expect(captionClip(long).endsWith('…')).toBe(true)
+    expect(captionClip('  two   words  ')).toBe('two words')
+  })
+})
+
+// ── the ticker ────────────────────────────────────────────────────────────────────────────
+
+describe('the chronicle crawling along the bottom edge', () => {
+  const entry = (seq: number, label: string) => ({ seq, label })
+
+  it('reads forward — oldest first, whatever order the record arrived in', () => {
+    expect(tickerText([entry(3, 'c'), entry(1, 'a'), entry(2, 'b')])).toBe(
+      ['a', 'b', 'c'].join(TICKER_SEP),
+    )
+  })
+
+  it('carries the NEWEST entries when the record is longer than the crawl', () => {
+    const many = Array.from({ length: TICKER_MAX + 5 }, (_, i) => entry(i, `e${i}`))
+    const text = tickerText(many)
+    expect(text.split(TICKER_SEP)).toHaveLength(TICKER_MAX)
+    expect(text.startsWith('e5')).toBe(true)
+    expect(text.endsWith(`e${TICKER_MAX + 4}`)).toBe(true)
+  })
+
+  it('has nothing to crawl in a town with no record yet', () => {
+    expect(tickerText([])).toBe('')
   })
 })

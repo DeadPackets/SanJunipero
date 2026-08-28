@@ -1,4 +1,9 @@
-import { BondsResponseSchema, type BondsResponse } from '@sj/shared'
+import {
+  BondsResponseSchema,
+  ChronicleResponseSchema,
+  type BondsResponse,
+  type ChronicleEntry,
+} from '@sj/shared'
 import { type LineageLike } from './bondModel2.js'
 import { dispatchesFrom } from './dispatches.js'
 import { endpoint } from './useEndpoint.js'
@@ -31,3 +36,16 @@ const DISPATCHES_REFETCH_MS = 60_000
 /** The town's paper, its captions, its weeks and its written lives, read once for the whole
  *  page: the Chronicle's paper tab and every open Inspector are looking at the same six lists. */
 export const dispatchesFeed = endpoint('/api/dispatches', dispatchesFrom, DISPATCHES_REFETCH_MS)
+
+/** The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
+ *  every tick, so a 2.5 s world never re-renders the sheet underneath the reader's pointer. */
+export const CHRONICLE_REFETCH_MS = 20_000
+
+const parseChronicle = (body: unknown): ChronicleEntry[] | null => {
+  const parsed = ChronicleResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data.entries : null
+}
+
+/** The town's own record, read once for the whole page: the Chronicle's Today tab and the
+ *  broadcast frame's ticker are looking at the same list. */
+export const chronicleFeed = endpoint('/api/chronicle', parseChronicle, CHRONICLE_REFETCH_MS)
