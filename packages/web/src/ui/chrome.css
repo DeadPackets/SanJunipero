@@ -96,9 +96,10 @@ body {
 .stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle `f`) ── */
+/* Top-LEFT: the quiet stamp owns the top-right corner, and the meter used to cover it. */
 .fps-overlay {
-  position: absolute; top: 0.8rem; right: 1rem; z-index: 30;
-  display: grid; gap: 0.15rem; justify-items: end;
+  position: absolute; top: 0.8rem; left: 1rem; z-index: 30;
+  display: grid; gap: 0.15rem; justify-items: start;
   background-color: var(--cream);
   padding: 0.15rem 0.3rem;
   font-family: var(--font-px); font-size: 0.78rem;
@@ -899,11 +900,13 @@ body {
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 
-/* ── the nameplate: a brown plate, nailed under the feet ── */
+/* ── the nameplate: a brown plate, hung under the pick ── */
 .stage-plate {
   position: absolute; left: 0; top: 0;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
-  translate: -50% 4px;
+  /* Clear of the ring's lowest arm: the plate and the ring are one mark — the pick — and are
+     placed off the same anchor, so their numbers have to be read together (chromeCss.test). */
+  translate: -50% 60px;
   pointer-events: none;
   font-family: var(--font-px); font-size: 12px; line-height: 16px;
   letter-spacing: 0.04em; white-space: nowrap;

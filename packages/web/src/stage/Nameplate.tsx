@@ -10,8 +10,8 @@ import {
   type WorldPoint,
 } from './anchor.js'
 
-/** `.stage-plate` is `translate(-50%, 4px)` off the anchor — chromeCss.test.ts pins it. */
-export const PLATE_DROP_PX = 4
+/** `.stage-plate` is `translate(-50%, 60px)` off the anchor — chromeCss.test.ts pins it. */
+export const PLATE_DROP_PX = 60
 
 /** The plate in the view's own space. It is drawn in the DOM, in CSS pixels the camera does
  *  not scale, so its world footprint shrinks as the town is zoomed in. */

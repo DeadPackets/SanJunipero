@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { cameraActionFor } from '../render/cameraNav.js'
 import { stageKeyAllowed, stageKeyFor } from './useStageKeys.js'
@@ -48,5 +49,16 @@ describe('typing an s is a letter, never a signpost', () => {
     expect(stageKeyAllowed('BODY', false)).toBe(true)
     expect(stageKeyAllowed('BUTTON', false)).toBe(true)
     expect(stageKeyAllowed('', false)).toBe(true)
+  })
+})
+
+// ★ Both listeners are on the window and neither reads the other's `defaultPrevented`, so a key
+// two of them claim fires twice: `f` used to go fullscreen AND raise the frame meter.
+describe('★ no other window listener in the tree claims a stage key', () => {
+  const FPS = readFileSync(new URL('../ui/FpsOverlay.tsx', import.meta.url), 'utf8')
+
+  it('★ leaves the frame meter on a key the stage does not own', () => {
+    const key = /e\.key === '(.)'/.exec(FPS)![1]!
+    expect(stageKeyFor(key), `the meter and the stage both claim "${key}"`).toBeNull()
   })
 })

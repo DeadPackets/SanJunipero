@@ -83,8 +83,8 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'structure', 'h2')).toBe('storehouse')
   })
 
-  it('falls back to the raw builder id rather than inventing a name', () => {
-    expect(hoverLabel(state, 'structure', 'h3')).toBe('shed — built by ghost')
+  it('★ says nothing about a builder who is not a person here — never a raw id', () => {
+    expect(hoverLabel(state, 'structure', 'h3')).toBe('shed')
   })
 
   it('counts an item and marks it when someone owns it', () => {

@@ -40,7 +40,10 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
       if (s === undefined) return null
       // R4: prose to a viewer — a hover used to read "fire_pit"
       const words = kindWords(s.kind)
-      return s.builtBy === null ? words : `${words} — built by ${agentName(state, s.builtBy)}`
+      // Genesis signs its own work with a builder who is nobody in the town. Naming it told a
+      // viewer the scripted runner laid the first stone.
+      const by = s.builtBy === null ? undefined : state.agents[s.builtBy]
+      return by === undefined ? words : `${words} — built by ${by.name}`
     }
     case 'item': {
       const it = state.items[id]

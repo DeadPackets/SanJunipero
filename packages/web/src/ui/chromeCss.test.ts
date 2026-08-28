@@ -143,6 +143,31 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(CSS).toContain(`translate: -50% ${PLATE_DROP_PX}px`)
   })
 
+  // ★ The plate and the ring are ONE mark — the pick — placed off the SAME anchor by two
+  // different rules. Read apart, they collided by 13px over every figure ever picked.
+  it('★ hangs the plate clear of the ring’s lowest arm', () => {
+    const num = (re: RegExp): number => Number(re.exec(CSS)![1])
+    const lift = num(/\.stage-ring \{[^}]*translate: -50% calc\(-50% - (\d+)px\)/)
+    const side = num(/\.stage-ring-arms \{[^}]*width: (\d+)px/)
+    const arm = num(/\.stage-ring-arms button \{[^}]*min-height: (\d+)px/)
+    // the lowest arm is centred on the ring's bottom edge, so it reaches this far below the feet
+    const armBottom = side / 2 - lift + arm / 2
+    expect(armBottom, 'the ring reaches below the anchor').toBeGreaterThan(0)
+    expect(PLATE_DROP_PX, `the plate must start below ${armBottom}px`).toBeGreaterThan(armBottom)
+  })
+
+  // ★ Both used to hang top-right, and the meter is opaque.
+  it('★ keeps the fps meter out of the corner the quiet stamp owns', () => {
+    // both selectors carry a second rule for their frame recipe; the placement one positions
+    const placed = (sel: string): string =>
+      [...CSS.matchAll(new RegExp(`\\${sel} \\{([^}]*)\\}`, 'g'))]
+        .map((m) => m[1]!)
+        .find((body) => body.includes('position:'))!
+    expect(placed('.stage-stamp')).toMatch(/right:/)
+    expect(placed('.fps-overlay')).toMatch(/left:/)
+    expect(placed('.fps-overlay')).not.toMatch(/right:/)
+  })
+
   it('leaves nothing of the bars the signpost replaced', () => {
     for (const gone of [
       '.control-bar',

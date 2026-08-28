@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 const FPS_WINDOW_MS = 60_000
 const FPS_SAMPLE_MS = 500
 
-// The town's own health meter — ships in every build, toggled with `f`.
+// The town's own health meter — ships in every build, toggled with `?`. NOT `f`: that is
+// fullscreen, and both listeners are on the window, so `f` used to fire both.
 export function FpsOverlay() {
   const [visible, setVisible] = useState(false)
   const [current, setCurrent] = useState(0)
@@ -11,7 +12,7 @@ export function FpsOverlay() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) setVisible((v) => !v)
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) setVisible((v) => !v)
     }
     window.addEventListener('keydown', onKey)
     return () => {
