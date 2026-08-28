@@ -49,7 +49,7 @@ const named = <T extends readonly string[]>(list: T): T => {
 // what a reader sees is the two baselines disagreeing.
 const ICON_LABEL_PAIRS = named([
   '.legend-chip',
-  '.strip-cell',
+  '.bonds-views',
   '.feed-line',
   '.room-roll li',
   '.rr-doing',
@@ -68,14 +68,14 @@ describe('1 · an icon and its word sit on one line, declared and never defaulte
 
 // ── 2 · tabular figures wherever a number ticks ───────────────────────────────────────────
 const TICKING_NUMBERS = named([
-  '.tick-badge',
-  '.strip-num i',
-  '.tab-count',
   '.player-clock',
   '.thumb-day',
-  '.tab-body .stamp',
+  '.paper-sheet .stamp',
   '.feed-line .stamp',
   '.bond-history .stamp',
+  '.edge-when',
+  '.day-tick em',
+  '.family-children .stamp',
 ])
 
 describe('2 · a ticking number never shifts the box it sits in', () => {
@@ -91,7 +91,7 @@ describe('2 · a ticking number never shifts the box it sits in', () => {
 
 // ── 3 · no layout shift on state change ───────────────────────────────────────────────────
 // A badge appearing must not reflow its row: the slot is there whether or not it is filled.
-const RESERVED_SLOTS = named(['.ctl-btn', '.rr-state', '.rr-place', '.rr-mood'])
+const RESERVED_SLOTS = named(['.rr-state', '.rr-place', '.rr-mood'])
 
 describe('3 · a state arriving does not move the row it arrives in', () => {
   it('reserves the slot, so an empty one is the same size as a full one', () => {
@@ -106,13 +106,7 @@ describe('3 · a state arriving does not move the row it arrives in', () => {
 
 // ── 4 · focus is never clipped ────────────────────────────────────────────────────────────
 // An outline drawn OUTSIDE a scroll container's edge is painted into the overflow and lost.
-const CLIPPING_CONTAINERS = named([
-  '#panel-outlet',
-  '.stage-cell',
-  '.hud-menu',
-  '.strip-list',
-  '.digest-modal',
-])
+const CLIPPING_CONTAINERS = named(['.paper-sheet', '.bonds-graph'])
 
 describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
   it('gives every clipping container an inset ring for its focusable children', () => {
@@ -133,14 +127,13 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 
 // ── 5 · press has weight ──────────────────────────────────────────────────────────────────
 const CONTROLS = named([
-  '.tab',
-  '.ctl-btn',
   '.feed-tab',
   '.live-pill',
   '.legend-chip',
-  '.hud-slot',
-  '.roster-back',
-  '.interior-back',
+  '.signpost-arm',
+  '.room-door',
+  '.place-row',
+  '.roster-sort',
 ])
 
 describe('5 · a control answers the finger that pressed it', () => {
@@ -177,7 +170,7 @@ describe('7 · waiting looks like the thing that is coming', () => {
   })
 
   it('renders skeleton rows in the panels that wait for a fetch', () => {
-    for (const f of ['./ChroniclePanel.tsx', './RosterPanel.tsx']) {
+    for (const f of ['../paper/pages/Chronicle.tsx', '../paper/pages/Folk.tsx']) {
       expect(src(f), f).toContain('skeleton-row')
     }
   })
@@ -201,7 +194,7 @@ describe('9 · the cursor never lies about what is under it', () => {
   })
 
   it('is not-allowed on a disabled one, and a grab hand on the town', () => {
-    expect(decl(rulesFor(CSS, '.ctl-btn:disabled'), 'cursor')).toBe('not-allowed')
+    expect(decl(rulesFor(CSS, '.law-edit input:disabled'), 'cursor')).toBe('not-allowed')
     // the canvas cursor is Pixi's, not the sheet's
     expect(src('../render/cameraRig.ts')).toContain("'grab'")
     expect(src('../render/cameraRig.ts')).toContain("'grabbing'")
@@ -223,13 +216,20 @@ describe('10 · a world with nothing happening still breathes', () => {
 
 // ── 11 · text never widows ────────────────────────────────────────────────────────────────
 const TITLES = named([
-  '.px-title',
+  '.paper-title',
   '.bond-title',
-  '.veil-title',
   '.thumb-title',
-  '.tab-body article h4',
+  '.edition-title',
+  '.paper-sheet article h4',
 ])
-const PARAGRAPHS = named(['.block p', '.feed-text', '.room-who', '.veil-sub', '.room-empty'])
+const PARAGRAPHS = named([
+  '.block p',
+  '.feed-text',
+  '.room-who',
+  '.sheet-note',
+  '.edge-line',
+  '.provenance-line',
+])
 
 describe('11 · a title never leaves one word on its own line', () => {
   it('balances every title', () => {
@@ -242,7 +242,7 @@ describe('11 · a title never leaves one word on its own line', () => {
 })
 
 // ── 12 · the scrollbars are the town's ────────────────────────────────────────────────────
-const SCROLLERS = named(['#panel-outlet', '.hud-menu', '.strip-list', '.digest-modal'])
+const SCROLLERS = named(['.paper-sheet', '.bond-detail'])
 
 describe("12 · a scrollable region says so, in the town's own colours", () => {
   it("paints every scroll container's bar from the palette and keeps it visible", () => {

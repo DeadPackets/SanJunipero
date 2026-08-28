@@ -17,7 +17,7 @@ const BANNERS = LINES.filter((l) => /^\/\* [──══]/u.test(l))
 /** The two blocks a merge train actually risks, named so a failure says whose block went. */
 const LANE_BLOCKS: readonly (readonly [lane: string, banner: string])[] = [
   ['the Discovery Record', '/* ── the Discovery Record: a chain of museum labels'],
-  ['THE LITTLE MAP', '/* ══ ★ THE LITTLE MAP ═'],
+  ['THE SIGNPOST AND THE PAPER', '/* ══ THE SIGNPOST AND THE PAPER ═'],
 ]
 
 describe('★ chrome.css survives the merge trains intact', () => {
@@ -47,14 +47,13 @@ describe('★ chrome.css survives the merge trains intact', () => {
 
 // These assertions are on the SHEET rather than on a model of it: no layout engine runs in vitest,
 // and a model of the sheet would have agreed with the model.
-describe('★ the control bar keeps every control at every stage width', () => {
+describe('★ the signpost and the paper hold their own shape', () => {
   /** The sheet with its comments removed. Everything below asks what the sheet DOES, and a
    *  comment quoting the rule that was wrong must not read as that rule still being there. */
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
   /**
-   * ONE top-level rule, by its own selector line, ending at the first bare `}`. A regex over the
-   * whole sheet reads whatever comes next: the first `.control-bar` here is the DOCKED variant.
+   * ONE top-level rule, by its own selector line, ending at the first bare `}`.
    */
   const topRule = (selector: string): string => {
     const lines = BARE.split('\n')
@@ -64,41 +63,52 @@ describe('★ the control bar keeps every control at every stage width', () => {
     const end = lines.indexOf('}', start)
     return end < 0 ? '' : lines.slice(start, end + 1).join('\n')
   }
-  const barRule = topRule('.control-bar')
 
-  it('wraps instead of cutting: a bar too narrow grows a row, it never loses a button', () => {
-    expect(barRule, '.control-bar is not a top-level rule in the sheet').not.toBe('')
-    expect(barRule, 'the bar must wrap; overflow is not a way to reach a control').toMatch(
-      /flex-wrap:\s*wrap/,
+  it('hangs the signpost in the corner the direction picked, at the inset it picked', () => {
+    const post = topRule('.signpost')
+    expect(post, '.signpost is not a top-level rule in the sheet').not.toBe('')
+    expect(post).toMatch(/right:\s*4%/)
+    expect(post).toMatch(/bottom:\s*4%/)
+  })
+
+  it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {
+    expect(topRule('.signpost-arm')).toMatch(/min-height:\s*44px/)
+  })
+
+  it('nudges an arm 3px in the tap band, and not at all under reduced motion', () => {
+    expect(BARE).toMatch(/\.signpost-arm:hover \{[^}]*translate:\s*3px 0/)
+    expect(BARE).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.signpost-arm:hover \{[^}]*translate:\s*0 0/,
     )
-    // a group that cannot wrap cuts its own buttons out of a bar that can
-    expect(topRule('.ctl-group'), '.ctl-group must wrap too').toMatch(/flex-wrap:\s*wrap/)
+    expect(topRule('.signpost-arm')).toMatch(/transition-timing-function:\s*var\(--ease-tap\)/)
   })
 
-  it('★ asks about the BAR, not the window — the panel is what narrows it', () => {
-    expect(
-      barRule,
-      'the bar must be a size container for @container to have anything to ask',
-    ).toMatch(/container-type:\s*inline-size/)
-    expect(BARE, 'the label rule must be a container query').toMatch(
-      /@container control-bar \(max-width: 1500px\)/,
+  it('sizes the paper off the stage, capped, and never over the whole of it', () => {
+    expect(BARE).toMatch(/--paper-w:\s*min\(78%, 760px\)/)
+    expect(BARE).toMatch(/--paper-h:\s*66%/)
+    const paper = topRule('.paper')
+    expect(paper).toMatch(/width:\s*var\(--paper-w\)/)
+    expect(paper).toMatch(/height:\s*var\(--paper-h\)/)
+  })
+
+  it('rises from the bottom edge in the sheet’s own 300ms enter curve', () => {
+    const paper = topRule('.paper')
+    expect(paper, 'the sheet must start below the edge').toMatch(/transform:\s*translateY\(102%\)/)
+    expect(paper).toMatch(/transition:\s*transform var\(--t-slow\) var\(--ease-enter\)/)
+    expect(BARE).toMatch(/\.paper\[data-open='yes'\] \{[^}]*transform:\s*translateY\(0\)/)
+  })
+
+  it('★ does not slide at all under reduced motion', () => {
+    expect(BARE).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.paper \{[^}]*transition:\s*none/,
     )
-    // and the viewport query it replaced must not come back beside it: two rules keyed to two
-    // different widths is how the bar came to have full labels in 1072 px of room.
-    const viewportLabelRules = BARE.split(/@media[^{]*\(max-width[^{]*\{/)
-      .slice(1)
-      .filter((chunk) => /\.ctl-label\b/.test(chunk.slice(0, chunk.indexOf('\n}'))))
-    expect(viewportLabelRules, 'a viewport media query still hides .ctl-label').toHaveLength(0)
   })
 
-  it('keeps the hit floor the minimap lane measured, in the sheet where it is set', () => {
-    const btn = topRule('.ctl-btn')
-    expect(btn).toMatch(/min-width:\s*44px/)
-    expect(btn).toMatch(/min-height:\s*44px/)
+  it('dims the town 28% behind the sheet, from one number', () => {
+    expect(BARE).toMatch(/--dim:\s*0\.28/)
+    expect(BARE).toMatch(/\.town-dim\[data-open='yes'\] \{[^}]*opacity:\s*var\(--dim\)/)
   })
 
-  // Two roster controls sat at 24px and 32px against fourteen siblings at 40 or 44: the sheet's
-  // own floor, undercut only where nobody measured.
   it('holds every pointer target in the sheet at 40px or more', () => {
     for (const [, sel, body] of BARE.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const px = /min-height:\s*(\d+)px/.exec(body ?? '')?.[1]
@@ -107,26 +117,19 @@ describe('★ the control bar keeps every control at every stage width', () => {
     }
   })
 
-  // A control with no pressed state does not feel pressed. Every other slab in the sheet
-  // collapses its ledge on :active.
-  it('gives the roster sort buttons the sheet\u2019s own press', () => {
-    expect(topRule('.roster-sort')).toMatch(/box-shadow:\s*var\(--ledge\)/)
-    expect(topRule('.roster-sort:active')).toMatch(/translate:\s*0 1px/)
-    expect(topRule('.roster-sort:active')).toMatch(/box-shadow:\s*1px 1px 0 0 var\(--deep\)/)
-  })
-
-  it('leaves the bar clear of the dock handle pinned to the same corner', () => {
-    expect(
-      barRule,
-      'a control under the 44px handle is as unreachable as one past the edge',
-    ).toMatch(/padding:\s*0\.3rem 52px 0\.3rem 0\.8rem/)
-    // 52 is the handle's own 44 plus the sheet's 8px of air
-    expect(topRule('.hud-handle')).toMatch(/width:\s*44px/)
-  })
-
-  it('does NOT wrap when the bar is docked to an edge — that makes a second column', () => {
-    expect(BARE).toMatch(
-      /data-dock-controls="right"\] \.control-bar \{[\s\S]{0,400}?flex-wrap:\s*nowrap/,
-    )
+  it('leaves nothing of the bars the signpost replaced', () => {
+    for (const gone of [
+      '.control-bar',
+      '.hud-dock',
+      '.status-strip',
+      '.lens-tabs',
+      '.timeline',
+      '.minimap',
+      '.digest-modal',
+      '.stage-veil',
+      '#panel-outlet',
+    ]) {
+      expect(CSS, `${gone} is still styled`).not.toContain(`${gone} `)
+    }
   })
 })

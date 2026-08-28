@@ -33,8 +33,8 @@ export function provenanceLines(
 }
 
 export function BuildingPage({ tab, subject, store, insideId, onInside }: PageProps) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  useSyncExternalStore(store.subscribe, store.getTick)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const id = subject?.kind === 'structure' ? subject.id : null
   // Keyed on the building, so a new subject is structurally a new read and the page can never
   // show one building's sentence under the next one's name.
@@ -46,9 +46,9 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
     builderId === null ? null : `/api/agent/${encodeURIComponent(builderId)}/journal`,
   )
 
-  if (id === null || state === null) return <p className="sheet-empty">Nothing is picked.</p>
+  if (id === null || state === null) return <p className="feed-empty">Nothing is picked.</p>
   const structure = state.structures[id]
-  if (structure === undefined) return <p className="sheet-empty">Nothing stands here now.</p>
+  if (structure === undefined) return <p className="feed-empty">Nothing stands here now.</p>
 
   if (tab === 'Inside') {
     const card = roomCard(state, id, store.assetRecords(), prov.data)
@@ -69,11 +69,9 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   const settled = prov.loaded && (prov.data === null || journal.loaded)
   return (
     <section className="provenance">
-      <h3 className="sheet-h">{kindWords(structure.kind)}</h3>
+      <h3 className="feed-head">{kindWords(structure.kind)}</h3>
       {settled ? (
-        <p className="provenance-line">
-          {provenanceLines(state, prov.data, journal.data ?? [])}
-        </p>
+        <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (
         <div aria-busy="true">
           <div className="skeleton-row" />
@@ -96,7 +94,7 @@ function Inside({
   onEnter: () => void
   onLeave: () => void
 }) {
-  if (card === null) return <p className="sheet-empty">There is no room in this to stand in.</p>
+  if (card === null) return <p className="feed-empty">There is no room in this to stand in.</p>
   return (
     <div className="room" aria-label={`Inside ${card.title}`}>
       <button
@@ -120,7 +118,7 @@ function Inside({
       <div className="room-present">
         <span className="room-label">In just now</span>
         {card.present.length === 0 ? (
-          <p className="sheet-empty">{card.empty}</p>
+          <p className="feed-empty">{card.empty}</p>
         ) : (
           <ul className="room-roll">
             {card.present.map((p) => (

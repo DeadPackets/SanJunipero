@@ -52,7 +52,7 @@ export function Paper({
     tabsRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     const opener = openerRef.current
     return () => {
-      opener?.focus?.()
+      opener?.focus()
     }
   }, [open])
 
@@ -86,7 +86,8 @@ export function Paper({
   const key = shown ?? 'folk'
   const tabs = PAGE_TABS[key] as readonly string[]
   const current = tabs.includes(tab) ? tab : tabs[0]!
-  const title = key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
+  const title =
+    key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
 
   return (
     <>

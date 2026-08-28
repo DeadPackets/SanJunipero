@@ -55,8 +55,8 @@ describe('the palette these fixes are measured against', () => {
   })
 })
 
-describe('B3 — the timeline day labels are on the slab they sit on', () => {
-  const body = ruleBody(CSS, '.timeline-day em')
+describe('B3 — the day-strip labels are on the slab they sit on', () => {
+  const body = ruleBody(CSS, '.day-tick em')
   const colour = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
 
   it('paints the label in a token, not in the slab colour under it', () => {
@@ -79,14 +79,10 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 // Reducing contrast with `opacity` makes the ratio unknowable at authoring time. These are the
 // ink-on-paper sites; the dark grounds are below.
 const QUIET_SITES = [
-  '.tick-badge.waking',
-  '.strip-weather',
-  '.strip-gone',
   '.fps-overlay .fps-avg',
   '.block h3',
   '.thought-line',
-  '.tab-body .stamp',
-  '.veil-sub',
+  '.paper-sheet .stamp',
   '.feed-line .stamp',
   '.feed-empty',
   '.edition-temper',
@@ -103,16 +99,14 @@ const QUIET_SITES = [
   '.bond-history .stamp',
   '.thumb-day',
   '.thumb-cast',
-  '.digest-footer',
   '.roster-gone',
-  '.laws-lede',
   '.law-history',
   '.law-edit input:disabled',
 ]
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
 // surface where the town is actually speaking.
-const DARK_QUIET_SITES = ['.subtitle.thought', '.roster-empty em']
+const DARK_QUIET_SITES = ['.player-clock']
 
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const
@@ -193,7 +187,7 @@ describe('the opacity habit, at every ink-on-paper site it produced', () => {
 // ── ★ THE BADGE THAT RAISES ITS VOICE, MEASURED ───────────────────────────────────────────
 
 describe('a stale clock is legible, not just loud', () => {
-  const ROSE_SITES = ['.tick-badge.stale', '.link-pill', '.badge.ill', '.rr-cond.ill']
+  const ROSE_SITES = ['.badge.ill', '.rr-cond.ill']
 
   it.each(ROSE_SITES)('%s clears AA on the rose it wears', (selector) => {
     const body = ruleBody(CSS, selector)
@@ -213,7 +207,7 @@ describe('a stale clock is legible, not just loud', () => {
 // ── ★ A RULE IS STRUCTURE, HELD TO 3:1 ────────────────────────────────────────────────────
 
 describe('a mark drawn to divide the panel can actually be seen', () => {
-  // .block is laid on #panel-outlet's parchment and on .digest-modal's cream. --sand is 1.19:1
+  // .block is laid on the paper's parchment and on the cream slabs inside it. --sand is 1.19:1
   // on the first and 1.34:1 on the second: the rule was a smudge on both.
   it('paints the section rule in a token that clears 3:1 on both grounds it is laid on', () => {
     const body = ruleBody(CSS, '.block h3::after')

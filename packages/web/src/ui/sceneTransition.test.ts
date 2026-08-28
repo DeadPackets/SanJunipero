@@ -140,23 +140,12 @@ const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
 const DIRECTOR = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
 const INTERIOR = readFileSync(new URL('../render/interiorScene.ts', import.meta.url), 'utf8')
 const ATMOS = readFileSync(new URL('../render/atmosphere.ts', import.meta.url), 'utf8')
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
-  /\/\*[\s\S]*?\*\//g,
-  '',
-)
 
-describe('a lens change is a change of subject, and it looks like one', () => {
-  it('drives the outgoing lens off the reducer rather than a hand-written timeout', () => {
-    expect(APP).toContain('sceneReducer')
-    expect(APP, 'the 260ms director timeout is a second motion vocabulary').not.toMatch(
-      /setTimeout\([^)]*260\)/,
+describe('the chrome keeps ONE motion vocabulary', () => {
+  it('writes no timeout of its own beside the table', () => {
+    expect(APP, 'a hand-written timeout is a second motion vocabulary').not.toMatch(
+      /setTimeout\([^)]*\d{3}\)/,
     )
-  })
-
-  it('tells the sheet which way the view moved', () => {
-    expect(APP).toContain('data-scene-phase')
-    expect(CSS).toContain(`[data-scene-phase='out']`)
-    expect(CSS).toContain(`[data-scene-phase='in']`)
   })
 })
 

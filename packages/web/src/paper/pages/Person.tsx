@@ -99,19 +99,19 @@ export function PersonStoryView({
 }) {
   return (
     <>
-      <section className="sheet-block">
-        <h3 className="sheet-h">Thought</h3>
+      <section className="block">
+        <h3 className="feed-head">Thought</h3>
         <p className="thought-line" aria-live="polite">
           {thought !== null ? `“${thought.text}”` : THOUGHT_EMPTY}
         </p>
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">Journal</h3>
+      <section className="block">
+        <h3 className="feed-head">Journal</h3>
         {journal === null ? (
           <Skeleton />
         ) : journal.length === 0 ? (
-          <p className="sheet-empty">{NOTHING_WRITTEN}</p>
+          <p className="feed-empty">{NOTHING_WRITTEN}</p>
         ) : (
           journal.map((row, i) => (
             <p key={i} className="doc">
@@ -123,8 +123,8 @@ export function PersonStoryView({
 
       {/* What is known of them from the outside: the chronicler reads the public log and
           nothing else, so this section can never say what the person privately thought. */}
-      <section className="sheet-block">
-        <h3 className="sheet-h">What is written of them</h3>
+      <section className="block">
+        <h3 className="feed-head">What is written of them</h3>
         {biography === null ? (
           <p className="doc">{BIOGRAPHY_EMPTY}</p>
         ) : (
@@ -139,8 +139,8 @@ export function PersonStoryView({
 
       {/* Leads with the LATEST document and the most recent edit; a person with one version
           has moved nothing yet and is told so, rather than handed v1 as a character sheet. */}
-      <section className="sheet-block">
-        <h3 className="sheet-h">How they have changed</h3>
+      <section className="block">
+        <h3 className="feed-head">How they have changed</h3>
         {changes === null ? (
           <Skeleton />
         ) : !hasChanged(changes) ? (
@@ -189,8 +189,8 @@ export function PersonLedgerView({
 }) {
   return (
     <>
-      <section className="sheet-block">
-        <h3 className="sheet-h">Body</h3>
+      <section className="block">
+        <h3 className="feed-head">Body</h3>
         <NeedBar label="Food" value={agent.needs.hunger} />
         <NeedBar label="Rest" value={agent.needs.energy} />
         <NeedBar label="Warmth" value={agent.needs.warmth} />
@@ -206,8 +206,8 @@ export function PersonLedgerView({
         )}
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">Carrying</h3>
+      <section className="block">
+        <h3 className="feed-head">Carrying</h3>
         {carrying.length === 0 ? (
           <p>Empty hands.</p>
         ) : (
@@ -221,8 +221,8 @@ export function PersonLedgerView({
         )}
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">Skills</h3>
+      <section className="block">
+        <h3 className="feed-head">Skills</h3>
         {Object.keys(agent.skills).length === 0 ? (
           <p>{SKILLS_EMPTY}</p>
         ) : (
@@ -236,12 +236,12 @@ export function PersonLedgerView({
         )}
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">What they make of people</h3>
+      <section className="block">
+        <h3 className="feed-head">What they make of people</h3>
         {ledger === null ? (
           <Skeleton />
         ) : ledger.length === 0 ? (
-          <p className="sheet-empty">{NOTHING_WRITTEN}</p>
+          <p className="feed-empty">{NOTHING_WRITTEN}</p>
         ) : (
           ledger.map((row) => (
             <article key={row.personId}>
@@ -257,8 +257,8 @@ export function PersonLedgerView({
 
 /** One person's own page. */
 export function PersonPage({ tab, subject, store }: PageProps) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  const tick = useSyncExternalStore(store.subscribe, store.getTick)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const dispatches = useFeed(dispatchesFeed).data
   const agentId = subject?.kind === 'agent' ? subject.id : null
   // Rows are held WITH the person they were fetched for, so a new subject reads as "nothing
@@ -283,7 +283,7 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   }, [agentId, docs])
 
   const a = agentId === null ? undefined : state?.agents[agentId]
-  if (a === undefined) return <p className="sheet-empty">No such townsfolk.</p>
+  if (a === undefined) return <p className="feed-empty">No such townsfolk.</p>
 
   const records = store.assetRecords()
   const portraitId = resolveAssetId(records, 'portrait', a.id)
@@ -340,15 +340,15 @@ export function PersonPage({ tab, subject, store }: PageProps) {
 
 /** This person's own edges, in the sentence the graph already writes for them. */
 function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] }) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  const tick = useSyncExternalStore(store.subscribe, store.getTick)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const api = useFeed(bondsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   if (api === null) return <Skeleton />
 
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
   const mine = api.bonds.filter((b) => b.aId === agentId || b.bId === agentId)
-  if (mine.length === 0) return <p className="sheet-empty">No ties yet.</p>
+  if (mine.length === 0) return <p className="feed-empty">No ties yet.</p>
 
   return (
     <ul className="edges">

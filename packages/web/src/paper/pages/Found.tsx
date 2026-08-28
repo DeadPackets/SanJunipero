@@ -1,11 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import { kindWords } from '../../ui/broadcastReady.js'
-import {
-  DISCOVERY_REFETCH_MS,
-  leavesOf,
-  recordSummary,
-} from '../../ui/discoveryModel.js'
+import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discoveryModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './index.js'
@@ -25,9 +21,9 @@ export function FoundPage(props: PageProps) {
  * line is agent-visible and this page is not.
  */
 function Things({ store, handle, onView }: PageProps) {
-  const assets = useSyncExternalStore(store.subscribe, store.assetRecords)
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  const mode = useSyncExternalStore(store.subscribe, store.getMode)
+  const assets = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The archive is history, not a stream: read on a slow beat, so a 2.5s world never
   // re-renders the record underneath the reader's pointer.
   const read = usePolled('/api/discoveries', discoveryRecords, DISCOVERY_REFETCH_MS)
@@ -46,7 +42,7 @@ function Things({ store, handle, onView }: PageProps) {
         </div>
       )}
       {leaves.length === 0 ? (
-        read.loaded && <p className="sheet-empty">{EMPTY_COPY.discoveries}</p>
+        read.loaded && <p className="feed-empty">{EMPTY_COPY.discoveries}</p>
       ) : (
         <ol className="discovery-chain">
           {leaves.map((leaf) => (
@@ -95,10 +91,10 @@ function Things({ store, handle, onView }: PageProps) {
 
 /** Everything that stands, and who put it there. The whole provenance is one tap away. */
 function Places({ store, onSubject }: PageProps) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const standing = Object.values(state?.structures ?? {}).filter((s) => s.stage === 'complete')
 
-  if (standing.length === 0) return <p className="sheet-empty">Nothing stands here yet.</p>
+  if (standing.length === 0) return <p className="feed-empty">Nothing stands here yet.</p>
   return (
     <ul className="places">
       {standing.map((s) => {

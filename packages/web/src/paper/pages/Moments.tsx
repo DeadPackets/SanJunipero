@@ -220,7 +220,7 @@ export function PlayerStripView({
 
 /** The filmstrip and its player, on the page instead of across the bottom of the town. */
 export function Moments({ store, handle, onView }: PageProps) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
   const moments = usePolled('/api/moments', momentRows).data
   const [openId, setOpenId] = useState<number | null>(null)
@@ -299,7 +299,7 @@ export function Moments({ store, handle, onView }: PageProps) {
   return (
     <>
       {moments !== null && moments.length === 0 ? (
-        <p className="sheet-empty">{EMPTY_COPY.moments}</p>
+        <p className="feed-empty">{EMPTY_COPY.moments}</p>
       ) : (
         <ol className="strip-list" aria-label="The days the town kept">
           {(moments ?? []).map((m) => (

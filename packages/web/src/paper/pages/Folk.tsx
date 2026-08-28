@@ -21,7 +21,7 @@ const BondsGraph = lazy(() => import('./BondsGraph.js').then((m) => ({ default: 
 export function FolkPage({ tab, store, onSubject }: PageProps) {
   if (tab === 'Bonds')
     return (
-      <Suspense fallback={<p className="sheet-wait">Reading the town’s ties…</p>}>
+      <Suspense fallback={<p className="feed-empty">Reading the town’s ties…</p>}>
         <BondsGraph store={store} onSubject={onSubject} />
       </Suspense>
     )
@@ -30,9 +30,9 @@ export function FolkPage({ tab, store, onSubject }: PageProps) {
 }
 
 function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  useSyncExternalStore(store.subscribe, store.assetsSeq) // faces re-resolve on codex pushes
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  useSyncExternalStore(store.subscribe, store.assetsSeq, store.assetsSeq) // faces re-resolve on codex pushes
   const [sort, setSort] = useState<RosterSort>('name')
   const [openId, setOpenId] = useState<string | null>(null)
   const bonds = useFeed(bondsFeed).data
@@ -99,17 +99,17 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
 }
 
 function Families({ store }: Pick<PageProps, 'store'>) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
   const homes = households(lineage)
 
-  if (homes.length === 0) return <p className="sheet-empty">{EMPTY_COPY.families}</p>
+  if (homes.length === 0) return <p className="feed-empty">{EMPTY_COPY.families}</p>
   return (
     <ul className="families">
       {homes.map((h) => (
         <li key={h.key} className="family">
-          <h3 className="sheet-h">{h.parents.map(nameOf).join(' and ')}</h3>
+          <h3 className="feed-head">{h.parents.map(nameOf).join(' and ')}</h3>
           <ul className="family-children">
             {h.children.map((c) => (
               <li key={c.id}>

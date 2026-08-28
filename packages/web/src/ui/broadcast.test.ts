@@ -107,7 +107,6 @@ describe('what a stream viewer is left with', () => {
     ).map((r) => r.selector)
     expect(phantom).toEqual([])
   })
-
 })
 
 // ── ★ R2, MEASURED AT THE TRUE 0.25 ───────────────────────────────────────────────────────

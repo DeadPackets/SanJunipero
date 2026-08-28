@@ -39,7 +39,11 @@ export function DirectorMode({
   const lastCutRef = useRef(0)
   const state = useSyncExternalStore(store.subscribe, store.getState)
 
-  const heat = usePolled<HeatWindow[]>(autoCut && pinned === null ? '/api/heat' : null, undefined, HEAT_POLL_MS)
+  const heat = usePolled<HeatWindow[]>(
+    autoCut && pinned === null ? '/api/heat' : null,
+    undefined,
+    HEAT_POLL_MS,
+  )
 
   // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {

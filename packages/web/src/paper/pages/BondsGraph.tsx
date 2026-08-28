@@ -54,7 +54,7 @@ export function BondsGraph({
   store: WorldStore
   onSubject: (subject: Subject) => void
 }) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const api = useFeed(bondsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   const [view, setView] = useState<SocietyView>('ties')
@@ -158,7 +158,7 @@ export function BondsGraph({
             id={`bonds-view-${v}`}
             aria-selected={v === view}
             tabIndex={v === view ? 0 : -1}
-            className={v === view ? 'sheet-tab on' : 'sheet-tab'}
+            className={v === view ? 'feed-tab active' : 'feed-tab'}
             onClick={() => {
               setView(v)
               setHidden(new Set())
@@ -210,11 +210,11 @@ export function BondsGraph({
       {/* A field of unconnected people is what BOTH a tieless town and an unanswered fetch look
           like, so the wait says so. */}
       {(view === 'ties' ? api : traffic.data) === null ? (
-        <p className="sheet-wait" aria-busy="true">
+        <p className="feed-empty" aria-busy="true">
           Reading the town’s ties…
         </p>
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-        <p className="sheet-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
+        <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
       ) : null}
 
       {view === 'ties' && selected !== null && api !== null && (

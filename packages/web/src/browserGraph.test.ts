@@ -25,6 +25,10 @@ export const BROWSER_SAFE_IMPORTS: readonly string[] = [
   '@fontsource/press-start-2p',
   '@fontsource/silkscreen',
   '@fontsource/silkscreen/700.css',
+  '@fontsource/fraunces/500.css',
+  '@fontsource/fraunces/700.css',
+  '@fontsource/manrope/400.css',
+  '@fontsource/manrope/600.css',
 ]
 
 // The three the controller's blank page actually died on, named so a regression reads plainly.

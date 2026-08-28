@@ -34,7 +34,7 @@ export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
       </p>
       {byGroup.map(({ group, rows: inGroup }) => (
         <section className="law-group" key={group}>
-          <h3 className="sheet-h">{group}</h3>
+          <h3 className="feed-head">{group}</h3>
           <ul className="laws-list">
             {inGroup.map((row) => {
               const copy = lawCopyFor(row.path)
@@ -75,7 +75,7 @@ export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
 }
 
 function World({ store }: PageProps) {
-  useSyncExternalStore(store.subscribe, store.getTick)
+  useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   return <WorldLawsView rows={lawRows(store.getConfig(), store.getLaws(), store.lawHistory())} />
 }
 
@@ -86,13 +86,13 @@ function nextValue(row: EditRow, raw: string): unknown {
 // Operator-only. Says so out loud, and offers nothing at all without a token, so a viewer who
 // wanders onto the tab sees no control surface to guess at.
 function Admin({ store, operatorToken }: PageProps) {
-  useSyncExternalStore(store.subscribe, store.getTick)
+  useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
 
   if (operatorToken === null)
     return (
-      <p className="sheet-empty">
+      <p className="feed-empty">
         The operator’s page. Nothing here is shown to a mind, and nothing here can be changed
         without the channel’s token.
       </p>

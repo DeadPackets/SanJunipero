@@ -175,7 +175,11 @@ export function DayStripView({
         ))}
         <span className="playhead" style={{ left: `${frac * 100}%` }} />
       </div>
-      <button className={live ? 'live-pill live' : 'live-pill'} onClick={onLive} aria-pressed={live}>
+      <button
+        className={live ? 'live-pill live' : 'live-pill'}
+        onClick={onLive}
+        aria-pressed={live}
+      >
         {live ? 'LIVE' : 'Return to now'}
       </button>
     </div>
@@ -183,8 +187,8 @@ export function DayStripView({
 }
 
 export function Days({ store, handle, onView }: PageProps) {
-  const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge)
-  const mode = useSyncExternalStore(store.subscribe, store.getMode)
+  const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
     usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES

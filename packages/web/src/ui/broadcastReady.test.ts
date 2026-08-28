@@ -39,7 +39,6 @@ import { EMPTY_COPY } from './townStats.js'
 import { stateWord, conditionsOf, CONDITION_WORD } from './status.js'
 import { BROADCAST_CAPTIONS } from './broadcast.js'
 
-
 describe('the eight conditions, stated', () => {
   it('names all eight and marks which four a machine can check', () => {
     expect(READINESS).toHaveLength(8)
@@ -277,7 +276,6 @@ describe('R8 · a dropped socket never leaves a confident clock on screen', () =
     expect(figuresAreLive('stale')).toBe(false)
     expect(figuresAreLive('live')).toBe(true)
   })
-
 })
 
 // ── R1 / R3 · the decidable halves, which were recorded as "unmeasured" whole ─────────────

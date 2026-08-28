@@ -52,7 +52,7 @@ export function RosterListView({
       )}
 
       {rows.length === 0 ? (
-        <p className="sheet-empty">
+        <p className="feed-empty">
           {EMPTY_COPY.roster}
           <em>{EMPTY_COPY.rosterSub}</em>
         </p>

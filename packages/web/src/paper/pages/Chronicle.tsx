@@ -87,9 +87,9 @@ function EditionView({ e }: { e: Edition }) {
 }
 
 function Today({ store, handle, gapTicks, onView }: PageProps) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
-  const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  const events = useSyncExternalStore(store.subscribe, store.recentEvents)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
+  const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
   // The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
   // every tick, so a 2.5s world never re-renders the sheet underneath the reader's pointer.
   const read = usePolled('/api/chronicle', chronicleEntries, CHRONICLE_REFETCH_MS)
@@ -124,17 +124,17 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
         </p>
       )}
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">The paper</h3>
+      <section className="block">
+        <h3 className="feed-head">The paper</h3>
         {latest === null ? (
-          <p className="sheet-empty">{EMPTY_COPY.paper}</p>
+          <p className="feed-empty">{EMPTY_COPY.paper}</p>
         ) : (
           <EditionView e={latest} />
         )}
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">What mattered</h3>
+      <section className="block">
+        <h3 className="feed-head">What mattered</h3>
         {entries.length === 0 && !read.loaded ? (
           <div aria-busy="true">
             {[0, 1, 2].map((i) => (
@@ -142,7 +142,7 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
             ))}
           </div>
         ) : entries.length === 0 ? (
-          <p className="sheet-empty">{EMPTY_COPY.chronicle}</p>
+          <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
         ) : (
           <ol className="feed important">
             {[...entries].reverse().map((e) => (
@@ -165,10 +165,10 @@ function Today({ store, handle, gapTicks, onView }: PageProps) {
         )}
       </section>
 
-      <section className="sheet-block">
-        <h3 className="sheet-h">Since you arrived</h3>
+      <section className="block">
+        <h3 className="feed-head">Since you arrived</h3>
         {lines.length === 0 ? (
-          <p className="sheet-empty">
+          <p className="feed-empty">
             {tickToMoment(store.getTick()).day >= 1
               ? EMPTY_COPY.chronicleQuiet
               : EMPTY_COPY.chronicle}
@@ -199,7 +199,7 @@ function Chapters() {
   return (
     <>
       {chapters.length > 0 && (
-        <section className="sheet-block">
+        <section className="block">
           {[...chapters]
             .sort((a, b) => b.day - a.day)
             .map((c) => (
@@ -213,7 +213,7 @@ function Chapters() {
         </section>
       )}
       {days.length === 0 ? (
-        <p className="sheet-empty">{EMPTY_COPY.paper}</p>
+        <p className="feed-empty">{EMPTY_COPY.paper}</p>
       ) : (
         <ol className="paper-run">
           {days.map((e) => (
