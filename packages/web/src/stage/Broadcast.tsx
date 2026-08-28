@@ -17,7 +17,7 @@ import { useFeed } from '../ui/useEndpoint.js'
 import { joinStageLoop } from './anchor.js'
 
 /** The face beside the caption, in CSS pixels of the source frame. */
-export const BUST_PX = 96
+const BUST_PX = 96
 
 const NO_ENTRIES: ChronicleEntry[] = []
 
@@ -38,7 +38,7 @@ export function LowerThird({ store }: { store: WorldStore }) {
         if (ev.type !== 'agent_spoke') continue
         const p = ev.payload as { agentId: string; text: string }
         const name = store.getState()?.agents[p.agentId]?.name ?? p.agentId
-        setSpoken({ agentId: p.agentId, name, words: p.text, atMs: performance.now() })
+        setSpoken({ agentId: p.agentId, name, words: p.text })
         clearTimeout(timer)
         timer = window.setTimeout(() => {
           setSpoken(null)
@@ -54,7 +54,6 @@ export function LowerThird({ store }: { store: WorldStore }) {
   const line = lowerThirdLine(
     spoken,
     latest === null ? null : { title: latest.title, body: latest.caption ?? latest.body },
-    performance.now(),
   )
   if (line === null) return null
   const bust =

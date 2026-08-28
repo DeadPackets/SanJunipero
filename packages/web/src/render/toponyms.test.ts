@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { ZOOM_STOPS } from './camera.js'
-import { AA_RATIO, TOPONYM_FACE, TOPONYM_HALO, bandRatios } from './legibility.js'
+import { AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, bandRatios } from './legibility.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 import { TOPONYM_LABEL_PX, toponymAlpha, toponymsOf } from './toponyms.js'
 
@@ -84,7 +84,7 @@ describe('a carved name is readable where it is cut', () => {
   })
 
   it('clears AA against its own halo in both halves of the day', () => {
-    const r = bandRatios(TOPONYM_FACE, TOPONYM_HALO)
+    const r = bandRatios(LANDMARK_PLATE, LANDMARK_INK)
     expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
     expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
   })

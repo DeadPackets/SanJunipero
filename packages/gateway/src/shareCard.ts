@@ -23,24 +23,29 @@ export type ShareMeta = { title: string; description: string; image: string }
 /** A day of the town as the card and the meta tags both read it. */
 type DayRead = { day: number; title: string; subtitle: string; heat: number }
 
-function one<T>(db: Database.Database | null, sql: string, ...args: unknown[]): T | null {
+type Row = Record<string, unknown>
+
+function one(db: Database.Database | null, sql: string, ...args: unknown[]): Row | null {
   if (db === null) return null
   try {
-    return (db.prepare(sql).get(...args) as T | undefined) ?? null
+    return (db.prepare(sql).get(...args) as Row | undefined) ?? null
   } catch {
     // A narrator db that predates a table is a window onto an unfinished room, not an error.
     return null
   }
 }
 
+const words = (row: Row | null, key: string): string | null =>
+  typeof row?.[key] === 'string' ? row[key] : null
+
 function readDay(deps: ShareCardDeps, day: number): DayRead {
-  const chapter = one<{ title: string }>(deps.narratorDb, 'SELECT title FROM chapters WHERE day = ?', day)
-  const caption = one<{ body: string }>(
+  const chapter = one(deps.narratorDb, 'SELECT title FROM chapters WHERE day = ?', day)
+  const caption = one(
     deps.narratorDb,
     "SELECT body FROM publications WHERE kind = 'timelapse_caption' AND day = ? ORDER BY id DESC",
     day,
   )
-  const heat = one<{ total: number | null }>(
+  const heat = one(
     deps.narratorDb,
     `SELECT MAX(h.total) AS total FROM heat_scores h JOIN scenes s ON s.id = h.scene_id
      WHERE s.day = ?`,
@@ -48,9 +53,9 @@ function readDay(deps: ShareCardDeps, day: number): DayRead {
   )
   return {
     day,
-    title: chapter?.title ?? `Day ${day}`,
-    subtitle: caption?.body ?? TOWN_NAME,
-    heat: heat?.total ?? 0,
+    title: words(chapter, 'title') ?? `Day ${day}`,
+    subtitle: words(caption, 'body') ?? TOWN_NAME,
+    heat: typeof heat?.total === 'number' ? heat.total : 0,
   }
 }
 
@@ -91,10 +96,16 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
       res.end('not found')
     }
     const last = params.time ?? ''
-    if (!last.endsWith(CARD_EXT)) return miss()
+    if (!last.endsWith(CARD_EXT)) {
+      miss()
+      return
+    }
     const day = Number(/^(?:day)?(\d+)$/.exec(params.day ?? '')?.[1] ?? NaN)
     const time = last.slice(0, -CARD_EXT.length)
-    if (Number.isNaN(momentToTick(day, time))) return miss()
+    if (Number.isNaN(momentToTick(day, time))) {
+      miss()
+      return
+    }
     const read = readDay(deps, day)
     const svg = renderShareCard({
       day: read.day,

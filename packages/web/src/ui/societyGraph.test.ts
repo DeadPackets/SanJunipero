@@ -95,7 +95,11 @@ describe('halosOf — the ring a person wears for what they belong to', () => {
   })
 
   it('★ is one ring per KIND, never one per membership — omar is in two groups', () => {
-    expect(halosOf(list).get('omar')?.kinds.filter((k) => k === 'group')).toHaveLength(1)
+    expect(
+      halosOf(list)
+        .get('omar')
+        ?.kinds.filter((k) => k === 'group'),
+    ).toHaveLength(1)
     expect(halosOf(list).get('omar')?.names).toEqual([
       'the morning watch',
       'the well diggers',

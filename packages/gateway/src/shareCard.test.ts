@@ -31,7 +31,8 @@ function scriptedWorld(dbPath: string): Database.Database {
     rng: new RngStreams('share-card-test'),
     snapshotEveryTicks: 25,
     onTick: ({ tick, emit }) => {
-      if (tick === 1) emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+      if (tick === 1)
+        emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
     },
   })
   for (let i = 0; i < 40; i++) loop.step()

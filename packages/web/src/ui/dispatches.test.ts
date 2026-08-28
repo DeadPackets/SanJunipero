@@ -103,8 +103,9 @@ describe('the members of a thing people formed', () => {
 
   it('takes an array straight, and answers empty for anything else', () => {
     const of = (memberIds: unknown): readonly string[] =>
-      dispatchesFrom({ institutions: [{ day: 0, kind: 'role', name: 'x', description: '', memberIds }] })
-        .institutions[0]!.memberIds
+      dispatchesFrom({
+        institutions: [{ day: 0, kind: 'role', name: 'x', description: '', memberIds }],
+      }).institutions[0]!.memberIds
     expect(of(['omar'])).toEqual(['omar'])
     expect(of('not json')).toEqual([])
     expect(of(undefined)).toEqual([])

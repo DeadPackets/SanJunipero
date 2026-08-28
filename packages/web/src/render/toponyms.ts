@@ -3,7 +3,7 @@ import { Container } from 'pixi.js'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen } from './iso.js'
-import { TOPONYM_FACE, TOPONYM_HALO } from './legibility.js'
+import { LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 import type { Scene } from './scene.js'
 import { faceFor, worldTextScale } from './textFaces.js'
 import { placeTag, type Rect } from './tooltip.js'
@@ -28,8 +28,8 @@ export function toponymsOf(state: WorldState | null): Toponym[] {
 /** A carved name is a thing you read when you are near it. It is whole at every stop from 0.5
  *  in and gone at the overview, so the layer is 1 or 0 at every resting `ZOOM_STOP` and never
  *  between — the same rule the place names are held to. */
-export const TOPONYM_FULL_SCALE = 0.5
-export const TOPONYM_GONE_SCALE = 0.25
+const TOPONYM_FULL_SCALE = 0.5
+const TOPONYM_GONE_SCALE = 0.25
 
 export function toponymAlpha(scale: number): number {
   const out = (scale - TOPONYM_GONE_SCALE) / (TOPONYM_FULL_SCALE - TOPONYM_GONE_SCALE)
@@ -40,7 +40,8 @@ export function toponymAlpha(scale: number): number {
 export const TOPONYM_LABEL_PX = faceFor('label').size
 
 /** The halo: the same glyph in ink, one pixel out on each side, so the name reads over grass,
- *  sand, road or water without a plate of its own. */
+ *  sand, road or water without a plate of its own. Ink on cream is the landmark pair turned
+ *  over, and `legibility.ts` proves the ratio holds in both halves of the day. */
 const HALO_AT = [
   [-1, 0],
   [1, 0],
@@ -56,7 +57,11 @@ function cutName(text: string): Cut {
   const faces: WorldLabel[] = []
   const family = faceFor('label').family
   for (const [dx, dy] of HALO_AT) {
-    const l = createWorldLabel(text, { fontFamily: family, fontSize: TOPONYM_LABEL_PX, fill: TOPONYM_HALO })
+    const l = createWorldLabel(text, {
+      fontFamily: family,
+      fontSize: TOPONYM_LABEL_PX,
+      fill: LANDMARK_INK,
+    })
     l.anchor.set(0.5, 0)
     l.eventMode = 'none'
     l.position.set(dx, dy)
@@ -66,7 +71,7 @@ function cutName(text: string): Cut {
   const top = createWorldLabel(text, {
     fontFamily: family,
     fontSize: TOPONYM_LABEL_PX,
-    fill: TOPONYM_FACE,
+    fill: LANDMARK_PLATE,
   })
   top.anchor.set(0.5, 0)
   top.eventMode = 'none'

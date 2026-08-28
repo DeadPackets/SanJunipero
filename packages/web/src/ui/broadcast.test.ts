@@ -179,11 +179,11 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
 // ── the lower third ───────────────────────────────────────────────────────────────────────
 
 describe('what the lower third carries', () => {
-  const spoken = { agentId: 'omar', name: 'Omar', words: 'The well is dry.', atMs: 1000 }
+  const spoken = { agentId: 'omar', name: 'Omar', words: 'The well is dry.' }
   const paper = { title: 'What the Fire Took', body: 'It burned all night.' }
 
-  it('gives a fresh line to whoever said it, and asks for their face', () => {
-    expect(lowerThirdLine(spoken, paper, 1500)).toEqual({
+  it('gives the line to whoever said it, and asks for their face', () => {
+    expect(lowerThirdLine(spoken, paper)).toEqual({
       kind: 'speech',
       agentId: 'omar',
       name: 'Omar',
@@ -191,18 +191,21 @@ describe('what the lower third carries', () => {
     })
   })
 
-  it('lets the town’s own paper back in once the line has been up long enough', () => {
-    expect(lowerThirdLine(spoken, paper, 1000 + CAPTION_HOLD_MS)).toEqual({
+  it('lets the town’s own paper back in once the spoken line’s hold has run out', () => {
+    expect(lowerThirdLine(null, paper)).toEqual({
       kind: 'dispatch',
       name: 'What the Fire Took',
       words: 'It burned all night.',
     })
   })
 
-  it('carries the paper when nobody has spoken, and nothing when there is neither', () => {
-    expect(lowerThirdLine(null, paper, 0)?.kind).toBe('dispatch')
-    expect(lowerThirdLine(null, null, 0)).toBeNull()
-    expect(lowerThirdLine(spoken, null, 1000 + CAPTION_HOLD_MS)).toBeNull()
+  it('carries nothing at all when there is neither', () => {
+    expect(lowerThirdLine(null, null)).toBeNull()
+  })
+
+  it('holds a spoken line long enough to read at broadcast size', () => {
+    expect(CAPTION_HOLD_MS).toBeGreaterThanOrEqual(3000)
+    expect(src('../stage/Broadcast.tsx')).toContain('CAPTION_HOLD_MS')
   })
 
   it('is a caption, not a paragraph', () => {

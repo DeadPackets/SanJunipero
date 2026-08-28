@@ -134,9 +134,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const site =
     opts.staticDir === undefined
       ? null
-      : makeStaticSite(opts.staticDir, (pathname) =>
-          shareMeta({ mirror, narratorDb }, pathname),
-        )
+      : makeStaticSite(opts.staticDir, (pathname) => shareMeta({ mirror, narratorDb }, pathname))
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')

@@ -39,7 +39,7 @@ export const dispatchesFeed = endpoint('/api/dispatches', dispatchesFrom, DISPAT
 
 /** The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
  *  every tick, so a 2.5 s world never re-renders the sheet underneath the reader's pointer. */
-export const CHRONICLE_REFETCH_MS = 20_000
+const CHRONICLE_REFETCH_MS = 20_000
 
 const parseChronicle = (body: unknown): ChronicleEntry[] | null => {
   const parsed = ChronicleResponseSchema.safeParse(body)

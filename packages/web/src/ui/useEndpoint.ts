@@ -72,7 +72,7 @@ export function feedFor<T>(
   const key = `${url}|${everyMs ?? 0}`
   let feed = readers.get(key)
   if (feed === undefined) {
-    feed = endpoint(url, parse, everyMs) as Endpoint<unknown>
+    feed = endpoint(url, parse, everyMs)
     readers.set(key, feed)
   }
   return feed as Endpoint<T>
@@ -90,9 +90,9 @@ export function usePolled<T>(
   parse?: (body: unknown) => T | null,
   everyMs?: number,
 ): Read<T> {
-  // `parse` is a parser, not a prop: re-keying on it would restart the read every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const feed = useMemo(
+    // `parse` is a parser, not a prop: re-keying on it would restart the read every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     () => (url === null ? endpoint<T>(null, parse, everyMs) : feedFor<T>(url, parse, everyMs)),
     [url, everyMs],
   )

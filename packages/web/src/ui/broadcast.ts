@@ -32,7 +32,11 @@ export type BroadcastCaption =
 
 export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
   { what: 'a speech bubble', from: 'canvas', px: FACE_INSTALL_PX * BROADCAST_TEXT_SCALE },
-  { what: 'the speaker’s name', from: 'sheet', selector: "[data-broadcast='on'] .lower-third-name" },
+  {
+    what: 'the speaker’s name',
+    from: 'sheet',
+    selector: "[data-broadcast='on'] .lower-third-name",
+  },
   { what: 'the caption', from: 'sheet', selector: "[data-broadcast='on'] .lower-third-words" },
   { what: 'the chronicle ticker', from: 'sheet', selector: "[data-broadcast='on'] .ticker-line" },
   { what: 'the quiet stamp', from: 'sheet', selector: "[data-broadcast='on'] .stage-stamp" },
@@ -42,7 +46,7 @@ export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
 // ── the lower third: who is talking, or what the town's own paper last said ────────────────
 
 /** A line somebody said, and when we heard it. */
-export type SpokenLine = { agentId: string; name: string; words: string; atMs: number }
+export type SpokenLine = { agentId: string; name: string; words: string }
 
 /** What the lower third is carrying. A speech caption brings the speaker's face with it; the
  *  narrator's own line does not, because a chapter has no speaker. */
@@ -51,7 +55,8 @@ export type LowerThirdLine =
   | { kind: 'dispatch'; name: string; words: string }
 
 /** How long a spoken line holds the lower third before the town's paper comes back. Long
- *  enough to read a sentence at broadcast size, short enough not to outlive the shot. */
+ *  enough to read a sentence at broadcast size, short enough not to outlive the shot. The hold
+ *  is a timer the mark owns, not a clock this module reads. */
 export const CAPTION_HOLD_MS = 6000
 
 /** A caption is a caption, not a paragraph: what does not fit ends in an ellipsis. */
@@ -62,15 +67,13 @@ export function captionClip(text: string, max = CAPTION_MAX_CHARS): string {
   return line.length <= max ? line : `${line.slice(0, max - 1).trimEnd()}…`
 }
 
-/** Speech while it is fresh, the newest dispatch the rest of the time, and nothing at all in a
- *  town that has neither. */
+/** Whoever is still talking, the newest dispatch the rest of the time, and nothing at all in a
+ *  town that has neither. `spoken` is null once its hold has run out. */
 export function lowerThirdLine(
   spoken: SpokenLine | null,
   dispatch: { title: string; body: string } | null,
-  nowMs: number,
-  holdMs = CAPTION_HOLD_MS,
 ): LowerThirdLine | null {
-  if (spoken !== null && nowMs - spoken.atMs < holdMs) {
+  if (spoken !== null) {
     return {
       kind: 'speech',
       agentId: spoken.agentId,
