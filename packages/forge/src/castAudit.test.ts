@@ -113,12 +113,14 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   return found
 }
 
-/** One pinned cell remains; adding an entry requires a written reason. */
+/** Two pinned cells; adding an entry requires a written reason. */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
   // NO REDRAW CAN CLEAR THIS: `gen-cast-v5` scores the same pair 0.1770 and ships it, because its
   // gate view trims to the figure and this one keeps the 256 canvas. Retiring it is a ruling on
   // which of the two views the 0.20 bar was calibrated for, not a request for better art.
   'amara se head contact-a': '0.2235 against 0.2000 — audit view 0.2235, generator view 0.1770',
+  // The same untrimmed-view gap on the re-cut nadia: `gen-cast-v5` scored 0.1963 and shipped it.
+  'nadia ne head contact-b': '0.2176 against 0.2000 — audit view 0.2176, generator view 0.1963',
 }
 
 const cast = listCommittedCast()
@@ -166,8 +168,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
     ).toEqual([])
   })
 
-  it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(1)
+  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
   })
 })
 
