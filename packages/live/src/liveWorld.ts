@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { DISCOVERY_EVENT, MINUTES_PER_DAY } from '@sj/shared'
+import { DISCOVERY_EVENT, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import type { TickHandler } from '@sj/engine'
 import {
   EngineBridge,
@@ -35,14 +35,22 @@ import {
 } from '@sj/llm'
 import {
   CodexStore,
+  ConstructStore,
   GENESIS_CODEX,
   makeArbiter,
   openArbiterDb,
+  runConstructPass,
   type Codified,
   type Recipe,
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
-import { NarratorStore, closeDay, makeNarratorLlm, openNarratorDb } from '@sj/narrator'
+import {
+  NarratorStore,
+  closeDay,
+  makeNarratorLlm,
+  openNarratorDb,
+  type TranscriptRecord,
+} from '@sj/narrator'
 import { publishThought, type LiveCast } from '@sj/gateway'
 import { createDiscoveryArt } from './discoveryCommission.js'
 
@@ -59,6 +67,9 @@ const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 const LIVE_SPEND_CHECK_TICKS = 10
 /** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
 const LIVE_RUNTIME_SAVE_TICKS = 48
+/** How many of a day's words the tier-2.5 pass is shown. A very loud day must not build an
+ *  unbounded prompt; the most recent words are the ones a first is most likely to be in. */
+const SEMANTIC_RECORD_CAP = 300
 /** A container gives about ten seconds before SIGKILL; losing a night's reflection is survivable
  *  and hanging the shutdown is not. */
 const REFLECTION_SETTLE_MS = 5_000
@@ -365,6 +376,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const narratorDb = opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
   const narratorStore = narratorDb === null ? null : new NarratorStore(narratorDb)
   let narrating = false
+  let recognizing = false
 
   const embedder = opts.embedder ?? (await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR))
 
@@ -578,6 +590,71 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             .get(day * MINUTES_PER_DAY, (day + 1) * MINUTES_PER_DAY) as { n: number }
         ).n
 
+      // What a mind said and what it thought, for the tier-2.5 pass. Speech is a public event;
+      // a thought exists only in the observer's own table, which no mind can read.
+      const transcriptFor = (day: number, events: SimEvent[]): TranscriptRecord[] => {
+        const spoken: TranscriptRecord[] = events
+          .filter((e) => e.type === 'agent_spoke')
+          .map((e) => {
+            const p = (e.payload ?? {}) as Record<string, unknown>
+            return {
+              sourceKind: 'speech',
+              agentId: String(p.agentId),
+              day,
+              tick: e.tick,
+              text: String(p.text),
+              eventSeq: e.seq,
+            }
+          })
+        const thought: TranscriptRecord[] = (
+          db
+            .prepare(
+              'SELECT tick, agent_id, text FROM observer_thoughts WHERE tick >= ? AND tick < ? ORDER BY id',
+            )
+            .all(day * MINUTES_PER_DAY, (day + 1) * MINUTES_PER_DAY) as {
+            tick: number
+            agent_id: string
+            text: string
+          }[]
+        ).map((t, i) => ({
+          sourceKind: 'thought',
+          agentId: t.agent_id,
+          day,
+          tick: t.tick,
+          text: t.text,
+          memoryRef: `thought:${day}:${i}`,
+        }))
+        return [...spoken, ...thought].sort((a, b) => a.tick - b.tick).slice(-SEMANTIC_RECORD_CAP)
+      }
+
+      // ── the recognizer, on the same boundary and off the same thread ──
+      // OBSERVER-SIDE: what it writes lives in the arbiter's db and reaches no prompt or memory.
+      const recognizeTheDay = (arb: Database.Database, tick: number): void => {
+        const day = tick / MINUTES_PER_DAY - 1
+        if (stopped || spentToday() >= dailyBudget) {
+          log(`stream: day ${day} goes unrecognized — the recognizer is outside today's budget`)
+          return
+        }
+        recognizing = true
+        setImmediate(() => {
+          void runConstructPass({
+            events: store.readFrom(0),
+            baseConfig: config,
+            store: new ConstructStore(arb),
+            llm: makeClient('constructs', 'town'),
+            laws: loop.state.laws,
+          })
+            .catch((e: unknown) => {
+              log(
+                `stream: day ${day} went unrecognized — ${e instanceof Error ? e.message : String(e)}`,
+              )
+            })
+            .finally(() => {
+              recognizing = false
+            })
+        })
+      }
+
       const writeTheDay = (chronicle: NarratorStore, tick: number): void => {
         const day = tick / MINUTES_PER_DAY - 1
         const from = narratedThroughSeq
@@ -609,6 +686,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               name: m.identity.name,
             })),
             world: { config, state: loop.state },
+            semantic: {
+              db: opsDb,
+              llm: makeClient('semantic', 'town'),
+              records: transcriptFor(day, events),
+            },
             alert: (d) => {
               log(`stream: chronicle — ${d}`)
             },
@@ -630,8 +712,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // ── the money, on the world's own clock ──
       bridge.onTick((tick) => {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
-        if (narratorStore !== null && tick > 0 && tick % MINUTES_PER_DAY === 0)
-          writeTheDay(narratorStore, tick)
+        if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
+          if (arbiterDb !== null) recognizeTheDay(arbiterDb, tick)
+          if (narratorStore !== null) writeTheDay(narratorStore, tick)
+        }
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
@@ -670,7 +754,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // Closing a mind's db while `runSleepReflection` is in flight throws out of a promise
       // nobody awaits, so this waits a bounded five seconds and then closes anyway.
       const settled = await settle(
-        () => booted?.reflecting() === true || narrating,
+        () => booted?.reflecting() === true || narrating || recognizing,
         REFLECTION_SETTLE_MS,
       )
       if (!settled) log('stream: a night was still being reflected on when the town closed')

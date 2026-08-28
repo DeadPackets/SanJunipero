@@ -22,7 +22,6 @@ import type {
   Milestone,
   NarratorLlm,
   PublicationRow,
-  SceneSegment,
   SegmentConfig,
 } from './types.js'
 
@@ -226,6 +225,9 @@ export async function closeDay(deps: {
   /** Written up one a night in turn, so a cast of five is five nights and then a deeper record. */
   cast: readonly { id: string; name: string }[]
   world?: { config: SimConfig; state?: WorldState }
+  /** The tier-2.5 pass, passed straight through to `narrateDay`. Absent, the night has no
+   *  semantic firsts and costs nothing. */
+  semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
   alert?: (d: string) => void
 }): Promise<ChapterRow> {
   const { store, llm, cast } = deps
@@ -236,6 +238,7 @@ export async function closeDay(deps: {
     rulebookCount: deps.rulebookCount,
     privateCounts: deps.privateCounts,
     ...(deps.world === undefined ? {} : { world: deps.world }),
+    ...(deps.semantic === undefined ? {} : { semantic: deps.semantic }),
     ...(deps.alert === undefined ? {} : { alert: deps.alert }),
   })
   const day = chapter.day

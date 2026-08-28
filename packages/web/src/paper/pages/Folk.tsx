@@ -8,6 +8,7 @@ import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { households } from '../families.js'
+import { CustomsPage } from './Customs.js'
 import { RosterListView } from './RosterList.js'
 import type { PageProps } from './index.js'
 
@@ -26,6 +27,7 @@ export function FolkPage({ tab, store, onSubject }: PageProps) {
       </Suspense>
     )
   if (tab === 'Families') return <Families store={store} />
+  if (tab === 'Customs') return <CustomsPage store={store} />
   return <People store={store} onSubject={onSubject} />
 }
 
