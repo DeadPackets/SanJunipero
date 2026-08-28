@@ -8,6 +8,8 @@ import { usePolled } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
+/** The first viewport, and the one between cuts: the town, close enough to read. */
+export const OVERVIEW_ZOOM = 1 as const
 
 /** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
  *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
@@ -33,7 +35,7 @@ export function DirectorMode({
   const followedRef = useRef<string | null>(null)
   const lastCutRef = useRef(0)
   const state = useSyncExternalStore(store.subscribe, store.getState)
-  // The overview is fitted to a town, so it has to wait for one: fitting an empty world frames
+  // The overview is OF a town, so it has to wait for one: an empty world has no centre but
   // whatever corner of the ground the camera was created over.
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
 
@@ -70,13 +72,16 @@ export function DirectorMode({
     }
   }, [store, autoCut, heat])
 
-  // With no subject the picture is the whole settlement: pushing to 3x before the first heat
-  // poll has named anybody frames a 3x crop of whatever the camera was over.
+  // With no subject the picture is the town itself. Centre BEFORE the stop changes: the zoom
+  // eases about whatever the middle of the screen holds.
   useEffect(() => {
     if (scene === null) return
     if (followed === null) {
       scene.setFollow(null)
-      if (awake) scene.fitToTown()
+      if (awake) {
+        scene.centerHome()
+        scene.setZoom(OVERVIEW_ZOOM)
+      }
       return
     }
     scene.setZoom(DIRECTOR_ZOOM)

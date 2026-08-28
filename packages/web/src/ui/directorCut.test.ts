@@ -48,9 +48,7 @@ describe('the televised town always has somebody in front of the camera', () => 
   const TOWN = ['amara', 'omar', 'salma', 'yusuf']
 
   it('still takes the hottest agent whenever the town gives it one', () => {
-    expect(subjectFor([w('farmer', 940, 6), w('builder', 940, 20)], null, 1000, TOWN)).toBe(
-      'builder',
-    )
+    expect(subjectFor([w('amara', 940, 6), w('omar', 940, 20)], null, 1000, TOWN)).toBe('omar')
   })
 
   it('falls back to somebody who is actually there when nothing has scored', () => {
@@ -67,6 +65,13 @@ describe('the televised town always has somebody in front of the camera', () => 
 
   it('holds still on a one-person town rather than cutting to the same face', () => {
     for (const t of [0, 59, 60, 1000]) expect(quietSubject(['amara'], t)).toBe('amara')
+  })
+
+  it('★ refuses a hot window naming somebody who is not a person in the town', () => {
+    // The scripted world scores its own runner as `script`; a camera told to follow it
+    // finds no body, never moves, and strands the whole first viewport at 3x.
+    expect(subjectFor([w('script', 0, 66)], null, 30, TOWN)).toBe(quietSubject(TOWN, 30))
+    expect(subjectFor([w('script', 0, 99), w('omar', 0, 1)], null, 30, TOWN)).toBe('omar')
   })
 
   it('answers null only when there is nobody left to look at', () => {
@@ -90,6 +95,11 @@ describe('DirectorMode reads the heat window through the one endpoint layer', ()
   it('★ hand-rolls no fetch of its own, and beats at the measured interval', () => {
     expect(SRC).not.toContain('fetch(')
     expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([\s\S]*?HEAT_POLL_MS,?\s*\)/)
+  })
+
+  it('★ the first viewport is the town at zoom 1, centred before the stop moves', () => {
+    expect(SRC).toContain('export const OVERVIEW_ZOOM = 1 as const')
+    expect(SRC).toMatch(/scene\.centerHome\(\)\s*\n\s*scene\.setZoom\(OVERVIEW_ZOOM\)/)
   })
 
   it('★ reads a refused window as an empty one, which is what turns the round over', () => {

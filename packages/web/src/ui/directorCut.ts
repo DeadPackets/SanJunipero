@@ -47,12 +47,14 @@ export function quietSubject(people: readonly string[], nowTick: number): string
   return people[Math.floor(tick / QUIET_TURN_TICKS) % people.length]!
 }
 
-/** Who the camera is on: the hottest agent, or — when the town is quiet — one of its people. */
+/** Who the camera is on: the hottest agent, or — when the town is quiet — one of its people.
+ *  Heat is scored for whatever acted, the scripted runner included; only a body can be followed. */
 export function subjectFor(
   heat: HeatWindow[],
   currentAgent: string | null,
   nowTick: number,
   people: readonly string[],
 ): string | null {
-  return pickCut(heat, currentAgent, nowTick) ?? quietSubject(people, nowTick)
+  const embodied = heat.filter((w) => people.includes(w.agentId))
+  return pickCut(embodied, currentAgent, nowTick) ?? quietSubject(people, nowTick)
 }
