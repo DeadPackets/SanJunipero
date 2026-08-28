@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DAYS_PER_SEASON, MINUTES_PER_DAY } from '@sj/shared'
+import { tickBadgeState } from '../ui/broadcastReady.js'
 import { STAMP_HOLD_MS, stampText, stampWord } from './QuietStamp.js'
 
 const DAY_12 = 12 * MINUTES_PER_DAY + 9 * 60 + 40
@@ -35,6 +36,14 @@ describe('a clock nobody can know is stale says so instead', () => {
     expect(stampWord(true, true, 'connecting')).toBe('OFFLINE')
     expect(stampWord(true, false, 'online')).toBe('OFFLINE')
     expect(stampWord(false, false)).toBe('OFFLINE')
+  })
+
+  it('is R8’s own badge state, said in three words rather than four', () => {
+    expect(stampWord(true, true, 'online')).toBe(
+      { live: 'LIVE', past: 'REPLAY', stale: 'OFFLINE', waking: 'OFFLINE' }[
+        tickBadgeState('online', true, true)
+      ],
+    )
   })
 
   it('holds for three seconds after the last input', () => {

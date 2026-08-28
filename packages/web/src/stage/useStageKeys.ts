@@ -55,16 +55,24 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
       if (e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
-      const which = stageKeyFor(e.key)
-      if (which === null) return
       const h = latest.current
-      const byKey: Record<StageKey, (() => void) | undefined> = {
-        signpost: h.onSignpost,
-        escape: h.onEscape,
-        fullscreen: h.onFullscreen,
-        director: h.onDirector,
+      let run: (() => void) | undefined
+      switch (stageKeyFor(e.key)) {
+        case 'signpost':
+          run = h.onSignpost
+          break
+        case 'escape':
+          run = h.onEscape
+          break
+        case 'fullscreen':
+          run = h.onFullscreen
+          break
+        case 'director':
+          run = h.onDirector
+          break
+        case null:
+          return
       }
-      const run = byKey[which]
       if (run === undefined) return
       e.preventDefault()
       run()

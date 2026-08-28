@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { simTimeFromTick, tickToMoment } from '@sj/shared'
-import type { LinkStatus } from '../net/socket.js'
+import { tickBadgeState, type BadgeState, type LinkState } from '../ui/broadcastReady.js'
 import type { WorldStore } from '../state/worldStore.js'
 
 /** How long the stamp stays after the last input, and how long it takes to go (chrome.css). */
@@ -8,11 +8,17 @@ export const STAMP_HOLD_MS = 3000
 
 export type StampWord = 'LIVE' | 'REPLAY' | 'OFFLINE'
 
-/** A clock nobody can know is stale is worse than no clock: a dropped socket or a town that
- *  has not woken yet says OFFLINE rather than printing the last tick as the time. */
-export function stampWord(live: boolean, awake: boolean, link?: LinkStatus): StampWord {
-  if (!awake || link === 'reconnecting' || link === 'connecting') return 'OFFLINE'
-  return live ? 'LIVE' : 'REPLAY'
+/** The badge's four states said in three words: R8's law is one law, and the stamp is not a
+ *  second answer to it. A clock nobody can know is stale reads OFFLINE rather than a time. */
+const STAMP_OF: Readonly<Record<BadgeState, StampWord>> = {
+  live: 'LIVE',
+  past: 'REPLAY',
+  stale: 'OFFLINE',
+  waking: 'OFFLINE',
+}
+
+export function stampWord(live: boolean, awake: boolean, link: LinkState = 'online'): StampWord {
+  return STAMP_OF[tickBadgeState(link, live, awake)]
 }
 
 export function stampText(tick: number, word: StampWord): string {
@@ -23,7 +29,7 @@ export function stampText(tick: number, word: StampWord): string {
 
 /** The time, chiselled in the corner, only while somebody is asking. The town is the picture;
  *  a clock that is always up is a clock nobody reads. */
-export function QuietStamp({ store, link }: { store: WorldStore; link?: LinkStatus }) {
+export function QuietStamp({ store, link }: { store: WorldStore; link?: LinkState }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)

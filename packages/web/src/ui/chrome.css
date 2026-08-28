@@ -1613,6 +1613,7 @@ body {
 /* ── the nameplate: a brown plate, nailed under the feet ── */
 .stage-plate {
   position: absolute; left: 0; top: 0;
+  visibility: hidden;   /* until anchor.ts has a camera to place it against */
   translate: -50% 4px;
   pointer-events: none;
   font-family: var(--font-px); font-size: 12px; line-height: 16px;
@@ -1630,6 +1631,7 @@ body {
 /* ── the subject ring: four things to ask, standing round the person you asked ── */
 .stage-ring {
   position: absolute; left: 0; top: 0;
+  visibility: hidden;   /* until anchor.ts has a camera to place it against */
   /* centred on the figure's middle, not its feet — the anchor is where a body stands */
   translate: -50% calc(-50% - 26px);
 }

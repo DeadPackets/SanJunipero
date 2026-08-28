@@ -1,4 +1,4 @@
-export { screenAnchor, subjectPoint, useStageAnchor } from './anchor.js'
+export { screenAnchor, subjectPoint, useStageAnchor, useSubjectAnchor } from './anchor.js'
 export type { StageAnchor, StageSubject, WorldPoint } from './anchor.js'
 export { DirectorCue } from './DirectorCue.js'
 export { Nameplate } from './Nameplate.js'

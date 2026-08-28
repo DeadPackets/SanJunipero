@@ -1,24 +1,23 @@
 import type { Scene } from '../render/scene.js'
-import { subjectPoint, useStageAnchor, type StageSubject, type WorldPoint } from './anchor.js'
+import type { WorldStore } from '../state/worldStore.js'
+import { useSubjectAnchor, type StageSubject } from './anchor.js'
 
 /** A plate nailed under the figure, the way a name is written on a thing in the town — not a
  *  tooltip about it. */
 export function Nameplate({
   subject,
   scene,
+  store,
   selected = false,
-  point,
 }: {
   subject: StageSubject | null
   scene: Scene | null
+  /** only a `structure` subject needs it — a body carries its own sprite anchor */
+  store?: WorldStore
   /** the plate a viewer has committed to, drawn in honey rather than brown */
   selected?: boolean
-  /** a structure has no sprite anchor: give its world point here */
-  point?: () => WorldPoint | null
 }) {
-  const ref = useStageAnchor(scene, () =>
-    subject === null || scene === null ? null : (point?.() ?? subjectPoint(scene, subject)),
-  )
+  const ref = useSubjectAnchor(scene, subject, store)
   if (subject === null) return null
   return (
     <div ref={ref} className={selected ? 'stage-plate selected' : 'stage-plate'} aria-hidden="true">

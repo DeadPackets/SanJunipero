@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
-import { subjectPoint, useStageAnchor, type StageSubject, type WorldPoint } from './anchor.js'
+import type { WorldStore } from '../state/worldStore.js'
+import { useSubjectAnchor, type StageSubject } from './anchor.js'
 
 export const RING_VERBS = ['follow', 'story', 'bonds', 'home'] as const
 export type RingVerb = (typeof RING_VERBS)[number]
@@ -39,19 +40,17 @@ export function SubjectRing({
   scene,
   onVerb,
   onClose,
-  point,
+  store,
 }: {
   subject: StageSubject | null
   scene: Scene | null
   onVerb: (verb: RingVerb) => void
   /** Escape, when the caller wants the ring to close itself rather than the whole stage */
   onClose?: () => void
-  /** a structure has no sprite anchor: give its world point here */
-  point?: () => WorldPoint | null
+  /** only a `structure` subject needs it — a body carries its own sprite anchor */
+  store?: WorldStore
 }) {
-  const ref = useStageAnchor(scene, () =>
-    subject === null || scene === null ? null : (point?.() ?? subjectPoint(scene, subject)),
-  )
+  const ref = useSubjectAnchor(scene, subject, store)
   const [at, setAt] = useState(0)
   const arms = useRef<(HTMLButtonElement | null)[]>([])
   const id = subject?.id ?? null

@@ -6,6 +6,10 @@ import {
   BUBBLE_PAD,
   BUBBLE_RADIUS,
   BUBBLE_STROKE,
+  GLYPH_DOTS,
+  GLYPH_DOT_R,
+  GLYPH_H,
+  GLYPH_W,
   RIM_DOT_R,
   SPEECH_FILL,
   SPEECH_INK,
@@ -18,6 +22,7 @@ import {
   wrapCharsFor,
   type BubbleSide,
 } from './textFaces.js'
+import { over } from './legibility.js'
 import { placeTag, type Rect } from './tooltip.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
@@ -50,12 +55,9 @@ export const BUBBLE_NEAREST = 3
 export const GLYPH_ZOOM: number = ZOOM_STOPS[0]
 /** How far the cream leans toward the speaker's own colour. */
 export const SPEAKER_TINT = 0.15
-
-const GLYPH_W = 15
-const GLYPH_H = 9
-const GLYPH_DOT_R = 1
-
-const BUBBLE_INK = SPEECH_INK
+/** How far that colour is washed out before it is leaned into. Measured, not chosen: cream
+ *  clears night AA at only 5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
+const SPEAKER_WASH = 0.5
 
 export function bubbleLife(text: string): number {
   return SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * Math.min(text.length, SPEECH_MAX_CHARS)
@@ -85,20 +87,7 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
   if (line.length > 0) lines.push(line)
   if (lines.length <= BUBBLE_MAX_LINES) return lines
   const last = lines[BUBBLE_MAX_LINES - 1]!.slice(0, Math.max(1, maxChars - 1)).trimEnd()
-  lines.length = BUBBLE_MAX_LINES
-  lines[BUBBLE_MAX_LINES - 1] = last + ELLIPSIS
-  return lines
-}
-
-/** Mixes `base` toward `toward` by `amount`, per channel, in 0xRRGGBB. */
-export function tintToward(base: number, toward: number, amount: number): number {
-  const k = Math.min(1, Math.max(0, amount))
-  const mix = (shift: number): number => {
-    const a = (base >> shift) & 0xff
-    const b = (toward >> shift) & 0xff
-    return Math.round(a + (b - a) * k) & 0xff
-  }
-  return (mix(16) << 16) | (mix(8) << 8) | mix(0)
+  return [...lines.slice(0, BUBBLE_MAX_LINES - 1), last + ELLIPSIS]
 }
 
 const TINT_BUCKET_BITS = 3
@@ -133,6 +122,19 @@ export function dominantColor(rgba: ArrayLike<number>): number | null {
   const best = top
   const avg = (sum: number): number => Math.round(sum / best.n) & 0xff
   return (avg(best.r) << 16) | (avg(best.g) << 8) | avg(best.b)
+}
+
+/** The speaker's colour as a pale wash. A bubble leans toward WHO is speaking, never toward
+ *  how dark their coat is — sprite ink mixed straight into the cream takes the paper under
+ *  the night AA floor, and a person in black would be the one nobody can read. */
+export function speakerWash(rgb: number): number {
+  const r = (rgb >> 16) & 0xff
+  const g = (rgb >> 8) & 0xff
+  const b = rgb & 0xff
+  const top = Math.max(r, g, b)
+  if (top === 0) return 0xffffff
+  const lift = (c: number): number => Math.round((c * 0xff) / top)
+  return over(0xffffff, (lift(r) << 16) | (lift(g) << 8) | lift(b), SPEAKER_WASH)
 }
 
 /** The three nearest the centre keep their bubble; input order breaks a tie, and `sort` is
@@ -193,8 +195,10 @@ type Bubble = {
   isThought: boolean
   /** the box, in the node's local space, and the tail that has to point out of it */
   box: Container
-  glyph: Container
+  glyph: Graphics
   tail: Graphics
+  /** the paper this one was drawn on, so a tail redrawn later matches its own box */
+  fill: number
   w: number
   h: number
   side: BubbleSide
@@ -218,7 +222,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         if (cell === null) return
         const px = scene.app.renderer.extract.pixels(cell.texture)
         const dominant = dominantColor(px.pixels)
-        if (dominant !== null) tints.set(agentId, tintToward(SPEECH_FILL, dominant, SPEAKER_TINT))
+        if (dominant !== null)
+          tints.set(agentId, over(speakerWash(dominant), SPEECH_FILL, SPEAKER_TINT))
       })
       .catch(() => {
         /* no sheet, or no GPU readback here: cream is a bubble too */
@@ -235,16 +240,16 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     tail.stroke({ width: 1, color: BUBBLE_EDGE })
   }
 
-  const glyphNode = (): Container => {
+  /** The "…" a bubble collapses to: an ink pill with the speaker's own paper for dots. */
+  const glyphNode = (isThought: boolean): Graphics => {
     const g = new Graphics()
     g.roundRect(0, 0, GLYPH_W, GLYPH_H, GLYPH_H / 2)
-    g.fill(BUBBLE_INK)
-    for (let i = 0; i < 3; i++) g.circle(4 + i * 4, GLYPH_H / 2, GLYPH_DOT_R)
-    g.fill(SPEECH_FILL)
+    g.fill(BUBBLE_EDGE)
+    const pitch = GLYPH_W / (GLYPH_DOTS + 1)
+    for (let i = 1; i <= GLYPH_DOTS; i++) g.circle(i * pitch, GLYPH_H / 2, GLYPH_DOT_R)
+    g.fill(isThought ? THOUGHT_FILL : SPEECH_FILL)
     g.position.set(-Math.round(GLYPH_W / 2), -GLYPH_H)
-    const node = new Container()
-    node.addChild(g)
-    return node
+    return g
   }
 
   const build = (
@@ -254,8 +259,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   ): {
     node: Container
     box: Container
-    glyph: Container
+    glyph: Graphics
     tail: Graphics
+    fill: number
     w: number
     h: number
   } => {
@@ -287,9 +293,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     paper.fill(fill)
     if (isThought) {
       for (const d of rimDots(w, h)) paper.circle(d.cx, d.cy, RIM_DOT_R)
-      paper.fill(BUBBLE_INK)
+      paper.fill(BUBBLE_EDGE)
     } else {
-      paper.stroke({ width: BUBBLE_STROKE, color: BUBBLE_INK, alignment: 1 })
+      paper.stroke({ width: BUBBLE_STROKE, color: BUBBLE_EDGE, alignment: 1 })
     }
     box.addChild(paper)
 
@@ -299,10 +305,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
 
     label.position.set(BUBBLE_PAD, BUBBLE_PAD)
     box.addChild(label)
-    const glyph = glyphNode()
+    const glyph = glyphNode(isThought)
     glyph.visible = false
     node.addChild(box, glyph)
-    return { node, box, glyph, tail, w, h }
+    return { node, box, glyph, tail, fill, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
@@ -342,9 +348,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     },
     tick: (nowMs) => {
       const state = store.getState()
+      const zoom = scene.getZoom()
       // The reader's size, times whatever the frame asks for: 1 at a desk, 2 in a broadcast,
       // where 16px of speech is 4.00px on a 480-wide player and nobody can read it.
-      const inv = worldTextScale(scene.getZoom()) * scene.textScale
+      const inv = worldTextScale(zoom) * scene.textScale
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
         if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
@@ -367,14 +374,15 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       })
       const view = scene.viewRect()
       const near = nearestSpeakers(at, { x: view.x + view.w / 2, y: view.y + view.h / 2 })
-      const zoom = scene.getZoom()
-      const want = at.map((p) => {
-        const b = bubbles[Number(p.id)]!
+      const want = at.map((p, i) => {
+        const b = bubbles[i]!
         const shown = bubbleShown(zoom, near.has(p.id))
         b.box.visible = shown
         b.glyph.visible = !shown
-        const size = shown ? { w: b.w, h: b.h } : { w: GLYPH_W, h: GLYPH_H }
-        return { ...p, size: { w: size.w * inv, h: size.h * inv } }
+        return {
+          ...p,
+          size: shown ? { w: b.w * inv, h: b.h * inv } : { w: GLYPH_W * inv, h: GLYPH_H * inv },
+        }
       })
       const boxes: Rect[] = []
       for (const placed of placeBubbles(want, view)) {
@@ -384,7 +392,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {
           b.side = placed.side
-          if (!b.isThought) drawTail(b.tail, placed.side, b.w, b.h, speakerFill(b.agentId))
+          if (!b.isThought) drawTail(b.tail, placed.side, b.w, b.h, b.fill)
         }
         boxes.push(placed.rect)
       }

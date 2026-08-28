@@ -111,7 +111,7 @@ export const BUBBLE_STROKE = 2
 /** The rim a thought wears instead of a drawn edge — a different SHAPE, never a thinner ink.
  *  Dots walk the box perimeter clockwise from the top-left corner. */
 export const RIM_DOT_R = 1
-export const RIM_STEP_PX = 5
+const RIM_STEP_PX = 5
 
 export function rimDots(w: number, h: number, step = RIM_STEP_PX): { cx: number; cy: number }[] {
   const out: { cx: number; cy: number }[] = []
@@ -180,3 +180,10 @@ export const SPEECH_INK = 0x241f2b // --deep
 export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
+
+/** What a bubble collapses to when it is not one of the nearest, or the town is a map: a
+ *  three-dot pill on the speaker's own paper, so a thought stays a thought at every stop. */
+export const GLYPH_W = 15
+export const GLYPH_H = 9
+export const GLYPH_DOT_R = 1
+export const GLYPH_DOTS = 3

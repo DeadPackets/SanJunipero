@@ -16,10 +16,11 @@ import {
   dominantColor,
   nearestSpeakers,
   placeBubbles,
-  tintToward,
+  speakerWash,
   wrapBubble,
 } from './bubbles.js'
-import { SPEECH_FILL, faceFor, wrapCharsFor } from './textFaces.js'
+import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
+import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import type { Rect } from './tooltip.js'
 
@@ -86,26 +87,47 @@ describe('a bubble stops at two lines and says so', () => {
 })
 
 describe('the bubble leans toward whoever is speaking', () => {
-  it('mixes cream 15% of the way to the speaker and no further', () => {
+  const tinted = (speaker: number): number => over(speakerWash(speaker), SPEECH_FILL, SPEAKER_TINT)
+
+  it('leans a fifth of the way at most', () => {
     expect(SPEAKER_TINT).toBe(0.15)
-    expect(tintToward(0x000000, 0xffffff, 0)).toBe(0x000000)
-    expect(tintToward(0x000000, 0xffffff, 1)).toBe(0xffffff)
-    expect(tintToward(0x000000, 0xffffff, 0.5)).toBe(0x808080)
+  })
+
+  it('takes the speaker’s hue, not how dark their coat is', () => {
+    // the same coat under two lamps is one person, so it washes to one paper
+    expect(speakerWash(0x402010)).toBe(speakerWash(0x804020))
+    expect(speakerWash(0x000000)).toBe(0xffffff)
+  })
+
+  it('never washes to something darker than the hue it came from', () => {
+    for (const c of [0xff0000, 0x00ff00, 0x0000ff, 0x402010]) {
+      const w = speakerWash(c)
+      for (const shift of [16, 8, 0]) {
+        expect((w >> shift) & 0xff, `${c.toString(16)} ch${shift}`).toBeGreaterThanOrEqual(
+          (c >> shift) & 0xff,
+        )
+      }
+    }
   })
 
   it('stays a cream bubble — the tint is a lean, not a repaint', () => {
-    const tinted = tintToward(SPEECH_FILL, 0x2f6f3f, SPEAKER_TINT)
+    const paper = tinted(0x2f6f3f)
     for (const shift of [16, 8, 0]) {
       const from = (SPEECH_FILL >> shift) & 0xff
-      const to = (tinted >> shift) & 0xff
+      const to = (paper >> shift) & 0xff
       expect(Math.abs(from - to), `channel ${shift}`).toBeLessThanOrEqual(40)
     }
-    expect(tinted).not.toBe(SPEECH_FILL)
+    expect(paper).not.toBe(SPEECH_FILL)
   })
 
-  it('clamps an out-of-range amount instead of drawing an impossible colour', () => {
-    expect(tintToward(0x102030, 0xffffff, -1)).toBe(0x102030)
-    expect(tintToward(0x102030, 0xffffff, 4)).toBe(0xffffff)
+  // The tinted paper is what is actually drawn, so it — not SPEECH_FILL — is what has to
+  // clear AA, in both light bands, for ANY sprite the forge ever makes.
+  it('clears AA in both bands whatever colour the speaker is', () => {
+    for (const speaker of [0x000000, 0xffffff, 0xff0000, 0x00ff00, 0x0000ff, 0x2f6f3f]) {
+      const r = bandRatios(SPEECH_INK, tinted(speaker))
+      expect(r.day, `day on ${speaker.toString(16)}`).toBeGreaterThanOrEqual(4.5)
+      expect(r.night, `night on ${speaker.toString(16)}`).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })
 
