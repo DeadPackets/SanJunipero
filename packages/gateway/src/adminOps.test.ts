@@ -15,20 +15,27 @@ const WORLD_DB = join(dir, 'world.db')
 const MINDS = join(dir, 'minds')
 
 function fakeClock(): Clock & { speedSet: number } {
+  const held = { paused: false, speed: 1, speedSet: 0 }
   return {
-    paused: false,
-    speed: 1,
+    get paused() {
+      return held.paused
+    },
+    get speed() {
+      return held.speed
+    },
+    get speedSet() {
+      return held.speedSet
+    },
     tick: 12,
-    speedSet: 0,
-    pause() {
-      this.paused = true
+    pause: () => {
+      held.paused = true
     },
-    resume() {
-      this.paused = false
+    resume: () => {
+      held.paused = false
     },
-    setSpeed(x: number) {
-      this.speed = x
-      this.speedSet += 1
+    setSpeed: (x: number) => {
+      held.speed = x
+      held.speedSet += 1
     },
   }
 }

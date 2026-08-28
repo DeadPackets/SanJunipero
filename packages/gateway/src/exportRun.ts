@@ -35,7 +35,7 @@ const octal = (n: number, width: number): string => n.toString(8).padStart(width
 
 /** A ustar header. Hand-rolled because a replication export must not add a dependency to the
  *  serving process, and the format is one 512-byte block. */
-export function tarHeader(name: string, bytes: number, mtimeMs: number): Buffer {
+function tarHeader(name: string, bytes: number, mtimeMs: number): Buffer {
   const head = Buffer.alloc(BLOCK)
   head.write(name, 0, 100, 'utf8')
   head.write('0000644\0', 100, 8, 'utf8')

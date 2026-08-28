@@ -793,6 +793,87 @@ body {
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
 .law-edit select:disabled, .law-edit input:disabled { color: var(--ink-quiet); cursor: not-allowed; }
+/* ── the operator's own three: the clock, the money, and the rulings a person still owes ── */
+
+.ops-block { margin-top: 1.2rem; padding-top: 0.6rem; border-top: 2px dotted var(--sand); }
+
+/* The clock, said in one word. Honey is the hand-on-it colour the changed law row already uses. */
+.ops-reading { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.3rem 0 0.5rem; }
+.ops-word {
+  font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.04em;
+  padding: 0.2rem 0.45rem; background: var(--cream); box-shadow: var(--frame-tight);
+}
+.ops-word.stopped { background: var(--honey) var(--grain); }
+.ops-at {
+  font-family: var(--font-data); font-size: 0.75rem; color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.ops-label {
+  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.4rem;
+}
+.ops-stops { display: flex; gap: 0.2rem; }
+/* The dial reads as a row of keys, and the one in force stays pressed. */
+.ops-stop { min-width: 44px; font-variant-numeric: tabular-nums; }
+.ops-stop[aria-pressed='true'] {
+  background: var(--honey) var(--grain); translate: 2px 2px; box-shadow: none;
+}
+
+/* THE ONE LOUD NUMBER ON THE PAGE. Money is what the question cost; this is the answer to it. */
+.ops-answer {
+  display: flex; align-items: baseline; gap: 0.7rem; margin: 0.4rem 0 0.6rem;
+  padding: 0.5rem 0.6rem; background: var(--cream); box-shadow: var(--frame-tight);
+}
+.ops-figure {
+  flex: none; font-family: var(--font-px); font-size: 1.75rem; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.ops-answer-says { text-wrap: pretty; }
+
+.ops-verbs, .ops-alerts, .ops-rulings { list-style: none; margin: 0 0 0.6rem; padding: 0; }
+.ops-verbs li {
+  display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0;
+}
+.ops-num { font-family: var(--font-data); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.ops-alerts li { padding: 0.2rem 0; color: var(--ink-quiet); text-wrap: pretty; }
+
+.ops-sub {
+  margin: 0.7rem 0 0.2rem;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; color: var(--ink-quiet);
+}
+.ops-ledger { margin: 0; }
+.ops-line {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem;
+  padding: 0.25rem 0; border-bottom: 2px dotted var(--sand);
+}
+.ops-line dt { min-width: 0; overflow-wrap: anywhere; }
+.ops-line dd {
+  margin: 0; text-align: right; font-family: var(--font-data); font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-ruling {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  padding: 0.3rem 0; border-bottom: 2px dotted var(--sand);
+}
+.ops-ruling .law-path { flex: 1 1 8rem; }
+.ops-reason { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+.ops-reason input {
+  flex: 1 1 auto; min-width: 0; font: inherit; min-height: 40px; padding: 0.15rem 0.35rem;
+  background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
+}
+
+.ops-export { display: grid; gap: 0.2rem; margin: 1rem 0 0; }
+.ops-link {
+  justify-self: start; min-height: 40px; padding: 0 0.2rem; cursor: pointer;
+  font: inherit; color: var(--ink); background: none; border: 0;
+  text-decoration: underline; text-decoration-color: var(--honey);
+  text-decoration-thickness: 3px; text-underline-offset: 3px;
+}
+.ops-link:hover { text-decoration-color: var(--ink); }
+.ops-link:disabled { color: var(--ink-quiet); cursor: progress; }
+
 .laws-notice {
   color: var(--cream); background-color: var(--deep);
   border: 10px solid transparent; border-image: var(--px-night);

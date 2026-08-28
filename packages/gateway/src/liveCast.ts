@@ -13,7 +13,7 @@ export type PendingRuling = {
 
 /** What an operator may do to a codified ruling. Structural, so the observatory never imports
  *  the arbiter — `ReviewStore` satisfies it. */
-export type RulingsAdmin = {
+type RulingsAdmin = {
   pending(): PendingRuling[]
   approve(ruleId: number): void
   /** Reverts the rulebook row AND unregisters the verb the ruling minted. */

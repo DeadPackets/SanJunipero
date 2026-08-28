@@ -78,8 +78,9 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
 | `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |
-| `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback law channel. |
+| `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback operator channel. |
 | `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
+| `SJ_GIT_SHA` | unset | Stamped into `/admin/export`'s manifest. Without it a replay cannot know which code folded the events. |
 | `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is folded into the world with no mind booted for it. |
@@ -193,10 +194,62 @@ That is the intent — but it is also why `_ops.db` must be in your backup.
 the same viewer, the same event log and the same port — only the deciding is scripted. Stream it
 scripted first and confirm the whole stack is right before attaching a card to it.
 
+## The operator's channel
+
+`SJ_ADMIN_TOKEN` opens the whole channel on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` **inside the
+container**. Every route takes the same `Authorization: Bearer $SJ_ADMIN_TOKEN`, and every one of
+them is the operator's: nothing here is ever rendered into a mind's prompt.
+
+| Route | What it does |
+|---|---|
+| `POST /admin/laws` | Turn one world law. See below. |
+| `GET /admin/clock` | Whether the world clock is running, its speed, and the tick it stands at. |
+| `POST /admin/pause` · `/admin/resume` | Stop and start the world clock. The stream keeps serving; the viewer's stamp reads `PAUSED`. |
+| `POST /admin/speed` `{x}` | Ticks per beat, between `0.1` and `60`. |
+| `GET /admin/cost` | Today's spend and its projection, lifetime, per caller, the ten costliest minds, the cache-read share, the caps and whether either was reached, the last ten alerts — and the **answer rate**. |
+| `GET /admin/rulings/pending` | Codified rulings still waiting on a person. |
+| `POST /admin/rulings/:ruleId/approve` | Keep the rule. |
+| `POST /admin/rulings/:ruleId/revert` `{reason}` | Tombstone the rule **and unregister the verb it minted**. |
+| `GET /admin/export` | The whole run as one tar. See below. |
+
+A scripted stream has no ledger and no god layer: `/admin/cost` answers `live: false` with zeros
+and `/admin/rulings/*` answers empty rather than erroring.
+
+**The answer rate** is `honest.md` §1's motive number, measured from the world log alone: of the
+acts a body STARTED (`action_started`), the share that reached `action_completed` rather than
+`action_interrupted`. It costs nothing, needs no live run, and a town that begins everything and
+finishes nothing reads as the rut it is.
+
+## Replicating a run elsewhere
+
+```
+docker compose exec town node -e "fetch('http://127.0.0.1:8788/admin/export',\
+  {headers:{authorization:'Bearer '+process.env.SJ_ADMIN_TOKEN}}).then(r=>r.arrayBuffer())\
+  .then(b=>require('fs').writeFileSync('/data/run.tar',Buffer.from(b)))"
+docker compose cp town:/data/run.tar ./run.tar
+```
+
+Every database is read with SQLite's own `serialize()` under one transaction, so the copy is
+consistent against a town that is still ticking — it is not a file copy racing the WAL.
+
+```
+run/manifest.json     git sha, the world's map/rings/seed, the tick and day it was taken at,
+                      the event count, and every file with its size
+run/config.json       the SimConfig the world folds with
+run/world.db          the event log, snapshots and rng state — the whole world
+run/minds/<id>.db     one per mind: memories, and the half-run plan it stopped on
+run/minds/_ops.db     the call ledger and the alerts
+run/minds/_arbiter.db the rulebook, the codex and the review queue
+run/minds/_narrator.db the chronicle
+```
+
+To replay it: unpack, put `world.db` where `SJ_MINDS_DIR`'s neighbour expects it, put `minds/`
+at `SJ_MINDS_DIR`, and boot the same `gitSha` the manifest names. The town resumes at the tick
+the manifest names.
+
 ## Turning a world law, mid-run
 
-`SJ_ADMIN_TOKEN` opens `POST /admin/laws` on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` **inside the
-container**. It is never published to the host and Caddy never proxies it, so the only way in is
+The law route on that same channel: It is never published to the host and Caddy never proxies it, so the only way in is
 through the container itself:
 
 ```

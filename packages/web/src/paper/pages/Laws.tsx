@@ -10,10 +10,14 @@ import {
   type LawRow,
 } from '../../ui/lawsModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import {
+  ADMIN_ENDPOINT,
+  ClockSection,
+  ExportLink,
+  RulingsSection,
+  SpendSection,
+} from './AdminOps.js'
 import type { PageProps } from './index.js'
-
-// The admin channel is a separate localhost server, not the viewer's origin.
-const ADMIN_ENDPOINT = 'http://127.0.0.1:8788'
 
 export function LawsPage(props: PageProps) {
   return props.tab === 'Admin' ? <Admin {...props} /> : <World {...props} />
@@ -130,6 +134,12 @@ function Admin({ store, operatorToken }: PageProps) {
           {notice}
         </p>
       )}
+      <ClockSection token={operatorToken} onNotice={setNotice} />
+      <SpendSection token={operatorToken} />
+      <RulingsSection token={operatorToken} onNotice={setNotice} />
+      <ExportLink token={operatorToken} onNotice={setNotice} />
+
+      <h3 className="feed-head">Laws</h3>
       <ul className="laws-edit-list">
         {rows.map((row) => (
           <li key={row.path} className="law-edit">

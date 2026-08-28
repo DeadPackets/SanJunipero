@@ -21,7 +21,7 @@ export type OpsDeps = ExportOpts & {
 }
 
 /** Faster than a mind can think and slower than the disk can write are both useless. */
-export const MIN_SPEED = 0.1
+const MIN_SPEED = 0.1
 export const MAX_SPEED = 60
 /** The projection window, in real minutes — the same window `@sj/llm`'s spend monitor uses. The
  *  gateway reads the ledger rather than importing it: `@sj/llm` pulls the model SDK. */
@@ -39,7 +39,7 @@ const send = (res: ServerResponse, status: number, body: unknown): void => {
 
 // ── the money ───────────────────────────────────────────────────────────────────────────────
 
-export type Spend = { calls: number; usd: number }
+type Spend = { calls: number; usd: number }
 export type CostReport = {
   /** False on a scripted stream: there is no ledger because nothing was ever bought. */
   live: boolean
@@ -204,7 +204,7 @@ export function costReport(deps: OpsDeps, now = Date.now()): CostReport {
 
 // ── the routes ──────────────────────────────────────────────────────────────────────────────
 
-export type ClockState = { paused: boolean; speed: number; tick: number }
+type ClockState = { paused: boolean; speed: number; tick: number }
 const clockState = (c: Clock): ClockState => ({ paused: c.paused, speed: c.speed, tick: c.tick })
 
 function rulingRoute(
