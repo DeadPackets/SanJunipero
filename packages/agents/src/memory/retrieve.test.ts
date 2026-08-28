@@ -9,7 +9,6 @@ import {
   MISS_TOP_SCORE,
   cuesToQuery,
   keywords,
-  recall,
   retrieveAmbient,
 } from './retrieve.js'
 
@@ -76,7 +75,7 @@ describe('hybrid retrieval', () => {
     expect(ids.indexOf(tagged)).toBeLessThan(ids.indexOf(untagged))
   })
 
-  it('recall ranks the memory containing both query words first, parts sum to score', async () => {
+  it('ranks the memory containing both query words first, parts sum to score', async () => {
     const { store } = await makeStore()
     const now = 6 * TICKS_PER_DAY
     const distractors = [
@@ -117,7 +116,11 @@ describe('hybrid retrieval', () => {
       importance: 5,
       tags: { people: ['yusuf'], place: null, objects: [], topics: ['debt'] },
     })
-    const results = await recall(store, 'firewood debt', now)
+    const results = await retrieveAmbient(
+      store,
+      { people: [], place: null, topics: ['firewood', 'debt'] },
+      now,
+    )
     expect(results[0]!.id).toBe(target)
 
     const top = results[0]!
@@ -160,7 +163,11 @@ describe('hybrid retrieval', () => {
       importance: 5,
       tags: EMPTY_TAGS,
     })
-    const results = await recall(store, text, now)
+    const results = await retrieveAmbient(
+      store,
+      { people: [], place: null, topics: keywords(text) },
+      now,
+    )
     const ids = results.map((r) => r.id)
     expect(ids.indexOf(newer)).toBeLessThan(ids.indexOf(old))
   })
@@ -183,7 +190,11 @@ describe('hybrid retrieval', () => {
       importance: 1,
       tags: EMPTY_TAGS,
     })
-    const results = await recall(store, text, now)
+    const results = await retrieveAmbient(
+      store,
+      { people: [], place: null, topics: keywords(text) },
+      now,
+    )
     const ids = results.map((r) => r.id)
     expect(ids.indexOf(oldHi)).toBeLessThan(ids.indexOf(recentLo))
 
@@ -211,23 +222,31 @@ describe('hybrid retrieval', () => {
       importance: 7,
       tags: { people: ['yusuf'], place: null, objects: [], topics: ['firewood', 'debt'] },
     })
-    const results = await recall(store, 'firewood debt', now)
+    const results = await retrieveAmbient(
+      store,
+      { people: [], place: null, topics: ['firewood', 'debt'] },
+      now,
+    )
     expect(results.length).toBeGreaterThan(0)
     const hit = results.find((r) => r.text === text)
     expect(hit).toBeDefined()
     expect(hit!.text).toBe(text)
   })
 
-  it('miss-log: empty recall logs resultCount 0; rich ambient logs nothing', async () => {
+  it('miss-log: an empty store logs resultCount 0; a rich one logs nothing', async () => {
     const now = 2 * TICKS_PER_DAY
 
     const { db: emptyDb, store: emptyStore } = await makeStore('empty-agent')
-    const emptyResults = await recall(emptyStore, 'firewood', now)
+    const emptyResults = await retrieveAmbient(
+      emptyStore,
+      { people: [], place: null, topics: ['firewood'] },
+      now,
+    )
     expect(emptyResults).toEqual([])
     const missRows = emptyDb
       .prepare('SELECT mode, result_count, top_score FROM recall_misses ORDER BY id')
       .all()
-    expect(missRows).toEqual([{ mode: 'recall', result_count: 0, top_score: null }])
+    expect(missRows).toEqual([{ mode: 'ambient', result_count: 0, top_score: null }])
 
     const { db: richDb, store: richStore } = await makeStore('rich-agent')
     await richStore.insertMemory({
@@ -320,7 +339,7 @@ describe('hybrid retrieval', () => {
       importance: 5,
       tags: EMPTY_TAGS,
     })
-    const results = await recall(bob, query, now)
+    const results = await retrieveAmbient(bob, { people: [], place: null, topics: [query] }, now)
     const ids = results.map((r) => r.id)
     expect(ids).toContain(bId)
     expect(results).toHaveLength(1)

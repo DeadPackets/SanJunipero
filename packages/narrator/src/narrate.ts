@@ -24,10 +24,7 @@ import type {
   PublicationRow,
   SceneSegment,
   SegmentConfig,
-  TimelineMarker,
 } from './types.js'
-
-export const MARKER_HEAT_THRESHOLD = 6
 
 // A night whose chronicle would not render. The rest of the night is attached, because the
 // render is not the only thing that happened and the caller has to be able to say so.
@@ -40,41 +37,6 @@ export class ChapterRenderError extends Error {
       cause: renderCause,
     })
     this.name = 'ChapterRenderError'
-  }
-}
-
-export function timelineMarkers(deps: {
-  milestones: Milestone[]
-  scenes: SceneSegment[]
-  heats: HeatScores[]
-}): TimelineMarker[] {
-  const markers: TimelineMarker[] = deps.milestones.map((m) => ({
-    day: m.day,
-    tick: m.tick,
-    label: m.label,
-    sceneIndex: deps.scenes.findIndex((s) => s.eventIds.includes(m.eventSeq)),
-  }))
-  deps.scenes.forEach((s, i) => {
-    const heat = deps.heats[i]
-    if (heat !== undefined && heat.total >= MARKER_HEAT_THRESHOLD) {
-      markers.push({ day: s.day, tick: s.startTick, label: 'a scene of high drama', sceneIndex: i })
-    }
-  })
-  return markers
-}
-
-export function renderDigest(
-  lastSeenDay: number,
-  currentDay: number,
-  chapters: ChapterRow[],
-): { headline: string; body: string } {
-  const missed = chapters
-    .filter((c) => c.day > lastSeenDay && c.day <= currentDay)
-    .sort((a, b) => a.day - b.day)
-  const days = currentDay - lastSeenDay
-  return {
-    headline: `While you were away — ${days} day${days === 1 ? '' : 's'} passed in San Junipero`,
-    body: missed.map((c) => `- Day ${c.day}: ${c.title}`).join('\n'),
   }
 }
 

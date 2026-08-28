@@ -128,10 +128,6 @@ export type EraRow = {
   chapterIds: number[]
 }
 
-// sceneIndex is an index into the scenes array handed to timelineMarkers (-1 when
-// no surviving scene contains the milestone's event) — not a store id.
-export type TimelineMarker = { day: number; tick: number; label: string; sceneIndex: number }
-
 export type PublicationRow = {
   id: number
   day: number

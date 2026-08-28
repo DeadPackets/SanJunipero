@@ -3,9 +3,8 @@ import Database from 'better-sqlite3'
 import { openDb } from '@sj/engine/store'
 import { EVENTFUL_DAY } from './fixtures/eventfulDay.js'
 import { renderChapter } from './chronicle.js'
-import { rankScenesForDirector } from './heat.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
-import { narrateDay, narrateWeek, renderDigest } from './narrate.js'
+import { narrateDay, narrateWeek } from './narrate.js'
 import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
@@ -77,9 +76,6 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
     const idleIdx = scenes.findIndex((s) => s.eventIds.includes(1))
     const argueIdx = scenes.findIndex((s) => s.eventIds.includes(4))
     const tradeIdx = scenes.findIndex((s) => s.eventIds.includes(10))
-    const ranking = rankScenesForDirector(scenes, heat)
-    expect(ranking[0]!.sceneIndex).toBe(argueIdx)
-    expect(ranking[0]!.sceneIndex).not.toBe(idleIdx)
     expect(heat[argueIdx]!.total).toBeGreaterThan(heat[idleIdx]!.total)
     expect(heat[argueIdx]!.total).toBeGreaterThan(heat[tradeIdx]!.total)
     expect(heat[tradeIdx]!.total).toBeGreaterThan(heat[idleIdx]!.total)
@@ -94,32 +90,6 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
     expect(seqs.has(speech!.eventSeq)).toBe(true)
     expect(seqs.has(trade!.eventSeq)).toBe(true)
     expect(milestones.map((m) => m.kind)).toContain('first_speech')
-  })
-
-  it('4. digest for a 3-day absence: while-you-were-away headline, exactly 3 day bullets', async () => {
-    for (const day of [1, 2, 3]) {
-      const scene: SceneSegment = {
-        day,
-        startTick: day * 1440,
-        endTick: day * 1440 + 1,
-        eventIds: [100 + day],
-        cast: ['omar'],
-        location: null,
-      }
-      const llm = {
-        ...gateLlm([100 + day]),
-        summarizeChapter: vi.fn(async () => ({
-          title: `The Quiet Work of Day ${day}`,
-          text: 'The settlement kept its small routines.',
-          citations: [100 + day],
-        })),
-      } as unknown as NarratorLlm
-      await renderChapter({ store, llm, day, scenes: [scene] })
-    }
-    const digest = renderDigest(0, 3, store.chaptersInRange(1, 3))
-    expect(digest.headline).toMatch(/while you were away/i)
-    const bullets = digest.body.split('\n').filter((l) => l.startsWith('- '))
-    expect(bullets.length).toBe(3)
   })
 
   it('5. framing: every persisted chapter/era/newspaper/biography/caption string is framing-free', async () => {
@@ -168,7 +138,7 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
     expect(store.eras().length).toBeGreaterThan(0)
     expect(store.publications('newspaper').length).toBe(1)
     expect(store.publications('biography').length).toBe(1)
-    expect(store.publications('timelapse_caption').length).toBe(4)
+    expect(store.publications('timelapse_caption').length).toBe(1)
     expect(strings.length).toBeGreaterThan(0)
     for (const s of strings) expect(s).not.toMatch(FORBIDDEN_FRAMING)
   })

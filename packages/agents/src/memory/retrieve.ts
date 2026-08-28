@@ -112,7 +112,6 @@ async function retrieve(
   nowTick: number,
   k: number,
   w: RetrievalWeights,
-  mode: 'ambient' | 'recall',
 ): Promise<ScoredMemory[]> {
   const db = store.db
   const agentId = store.agentId
@@ -197,7 +196,7 @@ async function retrieve(
 
   const topScore = top.length > 0 ? top[0]!.score : null
   if (topScore === null || topScore < MISS_TOP_SCORE || top.length < MISS_MIN_RESULTS) {
-    store.logMiss({ tick: nowTick, query, mode, topScore, resultCount: top.length })
+    store.logMiss({ tick: nowTick, query, mode: 'ambient', topScore, resultCount: top.length })
   }
 
   return top
@@ -211,15 +210,5 @@ export async function retrieveAmbient(
   w: RetrievalWeights = DEFAULT_WEIGHTS,
 ): Promise<ScoredMemory[]> {
   const queryTags = cueParts(cues)
-  return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w, 'ambient')
-}
-
-export async function recall(
-  store: MemoryStore,
-  query: string,
-  nowTick: number,
-  k = 12,
-  w: RetrievalWeights = DEFAULT_WEIGHTS,
-): Promise<ScoredMemory[]> {
-  return retrieve(store, query, keywords(query), nowTick, k, w, 'recall')
+  return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w)
 }

@@ -3,7 +3,7 @@ export { NARRATOR_TABLES, migrateNarratorTables, openNarratorDb } from './schema
 export { NarratorStore } from './store.js'
 export { WORLD_TABLES, openNarratorWorld } from './glass.js'
 export { DEFAULT_SEGMENT_CONFIG, eventAgentIds, eventLocation, segmentScenes } from './segment.js'
-export { CONFLICT_WEIGHT, STAKES_WEIGHT, rankScenesForDirector, scoreHeat } from './heat.js'
+export { CONFLICT_WEIGHT, STAKES_WEIGHT, scoreHeat } from './heat.js'
 export { FIRST_DEFS, detectFirsts } from './firsts.js'
 export { DEATH_CAUSE_LABELS, TIER1_DEFS } from './milestones/tier1.js'
 export { detectTier2, type Tier2Ctx } from './milestones/tier2.js'
@@ -27,15 +27,7 @@ export {
 } from './glass.js'
 export { DEFAULT_DETECT_CONFIG, ROLE_VERBS, detectInstitutions } from './institutions.js'
 export { renderChapter, renderEra, sceneDigests, verifyCitations } from './chronicle.js'
-export {
-  ChapterRenderError,
-  MARKER_HEAT_THRESHOLD,
-  closeDay,
-  narrateDay,
-  narrateWeek,
-  renderDigest,
-  timelineMarkers,
-} from './narrate.js'
+export { ChapterRenderError, closeDay, narrateDay, narrateWeek } from './narrate.js'
 export {
   PUBLIC_EVENT_TYPES,
   collectPublicRecord,

@@ -3,14 +3,7 @@ import Database from 'better-sqlite3'
 import { SimConfigSchema, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import {
-  ChapterRenderError,
-  MARKER_HEAT_THRESHOLD,
-  narrateDay,
-  narrateWeek,
-  renderDigest,
-  timelineMarkers,
-} from './narrate.js'
+import { ChapterRenderError, narrateDay, narrateWeek } from './narrate.js'
 import type { ChapterRow, NarratorLlm } from './types.js'
 import type { LlmClient, LlmUsage } from '@sj/llm'
 
@@ -240,62 +233,6 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
       privateCounts: { thoughts: 0, journals: 0 },
     })
     expect(out.semanticRan).toBe(false)
-  })
-})
-
-describe('timelineMarkers', () => {
-  it('emits one marker per milestone plus one per hot scene', async () => {
-    const store = memStore()
-    const { heat, milestones } = await narrateDay({
-      store,
-      llm: scriptedLlm([4]),
-      events: DAY1,
-      rulebookCount: 0,
-      privateCounts: { thoughts: 2, journals: 1 },
-    })
-    const scenes = store.scenesForDay(1)
-    const markers = timelineMarkers({ milestones, scenes, heats: heat })
-    const hot = heat.filter((h) => h.total >= MARKER_HEAT_THRESHOLD).length
-    expect(hot).toBeGreaterThan(0)
-    expect(markers.length).toBe(milestones.length + hot)
-    for (const m of markers) {
-      expect(m.day).toBe(1)
-      expect(typeof m.tick).toBe('number')
-      expect(m.label.length).toBeGreaterThan(0)
-      expect(m.sceneIndex).toBeGreaterThanOrEqual(0)
-    }
-  })
-})
-
-describe('renderDigest', () => {
-  it('renders a while-you-were-away headline with one bullet per missed day', () => {
-    const chapters: ChapterRow[] = [1, 2, 3].map((day) => ({
-      id: day,
-      day,
-      title: `Chapter of day ${day}`,
-      text: 'x',
-      citations: [day],
-      sceneIds: [],
-    }))
-    const digest = renderDigest(0, 3, chapters)
-    expect(digest.headline).toMatch(/while you were away/i)
-    const bullets = digest.body.split('\n').filter((l) => l.startsWith('- '))
-    expect(bullets.length).toBe(3)
-    for (const day of [1, 2, 3]) expect(digest.body).toContain(`Chapter of day ${day}`)
-  })
-
-  it('excludes chapters outside (lastSeenDay, currentDay]', () => {
-    const chapters: ChapterRow[] = [1, 2, 3, 4].map((day) => ({
-      id: day,
-      day,
-      title: `Day ${day}`,
-      text: 'x',
-      citations: [],
-      sceneIds: [],
-    }))
-    const digest = renderDigest(1, 3, chapters)
-    const bullets = digest.body.split('\n').filter((l) => l.startsWith('- '))
-    expect(bullets.length).toBe(2) // days 2 and 3 only
   })
 })
 
