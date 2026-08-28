@@ -212,14 +212,14 @@ export function marksFrom(sources: MarkSources): Mark[] {
 // ── coalescing ────────────────────────────────────────────────────────────────────────────
 
 /** The tick width one mark occupies on the track. On a short span that is the fixed window;
- *  on a long one the track runs out of room first. */
-function windowFor(span: number): number {
+ *  on a long one the track runs out of room first. Exported because it is ALL the fold reads
+ *  of the span: a caller memoising the fold keys on this, not on the live edge. */
+export function markWindow(span: number): number {
   return Math.max(MARK_COALESCE_TICKS, Math.ceil(Math.max(0, span) / MARK_SLOTS))
 }
 
-export function coalesceMarks(marks: readonly Mark[], span: number): Mark[] {
+export function coalesceMarks(marks: readonly Mark[], gap: number): Mark[] {
   if (marks.length === 0) return []
-  const gap = windowFor(span)
 
   // 1. Per kind, a run of the same thing inside one window is ONE mark that says how many.
   const perKind: Mark[] = []

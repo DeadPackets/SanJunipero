@@ -57,6 +57,27 @@ export function endpoint<T>(
   }
 }
 
+/** One reader per URL for the life of the session. Unmounting a page body used to drop the
+ *  last subscriber and take its last answer with it, so Chronicle → Days → Chronicle re-fetched
+ *  and blanked. The reader stops polling when nobody is listening and keeps what it read. */
+const readers = new Map<string, Endpoint<unknown>>()
+
+export function feedFor<T>(
+  url: string,
+  parse?: (body: unknown) => T | null,
+  everyMs?: number,
+): Endpoint<T> {
+  // The beat is part of the identity: two callers asking for the same URL on different beats
+  // are two readers, and the first parser registered is the one that reads it.
+  const key = `${url}|${everyMs ?? 0}`
+  let feed = readers.get(key)
+  if (feed === undefined) {
+    feed = endpoint(url, parse, everyMs) as Endpoint<unknown>
+    readers.set(key, feed)
+  }
+  return feed as Endpoint<T>
+}
+
 /** Read a feed that is shared page-wide (`feeds.ts`). */
 export function useFeed<T>(feed: Endpoint<T>): Read<T> {
   return useSyncExternalStore(feed.subscribe, feed.get, feed.get)
@@ -71,6 +92,9 @@ export function usePolled<T>(
 ): Read<T> {
   // `parse` is a parser, not a prop: re-keying on it would restart the read every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const feed = useMemo(() => endpoint<T>(url, parse, everyMs), [url, everyMs])
+  const feed = useMemo(
+    () => (url === null ? endpoint<T>(null, parse, everyMs) : feedFor<T>(url, parse, everyMs)),
+    [url, everyMs],
+  )
   return useFeed(feed)
 }

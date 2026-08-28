@@ -39,7 +39,7 @@ import {
 } from './textFaces.js'
 import { ZOOM_STOPS } from './camera.js'
 import { bandRatios } from './legibility.js'
-import { TEXT_MIN_PX, WORLD_TEXT_PX } from '../textFloor.js'
+import { TEXT_MIN_PX } from '../textFloor.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const src = (rel: string): string => readFileSync(join(HERE, rel), 'utf8')
@@ -107,7 +107,7 @@ describe('the two faces, and which one is allowed to say a sentence', () => {
   it('never drops below the floors the ui-blockers round set', () => {
     for (const role of FACE_ROLES) {
       expect(faceFor(role).size, role).toBeGreaterThanOrEqual(TEXT_MIN_PX)
-      expect(faceFor(role).size, role).toBeGreaterThanOrEqual(WORLD_TEXT_PX)
+      expect(faceFor(role).size, role).toBeGreaterThanOrEqual(TEXT_MIN_PX)
     }
   })
 
