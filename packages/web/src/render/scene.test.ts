@@ -85,8 +85,8 @@ describe('nobody outside the renderer reaches through app.ticker', () => {
     expect(offenders).toEqual([])
   })
 
-  it('is what App.tsx actually calls', () => {
-    expect(readFileSync(join(WEB_SRC, 'App.tsx'), 'utf8')).toContain('setTicking')
+  it('is what the renderer itself calls, and the only way anyone asks', () => {
+    expect(readFileSync(join(WEB_SRC, 'render/scene.ts'), 'utf8')).toContain('setTicking(on')
   })
 })
 

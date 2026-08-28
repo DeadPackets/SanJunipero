@@ -12,7 +12,7 @@ const CANVAS_TEXT_FILES = [
   './characters.ts',
   './tooltip.ts',
   './bubbles.ts',
-  '../ui/SocietyLens.tsx',
+  '../paper/pages/BondsGraph.tsx',
 ]
 
 describe('the legibility floors themselves', () => {
@@ -38,7 +38,7 @@ describe('B2 — world text, readable at ZOOM_MIN where a world px is a CSS px',
     }
   })
 
-  // SocietyLens cannot be imported outside a browser, so its label size is read from source.
+  // The bonds graph cannot be imported outside a browser, so its label size is read from source.
   it('leaves no bare pixel size below the floor in a canvas-text module', () => {
     for (const file of CANVAS_TEXT_FILES) {
       const text = src(file)

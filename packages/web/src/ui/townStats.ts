@@ -1,6 +1,5 @@
 import { tickToMoment } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
-import { LENSES, type Lens } from './route.js'
 
 export type TownStats = { day: number; time: string; weather: string; alive: number; total: number }
 
@@ -23,74 +22,6 @@ export function townStats(state: WorldState | null, tick: number): TownStats {
 // The living-documentary law as a regex the copy is tested against: no points, quests,
 // leaderboards or progress meters, ever, anywhere in the chrome.
 export const GAMIFICATION_BAN = /progress|score|level|quest|points|badge|streak|rank|xp\b/i
-
-export type LensHint = { lens: Lens; count: number | null; hint: string }
-
-/**
- * TOTAL by design: the next lens anybody adds is a type error until it decides where its number comes
- * from, so "the number I happen to have in hand" is not reachable.
- */
-export type LensCounts = Record<Lens, number | null>
-
-/** What the viewer can count without asking the server: the living, and nothing else. The chronicle
- *  and the bonds are fetched from the endpoints their own panels read, and `LensTabs` lays them over. */
-export const countsFromWorld = (stats: TownStats): LensCounts => ({
-  map: null, // the map IS the town; a number stuck on it would be a score
-  inspector: stats.alive, // the living, straight out of the state the viewer already holds
-  chronicle: null, // the size of the RECORD, and only /api/chronicle knows it
-  discoveries: null, // no count offered: the panel's own empty state says it better
-  society: null, // /api/bonds, the same endpoint the roster and the society lens read
-  director: null, // no count offered
-  laws: null, // a rule count is machinery, not a thing to show a viewer
-})
-
-/** The world's own counts with the two that come off the wire laid over them. A pure function, since
- *  the same line inside the component was unreachable by test; `null` means not answered yet. */
-export function lensCountsFor(
-  stats: TownStats,
-  chronicle: number | null,
-  bonds: number | null,
-): LensCounts {
-  return { ...countsFromWorld(stats), chronicle, society: bonds }
-}
-
-/** The count is resolved FIRST and the hint is a function of it, so the visible number and the
- *  spoken label cannot disagree. */
-
-/** What each lens says when it has nothing to count. The VIEW already prefixes the lens's own
- *  name, so a hint never repeats it. */
-const LENS_PROSE: Record<Lens, string> = {
-  map: 'Walk the town',
-  inspector: 'Who is walking the town',
-  chronicle: 'The town’s own ledger',
-  discoveries: 'What the townsfolk worked out for themselves',
-  society: 'Who the town has tied itself to',
-  director: 'The days the town kept',
-  laws: 'The rules the town lives under',
-}
-
-/** And what it says when it has. The phrasing is per lens because English is; the LAW — that
- *  a badged lens speaks its badge — is the loop below and the test that walks it. */
-const LENS_COUNTED: Partial<Record<Lens, (n: number) => string>> = {
-  inspector: (n) => `${n} walking the town`,
-  chronicle: (n) => `${n} in the town’s own ledger`,
-  society: (n) => `${n} ties the town has made`,
-  director: (n) => `${n} days the town kept`,
-}
-
-export function lensHints(
-  stats: TownStats,
-  counts: LensCounts = countsFromWorld(stats),
-): LensHint[] {
-  // Only `inspector` knows its own number: the cast is in the snapshot. Every other count is
-  // history and arrives as an override, or does not arrive and is not badged.
-  const own: Partial<Record<Lens, number>> = { inspector: stats.alive }
-  return LENSES.map((lens) => {
-    const count = counts[lens] ?? own[lens] ?? null
-    const counted = count === null ? undefined : LENS_COUNTED[lens]?.(count)
-    return { lens, count, hint: counted ?? LENS_PROSE[lens] }
-  })
-}
 
 // ------------------------------------------------------------------ empty states
 
@@ -118,6 +49,18 @@ export const EMPTY_COPY = {
   traffic:
     'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
   paper: 'Nothing printed yet. The chronicler writes a day up once it has closed.',
+  families: 'No families yet — nobody walking the town was born to anyone in it.',
+  places: 'Nothing stands here yet.',
+  ties: 'No ties yet.',
+  written: 'Nothing written yet.',
+  biography: 'Nobody has written of them yet.',
+  provenance: 'No one remembers who began this.',
+  room: 'This one has no room to stand in.',
+  noPlace: 'No place is picked.',
+  noPerson: 'No such townsfolk.',
+  admin:
+    'The operator’s page. Nothing here is shown to a mind, and nothing here opens without ' +
+    'the law channel’s key.',
 } as const
 
 // ------------------------------------------------------------------ weather glyphs

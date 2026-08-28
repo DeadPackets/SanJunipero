@@ -89,7 +89,7 @@ describe('DirectorMode reads the heat window through the one endpoint layer', ()
 
   it('★ hand-rolls no fetch of its own, and beats at the measured interval', () => {
     expect(SRC).not.toContain('fetch(')
-    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([^)]*HEAT_POLL_MS\)/)
+    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([\s\S]*?HEAT_POLL_MS,?\s*\)/)
   })
 
   it('★ reads a refused window as an empty one, which is what turns the round over', () => {

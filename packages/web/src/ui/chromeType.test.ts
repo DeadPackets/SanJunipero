@@ -10,19 +10,16 @@ const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').repla
 // Prose surfaces: containers whose text is sentences, plus the prose-only classes inside them.
 // Chips, stamps, counts, pills and pixel-face labels sit on TEXT_MIN_PX, not on this list.
 const PROSE = [
-  '.inspector-panel',
-  '.chronicle-panel',
-  '.roster-panel',
-  '.laws-panel',
-  '.laws-dashboard',
-  '.bond-detail',
-  '.provenance-pop',
+  '.paper-sheet',
+  '.laws',
+  '.laws-admin',
+  '.provenance-line',
+  '.edge-line',
   '.room-who',
   '.thumb-title',
   '.need-label',
   '.law-history',
-  '.veil-sub',
-  '.tab-body article h4',
+  '.sheet-note',
 ]
 
 type Decl = { selectors: string; px: number; raw: string }
@@ -69,7 +66,7 @@ describe('B4 (partial) — the chrome type floors', () => {
   // The panels override `body`, so a title that stayed at 13.6px would end up smaller than the
   // prose under it. The full six-step scale is C12 Task 53; this only forbids the inversion.
   it('never sets a panel title below the prose it heads', () => {
-    for (const title of ['.px-title', '.bond-title', '.veil-title']) {
+    for (const title of ['.paper-title', '.bond-title', '.place-name']) {
       const hit = DECLS.filter((d) => d.selectors.split(',').some((s) => s.trim() === title))
       expect(hit.length, `no font-size found for ${title}`).toBeGreaterThan(0)
       for (const d of hit) expect(d.px, where(d)).toBeGreaterThanOrEqual(BODY_MIN_PX)
@@ -80,12 +77,12 @@ describe('B4 (partial) — the chrome type floors', () => {
 // The sheet styles no bare `h2` outside `.digest-modal`, so an unclassed one is the browser's
 // system-ui bold at 21px — and RosterPanel's own skeleton used `.px-title`, so the heading
 // changed face and size the moment the data landed.
-describe('every panel heading is the sheet\u2019s own face', () => {
-  const HERE = new URL('.', import.meta.url)
+describe('every page heading is the sheet\u2019s own face', () => {
+  const HERE = new URL('../paper/pages/', import.meta.url)
   const views = readdirSync(HERE).filter((f) => f.endsWith('.tsx'))
 
   it('finds the views it is meant to be checking', () => {
-    expect(views.length).toBeGreaterThan(10)
+    expect(views.length).toBeGreaterThan(5)
   })
 
   it('leaves no <h2> to the browser default', () => {

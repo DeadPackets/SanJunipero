@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
     "@fontsource/press-start-2p": "^5.3.0",
     "@fontsource/silkscreen": "^5.3.0",
     "@sj/engine": "workspace:*",

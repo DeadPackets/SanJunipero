@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GAMIFICATION_BAN } from './townStats.js'
-import { RosterPanelView } from './RosterPanel.js'
+import { RosterListView } from '../paper/pages/RosterList.js'
 import { rosterRows2 } from './roster/rosterRow.js'
 import type { WorldState } from '@sj/engine/state'
 import {
@@ -104,7 +104,7 @@ describe('the duplicate, as a test', () => {
       counters: { nextEntityId: 2 },
     } as unknown as WorldState
     const html = renderToStaticMarkup(
-      createElement(RosterPanelView, {
+      createElement(RosterListView, {
         rows: rosterRows2(state, [], null, state.tick),
         gone: 0,
         sort: 'name' as const,

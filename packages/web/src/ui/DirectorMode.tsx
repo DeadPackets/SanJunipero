@@ -13,27 +13,35 @@ export const DIRECTOR_ZOOM = 3 as const
  *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
 const NO_HEAT: HeatWindow[] = []
 
-// `autoCut` is the LIVE town being televised; it must not fight a recorded day's playback.
+/** `autoCut` is the live town being televised; `pinned` is a viewer who asked to follow one
+ *  person, which outranks the heat. It draws nothing — `DirectorCue` prints the word. */
 export function DirectorMode({
   store,
   scene,
   autoCut,
-  leaving = false,
+  pinned = null,
+  onCue,
 }: {
   store: WorldStore
   scene: Scene | null
   autoCut: boolean
-  leaving?: boolean
+  pinned?: string | null
+  onCue?: (text: string | null) => void
 }) {
   const [cut, setCut] = useState<string | null>(null)
-  // no subject at all while the town is not being televised
-  const followed = autoCut ? cut : null
+  const followed = pinned ?? (autoCut ? cut : null)
   const followedRef = useRef<string | null>(null)
   const lastCutRef = useRef(0)
-  const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  // The overview is fitted to a town, so it has to wait for one: fitting an empty world frames
+  // whatever corner of the ground the camera was created over.
+  const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
 
-  const heat = usePolled<HeatWindow[]>(autoCut ? '/api/heat' : null, undefined, HEAT_POLL_MS)
+  const heat = usePolled<HeatWindow[]>(
+    autoCut && pinned === null ? '/api/heat' : null,
+    undefined,
+    HEAT_POLL_MS,
+  )
 
   // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {
@@ -48,39 +56,30 @@ export function DirectorMode({
       .map((a) => a.id)
       .sort()
     const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
+    // The first subject arrives at once; every later cut waits out CUT_MIN_MS.
     const now = performance.now()
-    if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
-      followedRef.current = next
-      lastCutRef.current = now
-      setCut(next)
-    } else if (followedRef.current === null && next !== null) {
+    const first = followedRef.current === null
+    if (
+      next !== null &&
+      next !== followedRef.current &&
+      (first || now - lastCutRef.current >= CUT_MIN_MS)
+    ) {
       followedRef.current = next
       lastCutRef.current = now
       setCut(next)
     }
   }, [store, autoCut, heat])
 
-  // camera: the scene's follow rig eases toward the followed agent's SPRITE
-  // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
-  useEffect(() => {
-    if (scene === null || !autoCut) return
-    return () => {
-      scene.setFollow(null)
-    }
-  }, [scene, autoCut])
   // With no subject the picture is the whole settlement: pushing to 3x before the first heat
   // poll has named anybody frames a 3x crop of whatever the camera was over.
   useEffect(() => {
-    if (scene === null || !autoCut) return
-    if (followed === null) scene.fitToTown()
-    else scene.setZoom(DIRECTOR_ZOOM)
-  }, [scene, autoCut, followed])
-  useEffect(() => {
     if (scene === null) return
-    if (leaving || followed === null) {
+    if (followed === null) {
       scene.setFollow(null)
+      if (awake) scene.fitToTown()
       return
     }
+    scene.setZoom(DIRECTOR_ZOOM)
     scene.setFollow(() => {
       const anchor = scene.anchorOf?.(followed)
       if (anchor !== undefined && anchor !== null) return anchor
@@ -89,47 +88,15 @@ export function DirectorMode({
       const { sx, sy } = tileToScreen(a.x, a.y)
       return { x: sx, y: sy }
     })
-  }, [scene, store, followed, leaving])
-
-  // subtitle: the followed agent's latest speech, else their latest thought
-  let subtitle: { text: string; kind: 'speech' | 'thought' } | null = null
-  if (followed !== null) {
-    for (let i = events.length - 1; i >= 0; i--) {
-      const ev = events[i]!
-      if (ev.type === 'agent_spoke' && (ev.payload as { agentId: string }).agentId === followed) {
-        subtitle = { text: (ev.payload as { text: string }).text, kind: 'speech' }
-        break
-      }
+    return () => {
+      scene.setFollow(null)
     }
-    if (subtitle === null) {
-      const t = store.latestThought(followed)
-      if (t !== null) subtitle = { text: t.text, kind: 'thought' }
-    }
-  }
-  const name = followed !== null ? (state?.agents[followed]?.name ?? followed) : null
+  }, [scene, store, followed, awake])
 
-  return (
-    <div
-      className={leaving ? 'director leaving' : 'director'}
-      aria-label="Moments — the town, televised"
-    >
-      {!leaving && name !== null && (
-        <div
-          className={subtitle?.kind === 'thought' ? 'subtitle thought' : 'subtitle'}
-          role="status"
-        >
-          <span className="subtitle-name">{name}</span>
-          {subtitle !== null ? (
-            subtitle.kind === 'thought' ? (
-              <em>{subtitle.text}</em>
-            ) : (
-              `"${subtitle.text}"`
-            )
-          ) : (
-            '…'
-          )}
-        </div>
-      )}
-    </div>
-  )
+  const name = followed === null ? null : (state?.agents[followed]?.name ?? followed)
+  useEffect(() => {
+    onCue?.(name === null ? null : `${pinned === null ? 'DIRECTOR' : 'FOLLOWING'} · ${name}`)
+  }, [name, pinned, onCue])
+
+  return null
 }

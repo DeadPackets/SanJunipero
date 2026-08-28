@@ -54,11 +54,6 @@ describe('dimetric math', () => {
     expect(screenToTile(sx, sy)).toEqual({ x: 3, y: 4 })
   })
 
-  it('★ and the minimap no longer shifts the point half a tile before asking', () => {
-    const src = readFileSync(new URL('./minimap.ts', import.meta.url), 'utf8')
-    expect(src).not.toMatch(/screenToTile\([^)]*-\s*TILE_H\s*\/\s*2\)/)
-  })
-
   it('depthKey increases along +x+y and is stable within a diagonal', () => {
     expect(depthKey(2, 3)).toBeLessThan(depthKey(3, 2))
     let prev = -Infinity
@@ -202,13 +197,6 @@ describe('depthKey says what it is for, and it is not the minimap', () => {
 
   it('no longer claims the minimap draws with it', () => {
     expect(doc).not.toMatch(/minimap's cheap draw order/)
-  })
-
-  it('★ and the minimap really does not — it never sorts anything', () => {
-    const map = readFileSync(new URL('./minimap.ts', import.meta.url), 'utf8')
-    const view = readFileSync(new URL('./MinimapView.tsx', import.meta.url), 'utf8')
-    expect(map).not.toMatch(/depthKey|zIndex|sortableChildren/)
-    expect(view).not.toMatch(/depthKey|zIndex|sortableChildren/)
   })
 
   it('names the two files that DO keep it alive, so the next reader can check', () => {

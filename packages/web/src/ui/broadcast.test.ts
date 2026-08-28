@@ -11,7 +11,7 @@ import { captionAtScale, captionFloorPx, captionMinPx, captionShortfall } from '
 import { BROADCAST_TEXT_SCALE, FACE_INSTALL_PX } from '../render/textFaces.js'
 import { landmarkAlpha } from '../render/landmarks.js'
 import { DIRECTOR_ZOOM } from './DirectorMode.js'
-import { navToLens, parseRoute, routeToPath } from './route.js'
+import { parseRoute, routeToPath } from './route.js'
 import { fontSizes } from './chromeType.test.js'
 
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
@@ -19,15 +19,6 @@ const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').repla
   '',
 )
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
-
-/** Every declaration block whose selector list contains `sel` exactly, in cascade order. */
-function rulesFor(sel: string): string {
-  const hits: string[] = []
-  for (const [, list, body] of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if ((list ?? '').split(',').some((s) => s.trim() === sel)) hits.push(body ?? '')
-  }
-  return hits.join(';')
-}
 
 /** The size the sheet lands on for one exact selector, in px. */
 function sheetPx(selector: string): number {
@@ -69,8 +60,7 @@ describe('what turns the broadcast layout on', () => {
   it('makes the route the televised town, because that is what the layout IS', () => {
     const r = parseRoute('/', '?broadcast=1')
     expect(r.broadcast).toBe(true)
-    expect(r.lens).toBe('director')
-    expect(r.momentId).toBeNull()
+    expect(r.agentId).toBeNull()
     expect(parseRoute('/', '').broadcast).toBe(false)
   })
 
@@ -79,16 +69,14 @@ describe('what turns the broadcast layout on', () => {
     // first tick of the sim takes the stream frame away
     const r = parseRoute('/', '?broadcast=1')
     expect(routeToPath({ ...r, moment: { day: 4, time: '19:31' } })).toBe(
-      `/moment/4/19:31?lens=director&${BROADCAST_PARAM}=1`,
+      `/moment/4/19:31?${BROADCAST_PARAM}=1`,
     )
     expect(routeToPath(parseRoute('/', ''))).toBe('/')
   })
 
-  it('does not let a stray arrow key walk a broadcast into the roster', () => {
-    const r = parseRoute('/', '?broadcast=1')
-    expect(navToLens(r, 'inspector')).toBe(r)
-    const ordinary = parseRoute('/', '')
-    expect(navToLens(ordinary, 'inspector').lens).toBe('inspector')
+  it('never carries a picked person, whatever the address says', () => {
+    expect(parseRoute('/', '?broadcast=1&agent=amara').agentId).toBeNull()
+    expect(parseRoute('/', '?agent=amara').agentId).toBe('amara')
   })
 })
 
@@ -119,30 +107,12 @@ describe('what a stream viewer is left with', () => {
     ).map((r) => r.selector)
     expect(phantom).toEqual([])
   })
-
-  it('takes the overlaid bands away with the filmstrip that was one of them', () => {
-    expect(CSS).toContain(
-      "[data-broadcast='on'] .moments-lens[data-letterboxed='true'] { --letterbox-h: 0px; }",
-    )
-  })
-
-  // The stage ENDS above the band, from one variable, so `placeBubbles` clamping to `viewRect()`
-  // cannot put anything in the world across the caption.
-  it('★ ends the picture where the caption starts, from one number', () => {
-    const h = /\[data-broadcast='on'\]\s*\{[^}]*--bc-caption-h:\s*([^;}]+)/.exec(CSS)?.[1]?.trim()
-    expect(h).toBe('11rem')
-    expect(rulesFor("[data-broadcast='on'] .stage-mount")).toContain('bottom: var(--bc-caption-h)')
-    expect(rulesFor("[data-broadcast='on'] .subtitle")).toContain('height: var(--bc-caption-h)')
-  })
 })
 
 // ── ★ R2, MEASURED AT THE TRUE 0.25 ───────────────────────────────────────────────────────
 
 describe('R2 · every caption in the broadcast frame survives the downscale', () => {
-  it('is measuring the sizes the sheet actually ships', () => {
-    expect(sheetPx("[data-broadcast='on'] .tick-badge")).toBe(28)
-    expect(sheetPx("[data-broadcast='on'] .subtitle-name")).toBe(28)
-    expect(sheetPx("[data-broadcast='on'] .subtitle")).toBe(32)
+  it('is measuring the size the frame actually ships', () => {
     expect(FACE_INSTALL_PX * BROADCAST_TEXT_SCALE).toBe(32)
   })
 
@@ -153,12 +123,7 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
   it('states what each one is worth to a viewer on a 480px phone', () => {
     expect(
       measured(BROADCAST_CAPTIONS).map((c) => `${c.what} — ${captionAtScale(c.px).toFixed(2)}px`),
-    ).toEqual([
-      'the clock — 7.00px',
-      'the speaker — 7.00px',
-      'what they said — 8.00px',
-      'a speech bubble — 8.00px',
-    ])
+    ).toEqual(['a speech bubble — 8.00px'])
     expect(captionMinPx()).toBeCloseTo(5.4, 3)
   })
 

@@ -1,23 +1,22 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import { tickToMoment, type BondsResponse } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
-import { TEXT_MIN_PX } from '../textFloor.js'
-import { BondDetailPanel } from './BondDetailPanel.js'
-import { LegendChip } from './LegendChip.js'
-import { BondsVeil } from './StageVeil.js'
-import { EMPTY_LINEAGE } from './bondModel2.js'
+import type { WorldStore } from '../../state/worldStore.js'
+import type { Subject } from '../../stage/index.js'
+import { TEXT_MIN_PX } from '../../textFloor.js'
+import { LegendChip } from '../../ui/LegendChip.js'
+import { BondDetail } from './BondDetail.js'
+import { EMPTY_LINEAGE, type BondNode, type PeopleIndex } from '../../ui/bondModel2.js'
 import {
-  toRelationGraph,
   relationLegend,
+  toRelationGraph,
   type LegendRow,
   type RelationLink,
-} from './relationGraph.js'
-import type { BondNode, PeopleIndex } from './bondModel2.js'
-import { EMPTY_SOCIETY, societyFrom, trafficGraph, trafficLegend } from './societyGraph.js'
-import { bondsFeed, lineageFeed } from './feeds.js'
-import { useFeed, usePolled } from './useEndpoint.js'
-import { EMPTY_COPY } from './townStats.js'
+} from '../../ui/relationGraph.js'
+import { EMPTY_SOCIETY, societyFrom, trafficGraph, trafficLegend } from '../../ui/societyGraph.js'
+import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
+import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { EMPTY_COPY } from '../../ui/townStats.js'
 
 /** Two readings of one town: how close people are, and what has actually passed between them.
  *  They answer different questions, so they are views rather than layers on one picture. */
@@ -48,14 +47,14 @@ type PositionedNode = BondNode & { x?: number; y?: number }
 
 const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.size) * 5))
 
-export function SocietyLens({
+export function BondsGraph({
   store,
-  onPick,
+  onSubject,
 }: {
   store: WorldStore
-  onPick: (agentId: string) => void
+  onSubject: (subject: Subject) => void
 }) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const api = useFeed(bondsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   const [view, setView] = useState<SocietyView>('ties')
@@ -66,12 +65,11 @@ export function SocietyLens({
     SOCIETY_REFETCH_MS,
   )
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  // R6: the key is shut on arrival, so the graph is never explained by a card standing on it.
   const [keyOpen, setKeyOpen] = useState(false)
   const [selected, setSelected] = useState<RelationLink | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined)
-  const [dims, setDims] = useState({ w: 800, h: 600 })
+  const [dims, setDims] = useState({ w: 480, h: 320 })
 
   // EDGE LENGTH IS THE LEVEL. `linkDistance` is not a component prop — the length lives on the
   // d3 link force, so it is set on the instance once the graph exists.
@@ -84,7 +82,7 @@ export function SocietyLens({
 
   useEffect(() => {
     const el = boxRef.current
-    if (el === null) return
+    if (el === null || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => {
       setDims({ w: el.clientWidth, h: el.clientHeight })
     })
@@ -94,8 +92,7 @@ export function SocietyLens({
     }
   }, [])
 
-  // Names come from the world the viewer already holds — the bonds endpoint carries ties, not
-  // people, so a rename can never disagree with the map. A fold lands every tick and remakes
+  // Names come from the world the viewer already holds. A fold lands every tick and remakes
   // `state`, but the graph only cares who is alive and what they are called: keying on that
   // signature is what stops the force layout being re-seeded from scratch every tick.
   const nameSig = useMemo(() => {
@@ -113,8 +110,6 @@ export function SocietyLens({
     return out
   }, [nameSig])
 
-  // The warmth an edge is drawn at reads the tick the BONDS answer was taken at, not the live
-  // clock, so the picture and the `legend-stamp` beside it name the same moment.
   const ties = useMemo(
     () => toRelationGraph(api ?? EMPTY_API, lineage, people, api?.asOfTick ?? 0),
     [api, lineage, people],
@@ -140,13 +135,9 @@ export function SocietyLens({
     [view, ties, passed, hidden],
   )
 
-  // The simulation writes x/y onto these very objects, so they are handed over uncloned and
-  // held by ref: a clone would discard the layout on every render, and the label pass below
-  // needs the positions force-graph is mutating.
+  // The simulation writes x/y onto these very objects, so they are handed over uncloned: a
+  // clone would discard the layout on every render.
   const graphData = useMemo(() => ({ nodes: graph.nodes, links }), [graph, links])
-
-  // A shut key must not hide the fact that lines are being filtered out.
-  const hiddenCount = hidden.size
 
   const toggle = (k: string): void => {
     setHidden((prev) => {
@@ -158,15 +149,15 @@ export function SocietyLens({
   }
 
   return (
-    <div className="society-lens" ref={boxRef}>
-      <div className="society-views" role="tablist" aria-label="What the picture shows">
+    <div className="bonds-graph" ref={boxRef}>
+      {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow keys,
+          and a second tablist nested in its panel would be one the keyboard cannot walk. */}
+      <div className="bonds-views" role="group" aria-label="What the picture shows">
         {SOCIETY_VIEWS.map((v) => (
           <button
             key={v}
-            role="tab"
-            id={`society-tab-${v}`}
-            aria-selected={v === view}
-            tabIndex={v === view ? 0 : -1}
+            type="button"
+            aria-pressed={v === view}
             className={v === view ? 'feed-tab active' : 'feed-tab'}
             onClick={() => {
               setView(v)
@@ -176,64 +167,58 @@ export function SocietyLens({
             {SOCIETY_VIEW_LABEL[v]}
           </button>
         ))}
-      </div>
-      <div className="society-key" data-open={keyOpen ? 'yes' : 'no'}>
         <button
           type="button"
           className="key-summary"
           aria-expanded={keyOpen}
-          aria-controls="society-key-body"
+          aria-controls="bonds-key"
           onClick={() => {
             setKeyOpen((v) => !v)
           }}
         >
           {keyOpen ? 'Hide the key' : 'How to read this'}
-          {hiddenCount > 0 && <span className="key-filtered">{hiddenCount} hidden</span>}
+          {hidden.size > 0 && <span className="key-filtered">{hidden.size} hidden</span>}
         </button>
-        {keyOpen && (
-          <div
-            id="society-key-body"
-            className="society-legend"
-            role="group"
-            aria-label="How to read this"
-          >
-            {axes.map((axis) => (
-              <div className="legend-axis" key={axis} data-axis={axis}>
-                <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
-                {legend
-                  .filter((r) => r.axis === axis)
-                  .map((r) => (
-                    <LegendChip
-                      key={key(r)}
-                      row={r}
-                      off={hidden.has(key(r))}
-                      onToggle={() => {
-                        toggle(key(r))
-                      }}
-                    />
-                  ))}
-              </div>
-            ))}
-            {api !== null && (
-              <span className="legend-stamp">
-                as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
-              </span>
-            )}
-          </div>
-        )}
       </div>
+      {keyOpen && (
+        <div id="bonds-key" className="bonds-legend" role="group" aria-label="How to read this">
+          {axes.map((axis) => (
+            <div className="legend-axis" key={axis} data-axis={axis}>
+              <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
+              {legend
+                .filter((r) => r.axis === axis)
+                .map((r) => (
+                  <LegendChip
+                    key={key(r)}
+                    row={r}
+                    off={hidden.has(key(r))}
+                    onToggle={() => {
+                      toggle(key(r))
+                    }}
+                  />
+                ))}
+            </div>
+          ))}
+          {api !== null && (
+            <span className="legend-stamp">
+              as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
+            </span>
+          )}
+        </div>
+      )}
 
-      {/* Nobody is missing from the picture any more, so the only honest empty state is a town
-          in which nothing has passed between anyone yet — and a field of unconnected people is
-          what BOTH a tieless town and an unanswered fetch look like, so the wait says so. */}
+      {/* A field of unconnected people is what BOTH a tieless town and an unanswered fetch look
+          like, so the wait says so. */}
       {(view === 'ties' ? api : traffic.data) === null ? (
-        <BondsVeil />
+        <p className="feed-empty" aria-busy="true">
+          Reading the town’s ties…
+        </p>
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-        <p className="society-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
+        <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
       ) : null}
 
       {view === 'ties' && selected !== null && api !== null && (
-        <BondDetailPanel
+        <BondDetail
           bond={api.bonds.find((b) => b.id === selected.id)!}
           people={people}
           type={selected.type}
@@ -283,8 +268,6 @@ export function SocietyLens({
         }}
         onRenderFramePost={(ctx, globalScale) => {
           // Every slab is down by now, so no name can be buried by a neighbour drawn later.
-          // ctx is already scaled, so dividing by globalScale pins the label at TEXT_MIN_PX
-          // on screen however far the graph is zoomed out.
           const fontSize = Math.max(TEXT_MIN_PX / globalScale, 4)
           ctx.imageSmoothingEnabled = false
           ctx.font = `${fontSize}px Silkscreen, monospace`
@@ -312,7 +295,8 @@ export function SocietyLens({
           if (view === 'ties') setSelected(l as unknown as RelationLink)
         }}
         onNodeClick={(n) => {
-          onPick((n as BondNode).id)
+          const node = n as BondNode
+          onSubject({ id: node.id, kind: 'agent', name: node.name })
         }}
       />
     </div>

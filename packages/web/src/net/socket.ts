@@ -1,7 +1,7 @@
 import { CLOSE_BAD_HELLO, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
-export const LAST_SEEN_KEY = 'sj:lastSeenTick'
+const LAST_SEEN_KEY = 'sj:lastSeenTick'
 const GAP_TICKS = 1440 // more than a missed day → offer the digest
 const BACKOFF_MIN_MS = 1_000
 const BACKOFF_MAX_MS = 30_000

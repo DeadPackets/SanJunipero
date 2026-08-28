@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { MomentsResponseSchema, tickToMoment, type Moment } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
-import type { Scene } from '../render/scene.js'
-import type { ObservatoryHandle } from '../net/socket.js'
-import type { PeopleIndex } from './bondModel2.js'
-import { DirectorMode } from './DirectorMode.js'
-import { stripLayout } from './frame.js'
-import { thumbLabel, thumbMotif, thumbTitle } from './momentThumb.js'
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { MomentsResponseSchema, type Moment } from '@sj/shared'
+import type { PeopleIndex } from '../../ui/bondModel2.js'
+import { thumbLabel, thumbMotif, thumbTitle } from '../../ui/momentThumb.js'
 import {
   idlePlayer,
   nextPlaySpeed,
@@ -15,9 +10,11 @@ import {
   seekPlayer,
   tickPlayer,
   type PlayerState,
-} from './momentsPlayer.js'
-import { EMPTY_COPY } from './townStats.js'
-import { usePolled } from './useEndpoint.js'
+} from '../../ui/momentsPlayer.js'
+import { EMPTY_COPY } from '../../ui/townStats.js'
+import { usePolled } from '../../ui/useEndpoint.js'
+import { momentStamp } from '../stamp.js'
+import type { PageProps } from './index.js'
 
 const momentRows = (body: unknown): Moment[] | null => {
   const parsed = MomentsResponseSchema.safeParse(body)
@@ -25,15 +22,10 @@ const momentRows = (body: unknown): Moment[] | null => {
 }
 
 const MOTIF_PX = 8
-
-const clock = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
-}
+const CREAM = '#FFF6E9'
 
 // Drawn, not typed: ▶ and ❙❙ are pictographic characters whose shape belongs to the reader's
 // font. The town draws its own controls, in its own pixels.
-const CREAM = '#FFF6E9'
 const PLAY_PIXELS: readonly (readonly [number, number])[] = [
   [2, 0],
   [2, 1],
@@ -56,40 +48,9 @@ const PLAY_PIXELS: readonly (readonly [number, number])[] = [
   [3, 6],
   [2, 7],
 ]
-const PAUSE_PIXELS: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [2, 0],
-  [5, 0],
-  [6, 0],
-  [1, 1],
-  [2, 1],
-  [5, 1],
-  [6, 1],
-  [1, 2],
-  [2, 2],
-  [5, 2],
-  [6, 2],
-  [1, 3],
-  [2, 3],
-  [5, 3],
-  [6, 3],
-  [1, 4],
-  [2, 4],
-  [5, 4],
-  [6, 4],
-  [1, 5],
-  [2, 5],
-  [5, 5],
-  [6, 5],
-  [1, 6],
-  [2, 6],
-  [5, 6],
-  [6, 6],
-  [1, 7],
-  [2, 7],
-  [5, 7],
-  [6, 7],
-]
+const PAUSE_PIXELS: readonly (readonly [number, number])[] = [1, 2, 5, 6].flatMap((x) =>
+  [0, 1, 2, 3, 4, 5, 6, 7].map((y) => [x, y] as const),
+)
 
 function TransportGlyph({ playing }: { playing: boolean }) {
   return (
@@ -110,7 +71,6 @@ function TransportGlyph({ playing }: { playing: boolean }) {
 }
 
 function Motif({ moment }: { moment: Moment }) {
-  const motif = thumbMotif(moment)
   return (
     <svg
       className="thumb-motif"
@@ -121,14 +81,14 @@ function Motif({ moment }: { moment: Moment }) {
       aria-hidden="true"
       focusable="false"
     >
-      {motif.pixels.map(([x, y, fill]) => (
+      {thumbMotif(moment).pixels.map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
       ))}
     </svg>
   )
 }
 
-export function MomentCardView({
+const MomentCardView = memo(function MomentCardView({
   moment,
   people,
   open,
@@ -155,7 +115,6 @@ export function MomentCardView({
         <span className="thumb-body">
           <span className="thumb-day">Day {label.day}</span>
           <span className="thumb-title">{thumbTitle(moment)}</span>
-          {/* one line inside a filmstrip card: the whole postcard is still in the aria-label */}
           <span className="thumb-meta">
             <span className="thumb-cast">{label.cast}</span>
             {label.location !== null && <span className="thumb-where">{label.location}</span>}
@@ -164,69 +123,9 @@ export function MomentCardView({
       </button>
     </li>
   )
-}
+})
 
-/** The bottom band of the three-box stage frame (`frame.ts`). Pure by construction: the scroll
- *  offset comes from `stripLayout`, so where the strip has got to is a number a test can read. */
-export function MomentsFrameView({
-  moments,
-  people,
-  momentId,
-  letterboxed,
-  leaving,
-  bandW,
-  onOpen,
-  children,
-}: {
-  moments: Moment[] | null
-  people: PeopleIndex
-  momentId: number | null
-  letterboxed: boolean
-  leaving: boolean
-  bandW: number
-  onOpen: (id: number) => void
-  children?: ReactNode
-}) {
-  const days = moments ?? []
-  const { scrollX } = stripLayout(
-    days.length,
-    days.findIndex((m) => m.id === momentId),
-    bandW,
-  )
-
-  // The strip scrolls NATIVELY — which is how focus gets carried into view for free — and
-  // `stripLayout` drives that scroll rather than replacing it, so opening a day still centres it.
-  const stripRef = useRef<HTMLOListElement>(null)
-  useEffect(() => {
-    if (stripRef.current !== null) stripRef.current.scrollLeft = scrollX
-  }, [scrollX])
-
-  return (
-    <div className="moments-lens" data-letterboxed={letterboxed ? 'true' : 'false'}>
-      {letterboxed && <div className={leaving ? 'letterbox top leaving' : 'letterbox top'} />}
-      <div className="film-strip" role="group" aria-label="The days the town kept">
-        {moments !== null && days.length === 0 ? (
-          <p className="feed-empty">{EMPTY_COPY.moments}</p>
-        ) : (
-          <ol ref={stripRef} className="strip-list" data-scroll-x={scrollX}>
-            {days.map((m) => (
-              <MomentCardView
-                key={m.id}
-                moment={m}
-                people={people}
-                open={m.id === momentId}
-                onOpen={onOpen}
-              />
-            ))}
-          </ol>
-        )}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-export function PlayerStripView({
+function PlayerStripView({
   moment,
   player,
   onToggle,
@@ -288,7 +187,7 @@ export function PlayerStripView({
         aria-valuemin={moment.startTick}
         aria-valuemax={moment.endTick}
         aria-valuenow={player.tick}
-        aria-valuetext={clock(player.tick)}
+        aria-valuetext={momentStamp(player.tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
           ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -300,7 +199,7 @@ export function PlayerStripView({
       >
         <span className="player-head" style={{ left: `${frac * 100}%` }} />
       </div>
-      <span className="player-clock">{clock(player.tick)}</span>
+      <span className="player-clock">{momentStamp(player.tick)}</span>
       <button
         className="player-btn speed"
         aria-label={`Speed ${player.speed} times. Change speed.`}
@@ -315,50 +214,18 @@ export function PlayerStripView({
   )
 }
 
-export function MomentsLens({
-  store,
-  handle,
-  scene,
-  momentId,
-  televised,
-  leaving,
-  onOpen,
-}: {
-  store: WorldStore
-  handle: ObservatoryHandle | null
-  scene: Scene | null
-  momentId: number | null
-  /** the live town, auto-cut by heat — as opposed to a recorded day playing back */
-  televised: boolean
-  /** held mounted for one beat while the bands slide out */
-  leaving: boolean
-  onOpen: (id: number | null) => void
-}) {
-  const state = useSyncExternalStore(store.subscribe, store.getState)
+/** The filmstrip and its player, on the page instead of across the bottom of the town. */
+export function Moments({ store, onJump, onLive }: PageProps) {
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
   const moments = usePolled('/api/moments', momentRows).data
+  const [openId, setOpenId] = useState<number | null>(null)
   // The player belongs to the day it plays: opening another one is a new player, never this
   // one carried across, so nothing has to be reset after the fact.
   const [playerOf, setPlayerOf] = useState<{ id: number | null; state: PlayerState }>(() => ({
     id: null,
     state: idlePlayer(0),
   }))
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [bandW, setBandW] = useState(0)
-
-  // ResizeObserver rather than a window listener: the stage narrows when a side panel opens
-  // without the window changing at all.
-  useEffect(() => {
-    const el = rootRef.current
-    if (el === null || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(([entry]) => {
-      setBandW(entry?.contentRect.width ?? 0)
-    })
-    ro.observe(el)
-    return () => {
-      ro.disconnect()
-    }
-  }, [])
 
   const people: PeopleIndex = useMemo(() => {
     const out: Record<string, { name: string; alive: boolean }> = {}
@@ -366,21 +233,20 @@ export function MomentsLens({
     return out
   }, [state])
 
-  const open = moments?.find((m) => m.id === momentId) ?? null
-  const openId = open?.id ?? null
+  const open = moments?.find((m) => m.id === openId) ?? null
+  const liveId = open?.id ?? null
   const playerFor = (p: { id: number | null; state: PlayerState }): PlayerState =>
-    p.id === openId ? p.state : idlePlayer(open?.startTick ?? 0)
+    p.id === liveId ? p.state : idlePlayer(open?.startTick ?? 0)
   const player = playerFor(playerOf)
   const setPlayer = (step: (prev: PlayerState) => PlayerState): void => {
-    setPlayerOf((prev) => ({ id: openId, state: step(playerFor(prev)) }))
+    setPlayerOf((prev) => ({ id: liveId, state: step(playerFor(prev)) }))
   }
 
-  // Opening a day parks the view at its first minute; a cold /moment/<id> load lands here too,
-  // as soon as the list arrives.
+  // Opening a day parks the view at its first minute.
   useEffect(() => {
     if (open === null) return
-    handle?.scrub(open.startTick)
-  }, [open, handle])
+    onJump(open.startTick)
+  }, [open, onJump])
 
   // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
   // socket messages.
@@ -396,7 +262,7 @@ export function MomentsLens({
         const next = tickPlayer(prev, dt, open.startTick, open.endTick)
         if (next.tick !== scrubbedRef.current) {
           scrubbedRef.current = next.tick
-          handle?.scrub(next.tick)
+          onJump(next.tick)
         }
         return next
       })
@@ -406,14 +272,14 @@ export function MomentsLens({
     return () => {
       cancelAnimationFrame(raf)
     }
-  }, [open, player.status, handle])
+  }, [open, player.status, onJump])
 
   const seek = (frac: number): void => {
     if (open === null) return
     setPlayer((prev) => {
       const next = seekPlayer(prev, frac, open.startTick, open.endTick)
       scrubbedRef.current = next.tick
-      handle?.scrub(next.tick)
+      onJump(next.tick)
       return next
     })
   }
@@ -421,45 +287,45 @@ export function MomentsLens({
   const goLive = (): void => {
     scrubbedRef.current = null
     setPlayerOf({ id: null, state: idlePlayer(0) })
-    handle?.goLive()
-    onOpen(null)
+    setOpenId(null)
+    onLive()
   }
 
-  // The auto-cut runs only while the town is being televised, so it cannot fight a recorded
-  // day's playback.
-  const letterboxed = momentId !== null || televised
-
   return (
-    <div ref={rootRef} className="moments-frame">
-      <MomentsFrameView
-        moments={moments}
-        people={people}
-        momentId={momentId}
-        letterboxed={letterboxed}
-        leaving={leaving}
-        bandW={bandW}
-        onOpen={onOpen}
-      >
-        <DirectorMode store={store} scene={scene} autoCut={televised} leaving={leaving} />
-        {open !== null && (
-          <PlayerStripView
-            moment={open}
-            player={player}
-            onToggle={() => {
-              setPlayer((prev) =>
-                prev.status === 'playing'
-                  ? pausePlayer(prev)
-                  : playPlayer(prev, open.startTick, open.endTick),
-              )
-            }}
-            onSeek={seek}
-            onSpeed={() => {
-              setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))
-            }}
-            onLive={goLive}
-          />
-        )}
-      </MomentsFrameView>
-    </div>
+    <>
+      {moments !== null && moments.length === 0 ? (
+        <p className="feed-empty">{EMPTY_COPY.moments}</p>
+      ) : (
+        <ol className="strip-list" aria-label="The days the town kept">
+          {(moments ?? []).map((m) => (
+            <MomentCardView
+              key={m.id}
+              moment={m}
+              people={people}
+              open={m.id === openId}
+              onOpen={setOpenId}
+            />
+          ))}
+        </ol>
+      )}
+      {open !== null && (
+        <PlayerStripView
+          moment={open}
+          player={player}
+          onToggle={() => {
+            setPlayer((prev) =>
+              prev.status === 'playing'
+                ? pausePlayer(prev)
+                : playPlayer(prev, open.startTick, open.endTick),
+            )
+          }}
+          onSeek={seek}
+          onSpeed={() => {
+            setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))
+          }}
+          onLive={goLive}
+        />
+      )}
+    </>
   )
 }
