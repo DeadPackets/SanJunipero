@@ -55,12 +55,3 @@ export const TILE_COLORS: Record<TileId, number> = {
   9: 0x6f9152 /* sapling */,
   10: 0x8fbfd6 /* channel */,
 }
-
-export const GROUND_FALLBACK_COLOR = 0x93b573
-
-const COLOR_BY_ID: Partial<Record<number, number>> = TILE_COLORS
-/** The palette colour for any id a terrain array carries — grass for one this build has no
- *  entry for. `TILE_COLORS` itself is total over `TileId` and needs no fallback. */
-export function tileColor(id: number): number {
-  return COLOR_BY_ID[id] ?? GROUND_FALLBACK_COLOR
-}

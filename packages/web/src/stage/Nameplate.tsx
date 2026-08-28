@@ -2,7 +2,13 @@ import { useEffect, useRef } from 'react'
 import type { Scene } from '../render/scene.js'
 import type { Rect } from '../render/tooltip.js'
 import type { WorldStore } from '../state/worldStore.js'
-import { joinStageLoop, subjectPoint, useSubjectAnchor, type Subject, type WorldPoint } from './anchor.js'
+import {
+  joinStageLoop,
+  subjectPoint,
+  useSubjectAnchor,
+  type Subject,
+  type WorldPoint,
+} from './anchor.js'
 
 /** `.stage-plate` is `translate(-50%, 4px)` off the anchor — chromeCss.test.ts pins it. */
 export const PLATE_DROP_PX = 4

@@ -157,7 +157,3 @@ export const WEATHER_GLYPH: Record<string, WeatherGlyph> = {
     ],
   },
 }
-
-export function weatherGlyph(kind: string): WeatherGlyph {
-  return WEATHER_GLYPH[kind] ?? WEATHER_GLYPH[WEATHER_UNKNOWN]!
-}

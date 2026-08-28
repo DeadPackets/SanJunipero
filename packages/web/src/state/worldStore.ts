@@ -11,7 +11,7 @@ import { isNarratable } from '../ui/chronicleFormat.js'
 
 const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
-export const RECENT_EVENTS_CAP = 400
+const RECENT_EVENTS_CAP = 400
 
 type ViewMode = { live: true } | { live: false; tick: number }
 type Thought = { agentId: string; tick: number; text: string }

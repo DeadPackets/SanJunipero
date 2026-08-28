@@ -69,7 +69,7 @@ export function joinStageLoop(step: () => void): () => void {
  * Puts a DOM mark over a world point, every frame, by writing the node's own style. A camera
  * moving at 60 fps through React state would re-render the whole overlay 60 times a second.
  */
-export function useStageAnchor(
+function useStageAnchor(
   scene: Scene | null,
   point: (() => WorldPoint | null) | null,
 ): RefObject<HTMLDivElement | null> {

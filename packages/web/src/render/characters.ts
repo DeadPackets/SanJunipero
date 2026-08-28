@@ -45,13 +45,13 @@ import {
   type Waypoint,
 } from './charAnim.js'
 
-export const EMOTE_MS = 2000
-export const EMOTE_ABOVE_HEAD_PX = 12
+const EMOTE_MS = 2000
+const EMOTE_ABOVE_HEAD_PX = 12
 // The name tag is set at the face's own size, which is above the 12px floor, not at it.
 export const CHAR_TAG_FONT_PX = faceFor('name').size
 export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
-export const SHADOW_ALPHA = 0.25
-export const EMOTE_PX = 16
+const SHADOW_ALPHA = 0.25
+const EMOTE_PX = 16
 
 /** The movement law's defaults, restated for a world whose snapshot has not arrived; `charAnim.test.ts` asserts these are what `shared/src/config.ts` defaults to. */
 export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 1, debuff: 2 } as const

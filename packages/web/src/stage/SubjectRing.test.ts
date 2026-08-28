@@ -32,7 +32,7 @@ describe('★ the arrows point at an arm, they do not step round a list', () => 
 
   it('★ points at the arm the sheet actually draws there', () => {
     const at = (n: number): string =>
-      CSS.match(new RegExp(`\\.stage-ring-arms button:nth-child\\(${n}\\) \\{([^}]*)\\}`))![1]!
+      new RegExp(`\\.stage-ring-arms button:nth-child\\(${n}\\) \\{([^}]*)\\}`).exec(CSS)![1]!
     expect(at(armFor('ArrowUp')! + 1), 'up').toContain('top: 0')
     expect(at(armFor('ArrowRight')! + 1), 'right').toContain('left: 100%')
     expect(at(armFor('ArrowDown')! + 1), 'down').toContain('top: 100%')

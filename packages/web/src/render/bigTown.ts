@@ -67,7 +67,7 @@ export function bigTown(rings: number): FixtureStructure[] {
 // A terrain array cannot hold a negative index, so this frame is shifted to the origin; ground
 // and structures cannot drift apart because both shift `bigTownTileExtent(rings)` by the same `lo`.
 
-export const ROAD = 7,
+const ROAD = 7,
   WATER = 2
 const GRASS = 0
 
@@ -75,7 +75,7 @@ const GRASS = 0
  *  feature the grammar produces, and the thing a map that point-samples loses first. */
 const CHANNEL_X = 2
 
-export function bigTownSide(rings: number): number {
+function bigTownSide(rings: number): number {
   const e = bigTownTileExtent(rings)
   return e.x1 - e.x0 + 1
 }
@@ -96,12 +96,6 @@ export function bigTownTerrain(rings: number): number[][] {
   for (let y = s; y < s + BLOCK_SIDE; y++)
     for (let x = s; x < s + BLOCK_SIDE; x++) out[y]![x] = ROAD
   return out
-}
-
-/** `bigTown` in the same origin-shifted frame `bigTownTerrain` indexes. */
-export function bigTownPlaced(rings: number): FixtureStructure[] {
-  const lo = -rings * BLOCK_PITCH
-  return bigTown(rings).map((s) => ({ ...s, x: s.x - lo, y: s.y - lo }))
 }
 
 /** The tile box the ring grammar plats into at this ring count, streets included. */
