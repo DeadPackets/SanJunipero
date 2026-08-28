@@ -225,6 +225,19 @@ describe('two speakers standing together do not composite into one pile', () => 
     }
   })
 
+  // ★ The nameplate is a DOM label over the same camera. It cannot move — it is nailed under
+  // the figure — so the bubble is the one that has to step aside.
+  it('★ steps a bubble clear of the nameplate under the same figure', () => {
+    const view = { x: 0, y: 0, w: 900, h: 700 }
+    // the plate sits just under the head the bubble is asked to sit under
+    const plate = { x: 380, y: 24, w: 140, h: 20 }
+    const want = [{ id: 'a', sx: 450, sy: 30, size: { w: 180, h: 60 } }]
+    const [bare] = placeBubbles(want, view)
+    const [clear] = placeBubbles(want, view, [plate])
+    expect(overlaps(bare!.rect, plate), 'the fixture has to collide to prove anything').toBe(true)
+    expect(overlaps(clear!.rect, plate)).toBe(false)
+  })
+
   it('is deterministic — the same speakers place the same way twice', () => {
     const view = { x: 0, y: 0, w: 900, h: 700 }
     const want = [

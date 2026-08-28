@@ -100,12 +100,18 @@ export function anchorForSprite(
 /** Three things may want a label. Only one of each, and never a stale one. */
 type TagOwner = 'hover' | 'door' | 'selection'
 
+/** Who else is holding screen space a label must keep off. `plate` is DOM over the canvas,
+ *  so nothing on the canvas can see it without being told. */
+export type LabelOwner = 'bubbles' | 'plate'
+
 export type TooltipLayer = {
   show(owner: TagOwner, text: string, a: Anchor): void
   hide(owner: TagOwner): void
   hideAll(): void
-  /** boxes a label must not composite onto — speech bubbles register theirs here */
-  setOccupied(boxes: readonly Rect[]): void
+  /** ONE occupancy, keyed by who owns the boxes. Everybody writes theirs; everybody reads
+   *  everybody else's, so no two labels can composite. Boxes are in view coordinates. */
+  setOccupied(owner: LabelOwner, boxes: readonly Rect[]): void
+  occupied(except?: LabelOwner): Rect[]
   /** the live label boxes, in draw order. The layer's own bookkeeping, exposed because the
    *  next label placed has to avoid them. */
   boxes(): { owner: TagOwner; rect: Rect }[]
@@ -142,7 +148,9 @@ export function createTooltipLayer(
   zoom: () => number = () => 1,
 ): TooltipLayer {
   const tags = new Map<TagOwner, Tag>()
-  let occupied: readonly Rect[] = []
+  const occupied = new Map<LabelOwner, readonly Rect[]>()
+  const occupiedBoxes = (except?: LabelOwner): Rect[] =>
+    [...occupied].filter(([o]) => o !== except).flatMap(([, boxes]) => boxes)
 
   const tagFor = (owner: TagOwner): Tag => {
     let t = tags.get(owner)
@@ -185,7 +193,7 @@ export function createTooltipLayer(
       }
       // every OTHER live tag is something this one must not land on
       const taken = [
-        ...occupied,
+        ...occupiedBoxes(),
         ...[...tags]
           .filter(([o]) => o !== owner)
           .map(([, x]) => x.box)
@@ -208,9 +216,10 @@ export function createTooltipLayer(
         t.box = null
       }
     },
-    setOccupied(boxes) {
-      occupied = boxes
+    setOccupied(owner, boxes) {
+      occupied.set(owner, boxes)
     },
+    occupied: occupiedBoxes,
     boxes: () =>
       [...tags].filter(([, t]) => t.box !== null).map(([owner, t]) => ({ owner, rect: t.box! })),
     destroy() {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { PLATE_DROP_PX } from '../stage/Nameplate.js'
 
 // A union merge that drops one side's block is invisible to tsc and to every other test in the
 // suite: the remaining CSS still parses, and the surface it styled just stops being styled.
@@ -40,7 +41,10 @@ describe('★ chrome.css survives the merge trains intact', () => {
   // behind: the CSS still parses and the surface simply stops moving.
   it('names no animation the sheet has no keyframes for', () => {
     const declared = new Set([...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]!))
-    const used = [...CSS.matchAll(/animation:\s*([\w-]+)/g)].map((m) => m[1]!)
+    // `animation: none` is the reduced-motion switch-off, a keyword and not a name.
+    const used = [...CSS.matchAll(/animation:\s*([\w-]+)/g)]
+      .map((m) => m[1]!)
+      .filter((n) => n !== 'none')
     expect(used.filter((n) => !declared.has(n))).toEqual([])
     expect(used.length, 'the sheet animates nothing at all').toBeGreaterThan(0)
   })
@@ -131,6 +135,12 @@ describe('★ the signpost and the paper hold their own shape', () => {
       if (px === undefined || !/cursor:\s*pointer/.test(body ?? '')) continue
       expect(Number(px), `${(sel ?? '').trim()} { min-height: ${px}px }`).toBeGreaterThanOrEqual(40)
     }
+  })
+
+  // The plate's drop is written twice — once in the sheet, once in TS, because the placer that
+  // keeps a bubble off the plate reasons about its box and cannot read CSS.
+  it('★ keeps the plate drop in the sheet and in Nameplate.tsx the same number', () => {
+    expect(CSS).toContain(`translate: -50% ${PLATE_DROP_PX}px`)
   })
 
   it('leaves nothing of the bars the signpost replaced', () => {

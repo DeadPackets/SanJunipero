@@ -1,7 +1,7 @@
-export { screenAnchor, subjectPoint, useStageAnchor, useSubjectAnchor } from './anchor.js'
+export { joinStageLoop, screenAnchor, subjectPoint, useStageAnchor, useSubjectAnchor } from './anchor.js'
 export type { StageAnchor, Subject, WorldPoint } from './anchor.js'
 export { DirectorCue } from './DirectorCue.js'
-export { Nameplate } from './Nameplate.js'
+export { Nameplate, PLATE_DROP_PX } from './Nameplate.js'
 export { QuietStamp, STAMP_HOLD_MS, stampText, stampWord } from './QuietStamp.js'
 export type { StampWord } from './QuietStamp.js'
 export {

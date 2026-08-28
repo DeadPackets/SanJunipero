@@ -162,8 +162,9 @@ export function bubbleShown(zoom: number, isNearest: boolean): boolean {
 export function placeBubbles(
   want: readonly { id: string; sx: number; sy: number; size: { w: number; h: number } }[],
   view: Rect,
+  keepOff: readonly Rect[] = [],
 ): { id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }[] {
-  const taken: Rect[] = []
+  const taken: Rect[] = [...keepOff]
   const out: { id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }[] = []
   for (const b of want) {
     const at = placeTag(
@@ -385,7 +386,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         }
       })
       const boxes: Rect[] = []
-      for (const placed of placeBubbles(want, view)) {
+      for (const placed of placeBubbles(want, view, scene.tags.occupied('bubbles'))) {
         const b = bubbles[Number(placed.id)]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
@@ -396,7 +397,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         }
         boxes.push(placed.rect)
       }
-      scene.tags.setOccupied(boxes)
+      scene.tags.setOccupied('bubbles', boxes)
     },
     destroy: () => {
       for (const b of bubbles) b.node.destroy({ children: true })

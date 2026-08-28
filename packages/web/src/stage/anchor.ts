@@ -42,6 +42,29 @@ export function subjectPoint(
   return at === null ? null : { sx: at.x, sy: at.y }
 }
 
+// ONE loop for every stage mark. A private rAF per mark let a plate land on a frame the ring
+// beside it had not reached yet, and cost a scheduler slot per mounted mark.
+const steps = new Set<() => void>()
+let raf = 0
+
+/** Run `step` on the stage's own frame, until the returned function is called. */
+export function joinStageLoop(step: () => void): () => void {
+  steps.add(step)
+  if (raf === 0) {
+    const tick = (): void => {
+      raf = requestAnimationFrame(tick)
+      for (const s of steps) s()
+    }
+    raf = requestAnimationFrame(tick)
+  }
+  return () => {
+    steps.delete(step)
+    if (steps.size > 0) return
+    cancelAnimationFrame(raf)
+    raf = 0
+  }
+}
+
 /**
  * Puts a DOM mark over a world point, every frame, by writing the node's own style. A camera
  * moving at 60 fps through React state would re-render the whole overlay 60 times a second.
@@ -59,9 +82,7 @@ export function useStageAnchor(
   })
   useEffect(() => {
     if (idle) return
-    let raf = 0
-    const step = (): void => {
-      raf = requestAnimationFrame(step)
+    return joinStageLoop(() => {
       const node = el.current
       const at = latest.current === null ? null : latest.current()
       if (node === null) return
@@ -74,11 +95,7 @@ export function useStageAnchor(
       last.current = { x: a.x, y: a.y, shown: a.onScreen }
       node.style.visibility = a.onScreen ? 'visible' : 'hidden'
       node.style.transform = `translate(${a.x}px, ${a.y}px)`
-    }
-    raf = requestAnimationFrame(step)
-    return () => {
-      cancelAnimationFrame(raf)
-    }
+    })
   }, [scene, idle])
   return el
 }

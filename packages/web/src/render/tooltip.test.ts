@@ -234,9 +234,21 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
   it('keeps a tag off a speech bubble that has registered its box', () => {
     const l = createTooltipLayer(layers() as never, view)
     const bare = placeTag(anchor(400, 300), { w: 14 * 7 + 10, h: 18 }, VIEW)
-    l.setOccupied([{ x: bare.sx - 60, y: bare.sy - 4, w: 120, h: 26 }])
+    l.setOccupied('bubbles', [{ x: bare.sx - 60, y: bare.sy - 4, w: 120, h: 26 }])
     l.show('hover', 'the storehouse', anchor(400, 300))
     const [box] = l.boxes().map((b) => b.rect)
     expect(box!.y + box!.h).toBeLessThanOrEqual(bare.sy - 4)
+  })
+
+  // ★ The nameplate is DOM over the canvas: nothing drawn IN the canvas can see it, so a
+  // bubble pushed below a figure used to land under the plate that names them.
+  it('★ hands every owner but the asker back, so a bubble can keep off the plate', () => {
+    const l = createTooltipLayer(layers() as never, view)
+    const plate = { x: 10, y: 20, w: 60, h: 20 }
+    const bubble = { x: 200, y: 40, w: 90, h: 30 }
+    l.setOccupied('plate', [plate])
+    l.setOccupied('bubbles', [bubble])
+    expect(l.occupied('bubbles')).toEqual([plate])
+    expect(l.occupied()).toEqual(expect.arrayContaining([plate, bubble]))
   })
 })
