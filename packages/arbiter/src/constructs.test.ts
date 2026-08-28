@@ -7,10 +7,10 @@ import {
   stateHash,
   type SimEvent,
   CONSTRUCT_VOCABULARY,
+  CONSTRUCT_TYPES,
   scanPromptForGlassLeak,
 } from '@sj/shared'
 import {
-  CONSTRUCT_TYPES,
   ConstructSchema,
   CONSTRUCT_TYPE_INSTRUCTION,
   detectCandidates,

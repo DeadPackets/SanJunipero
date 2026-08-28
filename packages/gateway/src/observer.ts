@@ -8,6 +8,7 @@ export function ensureObserverTables(db: Database.Database): void {
       tick INTEGER NOT NULL, agent_id TEXT NOT NULL, text TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_observer_thoughts_id ON observer_thoughts(id);
+    CREATE INDEX IF NOT EXISTS idx_observer_thoughts_tick ON observer_thoughts(tick);
   `)
 }
 

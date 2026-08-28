@@ -1,12 +1,10 @@
+import { CONSTRUCT_TYPES } from './constructSchema.js'
+
 // One-way glass, mechanically: the ops plane's own words for what it names — construct types,
 // milestone kinds, tier labels — may never reach a mind.
 
 // Every word the ops plane uses for a THING IT NAMES; only the taxonomy is banned, never a word
 // for a thing in the world. Authored surfaces get the whole list; mid-run only `MID_RUN_ENFORCED`.
-
-// The concepts the experiment watches a town reach on its own. Each is also an ordinary English
-// noun, so a mind may hear one from another mouth — but no authored surface may hand one over.
-const CONSTRUCT_TYPE_WORDS: readonly string[] = ['festival', 'faith', 'council', 'market', 'custom']
 
 // Our jargon for the machinery, not concepts a town invents; all three are ordinary English too.
 const OPS_JARGON_WORDS: readonly string[] = [
@@ -30,8 +28,11 @@ const OPS_KEYS: readonly string[] = [
   'semantic firsts',
 ]
 
+// The construct types are concepts the experiment watches a town reach on its own. Each is also
+// an ordinary English noun, so a mind may hear one from another mouth — but no authored surface
+// may hand one over.
 export const CONSTRUCT_VOCABULARY: readonly string[] = [
-  ...CONSTRUCT_TYPE_WORDS,
+  ...CONSTRUCT_TYPES,
   ...OPS_JARGON_WORDS,
   ...OPS_KEYS,
 ]

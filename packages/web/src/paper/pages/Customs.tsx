@@ -1,28 +1,24 @@
 import { useSyncExternalStore } from 'react'
-import { UNNAMED_CONSTRUCT_COPY } from '@sj/shared'
+import {
+  ConstructsResponseSchema,
+  UNNAMED_CONSTRUCT_COPY,
+  type ConstructKind,
+  type ConstructRecord,
+} from '@sj/shared'
 import { usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './index.js'
 
-type Custom = {
-  id: string
-  type: string
-  name: string | null
-  members: string[]
-  firstDay: number
-  gatherings: number
-  quote: string | null
-  saidBy: string | null
+const NO_CUSTOMS: ConstructRecord[] = []
+const customs = (body: unknown): ConstructRecord[] | null => {
+  const parsed = ConstructsResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data : null
 }
-
-const NO_CUSTOMS: Custom[] = []
-const customs = (body: unknown): Custom[] | null =>
-  Array.isArray(body) ? (body as Custom[]) : null
 
 /** The recognizer runs once a sim-day, which is once a real hour. */
 const CUSTOMS_REFETCH_MS = 60_000
 
 /** What each kind is, in the observer's voice. Never the id, which is ours. */
-const KIND_LINE: Readonly<Record<string, string>> = {
+const KIND_LINE: Readonly<Record<ConstructKind, string>> = {
   festival: 'Something they celebrate.',
   faith: 'Something they hold sacred.',
   council: 'Somewhere they settle things.',
@@ -58,7 +54,7 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
           <ul className="family-children">
             <li>
               <span className="stamp">Day {c.firstDay}</span>
-              {KIND_LINE[c.type] ?? KIND_LINE.custom}
+              {KIND_LINE[c.type]}
             </li>
             <li>
               <span className="stamp">×{c.gatherings}</span>

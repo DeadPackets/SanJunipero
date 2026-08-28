@@ -18,11 +18,11 @@ import {
   type SimEvent,
   scanPromptForGlassLeak,
   UNNAMED_CONSTRUCT_COPY,
+  CONSTRUCT_TYPES,
 } from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import {
-  CONSTRUCT_TYPES,
   CONSTRUCT_TYPE_INSTRUCTION,
   ConstructSchema,
   detectCandidates,

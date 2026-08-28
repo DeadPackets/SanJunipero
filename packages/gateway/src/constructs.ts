@@ -1,6 +1,13 @@
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import {
+  ARBITER_DB_FILE,
+  ConstructRowSchema,
+  ConstructsResponseSchema,
+  MINUTES_PER_DAY,
+  type ConstructRecord,
+  type ConstructRow,
+} from '@sj/shared'
 import type { Router } from './server.js'
 import { sendJson } from './http.js'
 import { reportOnce } from './degraded.js'
@@ -9,42 +16,12 @@ import { reportOnce } from './degraded.js'
 // created, and typed-empty until the arbiter has written a day. Plain SELECTs rather than
 // @sj/arbiter, which drags the mind stack onto the scripted path.
 
-/** The recognizer's own file, beside the minds. Must match `LIVE_ARBITER_DB` in @sj/live —
- *  the gateway may not import the live half. */
-const ARBITER_DB = '_arbiter.db'
-
-type ConstructRow = {
-  id: string
-  type: string
-  /** The town's own word for it, quoted from a mouth, or null while it has none. */
-  name: string | null
-  members: string[]
-  firstDay: number
-  /** Times they came back to it, the first gathering included. */
-  gatherings: number
-  anchor: { x: number; y: number } | null
-  /** The whole utterance the name was taken from, and whose mouth it came out of. */
-  quote: string | null
-  saidBy: string | null
-}
-
-type RawRow = {
-  id: string
-  type: string
-  name: string | null
-  name_provenance: string | null
-  anchor: string | null
-  participants: string
-  first_tick: number
-  recurrences: string
-}
-
 const parse = <T>(json: string | null, fallback: T): T =>
   json === null ? fallback : (JSON.parse(json) as T)
 
-function toRow(r: RawRow): ConstructRow {
+function toRecord(r: ConstructRow): ConstructRecord {
   const provenance = parse<{ quote: string; byId: string } | null>(r.name_provenance, null)
-  const anchor = parse<ConstructRow['anchor'] | string>(r.anchor, null)
+  const anchor = parse<ConstructRecord['anchor'] | string>(r.anchor, null)
   return {
     id: r.id,
     type: r.type,
@@ -61,14 +38,17 @@ function toRow(r: RawRow): ConstructRow {
 export function mountConstructsApi(
   router: Router,
   deps: { agentDbDir?: string | undefined },
-): void {
+): () => void {
   // Opened on the first request that finds it rather than at boot: the arbiter creates the file
   // on the first night, which is an hour after the gateway starts serving.
   let db: Database.Database | null = null
   const open = (): Database.Database | null => {
     if (db !== null || deps.agentDbDir === undefined) return db
     try {
-      db = new Database(join(deps.agentDbDir, ARBITER_DB), { readonly: true, fileMustExist: true })
+      db = new Database(join(deps.agentDbDir, ARBITER_DB_FILE), {
+        readonly: true,
+        fileMustExist: true,
+      })
     } catch {
       db = null // a scripted town, or one whose first day is still unrecognized
     }
@@ -82,12 +62,10 @@ export function mountConstructsApi(
       return
     }
     try {
-      sendJson(
-        res,
-        (arbiter.prepare('SELECT * FROM constructs ORDER BY first_tick, id').all() as RawRow[]).map(
-          toRow,
-        ),
+      const rows = ConstructRowSchema.array().parse(
+        arbiter.prepare('SELECT * FROM constructs ORDER BY first_tick, id').all(),
       )
+      sendJson(res, ConstructsResponseSchema.parse(rows.map(toRecord)))
     } catch (e) {
       reportOnce(
         'arbiter.constructs',
@@ -98,4 +76,9 @@ export function mountConstructsApi(
       sendJson(res, [])
     }
   })
+
+  return () => {
+    db?.close()
+    db = null
+  }
 }
