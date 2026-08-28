@@ -8,11 +8,21 @@ const MAX_BODY_BYTES = 4096
 
 const LawRequest = z.object({ path: z.string().min(1), value: z.unknown() })
 
+/** One route on the operator's channel. A `:name` segment is handed to the handler as a param;
+ *  the bearer and the interface are already checked by the time it runs. */
+export type AdminRoute = {
+  method: string
+  path: string
+  handle: (req: IncomingMessage, res: ServerResponse, params: Record<string, string>) => void
+}
+
 export type LawsAdminOpts = {
   // Injected: this listener never touches the engine, it only hands a change on.
   submitLaw: (path: string, value: unknown) => void
   token: string
   host?: string
+  /** Everything else the operator may do. `adminOps.ts` is one; a lane adds its own here. */
+  routes?: readonly AdminRoute[]
 }
 
 function send(res: ServerResponse, status: number, body: Record<string, unknown>): void {
@@ -20,7 +30,7 @@ function send(res: ServerResponse, status: number, body: Record<string, unknown>
   res.end(JSON.stringify(body))
 }
 
-function readBody(req: IncomingMessage): Promise<string | null> {
+export function readBody(req: IncomingMessage): Promise<string | null> {
   return new Promise((resolve) => {
     let text = ''
     let over = false
@@ -37,6 +47,19 @@ function readBody(req: IncomingMessage): Promise<string | null> {
   })
 }
 
+function match(route: AdminRoute, pathname: string): { params: Record<string, string> } | null {
+  const want = route.path.split('/').filter(Boolean)
+  const got = pathname.split('/').filter(Boolean)
+  if (want.length !== got.length) return null
+  const params: Record<string, string> = {}
+  for (let i = 0; i < want.length; i++) {
+    const seg = want[i]!
+    if (seg.startsWith(':')) params[seg.slice(1)] = got[i]!
+    else if (seg !== got[i]) return null
+  }
+  return { params }
+}
+
 // The admin channel is a separate server on a separate port from the read-only
 // viewer socket, so no viewer connection can ever reach a write path.
 export function createLawsAdmin(opts: LawsAdminOpts): Server {
@@ -48,14 +71,52 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
     host !== '::' &&
     (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
 
+  const laws: AdminRoute = {
+    method: 'POST',
+    path: ADMIN_LAWS_PATH,
+    handle: (req, res) => {
+      void readBody(req).then((text) => {
+        if (text === null) {
+          send(res, 400, { error: 'body unreadable' })
+          return
+        }
+        let parsed: z.infer<typeof LawRequest>
+        try {
+          parsed = LawRequest.parse(JSON.parse(text))
+        } catch {
+          send(res, 400, { error: 'expected {path, value}' })
+          return
+        }
+        const schema = TOGGLABLE_PATHS[parsed.path]
+        if (schema === undefined) {
+          send(res, 400, { error: `${parsed.path} is not a world law` })
+          return
+        }
+        // The fold THROWS on a value its schema rejects, so a cheerful 202 here
+        // would take the world down at the next tick boundary. Refuse it now.
+        const value = schema.safeParse(parsed.value)
+        if (!value.success) {
+          send(res, 400, { error: `value rejected for ${parsed.path}` })
+          return
+        }
+
+        opts.submitLaw(parsed.path, value.data)
+        send(res, 202, { accepted: parsed.path, value: value.data })
+      })
+    },
+  }
+  const routes: readonly AdminRoute[] = [laws, ...(opts.routes ?? [])]
+
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    if (url.pathname !== ADMIN_LAWS_PATH) {
+    const here = routes.filter((r) => match(r, url.pathname) !== null)
+    if (here.length === 0) {
       send(res, 404, { error: 'not found' })
       return
     }
-    if (req.method !== 'POST') {
-      send(res, 405, { error: 'POST only' })
+    const route = here.find((r) => r.method === (req.method ?? 'GET'))
+    if (route === undefined) {
+      send(res, 405, { error: `${here.map((r) => r.method).join('/')} only` })
       return
     }
     if (req.headers.authorization !== `Bearer ${opts.token}`) {
@@ -66,34 +127,6 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
       send(res, 403, { error: `the law channel answers on ${host} only` })
       return
     }
-
-    void readBody(req).then((text) => {
-      if (text === null) {
-        send(res, 400, { error: 'body unreadable' })
-        return
-      }
-      let parsed: z.infer<typeof LawRequest>
-      try {
-        parsed = LawRequest.parse(JSON.parse(text))
-      } catch {
-        send(res, 400, { error: 'expected {path, value}' })
-        return
-      }
-      const schema = TOGGLABLE_PATHS[parsed.path]
-      if (schema === undefined) {
-        send(res, 400, { error: `${parsed.path} is not a world law` })
-        return
-      }
-      // The fold THROWS on a value its schema rejects, so a cheerful 202 here
-      // would take the world down at the next tick boundary. Refuse it now.
-      const value = schema.safeParse(parsed.value)
-      if (!value.success) {
-        send(res, 400, { error: `value rejected for ${parsed.path}` })
-        return
-      }
-
-      opts.submitLaw(parsed.path, value.data)
-      send(res, 202, { accepted: parsed.path, value: value.data })
-    })
+    route.handle(req, res, match(route, url.pathname)!.params)
   })
 }

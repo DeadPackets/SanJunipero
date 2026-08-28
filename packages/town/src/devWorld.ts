@@ -21,6 +21,7 @@ import {
   publishThought,
   type Gateway,
   type LiveCast,
+  type LiveOps,
 } from '@sj/gateway'
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
@@ -84,6 +85,8 @@ export type DevWorld = {
   /** True when a live cast is driving the bodies. `false` is the scripted puppets, and the
    *  distinction is the whole seam — a caller that cannot read it cannot tell the two apart. */
   live: boolean
+  /** The live cast's ledger and ruling queue, for the operator's channel; `null` when scripted. */
+  ops: LiveOps | null
   /** ONE WHOLE TICK the way the wall clock takes it: the loop step AND the observer scan that
    *  follows it. `loop.step()` is most of a tick and not all of it. */
   tick(): void
@@ -343,6 +346,7 @@ export async function startDevWorld(
       terrain,
       config,
       db,
+      paused: () => loop.paused,
       ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
       ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
       ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
@@ -383,7 +387,14 @@ export async function startDevWorld(
     console.log(`dev world: fast-forwarded to tick ${loop.state.tick}`)
   }
 
-  const timer = setInterval(tickOnce, opts.realMsPerTick ?? DEV_MS_PER_TICK)
+  // A self-arming beat, not an interval: `loop.speed` is the operator's dial (POST /admin/speed)
+  // and an interval already armed cannot be re-timed.
+  const beatMs = opts.realMsPerTick ?? DEV_MS_PER_TICK
+  const beat = (): void => {
+    tickOnce()
+    timer = setTimeout(beat, beatMs / loop.speed)
+  }
+  let timer = setTimeout(beat, beatMs)
 
   return {
     gateway,
@@ -391,12 +402,13 @@ export async function startDevWorld(
     terrain,
     resumedAtTick: resumed ? resumed.state.tick : null,
     live: cast !== null,
+    ops: cast?.ops ?? null,
     tick: tickOnce,
     submitLaw: (path, value) => {
       applyLaw(lawQueue, path, value)
     },
     stop: async () => {
-      clearInterval(timer)
+      clearTimeout(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a
       // mind that never returns, and a reflection half-written is a night paid for twice.
       await cast?.stop()

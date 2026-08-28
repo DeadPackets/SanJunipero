@@ -10,15 +10,16 @@
 //   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
 //   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
 //   SJ_MAX_MINDS=15 …           how many minds the town may hold; a birth past it gets no mind
-//   SJ_ADMIN_TOKEN=… …          open the loopback law channel (POST /admin/laws) behind a bearer
+//   SJ_ADMIN_TOKEN=… …          open the loopback operator channel (/admin/*) behind a bearer
+//   SJ_GIT_SHA=… …              stamped into /admin/export's manifest, so a replay knows the code
 //
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { createLawsAdmin, type LiveCast } from '@sj/gateway'
-import { startDevWorld } from './devWorld.js'
+import { adminOpsRoutes, createLawsAdmin, type LiveCast } from '@sj/gateway'
+import { DEV_DB_PATH, SHOWCASE_CONFIG, startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
 export const STREAM_PORT = 8080
@@ -149,11 +150,21 @@ export async function main(): Promise<void> {
   const admin =
     adminToken === undefined || adminToken === ''
       ? null
-      : createLawsAdmin({ submitLaw: running.submitLaw, token: adminToken })
+      : createLawsAdmin({
+          submitLaw: running.submitLaw,
+          token: adminToken,
+          routes: adminOpsRoutes({
+            clock: running.loop,
+            ops: () => running.ops,
+            worldDbPath: DEV_DB_PATH,
+            mindsDir,
+            config: SHOWCASE_CONFIG,
+          }),
+        })
   if (admin !== null) {
     const adminPort = intEnv('SJ_ADMIN_PORT', STREAM_ADMIN_PORT, 1)
     admin.listen(adminPort, '127.0.0.1', () => {
-      console.log(`stream: the law channel is open on http://127.0.0.1:${adminPort}/admin/laws`)
+      console.log(`stream: the operator's channel is open on http://127.0.0.1:${adminPort}/admin/`)
     })
   } else {
     console.log('stream: no law channel — SJ_ADMIN_TOKEN opens one on loopback')

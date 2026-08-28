@@ -36,6 +36,7 @@ import {
 import {
   CodexStore,
   GENESIS_CODEX,
+  ReviewStore,
   makeArbiter,
   openArbiterDb,
   type Codified,
@@ -43,7 +44,7 @@ import {
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import { NarratorStore, closeDay, makeNarratorLlm, openNarratorDb } from '@sj/narrator'
-import { publishThought, type LiveCast } from '@sj/gateway'
+import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
 import { createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
@@ -408,7 +409,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     bridge?.drain('the moment passes')
   }
 
+  // The operator's read of this run: the ledger the caps are enforced against and the queue of
+  // rulings awaiting a person. Nothing here is ever rendered into a prompt.
+  const ops: LiveOps = {
+    opsDb,
+    caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
+    rulings: arbiterDb === null ? null : new ReviewStore(arbiterDb),
+  }
+
   return {
+    ops,
     attach({ loop, store, config, db, world }): TickHandler {
       const worldTick = loop.state.tick
       const cast = resolveCast(founders, store, maxMinds)
