@@ -35,6 +35,7 @@ export type GatewayOpts = {
   narratorDbPath?: string // C7's narrator.db; absent or unwritten → typed empties
   staticDir?: string // built @sj/web; absent → API/socket only (the dev split)
   maxViewers?: number // default DEFAULT_MAX_VIEWERS
+  paused?: () => boolean // the world clock's own state; absent → the town is always running
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
@@ -193,6 +194,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }).slice(0, -1)
     return `${busyHead},"reqId":${reqId}}`
   }
+  const isPaused = opts.paused ?? ((): boolean => false)
+  let wasPaused = isPaused()
   const snapshotJson = (): string => {
     snapJson ??= JSON.stringify({
       t: 'snapshot',
@@ -202,6 +205,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       config,
       laws: mirror.state().laws ?? {},
       live: true,
+      paused: isPaused(),
     })
     return snapJson
   }
@@ -345,6 +349,14 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let lastAssetSeq = 0
   let observerSeen = false
   const pump = (): void => {
+    // A stopped clock sends no deltas, so the one thing a viewer cannot see by waiting is that
+    // it has stopped. Its own frame: re-broadcasting the snapshot would yank a scrubbing viewer
+    // back to the live edge.
+    if (isPaused() !== wasPaused) {
+      wasPaused = isPaused()
+      snapJson = null
+      hub.broadcast(JSON.stringify({ t: 'paused', paused: wasPaused }))
+    }
     const groups = mirror.poll()
     if (groups.length > 0) {
       snapJson = null

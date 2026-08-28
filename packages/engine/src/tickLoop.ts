@@ -19,6 +19,7 @@ export class TickLoop {
   #snapEvery: number
   #onTick: TickHandler
   #timer: NodeJS.Timeout | null = null
+  #paused = false
   #nextAt = 0
   #config: SimConfig
   #onError: ((err: unknown) => void) | undefined
@@ -53,8 +54,33 @@ export class TickLoop {
   get tick(): number {
     return this.#tick
   }
+  get paused(): boolean {
+    return this.#paused
+  }
+  get speed(): number {
+    return this.#speed
+  }
+
+  /** The world clock stops. Nothing else does: the store, the socket and the viewer keep going,
+   *  and a paused world is the same world one tick later. */
+  pause(): void {
+    this.#paused = true
+  }
+  resume(): void {
+    this.#paused = false
+  }
+  /** Ticks per unit of real time, as a multiplier on `realMsPerTick`. A cadence the loop does
+   *  not own reads `speed` itself; the loop's own timer is re-armed here. */
+  setSpeed(speed: number): void {
+    this.#speed = speed
+    if (this.#timer !== null) {
+      this.stop()
+      this.start()
+    }
+  }
 
   step(): void {
+    if (this.#paused) return
     const prevTick = this.#tick
     const prevState = this.#state
     const prevRng = this.#rng.snapshot()

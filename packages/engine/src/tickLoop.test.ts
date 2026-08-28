@@ -181,3 +181,44 @@ describe('TickLoop', () => {
     expect(stateHash(replayFromGenesis(store, custom))).toBe(stateHash(l.state))
   })
 })
+
+describe('the operator stops the clock', () => {
+  it('a paused loop advances no tick, writes no event, and resumes where it stopped', () => {
+    const { store, loop: l } = loop(({ tick, emit }) => {
+      if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+    })
+    l.step()
+    const atPause = { tick: l.tick, seq: store.lastSeq(), hash: stateHash(l.state) }
+
+    l.pause()
+    expect(l.paused).toBe(true)
+    for (let i = 0; i < 5; i++) l.step()
+    expect(l.tick).toBe(atPause.tick)
+    expect(store.lastSeq()).toBe(atPause.seq)
+    expect(stateHash(l.state)).toBe(atPause.hash)
+
+    l.resume()
+    l.step()
+    expect(l.paused).toBe(false)
+    expect(l.tick).toBe(atPause.tick + 1)
+  })
+
+  it('the real-time cadence stops with it, and speed re-times the timer', () => {
+    vi.useFakeTimers()
+    try {
+      const { loop: l } = loop(() => {})
+      l.setSpeed(2)
+      expect(l.speed).toBe(2)
+      l.start()
+      vi.advanceTimersByTime(5000)
+      const ran = l.tick
+      expect(ran).toBeGreaterThan(0)
+      l.pause()
+      vi.advanceTimersByTime(60_000)
+      expect(l.tick, 'a paused world must not move on the wall clock either').toBe(ran)
+      l.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

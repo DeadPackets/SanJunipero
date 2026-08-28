@@ -29,6 +29,9 @@ export const ServerSnapshot = z
     config: z.unknown(),
     laws: z.record(z.string(), z.unknown()),
     live: z.boolean(),
+    /** The operator has stopped the world clock. Optional: a stream with no admin channel
+     *  never says it, and a viewer that is never told reads the town as running. */
+    paused: z.boolean().optional(),
   })
   .strict()
 // config = the sim's SimConfig: the client folds deltas with the SAME config as the engine, or live view drifts from truth
@@ -60,8 +63,12 @@ export const ServerThought = z
 export const ServerAssets = z
   .object({ t: z.literal('assets'), records: z.array(AssetRecordSchema) })
   .strict()
+// The one frame the world sends while its clock is stopped, so a viewer is never told a time
+// the town is not keeping.
+export const ServerPaused = z.object({ t: z.literal('paused'), paused: z.boolean() }).strict()
 export const ServerMsg = z.discriminatedUnion('t', [
   ServerSnapshot,
+  ServerPaused,
   ServerTick,
   ServerScrubbed,
   ServerThought,
