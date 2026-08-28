@@ -50,7 +50,8 @@ function specFor(id: string, sex: 'f' | 'm'): MindSpec {
 }
 
 // Answers the mother's naming call and nothing else; every other caller gets an idle turn.
-function scriptedModel(): MockLanguageModelV4 {
+// `refuseNaming` makes her answer with nothing, which is a call that happened and cost money.
+function scriptedModel(refuseNaming: boolean, namingCalls: { n: number }): MockLanguageModelV4 {
   return new MockLanguageModelV4({
     doGenerate: async (options) => {
       const parts = options.prompt as { role: string; content: unknown }[]
@@ -62,11 +63,13 @@ function scriptedModel(): MockLanguageModelV4 {
         )
         .join('\n')
         .includes('what do you call')
+      if (asked) namingCalls.n += 1
+      const named = refuseNaming ? { name: '' } : { name: SOCIAL_NAME }
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(asked ? { name: SOCIAL_NAME } : IDLE_TURN),
+            text: JSON.stringify(asked ? named : IDLE_TURN),
           },
         ],
         finishReason: { unified: 'stop' as const, raw: undefined },
@@ -83,7 +86,12 @@ afterEach(() => {
 })
 
 async function town(
-  opts: { namingBudgetUsd?: number; startTick?: number; maxMinds?: number } = {},
+  opts: {
+    namingBudgetUsd?: number
+    startTick?: number
+    maxMinds?: number
+    refuseNaming?: boolean
+  } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'sj-births-'))
   dirs.push(dir)
@@ -130,7 +138,8 @@ async function town(
     }
     return db
   }
-  const model = scriptedModel()
+  const namingCalls = { n: 0 }
+  const model = scriptedModel(opts.refuseNaming ?? false, namingCalls)
   // A budget the run can lift: a name lost to a spent budget is asked for again on a later boot.
   let namingBudgetUsd = opts.namingBudgetUsd
   const makeClient = (caller: string, agentId?: string): LlmClient =>
@@ -174,7 +183,6 @@ async function town(
       opsDb,
       embedder,
       namingLlm: makeClient('naming'),
-      homeOf: () => '',
       boot: (spec) => {
         booted.add(spec)
       },
@@ -187,7 +195,6 @@ async function town(
       embedder,
       opsDb,
       namingLlm: makeClient('naming'),
-      homeOf: () => '',
       maxMinds,
     })
     return {
@@ -206,6 +213,7 @@ async function town(
     get booted() {
       return running.booted
     },
+    namingCalls,
     opsDb,
     dbFor,
     crash: (on: boolean) => {
@@ -325,6 +333,20 @@ describe('★ a born mind survives a restart', () => {
 
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual(seeded)
+    t.stop()
+  })
+
+  it('★ a mother who answers with nothing is never asked twice, however often the town reboots', async () => {
+    const t = await town({ refuseNaming: true })
+    t.bear()
+    await t.settle(() => t.namingCalls.n > 0)
+    expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: '' }])
+
+    await t.reboot()
+    await t.reboot()
+
+    expect(t.namingCalls.n).toBe(1)
+    expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: '' }])
     t.stop()
   })
 
