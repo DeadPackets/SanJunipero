@@ -1596,3 +1596,98 @@ body {
 /* A stream has no operator: navigation a viewer can neither press nor read leaves the frame
    rather than shrinking inside it, exactly as the control bar and the dock do. */
 [data-broadcast='on'] .minimap { display: none; }
+
+/* ══ ★ STAGE MARKS ═════════════════════════════════════════════════════════════════════════
+   Every mark on the town is a THING OF THE TOWN: a plate nailed under a figure, a rope ring
+   round whoever you asked, a date chiselled in the corner, a caption at the foot of the shot.
+   No panels, no cards. The stage element these sit in owns `position: relative`; the anchored
+   marks are written by `stage/anchor.ts` on rAF, which owns `transform` — so every mark's own
+   offset uses the separate `translate` property and the two compose. */
+
+/* Read on demand, never drawn: the aria-live line that speaks every utterance. */
+.stage-sr {
+  position: absolute; width: 1px; height: 1px; margin: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ── the nameplate: a brown plate, nailed under the feet ── */
+.stage-plate {
+  position: absolute; left: 0; top: 0;
+  translate: -50% 4px;
+  pointer-events: none;
+  font-family: var(--font-px); font-size: 12px; line-height: 16px;
+  letter-spacing: 0.04em; white-space: nowrap;
+  color: var(--cream);
+  background: #7E512B;
+  padding: 2px 7px;
+  box-shadow: inset 0 -2px 0 0 #5D3F20;
+  opacity: 0;
+  animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
+}
+.stage-plate.selected { background: var(--honey); color: var(--deep); box-shadow: inset 0 -2px 0 0 #B8873A; }
+@keyframes stage-plate-in { to { opacity: 1; } }
+
+/* ── the subject ring: four things to ask, standing round the person you asked ── */
+.stage-ring {
+  position: absolute; left: 0; top: 0;
+  /* centred on the figure's middle, not its feet — the anchor is where a body stands */
+  translate: -50% calc(-50% - 26px);
+}
+.stage-ring-arms {
+  position: relative; width: 124px; height: 124px;
+  border: 1px dashed rgba(255, 246, 233, 0.75); border-radius: 50%;
+  animation: stage-ring-pop var(--t-move) var(--ease-enter);
+}
+@keyframes stage-ring-pop {
+  from { scale: 0.85; opacity: 0; }
+}
+.stage-ring-arms button {
+  position: absolute; translate: -50% -50%;
+  font: inherit; font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
+  min-height: 40px; padding: 0 14px;
+  color: var(--cream); background: var(--deep);
+  border: 0; border-radius: 20px;
+  cursor: pointer;
+}
+.stage-ring-arms button:hover { background: var(--honey); color: var(--deep); }
+.stage-ring-arms button:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+.stage-ring-arms button:active { scale: 0.96; }
+.stage-ring-arms button:nth-child(1) { left: 50%; top: 0; }
+.stage-ring-arms button:nth-child(2) { left: 100%; top: 50%; }
+.stage-ring-arms button:nth-child(3) { left: 50%; top: 100%; }
+.stage-ring-arms button:nth-child(4) { left: 0; top: 50%; }
+
+/* ── the quiet stamp: the date, chiselled top-right, only while somebody is asking ── */
+.stage-stamp {
+  position: absolute; top: 3%; right: 3%;
+  pointer-events: none;
+  font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
+  color: var(--cream);
+  text-shadow:
+    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
+    0 2px 4px rgba(36, 31, 43, 0.8);
+  opacity: 0;
+}
+.stage-stamp.shown { opacity: 0.92; }
+
+/* ── the director's cue: the caption under the shot ── */
+.stage-cue {
+  position: absolute; left: 50%; bottom: 4%; translate: -50% 0; margin: 0;
+  pointer-events: none;
+  font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--cream);
+  text-shadow:
+    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
+    0 2px 4px rgba(36, 31, 43, 0.8);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stage-stamp { transition: opacity var(--t-slow) var(--ease-enter); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-plate { opacity: 1; animation: none; }
+  .stage-ring-arms { animation: none; }
+  .stage-ring-arms button:active { scale: 1; }
+}

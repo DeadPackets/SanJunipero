@@ -75,7 +75,8 @@ describe('a bubble stops at two lines and says so', () => {
   it('never lets the ellipsis push a line past the wrap width', () => {
     const long = 'aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll'
     for (const width of [10, 16, 24, WRAP_CHARS]) {
-      for (const l of wrapBubble(long, width)) expect(l.length, `${width}`).toBeLessThanOrEqual(width)
+      for (const l of wrapBubble(long, width))
+        expect(l.length, `${width}`).toBeLessThanOrEqual(width)
     }
   })
 

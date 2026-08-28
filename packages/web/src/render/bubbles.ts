@@ -127,10 +127,11 @@ export function dominantColor(rgba: ArrayLike<number>): number | null {
       at.n++
     }
   }
-  let best: { r: number; g: number; b: number; n: number } | null = null
-  for (const v of buckets.values()) if (best === null || v.n > best.n) best = v
-  if (best === null) return null
-  const avg = (sum: number): number => Math.round(sum / best!.n) & 0xff
+  let top: { r: number; g: number; b: number; n: number } | null = null
+  for (const v of buckets.values()) if (top === null || v.n > top.n) top = v
+  if (top === null) return null
+  const best = top
+  const avg = (sum: number): number => Math.round(sum / best.n) & 0xff
   return (avg(best.r) << 16) | (avg(best.g) << 8) | avg(best.b)
 }
 
@@ -208,7 +209,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   const tints = new Map<string, number | null>()
   const speakerFill = (agentId: string): number => {
     const known = tints.get(agentId)
-    if (known !== undefined) return known === null ? SPEECH_FILL : known
+    if (known !== undefined) return known ?? SPEECH_FILL
     tints.set(agentId, null)
     const art = characterArt(store.assetRecords(), agentId)
     void Assets.load<Texture>(art.url)
