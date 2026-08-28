@@ -10,7 +10,7 @@ export type AgentBornPayload = z.infer<typeof AgentBorn>
 export function watchBirths(
   bridge: EngineBridge,
   store: EventStore,
-  spawn: (born: AgentBornPayload) => void,
+  spawn: (born: AgentBornPayload, seq: number) => void,
 ): () => void {
   let seq = store.lastSeq()
   let stopped = false
@@ -19,7 +19,7 @@ export function watchBirths(
     const fresh = store.readTypeFrom(seq, 'agent_born')
     // Past the last birth SEEN, not the last event written: a later birth still has a higher seq.
     seq = fresh.at(-1)?.seq ?? seq
-    for (const ev of fresh) spawn(AgentBorn.parse(ev.payload))
+    for (const ev of fresh) spawn(AgentBorn.parse(ev.payload), ev.seq)
   })
   return () => {
     stopped = true
