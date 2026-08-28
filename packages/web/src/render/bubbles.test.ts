@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUBBLE_FONT_PX,
+  BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
+  BUBBLE_NEAREST,
+  ELLIPSIS,
+  GLYPH_ZOOM,
+  SPEAKER_TINT,
   SPEECH_MAX_CHARS,
   SPEECH_MS_BASE,
   SPEECH_MS_PER_CHAR,
   WRAP_CHARS,
   bubbleLife,
+  bubbleShown,
+  dominantColor,
+  nearestSpeakers,
   placeBubbles,
+  tintToward,
   wrapBubble,
 } from './bubbles.js'
-import { SCALLOP_COUNT, faceFor, scallopTrail, wrapCharsFor } from './textFaces.js'
+import { SPEECH_FILL, faceFor, wrapCharsFor } from './textFaces.js'
+import { ZOOM_STOPS } from './camera.js'
 import type { Rect } from './tooltip.js'
 
 describe('bubbleLife', () => {
@@ -24,8 +34,8 @@ describe('bubbleLife', () => {
 
 describe('wrapBubble', () => {
   it('breaks on word boundaries at 24 chars', () => {
-    const lines = wrapBubble('the fish are biting well this morning by the river', 24)
-    expect(lines).toEqual(['the fish are biting well', 'this morning by the', 'river'])
+    const lines = wrapBubble('the fish are biting well this morning', 24)
+    expect(lines).toEqual(['the fish are biting well', 'this morning'])
     for (const l of lines) expect(l.length).toBeLessThanOrEqual(24)
   })
   it('never emits an empty line', () => {
@@ -36,7 +46,7 @@ describe('wrapBubble', () => {
   it('hard-splits a single overlong word rather than overflowing', () => {
     const lines = wrapBubble('a'.repeat(50), 24)
     expect(lines.every((l) => l.length <= 24)).toBe(true)
-    expect(lines.join('')).toBe('a'.repeat(50))
+    expect(lines[0]).toBe('a'.repeat(24))
   })
 
   it('takes its default from the face the bubble is set in', () => {
@@ -48,6 +58,121 @@ describe('wrapBubble', () => {
   it('keeps every default-wrapped line inside the box the bubble is allowed', () => {
     for (const l of wrapBubble('the fish are biting well this morning by the river')) {
       expect(l.length).toBeLessThanOrEqual(WRAP_CHARS)
+    }
+  })
+})
+
+// A bubble that grows to five lines is a paper standing in the street, and it hides the town
+// it is spoken over. Two lines, then the reader asks the person.
+describe('a bubble stops at two lines and says so', () => {
+  it('caps at BUBBLE_MAX_LINES and ends the last one in an ellipsis', () => {
+    const lines = wrapBubble('the fish are biting well this morning by the river', 24)
+    expect(lines).toHaveLength(BUBBLE_MAX_LINES)
+    expect(lines[BUBBLE_MAX_LINES - 1]!.endsWith(ELLIPSIS)).toBe(true)
+    expect(lines[0]).toBe('the fish are biting well')
+  })
+
+  it('never lets the ellipsis push a line past the wrap width', () => {
+    const long = 'aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll'
+    for (const width of [10, 16, 24, WRAP_CHARS]) {
+      for (const l of wrapBubble(long, width)) expect(l.length, `${width}`).toBeLessThanOrEqual(width)
+    }
+  })
+
+  it('leaves a short line alone — no ellipsis on text that fits', () => {
+    expect(wrapBubble('the iron sings today', 24)).toEqual(['the iron sings today'])
+  })
+})
+
+describe('the bubble leans toward whoever is speaking', () => {
+  it('mixes cream 15% of the way to the speaker and no further', () => {
+    expect(SPEAKER_TINT).toBe(0.15)
+    expect(tintToward(0x000000, 0xffffff, 0)).toBe(0x000000)
+    expect(tintToward(0x000000, 0xffffff, 1)).toBe(0xffffff)
+    expect(tintToward(0x000000, 0xffffff, 0.5)).toBe(0x808080)
+  })
+
+  it('stays a cream bubble — the tint is a lean, not a repaint', () => {
+    const tinted = tintToward(SPEECH_FILL, 0x2f6f3f, SPEAKER_TINT)
+    for (const shift of [16, 8, 0]) {
+      const from = (SPEECH_FILL >> shift) & 0xff
+      const to = (tinted >> shift) & 0xff
+      expect(Math.abs(from - to), `channel ${shift}`).toBeLessThanOrEqual(40)
+    }
+    expect(tinted).not.toBe(SPEECH_FILL)
+  })
+
+  it('clamps an out-of-range amount instead of drawing an impossible colour', () => {
+    expect(tintToward(0x102030, 0xffffff, -1)).toBe(0x102030)
+    expect(tintToward(0x102030, 0xffffff, 4)).toBe(0xffffff)
+  })
+})
+
+describe('the dominant colour of a sheet is the cloth, not the outline', () => {
+  const px = (rows: [number, number, number, number][]): number[] => rows.flat()
+
+  it('picks the colour the most pixels are', () => {
+    expect(
+      dominantColor(
+        px([
+          [40, 120, 200, 255],
+          [40, 120, 200, 255],
+          [200, 60, 60, 255],
+        ]),
+      ),
+    ).toBe(0x2878c8)
+  })
+
+  it('skips transparent pixels and the near-black outline', () => {
+    expect(
+      dominantColor(
+        px([
+          [10, 10, 10, 255],
+          [10, 10, 10, 255],
+          [10, 10, 10, 255],
+          [0, 255, 0, 0],
+          [200, 60, 60, 255],
+        ]),
+      ),
+    ).toBe(0xc83c3c)
+  })
+
+  it('says nothing rather than guessing when there is nothing to read', () => {
+    expect(dominantColor([])).toBeNull()
+    expect(dominantColor(px([[0, 0, 0, 0]]))).toBeNull()
+  })
+})
+
+// Ten people in a market square is ten bubbles, which is a wall of paper. Three is a scene.
+describe('only the nearest three speak out loud', () => {
+  const at = (id: string, sx: number, sy: number) => ({ id, sx, sy })
+
+  it('keeps BUBBLE_NEAREST, measured from the camera centre', () => {
+    const near = nearestSpeakers(
+      [at('far', 500, 0), at('a', 10, 0), at('b', 0, 20), at('c', 30, 0), at('mid', 200, 0)],
+      { x: 0, y: 0 },
+    )
+    expect(near.size).toBe(BUBBLE_NEAREST)
+    expect([...near].sort()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('takes everybody when there are fewer than three', () => {
+    expect(nearestSpeakers([at('a', 0, 0)], { x: 0, y: 0 }).size).toBe(1)
+  })
+
+  it('breaks a tie by arrival order, so the same frame chooses the same three twice', () => {
+    const want = [at('a', 10, 0), at('b', 10, 0), at('c', 10, 0), at('d', 10, 0)]
+    const first = [...nearestSpeakers(want, { x: 0, y: 0 })]
+    expect(first).toEqual(['a', 'b', 'c'])
+    expect([...nearestSpeakers(want, { x: 0, y: 0 })]).toEqual(first)
+  })
+
+  it('collapses the whole town to a glyph at the widest stop', () => {
+    expect(GLYPH_ZOOM).toBe(ZOOM_STOPS[0])
+    expect(bubbleShown(GLYPH_ZOOM, true)).toBe(false)
+    for (const zoom of ZOOM_STOPS.filter((z) => z > GLYPH_ZOOM)) {
+      expect(bubbleShown(zoom, true), `${zoom}x`).toBe(true)
+      expect(bubbleShown(zoom, false), `${zoom}x not nearest`).toBe(false)
     }
   })
 })
@@ -84,23 +209,5 @@ describe('two speakers standing together do not composite into one pile', () => 
       { id: 'b', sx: 310, sy: 305, size: { w: 150, h: 40 } },
     ]
     expect(placeBubbles(want, view)).toEqual(placeBubbles(want, view))
-  })
-})
-
-describe('a thought points at its thinker whichever side it ended up on', () => {
-  it('puts the trail on the edge facing the speaker, for all four sides', () => {
-    const w = 100,
-      h = 40
-    expect(scallopTrail('above', w, h).every((d) => d.cy > h)).toBe(true)
-    expect(scallopTrail('below', w, h).every((d) => d.cy < 0)).toBe(true)
-    expect(scallopTrail('left', w, h).every((d) => d.cx > w)).toBe(true)
-    expect(scallopTrail('right', w, h).every((d) => d.cx < 0)).toBe(true)
-  })
-
-  it('shrinks away from the bubble and never draws a zero-radius dot', () => {
-    const dots = scallopTrail('above', 100, 40)
-    expect(dots).toHaveLength(SCALLOP_COUNT)
-    for (const d of dots) expect(d.r).toBeGreaterThanOrEqual(1)
-    expect(dots[0]!.r).toBeGreaterThan(dots[dots.length - 1]!.r)
   })
 })

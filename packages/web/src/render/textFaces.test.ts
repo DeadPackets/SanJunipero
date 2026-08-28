@@ -12,8 +12,9 @@ vi.mock('pixi.js', () => ({
   },
 }))
 import {
-  BUBBLE_FRAME_PX,
-  BUBBLE_SLICE,
+  BUBBLE_PAD,
+  BUBBLE_RADIUS,
+  BUBBLE_STROKE,
   FACE_ADVANCE_EM,
   FACE_BODY,
   FACE_DESIGN_PX,
@@ -25,13 +26,14 @@ import {
   LOWERCASE_FACES,
   SPEECH_FILL,
   SPEECH_INK,
-  TAIL_PX,
+  TAIL_STEPS,
+  TAIL_STEP_PX,
   THOUGHT_FILL,
   THOUGHT_INK,
   faceFor,
   installFaces,
-  nineSlice,
-  tailPoly,
+  rimDots,
+  stairTail,
   worldTextScale,
   wrapCharsFor,
 } from './textFaces.js'
@@ -147,101 +149,70 @@ describe('wrapping, derived from the face rather than from a guess', () => {
   })
 })
 
-describe('a bubble is a nine-slice, like every other slab in the product', () => {
-  it('cuts the frame art the sheet already uses', () => {
-    expect(BUBBLE_FRAME_PX).toBe(3 * BUBBLE_SLICE)
-    expect(BUBBLE_SLICE).toBe(10)
+describe('a bubble is drawn, not nine-sliced — the frame art is gone', () => {
+  it('asks for no frame PNG', () => {
+    expect(src('./bubbles.ts')).not.toMatch(/frame-\w+\.png/)
   })
 
-  it('returns exactly nine pieces', () => {
-    expect(nineSlice(64, 32, 10)).toHaveLength(9)
-  })
-
-  it('tiles the destination exactly — no gap and no overlap', () => {
-    for (const [w, h] of [
-      [64, 32],
-      [20, 20],
-      [300, 41],
-      [21, 200],
-    ] as const) {
-      const rects = nineSlice(w, h, 10)
-      const area = rects.reduce((n, r) => n + r.dw * r.dh, 0)
-      expect(area, `${w}x${h} area`).toBe(w * h)
-      for (let i = 0; i < rects.length; i++) {
-        for (let j = i + 1; j < rects.length; j++) {
-          const a = rects[i]!,
-            b = rects[j]!
-          const overlap =
-            Math.max(0, Math.min(a.dx + a.dw, b.dx + b.dw) - Math.max(a.dx, b.dx)) *
-            Math.max(0, Math.min(a.dy + a.dh, b.dy + b.dh) - Math.max(a.dy, b.dy))
-          expect(overlap, `${w}x${h} ${i} overlaps ${j}`).toBe(0)
-        }
-      }
-    }
-  })
-
-  it('never scales a corner, whatever the bubble grows to', () => {
-    for (const [w, h] of [
-      [64, 32],
-      [300, 41],
-      [512, 300],
-    ] as const) {
-      const rects = nineSlice(w, h, 10)
-      // A corner is a piece against both a vertical and a horizontal edge of the box.
-      const corners = rects.filter(
-        (r) => (r.dx === 0 || r.dx + r.dw === w) && (r.dy === 0 || r.dy + r.dh === h),
-      )
-      expect(corners, `${w}x${h}`).toHaveLength(4)
-      for (const c of corners) {
-        expect(c.dw, `${w}x${h} corner width`).toBe(c.sw)
-        expect(c.dh, `${w}x${h} corner height`).toBe(c.sh)
-      }
-      // and the pieces that are NOT corners do stretch, or the frame would not fit the box
-      expect(
-        rects.some((r) => r.dw !== r.sw || r.dh !== r.sh),
-        `${w}x${h}`,
-      ).toBe(true)
-    }
-  })
-
-  it('reads every piece from inside the frame texture', () => {
-    for (const r of nineSlice(64, 32, 10)) {
-      expect(r.sx).toBeGreaterThanOrEqual(0)
-      expect(r.sy).toBeGreaterThanOrEqual(0)
-      expect(r.sx + r.sw).toBeLessThanOrEqual(BUBBLE_FRAME_PX)
-      expect(r.sy + r.sh).toBeLessThanOrEqual(BUBBLE_FRAME_PX)
-    }
-  })
-
-  it('refuses to fold a box smaller than its own corners', () => {
-    const rects = nineSlice(4, 4, 10)
-    expect(rects).toHaveLength(9)
-    expect(rects.reduce((n, r) => n + r.dw * r.dh, 0)).toBe(2 * 10 * (2 * 10))
+  it('states the box in world pixels: a 2px ink ring on a 4px radius', () => {
+    expect(BUBBLE_STROKE).toBe(2)
+    expect(BUBBLE_RADIUS).toBe(4)
+    expect(BUBBLE_PAD).toBeGreaterThanOrEqual(BUBBLE_STROKE * 2)
   })
 })
 
-describe('the tail points at the speaker', () => {
+describe('a thought wears a dotted rim instead of a drawn edge', () => {
+  it('walks the whole perimeter and never leaves the box', () => {
+    const [w, h] = [60, 30]
+    const dots = rimDots(w, h)
+    expect(dots.length).toBeGreaterThan(8)
+    for (const d of dots) {
+      expect(d.cx, 'cx').toBeGreaterThanOrEqual(0)
+      expect(d.cx, 'cx').toBeLessThanOrEqual(w)
+      expect(d.cy, 'cy').toBeGreaterThanOrEqual(0)
+      expect(d.cy, 'cy').toBeLessThanOrEqual(h)
+    }
+    // one run of dots down each of the four edges
+    expect(dots.some((d) => d.cy === 0)).toBe(true)
+    expect(dots.some((d) => d.cy === h)).toBe(true)
+    expect(dots.some((d) => d.cx === 0)).toBe(true)
+    expect(dots.some((d) => d.cx === w)).toBe(true)
+  })
+
+  it('spaces them by the step, whatever the box grows to', () => {
+    expect(rimDots(200, 30).length).toBeGreaterThan(rimDots(60, 30).length)
+  })
+})
+
+describe('the tail points at the speaker, in three steps', () => {
   it('hangs downward from a bubble placed above, and upward from one placed below', () => {
-    const above = tailPoly('above', 60, 30)
-    const below = tailPoly('below', 60, 30)
+    const above = stairTail('above', 60, 30)
+    const below = stairTail('below', 60, 30)
     expect(Math.max(...above.filter((_, i) => i % 2 === 1))).toBeGreaterThan(30)
     expect(Math.min(...below.filter((_, i) => i % 2 === 1))).toBeLessThan(0)
   })
 
   it('points right from a bubble placed left, and left from one placed right', () => {
-    const left = tailPoly('left', 60, 30)
-    const right = tailPoly('right', 60, 30)
+    const left = stairTail('left', 60, 30)
+    const right = stairTail('right', 60, 30)
     expect(Math.max(...left.filter((_, i) => i % 2 === 0))).toBeGreaterThan(60)
     expect(Math.min(...right.filter((_, i) => i % 2 === 0))).toBeLessThan(0)
   })
 
-  it('is total over the four sides, and every tail is a triangle', () => {
+  it('is a staircase of TAIL_STEPS, on every side', () => {
     for (const side of ['above', 'below', 'left', 'right'] as const) {
-      const poly = tailPoly(side, 60, 30)
-      expect(poly, side).toHaveLength(6)
+      const poly = stairTail(side, 60, 30)
+      // two base points, then two per step
+      expect(poly, side).toHaveLength(2 * (2 + 2 * TAIL_STEPS))
       for (const n of poly) expect(Number.isFinite(n), side).toBe(true)
     }
-    expect(TAIL_PX).toBeGreaterThan(2)
+    expect(TAIL_STEPS).toBe(3)
+    expect(TAIL_STEP_PX).toBeGreaterThan(1)
+  })
+
+  it('reaches TAIL_STEPS steps out of the box and no further', () => {
+    const out = stairTail('above', 60, 30).filter((_, i) => i % 2 === 1)
+    expect(Math.max(...out) - 30).toBe(TAIL_STEPS * TAIL_STEP_PX)
   })
 })
 
