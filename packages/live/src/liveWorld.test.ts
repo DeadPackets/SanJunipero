@@ -105,6 +105,8 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     { edits: [] },
     NARRATED_CHAPTER,
     NARRATED_BIOGRAPHY,
+    { hits: [] }, // the tier-2.5 verdict
+    { rulings: [] }, // the recognizer's classification
     {},
   ]
   return {
@@ -1026,7 +1028,7 @@ describe('★ the chronicle, written on the day boundary', () => {
 
   it('writes the day that just closed, and bills it to the same ledger the minds spend from', async () => {
     const dir = tmp()
-    const { world, callers } = await liveWorld({
+    const { world, callers, opsDb } = await liveWorld({
       dir,
       turn: SILENT_TURN,
       narratorDbPath: join(dir, 'minds', '_narrator.db'),
@@ -1052,8 +1054,11 @@ describe('★ the chronicle, written on the day boundary', () => {
     ).toEqual([{ subject_id: 'amara' }])
 
     // Through the cast's own client seam, which bills the ops db the cap is read off: a
-    // chronicler billing anywhere else would spend outside the anomaly stop.
-    expect([...callers]).toContain('narrator')
+    // chronicler billing anywhere else would spend outside the anomaly stop. The recognizer and
+    // the tier-2.5 pass ride the same boundary, each under its own name so spend is attributable.
+    expect([...callers]).toEqual(expect.arrayContaining(['narrator', 'semantic', 'constructs']))
+    // and the semantic pass ran rather than falling over: no unreadable-verdict alert
+    expect(alertsOf(opsDb, 'semantic_firsts_unreadable')).toEqual([])
   }, 120_000)
 
   it('leaves the day unwritten when the daily budget is already spent', async () => {

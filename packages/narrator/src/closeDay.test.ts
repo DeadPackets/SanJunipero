@@ -4,6 +4,7 @@ import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { closeDay } from './narrate.js'
+import type { LlmClient, LlmUsage } from '@sj/llm'
 import type { NarratorLlm } from './types.js'
 
 const store = (): NarratorStore => {
@@ -50,6 +51,30 @@ const llm = (): NarratorLlm => ({
   newspaperCopy: vi.fn(),
   biography: vi.fn(async () => ({ title: 'Amara of the tally', body: 'She was seen counting.' })),
 })
+
+// The world db above carries no `alerts`; the semantic pass writes one there when a verdict
+// will not parse, so a rig that runs the pass has to have the table.
+const opsDb = (): Database.Database => {
+  const db = new Database(':memory:')
+  db.exec(`CREATE TABLE alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
+    agent_id TEXT, kind TEXT NOT NULL, detail TEXT NOT NULL)`)
+  return db
+}
+
+const NO_USAGE: LlmUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
+
+/** Answers the tier-2.5 pass with one hit, whatever it is asked. */
+const scriptedSemantic = (value: unknown): LlmClient =>
+  ({
+    async object() {
+      return { value, usage: NO_USAGE }
+    },
+    async text() {
+      return { text: '', usage: NO_USAGE }
+    },
+    totalCostUsd: () => 0,
+    alert: () => {},
+  }) as unknown as LlmClient
 
 const CAST = [
   { id: 'amara', name: 'Amara' },
@@ -144,5 +169,70 @@ describe('closeDay', () => {
     expect(s.publications('biography')).toEqual([])
     expect(s.publications('newspaper').length).toBe(1)
     expect(alert.mock.calls.flat().join(' ')).toContain('framing')
+  })
+
+  it('★ carries the tier-2.5 pass: a semantic first lands as a milestone of the day it closed', async () => {
+    const s = store()
+    const evs = dayEvents(0, 1)
+    const said = 'Rain.'
+    const verdict = {
+      hits: [
+        {
+          conceptKind: 'love_expression',
+          agentId: 'amara',
+          day: 0,
+          sourceKind: 'speech',
+          eventSeq: 1,
+          quote: said,
+          confidence: 0.95,
+          rationale: 'She said it to him.',
+        },
+      ],
+    }
+    await closeDay({
+      store: s,
+      llm: llm(),
+      worldDb: worldDb(evs),
+      events: evs,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      cast: CAST,
+      semantic: {
+        db: opsDb(),
+        llm: scriptedSemantic(verdict),
+        records: [
+          {
+            sourceKind: 'speech',
+            agentId: 'amara',
+            day: 0,
+            tick: 10,
+            text: said,
+            eventSeq: 1,
+          },
+        ],
+      },
+    })
+
+    expect(s.milestones().map((m) => m.kind)).toContain('first_love_expression')
+    expect(s.milestones().find((m) => m.kind === 'first_love_expression')).toMatchObject({
+      day: 0,
+      tier: 2.5,
+      agentIds: ['amara'],
+    })
+  })
+
+  it('and without the pass the same day closes with no semantic milestone', async () => {
+    const s = store()
+    const evs = dayEvents(0, 1)
+    await closeDay({
+      store: s,
+      llm: llm(),
+      worldDb: worldDb(evs),
+      events: evs,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      cast: CAST,
+    })
+    expect(s.milestones().every((m) => m.tier !== 2.5)).toBe(true)
   })
 })
