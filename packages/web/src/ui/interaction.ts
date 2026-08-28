@@ -3,6 +3,20 @@ import { kindWords } from './broadcastReady.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
 
+/** What Escape puts down. The ring is not a rung of its own: it IS the pick's chrome, so it
+ *  goes down with the pick. */
+export type EscapeRung = 'paper' | 'interior' | 'subject' | 'fullscreen'
+
+export type StageUp = Readonly<Record<EscapeRung, boolean>>
+
+/** ONE ladder, topmost first — every Escape in the app resolves through this and nothing else. */
+export function escapeStep(up: StageUp): EscapeRung | null {
+  if (up.paper) return 'paper'
+  if (up.interior) return 'interior'
+  if (up.subject) return 'subject'
+  return up.fullscreen ? 'fullscreen' : null
+}
+
 export const CROP_STAGES = 4
 
 // Typographic apostrophe — the chrome sets prose, not code.

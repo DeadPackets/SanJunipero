@@ -12,6 +12,7 @@ import {
   SpeechLive,
   SubjectRing,
   QuietStamp,
+  toggleFullscreen,
   useStageKeys,
   type RingVerb,
   type Subject,
@@ -20,6 +21,7 @@ import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { kindWords } from './ui/broadcastReady.js'
+import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -42,6 +44,7 @@ export function App() {
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
+  const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
   const { autoCut, toggle: toggleDirector } = useAutoCut()
 
@@ -177,19 +180,25 @@ export function App() {
       signpostRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     },
     onEscape: () => {
-      if (sheet !== null) closePaper()
-      else if (insideId !== null) enterInterior(null)
-      else setSubject(null)
+      const rung = escapeStep({
+        paper: sheet !== null,
+        interior: insideId !== null,
+        subject: subject !== null,
+        fullscreen: document.fullscreenElement !== null,
+      })
+      if (rung === 'paper') closePaper()
+      else if (rung === 'interior') enterInterior(null)
+      else if (rung === 'subject') setSubject(null)
+      else if (rung === 'fullscreen') toggleFullscreen(appRef.current)
     },
     onFullscreen: () => {
-      if (document.fullscreenElement === null) void document.documentElement.requestFullscreen()
-      else void document.exitFullscreen()
+      toggleFullscreen(appRef.current)
     },
     onDirector: toggleDirector,
   })
 
   return (
-    <div className="app" data-broadcast={route.broadcast ? 'on' : undefined}>
+    <div className="app" ref={appRef} data-broadcast={route.broadcast ? 'on' : undefined}>
       <StageMount
         store={store}
         onScene={setScene}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import { CROP_STAGES, hoverLabel } from './interaction.js'
+import { readFileSync } from 'node:fs'
+import { CROP_STAGES, escapeStep, hoverLabel, type StageUp } from './interaction.js'
 
 function fixture(): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
@@ -105,5 +106,43 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'item', 'nope')).toBeNull()
     expect(hoverLabel(state, 'crop', 'nope')).toBeNull()
     expect(hoverLabel(null, 'agent', 'rahel')).toBeNull()
+  })
+})
+
+// ── ★ ONE ESCAPE LADDER ──────────────────────────────────────────────────────────────────
+//
+// Escape used to be owned three times over: the stage hook, the sheet's own window listener
+// and the ring's key handler. Three owners cannot agree an order, so a sheet over a pick came
+// down together with the pick.
+describe('escape puts down one thing at a time, topmost first', () => {
+  const up = (over: Partial<StageUp> = {}): StageUp => ({
+    paper: false,
+    interior: false,
+    subject: false,
+    fullscreen: false,
+    ...over,
+  })
+
+  it('★ the sheet comes down before the room, the room before the pick', () => {
+    expect(escapeStep(up({ paper: true, interior: true, subject: true }))).toBe('paper')
+    expect(escapeStep(up({ interior: true, subject: true }))).toBe('interior')
+    expect(escapeStep(up({ subject: true }))).toBe('subject')
+  })
+
+  it('★ fullscreen is the last rung, never the first', () => {
+    expect(escapeStep(up({ paper: true, fullscreen: true }))).toBe('paper')
+    expect(escapeStep(up({ subject: true, fullscreen: true }))).toBe('subject')
+    expect(escapeStep(up({ fullscreen: true }))).toBe('fullscreen')
+  })
+
+  it('★ answers nothing when the town is already bare', () => {
+    expect(escapeStep(up())).toBeNull()
+  })
+
+  it('★ nothing else in the web tree listens for Escape', () => {
+    const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8')
+    for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx'])
+      expect(src(f), f).not.toContain('Escape')
+    expect(src('../App.tsx')).toContain('escapeStep(')
   })
 })

@@ -60,19 +60,6 @@ export function Paper({
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open, onClose])
-
   const dragRef = useRef<number | null>(null)
   useEffect(() => {
     if (!open) return

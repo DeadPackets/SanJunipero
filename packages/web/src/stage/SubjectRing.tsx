@@ -39,14 +39,11 @@ export function SubjectRing({
   subject,
   scene,
   onVerb,
-  onClose,
   store,
 }: {
   subject: Subject | null
   scene: Scene | null
   onVerb: (verb: RingVerb) => void
-  /** Escape, when the caller wants the ring to close itself rather than the whole stage */
-  onClose?: () => void
   /** only a `structure` subject needs it — a body carries its own sprite anchor */
   store?: WorldStore
 }) {
@@ -83,11 +80,6 @@ export function SubjectRing({
               onVerb(verb)
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape' && onClose !== undefined) {
-                e.stopPropagation()
-                onClose()
-                return
-              }
               const next = cycleVerb(i, e.key)
               if (next === null) return
               // The stage owns the arrows for panning and reads them off this same React tree.

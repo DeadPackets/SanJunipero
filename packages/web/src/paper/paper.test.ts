@@ -189,9 +189,9 @@ describe('★ every tab of every arm reaches its own body', () => {
 describe('★ every way the paper goes down, and where focus lands', () => {
   const code = src('./Paper.tsx')
 
-  it('closes on Escape', () => {
-    expect(code).toMatch(/if \(e\.key !== 'Escape'\) return[\s\S]{0,80}onClose\(\)/)
-    expect(code).toContain("window.addEventListener('keydown', onKey)")
+  it('leaves Escape to the one ladder in App rather than listening itself', () => {
+    expect(code).not.toContain('Escape')
+    expect(code).not.toContain("addEventListener('keydown'")
   })
 
   it('closes on the close word and on a click on the town', () => {
