@@ -57,5 +57,8 @@ for (const f of files) {
   }
   if (t.includes('rulings'))
     console.log('rulings:', q('SELECT kind, COUNT(*) n FROM rulings GROUP BY kind'))
+  if (t.includes('constructs')) console.log('constructs:', q('SELECT * FROM constructs'))
+  if (t.includes('milestones'))
+    console.log('milestones:', q('SELECT day, tier, label FROM milestones ORDER BY day'))
 }
 db?.close()
