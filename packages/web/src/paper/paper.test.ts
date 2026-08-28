@@ -26,6 +26,8 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
       page: null,
       tab: '',
       subject: null,
+      thing: null,
+      momentId: null,
       store: createWorldStore(),
       scene: null,
       operatorToken: null,
@@ -37,6 +39,7 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
       onInside: () => {},
       onJump: () => {},
       onLive: () => {},
+      onMoment: () => {},
       ...over,
     }),
   )

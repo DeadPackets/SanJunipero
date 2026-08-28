@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Scene } from '../render/scene.js'
 import type { Rect } from '../render/tooltip.js'
-import type { WorldStore } from '../state/worldStore.js'
 import {
   joinStageLoop,
   subjectPoint,
@@ -27,17 +26,8 @@ function plateRect(scene: Scene, at: WorldPoint, size: { w: number; h: number })
 
 /** A plate nailed under the figure, the way a name is written on a thing in the town — not a
  *  tooltip about it. */
-export function Nameplate({
-  subject,
-  scene,
-  store,
-}: {
-  subject: Subject | null
-  scene: Scene | null
-  /** only a `structure` subject needs it — a body carries its own sprite anchor */
-  store?: WorldStore
-}) {
-  const ref = useSubjectAnchor(scene, subject, store)
+export function Nameplate({ subject, scene }: { subject: Subject | null; scene: Scene | null }) {
+  const ref = useSubjectAnchor(scene, subject)
   // Measured once a name, not once a frame: reading a layout box inside the loop would force
   // a reflow every frame.
   const size = useRef({ w: 0, h: 0 })
@@ -52,14 +42,14 @@ export function Nameplate({
   useEffect(() => {
     if (scene === null || subject === null) return
     const off = joinStageLoop(() => {
-      const at = subjectPoint(scene, subject, store)
+      const at = subjectPoint(scene, subject)
       scene.tags.setOccupied('plate', at === null ? [] : [plateRect(scene, at, size.current)])
     })
     return () => {
       off()
       scene.tags.setOccupied('plate', [])
     }
-  }, [scene, subject, store])
+  }, [scene, subject])
 
   if (subject === null) return null
   return (

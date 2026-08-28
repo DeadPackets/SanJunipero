@@ -215,11 +215,16 @@ function PlayerStripView({
 }
 
 /** The filmstrip and its player, on the page instead of across the bottom of the town. */
-export function Moments({ store, onJump, onLive }: PageProps) {
+export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
   const moments = usePolled('/api/moments', momentRows).data
-  const [openId, setOpenId] = useState<number | null>(null)
+  // `/moment/:id` names a recorded day, so a link opens the filmstrip on it.
+  const [openId, setOpenId] = useState<number | null>(momentId)
+  const openMoment = (id: number | null): void => {
+    setOpenId(id)
+    onMoment(id)
+  }
   // The player belongs to the day it plays: opening another one is a new player, never this
   // one carried across, so nothing has to be reset after the fact.
   const [playerOf, setPlayerOf] = useState<{ id: number | null; state: PlayerState }>(() => ({
@@ -287,7 +292,7 @@ export function Moments({ store, onJump, onLive }: PageProps) {
   const goLive = (): void => {
     scrubbedRef.current = null
     setPlayerOf({ id: null, state: idlePlayer(0) })
-    setOpenId(null)
+    openMoment(null)
     onLive()
   }
 
@@ -303,7 +308,7 @@ export function Moments({ store, onJump, onLive }: PageProps) {
               moment={m}
               people={people}
               open={m.id === openId}
-              onOpen={setOpenId}
+              onOpen={openMoment}
             />
           ))}
         </ol>

@@ -1,7 +1,8 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import { kindWords } from '../../ui/broadcastReady.js'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discoveryModel.js'
+import { itemCropDetail, thingKind } from '../../ui/interaction.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './index.js'
@@ -20,7 +21,7 @@ export function FoundPage(props: PageProps) {
  * The one place the agent's own words are printed. The chronicle never quotes them: a chronicle
  * line is agent-visible and this page is not.
  */
-function Things({ store, onJump }: PageProps) {
+function Things({ store, thing, onJump }: PageProps) {
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -30,8 +31,27 @@ function Things({ store, onJump }: PageProps) {
   const leaves = leavesOf(read.data ?? NO_RECORDS, assets)
   const viewTick = mode.live ? null : mode.tick
 
+  // What was clicked on the town, and the leaf of the record that made it — a thing on the
+  // ground has no page of its own, so the record it came out of is where it is answered.
+  const clicked = thing === null ? null : itemCropDetail(state, thing)
+  const clickedKind = thing === null ? null : thingKind(state, thing)
+  const madeBy =
+    clickedKind === null
+      ? null
+      : (leaves.find((l) => l.record.makes.includes(clickedKind))?.record.seq ?? null)
+  const atRef = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    atRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [madeBy])
+
   return (
     <>
+      {clicked !== null && (
+        <p className="found-clicked">
+          {clicked}
+          {madeBy === null && '. Nobody has worked out where this comes from yet.'}
+        </p>
+      )}
       {read.loaded || leaves.length > 0 ? (
         <p className="sheet-note">{recordSummary(leaves, state?.tick ?? 0)}</p>
       ) : (
@@ -48,11 +68,13 @@ function Things({ store, onJump }: PageProps) {
       ) : (
         <ol className="discovery-chain">
           {leaves.map((leaf) => (
-            <li key={leaf.record.seq}>
+            <li key={leaf.record.seq} ref={leaf.record.seq === madeBy ? atRef : undefined}>
               <button
                 type="button"
                 className="discovery-leaf"
-                aria-current={viewTick === leaf.record.tick ? 'true' : undefined}
+                aria-current={
+                  leaf.record.seq === madeBy || viewTick === leaf.record.tick ? 'true' : undefined
+                }
                 aria-label={`${leaf.headline}, ${leaf.when}. Go to this moment.`}
                 onClick={() => {
                   onJump(leaf.record.tick)

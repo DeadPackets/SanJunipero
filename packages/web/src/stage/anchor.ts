@@ -1,8 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { rectInView } from '../render/cull.js'
-import { tileToScreen } from '../render/iso.js'
 import type { Scene } from '../render/scene.js'
-import type { WorldStore } from '../state/worldStore.js'
 
 /** Who a stage mark is about. */
 export type Subject = { id: string; kind: 'agent' | 'structure'; name: string }
@@ -27,19 +25,10 @@ export function screenAnchor(
   }
 }
 
-/** Where a subject stands: a body's own sprite anchor (the interpolated step, not the record's
- *  tile), and a building's site. A structure needs the store — `Scene.anchorOf` is bodies only. */
-export function subjectPoint(
-  scene: Scene,
-  subject: Subject,
-  store?: WorldStore,
-): WorldPoint | null {
-  if (subject.kind === 'structure') {
-    const s = store?.getState()?.structures[subject.id]
-    return s === undefined ? null : tileToScreen(s.x, s.y)
-  }
-  const at = scene.anchorOf?.(subject.id) ?? null
-  return at === null ? null : { sx: at.x, sy: at.y }
+/** Where a subject stands. The scene answers for both kinds, so a mark over a person and a
+ *  mark over a place read the same point from the same place. */
+export function subjectPoint(scene: Scene, subject: Subject): WorldPoint | null {
+  return scene.pointOf(subject.kind, subject.id)
 }
 
 // ONE loop for every stage mark. A private rAF per mark let a plate land on a frame the ring
@@ -104,10 +93,9 @@ function useStageAnchor(
 export function useSubjectAnchor(
   scene: Scene | null,
   subject: Subject | null,
-  store?: WorldStore,
 ): RefObject<HTMLDivElement | null> {
   return useStageAnchor(
     scene,
-    scene === null || subject === null ? null : () => subjectPoint(scene, subject, store),
+    scene === null || subject === null ? null : () => subjectPoint(scene, subject),
   )
 }

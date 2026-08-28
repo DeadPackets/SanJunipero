@@ -26,6 +26,7 @@ import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
 import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
+import type { Thing } from './paper/pages/index.js'
 
 /** What the paper is showing, or `null` while it is down. */
 type Sheet = { page: PageKey; tab: string }
@@ -39,7 +40,12 @@ export function App() {
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
   const [subject, setSubject] = useState<Subject | null>(null)
-  const [sheet, setSheet] = useState<Sheet | null>(null)
+  // an item or a crop the viewer clicked: it has no ring, so the record answers for it
+  const [thing, setThing] = useState<Thing | null>(null)
+  // `/moment/:id` is a link to a recorded day, so the sheet comes up on the filmstrip.
+  const [sheet, setSheet] = useState<Sheet | null>(() =>
+    route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
+  )
   const [cue, setCue] = useState<string | null>(null)
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
@@ -114,6 +120,15 @@ export function App() {
   const onLive = useCallback(() => {
     goTo(null)
   }, [goTo])
+
+  /** The recorded day the filmstrip has open, in the address bar. */
+  const onMoment = useCallback((id: number | null) => {
+    setRoute((prev) => {
+      const next: Route = { ...prev, momentId: id }
+      history.replaceState(null, '', routeToPath(next))
+      return next
+    })
+  }, [])
 
   const openPage = (page: PageKey, tab?: string): void => {
     setSheet({ page, tab: tab ?? firstTab(page) })
@@ -204,10 +219,15 @@ export function App() {
         onScene={setScene}
         onInterior={setInsideId}
         onPick={(pick) => {
-          if (pick.kind !== 'structure') return
-          const s = store.getState()?.structures[pick.id]
-          if (s === undefined) return
-          setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
+          if (pick.kind === 'structure') {
+            const s = store.getState()?.structures[pick.id]
+            if (s === undefined) return
+            setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
+            return
+          }
+          // A thing on the ground has no ring; the record it came out of is its surface.
+          setThing({ kind: pick.kind, id: pick.id })
+          openPage('found', 'Things')
         }}
       />
       <SpeechLive store={store} />
@@ -227,6 +247,8 @@ export function App() {
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}
         subject={subject}
+        thing={thing}
+        momentId={route.momentId}
         store={store}
         scene={scene}
         operatorToken={operatorToken}
@@ -240,6 +262,7 @@ export function App() {
         onInside={enterInterior}
         onJump={onJump}
         onLive={onLive}
+        onMoment={onMoment}
       />
       <FpsOverlay />
     </div>

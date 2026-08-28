@@ -852,6 +852,14 @@ body {
    PER-BAND COLOUR: no palette token clears AA on both a light ground and a dark one — the dual-band
    set is EMPTY. Opacity is never the strategy. */
 
+/* what the viewer just clicked on the ground, over the record that answers for it */
+.found-clicked {
+  margin: 0 0 0.5rem; padding: 0.35rem 0.5rem;
+  font-size: 0.875rem; color: var(--ink);
+  background: var(--cream); box-shadow: var(--frame-tight);
+  border-left: 4px solid var(--honey);
+}
+
 .discovery-chain {
   /* --sand on --parchment is 1.19:1: the rule meant to bind the panel into one history was
      invisible. --ink-quiet is 5.83 on parchment. */

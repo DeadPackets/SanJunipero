@@ -13,6 +13,7 @@ import {
 } from './camera.js'
 import { createCameraRig } from './cameraRig.js'
 import { createGroundBaker } from './groundBake.js'
+import { tileToScreen } from './iso.js'
 import { groundArtSignature } from './groundField.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
@@ -111,6 +112,10 @@ export type Scene = {
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
+  /** Where a subject stands, in the space `tileToScreen` returns: a body's own sprite anchor
+   *  (the interpolated step, not the record's tile) and a building's site. One answer, so a
+   *  mark over a person and a mark over a place are not two different fallbacks. */
+  pointOf(kind: 'agent' | 'structure', id: string): { sx: number; sy: number } | null
   /** the interior sub-scene; wired by StageMount once the character layer exists */
   interior?: InteriorScene
   destroy(): void
@@ -255,7 +260,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   const clock = sceneClock(app)
 
-  return {
+  const scene: Scene = {
     app,
     setTicking: clock.set,
     textScale: 1,
@@ -270,6 +275,14 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     viewRect,
     reachableBox: () => bounds,
     tags,
+    pointOf: (kind, id) => {
+      if (kind === 'structure') {
+        const st = store.getState()?.structures[id]
+        return st === undefined ? null : tileToScreen(st.x, st.y)
+      }
+      const at = scene.anchorOf?.(id) ?? null
+      return at === null ? null : { sx: at.x, sy: at.y }
+    },
     sortDepth: () => {
       const entries: DepthEntry[] = []
       for (const fn of depthSources) for (const e of fn()) entries.push(e)
@@ -305,4 +318,5 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       app.destroy(true, { children: true })
     },
   }
+  return scene
 }

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
-import type { WorldStore } from '../state/worldStore.js'
 import { useSubjectAnchor, type Subject } from './anchor.js'
 
 export const RING_VERBS = ['follow', 'story', 'bonds', 'home'] as const
@@ -39,15 +38,12 @@ export function SubjectRing({
   subject,
   scene,
   onVerb,
-  store,
 }: {
   subject: Subject | null
   scene: Scene | null
   onVerb: (verb: RingVerb) => void
-  /** only a `structure` subject needs it — a body carries its own sprite anchor */
-  store?: WorldStore
 }) {
-  const ref = useSubjectAnchor(scene, subject, store)
+  const ref = useSubjectAnchor(scene, subject)
   const [at, setAt] = useState(0)
   const arms = useRef<(HTMLButtonElement | null)[]>([])
   const id = subject?.id ?? null
