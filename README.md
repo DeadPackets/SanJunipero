@@ -36,6 +36,22 @@ internet, see [deploy/README.md](deploy/README.md).
 Both boot the same world through `startDevWorld`; they differ only in who serves the client and in
 a few defaults below.
 
+## Rehearsing the live cast
+
+`pnpm rehearse` runs one short `SJ_LIVE=1` stream and `scripts/score.mjs` reads what it left
+behind — spend per caller, chapters, dreams, births, alerts, and a glass scan over every
+mind-facing string the run wrote. **It spends real money**, under a $2 daily budget and the
+lifetime anomaly stop. It reads `OPENROUTER_API_KEY` out of `.env` through `--env-file`, so the
+key is never on a command line.
+
+```
+pnpm rehearse 20                                        # 20 minutes, then Ctrl-C safe
+node --env-file=.env --import tsx scripts/score.mjs      # what the rehearsal produced
+```
+
+Both write under `rehearsals/`, which is gitignored. `--import tsx` is not optional: the
+workspace packages are published as TypeScript source.
+
 ## Environment
 
 Read by `pnpm stream` and `dev:world` alike, unless the table says otherwise. Nothing here needs to be

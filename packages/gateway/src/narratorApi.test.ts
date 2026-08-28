@@ -176,27 +176,10 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     ])
   })
 
-  /** Same scan, same window clamp and same memo as the body route — only the shape sent differs. */
-  it('answers the ledger length without sending the ledger', async () => {
-    const res = await fetch(`${base}/api/chronicle/count`)
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as { count: number; latestSeq: number; latestTick: number }
-    const entries = await chronicle()
-    expect(body.count).toBe(entries.length)
-    expect(body.latestSeq).toBe(entries[entries.length - 1]!.seq)
-    expect(body.latestTick).toBe(entries[entries.length - 1]!.tick)
-    // three integers, not a feed
-    const full = await (await fetch(`${base}/api/chronicle`)).text()
-    expect(JSON.stringify(body).length).toBeLessThan(full.length / 4)
-  })
-
-  it('counts the same window the body route would, and clamps a stranger’s the same way', async () => {
-    const count = async (q: string): Promise<number> =>
-      ((await (await fetch(`${base}/api/chronicle/count${q}`)).json()) as { count: number }).count
-    expect(await count('?fromTick=45')).toBe((await chronicle('?fromTick=45')).length)
-    expect(await count('?fromTick=45')).toBeLessThan(await count(''))
-    // an unbounded window is the world's window, exactly as the body route answers it
-    expect(await count('?toTick=1000000000')).toBe((await chronicle('?toTick=1000000000')).length)
+  it('clamps a stranger’s window into the world that exists', async () => {
+    expect((await chronicle('?fromTick=45')).length).toBeLessThan((await chronicle()).length)
+    // an unbounded window is the world's window
+    expect((await chronicle('?toTick=1000000000')).length).toBe((await chronicle()).length)
   })
 
   it('writes each entry as a sentence, never as a payload', async () => {
@@ -611,20 +594,17 @@ describe('a town with more history than a viewer can read', () => {
 
   /** Every open panel refetches this every 20 s; unbounded it is the whole town history per
    *  viewer per poll, and an unbounded list of rows at the other end. */
-  it('★ sends the newest page, while the badge still counts the whole record', async () => {
+  it('★ sends the newest page, not the first N of a town nobody is watching any more', async () => {
     const entries = (
       (await (await fetch(`${base}/api/chronicle`)).json()) as { entries: ChronicleEntry[] }
     ).entries
     expect(entries.length).toBe(CHRONICLE_MAX)
 
-    const count = (await (await fetch(`${base}/api/chronicle/count`)).json()) as {
-      count: number
-      latestSeq: number
-    }
-    expect(count.count, 'the badge counts what the panel does not send').toBeGreaterThan(
-      CHRONICLE_MAX,
-    )
-    // the page kept is the newest one, not the first N of a town nobody is watching any more
-    expect(entries[entries.length - 1]!.seq).toBe(count.latestSeq)
+    const all = (
+      (await (await fetch(`${base}/api/chronicle?fromTick=0`)).json()) as {
+        entries: ChronicleEntry[]
+      }
+    ).entries
+    expect(entries[entries.length - 1]!.seq).toBe(all[all.length - 1]!.seq)
   })
 })

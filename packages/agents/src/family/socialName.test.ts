@@ -5,7 +5,12 @@ import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 import type { ParentPersona } from './derivePersona.js'
 import type { AgentBornPayload } from './watchBirths.js'
-import { captureSocialName, migrateFamilyTables, promptBirthLine } from './socialName.js'
+import {
+  captureSocialName,
+  hasSocialName,
+  migrateFamilyTables,
+  promptBirthLine,
+} from './socialName.js'
 
 const ZERO_USAGE = {
   inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
@@ -150,7 +155,7 @@ describe('captureSocialName (T25)', () => {
     expect(prompts).toEqual([])
   })
 
-  it('an unresponsive mother leaves the name unset rather than throwing', async () => {
+  it('★ an unresponsive mother is written down as asked, so no later boot pays again', async () => {
     const db = makeDb()
     const name = await captureSocialName(client(db, throwing(new Error('provider down'))), db, {
       born: BORN,
@@ -158,10 +163,13 @@ describe('captureSocialName (T25)', () => {
       tick: 10,
     })
     expect(name).toBeNull()
-    expect(rows(db)).toEqual([])
+    expect(rows(db)).toEqual([
+      { agent_id: 'agent_7', social_name: '', named_by: 'amara', tick: 10 },
+    ])
+    expect(hasSocialName(db, BORN.id)).toBe(true)
   })
 
-  it('an exhausted budget never costs the town a birth', async () => {
+  it('★ an exhausted budget never asked, so it leaves nothing behind and may ask again', async () => {
     const db = makeDb()
     const { model } = answering(JSON.stringify({ name: 'Little Bird' }))
     const name = await captureSocialName(client(db, model, 0), db, {
@@ -171,9 +179,10 @@ describe('captureSocialName (T25)', () => {
     })
     expect(name).toBeNull()
     expect(rows(db)).toEqual([])
+    expect(hasSocialName(db, BORN.id)).toBe(false)
   })
 
-  it('a blank or absurdly long answer is no answer', async () => {
+  it('a blank or absurdly long answer is no answer, and the asking is still recorded', async () => {
     const db = makeDb()
     const blank = await captureSocialName(
       client(db, answering(JSON.stringify({ name: '   ' })).model),
@@ -196,7 +205,8 @@ describe('captureSocialName (T25)', () => {
       },
     )
     expect(long).toBeNull()
-    expect(rows(db)).toEqual([])
+    expect(rows(db).map((r) => (r as { social_name: string }).social_name)).toEqual(['', ''])
+    expect(hasSocialName(db, BORN.id)).toBe(true)
   })
 
   it('naming twice keeps both answers in the log, latest last', async () => {

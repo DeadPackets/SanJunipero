@@ -11,9 +11,15 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.10
         version: 2.5.10
+      '@sj/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      better-sqlite3:
+        specifier: ^13.0.0
+        version: 13.0.3
       eslint:
         specifier: 10.9.1
         version: 10.9.1(jiti@2.7.0)
@@ -69,9 +75,6 @@ importers:
 
   packages/arbiter:
     dependencies:
-      '@sj/agents':
-        specifier: workspace:*
-        version: link:../agents
       '@sj/engine':
         specifier: workspace:*
         version: link:../engine

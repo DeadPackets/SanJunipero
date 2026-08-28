@@ -1,5 +1,9 @@
 # Genesis & Rehearsal (C8) Implementation Plan — v6 DRAFT for controller review
 
+> **SUPERSEDED 2026-08-28 — a record, not a plan.** It was written against a tree that predates the
+> package split and the forge and cast re-cuts, and its task numbering no longer resolves. See
+> [2026-08-28-v1-rulings.md](2026-08-28-v1-rulings.md) and the stage-6/7 lane reports.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > ### ★★★ WHY v6 EXISTS — THE PINS ARE GONE, THE KEYSTONE IS GONE, AND THE PLAN IS A GRAPH INSTEAD OF A QUEUE

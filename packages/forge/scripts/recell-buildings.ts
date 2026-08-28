@@ -47,7 +47,7 @@ for (const b of BUILDINGS) {
   const rawBuf = readFileSync(join(from, 'raws', `${b.raw}.png`))
   const raw = await decodePng(rawBuf)
   const cellPx = buildingCellPx(b.fp)
-  const r = spriteCell(keyBg(raw), { cellPx, anchor: 'feet' })
+  const r = spriteCell(keyBg(raw), { w: cellPx, h: cellPx, anchor: 'feet' })
   const anchor = cellAnchor(r.cell)
 
   const before = await decodePng(readFileSync(join(from, 'cell.png')))

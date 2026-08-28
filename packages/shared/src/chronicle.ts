@@ -141,17 +141,6 @@ export type ChronicleEntry = z.infer<typeof ChronicleEntrySchema>
 export const ChronicleResponseSchema = z.object({ entries: z.array(ChronicleEntrySchema) }).strict()
 export type ChronicleResponse = z.infer<typeof ChronicleResponseSchema>
 
-/** What `/api/chronicle/count` answers. The lens badge shows one number and used to download the
- *  whole ledger to find it — every entry over the wire and through `JSON.parse`, every 20 s. */
-export const ChronicleCountSchema = z
-  .object({
-    count: z.number().int().nonnegative(),
-    latestSeq: z.number().int().nonnegative(),
-    latestTick: z.number().int().nonnegative(),
-  })
-  .strict()
-export type ChronicleCount = z.infer<typeof ChronicleCountSchema>
-
 export function chronicleIcon(type: string): string {
   return CHRONICLE_ICONS[type] ?? CHRONICLE_FALLBACK_ICON
 }

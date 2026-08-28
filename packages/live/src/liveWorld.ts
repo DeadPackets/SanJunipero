@@ -533,7 +533,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         opsDb,
         embedder,
         namingLlm: makeClient('naming'),
-        homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
         boot: (spec) => {
           booted?.add(spec)
         },
@@ -552,7 +551,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         embedder,
         opsDb,
         namingLlm: makeClient('naming'),
-        homeOf: (id) => loop.state.agents[id]?.insideId ?? '',
         maxMinds,
         log,
       })

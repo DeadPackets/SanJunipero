@@ -174,11 +174,10 @@ describe('the public surface a stranger reaches', () => {
   it('will not turn a 60-byte GET into megabytes via ?toTick', async () => {
     const gw = await gwPromise
     const base = `http://127.0.0.1:${gw.port}`
-    const honest = await (await fetch(`${base}/api/digest`)).text()
-    // Unclamped this loops once per day between 0 and toTick/1440 — on a real town it answered
-    // 4.75 MB to this exact request. Clamped, an impossible window IS today's window.
-    const absurd = await (await fetch(`${base}/api/digest?fromTick=0&toTick=1000000000`)).text()
-    expect(absurd.length).toBeLessThan(4096)
+    const honest = await (await fetch(`${base}/api/chronicle`)).text()
+    // Unclamped, a stranger's window is a scan of a range the world never had, and a cache key
+    // nothing else will ever hit. Clamped, an impossible window IS today's window.
+    const absurd = await (await fetch(`${base}/api/chronicle?fromTick=0&toTick=1000000000`)).text()
     expect(absurd).toEqual(honest)
 
     // Backwards, negative and non-numeric windows are answers, not errors or loops.
@@ -188,7 +187,7 @@ describe('the public surface a stranger reaches', () => {
       '?fromTick=9e99&toTick=1e99',
       '?toTick=abc',
     ]) {
-      const r = await fetch(`${base}/api/digest${q}`)
+      const r = await fetch(`${base}/api/chronicle${q}`)
       expect(r.status).toBe(200)
       expect((await r.text()).length).toBeLessThan(4096)
     }

@@ -131,18 +131,4 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
   router.route('GET', '/api/bonds', (_req, res) => {
     sendPrebuilt(res, cache.json('bonds', bonds))
   })
-
-  /**
-   * How many bonds there are without sending the bonds: a `Bond` carries its whole `history`,
-   * and the badge polls. The panel and the badge share one memoised build.
-   */
-  router.route('GET', '/api/bonds/count', (_req, res) => {
-    sendPrebuilt(
-      res,
-      cache.json('bonds-count', () => {
-        const b = bonds()
-        return { count: b.bonds.length, asOfTick: b.asOfTick }
-      }),
-    )
-  })
 }

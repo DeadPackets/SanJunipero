@@ -60,11 +60,8 @@ function medianDownscale(img: RawImage, f: number): RawImage {
   return { width: w, height: h, data: out }
 }
 
-// The cell spriteCell returns is square, so a non-square target (the crop and rig sheets) is cut
-// out of it: a subject with the target's aspect loses nothing, a taller one loses its ends.
 function keyedSprite(img: RawImage, anchor: Anchor, target: Target): RawImage {
-  const { cell } = spriteCell(keyBg(img), { cellPx: Math.max(target.w, target.h), anchor })
-  return centreCrop(cell, target.w, target.h)
+  return spriteCell(keyBg(img), { w: target.w, h: target.h, anchor }).cell
 }
 
 // No subject to find and no alpha to erode, so the sheet keeps its framing: crop to the target

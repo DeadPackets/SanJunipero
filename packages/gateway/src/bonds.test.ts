@@ -5,7 +5,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   BOND_RECENT_ACTS,
-  BondsCountSchema,
   BondsResponseSchema,
   DEFAULT_CONFIG,
   bondId,
@@ -204,14 +203,6 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
       'the log carries types bonds ignore',
     ).toBe(true)
     expect(buildBonds(all, DEFAULT_CONFIG.movement.earshotRadius, body.asOfTick)).toEqual(body)
-  })
-
-  it('★ counts the bonds without sending them', async () => {
-    const count = BondsCountSchema.parse(await (await fetch(`${base}/api/bonds/count`)).json())
-    expect(count.count).toBe(body.bonds.length)
-    expect(count.asOfTick).toBe(body.asOfTick)
-    const full = await (await fetch(`${base}/api/bonds`)).text()
-    expect(JSON.stringify(count).length, 'two integers, not a feed').toBeLessThan(full.length / 4)
   })
 })
 

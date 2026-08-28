@@ -137,6 +137,22 @@ back at the right tick with the right buildings and five people who remember not
 is your only tell.** If you see it and you did not intend a reset, stop the container before it
 writes more, and restore.
 
+### Upgrading a town deployed before the split
+
+The package that owns the data directory was renamed, so both the mount path and the volume name
+moved: `gateway-data:/app/packages/gateway/data` became `town-data:/app/packages/town/data`. A
+`compose up` on the new file mounts an **empty** `town-data` and the town boots at day 0, saying
+`this is a new town`. Copy the old volume across first, once, while nothing is running:
+
+```
+docker compose down
+docker run --rm -v san-junipero_gateway-data:/from -v san-junipero_town-data:/to alpine cp -a /from/. /to/
+docker compose up -d --build
+```
+
+Then check the boot says `resumed at tick N`. The old volume is untouched, so a wrong answer
+costs nothing but the copy — `docker volume rm san-junipero_gateway-data` when you are satisfied.
+
 ## ★ The reset is deliberate and cannot be left lying around
 
 `SJ_FRESH` is hard-coded to `0` in `compose.yaml` — never `${SJ_FRESH:-0}`, and never a bare

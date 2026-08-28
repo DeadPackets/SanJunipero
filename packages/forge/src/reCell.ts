@@ -23,7 +23,7 @@ export function buildingCellPx(fp: Footprint): number {
 
 export type SpritePlan = {
   factor: number // whole-number division between the crop window and the cell
-  window: number // side of the source crop, in generation pixels
+  window: number // longer side of the source crop, in generation pixels
   ox: number
   oy: number
   subjectPx: number
@@ -64,7 +64,7 @@ function blockSample(
 // the next one up and sits smaller in its window rather than being scaled or clipped.
 export function spriteCell(
   keyed: RawImage,
-  opts: { cellPx: number; anchor: 'feet' | 'centre' },
+  opts: { w: number; h: number; anchor: 'feet' | 'centre' },
 ): SpriteCelled {
   const banded = erodeAlpha(keyed, CHROMA_BAND_PX)
   const b = opaqueBbox(banded)
@@ -72,24 +72,26 @@ export function spriteCell(
   const bw = b.x1 - b.x0 + 1,
     bh = b.y1 - b.y0 + 1
 
-  const subjectPx = Math.max(bw, bh)
-  const factor = Math.max(1, Math.ceil(subjectPx / opts.cellPx))
-  const window = opts.cellPx * factor
-  const ox = Math.round(b.x0 + bw / 2 - window / 2)
+  // Each axis on its own, so a 128x32 rig sheet keeps a tall subject's head and feet instead of
+  // cutting them off a square cell.
+  const factor = Math.max(1, Math.ceil(bw / opts.w), Math.ceil(bh / opts.h))
+  const winW = opts.w * factor,
+    winH = opts.h * factor
+  const ox = Math.round(b.x0 + bw / 2 - winW / 2)
   // Feet: the subject's last row is the window's last row, so a standing figure keeps its
   // headroom instead of losing its feet.
-  const oy = opts.anchor === 'feet' ? b.y1 + 1 - window : Math.round(b.y0 + bh / 2 - window / 2)
+  const oy = opts.anchor === 'feet' ? b.y1 + 1 - winH : Math.round(b.y0 + bh / 2 - winH / 2)
 
-  const data = new Uint8ClampedArray(opts.cellPx * opts.cellPx * 4)
-  for (let cy = 0; cy < opts.cellPx; cy++)
-    for (let cx = 0; cx < opts.cellPx; cx++)
+  const data = new Uint8ClampedArray(opts.w * opts.h * 4)
+  for (let cy = 0; cy < opts.h; cy++)
+    for (let cx = 0; cx < opts.w; cx++)
       data.set(
         blockSample(banded, ox + cx * factor, oy + cy * factor, factor),
-        (cy * opts.cellPx + cx) * 4,
+        (cy * opts.w + cx) * 4,
       )
 
   return {
-    cell: { width: opts.cellPx, height: opts.cellPx, data },
-    plan: { factor, window, ox, oy, subjectPx },
+    cell: { width: opts.w, height: opts.h, data },
+    plan: { factor, window: Math.max(winW, winH), ox, oy, subjectPx: Math.max(bw, bh) },
   }
 }

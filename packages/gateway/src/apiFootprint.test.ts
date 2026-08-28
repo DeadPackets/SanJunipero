@@ -135,7 +135,6 @@ describe('★ the read path holds answers, not the log', () => {
       for (const [key, url] of [
         ['GET /api/society', '/api/society'],
         ['GET /api/heat', '/api/heat'],
-        ['GET /api/digest', '/api/digest'],
       ] as [string, string][]) {
         let body = ''
         routes.get(key)!(
@@ -150,12 +149,6 @@ describe('★ the read path holds answers, not the log', () => {
         )
         bodies.set(key, body)
       }
-      // the window nobody repeats, which is the cache miss a stranger can force at will
-      routes.get('GET /api/digest')!(
-        { url: `/api/digest?fromTick=7&toTick=${mirror.state().tick - 13}` } as IncomingMessage,
-        { writeHead: () => {}, end: () => {} } as unknown as ServerResponse,
-        {},
-      )
     }
 
     for (let i = 0; i < FIRST_TRANCHE_TICKS; i++) loop.step()
@@ -186,12 +179,11 @@ describe('★ the read path holds answers, not the log', () => {
     expect(society.nodes).toHaveLength(AGENTS)
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
     expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)
-    expect(bodies.get('GET /api/digest')!.length).toBeGreaterThan(500)
 
     /**
-     * The running map is the whole town's drama, because `/api/digest` must be exact over a
-     * window the viewer picks. What is SENT is the last sim-day, so the body is bounded by the
-     * population and not by the town's age.
+     * The running map is the whole town's drama, because a viewer-picked window must be exact
+     * however far back it reaches. What is SENT is the last sim-day, so the body is bounded by
+     * the population and not by the town's age.
      */
     const oldest = Math.min(...heat.map((w) => w.fromTick))
     const live = mirror.state().tick
@@ -202,7 +194,7 @@ describe('★ the read path holds answers, not the log', () => {
       heat.length,
       'one window per agent per 60 ticks of the horizon, at most',
     ).toBeLessThanOrEqual(Math.ceil(HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 1) * AGENTS)
-    expect(f.heat, 'the MAP is still the whole town, so the digest stays exact').toBeGreaterThan(
+    expect(f.heat, 'the MAP is still the whole town, not only what is sent').toBeGreaterThan(
       heat.length * 4,
     )
 

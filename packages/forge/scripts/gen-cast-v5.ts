@@ -268,7 +268,7 @@ function keyBg(img: RawImage): RawImage {
 // ONE WHOLE FACTOR PER CELL and no source correction: the figure lands where the factor puts it,
 // and the report's figure spread is what says whether the walk cycle still reads.
 const cutCell = (img: RawImage, anchor: 'feet' | 'centre' = 'feet'): RawImage =>
-  spriteCell(img, { cellPx: CHAR_CELL_PX, anchor }).cell
+  spriteCell(img, { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor }).cell
 
 const figureHeight = (img: RawImage): number => {
   const b = opaqueBbox(img)

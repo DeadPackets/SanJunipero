@@ -161,7 +161,7 @@ export async function runCells(o: RunOptions): Promise<void> {
         )
       }
       try {
-        const r = spriteCell(keyBg(await decodePng(buf)), { cellPx, anchor: 'feet' })
+        const r = spriteCell(keyBg(await decodePng(buf)), { w: cellPx, h: cellPx, anchor: 'feet' })
         // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
         const dist = paletteDistance(r.cell)
         const fill = r.plan.subjectPx / r.plan.window

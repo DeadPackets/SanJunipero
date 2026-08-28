@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import type { LlmClient } from '@sj/llm'
+import { BudgetExceededError, type LlmClient } from '@sj/llm'
 import type { ParentPersona } from './derivePersona.js'
 import type { AgentBornPayload } from './watchBirths.js'
 
@@ -19,7 +19,9 @@ export function migrateFamilyTables(db: Database.Database): void {
   `)
 }
 
-/** The mother has already answered for this child; the name is written once and never re-asked. */
+/** The mother has already been ASKED for this child, so no later boot pays for the call again.
+ *  An empty `social_name` is the asked-and-nothing-came-back row; a real name can still land
+ *  later, and the newest row wins. */
 export function hasSocialName(db: Database.Database, agentId: string): boolean {
   return (
     db.prepare('SELECT 1 FROM social_names WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined
@@ -71,12 +73,15 @@ export async function captureSocialName(
       schema: SocialNameAnswer,
     })
     answer = value.name.trim()
-  } catch {
-    return null
+  } catch (err) {
+    // The budget refused before the mother was ever asked, so there is nothing to write down
+    // and a funded boot may ask again. Anything else is a call that happened.
+    if (err instanceof BudgetExceededError) return null
+    answer = ''
   }
-  if (answer.length === 0 || answer.length > MAX_SOCIAL_NAME_CHARS) return null
+  if (answer.length > MAX_SOCIAL_NAME_CHARS) answer = ''
   db.prepare(
     'INSERT INTO social_names (agent_id, social_name, named_by, tick) VALUES (?, ?, ?, ?)',
   ).run(ctx.born.id, answer, ctx.born.motherId, ctx.tick)
-  return answer
+  return answer.length === 0 ? null : answer
 }

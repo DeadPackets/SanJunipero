@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore } from '../memory/store.js'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { buildHouseholdSeed } from './memorySeed.js'
+import { buildHouseholdSeed, SEED_TYPES } from './memorySeed.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 const CHILD = 'agent_7'
@@ -151,6 +151,17 @@ describe('buildHouseholdSeed (T25)', () => {
     const capped = buildHouseholdSeed(store, { ...OPTS, max: 2 })
     expect(capped).toHaveLength(2)
     expect(capped[capped.length - 1]!.text).toContain('mother’s hands')
+  })
+
+  it('★ reads the log by type — never the whole of it, which is 99.5% noise', () => {
+    const store = seedWorld()
+    for (let t = 0; t < 500; t++) store.append(t, 'agent_moved', { id: STRANGER, x: t, y: t })
+    const whole = vi.spyOn(store, 'readFrom')
+    const byType = vi.spyOn(store, 'readTypeFrom')
+
+    expect(buildHouseholdSeed(store, OPTS)).toEqual(buildHouseholdSeed(seedWorld(), OPTS))
+    expect(whole).not.toHaveBeenCalled()
+    expect(new Set(byType.mock.calls.map((c) => c[1]))).toEqual(new Set(SEED_TYPES))
   })
 
   it('a household with no recorded past seeds nothing rather than inventing one', () => {

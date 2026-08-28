@@ -23,7 +23,6 @@ import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { sendJson, toEvent } from './http.js'
-import { clampWindow } from './api.js'
 import { reportOnce } from './degraded.js'
 
 export type NarratorApiDeps = {
@@ -34,8 +33,7 @@ export type NarratorApiDeps = {
 }
 
 /** How many entries `/api/chronicle` sends. Every open panel refetches the feed on a 20 s timer,
- *  and unbounded that is the whole town history per viewer per poll. `/api/chronicle/count` still
- *  counts the whole record, so the badge does not shrink with the page. */
+ *  and unbounded that is the whole town history per viewer per poll. */
 export const CHRONICLE_MAX = 200
 
 /** How many days of the town's own paper `/api/dispatches` sends. The record grows one row a
@@ -92,14 +90,19 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     }
   }
 
-  // Clamped because a free key is a cache a stranger can miss on purpose. The clamped pair is
-  // also the memo key, so every over-long window collapses onto the same entry.
-  const windowOf = (url: URL): { fromTick: number; toTick: number } =>
-    clampWindow(
-      url.searchParams.get('fromTick'),
-      url.searchParams.get('toTick'),
-      deps.mirror.state().tick,
-    )
+  // Clamped because a free key is a cache a stranger can miss on purpose: unclamped,
+  // `?toTick=1000000000` is a scan of a range the world never had. The clamped pair is also the
+  // memo key, so every over-long window collapses onto the same entry.
+  const windowOf = (url: URL): { fromTick: number; toTick: number } => {
+    const liveTick = deps.mirror.state().tick
+    const pin = (raw: string | null, fallback: number): number => {
+      const n = Number(raw ?? fallback)
+      if (!Number.isFinite(n)) return fallback
+      return Math.min(Math.max(Math.trunc(n), 0), liveTick)
+    }
+    const fromTick = pin(url.searchParams.get('fromTick'), 0)
+    return { fromTick, toTick: Math.max(fromTick, pin(url.searchParams.get('toTick'), liveTick)) }
+  }
 
   const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
     cache.value(`chronicle:${fromTick}:${toTick}`, () => {
@@ -143,26 +146,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       cache.json(`chronicle:${fromTick}:${toTick}`, () => ({
         entries: chronicleEntries(fromTick, toTick).slice(-CHRONICLE_MAX),
       })),
-    )
-  })
-
-  /** How long the ledger is, without sending the ledger. It costs nothing extra:
-   *  `chronicleEntries` is memoised per generation, so the badge and the panel share one scan. */
-  router.route('GET', '/api/chronicle/count', (req: IncomingMessage, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const { fromTick, toTick } = windowOf(url)
-    sendPrebuilt(
-      res,
-      cache.json(`chronicle-count:${fromTick}:${toTick}`, () => {
-        const entries = chronicleEntries(fromTick, toTick)
-        const last = entries[entries.length - 1]
-        // `latestSeq` is the feed's newest entry, so a badge can say "N new" without the body.
-        return {
-          count: entries.length,
-          latestSeq: last ? last.seq : 0,
-          latestTick: last ? last.tick : 0,
-        }
-      }),
     )
   })
 

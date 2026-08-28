@@ -24,6 +24,7 @@ import {
   soleSilhouetteGate,
 } from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
+import { trimToFigure } from './hires.js'
 
 const MAX_ART_H = FEET_Y_V2 + 1
 const CALIBRATED_MEDIAN = 0.31
@@ -40,8 +41,12 @@ function fitForGate(img: RawImage): RawImage {
         Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
       )
 }
+// TRIMMED first, which is `gen-cast-v5`'s own gate view (RULING 2026-08-28): the fit below then
+// normalises scale, and the gates stop reading a figure's position in its 256 canvas as a broken
+// head. `gen-cast-v5` also quantizes here for measurement — no gate answer on this cast changes
+// either way, and the ruling says no palette snap anywhere.
 const gateView = (img: RawImage): RawImage =>
-  anchorToCanvas(fitForGate(img), CELL_V2, CELL_V2, FEET_Y_V2)
+  anchorToCanvas(fitForGate(trimToFigure(img)), CELL_V2, CELL_V2, FEET_Y_V2)
 
 const cropper =
   (c: CommittedCharacter, atlas: RawImage) =>
@@ -113,15 +118,10 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   return found
 }
 
-/** Two pinned cells; adding an entry requires a written reason. */
-export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // NO REDRAW CAN CLEAR THIS: `gen-cast-v5` scores the same pair 0.1770 and ships it, because its
-  // gate view trims to the figure and this one keeps the 256 canvas. Retiring it is a ruling on
-  // which of the two views the 0.20 bar was calibrated for, not a request for better art.
-  'amara se head contact-a': '0.2235 against 0.2000 — audit view 0.2235, generator view 0.1770',
-  // The same untrimmed-view gap on the re-cut nadia: `gen-cast-v5` scored 0.1963 and shipped it.
-  'nadia ne head contact-b': '0.2176 against 0.2000 — audit view 0.2176, generator view 0.1963',
-}
+/** EMPTY, measured 2026-08-28: on the generator's own view the shipped cast fails nothing.
+ *  The two entries this held were both the untrimmed view alone. Adding one back requires a
+ *  written reason. */
+export const KNOWN_GATE_DEBT: Record<string, string> = {}
 
 const cast = listCommittedCast()
 
@@ -168,8 +168,11 @@ describe('★ the committed cast against the gates as they now behave', () => {
     ).toEqual([])
   })
 
-  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
+  // The tightest margin on the shipped cast, so a re-cut that eats it shows up here: yusuf
+  // ne/contact-a silhouette 1.1687 against the 1.18 bar, and the worst head is nadia ne/contact-b
+  // at 0.1963 against 0.20.
+  it('★ and the debt is NOTHING, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(0)
   })
 })
 
