@@ -4,19 +4,18 @@
 // BEFORE arm reproduces the landing the previous lane recorded.
 import { writeFileSync } from 'node:fs'
 import { openDb } from '@sj/engine/store'
-import { type Turn, TurnSchema } from '@sj/agents'
 import { LlmClient, migrateLlmTables } from '@sj/llm'
-// Relative, like `g11-deepworld.ts`'s cross-package imports: `assemblePrompt` and the prompt
-// fixtures are internals of `@sj/agents` and not on its public surface. A script is outside
-// the package graph, which is the only reason this is legal here and nowhere in `src`.
-import { assemblePrompt } from '../../agents/src/prompt/assemble.js'
-import { fixtureBlocks } from '../../agents/src/testutil/fixtures.js'
+import { type Turn, TurnSchema } from '../src/turn.js'
+import { assemblePrompt } from '../src/prompt/assemble.js'
+import { fixtureBlocks } from '../src/testutil/fixtures.js'
+// Relative, like `g11-deepworld.ts`'s cross-package imports: a script is outside the package
+// graph, which is the only reason this may reach into `@sj/arbiter` without declaring it.
 import {
   INJECTION_CORPUS,
   renderHeard,
   renderHeardRaw,
   spokenGlassLeak,
-} from '../src/chaos/manipulator.js'
+} from '../../arbiter/src/chaos/manipulator.js'
 
 const CAP_USD = 0.75
 const OUT = process.env.SJ_OUT ?? '/tmp/manipulator-live.json'
