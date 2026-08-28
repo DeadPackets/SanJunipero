@@ -1,24 +1,14 @@
 import type Database from 'better-sqlite3'
+import { ConstructRowSchema, type ConstructRow } from '@sj/shared'
 import type { Construct, ConstructOpsEvent, ConstructOpsType } from './constructs.js'
 
 // The registry lives in the arbiter's database and nowhere else. Nothing here is world state:
 // no row reaches a snapshot, the hash, a perception packet or a prompt.
 
-type RawConstruct = {
-  id: string
-  type: string
-  name: string | null
-  name_provenance: string | null
-  anchor: string | null
-  participants: string
-  first_tick: number
-  recurrences: string
-}
-
-function toConstruct(r: RawConstruct): Construct {
+function toConstruct(r: ConstructRow): Construct {
   return {
     id: r.id,
-    type: r.type as Construct['type'],
+    type: r.type,
     name: r.name,
     nameProvenance:
       r.name_provenance === null
@@ -35,16 +25,14 @@ export class ConstructStore {
   constructor(readonly db: Database.Database) {}
 
   byId(id: string): Construct | null {
-    const row = this.db.prepare('SELECT * FROM constructs WHERE id = ?').get(id) as
-      | RawConstruct
-      | undefined
-    return row === undefined ? null : toConstruct(row)
+    const row = this.db.prepare('SELECT * FROM constructs WHERE id = ?').get(id)
+    return row === undefined ? null : toConstruct(ConstructRowSchema.parse(row))
   }
 
   all(): Construct[] {
-    return (this.db.prepare('SELECT * FROM constructs ORDER BY id').all() as RawConstruct[]).map(
-      toConstruct,
-    )
+    return ConstructRowSchema.array()
+      .parse(this.db.prepare('SELECT * FROM constructs ORDER BY id').all())
+      .map(toConstruct)
   }
 
   upsert(c: Construct): void {

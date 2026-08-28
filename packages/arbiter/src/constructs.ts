@@ -1,14 +1,18 @@
 import { z } from 'zod'
 import type { LlmClient } from '@sj/llm'
 import { effectiveConfig, TOGGLABLE_PATHS } from '@sj/engine'
-import { MINUTES_PER_DAY, assertQuotedName, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  CONSTRUCT_TYPES,
+  MINUTES_PER_DAY,
+  assertQuotedName,
+  type ConstructKind,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import type { ConstructStore } from './constructStore.js'
 
 // The recognizer names a TYPE; the name itself is the town's, quoted from a mouth or left null.
 // Nothing here may reach a prompt, a perception packet, world state or the hash.
-
-export const CONSTRUCT_TYPES = ['festival', 'faith', 'council', 'market', 'custom'] as const
-export type ConstructType = (typeof CONSTRUCT_TYPES)[number]
 
 export const ConstructSchema = z
   .object({
@@ -298,12 +302,10 @@ export async function classifyCandidates(
   candidates: Candidate[],
   llm: LlmClient,
   config: SimConfig,
-): Promise<Map<string, ConstructType>> {
-  const out = new Map<string, ConstructType>()
+): Promise<Map<string, ConstructKind>> {
+  const out = new Map<string, ConstructKind>()
   if (candidates.length === 0) return out
-  const allowed = new Set(
-    CONSTRUCT_TYPES.filter((t) => (config.constructs.types as Record<string, boolean>)[t]),
-  )
+  const allowed = new Set(CONSTRUCT_TYPES.filter((t) => config.constructs.types[t]))
   const r = await llm.object({
     schema: ClassificationSchema,
     system: CONSTRUCT_TYPE_INSTRUCTION,
@@ -312,8 +314,7 @@ export async function classifyCandidates(
   const rulings = r.value.rulings
   for (const c of candidates) {
     const said = rulings.find((x) => x.key === c.key)?.type
-    const type =
-      said !== undefined && allowed.has(said as ConstructType) ? (said as ConstructType) : 'custom'
+    const type = CONSTRUCT_TYPES.find((t) => t === said && allowed.has(t)) ?? 'custom'
     if (allowed.has(type)) out.set(c.key, type)
   }
   return out

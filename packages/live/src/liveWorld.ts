@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { DISCOVERY_EVENT, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { ARBITER_DB_FILE, DISCOVERY_EVENT, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import type { TickHandler } from '@sj/engine'
 import {
   EngineBridge,
@@ -82,10 +82,6 @@ const REFLECTION_SETTLE_MS = 5_000
 const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
-/** Rulings and the codex, never in the world db: the gateway serves that one to strangers. In
- *  `agentDbDir` so `SJ_FRESH=1` resets the town's laws with the town, underscore-prefixed to stay
- *  out of the `<mindId>.db` namespace the amnesia guard walks. */
-const LIVE_ARBITER_DB = '_arbiter.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
  *  mint a recipe out of a material nobody has a word for. */
 const STREAM_VOCABULARY = {
@@ -402,7 +398,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const wantsArbiter = opts.useArbiter !== false
   const arbiterDb =
     wantsArbiter && opts.arbiter === undefined
-      ? openArbiterDb(join(opts.agentDbDir, LIVE_ARBITER_DB))
+      ? openArbiterDb(join(opts.agentDbDir, ARBITER_DB_FILE))
       : null
   if (arbiterDb !== null) {
     // Seeded once per TOWN, not once per boot. Emptiness is the test because it is the only
@@ -584,7 +580,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       log(
         arbiter === undefined
           ? 'stream: the arbiter is OFF — an invented act falls back to experiment and the world answers it'
-          : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`,
+          : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${ARBITER_DB_FILE}`,
       )
 
       // ── the chronicle, on the day boundary ──
