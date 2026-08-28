@@ -61,8 +61,9 @@ export class TickLoop {
     return this.#speed
   }
 
-  /** The world clock stops. Nothing else does: the store, the socket and the viewer keep going,
-   *  and a paused world is the same world one tick later. */
+  /** The world clock stops. Nothing else does: the store, the socket and the viewer keep going.
+   *  The CADENCE honours this, never `step()` — a primitive that sometimes does nothing turns
+   *  every counted advance in the repo into a spin. */
   pause(): void {
     this.#paused = true
   }
@@ -80,7 +81,6 @@ export class TickLoop {
   }
 
   step(): void {
-    if (this.#paused) return
     const prevTick = this.#tick
     const prevState = this.#state
     const prevRng = this.#rng.snapshot()
@@ -121,7 +121,7 @@ export class TickLoop {
     this.#nextAt = Date.now() + this.#realMs / this.#speed
     const run = () => {
       try {
-        this.step()
+        if (!this.#paused) this.step()
       } catch (err) {
         this.#timer = null
         if (this.#onError) {

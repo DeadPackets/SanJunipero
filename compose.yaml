@@ -39,6 +39,7 @@ services:
       # `docker compose exec town`, never through Caddy.
       - SJ_ADMIN_TOKEN
       - SJ_ADMIN_PORT
+      - SJ_GIT_SHA
       - SJ_MINDS_DIR
       - SJ_MODELS_DIR
       - OPENROUTER_API_KEY

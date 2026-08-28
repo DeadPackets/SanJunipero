@@ -21,7 +21,7 @@ type RulingsAdmin = {
 }
 
 /** The live half's ops surface: the call ledger, the caps the run is under, and the ruling
- *  queue. Absent on a scripted stream, which spends nothing and codifies nothing. */
+ *  queue. */
 export type LiveOps = {
   /** `_ops.db` — `llm_calls` and `alerts`, open for as long as the cast is. */
   opsDb: Database.Database
@@ -44,8 +44,8 @@ export type LiveCast = {
      *  cast is attached (`FoundersOpts.minds`). A live cast wraps it, never replaces it. */
     world: TickHandler
   }): TickHandler
-  /** Read by the operator's channel only; nothing here ever reaches a mind's prompt. Absent
-   *  on a cast that buys nothing, which is every fake one. */
-  ops?: LiveOps
+  /** Read by the operator's channel only; nothing here ever reaches a mind's prompt. `null` is
+   *  a cast that buys nothing — every fake one. */
+  ops: LiveOps | null
   stop(): Promise<void>
 }

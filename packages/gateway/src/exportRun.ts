@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Writable } from 'node:stream'
 import Database from 'better-sqlite3'
+import { MINUTES_PER_DAY } from '@sj/shared'
 
 /** Everything a run needs to be replayed somewhere else, as one tar. See `deploy/README.md`. */
 export type ExportOpts = {
@@ -28,8 +29,6 @@ export type RunManifest = {
 
 const BLOCK = 512
 const ROOT = 'run/'
-/** One sim-day. `@sj/shared` owns the constant, and the gateway does not depend on the clock. */
-const TICKS_PER_DAY = 1440
 
 const octal = (n: number, width: number): string => n.toString(8).padStart(width - 1, '0') + '\0'
 
@@ -71,24 +70,26 @@ function snapshotDb(path: string): Buffer {
   }
 }
 
-function worldFacts(path: string): Pick<RunManifest, 'world' | 'tick' | 'events'> {
+/** The world, on ONE handle: its bytes and the facts the manifest reports about them. */
+function readWorld(
+  path: string,
+): Pick<RunManifest, 'world' | 'tick' | 'events'> & { bytes: Buffer } {
   const db = new Database(path, { readonly: true, fileMustExist: true })
   try {
+    // `seq` is an autoincrementing primary key and no row is ever deleted, so its max IS the count.
     const head = db
-      .prepare('SELECT COUNT(*) AS events, COALESCE(MAX(tick), 0) AS tick FROM events')
+      .prepare('SELECT COALESCE(MAX(seq), 0) AS events, COALESCE(MAX(tick), 0) AS tick FROM events')
       .get() as { events: number; tick: number }
     // `world_meta` is the town's table, not the observatory's: a world db without one still
     // exports, it simply cannot say which map it was platted on.
     let world: RunManifest['world'] = null
     try {
-      world =
-        (db.prepare('SELECT map, rings, seed FROM world_meta WHERE id = 1').get() as
-          | Record<string, unknown>
-          | undefined) ?? null
+      world = (db.prepare('SELECT map, rings, seed FROM world_meta WHERE id = 1').get() ??
+        null) as RunManifest['world']
     } catch {
-      world = null
+      /* no such table: an older world, or one this process never platted */
     }
-    return { world, ...head }
+    return { world, ...head, bytes: db.serialize() }
   } finally {
     db.close()
   }
@@ -104,23 +105,23 @@ export function writeRunTar(out: Writable, opts: ExportOpts): RunManifest {
     writeEntry(out, ROOT + path, body, now)
   }
 
-  put('world.db', snapshotDb(opts.worldDbPath))
+  const { bytes, ...world } = readWorld(opts.worldDbPath)
+  put('world.db', bytes)
   let minds: string[] = []
   try {
     minds = readdirSync(opts.mindsDir)
       .filter((n) => n.endsWith('.db'))
       .sort()
   } catch {
-    minds = []
+    /* a scripted stream has no minds directory */
   }
   for (const name of minds) put(`minds/${name}`, snapshotDb(join(opts.mindsDir, name)))
   put('config.json', Buffer.from(JSON.stringify(opts.config, null, 2)))
 
-  const facts = worldFacts(opts.worldDbPath)
   const manifest: RunManifest = {
     gitSha: process.env.SJ_GIT_SHA ?? null,
-    ...facts,
-    day: Math.floor(facts.tick / TICKS_PER_DAY),
+    ...world,
+    day: Math.floor(world.tick / MINUTES_PER_DAY),
     takenAt: new Date(now).toISOString(),
     files,
   }

@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { TOGGLABLE_PATHS } from '@sj/engine'
+import { reportOnce } from './degraded.js'
+import { sendJson } from './http.js'
 
 const ADMIN_LAWS_PATH = '/admin/laws'
 const DEFAULT_ADMIN_HOST = '127.0.0.1'
@@ -21,13 +23,8 @@ export type LawsAdminOpts = {
   submitLaw: (path: string, value: unknown) => void
   token: string
   host?: string
-  /** Everything else the operator may do. `adminOps.ts` is one; a lane adds its own here. */
+  /** Everything else the operator may do — see `adminOps.ts`. */
   routes?: readonly AdminRoute[]
-}
-
-function send(res: ServerResponse, status: number, body: Record<string, unknown>): void {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
 }
 
 export function readBody(req: IncomingMessage): Promise<string | null> {
@@ -47,7 +44,7 @@ export function readBody(req: IncomingMessage): Promise<string | null> {
   })
 }
 
-function match(route: AdminRoute, pathname: string): { params: Record<string, string> } | null {
+function match(route: AdminRoute, pathname: string): Record<string, string> | null {
   const want = route.path.split('/').filter(Boolean)
   const got = pathname.split('/').filter(Boolean)
   if (want.length !== got.length) return null
@@ -57,7 +54,7 @@ function match(route: AdminRoute, pathname: string): { params: Record<string, st
     if (seg.startsWith(':')) params[seg.slice(1)] = got[i]!
     else if (seg !== got[i]) return null
   }
-  return { params }
+  return params
 }
 
 // The admin channel is a separate server on a separate port from the read-only
@@ -77,31 +74,31 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
     handle: (req, res) => {
       void readBody(req).then((text) => {
         if (text === null) {
-          send(res, 400, { error: 'body unreadable' })
+          sendJson(res, { error: 'body unreadable' }, 400)
           return
         }
         let parsed: z.infer<typeof LawRequest>
         try {
           parsed = LawRequest.parse(JSON.parse(text))
         } catch {
-          send(res, 400, { error: 'expected {path, value}' })
+          sendJson(res, { error: 'expected {path, value}' }, 400)
           return
         }
         const schema = TOGGLABLE_PATHS[parsed.path]
         if (schema === undefined) {
-          send(res, 400, { error: `${parsed.path} is not a world law` })
+          sendJson(res, { error: `${parsed.path} is not a world law` }, 400)
           return
         }
         // The fold THROWS on a value its schema rejects, so a cheerful 202 here
         // would take the world down at the next tick boundary. Refuse it now.
         const value = schema.safeParse(parsed.value)
         if (!value.success) {
-          send(res, 400, { error: `value rejected for ${parsed.path}` })
+          sendJson(res, { error: `value rejected for ${parsed.path}` }, 400)
           return
         }
 
         opts.submitLaw(parsed.path, value.data)
-        send(res, 202, { accepted: parsed.path, value: value.data })
+        sendJson(res, { accepted: parsed.path, value: value.data }, 202)
       })
     },
   }
@@ -109,24 +106,31 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    const here = routes.filter((r) => match(r, url.pathname) !== null)
-    if (here.length === 0) {
-      send(res, 404, { error: 'not found' })
+    for (const route of routes) {
+      const params = match(route, url.pathname)
+      if (params === null) continue
+      if (route.method !== (req.method ?? 'GET')) {
+        sendJson(res, { error: `${route.method} only` }, 405)
+      } else if (req.headers.authorization !== `Bearer ${opts.token}`) {
+        sendJson(res, { error: 'unauthorized' }, 401)
+      } else if (wrongInterface(req)) {
+        sendJson(res, { error: `the law channel answers on ${host} only` }, 403)
+      } else {
+        try {
+          route.handle(req, res, params)
+        } catch (e) {
+          // Unguarded, a throw in here is an uncaughtException on the thread that ticks the town.
+          reportOnce(
+            `admin.${route.method} ${route.path}`,
+            () =>
+              `${route.method} ${route.path} threw — ${e instanceof Error ? e.message : String(e)}`,
+          )
+          if (res.headersSent) res.destroy()
+          else sendJson(res, { error: 'internal error' }, 500)
+        }
+      }
       return
     }
-    const route = here.find((r) => r.method === (req.method ?? 'GET'))
-    if (route === undefined) {
-      send(res, 405, { error: `${here.map((r) => r.method).join('/')} only` })
-      return
-    }
-    if (req.headers.authorization !== `Bearer ${opts.token}`) {
-      send(res, 401, { error: 'unauthorized' })
-      return
-    }
-    if (wrongInterface(req)) {
-      send(res, 403, { error: `the law channel answers on ${host} only` })
-      return
-    }
-    route.handle(req, res, match(route, url.pathname)!.params)
+    sendJson(res, { error: 'not found' }, 404)
   })
 }

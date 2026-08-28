@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { momentStamp } from '../stamp.js'
 
 /** The admin channel is a separate localhost server, not the viewer's origin. */
@@ -41,10 +41,8 @@ export const pct = (r: number | null): string => (r === null ? '—' : `${Math.r
 
 // ── the channel ─────────────────────────────────────────────────────────────────────────────
 
-export type FetchLike = typeof fetch
-
 async function ask<T>(
-  fetchFn: FetchLike,
+  fetchFn: typeof fetch,
   token: string,
   path: string,
   init: RequestInit = {},
@@ -68,30 +66,26 @@ async function ask<T>(
 const failed = (r: unknown): r is { error: string } =>
   typeof r === 'object' && r !== null && 'error' in r
 
-/** One read of the operator's channel, re-taken on `READ_EVERY_MS` and after every write. */
+/** One read of the operator's channel, re-taken on `READ_EVERY_MS` and after every write. The
+ *  refetch goes through a ref, not through the effect's deps: a write must not re-time the beat. */
 function useAdminRead<T>(token: string, path: string): [T | null, () => void] {
   const [data, setData] = useState<T | null>(null)
-  const [turn, setTurn] = useState(0)
+  const alive = useRef(true)
+  const read = useCallback(() => {
+    void ask<T>(fetch, token, path).then((r) => {
+      if (alive.current && !failed(r)) setData(r)
+    })
+  }, [token, path])
   useEffect(() => {
-    let live = true
-    const read = (): void => {
-      void ask<T>(fetch, token, path).then((r) => {
-        if (live && !failed(r)) setData(r)
-      })
-    }
+    alive.current = true
     read()
     const timer = setInterval(read, READ_EVERY_MS)
     return () => {
-      live = false
+      alive.current = false
       clearInterval(timer)
     }
-  }, [token, path, turn])
-  return [
-    data,
-    useCallback(() => {
-      setTurn((t) => t + 1)
-    }, []),
-  ]
+  }, [read])
+  return [data, read]
 }
 
 // ── the clock ───────────────────────────────────────────────────────────────────────────────
@@ -161,7 +155,7 @@ export function ClockSection({
       onWrite={(path, body) => {
         void ask<ClockState>(fetch, token, path, {
           method: 'POST',
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          body: JSON.stringify(body ?? {}),
         }).then((r) => {
           onNotice(failed(r) ? r.error : '')
           reread()
@@ -192,8 +186,7 @@ export function SpendView({ cost }: { cost: CostReport }) {
     <section className="ops-block" aria-label="Spend">
       <h3 className="feed-head">Spend</h3>
 
-      {/* The point of the whole page: a town that begins things and finishes none wanted none
-          of them. Money is the cost of the question; this is the answer. */}
+      {/* Money is what the question cost; this is the answer to it. */}
       <p className="ops-answer">
         <span className="ops-figure">{pct(answer.rate)}</span>
         <span className="ops-answer-says">

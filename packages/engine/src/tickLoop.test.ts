@@ -183,39 +183,50 @@ describe('TickLoop', () => {
 })
 
 describe('the operator stops the clock', () => {
-  it('a paused loop advances no tick, writes no event, and resumes where it stopped', () => {
-    const { store, loop: l } = loop(({ tick, emit }) => {
-      if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
-    })
-    l.step()
-    const atPause = { tick: l.tick, seq: store.lastSeq(), hash: stateHash(l.state) }
+  it('★ the cadence stops, and step() stays the primitive every counted advance relies on', () => {
+    vi.useFakeTimers()
+    try {
+      const { store, loop: l } = loop(({ tick, emit }) => {
+        if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+      })
+      l.start()
+      vi.advanceTimersByTime(5000)
+      const atPause = { tick: l.tick, seq: store.lastSeq(), hash: stateHash(l.state) }
+      expect(atPause.tick).toBeGreaterThan(0)
 
-    l.pause()
-    expect(l.paused).toBe(true)
-    for (let i = 0; i < 5; i++) l.step()
-    expect(l.tick).toBe(atPause.tick)
-    expect(store.lastSeq()).toBe(atPause.seq)
-    expect(stateHash(l.state)).toBe(atPause.hash)
+      l.pause()
+      expect(l.paused).toBe(true)
+      vi.advanceTimersByTime(60_000)
+      expect(l.tick, 'a paused world must not move on the wall clock').toBe(atPause.tick)
+      expect(store.lastSeq()).toBe(atPause.seq)
+      expect(stateHash(l.state)).toBe(atPause.hash)
 
-    l.resume()
-    l.step()
-    expect(l.paused).toBe(false)
-    expect(l.tick).toBe(atPause.tick + 1)
+      // A pause that made `step()` a no-op would turn every `while (tick < n) step()` in the
+      // repo into a spin. It is the CADENCE that stops.
+      l.step()
+      expect(l.tick).toBe(atPause.tick + 1)
+
+      l.resume()
+      vi.advanceTimersByTime(5000)
+      expect(l.paused).toBe(false)
+      expect(l.tick).toBeGreaterThan(atPause.tick + 1)
+      l.stop()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('the real-time cadence stops with it, and speed re-times the timer', () => {
+  it('speed re-times the loop’s own timer while it is running', () => {
     vi.useFakeTimers()
     try {
       const { loop: l } = loop(() => {})
-      l.setSpeed(2)
-      expect(l.speed).toBe(2)
       l.start()
-      vi.advanceTimersByTime(5000)
-      const ran = l.tick
-      expect(ran).toBeGreaterThan(0)
-      l.pause()
-      vi.advanceTimersByTime(60_000)
-      expect(l.tick, 'a paused world must not move on the wall clock either').toBe(ran)
+      vi.advanceTimersByTime(10_000)
+      const atOne = l.tick
+      l.setSpeed(4)
+      expect(l.speed).toBe(4)
+      vi.advanceTimersByTime(10_000)
+      expect(l.tick - atOne).toBeGreaterThan(atOne)
       l.stop()
     } finally {
       vi.useRealTimers()

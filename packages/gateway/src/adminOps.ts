@@ -1,7 +1,7 @@
-import type { ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
 import { readBody, type AdminRoute } from './adminLaws.js'
 import { writeRunTar, type ExportOpts } from './exportRun.js'
+import { sendJson } from './http.js'
 import type { LiveOps } from './liveCast.js'
 
 /** The world clock, as the operator holds it. `TickLoop` satisfies this. */
@@ -16,25 +16,31 @@ export type Clock = {
 
 export type OpsDeps = ExportOpts & {
   clock: Clock
-  /** The live half's ledger and ruling queue, or null on a scripted stream. */
+  /** A thunk, not a value: a cast attached after the channel opened is still seen. Null while
+   *  the stream is scripted, which spends nothing and codifies nothing. */
   ops: () => LiveOps | null
 }
 
 /** Faster than a mind can think and slower than the disk can write are both useless. */
 const MIN_SPEED = 0.1
 export const MAX_SPEED = 60
-/** The projection window, in real minutes — the same window `@sj/llm`'s spend monitor uses. The
- *  gateway reads the ledger rather than importing it: `@sj/llm` pulls the model SDK. */
+/** The gateway reads the ledger with SQL rather than importing `@sj/llm`'s spend monitor: that
+ *  package pulls the model SDK, which the scripted path must never load. */
 const SPEND_WINDOW_REAL_MINUTES = 15
-/** One sim-day is one real hour, so a 15-minute window scales by 4 to reach $/sim-day. */
 const REAL_MINUTES_PER_SIM_DAY = 60
 const DAY_MS = 24 * 60 * 60 * 1000
 const TOP_MINDS = 10
 const RECENT_ALERTS = 10
+/** One sim-day is one real hour, so the motive number moves far slower than a page polls. It is
+ *  the only read here that walks the whole world log. */
+const ANSWER_RATE_TTL_MS = 60_000
 
-const send = (res: ServerResponse, status: number, body: unknown): void => {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
+const bodyJson = (text: string | null): Record<string, unknown> => {
+  try {
+    return JSON.parse(text ?? '{}') as Record<string, unknown>
+  } catch {
+    return {}
+  }
 }
 
 // ── the money ───────────────────────────────────────────────────────────────────────────────
@@ -56,36 +62,57 @@ export type CostReport = {
   answerRate: AnswerRate
 }
 
-const NOTHING_SPENT = { calls: 0, usd: 0 }
+type Money = Omit<CostReport, 'answerRate'>
 
-const spendSince = (db: Database.Database, sinceMs: number): Spend =>
-  db
-    .prepare(
-      'SELECT COUNT(*) AS calls, COALESCE(SUM(cost_usd), 0) AS usd FROM llm_calls WHERE ts >= ?',
-    )
-    .get(sinceMs) as Spend
+const NOTHING_SPENT: Spend = { calls: 0, usd: 0 }
+const NOTHING_BOUGHT: Money = {
+  live: false,
+  today: NOTHING_SPENT,
+  lifetime: NOTHING_SPENT,
+  projection: { usdPerSimDay: 0, windowRealMinutes: SPEND_WINDOW_REAL_MINUTES, sampledCalls: 0 },
+  byCaller: [],
+  byMind: [],
+  cacheReadShare: null,
+  caps: { dailyUsd: 0, lifetimeUsd: 0 },
+  stop: { dailyReached: false, lifetimeReached: false },
+  alerts: [],
+}
 
-function ledger(
-  db: Database.Database,
-  caps: LiveOps['caps'],
-  now: number,
-): Omit<CostReport, 'answerRate'> {
-  const today = spendSince(db, now - DAY_MS)
-  const lifetime = spendSince(db, 0)
-  const window = spendSince(db, now - SPEND_WINDOW_REAL_MINUTES * 60_000)
-  const tokens = db
+// One pass for three windows and the token share: four `SELECT`s walked the same pages four times.
+type Totals = {
+  todayCalls: number
+  todayUsd: number
+  lifeCalls: number
+  lifeUsd: number
+  windowCalls: number
+  windowUsd: number
+  input: number
+  cached: number
+}
+
+function ledger(db: Database.Database, caps: LiveOps['caps'], now: number): Money {
+  const t = db
     .prepare(
-      'SELECT COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(cache_read_tokens), 0) AS cached FROM llm_calls',
+      `SELECT
+         COALESCE(SUM(ts >= @day), 0) AS todayCalls,
+         COALESCE(SUM(CASE WHEN ts >= @day THEN cost_usd ELSE 0 END), 0) AS todayUsd,
+         COUNT(*) AS lifeCalls,
+         COALESCE(SUM(cost_usd), 0) AS lifeUsd,
+         COALESCE(SUM(ts >= @window), 0) AS windowCalls,
+         COALESCE(SUM(CASE WHEN ts >= @window THEN cost_usd ELSE 0 END), 0) AS windowUsd,
+         COALESCE(SUM(input_tokens), 0) AS input,
+         COALESCE(SUM(cache_read_tokens), 0) AS cached
+       FROM llm_calls`,
     )
-    .get() as { input: number; cached: number }
+    .get({ day: now - DAY_MS, window: now - SPEND_WINDOW_REAL_MINUTES * 60_000 }) as Totals
   return {
     live: true,
-    today,
-    lifetime,
+    today: { calls: t.todayCalls, usd: t.todayUsd },
+    lifetime: { calls: t.lifeCalls, usd: t.lifeUsd },
     projection: {
-      usdPerSimDay: window.usd * (REAL_MINUTES_PER_SIM_DAY / SPEND_WINDOW_REAL_MINUTES),
+      usdPerSimDay: t.windowUsd * (REAL_MINUTES_PER_SIM_DAY / SPEND_WINDOW_REAL_MINUTES),
       windowRealMinutes: SPEND_WINDOW_REAL_MINUTES,
-      sampledCalls: window.calls,
+      sampledCalls: t.windowCalls,
     },
     byCaller: db
       .prepare(
@@ -99,11 +126,11 @@ function ledger(
           ' FROM llm_calls WHERE agent_id IS NOT NULL GROUP BY agent_id ORDER BY usd DESC LIMIT ?',
       )
       .all(TOP_MINDS) as CostReport['byMind'],
-    cacheReadShare: tokens.input > 0 ? tokens.cached / tokens.input : null,
+    cacheReadShare: t.input > 0 ? t.cached / t.input : null,
     caps,
     stop: {
-      dailyReached: caps.dailyUsd > 0 && today.usd >= caps.dailyUsd,
-      lifetimeReached: caps.lifetimeUsd > 0 && lifetime.usd >= caps.lifetimeUsd,
+      dailyReached: caps.dailyUsd > 0 && t.todayUsd >= caps.dailyUsd,
+      lifetimeReached: caps.lifetimeUsd > 0 && t.lifeUsd >= caps.lifetimeUsd,
     },
     alerts: db
       .prepare('SELECT ts, kind, detail FROM alerts ORDER BY id DESC LIMIT ?')
@@ -114,10 +141,8 @@ function ledger(
 // ── the motive number ───────────────────────────────────────────────────────────────────────
 
 /**
- * `~/handoff/cleanup/honest.md` §1 asks for the ANSWER RATE: of the wants a mind stated, the
- * share that led to an act. The drives layer it names does not exist on this branch, so this is
- * the closest the log can measure — of the actions a mind STARTED, the share that finished.
- * A mind that abandons everything it begins wanted none of it.
+ * `honest.md` §1's answer rate, as near as this branch can measure it: of the acts a body
+ * STARTED, the share that finished. A mind that abandons everything it begins wanted none of it.
  */
 export type AnswerRate = {
   stated: number
@@ -178,77 +203,62 @@ export function answerRate(worldDbPath: string): AnswerRate {
   }
 }
 
-export function costReport(deps: OpsDeps, now = Date.now()): CostReport {
-  const ops = deps.ops()
-  const money =
-    ops === null
-      ? {
-          live: false,
-          today: NOTHING_SPENT,
-          lifetime: NOTHING_SPENT,
-          projection: {
-            usdPerSimDay: 0,
-            windowRealMinutes: SPEND_WINDOW_REAL_MINUTES,
-            sampledCalls: 0,
-          },
-          byCaller: [],
-          byMind: [],
-          cacheReadShare: null,
-          caps: { dailyUsd: 0, lifetimeUsd: 0 },
-          stop: { dailyReached: false, lifetimeReached: false },
-          alerts: [],
-        }
-      : ledger(ops.opsDb, ops.caps, now)
-  return { ...money, answerRate: answerRate(deps.worldDbPath) }
-}
-
 // ── the routes ──────────────────────────────────────────────────────────────────────────────
 
-type ClockState = { paused: boolean; speed: number; tick: number }
-const clockState = (c: Clock): ClockState => ({ paused: c.paused, speed: c.speed, tick: c.tick })
+const clockState = (c: Clock) => ({ paused: c.paused, speed: c.speed, tick: c.tick })
 
-function rulingRoute(
-  deps: OpsDeps,
-  act: (rulings: NonNullable<LiveOps['rulings']>, ruleId: number, reason: string) => void,
-): AdminRoute['handle'] {
+function rulingRoute(deps: OpsDeps, verdict: 'approve' | 'revert'): AdminRoute['handle'] {
   return (req, res, params) => {
     const rulings = deps.ops()?.rulings ?? null
     if (rulings === null) {
-      send(res, 409, { error: 'this stream has no god layer — nothing has been codified' })
+      sendJson(res, { error: 'this stream has no god layer — nothing has been codified' }, 409)
       return
     }
     const ruleId = Number(params.id)
     if (!Number.isInteger(ruleId)) {
-      send(res, 400, { error: 'a ruling is named by its rule id' })
+      sendJson(res, { error: 'a ruling is named by its rule id' }, 400)
       return
     }
     void readBody(req).then((text) => {
-      let reason = ''
+      const said = bodyJson(text).reason
       try {
-        const said = (JSON.parse(text ?? '{}') as { reason?: unknown }).reason
-        if (typeof said === 'string') reason = said
-      } catch {
-        reason = ''
-      }
-      try {
-        act(rulings, ruleId, reason)
+        if (verdict === 'approve') rulings.approve(ruleId)
+        else
+          rulings.revert(
+            ruleId,
+            typeof said === 'string' && said !== '' ? said : 'the operator reverted it',
+            deps.clock.tick,
+          )
       } catch (e) {
-        send(res, 400, { error: e instanceof Error ? e.message : String(e) })
+        sendJson(res, { error: e instanceof Error ? e.message : String(e) }, 400)
         return
       }
-      send(res, 200, { pending: rulings.pending() })
+      sendJson(res, { pending: rulings.pending() })
     })
   }
 }
 
 /** The operator's own routes, mounted beside `/admin/laws` on the same loopback bearer channel. */
 export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
+  // The whole world log, aggregated, is the one costly read on this channel; the number it
+  // yields moves on a sim-day timescale and the page polls every few seconds.
+  let motive: { at: number; rate: AnswerRate } | null = null
+  const costReport = (now = Date.now()): CostReport => {
+    if (motive === null || now - motive.at > ANSWER_RATE_TTL_MS)
+      motive = { at: now, rate: answerRate(deps.worldDbPath) }
+    const ops = deps.ops()
+    return {
+      ...(ops === null ? NOTHING_BOUGHT : ledger(ops.opsDb, ops.caps, now)),
+      answerRate: motive.rate,
+    }
+  }
+
   return [
     {
       method: 'GET',
       path: '/admin/clock',
       handle: (_req, res) => {
-        send(res, 200, clockState(deps.clock))
+        sendJson(res, clockState(deps.clock))
       },
     },
     {
@@ -256,7 +266,7 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
       path: '/admin/pause',
       handle: (_req, res) => {
         deps.clock.pause()
-        send(res, 200, clockState(deps.clock))
+        sendJson(res, clockState(deps.clock))
       },
     },
     {
@@ -264,7 +274,7 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
       path: '/admin/resume',
       handle: (_req, res) => {
         deps.clock.resume()
-        send(res, 200, clockState(deps.clock))
+        sendJson(res, clockState(deps.clock))
       },
     },
     {
@@ -272,18 +282,13 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
       path: '/admin/speed',
       handle: (req, res) => {
         void readBody(req).then((text) => {
-          let x = NaN
-          try {
-            x = Number((JSON.parse(text ?? '') as { x?: unknown }).x)
-          } catch {
-            x = NaN
-          }
+          const x = Number(bodyJson(text).x)
           if (!(x >= MIN_SPEED && x <= MAX_SPEED)) {
-            send(res, 400, { error: `expected {x} between ${MIN_SPEED} and ${MAX_SPEED}` })
+            sendJson(res, { error: `expected {x} between ${MIN_SPEED} and ${MAX_SPEED}` }, 400)
             return
           }
           deps.clock.setSpeed(x)
-          send(res, 200, clockState(deps.clock))
+          sendJson(res, clockState(deps.clock))
         })
       },
     },
@@ -291,30 +296,18 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
       method: 'GET',
       path: '/admin/cost',
       handle: (_req, res) => {
-        send(res, 200, costReport(deps))
+        sendJson(res, costReport())
       },
     },
     {
       method: 'GET',
       path: '/admin/rulings/pending',
       handle: (_req, res) => {
-        send(res, 200, { pending: deps.ops()?.rulings?.pending() ?? [] })
+        sendJson(res, { pending: deps.ops()?.rulings?.pending() ?? [] })
       },
     },
-    {
-      method: 'POST',
-      path: '/admin/rulings/:id/approve',
-      handle: rulingRoute(deps, (rulings, ruleId) => {
-        rulings.approve(ruleId)
-      }),
-    },
-    {
-      method: 'POST',
-      path: '/admin/rulings/:id/revert',
-      handle: rulingRoute(deps, (rulings, ruleId, reason) => {
-        rulings.revert(ruleId, reason === '' ? 'the operator reverted it' : reason, deps.clock.tick)
-      }),
-    },
+    { method: 'POST', path: '/admin/rulings/:id/approve', handle: rulingRoute(deps, 'approve') },
+    { method: 'POST', path: '/admin/rulings/:id/revert', handle: rulingRoute(deps, 'revert') },
     {
       method: 'GET',
       path: '/admin/export',

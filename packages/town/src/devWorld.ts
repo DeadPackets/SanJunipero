@@ -387,14 +387,18 @@ export async function startDevWorld(
     console.log(`dev world: fast-forwarded to tick ${loop.state.tick}`)
   }
 
-  // A self-arming beat, not an interval: `loop.speed` is the operator's dial (POST /admin/speed)
-  // and an interval already armed cannot be re-timed.
+  // A self-arming beat, not an interval: the operator's dial (POST /admin/speed, /admin/pause)
+  // moves `loop.speed` and `loop.paused`, and an interval already armed cannot be re-timed.
   const beatMs = opts.realMsPerTick ?? DEV_MS_PER_TICK
   const beat = (): void => {
-    tickOnce()
+    if (!loop.paused) tickOnce()
+    arm()
+  }
+  const arm = (): void => {
     timer = setTimeout(beat, beatMs / loop.speed)
   }
-  let timer = setTimeout(beat, beatMs)
+  let timer: ReturnType<typeof setTimeout>
+  arm()
 
   return {
     gateway,

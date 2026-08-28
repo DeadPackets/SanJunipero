@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { openDb } from '@sj/engine/store'
 import { createLawsAdmin } from './adminLaws.js'
-import { adminOpsRoutes, answerRate, costReport, MAX_SPEED, type Clock } from './adminOps.js'
+import { adminOpsRoutes, answerRate, MAX_SPEED, type Clock, type CostReport } from './adminOps.js'
 import type { LiveOps, PendingRuling } from './liveCast.js'
 
 const TOKEN = 'ops-secret'
@@ -198,7 +198,7 @@ describe('the cost dashboard', () => {
   it('reads the ledger per caller, per mind and against the caps', async () => {
     const r = await call('/admin/cost')
     expect(r.status).toBe(200)
-    const cost = JSON.parse(r.body) as ReturnType<typeof costReport>
+    const cost = JSON.parse(r.body) as CostReport
     expect(cost.live).toBe(true)
     expect(cost.lifetime).toEqual({ calls: 3, usd: 0.08 })
     expect(cost.byCaller.map((c) => c.caller)).toEqual(['arbiter', 'turn'])
@@ -211,7 +211,7 @@ describe('the cost dashboard', () => {
   })
 
   it('★ carries the answer rate: of the acts begun, the share that finished', async () => {
-    const cost = JSON.parse((await call('/admin/cost')).body) as ReturnType<typeof costReport>
+    const cost = JSON.parse((await call('/admin/cost')).body) as CostReport
     expect(cost.answerRate).toMatchObject({ stated: 2, answered: 1, abandoned: 1, rate: 0.5 })
     expect(cost.answerRate.byVerb).toEqual([
       { verb: 'build', stated: 1, answered: 1 },
@@ -223,7 +223,7 @@ describe('the cost dashboard', () => {
     const live = ops
     ops = null
     try {
-      const cost = JSON.parse((await call('/admin/cost')).body) as ReturnType<typeof costReport>
+      const cost = JSON.parse((await call('/admin/cost')).body) as CostReport
       expect(cost.live).toBe(false)
       expect(cost.lifetime).toEqual({ calls: 0, usd: 0 })
       expect(cost.byCaller).toEqual([])

@@ -788,7 +788,7 @@ body {
   grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
   font-size: 0.875rem; color: var(--ink-quiet);
 }
-.law-edit select, .law-edit input {
+.law-edit select, .law-edit input, .ops-reason input {
   font: inherit; padding: 0.15rem 0.35rem; min-height: 40px;
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
@@ -859,10 +859,7 @@ body {
 }
 .ops-ruling .law-path { flex: 1 1 8rem; }
 .ops-reason { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
-.ops-reason input {
-  flex: 1 1 auto; min-width: 0; font: inherit; min-height: 40px; padding: 0.15rem 0.35rem;
-  background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
-}
+.ops-reason input { flex: 1 1 auto; min-width: 0; }
 
 .ops-export { display: grid; gap: 0.2rem; margin: 1rem 0 0; }
 .ops-link {

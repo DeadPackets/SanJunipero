@@ -310,6 +310,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const opsDb = openAgentDb(join(opts.agentDbDir, LIVE_OPS_DB))
   migrateLlmTables(opsDb)
   opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts)')
+  opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_agent ON llm_calls(agent_id)')
   const spentToday = (): number => ledgerTotalUsd(opsDb, Date.now() - SPEND_DAY_MS)
 
   // Before the pre-flight, because the pre-flight spends and a town that is already over either
