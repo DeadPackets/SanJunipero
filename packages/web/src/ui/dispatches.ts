@@ -8,7 +8,13 @@ export type DispatchesFeed = {
   captions: readonly { day: number; caption: string }[]
   biographies: readonly { subjectId: string; day: number; title: string; body: string }[]
   eras: readonly { startDay: number; endDay: number; title: string; text: string }[]
-  institutions: readonly { day: number; kind: string; name: string; description: string }[]
+  institutions: readonly {
+    day: number
+    kind: string
+    name: string
+    description: string
+    memberIds: readonly string[]
+  }[]
   heat: readonly { day: number; total: number }[]
 }
 
@@ -21,6 +27,20 @@ export const EMPTY_DISPATCHES: DispatchesFeed = {
   heat: [],
 }
 
+/** The members come off the narrator's table as the JSON array it stores, so they are read
+ *  here rather than at every call site that wants to know who is in a thing. */
+function memberIds(v: unknown): string[] {
+  const raw: unknown = typeof v === 'string' ? safeParse(v) : v
+  return Array.isArray(raw) ? raw.filter((s): s is string => typeof s === 'string') : []
+}
+const safeParse = (s: string): unknown => {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return null
+  }
+}
+
 /** Every list is optional on the wire; a table the narrator has nothing in is an empty one. */
 export function dispatchesFrom(body: unknown): DispatchesFeed {
   const b = body as Partial<DispatchesFeed> | null
@@ -29,7 +49,7 @@ export function dispatchesFrom(body: unknown): DispatchesFeed {
     captions: b?.captions ?? [],
     biographies: b?.biographies ?? [],
     eras: b?.eras ?? [],
-    institutions: b?.institutions ?? [],
+    institutions: (b?.institutions ?? []).map((i) => ({ ...i, memberIds: memberIds(i.memberIds) })),
     heat: b?.heat ?? [],
   }
 }

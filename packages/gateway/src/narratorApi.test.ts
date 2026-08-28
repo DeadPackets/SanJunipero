@@ -132,7 +132,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
         `INSERT INTO institutions (kind, name, description, founding_scene_id, member_ids, source_event_ids)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run('group', 'the morning watch', 'They rose together.', 1, '[]', '[]')
+      .run('group', 'the morning watch', 'They rose together.', 1, '["alice","bob"]', '[]')
     ndb
       .prepare(
         `INSERT INTO heat_scores (scene_id, conflict, novelty, firsts, stakes, dramatic_irony, total)
@@ -272,7 +272,14 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       { startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.' },
     ])
     expect(body.institutions).toEqual([
-      { day: 0, kind: 'group', name: 'the morning watch', description: 'They rose together.' },
+      {
+        day: 0,
+        kind: 'group',
+        name: 'the morning watch',
+        description: 'They rose together.',
+        // the viewer's `dispatchesFrom` reads the array; the gateway sends the row as stored
+        memberIds: '["alice","bob"]',
+      },
     ])
     // one reading a day: the hottest scene the narrator scored is what the day felt like
     expect(body.heat).toEqual([{ day: 0, total: 9 }])

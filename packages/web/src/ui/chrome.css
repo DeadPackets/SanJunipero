@@ -1215,6 +1215,8 @@ body {
 .bonds-views { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
 .bonds-graph canvas { background: var(--night); }
 .bond-detail { position: static; width: auto; max-height: 18rem; overflow-y: auto; }
+/* the institution key: a ring, not a line — the mark it explains is drawn round a person */
+.legend-halo { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; }
 
 /* ── the laws, read and written ── */
 .laws, .laws-admin { display: grid; gap: 0.4rem; font-size: 0.875rem; }

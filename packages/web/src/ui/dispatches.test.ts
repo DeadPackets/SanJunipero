@@ -21,7 +21,13 @@ const FEED = {
   ],
   eras: [{ startDay: 0, endDay: 6, title: 'The First Week', text: 'Seven days.' }],
   institutions: [
-    { day: 6, kind: 'group', name: 'the morning watch', description: 'They rose together.' },
+    {
+      day: 6,
+      kind: 'group',
+      name: 'the morning watch',
+      description: 'They rose together.',
+      memberIds: ['amara', 'omar'],
+    },
   ],
   heat: [
     { day: 0, total: 1 },
@@ -82,5 +88,26 @@ describe('biographyOf', () => {
     })
     expect(biographyOf(FEED, 'omar')?.day).toBe(3)
     expect(biographyOf(FEED, 'nobody')).toBeNull()
+  })
+})
+
+describe('the members of a thing people formed', () => {
+  it('reads the array the narrator stores as JSON on the wire', () => {
+    const feed = dispatchesFrom({
+      institutions: [
+        { day: 6, kind: 'group', name: 'the watch', description: '', memberIds: '["amara"]' },
+      ],
+    })
+    expect(feed.institutions[0]!.memberIds).toEqual(['amara'])
+  })
+
+  it('takes an array straight, and answers empty for anything else', () => {
+    const of = (memberIds: unknown): readonly string[] =>
+      dispatchesFrom({ institutions: [{ day: 0, kind: 'role', name: 'x', description: '', memberIds }] })
+        .institutions[0]!.memberIds
+    expect(of(['omar'])).toEqual(['omar'])
+    expect(of('not json')).toEqual([])
+    expect(of(undefined)).toEqual([])
+    expect(of([1, 'omar', null])).toEqual(['omar'])
   })
 })

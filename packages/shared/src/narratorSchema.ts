@@ -49,7 +49,7 @@ export const NARRATOR_READ_TABLES: Readonly<Record<string, readonly string[]>> =
   scenes: ['day', 'start_tick', 'end_tick', '"cast"', 'location'],
   publications: ['day', 'kind', 'title', 'body', 'subject_id'],
   eras: ['start_day', 'end_day', 'title', 'text'],
-  institutions: ['kind', 'name', 'description', 'founding_scene_id'],
+  institutions: ['kind', 'name', 'description', 'founding_scene_id', 'member_ids'],
   heat_scores: ['scene_id', 'total'],
 }
 
