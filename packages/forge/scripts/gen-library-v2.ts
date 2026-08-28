@@ -173,8 +173,8 @@ for (const item of items) {
       const keyed = chromaKey(await decodePng(buf))
       // The ENTRY's size, not the class default: a bed and a rug cover more ground than a knife
       // and are authored at 192. `artCoverage.test.ts` measures the sprite against `e.spritePx`.
-      const sprite = spriteCell(keyed, { cellPx: e.spritePx, anchor: 'centre' })
-      const icon = spriteCell(keyed, { cellPx: ICON_PX, anchor: 'centre' })
+      const sprite = spriteCell(keyed, { w: e.spritePx, h: e.spritePx, anchor: 'centre' })
+      const icon = spriteCell(keyed, { w: ICON_PX, h: ICON_PX, anchor: 'centre' })
       const { islands, opaqueFrac } = silhouetteStats(sprite.cell)
       // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
       // construction. The judge below is the only gate left.

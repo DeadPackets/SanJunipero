@@ -89,7 +89,7 @@ const bbox = (img: RawImage) => opaqueBbox(img)!
 
 describe('spriteCell', () => {
   it('divides by a WHOLE factor and never resamples the source', () => {
-    const r = spriteCell(fakeGeneration(1024, 800), { cellPx: 256, anchor: 'centre' })
+    const r = spriteCell(fakeGeneration(1024, 800), { w: 256, h: 256, anchor: 'centre' })
     expect(r.cell.width).toBe(256)
     expect(r.cell.height).toBe(256)
     expect(r.plan).toMatchObject({ factor: 4, window: 1024 })
@@ -102,7 +102,7 @@ describe('spriteCell', () => {
   it('takes the next whole factor up rather than shrinking a subject that overruns', () => {
     // 882 px of subject into a 384 cell: factor 2 would clip it, so the factor is 3 and the
     // subject sits smaller in a 1152 window that overhangs the 1024 generation.
-    const r = spriteCell(fakeGeneration(1024, 882), { cellPx: 384, anchor: 'centre' })
+    const r = spriteCell(fakeGeneration(1024, 882), { w: 384, h: 384, anchor: 'centre' })
     expect(r.plan.factor).toBe(3)
     expect(r.plan.window).toBe(1152)
     const b = bbox(r.cell)
@@ -110,7 +110,7 @@ describe('spriteCell', () => {
   })
 
   it('keeps the whole subject: nothing is cropped away by the window', () => {
-    const r = spriteCell(fakeGeneration(1024, 1000), { cellPx: 256, anchor: 'centre' })
+    const r = spriteCell(fakeGeneration(1024, 1000), { w: 256, h: 256, anchor: 'centre' })
     const b = bbox(r.cell)
     // 1000 px of subject minus the 4 px chroma band, divided by the factor of 4
     expect(b.x1 - b.x0 + 1).toBeGreaterThan(240)
@@ -119,15 +119,32 @@ describe('spriteCell', () => {
 
   it('anchors feet on the last row and centre in the middle', () => {
     const high = fakeGeneration(1024, 400, 100)
-    expect(bbox(spriteCell(high, { cellPx: 256, anchor: 'feet' }).cell).y1).toBe(255)
-    const centred = bbox(spriteCell(high, { cellPx: 256, anchor: 'centre' }).cell)
+    expect(bbox(spriteCell(high, { w: 256, h: 256, anchor: 'feet' }).cell).y1).toBe(255)
+    const centred = bbox(spriteCell(high, { w: 256, h: 256, anchor: 'centre' }).cell)
     expect(Math.abs(255 - centred.y1 - centred.y0)).toBeLessThanOrEqual(2)
+  })
+
+  // ★ The 4-frame rig sheet: 128x32, and a subject taller than that aspect. A square cell cut
+  // down to the target used to take 16 rows off the top and the bottom.
+  it('★ a NON-SQUARE target keeps a tall subject whole, head and feet', () => {
+    const src: RawImage = { width: 512, height: 512, data: new Uint8ClampedArray(512 * 512 * 4) }
+    for (let y = 224; y < 288; y++)
+      for (let x = 192; x < 320; x++) src.data.set(CREAM, (y * 512 + x) * 4)
+
+    const r = spriteCell(src, { w: 128, h: 32, anchor: 'centre' })
+
+    expect([r.cell.width, r.cell.height]).toEqual([128, 32])
+    // 128x64 of subject (less the 4 px band) into 128x32: the height is what picks the factor.
+    expect(r.plan.factor).toBe(2)
+    const b = bbox(r.cell)
+    expect(b.y0, 'the top of the subject is cut off').toBeGreaterThan(0)
+    expect(b.y1, 'the bottom of the subject is cut off').toBeLessThan(31)
   })
 
   it('is deterministic', () => {
     const src = fakeGeneration(1024, 800)
-    const a = spriteCell(src, { cellPx: 256, anchor: 'feet' })
-    const b = spriteCell(src, { cellPx: 256, anchor: 'feet' })
+    const a = spriteCell(src, { w: 256, h: 256, anchor: 'feet' })
+    const b = spriteCell(src, { w: 256, h: 256, anchor: 'feet' })
     expect([...a.cell.data]).toEqual([...b.cell.data])
   })
 })
@@ -143,7 +160,7 @@ describe('keyBg → spriteCell on a real 2048 generation', () => {
     )
     expect([raw.width, raw.height]).toEqual([2048, 2048])
 
-    const r = spriteCell(keyBg(raw), { cellPx: 512, anchor: 'feet' })
+    const r = spriteCell(keyBg(raw), { w: 512, h: 512, anchor: 'feet' })
 
     expect(Number.isInteger(r.plan.factor)).toBe(true)
     expect(r.plan.factor).toBe(4)

@@ -233,10 +233,8 @@ function cut(p: UiPiece, gen: RawImage): { img: RawImage; factor: number; fill: 
   const sw = src.x1 - src.x0 + 1,
     sh = src.y1 - src.y0 + 1
   const factor = Math.max(1, Math.ceil(sw / p.w), Math.ceil(sh / p.h))
-  const r = spriteCell(keyed, {
-    cellPx: Math.ceil(Math.max(sw, sh) / factor),
-    anchor: 'centre',
-  })
+  const side = Math.ceil(Math.max(sw, sh) / factor)
+  const r = spriteCell(keyed, { w: side, h: side, anchor: 'centre' })
   const b = opaqueBbox(r.cell)
   if (!b) throw new Error('cut: nothing opaque in the cell')
   const bw = b.x1 - b.x0 + 1,

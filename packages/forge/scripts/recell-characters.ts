@@ -108,8 +108,8 @@ for (const c of CAST) {
   const masterRaw = await decodePng(readFileSync(join(c.src, 'master', 'master.png')))
   const segs = sliceStrip(keyBg(masterRaw), 2)
   const idle = {
-    se: spriteCell(segs[0]!, { cellPx: CHAR_CELL_PX, anchor: 'feet' }),
-    ne: spriteCell(segs[1]!, { cellPx: CHAR_CELL_PX, anchor: 'feet' }),
+    se: spriteCell(segs[0]!, { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor: 'feet' }),
+    ne: spriteCell(segs[1]!, { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor: 'feet' }),
   }
 
   const poses = ['contact-a', 'passing', 'contact-b'] as const
@@ -126,7 +126,7 @@ for (const c of CAST) {
     const facing = i < 3 ? 'se' : 'ne'
     const pose = poses[i % 3]!
     const raw = await decodePng(readFileSync(findRaw(c.rawDirs, key)))
-    const r = spriteCell(keyBg(raw), { cellPx: CHAR_CELL_PX, anchor: 'feet' })
+    const r = spriteCell(keyBg(raw), { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor: 'feet' })
     strips[facing][pose] = r.cell
     cellPlans.push({
       name: `${pose}-${facing}`,
@@ -136,7 +136,7 @@ for (const c of CAST) {
   }
 
   const sleepRaw = await decodePng(readFileSync(findRaw(c.rawDirs, sleepKey)))
-  const sleep = spriteCell(keyBg(sleepRaw), { cellPx: CHAR_CELL_PX, anchor: 'centre' })
+  const sleep = spriteCell(keyBg(sleepRaw), { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor: 'centre' })
   cellPlans.push({ name: 'sleep', factor: sleep.plan.factor, figure: figureH(sleep.cell) })
 
   const cells = deriveSheet({
