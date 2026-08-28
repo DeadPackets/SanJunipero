@@ -56,10 +56,19 @@ export type ReasoningSetting =
   | { enabled: false }
   | { effort: 'minimal' | 'low' | 'medium' | 'high' }
 
-// Per `LlmClient` caller. `null` sends no reasoning parameter, which is what every call did
-// before the dial existed.
-const REASONING_BY_CALLER: Record<string, ReasoningSetting | null> = {}
+// What one caller's calls are pinned to, over and above the routing every call shares. An
+// absent field leaves that dial exactly where it sat before the dial existed.
+export type CallSettings = { reasoning?: ReasoningSetting; maxOutputTokens?: number }
 
-export function reasoningFor(caller: string): ReasoningSetting | null {
-  return REASONING_BY_CALLER[caller] ?? null
+const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
+  // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
+  // spent 31,179 reasoning tokens over 96 s and still answered nothing. Three concepts to an
+  // ask then measure ~500 output tokens, so the ceiling is headroom and not a target.
+  semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
+}
+
+const NO_SETTINGS: CallSettings = {}
+
+export function callSettingsFor(caller: string): CallSettings {
+  return SETTINGS_BY_CALLER[caller] ?? NO_SETTINGS
 }

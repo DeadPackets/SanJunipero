@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
+import { LlmClient, migrateLlmTables, type LlmMessage, type LlmUsage } from '@sj/llm'
+import { mockModel } from '@sj/llm/testutil'
 import { scanPromptForGlassLeak } from './glass.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
@@ -28,6 +29,8 @@ const emptyUsage = (): LlmUsage => ({
   costUsd: 0,
 })
 
+// The pass asks a few concepts at a time, so the scripted answer lands on the first batch and
+// the rest come back empty — as they would, the concepts having been answered already.
 class ScriptedLlm {
   objectCalls = 0
   systems: string[] = []
@@ -40,7 +43,7 @@ class ScriptedLlm {
   }): Promise<{ value: unknown; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
-    return { value: this.value, usage: emptyUsage() }
+    return { value: this.objectCalls === 1 ? this.value : { hits: [] }, usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {
@@ -108,10 +111,74 @@ describe('a verdict nobody can read', () => {
       day: DAY,
       records: AUTHORED_DAY,
     })
-    expect(llm.objectCalls).toBe(1)
+    // Nine concepts, three to an ask, and not one of them is worth a second try: this is a
+    // provider fault and not a wrong answer.
+    expect(llm.objectCalls).toBe(3)
     expect(milestones).toEqual([])
     expect(store.semanticFirsts()).toEqual([])
-    expect(alerts(db).map((a) => a.kind)).toEqual(['semantic_firsts_unreadable'])
+    expect(alerts(db).map((a) => a.kind)).toEqual([
+      'semantic_firsts_unreadable',
+      'semantic_firsts_unreadable',
+      'semantic_firsts_unreadable',
+    ])
+  })
+
+  // The live failure this lane closed: `.refine()` cannot be written as JSON Schema, so the
+  // model never saw that a hit must cite its record, and every verdict was refused unread.
+  it('a hit with no provenance is corrected once, and the night is saved', async () => {
+    const { db, store } = rig()
+    migrateLlmTables(db)
+    const noProvenance = {
+      hits: [
+        {
+          conceptKind: 'god_afterlife',
+          agentId: 'ada',
+          day: DAY,
+          sourceKind: 'speech',
+          quote: 'The dead are not nothing.',
+          confidence: 0.93,
+          rationale: 'She speaks of the dead as continuing.',
+        },
+      ],
+    }
+    const llm = new LlmClient({
+      db,
+      caller: 'semantic',
+      model: mockModel([{ json: noProvenance }, { json: GOOD_VERDICT }]),
+    })
+    const milestones = await detectSemanticFirsts({
+      db,
+      store,
+      llm,
+      day: DAY,
+      records: AUTHORED_DAY,
+      config: { concepts: ['god_afterlife', 'lie', 'joke'] },
+    })
+    expect(milestones.map((m) => m.kind)).toEqual(['first_god_afterlife', 'first_lie'])
+    expect(alerts(db).map((a) => a.kind)).not.toContain('semantic_firsts_unreadable')
+    const calls = db.prepare('SELECT ok FROM llm_calls ORDER BY id').all() as { ok: number }[]
+    expect(calls.map((c) => c.ok)).toEqual([0, 1])
+  })
+
+  it('gives up after the one correction rather than asking a third time', async () => {
+    const { db, store } = rig()
+    migrateLlmTables(db)
+    const llm = new LlmClient({
+      db,
+      caller: 'semantic',
+      model: mockModel([{ json: { hits: 'not an array' } }, { json: { wrong: true } }]),
+    })
+    const milestones = await detectSemanticFirsts({
+      db,
+      store,
+      llm,
+      day: DAY,
+      records: AUTHORED_DAY,
+      config: { concepts: ['god_afterlife'] },
+    })
+    expect(milestones).toEqual([])
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 2 })
+    expect(alerts(db).map((a) => a.kind)).toContain('semantic_firsts_unreadable')
   })
 })
 
@@ -235,8 +302,10 @@ describe('the nightly pass', () => {
       day: DAY,
       records: AUTHORED_DAY,
     })
-    expect(llm.objectCalls).toBe(1)
-    expect(llm.systems[0]).toContain('metaphor: not the plain')
+    // Nine concepts, three to an ask; what shrinks night to night is the catalog, not the
+    // number of asks it takes to read it.
+    expect(llm.objectCalls).toBe(3)
+    expect(llm.systems.join('\n')).toContain('metaphor: not the plain')
     const second = await detectSemanticFirsts({
       db,
       store,
@@ -247,10 +316,11 @@ describe('the nightly pass', () => {
     // The second night is a recurrence, never a second milestone.
     expect(second).toEqual([])
     expect(store.semanticFirsts()).toHaveLength(2)
-    expect(llm.objectCalls).toBe(2)
-    expect(llm.systems[1]).not.toContain('god_afterlife')
-    expect(llm.systems[1]).not.toContain('The lie contract')
-    expect(llm.systems[1]).toContain('metaphor: not the plain')
+    expect(llm.objectCalls).toBe(6)
+    const nightTwo = llm.systems.slice(3).join('\n')
+    expect(nightTwo).not.toContain('god_afterlife')
+    expect(nightTwo).not.toContain('The lie contract')
+    expect(nightTwo).toContain('metaphor: not the plain')
     const empty = await detectSemanticFirsts({
       db,
       store,
@@ -260,7 +330,7 @@ describe('the nightly pass', () => {
       config: { concepts: ['god_afterlife', 'lie'] },
     })
     expect(empty).toEqual([])
-    expect(llm.objectCalls).toBe(2)
+    expect(llm.objectCalls).toBe(6)
   })
 })
 

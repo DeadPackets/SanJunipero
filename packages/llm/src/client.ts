@@ -8,7 +8,7 @@ import {
 } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
-import type { z } from 'zod'
+import { z } from 'zod'
 import {
   insertAlert,
   insertLlmCall,
@@ -20,12 +20,12 @@ import {
   FALLBACK_MODELS,
   MIND_MODEL,
   PROVIDER_ORDER,
+  callSettingsFor,
   pricesFor,
-  reasoningFor,
   type PriceSource,
   type ReasoningSetting,
 } from './pins.js'
-import { repairToSchema } from './repair.js'
+import { jsonOrNothing, repairToSchema } from './repair.js'
 
 export type { ReasoningSetting }
 
@@ -48,6 +48,12 @@ type ExecResult<T> = {
 }
 
 export class BudgetExceededError extends Error {}
+
+// The provider's own bytes from a generation the schema refused. Anything else is not a wrong
+// answer and must never be re-asked.
+function malformedObjectText(err: unknown): string | undefined {
+  return NoObjectGeneratedError.isInstance(err) ? (err.text ?? '') : undefined
+}
 
 // A rejected generation still carries its usage; this stands in only when the SDK reports none.
 const EMPTY_USAGE: LanguageModelUsage = {
@@ -110,7 +116,8 @@ export type LlmClientOpts = {
   // False turns `providerOrder` from a preference into an allow-list. Absent leaves the
   // routing exactly as it has always been.
   allowProviderFallbacks?: boolean
-  // Absent falls back to the per-caller pin in `pins.ts`; `null` sends nothing at all.
+  // Both of these fall back to the caller's row in `pins.ts` when absent; `reasoning: null`
+  // sends nothing at all.
   reasoning?: ReasoningSetting | null
   maxRetries?: number
   // How long one attempt may sit before it is abandoned; without it a stalled response hangs
@@ -150,31 +157,63 @@ export class LlmClient {
     this.fallbackModels = opts.fallbackModels ?? FALLBACK_MODELS
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
-    this.reasoning = opts.reasoning === undefined ? reasoningFor(opts.caller) : opts.reasoning
+    const pinned = callSettingsFor(opts.caller)
+    this.reasoning = opts.reasoning === undefined ? (pinned.reasoning ?? null) : opts.reasoning
     this.maxRetries = opts.maxRetries ?? 2
     this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
     this.budgetUsd = opts.budgetUsd
-    this.maxOutputTokens = opts.maxOutputTokens
+    this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
   }
 
+  // `repairOnce` adds the second rung to the repair below: when the provider's own bytes
+  // cannot be re-framed into the schema, they go back as its own turn with what the schema
+  // said was wrong, and the answer is asked for once more. Off by default — a caller that
+  // wants a wrong answer corrected has to say so.
   async object<T>(opts: {
     system: string
     messages: LlmMessage[]
     schema: z.ZodType<T>
+    repairOnce?: boolean
   }): Promise<{ value: T; usage: LlmUsage }> {
+    try {
+      return await this.generateObject(opts.system, opts.messages, opts.schema)
+    } catch (err) {
+      const bad = opts.repairOnce === true ? malformedObjectText(err) : undefined
+      if (bad === undefined) throw err
+      const why = opts.schema.safeParse(jsonOrNothing(bad)).error
+      return await this.generateObject(
+        opts.system,
+        [
+          ...opts.messages,
+          { role: 'assistant', content: bad.length > 0 ? bad : '…' },
+          {
+            role: 'user',
+            content: `Your answer was rejected. Fix it:\n${why === undefined ? bad : z.prettifyError(why)}`,
+          },
+        ],
+        opts.schema,
+      )
+    }
+  }
+
+  private async generateObject<T>(
+    system: string,
+    messages: LlmMessage[],
+    schema: z.ZodType<T>,
+  ): Promise<{ value: T; usage: LlmUsage }> {
     return this.invoke(async (model) => {
       try {
         const r = await generateText({
           model,
-          system: opts.system,
-          messages: toModelMessages(opts.messages),
+          system,
+          messages: toModelMessages(messages),
           maxRetries: 0,
           ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
           abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
-          output: Output.object({ schema: opts.schema }),
+          output: Output.object({ schema }),
         })
         return {
           usage: r.usage,
@@ -187,7 +226,7 @@ export class LlmClient {
         // Re-frames the provider's own bytes against this caller's schema; never re-asks,
         // never invents.
         if (!NoObjectGeneratedError.isInstance(err)) throw err
-        const repaired = repairToSchema(err.text ?? '', opts.schema)
+        const repaired = repairToSchema(err.text ?? '', schema)
         if (repaired === undefined) throw err
         this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
         return {

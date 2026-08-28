@@ -46,6 +46,84 @@ describe('migrateLlmTables', () => {
   })
 })
 
+// The second rung of the repair `object` already does in-process. Off unless asked for, so a
+// caller that has never wanted a wrong answer corrected still pays for exactly one generation.
+describe('LlmClient.object, one correction', () => {
+  const EMPTY_USAGE = {
+    inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
+    outputTokens: { total: 0, text: 0, reasoning: 0 },
+  }
+
+  const answering = (texts: string[], seen: string[]): MockLanguageModelV4 =>
+    new MockLanguageModelV4({
+      doGenerate: (opts) => {
+        seen.push(JSON.stringify(opts.prompt))
+        return Promise.resolve({
+          content: [{ type: 'text' as const, text: texts[seen.length - 1] ?? '' }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: EMPTY_USAGE,
+          warnings: [],
+        })
+      },
+    })
+
+  it('leaves a wrong answer alone unless the caller asked for the correction', async () => {
+    const db = openDb()
+    const seen: string[] = []
+    const client = new LlmClient({
+      model: answering(['{"mood":"calm"}', '{"mood":"calm","count":3}'], seen),
+      db,
+      caller: 'test',
+    })
+    const asked = [{ role: 'user' as const, content: 'go' }]
+    await expect(client.object({ system: 's', messages: asked, schema: SCHEMA })).rejects.toThrow()
+    expect(seen).toHaveLength(1)
+    expect(rows(db)).toHaveLength(1)
+  })
+
+  it('quotes the bad answer back with what the schema said, and asks once more', async () => {
+    const db = openDb()
+    const seen: string[] = []
+    const client = new LlmClient({
+      model: answering(['{"mood":"calm"}', '{"mood":"calm","count":3}'], seen),
+      db,
+      caller: 'test',
+    })
+    const { value } = await client.object({
+      system: 's',
+      messages: [{ role: 'user', content: 'go' }],
+      schema: SCHEMA,
+      repairOnce: true,
+    })
+    expect(value).toEqual({ mood: 'calm', count: 3 })
+    // The provider's own bytes come back as its own turn, the correction as the user's.
+    expect(seen[1]).toContain('mood')
+    expect(seen[1]).toContain('Your answer was rejected')
+    expect(seen[1]).toContain('count')
+    // Both generations are billed: a wrong answer was still served.
+    expect(rows(db).map((r) => r.ok)).toEqual([0, 1])
+  })
+
+  it('gives up after the one correction rather than asking a third time', async () => {
+    const db = openDb()
+    const seen: string[] = []
+    const client = new LlmClient({
+      model: answering(['{"mood":"calm"}', '{"still":"wrong"}'], seen),
+      db,
+      caller: 'test',
+    })
+    await expect(
+      client.object({
+        system: 's',
+        messages: [{ role: 'user', content: 'go' }],
+        schema: SCHEMA,
+        repairOnce: true,
+      }),
+    ).rejects.toThrow()
+    expect(seen).toHaveLength(2)
+  })
+})
+
 describe('LlmClient.object', () => {
   it('returns the schema-parsed value and logs exact tokens + cost per the formula', async () => {
     const db = openDb()

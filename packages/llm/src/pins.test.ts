@@ -6,6 +6,7 @@ import {
   PRICE_PER_M,
   PRICE_PER_M_BY_PROVIDER,
   PROVIDER_ORDER,
+  callSettingsFor,
   pricesFor,
 } from './pins.js'
 
@@ -50,4 +51,15 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
   expect(pricesFor(MIND_MODEL, undefined).source).toBe('ceiling')
   expect(pricesFor('deepseek/deepseek-chat', 'Wafer').source).toBe('ceiling')
   expect(pricesFor(MIND_MODEL, 'SomeNewProvider').prices).toEqual(CEILING_PRICE_PER_M)
+})
+
+// The nightly pass once spent 31,179 reasoning tokens over 96 s to answer nothing at all. Only
+// `enabled:false` moves this endpoint, so an effort rung here would be a placebo.
+it('the semantic pass is pinned off the thinking preamble and under an output ceiling', () => {
+  expect(callSettingsFor('semantic').reasoning).toEqual({ enabled: false })
+  expect(callSettingsFor('semantic').maxOutputTokens).toBeLessThanOrEqual(4000)
+})
+
+it('an unpinned caller keeps the routing it has always had', () => {
+  expect(callSettingsFor('turn')).toEqual({})
 })

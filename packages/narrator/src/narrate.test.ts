@@ -204,7 +204,8 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
       (err: unknown) => err,
     )
 
-    expect(objectCalls).toHaveBeenCalledTimes(1)
+    // Nine concepts, three to an ask.
+    expect(objectCalls).toHaveBeenCalledTimes(3)
     expect(caught).toBeInstanceOf(ChapterRenderError)
     expect((caught as ChapterRenderError).night.semanticRan).toBe(true)
     expect((caught as ChapterRenderError).message).toContain('response did not match schema')

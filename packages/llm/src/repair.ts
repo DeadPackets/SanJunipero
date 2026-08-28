@@ -7,7 +7,7 @@ export type RepairCandidate = { value: unknown; how: string }
 
 const FENCE = /```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)```/
 
-const jsonOrNothing = (text: string): unknown => {
+export const jsonOrNothing = (text: string): unknown => {
   try {
     return JSON.parse(text) as unknown
   } catch {

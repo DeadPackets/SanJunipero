@@ -74,23 +74,39 @@ export type SemanticCandidateRow = {
 }
 
 // The verdict shape, `.strict()`. A hit cites either a logged event or a remembered record —
-// never neither, because a claim with no provenance cannot be checked.
+// never neither, because a claim with no provenance cannot be checked. `.refine()` cannot be
+// written as JSON Schema, so every field says its own part in a `describe()` the model does see.
 const SemanticHitSchema = z
   .object({
-    conceptKind: z.string().min(1),
-    agentId: z.string().min(1),
-    day: z.number().int().nonnegative(),
+    conceptKind: z.string().min(1).describe('The id from the list, exactly as written there.'),
+    agentId: z.string().min(1).describe("The name in the record's header."),
+    day: z.number().int().nonnegative().describe("The day in the record's header."),
     sourceKind: z.enum(['speech', 'thought', 'journal']),
-    eventSeq: z.number().int().nonnegative().optional(),
-    memoryRef: z.string().min(1).optional(),
-    quote: z.string().min(1),
-    quote2: z.string().min(1).optional(),
-    provenance2: z.string().min(1).optional(),
+    // Optional, these were simply omitted: `required` is the only part of the shape the
+    // provider enforces, so both are asked for and one of them comes back null.
+    eventSeq: z
+      .number()
+      .int()
+      .nonnegative()
+      .nullable()
+      .describe("The eventSeq in the record's header, or null if it has a memoryRef instead."),
+    memoryRef: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe("The memoryRef in the record's header, or null if it has an eventSeq instead."),
+    quote: z.string().min(1).describe("Copied from the record's text, character for character."),
+    quote2: z.string().min(1).optional().describe('For a lie only: the inner words, verbatim.'),
+    provenance2: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("For a lie only: the eventSeq or memoryRef of those inner words' record."),
     confidence: z.number().min(0).max(1),
-    rationale: z.string().min(1),
+    rationale: z.string().min(1).describe('One plain sentence for why this record shows it.'),
   })
   .strict()
-  .refine((h) => h.eventSeq !== undefined || h.memoryRef !== undefined, {
+  .refine((h) => h.eventSeq != null || h.memoryRef != null, {
     message: 'a hit must cite an event or a remembered record',
   })
 export const SemanticVerdictSchema = z.object({ hits: z.array(SemanticHitSchema) }).strict()
@@ -117,6 +133,8 @@ const CONCEPT_DESCRIPTIONS: Readonly<Record<string, string>> = {
 
 const VERBATIM_RULE = `Every quote you give must be copied from the record VERBATIM, character for character, or the hit is thrown away unread. Quote the shortest passage that carries it.`
 
+const PROVENANCE_RULE = `Every hit carries the provenance of the record you took it from, copied from that record's own header: eventSeq for a record that has one, otherwise memoryRef. A hit with neither is thrown away unread.`
+
 const LIE_CONTRACT = `The lie contract, and there is no lie without all of it:
 1. Both sides quoted — the words said aloud AND that same person's own thought, memory or journal, each with its own provenance.
 2. The same claim, not merely the same subject: the two must contradict on one thing about one entity.
@@ -127,15 +145,19 @@ const LIE_CONTRACT = `The lie contract, and there is no lie without all of it:
 const CONFIDENCE_RULE =
   'Give a confidence between 0 and 1 for every hit, and one plain sentence of rationale.'
 
+// Without a procedure the model answers `{"hits": []}` for a day that plainly holds several:
+// nine open questions over two hundred records is work, and it has to be told to do it.
+const PROCEDURE_RULE = `Take the ids one at a time, in the order given. For each, read the day through and give the EARLIEST record that shows it, as one hit. An id this day does not hold gets no hit at all — never a hit that says the id is absent. A day of ordinary talk usually holds a few of them.`
+
 // The contract rides along only while a lie is still to be found — one more way the nightly
 // prompt shrinks as the town's firsts land.
 export function semanticInstruction(concepts: readonly string[]): string {
   const rows = concepts
     .map((c) => CONCEPT_DESCRIPTIONS[c])
     .filter((d): d is string => d !== undefined)
-  const parts = [SEMANTIC_HEADER, rows.join('\n'), VERBATIM_RULE]
+  const parts = [SEMANTIC_HEADER, rows.join('\n'), VERBATIM_RULE, PROVENANCE_RULE]
   if (concepts.includes('lie')) parts.push(LIE_CONTRACT)
-  parts.push(CONFIDENCE_RULE)
+  parts.push(CONFIDENCE_RULE, PROCEDURE_RULE)
   return parts.join('\n')
 }
 
@@ -146,7 +168,7 @@ function renderRecords(records: TranscriptRecord[]): string {
   return records
     .map((r) => {
       const ref = r.eventSeq !== undefined ? `eventSeq ${r.eventSeq}` : `memoryRef ${r.memoryRef}`
-      return `[${r.sourceKind} | ${r.agentId} | tick ${r.tick} | ${ref}] ${r.text}`
+      return `[${r.sourceKind} | ${r.agentId} | day ${r.day} | tick ${r.tick} | ${ref}] ${r.text}`
     })
     .join('\n')
 }
@@ -154,8 +176,8 @@ function renderRecords(records: TranscriptRecord[]): string {
 const findRecord = (records: TranscriptRecord[], hit: SemanticHit): TranscriptRecord | undefined =>
   records.find(
     (r) =>
-      (hit.eventSeq !== undefined && r.eventSeq === hit.eventSeq) ||
-      (hit.memoryRef !== undefined && r.memoryRef === hit.memoryRef),
+      (hit.eventSeq != null && r.eventSeq === hit.eventSeq) ||
+      (hit.memoryRef != null && r.memoryRef === hit.memoryRef),
   )
 
 const findInner = (records: TranscriptRecord[], hit: SemanticHit): TranscriptRecord | undefined =>
@@ -173,8 +195,39 @@ export type SemanticPassDeps = {
 /** What a caller supplies; `store` and `day` come from the night being closed. */
 export type SemanticDeps = Omit<SemanticPassDeps, 'store' | 'day'>
 
-// One batched pass per night, after the chapters. Cost decays toward nothing on its own: a
-// concept already found is never scanned for again.
+// Nine open questions in one ask and the model answers `{"hits": []}`; three at a time and it
+// does the work. Measured on one live day, not guessed.
+const CONCEPTS_PER_ASK = 3
+
+// One ask, and one correction if the answer comes back the wrong shape. A batch nobody can
+// read is an alert and no hits, not a lost night.
+async function readBatch(
+  llm: LlmClient,
+  db: Database.Database,
+  day: number,
+  concepts: readonly string[],
+  rendered: string,
+): Promise<SemanticHit[]> {
+  try {
+    const { value } = await llm.object({
+      schema: SemanticVerdictSchema,
+      system: semanticInstruction(concepts),
+      messages: [{ role: 'user', content: rendered }],
+      repairOnce: true,
+    })
+    return value.hits
+  } catch (err) {
+    insertAlert(db, {
+      agentId: null,
+      kind: 'semantic_firsts_unreadable',
+      detail: `day ${day}, ${concepts.join('/')}: the verdict did not parse — ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`,
+    })
+    return []
+  }
+}
+
+// One pass per night, after the chapters, a few concepts to an ask. Cost decays toward nothing
+// on its own: a concept already found is never scanned for again.
 export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Milestone[]> {
   const cfg: SemanticConfig = { ...DEFAULT_SEMANTIC_CONFIG, ...deps.config }
   if (!cfg.enabled) return []
@@ -183,27 +236,15 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
   const remaining = cfg.concepts.filter((c) => !found.has(c))
   if (remaining.length === 0 || deps.records.length === 0) return []
 
-  const system = semanticInstruction(remaining)
-  // The generator throws on a verdict that does not fit the schema, so a second parse here is
-  // unreachable. A night nobody can read has no semantic firsts, and it says so in an alert.
-  let value: z.infer<typeof SemanticVerdictSchema>
-  try {
-    value = (
-      await deps.llm.object({
-        schema: SemanticVerdictSchema,
-        system,
-        messages: [{ role: 'user', content: renderRecords(deps.records) }],
-      })
-    ).value
-  } catch (err) {
-    insertAlert(deps.db, {
-      agentId: null,
-      kind: 'semantic_firsts_unreadable',
-      detail: `day ${deps.day}: the verdict did not parse — ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`,
-    })
-    return []
-  }
-  const hits = value.hits
+  const rendered = renderRecords(deps.records)
+  const batches: string[][] = []
+  for (let i = 0; i < remaining.length; i += CONCEPTS_PER_ASK)
+    batches.push(remaining.slice(i, i + CONCEPTS_PER_ASK))
+  // Together, not one after another: the night holds the whole close-day open, and `stop()`
+  // waits only five seconds for it. Nothing a batch writes is read by another.
+  const hits = (
+    await Promise.all(batches.map((b) => readBatch(deps.llm, deps.db, deps.day, b, rendered)))
+  ).flat()
 
   // A joke and a lie cannot both be true of the same words (contract 4). Read the jokes
   // first, whatever confidence they carry, so the lie meets them already there.
