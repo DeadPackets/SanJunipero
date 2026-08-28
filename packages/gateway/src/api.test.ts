@@ -285,32 +285,6 @@ describe('observer data apis', () => {
       { fromTick: 60, toTick: 119, agentId: 'dan', score: 20 },
     ])
   })
-
-  it('digest: deaths, completions, top heat moments, human agent lines', async () => {
-    expect(await (await fetch(`${base}/api/digest?fromTick=0&toTick=80`)).json()).toEqual({
-      days: [0],
-      deaths: [{ agentId: 'dan', tick: 70, cause: 'hunger' }],
-      births: [],
-      structuresCompleted: [{ id: 's1', kind: 'house', tick: 40 }],
-      topMoments: [
-        { tick: 60, agentId: 'dan', score: 20, moment: { day: 0, time: '01:00' } },
-        { tick: 0, agentId: 'bob', score: 8, moment: { day: 0, time: '00:00' } },
-        { tick: 0, agentId: 'alice', score: 4, moment: { day: 0, time: '00:00' } },
-        { tick: 0, agentId: 'cara', score: 2, moment: { day: 0, time: '00:00' } },
-        { tick: 60, agentId: 'bob', score: 2, moment: { day: 0, time: '01:00' } },
-      ],
-      agentLines: [
-        { agentId: 'alice', line: 'Alice was last seen resting' },
-        { agentId: 'bob', line: 'Bob was last seen resting' },
-        { agentId: 'cara', line: 'Cara was last seen fishing' },
-      ],
-    })
-  })
-
-  it('digest without params covers the whole history', async () => {
-    const full = (await (await fetch(`${base}/api/digest`)).json()) as { deaths: unknown[] }
-    expect(full.deaths).toHaveLength(1)
-  })
 })
 
 /** Three inspector tabs per viewer, 30 s of client cache and no rate limit: an open+close per GET

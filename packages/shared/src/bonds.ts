@@ -63,15 +63,6 @@ export const BondsResponseSchema = z
   .strict()
 export type BondsResponse = z.infer<typeof BondsResponseSchema>
 
-/** What `/api/bonds/count` answers — a badge showing one number may not ask for the feed. */
-export const BondsCountSchema = z
-  .object({
-    count: z.number().int().nonnegative(),
-    asOfTick: z.number().int().nonnegative(),
-  })
-  .strict()
-export type BondsCount = z.infer<typeof BondsCountSchema>
-
 /** The six acts a tie is derived from, and the whole of them: a bond count of zero IS "none of
  *  these six". Here, not the gateway, so the viewer can name them without reading the server. */
 export const BOND_NOTES: Readonly<Record<string, string>> = {

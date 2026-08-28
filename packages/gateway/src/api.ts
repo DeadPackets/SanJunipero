@@ -1,13 +1,6 @@
 import { join } from 'node:path'
-import type { IncomingMessage } from 'node:http'
 import Database from 'better-sqlite3'
-import {
-  MINUTES_PER_DAY,
-  tickToMoment,
-  type HeatWindow,
-  type SimConfig,
-  type SimEvent,
-} from '@sj/shared'
+import type { SimConfig, SimEvent } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
@@ -23,7 +16,6 @@ import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
 export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot → one talk weight
-const TOP_MOMENTS = 5
 
 /**
  * `server.ts` decodes each path segment AFTER splitting on `/`, so a `%2f` a stranger writes
@@ -51,9 +43,9 @@ export const FOLD_TYPES: readonly string[] = [
 ]
 
 /**
- * `/api/digest` builds one entry per day between the two ticks, and both are the stranger's
- * number: unclamped, `?toTick=1000000000` answers 4.75 MB to a 60-byte GET. Clamping into the
- * world that exists also collapses the cache key space — every over-long window is one window.
+ * A windowed route's two ticks are the stranger's numbers: unclamped, `?toTick=1000000000` is a
+ * multi-megabyte answer to a 60-byte GET. Clamping into the world that exists also collapses the
+ * cache key space — every over-long window is one window. `narratorApi.ts` is the caller.
  */
 export function clampWindow(
   from: string | null,
@@ -89,7 +81,6 @@ export type Footprint = {
   links: number
   spokes: number
   started: number
-  deaths: number
   /** The log head the fold has caught up to — NOT the SELECT's cursor, which stops at the last
    *  row of a type `FOLD_TYPES` names. Present so a guard can prove the fold consumed the log. */
   seq: number
@@ -103,10 +94,6 @@ export const JOURNAL_MAX = 200
 
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
-
-// "-ing" line for the digest: drop a trailing e (give→giving), else append
-const gerund = (verb: string): string =>
-  verb.endsWith('e') ? `${verb.slice(0, -1)}ing` : `${verb}ing`
 
 /** Returns the closer for the per-mind handles it holds; the gateway calls it on `close()`. */
 export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
@@ -130,7 +117,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   const completedTick = new Map<string, number>()
   const heat: HeatScores = new Map()
   const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
-  const deaths: { agentId: string; tick: number; cause: string }[] = []
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
   let spokes: Spoke[] = []
@@ -189,11 +175,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
         completedTick.set((ev.payload as { id: string }).id, ev.tick)
         return
       }
-      case 'agent_died': {
-        const p = ev.payload as { agentId: string; cause: string }
-        deaths.push({ agentId: p.agentId, tick: ev.tick, cause: p.cause })
-        return
-      }
       default:
     }
   }
@@ -220,41 +201,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     links: weights.size,
     spokes: spokes.length,
     started: started.size,
-    deaths: deaths.length,
     seq: foldGen,
   }))
-
-  /**
-   * Whole windows come from the running map; the at most TWO windows a viewer-picked range cuts
-   * are re-scored from the log — at most 120 ticks, bounded however old the town is.
-   */
-  const selRange = deps.db.prepare(
-    'SELECT seq, tick, type, payload FROM events WHERE tick BETWEEN ? AND ? ORDER BY seq',
-  )
-  const heatOver = (fromTick: number, toTick: number): HeatWindow[] => {
-    const lo = Math.floor(fromTick / HEAT_WINDOW_TICKS)
-    const hi = Math.floor(toTick / HEAT_WINDOW_TICKS)
-    const loWhole = fromTick % HEAT_WINDOW_TICKS === 0 ? lo : lo + 1
-    const hiWhole = toTick % HEAT_WINDOW_TICKS === HEAT_WINDOW_TICKS - 1 ? hi : hi - 1
-    const scores: HeatScores = new Map()
-    // A fresh actor memory per re-read; a verb's completion and its results share a tick, so a
-    // tick range never splits the pair and the re-scored window is exact.
-    const ctx = heatContext(builderOf)
-    for (const [key, score] of heat) {
-      const w = Number(key.slice(0, key.indexOf('\n')))
-      if (w >= loWhole && w <= hiWhole) scores.set(key, score)
-    }
-    for (const w of new Set([lo, hi])) {
-      if (w >= loWhole && w <= hiWhole) continue
-      const from = Math.max(fromTick, w * HEAT_WINDOW_TICKS)
-      const to = Math.min(toTick, (w + 1) * HEAT_WINDOW_TICKS - 1)
-      if (from > to) continue
-      for (const r of selRange.all(from, to) as EventRow[]) {
-        scoreEvent(scores, toEvent(r), ctx)
-      }
-    }
-    return heatFromScores(scores)
-  }
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
   // HELD, not reopened: three inspector tabs per viewer was an open+close per GET on the thread
@@ -389,7 +337,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
   /**
-   * The running map stays whole — `/api/digest` must be exact however far back the viewer
+   * The running map stays whole — a viewer-picked window must be exact however far back it
    * reaches — but what is SENT is the last sim-day, bounded by population not by the town's age.
    */
   router.route('GET', '/api/heat', (_req, res) => {
@@ -406,69 +354,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
           if (Number(key.slice(0, key.indexOf('\n'))) >= floorW) recent.set(key, score)
         }
         return heatSince(heatFromScores(recent), nowTick)
-      }),
-    )
-  })
-
-  router.route('GET', '/api/digest', (req: IncomingMessage, res) => {
-    readFold()
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const { fromTick, toTick } = clampWindow(
-      url.searchParams.get('fromTick'),
-      url.searchParams.get('toTick'),
-      deps.mirror.state().tick,
-    )
-    sendPrebuilt(
-      res,
-      cache.json(`digest:${fromTick}:${toTick}`, () => {
-        const inWindow = (t: number): boolean => t >= fromTick && t <= toTick
-
-        const days: number[] = []
-        for (
-          let d = Math.floor(fromTick / MINUTES_PER_DAY);
-          d <= Math.floor(toTick / MINUTES_PER_DAY);
-          d++
-        )
-          days.push(d)
-
-        const state = deps.mirror.state()
-        const structuresCompleted = [...completedTick]
-          .filter(([, tick]) => inWindow(tick))
-          .map(([id, tick]) => ({
-            id,
-            kind: state.structures[id]?.kind ?? 'structure',
-            tick,
-          }))
-
-        const topMoments = heatOver(fromTick, toTick)
-          .sort(
-            (a: HeatWindow, b: HeatWindow) =>
-              b.score - a.score || a.fromTick - b.fromTick || a.agentId.localeCompare(b.agentId),
-          )
-          .slice(0, TOP_MOMENTS)
-          .map((w) => ({
-            tick: w.fromTick,
-            agentId: w.agentId,
-            score: w.score,
-            moment: tickToMoment(w.fromTick),
-          }))
-
-        const agentLines = Object.values(state.agents)
-          .filter((a) => a.alive)
-          .sort((a, b) => (a.id < b.id ? -1 : 1))
-          .map((a) => ({
-            agentId: a.id,
-            line: `${a.name} was last seen ${a.activity ? gerund(a.activity.verb) : 'resting'}`,
-          }))
-
-        return {
-          days,
-          deaths: deaths.filter((d) => inWindow(d.tick)),
-          births: [],
-          structuresCompleted,
-          topMoments,
-          agentLines,
-        }
       }),
     )
   })

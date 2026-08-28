@@ -34,8 +34,7 @@ export type NarratorApiDeps = {
 }
 
 /** How many entries `/api/chronicle` sends. Every open panel refetches the feed on a 20 s timer,
- *  and unbounded that is the whole town history per viewer per poll. `/api/chronicle/count` still
- *  counts the whole record, so the badge does not shrink with the page. */
+ *  and unbounded that is the whole town history per viewer per poll. */
 export const CHRONICLE_MAX = 200
 
 /** How many days of the town's own paper `/api/dispatches` sends. The record grows one row a
@@ -143,26 +142,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       cache.json(`chronicle:${fromTick}:${toTick}`, () => ({
         entries: chronicleEntries(fromTick, toTick).slice(-CHRONICLE_MAX),
       })),
-    )
-  })
-
-  /** How long the ledger is, without sending the ledger. It costs nothing extra:
-   *  `chronicleEntries` is memoised per generation, so the badge and the panel share one scan. */
-  router.route('GET', '/api/chronicle/count', (req: IncomingMessage, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const { fromTick, toTick } = windowOf(url)
-    sendPrebuilt(
-      res,
-      cache.json(`chronicle-count:${fromTick}:${toTick}`, () => {
-        const entries = chronicleEntries(fromTick, toTick)
-        const last = entries[entries.length - 1]
-        // `latestSeq` is the feed's newest entry, so a badge can say "N new" without the body.
-        return {
-          count: entries.length,
-          latestSeq: last ? last.seq : 0,
-          latestTick: last ? last.tick : 0,
-        }
-      }),
     )
   })
 
