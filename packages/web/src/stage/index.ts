@@ -2,6 +2,7 @@
 // a barrel that re-exports more than one caller wants is a list of things nothing reads.
 export type { Subject } from './anchor.js'
 export { DirectorCue } from './DirectorCue.js'
+export { Figures } from './Figures.js'
 export { Nameplate } from './Nameplate.js'
 export { QuietStamp } from './QuietStamp.js'
 export { SpeechLive } from './SpeechLive.js'

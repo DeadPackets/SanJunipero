@@ -8,6 +8,7 @@ import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
 import type { Scene } from './render/scene.js'
 import {
   DirectorCue,
+  Figures,
   Nameplate,
   SpeechLive,
   SubjectRing,
@@ -40,6 +41,8 @@ export function App() {
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
   const [subject, setSubject] = useState<Subject | null>(null)
+  // the figure the keyboard is on; the plate follows it, and Enter opens the ring round it
+  const [focus, setFocus] = useState<Subject | null>(null)
   // an item or a crop the viewer clicked: it has no ring, so the record answers for it
   const [thing, setThing] = useState<Thing | null>(null)
   // `/moment/:id` is a link to a recorded day, so the sheet comes up on the filmstrip.
@@ -231,7 +234,8 @@ export function App() {
         }}
       />
       <SpeechLive store={store} />
-      <Nameplate subject={subject} scene={scene} />
+      <Figures scene={scene} store={store} onFocus={setFocus} onOpen={setSubject} />
+      <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
       <QuietStamp store={store} />
       <DirectorCue text={cue} />
