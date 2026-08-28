@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { BOND_LEVELS, BOND_TYPES, LEVEL_RANK, bondArc, type LineageLike } from './bondModel2.js'
-import { BondDetailPanel } from './BondDetailPanel.js'
+import { BondDetail } from '../paper/pages/BondDetail.js'
 import { LegendChip } from './LegendChip.js'
 import {
   ARC_COLOR,
@@ -259,12 +259,12 @@ describe('the legend’s off chip is a struck-through mark, not an opacity', () 
 })
 
 // ── THE DETAIL PANEL ───────────────────────────────────────────────────────────────────────
-describe('BondDetailPanel — the arc, the evidence, and NO filled bar', () => {
+describe('BondDetail — the arc, the evidence, and NO filled bar', () => {
   const history = [at(0, 'partner'), at(100, 'partner'), at(200, 'partner')]
   const b = bond('amara', 'nadia', 'partner', history, 200)
   const arc = bondArc(b, 200)
   const html = renderToStaticMarkup(
-    createElement(BondDetailPanel, {
+    createElement(BondDetail, {
       bond: b,
       people: PEOPLE,
       type: 'partner' as const,
@@ -304,7 +304,7 @@ describe('BondDetailPanel — the arc, the evidence, and NO filled bar', () => {
 
   it('a pair with no partnership gets no evidence line at all', () => {
     const plain = renderToStaticMarkup(
-      createElement(BondDetailPanel, {
+      createElement(BondDetail, {
         bond: bond('amara', 'yusuf', 'friend', [at(0, 'friend')]),
         people: PEOPLE,
         type: 'none' as const,

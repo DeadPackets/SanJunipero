@@ -12,8 +12,7 @@ import {
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { changeLog } from '../becoming.js'
 import { EMPTY_LINEAGE } from '../bondModel2.js'
-import { parseRoute, routeToPath } from '../route.js'
-import { RosterPanelView } from '../RosterPanel.js'
+import { RosterListView } from '../../paper/pages/RosterList.js'
 import { RosterExpanded } from './RosterExpanded.js'
 import { rosterRows2 } from './rosterRow.js'
 import {
@@ -126,7 +125,7 @@ describe('expanding never removes the way back, because the list never goes away
 
   const render = (openId: string | null): string =>
     renderToStaticMarkup(
-      createElement(RosterPanelView, {
+      createElement(RosterListView, {
         rows,
         gone: 0,
         sort: 'name' as const,
@@ -156,27 +155,6 @@ describe('expanding never removes the way back, because the list never goes away
   it('the open row is a button carrying aria-expanded, so it is reachable by keyboard', () => {
     const html = render('amara')
     expect(html).toMatch(/<button[^>]*data-row="amara"[^>]*aria-expanded="true"/)
-  })
-})
-
-// ── THE ROUTE ──────────────────────────────────────────────────────────────────────────────
-describe('?open= is a third state of the lens, and every landed route still round-trips', () => {
-  it('carries the open row in the address bar', () => {
-    const r = parseRoute('/', '?lens=inspector&open=amara')
-    expect(r.openId).toBe('amara')
-    expect(r.agentId).toBeNull()
-    expect(routeToPath(r)).toBe('/?lens=inspector&open=amara')
-  })
-
-  it('is independent of ?agent=, which still opens the standalone page', () => {
-    const deep = parseRoute('/', '?lens=inspector&agent=amara')
-    expect(deep.agentId).toBe('amara')
-    expect(deep.openId).toBeNull()
-    expect(routeToPath(deep)).toBe('/?lens=inspector&agent=amara')
-  })
-
-  it('an address with neither is the plain roster', () => {
-    expect(parseRoute('/', '?lens=inspector').openId).toBeNull()
   })
 })
 

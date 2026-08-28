@@ -16,20 +16,10 @@ export function broadcastFromSearch(search: string): boolean {
 /** Every operator surface the broadcast frame removes, with the reason. `broadcast.test.ts` holds
  *  the sheet to it, so nothing can be quietly left in the frame at 3px. */
 export const BROADCAST_REMOVED: readonly { selector: string; why: string }[] = [
-  { selector: '.px-title', why: 'the channel already says whose town it is' },
-  { selector: '.lens-tabs', why: 'nobody is navigating' },
-  { selector: '.link-pill', why: 'the badge states the same trouble in a word (R8)' },
-  { selector: '.status-strip', why: 'its figures repeat the clock at 12px' },
-  { selector: '.control-bar', why: 'eleven controls nobody can press' },
-  { selector: '.hud-dock', why: 'a menu for arranging chrome that is gone' },
-  { selector: '#panel-outlet', why: 'a 368px reading panel is 92px on a phone' },
-  { selector: '.timeline', why: 'a scrub track with no hand on it' },
-  { selector: '.film-strip', why: 'postcard navigation; its titles are 14px' },
-  { selector: '.moment-player', why: 'transport for a recorded day nobody opened' },
+  { selector: '.signpost', why: 'four arms nobody watching a stream can press' },
+  { selector: '.paper', why: 'a 760px reading sheet is 190px on a phone' },
+  { selector: '.town-dim', why: 'the sheet is gone, so what it dimmed for is gone too' },
   { selector: '.fps-overlay', why: 'an instrument, not a picture' },
-  { selector: '.scrub-banner', why: 'a broadcast is live by construction' },
-  { selector: '.room-card', why: 'a way back out of a room nobody walked into' },
-  { selector: '.digest-scrim', why: 'a modal with nobody there to dismiss it' },
 ]
 
 /**
@@ -40,9 +30,8 @@ export type BroadcastCaption =
   | { what: string; from: 'sheet'; selector: string }
   | { what: string; from: 'canvas'; px: number }
 
+// The stamp and the cue are the stage's own marks (web/src/stage): their sheet rows join this
+// table when they land, and until then the frame is measured by the one caption it draws itself.
 export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
-  { what: 'the clock', from: 'sheet', selector: "[data-broadcast='on'] .tick-badge" },
-  { what: 'the speaker', from: 'sheet', selector: "[data-broadcast='on'] .subtitle-name" },
-  { what: 'what they said', from: 'sheet', selector: "[data-broadcast='on'] .subtitle" },
   { what: 'a speech bubble', from: 'canvas', px: FACE_INSTALL_PX * BROADCAST_TEXT_SCALE },
 ]

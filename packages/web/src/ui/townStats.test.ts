@@ -1,17 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { BOND_NOTES } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
-import { LENSES, type Lens } from './route.js'
-import {
-  EMPTY_COPY,
-  GAMIFICATION_BAN,
-  WEATHER_GLYPH,
-  countsFromWorld,
-  lensCountsFor,
-  lensHints,
-  townStats,
-  type LensCounts,
-} from './townStats.js'
+import { EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, townStats } from './townStats.js'
 
 const agent = (id: string, alive: boolean): AgentBody => ({
   id,
@@ -63,112 +53,6 @@ describe('townStats', () => {
   it('passes the weather through and holds a dash before the town wakes', () => {
     expect(townStats(state(0, 'storm', []), 0).weather).toBe('storm')
     expect(townStats(null, 0)).toEqual({ day: 0, time: '00:00', weather: '—', alive: 0, total: 0 })
-  })
-})
-
-describe('lensHints', () => {
-  const stats = townStats(state(0, 'sunny', [agent('a', true), agent('b', true)]), 0)
-
-  it('gives one hint per lens, in lens order', () => {
-    expect(lensHints(stats).map((h) => h.lens)).toEqual([...LENSES])
-  })
-
-  it('badges the townsfolk count, and never counts the live feed as the chronicle', () => {
-    const by = new Map(lensHints(stats).map((h) => [h.lens, h]))
-    expect(by.get('inspector')!.count).toBe(2)
-    expect(by.get('chronicle')!.count, 'the badge invented a number').toBeNull()
-    expect(by.get('map')!.count).toBeNull()
-  })
-
-  // `lensHints` no longer takes the socket feed, so there is nothing for a chronicle count to be
-  // accidentally derived FROM.
-  it('★ takes no live feed at all — the only counts are the ones a caller declares', () => {
-    const declared: LensCounts = { ...countsFromWorld(stats), chronicle: 16, society: 7 }
-    const by = new Map(lensHints(stats, declared).map((h) => [h.lens, h]))
-    expect(by.get('chronicle')!.count).toBe(16)
-    expect(by.get('society')!.count).toBe(7)
-    expect(by.get('director')!.count).toBeNull()
-  })
-
-  // The MINIMAP_LENSES precedent, restated: a total record with a reason on every row, so the
-  // next lens anybody adds is a type error until it says where its number comes from.
-  it('★ every lens is accounted for by name, so a new one cannot arrive unbadged by silence', () => {
-    expect(Object.keys(countsFromWorld(stats)).sort()).toEqual([...LENSES].sort())
-    expect(countsFromWorld(stats).inspector).toBe(2)
-    for (const lens of LENSES) {
-      if (lens === 'inspector') continue
-      expect(countsFromWorld(stats)[lens], lens).toBeNull()
-    }
-  })
-
-  // A mutation proved this was the one line no test could reach: dropping both fetched counts inside
-  // `LensTabs` left every UI test green while the nav showed no chronicle number at all.
-  it('★ lays the two fetched counts over the world’s, and shows nothing until they answer', () => {
-    expect(lensCountsFor(stats, 16, 2)).toEqual({
-      ...countsFromWorld(stats),
-      chronicle: 16,
-      society: 2,
-    })
-    // Before either endpoint has answered: no badge is better than a wrong one.
-    expect(lensCountsFor(stats, null, null)).toEqual(countsFromWorld(stats))
-    expect(lensCountsFor(stats, 16, 2).inspector, 'the world’s own count was overwritten').toBe(2)
-    // Zero is a real answer and must survive: a town with nothing written down says so.
-    expect(lensCountsFor(stats, 0, 0).chronicle).toBe(0)
-    expect(lensCountsFor(stats, 0, 0).society).toBe(0)
-  })
-
-  it('★★ THE BADGE AND ITS LABEL ARE ONE NUMBER, not two that can disagree', () => {
-    // A hint is the tooltip AND the screen-reader label for the badge beside it, so a hint built
-    // before the override was applied could name a different number on the same button.
-    const declared: LensCounts = {
-      ...countsFromWorld(stats),
-      chronicle: 11,
-      inspector: 40,
-      society: 3,
-      director: 4,
-    }
-    for (const h of lensHints(stats, declared)) {
-      if (h.count === null) continue
-      expect(h.hint, `${h.lens}: hint does not carry its own count`).toContain(String(h.count))
-    }
-    const hintOf = (over: Partial<LensCounts>, lens: Lens): string =>
-      lensHints(stats, { ...countsFromWorld(stats), ...over }).find((h) => h.lens === lens)!.hint
-    expect(hintOf({ chronicle: 11 }, 'chronicle')).toBe('11 in the town’s own ledger')
-    // The badge itself is aria-hidden, so a visible count the label never mentions cannot be heard
-    // at all.
-    expect(hintOf({ society: 3 }, 'society')).toBe('3 ties the town has made')
-    expect(hintOf({ director: 4 }, 'director')).toBe('4 days the town kept')
-  })
-
-  it('and a lens with no count keeps its prose, with no empty parenthesis in it', () => {
-    for (const h of lensHints(stats)) {
-      if (h.count !== null) continue
-      expect(h.hint, h.lens).not.toMatch(/\(\s*\)|\bnull\b|undefined|NaN/)
-    }
-  })
-
-  it('takes a count override for the lenses whose readers land later', () => {
-    const over: LensCounts = { ...countsFromWorld(stats), society: 7, director: 0 }
-    const by = new Map(lensHints(stats, over).map((h) => [h.lens, h]))
-    expect(by.get('society')!.count).toBe(7)
-    expect(by.get('director')!.count).toBe(0)
-    expect(lensHints(stats).find((h) => h.lens === 'society')!.count).toBeNull()
-  })
-
-  it('never speaks the language of a game (living-documentary law)', () => {
-    for (const h of lensHints(stats, { ...countsFromWorld(stats), society: 3, director: 4 })) {
-      expect(h.hint, h.lens).not.toMatch(GAMIFICATION_BAN)
-    }
-    expect(GAMIFICATION_BAN.test('Your PROGRESS')).toBe(true)
-    expect(GAMIFICATION_BAN.test('quest log')).toBe(true)
-    expect(GAMIFICATION_BAN.test('the town')).toBe(false)
-  })
-
-  it('every hint is human-framed prose, never machinery', () => {
-    for (const h of lensHints(stats)) {
-      expect(h.hint.length).toBeGreaterThan(3)
-      expect(h.hint).not.toMatch(/\b(AI|LLM|model|prompt|token|agent)\b/i)
-    }
   })
 })
 

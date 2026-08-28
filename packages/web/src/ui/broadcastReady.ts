@@ -103,36 +103,6 @@ export function captionShortfall(captions: readonly Caption[]): string[] {
     )
 }
 
-// ── R7 · the three broadcast widths ───────────────────────────────────────────────────────
-
-export const BROADCAST_WIDTHS = [1280, 1440, 1920] as const
-/** The chrome's fixed rails, in CSS px, read off the sheet's own tokens by the test. */
-export type Rails = { panel: number; stripCard: number; controlItem: number; controlCount: number }
-/** A stage narrower than this cannot show a town, and the layout is a failure rather than a
- *  scroll: horizontal scrolling is the specific thing R7 forbids. */
-export const STAGE_MIN_PX = 640
-
-function stageWidthAt(width: number, rails: Rails): number {
-  return width - rails.panel
-}
-
-/** `width — why` for every broadcast width the chrome does not fit in. */
-export function layoutOffenders(
-  rails: Rails,
-  widths: readonly number[] = BROADCAST_WIDTHS,
-): string[] {
-  const out: string[] = []
-  for (const w of widths) {
-    const stage = stageWidthAt(w, rails)
-    if (stage < STAGE_MIN_PX)
-      out.push(`${w} — stage is ${stage}px with the panel open, under ${STAGE_MIN_PX}`)
-    const bar = rails.controlItem * rails.controlCount
-    if (bar > stage) out.push(`${w} — the control bar needs ${bar}px and has ${stage}px`)
-    if (rails.stripCard * 2 > stage) out.push(`${w} — the filmstrip cannot show two postcards`)
-  }
-  return out
-}
-
 // ── R8 · the stream never lies about the clock ────────────────────────────────────────────
 
 /** socket.ts's own vocabulary, not a second copy of it. */

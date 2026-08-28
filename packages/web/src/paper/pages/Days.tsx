@@ -1,7 +1,5 @@
 import { useMemo, useRef, useSyncExternalStore } from 'react'
 import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
-import type { ObservatoryHandle } from '../net/socket.js'
 import {
   MARK_GLYPH,
   MARK_GLYPH_PX,
@@ -12,8 +10,9 @@ import {
   tipSide,
   type Mark,
   type MarkSources,
-} from './timelineMarks.js'
-import { usePolled } from './useEndpoint.js'
+} from '../../ui/timelineMarks.js'
+import { usePolled } from '../../ui/useEndpoint.js'
+import type { PageProps } from './index.js'
 
 const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY
@@ -67,7 +66,7 @@ function MarkGlyph({ mark }: { mark: Mark }) {
   )
 }
 
-export function TimelineView({
+export function DayStripView({
   edge,
   viewTick,
   live,
@@ -120,84 +119,73 @@ export function TimelineView({
   const gridDays = Array.from({ length: Math.floor(span / MINUTES_PER_DAY) + 1 }, (_, d) => d)
 
   return (
-    <div className="timeline" role="group" aria-label="Town timeline">
-      <div className="timeline-body">
-        <div className="timeline-marks">
-          {marks.map((mk) => {
-            const at = tickToMoment(mk.tick)
-            return (
-              <button
-                key={`${mk.kind}-${mk.tick}`}
-                type="button"
-                className={`mark ${mk.kind}`}
-                style={{ left: markLeft(mk.tick, span) }}
-                aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
-                onClick={() => {
-                  onScrub(mk.tick)
-                }}
-              >
-                <MarkGlyph mark={mk} />
-                <span className="mark-tip" data-side={tipSide(mk.tick, span)}>
-                  {mk.words}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        <div
-          ref={trackRef}
-          className="timeline-track"
-          role="slider"
-          tabIndex={0}
-          aria-label="Moment in the town's history"
-          aria-valuemin={0}
-          aria-valuemax={edge}
-          aria-valuenow={viewTick}
-          aria-valuetext={`Day ${m.day} ${m.time}`}
-          onKeyDown={onKey}
-          onPointerDown={(e) => {
-            ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-            pick(e.clientX)
-          }}
-          onPointerMove={(e) => {
-            if (e.buttons === 1) pick(e.clientX)
-          }}
-        >
-          {gridDays.map((d) => (
-            <span
-              key={d}
-              className="timeline-day"
-              style={{ left: `${(d * MINUTES_PER_DAY * 100) / span}%` }}
+    <div className="day-strip" role="group" aria-label="The days the town has lived">
+      <p className="sheet-note">
+        Drag the strip to replay a day. The stamp reads REPLAY until you come back to now.
+      </p>
+      <div className="day-marks">
+        {marks.map((mk) => {
+          const at = tickToMoment(mk.tick)
+          return (
+            <button
+              key={`${mk.kind}-${mk.tick}`}
+              type="button"
+              className={`mark ${mk.kind}`}
+              style={{ left: markLeft(mk.tick, span) }}
+              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
+              onClick={() => {
+                onScrub(mk.tick)
+              }}
             >
-              <em>Day {d}</em>
-            </span>
-          ))}
-          <span className="playhead" style={{ left: `${frac * 100}%` }} />
-        </div>
+              <MarkGlyph mark={mk} />
+              <span className="mark-tip" data-side={tipSide(mk.tick, span)}>
+                {mk.words}
+              </span>
+            </button>
+          )
+        })}
       </div>
-      <button
-        className={live ? 'live-pill live' : 'live-pill'}
-        onClick={onLive}
-        aria-pressed={live}
+      <div
+        ref={trackRef}
+        className="day-track"
+        role="slider"
+        tabIndex={0}
+        aria-label="Moment in the town's history"
+        aria-valuemin={0}
+        aria-valuemax={edge}
+        aria-valuenow={viewTick}
+        aria-valuetext={`Day ${m.day} ${m.time}`}
+        onKeyDown={onKey}
+        onPointerDown={(e) => {
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          pick(e.clientX)
+        }}
+        onPointerMove={(e) => {
+          if (e.buttons === 1) pick(e.clientX)
+        }}
       >
+        {gridDays.map((d) => (
+          <span
+            key={d}
+            className="day-tick"
+            style={{ left: `${(d * MINUTES_PER_DAY * 100) / span}%` }}
+          >
+            <em>Day {d}</em>
+          </span>
+        ))}
+        <span className="playhead" style={{ left: `${frac * 100}%` }} />
+      </div>
+      <button className={live ? 'live-pill live' : 'live-pill'} onClick={onLive} aria-pressed={live}>
         {live ? 'LIVE' : 'Return to now'}
       </button>
     </div>
   )
 }
 
-export function Timeline({
-  store,
-  handle,
-  onView,
-}: {
-  store: WorldStore
-  handle: ObservatoryHandle | null
-  onView: (tick: number | null) => void // null = went live; updates the address bar
-}) {
+export function Days({ store, handle, onView }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  // The scrubber still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
+  // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
     usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
   const firsts = usePolled('/api/milestones', firstRows, MARKS_REFETCH_MS).data ?? NO_FIRSTS
@@ -209,24 +197,21 @@ export function Timeline({
     [sources, firsts, edge],
   )
 
-  const scrubTo = (tick: number): void => {
-    const t = Math.max(0, Math.min(edge, Math.round(tick)))
-    handle?.scrub(t)
-    onView(t)
-  }
-  const goLive = (): void => {
-    handle?.goLive()
-    onView(null)
-  }
-
   return (
-    <TimelineView
+    <DayStripView
       edge={edge}
       viewTick={viewTick}
       live={mode.live}
       marks={marks}
-      onScrub={scrubTo}
-      onLive={goLive}
+      onScrub={(tick) => {
+        const t = Math.max(0, Math.min(edge, Math.round(tick)))
+        handle?.scrub(t)
+        onView(t)
+      }}
+      onLive={() => {
+        handle?.goLive()
+        onView(null)
+      }}
     />
   )
 }

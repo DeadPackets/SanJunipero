@@ -12,10 +12,8 @@ import { chronicleGlyph } from './importantFeed.js'
 import { MARK_GLYPH, marksFrom } from './timelineMarks.js'
 import { subjectFor } from './directorCut.js'
 import {
-  BROADCAST_WIDTHS,
   MACHINE_CHECKABLE,
   READINESS,
-  STAGE_MIN_PX,
   TWITCH_SCALE,
   BADGE_WORD,
   captionAtScale,
@@ -26,11 +24,9 @@ import {
   figuresAreLive,
   kindWords,
   TWITCH_FRAME_H,
-  layoutOffenders,
   machineWordOffenders,
   readinessReport,
   tickBadgeState,
-  type Rails,
   type ReadinessLine,
   type StringSite,
 } from './broadcastReady.js'
@@ -40,14 +36,9 @@ import { hoverLabel } from './interaction.js'
 import { placeOf } from './place.js'
 import { LAW_COPY } from './lawCopy.js'
 import { EMPTY_COPY } from './townStats.js'
-import { controlItems } from './controlBar.js'
 import { stateWord, conditionsOf, CONDITION_WORD } from './status.js'
 import { BROADCAST_CAPTIONS } from './broadcast.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
-  /\/\*[\s\S]*?\*\//g,
-  '',
-)
 
 describe('the eight conditions, stated', () => {
   it('names all eight and marks which four a machine can check', () => {
@@ -180,17 +171,6 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     push(`law ${path} unit`, copy.unit)
   }
   for (const [k, v] of Object.entries(EMPTY_COPY)) push(`empty ${k}`, v)
-  for (const item of controlItems({
-    lens: 'map',
-    live: true,
-    zoom: 1,
-    following: null,
-    insideId: null,
-    hudHidden: false,
-    townFits: true,
-  })) {
-    push(`control ${item.id}`, item.label)
-  }
   return out
 }
 
@@ -240,27 +220,7 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
 /** Every caption a broadcast burns into the frame, and its source size in CSS px. */
 const CAPTIONS: readonly { what: string; px: number }[] = [
   { what: 'speech bubble', px: 16 }, // FACE_INSTALL_PX
-  { what: 'director subtitle', px: 0.95 * 16 },
-  {
-    what: 'director speaker name',
-    px:
-      Number.parseFloat(/\.subtitle-name\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(CSS)?.[1] ?? '0') *
-      16,
-  },
-  { what: 'filmstrip title', px: 14 },
 ]
-
-/** The broadcast frame's captions come off the shipped sheet, so a token change moves them. */
-function broadcastSheetPx(selector: string): number {
-  const hits: number[] = []
-  for (const [, list, body] of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (!(list ?? '').split(',').some((x) => x.trim() === selector)) continue
-    const raw = /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim()
-    if (raw !== undefined) hits.push(Number.parseFloat(raw) * (raw.endsWith('rem') ? 16 : 1))
-  }
-  if (hits.length === 0) throw new Error(`no font-size for ${selector}`)
-  return hits.at(-1)!
-}
 
 describe('R2 · every caption survives the downscale to a 480px mobile player', () => {
   it('computes the scale and the floor from the frame, never from a fixed pixel count', () => {
@@ -283,12 +243,7 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
   // The desktop shortfall is measured on purpose rather than asserted away: it is what bought
   // the second composition in `ui/broadcast.ts`.
   it('MEASURES the desktop shortfall rather than asserting it away', () => {
-    expect(captionShortfall(CAPTIONS)).toEqual([
-      'speech bubble — 4.00px of 5.4px',
-      'director subtitle — 3.80px of 5.4px',
-      'director speaker name — 3.00px of 5.4px',
-      'filmstrip title — 3.50px of 5.4px',
-    ])
+    expect(captionShortfall(CAPTIONS)).toEqual(['speech bubble — 4.00px of 5.4px'])
   })
 
   it('says what would close it, in one number', () => {
@@ -299,37 +254,10 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
   it('reports R2 as CLOSED by the broadcast layout', () => {
     const broadcast = BROADCAST_CAPTIONS.map((c) => ({
       what: c.what,
-      px: c.from === 'canvas' ? c.px : broadcastSheetPx(c.selector),
+      px: c.from === 'canvas' ? c.px : 0,
     }))
     expect(captionShortfall(broadcast)).toEqual([])
     for (const c of broadcast) expect(c.px, c.what).toBeGreaterThanOrEqual(captionFloorPx())
-  })
-})
-
-// ── R7 ────────────────────────────────────────────────────────────────────────────────────
-
-const rem = (v: string): number => Number.parseFloat(v) * (v.endsWith('rem') ? 16 : 1)
-const RAILS: Rails = {
-  panel: rem(/#panel-outlet\.open\s*\{[^}]*width:\s*([\d.]+rem)/.exec(CSS)?.[1] ?? '0'),
-  stripCard: Number.parseFloat(/--strip-card:\s*(\d+)px/.exec(CSS)?.[1] ?? '0'),
-  controlItem: 44, // the touch floor every control clears
-  controlCount: 11, // the widest bar controlItems can produce
-}
-
-describe('R7 · the three broadcast widths hold the layout', () => {
-  it('reads the rails off the sheet rather than repeating them', () => {
-    expect(RAILS.panel).toBe(368)
-    expect(RAILS.stripCard).toBe(168)
-  })
-
-  it('catches a width that does not fit', () => {
-    expect(layoutOffenders(RAILS, [900]).length).toBeGreaterThan(0)
-  })
-
-  it('leaves a workable stage at every broadcast width, with the panel open', () => {
-    expect(layoutOffenders(RAILS)).toEqual([])
-    for (const w of BROADCAST_WIDTHS)
-      expect(w - RAILS.panel, `${w}`).toBeGreaterThanOrEqual(STAGE_MIN_PX)
   })
 })
 
@@ -350,17 +278,6 @@ describe('R8 · a dropped socket never leaves a confident clock on screen', () =
     expect(figuresAreLive('live')).toBe(true)
   })
 
-  it('is what the badge in App.tsx actually renders', () => {
-    const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
-    expect(app).toContain('tickBadgeState')
-    expect(app).toContain('BADGE_WORD')
-    // the old hard-coded pair is gone, so the badge cannot say `Now` with the socket down
-    expect(app).not.toMatch(/\{live \? 'Now' : 'Back then'\}/)
-  })
-
-  it('marks the figures stale in the sheet too, so a viewer can see it', () => {
-    expect(CSS).toContain('.tick-badge.stale')
-  })
 })
 
 // ── R1 / R3 · the decidable halves, which were recorded as "unmeasured" whole ─────────────

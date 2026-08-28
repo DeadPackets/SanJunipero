@@ -6,17 +6,9 @@ import {
   type BondArc,
   type BondLevel,
   type BondType,
-} from './bondModel2.js'
-import { ARC_COLOR } from './relationGraph.js'
-import type { PeopleIndex } from './bondModel2.js'
-
-// The bar is gone: it filled toward the closest pair in town, which makes a relationship a
-// meter with a leader. The level word plus the dated history can also go DOWN.
-
-const moment = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
-}
+  type PeopleIndex,
+} from '../../ui/bondModel2.js'
+import { ARC_COLOR } from '../../ui/relationGraph.js'
 
 const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
   warming: 'Getting closer',
@@ -24,7 +16,14 @@ const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
   steady: 'Holding steady',
 }
 
-export function BondDetailPanel({
+const moment = (tick: number): string => {
+  const m = tickToMoment(tick)
+  return `Day ${m.day} ${m.time}`
+}
+
+/** One tie, opened. The bar is gone: it filled toward the closest pair in town, which makes a
+ *  relationship a meter with a leader. The level word plus the dated history can also go DOWN. */
+export function BondDetail({
   bond,
   people,
   type,
@@ -48,7 +47,7 @@ export function BondDetailPanel({
   const earlier = bond.strength - bond.recent.length
 
   return (
-    <aside className="bond-detail" role="dialog" aria-label={words}>
+    <aside className="bond-detail" role="group" aria-label={words}>
       <header className="bond-head">
         <span className="bond-level">{BOND_LEVEL_WORD[level]}</span>
         {type !== 'none' && <span className="bond-type">{BOND_TYPE_WORD[type]}</span>}
@@ -62,7 +61,6 @@ export function BondDetailPanel({
 
       <p className="bond-line">{words}</p>
 
-      {/* the arc is the thing the landed panel could not say at all */}
       <p className="bond-arc">
         <span
           className="bond-arc-mark"
@@ -82,11 +80,7 @@ export function BondDetailPanel({
         <dd>{moment(bond.lastUpdatedTick)}</dd>
       </dl>
 
-      {/* ★ WHAT THE TALLY SAYS AND THE LIST NEVER COULD.
-          The feed used to carry every act that ever formed the tie, which at sim-day 20 of a
-          talkative town was 83.7 MB of "They spoke together." — a list nobody reads to the end
-          of, and one no browser was going to render. The counts are the whole history; the
-          column below is the last {BOND_RECENT_ACTS} of it. */}
+      {/* The counts are the whole history; the column below is the last few acts of it. */}
       <ul className="bond-tally">
         {bond.acts.map((a) => (
           <li key={a.kind}>

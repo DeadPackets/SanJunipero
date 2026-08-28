@@ -6,7 +6,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { diffLines } from './diffLines.js'
-import { InspectorBodyView } from './InspectorPanel.js'
+import { PersonLedgerView, PersonStoryView } from '../paper/pages/Person.js'
 import {
   AUTHORED_IDENTITY_FIELDS,
   CHANGE_EMPTY,
@@ -247,7 +247,7 @@ describe('the placeholders that presented emptiness as a personality are gone', 
   })
 })
 
-describe('the inspector on a day-0 person makes no claim the run has not earned', () => {
+describe('a day-0 person’s page makes no claim the run has not earned', () => {
   const a = {
     id: 'amara',
     name: 'Amara',
@@ -263,35 +263,31 @@ describe('the inspector on a day-0 person makes no claim the run has not earned'
     needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
   }
 
-  const html = renderToStaticMarkup(
-    createElement(InspectorBodyView, {
-      agent: a,
-      tick: 0,
-      thought: null,
-      carrying: [],
-      changes: [],
-    }),
+  const story = renderToStaticMarkup(
+    createElement(PersonStoryView, { thought: null, journal: [], changes: [] }),
+  )
+  const ledger = renderToStaticMarkup(
+    createElement(PersonLedgerView, { agent: a, tick: 0, carrying: [], ledger: [] }),
   )
 
   it('says the record is empty rather than describing an empty person', () => {
-    expect(html).toContain(THOUGHT_EMPTY)
-    expect(html).toContain(SKILLS_EMPTY)
-    expect(html).toContain(CHANGE_EMPTY)
-    for (const gone of REMOVED_PLACEHOLDERS) expect(html).not.toContain(gone)
+    expect(story).toContain(THOUGHT_EMPTY)
+    expect(ledger).toContain(SKILLS_EMPTY)
+    expect(story).toContain(CHANGE_EMPTY)
+    for (const gone of REMOVED_PLACEHOLDERS) expect(story + ledger).not.toContain(gone)
   })
 
   // WHAT THE BROWSER CAUGHT: the header badge prints the state and so did the Doing section,
   // so an idle person read "Asleep" twice on one panel.
-  it('says what a person is doing exactly once on the panel', () => {
-    const withHeader = `<span class="badge">Asleep</span>${html}`
+  it('says what a person is doing exactly once on the page', () => {
+    const withHeader = `<span class="badge">Asleep</span>${ledger}`
     expect(withHeader.match(/Asleep/g)?.length).toBe(1)
     const busy = renderToStaticMarkup(
-      createElement(InspectorBodyView, {
+      createElement(PersonLedgerView, {
         agent: { ...a, activity: { verb: 'build', ticksRemaining: 12 } },
         tick: 0,
-        thought: null,
         carrying: [],
-        changes: [],
+        ledger: [],
       }),
     )
     expect(busy).toContain('Building — 12 min to go')
@@ -299,18 +295,16 @@ describe('the inspector on a day-0 person makes no claim the run has not earned'
   })
 
   it('shows no profile prose and no authored-looking sheet', () => {
-    const text = html.replace(/<[^>]*>/g, ' ')
+    const text = (story + ledger).replace(/<[^>]*>/g, ' ')
     expect(text).not.toMatch(GAMIFICATION_BAN)
     expect(text).not.toMatch(/\b(trait|background|backstory|archetype|persona|bio|origin)\b/i)
   })
 
   it('leads with the LATEST document and the most recent edit once there is one', () => {
     const rich = renderToStaticMarkup(
-      createElement(InspectorBodyView, {
-        agent: a,
-        tick: 4000,
+      createElement(PersonStoryView, {
         thought: null,
-        carrying: [],
+        journal: [],
         changes: changeLog([
           { version: 1, day: 0, doc: 'first', edit: 'first written' },
           { version: 2, day: 4, doc: 'second', edit: 'after the flood' },
