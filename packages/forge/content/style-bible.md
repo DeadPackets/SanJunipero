@@ -85,11 +85,22 @@ RETRACTED: the v4 "soft-lattice" flags (8 cells at 40–44% ambiguity) were a 5-
 
 ## Canonical style anchor
 
-- `content/reference/style-anchor.png` (the approved T6 cottage raw) is THE art-style reference for the entire simulation: pixel density ("blocky but not too much"), palette warmth, cute rounded style.
-- Measured: detectArtScale = 4 on the 512px generation canvas → effective art resolution 128×128 (each art pixel ≈ 4 source px).
-- LAW: style-anchor.png is the FIRST input_reference on EVERY generation (all classes) and the FIRST judge refSheet.
-- style-anchor.png stays RAW — never post-processed. It is the generation/judge reference, not a shipped sprite.
-- Prompts for non-character classes append: "match the pixel density, palette warmth, and cute rounded style of the first reference image exactly".
+SUPERSEDED for the reference itself, kept for the clause. Attaching the cottage cost a generation
+its architecture — the model returned THE ANCHOR RECOLOURED against a prompt that banned the arch
+by name (measured A/B, $0.2053).
+
+- LAW: `refs[0]` is the MASTER_PALETTE swatch that `loadReferenceSheet` builds — a colour chart,
+  no subject, no architecture, no projection. The live forge and every current generator attach
+  that and nothing else; only the superseded v1 scripts still read `style-anchor.png`, as a judge
+  reference.
+- The clause stands, and now points at the swatch: non-character classes still append
+  `STYLE_ANCHOR_CLAUSE` — "match the pixel density, palette warmth, and cute rounded style of the
+  first reference image exactly". Characters carry their own identity refs and get no such clause.
+- Calls whose only reference is the chart also carry `SWATCH_CLAUSE` and `PALETTE_WORDS`
+  (`src/library/plan.ts`), which say in words that there is no object to copy.
+- `content/reference/style-anchor.png` is still the human style reference — pixel density ("blocky
+  but not too much"), palette warmth, cute rounded style. Measured: detectArtScale = 4 on the 512px
+  generation canvas → effective art resolution 128×128 (each art pixel ≈ 4 source px).
 
 ## Character standard v3 — mirror standard
 
