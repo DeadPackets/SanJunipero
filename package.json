@@ -13,10 +13,13 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "knip": "knip",
+    "rehearse": "scripts/rehearse.sh 20",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm knip && pnpm test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
+    "@sj/shared": "workspace:*",
+    "better-sqlite3": "^13.0.0",
     "@types/node": "^24.0.0",
     "eslint": "10.9.1",
     "eslint-plugin-react-hooks": "7.1.1",
