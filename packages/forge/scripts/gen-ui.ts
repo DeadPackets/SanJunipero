@@ -51,8 +51,6 @@ type RGBA = readonly [number, number, number, number]
 const INK: RGBA = [0x32, 0x2b, 0x38, 255]
 const PARCHMENT: RGBA = [0xf6, 0xe8, 0xd5, 255]
 const INNER_CREAM: RGBA = [0xe8, 0xd5, 0xbc, 255]
-// Pure white, not the cream: `tint * white === tint`, so W1's speaker colour arrives exact.
-const NEUTRAL: RGBA = [0xff, 0xff, 0xff, 255]
 const PLATE: RGBA = [0x7e, 0x51, 0x2b, 255]
 const PLATE_LIP: RGBA = [0x5d, 0x3f, 0x20, 255]
 const PLATE_TOP: RGBA = [0xa6, 0x6e, 0x38, 255]
@@ -93,32 +91,6 @@ function panel(
 /** One row of a panel's field, inside its one-pixel border. */
 function band(img: RawImage, y: number, c: RGBA): void {
   for (let x = 1; x < img.width - 1; x++) put(img, x, y, c)
-}
-
-// The bubble tail, drawn out rather than derived: at eight pixels a two-pixel wall leaves room
-// for exactly three steps, and the arithmetic that gets there is longer than the picture. The
-// top two rows are `W`, so laying the tail on the box COVERS its bottom border and the tail
-// opens into the bubble instead of hanging off a closed edge. Symmetric, so W1 turns it to
-// whichever of the four sides de-confliction put the bubble on.
-const TAIL = [
-  'WWWWWWWW',
-  'WWWWWWWW',
-  'IIWWWWII',
-  'IIWWWWII',
-  '.IIWWII.',
-  '.IIWWII.',
-  '..IIII..',
-  '...II...',
-]
-
-function tail(): RawImage {
-  const img = canvas(TAIL[0]!.length, TAIL.length)
-  for (let y = 0; y < TAIL.length; y++)
-    for (let x = 0; x < img.width; x++) {
-      const c = TAIL[y]![x]
-      if (c !== '.') put(img, x, y, c === 'I' ? INK : NEUTRAL)
-    }
-  return img
 }
 
 /** The ring marker: the town's 2:1 diamond — `size` across and half that tall — ink-edged, its
@@ -201,21 +173,6 @@ const PIECES: readonly UiPiece[] = [
     slice: 4,
     note: 'under a hovered or selected figure',
     paint: () => nameplate(32, 16),
-  },
-  {
-    id: 'speech',
-    w: 24,
-    h: 24,
-    slice: 6,
-    note: 'the bubble box; tint it for the speaker',
-    paint: () => panel(24, 24, { border: 2, edge: INK, fill: NEUTRAL }),
-  },
-  {
-    id: 'speech-tail',
-    w: 8,
-    h: 8,
-    note: 'rotate for the side the bubble sits on',
-    paint: tail,
   },
   {
     id: 'ring-pip',

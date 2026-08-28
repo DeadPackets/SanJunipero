@@ -50,11 +50,8 @@
   --ledge: 4px 4px 0 0 var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
-  --px-parchment: url('./px/frame-parchment.png') 10 repeat;
   --px-cream: url('./px/frame-cream.png') 10 repeat;
-  --px-honey: url('./px/frame-honey.png') 10 repeat;
   --px-night: url('./px/frame-night.png') 10 repeat;
-  --px-ceremony: url('./px/frame2-parchment.png') 12 repeat;
   --px-paper: url('./px/paper.png') 24 repeat;
   --grain: url('./px/dither-warm.png');
 
@@ -912,12 +909,12 @@ body {
   letter-spacing: 0.04em; white-space: nowrap;
   color: var(--cream);
   background: #7E512B;
-  padding: 2px 7px;
-  box-shadow: inset 0 -2px 0 0 #5D3F20;
+  padding: 0 3px;
+  /* the plate's ink edge, lit top row and bottom lip are drawn in the raster's own slices */
+  border: 4px solid transparent; border-image: url('./px/nameplate.png') 4 repeat;
   opacity: 0;
   animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
 }
-.stage-plate.selected { background: var(--honey); color: var(--deep); box-shadow: inset 0 -2px 0 0 #B8873A; }
 @keyframes stage-plate-in { to { opacity: 1; } }
 
 /* ── the subject ring: four things to ask, standing round the person you asked ── */

@@ -225,12 +225,12 @@ describe('★ the wheel gesture is released on the frame, so the resting frame s
   })
 })
 
-// ── ★ THE MINIMAP DOES NOT OPEN A FIFTH DOOR ONTO THE CAMERA ──────────────────────────────
+// ── ★ NO MOVER OPENS A SECOND DOOR ONTO THE CAMERA ────────────────────────────────────────
 //
 // A mover that wrote `world.position` itself would skip every guard, and would look right in
-// the browser until somebody clicked the map while a throw was still in the air.
+// the browser until somebody moved the camera while a throw was still in the air.
 
-describe('going somewhere from the map takes the same road as going home', () => {
+describe('travelling to a point takes the same road as going home', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
   const body = (name: string): string => functionBody(src, name)
 
@@ -279,8 +279,8 @@ describe('going somewhere from the map takes the same road as going home', () =>
     expect(p, 'place() moves the camera without telling anybody').toContain('notifyCamera()')
   })
 
-  it('the map is drawn over the SAME box the clamp uses, from one accessor', () => {
-    // the scene owns `bounds`, and hands the rig the very accessor the minimap is drawn from
+  it('every reader of the reachable box gets it from one accessor', () => {
+    // the scene owns `bounds`, and hands the rig that very accessor
     const scene = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
     expect(scene).toContain('reachableBox: () => bounds')
     expect(scene).toContain('reachable: () => bounds')

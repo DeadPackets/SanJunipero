@@ -55,28 +55,6 @@
         "painter": "gen-ui.ts"
       }
     },
-    "speech": {
-      "file": "speech.png",
-      "w": 24,
-      "h": 24,
-      "slice": 6,
-      "note": "the bubble box; tint it for the speaker",
-      "provenance": {
-        "source": "code-painted",
-        "painter": "gen-ui.ts"
-      }
-    },
-    "speech-tail": {
-      "file": "speech-tail.png",
-      "w": 8,
-      "h": 8,
-      "slice": null,
-      "note": "rotate for the side the bubble sits on",
-      "provenance": {
-        "source": "code-painted",
-        "painter": "gen-ui.ts"
-      }
-    },
     "ring-pip": {
       "file": "ring-pip.png",
       "w": 24,

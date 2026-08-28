@@ -70,8 +70,7 @@ export type Scene = {
   depthCounts(): DepthCounts
   /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
   viewRect(): { x: number; y: number; w: number; h: number }
-  /** The box the camera may travel over: the ground that exists union the town as it is drawn.
-   *  The minimap draws exactly this, so every point it shows is somewhere the camera can go. */
+  /** The box the camera may travel over: the ground that exists union the town as it is drawn. */
   reachableBox(): CameraBounds
   /** THE label layer. One owner for every world tag, so two can never be up by accident and
    *  a torn-down sprite cannot leave one behind. */
@@ -95,7 +94,7 @@ export type Scene = {
    *  never shows a number the stop set does not contain. */
   getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
-  /** A press on the minimap, in the space `tileToScreen` returns. A cut, never a glide. */
+  /** Go straight to a point in the space `tileToScreen` returns. A cut, never a glide. */
   travelTo(sx: number, sy: number): void
   centerHome(): void
   /** a view of the whole settlement, at the largest stop it fits at */

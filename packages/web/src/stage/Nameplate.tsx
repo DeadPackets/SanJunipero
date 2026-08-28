@@ -25,14 +25,11 @@ export function Nameplate({
   subject,
   scene,
   store,
-  selected = false,
 }: {
   subject: Subject | null
   scene: Scene | null
   /** only a `structure` subject needs it — a body carries its own sprite anchor */
   store?: WorldStore
-  /** the plate a viewer has committed to, drawn in honey rather than brown */
-  selected?: boolean
 }) {
   const ref = useSubjectAnchor(scene, subject, store)
   // Measured once a name, not once a frame: reading a layout box inside the loop would force
@@ -60,7 +57,7 @@ export function Nameplate({
 
   if (subject === null) return null
   return (
-    <div ref={ref} className={selected ? 'stage-plate selected' : 'stage-plate'} aria-hidden="true">
+    <div ref={ref} className="stage-plate" aria-hidden="true">
       {subject.name}
     </div>
   )

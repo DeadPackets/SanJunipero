@@ -17,8 +17,6 @@ export const UI_PIECE_IDS = [
   'signpost-post',
   'paper',
   'nameplate',
-  'speech',
-  'speech-tail',
   'ring-pip',
 ] as const
 
