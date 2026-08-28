@@ -13,7 +13,7 @@ export {
   speechLine,
 } from './SpeechLive.js'
 export type { Utterance } from './SpeechLive.js'
-export { RING_LABEL, RING_VERBS, SubjectRing, cycleVerb } from './SubjectRing.js'
+export { RING_LABEL, RING_VERBS, SubjectRing, armFor } from './SubjectRing.js'
 export type { RingVerb } from './SubjectRing.js'
 export { stageKeyAllowed, stageKeyFor, toggleFullscreen, useStageKeys } from './useStageKeys.js'
 export type { StageKey, StageKeyHandlers } from './useStageKeys.js'

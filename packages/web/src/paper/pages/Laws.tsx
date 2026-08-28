@@ -75,8 +75,16 @@ function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
   )
 }
 
+/** A law moves when a law moves, not when the clock does. Subscribing to the tick rebuilt
+ *  every row of every group of the whole config once a tick, with the sheet open. */
+function useLawsSeq(store: PageProps['store']): void {
+  const seq = (): string =>
+    `${store.getConfig() === null ? 'wait' : 'have'}:${store.lawHistory().length}`
+  useSyncExternalStore(store.subscribe, seq, seq)
+}
+
 function World({ store }: PageProps) {
-  useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  useLawsSeq(store)
   return <WorldLawsView rows={lawRows(store.getConfig(), store.getLaws(), store.lawHistory())} />
 }
 
@@ -87,7 +95,7 @@ function nextValue(row: EditRow, raw: string): unknown {
 // Operator-only. Says so out loud, and offers nothing at all without a token, so a viewer who
 // wanders onto the tab sees no control surface to guess at.
 function Admin({ store, operatorToken }: PageProps) {
-  useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  useLawsSeq(store)
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { RING_LABEL, RING_VERBS, SubjectRing, cycleVerb } from './SubjectRing.js'
+import { readFileSync } from 'node:fs'
+import { RING_LABEL, RING_VERBS, SubjectRing, armFor } from './SubjectRing.js'
 import type { Subject } from './anchor.js'
 
 const AMARA: Subject = { id: 'a1', kind: 'agent', name: 'Amara' }
@@ -17,27 +18,35 @@ const markup = (subject: Subject | null): string =>
     }),
   )
 
-describe('the arrows walk the ring and it has no end', () => {
-  it('moves forward on right and down, back on left and up', () => {
-    expect(cycleVerb(0, 'ArrowRight')).toBe(1)
-    expect(cycleVerb(0, 'ArrowDown')).toBe(1)
-    expect(cycleVerb(1, 'ArrowLeft')).toBe(0)
-    expect(cycleVerb(1, 'ArrowUp')).toBe(0)
+// ★ The arms stand at 12, 3, 6 and 9 o'clock. Stepping round a flat list put ArrowDown from
+// the top arm on the RIGHT one, which is not where the viewer is pointing.
+describe('★ the arrows point at an arm, they do not step round a list', () => {
+  const CSS = readFileSync(new URL('../ui/chrome.css', import.meta.url), 'utf8')
+
+  it('★ names the arm the key points at, whichever arm the focus is on', () => {
+    expect(armFor('ArrowUp')).toBe(0)
+    expect(armFor('ArrowRight')).toBe(1)
+    expect(armFor('ArrowDown')).toBe(2)
+    expect(armFor('ArrowLeft')).toBe(3)
   })
 
-  it('wraps both ways — a ring has no first arm and no last', () => {
-    expect(cycleVerb(RING_VERBS.length - 1, 'ArrowRight')).toBe(0)
-    expect(cycleVerb(0, 'ArrowLeft')).toBe(RING_VERBS.length - 1)
+  it('★ points at the arm the sheet actually draws there', () => {
+    const at = (n: number): string =>
+      CSS.match(new RegExp(`\\.stage-ring-arms button:nth-child\\(${n}\\) \\{([^}]*)\\}`))![1]!
+    expect(at(armFor('ArrowUp')! + 1), 'up').toContain('top: 0')
+    expect(at(armFor('ArrowRight')! + 1), 'right').toContain('left: 100%')
+    expect(at(armFor('ArrowDown')! + 1), 'down').toContain('top: 100%')
+    expect(at(armFor('ArrowLeft')! + 1), 'left').toContain('left: 0')
   })
 
-  it('jumps to the ends on Home and End', () => {
-    expect(cycleVerb(2, 'Home')).toBe(0)
-    expect(cycleVerb(0, 'End')).toBe(RING_VERBS.length - 1)
+  it('keeps Home and End on the first and last arm', () => {
+    expect(armFor('Home')).toBe(0)
+    expect(armFor('End')).toBe(RING_VERBS.length - 1)
   })
 
   it('leaves every other key to whoever else wants it', () => {
     for (const key of ['Enter', ' ', 'Escape', 'a', 'Tab', '+', '-']) {
-      expect(cycleVerb(0, key), key).toBeNull()
+      expect(armFor(key), key).toBeNull()
     }
   })
 })

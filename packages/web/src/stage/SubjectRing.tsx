@@ -14,21 +14,21 @@ export const RING_LABEL: Readonly<Record<RingVerb, string>> = {
   home: 'Home',
 }
 
-/** Which arm a key moves to, or null when the ring does not own the press. Wraps, because a
- *  ring has no first arm and no last one. */
-export function cycleVerb(index: number, key: string): number | null {
-  const n = RING_VERBS.length
+/** Which arm a key moves to, or null when the ring does not own the press. The arms stand at
+ *  12, 3, 6 and 9 o'clock, so an arrow POINTS at one rather than stepping round a list: every
+ *  arm is one press away from every other, and the key agrees with what the viewer can see. */
+export function armFor(key: string): number | null {
   switch (key) {
-    case 'ArrowRight':
-    case 'ArrowDown':
-      return (index + 1) % n
-    case 'ArrowLeft':
     case 'ArrowUp':
-      return (index + n - 1) % n
     case 'Home':
       return 0
+    case 'ArrowRight':
+      return 1
+    case 'ArrowDown':
+      return 2
+    case 'ArrowLeft':
     case 'End':
-      return n - 1
+      return 3
     default:
       return null
   }
@@ -80,7 +80,7 @@ export function SubjectRing({
               onVerb(verb)
             }}
             onKeyDown={(e) => {
-              const next = cycleVerb(i, e.key)
+              const next = armFor(e.key)
               if (next === null) return
               // The stage owns the arrows for panning and reads them off this same React tree.
               e.preventDefault()
