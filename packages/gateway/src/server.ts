@@ -21,6 +21,7 @@ import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
+import { mountShareCard, shareMeta } from './shareCard.js'
 import { reportOnce } from './degraded.js'
 import { frameText, notFound, sendJson } from './http.js'
 
@@ -127,9 +128,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
+  mountShareCard(router, { mirror, narratorDb })
 
   // The built client, served from the world's own origin so the stream is one address.
-  const site = opts.staticDir === undefined ? null : makeStaticSite(opts.staticDir)
+  const site =
+    opts.staticDir === undefined
+      ? null
+      : makeStaticSite(opts.staticDir, (pathname) =>
+          shareMeta({ mirror, narratorDb }, pathname),
+        )
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
