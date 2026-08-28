@@ -13,3 +13,9 @@ export const BIG_PIXEL =
   'Rendered as chunky low-resolution pixel art: the entire figure is drawn from large visible square pixels ' +
   '(as if a 32x32 sprite enlarged), flat solid colors from a limited palette, absolutely no smooth shading, ' +
   'no painterly detail, no anti-aliasing, thick 1-pixel dark outline around the silhouette.'
+
+// The masters kept coming back five heads tall beside a three-head anchor, and the reference
+// picture alone did not hold it — so the proportion is stated in words as well.
+export const PROPORTION_CLAUSE =
+  'chibi proportions like the reference cast: exactly three heads tall, large round head about ' +
+  'one third of the total height, short legs'

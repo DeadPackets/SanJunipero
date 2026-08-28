@@ -37,7 +37,7 @@ import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pix
 import { quantize } from '../src/post/quantize.js'
 import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
-import { BIG_PIXEL } from './character.js'
+import { BIG_PIXEL, PROPORTION_CLAUSE } from './character.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastMember } from './cast-v5.js'
 import { scratch } from './scratch.js'
 
@@ -198,6 +198,7 @@ function masterPrompt(m: CastMember, proportionRef: boolean): string {
     proportionClause +
     `${NO_SCENERY} ` +
     `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${SWATCH_CLAUSE} ${PALETTE_WORDS} ${BIG_PIXEL} ` +
+    `${PROPORTION_CLAUSE}. ` +
     'Each figure stands about three quarters of the frame height tall, with clear magenta ' +
     'margin above and below; figures must NOT touch the edges of the image.'
   )
