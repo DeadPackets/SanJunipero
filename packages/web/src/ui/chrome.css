@@ -61,6 +61,9 @@
   /* the paper: one sheet, sized off the stage it rises over */
   --paper-w: min(78%, 760px);
   --paper-h: 66%;
+  /* 78% of a phone is 304px, which no roster row fits in: the sheet takes the width there. */
+  --paper-w-narrow: 96%;
+  --paper-h-narrow: 80%;
   --dim: 0.28;
 }
 
@@ -936,7 +939,9 @@ body {
   position: absolute; left: 50%; bottom: 0; z-index: 30;
   width: var(--paper-w); height: var(--paper-h);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr);
-  translate: -50% 0; transform: translateY(102%);
+  /* One property carries both axes: a minifier folds a separate `translate` into `transform`,
+     and the open state's `transform` then throws the centring away. */
+  transform: translate(-50%, 102%);
   background: var(--parchment) var(--grain); background-clip: padding-box;
   color: var(--ink);
   /* W3's parchment nine-slice carries the 3px ink edge the direction asked for */
@@ -944,12 +949,15 @@ body {
   box-shadow: 0 -10px 30px rgba(36, 31, 43, 0.35);
   transition: transform var(--t-slow) var(--ease-enter);
 }
-.paper[data-open='yes'] { transform: translateY(0); }
+.paper[data-open='yes'] { transform: translate(-50%, 0); }
 .paper[aria-hidden='true'] { pointer-events: none; }
 /* Reduced motion: the sheet is simply there or not there — no slide, and no fade standing in
    for one, because a 300ms fade is the same 300ms of waiting. */
 @media (prefers-reduced-motion: reduce) {
   .paper { transition: none; }
+}
+@media (max-width: 640px) {
+  .paper { width: var(--paper-w-narrow); height: var(--paper-h-narrow); }
 }
 
 .paper-grip {

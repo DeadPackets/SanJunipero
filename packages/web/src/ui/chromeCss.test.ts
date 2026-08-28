@@ -102,9 +102,16 @@ describe('★ the signpost and the paper hold their own shape', () => {
 
   it('rises from the bottom edge in the sheet’s own 300ms enter curve', () => {
     const paper = topRule('.paper')
-    expect(paper, 'the sheet must start below the edge').toMatch(/transform:\s*translateY\(102%\)/)
+    expect(paper, 'the sheet must start below the edge').toMatch(
+      /transform:\s*translate\(-50%, 102%\)/,
+    )
     expect(paper).toMatch(/transition:\s*transform var\(--t-slow\) var\(--ease-enter\)/)
-    expect(BARE).toMatch(/\.paper\[data-open='yes'\] \{[^}]*transform:\s*translateY\(0\)/)
+    expect(BARE).toMatch(/\.paper\[data-open='yes'\] \{[^}]*transform:\s*translate\(-50%, 0\)/)
+    // A separate `translate` gets folded into `transform` by the minifier and the open state
+    // then throws the centring away — one property has to carry both axes.
+    expect(paper, 'the sheet centres itself with `transform`, never `translate`').not.toMatch(
+      /^\s*translate:/m,
+    )
   })
 
   it('★ does not slide at all under reduced motion', () => {

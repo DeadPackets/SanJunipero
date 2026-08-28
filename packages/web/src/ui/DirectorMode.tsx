@@ -33,6 +33,9 @@ export function DirectorMode({
   const followedRef = useRef<string | null>(null)
   const lastCutRef = useRef(0)
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  // The overview is fitted to a town, so it has to wait for one: fitting an empty world frames
+  // whatever corner of the ground the camera was created over.
+  const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
 
   const heat = usePolled<HeatWindow[]>(
     autoCut && pinned === null ? '/api/heat' : null,
@@ -73,7 +76,7 @@ export function DirectorMode({
     if (scene === null) return
     if (followed === null) {
       scene.setFollow(null)
-      if (autoCut) scene.fitToTown()
+      if (awake) scene.fitToTown()
       return
     }
     scene.setZoom(DIRECTOR_ZOOM)
@@ -88,7 +91,7 @@ export function DirectorMode({
     return () => {
       scene.setFollow(null)
     }
-  }, [scene, store, followed, autoCut])
+  }, [scene, store, followed, awake])
 
   const name = followed === null ? null : (state?.agents[followed]?.name ?? followed)
   useEffect(() => {
