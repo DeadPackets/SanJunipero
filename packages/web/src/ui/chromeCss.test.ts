@@ -111,7 +111,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
       /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*left:/,
     )
     expect(BARE).toMatch(
-      /@media \(max-width: 640px\), \(max-height: 620px\) \{[\s\S]*?\.signpost\[data-open='yes'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.signpost\[data-open='yes'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
     )
     expect(BARE).toMatch(
       /@media \(min-width: 641px\) and \(max-height: 620px\) \{[^}]*grid-auto-flow: column/,
@@ -127,11 +127,13 @@ describe('★ the signpost and the paper hold their own shape', () => {
   })
 
   it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {
-    expect(topRule('.signpost-arm')).toMatch(/min-height:\s*44px/)
+    // 22 drawn pixels at --px: 2 is 44px; the row is measured live in shots-signpost/measurements
+    expect(topRule('.signpost')).toMatch(/--px:\s*2;/)
+    expect(topRule('.signpost-arm')).toMatch(/min-height:\s*calc\(22px \* var\(--px\)\)/)
   })
 
-  it('nudges an arm 3px in the tap band, and not at all under reduced motion', () => {
-    expect(BARE).toMatch(/\.signpost-arm:hover \{[^}]*translate:\s*3px 0/)
+  it('lifts an arm 1px in the tap band, and not at all under reduced motion', () => {
+    expect(BARE).toMatch(/\.signpost-arm:hover \{[^}]*translate:\s*0 -1px/)
     expect(BARE).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{\s*\.signpost-arm:hover \{[^}]*translate:\s*0 0/,
     )
@@ -284,7 +286,7 @@ describe('★ the sheet answers the device, not only the window width', () => {
   })
 
   it('scales the whole sign rather than four postage stamps, on a very wide screen', () => {
-    expect(BARE).toMatch(/@media \(min-width: 1920px\) \{\s*\.signpost \{[^}]*scale: 1\.5/)
+    expect(BARE).toMatch(/@media \(min-width: 1920px\) \{\s*\.signpost \{[^}]*--px: 3/)
     expect(BARE).toMatch(
       /@media \(min-width: 1920px\) \{\s*\.paper \{[^}]*--paper-w: min\(78%, 1040px\)/,
     )
