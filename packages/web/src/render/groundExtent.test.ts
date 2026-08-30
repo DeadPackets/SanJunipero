@@ -96,8 +96,8 @@ describe('★ nothing the decoration layer draws leaves the terrain extent', () 
   it('holds on a world that is nothing but forest, where every edge tile is a candidate', () => {
     const all = grid(6, 6, FOREST)
     expect(offenders(all, sampleDecorations(all))).toEqual([])
-    // and it did not answer by placing nothing: the interior is still decorated. A canopy
-    // stands on its tile's feet (the south vertex) now, so only the 4x4 interior holds one.
+    // not vacuous: the interior is still decorated. A canopy stands on its tile's feet — the
+    // south vertex — so only the 4x4 interior holds one.
     expect(sampleDecorations(all).length).toBe(16)
   })
 

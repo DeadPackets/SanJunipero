@@ -47,8 +47,6 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
     }),
   )
 
-// ── the signpost ───────────────────────────────────────────────────────────────────────────
-
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
     renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {} }))
@@ -89,8 +87,6 @@ describe('the signpost', () => {
   })
 })
 
-// ── the page table ─────────────────────────────────────────────────────────────────────────
-
 describe('the pages the paper can carry', () => {
   it('gives every page at least two tabs, and a title', () => {
     for (const page of PAGES) {
@@ -123,8 +119,6 @@ describe('the pages the paper can carry', () => {
       expect(tabFromKey('folk', key, 'People'), key).toBeNull()
   })
 })
-
-// ── the paper ──────────────────────────────────────────────────────────────────────────────
 
 describe('the paper', () => {
   it('is a NON-modal dialog: the town keeps living above it', () => {
@@ -191,9 +185,8 @@ describe('the paper', () => {
   })
 })
 
-// ANTI-DRIFT. The table names the tabs; every page then picks its body by string. Rename a tab
-// in the table and the page renders its fallback forever, with no type error to catch it — so
-// the sheet is rendered on every tab of every page and the bodies must differ.
+// The table names the tabs and every page picks its body by string: rename a tab and the page
+// renders its fallback forever, with no type error to catch it.
 describe('★ every tab of every arm reaches its own body', () => {
   // The two subject pages are not here: with nobody picked they correctly render one empty
   // state on every tab. `becoming.test.ts` renders their bodies directly instead.
@@ -238,8 +231,6 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     expect(code).toMatch(/gripDismiss\(e\.clientY - d\.from, thrown\?\.vy \?\? 0\)/)
   })
 
-  // The gesture a person compares directly against a native sheet: it followed nothing until
-  // the finger was already off it.
   it('★ follows the finger, rubber-banded upward, and brightens the town under it', () => {
     expect(code).toMatch(/onPointerMove/)
     expect(code).toMatch(/setPointerCapture/)
@@ -281,10 +272,8 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   })
 })
 
-// ── ★ a refused read is not an empty town ─────────────────────────────────────────────────
-// `useEndpoint` settles a refusal as `{ data: null, loaded: true }`, so every one of these
-// branches used to print the product's best writing to assert something false. The empty copy
-// is news about the town; `OutOfReach` is news about the wire.
+// `useEndpoint` settles a refusal as `{ data: null, loaded: true }`: the empty copy is news
+// about the town, `OutOfReach` is news about the wire.
 describe('★ every page that can be quiet can also be out of reach', () => {
   const PAGES = [
     './pages/Found.tsx',
@@ -308,8 +297,6 @@ describe('★ every page that can be quiet can also be out of reach', () => {
     expect(src('./pages/Chronicle.tsx')).toContain('entries.length === 0 && record.failed')
   })
 })
-
-// ── no page may blank the town ─────────────────────────────────────────────────────────────
 
 // `renderToStaticMarkup` rethrows rather than catching, so the two branches are asked of the
 // class's own `render` instead of being triggered by a throwing child.
@@ -346,10 +333,8 @@ describe('★ a page that throws costs the viewer the page, not the town', () =>
   })
 })
 
-// ── the pasted link ────────────────────────────────────────────────────────────────────────
-
-// Ruling 18. `route.test.ts` owns the parse and `worldStore.test.ts` owns the latch the landing
-// waits on; what is left is one wiring seam inside an effect, pinned where it is written.
+// `route.test.ts` owns the parse and `worldStore.test.ts` owns the latch the landing waits on;
+// what is left is one wiring seam inside an effect, pinned where it is written.
 describe('★ a pasted /agent/:id link lands on the person it names', () => {
   const app = src('../App.tsx')
 
@@ -364,8 +349,6 @@ describe('★ a pasted /agent/:id link lands on the person it names', () => {
     expect(app).toContain('if (name !== undefined) setSubject(')
   })
 })
-
-// ── who came from whom ─────────────────────────────────────────────────────────────────────
 
 describe('households', () => {
   it('gathers the children of one pair into one home, oldest first', () => {

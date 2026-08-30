@@ -13,7 +13,6 @@ export function speechLine(u: Utterance): string {
   return `${u.name}: ${u.text}`
 }
 
-/** The next line the region may say, or null while the last one is still being read. */
 export function nextLine(
   queue: readonly Utterance[],
   lastAtMs: number,
@@ -33,10 +32,8 @@ export function enqueue(
   return next.length > cap ? next.slice(next.length - cap) : next
 }
 
-/**
- * Every utterance in the town, spoken once, whether or not it drew a bubble. The nearest-three
- * rule is about paper over the picture; it is not about who is allowed to be heard.
- */
+/** Every utterance, spoken once, whether or not it drew a bubble: the nearest-three rule is
+ *  about paper over the picture, not about who is allowed to be heard. */
 export function SpeechLive({ store }: { store: WorldStore }) {
   const [line, setLine] = useState('')
   const queue = useRef<Utterance[]>([])

@@ -21,7 +21,6 @@ import {
 import { type DragTrack, type Fling, flingFrom, flingStep, isDrag, trackDrag } from './fling.js'
 import { screenToTile, tileToScreen } from './iso.js'
 
-/** What the rig has to ask the scene: the box the camera may reach, and what is standing. */
 export type CameraRigDeps = {
   reachable: () => CameraBounds
   /** the settlement AS DRAWN, or the reachable box when nothing has been built yet */
@@ -30,7 +29,6 @@ export type CameraRigDeps = {
 
 /** Everything imperative about the camera. `place` is deliberately not on this surface. */
 export type CameraRig = {
-  /** Re-clamp where the camera already is — for a stage that changed size under it. */
   onResize: () => void
   panBy: (dx: number, dy: number) => void
   travelTo: (sx: number, sy: number) => void
@@ -63,14 +61,12 @@ export function createCameraRig(
     for (const cb of cameraCbs) cb()
   }
 
-  // The camera's own position is a float, so a lerp and a fling keep their curves; the world
-  // container lands on a whole pixel, so `roundPixels` cannot snap the ground and the bodies
-  // on different frames.
+  // The camera's own position stays a float so a lerp and a fling keep their curves; the world
+  // container lands on a whole pixel, or `roundPixels` snaps ground and bodies on different frames.
   const cam = { x: 0, y: 0 }
 
-  /** The one writer of the camera's position, and therefore the one that fires `onCamera` —
-   *  a mover added later cannot forget to announce itself. `announce: false` is for the one
-   *  caller that changes the scale too and announces both at once. */
+  /** The one writer of the camera's position, and therefore the one that fires `onCamera`.
+   *  `announce: false` is for the caller that changes the scale too and announces both at once. */
   function place(x: number, y: number, announce = true): void {
     const p = clampCamera({ x, y }, world.scale.x, deps.reachable(), screenBox())
     cam.x = p.x
@@ -114,7 +110,6 @@ export function createCameraRig(
 
   const fitsWholeTown = (): boolean => !tooBigToFit(deps.town(), screenBox())
 
-  // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
   const followEndCbs: (() => void)[] = []
   const breakFollow = (): void => {
@@ -159,25 +154,20 @@ export function createCameraRig(
   // of an event: nothing arrives to notice it, and the frame is the only thing still running.
   const zoomTick = (): void => {
     const now = performance.now()
-    // reduced motion gets the exact stop immediately; the tracking during the gesture stays,
-    // because that was the viewer's own hand and not motion we chose for them.
-    // A pinch held still is still a hand on the camera; only a wheel goes quiet mid-gesture.
+    // A pinch held still is still a hand on the camera; only a wheel goes quiet mid-gesture, so
+    // the release is gated on `pinch`. Reduced motion takes the exact stop at once.
     if (pinch === null && zoomGestureEnded(zoom, now)) zoom = zoomRelease(zoom, now, !wantsMotion())
     const s = zoomScaleAt(zoom, now)
     if (s === world.scale.x) return
     world.scale.set(s)
-    // While a follow is running it owns the position; otherwise the anchor stays put.
     if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s, false)
     else place(cam.x, cam.y, false)
     notifyCamera()
   }
 
-  // camera: drag to pan, wheel steps integer zoom 1-4; the hand shows it
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.renderer.events.cursorStyles.default = 'grab'
-  // One tracker answers both questions the pointer raises: `isDrag` tells a tile pick from a
-  // pan and is the same answer the throw reads, so a click can never become a fling.
   const wantsMotion = (): boolean =>
     typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -200,7 +190,6 @@ export function createCameraRig(
     return both === null ? 0 : Math.hypot(both[0].x - both[1].x, both[0].y - both[1].y)
   }
 
-  /** Anything that says where the camera should be outranks something still deciding. */
   const stopGlide = (): void => {
     glide = null
   }
@@ -261,8 +250,7 @@ export function createCameraRig(
     for (const cb of tileCbs) cb(t)
   })
 
-  // The glide, one frame at a time. A throw that reaches the edge of the world is over: the
-  // clamp refused the move, and a camera grinding against a wall it cannot cross is not motion.
+  // A throw that reaches the edge of the world is over: the clamp refused the move.
   const glideTick = (): void => {
     if (glide === null) return
     const step = flingStep(glide, app.ticker.deltaMS)
@@ -273,12 +261,11 @@ export function createCameraRig(
   }
   app.ticker.add(glideTick)
 
-  // Read the delta, ask the pure rule, store. The DOM half has no logic (P6) — except for the
-  // one thing only the DOM knows: `ctrlKey` is how the platform says "this was a pinch".
+  // `ctrlKey` is how the platform says "this wheel event was a trackpad pinch".
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
     // A zoom pins the world point under the cursor; a camera still gliding would tear it out
-    // from under the anchor, which is the class of defect the wheel gate already exists for.
+    // from under the anchor.
     stopGlide()
     const now = performance.now()
     // Once per gesture, not once per step: a continuous zoom moves the scale on every event,

@@ -1,6 +1,5 @@
 import { ARMS, PAGE_TITLE, type Arm, type PageKey } from './pageModel.js'
 
-/** Four arms on a post in the corner of the town: the only standing chrome on the stage. */
 export function Signpost({
   open,
   onOpen,

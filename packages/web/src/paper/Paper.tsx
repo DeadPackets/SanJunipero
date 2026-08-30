@@ -20,8 +20,7 @@ const RUBBER_BAND = 3
 
 type Drag = { from: number; dim: number; tall: number; at: number; track: DragTrack }
 
-/** A sheet of paper the town hands up when you ask it something. Non-modal on purpose: the
- *  town keeps living above it, and a click on the town puts it away. */
+/** Non-modal on purpose: the town keeps living above it, and a click on the town puts it away. */
 export function Paper({
   page,
   tab,
@@ -69,8 +68,7 @@ export function Paper({
 
   const key = shown ?? 'folk'
 
-  // [open, key]: switching arms while the sheet is up unmounts the focused tab, and focus fell
-  // to <body>.
+  // [open, key]: switching arms unmounts the focused tab, and focus would fall to <body>.
   useEffect(() => {
     if (!open) return
     const opener = document.activeElement as HTMLElement | null
@@ -80,7 +78,6 @@ export function Paper({
     }
   }, [open, key])
 
-  /** Hand the sheet and the scrim back to the stylesheet, whatever the drag wrote on them. */
   const release = (): void => {
     if (sheetRef.current !== null) sheetRef.current.style.cssText = ''
     if (dimRef.current !== null) dimRef.current.style.cssText = ''
@@ -89,9 +86,8 @@ export function Paper({
     if (open) release()
   }, [open])
 
-  // The drag is written straight to the DOM: a sheet following a finger through React state
-  // would re-render the whole page on every pointer sample. The sheet's height and the scrim's
-  // rest opacity are read once on the way down, so no sample flushes layout.
+  // Written straight to the DOM: a sheet following a finger through React state would re-render
+  // the whole page on every pointer sample, and the read-once values keep layout out of the loop.
   const drag = useRef<Drag | null>(null)
   const paint = (down: number, d: Drag): void => {
     const sheet = sheetRef.current
@@ -99,7 +95,6 @@ export function Paper({
     if (sheet === null || y === d.at) return
     d.at = y
     sheet.style.transform = `translate(-50%, ${y}px)`
-    // the town brightening under your thumb is the whole feeling
     if (dimRef.current !== null) {
       dimRef.current.style.opacity = `${d.dim * (1 - Math.min(1, y / d.tall))}`
     }

@@ -175,8 +175,7 @@ describe('the browser graph', () => {
   })
 
   it('THE BATCH-1 LEAK: the engine ROOT is a banned door, its deep paths are not', () => {
-    // `openDb`/`EventStore` left the root for './store'; the root still reaches the driver
-    // through the scripted-world fixtures it also exports.
+    // The root still reaches the driver through the scripted-world fixtures it also exports.
     expect(bannedReachableFrom('@sj/engine/store')).toContain('better-sqlite3')
     expect(bannedReachableFrom('@sj/engine')).toContain('better-sqlite3')
     expect(bannedReachableFrom('@sj/engine/state')).toEqual([])

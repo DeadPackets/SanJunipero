@@ -104,9 +104,8 @@ export function zoomWheel(
   }
 }
 
-/** Two fingers ARE the scale: the span between them says what it should be outright, where a
- *  notch says how far to move it. Same gesture window and same release, so a pinch and a wheel
- *  come to rest on the same six stops. */
+/** Two fingers ARE the scale: the span says what it should be outright, where a notch says how
+ *  far to move it. Same gesture window and release, so both rest on the same six stops. */
 export function zoomPinch(prev: ZoomState, scale: number, nowMs: number): ZoomState {
   const fresh = prev.live === null || nowMs - prev.lastWheelMs > WHEEL_GESTURE_GAP_MS
   return {

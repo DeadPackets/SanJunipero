@@ -158,9 +158,8 @@ export type FieldLayer = {
 
 export type GroundField = {
   layers: FieldLayer[]
-  /** U7: one tile of earth past the map on every side, so the world ends in ground rather
-   *  than a black wedge. Baked UNDER the layers and never one of them, so a layer keeps the
-   *  index its material rotation is read from. */
+  /** One tile of earth past the map on every side, so the world ends in ground rather than a
+   *  black wedge. Baked UNDER the layers, so a layer keeps the index its rotation is read from. */
   skirt: FieldLayer
   /** the ground that fills a road tile's diamond around its ribbon */
   under: TerrainTileKind
@@ -174,7 +173,6 @@ export type GroundField = {
 export const SKIRT_KIND: TerrainTileKind = 'earth'
 const SKIRT_TILES = 1
 
-/** The ring of tiles `SKIRT_TILES` deep around a `w × h` map. */
 export function skirtTiles(w: number, h: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = []
   if (w === 0 || h === 0) return out
@@ -190,9 +188,8 @@ export const ROAD_UNDER: TerrainTileKind = 'grass'
 // and corners included, and no tile of a 1-wide run ever does, not even at a crossing.
 export const CALM_ROAD_KIND = 'road-calm'
 
-/** A tile whose four neighbours are all road is drawn as the paving it stands in. The template
- *  paves the square AROUND the well and the fire pit, and a grass diamond under a monument read
- *  as a hole in the plaza. The sim's terrain is untouched: only the picture is paved. */
+/** A tile whose four neighbours are all road is drawn as the paving it stands in: a grass
+ *  diamond under a monument read as a hole in the plaza. The sim's terrain is untouched. */
 export function pavePlazaIslands(terrain: TileId[][]): TileId[][] {
   const road = (x: number, y: number): boolean => terrain[y]?.[x] === T_ROAD
   return terrain.map((row, y) =>

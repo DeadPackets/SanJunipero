@@ -9,8 +9,6 @@ import type { PageProps } from './types.js'
 
 type Journal = { tick: number; text: string; kind: 'journal' | 'dream' }
 
-/** The provenance sentence and the builder's nearest journal line, from the one builder both
- *  the room card and this page read — the two used to print the same fact differently. */
 function provenanceLines(
   state: WorldState | null,
   p: Provenance | null,
@@ -79,8 +77,6 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   )
 }
 
-/** What InteriorBar used to hand a viewer who had walked the camera in — now a page, with the
- *  door on it either way round. */
 function Inside({
   card,
   inside,

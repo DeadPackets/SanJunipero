@@ -187,7 +187,6 @@ export function bedCells(kind: InteriorKind, plan: RoomItem[]): { x: number; y: 
   return cells
 }
 
-/** Which of those cells each sleeper lies in. */
 export function bedSlots(
   sleeping: string[],
   cells: readonly { x: number; y: number }[],

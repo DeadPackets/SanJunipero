@@ -9,8 +9,8 @@ import { faceFor, worldTextScale } from './textFaces.js'
 import { placeTag, type Rect } from './tooltip.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 
-// The names the town coined for itself. A landmark name is the viewer's legend, derived from
-// what is standing; a toponym is what somebody CARVED, kept verbatim, standing where they cut it.
+// A landmark name is the viewer's legend, derived from what is standing; a toponym is what
+// somebody carved, kept verbatim, standing where they cut it.
 
 export type Toponym = { id: string; name: string; x: number; y: number }
 
@@ -25,9 +25,8 @@ export function toponymsOf(state: WorldState | null): Toponym[] {
   return out.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-/** A carved name is a thing you read when you are near it. It is whole at every stop from 0.5
- *  in and gone at the overview, so the layer is 1 or 0 at every resting `ZOOM_STOP` and never
- *  between — the same rule the place names are held to. */
+/** Whole from the 0.5 stop in, gone at the overview: the layer is 1 or 0 at every resting
+ *  `ZOOM_STOP` and never between — the same rule the place names are held to. */
 const TOPONYM_FULL_SCALE = 0.5
 const TOPONYM_GONE_SCALE = 0.25
 
@@ -39,18 +38,13 @@ export function toponymAlpha(scale: number): number {
 /** The chrome type floor is 12px and a carved name is chrome. */
 export const TOPONYM_LABEL_PX = faceFor('label').size
 
-/** The ink the name is cut into, around the glyphs. */
 export const TOPONYM_PAD_X = 4,
   TOPONYM_PAD_Y = 2
 
 type Cut = { node: Container; plate: Graphics; face: WorldLabel; drawn: string; plateW: number }
 
-/**
- * A cream name on a slab of ink — the landmark plate turned over, so a carved name reads as a
- * different kind of mark from a district's legend. It is a PLATE and not a glyph halo because
- * a halo is drawn in glyphs, and a glyph's own colour is the one channel this renderer is
- * measured to drop: see the open canvas-text defect in the stage 7 integration report.
- */
+/** A PLATE and not a glyph halo: a halo is drawn in glyphs, and a glyph's own colour is the one
+ *  channel this renderer is measured to drop. */
 function cutName(text: string): Cut {
   const node = new Container()
   node.eventMode = 'none'
@@ -67,7 +61,6 @@ function cutName(text: string): Cut {
   return { node, plate, face, drawn: '', plateW: -1 }
 }
 
-/** The slab under one name, cut to what the glyphs actually measure. */
 function drawPlate(cut: Cut): void {
   const w = cut.plateW,
     h = cut.face.height + TOPONYM_PAD_Y * 2
@@ -76,7 +69,6 @@ function drawPlate(cut: Cut): void {
   cut.plate.fill(LANDMARK_INK)
 }
 
-/** Do two boxes touch. */
 const hits = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
@@ -150,7 +142,6 @@ export function createToponymLayer(scene: Scene, store: WorldStore): ToponymLaye
     // Each name holds a constant screen size while the town grows and shrinks under it.
     const inv = worldTextScale(scene.world.scale.x)
     const view = scene.viewRect()
-    // Everybody else's boxes first, then this layer's own as they are put down.
     const avoid = scene.tags.occupied('toponyms')
     const mine: Rect[] = []
     for (const b of built) {

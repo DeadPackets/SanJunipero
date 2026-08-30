@@ -19,8 +19,7 @@ import type { PageProps } from './types.js'
 const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY
 
-/** The marks come from the record, in one request. Refreshed slowly, because a mark is a
- *  thing that already happened and re-folding it per frame would buy nothing. */
+/** Refreshed slowly: a mark is a thing that already happened. */
 const MARKS_REFETCH_MS = 30_000
 
 /** The firsts are `/api/milestones`' to serve; `/api/timeline/marks` carries the other five. */
@@ -34,7 +33,6 @@ const EMPTY_SOURCES: WireSources = {
   discoveries: [],
 }
 
-/** Every list is optional on the wire; a source the gateway has nothing for is an empty one. */
 const markSources = (body: unknown): WireSources => {
   const b = body as Partial<WireSources>
   return {

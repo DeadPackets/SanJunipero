@@ -8,7 +8,6 @@ import { useEndpointFor, useFeed } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
-/** The first viewport, and the one between cuts: the town, close enough to read. */
 export const OVERVIEW_ZOOM = 1 as const
 
 /** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
@@ -49,7 +48,6 @@ export function DirectorMode({
   // the same read, and a director that only cut when the numbers moved would freeze on one face.
   const beat = useSyncExternalStore(feed.subscribe, feed.beat)
 
-  // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {
     if (!autoCut) {
       followedRef.current = null
@@ -62,7 +60,6 @@ export function DirectorMode({
       .map((a) => a.id)
       .sort()
     const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
-    // The first subject arrives at once; every later cut waits out CUT_MIN_MS.
     const now = performance.now()
     const first = followedRef.current === null
     if (
@@ -76,8 +73,7 @@ export function DirectorMode({
     }
   }, [store, autoCut, heat, beat])
 
-  // With no subject the picture is the town itself. Centre BEFORE the stop changes: the zoom
-  // eases about whatever the middle of the screen holds.
+  // Centre BEFORE the stop changes: the zoom eases about whatever the middle of the screen holds.
   useEffect(() => {
     if (scene === null) return
     if (followed === null) {

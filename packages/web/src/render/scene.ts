@@ -119,8 +119,7 @@ export type Scene = {
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
   /** Where a subject stands, in the space `tileToScreen` returns: a body's own sprite anchor
-   *  (the interpolated step, not the record's tile) and a building's site. One answer, so a
-   *  mark over a person and a mark over a place are not two different fallbacks. */
+   *  (the interpolated step, not the record's tile) and a building's site. */
   pointOf(kind: 'agent' | 'structure', id: string): { sx: number; sy: number } | null
   /** the interior sub-scene; wired by StageMount once the character layer exists */
   interior?: InteriorScene

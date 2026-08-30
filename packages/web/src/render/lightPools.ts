@@ -17,23 +17,15 @@ import type { Scene } from './scene.js'
 import { bakeTexture, buildingArt, cellPointOf } from './textures.js'
 import { skyLevel } from './tints.js'
 
-/**
- * Every light in the town, painted from `flamesAt` — the same walk `isDark` makes, so the
- * rendered dark and the queried dark cannot drift. All of it lives in `screen.lights`, ABOVE
- * the night multiply: a light drawn under the grade is darkened by the very thing it exists to
- * fight, and `#F7A66B` reached the glass as (115, 115, 160) — blue.
- *
- * Light comes only from a source the art shows lit (owner ruling 21): the pool on the ground,
- * a bloom on the painted lamp head or flame, a glow on a window painted lit. Never a door.
- */
+// Every light lives in `screen.lights`, ABOVE the night multiply: under the grade `#F7A66B`
+// reached the glass as (115, 115, 160) — blue. Light only where the art is painted lit.
 
 export const POOL_COLOR = 0xf7a66b // MASTER_PALETTE: the one warm-light token
 export const GLOW_COLOR = 0xf4e289
 export const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
 
-/** Additive over a darkened ground is exactly when a pale shape shows most, so the pool lifts
- *  the ground back toward its day value and stops well short of white. Measured at 0.44 a pair
- *  of posts washed the cottage wall behind them to (255,255,255); 0.32 keeps it under 0.9. */
+/** Measured: at 0.44 a pair of posts washed the cottage wall behind them to (255,255,255);
+ *  0.32 keeps it under 0.9. */
 export const POOL_MAX_ALPHA = 0.32
 export const GLOW_BASE_ALPHA = 0.3
 /** Two heads at full breath must still sum under 1 of POOL_COLOR: 2 · (0.22 + BREATH_AMP) · core. */
@@ -49,7 +41,6 @@ const BREATH_SLOW = 0.06
 const BREATH_FAST = 0.035
 export const BREATH_AMP = BREATH_SLOW + BREATH_FAST
 
-/** The swing at `tSec`, for a light whose phase is `phase` (from `phaseOf(id)`). */
 export function breath(phase: number, tSec: number): number {
   return (
     BREATH_SLOW * Math.sin(2 * Math.PI * 1.7 * tSec + phase) +
@@ -71,8 +62,8 @@ export function poolRadiusPx(radius: number): { rx: number; ry: number } {
   return { rx: (radius + 0.5) * TILE_W, ry: (radius + 0.5) * TILE_H }
 }
 
-/** Where the flame's sprite stands — the footprint's south vertex, the one anchor law (D29).
- *  A lamp's pool sits under its plinth and a hearth's under the house's front wall. */
+/** The footprint's south vertex, the one anchor law: a lamp's pool sits under its plinth and a
+ *  hearth's under the house's front wall. */
 export function poolCentre(f: Flame): { sx: number; sy: number } {
   return feetOf(f.x, f.y, f.w, f.h)
 }
@@ -106,8 +97,7 @@ function poolTexture(scene: Scene): Texture {
   })
 }
 
-/** Three stacked cells at the painted flame: a tongue, not a card. Drawn about the flame
- *  point, which sits in the middle cell. */
+/** Drawn about the flame point, which sits in the middle cell. */
 export const FLAME_CELLS: readonly [number, number, number, number][] = [
   [-3, 4, 6, 4],
   [-4, 0, 8, 5],
@@ -161,7 +151,6 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   }
   const drop = (s: Sprite | null): void => s?.destroy({ texture: false, textureSource: false })
 
-  /** The entity layer's sprite for a structure, looked up once and again only if it was torn down. */
   const entityOf = (id: string, held: Sprite | null): Sprite | null =>
     held !== null && !held.destroyed ? held : entitySpriteOf(scene, 'structure', id)
 

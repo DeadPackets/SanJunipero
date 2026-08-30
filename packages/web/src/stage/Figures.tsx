@@ -33,11 +33,8 @@ const RING_MIN_W = 14,
 
 type Placed = { x: number; y: number; w: number; shown: boolean }
 
-/**
- * The keyboard's way to a figure: one focusable box over each person the camera can see, in
- * nearest-first order, so Tab and Shift-Tab walk the town the way a pointer would. The boxes
- * take no clicks — the canvas owns the pointer — and show nothing but their focus ring.
- */
+/** One focusable box over each person the camera can see, in nearest-first order. The boxes take
+ *  no clicks — the canvas owns the pointer — and show nothing but their focus ring. */
 export function Figures({
   scene,
   store,
@@ -82,9 +79,8 @@ export function Figures({
         node.style.height = `${h}px`
         // the anchor is where a body stands, so the box rises from its feet
         node.style.margin = `${-h}px 0 0 ${-Math.round(w / 2)}px`
-        // A body that has walked out of the picture is not a stop on the way to the signpost.
-        // `visibility` takes the walked-off body out of the tab order too, so the stop set
-        // moves with the snapshot rather than 60 times a second under the finger.
+        // `visibility` takes a body that has walked off out of the tab order too, so the stop
+        // set moves with the snapshot rather than 60 times a second under the finger.
         node.style.visibility = a.onScreen ? 'visible' : 'hidden'
       }
     })

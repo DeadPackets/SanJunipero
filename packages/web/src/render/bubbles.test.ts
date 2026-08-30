@@ -66,8 +66,6 @@ describe('wrapBubble', () => {
   })
 })
 
-// A bubble that grows to five lines is a paper standing in the street, and it hides the town
-// it is spoken over. Two lines, then the reader asks the person.
 describe('a bubble stops at two lines and says so', () => {
   it('caps at BUBBLE_MAX_LINES and ends the last one in an ellipsis', () => {
     const lines = wrapBubble('the fish are biting well this morning by the river', 24)
@@ -169,7 +167,6 @@ describe('the dominant colour of a sheet is the cloth, not the outline', () => {
   })
 })
 
-// Ten people in a market square is ten bubbles, which is a wall of paper. Three is a scene.
 describe('only the nearest three speak out loud', () => {
   const at = (id: string, sx: number, sy: number) => ({ id, sx, sy })
 

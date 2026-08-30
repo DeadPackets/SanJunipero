@@ -39,7 +39,8 @@ const BIRD_MAX_S = 45
 const WATER: TileId = 2
 const FOREST: TileId = 3
 
-/** The two ground decorations at painted size: a canopy anchors bottom-centre on its tile's feet (the south vertex, the one anchor law), a shimmer top-left one pixel to the left of it. */
+/** Painted size. A canopy anchors bottom-centre on its tile's feet — the south vertex, the one
+ *  anchor law; a shimmer anchors top-left, one pixel to the left of it. */
 export const CANOPY_PX = { w: 12, h: 20 } as const
 export const SHIMMER_PX = { w: 2, h: 2 } as const
 
@@ -109,7 +110,7 @@ export function sampleDecorations(terrain: TileId[][]): Decoration[] {
     return true
   }
   // Chosen by hash, not by scan order: a scan that stops at the cap woods the north-west rows
-  // and leaves the southern forest bare (D15). The hash spreads the cap over the whole map.
+  // and leaves the southern forest bare.
   const spread = (kind: Decoration['kind'], id: TileId, cap: number): void => {
     const found: { x: number; y: number; h: number }[] = []
     for (let y = 0; y < terrain.length; y++)
@@ -252,7 +253,7 @@ export function createAmbient(
   }
   birdV.visible = false
   birdV.eventMode = 'none'
-  // In the world, over the town: a flock on `app.stage` neither parallaxed nor darkened (D24).
+  // In the world, over the town: a flock on `app.stage` neither parallaxed nor darkened.
   scene.layers.overhead.addChild(birdV)
   let birdAt = -1 // director-time when the current flight started; <0 → waiting
   let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
@@ -298,13 +299,11 @@ export function createAmbient(
       if (done || !subject) bounces.splice(i, 1)
     }
 
-    // squash-and-stretch while a work verb persists — a grave town stills mid-squash
     if (!grave && !still && layers.chars !== undefined) {
       const k = 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
       for (const id of working) layers.chars.setScaleMulY(id, k)
     }
 
-    // birds across the town, in world px, so they scale and darken with everything else
     if (!grave && !still) {
       const box = scene.reachableBox()
       if (birdAt < 0) {

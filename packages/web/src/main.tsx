@@ -15,8 +15,7 @@ import './ui/chrome.css'
 
 detachFirstFrame()
 
-// The last net. The canvas lives inside the tree, so an uncaught render takes the town with it;
-// this line is then the whole of what the viewer has, and it says the way back.
+// The canvas lives inside the tree, so an uncaught render takes the town with it.
 createRoot(document.getElementById('root')!).render(
   <PageBoundary
     fallback={<p className="town-lost">The town is out of sight. Reload the page to look again.</p>}

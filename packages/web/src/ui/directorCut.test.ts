@@ -84,11 +84,6 @@ describe('the televised town always has somebody in front of the camera', () => 
   })
 })
 
-// ── ★ THE ROUND MUST KEEP TURNING WHILE /api/heat IS DOWN ────────────────────────────────
-//
-// The broadcast path has no operator to notice a caption stuck on one face. `endpoint()` wakes
-// its readers on every settled read (`useEndpoint.test.ts`); DirectorMode supplies the other
-// half by reading the refused answer as an empty window.
 describe('DirectorMode reads the heat window through the one endpoint layer', () => {
   const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
 

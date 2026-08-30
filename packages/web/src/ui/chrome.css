@@ -18,12 +18,10 @@
   --ember: #E8785A;
   --sage: #93B573;
   --rose: #C47876;
-  /* The feed's zebra was `rgba(sand, .35)` over parchment: an alpha's ratio is unknowable at
-     the call site, so the composite is computed once and named. Ink on it is 9.5:1. */
+  /* The zebra is a computed composite, never an alpha: ink on it is 9.5:1. */
   --parchment-zebra: #F1E1CC;
 
-  /* One ladder for every gap, pad and inset in the sheet, on a 2px base — the chrome is drawn
-     in whole pixels and a 4px base cannot spell the hairline pads the chips are built from. */
+  /* A 2px base, not 4px: 4px cannot spell the hairline pads the chips are built from. */
   --s-1: 2px;
   --s-2: 4px;
   --s-3: 6px;
@@ -52,8 +50,7 @@
   --font-title: Fraunces, Georgia, serif;
   --font-data: ui-monospace, 'SF Mono', monospace;
 
-  /* Seven sizes. 12.48px, 12.8px and 13px were three steps no eye can separate; they are one.
-     `--f-1` is the 12px floor and belongs to stamps and pixel chips, never to a word. */
+  /* --f-1 is the 12px floor: stamps and pixel chips only, never a word. */
   --f-1: 12px;
   --f-2: 13px;
   --f-3: 14px;
@@ -66,7 +63,6 @@
   --frame: 0 0 0 2px var(--ink), 4px 4px 0 0 var(--deep);
   --frame-tight: 0 0 0 2px var(--ink);
   --ledge: 4px 4px 0 0 var(--deep);
-  /* the same ledge with the control pushed into it */
   --ledge-in: 1px 1px 0 0 var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
@@ -75,7 +71,6 @@
   --px-paper: url('./px/paper.webp') 24 repeat;
   --grain: url('./px/dither-warm.webp');
 
-  /* the paper: one sheet, sized off the stage it rises over */
   --paper-w: min(78%, 760px);
   --paper-h: min(66%, 100dvh - 96px);
   /* 78% of a phone is 304px, which no roster row fits in: the sheet takes the width there. */
@@ -87,8 +82,7 @@
      2560. One inset, and it clears the notch on the phones that have one. */
   --mark-inset: clamp(16px, 3vmin, 40px);
 
-  /* A bar that must keep its drawn size takes its 44px from a transparent pseudo-element, and
-     the arithmetic is written once: hand-computed, three of four insets were right. */
+  /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
 
   color-scheme: light;
@@ -126,8 +120,7 @@ body {
 .stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle `f`) ── */
-/* Top-LEFT: the quiet stamp owns the top-right corner, and the meter used to cover it.
-   The one floating slab left over the town wears real 9-slice frame art. */
+/* Top-LEFT: the quiet stamp owns the top-right corner. */
 .fps-overlay {
   position: absolute; top: var(--s-5); left: var(--s-6); z-index: 30;
   display: grid; gap: var(--s-1); justify-items: start;
@@ -165,8 +158,7 @@ body {
 .badge.ill { background: var(--rose); color: var(--deep); }
 
 .block { margin: var(--s-5) 0; }
-/* `.feed-head` is named on six headings with no `.block` around them; without its own rule they
-   fell back to a UA-default h3 while the ones inside `.block` were pixel caps. */
+/* Six headings carry `.feed-head` with no `.block` around them. */
 .block h3, .feed-head {
   margin: 0 0 var(--s-3); font-size: var(--f-1);
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
@@ -174,8 +166,7 @@ body {
 }
 .block h3::after, .feed-head::after {
   content: ''; display: block; margin-top: var(--s-2); height: 2px; width: 2.2rem;
-  /* --sand is 1.19:1 on parchment and 1.34:1 on the modal's cream — this rule was a smudge.
-     --ink-quiet is 5.83 and 6.57 on the two grounds .block is ever laid on. */
+  /* --sand is 1.19:1 on parchment and 1.34:1 on cream; --ink-quiet is 5.83 and 6.57. */
   background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 7px);
 }
 .block ul { margin: 0; padding-left: var(--s-6); }
@@ -214,7 +205,6 @@ body {
 .diff-line.add { background: #DCE8C8; }
 .diff-line.del { background: #F2C6C2; text-decoration: line-through; }
 
-/* ── what is written of them: the chronicler's write-up, from the public record alone ── */
 .biography { margin: 0; padding-left: var(--s-4); border-left: 2px solid var(--honey); }
 .biography-head { margin: 0; font-size: var(--f-3); font-weight: 600; }
 .biography-head .stamp {
@@ -231,8 +221,6 @@ body {
   margin-right: var(--s-3); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums; font-family: var(--font-data);
 }
-
-/* ── the chronicle's feeds ── */
 
 .feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
 .feed-line {
@@ -282,8 +270,7 @@ body {
                 border-left-color var(--t-fast) var(--ease-enter);
   }
 }
-/* One stagger, one ladder, one depth: the sheet had three of them, truncated at 3, 2 and 4
-   steps, so every item past the last step arrived at once. The table's own 30ms, capped at 6. */
+/* One stagger for all three lists, at the motion table's own 30ms, capped at 6 steps. */
 @media (prefers-reduced-motion: no-preference) {
   :is(.feed-line, .edition-slot, .strip-list > li) {
     animation: feed-in var(--t-fast) var(--ease-enter) backwards;
@@ -301,7 +288,6 @@ body {
   }
 }
 
-/* ── the town's own paper: one edition per recorded day, newest first ── */
 .paper-run { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-6); }
 .edition { background: var(--cream); padding: var(--s-4) var(--s-5); box-shadow: var(--frame-tight); }
 .edition-head {
@@ -319,7 +305,6 @@ body {
 .edition-caption {
   margin: var(--s-4) 0 0; font-size: var(--f-2); font-style: italic; color: var(--ink-quiet);
 }
-/* The one loud thing on the page, and it lands once a week. */
 .era-band {
   background: var(--honey); color: var(--deep);
   padding: var(--s-4) var(--s-5); margin-bottom: var(--s-3); box-shadow: var(--frame-tight);
@@ -450,8 +435,6 @@ body {
   margin: var(--s-2) 0 0;
   font-family: var(--font-body); font-size: var(--f-2); font-style: italic; color: var(--ink-quiet);
 }
-
-/* ── the bonds graph, on the page rather than over the town ── */
 
 /* R6: thirteen chips permanently across the corner is a card standing on the graph, and on a
    larger town a node spawns behind it. The key opens on request; shut, it is one control. */
@@ -605,7 +588,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .thumb-title {
-  font-size: var(--f-3); font-weight: 600; line-height: 1.2;   /* the 14px prose floor holds */
+  font-size: var(--f-3); font-weight: 600; line-height: 1.2;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
 .thumb-meta {
@@ -842,11 +825,8 @@ body {
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
 .law-edit select:disabled, .law-edit input:disabled { color: var(--ink-quiet); cursor: not-allowed; }
-/* ── the operator's own three: the clock, the money, and the rulings a person still owes ── */
-
 .ops-block { margin-top: var(--s-6); padding-top: var(--s-4); border-top: 2px dotted var(--sand); }
 
-/* The clock, said in one word. Honey is the hand-on-it colour the changed law row already uses. */
 .ops-reading { display: flex; align-items: baseline; gap: var(--s-4); margin: var(--s-2) 0 var(--s-4); }
 .ops-word {
   font-family: var(--font-px); font-size: var(--f-3); letter-spacing: 0.04em;
@@ -863,13 +843,11 @@ body {
   font-family: var(--font-px); font-size: var(--f-1); color: var(--ink-quiet); margin-left: var(--s-3);
 }
 .ops-stops { display: flex; gap: var(--s-2); }
-/* The dial reads as a row of keys, and the one in force stays pressed. */
 .ops-stop { min-width: 44px; font-variant-numeric: tabular-nums; }
 .ops-stop[aria-pressed='true'] {
   background: var(--honey) var(--grain); translate: 2px 2px; box-shadow: none;
 }
 
-/* THE ONE LOUD NUMBER ON THE PAGE. Money is what the question cost; this is the answer to it. */
 .ops-answer {
   display: flex; align-items: baseline; gap: var(--s-5); margin: var(--s-3) 0 var(--s-4);
   padding: var(--s-4); background: var(--cream); box-shadow: var(--frame-tight);
@@ -943,9 +921,8 @@ body {
 
 .legend-chip:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 
-/* Hover arrives in 150ms and leaves the instant the pointer does: a hover that FADES OUT goes on
-   claiming the pointer is somewhere it already left. A transition reads the duration of the state
-   it goes TO, so the 0s belongs on the base and the 150ms on `:hover`, not the other way round. */
+/* Hover arrives in 150ms and leaves the instant the pointer does. A transition reads the
+   duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
   .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
   .roster-row, .key-summary, .discovery-leaf {
@@ -982,7 +959,6 @@ body {
    PER-BAND COLOUR: no palette token clears AA on both a light ground and a dark one — the dual-band
    set is EMPTY. Opacity is never the strategy. */
 
-/* what the viewer just clicked on the ground, over the record that answers for it */
 .found-clicked {
   margin: 0 0 var(--s-4); padding: var(--s-3) var(--s-4);
   font-size: var(--f-3); color: var(--ink);
@@ -1018,7 +994,6 @@ body {
   color: var(--cream-quiet); background: var(--deep);
   padding: var(--s-3) var(--s-4); border-radius: 0; margin: var(--s-3) 0;
 }
-/* a first the town named itself: the words it was named in, set in clear of the glyph */
 /* not a step off the ladder: the indent lines the quote up with the glyph column above it */
 .feed-line .discovery-quote { margin: 0 0 var(--s-3) 2.1rem; }
 .discovery-makes { color: var(--ink-quiet); }
@@ -1029,22 +1004,15 @@ body {
 @media (prefers-reduced-motion: reduce) { .discovery-leaf { transition: none; }
 }
 
-/* ══ ★ STAGE MARKS ═════════════════════════════════════════════════════════════════════════
-   Every mark on the town is a THING OF THE TOWN: a plate nailed under a figure, a rope ring
-   round whoever you asked, a date chiselled in the corner, a caption at the foot of the shot.
-   No panels, no cards. The stage element these sit in owns `position: relative`; the anchored
-   marks are written by `stage/anchor.ts` on rAF, which owns `transform` — so every mark's own
-   offset uses the separate `translate` property and the two compose. */
+/* `stage/anchor.ts` writes these marks' `transform` on rAF, so every mark's own offset uses
+   the separate `translate` property and the two compose. */
 
-/* Read on demand, never drawn: the product's one visually-hidden line — the page's own name,
-   the tab strip's key hint, and the aria-live line that speaks every utterance. */
 .stage-sr {
   position: absolute; width: 1px; height: 1px; margin: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 
-/* Figures mounts one tab stop per visible person, so the arms could be forty presses away. The
-   link is the first thing Tab finds and the only time it is ever drawn. */
+/* Figures mounts one tab stop per visible person, so the arms are up to forty presses away. */
 .skip {
   position: absolute; z-index: 40; top: 0; left: 0; translate: 0 -110%;
   display: grid; align-content: center; min-height: 44px;
@@ -1055,12 +1023,10 @@ body {
 }
 .skip:focus-visible { translate: 0 0; }
 
-/* ── the nameplate: a brown plate, hung under the pick ── */
 .stage-plate {
   position: absolute; left: 0; top: 0;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
-  /* Clear of the ring's lowest arm: the plate and the ring are one mark — the pick — and are
-     placed off the same anchor, so their numbers have to be read together (chromeCss.test). */
+  /* Clear of the ring's lowest arm: both are placed off the same anchor (chromeCss.test). */
   translate: -50% 60px;
   pointer-events: none;
   font-family: var(--font-px); font-size: var(--f-2); line-height: 18px;
@@ -1068,20 +1034,15 @@ body {
   color: var(--cream);
   background: #7E512B;
   padding: 0 var(--s-1);
-  /* the plate's ink edge, lit top row and bottom lip are drawn in the raster's own slices */
   border: 4px solid transparent; border-image: url('./px/nameplate.webp') 4 repeat;
   opacity: 0;
   animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
 }
 @keyframes stage-plate-in { to { opacity: 1; } }
 
-/* ── the figures, for the keyboard: one focus box over each person the camera can see.
-   They take no clicks — the canvas owns the pointer — and show nothing but their focus ring. ── */
-/* Above `.town-dim` (z 20): a focus ring behind a scrim is not a focus ring. The plate and the
-   ring stay below it on purpose — with the sheet up, the sheet IS the pick. */
+/* Above `.town-dim` (z 20): a focus ring behind a scrim is not a focus ring. */
 .stage-figures { position: absolute; inset: 0; z-index: 21; pointer-events: none; }
-/* The box is sized and placed by the stage loop, which is the only thing that knows how big a
-   body is drawn at this zoom. */
+/* Sized and placed by the stage loop: only it knows how big a body is drawn at this zoom. */
 .stage-figure {
   position: absolute; left: 0; top: 0; padding: 0;
   background: none; border: 0; border-radius: 2px;
@@ -1090,7 +1051,6 @@ body {
 }
 .stage-figure:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
 
-/* ── the subject ring: four things to ask, standing round the person you asked ── */
 .stage-ring {
   position: absolute; left: 0; top: 0;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
@@ -1128,7 +1088,6 @@ body {
   @keyframes stage-arm-in { from { opacity: 0; scale: 0.85; } }
 }
 
-/* ── the quiet stamp: the date, chiselled top-right, only while somebody is asking ── */
 .stage-stamp {
   position: absolute; z-index: 21;
   top: max(var(--mark-inset), env(safe-area-inset-top));
@@ -1144,7 +1103,6 @@ body {
 }
 .stage-stamp.shown { opacity: 1; }
 
-/* ── the director's cue: the caption under the shot ── */
 .stage-cue {
   position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
@@ -1174,21 +1132,16 @@ body {
   .stage-ring-arms, .stage-ring-arms button { animation: none; }
   .stage-ring-arms button:active { scale: 1; }
 }
-/* ══ THE SIGNPOST AND THE PAPER ════════════════════════════════════════════════════════════
-   The town is the whole viewport. Everything below is a thing IN the town: a signpost you can
-   read the arms of, and a sheet of paper that rises from the bottom edge when you ask it one. */
 
 .app {
   position: relative; display: block; height: 100%; overflow: hidden;
   background: var(--night); user-select: none;
 }
-/* the root boundary's line: the canvas is gone with the tree, so this sits on the bare ground */
 .town-lost {
   display: grid; place-content: center; height: 100%; margin: 0; padding: var(--s-8);
   font-size: var(--f-3); color: var(--cream-quiet); text-align: center; text-wrap: pretty;
 }
 
-/* ── the signpost: four arms on a post, bottom-right ── */
 .signpost {
   position: absolute; z-index: 25;
   right: max(var(--mark-inset), env(safe-area-inset-right));
@@ -1197,9 +1150,8 @@ body {
   /* one drawn pixel is --px screen pixels: every size below is a whole number of them */
   --px: 2;
 }
-/* Each arm is cut to its word: an 88x18 plank drawn at native size, sliced at the nailed end and
-   the point so the grain between them repeats instead of stretching. The 18-pixel plank sits
-   centred in a 22-pixel row, which leaves 4 pixels of post showing between arms. */
+/* An 88x18 plank sliced at the nailed end and the point, so the grain between them repeats
+   instead of stretching; the 18px plank in a 22px row leaves 4px of post between arms. */
 .signpost-arm {
   display: flex; align-items: center;
   min-height: calc(22px * var(--px));
@@ -1218,8 +1170,7 @@ body {
 }
 .signpost-arm:hover { translate: 0 -1px; border-image-source: url('./px/signpost-arm-hot.webp'); }
 .signpost-arm:active { translate: 0 1px; box-shadow: none; }
-/* The arm you pulled stays down on a plank drawn darker: two channels, no repaint of the raster
-   layer, and no 1.2 -> 0.94 -> 1.2 flicker when a pressed arm is pressed again. */
+/* A second plank, never a filter: brightness on the pressed arm flickered when pressed again. */
 .signpost-arm[aria-expanded='true'] {
   translate: 0 1px;
   border-image-source: url('./px/signpost-arm-on.webp');
@@ -1229,8 +1180,6 @@ body {
   outline: 2px solid var(--honey); outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--deep), 0 0 0 6px var(--deep);
 }
-/* The post runs behind every arm from under the top plank to the ground, so the arms overlap it
-   the way they are nailed on, instead of standing on it. */
 .signpost-post {
   position: absolute; z-index: -1; left: calc(3px * var(--px)); top: calc(4px * var(--px));
   bottom: 0; width: calc(8px * var(--px));
@@ -1238,9 +1187,8 @@ body {
   border-bottom: calc(1px * var(--px)) solid var(--deep);
   image-rendering: pixelated;
 }
-/* A 192px arm is 7% of a 2560px viewport and reads as a postage stamp. Three screen pixels per
-   drawn one, so the arms, the gaps and the pole grow as one sign and stay on the grid — a
-   `scale: 1.5` resampled the 2x layer and left the outline one row thick, then two. */
+/* A 192px arm is 7% of a 2560px viewport. Whole screen pixels per drawn one, never `scale`:
+   1.5 resampled the 2x layer and left the outline one row thick, then two. */
 @media (min-width: 1920px) {
   .signpost { --px: 3; }
   /* 3x the face's 8px grid; a size the type ladder does not carry */
@@ -1250,11 +1198,8 @@ body {
 @media (max-height: 620px) {
   .signpost-post { display: none; }
 }
-/* With the sheet up there is no corner left: under 640px the sheet takes the width, up to 1000px
-   the sheet pushed to the left edge leaves less beside it than the longest arm (146px at 768
-   against 192px), and a short window has no room under it. The arms move to the top edge, where
-   all four stay one press from every other: two by two, clear of the stamp in the other corner,
-   and in a row on a short window, where two rows would reach the sheet. */
+/* No corner left with the sheet up: at 768px the space beside it is 146px against a 192px arm.
+   The arms move to the top edge, two by two, and into one row on a short window. */
 @media (max-width: 1000px), (max-height: 620px) {
   .signpost[data-open='yes'] {
     top: max(var(--mark-inset), env(safe-area-inset-top)); bottom: auto;
@@ -1270,7 +1215,6 @@ body {
   .signpost-arm:hover { translate: 0 0; }
 }
 
-/* ── the town, dimmed behind the sheet ── */
 .town-dim {
   position: absolute; inset: 0; z-index: 20;
   background: var(--deep); opacity: 0; pointer-events: none;
@@ -1278,7 +1222,6 @@ body {
 }
 .town-dim[data-open='yes'] { opacity: var(--dim); pointer-events: auto; }
 
-/* ── the paper: 78% of the stage wide, 66% of it tall, rising from the bottom edge ── */
 .paper {
   position: absolute; left: 50%; bottom: 0; z-index: 30;
   width: var(--paper-w); height: var(--paper-h);
@@ -1288,24 +1231,20 @@ body {
   transform: translate(-50%, 102%);
   background: var(--parchment) var(--grain); background-clip: padding-box;
   color: var(--ink);
-  /* W3's parchment nine-slice carries the 3px ink edge the direction asked for */
   border: 24px solid transparent; border-bottom-width: 0; border-image: var(--px-paper);
   box-shadow: 0 -10px 30px rgba(36, 31, 43, 0.35);
   transition: transform var(--t-slow) var(--ease-enter);
 }
 .paper[data-open='yes'] { transform: translate(-50%, 0); }
 .paper[aria-hidden='true'] { pointer-events: none; }
-/* Reduced motion: the sheet is simply there or not there — no slide, and no fade standing in
-   for one, because a 300ms fade is the same 300ms of waiting. */
+/* No fade standing in for the slide: a 300ms fade is the same 300ms of waiting. */
 @media (prefers-reduced-motion: reduce) {
   .paper { transition: none; }
 }
 @media (max-width: 640px) {
   .paper { width: var(--paper-w-narrow); height: var(--paper-h-narrow); }
 }
-/* Between 641 and 1400 the centred sheet's right edge sliced the signpost's arms mid-word. It
-   steps left far enough to clear them and no further — a static offset, so nothing moves when
-   the sheet opens and the arms never need to dodge. */
+/* Stepped left far enough to clear the signpost's arms, statically: nothing moves on open. */
 @media (min-width: 641px) and (max-width: 1400px) {
   .paper {
     left: clamp(
@@ -1337,8 +1276,7 @@ body {
 .paper-grip {
   position: relative; justify-self: center;
   width: 44px; height: 5px; margin: var(--s-3) 0;
-  /* 4.28:1 on parchment. The bar it replaced was 2.13:1 — the only affordance saying "drag me
-     down", drawn below the 3:1 non-text floor. */
+  /* 4.28:1 on parchment: the one "drag me down" affordance, so it clears the 3:1 floor. */
   background: #8B6F4E; border-radius: 3px;
   cursor: grab; touch-action: none;
 }
@@ -1365,8 +1303,8 @@ body {
   transition-property: color, border-color; transition-duration: var(--t-fast);
 }
 .paper-tab:hover { color: var(--ink); }
-/* Honey on parchment is 1.31:1 — the underline was not there. The selected tab used to go to
-   600 as well, which widened it and shoved the whole strip sideways on every change. */
+/* Honey on parchment is 1.31:1. No weight change either: 600 widened the tab and shoved the
+   whole strip sideways on every change. */
 .paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .paper-close {
   min-height: 44px; padding: 0 var(--s-3) 0 var(--s-6);
@@ -1385,9 +1323,8 @@ body {
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* Under 480px the head wrapped onto three rows and took a third of the sheet. The title keeps
-   the close word's company on the first row; the tabs get the second one to themselves and
-   scroll along it rather than wrapping again. */
+/* Under 480px the head wrapped onto three rows and took a third of the sheet: the tabs get the
+   second row to themselves and scroll along it. */
 @media (max-width: 480px) {
   .paper-head {
     display: grid; grid-template-columns: minmax(0, 1fr) auto;
@@ -1405,7 +1342,6 @@ body {
 }
 .paper-sheet > :first-child { margin-top: 0; }
 
-/* the one small voice on a page: a line about the page rather than about the town */
 .sheet-note {
   margin: 0 0 var(--s-5); font-size: var(--f-3); color: var(--ink-quiet); text-wrap: pretty;
 }
@@ -1414,10 +1350,8 @@ body {
   background: var(--honey) var(--grain); box-shadow: var(--frame-tight);
 }
 
-/* ── a person's own page ── */
 .person-head { display: flex; gap: var(--s-5); align-items: flex-start; margin: 0 0 var(--s-5); }
 
-/* ── their edges, one sentence each ── */
 .edges { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-4); }
 .edge { padding: var(--s-3) var(--s-4); background: var(--cream); box-shadow: var(--frame-tight); }
 .edge-line { margin: 0; font-size: var(--f-3); text-wrap: pretty; }
@@ -1426,7 +1360,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── who came from whom ── */
 .families { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-5); }
 .family-children { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: var(--s-1); }
 .family-children li { font-size: var(--f-3); }
@@ -1435,7 +1368,6 @@ body {
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
-/* ── everything that stands, and who put it there ── */
 .places { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
 .place-row {
   display: grid; gap: var(--s-1); width: 100%; min-height: 44px; padding: var(--s-3) var(--s-4);
@@ -1450,7 +1382,6 @@ body {
 .place-name { font-family: var(--font-body); font-weight: 600; font-size: var(--f-3); }
 .place-by { font-size: var(--f-1); color: var(--ink-quiet); }
 
-/* ── one building's provenance, and the room behind its door ── */
 .provenance-line { margin: 0; font-size: var(--f-3); white-space: pre-wrap; text-wrap: pretty; }
 .room { display: grid; gap: var(--s-4); }
 .room-door {
@@ -1464,7 +1395,6 @@ body {
 .room-door:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .room-door[aria-pressed='true'] { background: var(--ember); color: var(--deep); border-color: var(--deep); }
 
-/* ── the day strip: what the bottom scrub bar used to be, on its own page ── */
 .day-strip { display: grid; gap: var(--s-4); }
 .day-marks { position: relative; height: 30px; }
 .day-track {
@@ -1481,7 +1411,6 @@ body {
 }
 .day-strip .live-pill { justify-self: start; }
 
-/* ── the filmstrip, unrolled down the page instead of across the stage ── */
 .strip-list {
   list-style: none; margin: 0 0 var(--s-5); padding: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
@@ -1497,37 +1426,27 @@ body {
   border: 2px solid var(--deep); box-shadow: var(--ledge);
 }
 
-/* ── the bonds graph, inside the sheet ── */
 .bonds-graph {
   position: relative; display: flex; flex-direction: column; gap: var(--s-3);
   height: min(30rem, 100%);
 }
-/* The canvas's own cell, with a size that does NOT come from the canvas: `flex-basis: 0` and
-   `overflow: hidden` are what stop force-graph measuring itself bigger every frame. The night
-   ground is the CELL's, not the canvas's — force-graph writes the canvas's own background. */
+/* `flex-basis: 0` and `overflow: hidden` stop force-graph measuring itself bigger every frame;
+   the night ground is the CELL's, because force-graph writes the canvas's own background. */
 .bonds-canvas {
   position: relative; flex: 1 1 0; min-height: 14rem; overflow: hidden;
   background: var(--night);
 }
 .bonds-views { display: flex; gap: var(--s-2); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
-/* the institution key: a ring, not a line — the mark it explains is drawn round a person */
 .legend-halo {
   display: inline-flex; align-items: center; gap: var(--s-2); flex: none;
   font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase; color: var(--ink);
 }
 .legend-halo svg { flex: none; }
 
-/* ── the laws, read and written ── */
 .laws, .laws-admin { display: grid; gap: var(--s-3); font-size: var(--f-3); }
 
-/* ══ THE SHEET ANSWERS TO ITS OWN WIDTH ════════════════════════════════════════════════════
-   The paper is a 500-to-1040px box on a 320-to-2560px screen, so its lists read the sheet and
-   not the window. */
-
-/* The three cells that fill in from live data reserve their width, so a founder who starts
-   walking does not shove the place-name column sideways on the tick they set off — but only
-   where the sheet HAS the width: on a 320px phone they ate the whole track and four of five
-   names ellipsised. */
+/* Reserved widths stop a walking founder shoving the place column sideways — but only where
+   the sheet has the width: on a 320px phone they ellipsised four names of five. */
 @container (min-width: 26rem) {
   .rr-state { min-width: 6.5rem; }
   .rr-mood { min-width: 1.75rem; }
@@ -1538,10 +1457,7 @@ body {
   .roster-list { grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); }
 }
 
-/* ══ TOUCH, AND THE COLOURS THE BROWSER PICKS ══════════════════════════════════════════════ */
-
-/* Forced colours drop `box-shadow`, and the pixel slab IS a box-shadow — the ink ring, the
-   ledge and every chip's edge. Windows High Contrast got a product with no edges at all. */
+/* Forced colours drop `box-shadow`, and the pixel slab IS a box-shadow. */
 @media (forced-colors: active) {
   .badge, .edition, .era-band, .mark-tip, .key-summary, .legend-chip, .moment-card,
   .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
@@ -1570,7 +1486,6 @@ body {
   .paper-close-key { display: none; }
 }
 
-/* ── the key map: every press the town answers to, on the sheet's own parchment ── */
 .key-map {
   position: fixed; inset: 0; z-index: 45;
   display: grid; place-items: center; padding: 5vmin;
@@ -1584,8 +1499,7 @@ body {
   background: var(--parchment) var(--grain); color: var(--ink);
   box-shadow: var(--frame);
 }
-/* The sheet takes focus so a screen reader announces it, but it is not a control: a ring round
-   the whole parchment says nothing, and the first Tab lands on `close`, which rings properly. */
+/* Focused only so a screen reader announces it; the first Tab lands on `close`, which rings. */
 .key-map-sheet:focus-visible { outline: none; }
 .key-map-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-6);
@@ -1597,14 +1511,12 @@ body {
   font-family: var(--font-title); font-weight: 500; font-size: var(--f-6);
   line-height: 1.2; letter-spacing: -0.01em;
 }
-/* One shared pair of columns, so the key column is exactly as wide as the widest chord (the
-   arrows) and no row leaves a gutter between the key and what it does. */
 .key-map-list {
   display: grid; grid-template-columns: max-content 1fr; align-items: baseline;
   row-gap: var(--s-3); column-gap: var(--s-6); margin: 0;
 }
-/* Right-aligned, because the arrow chord is three times the width of an `S` and left-aligning
-   the column leaves every other row a 50px gutter between the key and what it does. */
+/* Right-aligned: the arrow chord is three times the width of an `S`, and left-aligning leaves
+   every other row a 50px gutter. */
 .key-map-keys { display: flex; flex-wrap: wrap; justify-content: end; gap: var(--s-1); margin: 0; }
 .key-map-key {
   padding: var(--s-1) var(--s-2);
@@ -1620,7 +1532,6 @@ body {
   }
 }
 
-/* ── what a page says where an empty state would lie ── */
 .out-of-reach { display: grid; justify-items: start; gap: var(--s-4); }
 .out-of-reach .sheet-note { margin: 0; }
 
@@ -1629,16 +1540,12 @@ body {
 [data-broadcast='on'] .town-dim,
 [data-broadcast='on'] .fps-overlay { display: none; }
 
-/* ══ THE BROADCAST FRAME ══════════════════════════════════════════════════════════════════
-   1080p into a 480px player is a quarter scale, so every size below is FOUR TIMES the desk
-   chrome's. `broadcast.ts`'s BROADCAST_CAPTIONS names each of these and its test measures them
-   against the 5.4px subtitle floor. Only the two marks the stream adds are styled here; the
-   stamp and the cue are the stage's own, enlarged. */
+/* 1080p into a 480px player is quarter scale, so every size below is FOUR TIMES the desk
+   chrome's; broadcast.ts's BROADCAST_CAPTIONS measures them against the 5.4px subtitle floor. */
 
 [data-broadcast='on'] .stage-stamp { font-size: 24px; }
 [data-broadcast='on'] .stage-cue { font-size: 24px; bottom: 88px; }
 
-/* ── the lower third: who is talking, on a plate of the town's own parchment ── */
 [data-broadcast='on'] .lower-third {
   position: absolute; left: 4%; bottom: 88px; z-index: 26;
   display: flex; align-items: stretch; gap: 12px;
@@ -1669,7 +1576,6 @@ body {
   color: var(--ink);
 }
 
-/* ── the ticker: the town's own record along the bottom letterbox edge ── */
 [data-broadcast='on'] .stage-ticker {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
   display: flex; align-items: center; height: 56px;

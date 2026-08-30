@@ -30,8 +30,7 @@ const KIND_LINE: Readonly<Record<ConstructKind, string>> = {
 
 const EMPTY = 'Nobody keeps anything yet — a custom is a place they keep coming back to.'
 
-/** What the town does over and over, and what it calls it. Read-only, like every other pane:
- *  nothing on this page is ever shown to a mind. */
+/** Read-only, like every other pane: nothing on this page is ever shown to a mind. */
 export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const record = useEndpointFor('/api/constructs', customs, CUSTOMS_REFETCH_MS)

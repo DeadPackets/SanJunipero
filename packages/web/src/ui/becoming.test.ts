@@ -294,7 +294,7 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(busy.match(/Building/g)?.length).toBe(1)
   })
 
-  // ★ The page printed `fishing — level 2`; the addendum bans a numeric skill outright.
+  // The addendum bans a numeric skill outright.
   it('says a skill as a phrase, never as a level', () => {
     const skilled = renderToStaticMarkup(
       createElement(PersonLedgerView, {

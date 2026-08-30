@@ -17,9 +17,9 @@ const LINES = CSS.split('\n')
 const BANNERS = LINES.filter((l) => /^\/\* [──══]/u.test(l))
 
 /** The two blocks a merge train actually risks, named so a failure says whose block went. */
-const LANE_BLOCKS: readonly (readonly [lane: string, banner: string])[] = [
+const LANE_BLOCKS: readonly (readonly [lane: string, mark: string])[] = [
   ['the Discovery Record', '/* ── the Discovery Record: a chain of museum labels'],
-  ['THE SIGNPOST AND THE PAPER', '/* ══ THE SIGNPOST AND THE PAPER ═'],
+  ['THE SIGNPOST AND THE PAPER', '\n.signpost {\n'],
 ]
 
 describe('★ chrome.css survives the merge trains intact', () => {
@@ -33,8 +33,8 @@ describe('★ chrome.css survives the merge trains intact', () => {
   })
 
   it('carries each lane’s own block exactly once', () => {
-    for (const [lane, banner] of LANE_BLOCKS) {
-      expect(CSS.split(banner).length - 1, `${lane}: block missing or duplicated`).toBe(1)
+    for (const [lane, mark] of LANE_BLOCKS) {
+      expect(CSS.split(mark).length - 1, `${lane}: block missing or duplicated`).toBe(1)
     }
   })
 
@@ -66,9 +66,6 @@ describe('★ the signpost and the paper hold their own shape', () => {
    *  comment quoting the rule that was wrong must not read as that rule still being there. */
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
-  /**
-   * ONE top-level rule, by its own selector line, ending at the first bare `}`.
-   */
   const topRule = (selector: string): string => {
     const lines = BARE.split('\n')
     const start = lines.findIndex((l) => l === `${selector} {` || l.startsWith(`${selector} { `))
@@ -118,7 +115,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
     )
   })
 
-  // Height is what a landscape phone runs out of, and nothing in the sheet used to read it.
+  // Height is what a landscape phone runs out of.
   it('★ answers the window’s height as well as its width', () => {
     expect(BARE).toMatch(
       /@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: calc\(100dvh - 64px\)/,
@@ -201,7 +198,6 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(PLATE_DROP_PX, `the plate must start below ${armBottom}px`).toBeGreaterThan(armBottom)
   })
 
-  // ★ Both used to hang top-right, and the meter is opaque.
   it('★ keeps the fps meter out of the corner the quiet stamp owns', () => {
     // both selectors carry a second rule for their frame recipe; the placement one positions
     const placed = (sel: string): string =>
@@ -230,9 +226,6 @@ describe('★ the signpost and the paper hold their own shape', () => {
   })
 })
 
-// ── ★ STAGE 8 · THE DEVICE THE TOWN IS BEING WATCHED ON ───────────────────────────────────
-// One viewport media query in 1,383 lines, and it was width-only at 640px. Height is what a
-// landscape phone runs out of, and touch is what has no hover.
 describe('★ the sheet answers the device, not only the window width', () => {
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -299,16 +292,13 @@ describe('★ the sheet answers the device, not only the window width', () => {
   })
 })
 
-// ── ★ one motion vocabulary, and reduced motion honoured in all of it ─────────────────────
 describe('★ nothing moves for a viewer who asked for stillness', () => {
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
-  /** Everything the sheet says outside a `prefers-reduced-motion` block. */
   const UNGUARDED = BARE.replace(/@media \(prefers-reduced-motion[^{]*\{[\s\S]*?\n\}/g, '')
   /** A motion of these is a fade, which DESIGN.md keeps under reduced motion. */
   const FADE_ONLY = /^(?:[\s;]|opacity|color|background-color|border-color|fill|[\s,])+$/
 
-  // Five rules kept a 2px lift the other thirteen had already given up.
   it('★ moves nothing outside a no-preference guard that is not a fade', () => {
     const loud: string[] = []
     for (const [, sel, body] of UNGUARDED.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -319,7 +309,6 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
       if (props === undefined || !ms) continue
       if (!FADE_ONLY.test(props)) loud.push(`${(sel ?? '').trim()} — ${props}`)
     }
-    // `.paper` and `.discovery-leaf` move, and both switch themselves off under `reduce`
     for (const sel of ['.paper', '.discovery-leaf']) {
       expect(BARE, sel).toMatch(
         new RegExp(

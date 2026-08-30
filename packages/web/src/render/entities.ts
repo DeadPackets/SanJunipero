@@ -64,14 +64,12 @@ export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: numb
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
 }
 
-/** NOT the painter's order — depth.ts owns that. This is the landed before-state that
- *  depth.test.ts and occlusion.test.ts measure U8 against. */
+/** NOT the painter's order — depth.ts owns that; kept as the before-state its tests measure. */
 export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
   return depthKey(s.x + s.w - 1, s.y + s.h - 1)
 }
 
-/** NOT a hit area — it is the BASE of the hit prism, the shape `builtForm` cuts its plinth
- *  from, and the before-state `entities.test.ts` cites. */
+/** NOT a hit area — the BASE of the hit prism, the shape `builtForm` cuts its plinth from. */
 export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
   const k = scale === 0 ? 1 : scale
   return footprintDiamond(w, h).map((v) => v / k)
@@ -115,7 +113,6 @@ type Entry = {
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
-/** What the pointer landed on, and where on screen — the chrome draws the popover. */
 export type WorldPick = {
   kind: 'structure' | 'item' | 'crop'
   id: string
@@ -187,7 +184,6 @@ function applyBuildingArt(
   })
 }
 
-/** The layer's own scale, composed with whatever multiplier an effect is holding. */
 function writeScale(entry: Entry, base: number): void {
   entry.base = base
   entry.sprite.scale.set(base * entry.mul)
@@ -225,7 +221,6 @@ function drawPips(g: Graphics, filled: number): void {
   }
 }
 
-/** The sprite this layer drew for a subject — the layer's own read-back. */
 export function entitySpriteOf(scene: Scene, kind: WorldPick['kind'], id: string): Sprite | null {
   return syncStates.get(scene)?.entries.get(`${kind}:${id}`)?.sprite ?? null
 }

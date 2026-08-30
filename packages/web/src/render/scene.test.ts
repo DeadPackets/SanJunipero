@@ -225,8 +225,6 @@ describe('★ the wheel gesture is released on the frame, so the resting frame s
   })
 })
 
-// ── ★ NO MOVER OPENS A SECOND DOOR ONTO THE CAMERA ────────────────────────────────────────
-//
 // A mover that wrote `world.position` itself would skip every guard, and would look right in
 // the browser until somebody moved the camera while a throw was still in the air.
 

@@ -141,7 +141,6 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
     expect(captionMinPx()).toBeCloseTo(5.4, 3)
   })
 
-  // The comment on the table promised the stamp and the cue would join it once they landed.
   it('★ measures every caption the frame draws, not only the one it added', () => {
     const promised = ['the quiet stamp', 'the director’s cue', 'the chronicle ticker']
     for (const what of promised) {
@@ -175,8 +174,6 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
     expect(app).toMatch(/scene\.textScale = route\.broadcast \? BROADCAST_TEXT_SCALE : 1/)
   })
 })
-
-// ── the lower third ───────────────────────────────────────────────────────────────────────
 
 describe('what the lower third carries', () => {
   const spoken = { agentId: 'omar', name: 'Omar', words: 'The well is dry.' }
@@ -215,8 +212,6 @@ describe('what the lower third carries', () => {
     expect(captionClip('  two   words  ')).toBe('two words')
   })
 })
-
-// ── the ticker ────────────────────────────────────────────────────────────────────────────
 
 describe('the chronicle crawling along the bottom edge', () => {
   const entry = (seq: number, label: string) => ({ seq, label })

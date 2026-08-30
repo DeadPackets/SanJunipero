@@ -43,9 +43,6 @@ export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
   { what: 'the director’s cue', from: 'sheet', selector: "[data-broadcast='on'] .stage-cue" },
 ]
 
-// ── the lower third: who is talking, or what the town's own paper last said ────────────────
-
-/** A line somebody said, and when we heard it. */
 export type SpokenLine = { agentId: string; name: string; words: string }
 
 /** What the lower third is carrying. A speech caption brings the speaker's face with it; the
@@ -54,9 +51,8 @@ export type LowerThirdLine =
   | { kind: 'speech'; agentId: string; name: string; words: string }
   | { kind: 'dispatch'; name: string; words: string }
 
-/** How long a spoken line holds the lower third before the town's paper comes back. Long
- *  enough to read a sentence at broadcast size, short enough not to outlive the shot. The hold
- *  is a timer the mark owns, not a clock this module reads. */
+/** Long enough to read a sentence at broadcast size, short enough not to outlive the shot.
+ *  The hold is a timer the mark owns, not a clock this module reads. */
 export const CAPTION_HOLD_MS = 6000
 
 /** A caption is a caption, not a paragraph: what does not fit ends in an ellipsis. */
@@ -84,8 +80,6 @@ export function lowerThirdLine(
   if (dispatch === null) return null
   return { kind: 'dispatch', name: captionClip(dispatch.title), words: captionClip(dispatch.body) }
 }
-
-// ── the ticker: the town's own record, crawling along the bottom edge ──────────────────────
 
 /** How many entries the crawl carries. The record grows forever and a stream viewer reads the
  *  last minutes of it, not the whole town history. */

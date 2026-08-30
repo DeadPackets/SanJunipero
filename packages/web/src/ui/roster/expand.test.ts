@@ -298,7 +298,6 @@ describe('skillBand — five bands and no arithmetic reaches a viewer', () => {
     expect(seen).toEqual(SKILL_BANDS.map((b) => b.words))
   })
 
-  // The inspector printed `fishing — level 2` off a second ladder of its own.
   it('is the ONE phrase the roster card and the inspector both say', () => {
     expect(skillPhrase('fire_making', 50)).toBe('is relied on for fire making')
     expect(skillPhrase('fishing', 0)).toBe('has just started fishing')

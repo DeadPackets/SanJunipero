@@ -115,8 +115,6 @@ describe('sampleDecorations spreads the cap over the whole map (D15)', () => {
 })
 
 describe('the frame loop does not walk the world', () => {
-  // The frame loop used to build an `Object.values` array and a live-id `Set` of every
-  // structure, 60×/s, against deltas that arrive at most every 250 ms. Both now run per delta.
   it('allocates nothing per frame over the structure set — the table', () => {
     for (const rings of [1, 2, 3]) {
       const town = bigTown(rings)

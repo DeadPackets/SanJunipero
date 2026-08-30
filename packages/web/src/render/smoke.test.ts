@@ -15,8 +15,6 @@ import {
 } from './smoke.js'
 import { advanceWind } from './wind.js'
 
-// ── the puff, as a function of its life ─────────────────────────────────────────────────
-
 describe('★ U8 — a puff is born faint, swells, leans on the wind and fades', () => {
   it('alpha is 0.42·sin(π·prog): nothing at birth, the peak at mid-life, nothing at death', () => {
     expect(puffAt(0, 0).alpha).toBeCloseTo(0, 6)
@@ -51,8 +49,6 @@ describe('★ U8 — a puff is born faint, swells, leans on the wind and fades',
     expect(puffAt(0.5, 0).drift).toBe(0)
   })
 })
-
-// ── the chimney, read off the manifest ──────────────────────────────────────────────────
 
 const HEARTH = [...HEARTH_KINDS].find((k) => k !== 'fire_pit')!
 
@@ -103,8 +99,6 @@ describe('★ U8 — the chimney comes from `points.chimney`, and its absence is
     expect(chimneyOf([sw], HEARTH, 2, 2, 'se')!.dx).toBeCloseTo((100 - 256) * 0.25, 6)
   })
 })
-
-// ── the layer, driven ───────────────────────────────────────────────────────────────────
 
 function fixture(motion = true) {
   const overhead = new Container()

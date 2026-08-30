@@ -100,8 +100,6 @@ export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
   }
 }
 
-// ── the bubble box ────────────────────────────────────────────────────────────────────────
-
 /** World pixels. The box is drawn with Graphics, not nine-sliced art: 2px of ink on a 4px
  *  radius, so one shape tints to whoever is speaking. */
 export const BUBBLE_PAD = 6
@@ -135,9 +133,8 @@ export type BubbleSide = 'above' | 'below' | 'left' | 'right'
 export const TAIL_STEPS = 3
 export const TAIL_STEP_PX = 3
 
-/** A stair-stepped tail in the same pixel grammar as the art, never a smooth triangle. It
- *  leaves the edge FACING the speaker (`Placed['side']`), so a de-conflicted bubble still
- *  points at its own mouth. Box local space is (0, 0) to (w, h). */
+/** A stair-stepped tail, never a smooth triangle. It leaves the edge FACING the speaker, so a
+ *  de-conflicted bubble still points at its own mouth. Box local space is (0, 0) to (w, h). */
 export function stairTail(side: BubbleSide, w: number, h: number): number[] {
   const s = TAIL_STEP_PX
   const span = TAIL_STEPS * s
@@ -181,8 +178,6 @@ export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
 
-/** What a bubble collapses to when it is not one of the nearest, or the town is a map: a
- *  three-dot pill on the speaker's own paper, so a thought stays a thought at every stop. */
 export const GLYPH_W = 15
 export const GLYPH_H = 9
 export const GLYPH_DOT_R = 1

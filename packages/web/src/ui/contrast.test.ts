@@ -204,8 +204,6 @@ describe('a stale clock is legible, not just loud', () => {
   })
 })
 
-// ── ★ A RULE IS STRUCTURE, HELD TO 3:1 ────────────────────────────────────────────────────
-
 describe('a mark drawn to divide the panel can actually be seen', () => {
   // .block is laid on the paper's parchment and on the cream slabs inside it. --sand is 1.19:1
   // on the first and 1.34:1 on the second: the rule was a smudge on both.
@@ -227,9 +225,6 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
   })
 })
 
-// ── ★ STAGE 8 · THE RING, THE RULE AND THE MARKS OVER ART ─────────────────────────────────
-
-/** Every ground a focus ring is ever painted on. */
 const GROUNDS = ['parchment', 'cream', 'sand', 'honey'] as const
 
 describe('C1 · the focus ring is visible on every ground it sits on', () => {
@@ -327,7 +322,6 @@ describe('C6, C11, C12 · the sheet stops thinning colours it cannot measure', (
   })
 })
 
-// ── the paper's one loud thing: the week banner ───────────────────────────────────────────
 describe('the week band is read on the honey it is printed on', () => {
   it('clears AA, and paints both halves of the pair rather than inheriting one', () => {
     const body = ruleBody(CSS, '.era-band')

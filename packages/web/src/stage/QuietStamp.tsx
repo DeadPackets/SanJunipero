@@ -7,13 +7,11 @@ import type { WorldStore } from '../state/worldStore.js'
 export const STAMP_HOLD_MS = 3000
 /** One wake per this, however fast the pointer reports. */
 const WAKE_THROTTLE_MS = 200
-/** Everything that counts as somebody asking. */
 const WAKE_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const
 
 export type StampWord = 'LIVE' | 'REPLAY' | 'OFFLINE' | 'PAUSED'
 
-/** The badge's four states said in three words: R8's law is one law, and the stamp is not a
- *  second answer to it. A clock nobody can know is stale reads OFFLINE rather than a time. */
+/** A clock nobody can know is stale reads OFFLINE rather than a time. */
 const STAMP_OF: Readonly<Record<BadgeState, StampWord>> = {
   live: 'LIVE',
   past: 'REPLAY',
@@ -38,8 +36,7 @@ export function stampText(tick: number, word: StampWord): string {
   return `DAY ${m.day} · ${season} · ${m.time} · ${word}`
 }
 
-/** The time, chiselled in the corner, only while somebody is asking. The town is the picture;
- *  a clock that is always up is a clock nobody reads. */
+/** Only while somebody is asking: a clock that is always up is a clock nobody reads. */
 export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState }) {
   const isLive = (): boolean => store.getMode().live
   const isAwake = (): boolean => store.getState() !== null

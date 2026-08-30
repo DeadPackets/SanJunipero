@@ -1,12 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 
-/**
- * `data` is the last answer that arrived, `loaded` says whether one has been WAITED for yet —
- * the difference between "nothing has happened" and "nobody has asked". `failed` is the third
- * state, and the reason it exists: a refused read used to settle as `{ null, loaded }`, so every
- * page printed its empty state as a fact about the town. A quiet town and a broken wire are not
- * the same news.
- */
+/** `loaded` says an answer has been waited for; `failed` keeps a refused read from printing
+ *  the empty state as a fact about the town. */
 export type Read<T> = { data: T | null; loaded: boolean; failed: boolean }
 export type Endpoint<T> = {
   get: () => Read<T>
@@ -14,20 +9,13 @@ export type Endpoint<T> = {
    *  than on the answer changing */
   beat: () => number
   subscribe: (fn: () => void) => () => void
-  /** read again now, for a viewer who asks after the wire dropped */
   retry: () => void
 }
 
 const UNREAD: Read<never> = { data: null, loaded: false, failed: false }
 
-/**
- * One reader for one URL. It reads while somebody is subscribed and stops when the last of them
- * leaves; `everyMs` re-reads on that beat, and no `everyMs` reads once. A refused read, or a body
- * the parser rejects, keeps the last good answer rather than blanking the panel — and still wakes
- * its readers, so a reader whose BEAT drives a state machine keeps turning while the gateway is
- * down. A body identical to the last one hands back the SAME read, so a poll over an unchanged
- * answer costs no parse and no render.
- */
+/** Reads while somebody is subscribed. A refused read keeps the last good answer and still
+ *  wakes its readers, so a caller whose beat drives a state machine keeps turning. */
 export function endpoint<T>(
   url: string | null,
   parse: (body: unknown) => T | null = (body) => body as T,
@@ -38,8 +26,7 @@ export function endpoint<T>(
   let timer: ReturnType<typeof setInterval> | null = null
   let beats = 0
   let lastBody: string | null = null
-  // ONE read at a time. Two polls used to overlap on a slow link, and the older one landing last
-  // won; a beat that arrives while a read is still in the air now waits its turn instead.
+  // ONE read at a time: two polls overlapping on a slow link land out of order.
   let inflight: AbortController | null = null
 
   const wake = (): void => {
@@ -81,7 +68,7 @@ export function endpoint<T>(
       })
       .catch(() => {
         inflight = null
-        if (!ctl.signal.aborted) settle(null, true) // an abandoned read is nobody's news
+        if (!ctl.signal.aborted) settle(null, true)
       })
   }
 
@@ -102,7 +89,6 @@ export function endpoint<T>(
           clearInterval(timer)
           timer = null
         }
-        // nobody is listening any more, so the answer in the air is nobody's
         inflight?.abort()
         inflight = null
       }
@@ -110,9 +96,8 @@ export function endpoint<T>(
   }
 }
 
-/** One reader per URL for the life of the session. Unmounting a page body used to drop the
- *  last subscriber and take its last answer with it, so Chronicle → Days → Chronicle re-fetched
- *  and blanked. The reader stops polling when nobody is listening and keeps what it read. */
+/** One reader per URL for the life of the session: it stops polling when nobody is listening
+ *  and keeps what it read. */
 const readers = new Map<string, Endpoint<unknown>>()
 
 export function feedFor<T>(
@@ -131,13 +116,11 @@ export function feedFor<T>(
   return feed as Endpoint<T>
 }
 
-/** Read a feed that is shared page-wide (`feeds.ts`). */
 export function useFeed<T>(feed: Endpoint<T>): Read<T> {
   return useSyncExternalStore(feed.subscribe, feed.get, feed.get)
 }
 
-/** The one reader for a url this component alone wants, held for as long as it asks for the same
- *  one. A changed `url` is a new reader, so a panel showing one person's document never shows it
+/** A changed `url` is a new reader, so a panel showing one person's document never shows it
  *  under the next person's name. */
 export function useEndpointFor<T>(
   url: string | null,
@@ -152,7 +135,6 @@ export function useEndpointFor<T>(
   )
 }
 
-/** Read an endpoint this component alone wants. */
 export function usePolled<T>(
   url: string | null,
   parse?: (body: unknown) => T | null,

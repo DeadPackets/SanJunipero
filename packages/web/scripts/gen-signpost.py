@@ -21,7 +21,6 @@ def plank(light, face, shade, dark, out):
     im = Image.new('RGBA', (W, H), CLEAR)
     px = im.load()
     for y in range(H):
-        # the point: each row of the tip ends one column shorter than the row above the middle
         d = abs(y - (H - 1) / 2)
         right = W - 1 - int(d * (TIP - 1) * 2 / (H - 1))
         for x in range(0, right + 1):

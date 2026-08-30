@@ -75,8 +75,8 @@ export function connectObservatory(opts: {
     }
     sock.onclose = (e: CloseEvent) => {
       if (closed) return
-      // The server refuses a hello it does not recognise; reconnecting with the same one loops
-      // forever, and a reload is the only thing that fetches the viewer this town speaks to.
+      // The server refuses a hello it does not recognise: reconnecting with the same one loops
+      // forever, and only a reload fetches a viewer this town speaks to.
       if (e.code === CLOSE_BAD_HELLO) {
         location.reload()
         return

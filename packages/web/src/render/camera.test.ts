@@ -849,8 +849,6 @@ describe('stageFill — the number R8 is about', () => {
   })
 })
 
-// E8: `touch-action: none` on the stage took the browser's own page-zoom away, so two fingers
-// were the only way left to the six stops and the rig had no handler for them.
 describe('★ two fingers are the touch screen’s wheel', () => {
   it('takes the span between them as the scale, not as a push', () => {
     const spread = zoomPinch(initialZoom(1), 2, 1000)

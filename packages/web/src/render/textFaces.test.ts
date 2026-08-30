@@ -172,7 +172,6 @@ describe('a thought wears a dotted rim instead of a drawn edge', () => {
       expect(d.cy, 'cy').toBeGreaterThanOrEqual(0)
       expect(d.cy, 'cy').toBeLessThanOrEqual(h)
     }
-    // one run of dots down each of the four edges
     expect(dots.some((d) => d.cy === 0)).toBe(true)
     expect(dots.some((d) => d.cy === h)).toBe(true)
     expect(dots.some((d) => d.cx === 0)).toBe(true)
@@ -219,8 +218,7 @@ describe('the tail points at the speaker, in three steps', () => {
 describe('a thought is a different material, never a thinner one', () => {
   it('leaves no alpha on a bubble node', () => {
     // comments stripped: the source SAYS `alpha: 0.55` where it explains what it stopped doing
-    // the fade out (D19) is a motion on the way to nothing, not a thinner material: its one
-    // write goes through `bubbleAlpha`, and that line is the only alpha allowed
+    // the one write goes through `bubbleAlpha`, and that line is the only alpha allowed
     const text = src('./bubbles.ts')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '')

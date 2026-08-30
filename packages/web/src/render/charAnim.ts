@@ -25,8 +25,6 @@ export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/f
 // before-state.
 export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
-/** NOT the click target — hitShapes.bodyHitPolygon is. Kept as the before-state the landed
- *  tests measure against. */
 export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
   return {
     x: -HIT_AREA_W / 2 / scale,

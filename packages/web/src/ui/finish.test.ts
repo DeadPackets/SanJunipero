@@ -126,9 +126,7 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 })
 
 // ── 5 · press has weight ──────────────────────────────────────────────────────────────────
-// Every control that lifts on hover, not the seven somebody happened to list: `.roster-row`,
-// `.key-summary` and `.discovery-leaf` carried the duration on their base rule and so kept
-// fading out for 150ms after finish line 6 was declared closed.
+// Every control that lifts on hover, not the seven somebody happened to list.
 const CONTROLS = named([
   '.feed-tab',
   '.live-pill',
@@ -153,10 +151,8 @@ describe('5 · a control answers the finger that pressed it', () => {
   })
 })
 
-// ── 6 · hover is 150ms in and instant out ─────────────────────────────────────────────────
 // A hover that fades OUT keeps claiming the pointer is somewhere it left. A transition reads
-// the duration of the state it goes TO, so the 150ms belongs on `:hover` and the 0s on the base
-// — the sheet had them the other way round and every hover-out lied for 150ms.
+// the duration of the state it goes TO, so the 150ms belongs on `:hover` and the 0s on the base.
 describe('6 · a hover arrives in 150ms and leaves the instant the pointer does', () => {
   it('transitions in on --t-fast and out on 0s, for every hovering control', () => {
     expect(

@@ -212,8 +212,7 @@ export function createInteriorScene(
   let perches: Tile[] = []
   /** The kinds the wall itself draws this room, so no object is drawn for them as well. */
   let elevated: ReadonlySet<string> = new Set()
-  /** What is on the floor and what the painter's order sorts. Furniture cannot move, so both
-   *  are derived when the plan is, not when a body walks. */
+  /** Furniture cannot move: derived when the plan is, not when a body walks. */
   let roomState: WorldState | null = null
   let roomFor: string | null = null
   let room2: ReturnType<typeof interiorOf> = null
@@ -656,8 +655,6 @@ export function createInteriorScene(
       replan(room2.kind, records, seq)
       laidDown = true
     }
-    // Who is asleep follows the world, and which cell they lie in follows `replan`'s plan.
-    // Neither is a thing a frame changes.
     if (laidDown) {
       const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
       beds = bedSlots(sleeping, bedTiles)
@@ -808,8 +805,7 @@ export function createInteriorScene(
       : advanceInterior(phase, entered, now)
 
     // OUT THEN IN, never both: the veil rises over the first 120 ms and the room arrives over
-    // the next 180, or the room leaves first and the veil follows. One alpha on the root put
-    // the town through a half-drawn room for the whole 300 ms (D22).
+    // the next 180. One alpha on the root shows a half-drawn room for the whole 300 ms.
     const elapsed = now - phase.sinceMs
     const moving =
       (phase.phase === 'entering' || phase.phase === 'exiting') && elapsed < SCENE_TOTAL_MS
@@ -817,7 +813,6 @@ export function createInteriorScene(
     let roomAlpha = veilAlpha
     if (moving) {
       const pair = transitionAlpha(elapsed)
-      // in: the veil rises as the town goes out, then the room comes in. Out: the reverse.
       veilAlpha = phase.phase === 'entering' ? 1 - pair.out : 1 - pair.in
       roomAlpha = phase.phase === 'entering' ? pair.in : pair.out
     }

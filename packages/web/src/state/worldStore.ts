@@ -158,11 +158,8 @@ export function createWorldStore(): WorldStore {
   }
 }
 
-/**
- * Run `fn` the moment the world can be asked anything — now, if it already can. Every deep link
- * needs this: an address is read before the first snapshot arrives, so the town cannot yet say
- * whether the moment, or the person, in it is real.
- */
+/** Run `fn` the moment the world can be asked anything — now, if it already can. An address is
+ *  read before the first snapshot lands, so the town cannot yet say if what it names is real. */
 export function onFirstSnapshot(store: WorldStore, fn: () => void): () => void {
   if (store.getState() !== null) {
     fn()

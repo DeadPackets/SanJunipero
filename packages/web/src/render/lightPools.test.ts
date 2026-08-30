@@ -119,8 +119,6 @@ describe('the picture and the query cannot disagree about what is alight', () =>
     expect(flamesAt(lit, MIDNIGHT, CFG)).toHaveLength(1)
   })
 
-  // The old strength stepped at 19:00 / 21:00 / 05:00 / 07:00 while the sky ramped between
-  // 19:00 and 20:30: six hard steps a day. Now it is the sky's own curve, inverted (D4, U4).
   it('is the inverse of the one sky curve: full at midnight, nothing at noon, partway at dusk', () => {
     expect(poolStrengthAt(MIDNIGHT)).toBe(1)
     expect(poolStrengthAt(NOON)).toBe(0)
@@ -176,7 +174,7 @@ describe('two lamp heads side by side', () => {
     const core = poolDiscAlpha(0)
     expect(core).toBeGreaterThan(0.8)
     expect(2 * (BLOOM_ALPHA + BREATH_AMP) * core).toBeLessThanOrEqual(1)
-    // not vacuous: the 0.5 this replaced clipped where two posts stood together
+    // not vacuous: 0.5 clips where two posts stand together
     expect(2 * (0.5 + BREATH_AMP) * core).toBeGreaterThan(1)
   })
 })
@@ -186,8 +184,7 @@ describe('the pool is a pool of light and not a pale plate', () => {
     expect(POOL_COLOR).toBe(0xf7a66b)
   })
 
-  // Above the night quad now (U1), so the multiply no longer touches it — but the token is
-  // still the one that would survive it, which is why it was chosen.
+  // The token was chosen to survive the night multiply, even though it now sits above it.
   it('★ reads WARM even under the night multiply — measured, not chosen', () => {
     const NIGHT_TINT = CLOCK_STOPS.find((s) => s.minute === 0)!.tint
     const after = (rgb: number): [number, number, number] => [

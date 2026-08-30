@@ -33,8 +33,6 @@ export function FadedBond({ onClose }: { onClose: () => void }) {
   )
 }
 
-/** One tie, opened. The bar is gone: it filled toward the closest pair in town, which makes a
- *  relationship a meter with a leader. The level word plus the dated history can also go DOWN. */
 export function BondDetail({
   bond,
   people,

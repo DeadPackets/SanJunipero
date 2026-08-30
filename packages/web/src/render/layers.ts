@@ -18,13 +18,12 @@ export type LayerSet = Readonly<Record<LayerName, Container>>
 /** The one layer that sorts its children by depth. Everything else is arrival order. */
 export const SORTED_LAYER: LayerName = 'entities'
 
-/** The layers the weather grade colours: the PICTURE, `ground` through `overhead`. Words and
- *  reading aids sit outside it, so speech is never graded under the 4.5:1 floor (D5). */
+/** The PICTURE, `ground` through `overhead`. Words and reading aids sit outside it, so speech
+ *  is never graded under the 4.5:1 floor. */
 export const GRADED_LAYERS: readonly LayerName[] = LAYERS.slice(0, LAYERS.indexOf('worldText'))
 
-/** Creates the layer containers under `world`. Only `entities` sorts; every other layer is
- *  event-inert so a decoration can never take a click from the world beneath it. The graded
- *  layers share one sub-container, which is the only node the grade filter is ever put on. */
+/** Only `entities` sorts; every other layer is event-inert, so a decoration can never take a
+ *  click from the world beneath it. The graded layers share the one node the filter goes on. */
 export function createLayers(world: Container): { layers: LayerSet; graded: Container } {
   const graded = new Container()
   world.addChild(graded)
@@ -39,11 +38,8 @@ export function createLayers(world: Container): { layers: LayerSet; graded: Cont
   return { layers: out, graded }
 }
 
-// ── the screen stack ─────────────────────────────────────────────────────────────────────
-
-/** What sits on `app.stage` over `world`, in paint order. `lights` mirrors the world's
- *  transform every frame and is the ONLY place an additive light may live: a light drawn under
- *  the night multiply is darkened by the very grade it exists to fight (D1). */
+/** In paint order over `world`. `lights` mirrors the world's transform and is the ONLY place
+ *  an additive light may live: under the night multiply the grade darkens it. */
 export const SCREEN_LAYERS = [
   'flash', // lightning — under the night quad, so a strike at 2 a.m. is a night strike (D8)
   'night', // the deep-blue multiply quad

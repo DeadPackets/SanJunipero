@@ -33,8 +33,8 @@ export function stageKeyAllowed(tagName: string, editable: boolean): boolean {
   return !editable && !/^(INPUT|TEXTAREA|SELECT)$/.test(tagName)
 }
 
-/** Fullscreen for the stage element, or back out of it. Rejected by a browser that will not
- *  grant it (no user gesture, an iframe without the permission) and the stage stays as it is. */
+/** A browser may refuse it (no user gesture, an iframe without the permission); the stage stays
+ *  as it is. */
 export function toggleFullscreen(el: Element | null): void {
   const refused = (): void => {
     /* the browser would not grant it; the stage stays the size it is */

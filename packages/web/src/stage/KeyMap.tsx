@@ -59,7 +59,6 @@ export function KeyMap({
     }
   }, [open, onOpenChange])
 
-  // Focus enters the sheet on open and goes back where it came from on close.
   useEffect(() => {
     if (open) {
       opener.current = document.activeElement

@@ -68,12 +68,8 @@ export const CSS_EASE_TOKEN: Readonly<Record<MotionName, string>> = {
   ambient: '--ease-ambient',
 }
 
-/**
- * Reduced motion is a FADE OR NOTHING, which is what `chrome.css` does and what DESIGN.md says:
- * every property that moves a box goes to zero, a stagger with it, and a colour keeps its own
- * duration so a viewer who opted out still sees that something changed. The table used to
- * promise a third of the duration instead, which no rule in the sheet ever implemented.
- */
+/** Reduced motion is a FADE OR NOTHING: every property that moves a box goes to zero, a
+ *  stagger with it, and a colour keeps its own duration so an opted-out viewer sees a change. */
 const OPACITY_PROPS: readonly string[] = [
   'opacity',
   'color',

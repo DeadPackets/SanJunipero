@@ -1,10 +1,8 @@
-# Generates the tab mark: the signpost's own arm, on the same pixel grid as the chrome's frames.
 # Run: uv run --with pillow scripts/gen-favicon.py   (from packages/web)
-# Writes public/{favicon.svg,favicon-32.png,apple-touch-icon.png,icon-512.png}.
 from PIL import Image
 
 INK = {
-    ".": "#322B38",  # night, the ground everything in this world sits on
+    ".": "#322B38",
     "H": "#F8DCA2",
     "P": "#E0A85A",
     "I": "#43394A",

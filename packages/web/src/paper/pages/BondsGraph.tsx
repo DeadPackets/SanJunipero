@@ -30,8 +30,8 @@ import { OutOfReach } from '../../ui/OutOfReach.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 
-/** Two readings of one town: how close people are, and what has actually passed between them.
- *  They answer different questions, so they are views rather than layers on one picture. */
+/** Views, not layers on one picture: how close people are and what has passed between them are
+ *  different questions. */
 export const SOCIETY_VIEWS = ['ties', 'traffic'] as const
 export type SocietyView = (typeof SOCIETY_VIEWS)[number]
 export const SOCIETY_VIEW_LABEL: Record<SocietyView, string> = {
@@ -48,7 +48,6 @@ const HALO_STEP = 4
 const HALO_FIRST = 8
 const NO_HALO: Halo = { kinds: [], names: [] }
 
-/** What the canvas needs of a line, whichever view drew it. */
 type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
 
 const AXIS_NAME: Readonly<Record<LegendRow['axis'], string>> = {
@@ -74,7 +73,6 @@ export function BondsGraph({
   const bonds = useFeed(bondsFeed)
   const api = bonds.data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
-  // What the town has FORMED, from the record the narrator already serves.
   const paper = useFeed(dispatchesFeed).data ?? EMPTY_DISPATCHES
   const halos = useMemo(() => halosOf(paper.institutions), [paper.institutions])
   const haloKinds = useMemo(() => institutionLegend(halos), [halos])
@@ -99,8 +97,8 @@ export function BondsGraph({
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined)
   const [dims, setDims] = useState({ w: 480, h: 320 })
 
-  // EDGE LENGTH IS THE LEVEL. `linkDistance` is not a component prop — the length lives on the
-  // d3 link force, so it is set on the instance once the graph exists.
+  // Edge length is the level, and it is not a component prop: it lives on the d3 link force, so
+  // it is set on the instance once the graph exists.
   useEffect(() => {
     const link = fgRef.current?.d3Force('link') as
       | { distance: (f: (l: unknown) => number) => void }
@@ -108,9 +106,8 @@ export function BondsGraph({
     link?.distance((l: unknown) => (l as Drawn).distance)
   }, [])
 
-  // The box measured is the canvas's OWN cell, never the block around it: force-graph sizes the
-  // canvas from `dims`, and a canvas that can grow its own container measures itself bigger every
-  // frame — this block reached 7 946px before the cell was given a size of its own.
+  // Measure the canvas's own cell, never the block around it: force-graph sizes the canvas from
+  // `dims`, so a canvas that can grow its container measures itself bigger every frame (7 946px).
   useEffect(() => {
     const el = boxRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
@@ -123,9 +120,8 @@ export function BondsGraph({
     }
   }, [])
 
-  // Names come from the world the viewer already holds. A fold lands every tick and remakes
-  // `state`, but the graph only cares who is alive and what they are called: keying on that
-  // signature is what stops the force layout being re-seeded from scratch every tick.
+  // A fold lands every tick and remakes `state`; keying on who is alive and what they are called
+  // is what stops the force layout being re-seeded from scratch every tick.
   const nameSig = useMemo(() => {
     const out: string[] = []
     for (const a of Object.values(state?.agents ?? {})) if (a.alive) out.push(`${a.id}\t${a.name}`)
@@ -201,9 +197,8 @@ export function BondsGraph({
     },
     [onSubject],
   )
-  // The canvas mounts nothing tabbable, so Folk > Bonds was a whole tab of content with no
-  // keyboard path into it. The same people, as a list nothing draws — memoised, because this
-  // component re-renders on every world tick.
+  // The canvas mounts nothing tabbable, so this list is the keyboard's only path in. Memoised:
+  // the component re-renders on every world tick.
   const roll = useMemo(
     () => (
       <ul className="stage-sr" aria-label="Everyone in the graph">
@@ -226,9 +221,8 @@ export function BondsGraph({
 
   const drawNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D) => {
-      // pixel token: integer-snapped square slab with ink ring, ledge, and bevel. The NAME
-      // is not painted here: force-graph runs this once per node in array order, so a later
-      // slab would bury an earlier neighbour's name. See onRenderFramePost.
+      // The name is not painted here: force-graph runs this once per node in array order, so a
+      // later slab would bury an earlier neighbour's name. See onRenderFramePost.
       const n = node as PositionedNode
       if (n.x === undefined || n.y === undefined) return
       ctx.imageSmoothingEnabled = false
@@ -251,7 +245,6 @@ export function BondsGraph({
         ctx.setLineDash([])
         ctx.strokeRect(x - HALO_STEP, y - HALO_STEP, side + HALO_STEP * 2, side + HALO_STEP * 2)
       }
-      // A ring for each kind of thing this person belongs to, outermost last.
       const halo = halos.get(n.id) ?? NO_HALO
       halo.kinds.forEach((kind, i) => {
         const out = HALO_FIRST + i * HALO_STEP

@@ -3,11 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ZOOM_SETTLE_MS, ZOOM_STOPS, type ZoomStop } from './camera.js'
 import { createCameraRig } from './cameraRig.js'
 
-// D10: every writer of the camera's position went through a float lerp, a fling or a raw
-// pointer delta, and `roundPixels` then rounded each sprite's vertices on its own — so the
-// ground chunks, the bodies and their shadows snapped on different frames and the scene
-// sheared by a pixel through every follow. The world container now lands on a whole pixel.
-
 type Tick = () => void
 
 function fakeApp(): {
@@ -35,7 +30,6 @@ function fakeApp(): {
 
 const WIDE = { minX: -20000, maxX: 20000, minY: -20000, maxY: 20000 }
 
-/** A rig at rest on `zoom`, on a clock the test advances. */
 function rigAt(zoom: ZoomStop) {
   const clock = { now: 1000 }
   vi.spyOn(performance, 'now').mockImplementation(() => clock.now)
