@@ -8,7 +8,7 @@ import {
   assertNoGlassLeak,
   scanPromptForGlassLeak,
 } from '@sj/shared'
-import { assembleAdjudicationPrompt, INTENT_MAX_CHARS } from '../prompt.js'
+import { assembleAdjudicationPrompt, INTENT_MAX_CHARS } from '../../src/prompt.js'
 import {
   INJECTION_CORPUS,
   analyzeAgainstMind,

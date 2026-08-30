@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, renameSync, rmSync } from 'node:fs'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import { IntentSchema } from '../turn.js'
+import { IntentSchema } from '../../src/turn.js'
 
 // A rollback point, not a bookmark: an atomic VACUUM INTO with the accumulators written inside,
 // so a resume drops the tail. Four rules bar laundering: fingerprint, forward-only, hash, resumes.

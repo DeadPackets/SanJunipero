@@ -92,7 +92,7 @@ import {
   survivalTax,
   type G11Discretion,
   type G11Report,
-} from '../src/live/g11report.js'
+} from './lib/g11report.js'
 import {
   G11_CHECKPOINT_VERSION,
   checkpointRefusal,
@@ -104,7 +104,7 @@ import {
   type G11Checkpoint,
   type G11Fingerprint,
   type G11Sidecar,
-} from '../src/live/g11checkpoint.js'
+} from './lib/g11checkpoint.js'
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 import type { DiscoveryCredit } from '@sj/shared'
 

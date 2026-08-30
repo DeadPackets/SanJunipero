@@ -1,4 +1,4 @@
-// LIVE — drives the `src/chaos/manipulator.ts` payloads through a real mind and writes down
+// LIVE — drives the `arbiter/scripts/lib/manipulator.ts` payloads through a real mind and writes down
 // what came back; the output is the transcript, not a verdict. Every payload runs twice, once
 // through `renderHeardRaw` and once through `renderHeard`: a row is only evidence if the
 // BEFORE arm reproduces the landing the previous lane recorded.
@@ -15,7 +15,7 @@ import {
   renderHeard,
   renderHeardRaw,
   spokenGlassLeak,
-} from '../../arbiter/src/chaos/manipulator.js'
+} from '../../arbiter/scripts/lib/manipulator.js'
 
 const CAP_USD = 0.75
 const OUT = process.env.SJ_OUT ?? '/tmp/manipulator-live.json'

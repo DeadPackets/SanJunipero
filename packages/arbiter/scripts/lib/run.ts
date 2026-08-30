@@ -1,6 +1,6 @@
-import type { AgentCtx, Arbiter } from '../adjudicate.js'
-import { CodexStore } from '../codex.js'
-import type { Verdict } from '../verdict.js'
+import type { AgentCtx, Arbiter } from '../../src/adjudicate.js'
+import { CodexStore } from '../../src/codex.js'
+import type { Verdict } from '../../src/verdict.js'
 import { EXPLOIT_CORPUS } from './corpus.js'
 
 export type ChaosResult = {
