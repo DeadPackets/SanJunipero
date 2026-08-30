@@ -133,6 +133,44 @@ const quotedNumber = (v: unknown): number | undefined => {
   return Number.isFinite(n) && String(n) === trimmed ? n : undefined
 }
 
+// Drop the keys strict zod named, in the container it named them in.
+function dropUnknownKeys(
+  root: unknown,
+  path: readonly PropertyKey[],
+  keys: readonly string[],
+): boolean {
+  const holder = containerAt(root, path)
+  if (!isRecord(holder)) return false
+  let dropped = false
+  for (const key of keys)
+    if (key in holder) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
+      delete holder[key]
+      dropped = true
+    }
+  return dropped
+}
+
+// Read the quoted number in the slot the schema wanted a number in.
+function readQuotedNumber(root: unknown, path: readonly PropertyKey[]): boolean {
+  const key = path[path.length - 1]
+  if (key === undefined) return false
+  const holder = containerAt(root, path.slice(0, -1))
+  if (Array.isArray(holder) && typeof key === 'number') {
+    const n = quotedNumber(holder[key])
+    if (n === undefined) return false
+    holder[key] = n
+    return true
+  }
+  if (isRecord(holder)) {
+    const n = quotedNumber(holder[String(key)])
+    if (n === undefined) return false
+    holder[String(key)] = n
+    return true
+  }
+  return false
+}
+
 // The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
 // dropped and a quoted number is read as the number it spells. Nothing is supplied.
 function applySchemaIssues<T>(
@@ -149,30 +187,11 @@ function applySchemaIssues<T>(
     let changed = false
     for (const issue of parsed.error.issues) {
       if (issue.code === 'unrecognized_keys') {
-        const holder = containerAt(current, issue.path)
-        if (!isRecord(holder)) continue
-        for (const key of issue.keys)
-          if (key in holder) {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
-            delete holder[key]
-            changed = true
-          }
-        if (changed && !applied.includes('unknown-keys-dropped'))
-          applied.push('unknown-keys-dropped')
+        if (!dropUnknownKeys(current, issue.path, issue.keys)) continue
+        changed = true
+        if (!applied.includes('unknown-keys-dropped')) applied.push('unknown-keys-dropped')
       } else if (issue.code === 'invalid_type' && issue.expected === 'number') {
-        const key = issue.path[issue.path.length - 1]
-        const holder = containerAt(current, issue.path.slice(0, -1))
-        if (key === undefined) continue
-        const n = quotedNumber(
-          Array.isArray(holder) && typeof key === 'number'
-            ? holder[key]
-            : isRecord(holder)
-              ? holder[String(key)]
-              : undefined,
-        )
-        if (n === undefined) continue
-        if (Array.isArray(holder) && typeof key === 'number') holder[key] = n
-        else if (isRecord(holder)) holder[String(key)] = n
+        if (!readQuotedNumber(current, issue.path)) continue
         changed = true
         if (!applied.includes('quoted-numbers-read')) applied.push('quoted-numbers-read')
       }

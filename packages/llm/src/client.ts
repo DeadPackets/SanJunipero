@@ -16,6 +16,7 @@ import {
   makeBudgetGuard,
   sumCostUsd,
   type BudgetGuard,
+  type LlmCallInsert,
 } from './callLog.js'
 import {
   FALLBACK_MODELS,
@@ -112,7 +113,6 @@ export type LlmClientOpts = {
   db: Database.Database
   caller: string
   agentId?: string
-  fallbackModels?: string[]
   providerOrder?: string[]
   // False turns `providerOrder` from a preference into an allow-list. Absent leaves the
   // routing exactly as it has always been.
@@ -130,6 +130,21 @@ export type LlmClientOpts = {
   expectedCallCostUsd?: number
 }
 
+type CallTokens = Pick<
+  LlmCallInsert,
+  'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'reasoningTokens'
+>
+
+// Absent on a call that died before it reported anything; every column is still written, as 0.
+function callTokens(raw: LanguageModelUsage | undefined): CallTokens {
+  return {
+    inputTokens: raw?.inputTokens ?? 0,
+    outputTokens: raw?.outputTokens ?? 0,
+    cacheReadTokens: raw?.inputTokenDetails.cacheReadTokens ?? 0,
+    reasoningTokens: raw?.outputTokenDetails.reasoningTokens ?? 0,
+  }
+}
+
 const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 
 // Six minutes: ~75% headroom over the slowest call that has ever legitimately answered.
@@ -139,7 +154,6 @@ export class LlmClient {
   private readonly db: Database.Database
   private readonly caller: string
   private readonly agentId: string | null
-  private readonly fallbackModels: string[]
   private readonly providerOrder: string[]
   private readonly allowProviderFallbacks: boolean
   private readonly reasoning: ReasoningSetting | null
@@ -155,7 +169,6 @@ export class LlmClient {
     this.db = opts.db
     this.caller = opts.caller
     this.agentId = opts.agentId ?? null
-    this.fallbackModels = opts.fallbackModels ?? FALLBACK_MODELS
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
     const pinned = callSettingsFor(opts.caller)
@@ -360,10 +373,8 @@ export class LlmClient {
           reportedCostUsd: reported,
         } = await exec(model)
         const served = servedModel ?? modelName
-        const inputTokens = raw.inputTokens ?? 0
-        const outputTokens = raw.outputTokens ?? 0
-        const cacheReadTokens = raw.inputTokenDetails.cacheReadTokens ?? 0
-        const reasoningTokens = raw.outputTokenDetails.reasoningTokens ?? 0
+        const tokens = callTokens(raw)
+        const { inputTokens, outputTokens, cacheReadTokens } = tokens
         const computed = computeCostUsd(
           inputTokens,
           outputTokens,
@@ -372,22 +383,19 @@ export class LlmClient {
           provider,
         )
         const costUsd = this.book(computed, reported ?? null, served, provider ?? null)
-        insertLlmCall(this.db, {
-          agentId: this.agentId,
-          caller: this.caller,
-          model: served,
-          provider: provider ?? null,
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          reasoningTokens,
-          costUsd,
-          estimatedCostUsd: computed.costUsd,
-          reportedCostUsd: reported ?? null,
-          latencyMs: performance.now() - start,
-          ok: true,
-          error: null,
-        })
+        insertLlmCall(
+          this.db,
+          this.llmCallRow({
+            model: served,
+            provider: provider ?? null,
+            tokens,
+            costUsd,
+            estimatedCostUsd: computed.costUsd,
+            reportedCostUsd: reported ?? null,
+            latencyMs: performance.now() - start,
+            error: null,
+          }),
+        )
         return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
@@ -396,36 +404,30 @@ export class LlmClient {
         // reconcile against, and an unattributed route would alert on every dead call.
         const dead = NoObjectGeneratedError.isInstance(err) ? err : null
         const served = dead?.response?.modelId ?? modelName
+        // A failure that carries no answer carries no back end to name it by. The
+        // per-provider empty-call rate is therefore a rate over the calls that landed.
         const provider = dead === null ? null : servedProvider(dead.response, undefined)
-        const raw = dead?.usage
-        const inputTokens = raw?.inputTokens ?? 0
-        const outputTokens = raw?.outputTokens ?? 0
-        const cacheReadTokens = raw?.inputTokenDetails.cacheReadTokens ?? 0
+        const tokens = callTokens(dead?.usage)
         const deadCost = computeCostUsd(
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
+          tokens.inputTokens,
+          tokens.outputTokens,
+          tokens.cacheReadTokens,
           served,
           provider,
         ).costUsd
-        insertLlmCall(this.db, {
-          agentId: this.agentId,
-          caller: this.caller,
-          model: served,
-          // A failure that carries no answer carries no back end to name it by. The
-          // per-provider empty-call rate is therefore a rate over the calls that landed.
-          provider,
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          reasoningTokens: raw?.outputTokenDetails.reasoningTokens ?? 0,
-          costUsd: deadCost,
-          estimatedCostUsd: deadCost,
-          reportedCostUsd: null,
-          latencyMs: performance.now() - start,
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        })
+        insertLlmCall(
+          this.db,
+          this.llmCallRow({
+            model: served,
+            provider,
+            tokens,
+            costUsd: deadCost,
+            estimatedCostUsd: deadCost,
+            reportedCostUsd: null,
+            latencyMs: performance.now() - start,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err
@@ -434,11 +436,26 @@ export class LlmClient {
     throw lastError
   }
 
+  private llmCallRow(
+    call: Omit<LlmCallInsert, 'agentId' | 'caller' | 'ok' | keyof CallTokens> & {
+      tokens: CallTokens
+    },
+  ): LlmCallInsert {
+    const { tokens, ...rest } = call
+    return {
+      agentId: this.agentId,
+      caller: this.caller,
+      ...tokens,
+      ...rest,
+      ok: call.error === null,
+    }
+  }
+
   /** The routing and reasoning body this client's calls carry. Readable so a test can prove
    *  what a live call sends without making one. */
   requestBody(): ReturnType<typeof defaultExtraBody> {
     return defaultExtraBody(
-      this.fallbackModels,
+      FALLBACK_MODELS,
       this.providerOrder,
       this.allowProviderFallbacks,
       this.reasoning ?? undefined,

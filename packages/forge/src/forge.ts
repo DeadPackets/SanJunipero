@@ -32,9 +32,8 @@ export function createForge(deps: {
   judge: VisionJudgeFn
   codex: AssetCodex
   refs: Buffer[]
-  config?: ForgeConfig
 }): Forge {
-  const asked = deps.config ?? loadForgeConfig()
+  const asked = loadForgeConfig()
   const config: ForgeConfig = {
     ...asked,
     visionQa: {
