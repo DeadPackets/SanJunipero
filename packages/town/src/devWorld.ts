@@ -26,7 +26,7 @@ import {
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
-import { parseWorldEnv } from './worldEnv.js'
+import { parseWorldEnv, type WorldEnv } from './worldEnv.js'
 import { devWorldOrigin } from './devTown.js'
 import {
   assertSameWorld,
@@ -154,25 +154,15 @@ export async function startDevWorld(
     realMsPerTick?: number
     seed?: string
     ingest?: boolean
-    map?: DevMapKind
-    /** How many rings of blocks the showcase town is platted for; ignored by `scripted`, which
-     *  is frozen. Every dimension of the map derives from it. */
-    rings?: number
-    /** dev/demo only: tired founders go indoors and come out again. Off by default, so every
-     *  existing gate folds exactly the events it always did. */
-    interiors?: boolean
-    /** dev/demo only: the founders raise houses on claimed plots through the real `build` verb.
-     *  Off by default — the frozen fixture has no lattice to build on. */
-    builders?: boolean
+    /** Every world knob at once, the way `parseWorldEnv()` hands them over; `worldEnv.ts` says
+     *  what each one means. The absent ones do NOT take the env defaults: the map is `scripted`
+     *  and interiors, builders, the bridge and joint building are all off, so every frozen gate
+     *  folds exactly the events it always did. `fresh` is off for its own reason — a function
+     *  handed a path to a database does not get to delete it without being asked. */
+    world?: Partial<WorldEnv>
     /** dev/demo only: how many lamp posts one founder raises along the street and keeps fed.
      *  ABSENT by default — the stream asks for them; no gate does. */
     lamps?: number
-    /** dev/demo only: one founder decks the ford, joining the blocks across the water to the
-     *  town. Off by default — only the showcase has a ford. */
-    bridge?: boolean
-    /** dev/demo only: a mason beside somebody's half-raised walls lends a hand. Off by default —
-     *  see `jointBuild` on `FoundersOpts` for the numbers. */
-    jointBuild?: boolean
     /** The narrator db, opened readonly. Absent, every narrated surface — chapters, milestones,
      *  moments — answers typed-empty. */
     narratorDbPath?: string
@@ -183,11 +173,6 @@ export async function startDevWorld(
      *  `wipeAgentMemory` — thrown away together with the world when `fresh` is asked for. */
     agentDbDir?: string
     /**
-     * Throw the town away and start a new day 0. Off by default: a function handed a path to a
-     * database does not get to delete it without being asked.
-     */
-    fresh?: boolean
-    /**
      * Minds instead of puppets; absent, the founders are the scripted cast. A FACTORY, not a
      * cast: one built before this call has already opened the per-mind dbs that `fresh` deletes.
      */
@@ -195,7 +180,8 @@ export async function startDevWorld(
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
-  const fresh = opts.fresh === true
+  const world = opts.world ?? {}
+  const fresh = world.fresh === true
   mkdirSync(dirname(dbPath), { recursive: true })
   if (fresh) {
     for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true })
@@ -206,8 +192,8 @@ export async function startDevWorld(
   }
 
   const config = SHOWCASE_CONFIG
-  const map = opts.map ?? DEV_MAP_DEFAULT
-  const rings = opts.rings ?? TOWN_RINGS_GENESIS
+  const map = world.map ?? DEV_MAP_DEFAULT
+  const rings = world.rings ?? TOWN_RINGS_GENESIS
   const seed = opts.seed ?? DEV_SEED
   // The frozen fixture has no grammar to grow, so its ring count is not part of its identity.
   const identity = { map, rings: map === 'showcase' ? rings : 0, seed }
@@ -313,23 +299,25 @@ export async function startDevWorld(
   const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
     laws: lawQueue,
     // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
-    interiors: opts.interiors === true,
+    interiors: world.interiors === true,
     structures,
     founders: foundersFor(structures),
     // the showcase town is what a viewer opens, and an empty storeroom is why the room
     // card's holdings grid had never been seen
     holdings: map === 'showcase',
     // and a lattice nobody ever builds in is why merge train 3 called a ring-3 town empty
-    builders: opts.builders === true && map === 'showcase',
+    builders: world.builders === true && map === 'showcase',
     // two pairs of hands on one roof — reachable, and off unless asked for
-    jointBuild: opts.jointBuild === true && map === 'showcase',
+    jointBuild: world.jointBuild === true && map === 'showcase',
     // the streets, lit: one founder raises lamp posts on the verge and keeps them fed.
     // ABSENT unless asked for, so every landed gate folds exactly the world it always did.
     ...(opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase'
       ? { lamps: opts.lamps }
       : {}),
     // the crossing: derived from the ford the map lays, so the two cannot disagree
-    ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
+    ...(world.bridge === true && map === 'showcase'
+      ? { deck: showcaseDeck(undefined, rings) }
+      : {}),
     // ★ AND THE PUPPET STRINGS COME OFF THE MOMENT A LIVE CAST IS ATTACHED. The town on
     // tick 1 and the world systems stay; the patrols, the masons and the need top-ups go.
     minds: opts.cast !== undefined,
@@ -425,7 +413,7 @@ export async function startDevWorld(
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   // The dev loop's answers: doors open, the ford decked. `serve.ts` names its own.
   const env = parseWorldEnv()
-  void startDevWorld({ ingest: true, ...env }).then(({ gateway }) => {
+  void startDevWorld({ ingest: true, world: env }).then(({ gateway }) => {
     const showcase = env.map === 'showcase'
     console.log(
       `dev world: interiors=${env.interiors ? 'on' : 'off'} builders=${env.builders && showcase ? 'on (SCRIPTED masons, real build verb)' : 'off'}` +

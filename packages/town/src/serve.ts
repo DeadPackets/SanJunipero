@@ -96,7 +96,7 @@ export async function main(): Promise<void> {
 
   try {
     world = await startDevWorld({
-      ...env,
+      world: env,
       ingest: true,
       port,
       lamps,
