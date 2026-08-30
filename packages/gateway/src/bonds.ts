@@ -31,12 +31,8 @@ export const BOND_TYPES: readonly string[] = [
   'agent_born',
 ]
 
-/**
- * Ticks between rebuilds. The graph is folded from the WHOLE bond history — measured 4.2 ms over
- * 1,605 rows at tick 5,000, and linear in the town's age — so keying the memo on the mirror's
- * generation rebuilt it on the tick thread every tick a viewer's poll landed in. Warmth's
- * half-life is 2,880 ticks, so 20 moves `asOfTick` by under 1% of it.
- */
+/** The graph folds the WHOLE bond history — 4.2 ms over 1,605 rows at tick 5,000, linear in the
+ *  town's age. Warmth's half-life is 2,880 ticks, so 20 moves `asOfTick` by under 1% of it. */
 export const BONDS_REBUILD_TICKS = 20
 
 export type BondsDeps = {

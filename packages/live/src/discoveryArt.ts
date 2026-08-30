@@ -1,11 +1,8 @@
 import type { AssetCodex, Forge } from '@sj/forge'
 
-/**
- * Commissioning writes the `assets` table — not the event log, not folded — so it runs off the
- * tick and cannot move a golden. `commission()` never rejects, so art never blocks a discovery.
- */
+// Commissioning writes the `assets` table — not the event log, not folded — so it runs off the
+// tick and cannot move a golden. `commission()` never rejects, so art never blocks a discovery.
 
-/** The item kinds a discovery names that the codex has no art for. Sorted, deduped. */
 export function artNeededFor(makes: readonly string[], known: ReadonlySet<string>): string[] {
   return [...new Set(makes)].filter((k) => !known.has(k)).sort()
 }
@@ -29,8 +26,6 @@ export function watchDiscoveryArt(deps: {
   codex: Pick<AssetCodex, 'listSince' | 'onAssetReady'>
   onError?: (kind: string, err: unknown) => void
 }): DiscoveryArtWatcher {
-  // Every kind the codex has ever registered, kept live. `listSince(0)` seeds it once; the
-  // ready callback keeps it current, including for art this watcher did not ask for.
   const known = new Set<string>()
   for (const rec of deps.codex.listSince(0)) if (rec.kind !== null) known.add(rec.kind)
   deps.codex.onAssetReady((rec) => {

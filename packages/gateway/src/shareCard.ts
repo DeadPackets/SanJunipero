@@ -14,31 +14,20 @@ import { makeSpriteReader, renderAgentCard, type AgentRead } from './agentCard.j
 
 export const TOWN_NAME = 'San Junipero'
 
-/** What the town is, in one line, for every surface that has no sentence of its own to show.
- *  Never the town's own name: an unfurl that reads "Day 0 in San Junipero. San Junipero" says
- *  nothing twice. */
 export const TOWN_STRAPLINE = 'A town of minds that live their own days, watched kindly.'
 
-/** Every title is `<what this page is> — <the town>`, and `staticSite.ts` takes the first half
- *  back out for the structured data. Written once so the two cannot disagree. */
+/** `staticSite.ts` splits a title back on this for the structured data. */
 export const TITLE_JOIN = ' — '
 
-/** The two suffixes the card route answers on. The router splits on `/`, so the extension is
- *  part of the last segment and this handler owns it. */
 const SVG_EXT = '.svg'
 const PNG_EXT = '.png'
 
 export type ShareCardDeps = {
   mirror: WorldMirror
   narratorDb: Database.Database | null
-  /** Null → a person's card is type only, which is what a world with no forge has to show. */
   getCodex: () => AssetCodex | null
 }
 
-/** What one link says about itself when somebody pastes it somewhere. The card is always the
- *  box `agentCard.ts` names, so `staticSite.ts` stamps the size and this says nothing about it.
- *  `canonical` is the ONE address this page is: every minute of a day is the same day, and the
- *  scrubber rewrites the address on every tick. */
 export type ShareMeta = {
   title: string
   description: string
@@ -48,7 +37,6 @@ export type ShareMeta = {
   canonical: string
 }
 
-/** A day of the town as the card and the meta tags both read it. */
 type DayRead = { day: number; title: string; subtitle: string }
 
 type Row = Record<string, unknown>
@@ -58,7 +46,7 @@ function one(db: Database.Database | null, sql: string, ...args: unknown[]): Row
   try {
     return (db.prepare(sql).get(...args) as Row | undefined) ?? null
   } catch {
-    // A narrator db that predates a table is a window onto an unfinished room, not an error.
+    // A narrator db that predates a table is not an error: the table is simply not written yet.
     return null
   }
 }
@@ -80,8 +68,6 @@ function readDay(deps: ShareCardDeps, day: number): DayRead {
   }
 }
 
-/** How hot the day got — only the card draws it, and it is a three-table aggregate, so the head
- *  a visitor waits on does not pay for it. */
 function readHeat(deps: ShareCardDeps, day: number): number {
   const heat = one(
     deps.narratorDb,
@@ -92,8 +78,6 @@ function readHeat(deps: ShareCardDeps, day: number): number {
   return typeof heat?.total === 'number' ? heat.total : 0
 }
 
-/** Somebody the world has, and the first sentence of the newest life the town wrote for them —
- *  their own words as they were written, and null rather than prose nobody wrote. */
 function readAgent(deps: ShareCardDeps, id: string): AgentRead | null {
   const person = AGENT_ID.test(id) ? deps.mirror.state().agents[id] : undefined
   if (person === undefined) return null
@@ -106,8 +90,7 @@ function readAgent(deps: ShareCardDeps, id: string): AgentRead | null {
   return { id, name: person.name, line: /^[^.!?]*[.!?]/.exec(body?.trim() ?? '')?.[0] ?? null }
 }
 
-/** `/agent/:id` → that person. The client addresses one as `?agent=<id>` too; only the path is
- *  ever pasted, and only the path a crawler can read gets tags. */
+/** Only the path form gets tags: `?agent=<id>` addresses a person too but is never pasted. */
 export function shareRouteAgent(pathname: string): string | null {
   const segs = pathname.split('/').filter(Boolean)
   if (segs.length !== 2 || segs[0] !== 'agent') return null
@@ -118,8 +101,6 @@ export function shareRouteAgent(pathname: string): string | null {
   }
 }
 
-/** `/moment/:day/:time` → that minute; `/` → the day the town is living. Anything else is not
- *  a page a link is ever pasted from, and gets no tags of its own. */
 export function shareRouteDay(pathname: string, liveTick: number): number | null {
   const segs = pathname.split('/').filter(Boolean)
   if (segs.length === 0) return Math.floor(liveTick / MINUTES_PER_DAY)
@@ -136,7 +117,6 @@ export function shareRouteDay(pathname: string, liveTick: number): number | null
   return Number.isNaN(momentToTick(day, time)) ? null : day
 }
 
-/** `/moment/:id` → the recorded scene by the id the record gave it, or null. */
 export function shareRouteScene(pathname: string): number | null {
   const segs = pathname.split('/').filter(Boolean)
   if (segs.length !== 2 || segs[0] !== 'moment') return null
@@ -144,8 +124,6 @@ export function shareRouteScene(pathname: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null
 }
 
-/** What one recorded day says about itself. `at` is the address it was reached by: the root is
- *  the town itself, and every minute of a day canonicalises to the day. */
 function dayMeta(deps: ShareCardDeps, day: number, at: string): ShareMeta {
   const read = readDay(deps, day)
   const home = at === '/'
@@ -159,15 +137,13 @@ function dayMeta(deps: ShareCardDeps, day: number, at: string): ShareMeta {
   }
 }
 
-/** The tags a paste needs, or null where the path is not a page this product has. */
 export function shareMeta(deps: ShareCardDeps, pathname: string): ShareMeta | null {
   const agentId = shareRouteAgent(pathname)
   if (agentId !== null) {
     if (!AGENT_ID.test(agentId)) return null
     const read = readAgent(deps, agentId)
     const canonical = `/agent/${encodeURIComponent(agentId)}`
-    // Somebody the world no longer has is still a page: the link was true when it was pasted,
-    // and a card for the whole town in their place is a worse answer than saying so.
+    // Somebody the world no longer has is still a page: the link was true when it was pasted.
     if (read === null)
       return {
         title: `Someone the town no longer has${TITLE_JOIN}${TOWN_NAME}`,
@@ -187,8 +163,6 @@ export function shareMeta(deps: ShareCardDeps, pathname: string): ShareMeta | nu
     }
   }
 
-  // `/moment/:id` names a scene, and a scene names its own day — the most shareable thing the
-  // product has, and it used to unfurl as a bare link.
   const sceneId = shareRouteScene(pathname)
   if (sceneId !== null) {
     const scene = one(deps.narratorDb, 'SELECT day FROM scenes WHERE id = ?', sceneId)
@@ -198,11 +172,10 @@ export function shareMeta(deps: ShareCardDeps, pathname: string): ShareMeta | nu
 
   const day = shareRouteDay(pathname, deps.mirror.state().tick)
   if (day === null) return null
-  // every minute of a day is the same page, and the scrubber rewrites the address on every tick
   return dayMeta(deps, day, pathname === '/' ? '/' : `/moment/${day}/00:00`)
 }
 
-/** A card that is not one. Plain text, not JSON: what asked for it wanted an image. */
+/** Plain text, not JSON: whatever asked for this wanted an image. */
 const failCard = (res: ServerResponse, status: number, why: string): void => {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' })
   res.end(why)
@@ -212,7 +185,6 @@ const failCard = (res: ServerResponse, status: number, why: string): void => {
 const CACHE_LIVE = 'public, max-age=300'
 const CACHE_CLOSED = 'public, max-age=31536000, immutable'
 
-/** The name a card path asks for and whether it wants the raster, or null for neither suffix. */
 function splitExt(last: string): { name: string; png: boolean } | null {
   for (const ext of [PNG_EXT, SVG_EXT]) {
     if (last.endsWith(ext)) return { name: last.slice(0, -ext.length), png: ext === PNG_EXT }
@@ -220,11 +192,8 @@ function splitExt(last: string): { name: string; png: boolean } | null {
   return null
 }
 
-/**
- * Rasters held at once, keyed by the SVG they came from — so a retitled day or a newly written
- * life misses by construction. A person's card measures 43 ms of libuv's four-thread pool, which
- * is the same pool the tick thread reads files on, and an unfurl refetches on every preview.
- */
+/** A person's card measures 43 ms of libuv's four-thread pool — the pool the tick thread reads
+ *  files on — and an unfurl refetches on every preview. */
 const MAX_RASTERS = 32
 const rasters = new Map<string, Promise<Buffer>>()
 function rasterize(svg: string): Promise<Buffer> {
@@ -239,8 +208,7 @@ function rasterize(svg: string): Promise<Buffer> {
   return png
 }
 
-/** The card, in the format the extension asked for. Every chat client refuses an SVG for
- *  `og:image`, so the PNG is what the tags point at and the SVG is what a person may look at. */
+/** Every chat client refuses an SVG for `og:image`, so the tags point at the PNG. */
 function sendCard(
   res: ServerResponse,
   png: boolean,

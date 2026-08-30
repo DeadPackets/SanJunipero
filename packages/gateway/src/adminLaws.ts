@@ -10,8 +10,7 @@ const MAX_BODY_BYTES = 4096
 
 const LawRequest = z.object({ path: z.string().min(1), value: z.unknown() })
 
-/** One route on the operator's channel. A `:name` segment is handed to the handler as a param;
- *  the bearer and the interface are already checked by the time it runs. */
+/** A `:name` segment reaches `handle` as a param; the bearer and interface are already checked. */
 export type AdminRoute = {
   method: string
   path: string
@@ -23,7 +22,6 @@ export type LawsAdminOpts = {
   submitLaw: (path: string, value: unknown) => void
   token: string
   host?: string
-  /** Everything else the operator may do — see `adminOps.ts`. */
   routes?: readonly AdminRoute[]
 }
 

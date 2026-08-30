@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { repairCandidates, repairToSchema } from './repair.js'
 
-// The chronicle schema the narrator asks for, verbatim — this is the decode that failed on
-// a live night and cost the run a criterion.
+// The chronicle schema the narrator asks for, verbatim: this is the decode that failed live.
 const Chapter = z
   .object({
     title: z.string().min(1),

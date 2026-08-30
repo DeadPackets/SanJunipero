@@ -13,16 +13,14 @@ import {
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
   expect(PROVIDER_ORDER.length).toBeGreaterThan(0)
-  // Design §1: never a floating alias. Every model this run may be served by names the dated
-  // snapshot it was probed at, so nothing can swap under the town.
+  // Never a floating alias: every model names the dated snapshot it was probed at.
   for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
-  // Baidu's real charged price, reconciled against its bill in `llm-audit/raw/e5.json`. Its
-  // LIST price is 0.14/0.28/0.028; booking the pin at that would over-report every call 3x.
+  // Baidu's real charged rate, not its 0.14/0.28/0.028 list rate: the list would over-report
+  // every call 3x.
   expect(PRICE_PER_M).toEqual({ input: 0.04494, output: 0.08988, cacheRead: 0.008988 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
-  // An unpriced name on the allow-list books at the ceiling, which over-reports every call it serves.
   for (const name of PROVIDER_ORDER) expect(PRICE_PER_M_BY_PROVIDER[name], name).toBeDefined()
   expect(PRICE_PER_M_BY_PROVIDER[PROVIDER_ORDER[0]!]).toEqual(PRICE_PER_M)
 })
@@ -50,7 +48,6 @@ it('prices the pinned model by who served it', () => {
   )
 })
 
-// The failure mode the whole lane exists to close: a route nobody priced must not book cheap.
 it('an unpriced or unattributed route books at the ceiling, never at the pinned rate', () => {
   expect(pricesFor(MIND_MODEL, 'SomeNewProvider').source).toBe('ceiling')
   expect(pricesFor(MIND_MODEL, null).source).toBe('ceiling')
@@ -66,8 +63,8 @@ it('the semantic pass is pinned off the thinking preamble and under an output ce
   expect(callSettingsFor('semantic').maxOutputTokens).toBeLessThanOrEqual(4000)
 })
 
-// E6, 12 matched pairs: reasoning was 94% of a turn's output and holding it off left parse at
-// 100% and moved grounding from 75% to 92%. The night keeps it only for `proposeEdit`.
+// Over 12 matched pairs, reasoning was 94% of a turn's output; holding it off left parse at
+// 100% and moved grounding from 75% to 92%.
 it('the turn and the night are pinned off the thinking preamble', () => {
   expect(callSettingsFor('turn').reasoning).toEqual({ enabled: false })
   expect(callSettingsFor('reflection').reasoning).toEqual({ enabled: false })

@@ -1,5 +1,3 @@
-// Tier 3: the arbiter recognizes a construct, and the ledger is how it reaches the chronicle.
-// Every construct here is a fixture — no provider is reached.
 import { describe, expect, it } from 'vitest'
 import { CONSTRUCT_TYPES, MINUTES_PER_DAY } from '@sj/shared'
 import { openNarratorDb } from '../schema.js'

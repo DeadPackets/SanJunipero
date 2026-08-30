@@ -24,9 +24,8 @@ export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot �
  */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
-/** The only rows the fold below reads: `foldOne`'s five cases and `HEAT_WEIGHTS`' nine keys.
- *  0.5% of a real log — `needs_changed` alone is 59% of it — and `idx_events_type` serves the
- *  filter. `heat.ts` reads the seq gaps this leaves as the events they were. */
+/** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`.
+ *  `heat.ts` reads the seq gaps this filter leaves as the events they were. */
 export const FOLD_TYPES: readonly string[] = [
   'action_completed',
   'action_started',
@@ -66,14 +65,12 @@ export type Footprint = {
 
 type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
 
-/** How much of one mind's feed `/api/agent/:id/journal` sends. A mind writes a line most nights
- *  forever and the panel refetches the lot on every open, so it reads the recent run. */
+/** A mind writes a line most nights forever and the panel refetches the lot on every open. */
 export const JOURNAL_MAX = 200
 
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
 const VERB_LINKS: ReadonlySet<string> = new Set(['give', 'teach', 'attack'])
 
-/** Returns the closer for the per-mind handles it holds; the gateway calls it on `close()`. */
 export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   const cache = makeSeqCache(() => deps.mirror.seq())
   const selEventsAfter = deps.db.prepare(
@@ -183,9 +180,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   }))
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
-  // HELD, not reopened: three inspector tabs per viewer was an open+close per GET on the thread
-  // that ticks the town, each one throwing that file's page cache away. `fileMustExist` is the
-  // cap — only a mind that has a file gets a handle, so a stranger's slug opens nothing.
+  // HELD, not reopened: an open+close per GET on the tick thread throws that file's page cache away.
   const agentDbs = new Map<string, Database.Database>()
   const readAgentRows = <T>(agentId: string, sql: string): T[] => {
     if (!deps.agentDbDir || !AGENT_ID.test(agentId)) return []
@@ -204,8 +199,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     }
   }
 
-  // A dream is a memory row and not a journal row, so the feed is two reads merged. Each half
-  // reads its newest `JOURNAL_MAX` and is turned back the right way up before the merge.
+  // A dream is a memory row and not a journal row, so the feed is two reads merged.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
     const id = params.id ?? ''
     const rows = [

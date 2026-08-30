@@ -115,7 +115,6 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
     const base = `http://127.0.0.1:${gw.port}`
     try {
-      // Before: the item has no art, and the placeholder assetsHttp serves is what stands in.
       expect((await fetch(`${base}/assets/placeholder/item.png`)).status).toBe(200)
 
       const art = artFor(3)
@@ -134,7 +133,6 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
       )
       expect(ledgerTotalUsd(opsDb)).toBeCloseTo(ONE_COMMISSION_USD, 6)
 
-      // After: the same URL the viewer builds from the codex row serves the art it paid for.
       const after = await fetch(`${base}/assets/${records[0]!.id}.png`)
       expect(after.status).toBe(200)
       expect(after.headers.get('content-type')).toBe('image/png')

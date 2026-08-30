@@ -301,7 +301,6 @@ async function run(world: DevWorld, ticks: number): Promise<void> {
   }
 }
 
-/** The world's own log, read back out of the db the way any other reader would. */
 function eventsOf(dir: string, type: string): Record<string, unknown>[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
@@ -350,7 +349,6 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
 
     expect(world.live).toBe(false)
     expect(eventsOf(dir, 'agent_spoke')).toHaveLength(0)
-    // …and it is a town that is genuinely running: the puppets walk.
     expect(eventsOf(dir, 'action_started').length).toBeGreaterThan(0)
   }, 30_000)
 
@@ -421,7 +419,6 @@ describe('★ the money, inside the served world', () => {
     expect(stops).toHaveLength(1)
     expect(stops[0]!.cap).toBe(0.25)
 
-    // And the minds are actually stopped, not merely reported: nothing more is said.
     const atStop = eventsOf(dir, 'agent_spoke').length
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
@@ -530,8 +527,8 @@ describe('★ the money, inside the served world', () => {
     expect(alerts[0]).toContain('2.00x out')
   }, 40_000)
 
-  // ★ minds.md finding 4: 5 failed calls, $0.0652 = 9.2% of rehearsal 3's dollars, and the ops
-  // surface said so nowhere — `reportDeadCalls` and `reportProviders` had no caller at all.
+  // Rehearsal 3 paid $0.0652 — 9.2% of its dollars — for calls that came back with nothing, and
+  // no ops surface said so.
   it('★ says what the run bought and who served it when the town closes', async () => {
     const dir = tmp()
     const { world, opsDb } = await liveWorld({ dir })
@@ -558,8 +555,7 @@ describe('★ the money, inside the served world', () => {
     expect(mix.length, 'the run closed without naming who served it').toBeGreaterThan(0)
   }, 40_000)
 
-  // The operator alert: built and tested since C11, and reached from nothing but a gate script.
-  // Only the hard stops ran on a live town. Ruling 22 (2026-08-30) set it to $0.40/sim-day.
+  // The projected-burn alert fires at $0.40/sim-day, well under either hard stop.
   it('★ warns the operator about a projected burn well before a hard stop kills the run', async () => {
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
@@ -589,8 +585,8 @@ describe('★ the money, inside the served world', () => {
     expect(alerts[0]).toContain('projected $0.60/sim-day over a $0.40 threshold')
   }, 40_000)
 
-  // Ruling 19 (2026-08-30). 9 of rehearsal 3's 309 calls were served by OpenInference, not the
-  // pinned Wafer: a cold prefix and an unpriced route each time.
+  // 9 of rehearsal 3's 309 calls were served off the pin: a cold prefix and an unpriced route
+  // each time.
   it('★ pins the provider as an allow-list for every mind-facing call', () => {
     const db = new Database(':memory:')
     migrateLlmTables(db)
@@ -668,8 +664,8 @@ describe('★ the cap is per town, not per process', () => {
   })
 
   it('reports what the PRE-FLIGHT cost, not what the town has ever cost', () => {
-    // The first resumed live boot printed `pre-flight … $0.047463` for twelve calls that had
-    // cost about a tenth of a cent, because the ledger resumes with the world.
+    // The ledger resumes with the world, so an unscoped sum reports the town's whole history
+    // as what the pre-flight cost.
     const dir = tmp()
     const db = openAgentDb(join(dir, 'ledger.db'))
     db.exec(`CREATE TABLE IF NOT EXISTS llm_calls (
@@ -695,7 +691,6 @@ describe('★ the cap is per town, not per process', () => {
 describe("★ a mind's memory across a resume", () => {
   it('REFUSES a new day-0 town whose minds remember an older one', async () => {
     const dir = tmp()
-    // Boot once, let two minds write memories, stop.
     const { world } = await liveWorld({ dir })
     await run(world, 4)
     await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
@@ -704,7 +699,6 @@ describe("★ a mind's memory across a resume", () => {
     amara.close()
     expect(held).toBeGreaterThan(0)
 
-    // Now throw the WORLD away by hand and leave the minds standing.
     rmSync(join(dir, 'world.db'), { force: true })
     rmSync(join(dir, 'world.db-wal'), { force: true })
     rmSync(join(dir, 'world.db-shm'), { force: true })
@@ -869,7 +863,6 @@ describe('★ what the first live boot broke', () => {
 
   it('a world that cannot take its port stops the cast instead of leaving it booted', async () => {
     const dir = tmp()
-    // Hold a port, then ask the world for it.
     const blocker = createServer()
     const taken = await new Promise<number>((resolve) => {
       blocker.listen(0, () => {
@@ -899,9 +892,8 @@ describe('★ what the first live boot broke', () => {
     }
     expect(stopped, 'five minds were left holding databases and the process never exited').toBe(1)
 
-    // `createGateway` builds its pump timer BEFORE it listens, and `close()` is on the object a
-    // failed listen never returns. Vitest reports the orphan's throw as an unhandled error rather
-    // than a failure, so this waits past two poll intervals for it.
+    // A failed listen never returns the object `close()` is on, orphaning its pump timer, and
+    // vitest reports the orphan's throw as an unhandled error — so wait out two poll intervals.
     await new Promise((r) => setTimeout(r, 600))
   }, 30_000)
 })
@@ -927,10 +919,8 @@ describe('★ closing the town without closing a database under a mind', () => {
   })
 })
 
-/**
- * Every row here asserts the ROUND TRIP and not the call: a mind's novel intent reached the god
- * AND came back as something the world or the mind can perceive.
- */
+// Every row here asserts the ROUND TRIP and not the call: a novel intent reached the god AND came
+// back as something the world or the mind can perceive.
 describe('★ a mind attempts what the engine has no verb for, and a god rules on it', () => {
   const rulebookOf = (dir: string): { recipe_id: string; verb: string }[] => {
     const db = new Database(join(dir, 'minds', '_arbiter.db'), {
@@ -1131,7 +1121,6 @@ describe('★ the chronicle, written on the day boundary', () => {
     expect(narratorRows(dir, 'SELECT day, title FROM chapters')).toEqual([
       { day: 0, title: NARRATED_CHAPTER.title },
     ])
-    // and the two thirds nothing used to read: the paper, its caption, and one life
     expect(narratorRows(dir, 'SELECT kind, day FROM publications ORDER BY kind')).toEqual([
       { kind: 'biography', day: 0 },
       { kind: 'newspaper', day: 0 },
@@ -1141,9 +1130,8 @@ describe('★ the chronicle, written on the day boundary', () => {
       narratorRows(dir, "SELECT subject_id FROM publications WHERE kind = 'biography'"),
     ).toEqual([{ subject_id: 'amara' }])
 
-    // Through the cast's own client seam, which bills the ops db the cap is read off: a
-    // chronicler billing anywhere else would spend outside the anomaly stop. The recognizer and
-    // the tier-2.5 pass ride the same boundary, each under its own name so spend is attributable.
+    // A chronicler billing anywhere but the ops db the cap is read off would spend outside the
+    // anomaly stop. Each rider on the boundary bills under its own name, so spend is attributable.
     expect([...callers]).toEqual(expect.arrayContaining(['narrator', 'semantic', 'constructs']))
     // and the semantic pass ran rather than falling over: no unreadable-verdict alert
     expect(alertsOf(opsDb, 'semantic_firsts_unreadable')).toEqual([])

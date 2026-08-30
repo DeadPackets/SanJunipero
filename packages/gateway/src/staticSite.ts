@@ -48,11 +48,8 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
 
 export type StaticSite = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean
 
-/** The schema.org type each page shape is, in the vocabulary a crawler reads. */
 const SCHEMA = { website: 'WebSite', profile: 'Person', article: 'Article' } as const
 
-/** The structured data a crawler reads instead of running the app. Built from the same
- *  `ShareMeta` the tags are, so the two can never disagree. */
 function jsonLd(meta: ShareMeta, url: string, image: string): string {
   const type = SCHEMA[meta.type]
   const base = { '@context': 'https://schema.org', '@type': type, url, image }
@@ -66,11 +63,8 @@ function jsonLd(meta: ShareMeta, url: string, image: string): string {
   return `<script type="application/ld+json">${JSON.stringify(graph).replace(/</g, '\\u003c')}</script>`
 }
 
-/**
- * The head one deep link is served with, written where a crawler reads it. A crawler never runs
- * the app, so without this the single-page title and description are the only ones it ever sees.
- * `origin` makes the card absolute — several crawlers refuse a relative `og:image`.
- */
+/** A crawler never runs the app, so this is the only head it sees. `origin` makes the card
+ *  absolute — several crawlers refuse a relative `og:image`. */
 export function withShareTags(html: string, meta: ShareMeta, origin = ''): string {
   const image = meta.image.startsWith('http') ? meta.image : origin + meta.image
   const url = origin + meta.canonical
@@ -99,7 +93,6 @@ export function withShareTags(html: string, meta: ShareMeta, origin = ''): strin
     .replace('</head>', `  ${tags}\n  </head>`)
 }
 
-/** The origin this request arrived on, as a crawler must be able to fetch it back. */
 export function originOf(req: IncomingMessage): string {
   const header = (name: string): string | null => {
     const v = req.headers[name]
@@ -115,7 +108,6 @@ export function originOf(req: IncomingMessage): string {
  *  ours. The client is a single-page app, so an unknown non-API path gets `index.html`. */
 export function makeStaticSite(
   root: string,
-  /** what this path is worth saying to a crawler, or null where it is not a page */
   shareMeta?: (pathname: string) => ShareMeta | null,
 ): StaticSite {
   const indexPath = join(resolve(root), 'index.html')
@@ -142,9 +134,8 @@ export function makeStaticSite(
     return true
   }
 
-  /** The app, with this link's own head. A path that resolves to no page of this product still
-   *  gets the app — it is a single page and the client must be able to say so — but with a 404,
-   *  so a crawler stops indexing every typo as a soft duplicate of the town. */
+  /** A path that is no page still gets the app — the client must be able to say so — but with a
+   *  404, so a crawler stops indexing every typo as a soft duplicate of the town. */
   const sendApp = (req: IncomingMessage, res: ServerResponse, pathname: string): boolean => {
     if (shareMeta === undefined) return sendFile(res, indexPath, false)
     const meta = shareMeta(pathname)

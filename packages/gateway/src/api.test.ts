@@ -168,8 +168,7 @@ describe('observer data apis', () => {
   })
 
   it('journal / ledgers / personality read the agent db; missing db → []', async () => {
-    // The journal feed is what a mind wrote down AND what it dreamed, in one order. Nothing
-    // else it remembers is a viewer's to read.
+    // The feed is what a mind wrote AND what it dreamed; nothing else it remembers is a viewer's.
     expect(await (await fetch(`${base}/api/agent/alice/journal`)).json()).toEqual([
       { tick: 100, day: 0, text: 'First entry', kind: 'journal' },
       { tick: 1439, day: 0, text: 'the storehouse had no door', kind: 'dream' },
@@ -188,7 +187,6 @@ describe('observer data apis', () => {
   })
 
   it('the journal feed is capped, and the cap keeps the newest of both halves', async () => {
-    // A mind writes a line most nights forever and the panel refetches the lot on every open.
     const over = JOURNAL_MAX + 50
     const cdb = openAgentFixtureDb(join(dir, 'carl.db'))
     const wrote = cdb.prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, ?, ?, ?)')
@@ -322,7 +320,6 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
     expect(api.call('mira'), 'the handle was dropped between two requests').toEqual([
       { tick: 5, day: 0, text: 'I banked the fire.', kind: 'journal' },
     ])
-    // …and a name with no file is still no handle and no answer.
     expect(api.call('nobody')).toEqual([])
     api.close()
   })

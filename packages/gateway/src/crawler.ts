@@ -11,8 +11,7 @@ export type CrawlerDeps = { mirror: WorldMirror; narratorDb: Database.Database |
  *  crawl is a full agent scan, and a crawler asks in bursts. */
 const SITEMAP_TTL_MS = 300_000
 
-/** What a crawler may walk. The record's read API, the operator's channel and the hashed bundle
- *  are not pages — they are the machinery a page is made of. */
+/** The read API, the operator's channel and the hashed bundle are machinery, not pages. */
 const ROBOTS = [
   'User-agent: *',
   'Allow: /$',
@@ -26,7 +25,6 @@ const ROBOTS = [
   '',
 ]
 
-/** Every address of this town a crawler can be told about, newest day first. */
 function sitemapXml(deps: CrawlerDeps, origin: string): string {
   const paths = ['/']
   for (const a of Object.values(deps.mirror.state().agents)) {

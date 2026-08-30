@@ -37,17 +37,14 @@ export function witnessedAttackers(events: SimEvent[]): { victim: string; byId: 
   return out
 }
 
-/** The one line a paragraph may end on, and the only place a number is allowed to stand. */
 export const FOOTNOTE_PREFIX = 'Seen:'
 
-// The label is what marks a footnote, not where it sits: asked for a trailing line, the narrator
-// writes it onto the tail of a sentence about as often, and sometimes after every sentence. The
-// run may contain a range ("1-6009"); a range is not a citation and parses away to nothing.
+// The label marks a footnote, not its position: asked for a trailing line, the narrator as often
+// hangs it off a sentence. A range ("1-6009") is not a citation and parses away to nothing.
 const FOOTNOTE_LINE = /[ \t]*\bSeen:[ \t]*(\d+(?:[ \t]*[,–—-][ \t]*\d+)*)[ \t]*\.?/gu
 
-// A number inside a sentence, in every shape the chronicle has produced one: a bracket, a
-// counted tick or event, a parenthesised run, or a bare list the footnote parser did not claim
-// — which is how a misspelled label smuggles unchecked seqs into the prose.
+// Every shape the chronicle has produced a number in. The bare list is how a misspelled label
+// smuggles unchecked seqs into the prose.
 const PROSE_ID_LEAK =
   /\[\s*\d|\b(?:tick|ticks|event|events|seq|seqs|number|numbers)\s+#?\d|\(\s*\d[\d\s,–—-]*\)|\b\d+\s*,\s*\d+/giu
 
@@ -57,19 +54,16 @@ const numbersIn = (list: string): number[] =>
     .map((n) => Number(n.trim()))
     .filter((n) => Number.isInteger(n) && n >= 0)
 
-/** Every seq the footnote lines claim, in the order they are claimed, each one once. */
 export function footnoteSeqs(text: string): number[] {
   const out = new Set<number>()
   for (const m of text.matchAll(FOOTNOTE_LINE)) for (const n of numbersIn(m[1] ?? '')) out.add(n)
   return [...out]
 }
 
-/** The prose alone, for a scan that must not trip over the footnotes' own digits. */
 export function stripFootnotes(text: string): string {
   return text.replace(FOOTNOTE_LINE, '').trim()
 }
 
-/** The same text with every unresolvable seq dropped from its footnote line. */
 export function pruneFootnotes(text: string, valid: Set<number>): string {
   return text.replace(FOOTNOTE_LINE, (line, list: string) => {
     const kept = numbersIn(list).filter((n) => valid.has(n))
@@ -77,17 +71,14 @@ export function pruneFootnotes(text: string, valid: Set<number>): string {
   })
 }
 
-/** Whatever the prose is still carrying that belongs under it. Empty is the only good answer. */
 export function proseIdLeaks(text: string): string[] {
   return [...stripFootnotes(text).matchAll(PROSE_ID_LEAK)].map((m) => m[0])
 }
 
-// One sentence at a time, and never across a line break — a list of milestone labels carries no
-// full stop, and one bad line there must not take the whole block with it. Newlines are matched
-// by nothing, so they stay exactly where they were when a sentence between them is dropped.
+// Never across a line break: a list of milestone labels carries no full stop, and one bad line
+// there must not take the whole block with it. Newlines match nothing, so they stay put.
 const SENTENCE = /[^.!?\n]+[.!?]*/gu
 
-/** The same prose with every sentence that still carries a number taken out whole. */
 export function withoutProseIds(text: string): { text: string; dropped: string[] } {
   const dropped: string[] = []
   const kept = text.replace(SENTENCE, (s) => {
@@ -99,11 +90,8 @@ export function withoutProseIds(text: string): { text: string; dropped: string[]
   return { text: kept.replace(/\n{3,}/gu, '\n\n').trim(), dropped }
 }
 
-/**
- * The guard at the point of publication (commit `0cadae64`): FOOTNOTE_RULE is a prompt line and
- * a prompt line is not enforcement. A leaking sentence is dropped rather than re-rendered —
- * a second call for a paragraph the voice already got wrong buys a coin-flip for real money.
- */
+/** FOOTNOTE_RULE is a prompt line, and a prompt line is not enforcement. A leaking sentence is
+ *  dropped rather than re-rendered: a second call for it buys a coin-flip for real money. */
 export function publishClean(
   deps: { store: NarratorStore; alert?: ((d: string) => void) | undefined },
   where: string,
@@ -133,9 +121,8 @@ export function verifyCitations(
   return { ok: dangling.length === 0, dangling }
 }
 
-// The citation check, reading the footnote line the voices write under each paragraph. What the
-// footnotes claim and what the schema field claims are one set; a seq no scene owns is dropped
-// from both, so nothing unresolvable is ever stored or rendered.
+// What the footnotes claim and what the schema field claims are one set; a seq no scene owns is
+// dropped from both, so nothing unresolvable is ever stored or rendered.
 export function applyFootnotes(
   text: string,
   citations: number[],

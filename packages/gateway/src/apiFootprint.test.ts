@@ -180,11 +180,8 @@ describe('★ the read path holds answers, not the log', () => {
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
     expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)
 
-    /**
-     * The running map is the whole town's drama, because a viewer-picked window must be exact
-     * however far back it reaches. What is SENT is the last sim-day, so the body is bounded by
-     * the population and not by the town's age.
-     */
+    // The running map is the whole town's drama; what is SENT is the last sim-day, so the body
+    // is bounded by the population and not by the town's age.
     const oldest = Math.min(...heat.map((w) => w.fromTick))
     const live = mirror.state().tick
     expect(oldest, 'nothing older than the horizon is sent').toBeGreaterThanOrEqual(

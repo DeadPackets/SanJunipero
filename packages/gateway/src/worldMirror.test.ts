@@ -79,8 +79,8 @@ describe('WorldMirror', () => {
     db.close()
   })
 
-  // The scrub query used to be a SCAN plus a temp b-tree over rows carrying ~30 KB of state
-  // JSON each, so it slowed as the world aged. idx_snapshots_tick is what keeps it flat.
+  // Without idx_snapshots_tick this is a SCAN plus a temp b-tree over rows carrying ~30 KB of
+  // state JSON each, and it slows as the world ages.
   it('finds the scrub snapshot through the index, never by scanning the table', () => {
     const dbPath = join(dir, 'world3.db')
     const { db, loop } = makeWorld(dbPath)

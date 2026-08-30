@@ -4,8 +4,6 @@ export type LlmCallInsert = {
   agentId: string | null
   caller: string
   model: string
-  // Null when the answer did not say, which is itself a finding: a run cannot be attributed
-  // to a provider it cannot name.
   provider: string | null
   inputTokens: number
   outputTokens: number
@@ -60,8 +58,6 @@ export function migrateLlmTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
-  // A ledger written before the column existed is still a ledger: add it in place rather
-  // than making every recorded run unreadable.
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
@@ -81,7 +77,6 @@ export function sumReserved(db: Database.Database, caller: string): number {
 }
 
 export type BudgetGuard = {
-  // Returns the reservation id, or null when the call cannot be paid for.
   reserve(expectedUsd: number, budgetUsd: number | null): number | null
   release(reservationId: number): void
   sumReserved(): number

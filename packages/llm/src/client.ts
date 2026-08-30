@@ -45,7 +45,6 @@ type ExecResult<T> = {
   value: T
   servedModel?: string | undefined
   provider?: string | null
-  // What OpenRouter says it actually charged, when it says so at all.
   reportedCostUsd?: number | null
 }
 
@@ -85,8 +84,8 @@ export function defaultExtraBody(
   }
 }
 
-// Which back end answered. OpenRouter says so in its own metadata and again in the raw body;
-// neither is guaranteed, and a call nobody can attribute is recorded as one.
+// OpenRouter names the back end in its own metadata and again in the raw body; neither is
+// guaranteed, and a call nobody can attribute is recorded as one.
 export function servedProvider(response: unknown, meta: unknown): string | null {
   const fromMeta = (meta as { openrouter?: { provider?: unknown } } | undefined)?.openrouter
     ?.provider
@@ -95,8 +94,7 @@ export function servedProvider(response: unknown, meta: unknown): string | null 
   return typeof fromBody === 'string' && fromBody.length > 0 ? fromBody : null
 }
 
-// What the bill says, reported under `usage.cost` once `usage: { include: true }` is set on
-// the request. The only number here that cannot go stale.
+// Reported under `usage.cost` only once `usage: { include: true }` is set on the request.
 function reportedCostUsd(meta: unknown): number | null {
   const cost = (meta as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter
     ?.usage?.cost
@@ -120,8 +118,7 @@ export type LlmClientOpts = {
   // sends nothing at all.
   reasoning?: ReasoningSetting | null
   maxRetries?: number
-  // How long one attempt may sit before it is abandoned; without it a stalled response hangs
-  // the caller for ever, with the retries queued behind it.
+  // Without it a stalled response hangs the caller for ever, with the retries queued behind it.
   requestTimeoutMs?: number
   budgetUsd?: number
   maxOutputTokens?: number
@@ -183,10 +180,8 @@ export class LlmClient {
     this.model = opts.model
   }
 
-  // `repairOnce` adds the second rung to the repair below: when the provider's own bytes
-  // cannot be re-framed into the schema, they go back as its own turn with what the schema
-  // said was wrong, and the answer is asked for once more. Off by default — a caller that
-  // wants a wrong answer corrected has to say so.
+  // `repairOnce` is off by default: the second rung sends the provider's own bytes back with
+  // the schema error, and that costs a second billed generation.
   async object<T>(opts: {
     system: string
     messages: LlmMessage[]
@@ -240,8 +235,7 @@ export class LlmClient {
           reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
         }
       } catch (err) {
-        // Re-frames the provider's own bytes against this caller's schema; never re-asks,
-        // never invents.
+        // Re-frames the provider's own bytes against the schema; never re-asks, never invents.
         if (!NoObjectGeneratedError.isInstance(err)) throw err
         const repaired = repairToSchema(err.text ?? '', schema)
         if (repaired === undefined) throw err
@@ -282,8 +276,7 @@ export class LlmClient {
     return { text: value, usage }
   }
 
-  /** The same caller, ledger and budget with one dial moved, for the odd call inside a pass that
-   *  needs a different one. `null` sends no reasoning field, which is the endpoint's maximum. */
+  /** `null` sends no reasoning field, which is the endpoint's maximum. */
   withReasoning(reasoning: ReasoningSetting | null): LlmClient {
     return new LlmClient({ ...this.opts, reasoning })
   }
@@ -316,8 +309,8 @@ export class LlmClient {
     served: string,
     provider: string | null,
   ): number {
-    // A back end or model nobody has priced must never book cheap: it books at the worst rate
-    // any endpoint charges for this model, and it says so.
+    // A route nobody has priced must never book cheap: it books at the worst rate any endpoint
+    // charges for this model, and it says so.
     if (computed.source === 'ceiling') {
       this.alert(
         'llm_price_unpriced_route',
@@ -329,7 +322,6 @@ export class LlmClient {
     const gap = Math.abs(reported - computed.costUsd)
     const scale = Math.max(reported, computed.costUsd)
     if (gap > COST_DIVERGENCE_FLOOR_USD && scale > 0 && gap / scale > COST_DIVERGENCE_FRACTION) {
-      // The alert that catches a mispriced pin on the first call rather than the six hundredth.
       this.alert(
         'llm_price_divergence',
         `${provider ?? 'unattributed'} charged $${reported.toFixed(6)} for ${served} but the ` +
@@ -406,13 +398,10 @@ export class LlmClient {
         return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
-        // A generation that came back with nothing was still billed, and it carries the tokens
-        // to say so. Priced here rather than through `book`: there is no reported cost to
-        // reconcile against, and an unattributed route would alert on every dead call.
+        // Priced here rather than through `book`: a dead call was still billed, has no reported
+        // cost to reconcile against, and an unattributed route would alert on every one of them.
         const dead = NoObjectGeneratedError.isInstance(err) ? err : null
         const served = dead?.response?.modelId ?? modelName
-        // A failure that carries no answer carries no back end to name it by. The
-        // per-provider empty-call rate is therefore a rate over the calls that landed.
         const provider = dead === null ? null : servedProvider(dead.response, undefined)
         const tokens = tokensOf(dead?.usage)
         const { inputTokens, outputTokens, cacheReadTokens } = tokens
@@ -448,8 +437,7 @@ export class LlmClient {
     return { agentId: this.agentId, caller: this.caller, ...call, ok: call.error === null }
   }
 
-  /** The routing and reasoning body this client's calls carry. Readable so a test can prove
-   *  what a live call sends without making one. */
+  /** Public so a test can prove what a live call sends without making one. */
   requestBody(): ReturnType<typeof defaultExtraBody> {
     return defaultExtraBody(
       FALLBACK_MODELS,
@@ -474,8 +462,8 @@ export class LlmClient {
 
 export type ComputedCost = { costUsd: number; source: PriceSource }
 
-// The table's estimate, and which row it came from. `source: 'ceiling'` means nobody priced this
-// route and the caller must be loud rather than book it cheap.
+// `source: 'ceiling'` means nobody priced this route, so the caller must be loud rather than
+// book it cheap.
 export function computeCostUsd(
   inputTokens: number,
   outputTokens: number,

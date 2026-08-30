@@ -251,8 +251,6 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(await chronicle('?fromTick=1000&toTick=2000')).toEqual([])
   })
 
-  // The TEXT is the point of the endpoint: a viewer handed only titles has the index of a
-  // book nobody printed.
   it('reads the real chapters C7 wrote, prose and all', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([
       { day: 0, title: 'The First Morning', text: 'They woke.' },
@@ -267,7 +265,6 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     >
     expect(body.papers).toEqual([{ day: 0, title: 'The Fire', body: 'It burned all night.' }])
     expect(body.captions).toEqual([{ day: 0, caption: 'Day 0: The First Morning' }])
-    // only the newest of a life, so an older draft never stands beside the one that replaced it
     expect(body.biographies).toEqual([
       { subjectId: 'alice', day: 1, title: 'Alice, who woke first', body: 'She was seen early.' },
     ])
@@ -284,12 +281,9 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
         memberIds: '["alice","bob"]',
       },
     ])
-    // one reading a day: the hottest scene the narrator scored is what the day felt like
     expect(body.heat).toEqual([{ day: 0, total: 9 }])
   })
 
-  // Four of nine columns used to reach a viewer, which is why no panel could filter by tier or
-  // quote the town's own naming.
   it('reads the firsts ledger to its full width, JSON columns already parsed', async () => {
     expect(await (await fetch(`${base}/api/milestones`)).json()).toEqual([
       {
@@ -587,8 +581,8 @@ describe('the days a personality moved', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  /** The memo is keyed on `mirror.seq()`, which moves every pump — so a 30 s-per-viewer poll
-   *  reopens every agent memory db from disk, on the tick thread, essentially every time. */
+  /** Keyed on `mirror.seq()` this reopens every agent memory db from disk, on the tick thread,
+   *  on essentially every 30 s-per-viewer poll. */
   it('★ does not re-open every agent memory db when only the tick moved', async () => {
     expect(await changes()).toEqual([{ tick: 3 * MINUTES_PER_DAY }])
 
@@ -638,8 +632,6 @@ describe('a town with more history than a viewer can read', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  /** Every open panel refetches this every 20 s; unbounded it is the whole town history per
-   *  viewer per poll, and an unbounded list of rows at the other end. */
   it('★ sends the newest page, not the first N of a town nobody is watching any more', async () => {
     const entries = (
       (await (await fetch(`${base}/api/chronicle`)).json()) as { entries: ChronicleEntry[] }

@@ -18,7 +18,6 @@ import {
 } from '@sj/forge/gen'
 import { noDiscoveryArt, watchDiscoveryArt, type DiscoveryArtWatcher } from './discoveryArt.js'
 
-/** The ledger name art bills under, beside the minds' `turn`, `reflection` and `arbiter`. */
 export const FORGE_CALLER = 'forge'
 
 export type CommissionArtOpts = {
@@ -37,7 +36,6 @@ export type CommissionArtOpts = {
   judge?: VisionJudgeFn
 }
 
-/** Discoveries drawn for real, on the minds' budget. */
 export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher {
   const apiKey = opts.apiKey
   if (apiKey === undefined) return noDiscoveryArt()

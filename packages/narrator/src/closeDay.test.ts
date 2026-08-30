@@ -52,7 +52,6 @@ const llm = (): NarratorLlm => ({
   biography: vi.fn(async () => ({ title: 'Amara of the tally', body: 'She was seen counting.' })),
 })
 
-// The ledger the semantic pass writes an alert into when a verdict will not parse.
 const opsDb = (): Database.Database => {
   const db = new Database(':memory:')
   migrateLlmTables(db)
@@ -61,7 +60,6 @@ const opsDb = (): Database.Database => {
 
 const NO_USAGE: LlmUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
 
-/** Answers the tier-2.5 pass with one hit, whatever it is asked. */
 const scriptedSemantic = (value: unknown): LlmClient =>
   ({
     async object() {
@@ -99,7 +97,6 @@ describe('closeDay', () => {
       expect.objectContaining({ day: 0, title: 'Rain', kind: 'newspaper' }),
     ])
     expect(s.publications('timelapse_caption')[0]?.body).toBe('Day 0: Rain')
-    // day 0 of a cast of two is the first of them, and the row says who it is about
     expect(s.publications('biography')[0]).toMatchObject({
       subjectId: 'amara',
       title: 'Amara of the tally',

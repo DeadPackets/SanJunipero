@@ -12,9 +12,8 @@ import type { Router } from './router.js'
 import { sendJson } from './http.js'
 import { reportOnce } from './degraded.js'
 
-// The recognizer's registry, read the way the observatory reads everything: readonly, never
-// created, and typed-empty until the arbiter has written a day. Plain SELECTs rather than
-// @sj/arbiter, which drags the mind stack onto the scripted path.
+// Plain SELECTs rather than @sj/arbiter, which drags the mind stack onto the scripted path.
+// Readonly and never created: typed-empty until the arbiter has written a day.
 
 const parse = <T>(json: string | null, fallback: T): T =>
   json === null ? fallback : (JSON.parse(json) as T)

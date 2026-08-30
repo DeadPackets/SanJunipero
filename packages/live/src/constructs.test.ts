@@ -1,6 +1,4 @@
-// The recognizer end to end: a scripted town that keeps coming back to one patch of ground,
-// through the registry the live day boundary writes, out of the route the observatory reads,
-// and never once across the glass. No provider is reached — every model here is a script.
+// No provider is reached — every model here is a script.
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,13 +24,11 @@ const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
   payload,
 })
 
-/** One evening at (20, 20): three bodies walk in and stand together. */
 const gathering = (day: number): SimEvent[] => {
   const at = day * MINUTES_PER_DAY + 19 * 60
   return THREE.map((id, i) => ev(at, 'agent_moved', { id, x: 20 + i, y: 20 }))
 }
 
-/** The night one of them gives the thing a name, out of her own mouth. */
 const naming = (day: number): SimEvent =>
   ev(day * MINUTES_PER_DAY + 19 * 60 + 1, 'agent_spoke', {
     agentId: 'bex',

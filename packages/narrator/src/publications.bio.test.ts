@@ -144,7 +144,6 @@ describe('writeBiography', () => {
     expect(store.publications('biography')).toEqual([])
   })
 
-  // One refused draft used to lose the whole biography.
   it('★ asks again once when the first draft breaks the framing law', async () => {
     const world = seedWorld()
     const store = memStore()

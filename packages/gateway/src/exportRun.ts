@@ -4,9 +4,8 @@ import type { Writable } from 'node:stream'
 import Database from 'better-sqlite3'
 import { MINUTES_PER_DAY } from '@sj/shared'
 
-/** Everything a run needs to be replayed somewhere else, as one tar. See `deploy/README.md`. */
+/** What a replay elsewhere needs; see `deploy/README.md`. */
 export type ExportOpts = {
-  /** The world event log. */
   worldDbPath: string
   /** `<id>.db` per mind, plus `_ops.db`, `_arbiter.db` and `_narrator.db`. */
   mindsDir: string
@@ -15,8 +14,7 @@ export type ExportOpts = {
 }
 
 export type RunManifest = {
-  /** `SJ_GIT_SHA`, or null when the operator did not stamp the image. Without it a replay
-   *  cannot know which code folded these events. */
+  /** `SJ_GIT_SHA`, or null when the operator did not stamp the image. */
   gitSha: string | null
   /** `world_meta`: the map, its ring count and the rng seed. */
   world: Record<string, unknown> | null
@@ -70,7 +68,6 @@ function snapshotDb(path: string): Buffer {
   }
 }
 
-/** The world, on ONE handle: its bytes and the facts the manifest reports about them. */
 function readWorld(
   path: string,
 ): Pick<RunManifest, 'world' | 'tick' | 'events'> & { bytes: Buffer } {
@@ -80,8 +77,7 @@ function readWorld(
     const head = db
       .prepare('SELECT COALESCE(MAX(seq), 0) AS events, COALESCE(MAX(tick), 0) AS tick FROM events')
       .get() as { events: number; tick: number }
-    // `world_meta` is the town's table, not the observatory's: a world db without one still
-    // exports, it simply cannot say which map it was platted on.
+    // A world db with no `world_meta` still exports; it cannot say which map it was platted on.
     let world: RunManifest['world'] = null
     try {
       world = (db.prepare('SELECT map, rings, seed FROM world_meta WHERE id = 1').get() ??
@@ -95,8 +91,7 @@ function readWorld(
   }
 }
 
-/** Streams the whole run into `out` and returns the manifest it wrote last. Ordering inside a
- *  tar carries no meaning, so the manifest can name the sizes it has just seen. */
+/** Ordering inside a tar carries no meaning, so the manifest is written last, sizes and all. */
 export function writeRunTar(out: Writable, opts: ExportOpts): RunManifest {
   const now = Date.now()
   const files: RunManifest['files'] = []

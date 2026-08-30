@@ -151,7 +151,6 @@ describe('gateway server', () => {
     const lateAssets = lateFrames
       .map((f) => ServerMsg.parse(JSON.parse(f)))
       .filter((m) => m.t === 'assets')
-    // ONE frame, whatever the codex holds: the catch-up used to be one send per record.
     expect(lateAssets).toHaveLength(1)
     expect(lateAssets[0]!.records).toHaveLength(1)
 

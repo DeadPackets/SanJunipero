@@ -1,5 +1,5 @@
-// Day 0 of rehearsal 3, rendered once per voice against a COPY of the narrator db, so the owner
-// can pick by eye. Never run in the pipeline; never opens the original narrator db for writing.
+// Renders one day per voice against a COPY of the narrator db. Never run in the pipeline; never
+// opens the original narrator db for writing.
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'

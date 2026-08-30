@@ -3,7 +3,6 @@ import type { SimConfig } from '@sj/shared'
 import type { EventStore, openDb } from '@sj/engine/store'
 import type { TickHandler, TickLoop } from '@sj/engine'
 
-/** One row of the ruling review queue, as the operator's page reads it. */
 export type PendingRuling = {
   id: number
   ruleId: number
@@ -11,8 +10,7 @@ export type PendingRuling = {
   tick: number
 }
 
-/** What an operator may do to a codified ruling. Structural, so the observatory never imports
- *  the arbiter — `ReviewStore` satisfies it. */
+/** Structural, so the observatory never imports the arbiter — `ReviewStore` satisfies it. */
 type RulingsAdmin = {
   pending(): PendingRuling[]
   approve(ruleId: number): void
@@ -20,8 +18,6 @@ type RulingsAdmin = {
   revert(ruleId: number, reason: string, tick: number): void
 }
 
-/** The live half's ops surface: the call ledger, the caps the run is under, and the ruling
- *  queue. */
 export type LiveOps = {
   /** `_ops.db` — `llm_calls` and `alerts`, open for as long as the cast is. */
   opsDb: Database.Database
@@ -37,11 +33,9 @@ export type LiveCast = {
     loop: TickLoop
     store: EventStore
     config: SimConfig
-    /** The world db, in process. A live cast publishes what its minds actually thought into
-     *  `observer_thoughts`, which is the same channel the scripted canned lines used. */
+    /** In process: a cast publishes what its minds thought into `observer_thoughts`. */
     db: ReturnType<typeof openDb>
-    /** The scripted handler: the tick-1 town, the world systems, and nothing else when the
-     *  cast is attached (`FoundersOpts.minds`). A live cast wraps it, never replaces it. */
+    /** The scripted handler. A live cast wraps it, never replaces it. */
     world: TickHandler
   }): TickHandler
   /** Read by the operator's channel only; nothing here ever reaches a mind's prompt. `null` is
