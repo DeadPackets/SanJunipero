@@ -110,6 +110,7 @@ const MomentCardView = memo(function MomentCardView({
   return (
     <li>
       <button
+        type="button"
         className={open ? 'moment-card open' : 'moment-card'}
         aria-current={open ? 'true' : undefined}
         aria-label={`${thumbTitle(moment)}. Day ${label.day}, ${label.cast}, ${where}. Play this day.`}
@@ -177,6 +178,7 @@ function PlayerStripView({
   return (
     <div className="moment-player" role="group" aria-label={`Playing ${thumbTitle(moment)}`}>
       <button
+        type="button"
         className="player-btn"
         aria-pressed={playing}
         aria-label={playing ? 'Pause this day' : 'Play this day'}
@@ -207,13 +209,14 @@ function PlayerStripView({
       </div>
       <span className="player-clock">{momentStamp(player.tick)}</span>
       <button
+        type="button"
         className="player-btn speed"
         aria-label={`Speed ${player.speed} times. Change speed.`}
         onClick={onSpeed}
       >
         {player.speed}×
       </button>
-      <button className="player-btn live" onClick={onLive}>
+      <button type="button" className="player-btn live" onClick={onLive}>
         LIVE
       </button>
     </div>
@@ -262,21 +265,26 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
   // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
   // socket messages.
   const scrubbedRef = useRef<number | null>(null)
+  const runningRef = useRef<PlayerState>(player)
   useEffect(() => {
     if (open === null || player.status !== 'playing') return
+    // the run starts from what React last committed; the fraction of a tick lives here after
+    runningRef.current = player
     let raf = 0
     let last = performance.now()
     const frame = (now: number): void => {
       const dt = now - last
       last = now
-      setPlayer((prev) => {
-        const next = tickPlayer(prev, dt, open.startTick, open.endTick)
+      const next = tickPlayer(runningRef.current, dt, open.startTick, open.endTick)
+      const was = runningRef.current
+      runningRef.current = next
+      if (next.tick !== was.tick || next.status !== was.status) {
         if (next.tick !== scrubbedRef.current) {
           scrubbedRef.current = next.tick
           onJump(next.tick)
         }
-        return next
-      })
+        setPlayer(() => next)
+      }
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
@@ -290,6 +298,7 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
     setPlayer((prev) => {
       const next = seekPlayer(prev, frac, open.startTick, open.endTick)
       scrubbedRef.current = next.tick
+      runningRef.current = next
       onJump(next.tick)
       return next
     })

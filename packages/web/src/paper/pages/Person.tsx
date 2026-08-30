@@ -18,6 +18,7 @@ import {
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NEED_LOW = 30
@@ -50,20 +51,20 @@ function NeedBar({ label, value }: { label: string; value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
   return (
     <div className="need-row">
-      <span className="need-label">{label}</span>
-      <div className="need-track">
+      <span className="need-label" id={`need-${label}`}>
+        {label}
+      </span>
+      <div
+        className="need-track"
+        role="meter"
+        aria-labelledby={`need-${label}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={v}
+        aria-valuetext={`${v} of 100`}
+      >
         <div className={v < NEED_LOW ? 'need-fill low' : 'need-fill'} style={{ width: `${v}%` }} />
       </div>
-    </div>
-  )
-}
-
-function Skeleton() {
-  return (
-    <div aria-busy="true">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="skeleton-row" />
-      ))}
     </div>
   )
 }
@@ -88,9 +89,7 @@ export function PersonStoryView({
     <>
       <section className="block">
         <h3 className="feed-head">Thought</h3>
-        <p className="thought-line" aria-live="polite">
-          {thought !== null ? `“${thought.text}”` : THOUGHT_EMPTY}
-        </p>
+        <p className="thought-line">{thought !== null ? `“${thought.text}”` : THOUGHT_EMPTY}</p>
       </section>
 
       <section className="block">

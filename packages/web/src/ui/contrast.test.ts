@@ -227,6 +227,100 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
   })
 })
 
+// ── ★ STAGE 8 · THE RING, THE RULE AND THE MARKS OVER ART ─────────────────────────────────
+
+/** Every ground a focus ring is ever painted on. */
+const GROUNDS = ['parchment', 'cream', 'sand', 'honey'] as const
+
+describe('C1 · the focus ring is visible on every ground it sits on', () => {
+  const ring = (selector: string): string =>
+    /outline:\s*2px solid var\(--([\w-]+)\)/.exec(ruleBody(CSS, selector))?.[1] ?? ''
+
+  it('paints the ring in one token across the chrome and the two clipping boxes', () => {
+    expect(ring(':focus-visible')).toBe('ink')
+    expect(ring('.paper-sheet :focus-visible')).toBe('ink')
+    expect(ring('.bonds-graph :focus-visible')).toBe('ink')
+  })
+
+  it('clears SC 1.4.11 (3:1) on all four papers', () => {
+    for (const ground of GROUNDS) {
+      expect(contrast(T.ink!, T[ground]!), `the ring on ${ground}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('records the ember it replaced, so it cannot come back', () => {
+    expect(contrast(T.ember!, T.parchment!)).toBeCloseTo(2.4, 1)
+    expect(contrast(T.ember!, T.honey!)).toBeCloseTo(1.84, 1)
+  })
+
+  // The two stage marks keep honey: they are the only rings painted on the deep ground.
+  it('keeps the honey ring where honey is the legible one', () => {
+    expect(ruleBody(CSS, '.stage-figure:focus-visible')).toMatch(/var\(--honey\)/)
+    expect(contrast(T.honey!, T.deep!)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('C3, C4, C5 · three marks that were painted below their own floor', () => {
+  it('underlines the open tab in something a reader can see', () => {
+    const colour = /border-bottom-color:\s*var\(--([\w-]+)\)/.exec(
+      ruleBody(CSS, '.paper-tab.on'),
+    )?.[1]
+    expect(colour).toBe('ink')
+    expect(contrast(T.honey!, T.parchment!), 'the honey rule it replaced').toBeLessThan(3)
+  })
+
+  it('draws the grip at the 3:1 non-text floor on the parchment it lies on', () => {
+    const hex = /background:\s*(#[0-9A-Fa-f]{6})/.exec(ruleBody(CSS, '.paper-grip'))?.[1]
+    expect(hex).toBeDefined()
+    expect(contrast(hex!, T.parchment!)).toBeGreaterThanOrEqual(3)
+    expect(contrast('#B89D7E', T.parchment!), 'the bar it replaced').toBeLessThan(3)
+  })
+
+  it('draws the day gridlines on the cream track they cross', () => {
+    const colour = /background:\s*var\(--([\w-]+)\)/.exec(ruleBody(CSS, '.day-tick'))?.[1]
+    expect(colour).toBe('ink-quiet')
+    expect(contrast(T[colour!]!, T.cream!)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('C9 · the signpost arm, whose ground is a drawn plank and not a token', () => {
+  // Pixel-sampled off the rendered raster, cream on the plank's own wood is 2.13:1 — a measured
+  // AA failure no CSS-ancestor audit can see, because the first opaque ancestor is `--night`.
+  // The label carries its own ground instead, the way the quiet stamp already does.
+  it('gives the label the four-way ink halo, on every side', () => {
+    const body = ruleBody(CSS, '.signpost-arm')
+    for (const side of ['1px 0 0', '-1px 0 0', '0 1px 0', '0 -1px 0']) {
+      expect(body, side).toContain(`${side} var(--deep)`)
+    }
+    expect(contrast(T.cream!, T.deep!)).toBeGreaterThanOrEqual(AA)
+  })
+
+  // brightness(1.2) on the pressed arm took the label to 1.53:1 — the arm you are on was the
+  // least readable one on screen.
+  it('signals the open arm with a second plank, never with a filter', () => {
+    expect(CSS).not.toMatch(/\.signpost-arm[^{]*\{[^}]*filter:/)
+    expect(ruleBody(CSS, ".signpost-arm[aria-expanded='true']")).toContain('signpost-arm-on.webp')
+  })
+})
+
+describe('C6, C11, C12 · the sheet stops thinning colours it cannot measure', () => {
+  it('states the stamp at full strength', () => {
+    expect(ruleBody(CSS, '.stage-stamp.shown')).toMatch(/opacity:\s*1/)
+  })
+
+  it('names the feed zebra as a computed composite rather than an alpha', () => {
+    expect(T['parchment-zebra']).toMatch(/^#[0-9A-Fa-f]{6}$/)
+    expect(ruleBody(CSS, '.feed-line:nth-child(odd)')).toContain('var(--parchment-zebra)')
+    expect(contrast(T.ink!, T['parchment-zebra']!)).toBeGreaterThanOrEqual(AA)
+  })
+
+  it('rings the subject in a token, not in a transparency', () => {
+    const body = ruleBody(CSS, '.stage-ring-arms')
+    expect(body).toContain('dashed var(--cream-quiet)')
+    expect(body).not.toMatch(/rgba\(/)
+  })
+})
+
 // ── the paper's one loud thing: the week banner ───────────────────────────────────────────
 describe('the week band is read on the honey it is printed on', () => {
   it('clears AA, and paints both halves of the pair rather than inheriting one', () => {

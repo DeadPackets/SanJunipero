@@ -88,11 +88,42 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(rulesFor(BARE, '.feed-head::after')).toMatch(/content:/)
   })
 
-  it('hangs the signpost in the corner the direction picked, at the inset it picked', () => {
+  // A percentage inset is 15.6px on a landscape phone and 57.6px at 2560 — the same chrome
+  // 3.7x further from the edge across the range, and under the notch on both.
+  it('hangs the signpost in the corner the direction picked, at one measured inset', () => {
     const post = topRule('.signpost')
     expect(post, '.signpost is not a top-level rule in the sheet').not.toBe('')
-    expect(post).toMatch(/right:\s*4%/)
-    expect(post).toMatch(/bottom:\s*4%/)
+    expect(post).toMatch(/right:\s*max\(var\(--mark-inset\), env\(safe-area-inset-right\)\)/)
+    expect(post).toMatch(/bottom:\s*max\(var\(--mark-inset\), env\(safe-area-inset-bottom\)\)/)
+    expect(BARE).toMatch(/--mark-inset:\s*clamp\(16px, 3vmin, 40px\)/)
+  })
+
+  // Every mark that hangs off an edge takes the same inset and the same notch guard.
+  it('gives the stamp and the cue the signpost’s own inset', () => {
+    for (const sel of ['.stage-stamp', '.stage-cue']) {
+      expect(rulesFor(BARE, sel), sel).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    }
+  })
+
+  // Below 1400px a centred sheet sliced the arms mid-word; below 640 it buried them entirely.
+  it('★ keeps the signpost reachable with the sheet open, at every width', () => {
+    expect(BARE).toMatch(
+      /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*left:/,
+    )
+    expect(BARE).toMatch(
+      /@media \(max-width: 640px\), \(max-height: 620px\) \{[\s\S]*?\.signpost\[data-open='yes'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
+    )
+    expect(BARE).toMatch(
+      /@media \(min-width: 641px\) and \(max-height: 620px\) \{[^}]*grid-auto-flow: column/,
+    )
+  })
+
+  // Height is what a landscape phone runs out of, and nothing in the sheet used to read it.
+  it('★ answers the window’s height as well as its width', () => {
+    expect(BARE).toMatch(
+      /@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: calc\(100dvh - 64px\)/,
+    )
+    expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.signpost-post \{ display: none/)
   })
 
   it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {
@@ -109,7 +140,8 @@ describe('★ the signpost and the paper hold their own shape', () => {
 
   it('sizes the paper off the stage, capped, and never over the whole of it', () => {
     expect(BARE).toMatch(/--paper-w:\s*min\(78%, 760px\)/)
-    expect(BARE).toMatch(/--paper-h:\s*66%/)
+    // `dvh`, not `vh`: iOS moves the bottom edge the sheet is anchored to as the URL bar goes.
+    expect(BARE).toMatch(/--paper-h:\s*min\(66%, 100dvh - 96px\)/)
     const paper = topRule('.paper')
     expect(paper).toMatch(/width:\s*var\(--paper-w\)/)
     expect(paper).toMatch(/height:\s*var\(--paper-h\)/)
@@ -140,11 +172,11 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(BARE).toMatch(/\.town-dim\[data-open='yes'\] \{[^}]*opacity:\s*var\(--dim\)/)
   })
 
-  it('holds every pointer target in the sheet at 40px or more', () => {
+  it('holds every pointer target in the sheet at 44px or more', () => {
     for (const [, sel, body] of BARE.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const px = /min-height:\s*(\d+)px/.exec(body ?? '')?.[1]
       if (px === undefined || !/cursor:\s*pointer/.test(body ?? '')) continue
-      expect(Number(px), `${(sel ?? '').trim()} { min-height: ${px}px }`).toBeGreaterThanOrEqual(40)
+      expect(Number(px), `${(sel ?? '').trim()} { min-height: ${px}px }`).toBeGreaterThanOrEqual(44)
     }
   })
 
@@ -193,5 +225,118 @@ describe('★ the signpost and the paper hold their own shape', () => {
     ]) {
       expect(CSS, `${gone} is still styled`).not.toContain(`${gone} `)
     }
+  })
+})
+
+// ── ★ STAGE 8 · THE DEVICE THE TOWN IS BEING WATCHED ON ───────────────────────────────────
+// One viewport media query in 1,383 lines, and it was width-only at 640px. Height is what a
+// landscape phone runs out of, and touch is what has no hover.
+describe('★ the sheet answers the device, not only the window width', () => {
+  const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('takes the browser’s own surfaces off their defaults', () => {
+    expect(BARE).toMatch(/color-scheme:\s*light/)
+    expect(BARE).toMatch(/accent-color:\s*var\(--honey\)/)
+    expect(BARE).toMatch(/-webkit-tap-highlight-color:\s*transparent/)
+    expect(BARE).toMatch(/::selection \{[^}]*background:\s*var\(--honey\)/)
+  })
+
+  it('measures the viewport in dvh, because iOS moves the bottom edge', () => {
+    expect(BARE).toMatch(/html, body, #root \{[^}]*height: 100dvh/)
+  })
+
+  it('clears the notch on every mark that hangs off an edge', () => {
+    for (const want of [
+      'safe-area-inset-right',
+      'safe-area-inset-bottom',
+      'safe-area-inset-top',
+      'safe-area-inset-left',
+    ]) {
+      expect(BARE, want).toContain(`env(${want})`)
+    }
+  })
+
+  it('gives the canvas the pointer and stops the page rubber-banding behind the sheet', () => {
+    expect(rulesFor(BARE, '.stage-mount')).toMatch(/touch-action:\s*none/)
+    expect(rulesFor(BARE, '.app')).toMatch(/user-select:\s*none/)
+    expect(rulesFor(BARE, '.paper-sheet')).toMatch(/overscroll-behavior:\s*contain/)
+    expect(rulesFor(BARE, '.bond-detail')).toMatch(/overscroll-behavior:\s*contain/)
+  })
+
+  it('★ answers touch, where there is no hover to answer with', () => {
+    expect(BARE).toMatch(/@media \(hover: none\) \{/)
+    expect(BARE).toMatch(/@media \(hover: none\) \{[\s\S]*?\.paper-close-key \{ display: none/)
+    // a tap focuses a mark but never `:focus-visible`, so the day-strip dots were unlabelled
+    expect(BARE).toMatch(/\.mark:focus \.mark-tip/)
+  })
+
+  it('★ brings the pixel slab back where forced colours drop box-shadow', () => {
+    const forced = /@media \(forced-colors: active\) \{([\s\S]*?)\n\}/.exec(BARE)?.[1] ?? ''
+    expect(forced, 'no forced-colors block').not.toBe('')
+    expect(forced).toContain('border: 2px solid CanvasText')
+    expect(forced).toContain('outline-color: Highlight')
+  })
+
+  it('★ sizes the sheet’s own lists off the sheet, not off the window', () => {
+    expect(rulesFor(BARE, '.paper-sheet')).toMatch(/container-type:\s*inline-size/)
+    expect(BARE).toMatch(/@container \(min-width: 26rem\) \{[\s\S]*?\.rr-place \{ min-width/)
+    expect(BARE).toMatch(/@container \(min-width: 46rem\) \{\s*\.roster-list \{/)
+  })
+
+  it('scales the whole sign rather than four postage stamps, on a very wide screen', () => {
+    expect(BARE).toMatch(/@media \(min-width: 1920px\) \{\s*\.signpost \{[^}]*scale: 1\.5/)
+    expect(BARE).toMatch(
+      /@media \(min-width: 1920px\) \{\s*\.paper \{[^}]*--paper-w: min\(78%, 1040px\)/,
+    )
+  })
+
+  it('makes the tab strip a scroller before it wraps onto a third row', () => {
+    expect(BARE).toMatch(
+      /@media \(max-width: 480px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
+    )
+  })
+})
+
+// ── ★ one motion vocabulary, and reduced motion honoured in all of it ─────────────────────
+describe('★ nothing moves for a viewer who asked for stillness', () => {
+  const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  /** Everything the sheet says outside a `prefers-reduced-motion` block. */
+  const UNGUARDED = BARE.replace(/@media \(prefers-reduced-motion[^{]*\{[\s\S]*?\n\}/g, '')
+  /** A motion of these is a fade, which DESIGN.md keeps under reduced motion. */
+  const FADE_ONLY = /^(?:[\s;]|opacity|color|background-color|border-color|fill|[\s,])+$/
+
+  // Five rules kept a 2px lift the other thirteen had already given up.
+  it('★ moves nothing outside a no-preference guard that is not a fade', () => {
+    const loud: string[] = []
+    for (const [, sel, body] of UNGUARDED.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const props =
+        /transition-property:\s*([^;}]+)/.exec(body ?? '')?.[1] ??
+        /transition:\s*([a-z-]+)\s/.exec(body ?? '')?.[1]
+      const ms = /(?:transition-duration|transition):[^;}]*var\(--t-/.test(body ?? '')
+      if (props === undefined || !ms) continue
+      if (!FADE_ONLY.test(props)) loud.push(`${(sel ?? '').trim()} — ${props}`)
+    }
+    // `.paper` and `.discovery-leaf` move, and both switch themselves off under `reduce`
+    for (const sel of ['.paper', '.discovery-leaf']) {
+      expect(BARE, sel).toMatch(
+        new RegExp(
+          `@media \\(prefers-reduced-motion: reduce\\)[\\s\\S]{0,200}?\\${sel} \\{[^}]*transition: none`,
+        ),
+      )
+    }
+    expect(
+      loud.filter((l) => !l.startsWith('.paper ') && !l.startsWith('.discovery-leaf')),
+    ).toEqual([])
+  })
+
+  it('staggers one way, at the table’s own 30ms, capped rather than truncated', () => {
+    expect(BARE).toMatch(/animation-delay: calc\(var\(--stagger-i, 6\) \* 30ms\)/)
+    expect(BARE).not.toMatch(/animation-delay: \d+ms/)
+  })
+
+  it('lands the scrim and the sheet together, on one duration', () => {
+    expect(rulesFor(BARE, '.town-dim')).toMatch(/transition: opacity var\(--t-slow\)/)
+    expect(rulesFor(BARE, '.paper')).toMatch(/transition: transform var\(--t-slow\)/)
   })
 })

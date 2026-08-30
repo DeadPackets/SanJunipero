@@ -6,6 +6,7 @@ import {
   type ConstructRecord,
 } from '@sj/shared'
 import { usePolled } from '../../ui/useEndpoint.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_CUSTOMS: ConstructRecord[] = []
@@ -36,16 +37,7 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
   const rows = read.data ?? NO_CUSTOMS
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
 
-  if (rows.length === 0)
-    return read.loaded ? (
-      <p className="feed-empty">{EMPTY}</p>
-    ) : (
-      <div aria-busy="true">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton-row" />
-        ))}
-      </div>
-    )
+  if (rows.length === 0) return read.loaded ? <p className="feed-empty">{EMPTY}</p> : <Skeleton />
   return (
     <ul className="families">
       {rows.map((c) => (

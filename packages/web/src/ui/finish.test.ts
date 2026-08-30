@@ -126,6 +126,9 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 })
 
 // ── 5 · press has weight ──────────────────────────────────────────────────────────────────
+// Every control that lifts on hover, not the seven somebody happened to list: `.roster-row`,
+// `.key-summary` and `.discovery-leaf` carried the duration on their base rule and so kept
+// fading out for 150ms after finish line 6 was declared closed.
 const CONTROLS = named([
   '.feed-tab',
   '.live-pill',
@@ -134,6 +137,9 @@ const CONTROLS = named([
   '.room-door',
   '.place-row',
   '.roster-sort',
+  '.roster-row',
+  '.key-summary',
+  '.discovery-leaf',
 ])
 
 describe('5 · a control answers the finger that pressed it', () => {
@@ -148,15 +154,16 @@ describe('5 · a control answers the finger that pressed it', () => {
 })
 
 // ── 6 · hover is 150ms in and instant out ─────────────────────────────────────────────────
-// A hover that fades OUT keeps claiming the pointer is somewhere it left.
+// A hover that fades OUT keeps claiming the pointer is somewhere it left. A transition reads
+// the duration of the state it goes TO, so the 150ms belongs on `:hover` and the 0s on the base
+// — the sheet had them the other way round and every hover-out lied for 150ms.
 describe('6 · a hover arrives in 150ms and leaves the instant the pointer does', () => {
   it('transitions in on --t-fast and out on 0s, for every hovering control', () => {
     expect(
       missing(CONTROLS, (s) => {
-        const base = rulesFor(CSS, s)
-        const inMs = decl(base, 'transition-duration')
-        const out = decl(rulesFor(CSS, `${s}:hover`), 'transition-duration')
-        return inMs === `var(${CSS_DURATION_TOKEN.reveal})` && out === '0s'
+        const base = decl(rulesFor(CSS, s), 'transition-duration')
+        const hovered = decl(rulesFor(CSS, `${s}:hover`), 'transition-duration')
+        return base === '0s' && hovered === `var(${CSS_DURATION_TOKEN.reveal})`
       }),
     ).toEqual([])
   })
@@ -169,9 +176,12 @@ describe('7 · waiting looks like the thing that is coming', () => {
     expect(decl(rulesFor(CSS, '.skeleton-row'), 'background')).not.toBeNull()
   })
 
-  it('renders skeleton rows in the panels that wait for a fetch', () => {
+  // One component, so the loading state's role and its announced word cannot drift between
+  // the seven panels that wait.
+  it('renders the one skeleton in the panels that wait for a fetch', () => {
+    expect(src('../paper/pages/Skeleton.tsx')).toContain('skeleton-row')
     for (const f of ['../paper/pages/Chronicle.tsx', '../paper/pages/Folk.tsx']) {
-      expect(src(f), f).toContain('skeleton-row')
+      expect(src(f), f).toContain('<Skeleton')
     }
   })
 })

@@ -197,6 +197,29 @@ export function BondsGraph({
     },
     [onSubject],
   )
+  // The canvas mounts nothing tabbable, so Folk > Bonds was a whole tab of content with no
+  // keyboard path into it. The same people, as a list nothing draws — memoised, because this
+  // component re-renders on every world tick.
+  const roll = useMemo(
+    () => (
+      <ul className="stage-sr" aria-label="Everyone in the graph">
+        {graph.nodes.map((n) => (
+          <li key={n.id}>
+            <button
+              type="button"
+              onClick={() => {
+                onNodeClick(n)
+              }}
+            >
+              {nodeLabel(n)}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ),
+    [graph.nodes, nodeLabel, onNodeClick],
+  )
+
   const drawNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D) => {
       // pixel token: integer-snapped square slab with ink ring, ledge, and bevel. The NAME
@@ -380,6 +403,8 @@ export function BondsGraph({
         ) : (
           <FadedBond onClose={closeDetail} />
         ))}
+
+      {roll}
 
       <div className="bonds-canvas" ref={boxRef}>
         <ForceGraph2D

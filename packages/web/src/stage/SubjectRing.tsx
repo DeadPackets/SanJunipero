@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
-import { useSubjectAnchor, type Subject } from './anchor.js'
+import { useSubjectAnchor, type Reach, type Subject } from './anchor.js'
 
 export const RING_VERBS = ['follow', 'story', 'bonds', 'home'] as const
 export type RingVerb = (typeof RING_VERBS)[number]
@@ -33,6 +33,10 @@ export function armFor(key: string): number | null {
   }
 }
 
+/** Half the ring's real footprint: the 124px circle, plus an arm hung off each side of it and
+ *  the 26px the whole mark is lifted by (chrome.css `.stage-ring`, `.stage-ring-arms`). */
+const RING_REACH: Reach = { x: 100, y: 110 }
+
 /** Four things to ask, standing round the person you asked. */
 export function SubjectRing({
   subject,
@@ -43,7 +47,7 @@ export function SubjectRing({
   scene: Scene | null
   onVerb: (verb: RingVerb) => void
 }) {
-  const ref = useSubjectAnchor(scene, subject)
+  const ref = useSubjectAnchor(scene, subject, RING_REACH)
   const [at, setAt] = useState(0)
   const arms = useRef<(HTMLButtonElement | null)[]>([])
   const id = subject?.id ?? null
@@ -56,7 +60,12 @@ export function SubjectRing({
     setAt(0)
   }
   useEffect(() => {
-    if (id !== null) arms.current[0]?.focus()
+    if (id === null) return
+    // Only when the pick came from a hand. A ring resolved from the address bar arrives with no
+    // input from the viewer, and taking their focus for it is WCAG 3.2.1.
+    const picked = document.activeElement?.closest('.stage-mount, .stage-figures') ?? null
+    if (picked === null) return
+    arms.current[0]?.focus()
   }, [id])
 
   if (subject === null) return null

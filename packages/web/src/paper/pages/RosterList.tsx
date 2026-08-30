@@ -32,7 +32,7 @@ export function RosterListView({
   onOpenFull?: (agentId: string) => void
 }) {
   return (
-    <div className="roster" aria-label="Townsfolk">
+    <section className="roster" aria-label="Townsfolk">
       {rows.length > 1 && (
         <div className="roster-sorts" role="group" aria-label="Order the roster">
           {ROSTER_SORTS.map((by) => (
@@ -77,6 +77,6 @@ export function RosterListView({
           {gone === 1 ? 'One rests in the town’s memory.' : `${gone} rest in the town’s memory.`}
         </p>
       )}
-    </div>
+    </section>
   )
 }

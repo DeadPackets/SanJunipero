@@ -3,7 +3,6 @@
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
-  --panel: #F6E8D5; /* legacy alias */
   --sand: #E8D5BC;
   --ink: #43394A;
   /* De-emphasis is a colour, never `opacity` — a transparency's ratio is unknowable at the
@@ -17,12 +16,22 @@
   --honey: #F2C879;
   --honey-l: #F8DCA2;
   --ember: #E8785A;
-  --accent: #E8785A; /* legacy alias */
   --sage: #93B573;
   --rose: #C47876;
-  --water: #7FB0C9;
+  /* The feed's zebra was `rgba(sand, .35)` over parchment: an alpha's ratio is unknowable at
+     the call site, so the composite is computed once and named. Ink on it is 9.5:1. */
+  --parchment-zebra: #F1E1CC;
 
-  --stone: #ABA198;
+  /* One ladder for every gap, pad and inset in the sheet, on a 2px base — the chrome is drawn
+     in whole pixels and a 4px base cannot spell the hairline pads the chips are built from. */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
+  --s-7: 24px;
+  --s-8: 40px;
 
   /* Every value below is DERIVED from `motion.ts`'s MOTION table and a test fails if the two
      disagree. `--t-ambient` is scenery, which is why it is the one value above the 300ms ceiling. */
@@ -37,17 +46,27 @@
   --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-ambient: linear;
 
-  /* bitmap type: display face for identity moments, ui face for labels/controls */
-  --font-display: 'Press Start 2P', 'Silkscreen', monospace;
   --font-px: 'Silkscreen', 'Press Start 2P', monospace;
   --font-body: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-title: Fraunces, Georgia, serif;
   --font-data: ui-monospace, 'SF Mono', monospace;
 
+  /* Seven sizes. 12.48px, 12.8px and 13px were three steps no eye can separate; they are one.
+     `--f-1` is the 12px floor and belongs to stamps and pixel chips, never to a word. */
+  --f-1: 12px;
+  --f-2: 13px;
+  --f-3: 14px;
+  --f-4: 16px;
+  --f-5: 18px;
+  --f-6: 22px;
+  --f-7: 28px;
+
   /* signature: the pixel slab — 2px ink ring with a stepped deep-shadow ledge */
   --frame: 0 0 0 2px var(--ink), 4px 4px 0 0 var(--deep);
   --frame-tight: 0 0 0 2px var(--ink);
   --ledge: 4px 4px 0 0 var(--deep);
+  /* the same ledge with the control pushed into it */
+  --ledge-in: 1px 1px 0 0 var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
   --px-cream: url('./px/frame-cream.webp') 10 repeat;
@@ -57,54 +76,67 @@
 
   /* the paper: one sheet, sized off the stage it rises over */
   --paper-w: min(78%, 760px);
-  --paper-h: 66%;
+  --paper-h: min(66%, 100dvh - 96px);
   /* 78% of a phone is 304px, which no roster row fits in: the sheet takes the width there. */
   --paper-w-narrow: 96%;
   --paper-h-narrow: 80%;
   --dim: 0.28;
+
+  /* The stage marks hang off percentages, which is 15.6px on a landscape phone and 57.6px at
+     2560. One inset, and it clears the notch on the phones that have one. */
+  --mark-inset: clamp(16px, 3vmin, 40px);
+
+  /* A bar that must keep its drawn size takes its 44px from a transparent pseudo-element, and
+     the arithmetic is written once: hand-computed, three of four insets were right. */
+  --reach-44: calc((44px - 100%) / -2);
+
+  color-scheme: light;
+  accent-color: var(--honey);
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* the one floating slab left over the town wears real 9-slice frame art */
-.fps-overlay {
-  border: 10px solid transparent;
-  border-radius: 0;
-  background-clip: padding-box;
-  border-image: var(--px-cream);
-  box-shadow: var(--ledge);
-}
+::selection { background: var(--honey); color: var(--ink); }
 
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
+html, body, #root { height: 100%; height: 100dvh; margin: 0; }
 body {
   background: var(--night);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 16px;
+  /* `100%`, not `16px`: a raised browser default has to move the body with every rem in the
+     sheet, or the two drift apart. */
+  font-size: 100%;
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
 }
+/* Antialiasing thins light-on-dark text by about a sixth of its weight, and half the marks in
+   this product are cream over the night town. It belongs to the paper. */
+.paper, .bond-detail, .fps-overlay { -webkit-font-smoothing: antialiased; }
 
+/* Ember measures 2.40:1 on parchment and 1.84:1 on honey — the ring was invisible on the
+   grounds it sits on most. Ink is 9.06 / 10.20 / 7.63 / 6.92 on the four papers. */
 :focus-visible {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
-  border-radius: 2px;
 }
 
 /* the stage fills its cell; canvas is a block so no inline descender gap seeds resizeTo */
-.stage-mount { position: absolute; inset: 0; overflow: hidden; }
+.stage-mount { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
 .stage-mount canvas { display: block; }
 .stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle `f`) ── */
-/* Top-LEFT: the quiet stamp owns the top-right corner, and the meter used to cover it. */
+/* Top-LEFT: the quiet stamp owns the top-right corner, and the meter used to cover it.
+   The one floating slab left over the town wears real 9-slice frame art. */
 .fps-overlay {
-  position: absolute; top: 0.8rem; left: 1rem; z-index: 30;
-  display: grid; gap: 0.15rem; justify-items: start;
-  background-color: var(--cream);
-  padding: 0.15rem 0.3rem;
-  font-family: var(--font-px); font-size: 0.78rem;
+  position: absolute; top: var(--s-5); left: var(--s-6); z-index: 30;
+  display: grid; gap: var(--s-1); justify-items: start;
+  padding: var(--s-1) var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-2);
+  background-color: var(--cream); background-clip: padding-box;
+  border: 10px solid transparent; border-image: var(--px-cream);
+  box-shadow: var(--ledge);
 }
-.fps-overlay .fps-avg { font-size: 0.75rem; color: var(--ink-quiet); }
+.fps-overlay .fps-avg { font-size: var(--f-1); color: var(--ink-quiet); }
 
 /* ── slide-over panel: parchment slab sliding in from the frame edge ── */
 .portrait {
@@ -121,35 +153,37 @@ body {
     var(--sand);
 }
 
-.badges { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.badges { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: var(--s-2); }
 .badge {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em; text-transform: uppercase;
   background: var(--cream); border-radius: 0; box-shadow: 0 0 0 2px var(--ink);
-  padding: 0.05rem 0.4rem;
+  padding: var(--s-1) var(--s-3);
 }
+/* A rail as well as a fill: "ill" against "well" may not be a colour on its own. */
+.badge.ill, .rr-cond.ill { border-left: 3px solid var(--ember); }
 .badge.ill { background: var(--rose); color: var(--deep); }
 
-.block { margin: 0.8rem 0; }
+.block { margin: var(--s-5) 0; }
 /* `.feed-head` is named on six headings with no `.block` around them; without its own rule they
    fell back to a UA-default h3 while the ones inside `.block` were pixel caps. */
 .block h3, .feed-head {
-  margin: 0 0 0.35rem; font-size: 0.75rem;
+  margin: 0 0 var(--s-3); font-size: var(--f-1);
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--ink-quiet);
 }
 .block h3::after, .feed-head::after {
-  content: ''; display: block; margin-top: 2px; height: 2px; width: 2.2rem;
+  content: ''; display: block; margin-top: var(--s-2); height: 2px; width: 2.2rem;
   /* --sand is 1.19:1 on parchment and 1.34:1 on the modal's cream — this rule was a smudge.
      --ink-quiet is 5.83 and 6.57 on the two grounds .block is ever laid on. */
-  background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 6px);
+  background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 7px);
 }
-.block ul { margin: 0; padding-left: 1.1rem; }
-.block p { margin: 0.25rem 0; text-wrap: pretty; }
+.block ul { margin: 0; padding-left: var(--s-6); }
+.block p { margin: var(--s-2) 0; text-wrap: pretty; }
 
 .thought-line { font-style: italic; color: var(--ink-quiet); margin: 0; }
 
-.need-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
-.need-label { width: 4.5rem; font-size: 0.875rem; font-weight: 500; }
+.need-row { display: flex; align-items: center; gap: var(--s-4); margin: var(--s-2) 0; }
+.need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 500; }
 .need-track {
   flex: 1; height: 10px; background: var(--cream);
   border-radius: 3px; box-shadow: 0 0 0 1.5px var(--ink);
@@ -164,50 +198,50 @@ body {
 }
 .need-fill.low { background-color: var(--rose); }
 
-.paper-sheet .doc { white-space: pre-wrap; margin: 0.35rem 0; }
+.paper-sheet .doc { white-space: pre-wrap; margin: var(--s-3) 0; }
 .paper-sheet .stamp {
-  font-size: 0.75rem; color: var(--ink-quiet); font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: var(--f-1); color: var(--ink-quiet); font-variant-numeric: tabular-nums;
+  font-family: var(--font-data);
 }
 
 .diff {
-  font-family: ui-monospace, 'SF Mono', monospace; font-size: 0.75rem;
+  font-family: var(--font-data); font-size: var(--f-1);
   background: var(--cream); border-radius: 4px; box-shadow: var(--frame-tight);
-  padding: 0.5rem; overflow-x: auto; margin: 0.4rem 0 0;
+  padding: var(--s-4); overflow-x: auto; margin: var(--s-3) 0 0;
 }
-.diff-line { padding: 0 0.2rem; }
+.diff-line { padding: 0 var(--s-2); }
 .diff-line.add { background: #DCE8C8; }
 .diff-line.del { background: #F2C6C2; text-decoration: line-through; }
 
 /* ── what is written of them: the chronicler's write-up, from the public record alone ── */
-.biography { margin: 0; padding-left: 0.55rem; border-left: 2px solid var(--honey); }
-.biography-head { margin: 0; font-size: 0.875rem; font-weight: 600; }
+.biography { margin: 0; padding-left: var(--s-4); border-left: 2px solid var(--honey); }
+.biography-head { margin: 0; font-size: var(--f-3); font-weight: 600; }
 .biography-head .stamp {
-  margin-right: 0.35rem; font-size: 0.75rem; font-weight: 400; color: var(--ink-quiet);
+  margin-right: var(--s-3); font-size: var(--f-1); font-weight: 400; color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
-.biography-body { margin: 0.2rem 0 0; white-space: pre-wrap; text-wrap: pretty; }
+.biography-body { margin: var(--s-2) 0 0; white-space: pre-wrap; text-wrap: pretty; }
 
 /* ── how they have changed: what the run MOVED, newest first ── */
-.change-entry { margin: 0.5rem 0 0; padding-left: 0.55rem; border-left: 2px solid var(--sand); }
+.change-entry { margin: var(--s-4) 0 0; padding-left: var(--s-4); border-left: 2px solid var(--sand); }
 .change-entry:first-of-type { border-left-color: var(--honey); }
-.change-head { margin: 0; font-size: 0.875rem; }
+.change-head { margin: 0; font-size: var(--f-3); }
 .change-head .stamp {
-  margin-right: 0.35rem; font-size: 0.75rem; color: var(--ink-quiet);
-  font-variant-numeric: tabular-nums; font-family: ui-monospace, 'SF Mono', monospace;
+  margin-right: var(--s-3); font-size: var(--f-1); color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums; font-family: var(--font-data);
 }
 
 /* ── the chronicle's feeds ── */
 
-.feed { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
 .feed-line {
-  display: flex; gap: 0.55rem; align-items: baseline;
-  padding: 0.3rem 0.4rem; margin: 0 -0.4rem; border-radius: 4px;
+  display: flex; gap: var(--s-4); align-items: baseline;
+  padding: var(--s-2) var(--s-3); margin: 0 calc(-1 * var(--s-3)); border-radius: 4px;
 }
-.feed-line:nth-child(odd) { background: rgba(232, 213, 188, 0.35); }
+.feed-line:nth-child(odd) { background: var(--parchment-zebra); }
 .feed-line .stamp {
-  flex: none; width: 6.2rem; font-size: 0.75rem; color: var(--ink-quiet);
-  font-family: ui-monospace, 'SF Mono', monospace; font-variant-numeric: tabular-nums;
+  flex: none; width: 6.2rem; font-size: var(--f-1); color: var(--ink-quiet);
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .feed-text { text-wrap: pretty; }
 .feed-line.death .feed-text { color: var(--deep); font-weight: 600; }
@@ -219,20 +253,21 @@ body {
 /* ── the curated chronicle: what mattered, and the way back to it ── */
 
 .feed-tab {
-  font-family: var(--font-px); font-size: 0.75rem; line-height: 1;
+  transition-property: background-color;
+  font-family: var(--font-px); font-size: var(--f-1); line-height: 1;
   background: var(--sand); color: var(--ink);
   border: 2px solid var(--ink); border-radius: 0;
-  padding: 0.3rem 0.55rem; min-height: 40px; cursor: pointer;
+  padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
   box-shadow: var(--ledge);
 }
 .feed-tab:hover:not(.active) { background: var(--parchment); }
-.feed-tab:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.feed-tab:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .feed-tab.active { background: var(--honey); }
 
-.feed.important .feed-line { display: block; padding: 0; }
+.feed.important .feed-line { display: block; padding: 0; margin: 0; }
 .feed-jump {
-  display: flex; align-items: center; gap: 0.5rem;
-  width: 100%; min-height: 40px; padding: 0.3rem 0.4rem;
+  display: flex; align-items: center; gap: var(--s-4);
+  width: 100%; min-height: 44px; padding: var(--s-2) var(--s-3);
   font: inherit; color: inherit; text-align: left; cursor: pointer;
   background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 4px;
 }
@@ -246,11 +281,19 @@ body {
                 border-left-color var(--t-fast) var(--ease-enter);
   }
 }
+/* One stagger, one ladder, one depth: the sheet had three of them, truncated at 3, 2 and 4
+   steps, so every item past the last step arrived at once. The table's own 30ms, capped at 6. */
 @media (prefers-reduced-motion: no-preference) {
-  .feed-line { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
-  .feed-line:nth-child(1) { animation-delay: 0ms; }
-  .feed-line:nth-child(2) { animation-delay: 30ms; }
-  .feed-line:nth-child(3) { animation-delay: 60ms; }
+  :is(.feed-line, .edition-slot, .strip-list > li) {
+    animation: feed-in var(--t-fast) var(--ease-enter) backwards;
+    animation-delay: calc(var(--stagger-i, 6) * 30ms);
+  }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(1) { --stagger-i: 0; }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(2) { --stagger-i: 1; }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(3) { --stagger-i: 2; }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(4) { --stagger-i: 3; }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(5) { --stagger-i: 4; }
+  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(6) { --stagger-i: 5; }
   @keyframes feed-in {
     from { opacity: 0; translate: 0 6px; }
     to { opacity: 1; translate: 0 0; }
@@ -258,41 +301,34 @@ body {
 }
 
 /* ── the town's own paper: one edition per recorded day, newest first ── */
-.paper-run { list-style: none; margin: 0.6rem 0 0; padding: 0; }
-.edition-slot + .edition-slot { margin-top: 1rem; }
-.edition { background: var(--cream); padding: 0.6rem 0.7rem; box-shadow: var(--frame-tight); }
+.paper-run { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-6); }
+.edition { background: var(--cream); padding: var(--s-4) var(--s-5); box-shadow: var(--frame-tight); }
 .edition-head {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem;
-  margin: 0 0 0.35rem; padding-bottom: 0.3rem; border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
+  margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 2px solid var(--ink);
 }
 .edition-day {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.08em;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em;
   text-transform: uppercase; font-variant-numeric: tabular-nums;
 }
-.edition-temper { font-size: 0.75rem; font-style: italic; color: var(--ink-quiet); }
-.edition-title { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 600; text-wrap: balance; }
+.edition-temper { font-size: var(--f-1); font-style: italic; color: var(--ink-quiet); }
+.edition-title { margin: 0 0 var(--s-2); font-size: var(--f-4); font-weight: 600; text-wrap: balance; }
 .edition-body { margin: 0; white-space: pre-wrap; text-wrap: pretty; }
-.edition-formed { margin: 0.45rem 0 0; padding-left: 1.1rem; font-size: 0.8125rem; }
+.edition-formed { margin: var(--s-4) 0 0; padding-left: var(--s-6); font-size: var(--f-2); }
 .edition-caption {
-  margin: 0.55rem 0 0; font-size: 0.8125rem; font-style: italic; color: var(--ink-quiet);
+  margin: var(--s-4) 0 0; font-size: var(--f-2); font-style: italic; color: var(--ink-quiet);
 }
 /* The one loud thing on the page, and it lands once a week. */
 .era-band {
   background: var(--honey); color: var(--deep);
-  padding: 0.5rem 0.7rem; margin-bottom: 0.4rem; box-shadow: var(--frame-tight);
+  padding: var(--s-4) var(--s-5); margin-bottom: var(--s-3); box-shadow: var(--frame-tight);
 }
 .era-label {
-  margin: 0; font-family: var(--font-px); font-size: 0.75rem;
+  margin: 0; font-family: var(--font-px); font-size: var(--f-1);
   letter-spacing: 0.1em; text-transform: uppercase;
 }
-.era-title { margin: 0.2rem 0 0.15rem; font-size: 0.9375rem; font-weight: 600; }
+.era-title { margin: var(--s-2) 0 var(--s-1); font-size: var(--f-4); font-weight: 600; }
 .era-text { margin: 0; text-wrap: pretty; }
-@media (prefers-reduced-motion: no-preference) {
-  .edition-slot { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
-  .edition-slot:nth-child(2) { animation-delay: 60ms; }
-  .edition-slot:nth-child(3) { animation-delay: 120ms; }
-}
-
 @media (prefers-reduced-motion: no-preference) {
   @keyframes panel-in {
     from { opacity: 0; translate: 0 10px; }
@@ -308,6 +344,10 @@ body {
   display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
   background: transparent; border: 0; cursor: pointer;
 }
+.mark::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 44px; height: 44px; translate: -50% -50%;
+}
 .mark-glyph { display: block; }
 .mark:hover .mark-glyph, .mark:focus-visible .mark-glyph { translate: 0 -2px; }
 @media (prefers-reduced-motion: no-preference) {
@@ -316,17 +356,18 @@ body {
 /* the word for the mark: hidden until the mark is asked about, and then a real slab */
 .mark-tip {
   position: absolute; bottom: 100%; left: 50%; translate: -50% -4px; z-index: 2;
-  display: none; white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  display: none; white-space: nowrap; max-width: min(22rem, calc(100vw - 32px));
+  overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--ink); background: var(--cream);
   border: 2px solid var(--ink); box-shadow: 2px 2px 0 0 var(--deep);
-  padding: 0.2rem 0.4rem; pointer-events: none;
+  padding: var(--s-2) var(--s-3); pointer-events: none;
 }
 /* WHAT THE BROWSER CAUGHT: centred on the first mark, the tip ran off the left of the
    viewport and lost its first three words. Near an edge it hangs from that edge instead. */
 .mark-tip[data-side='start'] { left: 0; translate: 0 -4px; }
 .mark-tip[data-side='end'] { left: auto; right: 0; translate: 0 -4px; }
-.mark:hover .mark-tip, .mark:focus-visible .mark-tip { display: block; }
+.mark:hover .mark-tip, .mark:focus .mark-tip { display: block; }
 .playhead {
   position: absolute; top: -3px; bottom: -3px; width: 3px; translate: -50%;
   background: var(--ember); border-radius: 1px; box-shadow: 0 0 0 1px var(--ink);
@@ -336,13 +377,13 @@ body {
 }
 .live-pill {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 0.3rem 0.6rem; min-height: 40px; cursor: pointer;
+  color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em; text-transform: uppercase;
+  padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--deep);
-  transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast);
+  transition-property: background-color, translate, box-shadow;
 }
 .live-pill:hover { translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
-.live-pill:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.live-pill:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .live-pill.live { background: var(--honey); }
 
 /* ── interiors: the room the camera stepped into, and the way back out ──
@@ -352,37 +393,38 @@ body {
    by side, "the storehouse" truncates, and a card may not cut the one thing it is naming. */
 
 .room-built {
-  margin: -0.2rem 0 0;
-  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-quiet);
+  margin: calc(-1 * var(--s-2)) 0 0;
+  font-family: var(--font-body); font-size: var(--f-3); color: var(--ink-quiet);
   font-style: italic; text-wrap: pretty;
 }
 /* the one repeated shape: a small pixel label over the thing it names */
 .room-label {
-  display: block; margin-bottom: 0.2rem;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.06em;
+  display: block; margin-bottom: var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--ink-quiet);
 }
 .room-lives { display: block; margin: 0; }
 .room-names, .room-empty, .room-who {
-  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink);
+  font-family: var(--font-body); font-size: var(--f-3); color: var(--ink);
 }
 
-.room-roll { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
-.room-roll li { display: flex; align-items: baseline; gap: 0.5rem; }
+.room-roll { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+.room-roll li { display: flex; align-items: baseline; gap: var(--s-4); }
 .room-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-state {
   flex: none;
-  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink);
-  padding: 0.1rem 0.3rem; background: var(--sand); border: 1px solid var(--ink);
+  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
+  padding: var(--s-1) var(--s-2); background: var(--sand); border: 1px solid var(--ink);
 }
 .hold-grid {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: 0.3rem;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(6rem, 18%, 9rem), 1fr));
+  gap: var(--s-2);
   align-items: stretch;
 }
 .hold {
-  display: flex; align-items: center; gap: 0.25rem;
-  padding: 0.15rem 0.25rem; background: var(--parchment); border: 1px solid var(--ink);
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-1) var(--s-2); background: var(--parchment); border: 1px solid var(--ink);
 }
 .hold-icon {
   flex: none; width: 16px; height: 16px;
@@ -390,22 +432,22 @@ body {
   image-rendering: pixelated;
 }
 /* a kind the codex has no icon for gets a drawn chip, never a broken image */
-.hold-icon.bare { background: var(--sand); box-shadow: inset 0 0 0 1px var(--stone); }
+.hold-icon.bare { background: var(--sand); box-shadow: inset 0 0 0 1px var(--ink-quiet); }
 /* A row may not cut the one thing it names — `wheat_sheaf` read as `wheat_s…` the first time
    this grid ever had data in it. Two words wrap onto two lines instead. */
 .hold-kind {
   flex: 1; min-width: 0;
-  font-family: var(--font-body); font-size: 0.75rem; color: var(--ink);
+  font-family: var(--font-body); font-size: var(--f-2); color: var(--ink);
   white-space: normal; overflow-wrap: break-word; text-wrap: pretty; line-height: 1.25;
 }
 .hold-qty {
   flex: none;
-  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink);
+  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .room-more {
-  margin: 0.25rem 0 0;
-  font-family: var(--font-body); font-size: 0.75rem; font-style: italic; color: var(--ink-quiet);
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-body); font-size: var(--f-2); font-style: italic; color: var(--ink-quiet);
 }
 
 /* ── the bonds graph, on the page rather than over the town ── */
@@ -414,29 +456,31 @@ body {
    larger town a node spawns behind it. The key opens on request; shut, it is one control. */
 
 .key-summary {
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  min-width: 10.5rem; min-height: 40px; padding: 0.3rem 0.7rem; cursor: pointer;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: var(--s-4);
+  min-width: 10.5rem; min-height: 44px; padding: var(--s-2) var(--s-5); cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--ink); background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
-  transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .key-summary { transition-property: background-color, translate, box-shadow; }
 }
 .key-summary:hover { translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep); }
-.key-summary:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.key-summary:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 
 /* struck-out chips keep filtering while the key is shut — say so where the key is */
 .key-filtered {
-  font-family: var(--font-px); font-size: 0.75rem;
+  font-family: var(--font-px); font-size: var(--f-1);
   background: var(--ember); color: var(--deep);
-  padding: 0.1rem 0.3rem; box-shadow: 0 0 0 2px var(--ink);
+  padding: var(--s-1) var(--s-2); box-shadow: 0 0 0 2px var(--ink);
 }
 
 .legend-chip {
-  display: inline-flex; align-items: center; gap: 0.35rem;
+  display: inline-flex; align-items: center; gap: var(--s-3);
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase;
-  padding: 0.25rem 0.5rem; min-height: 40px; cursor: pointer;
-  transition-property: color, background-color, translate; transition-duration: var(--t-fast);
+  color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase;
+  padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
+  transition-property: color, background-color, translate;
 }
 .legend-chip:hover { translate: 0 -2px; }
 .legend-chip:active { translate: 0 1px; }
@@ -447,86 +491,88 @@ body {
    as every other chip's. Fading it would say "less important", which it is not. */
 .legend-chip.off { color: var(--ink); background: var(--sand); }
 .legend-strike {
-  position: absolute; left: 0.25rem; right: 0.25rem; top: 50%;
+  position: absolute; left: var(--s-4); right: var(--s-4); top: 50%;
   height: 2px; background: var(--ink); pointer-events: none;
 }
 .legend-mark { flex: none; }
 .legend-word { line-height: 1; }
 /* three axes, each labelled, so a two-channel encoding does not become a manual */
-.legend-axis { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
-.legend-axis + .legend-axis { border-left: 2px solid var(--sand); padding-left: 0.5rem; }
+.legend-axis {
+  display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+  padding-right: var(--s-4);
+}
+.legend-axis + .legend-axis { border-left: 2px solid var(--sand); padding-left: var(--s-4); }
 .legend-axis-name {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.05em;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-quiet);
 }
 .legend-stamp {
-  font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.3rem;
+  font-size: var(--f-1); color: var(--ink-quiet); margin-left: var(--s-2);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
 /* ── what passed between two people: the bond detail ── */
 .bond-detail {
-  position: absolute; top: 4.6rem; right: 1rem; z-index: 30;
-  width: min(21rem, calc(100% - 2rem)); max-height: 62%; overflow-y: auto;
+  max-height: 18rem; overflow-y: auto; overscroll-behavior: contain;
   background-color: var(--cream); background-image: var(--grain); color: var(--ink);
   border: 10px solid transparent; border-image: var(--px-cream);
   box-shadow: var(--ledge);
-  font-size: 0.875rem;
+  font-size: var(--f-3);
 }
 .bond-detail :focus-visible { outline-offset: -2px; }  /* the panel scrolls; keep the ring inside */
 @media (prefers-reduced-motion: no-preference) {
   .bond-detail { animation: panel-in var(--t-med) var(--ease-enter); }
 }
-.bond-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.bond-head { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .bond-level, .bond-type {
-  display: inline-flex; align-items: center; gap: 0.35rem;
+  display: inline-flex; align-items: center; gap: var(--s-3);
   background: var(--sand); color: var(--ink);
-  font-family: var(--font-px); font-size: 0.75rem; line-height: 1; text-transform: uppercase;
-  border: 2px solid var(--ink); padding: 0.3rem 0.4rem;
+  font-family: var(--font-px); font-size: var(--f-1); line-height: 1; text-transform: uppercase;
+  border: 2px solid var(--ink); padding: var(--s-2) var(--s-3);
 }
 .bond-level { background: var(--honey); }
 /* the sentence, then which way it is going — the two things the bar could not say */
-.bond-line { margin: 0.6rem 0 0; text-wrap: pretty; }
+.bond-line { margin: var(--s-4) 0 0; text-wrap: pretty; }
 .bond-arc {
-  display: flex; align-items: center; gap: 0.35rem;
-  margin: 0.4rem 0 0; font-size: 0.75rem;
+  display: flex; align-items: center; gap: var(--s-3);
+  margin: var(--s-3) 0 0; font-size: var(--f-1);
   font-family: var(--font-px); letter-spacing: 0.03em; text-transform: uppercase;
 }
 .bond-arc-mark { width: 18px; height: 4px; box-shadow: 0 0 0 1px var(--ink); }
-.bond-evidence { margin: 0.35rem 0 0; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
-.bond-title { flex: 1 1 8rem; margin: 0; font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
+.bond-evidence { margin: var(--s-3) 0 0; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
+.bond-title { flex: 1 1 8rem; margin: 0; font-size: var(--f-3); font-weight: 600; text-wrap: balance; }
 .bond-close {
-  flex: none; min-width: 40px; min-height: 40px; cursor: pointer;
+  flex: none; min-width: 44px; min-height: 44px; cursor: pointer;
   background: var(--parchment); color: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
   font: 1rem/1 var(--font-body);
 }
 .bond-close:hover { background: var(--honey); }
-.bond-close:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.bond-close:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .bond-dates {
-  display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
-  margin: 0.6rem 0 0; font-size: 0.75rem;
+  display: grid; grid-template-columns: auto 1fr; gap: var(--s-1) var(--s-4);
+  margin: var(--s-4) 0 0; font-size: var(--f-1);
 }
-.bond-dates dt { font-family: var(--font-px); font-size: 0.75rem; align-self: center; color: var(--ink-quiet); }
+.bond-dates dt { font-family: var(--font-px); font-size: var(--f-1); align-self: center; color: var(--ink-quiet); }
 .bond-dates dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
-.bond-history { list-style: none; margin: 0.7rem 0 0; padding: 0; }
+.bond-history { list-style: none; margin: var(--s-5) 0 0; padding: 0; }
 .bond-history li {
-  display: flex; gap: 0.5rem; align-items: baseline;
-  padding: 0.3rem 0; border-top: 1px solid var(--sand);
+  display: flex; gap: var(--s-4); align-items: baseline;
+  padding: var(--s-2) 0; border-top: 1px solid var(--sand);
 }
 .bond-history .stamp {
-  flex: none; width: 6.2rem; font-size: 0.75rem; color: var(--ink-quiet);
+  flex: none; width: 6.2rem; font-size: var(--f-1); color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 /* The tally is the whole history; the column under it is the last few of it. The count reads
    as a figure, so it takes the data face and tabular figures the stamps already use. */
-.bond-tally { list-style: none; margin: 0.6rem 0 0; padding: 0; }
-.bond-tally li { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.15rem 0; }
+.bond-tally { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
+.bond-tally li { display: flex; gap: var(--s-4); align-items: baseline; padding: var(--s-1) 0; }
 .bond-tally .tally-count {
   flex: none; min-width: 4.4rem; text-align: right; font-family: var(--font-data);
-  font-variant-numeric: tabular-nums; font-size: 0.8rem;
+  font-variant-numeric: tabular-nums; font-size: var(--f-2);
 }
-.bond-earlier { margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--ink-quiet); }
+.bond-earlier { margin: var(--s-3) 0 0; font-size: var(--f-1); color: var(--ink-quiet); }
 
 /* ── the days the town kept: postcard rail + transport ── */
 
@@ -534,8 +580,8 @@ body {
    594px stage, and a lopsided frame is not a frame. One number, both bands. */
 
 .moment-card {
-  display: flex; gap: 0.4rem; align-items: flex-start;
-  min-height: 40px; padding: 0.35rem 0.4rem;
+  display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: 44px; padding: var(--s-3);
   overflow: hidden;
   text-align: left; font: inherit; color: var(--ink); cursor: pointer;
   background: var(--parchment);
@@ -543,43 +589,38 @@ body {
   box-shadow: var(--ledge);
 }
 .moment-card:hover { background: var(--cream); border-left-color: var(--honey); }
-.moment-card:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.moment-card:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the day you are watching — a rail as well as a fill, never colour alone */
 .moment-card.open { background: var(--cream); border-left-color: var(--ember); }
 @media (prefers-reduced-motion: no-preference) {
   .moment-card { transition: background-color var(--t-fast) var(--ease-enter), border-left-color var(--t-fast); }
-  .strip-list li { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
-  .strip-list li:nth-child(1) { animation-delay: 0ms; }
-  .strip-list li:nth-child(2) { animation-delay: 30ms; }
-  .strip-list li:nth-child(3) { animation-delay: 60ms; }
-  .strip-list li:nth-child(4) { animation-delay: 90ms; }
 }
 .thumb-motif { flex: none; display: block; }
 /* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by the
    band; the aria-label still says the whole postcard. */
-.thumb-body { display: grid; gap: 0.05rem; min-width: 0; align-content: start; }
+.thumb-body { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
 .thumb-day {
-  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet);
+  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 .thumb-title {
-  font-size: 0.875rem; font-weight: 600; line-height: 1.2;   /* the 14px prose floor holds */
+  font-size: var(--f-3); font-weight: 600; line-height: 1.2;   /* the 14px prose floor holds */
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
 .thumb-meta {
-  display: flex; gap: 0.3rem; min-width: 0;
+  display: flex; gap: var(--s-2); min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.thumb-cast, .thumb-where { font-size: 0.75rem; color: var(--ink-quiet); }
+.thumb-cast, .thumb-where { font-size: var(--f-1); color: var(--ink-quiet); }
 .thumb-cast { overflow: hidden; text-overflow: ellipsis; }
 .thumb-where { flex: none; font-style: italic; }
 
 .player-btn {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  min-width: 40px; min-height: 40px; cursor: pointer;
+  min-width: 44px; min-height: 44px; cursor: pointer;
   background: var(--deep); color: var(--cream);
   border: 2px solid var(--ink); border-radius: 0;
-  font-family: var(--font-px); font-size: 0.75rem;
+  font-family: var(--font-px); font-size: var(--f-1);
 }
 .player-btn:hover { background: var(--ink); }
 .player-btn:active { translate: 0 1px; }
@@ -590,6 +631,7 @@ body {
   flex: 1; position: relative; height: 12px; cursor: pointer;
   background: var(--deep); border: 2px solid var(--ink);
 }
+.player-track::after { content: ''; position: absolute; inset: var(--reach-44) 0; }
 /* positioned, never transitioned: a transition would lag a drag and lie about the town */
 .player-head {
   position: absolute; top: -4px; width: 6px; height: 18px;
@@ -597,61 +639,61 @@ body {
   translate: -50% 0;
 }
 .player-clock {
-  flex: none; font-family: var(--font-data); font-size: 0.75rem;
+  flex: none; font-family: var(--font-data); font-size: var(--f-1);
   color: var(--cream-quiet);
   font-variant-numeric: tabular-nums;
 }
 
 .chapter { margin: 0; }
-.chapter-head { margin: 0 0 0.15rem; font-weight: 600; text-wrap: balance; }
+.chapter-head { margin: 0 0 var(--s-1); font-weight: 600; text-wrap: balance; }
 .chapter-head .stamp {
-  margin-right: 0.35rem; font-size: 0.75rem; font-weight: 400; color: var(--ink-quiet);
+  margin-right: var(--s-3); font-size: var(--f-1); font-weight: 400; color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .chapter-text { margin: 0; white-space: pre-wrap; text-wrap: pretty; }
 
 /* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
 
-.roster-sorts { display: flex; gap: 0.25rem; }
+.roster-sorts { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--s-2); }
 .roster-sort {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
-  min-height: 40px; padding: 0.15rem 0.4rem; cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
+  min-height: 44px; padding: var(--s-1) var(--s-3); cursor: pointer;
   background: var(--parchment); color: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
 }
 .roster-sort:hover { background: var(--honey); }
 .roster-sort.on { background: var(--honey); box-shadow: var(--ledge), inset 0 0 0 2px var(--cream); }
-.roster-sort:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.roster-sort:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 @media (prefers-reduced-motion: no-preference) {
-  .roster-sort {
-    transition-property: background-color, translate, box-shadow;
-    transition-duration: var(--t-fast);
-  }
+  .roster-sort { transition-property: background-color, translate, box-shadow; }
 }
 
-.roster-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.roster-list { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-3); }
 
 .roster-row {
   width: 100%; min-height: 56px; cursor: pointer; font: inherit; color: inherit;
   display: grid; align-items: center; text-align: left;
   grid-template-columns: 48px minmax(0, 1fr) 32px;
   grid-template-areas: 'face who mood' 'face doing mood' 'face place mood' 'face with with';
-  gap: 0.1rem 0.55rem;
-  padding: 0.45rem 0.55rem;
+  gap: var(--s-1) var(--s-4);
+  padding: var(--s-4);
   background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0;
   box-shadow: 3px 3px 0 0 var(--deep);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .roster-row { transition: translate var(--t-fast) var(--ease-enter), box-shadow var(--t-fast); }
+  .roster-row {
+    transition-property: translate, box-shadow;
+    transition-timing-function: var(--ease-enter);
+  }
 }
 .roster-row:hover { translate: 0 -2px; box-shadow: 3px 5px 0 0 var(--deep); background-color: var(--honey); }
-.roster-row:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.roster-row:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .roster-row.open { background-color: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), 3px 3px 0 0 var(--deep); }
 /* substance drives DENSITY, never a printed number: a person the run has made something of
    gets a row with more room to say it in. */
-.roster-row[data-lived='some'] { padding-block: 0.55rem; }
-.roster-row[data-lived='much'] { padding-block: 0.7rem; border-left-width: 5px; }
+.roster-row[data-lived='some'] { padding-block: var(--s-4); }
+.roster-row[data-lived='much'] { padding-block: var(--s-5); border-left-width: 5px; }
 
 .rr-face {
   grid-area: face; align-self: start;
@@ -663,28 +705,28 @@ body {
 }
 .rr-token {
   display: grid; place-items: center; image-rendering: auto;
-  font-family: var(--font-px); font-size: 1.1rem; color: var(--ink);
+  font-family: var(--font-px); font-size: var(--f-5); color: var(--ink);
 }
-.rr-who { grid-area: who; display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; }
+.rr-who { grid-area: who; display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; }
 .rr-name {
-  font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.03em;
+  font-family: var(--font-body); font-weight: 600; font-size: var(--f-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rr-age {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
   text-transform: uppercase; color: var(--ink-quiet); flex: none;
 }
-.rr-doing { grid-area: doing; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.rr-doing { grid-area: doing; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .rr-state {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
-  padding: 0.05rem 0.35rem; background: var(--honey);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
+  padding: var(--s-1) var(--s-3); background: var(--honey);
   border: 1px solid var(--ink); border-radius: 0;
 }
 .roster-row:hover .rr-state, .roster-row.open .rr-state { background: var(--cream); }
-.rr-conds { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+.rr-conds { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .rr-cond {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
-  padding: 0.05rem 0.3rem; background: var(--sand);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
+  padding: var(--s-1) var(--s-2); background: var(--sand);
   border: 1px solid var(--ink); border-radius: 0;
 }
 .rr-cond.ill { background: var(--rose); color: var(--deep); }
@@ -697,15 +739,15 @@ body {
 }
 .roster-row:hover .rr-mood, .roster-row.open .rr-mood { background: var(--cream); }
 .rr-place {
-  grid-area: place; font-size: 0.875rem; color: var(--ink);
+  grid-area: place; font-size: var(--f-3); color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.rr-with { grid-area: with; font-size: 0.75rem; color: var(--ink-quiet); font-style: italic; }
+.rr-with { grid-area: with; font-size: var(--f-1); color: var(--ink-quiet); font-style: italic; }
 
 /* ── who they have become, opened UNDER the row ──
    The list stays mounted behind it, so the way back is the row the viewer just clicked. */
 .roster-expanded {
-  margin: 0 0 0 0.6rem; padding: 0.6rem 0.7rem;
+  margin: 0 0 0 var(--s-4); padding: var(--s-4) var(--s-5);
   background: var(--parchment) var(--grain);
   border: 2px solid var(--ink); border-top: 0; border-radius: 0;
   box-shadow: 3px 3px 0 0 var(--deep);
@@ -713,109 +755,113 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .roster-expanded { animation: panel-in var(--t-fast) var(--ease-enter); }
 }
-.rx-lived { margin: 0 0 0.5rem; font-style: italic; color: var(--ink-quiet); }
-.rx-block { margin: 0 0 0.55rem; }
+.rx-lived { margin: 0 0 var(--s-4); font-style: italic; color: var(--ink-quiet); }
+.rx-block { margin: 0 0 var(--s-4); }
 .rx-title {
-  margin: 0 0 0.2rem;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.06em;
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--ink-quiet);
 }
-.rx-empty { margin: 0; font-size: 0.875rem; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
-.rx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
-.rx-list li { font-size: 0.875rem; text-wrap: pretty; }
+.rx-empty { margin: 0; font-size: var(--f-3); font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
+.rx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.rx-list li { font-size: var(--f-3); text-wrap: pretty; }
 .rx-list .stamp {
-  margin-right: 0.3rem; font-size: 0.75rem; color: var(--ink-quiet);
-  font-variant-numeric: tabular-nums; font-family: ui-monospace, 'SF Mono', monospace;
+  margin-right: var(--s-2); font-size: var(--f-1); color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums; font-family: var(--font-data);
 }
 .rx-level {
-  margin-right: 0.3rem; padding: 0.05rem 0.3rem;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  margin-right: var(--s-2); padding: var(--s-1) var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
   background: var(--sand); border: 1px solid var(--ink);
 }
 .rx-full {
-  margin-top: 0.3rem; min-height: 40px; cursor: pointer;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
-  padding: 0.25rem 0.5rem; color: var(--ink);
+  margin-top: var(--s-2); min-height: 44px; cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
+  padding: var(--s-2) var(--s-4); color: var(--ink);
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
   box-shadow: 2px 2px 0 0 var(--deep);
 }
 .rx-full:hover { background: var(--honey); }
-.rx-full:active { translate: 2px 2px; box-shadow: none; }
+.rx-full:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 
-.roster-gone { margin-top: 0.8rem; font-style: italic; color: var(--ink-quiet); }
+.roster-gone { margin-top: var(--s-5); font-style: italic; color: var(--ink-quiet); }
 
 /* ── World Laws: the town's rulebook, and the operator's hand on it ── */
 
 .laws-list, .laws-edit-list { list-style: none; margin: 0; padding: 0; }
 /* U17: seventeen rows read as four subjects rather than an alphabetical dump */
-.law-group + .law-group { margin-top: 1.1rem; }
+.law-group + .law-group { margin-top: var(--s-6); }
 
 .law-row, .law-edit {
-  display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 0.5rem;
-  padding: 0.4rem 0; border-bottom: 2px dotted var(--sand);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: baseline; gap: var(--s-4);
+  padding: var(--s-3) 0; border-bottom: 2px dotted var(--sand);
 }
 .law-row { grid-template-columns: minmax(0, 1fr) auto; }
-.law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: 0.4rem; }
+.law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: var(--s-3); }
 /* the human title leads; the machine path is the operator's subtitle underneath it */
-.law-title { grid-column: 1 / -1; margin: 0; font-size: 1rem; line-height: 1.3; }
-.law-says { grid-column: 1 / -1; margin: 0.15rem 0 0; font-size: 0.875rem; text-wrap: pretty; }
+.law-title { grid-column: 1 / -1; margin: 0; font-size: var(--f-4); line-height: 1.3; }
+.law-says { grid-column: 1 / -1; margin: var(--s-1) 0 0; font-size: var(--f-3); text-wrap: pretty; }
 /* AUDIT M2: `word-break: break-all` on a dotted path collapsed the label column to one
    character per line and pushed 77px off the viewport. A path wraps at its own joints. */
 /* Silkscreen has no lowercase, so the pixel face renders `aging.deathOfOldAgeEnabled` with every
    word boundary gone. The operator's path is set in the data face. */
 .law-path {
-  font-family: var(--font-data); font-size: 0.75rem; letter-spacing: 0;
+  font-family: var(--font-data); font-size: var(--f-1); letter-spacing: 0;
   color: var(--ink-quiet); overflow-wrap: anywhere; min-width: 0;
 }
 .law-edit label {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
   color: var(--ink-quiet); overflow-wrap: anywhere; min-width: 0;
 }
-.law-path { grid-column: 1 / -1; margin-top: 0.3rem; }
+.law-path { grid-column: 1 / -1; margin-top: var(--s-2); }
 /* AUDIT M2, the other half: an unwrappable value pushed the row 77px past the viewport. The
    operator's dashboard still prints a raw value, so it wraps too. */
-.law-value { font-family: var(--font-px); font-size: 0.75rem; min-width: 0; overflow-wrap: anywhere; }
+.law-value { font-family: var(--font-px); font-size: var(--f-1); min-width: 0; overflow-wrap: anywhere; }
 /* In the viewer's panel the value is the law's OWN small table, never a JSON blob. */
 .law-row .law-value {
-  grid-column: 1 / -1; margin: 0.35rem 0 0; font-family: var(--font-body); font-size: 0.875rem;
-  display: flex; flex-wrap: wrap; gap: 0.3rem;
+  grid-column: 1 / -1; margin: var(--s-3) 0 0; font-family: var(--font-body); font-size: var(--f-3);
+  display: flex; flex-wrap: wrap; gap: var(--s-2);
 }
 .law-cell {
-  display: flex; align-items: baseline; gap: 0.35rem; min-width: 0;
-  background: var(--cream); box-shadow: 0 0 0 2px var(--ink); padding: 0.15rem 0.4rem;
+  display: flex; align-items: baseline; gap: var(--s-3); min-width: 0;
+  background: var(--cream); box-shadow: 0 0 0 2px var(--ink); padding: var(--s-1) var(--s-3);
 }
-.law-cell dt { font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet); }
-.law-cell dd { margin: 0; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.law-cell dt {
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-quiet);
+}
+.law-cell dd { margin: 0; font-size: var(--f-3); font-variant-numeric: tabular-nums; }
 .law-history {
-  grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
-  font-size: 0.875rem; color: var(--ink-quiet);
+  grid-column: 1 / -1; margin: var(--s-2) 0 0; padding-left: var(--s-6);
+  font-size: var(--f-3); color: var(--ink-quiet);
 }
 .law-edit select, .law-edit input, .ops-reason input {
-  font: inherit; padding: 0.15rem 0.35rem; min-height: 40px;
+  font: inherit; padding: var(--s-1) var(--s-3); min-height: 44px;
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
 .law-edit select:disabled, .law-edit input:disabled { color: var(--ink-quiet); cursor: not-allowed; }
 /* ── the operator's own three: the clock, the money, and the rulings a person still owes ── */
 
-.ops-block { margin-top: 1.2rem; padding-top: 0.6rem; border-top: 2px dotted var(--sand); }
+.ops-block { margin-top: var(--s-6); padding-top: var(--s-4); border-top: 2px dotted var(--sand); }
 
 /* The clock, said in one word. Honey is the hand-on-it colour the changed law row already uses. */
-.ops-reading { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.3rem 0 0.5rem; }
+.ops-reading { display: flex; align-items: baseline; gap: var(--s-4); margin: var(--s-2) 0 var(--s-4); }
 .ops-word {
-  font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.04em;
-  padding: 0.2rem 0.45rem; background: var(--cream); box-shadow: var(--frame-tight);
+  font-family: var(--font-px); font-size: var(--f-3); letter-spacing: 0.04em;
+  padding: var(--s-2) var(--s-4); background: var(--cream); box-shadow: var(--frame-tight);
 }
 .ops-word.stopped { background: var(--honey) var(--grain); }
 .ops-at {
-  font-family: var(--font-data); font-size: 0.75rem; color: var(--ink-quiet);
+  font-family: var(--font-data); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 
-.ops-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.ops-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); }
 .ops-label {
-  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.4rem;
+  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink-quiet); margin-left: var(--s-3);
 }
-.ops-stops { display: flex; gap: 0.2rem; }
+.ops-stops { display: flex; gap: var(--s-2); }
 /* The dial reads as a row of keys, and the one in force stays pressed. */
 .ops-stop { min-width: 44px; font-variant-numeric: tabular-nums; }
 .ops-stop[aria-pressed='true'] {
@@ -824,48 +870,48 @@ body {
 
 /* THE ONE LOUD NUMBER ON THE PAGE. Money is what the question cost; this is the answer to it. */
 .ops-answer {
-  display: flex; align-items: baseline; gap: 0.7rem; margin: 0.4rem 0 0.6rem;
-  padding: 0.5rem 0.6rem; background: var(--cream); box-shadow: var(--frame-tight);
+  display: flex; align-items: baseline; gap: var(--s-5); margin: var(--s-3) 0 var(--s-4);
+  padding: var(--s-4); background: var(--cream); box-shadow: var(--frame-tight);
 }
 .ops-figure {
-  flex: none; font-family: var(--font-px); font-size: 1.75rem; line-height: 1;
+  flex: none; font-family: var(--font-px); font-size: var(--f-7); line-height: 1;
   font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .ops-answer-says { text-wrap: pretty; }
 
-.ops-verbs, .ops-alerts, .ops-rulings { list-style: none; margin: 0 0 0.6rem; padding: 0; }
+.ops-verbs, .ops-alerts, .ops-rulings { list-style: none; margin: 0 0 var(--s-4); padding: 0; }
 .ops-verbs li {
-  display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0;
+  display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-1) 0;
 }
-.ops-num { font-family: var(--font-data); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-.ops-alerts li { padding: 0.2rem 0; color: var(--ink-quiet); text-wrap: pretty; }
+.ops-num { font-family: var(--font-data); font-size: var(--f-1); font-variant-numeric: tabular-nums; }
+.ops-alerts li { padding: var(--s-2) 0; color: var(--ink-quiet); text-wrap: pretty; }
 
 .ops-sub {
-  margin: 0.7rem 0 0.2rem;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; color: var(--ink-quiet);
+  margin: var(--s-5) 0 var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em; color: var(--ink-quiet);
 }
 .ops-ledger { margin: 0; }
 .ops-line {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem;
-  padding: 0.25rem 0; border-bottom: 2px dotted var(--sand);
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4);
+  padding: var(--s-2) 0; border-bottom: 2px dotted var(--sand);
 }
 .ops-line dt { min-width: 0; overflow-wrap: anywhere; }
 .ops-line dd {
-  margin: 0; text-align: right; font-family: var(--font-data); font-size: 0.8125rem;
+  margin: 0; text-align: right; font-family: var(--font-data); font-size: var(--f-2);
   font-variant-numeric: tabular-nums;
 }
 
 .ops-ruling {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
-  padding: 0.3rem 0; border-bottom: 2px dotted var(--sand);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3);
+  padding: var(--s-2) 0; border-bottom: 2px dotted var(--sand);
 }
 .ops-ruling .law-path { flex: 1 1 8rem; }
-.ops-reason { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+.ops-reason { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-3); }
 .ops-reason input { flex: 1 1 auto; min-width: 0; }
 
-.ops-export { display: grid; gap: 0.2rem; margin: 1rem 0 0; }
+.ops-export { display: grid; gap: var(--s-2); margin: var(--s-6) 0 0; }
 .ops-link {
-  justify-self: start; min-height: 40px; padding: 0 0.2rem; cursor: pointer;
+  justify-self: start; min-height: 44px; padding: 0 var(--s-2); cursor: pointer;
   font: inherit; color: var(--ink); background: none; border: 0;
   text-decoration: underline; text-decoration-color: var(--honey);
   text-decoration-thickness: 3px; text-underline-offset: 3px;
@@ -876,7 +922,7 @@ body {
 .laws-notice {
   color: var(--cream); background-color: var(--deep);
   border: 10px solid transparent; border-image: var(--px-night);
-  padding: 0.5rem 0.7rem; margin: 0 0 0.8rem;
+  padding: var(--s-4) var(--s-5); margin: 0 0 var(--s-5);
 }
 
 /* ══ THE FINISH PASS ════════════════════════════════════════════════════════ */
@@ -890,30 +936,33 @@ body {
 /* An outline offset outward at the edge of an `overflow: hidden` box is painted into the overflow
    and lost, so the focus ring is drawn INSIDE the clipping box. */
 .paper-sheet :focus-visible,
-.bonds-graph :focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+.bonds-graph :focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
 /* 5 · press has weight — every control moves and drops a shadow step, not just the camera's */
 
-.legend-chip:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.legend-chip:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 
 /* Hover arrives in 150ms and leaves the instant the pointer does: a hover that FADES OUT goes on
-   claiming the pointer is somewhere it already left. */
-.feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort {
-  transition-duration: var(--t-fast);
+   claiming the pointer is somewhere it already left. A transition reads the duration of the state
+   it goes TO, so the 0s belongs on the base and the 150ms on `:hover`, not the other way round. */
+@media (prefers-reduced-motion: no-preference) {
+  .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
+  .roster-row, .key-summary, .discovery-leaf {
+    transition-duration: 0s;
+  }
+  .feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
+  .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
+  .discovery-leaf:hover {
+    transition-duration: var(--t-fast);
+  }
 }
-.feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover,
-.room-door:hover, .place-row:hover, .roster-sort:hover { transition-duration: 0s; }
 
 /* 7 · a loading surface has a SHAPE, not a spinner. A slab at the real row height tells the
    viewer what is coming and stops the panel jumping when it lands. */
 .skeleton-row {
-  height: 40px; margin: 0.25rem 0;
+  height: 40px; margin: var(--s-2) 0;
   background: linear-gradient(90deg, var(--sand) 0 60%, var(--parchment) 60% 100%);
   box-shadow: inset 0 0 0 2px var(--parchment);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .skeleton-row { animation: skeleton-breathe var(--t-ambient) ease-in-out infinite alternate; }
-  @keyframes skeleton-breathe { from { opacity: 0.75; } to { opacity: 1; } }
 }
 
 /* 11 · text never widows. A title that leaves one word alone on its second line reads as a
@@ -934,8 +983,8 @@ body {
 
 /* what the viewer just clicked on the ground, over the record that answers for it */
 .found-clicked {
-  margin: 0 0 0.5rem; padding: 0.35rem 0.5rem;
-  font-size: 0.875rem; color: var(--ink);
+  margin: 0 0 var(--s-4); padding: var(--s-3) var(--s-4);
+  font-size: var(--f-3); color: var(--ink);
   background: var(--cream); box-shadow: var(--frame-tight);
   border-left: 4px solid var(--honey);
 }
@@ -943,32 +992,34 @@ body {
 .discovery-chain {
   /* --sand on --parchment is 1.19:1: the rule meant to bind the panel into one history was
      invisible. --ink-quiet is 5.83 on parchment. */
-  list-style: none; margin: 0; padding: 0 0 0 0.9rem; border-left: 2px solid var(--ink-quiet);
+  list-style: none; margin: 0; padding: 0 0 0 var(--s-6); border-left: 2px solid var(--ink-quiet);
 }
 .discovery-leaf {
-  display: flex; gap: 0.75rem; width: 100%; min-height: 64px; padding: 0.6rem;
+  display: flex; gap: var(--s-5); width: 100%; min-height: 64px; padding: var(--s-4);
   text-align: left; background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
-  margin: 0 0 0.6rem; cursor: pointer;
+  margin: 0 0 var(--s-4); cursor: pointer;
   transition-property: background-color, translate, box-shadow;
-  transition-duration: var(--t-fast); transition-timing-function: var(--ease-tap);
+  transition-timing-function: var(--ease-tap);
 }
 .discovery-leaf:hover, .discovery-leaf:focus-visible {
   background-color: var(--honey-l); translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep);
 }
-.discovery-leaf:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.discovery-leaf:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the leaf you are standing in — an ember rail as well as a ring, never colour alone */
 .discovery-leaf[aria-current='true'] { border-left-width: 6px; border-left-color: var(--ember); }
-.discovery-leaf h3 { font-size: 0.875rem; color: var(--ink); margin: 0 0 0.25rem; }
-.discovery-leaf p { font-size: 0.75rem; color: var(--ink-quiet); margin: 0 0 0.25rem; }
-.discovery-body { min-width: 0; }
+.discovery-body { display: grid; gap: var(--s-2); min-width: 0; }
+.discovery-body > * { font-size: var(--f-2); color: var(--ink-quiet); }
+.discovery-name { font-size: var(--f-3); font-weight: 600; color: var(--ink); text-wrap: balance; }
+.discovery-credit, .discovery-makes { text-wrap: pretty; }
 .discovery-credit { color: var(--ink); }
 .discovery-quote {
-  font-size: 0.75rem; color: var(--cream-quiet); background: var(--deep);
-  padding: 0.35rem 0.5rem; border-radius: 0; margin: 0.35rem 0;
+  color: var(--cream-quiet); background: var(--deep);
+  padding: var(--s-3) var(--s-4); border-radius: 0; margin: var(--s-3) 0;
 }
 /* a first the town named itself: the words it was named in, set in clear of the glyph */
-.feed-line .discovery-quote { margin: 0 0 0.35rem 2.1rem; }
+/* not a step off the ladder: the indent lines the quote up with the glyph column above it */
+.feed-line .discovery-quote { margin: 0 0 var(--s-3) 2.1rem; }
 .discovery-makes { color: var(--ink-quiet); }
 .discovery-art {
   width: 48px; height: 48px; image-rendering: pixelated; flex: 0 0 48px;
@@ -984,11 +1035,24 @@ body {
    marks are written by `stage/anchor.ts` on rAF, which owns `transform` — so every mark's own
    offset uses the separate `translate` property and the two compose. */
 
-/* Read on demand, never drawn: the aria-live line that speaks every utterance. */
+/* Read on demand, never drawn: the product's one visually-hidden line — the page's own name,
+   the tab strip's key hint, and the aria-live line that speaks every utterance. */
 .stage-sr {
   position: absolute; width: 1px; height: 1px; margin: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+
+/* Figures mounts one tab stop per visible person, so the arms could be forty presses away. The
+   link is the first thing Tab finds and the only time it is ever drawn. */
+.skip {
+  position: absolute; z-index: 40; top: 0; left: 0; translate: 0 -110%;
+  display: grid; align-content: center; min-height: 44px;
+  padding: var(--s-4) var(--s-5);
+  font-family: var(--font-px); font-size: var(--f-2);
+  color: var(--ink); background: var(--cream);
+  box-shadow: var(--frame);
+}
+.skip:focus-visible { translate: 0 0; }
 
 /* ── the nameplate: a brown plate, hung under the pick ── */
 .stage-plate {
@@ -998,11 +1062,11 @@ body {
      placed off the same anchor, so their numbers have to be read together (chromeCss.test). */
   translate: -50% 60px;
   pointer-events: none;
-  font-family: var(--font-px); font-size: 12px; line-height: 16px;
+  font-family: var(--font-px); font-size: var(--f-2); line-height: 18px;
   letter-spacing: 0.04em; white-space: nowrap;
   color: var(--cream);
   background: #7E512B;
-  padding: 0 3px;
+  padding: 0 var(--s-1);
   /* the plate's ink edge, lit top row and bottom lip are drawn in the raster's own slices */
   border: 4px solid transparent; border-image: url('./px/nameplate.webp') 4 repeat;
   opacity: 0;
@@ -1012,7 +1076,9 @@ body {
 
 /* ── the figures, for the keyboard: one focus box over each person the camera can see.
    They take no clicks — the canvas owns the pointer — and show nothing but their focus ring. ── */
-.stage-figures { position: absolute; inset: 0; pointer-events: none; }
+/* Above `.town-dim` (z 20): a focus ring behind a scrim is not a focus ring. The plate and the
+   ring stay below it on purpose — with the sheet up, the sheet IS the pick. */
+.stage-figures { position: absolute; inset: 0; z-index: 21; pointer-events: none; }
 /* The box is sized and placed by the stage loop, which is the only thing that knows how big a
    body is drawn at this zoom. */
 .stage-figure {
@@ -1032,7 +1098,7 @@ body {
 }
 .stage-ring-arms {
   position: relative; width: 124px; height: 124px;
-  border: 1px dashed rgba(255, 246, 233, 0.75); border-radius: 50%;
+  border: 1px dashed var(--cream-quiet); border-radius: 50%;
   animation: stage-ring-pop var(--t-move) var(--ease-enter);
 }
 @keyframes stage-ring-pop {
@@ -1040,8 +1106,8 @@ body {
 }
 .stage-ring-arms button {
   position: absolute; translate: -50% -50%;
-  font: inherit; font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
-  min-height: 40px; padding: 0 14px;
+  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  min-height: 44px; padding: 0 var(--s-5);
   color: var(--cream); background: var(--deep);
   border: 0; border-radius: 20px;
   cursor: pointer;
@@ -1053,12 +1119,21 @@ body {
 .stage-ring-arms button:nth-child(2) { left: 100%; top: 50%; }
 .stage-ring-arms button:nth-child(3) { left: 50%; top: 100%; }
 .stage-ring-arms button:nth-child(4) { left: 0; top: 50%; }
+@media (prefers-reduced-motion: no-preference) {
+  .stage-ring-arms button {
+    animation: stage-arm-in var(--t-move) var(--ease-enter) backwards;
+    animation-delay: calc(var(--stagger-i, 0) * 30ms);
+  }
+  @keyframes stage-arm-in { from { opacity: 0; scale: 0.85; } }
+}
 
 /* ── the quiet stamp: the date, chiselled top-right, only while somebody is asking ── */
 .stage-stamp {
-  position: absolute; top: 3%; right: 3%;
+  position: absolute; z-index: 21;
+  top: max(var(--mark-inset), env(safe-area-inset-top));
+  right: max(var(--mark-inset), env(safe-area-inset-right));
   pointer-events: none;
-  font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
   color: var(--cream);
   text-shadow:
@@ -1066,13 +1141,16 @@ body {
     0 2px 4px rgba(36, 31, 43, 0.8);
   opacity: 0;
 }
-.stage-stamp.shown { opacity: 0.92; }
+.stage-stamp.shown { opacity: 1; }
 
 /* ── the director's cue: the caption under the shot ── */
 .stage-cue {
-  position: absolute; left: 50%; bottom: 4%; translate: -50% 0; margin: 0;
+  position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
+  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
+  text-align: center; text-wrap: balance;
   pointer-events: none;
-  font-family: 'Manrope', var(--font-body); font-size: 12px; font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow:
@@ -1080,51 +1158,96 @@ body {
     0 2px 4px rgba(36, 31, 43, 0.8);
 }
 
+/* Once the signpost has a corner, the cue may not reach it. */
+@media (min-width: 700px) {
+  .stage-cue { max-width: min(60ch, calc(100% - 320px)); }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  /* Slow out, fast in: a mark that answers a mouse-move may not lag it by 300ms. */
   .stage-stamp { transition: opacity var(--t-slow) var(--ease-enter); }
+  .stage-stamp.shown { transition-duration: var(--t-fast); }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-plate { opacity: 1; animation: none; }
-  .stage-ring-arms { animation: none; }
+  .stage-ring-arms, .stage-ring-arms button { animation: none; }
   .stage-ring-arms button:active { scale: 1; }
 }
 /* ══ THE SIGNPOST AND THE PAPER ════════════════════════════════════════════════════════════
    The town is the whole viewport. Everything below is a thing IN the town: a signpost you can
    read the arms of, and a sheet of paper that rises from the bottom edge when you ask it one. */
 
-.app { position: relative; display: block; height: 100%; overflow: hidden; background: var(--night); }
+.app {
+  position: relative; display: block; height: 100%; overflow: hidden;
+  background: var(--night); user-select: none;
+}
 /* the root boundary's line: the canvas is gone with the tree, so this sits on the bare ground */
 .town-lost {
-  display: grid; place-content: center; height: 100%; margin: 0; padding: 2rem;
-  font-size: 0.875rem; color: var(--cream-quiet); text-align: center; text-wrap: pretty;
+  display: grid; place-content: center; height: 100%; margin: 0; padding: var(--s-8);
+  font-size: var(--f-3); color: var(--cream-quiet); text-align: center; text-wrap: pretty;
 }
 
 /* ── the signpost: four arms on a post, bottom-right ── */
 .signpost {
-  position: absolute; right: 4%; bottom: 4%; z-index: 25;
-  display: grid; gap: 3px; justify-items: start;
+  position: absolute; z-index: 25;
+  right: max(var(--mark-inset), env(safe-area-inset-right));
+  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  display: grid; gap: var(--s-1); justify-items: start;
 }
 /* The plank is a drawn 128x32 raster with 15px of clear at each end; the label is rendered
    over it rather than painted into it, so a rename never needs a new asset. */
 .signpost-arm {
   display: flex; align-items: center;
-  width: 128px; min-height: 44px; padding: 0 2rem 0 1.1rem;
-  font-family: var(--font-px); font-size: 0.8125rem; letter-spacing: 0.03em;
+  /* 88px of content box: 'CHRONICLE' at 13px Silkscreen is 74px and the old pad left 4.4px. */
+  width: 128px; min-height: 44px; padding: 0 var(--s-7) 0 var(--s-6);
+  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   text-align: left; color: var(--cream); cursor: pointer;
   background: url('./px/signpost-arm.webp') no-repeat center / 128px 32px;
   image-rendering: pixelated;
   border: 0; border-radius: 0;
-  text-shadow: 0 1px 0 rgba(36, 31, 43, 0.85);
-  transition-property: translate, filter;
+  /* Cream on the plank's own wood samples at 2.13:1 — a measured AA failure on the product's
+     primary navigation, invisible to any audit that reads the CSS ancestry. The 4-way ink halo
+     the quiet stamp already uses gives the glyph its own ground at 15:1. */
+  text-shadow:
+    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep);
+  transition-property: translate;
   transition-timing-function: var(--ease-tap);
 }
-.signpost-arm:hover { translate: 3px 0; filter: brightness(1.12); }
-.signpost-arm:active { translate: 1px 1px; box-shadow: none; filter: brightness(0.94); }
-.signpost-arm[aria-pressed='true'] { filter: brightness(1.2) saturate(1.15); }
+.signpost-arm:hover { translate: 3px 0; }
+.signpost-arm:active { translate: 1px 1px; box-shadow: none; }
+/* The arm you pulled stays pulled, on a plank drawn darker: two channels, no repaint of the
+   raster layer, and no 1.2 -> 0.94 -> 1.2 flicker when a pressed arm is pressed again. */
+.signpost-arm[aria-expanded='true'] {
+  translate: 3px 0;
+  background-image: url('./px/signpost-arm-on.webp');
+}
 .signpost-post {
-  width: 16px; height: 96px; margin-left: 1.2rem;
+  width: 16px; height: 96px; margin-left: var(--s-6);
   background: url('./px/signpost-post.webp') no-repeat center / 16px 96px;
   image-rendering: pixelated;
+}
+/* A 128px plank is 5% of a 2560px viewport and reads as a postage stamp. Whole-number-ish
+   scaling on the whole post, so the arms, the gaps and the pole grow as one sign. */
+@media (min-width: 1920px) {
+  .signpost { scale: 1.5; transform-origin: 100% 100%; }
+}
+/* 284px of a 390px landscape phone is 73% of the screen, and the pole ran off the bottom. */
+@media (max-height: 620px) {
+  .signpost-post { display: none; }
+}
+/* With the sheet up there is no corner left under 640px, and no room beside it on a short
+   window. The arms move to the top edge, where all four stay one press from every other:
+   two-by-two on a phone, because a row of four planks is 518px, and in a row where that fits. */
+@media (max-width: 640px), (max-height: 620px) {
+  .signpost[data-open='yes'] {
+    top: max(var(--mark-inset), env(safe-area-inset-top)); bottom: auto;
+    left: max(var(--mark-inset), env(safe-area-inset-left)); right: auto;
+    grid-template-columns: repeat(2, auto);
+  }
+  .signpost[data-open='yes'] .signpost-post { display: none; }
+}
+@media (min-width: 641px) and (max-height: 620px) {
+  .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .signpost-arm:hover { translate: 0 0; }
@@ -1134,11 +1257,11 @@ body {
 .town-dim {
   position: absolute; inset: 0; z-index: 20;
   background: var(--deep); opacity: 0; pointer-events: none;
-  transition: opacity var(--t-med) var(--ease-enter);
+  transition: opacity var(--t-slow) var(--ease-enter);
 }
 .town-dim[data-open='yes'] { opacity: var(--dim); pointer-events: auto; }
 
-/* ── the paper: 78% x 66% of the stage, rising from the bottom edge ── */
+/* ── the paper: 78% of the stage wide, 66% of it tall, rising from the bottom edge ── */
 .paper {
   position: absolute; left: 50%; bottom: 0; z-index: 30;
   width: var(--paper-w); height: var(--paper-h);
@@ -1163,142 +1286,204 @@ body {
 @media (max-width: 640px) {
   .paper { width: var(--paper-w-narrow); height: var(--paper-h-narrow); }
 }
+/* Between 641 and 1400 the centred sheet's right edge sliced the signpost's arms mid-word. It
+   steps left far enough to clear them and no further — a static offset, so nothing moves when
+   the sheet opens and the arms never need to dodge. */
+@media (min-width: 641px) and (max-width: 1400px) {
+  .paper {
+    left: clamp(
+      calc(var(--paper-w) / 2),
+      calc(100% - var(--paper-w) / 2 - var(--mark-inset) - 136px),
+      50%
+    );
+  }
+}
+/* A short window is all the reading area there is: 66% of 390px was 166px of sheet against
+   575px of page — 29% of it visible. */
+@media (max-height: 620px) {
+  /* the arms are along the top edge here, so the sheet takes the width as well as the height */
+  .paper {
+    left: 50%; width: min(96%, 1040px);
+    height: calc(100dvh - 64px); border-top-width: 12px;
+  }
+  .paper-head { padding-block: var(--s-2); }
+  .paper-title { font-size: var(--f-4); }
+}
+/* short AND narrow: the arms are two rows there, so the sheet leaves two rows of room */
+@media (max-width: 640px) and (max-height: 620px) {
+  .paper { height: calc(100dvh - 106px); }
+}
+@media (min-width: 1920px) {
+  .paper { --paper-w: min(78%, 1040px); }
+}
 
 .paper-grip {
-  justify-self: center;
-  width: 44px; height: 5px; margin: 8px 0 4px;
-  background: #B89D7E; border-radius: 3px;
+  position: relative; justify-self: center;
+  width: 44px; height: 5px; margin: var(--s-3) 0;
+  /* 4.28:1 on parchment. The bar it replaced was 2.13:1 — the only affordance saying "drag me
+     down", drawn below the 3:1 non-text floor. */
+  background: #8B6F4E; border-radius: 3px;
   cursor: grab; touch-action: none;
 }
+.paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
 .paper-grip:active { cursor: grabbing; }
 
 .paper-head {
-  display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap;
-  padding: 0.1rem 1.1rem 0.45rem;
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-4) var(--s-6); flex-wrap: wrap;
+  padding: var(--s-5) var(--s-6);
   border-bottom: 2px solid var(--sand);
 }
 .paper-title {
   margin: 0;
-  font-family: var(--font-title); font-weight: 500; font-size: 1.15rem;
-  letter-spacing: 0.01em; line-height: 1.2; text-wrap: balance;
+  font-family: var(--font-title); font-weight: 500; font-size: var(--f-6);
+  letter-spacing: -0.01em; line-height: 1.2; text-wrap: balance;
 }
-.paper-tabs { display: flex; gap: 0.1rem; margin-left: auto; flex-wrap: wrap; }
+.paper-tabs { display: flex; gap: var(--s-1); flex: 0 1 auto; flex-wrap: wrap; }
 .paper-tab {
-  min-height: 40px; padding: 0 0.6rem;
-  font: inherit; font-size: 0.875rem; color: var(--ink-quiet);
+  min-height: 44px; padding: 0 var(--s-4);
+  font: inherit; font-size: var(--f-3); color: var(--ink-quiet);
   background: transparent; border: 0; border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition-property: color, border-color;
+  transition-property: color, border-color; transition-duration: var(--t-fast);
 }
 .paper-tab:hover { color: var(--ink); }
-.paper-tab.on { color: var(--ink); border-bottom-color: var(--honey); font-weight: 600; }
+/* Honey on parchment is 1.31:1 — the underline was not there. The selected tab used to go to
+   600 as well, which widened it and shoved the whole strip sideways on every change. */
+.paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .paper-close {
-  min-height: 40px; padding: 0 0.4rem;
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
-  color: var(--ink-quiet); background: none; border: 0; cursor: pointer;
+  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-6);
+  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.04em;
+  color: var(--ink-quiet); background: none; cursor: pointer;
+  /* A divider and a rem of clear, or the close word reads as a fifth tab at every width. */
+  border: 0; border-left: 2px solid var(--sand);
 }
 .paper-close:hover { color: var(--ink); }
 
 .paper-sheet {
-  padding: 0.7rem 1.1rem 1.1rem;
-  overflow-y: auto; overflow-x: hidden;
-  font-size: 0.875rem; line-height: 1.5;
+  container-type: inline-size;
+  /* the sheet is bottom-anchored, so its last line sits under the home indicator */
+  padding: var(--s-5) var(--s-6) max(var(--s-6), env(safe-area-inset-bottom));
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  font-size: var(--f-3); line-height: 1.5;
+  user-select: text;
+}
+/* Under 480px the head wrapped onto three rows and took a third of the sheet. The title keeps
+   the close word's company on the first row; the tabs get the second one to themselves and
+   scroll along it rather than wrapping again. */
+@media (max-width: 480px) {
+  .paper-head {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline; gap: var(--s-2) var(--s-4);
+  }
+  .paper-tabs {
+    grid-column: 1 / -1; flex-wrap: nowrap;
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  }
+  .paper-tab { flex: none; scroll-snap-align: start; }
+  .paper-close {
+    grid-row: 1; grid-column: 2; justify-self: end;
+    border-left: 0; padding-left: var(--s-3);
+  }
 }
 .paper-sheet > :first-child { margin-top: 0; }
 
 /* the one small voice on a page: a line about the page rather than about the town */
 .sheet-note {
-  margin: 0 0 0.7rem; font-size: 0.875rem; color: var(--ink-quiet); text-wrap: pretty;
+  margin: 0 0 var(--s-5); font-size: var(--f-3); color: var(--ink-quiet); text-wrap: pretty;
 }
 .sheet-note.operator {
-  padding: 0.35rem 0.5rem; color: var(--ink);
+  padding: var(--s-3) var(--s-4); color: var(--ink);
   background: var(--honey) var(--grain); box-shadow: var(--frame-tight);
 }
 
 /* ── a person's own page ── */
-.person-head { display: flex; gap: 0.7rem; align-items: center; margin: 0 0 0.8rem; }
+.person-head { display: flex; gap: var(--s-5); align-items: flex-start; margin: 0 0 var(--s-5); }
 
 /* ── their edges, one sentence each ── */
-.edges { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
-.edge { padding: 0.4rem 0.55rem; background: var(--cream); box-shadow: var(--frame-tight); }
-.edge-line { margin: 0; font-size: 0.875rem; text-wrap: pretty; }
+.edges { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-4); }
+.edge { padding: var(--s-3) var(--s-4); background: var(--cream); box-shadow: var(--frame-tight); }
+.edge-line { margin: 0; font-size: var(--f-3); text-wrap: pretty; }
 .edge-when {
-  margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--ink-quiet);
+  margin: var(--s-1) 0 0; font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 
 /* ── who came from whom ── */
-.families { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; }
-.family-children { list-style: none; margin: 0.2rem 0 0; padding: 0; display: grid; gap: 0.15rem; }
-.family-children li { font-size: 0.875rem; }
+.families { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-5); }
+.family-children { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: var(--s-1); }
+.family-children li { font-size: var(--f-3); }
 .family-children .stamp {
-  margin-right: 0.35rem; font-size: 0.75rem; color: var(--ink-quiet);
+  margin-right: var(--s-3); font-size: var(--f-1); color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
 /* ── everything that stands, and who put it there ── */
-.places { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.places { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
 .place-row {
-  display: grid; gap: 0.1rem; width: 100%; min-height: 44px; padding: 0.4rem 0.55rem;
+  display: grid; gap: var(--s-1); width: 100%; min-height: 44px; padding: var(--s-3) var(--s-4);
   font: inherit; color: inherit; text-align: left; cursor: pointer;
   background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
   transition-property: translate, box-shadow, background-color;
-  transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
+  transition-timing-function: var(--ease-enter);
 }
 .place-row:hover { translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep); background-color: var(--honey); }
-.place-row:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-.place-name { font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.03em; }
-.place-by { font-size: 0.75rem; color: var(--ink-quiet); }
+.place-row:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.place-name { font-family: var(--font-body); font-weight: 600; font-size: var(--f-3); }
+.place-by { font-size: var(--f-1); color: var(--ink-quiet); }
 
 /* ── one building's provenance, and the room behind its door ── */
-.provenance-line { margin: 0; font-size: 0.875rem; white-space: pre-wrap; text-wrap: pretty; }
-.room { display: grid; gap: 0.55rem; }
+.provenance-line { margin: 0; font-size: var(--f-3); white-space: pre-wrap; text-wrap: pretty; }
+.room { display: grid; gap: var(--s-4); }
 .room-door {
-  justify-self: start; min-height: 44px; padding: 0 0.8rem;
-  font-family: var(--font-px); font-size: 0.8125rem; letter-spacing: 0.03em;
+  justify-self: start; min-height: 44px; padding: 0 var(--s-5);
+  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--cream); background: var(--ink); cursor: pointer;
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
   transition-property: background-color, translate, box-shadow;
 }
 .room-door:hover { background: var(--deep); }
-.room-door:active { translate: 2px 2px; box-shadow: none; }
+.room-door:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .room-door[aria-pressed='true'] { background: var(--ember); color: var(--deep); border-color: var(--deep); }
 
 /* ── the day strip: what the bottom scrub bar used to be, on its own page ── */
-.day-strip { display: grid; gap: 0.5rem; }
+.day-strip { display: grid; gap: var(--s-4); }
 .day-marks { position: relative; height: 30px; }
 .day-track {
-  position: relative; height: 22px; cursor: pointer;
+  position: relative; height: 22px; margin-bottom: var(--s-6); cursor: pointer;
   background: var(--cream); box-shadow: var(--frame-tight);
   touch-action: none;
 }
-.day-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--sand); }
+.day-track::after { content: ''; position: absolute; inset: var(--reach-44) 0; }
+.day-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink-quiet); }
 .day-tick em {
-  position: absolute; top: 100%; left: 2px;
-  font-family: var(--font-data); font-size: 0.75rem; font-style: normal;
+  position: absolute; top: 100%; left: 2px; line-height: 1;
+  font-family: var(--font-data); font-size: var(--f-1); font-style: normal;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums;
 }
-.day-strip .live-pill { justify-self: start; margin-top: 0.9rem; }
+.day-strip .live-pill { justify-self: start; }
 
 /* ── the filmstrip, unrolled down the page instead of across the stage ── */
 .strip-list {
-  list-style: none; margin: 0 0 0.7rem; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.4rem;
+  list-style: none; margin: 0 0 var(--s-5); padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
+  gap: var(--s-3);
 }
 .strip-list > li { display: flex; }
 .strip-list .moment-card { width: 100%; min-height: 72px; }
 .moment-player {
   position: sticky; bottom: 0;
-  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-  padding: 0.4rem 0.6rem;
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  padding: var(--s-3) var(--s-4);
   background: var(--night); color: var(--cream);
   border: 2px solid var(--deep); box-shadow: var(--ledge);
 }
 
 /* ── the bonds graph, inside the sheet ── */
 .bonds-graph {
-  position: relative; display: flex; flex-direction: column; gap: 0.4rem; height: 30rem;
+  position: relative; display: flex; flex-direction: column; gap: var(--s-3);
+  height: min(30rem, 100%);
 }
 /* The canvas's own cell, with a size that does NOT come from the canvas: `flex-basis: 0` and
    `overflow: hidden` are what stop force-graph measuring itself bigger every frame. The night
@@ -1307,17 +1492,62 @@ body {
   position: relative; flex: 1 1 0; min-height: 14rem; overflow: hidden;
   background: var(--night);
 }
-.bonds-views { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
-.bond-detail { position: static; width: auto; max-height: 18rem; overflow-y: auto; }
+.bonds-views { display: flex; gap: var(--s-2); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
 /* the institution key: a ring, not a line — the mark it explains is drawn round a person */
 .legend-halo {
-  display: inline-flex; align-items: center; gap: 0.3rem; flex: none;
-  font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase; color: var(--ink);
+  display: inline-flex; align-items: center; gap: var(--s-2); flex: none;
+  font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase; color: var(--ink);
 }
 .legend-halo svg { flex: none; }
 
 /* ── the laws, read and written ── */
-.laws, .laws-admin { display: grid; gap: 0.4rem; font-size: 0.875rem; }
+.laws, .laws-admin { display: grid; gap: var(--s-3); font-size: var(--f-3); }
+
+/* ══ THE SHEET ANSWERS TO ITS OWN WIDTH ════════════════════════════════════════════════════
+   The paper is a 500-to-1040px box on a 320-to-2560px screen, so its lists read the sheet and
+   not the window. */
+
+/* The three cells that fill in from live data reserve their width, so a founder who starts
+   walking does not shove the place-name column sideways on the tick they set off — but only
+   where the sheet HAS the width: on a 320px phone they ate the whole track and four of five
+   names ellipsised. */
+@container (min-width: 26rem) {
+  .rr-state { min-width: 6.5rem; }
+  .rr-mood { min-width: 1.75rem; }
+  .rr-place { min-width: 9rem; }
+}
+/* One 656px row with 450px of empty parchment beside it is not a wide layout. */
+@container (min-width: 46rem) {
+  .roster-list { grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); }
+}
+
+/* ══ TOUCH, AND THE COLOURS THE BROWSER PICKS ══════════════════════════════════════════════ */
+
+/* Forced colours drop `box-shadow`, and the pixel slab IS a box-shadow — the ink ring, the
+   ledge and every chip's edge. Windows High Contrast got a product with no edges at all. */
+@media (forced-colors: active) {
+  .badge, .edition, .era-band, .mark-tip, .key-summary, .legend-chip, .moment-card,
+  .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
+  .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
+  .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
+  .bond-detail, .fps-overlay, .stage-plate, .signpost-arm {
+    border: 2px solid CanvasText;
+  }
+  .paper, .bond-detail, .fps-overlay { border-image: none; }
+  .signpost-arm, .signpost-arm[aria-expanded='true'], .signpost-post { background-image: none; }
+  :focus-visible { outline-color: Highlight; }
+}
+
+/* A finger cannot hover: every lift the sheet paints on :hover stayed lit after the tap. */
+@media (hover: none) {
+  .roster-row:hover, .place-row:hover, .moment-card:hover, .discovery-leaf:hover,
+  .live-pill:hover, .key-summary:hover, .legend-chip:hover, .signpost-arm:hover,
+  .room-door:hover, .rx-full:hover, .roster-sort:hover, .mark:hover .mark-glyph {
+    translate: 0 0;
+  }
+  /* a phone has no Escape key to be told to press */
+  .paper-close-key { display: none; }
+}
 
 [data-broadcast='on'] .signpost,
 [data-broadcast='on'] .paper,
@@ -1379,5 +1609,4 @@ body {
   font-family: var(--font-px); font-size: 24px; line-height: 1;
   letter-spacing: 0.04em;
   color: var(--cream);
-  will-change: transform;
 }

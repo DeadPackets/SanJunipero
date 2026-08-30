@@ -176,9 +176,11 @@ function DayStripView({
         <span className="playhead" style={{ left: `${frac * 100}%` }} />
       </div>
       <button
+        type="button"
         className={live ? 'live-pill live' : 'live-pill'}
         onClick={onLive}
         aria-pressed={live}
+        aria-label="Return to now"
       >
         {live ? 'LIVE' : 'Return to now'}
       </button>

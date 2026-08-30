@@ -327,7 +327,9 @@ describe('★ a bond that decays while its panel is open', () => {
     const html = renderToStaticMarkup(createElement(FadedBond, { onClose: () => {} }))
     expect(html).toContain('This bond has faded')
     expect(html).toContain('aria-label="Close this bond"')
-    expect(html).toContain('role="status"')
+    // One component, one role: it used `status` on this branch and `group` on the other, and a
+    // panel that opened on a click is not an announcement.
+    expect(html).toContain('role="group"')
   })
 
   it('is the branch the graph takes when the lookup finds nothing', () => {

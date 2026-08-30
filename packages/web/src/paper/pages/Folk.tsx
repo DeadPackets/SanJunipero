@@ -10,6 +10,7 @@ import { EMPTY_COPY } from '../../ui/townStats.js'
 import { households } from '../families.js'
 import { CustomsPage } from './Customs.js'
 import { RosterListView } from './RosterList.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_CHANGES: PersonalityRow[] = []
@@ -46,14 +47,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       personalityRows,
     ).data ?? NO_CHANGES
 
-  if (state === null)
-    return (
-      <div aria-busy="true">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="skeleton-row" />
-        ))}
-      </div>
-    )
+  if (state === null) return <Skeleton rows={5} />
 
   // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
   const byName = rosterRows2(

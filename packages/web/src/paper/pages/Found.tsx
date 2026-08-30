@@ -5,6 +5,7 @@ import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discover
 import { itemCropDetail, thingKind } from '../../ui/interaction.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_RECORDS: DiscoveryRecord[] = []
@@ -55,11 +56,7 @@ function Things({ store, thing, onJump }: PageProps) {
       {read.loaded || leaves.length > 0 ? (
         <p className="sheet-note">{recordSummary(leaves, state?.tick ?? 0)}</p>
       ) : (
-        <div aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="skeleton-row" />
-          ))}
-        </div>
+        <Skeleton />
       )}
       {leaves.length === 0 ? (
         read.loaded ? (
@@ -92,15 +89,15 @@ function Things({ store, thing, onJump }: PageProps) {
                   />
                 )}
                 <span className="discovery-body">
-                  <h3>{leaf.record.name}</h3>
-                  <p className="discovery-credit">
+                  <span className="discovery-name">{leaf.record.name}</span>
+                  <span className="discovery-credit">
                     {leaf.when} — {leaf.record.by} worked this out.
-                  </p>
-                  <p className="discovery-quote">“{leaf.record.intent}”</p>
+                  </span>
+                  <span className="discovery-quote">“{leaf.record.intent}”</span>
                   {leaf.record.makes.length > 0 && (
-                    <p className="discovery-makes">
+                    <span className="discovery-makes">
                       After this, anyone could make {leaf.record.makes.map(kindWords).join(', ')}.
-                    </p>
+                    </span>
                   )}
                 </span>
               </button>

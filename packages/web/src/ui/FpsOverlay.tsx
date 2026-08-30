@@ -47,7 +47,7 @@ export function FpsOverlay() {
 
   if (!visible) return null
   return (
-    <div className="fps-overlay" role="status" aria-label="Frames per second">
+    <div className="fps-overlay" role="group" aria-label="Frames per second">
       <span className="fps-now">{current} fps</span>
       <span className="fps-avg">{avg ?? '—'} avg 60s</span>
     </div>

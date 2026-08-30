@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { tickToMoment } from '@sj/shared'
 import { LAW_GROUPS, lawCopyFor, lawGroupOf, lawReadingRank } from '../../ui/lawCopy.js'
 import {
@@ -24,7 +24,7 @@ export function LawsPage(props: PageProps) {
 }
 
 /** Every law of this town and every time it changed. Read-only: there is no write path. */
-function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
+function WorldLawsView({ rows, operator }: { rows: readonly LawRow[]; operator: boolean }) {
   const byGroup = LAW_GROUPS.map((group) => ({
     group,
     rows: rows
@@ -33,7 +33,7 @@ function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
   })).filter((g) => g.rows.length > 0)
 
   return (
-    <div className="laws" aria-label="World Laws">
+    <section className="laws" aria-label="World Laws">
       <p className="sheet-note">
         The rules this town runs on. When one changes, the change is written down here.
       </p>
@@ -55,7 +55,7 @@ function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
                       </div>
                     ))}
                   </dl>
-                  <code className="law-path">{row.path}</code>
+                  {operator && <code className="law-path">{row.path}</code>}
                   {row.overridden && <span className="badge">changed</span>}
                   {row.history.length > 0 && (
                     <ol className="law-history">
@@ -75,40 +75,116 @@ function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
           </ul>
         </section>
       ))}
-    </div>
+    </section>
   )
 }
 
 /** A law moves when a law moves, not when the clock does. Subscribing to the tick rebuilt
  *  every row of every group of the whole config once a tick, with the sheet open. */
-function useLawsSeq(store: PageProps['store']): void {
+function useLawsSeq(store: PageProps['store']): string {
   const seq = (): string =>
     `${store.getConfig() === null ? 'wait' : 'have'}:${store.lawHistory().length}`
-  useSyncExternalStore(store.subscribe, seq, seq)
+  return useSyncExternalStore(store.subscribe, seq, seq)
 }
 
-function World({ store }: PageProps) {
+function World({ store, operatorToken }: PageProps) {
   useLawsSeq(store)
-  return <WorldLawsView rows={lawRows(store.getConfig(), store.getLaws(), store.lawHistory())} />
+
+  return (
+    <WorldLawsView
+      rows={lawRows(store.getConfig(), store.getLaws(), store.lawHistory())}
+      operator={operatorToken !== null}
+    />
+  )
 }
 
 function nextValue(row: EditRow, raw: string): unknown {
   return row.kind === 'boolean' ? raw === 'on' : Number(raw)
 }
 
+/** One law, with the operator's draft of it. The draft lives here rather than on the page so a
+ *  keystroke re-renders this row and not the other forty-one. */
+function LawEdit({
+  row,
+  pending,
+  onSubmit,
+}: {
+  row: EditRow
+  pending: boolean
+  onSubmit: (row: EditRow, raw: string) => void
+}) {
+  const settled = formatLawValue(row.value)
+  const [draft, setDraft] = useState<string | null>(null)
+  const raw = draft ?? settled
+  const id = `law-${row.path}`
+  const stuck = !row.editable || pending
+
+  return (
+    <li className="law-edit">
+      <label htmlFor={id}>{lawCopyFor(row.path)?.title ?? row.path}</label>
+      <code className="law-path">{row.path}</code>
+      <span className="law-value">{settled}</span>
+      {row.kind === 'boolean' ? (
+        <select
+          id={id}
+          value={raw}
+          disabled={stuck}
+          onChange={(e) => {
+            setDraft(e.target.value)
+          }}
+        >
+          <option value="on">on</option>
+          <option value="off">off</option>
+        </select>
+      ) : (
+        <input
+          id={id}
+          type="number"
+          step="any"
+          value={raw}
+          disabled={stuck}
+          onChange={(e) => {
+            setDraft(e.target.value)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSubmit(row, raw)
+          }}
+        />
+      )}
+      <button
+        type="button"
+        className="rx-full"
+        disabled={stuck || raw === settled}
+        onClick={() => {
+          onSubmit(row, raw)
+        }}
+      >
+        Set
+      </button>
+      {!row.editable && row.kind === 'other' && (
+        <span className="badge">set it from the channel</span>
+      )}
+    </li>
+  )
+}
+
 // Operator-only. Says so out loud, and offers nothing at all without a token, so a viewer who
 // wanders onto the tab sees no control surface to guess at.
 function Admin({ store, operatorToken }: PageProps) {
-  useLawsSeq(store)
-  const [notice, setNotice] = useState<string | null>(null)
+  const seq = useLawsSeq(store)
+  const [notice, setNotice] = useState<{ words: string; ok: boolean } | null>(null)
   const [pending, setPending] = useState<string | null>(null)
+  const rows = useMemo(
+    () =>
+      operatorToken === null
+        ? []
+        : editRows(lawRows(store.getConfig(), store.getLaws(), store.lawHistory()), operatorToken),
+    // `seq` is the dependency: the rows move when a law does, not when the clock does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, operatorToken, seq],
+  )
 
   if (operatorToken === null) return <p className="feed-empty">{EMPTY_COPY.admin}</p>
-
-  const rows = editRows(
-    lawRows(store.getConfig(), store.getLaws(), store.lawHistory()),
-    operatorToken,
-  )
 
   async function submit(row: EditRow, raw: string): Promise<void> {
     setPending(row.path)
@@ -121,56 +197,43 @@ function Admin({ store, operatorToken }: PageProps) {
     })
     setPending(null)
     // Never write the new value here: the page moves when the delta lands.
-    setNotice(r.ok ? `${row.path} — asked; it lands at the next tick.` : r.message)
+    setNotice({
+      words: r.ok ? `${row.path} — asked; it lands at the next tick.` : r.message,
+      ok: r.ok,
+    })
+  }
+
+  // The three sections above report failures only; an empty string is their "it went through".
+  const refused = (words: string): void => {
+    setNotice(words === '' ? null : { words, ok: false })
   }
 
   return (
-    <div className="laws-admin" aria-label="World law controls">
+    <section className="laws-admin" aria-label="World law controls">
       <p className="sheet-note operator">
         The operator’s page — the one write path in the whole product. A mind never sees it.
       </p>
       {notice !== null && (
-        <p className="laws-notice" role="status">
-          {notice}
+        <p className="laws-notice" role={notice.ok ? undefined : 'alert'}>
+          {notice.words}
         </p>
       )}
-      <ClockSection token={operatorToken} onNotice={setNotice} />
+      <ClockSection token={operatorToken} onNotice={refused} />
       <SpendSection token={operatorToken} />
-      <RulingsSection token={operatorToken} onNotice={setNotice} />
-      <ExportLink token={operatorToken} onNotice={setNotice} />
+      <RulingsSection token={operatorToken} onNotice={refused} />
+      <ExportLink token={operatorToken} onNotice={refused} />
 
       <h3 className="feed-head">Laws</h3>
       <ul className="laws-edit-list">
         {rows.map((row) => (
-          <li key={row.path} className="law-edit">
-            <label htmlFor={`law-${row.path}`}>{row.path}</label>
-            <span className="law-value">{formatLawValue(row.value)}</span>
-            {row.kind === 'boolean' ? (
-              <select
-                id={`law-${row.path}`}
-                value={row.value === true ? 'on' : 'off'}
-                disabled={!row.editable || pending === row.path}
-                onChange={(e) => void submit(row, e.target.value)}
-              >
-                <option value="on">on</option>
-                <option value="off">off</option>
-              </select>
-            ) : (
-              <input
-                id={`law-${row.path}`}
-                type="number"
-                step="any"
-                defaultValue={typeof row.value === 'number' ? row.value : ''}
-                disabled={!row.editable || pending === row.path}
-                onBlur={(e) => void submit(row, e.target.value)}
-              />
-            )}
-            {!row.editable && row.kind === 'other' && (
-              <span className="badge">set it from the channel</span>
-            )}
-          </li>
+          <LawEdit
+            key={row.path}
+            row={row}
+            pending={pending === row.path}
+            onSubmit={(r, raw) => void submit(r, raw)}
+          />
         ))}
       </ul>
-    </div>
+    </section>
   )
 }
