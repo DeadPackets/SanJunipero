@@ -154,8 +154,7 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
   return { ...base, ...overrides }
 }
 
-// A flat, foodless, waterless world: every horizon a perception test reads is a distance and
-// nothing else.
+// Flat, foodless, waterless: every horizon a perception test reads is a distance and nothing else.
 export const FLAT_WORLD = {
   isWalkable: () => true,
   isEdible: () => false,
@@ -164,8 +163,7 @@ export const FLAT_WORLD = {
   nearestFood: () => null,
 }
 
-/** The runtime's own plumbing around an authored state: the world tick, the loop and the bridge
- *  a perception is read from, so a prose test reads packets the runtime would have produced. */
+/** The real world tick, loop and bridge, so a prose test reads packets the runtime would produce. */
 export function wireTown(opts: {
   state: WorldState
   store: EventStore

@@ -1,8 +1,4 @@
-// Last of four files, and the only one that renders bytes. A mind's prompt is built by:
-//   runtime/bridge.ts        the world -> a PerceptionPacket
-//   prompt/prose.ts          the packet -> the prose of block 6
-//   runtime/agentRuntime.ts  fills the PromptBlocks below, turn by turn
-//   prompt/assemble.ts       renders them into system + messages (here)
+// Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
@@ -25,7 +21,6 @@ export type IdentityCore = {
 
 type JournalEntry = { day: number; text: string }
 
-/** What a deliberate cast back over one's own past brought up, ready to be read next turn. */
 export type Recalled = { query: string; memories: string[] }
 
 export type PromptBlocks = {
@@ -53,7 +48,6 @@ const BLOCK_DELIM = '\n\n---\n\n'
 
 const DAYLOG_COMPACTION_TOKENS = 6000
 
-/** Pages a mind can turn back in one sitting. */
 export const JOURNAL_LINES = 5
 const JOURNAL_MAX_CHARS = 1200
 
@@ -92,14 +86,12 @@ function renderPersonality(p: PromptBlocks['personality']): string {
   return lines.join('\n')
 }
 
-// Rereading one's own book is the physical version of recall: the last few pages in the order
-// they were written, oldest dropped first so a long hand cannot flood the page.
+// Oldest pages drop first, so one long hand cannot flood the page.
 function renderJournal(entries: JournalEntry[]): string {
   const lines = entries.slice(-JOURNAL_LINES).map((e) => `Day ${e.day}: ${e.text}`)
   while (lines.length > 1 && lines.join('\n').length > JOURNAL_MAX_CHARS) lines.shift()
   if (lines.length === 0) return ''
   const page = lines.join('\n')
-  // A single page longer than the whole budget is cut at a word, and the ellipsis shows the cut.
   const bounded =
     page.length <= JOURNAL_MAX_CHARS
       ? page
@@ -107,8 +99,7 @@ function renderJournal(entries: JournalEntry[]): string {
   return `You turn back the pages of your own book:\n${bounded}`
 }
 
-// What the beat spent casting back brought up. Nothing is an answer too, and it is said plainly
-// rather than left as silence the mind would read as never having asked.
+// Nothing is said plainly: silence would read to the mind as never having asked.
 function renderRecall(recalled: Recalled): string {
   const opening = `You cast your mind back to ${recalled.query}.`
   if (recalled.memories.length === 0) return `${opening} Nothing comes back.`
@@ -150,9 +141,8 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const recalled = blocks.recalled === null ? '' : renderRecall(blocks.recalled)
   const now = blocks.now.prose
   const heard = blocks.now.heard ?? ''
-  // One order drives all three readings of the blocks. The book changes only when the mind
-  // writes in it, dayLog is append-only all day, and the scene changes every turn: stable
-  // before volatile keeps the byte prefix cacheable.
+  // Stable before volatile — the book changes only when the mind writes in it, dayLog is
+  // append-only, the scene changes every turn — so the byte prefix stays cacheable.
   const ordered = [journal, dayLog, scene, recalled, now, heard]
   const messages = ordered
     .filter((content) => content.length > 0)

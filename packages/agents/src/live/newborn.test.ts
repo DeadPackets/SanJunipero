@@ -49,8 +49,7 @@ function specFor(id: string, sex: 'f' | 'm'): MindSpec {
   }
 }
 
-// Answers the mother's naming call and nothing else; every other caller gets an idle turn.
-// `refuseNaming` makes her answer with nothing, which is a call that happened and cost money.
+// `refuseNaming` answers with nothing: a call that happened and cost money.
 function scriptedModel(refuseNaming: boolean, namingCalls: { n: number }): MockLanguageModelV4 {
   return new MockLanguageModelV4({
     doGenerate: async (options) => {
@@ -304,7 +303,6 @@ describe('★ a born mind survives a restart', () => {
     t.bear()
     await t.settle(() => birthAlerts(t.opsDb).some((a) => a.kind === 'birth_failed'))
 
-    // The window the concern names: a body in the world, and a person with no origin.
     expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual([])
     expect(socialNames(t.opsDb)).toEqual([])
     expect(t.booted.runtimes.has(CHILD)).toBe(false)

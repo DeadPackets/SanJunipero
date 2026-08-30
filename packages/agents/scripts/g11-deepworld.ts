@@ -44,8 +44,7 @@ import {
 // Cross-package by relative path on purpose: @sj/arbiter and @sj/narrator both depend on
 // @sj/agents, so a package-level dependency here would close a cycle.
 import { makeArbiter, type Codified } from '../../arbiter/src/adjudicate.js'
-// Same relative-path convention as the arbiter imports above. The discovery-art watcher lives
-// in `@sj/live` because `packages/forge` belongs to another lane (controller ruling).
+// Same relative-path convention as the arbiter imports above.
 import { noDiscoveryArt } from '../../live/src/discoveryArt.js'
 import { GENESIS_CODEX } from '../../arbiter/src/canon.js'
 import { CodexStore } from '../../arbiter/src/codex.js'
@@ -1181,7 +1180,6 @@ async function main(): Promise<void> {
     const firstExpressive = adjudications.find(isExpressive) ?? null
     const { reusedBy, reuseArbiterCalls } = reuse
 
-    // --- the chronicle, over every C11 event that fired ---
     const C11_TYPES = new Set([
       'agent_afflicted',
       'affliction_worsened',
@@ -1224,15 +1222,13 @@ async function main(): Promise<void> {
       .filter((l): l is string => l !== null)
     const violations = chronicleViolations(lines)
 
-    // --- feet, and the trail they wore ---
     const trafficValues = Object.values(finalState.traffic ?? {})
     const tilesWorn = allEvents.filter(
       (e) => e.type === 'tile_changed' && payloadOf(e).reason === 'worn',
     ).length
 
-    // --- the three named world assertions ---
-    // Each is asked of a FRESH body dropped into a copy of the town the run left standing: a
-    // founder who has been on her feet for two days answers about her own legs, not the river.
+    // A FRESH body in a copy of the standing town: a founder two days on her feet would answer
+    // about her own legs, not the river.
     const PROBE = 'probe_walker'
     const probeWorld = (
       at: { x: number; y: number },
@@ -1280,9 +1276,8 @@ async function main(): Promise<void> {
     })()
 
     const farBank = (() => {
-      // The town stands east of the river, so the far bank is the west one — a bridge away, and
-      // the legs are asked for it anyway (batch-6 ruling 1: stopping at the shore is correct
-      // physics, not a path bug).
+      // The town stands east of the river, so the far bank is the west one. Stopping at the
+      // shore is correct physics, not a path bug.
       const y = fordAt.y
       const s = probeWorld({ x: spit.x, y })
       const asked = submitIntent(s, config, PROBE, 'walk', { x: fordAt.x - 6, y })
@@ -1300,8 +1295,6 @@ async function main(): Promise<void> {
       }
     })()
 
-    // The winter ladder, probed on the town the run actually left standing (batch-5 ruling 1):
-    // three fresh bodies, one deep-winter night, and the cold ticks each of them was billed.
     const clothedSurvive = (() => {
       const NIGHT = 3 * 91 * MINUTES_PER_DAY + 22 * 60
       const home = Object.values(finalState.structures).find((x) => x.kind === 'house')
@@ -1363,7 +1356,6 @@ async function main(): Promise<void> {
           ` inside cold=${cold('probe_inside')} warmth=${s.agents.probe_inside!.needs.warmth.toFixed(1)};` +
           ` hearth cold=${cold('probe_hearth')} warmth=${s.agents.probe_hearth!.needs.warmth.toFixed(1)}`,
       )
-      // Four walls and a fed fire are each an answer to the cold; bare ground is not.
       return (
         alive('probe_inside') &&
         alive('probe_hearth') &&
@@ -1374,12 +1366,9 @@ async function main(): Promise<void> {
       )
     })()
 
-    // --- the measurements (batch-3 r5, batch-4 r5), taken on a GROWN map ---
     const grown = (() => {
       const w = finalState.terrain[0]!.length
-      // WORLD_MARGIN, not `mapGrowth.step`: the ceiling and the pace it was guessed against were
-      // deleted when growth became a clearance, and this line kept compiling only because
-      // `packages/agents/scripts` was never typechecked. One block pitch is the derived unit.
+      // WORLD_MARGIN, not `mapGrowth.step`: growth is a clearance, so one block pitch is the unit.
       const strip = Array.from({ length: WORLD_MARGIN }, () =>
         Array.from({ length: w }, (): TileId => 0),
       )
@@ -1400,7 +1389,6 @@ async function main(): Promise<void> {
     const foldMs = performance.now() - foldStart
     const replayHashMatches = stateHash(replayed) === stateHash(finalState)
 
-    // --- discretionary time, per mind per sim-day (controller ruling 2026-08-17) ---
     const started = allEvents.filter((e) => e.type === 'action_started')
     const completed = allEvents.filter((e) => e.type === 'action_completed')
     const discretion: G11Discretion[] = []
@@ -1430,13 +1418,10 @@ async function main(): Promise<void> {
         })
       }
     }
-    // What a body actually has to eat in a day to stay level, from the world's own numbers.
     const mealsNeeded =
       (config.needs.hungerDecayPerTick * MINUTES_PER_DAY) / config.needs.eatRestoreHunger
 
-    // --- what a gather produced, and whether any of it was ever eaten ---
-    // §18 asks for a forage, hunt or fish "yielding food that gets eaten", which is one fact
-    // and not two counts: the item a gather spawned has to be the item somebody swallowed.
+    // One fact, not two counts: the item a gather spawned has to be the item somebody swallowed.
     const gathered = (() => {
       const GATHER_VERBS = new Set(['forage', 'fish', 'hunt', 'harvest'])
       const fromGathering = new Set<string>()
@@ -1460,8 +1445,7 @@ async function main(): Promise<void> {
       return { acts, eaten }
     })()
 
-    // A visible response is a hand, a thing put into her hands, or her name in somebody's mouth:
-    // recovery and death both pass, silence does not. The window is the stretch she was ill for.
+    // A visible response: a hand, a thing put in her hands, or her name in a mouth — not silence.
     const illFrom = 0
     const illTo =
       allEvents.find((e) => e.type === 'affliction_recovered' && payloadOf(e).agentId === SICK_ONE)
@@ -1491,9 +1475,7 @@ async function main(): Promise<void> {
         ? ('standing' as const)
         : ('recovered' as const)
 
-    // --- perception in the dark, read out of the run's own memory rows ---
-    // The sentence `perceptionToProse` writes when `packet.light` reads 'dark' — the words a
-    // mind actually saw, not the band name, which never reaches a prompt (G10).
+    // The sentence `perceptionToProse` writes for 'dark': the band name never reaches a prompt.
     const DARK_LINE = 'The night is close around you'
     const darkPerceptions = qInt(
       db,
@@ -1507,7 +1489,6 @@ async function main(): Promise<void> {
         `%${DARK_LINE}%`,
       )[0]?.text ?? null
 
-    // --- the recognizer's own rows, and the naming law over them ---
     const constructRows = constructStore.all()
     const namingLawHolds = constructRows.every(
       (c) => c.name === null || c.nameProvenance?.quote.includes(c.name) === true,

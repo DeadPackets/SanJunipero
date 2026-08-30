@@ -3,8 +3,7 @@ import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { IntentSchema } from '../../src/turn.js'
 
-// A rollback point, not a bookmark: an atomic VACUUM INTO with the accumulators written inside,
-// so a resume drops the tail. Four rules bar laundering: fingerprint, forward-only, hash, resumes.
+// An atomic VACUUM INTO with the accumulators written inside, so a resume drops the tail.
 
 // 2: a version-1 checkpoint carries no count of the nights it lost, so it cannot be resumed
 // into a run that reports one.
@@ -32,8 +31,8 @@ const Accepted = z
   .object({ tick: z.number().int(), agentId: z.string(), verb: z.string() })
   .strict()
 const SpendProjection = z.object({ tick: z.number().int(), usdPerSimDay: z.number() }).strict()
-// The shape of `RuntimeSnapshot`, written out. The test holds the two to each other so a field
-// added to a mind's clock cannot be silently dropped by a resume.
+// Mirrors `RuntimeSnapshot`; a test holds the two together so a field added to a mind's clock
+// cannot be silently dropped by a resume.
 const MindClockZ = z
   .object({
     lastTurnTick: z.number().nullable(),
@@ -81,8 +80,7 @@ const MindSnapshot = z
   })
   .strict()
 
-// Everything that decides whether two runs are the same run. A resume across ANY difference
-// here is a different gate wearing the first one's evidence.
+// Every field that decides whether two runs are the same run: any difference bars a resume.
 const G11FingerprintSchema = z
   .object({
     gitSha: z.string(),
@@ -99,8 +97,7 @@ const G11FingerprintSchema = z
   .strict()
 export type G11Fingerprint = z.infer<typeof G11FingerprintSchema>
 
-// The run's memory: nothing here is in the event log, and every field feeds a criterion or
-// the transcript.
+// Nothing here is in the event log, so only the checkpoint can carry it across a resume.
 const G11SidecarSchema = z
   .object({
     tick: z.number().int(),
@@ -116,8 +113,7 @@ const G11SidecarSchema = z
     nightsRun: z.array(z.number().int()),
     semanticRan: z.boolean(),
     semanticErrors: z.number().int(),
-    // Restored like the rest: a resume that zeroed it would turn a lost night into one that
-    // never happened.
+    // A resume that zeroed this would turn a lost night into one that never happened.
     semanticSkippedNights: z.number().int(),
     narrateErrors: z.number().int(),
     constructErrors: z.number().int(),
@@ -146,8 +142,7 @@ export function migrateCheckpointTable(db: Database.Database): void {
   )
 }
 
-// Which fields of the saved run differ from the one asking to continue it. Empty means the two
-// are the same run and the resume is allowed.
+// Empty means the two are the same run and the resume is allowed.
 export function fingerprintMismatch(saved: G11Fingerprint, now: G11Fingerprint): string[] {
   const out: string[] = []
   const say = (field: string, a: unknown, b: unknown): void => {
@@ -203,8 +198,7 @@ export function writeCheckpoint(
   renameSync(tmp, snapshotPath)
 }
 
-// Put the snapshot back where the live database lives, and clear the write-ahead files that
-// belong to the database being replaced — leaving them would fold a dead tail back in.
+// The -wal/-shm of the replaced database must go too, or a dead tail folds back in.
 export function restoreSnapshot(snapshotPath: string, dbPath: string): void {
   if (!existsSync(snapshotPath)) throw new Error(`no checkpoint snapshot at ${snapshotPath}`)
   for (const suffix of ['', '-wal', '-shm']) rmSync(`${dbPath}${suffix}`, { force: true })

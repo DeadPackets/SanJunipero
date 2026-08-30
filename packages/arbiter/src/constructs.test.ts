@@ -56,7 +56,6 @@ const NAMING = (day: number): SimEvent =>
 
 const threeNights = (): SimEvent[] => [...gathering(1), ...gathering(3), ...gathering(5)]
 
-// Answers every candidate key the prompt listed with the same construct type.
 const ruleEvery =
   (type = 'festival') =>
   ({ user }: ScriptedCall): unknown => ({

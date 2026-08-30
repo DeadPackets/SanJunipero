@@ -36,8 +36,7 @@ const kin = (ctx: Ctx, id: string): boolean => ctx.relation(id) !== null
 
 type Say = (p: Record<string, unknown>, ctx: Ctx) => Phrased | null
 
-// The authored table, and the only event types a seeding reads: a type absent from it is not part
-// of what a newborn is told, and nothing here invents a happening the log does not carry.
+// The only event types a seeding reads: nothing here invents a happening the log does not carry.
 const PHRASINGS: Readonly<Record<string, Say>> = {
   structure_planned: (p, ctx) => {
     const str = strOf(p)

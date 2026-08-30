@@ -153,7 +153,6 @@ const cards = (): Card[] => {
 const UTTERANCE =
   /\b(say|says|saying|open|opens|start|starts|begin|begins|greet|greets|answer|answers|replies|reply)\b[^"'“]{0,20}["'“]/i
 
-// One tree walk for the whole file: every assertion below reads the same scan.
 const CARDS = cards()
 
 describe('★ a tic is a habit, not a script — over every cast in the repo', () => {

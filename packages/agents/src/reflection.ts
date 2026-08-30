@@ -39,8 +39,7 @@ function dayDigest(dayMemories: MemoryRow[]): string {
   return full.length <= FALLBACK_DIGEST_CHARS ? full : `${full.slice(0, FALLBACK_DIGEST_CHARS)}…`
 }
 
-// Only a refused budget, unusable model output or a transient provider stall degrade the
-// night. Anything else is a real fault and belongs to the caller's alert path.
+// Anything not listed here is a real fault and belongs to the caller's alert path.
 // Matched by name, not by class: an abort wrapped on its way up is the same stall.
 function isDegradable(err: unknown): boolean {
   return (
@@ -337,8 +336,8 @@ export const ProposeEditSchema = z.discriminatedUnion('verdict', [
 ])
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
-  // E2: with the night's thinking off, facts and scenes came back identical and only the
-  // personality edit thinned out — so this one call keeps it and the other five do not.
+  // With the night's thinking off, facts and scenes came back identical and only the personality
+  // edit thinned out, so this one call keeps reasoning and the other five do not.
   const editClient = client.withReasoning(null)
   return {
     async extractFacts(dayMemories) {

@@ -287,7 +287,6 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     )
   })
 
-  // The model answering with its own class id. Two word rosters and no shape test let it through.
   it('★ swaps a reason that is a machine token, not a sentence', async () => {
     for (const token of [
       'INSUFFICIENT_MATERIALS',
@@ -307,7 +306,6 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     }
   })
 
-  // prompt.ts states the law and the validation loop enforced three others and not this one.
   it('★ swaps a refusal whose own words say the act can be attempted', async () => {
     for (const leak of [
       'she can attempt this, but not here',

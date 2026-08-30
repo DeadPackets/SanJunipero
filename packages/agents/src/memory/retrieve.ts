@@ -217,8 +217,7 @@ export async function retrieveAmbient(
   return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w, 'ambient')
 }
 
-/** A mind spending a beat on its own past, in its own words. Same hybrid score as the ambient
- *  pass; only the miss-log tells the two apart. */
+/** Same hybrid score as the ambient pass; only the miss-log tells the two apart. */
 export async function retrieveRecall(
   store: MemoryStore,
   query: string,

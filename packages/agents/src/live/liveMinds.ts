@@ -27,7 +27,6 @@ export type BootedMinds = {
   /** Who is in the town, by id — the founders plus everyone born since. A newborn's parents
    *  are read from here, so it grows as `add` is called. */
   cast: ReadonlyMap<string, MindSpec>
-  /** Bring one more mind up on a town that is already running: a birth. */
   add(spec: MindSpec): void
   /** What each mind is carrying that is not in its database — the clock, the half-run plan,
    *  the turn counts. The only thing a resume has to write down itself. */

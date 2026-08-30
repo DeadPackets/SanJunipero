@@ -19,9 +19,8 @@ export function migrateFamilyTables(db: Database.Database): void {
   `)
 }
 
-/** The mother has already been ASKED for this child, so no later boot pays for the call again.
- *  An empty `social_name` is the asked-and-nothing-came-back row; a real name can still land
- *  later, and the newest row wins. */
+/** Asked-and-answered, so no later boot pays for the call again. An empty `social_name` is the
+ *  asked-and-nothing-came-back row, and the newest row wins. */
 export function hasSocialName(db: Database.Database, agentId: string): boolean {
   return (
     db.prepare('SELECT 1 FROM social_names WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined

@@ -25,10 +25,6 @@ export type BirthsOpts = {
   log?: (line: string) => void
 }
 
-/**
- * Every `agent_born` in the world's log becomes a mind: a persona derived from its parents, the
- * household it was born into written down as memory, and the mother asked what she calls it.
- */
 export function wireBirths(opts: BirthsOpts): () => void {
   migrateFamilyTables(opts.opsDb)
 

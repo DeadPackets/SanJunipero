@@ -65,7 +65,6 @@ describe('ensureHousehold', () => {
     await ensureHousehold({ store, db, embedder: real }, BORN, BIRTH)
     expect(texts(db)).toEqual([HOUSE_LINE, BORN_LINE])
 
-    // And a third boot writes nothing: the seed is done.
     await ensureHousehold({ store, db, embedder: real }, BORN, BIRTH)
     expect(texts(db)).toEqual([HOUSE_LINE, BORN_LINE])
     db.close()
