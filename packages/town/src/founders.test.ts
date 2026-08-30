@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { RngStreams, doorTile, findPath, fold, genesisState, makeFixtureMap } from '@sj/engine'
+import {
+  RngStreams,
+  awakeEnergyDecay,
+  doorTile,
+  findPath,
+  fold,
+  genesisState,
+  makeFixtureMap,
+} from '@sj/engine'
 import type { WorldState } from '@sj/engine'
 import { FOUNDER_IDS, INTERIOR_KINDS } from '@sj/shared'
 import { libraryEntry } from '@sj/forge'
@@ -142,6 +150,23 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
     const stranded = at(6, 32, SHOWCASE_CONFIG.needs.collapseThreshold + 1)
     expect(arrivesStanding(stranded, SHOWCASE_CONFIG, 'omar', door)).toBe(false)
     expect(homeIntent(stranded, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
+  })
+
+  it('★ prices the two ticks at the door, so the walk never ends in a collapse on the step', () => {
+    // Enough for the walk and nothing more: enter and sleep would take the body under the
+    // threshold, and a body on the step that cannot sleep is the collapse the storm run found.
+    const far = at(6, 32, GO_HOME_BELOW - 1)
+    const decay = awakeEnergyDecay(SHOWCASE_CONFIG, far.agents.omar!)
+    const need = walkEnergyCost(far, SHOWCASE_CONFIG, 'omar', door)! + 2 * decay
+    const floor = SHOWCASE_CONFIG.needs.collapseThreshold
+    const oneTickShort = at(6, 32, floor + need - decay)
+    expect(arrivesStanding(oneTickShort, SHOWCASE_CONFIG, 'omar', door)).toBe(true)
+    expect(homeIntent(oneTickShort, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
+    const oneTickSpare = at(6, 32, floor + need + decay)
+    expect(homeIntent(oneTickSpare, SHOWCASE_CONFIG, 'omar')).toEqual({
+      verb: 'walk',
+      params: { x: door.x, y: door.y },
+    })
   })
 
   it('★ and a body with NO path home lies down too, rather than answering nothing', () => {
