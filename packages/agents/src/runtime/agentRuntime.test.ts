@@ -1425,3 +1425,71 @@ describe('refusal prose teaches a path (T18)', () => {
     expect(reason).toBe('you have not the hands for it')
   })
 })
+
+describe("a beat spent on one's own past", () => {
+  const RECALL_TURN = {
+    thought: 'I have stood here before.',
+    recall: 'the storehouse',
+    speech: 'I will say nothing.',
+    action: { verb: 'walk', params: { x: 5, y: 6 } },
+    journal: 'and write nothing either',
+    importance: 6,
+  }
+
+  it('spends the whole beat: nothing else in that answer reaches the world', async () => {
+    const { world, loop, runtime, agentDb } = await setup({
+      model: turnModel([RECALL_TURN], RECALL_TURN),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
+    expect(spokeTexts(world.engineDb)).toEqual([])
+    expect(startedVerbs(world.engineDb)).toEqual([])
+    expect(journalRows(agentDb)).toEqual([])
+    // The thought is still the mind's, and still remembered, and the letting-go is counted.
+    expect(memoriesOfKind(agentDb, 'thought').map((m) => m.text)).toContain(
+      'I have stood here before.',
+    )
+    expect(alertKinds(agentDb)).toContain('recall_took_the_beat')
+  })
+
+  it("writes the miss as a recall, not as the turn's free ambient pass", async () => {
+    const { loop, runtime, agentDb } = await setup({
+      model: turnModel([RECALL_TURN], BENIGN_TURN),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
+    const modes = (
+      agentDb.prepare('SELECT DISTINCT mode FROM recall_misses').all() as { mode: string }[]
+    ).map((r) => r.mode)
+    expect(modes).toContain('recall')
+  })
+
+  it('hands what came back to the next turn, once', async () => {
+    const { model, prompts } = capturingModel([RECALL_TURN, BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 3, 90)
+    const said = (turn: number): string =>
+      prompts[turn]!.filter((m) => m.role === 'user')
+        .map((m) => m.text)
+        .join('\n')
+    expect(said(0)).not.toContain('You cast your mind back')
+    expect(said(1)).toContain('You cast your mind back to the storehouse.')
+    expect(said(2)).not.toContain('You cast your mind back')
+  })
+
+  it('reads its own book back, dated by the day the world counts', async () => {
+    const { model, prompts } = capturingModel([
+      { thought: 'Worth writing down.', journal: 'The roof held.', importance: 6 },
+      BENIGN_TURN,
+    ])
+    const { loop, runtime } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, journalTicks: 0 },
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
+    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain('turn back the pages')
+    expect(prompts[1]!.find((m) => m.role === 'user')!.text).toBe(
+      'You turn back the pages of your own book:\nDay 1: The roof held.',
+    )
+  })
+})

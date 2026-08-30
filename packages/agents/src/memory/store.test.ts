@@ -264,6 +264,16 @@ describe('facts, summaries, journal, autobiography, miss log', () => {
     ])
   })
 
+  it('reading the book back gives the last pages, oldest first', async () => {
+    const { store } = await makeStore()
+    for (let i = 0; i < 8; i += 1) store.insertJournal(i * 1440, i, `page ${i}`)
+    expect(store.recentJournal(3)).toEqual([
+      { tick: 5 * 1440, text: 'page 5' },
+      { tick: 6 * 1440, text: 'page 6' },
+      { tick: 7 * 1440, text: 'page 7' },
+    ])
+  })
+
   it('autobiography appends and reads back paragraphs in order', async () => {
     const { store } = await makeStore()
     store.appendAutobiography(1, 'I was born by the river.')

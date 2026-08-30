@@ -11,6 +11,8 @@ const promptFor = (mind: (typeof FOUNDER_MINDS)[number]): string => {
     rulesOfBeing: RULES_OF_BEING,
     identity: mind.identity,
     personality: { doc: mind.personality, autobiography: [] },
+    journal: [],
+    recalled: null,
     scene: { ledgers: [], memories: [] },
     dayLog: ['The morning is bright and the valley is awake.'],
     now: { prose: 'You are standing on the road outside your own door.' },

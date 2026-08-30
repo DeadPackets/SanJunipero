@@ -224,11 +224,16 @@ function seasonPart(dayOfSeason: number): string {
   return dayOfSeason <= (DAYS_PER_SEASON * 2) / 3 ? 'mid' : 'late'
 }
 
+// What the world CALLS this day, which is one more than the zero-based `day` column every
+// table stores. Anything dated for a mind counts days the way the calendar line says them.
+export function worldDay(tick: number): number {
+  return Math.floor(tick / MINUTES_PER_DAY) + 1
+}
+
 // The calendar every mind shares, said the same way every turn. The phase is
 // `dayPhaseFromTick` and never a second derivation.
 export function calendarLine(time: SimTime): string {
-  const day = Math.floor(time.tick / MINUTES_PER_DAY) + 1
-  return `It is day ${day}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
+  return `It is day ${worldDay(time.tick)}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
 }
 function footprintPhrase(w: number, h: number): string {
   if (w <= 1 && h <= 1) return 'one tile wide'

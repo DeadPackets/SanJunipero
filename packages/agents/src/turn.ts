@@ -54,6 +54,13 @@ export const TurnSchema = z
       .min(1)
       .nullish()
       .describe('Words you set down in your own book. Writing takes part of the hour.'),
+    recall: z
+      .string()
+      .min(1)
+      .nullish()
+      .describe(
+        'Something out of your own past to cast your mind back to. Casting back fills the whole moment: you do nothing else with it, and what comes back reaches you a moment later.',
+      ),
     importance: z
       .number()
       .int()

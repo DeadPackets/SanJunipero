@@ -1,6 +1,9 @@
 import { MINUTES_PER_DAY } from '@sj/shared'
 import type { MemoryRow, MemoryStore, MemoryTags } from './store.js'
 
+/** Ambient is the free per-turn pass; recall is the beat a mind chose to spend. */
+type RetrievalMode = 'ambient' | 'recall'
+
 export type SceneCues = {
   people: string[]
   place: string | null
@@ -112,6 +115,7 @@ async function retrieve(
   nowTick: number,
   k: number,
   w: RetrievalWeights,
+  mode: RetrievalMode,
 ): Promise<ScoredMemory[]> {
   const db = store.db
   const agentId = store.agentId
@@ -196,7 +200,7 @@ async function retrieve(
 
   const topScore = top.length > 0 ? top[0]!.score : null
   if (topScore === null || topScore < MISS_TOP_SCORE || top.length < MISS_MIN_RESULTS) {
-    store.logMiss({ tick: nowTick, query, mode: 'ambient', topScore, resultCount: top.length })
+    store.logMiss({ tick: nowTick, query, mode, topScore, resultCount: top.length })
   }
 
   return top
@@ -210,5 +214,17 @@ export async function retrieveAmbient(
   w: RetrievalWeights = DEFAULT_WEIGHTS,
 ): Promise<ScoredMemory[]> {
   const queryTags = cueParts(cues)
-  return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w)
+  return retrieve(store, queryTags.join(' '), queryTags, nowTick, k, w, 'ambient')
+}
+
+/** A mind spending a beat on its own past, in its own words. Same hybrid score as the ambient
+ *  pass; only the miss-log tells the two apart. */
+export async function retrieveRecall(
+  store: MemoryStore,
+  query: string,
+  nowTick: number,
+  k = 8,
+  w: RetrievalWeights = DEFAULT_WEIGHTS,
+): Promise<ScoredMemory[]> {
+  return retrieve(store, query, keywords(query), nowTick, k, w, 'recall')
 }

@@ -59,6 +59,8 @@ export function preflightPrompts(
       rulesOfBeing: RULES_OF_BEING,
       identity,
       personality: { doc: personality, autobiography: [] },
+      journal: [],
+      recalled: null,
       scene: { ledgers: [], memories: [] },
       dayLog: ['The morning is bright and the valley is awake.'],
       now: { prose },

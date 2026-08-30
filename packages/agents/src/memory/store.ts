@@ -270,6 +270,14 @@ export class MemoryStore {
       .all(this.agentId) as { tick: number; day: number; text: string }[]
   }
 
+  /** The last pages of the book, oldest first, for the writer to read back. */
+  recentJournal(limit: number): { tick: number; text: string }[] {
+    const rows = this.db
+      .prepare('SELECT tick, text FROM journal WHERE agent_id = ? ORDER BY id DESC LIMIT ?')
+      .all(this.agentId, limit) as { tick: number; text: string }[]
+    return rows.reverse()
+  }
+
   appendAutobiography(day: number, paragraph: string): void {
     this.db
       .prepare('INSERT INTO autobiography (agent_id, day, paragraph) VALUES (?, ?, ?)')

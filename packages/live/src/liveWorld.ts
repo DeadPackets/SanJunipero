@@ -612,6 +612,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             .get(day * MINUTES_PER_DAY, (day + 1) * MINUTES_PER_DAY) as { n: number }
         ).n
 
+      const journalsOn = (day: number): { tick: number; agent_id: string; text: string }[] =>
+        [...mindDbs.values()].flatMap(
+          (mind) =>
+            mind
+              .prepare('SELECT tick, agent_id, text FROM journal WHERE day = ? ORDER BY id')
+              .all(day) as { tick: number; agent_id: string; text: string }[],
+        )
+
       // What a mind said and what it thought, for the tier-2.5 pass. Speech is a public event;
       // a thought exists only in the observer's own table, which no mind can read.
       const transcriptFor = (day: number, events: SimEvent[]): TranscriptRecord[] => {
@@ -646,7 +654,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           text: t.text,
           memoryRef: `thought:${day}:${i}`,
         }))
-        return [...spoken, ...thought].sort((a, b) => a.tick - b.tick).slice(-SEMANTIC_RECORD_CAP)
+        // A journal is written by hand and read by no one else; deep-world §20 counts it as
+        // testimony the tier-2.5 pass may quote, alongside speech and thought.
+        const journal: TranscriptRecord[] = journalsOn(day).map((j, i) => ({
+          sourceKind: 'journal',
+          agentId: j.agent_id,
+          day,
+          tick: j.tick,
+          text: j.text,
+          memoryRef: `journal:${day}:${j.agent_id}:${i}`,
+        }))
+        return [...spoken, ...thought, ...journal]
+          .sort((a, b) => a.tick - b.tick)
+          .slice(-SEMANTIC_RECORD_CAP)
       }
 
       // ── the recognizer, on the same boundary and off the same thread ──
@@ -707,7 +727,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             worldDb: db,
             events,
             rulebookCount: rulebookCount(),
-            privateCounts: { thoughts: thoughtsOn(day), journals: 0 },
+            privateCounts: { thoughts: thoughtsOn(day), journals: journalsOn(day).length },
             cast: [...(booted?.cast.values() ?? cast)].map((m) => ({
               id: m.id,
               name: m.identity.name,

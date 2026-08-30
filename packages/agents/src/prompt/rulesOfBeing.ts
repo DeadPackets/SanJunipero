@@ -73,8 +73,10 @@ mind, and importance, how deeply the moment matters, one through ten. When you
 choose to, add: speech, words said aloud for those in earshot; action, one act
 begun now; plan, acts your body carries out one after another while your mind
 rests; journal, words set down in your own book, which takes part of the hour;
-reconsider_at, a clock time such as 08:30 when you mean to return to your
-thoughts.
+recall, something out of your own past to cast your mind back to, which fills
+the whole moment so that you do nothing else with it and what comes back
+reaches you a moment later; reconsider_at, a clock time such as 08:30 when you
+mean to return to your thoughts.
 
 What you cannot do yet, the world will show you, and you will learn.`
 

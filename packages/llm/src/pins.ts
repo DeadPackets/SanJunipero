@@ -3,8 +3,7 @@ export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
 // unpriced route. A Wafer outage therefore idles the minds until PROVIDER_ORDER is changed.
 export const PROVIDER_ORDER: string[] = ['Wafer']
-// Empty on purpose. `deepseek/deepseek-chat` stood here and is a floating alias that can swap
-// under a run, which design §1 forbids; no dated snapshot of a second model has been probed.
+// Owner ruling 2026-08-30: the fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }

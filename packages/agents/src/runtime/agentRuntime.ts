@@ -2,19 +2,20 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
-import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
+import type { IdentityCore, AssembledPrompt, PromptBlocks, Recalled } from '../prompt/assemble.js'
+import { assemblePrompt, compactDayLog, JOURNAL_LINES } from '../prompt/assemble.js'
 import {
   heardProse,
   makeablesLine,
   perceptionToProse,
   standingWallsLine,
+  worldDay,
   type PerceptionPacket,
 } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
-import { keywords, retrieveAmbient, type SceneCues } from '../memory/retrieve.js'
+import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import {
   isBlankAnswer,
   parseTurnWithRepair,
@@ -137,6 +138,8 @@ export type RuntimeSnapshot = {
   reflectedNight: number | null
   wasNight: boolean
   pendingDreamMood: string | null
+  // Optional so a checkpoint written before the recall verb existed still resumes.
+  pendingRecall?: Recalled | null | undefined
 }
 
 function freshClock(): MindClock {
@@ -185,6 +188,7 @@ export class AgentRuntime {
   #reflectedNight: number | null = null
   #reflectionInFlight = false
   #pendingDreamMood: string | null = null
+  #pendingRecall: Recalled | null = null
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -230,6 +234,7 @@ export class AgentRuntime {
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
     this.#pendingDreamMood = null
+    this.#pendingRecall = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     this.#started = true
     if (this.#offTick === null) {
@@ -255,6 +260,7 @@ export class AgentRuntime {
       reflectedNight: this.#reflectedNight,
       wasNight: this.#wasNight,
       pendingDreamMood: this.#pendingDreamMood,
+      pendingRecall: this.#pendingRecall,
     }
   }
 
@@ -271,6 +277,7 @@ export class AgentRuntime {
     this.#reflectedNight = s.reflectedNight
     this.#wasNight = s.wasNight
     this.#pendingDreamMood = s.pendingDreamMood
+    this.#pendingRecall = s.pendingRecall ?? null
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -581,8 +588,13 @@ export class AgentRuntime {
         doc: this.#personality.current().doc,
         autobiography: this.#mem!.autobiography(),
       },
+      journal: this.#mem!.recentJournal(JOURNAL_LINES).map((e) => ({
+        day: worldDay(e.tick),
+        text: e.text,
+      })),
       scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
       dayLog: this.#dayLog,
+      recalled: this.#pendingRecall,
       now: { prose: nowProse, heard },
     }
     let assembled = assemblePrompt(blocks)
@@ -622,6 +634,8 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
+    // Read once: a cast back that has been answered is not answered again next turn.
+    this.#pendingRecall = null
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
@@ -676,6 +690,13 @@ export class AgentRuntime {
     const mem = this.#mem!
     // Held for the god: the sentence that reached for whatever this turn is about to try.
     this.#lastThought = turn.thought
+    // Cast back BEFORE this turn's own thought is stored, or the asking answers itself.
+    const recalled = turn.recall
+      ? {
+          query: turn.recall,
+          memories: (await retrieveRecall(mem, turn.recall, tick)).map((m) => m.text),
+        }
+      : null
     await mem.insertMemory({
       tick,
       kind: 'thought',
@@ -684,6 +705,17 @@ export class AgentRuntime {
       tags: EMPTY_TAGS,
     })
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
+
+    // The beat is spent casting back: whatever else the answer carried goes nowhere, and what
+    // comes up waits for the next turn. The plan stands — the body is not what is busy.
+    if (recalled !== null) {
+      this.#pendingRecall = recalled
+      const alsoCarried = [turn.speech, turn.action, turn.plan, turn.journal, turn.reconsider_at]
+      if (alsoCarried.some((v) => (v ?? null) !== null)) {
+        this.#llm.alert('recall_took_the_beat', 'the rest of the answer was let go')
+      }
+      return
+    }
 
     // A turn that speaks or acts directly preempts whatever plan was running.
     if ((turn.speech ?? null) !== null || (turn.action ?? null) !== null) {

@@ -85,6 +85,7 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
           reflectedNight: 0,
           wasNight: false,
           pendingDreamMood: null,
+          pendingRecall: { query: 'the flood', memories: ['The water took the fork.'] },
         },
       },
     ],
@@ -242,6 +243,17 @@ describe('a mind comes back with its clock, not with a fresh one', () => {
     expect(back.clock.reconsiderAtTick).toBe(2920)
     expect(back.clock.prevVisibleIds).toEqual(['salma'])
     expect(back.stats).toEqual({ turns: 27, dozes: 3, reflections: 2 })
+    expect(back.pendingRecall).toEqual({
+      query: 'the flood',
+      memories: ['The water took the fork.'],
+    })
+  })
+
+  it('resumes a checkpoint written before a mind could cast its mind back', () => {
+    const cp = checkpointAt(2880)
+    delete (cp.sidecar.minds[0]!.snapshot as { pendingRecall?: unknown }).pendingRecall
+    writeCheckpoint(db, snapPath, cp)
+    expect(readCheckpoint(db)!.sidecar.minds[0]!.snapshot.pendingRecall).toBeUndefined()
   })
 })
 

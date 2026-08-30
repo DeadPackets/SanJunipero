@@ -10,6 +10,7 @@ import {
   cuesToQuery,
   keywords,
   retrieveAmbient,
+  retrieveRecall,
 } from './retrieve.js'
 
 const TICKS_PER_DAY = 1440
@@ -281,6 +282,35 @@ describe('hybrid retrieval', () => {
       n: number
     }
     expect(missCount.n).toBe(0)
+  })
+
+  it("a deliberate cast back reaches the mind's own words, and its miss is logged as one", async () => {
+    const now = 2 * TICKS_PER_DAY
+    const { db, store } = await makeStore('caster')
+    await store.insertMemory({
+      tick: now - 900,
+      kind: 'perception',
+      text: 'the river took the footbridge in the night',
+      importance: 9,
+      tags: { people: [], place: 'river', objects: [], topics: ['flood'] },
+    })
+
+    const found = await retrieveRecall(store, 'the night the river rose', now)
+    expect(found.map((r) => r.text)).toContain('the river took the footbridge in the night')
+
+    const modes = db.prepare('SELECT mode, query FROM recall_misses ORDER BY id').all() as {
+      mode: string
+      query: string
+    }[]
+    expect(modes).toEqual([{ mode: 'recall', query: 'the night the river rose' }])
+  })
+
+  it('a cast back that finds nothing logs a recall miss with no results', async () => {
+    const { db, store } = await makeStore('empty-caster')
+    expect(await retrieveRecall(store, 'my mother', TICKS_PER_DAY)).toEqual([])
+    expect(db.prepare('SELECT mode, result_count FROM recall_misses ORDER BY id').all()).toEqual([
+      { mode: 'recall', result_count: 0 },
+    ])
   })
 
   it('fencing: agent B never sees agent A rows', async () => {

@@ -53,6 +53,16 @@ describe('TurnSchema', () => {
     expect(IntentSchema.parse({ verb: 'sit' }).params).toEqual({})
   })
 
+  it('parses a turn that spends the beat casting its mind back', () => {
+    const t = TurnSchema.parse({
+      thought: 'I have been here before.',
+      importance: 6,
+      recall: 'the night the river rose',
+    })
+    expect(t.recall).toBe('the night the river rose')
+    expect(TurnSchema.safeParse({ ...validTurn, recall: '' }).success).toBe(false)
+  })
+
   it('FALLBACK_TURN satisfies the schema', () => {
     expect(TurnSchema.parse(FALLBACK_TURN)).toEqual(FALLBACK_TURN)
   })
@@ -60,7 +70,7 @@ describe('TurnSchema', () => {
   it('keeps a complete turn that wrote null where it had nothing to say', () => {
     // A null in an optional field is the model saying "none", not a malformed answer — a strict
     // optional throws away a whole valid turn over it.
-    for (const key of ['speech', 'action', 'plan', 'journal', 'reconsider_at'] as const) {
+    for (const key of ['speech', 'action', 'plan', 'journal', 'recall', 'reconsider_at'] as const) {
       const parsed = TurnSchema.safeParse({ ...validTurn, [key]: null })
       expect(parsed.success, key).toBe(true)
     }
@@ -74,12 +84,14 @@ describe('TurnSchema', () => {
       action: null,
       plan: null,
       journal: null,
+      recall: null,
       reconsider_at: null,
     })
     expect(t.speech ?? undefined).toBeUndefined()
     expect(t.action ?? undefined).toBeUndefined()
     expect(t.plan ?? undefined).toBeUndefined()
     expect(t.journal ?? undefined).toBeUndefined()
+    expect(t.recall ?? undefined).toBeUndefined()
     expect(t.reconsider_at ?? undefined).toBeUndefined()
   })
 
