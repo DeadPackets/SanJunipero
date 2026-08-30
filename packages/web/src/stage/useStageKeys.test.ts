@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { cameraActionFor } from '../render/cameraNav.js'
+import { KEY_MAP_KEY } from './KeyMap.js'
 import { stageKeyAllowed, stageKeyFor } from './useStageKeys.js'
 
 describe('the four keys the stage itself owns', () => {
@@ -58,7 +59,16 @@ describe('★ no other window listener in the tree claims a stage key', () => {
   const FPS = readFileSync(new URL('../ui/FpsOverlay.tsx', import.meta.url), 'utf8')
 
   it('★ leaves the frame meter on a key the stage does not own', () => {
-    const key = /e\.key === '(.)'/.exec(FPS)![1]!
+    const key = /e\.key\.toLowerCase\(\) !== '(.)'/.exec(FPS)![1]!
     expect(stageKeyFor(key), `the meter and the stage both claim "${key}"`).toBeNull()
+    // and it is a chord, so the bare letter still belongs to whoever wants it next
+    expect(FPS).toContain('e.shiftKey')
+  })
+
+  it('★ the key map owns `?` alone', () => {
+    const MAP = readFileSync(new URL('./KeyMap.tsx', import.meta.url), 'utf8')
+    expect(stageKeyFor(KEY_MAP_KEY)).toBeNull()
+    expect(MAP).toContain('e.key !== KEY_MAP_KEY')
+    expect(FPS).not.toContain("'?'")
   })
 })

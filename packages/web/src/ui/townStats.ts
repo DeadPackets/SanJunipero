@@ -64,6 +64,14 @@ export const EMPTY_COPY = {
     'the law channel’s key.',
 } as const
 
+// The third read state, and the reason it is not up there. An empty state says what the TOWN has
+// not done; this says what the WIRE has not carried. A refused read used to print the empty copy,
+// which is the product's best writing deployed to assert something false.
+export const OUT_OF_REACH = {
+  says: 'The town’s record is out of reach. Nothing here is missing — it has not been read.',
+  again: 'Look again',
+} as const
+
 // ------------------------------------------------------------------ weather glyphs
 
 // Palette hexes on an 8×8 pixel grid — the chrome speaks the world's own pixel language and

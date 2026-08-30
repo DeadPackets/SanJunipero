@@ -14,6 +14,20 @@ export type Route = {
   broadcast: boolean
 }
 
+const TOWN = 'San Junipero'
+
+/** The title the shipped `index.html` carries, and the tab's name for the town itself. */
+export const TOWN_TITLE = `${TOWN} — a small town, watched kindly`
+
+/** What the tab says about where the viewer is. The gateway writes the same shape into the head
+ *  a crawler reads (`staticSite.ts`); this keeps the tab true once the app has taken over. */
+export function titleFor(route: Route, personName: string | null): string {
+  if (route.agentId !== null && personName !== null) return `${personName} — ${TOWN}`
+  if (route.moment !== null) return `Day ${route.moment.day} — ${TOWN}`
+  if (route.momentId !== null) return `A recorded day — ${TOWN}`
+  return TOWN_TITLE
+}
+
 export function parseRoute(pathname: string, search: string): Route {
   const params = new URLSearchParams(search)
   const segs = pathname.split('/').filter(Boolean)

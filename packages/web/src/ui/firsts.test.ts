@@ -61,20 +61,20 @@ describe('the firsts ledger, grouped as the chronicle reads it', () => {
 
 describe('the Firsts tab', () => {
   it('waits with the skeleton the other pages wait with', () => {
-    const html = view({ data: null, loaded: false })
+    const html = view({ data: null, loaded: false, failed: false })
     expect(html).toContain('aria-busy="true"')
     expect(html).toContain('skeleton-row')
     expect(html).not.toContain(EMPTY_COPY.firsts)
   })
 
   it('says one quiet line once it has asked and there is nothing', () => {
-    const html = view({ data: [], loaded: true })
+    const html = view({ data: [], loaded: true, failed: false })
     expect(html).toContain(EMPTY_COPY.firsts)
     expect(html).not.toContain('skeleton-row')
   })
 
   it('★ prints each first as the chronicle would say it, over the day it happened', () => {
-    const html = view({ data: [first({ tick: 1500 })], loaded: true })
+    const html = view({ data: [first({ tick: 1500 })], loaded: true, failed: false })
     expect(html).toContain('the first fire')
     expect(html).toContain('Day 1 01:00')
     expect(html).toContain('class="feed-head"')
@@ -85,7 +85,7 @@ describe('the Firsts tab', () => {
   it('★ draws a first with the glyph the record already gives one', () => {
     expect(chronicleGlyph(MILESTONE_ICON).label).toBe('a first')
     expect(MILESTONE_ICON).not.toBe(CHRONICLE_FALLBACK_ICON)
-    const html = view({ data: [first()], loaded: true })
+    const html = view({ data: [first()], loaded: true, failed: false })
     for (const [x, y] of chronicleGlyph(MILESTONE_ICON).pixels)
       expect(html, `${x},${y}`).toContain(`x="${x}" y="${y}"`)
   })
@@ -93,7 +93,7 @@ describe('the Firsts tab', () => {
   it('★ makes every first a way back to the minute it happened in', () => {
     const html = renderToStaticMarkup(
       createElement(FirstsView, {
-        read: { data: [first({ tick: 1500 })], loaded: true },
+        read: { data: [first({ tick: 1500 })], loaded: true, failed: false },
         viewTick: 1500,
         onJump: () => {},
       }),
@@ -116,7 +116,7 @@ describe('the Firsts tab', () => {
         byId: 'amara',
       },
     })
-    const html = view({ data: [named, first()], loaded: true })
+    const html = view({ data: [named, first()], loaded: true, failed: false })
     expect(html).toContain('class="discovery-quote"')
     expect(html).toContain('we should call it Emberfall')
     expect(html.match(/discovery-quote/g)).toHaveLength(1)

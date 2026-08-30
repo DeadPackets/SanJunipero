@@ -1,14 +1,19 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './App.js'
 import { PageBoundary } from './paper/PageBoundary.js'
-import '@fontsource/press-start-2p'
-import '@fontsource/silkscreen'
-import '@fontsource/silkscreen/700.css'
-import '@fontsource/fraunces/500.css'
-import '@fontsource/fraunces/700.css'
-import '@fontsource/manrope/400.css'
-import '@fontsource/manrope/600.css'
+import { detachFirstFrame } from './ui/firstFrame.js'
+// The latin subset alone: the town's copy is latin, and the full packages carry cyrillic, greek
+// and vietnamese `@font-face` blocks that no reader here can reach but every reader must parse.
+import '@fontsource/press-start-2p/latin-400.css'
+import '@fontsource/silkscreen/latin-400.css'
+import '@fontsource/silkscreen/latin-700.css'
+import '@fontsource/fraunces/latin-500.css'
+import '@fontsource/fraunces/latin-700.css'
+import '@fontsource/manrope/latin-400.css'
+import '@fontsource/manrope/latin-600.css'
 import './ui/chrome.css'
+
+detachFirstFrame()
 
 // The last net. The canvas lives inside the tree, so an uncaught render takes the town with it;
 // this line is then the whole of what the viewer has, and it says the way back.
