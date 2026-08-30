@@ -171,8 +171,8 @@ describe("worldTick: infection is not healthSystem's any more", () => {
   })
 })
 
-// healthSystem no longer spreads anything. `agent_fell_ill` still folds for
-// recorded logs, but nothing in the engine emits it — illnessSystem owns contagion.
+// `agent_fell_ill` still folds for recorded logs, but nothing emits it: illnessSystem owns
+// contagion.
 describe("worldTick: contagion is not healthSystem's any more", () => {
   it('an ill body beside a healthy one infects nobody, at any dial', () => {
     let s = makeWorld(CFG, [

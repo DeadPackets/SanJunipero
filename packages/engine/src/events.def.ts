@@ -34,8 +34,8 @@ export const AgentBorn = z
   })
   .strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
-// The changes are applied in the order the laws queued them, so a batch folds to exactly the
-// state the separate events left. Only the cold sets `reason`, on the change it bills energy.
+// Applied in the order the laws queued them, so a batch folds to exactly the state the
+// separate events left.
 export const NeedsChanged = z
   .object({
     id: z.string(),
@@ -128,8 +128,7 @@ export const StructurePlanned = z
     flammable: z.boolean(),
     builderId: z.string(),
     owner: z.string().optional(),
-    // Two facings and no third: NE and NW are unauthored and must stay unrepresentable. Written
-    // only when the plot TURNED the building, so an unturned world folds the payload it always did.
+    // NE and NW are unauthored and must stay unrepresentable. Written only when the plot turned it.
     facing: z.enum(TOWN_FACINGS).optional(),
   })
   .strict()
@@ -146,8 +145,7 @@ export const StructureDamaged = z.object({ id: z.string(), amount: z.number() })
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
 export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()
 export const FireSpread = z.object({ fromId: z.string(), toId: z.string() }).strict()
-// A dousing has a place and a pair of hands. The new fields are optional so
-// every recorded rain and burnout still parses, and `cause` stays required.
+// The added fields are optional so every recorded rain and burnout still parses.
 export const FireExtinguished = z
   .object({
     structureId: z.string().optional(),
@@ -232,8 +230,7 @@ export const AgentInjured = z
 export const AgentInfected = z.object({ agentId: z.string() }).strict()
 export const AgentFellIll = z.object({ agentId: z.string() }).strict()
 export const AgentRecovered = z.object({ agentId: z.string() }).strict()
-// `agentId` stays the PATIENT so recorded logs fold unchanged; the hands and what was in
-// them arrive as optional fields.
+// `agentId` stays the PATIENT so recorded logs fold unchanged.
 export const AgentTended = z
   .object({
     agentId: z.string(),
@@ -243,7 +240,6 @@ export const AgentTended = z
   .strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
 
-// Mortality. Harm is an amount with a source; an affliction is a cause with a clock.
 const AfflictionKindSchema = z.enum(['fatigue', 'illness', 'injury', 'poison'])
 export const AgentHarmed = z
   .object({
@@ -318,8 +314,7 @@ export const WildlifeChanged = z
   .object({ fish: z.number().optional(), deer: z.number().optional() })
   .strict()
 
-// Fauna: bodies with no minds. `stock` rides the spawn because a school arrives as a
-// number of fish, not as one; nothing that walks ever carries it.
+// `stock` rides the spawn: a school arrives as a number of fish, not as one.
 const FaunaKindSchema = z.enum(['deer', 'rabbit', 'fish'])
 export const FaunaSpawned = z
   .object({
@@ -353,8 +348,7 @@ export const FaunaKilled = z
     byId: z.string().optional(),
   })
   .strict()
-// Forageables. Stripping one is a stock change; the last handful is a depletion, which is
-// the same arithmetic with a name the chronicle can use. A node is never removed.
+// A node is never removed: the last handful is a depletion, not a deletion.
 const ForageableKindSchema = z.enum([
   'berry_bush',
   'mushroom_patch',
@@ -364,8 +358,7 @@ const ForageableKindSchema = z.enum([
   'stone_outcrop',
   'reed_bed',
 ])
-// `fullStock` is the abundance the ground climbs back toward. Optional so every recorded
-// scatter still parses; absent means the old ceiling of one.
+// Optional so every recorded scatter still parses; absent means a ceiling of one.
 export const ForageableSpawned = z
   .object({
     id: z.string(),
@@ -384,8 +377,6 @@ export const ForageableRegrown = z
   .object({ id: z.string(), stock: z.number().int().positive() })
   .strict()
 
-// The terrain event. It carries where the cell came from and why, which is what a
-// doctored log cannot fake.
 export const TileChanged = z
   .object({
     x: z.number(),

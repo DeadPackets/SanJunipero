@@ -3,15 +3,13 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 
-// The Signpost UI's rasters, drawn by `scripts/gen-ui.ts`. They ship TWICE: `content/ui` holds
-// the authored piece beside its manifest, and `packages/web/src/ui/px` is the directory the web
-// bundler resolves `frame-cream.webp` and its siblings from. The producer runs a live generation
-// at import time, so the roster cannot live in it — it lives here, where web and test both reach.
+// The rasters ship TWICE: `content/ui`, and `packages/web/src/ui/px` where the web bundler
+// resolves them. The producer spends live at import time, so the roster cannot live in it.
 export const UI_CONTENT_DIR = fileURLToPath(new URL('../content/ui', import.meta.url))
 export const UI_PX_DIR = fileURLToPath(new URL('../../web/src/ui/px', import.meta.url))
 
-/** What W1 and W2 reference by name. A piece dropped from the producer takes its manifest row
- *  with it, so the roster is pinned here rather than read back out of the manifest. */
+/** Pinned here rather than read back out of the manifest: a piece dropped from the producer
+ *  takes its manifest row with it. */
 export const UI_PIECE_IDS = [
   'signpost-arm',
   'signpost-post',

@@ -1,5 +1,4 @@
-// OFFLINE, $0.00 — re-cell the five production buildings from their cached 1024 raws; every
-// shipped cell was matched byte-for-byte to one raw, so this repairs from source.
+// OFFLINE, $0.00 — re-cell the five production buildings from their cached 1024 raws.
 // Writes a LEAN art root: point SJ_ART_ROOT at it to see the repair, remove it to undo.
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -57,8 +56,8 @@ for (const b of BUILDINGS) {
     tile: TOWN_TILE,
   })
   members.push({ name: b.dir, density })
-  // ★ THE GATE USED TO RUN AFTER THE WRITE. It decides now, and a refused building skips its
-  // own write and lets the rest of the run finish. The palette distance is reported, not judged.
+  // A refused building skips its own write and lets the rest of the run finish. The palette
+  // distance is reported, not judged.
   const fails = integerScaleGate({ w: raw.width, h: raw.height }, { w: cellPx, h: cellPx }).failures
   rows.push(
     `| ${b.dir} | ${b.fp.w}x${b.fp.h} | ${before.width}x${before.height} | ${cellPx}x${cellPx} | ` +

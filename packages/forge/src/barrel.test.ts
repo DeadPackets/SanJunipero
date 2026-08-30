@@ -3,9 +3,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// The free scripted stream imports `@sj/forge` for geometry and the codex, and nothing else.
 // `judge.ts` and `visionQa/visionJudge.ts` pull 9.7 MB of LLM SDK, so they live behind
-// `@sj/forge/gen`, which only the live path loads.
+// `@sj/forge/gen`; the free scripted stream imports `@sj/forge` and must stay free of it.
 const SDK = ['ai', '@openrouter/ai-sdk-provider']
 const HERE = dirname(fileURLToPath(import.meta.url))
 

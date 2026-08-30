@@ -451,8 +451,7 @@ describe('G9a-7: what is carved can be read back', () => {
     let s = raise(genesisState(config, MAP()), config, HOUSE)
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
     s = spawn(s, config, { id: 'passerby', x: 12, y: 6 }) // in sight, out of arm's reach
-    // By daylight, for the same reason the ownership chain above is: what "in sight" means
-    // now depends on the light on the wall.
+    // By daylight: what "in sight" means depends on the light on the wall.
     return { ...s, tick: 720 }
   }
 

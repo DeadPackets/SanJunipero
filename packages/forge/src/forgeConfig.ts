@@ -18,7 +18,7 @@ export const ForgeConfigSchema = z
       .prefault({}),
     library: z
       .object({
-        // Was a literal 24. The C-level bar puts icons on 64, an exact 8th of the generation.
+        // The C-level bar puts icons on 64, an exact 8th of the generation.
         iconSizePx: z.number().int().min(16).max(128).default(64),
         furnitureIconSizePx: z.number().int().min(16).max(128).default(64),
       })

@@ -1,7 +1,5 @@
-// OFFLINE, $0. Re-encodes every shipped PNG as LOSSLESS WebP, proves not one visible pixel moved,
-// and deletes the PNG it replaces. Idempotent: a converted tree converts nothing.
-// `content/reference/` is excluded — those three photographic plates get 24% BIGGER as lossless
-// WebP, and they are prompt anchors sent to the image vendor, never served.
+// OFFLINE, $0. `content/reference/` is excluded: those three photographic plates get 24% BIGGER
+// as lossless WebP, and they are prompt anchors sent to the image vendor, never served.
 import { globSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

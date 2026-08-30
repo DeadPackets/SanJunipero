@@ -291,8 +291,6 @@ describe('makeGenesisWorld: the town', () => {
   })
 })
 
-// Every line of it measured rather than reasoned: the arithmetic of a deck against
-// the arithmetic of a channel, then a walk that actually arrives.
 describe('the ford: one reach where the channel runs two wide', () => {
   const T_SAND = 5
 

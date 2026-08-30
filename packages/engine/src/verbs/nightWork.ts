@@ -1,8 +1,7 @@
 import { type WorldState } from '../state.js'
 import { dayPhaseFromTick, litSourceWithin, type SimConfig } from '@sj/shared'
 
-// The five things hands do that eyes have to be part of. Speech, walking and everything else
-// cost the same in the dark as at noon — the night is a price change, not a curfew.
+// Everything else costs the same in the dark as at noon: the night is a price change, not a curfew.
 export const NIGHT_WORK_VERBS: ReadonlySet<string> = new Set([
   'build',
   'craft',
@@ -11,7 +10,6 @@ export const NIGHT_WORK_VERBS: ReadonlySet<string> = new Set([
   'dig_channel',
 ])
 
-// Working blind: night, no flame within reach, and the light law switched on.
 export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: string): boolean {
   if (!config.light.enabled) return false
   if (dayPhaseFromTick(state.tick) !== 'night') return false
@@ -20,8 +18,8 @@ export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: 
   return !litSourceWithin(state, a.x, a.y, state.tick, config, config.light.workRadius)
 }
 
-// The one derivation of what the dark costs: submitIntent multiplies a duration by it,
-// and perception says so out loud. Never a refusal — burning fuel or burning time is a choice.
+// The one derivation of what the dark costs. Never a refusal: burning fuel or burning time is
+// the body's own choice.
 export function workPenalty(
   state: WorldState,
   config: SimConfig,

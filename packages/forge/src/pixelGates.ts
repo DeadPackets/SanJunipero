@@ -142,8 +142,7 @@ export function paletteGate(
   return { ok: ok(failures), failures, offPalette, offenders }
 }
 
-// What the committed-art audits ask of a cell now that `paletteGate` is off the sprite path:
-// not that every pixel IS a palette member, but that the art sits close to the palette. The
+// Not that every pixel IS a palette member, but that the art sits close to the palette. The
 // regenerated buildings measure 12.6–17.7 on this scale (0 is a fully snapped cell).
 export const PALETTE_DISTANCE_MAX = 25
 

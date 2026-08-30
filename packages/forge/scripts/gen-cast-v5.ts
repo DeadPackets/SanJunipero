@@ -276,9 +276,8 @@ const figureHeight = (img: RawImage): number => {
 }
 
 const MAX_ART_H = FEET_Y_V2 + 1
-// TRIMMED first, and that is what makes the fit below NORMALISE scale. The old chain trimmed
-// every cell to its figure, so this got it for free; a 256 canvas with the figure somewhere
-// inside does not, and the gates read the size difference as a broken head.
+// Trimmed first, and that is what makes the fit below NORMALISE scale: a 256 canvas with the
+// figure somewhere inside has the gates read the size difference as a broken head.
 function gateView(cell: RawImage): RawImage {
   const img = trimToFigure(cell)
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
@@ -572,7 +571,6 @@ async function runCharacter(m: CastMember): Promise<void> {
   const { image, manifest } = packCharacterAtlas(cells, TARGET_H)
   const atlas = await encodeWebp(image)
 
-  // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
   const bar = alphaBinaryGate(image).failures
   const figures = [...cells].map(([, img]) => figureHeight(img))
   push(

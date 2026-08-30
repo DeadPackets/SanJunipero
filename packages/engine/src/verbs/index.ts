@@ -175,8 +175,7 @@ function adjacentLivingTarget(
   if (!target?.alive) return reasons.gone
   if (reasons.busy !== undefined && target.activity) return reasons.busy
   const a = state.agents[agentId]!
-  // A refusal must leave a door open (addendum §9): the one thing missing is two paces, so
-  // the answer says which two. Zero tends and one give across five live runs.
+  // A refusal must leave a door open: the one thing missing is two paces, so the answer says which two.
   if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) {
     return `${reasons.far} — they are at (${target.x}, ${target.y})`
   }
@@ -247,7 +246,6 @@ export function worstAffliction(state: WorldState, agentId: string): Affliction 
   return worst
 }
 
-// One relief, whether it was chewed or pressed into a patient's hands.
 export function relieveWorst(state: WorldState, agentId: string, amount: number): PendingEvent[] {
   const worst = worstAffliction(state, agentId)
   if (worst === undefined) return []
@@ -350,8 +348,8 @@ const wake: VerbDef = makeVerb({
   },
 })
 
-// What a meal is worth to THIS body right now: the kind's own nutrition, then a mild bonus for
-// every distinct kind the window still remembers. The one derivation of both.
+// The one derivation of a meal's worth: the kind's nutrition, plus a bonus for every distinct
+// kind the variety window still remembers.
 export function mealRestore(
   state: WorldState,
   config: SimConfig,
@@ -568,8 +566,8 @@ const fill: VerbDef = makeVerb({
 
 export const WearParams = z.object({ itemId: z.string() }).strict()
 
-// What counts as clothing is what the world knows how to be warmed by: `warmth.insulation` is
-// the one table of it, so a kind nobody can be warmed by is a kind nobody can wear.
+// `warmth.insulation` is the one table of what clothing is: a kind nobody can be warmed by is
+// a kind nobody can wear.
 export function isWearable(config: SimConfig, kind: string): boolean {
   return (config.warmth.insulation as Record<string, number | undefined>)[kind] !== undefined
 }
@@ -676,8 +674,7 @@ const snuff: VerbDef = makeVerb({
 
 export const FUEL_KIND = 'wood'
 
-// Arm's reach of a fire: the room you are standing in, or a footprint you are beside. The wall
-// half is `warmth`'s one derivation of it; only the distance is this verb's own.
+// The wall half is `warmth`'s one derivation of reach; only the distance is this verb's own.
 function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
   const a = state.agents[agentId]!
   if (!fireIsOnYourSide(a, s)) return false
@@ -690,8 +687,6 @@ export function isStokeable(config: SimConfig, kind: string): boolean {
   return structureGlowRadius(config, kind) !== undefined && isStandingLight(config, kind)
 }
 
-// Fed by the armful. Its complement among the stokeable kinds is a fire in the open, which is
-// lit for the night instead — the rule `stoke` writes and the lamplighter walks.
 export function isRoofedFire(config: SimConfig, kind: string): boolean {
   return kind === CITY_HEARTH_KIND || (isHeatSource(config, kind) && isRoofedKind(config, kind))
 }
@@ -718,8 +713,7 @@ const stoke: VerbDef = makeVerb({
         type: 'structure_fueled',
         payload: {
           structureId: p.structureId,
-          // A fire under a roof is fed by the armful; a fire in the open — the square's pit, a
-          // lamp post — is lit for the night and put out at dawn.
+          // Under a roof a fire burns an armful; in the open it is lit for the night and out at dawn.
           burnsUntilTick: isRoofedFire(config, s.kind)
             ? state.tick + config.light.fuelBurnTicks
             : nextDawnTick(state.tick),
@@ -894,8 +888,7 @@ const harvest: VerbDef = makeVerb({
 // How far from the cast a school still counts as "where the fish are".
 export const FISH_SCHOOL_RADIUS = 2
 
-// The school a cast reaches, if any: the nearest one in id order. Gated on the fauna law, so
-// with the entity layer off the catch chance is exactly what it always was.
+// First in id order, not nearest: the tie-break has to land the same way on every run.
 export function schoolNear(
   state: WorldState,
   config: SimConfig,
@@ -912,8 +905,8 @@ export function schoolNear(
   return null
 }
 
-// The one derivation of a cast's odds: season and school compose on top of skill, which
-// is why winter's 0.5 and a school's 2x cancel to exactly the plain-day chance.
+// The one derivation of a cast's odds: season and school multiply on top of skill, so winter's
+// 0.5 and a school's 2x cancel to the plain-day chance.
 export function fishCatchChance(
   state: WorldState,
   config: SimConfig,
@@ -1056,8 +1049,7 @@ const hunt: VerbDef = makeVerb({
   rngStream: 'fauna',
 })
 
-// Naming a node is optional, and that is the whole of the backward compatibility: an empty
-// `{}` is still the old "gather from the wood beside you", event for event.
+// An empty `{}` means "gather from the wood beside you".
 export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
 
 const forage: VerbDef = makeVerb({
@@ -1522,8 +1514,7 @@ export const ReadParams = z.object({ itemId: z.string() }).strict()
 export const TeachParams = z.object({ targetId: z.string(), track: z.string() }).strict()
 export const AttackParams = z.object({ targetId: z.string() }).strict()
 
-// One function under two names, so the word a busy body says and the word an idle one says are
-// composed in exactly one place.
+// One composer for both spoken paths, so a busy body's word and an idle one's cannot drift.
 const spoken = (
   state: WorldState,
   _config: SimConfig,
@@ -1986,7 +1977,7 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   ]
 }
 
-// The four subsystems this file hosted but is not; their surface stays part of `verbs`.
+// Their surface stays part of `verbs`.
 export * from '../food.js'
 export * from './craft.js'
 export * from './nightWork.js'

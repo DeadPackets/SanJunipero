@@ -6,7 +6,7 @@ import { heldQty, nearRect, siteAt } from './common.js'
 import { buildTicks, buildableRecipe, shortOf } from './craft.js'
 import { isTravelled, isWet, type SimConfig, type TownFacing } from '@sj/shared'
 
-/** Absent means this. The same convention `forge/buildingArt.facingKind` uses for a cell id. */
+/** Absent means this; the same convention `forge/buildingArt.facingKind` uses. */
 const DEFAULT_TOWN_FACING: TownFacing = 'sw'
 
 function buildableGroundRefusal(
@@ -24,15 +24,13 @@ function buildableGroundRefusal(
   return null
 }
 
-// A bank is anything that is not open water — or a deck already laid over it.
 function banked(state: WorldState, x: number, y: number): boolean {
   const tile = state.terrain[y]?.[x]
   if (tile === undefined) return false
   return !isWet(tile) || bridgeAt(state, x, y)
 }
 
-// Two or three tiles of deck, every one over water, with a foot on solid ground at each end.
-// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped bridge is 1x2.
+// Bounds the recipe's shape, not a constant: the shipped bridge is 1x2.
 const BRIDGE_SPAN = { min: 2, max: 3 }
 
 function bridgeSiteRefusal(
@@ -67,8 +65,7 @@ function bridgeSiteRefusal(
 
 type BuildSite = { kind: string; x: number; y: number }
 
-// Every structure makes its tiles impassable, so a post raised in the street would close the
-// street. Only a sited kind can be aimed at a road, so only a sited one is asked.
+// A structure makes its tiles impassable, so a post raised in the street would close the street.
 function roadBlockRefusal(
   state: WorldState,
   kind: string,
@@ -89,7 +86,6 @@ function roadBlockRefusal(
   return null
 }
 
-// Everything about a site that depends on how big the thing standing on it is.
 function footprintRefusal(
   state: WorldState,
   config: SimConfig,
@@ -124,8 +120,7 @@ function footprintRefusal(
   return null
 }
 
-// A recipe's w and h are a shape, not a compass bearing. As written wins; the turned reading is
-// tried only when the written one refuses, and a refusal always uses the written one's words.
+// A recipe's w and h are a shape, not a compass bearing.
 export function buildFootprint(
   state: WorldState,
   config: SimConfig,
@@ -139,18 +134,15 @@ export function buildFootprint(
   return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
 }
 
-/** A mass stands where the town decides; a sited thing belongs to a spot somebody picked and says
- *  so in its recipe. bridgeSiteRefusal stays the bridge's alone: the water rule is not every sited kind's. */
+/** A sited kind names its own spot in its recipe; everything else is a mass the town places. */
 export const isPlottedKind = (config: SimConfig, kind: string): boolean =>
   config.structures.recipes[kind]?.sited !== true
 
-/** Whether THIS world seats THIS kind on a plot. It takes a town to seat one. */
 export function buildIsPlotted(state: WorldState, config: SimConfig, kind: string): boolean {
   return isPlottedKind(config, kind) && townSquareOf(state) !== null
 }
 
-/** The site this agent already has half-raised, so an interrupted build goes back to the same
- *  walls. Keyed on the BUILDER, because on a plot there is no coordinate to look one up by. */
+/** Keyed on the BUILDER: on a plot there is no coordinate to look a half-raised site up by. */
 function ownSite(state: WorldState, agentId: string, kind: string) {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
@@ -159,8 +151,8 @@ function ownSite(state: WorldState, agentId: string, kind: string) {
   return null
 }
 
-/** Somebody else's walls, within reach, keyed on the GROUND — without it claimInWorld hands the
- *  second body the next FREE plot and five bodies raise five houses. Plots are four tiles apart, so there is never a choice. */
+/** Keyed on the GROUND: without it claimInWorld hands the second body the next free plot and
+ *  five bodies raise five houses. */
 function joinableSite(state: WorldState, agentId: string, kind: string): Structure | null {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
@@ -174,15 +166,12 @@ function joinableSite(state: WorldState, agentId: string, kind: string): Structu
   return null
 }
 
-/** Its own half-finished walls first, then a neighbour's within reach, and only then new ground.
- *  ownSite is asked first, so joinableSite is never looking at walls this body began. */
 export function siteToRaise(state: WorldState, agentId: string, kind: string) {
   return ownSite(state, agentId, kind) ?? joinableSite(state, agentId, kind)
 }
 
 export type BuildSiteAnswer = {
-  /** `facing` rides along ONLY when the plot turned the building — absent is `sw`, and a
-   *  bridge has no door and no facing at all. */
+  /** Present only when the plot turned the building; absent is `sw`. */
   site: { x: number; y: number; w: number; h: number; facing?: TownFacing } | null
   /** The standing construction this build continues, if any: its materials are already spent. */
   resume: { id: string; progressTicks: number } | null
@@ -193,8 +182,7 @@ export type BuildSiteAnswer = {
 
 export const words = (kind: string): string => kind.replace(/_/g, ' ')
 
-/** On a plot, nothing about the asker reaches the site: claimInWorld decides it and params are
- *  not consulted. The refusal names the place to walk to rather than offering nothing. */
+/** On a plot the site is claimInWorld's; the `x`/`y` params are not consulted. */
 export function buildSiteOf(
   state: WorldState,
   config: SimConfig,
@@ -209,8 +197,8 @@ export function buildSiteOf(
   return answer
 }
 
-// One build intent asks this from `validate`, `duration` and `onStart` over the same immutable
-// world, and each answer costs a claim search of the whole lattice.
+// `validate`, `duration` and `onStart` all ask this over the same immutable world, and each
+// answer costs a claim search of the whole lattice.
 const siteMemo = new WeakMap<
   WorldState,
   { config: SimConfig; key: string; answer: BuildSiteAnswer }
@@ -263,8 +251,8 @@ function computeBuildSite(
     ...claim.site,
     ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }),
   }
-  // The town lays the block the first time somebody builds on it; "off the map" is loud because a
-  // plot silently withheld for want of a bigger world is the ring-1 clamp all over again.
+  // A refusal rather than a silent skip: a plot withheld for want of a bigger world would look
+  // to a mind like no plot at all.
   const lay = layBlock(state, square, claim.block)
   if (lay === 'off the map') {
     return {
@@ -275,8 +263,7 @@ function computeBuildSite(
     }
   }
   const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
-  // The door tile, not the corner of the footprint: a road, passable, and adjacent to every mass
-  // the plot can hold. The same number groundForBuilding puts in the perception.
+  // The door tile, not the footprint's corner: a road, passable, adjacent to every mass the plot holds.
   const go = `go and stand at (${claim.door.x}, ${claim.door.y})`
   if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
     return {
@@ -294,14 +281,11 @@ function computeBuildSite(
   }
 }
 
-/** The next free plot's street corner; every plot holds every legal mass, so one answer serves
- *  every buildable kind. Free ground is only half of "where does work go" — unfinishedWork is the rest. */
+/** Every plot holds every legal mass, so a 1x1 claim's door serves every buildable kind. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
 }
 
-/** Walls that already stand, unfinished, and the tile a body reaches them from. Nearest first,
- *  ties by id. Only kinds a pair of hands can carry on: naming a wall nobody can finish is worse than silence. */
 export type StandingWalls = {
   id: string
   kind: string
@@ -332,7 +316,6 @@ export function unfinishedWork(
   return best
 }
 
-/** Everything that can still be wrong once the town has named the ground. */
 function plottedRefusal(
   state: WorldState,
   config: SimConfig,
@@ -346,8 +329,7 @@ function plottedRefusal(
   for (const a of Object.values(state.agents)) {
     if (!a.alive) continue
     if (a.x < site.x || a.x >= site.x + site.w || a.y < site.y || a.y >= site.y + site.h) continue
-    // A body inside the footprint would be walled in by its own walls. Standing ON the ground
-    // is the near miss the door tile exists to prevent, so that refusal points at the door.
+    // A body inside the footprint would be walled in by its own walls.
     return a.id === agentId
       ? `you are standing on the ground itself — ${go}`
       : 'someone is in the way'

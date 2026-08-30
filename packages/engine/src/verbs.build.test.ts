@@ -14,8 +14,7 @@ const FAST: SimConfig = SimConfigSchema.parse({
   construction: { houseTicks: 3 },
 })
 
-// Noon: work started in the dark takes half again as long, and nothing in
-// this file is about the dark.
+// Noon: work started in the dark takes half again as long, and nothing here is about the dark.
 const NOON = 720
 
 function makeWorld(config = CFG, wood = 10): WorldState {

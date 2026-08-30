@@ -34,9 +34,8 @@ export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): Ra
 // the fidelity: 256 is eight tile-widths, and what a 512 generation supports after the crop.
 export const MATERIAL_PX = 256
 
-// The material is CUT from the generation, never resampled onto it: the crop is the largest whole
-// multiple of the grid that fits inside the margin, so what follows is a whole-factor divide. From
-// a 512 candidate that is 256 at factor 1 — the model's own pixels, and twice the frame cut.
+// The material is CUT from the generation, never resampled onto it: the crop is the largest
+// whole multiple of the grid that fits inside the margin, so what follows is a whole-factor divide.
 export function cropToGrid(img: RawImage, px: number, margin: number = CANDIDATE_MARGIN): RawImage {
   const span = Math.min(img.width, img.height)
   const side = Math.floor((span - 2 * Math.round(span * margin)) / px) * px

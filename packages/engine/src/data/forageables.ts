@@ -46,8 +46,7 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
   { kind: 'herb_patch', x: 76, y: 107, stock: 4 },
 ]
 
-// How a node reads from across the clearing. Never a count — a picker sees abundance or
-// bareness, and the difference between the two mushrooms is not one of them.
+// Never a count: a picker sees abundance or bareness, and the two mushrooms read alike.
 export const FORAGEABLE_PROSE: Readonly<
   Record<ForageableKind, { standing: string; bare: string }>
 > = {

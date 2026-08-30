@@ -15,7 +15,7 @@ export const TilesetManifest = z
       z.object({ file: z.string(), tiles: z.array(z.string()).length(16) }),
     ),
     scaffolding: z.object({ file: z.string() }),
-    // Additive and optional so today's manifest (and C10's) parses unchanged.
+    // Additive and optional so an existing manifest parses unchanged.
     autotile: z
       .object({
         road: z

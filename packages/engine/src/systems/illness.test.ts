@@ -211,8 +211,6 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
   })
 })
 
-// The wound's own way into the fever. An older pass set a boolean nothing
-// could lift; the same roll now mints the affliction the midnight turn above can worsen or lift.
 describe('illnessSystem: a wound turns septic at dawn', () => {
   const DAWN = 360
   const wound = (config: SimConfig, tick = 0): WorldState =>

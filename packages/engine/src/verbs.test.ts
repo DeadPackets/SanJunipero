@@ -200,7 +200,6 @@ describe('eat: a last-day meal and the pale mushroom', () => {
       type: 'agent_afflicted',
       payload: { agentId: 'a1', kind: 'poison', severity: 1, itemId: 'item_1' },
     })
-    // A pale mushroom is a poor meal as well as a gamble (per-kind nutrition).
     expect(out).toContainEqual({
       type: 'needs_changed',
       payload: {
@@ -625,8 +624,6 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     if (!empty.ok) expect(empty.reason).toBe('nothing there to hunt')
   })
 
-  // SimConfigSchema is closed, so a recipe says what it makes is
-  // a weapon in its own row, and a spear nobody authored can take a deer.
   it('a recipe that says it makes a weapon makes one, and the knife stays a weapon regardless', () => {
     const speared = (config: SimConfig): WorldState => {
       let s = makeWorld(['..', '..'])
@@ -731,7 +728,6 @@ describe('fish: a school is where the fish are', () => {
   })
 })
 
-// ------------------------------------------------- the clothing line, and one slot
 describe('wear and doff: one body slot, and a night you can survive', () => {
   const CFG = SimConfigSchema.parse({
     weather: { hourlyChangeChance: 0 },
@@ -879,7 +875,6 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
   })
 })
 
-// ------------------------------------------ night work costs time, or it costs fuel
 describe('night work: the choice is fuel or time, and it is theirs', () => {
   const CFG = SimConfigSchema.parse({
     weather: { hourlyChangeChance: 0 },
@@ -1022,7 +1017,6 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   })
 })
 
-// --------------------------------- monotony is a cost, and a shared stew is a reason
 describe('food variety: the same meal twice is worth less than two meals', () => {
   const CFG = SimConfigSchema.parse({
     weather: { hourlyChangeChance: 0 },

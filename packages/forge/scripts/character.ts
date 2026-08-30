@@ -1,4 +1,3 @@
-// Shared identity for the character generator scripts.
 // Character standard v3 (mirror standard): simplified identity, 3 signature features MAX.
 // Symmetric-enough silhouette; the satchel may jump hips on mirrored facings (accepted).
 export const CHAR_DESC_V4 =
