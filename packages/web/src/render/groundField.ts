@@ -190,6 +190,20 @@ export const ROAD_UNDER: TerrainTileKind = 'grass'
 // and corners included, and no tile of a 1-wide run ever does, not even at a crossing.
 export const CALM_ROAD_KIND = 'road-calm'
 
+/** A tile whose four neighbours are all road is drawn as the paving it stands in. The template
+ *  paves the square AROUND the well and the fire pit, and a grass diamond under a monument read
+ *  as a hole in the plaza. The sim's terrain is untouched: only the picture is paved. */
+export function pavePlazaIslands(terrain: TileId[][]): TileId[][] {
+  const road = (x: number, y: number): boolean => terrain[y]?.[x] === T_ROAD
+  return terrain.map((row, y) =>
+    row.map((id, x) =>
+      id !== T_ROAD && road(x - 1, y) && road(x + 1, y) && road(x, y - 1) && road(x, y + 1)
+        ? T_ROAD
+        : id,
+    ),
+  )
+}
+
 export function isRoadMass(terrain: TileId[][], x: number, y: number): boolean {
   const isRoad = (px: number, py: number): boolean => terrain[py]?.[px] === T_ROAD
   for (const [ox, oy] of [

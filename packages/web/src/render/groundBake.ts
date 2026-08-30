@@ -20,6 +20,7 @@ import {
   materialMatrix,
   OCTAVE_ALPHA,
   octaveMatrix,
+  pavePlazaIslands,
   ROAD_SHOULDER_DARK,
   ROAD_SHOULDER_LIGHT,
   roadRibbonPolys,
@@ -237,7 +238,8 @@ export function createGroundBaker(
 
   return {
     rebake(terrain, records) {
-      const field = groundField(terrain, records)
+      const drawn = pavePlazaIslands(terrain)
+      const field = groundField(drawn, records)
       offsetX = field.offsetX
       offsetY = field.offsetY
       grid = groundGrid(field.widthPx, field.heightPx, field.offsetX, field.offsetY)
@@ -245,11 +247,11 @@ export function createGroundBaker(
 
       const plaza: Tile[] = [],
         farmland: Tile[] = []
-      for (let y = 0; y < terrain.length; y++) {
-        const row = terrain[y]!
+      for (let y = 0; y < drawn.length; y++) {
+        const row = drawn[y]!
         for (let x = 0; x < row.length; x++) {
           if (tileKind(row[x]!) === 'farmland') farmland.push({ x, y })
-          else if (isRoadMass(terrain, x, y)) plaza.push({ x, y })
+          else if (isRoadMass(drawn, x, y)) plaza.push({ x, y })
         }
       }
       furrowPolys = bucketPolys(grid, furrowLines(farmland))

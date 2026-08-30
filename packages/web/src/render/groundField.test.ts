@@ -10,6 +10,7 @@ import {
   groundField,
   isRoadMass,
   materialUv,
+  pavePlazaIslands,
   resolveMaterial,
   roadArms,
   roadRibbonPolys,
@@ -517,6 +518,29 @@ describe('a road run is CONNECTED', () => {
     ])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 2, 2), centreOf(r, 10, 8))).toBe(false)
+  })
+})
+
+// The template paves the square AROUND the well and the fire pit; under a monument whose art
+// is wider than its plot, that grass diamond read as a hole in the paving.
+describe('pavePlazaIslands', () => {
+  const grid = (n: number, road: (x: number, y: number) => boolean): TileId[][] =>
+    Array.from({ length: n }, (_, y) =>
+      Array.from({ length: n }, (_, x) => (road(x, y) ? T_ROAD : 0)),
+    )
+
+  it('draws a tile ringed by road on all four sides as road, and leaves the sim terrain alone', () => {
+    const t = grid(7, (x, y) => x >= 1 && x <= 5 && y >= 1 && y <= 5 && !(x === 3 && y === 3))
+    const drawn = pavePlazaIslands(t)
+    expect(drawn[3]![3]).toBe(T_ROAD)
+    expect(t[3]![3]).toBe(0)
+  })
+
+  it('leaves a plot alone when any neighbour is not road — a house on a street corner', () => {
+    const t = grid(7, (x, y) => y === 1 || x === 1)
+    const drawn = pavePlazaIslands(t)
+    expect(drawn[2]![2]).toBe(0)
+    expect(drawn).toEqual(t)
   })
 })
 
