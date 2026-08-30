@@ -42,9 +42,11 @@ function runShowcase(lamps: number, ticks: number): WorldState {
   return loop.state
 }
 
+const isFed = (x: { fueledUntilTick?: number }, tick: number) => (x.fueledUntilTick ?? -1) >= tick
 const lampsIn = (s: WorldState) => Object.values(s.structures).filter((x) => x.kind === 'lamp_post')
+const pitIn = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'fire_pit')
 const litIn = (s: WorldState) =>
-  lampsIn(s).filter((l) => l.stage === 'complete' && (l.fueledUntilTick ?? -1) >= s.tick)
+  lampsIn(s).filter((l) => l.stage === 'complete' && isFed(l, s.tick))
 
 describe('★ the lamplighter: the showcase town lights its own streets', () => {
   const lit = runShowcase(LAMPS, 1440)
@@ -123,63 +125,60 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
     expect(isDark(lit, far!.x, far!.y, MIDNIGHT, CFG)).toBe(true)
   })
 
-  it('★ keeps them lit EVERY night for the life of the town, not just the first', () => {
-    // Three days through the shipped harness (a ring-3 town, builders on, the lamplighter also
-    // sleeping and building). A post that has stood a stoke's walk is lit at every night tick.
-    const STOOD = 60
+  // ONE three-day run through the shipped harness (a ring-3 town, builders on, the lamplighter
+  // also sleeping and building), read by both the tests below.
+  const threeDays = (() => {
+    const STOOD = 60 // a post that has stood a stoke's walk is one the rounds have had time to reach
     const completedAt = new Map<string, number>()
-    const dark: string[] = []
-    let checked = 0
+    const postsDark: string[] = []
+    const pitDark: number[] = []
+    let postTicks = 0
+    let pitTicks = 0
+    let pitFirstFed = -1
     const { state } = runFoundersWorld(
       { interiors: true, builders: true, holdings: true, lamps: 8 },
       4320,
       3,
       (tick, s) => {
-        const lamps = lampsIn(s)
-        for (const l of lamps) {
+        const posts = lampsIn(s)
+        for (const l of posts) {
           if (l.stage === 'complete' && !completedAt.has(l.id)) completedAt.set(l.id, tick)
         }
+        const pit = pitIn(s)
+        if (pit !== undefined && pitFirstFed < 0 && (pit.fueledUntilTick ?? -1) >= tick) {
+          pitFirstFed = tick
+        }
         if (dayPhaseFromTick(tick) !== 'night') return
-        for (const l of lamps) {
+        for (const l of posts) {
           const since = completedAt.get(l.id)
           if (since === undefined || tick - since < STOOD) continue
-          checked++
-          if ((l.fueledUntilTick ?? -1) < tick) dark.push(`${l.id} at ${l.x},${l.y} tick ${tick}`)
+          postTicks++
+          if (!isFed(l, tick)) postsDark.push(`${l.id} at ${l.x},${l.y} tick ${tick}`)
         }
+        if (pit === undefined || pitFirstFed < 0) return
+        pitTicks++
+        if (!isFed(pit, tick)) pitDark.push(tick)
       },
     )
-    expect(lampsIn(state)).toHaveLength(8)
+    return { state, postsDark, pitDark, postTicks, pitTicks, pitFirstFed }
+  })()
+
+  it('★ keeps them lit EVERY night for the life of the town, not just the first', () => {
+    expect(lampsIn(threeDays.state)).toHaveLength(8)
     // Seven of the eight posts through two full nights of 480 ticks. Eight was the floor until
     // ruling 22 put the square's pit on the same rounds, which stands the last post ~20 ticks later.
-    expect(checked, 'no post stood through a night').toBeGreaterThan(2 * 480 * 7)
-    expect(dark).toEqual([])
+    expect(threeDays.postTicks, 'no post stood through a night').toBeGreaterThan(2 * 480 * 7)
+    expect(threeDays.postsDark).toEqual([])
   })
 
   // Ruling 22 (2026-08-30): the square's fire pit is fed daily like the lamps, so one armful
   // covers the whole coming night and the pit burns every night the town stands.
   it('★ feeds the square fire pit too, and it is lit at every night tick', () => {
-    const pitIn = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'fire_pit')
-    let firstFed = -1
-    let nightTicks = 0
-    const dark: number[] = []
-    runFoundersWorld(
-      { interiors: true, builders: true, holdings: true, lamps: 8 },
-      4320,
-      3,
-      (tick, s) => {
-        const pit = pitIn(s)
-        if (pit === undefined) return
-        if (firstFed < 0 && (pit.fueledUntilTick ?? -1) >= tick) firstFed = tick
-        if (firstFed < 0 || dayPhaseFromTick(tick) !== 'night') return
-        nightTicks++
-        if ((pit.fueledUntilTick ?? -1) < tick) dark.push(tick)
-      },
-    )
     // Nobody can feed a fire they have not walked to: the first armful lands in the first half hour.
-    expect(firstFed).toBeGreaterThan(0)
-    expect(firstFed).toBeLessThan(30)
-    expect(nightTicks, 'the pit stood through no night').toBeGreaterThan(3 * 400)
-    expect(dark).toEqual([])
+    expect(threeDays.pitFirstFed).toBeGreaterThan(0)
+    expect(threeDays.pitFirstFed).toBeLessThan(30)
+    expect(threeDays.pitTicks, 'the pit stood through no night').toBeGreaterThan(3 * 400)
+    expect(threeDays.pitDark).toEqual([])
     // ★ VACUOUS GUARD: with no lamplighter on the rounds nobody feeds it, and it never lights.
     const unlit = runFoundersWorld({ interiors: true, builders: true, holdings: true }, 1440, 3)
     expect(pitIn(unlit.state)?.fueledUntilTick).toBeUndefined()

@@ -11,31 +11,32 @@ function stormyDays(stormLightningFireChance: number): StormRun {
     ...SHOWCASE_CONFIG,
     weather: { ...SHOWCASE_CONFIG.weather, stormLightningFireChance },
   }
-  let spells = 0
-  let previous = ''
   const { events } = runFoundersWorld(
     { interiors: true, builders: true, holdings: true },
     4320,
     3,
-    (_tick, s) => {
-      if (s.weather.kind === 'storm' && previous !== 'storm') spells++
-      previous = s.weather.kind
-    },
+    undefined,
     config,
   )
+  const count = (type: string, key: string, value: unknown): number =>
+    events.filter((e) => e.type === type && e.payload[key] === value).length
   const flammable = new Set(
     events
       .filter((e) => e.type === 'structure_planned' && e.payload.flammable === true)
       .map((e) => e.payload.id),
   )
-  const has = (e: { type: string; payload: Record<string, unknown> }, t: string, cause: string) =>
-    e.type === t && e.payload.cause === cause
   return {
-    spells,
+    // `weather_changed` carries the kind it came FROM, so a spell is an edge and not a duration.
+    spells: events.filter(
+      (e) =>
+        e.type === 'weather_changed' &&
+        e.payload.kind === 'storm' &&
+        e.payload.prevKind !== 'storm',
+    ).length,
     roofs: events.filter((e) => e.type === 'structure_completed' && flammable.has(e.payload.id))
       .length,
-    struck: events.filter((e) => has(e, 'fire_ignited', 'lightning')).length,
-    lost: events.filter((e) => has(e, 'fire_extinguished', 'burnout')).length,
+    struck: count('fire_ignited', 'cause', 'lightning'),
+    lost: count('fire_extinguished', 'cause', 'burnout'),
   }
 }
 

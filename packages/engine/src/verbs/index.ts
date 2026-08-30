@@ -690,8 +690,9 @@ export function isStokeable(config: SimConfig, kind: string): boolean {
   return structureGlowRadius(config, kind) !== undefined && isStandingLight(config, kind)
 }
 
-// CITY_HEARTH_KIND is a furnishing and has no recipe row, so it is named rather than derived.
-function isRoofedFire(config: SimConfig, kind: string): boolean {
+// Fed by the armful. Its complement among the stokeable kinds is a fire in the open, which is
+// lit for the night instead — the rule `stoke` writes and the lamplighter walks.
+export function isRoofedFire(config: SimConfig, kind: string): boolean {
   return kind === CITY_HEARTH_KIND || (isHeatSource(config, kind) && isRoofedKind(config, kind))
 }
 

@@ -1,8 +1,8 @@
 // Observed by scripts/probe.ts live run 2026-08-15 — not invented. Re-run the probe before changing.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
-// unpriced route. Wafer is the second name on it so a Baidu rate limit does not idle the minds;
-// both are priced below, so neither can book at the ceiling.
+// unpriced route. Wafer is the second name so a Baidu rate limit idles nobody — but it is 6.2x
+// Baidu's rate, so a sustained failover is expected to trip the live rate ceiling.
 export const PROVIDER_ORDER: string[] = ['Baidu', 'Wafer']
 // Owner ruling 2026-08-30: the fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []

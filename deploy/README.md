@@ -203,7 +203,7 @@ forever, until you stop it.** A live town is not something to leave running.
 charged — reconciled against the bill, not read off a price list — and a call whose bill
 OpenRouter reports is booked at that bill. The dashboards and this page are the same dollars.
 
-### The three guards, and where they trip
+### The four guards, and where they trip
 
 Each is calibrated against the price the ledger books, so each fires at its nominal spend.
 
@@ -218,6 +218,10 @@ Each is calibrated against the price the ledger books, so each fires at its nomi
 were not re-derived with it, so at the expected rate the rate tripwire is the guard that fires
 first and the other two are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you want the daily
 budget back as a working limit.
+
+**The operator alert sits above the tripwire, not before it.** Ruling 22 set it at 10x the expected
+rate and the tripwire at 5x, so for mind traffic the tripwire stops the cast first; the alert is what
+speaks for the spend the tripwire excludes by design (art, the narrator, the arbiter).
 
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;

@@ -21,6 +21,8 @@ import {
   findPath,
   isAdjacentToRect,
   isPassable,
+  isRoofedFire,
+  isStokeable,
   submitIntent,
   townSquareOf,
   type PerceptionPacket,
@@ -386,7 +388,6 @@ export function bridgewrightIntent(
 // the buildings already standing, stepped one tile off the way: a post in the road closes it.
 
 const LAMP_KIND = 'lamp_post'
-const FIRE_PIT_KIND = 'fire_pit'
 
 type LampSite = { x: number; y: number; stand: { x: number; y: number } }
 
@@ -473,11 +474,11 @@ function lamplighterIntent(
 
   // Feeding walks the fires that EXIST, never the sites: `lampSites` is recomputed each tick
   // against the buildings standing NOW, so a raised post falls off the site list as the town grows.
-  // The square's pit is on the same rounds because it burns by the same rule — one armful at any
-  // hour covers the whole coming night.
+  // Every fire in the OPEN, which is the same set `stoke` lights for the night — the posts and the
+  // square's pit. A hearth under a roof burns the armful and is nobody's daily round.
   const dawn = nextDawnTick(state.tick)
   const toFeed = Object.values(state.structures)
-    .filter((s) => s.kind === LAMP_KIND || s.kind === FIRE_PIT_KIND)
+    .filter((s) => isStokeable(config, s.kind) && !isRoofedFire(config, s.kind))
     .sort((p, q) => p.id.localeCompare(q.id))
   for (const s of toFeed) {
     if (s.stage !== 'complete') continue
