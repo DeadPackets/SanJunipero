@@ -1,5 +1,5 @@
 import { CELL, CHAR_TARGET_PX, FEET_Y } from './charAnim.js'
-import { TILE_H, tileToScreen } from './iso.js'
+import { feetOf } from './iso.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 
 // The sort is GEOMETRIC: a drawable declares its ground in tile-EDGE coordinates — tile (x, y)
@@ -145,7 +145,7 @@ const BODY_BELOW_FEET_PX = (CELL - FEET_Y) * BODY_SCALE
 
 /** A body stands on ONE tile, at its interpolated position — no rounding anywhere (F-3c). */
 export function bodyDepthBox(id: string, px: number, py: number): DepthBox {
-  const { sx, sy } = tileToScreen(px, py)
+  const { sx, sy } = feetOf(px, py)
   return {
     id,
     rank: OVERLAP_RANK.body,
@@ -166,7 +166,7 @@ export function structureDepthBox(
   id: string,
   s: { x: number; y: number; w: number; h: number },
 ): DepthBox {
-  const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+  const ground = feetOf(s.x, s.y, s.w, s.h)
   const side = (s.w + s.h) * BUILDING_PX_PER_TILE
   return {
     id,
@@ -178,13 +178,13 @@ export function structureDepthBox(
     sx0: ground.sx - side / 2,
     sy0: ground.sy - side,
     sx1: ground.sx + side / 2,
-    sy1: ground.sy + ((s.w + s.h) * TILE_H) / 2,
+    sy1: ground.sy,
   }
 }
 
 /** An item or a crop: one tile of ground, a small sprite. */
 export function tileDepthBox(id: string, x: number, y: number, spritePx = 24): DepthBox {
-  const { sx, sy } = tileToScreen(x, y)
+  const { sx, sy } = feetOf(x, y)
   return {
     id,
     rank: OVERLAP_RANK.ground,
@@ -195,6 +195,6 @@ export function tileDepthBox(id: string, x: number, y: number, spritePx = 24): D
     sx0: sx - spritePx / 2,
     sy0: sy - spritePx,
     sx1: sx + spritePx / 2,
-    sy1: sy + TILE_H / 2,
+    sy1: sy,
   }
 }

@@ -772,17 +772,17 @@ describe('★ the fill floor is derived per town and per stage, because both ter
 })
 
 describe('stageFill — the number R8 is about', () => {
-  it('THE R8 MEASUREMENT: the town the grammar grows fills two and a half times the frame', () => {
+  it('THE R8 MEASUREMENT: the town the grammar grows fills almost two and a half times the frame', () => {
     expect(TOWN_BOX).toEqual({ minX: -528, maxX: 528, minY: 448, maxY: 840 })
     expect(TOWN_DRAWN).toEqual(drawnBoundsOf(TOWN))
     expect([TOWN_DRAWN.maxX - TOWN_DRAWN.minX, TOWN_DRAWN.maxY - TOWN_DRAWN.minY]).toEqual([
-      1136, 520,
+      1136, 488,
     ])
-    expect(stageFill(TOWN_DRAWN, 1, STAGE)).toBeCloseTo(0.3885, 4)
+    expect(stageFill(TOWN_DRAWN, 1, STAGE)).toBeCloseTo(0.3646, 4)
     expect(
       stageFill(TOWN_DRAWN, 1, STAGE) / 0.1485,
       'against the 14.8 % R8 measured',
-    ).toBeGreaterThan(2.5)
+    ).toBeGreaterThan(2.4)
   })
 
   it('takes the largest stop that fits, and no larger one does', () => {

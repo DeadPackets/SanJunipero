@@ -1,4 +1,4 @@
-import { TILE_H, TILE_W } from './iso.js'
+import { feetOf, TILE_H, TILE_W } from './iso.js'
 
 // A stop is a reciprocal of an integer or an integer, so NEAREST resamples exactly. The ladder
 // stops at 0.25 because the >=24 screen px hit floor is 24/z WORLD px: at 0.125 a door's target
@@ -199,15 +199,12 @@ export function drawnBoundsOf(
     minY = Infinity,
     maxY = -Infinity
   for (const s of list) {
-    const cx = s.x + s.w / 2 - 0.5,
-      cy = s.y + s.h / 2 - 0.5
-    const gsx = (cx - cy) * (TILE_W / 2),
-      gsy = (cx + cy) * (TILE_H / 2)
+    const feet = feetOf(s.x, s.y, s.w, s.h)
     const side = (s.w + s.h) * BUILDING_OVERHANG_PX_PER_TILE
-    minX = Math.min(minX, gsx - side / 2)
-    maxX = Math.max(maxX, gsx + side / 2)
-    minY = Math.min(minY, gsy - side)
-    maxY = Math.max(maxY, gsy + ((s.w + s.h) * TILE_H) / 2)
+    minX = Math.min(minX, feet.sx - side / 2)
+    maxX = Math.max(maxX, feet.sx + side / 2)
+    minY = Math.min(minY, feet.sy - side)
+    maxY = Math.max(maxY, feet.sy)
   }
   return { minX, maxX, minY, maxY }
 }
