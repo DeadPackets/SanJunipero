@@ -13,6 +13,17 @@ host — nothing in this repository provisions anything or spends anything on yo
 | An S3 bucket | Only for continuous backup. Optional, and you can add it later. |
 | An OpenRouter key | **Only for `SJ_LIVE=1`.** The default town costs nothing and needs no key. |
 
+## A box that already has a reverse proxy (this one: nginx, behind Cloudflare)
+
+Skip Caddy. The `caddy` service sits behind `--profile edge` and never starts on a plain `up`.
+
+1. `.env` sets `PORT=8090` (any free loopback port) — the town publishes on `127.0.0.1:$PORT` only.
+2. One vhost on the box's nginx forwards the hostname to it; here `add-site
+   sanjunipero.deadpackets.pw 8090 --cloudflare-only` wrote it (WebSocket upgrade included).
+3. Cloudflare's proxied record terminates TLS; the origin speaks plain HTTP on :80 and only
+   accepts Cloudflare's ranges. Nothing in this repo needs a certificate.
+4. `docker compose up -d --build` — town only. `docker compose logs -f town` as below.
+
 ## The runbook
 
 1. **Install Docker** on the box, if it is not there.
@@ -213,9 +224,12 @@ scripted first and confirm the whole stack is right before attaching a card to i
 
 ## The operator's channel
 
-`SJ_ADMIN_TOKEN` opens the whole channel on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` **inside the
-container**. Every route takes the same `Authorization: Bearer $SJ_ADMIN_TOKEN`, and every one of
-them is the operator's: nothing here is ever rendered into a mind's prompt.
+`SJ_ADMIN_TOKEN` opens the whole channel on `127.0.0.1:${SJ_ADMIN_PORT:-8788}` inside the
+container, and the served origin proxies `/admin/*` to it — so `https://<your host>/admin/cost`
+is reachable from the internet, **locked only by the bearer**. Treat the token like the key.
+Every route takes the same `Authorization: Bearer $SJ_ADMIN_TOKEN`, and every one of them is the
+operator's: nothing here is ever rendered into a mind's prompt. The viewer's Laws page (behind the
+Signpost) is the same channel with a form on it: paste the token once.
 
 | Route | What it does |
 |---|---|

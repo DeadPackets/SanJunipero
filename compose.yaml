@@ -13,8 +13,8 @@
 services:
   town:
     build: .
-    # Loopback, not 0.0.0.0: Caddy answers the internet. Reachable on the box so an operator can
-    # tell "the town is down" apart from "TLS is down".
+    # Loopback, not 0.0.0.0: the edge (Caddy, or the box's own nginx) answers the internet.
+    # Reachable on the box so an operator can tell "the town is down" apart from "TLS is down".
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
     environment:
@@ -35,8 +35,8 @@ services:
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
       - SJ_MAX_MINDS
-      # Loopback INSIDE the container and never published: reach it with
-      # `docker compose exec town`, never through Caddy.
+      # The channel listens on loopback INSIDE the container; the served origin proxies
+      # `/admin/*` to it behind the bearer token, so the operator's page reaches it (ruling 10).
       - SJ_ADMIN_TOKEN
       - SJ_ADMIN_PORT
       - SJ_GIT_SHA
@@ -52,6 +52,8 @@ services:
       # The whole `data` directory, not the world file inside it — see the header.
       # `docker compose down -v` is the deliberate way to end a town.
       - town-data:/app/packages/town/data
+      # The embedder weights: pulled from Hugging Face on first boot, kept across recreates.
+      - town-models:/app/data/models
     restart: unless-stopped
     stop_grace_period: 20s
     # There is no metrics endpoint: a lagging viewer is reported only as a stderr line. Rotation
@@ -73,7 +75,10 @@ services:
     # population. Raise it, never remove it: no limit means the OOM killer takes the whole box.
     mem_limit: 1g
 
+  # Behind a profile: a box that already runs its own reverse proxy (nginx in front of Cloudflare)
+  # points it at 127.0.0.1:${PORT} and never starts this. `--profile edge` for a bare box.
   caddy:
+    profiles: ["edge"]
     image: caddy:2-alpine
     depends_on:
       - town
@@ -129,5 +134,6 @@ services:
 
 volumes:
   town-data:
+  town-models:
   caddy-data:
   caddy-config:
