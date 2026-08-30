@@ -132,7 +132,7 @@ import { ZOOM_STOPS } from './camera.js'
 import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
 import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
-import { tileToScreen } from './iso.js'
+import { feetOf, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 
@@ -673,7 +673,7 @@ describe('★ four people on one tile, through the real layer', () => {
     layer.tick(1000)
     layer.tick(2000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const { sx, sy } = tileToScreen(103, 77)
+    const { sx, sy } = feetOf(103, 77)
     expect(l.entities!.children[0]!.position.x).toBe(sx)
     expect(l.entities!.children[0]!.position.y).toBe(sy)
   })

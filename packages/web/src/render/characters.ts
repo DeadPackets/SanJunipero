@@ -4,7 +4,7 @@ import { ticksPerTileFor } from '@sj/engine/verbs'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { bodyDepthBox } from './depth.js'
-import { facingFrom, tileToScreen, type Facing } from './iso.js'
+import { facingFrom, feetOf, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
@@ -479,7 +479,7 @@ export function createCharacterLayer(
             }
       const px = pos.x + e.crowd.dx
       const py = pos.y + e.crowd.dy
-      const { sx, sy } = tileToScreen(px, py)
+      const { sx, sy } = feetOf(px, py)
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)

@@ -5,7 +5,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox } from './depth.js'
-import { depthKey, tileToScreen } from './iso.js'
+import { depthKey, feetOf } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
@@ -338,7 +338,7 @@ export function syncEntities(
         s.kind,
       )
     }
-    const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+    const ground = feetOf(s.x, s.y, s.w, s.h)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = structureDepthBox(key, s)
     if (s.stage === 'construction') {
@@ -401,7 +401,7 @@ export function syncEntities(
         entry!.sprite.height = ITEM_PX
       })
     }
-    const ground = tileToScreen(it.loc.x, it.loc.y)
+    const ground = feetOf(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
   }
@@ -434,7 +434,7 @@ export function syncEntities(
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
     }
-    const ground = tileToScreen(c.x, c.y)
+    const ground = feetOf(c.x, c.y)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, c.x, c.y)
     writeScale(entry, CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
