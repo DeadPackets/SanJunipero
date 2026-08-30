@@ -158,11 +158,30 @@ export type FieldLayer = {
 
 export type GroundField = {
   layers: FieldLayer[]
+  /** U7: one tile of earth past the map on every side, so the world ends in ground rather
+   *  than a black wedge. Baked UNDER the layers and never one of them, so a layer keeps the
+   *  index its material rotation is read from. */
+  skirt: FieldLayer
   /** the ground that fills a road tile's diamond around its ribbon */
   under: TerrainTileKind
   widthPx: number
   heightPx: number
+  /** bake space is screen space shifted by these, so the skirt's negative rows fit too */
   offsetX: number
+  offsetY: number
+}
+
+export const SKIRT_KIND: TerrainTileKind = 'earth'
+const SKIRT_TILES = 1
+
+/** The ring of tiles `SKIRT_TILES` deep around a `w × h` map. */
+export function skirtTiles(w: number, h: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = []
+  if (w === 0 || h === 0) return out
+  for (let y = -SKIRT_TILES; y < h + SKIRT_TILES; y++)
+    for (let x = -SKIRT_TILES; x < w + SKIRT_TILES; x++)
+      if (x < 0 || y < 0 || x >= w || y >= h) out.push({ x, y })
+  return out
 }
 
 export const ROAD_UNDER: TerrainTileKind = 'grass'
@@ -260,12 +279,22 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
     })
   }
 
+  const skirt: FieldLayer = {
+    id: 'skirt',
+    kind: SKIRT_KIND,
+    url: resolveMaterial(records, SKIRT_KIND),
+    fallback: TILE_COLORS[ID_OF_KIND.get(SKIRT_KIND) ?? 1],
+    shapes: skirtTiles(w, h).map((t) => ({ ...tileToScreen(t.x, t.y), roadKey: null })),
+  }
+  const pad = 2 * SKIRT_TILES
   return {
     layers,
+    skirt,
     under: ROAD_UNDER,
-    widthPx: (w + h) * (TILE_W / 2),
-    heightPx: (w + h) * (TILE_H / 2),
-    offsetX: h * (TILE_W / 2),
+    widthPx: (w + h + 2 * pad) * (TILE_W / 2),
+    heightPx: (w + h + 2 * pad) * (TILE_H / 2),
+    offsetX: (h + pad) * (TILE_W / 2),
+    offsetY: pad * (TILE_H / 2),
   }
 }
 

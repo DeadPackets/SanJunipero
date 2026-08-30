@@ -63,19 +63,27 @@ export type ChunkGrid = {
   rows: number
   fieldW: number
   fieldH: number
-  /** `sx` runs negative down to `-h · TILE_W/2`; bake space is screen space shifted by this. */
+  /** `sx` runs negative down to the skirt's left corner and `sy` to its top row; bake space
+   *  is screen space shifted by these. */
   offsetX: number
+  offsetY: number
 }
 
 export const chunkKey = (c: number, r: number): ChunkKey => `${c}:${r}`
 
-export function groundGrid(fieldW: number, fieldH: number, offsetX: number): ChunkGrid {
+export function groundGrid(
+  fieldW: number,
+  fieldH: number,
+  offsetX: number,
+  offsetY = 0,
+): ChunkGrid {
   return {
     cols: Math.max(1, Math.ceil(fieldW / CHUNK_PX_W)),
     rows: Math.max(1, Math.ceil(fieldH / CHUNK_PX_H)),
     fieldW,
     fieldH,
     offsetX,
+    offsetY,
   }
 }
 
@@ -115,19 +123,18 @@ export function chunksInView(
   // asking is the size of the VIEW and not the size of the town — the whole point of chunking.
   const bx0 = view.x - margin + grid.offsetX,
     bx1 = view.x + view.w + margin + grid.offsetX
+  const by0 = view.y - margin + grid.offsetY,
+    by1 = view.y + view.h + margin + grid.offsetY
   const c0 = Math.max(0, Math.min(grid.cols - 1, Math.floor(bx0 / CHUNK_PX_W)))
   const c1 = Math.max(0, Math.min(grid.cols - 1, Math.floor(bx1 / CHUNK_PX_W)))
-  const r0 = Math.max(0, Math.min(grid.rows - 1, Math.floor((view.y - margin) / CHUNK_PX_H)))
-  const r1 = Math.max(
-    0,
-    Math.min(grid.rows - 1, Math.floor((view.y + view.h + margin) / CHUNK_PX_H)),
-  )
+  const r0 = Math.max(0, Math.min(grid.rows - 1, Math.floor(by0 / CHUNK_PX_H)))
+  const r1 = Math.max(0, Math.min(grid.rows - 1, Math.floor(by1 / CHUNK_PX_H)))
   const out: ChunkRect[] = []
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
       const k = chunkAt(grid, c, r)
       const sx0 = k.x - grid.offsetX,
-        sy0 = k.y
+        sy0 = k.y - grid.offsetY
       if (rectInView(sx0, sy0, sx0 + k.w, sy0 + k.h, view, margin)) out.push(k)
     }
   }
@@ -187,12 +194,13 @@ function shapeBox(
   sx: number,
   sy: number,
 ): { x0: number; y0: number; x1: number; y1: number } {
-  const bx = sx + grid.offsetX
+  const bx = sx + grid.offsetX,
+    by = sy + grid.offsetY
   return {
     x0: bx - TILE_W / 2 - SHAPE_PAD_PX,
     x1: bx + TILE_W / 2 + SHAPE_PAD_PX,
-    y0: sy - SHAPE_PAD_PX,
-    y1: sy + TILE_H + SHAPE_PAD_PX,
+    y0: by - SHAPE_PAD_PX,
+    y1: by + TILE_H + SHAPE_PAD_PX,
   }
 }
 
@@ -237,7 +245,7 @@ export function bucketPolys(
       y1 = -Infinity
     for (let i = 0; i < poly.length; i += 2) {
       const x = poly[i]! + grid.offsetX,
-        y = poly[i + 1]!
+        y = poly[i + 1]! + grid.offsetY
       if (x < x0) x0 = x
       if (x > x1) x1 = x
       if (y < y0) y0 = y
