@@ -12,6 +12,9 @@ import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
+import { createSmoke, type SmokeLayer } from './smoke.js'
+import { createVignette, type Vignette } from './vignette.js'
+import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
 import { createToponymLayer, type ToponymLayer } from './toponyms.js'
@@ -65,6 +68,8 @@ export function StageMount({
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let lightPools: LightPools | null = null
+    let smoke: SmokeLayer | null = null
+    let vignette: Vignette | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
     let toponyms: ToponymLayer | null = null
@@ -120,6 +125,8 @@ export function StageMount({
         weather = createWeatherLayer(s)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
+        smoke = createSmoke(s, store)
+        vignette = createVignette(s.app) // last onto app.stage: over the weather
         sceneRef.current = s
         const charLayer = chars
         s.anchorOf = (agentId) => {
@@ -147,12 +154,15 @@ export function StageMount({
           const now = performance.now()
           const dt = now - lastMs
           lastMs = now
+          advanceWind(dt)
           chars?.tick(now)
           s.sortDepth() // one painter's order for the whole frame, after every box is published
           bubbles?.tick(now)
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
+          smoke?.tick(dt)
+          vignette?.tick()
           const state = store.getState()
           if (state !== null) {
             atmosphere?.update(state)
@@ -186,6 +196,8 @@ export function StageMount({
       bubbles?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
+      smoke?.destroy()
+      vignette?.destroy()
       weather?.destroy()
       atmosphere?.destroy()
       scene?.destroy()
