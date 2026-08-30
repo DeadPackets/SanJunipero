@@ -193,9 +193,10 @@ export async function settle(
  * A per-call cap cannot see a slow leak; this bounds spend per unit time.
  * PER MIND, because the bill scales with the cast and not with the world — a total ceiling would
  * false-fire the day somebody streams ten people.
- * 0.70 is 5x the measured $0.09–0.14/mind/sim-day (rehearsal 3, 2026-08-30).
+ * 0.04 is 5x the EXPECTED $0.005–0.008/mind/sim-day: rehearsal 3's measured $0.09–0.14 recosted
+ * on the Baidu pin with the turn's reasoning off and the day log deduped. Re-derive on rehearsal 4.
  */
-const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.7
+const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.04
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
@@ -204,7 +205,7 @@ const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
 
 /** The pinned provider is an ALLOW-LIST for every mind-facing call, not a preference: a routing
- *  hop costs a cold prefix and an unpriced route. A Wafer outage idles the minds rather than
+ *  hop costs a cold prefix and an unpriced route. A Baidu outage idles the minds rather than
  *  routing around it — an operator who wants it served anyway changes `PROVIDER_ORDER`. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 

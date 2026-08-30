@@ -511,6 +511,9 @@ describe('makeReflectionLlm prompts', () => {
           usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 },
         }
       },
+      withReasoning() {
+        return this
+      },
     } as unknown as LlmClient
     return { client, calls }
   }

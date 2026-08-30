@@ -34,12 +34,37 @@ import { tileKind } from './tileset.js'
 // the square of the ring count and passes `MAX_TEXTURE_SIZE`, where the allocation FAILS.
 export type GroundBaker = {
   rebake(terrain: TileId[][], records: AssetRecord[]): void
-  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it. */
+  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it.
+   *  Called once a frame by the scene, so it is also the pump: `BAKES_PER_FRAME` queued chunks
+   *  bake per call. `rebake` alone bakes unmetered. */
   setView(view: ViewRect): void
   /** What is on the GPU right now. A bound nobody can count is a claim, not a bound. */
   vram(): { chunks: number; bytes: number; maxDimPx: number }
   destroy(): void
 }
+
+/** D3: a diamond rasterised on its own composites fractional edge coverage against the
+ *  transparent bake target, and every shared edge read as a dark line (×0.845 luma measured).
+ *  Half a pixel of outset makes neighbours overlap, so no pixel is left half-covered. */
+export const TILE_EDGE_OUTSET_PX = 0.5
+
+/** A tile's diamond as `poly()` points, top vertex at (cx, cy), outset on every side. */
+export function tileDiamond(cx: number, cy: number, outset = TILE_EDGE_OUTSET_PX): number[] {
+  return [
+    cx,
+    cy - outset,
+    cx + TILE_W / 2 + outset,
+    cy + TILE_H / 2,
+    cx,
+    cy + TILE_H + outset,
+    cx - TILE_W / 2 - outset,
+    cy + TILE_H / 2,
+  ]
+}
+
+/** D17: a zoom-out can put a whole grid on screen in one tick; this many bake per frame and
+ *  the rest on the frames after. A new map still bakes whole — see `rebake`. */
+export const BAKES_PER_FRAME = 2
 
 /** The one thing the baker needs a live GPU for, named so a test can drive the real baker. */
 export type BakeRenderer = {
@@ -53,6 +78,7 @@ export function createGroundBaker(
 ): GroundBaker {
   let grid: ChunkGrid | null = null
   /** the field's layers, cut per chunk — one O(shapes) pass per terrain, never per chunk */
+  /** the field's layers with the skirt LAST — drawn first, at that index for its rotation */
   let buckets = new Map<ChunkKey, FieldLayer[]>()
   let kerbPolys = new Map<ChunkKey, number[][]>()
   let headlandPolys = new Map<ChunkKey, number[][]>()
@@ -66,13 +92,12 @@ export function createGroundBaker(
 
   // Geometry stays in BAKE space (`sx + offX`) with only the container translated, so a material
   // samples the same coordinates in any chunk and the framebuffer edge does all the cutting.
-  function drawChunk(rect: ChunkRect, target: RenderTexture, offX: number): void {
+  function drawChunk(rect: ChunkRect, target: RenderTexture, offX: number, offY: number): void {
     const layer = new Container()
     layer.position.set(-rect.x, -rect.y)
     const stack = buckets.get(rect.key) ?? []
-    for (let li = 0; li < stack.length; li++) {
-      const l = stack[li]!
-      if (l.shapes.length === 0) continue // its index is still its index — see bucketLayers
+    const paint = (l: FieldLayer, li: number): void => {
+      if (l.shapes.length === 0) return // its index is still its index — see bucketLayers
       // Every shoulder is laid down BEFORE any ribbon, so a neighbour's rim can never sit on
       // top of this tile's surface.
       if (l.kind === 'road') {
@@ -87,7 +112,7 @@ export function createGroundBaker(
             for (const poly of roadShoulderBands(shape.roadKey)[pick]) {
               const pts: number[] = []
               for (let i = 0; i < poly.length; i += 2) {
-                pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+                pts.push(shape.sx + offX + poly[i]!, shape.sy + offY + poly[i + 1]!)
               }
               sh.poly(pts)
             }
@@ -100,18 +125,9 @@ export function createGroundBaker(
       const shapesInto = (g: Graphics): void => {
         for (const shape of l.shapes) {
           const cx = shape.sx + offX,
-            cy = shape.sy
+            cy = shape.sy + offY
           if (shape.roadKey === null) {
-            g.poly([
-              cx,
-              cy,
-              cx + TILE_W / 2,
-              cy + TILE_H / 2,
-              cx,
-              cy + TILE_H,
-              cx - TILE_W / 2,
-              cy + TILE_H / 2,
-            ])
+            g.poly(tileDiamond(cx, cy))
             continue
           }
           for (const poly of roadRibbonPolys(shape.roadKey)) {
@@ -142,6 +158,9 @@ export function createGroundBaker(
         layer.addChild(oct)
       }
     }
+    // the skirt goes under everything, at the index it was bucketed at
+    if (stack.length > 0) paint(stack[stack.length - 1]!, stack.length - 1)
+    for (let li = 0; li < stack.length - 1; li++) paint(stack[li]!, li)
     // The tile scan that finds these patches lives in the terrain pass, not here: it is O(the
     // map), and running it per chunk would put the whole map into every chunk's bake.
     const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
@@ -149,7 +168,7 @@ export function createGroundBaker(
       const g = new Graphics()
       for (const poly of polys) {
         const pts: number[] = []
-        for (let i = 0; i < poly.length; i += 2) pts.push(poly[i]! + offX, poly[i + 1]!)
+        for (let i = 0; i < poly.length; i += 2) pts.push(poly[i]! + offX, poly[i + 1]! + offY)
         if (close) g.poly(pts)
         else {
           g.moveTo(pts[0]!, pts[1]!)
@@ -169,6 +188,9 @@ export function createGroundBaker(
   }
 
   let offsetX = 0
+  let offsetY = 0
+  /** on screen and not yet baked — drained `BAKES_PER_FRAME` at a time by `setView` */
+  let pending: ChunkRect[] = []
 
   function bake(rect: ChunkRect): void {
     // resolution 1 and NEAREST, stated rather than inherited: a chunk baked at the device ratio
@@ -180,10 +202,15 @@ export function createGroundBaker(
       resolution: 1,
     })
     const sprite = new Sprite(tex)
-    sprite.position.set(rect.x - offsetX, rect.y)
+    sprite.position.set(rect.x - offsetX, rect.y - offsetY)
     root.addChild(sprite)
     live.set(rect.key, { rect, tex, sprite })
-    drawChunk(rect, tex, offsetX)
+    drawChunk(rect, tex, offsetX, offsetY)
+  }
+
+  function drain(limit: number): void {
+    if (pending.length === 0) return
+    for (const rect of pending.splice(0, limit)) bake(rect)
   }
 
   function release(key: ChunkKey): void {
@@ -196,12 +223,15 @@ export function createGroundBaker(
 
   function applyResidency(): void {
     const step = residency.update(view)
-    for (const rect of step.bake) bake(rect)
-    for (const key of step.evict) release(key)
+    pending.push(...step.bake)
+    const gone = new Set(step.evict)
+    for (const key of gone) release(key)
+    pending = pending.filter((r) => !gone.has(r.key))
   }
 
   function releaseAll(): void {
     for (const key of [...live.keys()]) release(key)
+    pending.length = 0
     residency.clear()
   }
 
@@ -209,8 +239,9 @@ export function createGroundBaker(
     rebake(terrain, records) {
       const field = groundField(terrain, records)
       offsetX = field.offsetX
-      grid = groundGrid(field.widthPx, field.heightPx, field.offsetX)
-      buckets = bucketLayers(grid, field.layers)
+      offsetY = field.offsetY
+      grid = groundGrid(field.widthPx, field.heightPx, field.offsetX, field.offsetY)
+      buckets = bucketLayers(grid, [...field.layers, field.skirt])
 
       const plaza: Tile[] = [],
         farmland: Tile[] = []
@@ -229,10 +260,11 @@ export function createGroundBaker(
       releaseAll()
       residency.setGrid(grid)
       applyResidency()
+      drain(Infinity) // a new map appears whole; only a moving view is metered
 
       // Textures load async: paint the flat fallback now, repaint once the art is in, and let
       // the generation counter stop a stale load overwriting a newer bake.
-      const urls = [...new Set(field.layers.map((l) => l.url))].filter(
+      const urls = [...new Set([field.skirt, ...field.layers].map((l) => l.url))].filter(
         (u): u is string => u !== null && !loaded.has(u),
       )
       if (urls.length === 0) return
@@ -244,13 +276,14 @@ export function createGroundBaker(
       )
         .then(() => {
           if (gen !== generation) return
-          for (const held of live.values()) drawChunk(held.rect, held.tex, offsetX)
+          for (const held of live.values()) drawChunk(held.rect, held.tex, offsetX, offsetY)
         })
         .catch(() => {
           /* art is optional — the flat diamonds already rendered */
         })
     },
     setView(next) {
+      drain(BAKES_PER_FRAME)
       if (next.x === view.x && next.y === view.y && next.w === view.w && next.h === view.h) return
       view = next
       applyResidency()

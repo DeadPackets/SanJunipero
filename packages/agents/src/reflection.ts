@@ -337,6 +337,9 @@ export const ProposeEditSchema = z.discriminatedUnion('verdict', [
 ])
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
+  // E2: with the night's thinking off, facts and scenes came back identical and only the
+  // personality edit thinned out — so this one call keeps it and the other five do not.
+  const editClient = client.withReasoning(null)
   return {
     async extractFacts(dayMemories) {
       const p = extractFactsPrompt(dayMemories)
@@ -385,7 +388,7 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
     },
     async proposeEdit(daySummary, doc, dayMemories) {
       const p = proposeEditPrompt(daySummary, doc, dayMemories)
-      const { value } = await client.object({
+      const { value } = await editClient.object({
         system: p.system,
         messages: p.messages,
         schema: ProposeEditSchema,

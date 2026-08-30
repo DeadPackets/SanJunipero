@@ -16,9 +16,9 @@ it('pins are concrete', () => {
   // Design §1: never a floating alias. Every model this run may be served by names the dated
   // snapshot it was probed at, so nothing can swap under the town.
   for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
-  // Wafer's real published price. The old pin here was 0.14/0.28/0.028 — that is BAIDU's price,
-  // and booking Wafer's calls at it halved every cost the project ever reported.
-  expect(PRICE_PER_M).toEqual({ input: 0.28, output: 0.56, cacheRead: 0.07 })
+  // Baidu's real charged price, reconciled against its bill in `llm-audit/raw/e5.json`. Its
+  // LIST price is 0.14/0.28/0.028; booking the pin at that would over-report every call 3x.
+  expect(PRICE_PER_M).toEqual({ input: 0.04494, output: 0.08988, cacheRead: 0.008988 })
 })
 
 it('the pinned provider is priced, and is what PRICE_PER_M reports', () => {
@@ -42,8 +42,10 @@ it('prices the pinned model by who served it', () => {
     prices: PRICE_PER_M_BY_PROVIDER.Baidu,
     source: 'provider',
   })
-  // Two back ends for one model at prices that differ 2x. A model-keyed table cannot say this.
-  expect(PRICE_PER_M_BY_PROVIDER.Wafer!.input).toBe(PRICE_PER_M_BY_PROVIDER.Baidu!.input * 2)
+  // Two back ends for one model at prices that differ 6x. A model-keyed table cannot say this.
+  expect(PRICE_PER_M_BY_PROVIDER.Wafer!.input).toBeGreaterThan(
+    PRICE_PER_M_BY_PROVIDER.Baidu!.input * 6,
+  )
 })
 
 // The failure mode the whole lane exists to close: a route nobody priced must not book cheap.
@@ -62,6 +64,33 @@ it('the semantic pass is pinned off the thinking preamble and under an output ce
   expect(callSettingsFor('semantic').maxOutputTokens).toBeLessThanOrEqual(4000)
 })
 
+// E6, 12 matched pairs: reasoning was 94% of a turn's output and holding it off left parse at
+// 100% and moved grounding from 75% to 92%. The night keeps it only for `proposeEdit`.
+it('the turn and the night are pinned off the thinking preamble', () => {
+  expect(callSettingsFor('turn').reasoning).toEqual({ enabled: false })
+  expect(callSettingsFor('reflection').reasoning).toEqual({ enabled: false })
+  // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
+  expect(callSettingsFor('narrator').reasoning).toBeUndefined()
+})
+
+// An uncapped call once spent 31,544 output tokens on one dead answer. Each ceiling clears 2x
+// that caller's p99 in rehearsal 3, so it stops a runaway and never truncates an honest answer.
+it('every caller that ran in rehearsal 3 has an output ceiling above its measured p99', () => {
+  // The three callers at zero ran two or three times all run, so their p99 is only their max.
+  const p99 = {
+    turn: 266,
+    reflection: 7846,
+    arbiter: 3942,
+    narrator: 10616,
+    preflight: 0,
+    dream: 0,
+    semantic: 0,
+  }
+  for (const [caller, measured] of Object.entries(p99)) {
+    expect(callSettingsFor(caller).maxOutputTokens, caller).toBeGreaterThanOrEqual(measured * 2)
+  }
+})
+
 it('an unpinned caller keeps the routing it has always had', () => {
-  expect(callSettingsFor('turn')).toEqual({})
+  expect(callSettingsFor('naming')).toEqual({})
 })

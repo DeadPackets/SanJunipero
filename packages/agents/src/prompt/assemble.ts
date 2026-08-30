@@ -166,6 +166,13 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   }
 }
 
+export function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
 // The overflow path only: sleep is the real compaction.
 export function compactDayLog(dayLog: string[], summary: string): string[] {
   return [`Your mind wanders back over the day: ${summary}`, ...dayLog.slice(-10)]

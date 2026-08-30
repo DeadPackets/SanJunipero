@@ -161,10 +161,13 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
       const view = viewAt(z, centre)
       const tight = boxes.filter((x) => boxInView(x, view, 0)).length
       const slack = boxes.filter((x) => boxInView(x, view)).length
+      // the ring's share of the view's area, plus a row of houses for the discreteness
+      const ring =
+        ((view.w + 2 * CULL_MARGIN_PX) * (view.h + 2 * CULL_MARGIN_PX)) / (view.w * view.h) - 1
       expect(
         slack - tight,
         `zoom ${z} pays ${slack - tight} extra for ${CULL_MARGIN_PX}px of margin`,
-      ).toBeLessThan(Math.max(8, tight))
+      ).toBeLessThan(Math.ceil(tight * ring) + 8)
     }
   })
 })

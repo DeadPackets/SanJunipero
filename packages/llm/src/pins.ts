@@ -1,8 +1,8 @@
 // Observed by scripts/probe.ts live run 2026-08-15 — not invented. Re-run the probe before changing.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
-// unpriced route. A Wafer outage therefore idles the minds until PROVIDER_ORDER is changed.
-export const PROVIDER_ORDER: string[] = ['Wafer']
+// unpriced route. A Baidu outage therefore idles the minds until PROVIDER_ORDER is changed.
+export const PROVIDER_ORDER: string[] = ['Baidu']
 // Owner ruling 2026-08-30: the fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
@@ -12,7 +12,9 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // depends on WHO served the call, so the table is keyed by that and not by the model alone.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
-  Baidu: { input: 0.14, output: 0.28, cacheRead: 0.028 },
+  // Baidu re-read 2026-08-30 (`llm-audit/raw/endpoints-2026-08-30.json`) and reconciled against
+  // the bill in `raw/e5.json`: these are its 67.9%-discounted rates, not its list rates.
+  Baidu: { input: 0.04494, output: 0.08988, cacheRead: 0.008988 },
   StreamLake: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
   DeepInfra: { input: 0.08, output: 0.18, cacheRead: 0.016 },
 }
@@ -22,7 +24,7 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
 // The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Baidu!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.
@@ -63,10 +65,21 @@ export type ReasoningSetting =
 // absent field leaves that dial exactly where it sat before the dial existed.
 export type CallSettings = { reasoning?: ReasoningSetting; maxOutputTokens?: number }
 
+// A ceiling is 2x that caller's rehearsal-3 p99 measured as it will NOW run: the answer alone
+// where reasoning is off below, the whole output where it stays on. Truncation is a hard failure.
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
+  // 94% of a turn's output was thinking that bought nothing: E6's 12 matched pairs held parse at
+  // 100% and moved grounding from 75% to 92% with it off. The answer's own p99 is 266 tokens.
+  turn: { reasoning: { enabled: false }, maxOutputTokens: 800 },
+  // Off for the five night calls that E2 showed lose nothing; `proposeEdit` overrides it back on,
+  // and its 7,846-token p99 is what this ceiling has to clear.
+  reflection: { reasoning: { enabled: false }, maxOutputTokens: 16000 },
+  arbiter: { maxOutputTokens: 8000 },
+  narrator: { maxOutputTokens: 24000 },
+  preflight: { maxOutputTokens: 4000 },
+  dream: { maxOutputTokens: 4000 },
   // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
-  // spent 31,179 reasoning tokens over 96 s and still answered nothing. Three concepts to an
-  // ask then measure ~500 output tokens, so the ceiling is headroom and not a target.
+  // spent 31,179 reasoning tokens over 96 s and still answered nothing.
   semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
 }
 

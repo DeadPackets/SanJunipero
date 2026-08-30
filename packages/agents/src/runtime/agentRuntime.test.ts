@@ -37,6 +37,7 @@ import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
+import { splitSentences } from '../prompt/assemble.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { ReflectionLlm } from '../reflection.js'
 import type { DreamLlm } from '../dream.js'
@@ -816,7 +817,29 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const dayLogA = a.find((m) => m.role === 'user')!.text
     const dayLogB = b.find((m) => m.role === 'user')!.text
     expect(dayLogB.startsWith(dayLogA)).toBe(true)
-    expect(dayLogB.length).toBeGreaterThan(dayLogA.length)
+  })
+
+  // D4: the whole day log is re-sent every turn, and 82% of rehearsal 3's was sentences the
+  // mind had already read. Only what the last moment did not say goes in — and all of it does.
+  it('the day log drops what the last moment already said, and keeps what it did not', async () => {
+    const { loop, runtime, agentDb } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 6, 200)
+
+    const moments = memoriesOfKind(agentDb, 'perception').map((m) => m.text)
+    const logged = runtime.dayLogSnapshot().join(' ')
+    expect(moments.length).toBeGreaterThanOrEqual(4)
+
+    // It shrinks: a still scene renders the same sentences every turn and pays for them once.
+    expect(logged.length).toBeLessThan(moments.join(' ').length / 2)
+
+    // And nothing new is dropped: every sentence a moment added over the one before it is there.
+    const kept = new Set(splitSentences(logged))
+    for (const [i, moment] of moments.entries()) {
+      const before = new Set(i === 0 ? [] : splitSentences(moments[i - 1]!))
+      for (const s of splitSentences(moment)) {
+        if (!before.has(s)) expect(kept.has(s), s).toBe(true)
+      }
+    }
   })
 
   it('the makeable vocabulary rides the volatile block and never the frozen prefix (C11 R-H)', async () => {

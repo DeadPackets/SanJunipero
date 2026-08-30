@@ -125,6 +125,9 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     alert: (kind: string, detail: string) => {
       insertAlert(db, { agentId, kind, detail })
     },
+    withReasoning() {
+      return this
+    },
   } as unknown as LlmClient
 }
 
