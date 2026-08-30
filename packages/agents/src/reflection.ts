@@ -162,6 +162,7 @@ export async function runSleepReflection(deps: {
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
+    deps.alert?.('personality_edit_rejected', result.reason)
     return {
       factCount,
       sceneCount: scenes.length,

@@ -483,7 +483,12 @@ export function perceptionToProse(
 
   // What the dark is doing where the body stands. Silent in plain daylight.
   if (packet.light === 'dark') lines.push('The night is close around you.')
-  else if (packet.light === 'dim') lines.push('The last of the light is going out of the day.')
+  else if (packet.light === 'dim')
+    lines.push(
+      dayPhaseFromTick(packet.time.tick) === 'dawn'
+        ? 'The first light is coming into the day.'
+        : 'The last of the light is going out of the day.',
+    )
   else if (packet.light === 'bright' && packet.time.isNight)
     lines.push('A fire throws a circle of light around you.')
 
