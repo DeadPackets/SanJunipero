@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, onFirstSnapshot } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
-import { parseRoute, routeToPath, type Route } from './ui/route.js'
+import { parseRoute, routeToPath, titleFor, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
 import type { Scene } from './render/scene.js'
@@ -20,10 +20,12 @@ import {
   type RingVerb,
   type Subject,
 } from './stage/index.js'
+import { KeyMap } from './stage/KeyMap.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { kindWords } from './ui/broadcastReady.js'
+import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
@@ -53,6 +55,8 @@ export function App() {
     route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
   )
   const [cue, setCue] = useState<string | null>(null)
+  // the help sheet, and the top rung of the Escape ladder while it is up
+  const [keysOpen, setKeysOpen] = useState(false)
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
@@ -106,6 +110,19 @@ export function App() {
       window.removeEventListener('popstate', onPop)
     }
   }, [store])
+
+  // The static title card hands over the moment the town can be seen, and until then it says
+  // what it is waiting for. One way only: a socket that drops later is the stamp's news.
+  useEffect(() => {
+    if (scene !== null && link === 'online') dismissFirstFrame()
+    else firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
+  }, [scene, link])
+
+  // The address bar moves without a page load, so nothing else would ever rename the tab.
+  const named = subject?.kind === 'agent' && subject.id === route.agentId ? subject.name : null
+  useEffect(() => {
+    document.title = titleFor(route, named)
+  }, [route, named])
 
   // The one owner of the ring: a figure clicked on the canvas, or a person a pasted link names.
   // It waits for the world to be able to say who they are, so a stranger's id rings nobody.
@@ -218,12 +235,14 @@ export function App() {
     },
     onEscape: () => {
       const rung = escapeStep({
+        keys: keysOpen,
         paper: sheet !== null,
         interior: insideId !== null,
         subject: subject !== null,
         fullscreen: document.fullscreenElement !== null,
       })
-      if (rung === 'paper') closePaper()
+      if (rung === 'keys') setKeysOpen(false)
+      else if (rung === 'paper') closePaper()
       else if (rung === 'interior') enterInterior(null)
       else if (rung === 'subject') setSubject(null)
       else if (rung === 'fullscreen') toggleFullscreen(appRef.current)
@@ -289,6 +308,7 @@ export function App() {
         onLive={onLive}
         onMoment={onMoment}
       />
+      <KeyMap open={keysOpen} onOpenChange={setKeysOpen} />
       <FpsOverlay />
     </div>
   )

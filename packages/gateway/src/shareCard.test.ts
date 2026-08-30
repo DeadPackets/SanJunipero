@@ -9,7 +9,14 @@ import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { CARD_HEIGHT, CARD_WIDTH } from './agentCard.js'
-import { TOWN_NAME, shareRouteAgent, shareRouteDay } from './shareCard.js'
+import {
+  TOWN_NAME,
+  TOWN_STRAPLINE,
+  shareRouteAgent,
+  shareRouteDay,
+  shareRouteScene,
+  type ShareMeta,
+} from './shareCard.js'
 import { withShareTags } from './staticSite.js'
 import { createGateway, type Gateway } from './server.js'
 
@@ -60,28 +67,75 @@ describe('shareRouteDay — which pages a link is ever pasted from', () => {
     expect(shareRouteDay('/moment/4/19:31/extra', 0)).toBeNull()
     expect(shareRouteDay('/api/chronicle', 0)).toBeNull()
   })
+
+  it('★ reads the scene a `/moment/:id` link names — the day itself answers for it', () => {
+    expect(shareRouteScene('/moment/7')).toBe(7)
+    expect(shareRouteScene('/moment/0')).toBeNull()
+    expect(shareRouteScene('/moment/day7')).toBeNull()
+    expect(shareRouteScene('/moment/4/19:31')).toBeNull()
+    expect(shareRouteScene('/agent/alice')).toBeNull()
+  })
+
+  it('★ has a line of its own to fall back on, so no unfurl says the town twice', () => {
+    expect(TOWN_STRAPLINE).not.toContain(TOWN_NAME)
+  })
 })
 
 describe('withShareTags', () => {
-  const html = withShareTags(INDEX_HTML, {
+  const META: ShareMeta = {
     title: 'What the Fire Took — San Junipero',
     description: 'Day 1 in San Junipero. "quotes" & <angles>',
     image: '/card/moment/1/00:00.png',
-  })
+    imageAlt: 'What the Fire Took — day 1 of San Junipero',
+    type: 'article',
+    canonical: '/moment/1/00:00',
+  }
+  const html = withShareTags(INDEX_HTML, META, 'https://town.example')
 
   it('puts the tags a paste needs inside the head, sized so no client has to guess', () => {
     expect(html.indexOf('og:title')).toBeGreaterThan(html.indexOf('<head>'))
     expect(html.indexOf('og:title')).toBeLessThan(html.indexOf('</head>'))
     expect(html).toContain('<meta property="og:description"')
-    expect(html).toContain('<meta property="og:image" content="/card/moment/1/00:00.png" />')
     expect(html).toContain(`<meta property="og:image:width" content="${CARD_WIDTH}" />`)
     expect(html).toContain(`<meta property="og:image:height" content="${CARD_HEIGHT}" />`)
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />')
   })
 
+  it('★ rewrites the title, so a tab and a search result are not all one page', () => {
+    expect(html).toContain('<title>What the Fire Took — San Junipero</title>')
+    expect(html).not.toContain('a small town, watched kindly</title>')
+  })
+
+  it('★ writes a description Google reads — `og:description` is not one', () => {
+    expect(html).toContain('<meta name="description" content="Day 1 in San Junipero.')
+  })
+
+  it('★ makes the card absolute and names the ONE address of the page', () => {
+    expect(html).toContain(
+      '<meta property="og:image" content="https://town.example/card/moment/1/00:00.png" />',
+    )
+    expect(html).toContain('<link rel="canonical" href="https://town.example/moment/1/00:00" />')
+    expect(html).toContain('<meta property="og:url" content="https://town.example/moment/1/00:00"')
+    expect(html).toContain('<meta property="og:type" content="article" />')
+    expect(html).toContain('<meta property="og:site_name" content="San Junipero" />')
+    expect(html).toContain('<meta property="og:locale" content="en_US" />')
+    expect(html).toContain('<meta property="og:image:alt"')
+    expect(html).toContain('<meta name="twitter:image:alt"')
+  })
+
+  it('★ carries structured data a crawler can read without running the app', () => {
+    const ld = /<script type="application\/ld\+json">(.*?)<\/script>/s.exec(html)?.[1] ?? ''
+    const graph = JSON.parse(ld.replace(/\\u003c/g, '<')) as Record<string, unknown>
+    expect(graph['@type']).toBe('Article')
+    expect(graph.headline).toBe(META.title)
+    expect(graph.url).toBe('https://town.example/moment/1/00:00')
+  })
+
   it('escapes the attribute, so a chapter title cannot close it', () => {
     expect(html).toContain('&quot;quotes&quot; &amp; &lt;angles&gt;')
     expect(html).not.toContain('<angles>')
+    // and cannot close the JSON-LD block either
+    expect(html).not.toContain('</angles>')
   })
 })
 
@@ -175,7 +229,7 @@ describe('the card route and the tags the app is served with', () => {
   it('serves the deep link’s own tags, pointing at that day’s card', async () => {
     const html = await (await fetch(`${base}/moment/1/19:31`)).text()
     expect(html).toContain('<meta property="og:title" content="What the Fire Took — San Junipero"')
-    expect(html).toContain('content="/card/moment/1/00:00.png"')
+    expect(html).toContain(`content="${base}/card/moment/1/00:00.png"`)
     expect(html).toContain('the night the roof went')
   })
 
@@ -183,6 +237,56 @@ describe('the card route and the tags the app is served with', () => {
     const html = await (await fetch(`${base}/`)).text()
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />')
     expect(html).toContain('og:title')
+    expect(html).toContain('<meta property="og:type" content="website" />')
+  })
+
+  it('★ unfurls `/moment/:id` — a recorded day is the most shareable thing the town has', async () => {
+    const res = await fetch(`${base}/moment/1`)
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('<meta property="og:title" content="What the Fire Took — San Junipero"')
+    expect(html).toContain('<meta property="og:type" content="article" />')
+    expect(html).toContain('/moment/1"')
+  })
+
+  it('★ names one address for a whole day, so every scrubbed minute is not its own page', async () => {
+    const html = await (await fetch(`${base}/moment/1/19:31`)).text()
+    expect(html).toContain('rel="canonical"')
+    expect(html).toContain('/moment/1/00:00" />')
+    expect(html).not.toContain('/moment/1/19:31" />')
+  })
+
+  it('★ never says the town’s name twice in one sentence', async () => {
+    const html = await (await fetch(`${base}/moment/9/06:00`)).text()
+    expect(html).not.toContain('Day 9 in San Junipero. San Junipero')
+    expect(html).toContain('Day 9 in San Junipero. A town of minds')
+  })
+
+  it('★ 404s a path that is not a page, rather than indexing every typo as the town', async () => {
+    for (const path of ['/nonsense', '/moment/1/19:31/extra', '/moment/404']) {
+      const res = await fetch(`${base}${path}`)
+      expect(res.status, path).toBe(404)
+      expect(await res.text()).toContain('<div id="root">') // the app still answers for itself
+    }
+  })
+
+  it('★ tells a crawler where it may walk, and hands it every page', async () => {
+    const robots = await (await fetch(`${base}/robots.txt`)).text()
+    expect(robots).toContain('Disallow: /api/')
+    expect(robots).toContain('Disallow: /admin/')
+    expect(robots).toContain(`Sitemap: ${base}/sitemap.xml`)
+
+    const res = await fetch(`${base}/sitemap.xml`)
+    expect(res.headers.get('content-type')).toContain('application/xml')
+    const xml = await res.text()
+    expect(xml).toContain(`<loc>${base}/</loc>`)
+    expect(xml).toContain(`<loc>${base}/agent/alice</loc>`)
+    expect(xml).toContain(`<loc>${base}/moment/1/00:00</loc>`)
+  })
+
+  it('keeps the living day’s card on a short lease — it is rewritten as the day is lived', async () => {
+    const live = await fetch(`${base}/card/moment/0/06:00.svg`)
+    expect(live.headers.get('cache-control')).toBe('public, max-age=300')
   })
 })
 
@@ -294,18 +398,31 @@ describe('a person’s own card', () => {
   it('gives `/agent/:id` its own tags, pointing at that person’s card', async () => {
     const html = await (await fetch(`${base}/agent/alice`)).text()
     expect(html).toContain('<meta property="og:title" content="Alice — San Junipero"')
-    expect(html).toContain('<meta property="og:image" content="/card/agent/alice.png" />')
+    expect(html).toContain(`<meta property="og:image" content="${base}/card/agent/alice.png" />`)
     expect(html).toContain(`<meta property="og:image:width" content="${CARD_WIDTH}" />`)
     // The life the town wrote, one sentence of it, verbatim — nothing composed about a person.
     expect(html).toContain('Alice dug the first well.')
     expect(html).not.toContain('Then she slept.')
   })
 
-  it('says nothing about somebody the world does not have', async () => {
-    const html = await (await fetch(`${base}/agent/nobody`)).text()
-    expect(html).not.toContain('og:title')
+  it('★ says the town no longer has them, rather than handing back the whole town', async () => {
+    const res = await fetch(`${base}/agent/nobody`)
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('Someone the town no longer has — San Junipero')
+    expect(html).toContain('<meta property="og:type" content="profile" />')
+    expect(html).toContain('/agent/nobody" />')
+    // there is still no card of a person nobody has
     expect((await fetch(`${base}/card/agent/nobody.png`)).status).toBe(404)
     expect((await fetch(`${base}/card/agent/__proto__.svg`)).status).toBe(404)
+  })
+
+  it('★ marks a person up as a Person, with their own name', async () => {
+    const html = await (await fetch(`${base}/agent/alice`)).text()
+    const ld = /<script type="application\/ld\+json">(.*?)<\/script>/s.exec(html)?.[1] ?? ''
+    const graph = JSON.parse(ld.replace(/\\u003c/g, '<')) as Record<string, unknown>
+    expect(graph['@type']).toBe('Person')
+    expect(graph.name).toBe('Alice')
   })
 
   it('draws the person, and rasterizes the same card for a chat thread', async () => {

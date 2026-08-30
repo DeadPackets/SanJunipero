@@ -4,7 +4,7 @@ import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import type { HeatWindow } from '@sj/shared'
 import { CUT_MIN_MS, subjectFor } from './directorCut.js'
-import { usePolled } from './useEndpoint.js'
+import { useEndpointFor, useFeed } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
@@ -39,11 +39,15 @@ export function DirectorMode({
   // whatever corner of the ground the camera was created over.
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
 
-  const heat = usePolled<HeatWindow[]>(
+  const feed = useEndpointFor<HeatWindow[]>(
     autoCut && pinned === null ? '/api/heat' : null,
     undefined,
     HEAT_POLL_MS,
   )
+  const heat = useFeed(feed)
+  // The round turns on the POLL, not on the answer changing: an unchanged heat body hands back
+  // the same read, and a director that only cut when the numbers moved would freeze on one face.
+  const beat = useSyncExternalStore(feed.subscribe, feed.beat)
 
   // heat read → sticky cut, one turn per read that settles, never faster than CUT_MIN_MS
   useEffect(() => {
@@ -70,7 +74,7 @@ export function DirectorMode({
       lastCutRef.current = now
       setCut(next)
     }
-  }, [store, autoCut, heat])
+  }, [store, autoCut, heat, beat])
 
   // With no subject the picture is the town itself. Centre BEFORE the stop changes: the zoom
   // eases about whatever the middle of the screen holds.

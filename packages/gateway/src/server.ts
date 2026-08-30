@@ -23,6 +23,7 @@ import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
 import { mountShareCard, shareMeta } from './shareCard.js'
+import { mountCrawlerRoutes } from './crawler.js'
 import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
 import { frameText, notFound, sendJson } from './http.js'
@@ -131,6 +132,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountDiscoveryApi(router, { db, mirror })
   const shareDeps = { mirror, narratorDb, getCodex }
   mountShareCard(router, shareDeps)
+  mountCrawlerRoutes(router, { mirror, narratorDb })
 
   // The built client, served from the world's own origin so the stream is one address.
   const site =

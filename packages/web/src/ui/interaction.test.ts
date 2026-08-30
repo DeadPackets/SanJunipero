@@ -123,6 +123,7 @@ describe('hoverLabel', () => {
 // down together with the pick.
 describe('escape puts down one thing at a time, topmost first', () => {
   const up = (over: Partial<StageUp> = {}): StageUp => ({
+    keys: false,
     paper: false,
     interior: false,
     subject: false,
@@ -142,13 +143,18 @@ describe('escape puts down one thing at a time, topmost first', () => {
     expect(escapeStep(up({ fullscreen: true }))).toBe('fullscreen')
   })
 
+  it('★ the key map is the top rung — it is the sheet a lost viewer just opened', () => {
+    expect(escapeStep(up({ keys: true, paper: true, subject: true }))).toBe('keys')
+    expect(escapeStep(up({ keys: true }))).toBe('keys')
+  })
+
   it('★ answers nothing when the town is already bare', () => {
     expect(escapeStep(up())).toBeNull()
   })
 
   it('★ nothing else in the web tree listens for Escape', () => {
     const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8')
-    for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx'])
+    for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx', '../stage/KeyMap.tsx'])
       expect(src(f), f).not.toContain('Escape')
     expect(src('../App.tsx')).toContain('escapeStep(')
   })
