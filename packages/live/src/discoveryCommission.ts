@@ -3,7 +3,7 @@
 import type Database from 'better-sqlite3'
 import { insertLlmCall } from '@sj/llm'
 import {
-  ANOMALY_STOP_USD,
+  PER_ASSET_STOP_USD,
   BudgetGuard,
   loadReferenceSheet,
   type AssetCodex,
@@ -72,7 +72,7 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
     if (left <= 0) throw new Error(`no budget left to draw ${kind}`)
     // The cap is what the run has left, never past the per-asset anomaly stop, and it is read
     // fresh because the day rolls and the minds spend out of the same balance.
-    const budget = new BudgetGuard(Math.min(ANOMALY_STOP_USD, left))
+    const budget = new BudgetGuard(Math.min(PER_ASSET_STOP_USD, left))
     const client = makeImageClient({
       apiKey,
       budget,

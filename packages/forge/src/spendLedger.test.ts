@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SpendLedger, SpendRowSchema, AnomalyStopError, ANOMALY_STOP_USD } from './spendLedger.js'
+import { SpendLedger, SpendRowSchema, AnomalyStopError, PER_ASSET_STOP_USD } from './spendLedger.js'
 
 let dir: string, file: string
 let t = 0
@@ -138,7 +138,7 @@ describe('anomaly stop', () => {
 
   it('allows a total that lands exactly on the stop and refuses the next cent', () => {
     const l = new SpendLedger(null, now)
-    l.append(row('a', ANOMALY_STOP_USD))
+    l.append(row('a', PER_ASSET_STOP_USD))
     expect(l.totalFor('a')).toBe(5)
     expect(() => {
       l.append(row('a', 0.01))

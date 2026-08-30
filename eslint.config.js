@@ -18,7 +18,7 @@ export default tseslint.config(
       ],
       // 484 object types, 0 interfaces: the measured house style, not the plugin's default.
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
-      // Invariant 6: the tuned prices, thresholds and tuning constants stay written where they are.
+      // The tuned prices, thresholds and tuning constants stay written where they are used.
       'no-magic-numbers': 'off',
       '@typescript-eslint/no-magic-numbers': 'off',
       '@typescript-eslint/restrict-template-expressions': [

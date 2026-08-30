@@ -14,7 +14,7 @@ import {
   stripFootnotes,
 } from './chronicle.js'
 import { makeNarratorLlm, type NarratorLlmClient } from './llm/narratorLlm.js'
-import { scanPromptForGlassLeak } from './glass.js'
+import { scanPromptForGlassLeak } from '@sj/shared'
 import { NARRATOR_VOICE, NARRATOR_VOICES, type NarratorVoice } from './voice.js'
 import type { NarratorLlm, SceneSegment } from './types.js'
 

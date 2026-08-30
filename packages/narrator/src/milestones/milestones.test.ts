@@ -11,7 +11,7 @@ import {
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { detectFirsts } from '../firsts.js'
-import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '../glass.js'
+import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '@sj/shared'
 import { migrateNarratorTables } from '../schema.js'
 import { NarratorStore } from '../store.js'
 import { DEATH_CAUSE_LABELS, TIER1_DEFS } from './tier1.js'

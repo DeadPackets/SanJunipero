@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { LlmClient, migrateLlmTables, type LlmMessage, type LlmUsage } from '@sj/llm'
 import { mockModel } from '@sj/llm/testutil'
-import { scanPromptForGlassLeak } from './glass.js'
+import { scanPromptForGlassLeak } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import {

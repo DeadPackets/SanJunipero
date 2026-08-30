@@ -1,3 +1,8 @@
+// Last of four files, and the only one that renders bytes. A mind's prompt is built by:
+//   runtime/bridge.ts        the world -> a PerceptionPacket
+//   prompt/prose.ts          the packet -> the prose of block 6
+//   runtime/agentRuntime.ts  fills the PromptBlocks below, turn by turn
+//   prompt/assemble.ts       renders them into system + messages (here)
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'

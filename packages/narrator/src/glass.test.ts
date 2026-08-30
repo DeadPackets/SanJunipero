@@ -3,16 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '@sj/engine/store'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { CONSTRUCT_VOCABULARY, FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
 import { NARRATOR_CANON } from './canon.js'
-import {
-  CONSTRUCT_VOCABULARY,
-  NARRATOR_TABLES,
-  WORLD_TABLES,
-  openNarratorDb,
-  openNarratorWorld,
-  scanPromptForGlassLeak,
-} from './glass.js'
+import { NARRATOR_TABLES, WORLD_TABLES, openNarratorDb, openNarratorWorld } from './schema.js'
 import { FIRST_DEFS } from './firsts.js'
 
 it('narrator has no write grant on world tables', () => {

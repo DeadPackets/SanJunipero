@@ -96,7 +96,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is folded into the world with no mind booted for it. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
-| `SJ_MODELS_DIR` | `/app/data/models` | Where the memory embedder's model is cached. **Not in the image and not in a volume** — the `Dockerfile` copies `packages/` only, so the first `SJ_LIVE=1` boot pulls the model from the HuggingFace CDN onto the container's writable layer and pulls it again on every recreate. Point it inside `/app/packages/town/data` to cache it once. |
+| `SJ_MODELS_DIR` | `/app/data/models` | Where the memory embedder's model is cached. **Leave it unset.** The `Dockerfile` copies `packages/` only, so the model is not in the image — but `compose.yaml` mounts the named volume `town-models` at exactly the path the code defaults to, so the first `SJ_LIVE=1` boot pulls it from the HuggingFace CDN once and every recreate reuses it. **Never point it inside `/app/packages/town/data`**: that is the `town-data` volume, and `SJ_FRESH=1` empties it. |
 | `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |
 
 `SJ_FRESH` is deliberately NOT in that list — see below.
@@ -246,7 +246,9 @@ Signpost) is the same channel with a form on it: paste the token once.
 A scripted stream has no ledger and no god layer: `/admin/cost` answers `live: false` with zeros
 and `/admin/rulings/*` answers empty rather than erroring.
 
-**The answer rate** is `honest.md` §1's motive number, measured from the world log alone: of the
+**The answer rate** is the town's one motive number — criterion 18 of
+[the genesis rehearsal plan](../docs/superpowers/plans/2026-08-24-03-genesis-rehearsal-v6.DRAFT.md),
+the only gate that measures motive rather than activity. It is read from the world log alone: of the
 acts a body STARTED (`action_started`), the share that reached `action_completed` rather than
 `action_interrupted`. It costs nothing, needs no live run, and a town that begins everything and
 finishes nothing reads as the rut it is.
@@ -292,7 +294,8 @@ docker compose exec town node -e "fetch('http://127.0.0.1:8788/admin/laws',{meth
   body:JSON.stringify({path:'mystery.enabled',value:false})}).then(r=>r.text()).then(console.log)"
 ```
 
-A law is checked against the engine's whitelist before it is accepted, lands as one
+A law is checked against the engine's whitelist — `TOGGLABLE_PATHS` in
+`packages/engine/src/laws.ts` — before it is accepted, lands as one
 `config_changed` at the next tick boundary, and is hashed, snapshotted and replayed like every
 other fact. A path that is not on the whitelist is a 400, not a world that dies at the next tick.
 **Unset the token and no write path into the world exists at all** — which is the default.

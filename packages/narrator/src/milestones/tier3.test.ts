@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { CONSTRUCT_TYPES, MINUTES_PER_DAY } from '@sj/shared'
 import { openNarratorDb } from '../schema.js'
 import { NarratorStore } from '../store.js'
-import { scanPromptForGlassLeak } from '../glass.js'
+import { scanPromptForGlassLeak } from '@sj/shared'
 import { constructMilestones, type RecognizedConstruct } from './tier3.js'
 
 const QUOTE = 'Every seventh night now. We call it the Long Turning.'

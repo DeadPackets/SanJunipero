@@ -1,3 +1,5 @@
+// The offline art pipeline's own ledger: a `spend.json` the `scripts/gen-*` one-shots keep.
+// A live stream books its art to `_ops.db` instead, against the town's lifetime cap.
 import { z } from 'zod'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -5,7 +7,7 @@ import { dirname } from 'node:path'
 export const SPEND_KINDS = ['image_gen', 'vision_qa', 'style_judge'] as const
 export type SpendKind = (typeof SPEND_KINDS)[number]
 
-export const ANOMALY_STOP_USD = 5
+export const PER_ASSET_STOP_USD = 5
 
 export class AnomalyStopError extends Error {
   constructor(
@@ -13,7 +15,7 @@ export class AnomalyStopError extends Error {
     public totalUsd: number,
   ) {
     super(
-      `asset ${assetId} crossed the $${ANOMALY_STOP_USD} anomaly stop (attempted total $${totalUsd.toFixed(4)})`,
+      `asset ${assetId} crossed the $${PER_ASSET_STOP_USD} anomaly stop (attempted total $${totalUsd.toFixed(4)})`,
     )
     this.name = 'AnomalyStopError'
   }
@@ -55,7 +57,7 @@ export class SpendLedger {
   append(input: Omit<SpendRow, 'at'>): void {
     const row = SpendRowSchema.parse({ ...input, at: this.now() })
     const total = this.totalFor(row.assetId) + row.usd
-    if (total > ANOMALY_STOP_USD) throw new AnomalyStopError(row.assetId, total)
+    if (total > PER_ASSET_STOP_USD) throw new AnomalyStopError(row.assetId, total)
     this.#rows.push(row)
   }
 

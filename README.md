@@ -25,7 +25,41 @@ pnpm stream                  # build the viewer, tick the town, serve both on ht
 | `@sj/gateway` | The observatory: socket hub, HTTP API, asset routes, and the built viewer. |
 | `@sj/town` | The scripted composition root: world boot, founders, the `pnpm stream` entrypoint. |
 | `@sj/live` | The LLM cast behind the bodies. Loaded only by `SJ_LIVE=1`, through one dynamic import. |
+| `@sj/llm` | The model pin, the price table, `LlmClient`, and the `_ops.db` ledger every dollar is booked to. |
 | `@sj/web` | The React + PixiJS viewer. |
+
+`packages/*/scripts` is not part of any of them: 38 human-run one-shots — probes, art
+generation, scoring. The `gen-*` and `*-live` ones spend real money.
+
+## The rules, and the tests that hold them
+
+The specification of this project is its tests. These six hold the rules a change is most likely
+to break by accident.
+
+| Rule | The test |
+|---|---|
+| The scripted path never loads the mind stack, so the default run stays free. | `packages/town/src/liveSeam.test.ts` |
+| Every knob the docs promise reaches the container, and the backup covers the minds that exist. | `packages/town/src/deployEnv.test.ts` |
+| Nothing Node-only reaches the browser bundle. | `packages/web/src/browserGraph.test.ts` |
+| Two viewers fold the same events to the same bytes, over three sim-days. | `packages/town/src/g6.test.ts` |
+| The one-way glass holds: no operator word reaches a mind. | `packages/shared/src/glassScan.test.ts` |
+| `SimConfig` takes no unknown key at any depth, and its binding defaults are asserted by value. | `packages/shared/src/config.test.ts` |
+
+A `★` in a comment or a test name marks a load-bearing line — somebody paid to learn it, so read
+it before you change it. There are 836.
+
+**One-way glass** names two mechanisms, both about what a mind may know. *Vocabulary*:
+`packages/shared/src/glassScan.ts` refuses any operator word — `construct`, `milestone`,
+`first_*` — in a mind-facing string. *Direction*: the observatory opens the world database
+readonly, so nothing an operator reads or writes is ever folded back into the town.
+
+## Where do I…
+
+| | |
+|---|---|
+| Add a world law | A path and a zod type in `TOGGLABLE_PATHS`, `packages/engine/src/laws.ts`. |
+| Follow a mind's prompt | `runtime/bridge.ts` → `prompt/prose.ts` → `runtime/agentRuntime.ts` → `prompt/assemble.ts`, all under `packages/agents/src`. |
+| Import the engine from the browser | The deep paths only: `@sj/engine/state`, `/fold`, `/verbs`, `/laws`. One `from '@sj/engine'` drags in `better-sqlite3` and the page dies before React mounts. |
 
 ## The two entrypoints
 
@@ -36,6 +70,10 @@ pnpm stream                  # build the viewer, tick the town, serve both on ht
 
 Both boot the same world through `startDevWorld`; they differ only in who serves the client and in
 a few defaults below.
+
+Both run inside `packages/town`, so the town on disk is `packages/town/data/dev-world.db` —
+the path is relative to the working directory, and a script launched from the repo root writes a
+second, different town at `data/dev-world.db`.
 
 ## Rehearsing the live cast
 
@@ -79,7 +117,7 @@ block reach the container.
 | `SJ_ADMIN_TOKEN` | unset | Set it to open the loopback law channel (`POST /admin/laws`) behind that bearer token. Unset, no write path into the world exists. `pnpm stream` only. |
 | `SJ_ADMIN_PORT` | `8788` | The port that channel listens on, on `127.0.0.1` only. Never proxy it. `pnpm stream` only. |
 | `SJ_MINDS_DIR` | `data/minds` under `packages/town` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
-| `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
+| `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Nothing else lives there. Under Docker it has its own volume, `town-models`, separate from the town's — leave it unset. `pnpm stream` only. |
 | `SJ_BUILDERS` | on | `0` stops the founders raising houses. |
 | `SJ_BRIDGE` | on | `0` leaves the river uncrossed. |
 | `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. |
