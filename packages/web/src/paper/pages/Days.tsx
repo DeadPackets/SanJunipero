@@ -14,7 +14,7 @@ import {
 } from '../../ui/timelineMarks.js'
 import { milestonesFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY

@@ -17,7 +17,7 @@ import {
   RulingsSection,
   SpendSection,
 } from './AdminOps.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 export function LawsPage(props: PageProps) {
   return props.tab === 'Admin' ? <Admin {...props} /> : <World {...props} />

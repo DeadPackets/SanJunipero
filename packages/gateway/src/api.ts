@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import type { SimConfig, SimEvent } from '@sj/shared'
-import type { Router } from './server.js'
+import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
   HEAT_HORIZON_TICKS,

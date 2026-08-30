@@ -11,7 +11,7 @@ import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
 import { Moments } from './Moments.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const FEED_MAX = 120
 const GLYPH_PX = 8

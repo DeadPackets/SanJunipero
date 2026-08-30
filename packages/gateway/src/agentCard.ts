@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { parseCharacterAtlasManifest } from '@sj/shared'
 import type { AssetCodex } from '@sj/forge'
 import { makeNewestReady } from './assetsHttp.js'
-import { attr } from './staticSite.js'
+import { attr } from './http.js'
 
 /** The box every share card is drawn in — `@sj/narrator`'s `renderShareCard` uses the same one,
  *  and `og:image:width/height` claims it for both. */

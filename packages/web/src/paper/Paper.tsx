@@ -3,7 +3,8 @@ import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
-import { PageBody, type Thing } from './pages/index.js'
+import { PageBody } from './pages/index.js'
+import type { Thing } from './pages/types.js'
 import {
   GRIP_CLOSE_PX,
   PAGE_TABS,

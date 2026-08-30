@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
-import type { Router } from './server.js'
+import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { toEvent, type EventRow } from './http.js'

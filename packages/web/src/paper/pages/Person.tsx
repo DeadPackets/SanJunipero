@@ -18,7 +18,7 @@ import {
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const NEED_LOW = 30
 export type LedgerRow = { personId: string; doc: string; updatedDay: number }

@@ -25,7 +25,7 @@ import {
 } from '@sj/shared/narratorSchema'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
-import type { Router } from './server.js'
+import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { sendJson, toEvent } from './http.js'

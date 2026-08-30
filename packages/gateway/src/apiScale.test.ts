@@ -9,7 +9,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { FOLD_TYPES, mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
-import type { RouteHandler, Router } from './server.js'
+import type { RouteHandler, Router } from './router.js'
 
 const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0))
 
