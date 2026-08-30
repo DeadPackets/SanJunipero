@@ -3,8 +3,8 @@
   "pieces": {
     "signpost-arm": {
       "file": "signpost-arm.webp",
-      "w": 128,
-      "h": 32,
+      "w": 88,
+      "h": 18,
       "slice": null,
       "note": "the four signpost arms; the label is rendered text, never baked in",
       "provenance": {
@@ -19,8 +19,8 @@
     },
     "signpost-post": {
       "file": "signpost-post.webp",
-      "w": 16,
-      "h": 96,
+      "w": 8,
+      "h": 16,
       "slice": null,
       "note": "the post the arms hang from",
       "provenance": {
