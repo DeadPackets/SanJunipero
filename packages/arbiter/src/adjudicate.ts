@@ -42,6 +42,12 @@ const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set([
 // many total tries before the diegetic fallback below.
 const MAX_LLM_ATTEMPTS = 2
 
+// Below this a neighbour is not precedent, only the nearest row a near-empty store holds. Run D
+// handed ruling #2 the whole of ruling #1's reason at cosine 0.403 and the model copied it back;
+// the length cap is the second half of the same guard.
+const PRECEDENT_FLOOR = 0.75
+const PRECEDENT_SUMMARY_MAX = 100
+
 // Returned, never recorded, so a bad run cannot become precedent; mind-facing, so it may name
 // the attempt, never the act. Widening `ImpossibleClassSchema` would hand the model an easy out.
 export const FALLBACK_IMPOSSIBLE = {
@@ -72,17 +78,34 @@ export function wordTainted(word: string): boolean {
 const MACHINE_TOKEN = /^[A-Z0-9_]+$/
 
 // The law prompt.ts states: a refusal whose own words say the act can be begun. Subject-led,
-// so an honest "no one can begin this" is not a match.
+// so an honest "no one can begin this" is not a match. Run D added two more shapes: a reason
+// naming a verdict it did not return, and one conceding the first step to a different subject.
 const REASON_AFFIRMS_THE_ATTEMPT =
   /\b(you|he|she|they|it|this) (can|could|may|might) (attempt|try|begin|start)\b/i
+const REASON_NAMES_ANOTHER_VERDICT = /\b(?:ruling|verdict) is ['"‘’“”]?(?:map|attempt)\b/i
+const REASON_CONCEDES_A_FIRST_STEP = /\bfirst step\b[^.]{0,80}\bcan be (?:taken|begun|started)\b/i
+// "None", a bare token, a stub cut off mid-quote: not a sentence a mind can read back.
+const NOT_A_SENTENCE = /^\S{0,14}$/
+
+// A verdict arguing against itself. Retried, not laundered: the text is not the fault, the
+// branch is, and only a fresh call can pick the other one.
+function impossibleSelfContradicts(v: Verdict): boolean {
+  if (v.kind !== 'impossible') return false
+  return (
+    REASON_AFFIRMS_THE_ATTEMPT.test(v.reason) ||
+    REASON_NAMES_ANOTHER_VERDICT.test(v.reason) ||
+    REASON_CONCEDES_A_FIRST_STEP.test(v.reason) ||
+    NOT_A_SENTENCE.test(v.reason.trim())
+  )
+}
 
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
+// Self-contradiction is not on this list — that one is retried, above.
 function reasonTainted(reason: string, vocabulary?: RulingVocabulary): boolean {
   return (
     FORBIDDEN_FRAMING.test(reason) ||
     MACHINE_TOKEN.test(reason.trim()) ||
-    REASON_AFFIRMS_THE_ATTEMPT.test(reason) ||
     scanRulingForGlassLeak(reason, vocabulary).length > 0
   )
 }
@@ -271,14 +294,23 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       }
 
       // Stage 3 — only genuinely novel intents reach the LLM.
-      const precedent = similar.map(({ ruling }) => {
-        const v = JSON.parse(ruling.verdictJson) as Verdict
-        if (v.kind === 'attempt')
-          return { summary: v.summary, verdictKind: 'attempt', recipeName: v.recipe.name } as const
-        if (v.kind === 'impossible')
-          return { summary: v.reason, verdictKind: 'impossible' } as const
-        return { summary: v.verb, verdictKind: 'map' } as const
-      })
+      const precedent = similar
+        .filter(({ cosine }) => cosine >= PRECEDENT_FLOOR)
+        .map(({ ruling }) => {
+          const v = JSON.parse(ruling.verdictJson) as Verdict
+          if (v.kind === 'attempt')
+            return {
+              summary: v.summary,
+              verdictKind: 'attempt',
+              recipeName: v.recipe.name,
+            } as const
+          if (v.kind === 'impossible')
+            return {
+              summary: v.reason.slice(0, PRECEDENT_SUMMARY_MAX),
+              verdictKind: 'impossible',
+            } as const
+          return { summary: v.verb, verdictKind: 'map' } as const
+        })
       const vocab = codifiedVocabulary(agentCtx)
       const { system, messages } = assembleAdjudicationPrompt({
         canon: `${CANON}\n\nThe town currently knows: ${codex.known().join(', ')}`,
@@ -291,8 +323,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         ...(deps.vocabulary === undefined ? {} : { materials: deps.vocabulary }),
       })
       let value: Verdict | null = null
+      let contradicted = false
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
         const r = await deps.llm.object({ schema: VerdictSchema, system, messages })
+        contradicted = false
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
         if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
@@ -302,9 +336,22 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
         if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null)
           continue
+        // An impossible whose own reason argues the other way — retry, never launder.
+        if (impossibleSelfContradicts(r.value)) {
+          contradicted = true
+          continue
+        }
         value = r.value
       }
-      if (value === null) return FALLBACK_IMPOSSIBLE
+      if (value === null) {
+        if (contradicted) {
+          deps.llm.alert(
+            'arbiter_verdict_self_contradicts',
+            `twice over, an impossible ruling's own reason argued the act could be begun: ${intent}`,
+          )
+        }
+        return FALLBACK_IMPOSSIBLE
+      }
       if (value.kind === 'impossible' && reasonTainted(value.reason, deps.vocabulary)) {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }

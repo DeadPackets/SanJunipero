@@ -30,6 +30,7 @@ doff: name it doff to take off what you are wearing; nothing more is needed
 take: name it take; give itemId, the mark of the thing within reach
 give: name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side, never a building
 speak: name it speak; give text, the words you say aloud
+drop: name it drop; give itemId, the mark of the thing you hold, and it rests on the ground at your feet
 stow: name it stow; give itemId, the mark of the thing you hold, and structureId, the building you leave it in
 write: name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
 read: name it read; give itemId, the mark of the writing you hold
@@ -58,10 +59,10 @@ experiment: name it experiment; give description, what you attempt
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
 stand beside where it rests and see it; until then you cannot name it.
 
-What you carry stays with you until you part with it. You may stow it in a
-building you stand beside or stand within, and it waits there. There is still
-no way to set a thing down on bare ground: keep it, eat it if it is food, stow
-it, or give it to a person standing beside you.
+What you carry stays with you until you part with it. You may drop it and it
+rests on the ground where you stand, or stow it in a building you stand beside
+or stand within, and it waits there. You may also keep it, eat it if it is
+food, or give it to a person standing beside you.
 
 And some things are someone's; all can see whose. A thing you make or gather
 is yours, and stays yours wherever it is set down; stowing it changes nothing.

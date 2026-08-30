@@ -24,7 +24,13 @@ import {
 import { fleeTo } from '../systems/fauna.js'
 import { isSpoiling, spoilageFor } from '../systems/spoilage.js'
 import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from '../systems/warmth.js'
-import { buildIsPlotted, buildSiteOf, siteToRaise, words } from './build.js'
+import {
+  BUILD_NEEDS_A_THING_AND_A_PLACE,
+  buildIsPlotted,
+  buildSiteOf,
+  siteToRaise,
+  words,
+} from './build.js'
 import {
   consumeHeld,
   heldQty,
@@ -85,6 +91,7 @@ export type VerbKind =
   | 'speak'
   | 'give'
   | 'take'
+  | 'drop'
   | 'stow'
   | 'write'
   | 'read'
@@ -203,7 +210,7 @@ const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
     const p = WalkParams.safeParse(params)
-    if (!p.success) return 'walk needs a destination {x, y}'
+    if (!p.success) return 'a walk needs a place to end'
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
@@ -293,7 +300,7 @@ const enter: VerbDef = makeVerb({
   kind: 'enter',
   validate(state, config, agentId, params) {
     const p = EnterParams.safeParse(params)
-    if (!p.success) return 'enter needs a {structureId}'
+    if (!p.success) return 'going inside needs the building you mean'
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'already inside'
     const s = state.structures[p.data.structureId]
@@ -379,7 +386,7 @@ const eat: VerbDef = makeVerb({
   kind: 'eat',
   validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
-    if (!p.success) return 'eat needs an {itemId}'
+    if (!p.success) return 'eating needs the food named'
     const item = state.items[p.data.itemId]
     if (!item) return 'not holding that'
     if (item.loc.t === 'agent' && item.loc.id !== agentId) return 'someone is holding that'
@@ -441,7 +448,7 @@ const tend: VerbDef = makeVerb({
   duration: () => TEND_TICKS,
   validate(state, config, agentId, params) {
     const p = TendParams.safeParse(params)
-    if (!p.success) return 'tend needs a {targetId}'
+    if (!p.success) return 'tending needs someone to tend'
     const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
       self: 'cannot tend yourself',
       gone: 'no one there to tend',
@@ -514,7 +521,7 @@ const drink: VerbDef = makeVerb({
   kind: 'drink',
   validate(state, _config, agentId, params) {
     const p = DrinkParams.safeParse(params)
-    if (!p.success) return 'drink takes an optional {itemId}'
+    if (!p.success) return 'drinking takes water at your side, or the vessel you name'
     if (p.data.itemId !== undefined) {
       const item = state.items[p.data.itemId]
       if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
@@ -547,7 +554,7 @@ const fill: VerbDef = makeVerb({
   kind: 'fill',
   validate(state, _config, agentId, params) {
     const p = FillParams.safeParse(params)
-    if (!p.success) return 'fill needs an {itemId}'
+    if (!p.success) return 'filling needs the vessel named'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!VESSEL_KINDS.has(item.kind)) return 'that holds no water'
@@ -576,7 +583,7 @@ const wear: VerbDef = makeVerb({
   kind: 'wear',
   validate(state, config, agentId, params) {
     const p = WearParams.safeParse(params)
-    if (!p.success) return 'wear needs an {itemId}'
+    if (!p.success) return 'wearing needs the garment named'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!isWearable(config, item.kind)) return 'that is not something you can wear'
@@ -634,7 +641,7 @@ const kindle: VerbDef = makeVerb({
   kind: 'kindle',
   validate(state, config, agentId, params) {
     const p = KindleParams.safeParse(params)
-    if (!p.success) return 'kindle needs an {itemId}'
+    if (!p.success) return 'kindling needs the torch or lamp named'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!isKindleable(config, item.kind)) return 'that will not take a flame'
@@ -657,7 +664,7 @@ const snuff: VerbDef = makeVerb({
   kind: 'snuff',
   validate(state, _config, agentId, params) {
     const p = KindleParams.safeParse(params)
-    if (!p.success) return 'snuff needs an {itemId}'
+    if (!p.success) return 'snuffing needs the lit thing named'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (item.litUntilTick === undefined) return 'it is not lit'
@@ -695,7 +702,7 @@ const stoke: VerbDef = makeVerb({
   kind: 'stoke',
   validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
-    if (!p.success) return 'stoke needs a {structureId}'
+    if (!p.success) return 'stoking needs the fire named'
     const s = state.structures[p.data.structureId]
     if (!s || !isStokeable(config, s.kind)) return 'there is no fire there to feed'
     if (s.stage !== 'complete') return 'it is not finished'
@@ -752,7 +759,7 @@ const till: VerbDef = makeVerb({
   kind: 'till',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
-    if (!p.success) return 'till needs a tile {x, y}'
+    if (!p.success) return 'tilling needs a patch of ground to break'
     const tile = tileAt(state, p.data.x, p.data.y)
     if (tile !== 0 && tile !== 1) return 'only grass or dirt can be tilled'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to till'
@@ -787,7 +794,7 @@ const digChannel: VerbDef = makeVerb({
   duration: () => DIG_CHANNEL_TICKS,
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
-    if (!p.success) return 'dig_channel needs a tile {x, y}'
+    if (!p.success) return 'a channel needs a patch of ground to cut'
     const tile = tileAt(state, p.data.x, p.data.y)
     if (tile !== 0 && tile !== 1) return 'only grass or dirt can be dug out'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to dig'
@@ -826,7 +833,7 @@ const plant: VerbDef = makeVerb({
   kind: 'plant',
   validate(state, config, agentId, params) {
     const p = PlantParams.safeParse(params)
-    if (!p.success) return 'plant needs {x, y, kind}'
+    if (!p.success) return 'planting needs ground and a seed to sow'
     if (tileAt(state, p.data.x, p.data.y) !== 6) return 'crops need farmland'
     if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind}`
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to plant'
@@ -852,7 +859,7 @@ const harvest: VerbDef = makeVerb({
   kind: 'harvest',
   validate(state, config, agentId, params) {
     const p = HarvestParams.safeParse(params)
-    if (!p.success) return 'harvest needs a {cropId}'
+    if (!p.success) return 'harvesting needs the ripe plant named'
     const crop = state.crops[p.data.cropId]
     if (!crop) return 'no such crop'
     if (crop.withered) return 'the crop has withered'
@@ -927,7 +934,7 @@ const fish: VerbDef = makeVerb({
   kind: 'fish',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
-    if (!p.success) return 'fish needs a water tile {x, y}'
+    if (!p.success) return 'fishing needs the water to cast into'
     if (tileAt(state, p.data.x, p.data.y) !== 2) return 'no water there'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to the water'
     return null
@@ -1001,7 +1008,7 @@ const hunt: VerbDef = makeVerb({
   kind: 'hunt',
   validate(state, config, agentId, params) {
     const p = HuntParams.safeParse(params)
-    if (!p.success) return 'hunt needs a {faunaId}'
+    if (!p.success) return 'a hunt needs the animal named'
     const f = state.fauna?.[p.data.faunaId]
     if (!f?.alive) return 'nothing there to hunt'
     if (!HUNTABLE_KINDS.has(f.kind)) return 'that is not something you can run down'
@@ -1056,7 +1063,7 @@ const forage: VerbDef = makeVerb({
   kind: 'forage',
   validate(state, _config, agentId, params) {
     const p = ForageParams.safeParse(params)
-    if (!p.success) return 'forage takes an optional {nodeId}'
+    if (!p.success) return 'foraging takes the patch you mean, or nothing at all'
     if (p.data.nodeId !== undefined) {
       const node = state.forageables?.[p.data.nodeId]
       if (!node) return 'nothing of the kind there'
@@ -1158,7 +1165,7 @@ const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
     const kind = (params as { kind?: unknown }).kind
-    if (typeof kind !== 'string') return 'build needs {kind, x, y}'
+    if (typeof kind !== 'string') return BUILD_NEEDS_A_THING_AND_A_PLACE
     if (buildableRecipe(config, kind) === null) return `cannot build a ${kind}`
     const plotted = buildIsPlotted(state, config, kind)
     const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
@@ -1166,8 +1173,8 @@ const build: VerbDef = makeVerb({
     // it; a mind that names a coordinate anyway is told plainly that it does not get to.
     if (!p.success) {
       return plotted
-        ? `build needs {kind} — where a ${words(kind)} stands is the town's to say, not yours`
-        : 'build needs {kind, x, y}'
+        ? `where a ${words(kind)} stands is the town's to say, not yours — name the thing to raise and nothing else`
+        : BUILD_NEEDS_A_THING_AND_A_PLACE
     }
     return buildSiteOf(state, config, agentId, p.data).refusal
   },
@@ -1317,7 +1324,7 @@ const craft: VerbDef = makeVerb({
   kind: 'craft',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
-    if (!p.success) return 'craft needs a {recipe}'
+    if (!p.success) return 'crafting needs the thing to shape named'
     const route = chosenRoute(state, config, agentId, p.data.recipe)
     return 'refusal' in route ? route.refusal : null
   },
@@ -1363,7 +1370,7 @@ const extinguish: VerbDef = makeVerb({
   kind: 'extinguish',
   validate(state, _config, agentId, params) {
     const p = ExtinguishParams.safeParse(params)
-    if (!p.success) return 'extinguish needs a {structureId}'
+    if (!p.success) return 'putting a fire out needs the burning thing named'
     const s = state.structures[p.data.structureId]
     if (!s) return 'no such structure'
     if (!s.burning) return 'not burning'
@@ -1386,7 +1393,7 @@ const pave: VerbDef = makeVerb({
   validate(state, config, agentId, params) {
     if (!config.roads.enabled) return 'your hands find no way to lay a road here'
     const p = TileParams.safeParse(params)
-    if (!p.success) return 'pave needs a tile {x, y}'
+    if (!p.success) return 'paving needs the ground to lay stone on'
     const tile = tileAt(state, p.data.x, p.data.y)
     if (tile === null || !isPaveable(tile)) return 'nothing to pave here'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to pave'
@@ -1423,7 +1430,7 @@ const chop: VerbDef = makeVerb({
   },
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
-    if (!p.success) return 'chop needs a tile {x, y}'
+    if (!p.success) return 'chopping needs the tree to fell'
     const tile = tileAt(state, p.data.x, p.data.y)
     if (tile === null || !isWoody(tile)) return 'there is nothing standing there to cut'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to cut'
@@ -1476,7 +1483,7 @@ const douse: VerbDef = makeVerb({
   kind: 'douse',
   validate(state, _config, agentId, params) {
     const p = DouseParams.safeParse(params)
-    if (!p.success) return 'douse needs a tile {x, y}'
+    if (!p.success) return 'dousing needs the burning ground named'
     const s = burningAt(state, p.data.x, p.data.y)
     if (!s) return 'nothing is burning there'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
@@ -1507,6 +1514,7 @@ export const SpeakParams = z
   .strict()
 export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
 export const TakeParams = z.object({ itemId: z.string() }).strict()
+export const DropParams = z.object({ itemId: z.string() }).strict()
 export const WriteParams = z
   .object({ itemId: z.string().optional(), text: z.string().min(1) })
   .strict()
@@ -1544,13 +1552,13 @@ const speak: VerbDef = makeVerb({
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
     // Length is refused in the town's own words: the refusal becomes a memory the mind reads
-    // back, and `speak needs a {text}` is our schema talking where a body should be.
+    // back, and a schema's own words are our machinery talking where a body should be.
     if (!p.success) {
       const text: unknown = (params as { text?: unknown }).text
       if (typeof text === 'string' && text.length > SPEECH_INPUT_MAX_CHARS) {
         return 'that is more words than one breath holds'
       }
-      return 'speak needs a {text}'
+      return 'speaking needs words to say'
     }
     return null
   },
@@ -1562,7 +1570,7 @@ const give: VerbDef = makeVerb({
   kind: 'give',
   validate(state, _config, agentId, params) {
     const p = GiveParams.safeParse(params)
-    if (!p.success) return 'give needs {itemId, targetId}'
+    if (!p.success) return 'giving needs the thing and the person to hand it to'
     const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
       self: 'cannot give to yourself',
       gone: 'no one there to receive',
@@ -1631,7 +1639,7 @@ const take: VerbDef = makeVerb({
   kind: 'take',
   validate(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
-    if (!p.success) return 'take needs an {itemId}'
+    if (!p.success) return 'taking needs the thing to lift'
     const item = state.items[p.data.itemId]
     if (!item) return 'no such item'
     if (item.loc.t === 'agent')
@@ -1643,13 +1651,36 @@ const take: VerbDef = makeVerb({
   },
 })
 
+// The other half of `take`, and its mirror: the thing leaves the hand onto the tile the body
+// stands on, which is always within reach. Title is untouched — setting a thing down is not
+// parting with it.
+const drop: VerbDef = makeVerb({
+  kind: 'drop',
+  validate(state, _config, agentId, params) {
+    const p = DropParams.safeParse(params)
+    if (!p.success) return 'setting a thing down needs the thing named'
+    const item = state.items[p.data.itemId]
+    if (!item) return 'no such item'
+    if (item.loc.t !== 'agent') return 'that is already on the ground'
+    if (item.loc.id !== agentId) return 'someone is holding that'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = DropParams.parse(params)
+    const item = state.items[p.itemId]
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    const a = state.agents[agentId]!
+    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'tile', x: a.x, y: a.y } } }]
+  },
+})
+
 export const StowParams = z.object({ itemId: z.string(), structureId: z.string() }).strict()
 
 const stow: VerbDef = makeVerb({
   kind: 'stow',
   validate(state, _config, agentId, params) {
     const p = StowParams.safeParse(params)
-    if (!p.success) return 'stow needs {itemId, structureId}'
+    if (!p.success) return 'stowing needs the thing and the store to leave it in'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     const s = state.structures[p.data.structureId]
@@ -1687,7 +1718,7 @@ const inscribe: VerbDef = makeVerb({
     if (!config.inscription.enabled) return 'your hands find no way to mark this'
     const p = InscribeParams.safeParse(params)
     if (!p.success)
-      return `inscribe needs {structureId, text} of 1 to ${INSCRIPTION_MAX_CHARS} characters`
+      return `marking needs the thing to mark and words of 1 to ${INSCRIPTION_MAX_CHARS} characters`
     const s = state.structures[p.data.structureId]
     if (!s) return 'there is nothing there to mark'
     if (s.stage !== 'complete') return 'it is not finished'
@@ -1715,7 +1746,7 @@ const write: VerbDef = makeVerb({
   kind: 'write',
   validate(state, _config, agentId, params) {
     const p = WriteParams.safeParse(params)
-    if (!p.success) return 'write needs {text}'
+    if (!p.success) return 'writing needs words to set down'
     if (p.data.itemId !== undefined) {
       const item = state.items[p.data.itemId]
       if (!item) return 'no such item'
@@ -1751,7 +1782,7 @@ const read: VerbDef = makeVerb({
   kind: 'read',
   validate(state, _config, agentId, params) {
     const p = ReadParams.safeParse(params)
-    if (!p.success) return 'read needs an {itemId}'
+    if (!p.success) return 'reading needs the writing named'
     const item = state.items[p.data.itemId]
     if (!item) return 'no such item'
     if (item.kind !== 'note') return 'there is nothing to read'
@@ -1771,7 +1802,7 @@ const teach: VerbDef = makeVerb({
   kind: 'teach',
   validate(state, config, agentId, params) {
     const p = TeachParams.safeParse(params)
-    if (!p.success) return 'teach needs {targetId, track}'
+    if (!p.success) return 'teaching needs someone to teach and a craft to pass on'
     const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
       self: 'cannot teach yourself',
       gone: 'no one there to teach',
@@ -1806,7 +1837,7 @@ const attack: VerbDef = makeVerb({
   kind: 'attack',
   validate(state, _config, agentId, params) {
     const p = AttackParams.safeParse(params)
-    if (!p.success) return 'attack needs a {targetId}'
+    if (!p.success) return 'a blow needs someone to strike'
     return adjacentLivingTarget(state, agentId, p.data.targetId, {
       self: 'cannot attack yourself',
       gone: 'no one there to attack',
@@ -1894,6 +1925,7 @@ export const VERBS: Record<string, VerbDef> = {
   speak,
   give,
   take,
+  drop,
   stow,
   write,
   read,

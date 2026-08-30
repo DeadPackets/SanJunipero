@@ -182,6 +182,9 @@ export type BuildSiteAnswer = {
 
 export const words = (kind: string): string => kind.replace(/_/g, ' ')
 
+export const BUILD_NEEDS_A_THING_AND_A_PLACE =
+  'building needs the thing to raise, and the ground to raise it on'
+
 /** On a plot the site is claimInWorld's; the `x`/`y` params are not consulted. */
 export function buildSiteOf(
   state: WorldState,
@@ -213,7 +216,7 @@ function computeBuildSite(
   const recipe = buildableRecipe(config, params.kind)!
   if (!buildIsPlotted(state, config, params.kind)) {
     if (params.x === undefined || params.y === undefined) {
-      return { site: null, resume: null, lay: [], refusal: `build needs {kind, x, y}` }
+      return { site: null, resume: null, lay: [], refusal: BUILD_NEEDS_A_THING_AND_A_PLACE }
     }
     const d = { kind: params.kind, x: params.x, y: params.y }
     const { w, h, refusal } = buildFootprint(state, config, agentId, d)

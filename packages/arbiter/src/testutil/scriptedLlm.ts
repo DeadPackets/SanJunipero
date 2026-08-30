@@ -18,6 +18,7 @@ export class ScriptedLlm {
   lastSystem = ''
   systems: string[] = []
   users: string[] = []
+  alerts: { kind: string; detail: string }[] = []
 
   constructor(private readonly respond: (call: ScriptedCall) => unknown) {}
 
@@ -50,8 +51,8 @@ export class ScriptedLlm {
     return 0
   }
 
-  alert(): void {
-    // a scripted client has no provider to raise anything against
+  alert(kind: string, detail: string): void {
+    this.alerts.push({ kind, detail })
   }
 }
 

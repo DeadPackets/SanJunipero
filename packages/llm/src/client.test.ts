@@ -944,7 +944,7 @@ describe('★ a generation that answered but produced no output still bills what
     expect(
       (db.prepare('SELECT finish_reason AS r FROM llm_calls').get() as { r: string | null }).r,
     ).toBe('length')
-    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('8000 output token ceiling')
+    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('2000 output token ceiling')
   })
 })
 
@@ -982,7 +982,7 @@ describe('★ one unified call discipline, the arbiter included', () => {
     ).rejects.toThrow()
     expect(rows(db), 'a third attempt only spends the stall again').toHaveLength(2)
     expect(alertsOf(db, 'llm_call_failed')).toEqual([
-      'arbiter: 2 attempt(s) failed, the last bounded at 182s — scripted failure',
+      'arbiter: 2 attempt(s) failed, the last bounded at 45s — scripted failure',
     ])
   })
 

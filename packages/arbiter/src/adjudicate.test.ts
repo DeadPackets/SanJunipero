@@ -5,7 +5,7 @@ import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EMBEDDING_DIM, FORBIDDEN_FRAMING } from '@sj/shared'
-import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
+import { FALLBACK_IMPOSSIBLE, makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
 import { CodexStore } from './codex.js'
@@ -243,7 +243,6 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     for (const leak of [
       'this requires a sharpened axe you do not carry',
       'you cannot smoke fish without a rack',
-      'she can attempt this once she has a sharper stone',
     ]) {
       const llm = new ScriptedLlm(() => ({
         kind: 'impossible',
@@ -306,24 +305,52 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     }
   })
 
-  it('★ swaps a refusal whose own words say the act can be attempted', async () => {
-    for (const leak of [
+  // ★ A verdict arguing against itself is the branch being wrong, not the words. Laundering it
+  // shipped a refusal for an act the model had just conceded; the second call gets to re-pick.
+  it('★ retries an impossible whose reason argues the other way, then falls back with an alert', async () => {
+    for (const contradiction of [
       'she can attempt this, but not here',
       'you could try it with a steadier hand',
       'it may begin only at first light',
+      "Thus the ruling is 'map', not 'attempt' or 'impossible'.",
+      'the first step of placing one stone on another can be taken',
+      'None',
     ]) {
       const llm = new ScriptedLlm(() => ({
         kind: 'impossible',
-        reason: leak,
+        reason: contradiction,
         class: 'physically_impossible',
       }))
       const { arbiter } = await makeArbiterRig({ llm })
-      const verdict = await arbiter.adjudicate(`I try ${leak}`, TAMAR_CTX)
-      expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
-        'nothing in the town lends itself to this',
-      )
+      const verdict = await arbiter.adjudicate(`I try ${contradiction}`, TAMAR_CTX)
+      expect(llm.objectCalls, contradiction).toBe(2)
+      expect(verdict, contradiction).toEqual(FALLBACK_IMPOSSIBLE)
+      expect(
+        llm.alerts.map((x) => x.kind),
+        contradiction,
+      ).toEqual(['arbiter_verdict_self_contradicts'])
     }
-    // ANTI-VACUITY: a refusal that says nobody can begin it is a refusal, and it survives.
+  })
+
+  it('★ and the second call gets to answer: a clean reason on the retry is the ruling', async () => {
+    let n = 0
+    const llm = new ScriptedLlm(() => {
+      n += 1
+      return {
+        kind: 'impossible',
+        reason: n === 1 ? 'you may begin this at dawn' : 'the ground here will not hold a post',
+        class: 'physically_impossible',
+      }
+    })
+    const { arbiter } = await makeArbiterRig({ llm })
+    expect(await arbiter.adjudicate('I set a post in the mire', TAMAR_CTX)).toHaveProperty(
+      'reason',
+      'the ground here will not hold a post',
+    )
+    expect(llm.alerts).toEqual([])
+  })
+
+  it('★ and it is not vacuous: a refusal that says nobody can begin it survives', async () => {
     const honest = 'no one can begin this in the dark'
     const llm = new ScriptedLlm(() => ({
       kind: 'impossible',

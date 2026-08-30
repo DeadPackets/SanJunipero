@@ -125,11 +125,11 @@ describe('verb: speak', () => {
   it('rejects empty text', () => {
     expect(submitIntent(makeWorld(), CFG, 'a1', 'speak', { text: '' })).toEqual({
       ok: false,
-      reason: 'speak needs a {text}',
+      reason: 'speaking needs words to say',
     })
     expect(submitIntent(makeWorld(), CFG, 'a1', 'speak', {})).toEqual({
       ok: false,
-      reason: 'speak needs a {text}',
+      reason: 'speaking needs words to say',
     })
   })
 })
@@ -248,6 +248,79 @@ describe('verb: take', () => {
     expect(submitIntent(makeWorld(), CFG, 'a1', 'take', { itemId: 'ghost' })).toEqual({
       ok: false,
       reason: 'no such item',
+    })
+  })
+})
+
+// ★ Run D's five minds all reached for this in their own words — "set the wood back down",
+// "not in my arms all day" — and the town had no word for it. 13 of 30 refusals were the want.
+describe('verb: drop', () => {
+  function holding(): WorldState {
+    return fold(
+      makeWorld(),
+      ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
+      CFG,
+    )
+  }
+
+  it('puts a held thing on the ground at your feet', () => {
+    let s = holding()
+    const r = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(s, r.events)
+    const res = tickOnce(s)
+    expect(res.state.items.item_1!.loc).toEqual({ t: 'tile', x: 0, y: 0 })
+  })
+
+  it('and the thing it dropped is the thing take would hand back', () => {
+    let s = holding()
+    const rd = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
+    if (!rd.ok) throw new Error(rd.reason)
+    s = tickOnce(applyAll(s, rd.events)).state
+    const rt = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
+    if (!rt.ok) throw new Error(rt.reason)
+    expect(tickOnce(applyAll(s, rt.events)).state.items.item_1!.loc).toEqual({
+      t: 'agent',
+      id: 'a1',
+    })
+  })
+
+  it('leaves whose it is alone: setting a thing down is not parting with it', () => {
+    let s = fold(holding(), ev('item_owner_changed', { id: 'item_1', owner: 'a2' }), CFG)
+    const r = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(s, r.events)
+    expect(tickOnce(s).state.items.item_1!.owner).toBe('a2')
+  })
+
+  it('refuses what you are not holding, what is already down, and what is not there', () => {
+    let ground = makeWorld()
+    ground = fold(
+      ground,
+      ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'tile', x: 0, y: 0 } }),
+      CFG,
+    )
+    expect(submitIntent(ground, CFG, 'a1', 'drop', { itemId: 'item_1' })).toEqual({
+      ok: false,
+      reason: 'that is already on the ground',
+    })
+    let theirs = makeWorld()
+    theirs = fold(
+      theirs,
+      ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a2' } }),
+      CFG,
+    )
+    expect(submitIntent(theirs, CFG, 'a1', 'drop', { itemId: 'item_2' })).toEqual({
+      ok: false,
+      reason: 'someone is holding that',
+    })
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'drop', { itemId: 'ghost' })).toEqual({
+      ok: false,
+      reason: 'no such item',
+    })
+    expect(submitIntent(holding(), CFG, 'a1', 'drop', {})).toEqual({
+      ok: false,
+      reason: 'setting a thing down needs the thing named',
     })
   })
 })

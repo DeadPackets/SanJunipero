@@ -49,7 +49,7 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
       },
     ],
     rejections: [
-      { tick: tick - 3, agentId: 'yusuf', verb: 'tend', reason: 'tend needs a {targetId}' },
+      { tick: tick - 3, agentId: 'yusuf', verb: 'tend', reason: 'tending needs someone to tend' },
     ],
     accepted: [{ tick: tick - 4, agentId: 'amara', verb: 'drink' }],
     tickMs: [0.4, 0.5, 0.41],

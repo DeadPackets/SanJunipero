@@ -70,9 +70,28 @@ const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [
 // earns it: a thing nobody can do teaches no one a false path.
 export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 
-// Engine-side words: registry names and param schemas. An arbiter reason is scanned upstream,
-// an engine reason by nothing, so it must never reach a mind.
-const MACHINE_REASON = /[{}]|^(unknown verb:|no such agent)/
+// Engine-side words: a parameter schema spelled out in braces, or a registry name. Every
+// other engine reason is the town's own sentence now and reaches the mind whole.
+const MACHINE_REASON = /\{[^}]*\}|^(?:unknown verb:|no such agent)/
+
+// Words for standing still. The body was already doing it, so the moment is a quiet beat: no
+// refusal to remember, and nothing for a god to rule on.
+const BODY_NOOPS = new Set([
+  'stand',
+  'sit',
+  'wait',
+  'rest',
+  'look',
+  'think',
+  'none',
+  'nothing',
+  'pause',
+  'stay',
+])
+
+function isBodyNoOp(reason: string, verb: string): boolean {
+  return reason.startsWith('unknown verb:') && BODY_NOOPS.has(verb)
+}
 
 export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
 
@@ -397,6 +416,7 @@ export class AgentRuntime {
         }
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
+        if (isBodyNoOp(res.reason, intent.verb)) return
         if (this.#reroutesUnknownVerb(res.reason)) {
           void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(
             this.#sink('adjudicate_crash'),
@@ -487,6 +507,7 @@ export class AgentRuntime {
     this.#plan.lastResult = 'blocked'
     this.#plan.queue = []
     this.#planHeadInFlight = false
+    if (isBodyNoOp(res.reason, head.verb)) return
     if (this.#reroutesUnknownVerb(res.reason)) {
       void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
         this.#sink('adjudicate_crash'),

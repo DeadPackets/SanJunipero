@@ -140,7 +140,7 @@ describe('verb: inscribe', () => {
       submitIntent(s, DEFAULT_CONFIG, 'a1', 'inscribe', { structureId: 'structure_1', text: '' }),
     ).toMatchObject({
       ok: false,
-      reason: 'inscribe needs {structureId, text} of 1 to 280 characters',
+      reason: 'marking needs the thing to mark and words of 1 to 280 characters',
     })
     expect(
       submitIntent(s, DEFAULT_CONFIG, 'a1', 'inscribe', {
@@ -149,7 +149,7 @@ describe('verb: inscribe', () => {
       }),
     ).toMatchObject({
       ok: false,
-      reason: 'inscribe needs {structureId, text} of 1 to 280 characters',
+      reason: 'marking needs the thing to mark and words of 1 to 280 characters',
     })
     expect(
       submitIntent(s, DEFAULT_CONFIG, 'a1', 'inscribe', {
