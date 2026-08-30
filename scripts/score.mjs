@@ -1,7 +1,7 @@
 // Reads a rehearsal's databases. Prints spend per caller, chapters, dreams, births, alerts, and
 // runs the glass scan over every mind-facing artifact the run produced. Reads only, writes nothing.
 // `@sj/shared` is published as TypeScript source, so plain node cannot load it: `--import tsx`.
-//     node --env-file=.env --import tsx scripts/score.mjs
+//     node --import tsx scripts/score.mjs
 //     SJ_MINDS_DIR=... node --import tsx scripts/score.mjs
 import Database from 'better-sqlite3'
 import { readdirSync } from 'node:fs'
@@ -35,6 +35,13 @@ for (const f of files) {
         'SELECT caller, COUNT(*) n, ROUND(SUM(cost_usd),4) usd, SUM(ok=0) failed FROM llm_calls GROUP BY caller',
       ),
     )
+    // The semantic pass is pinned to no reasoning (llm/pins.ts): a non-zero total means it slipped.
+    console.log(
+      'semantic:',
+      q(
+        "SELECT COUNT(*) n, SUM(ok=0) failed, SUM(reasoning_tokens) reasoning FROM llm_calls WHERE caller='semantic'",
+      ),
+    )
     console.log('alerts:', q('SELECT kind, COUNT(*) n FROM alerts GROUP BY kind'))
   }
   if (t.includes('chapters'))
@@ -55,8 +62,12 @@ for (const f of files) {
       leaks.slice(0, 3),
     )
   }
+  // `rulings` keeps the whole verdict as JSON; its kind is inside, not a column.
   if (t.includes('rulings'))
-    console.log('rulings:', q('SELECT kind, COUNT(*) n FROM rulings GROUP BY kind'))
+    console.log(
+      'rulings:',
+      q("SELECT json_extract(verdict_json,'$.kind') kind, COUNT(*) n FROM rulings GROUP BY kind"),
+    )
   if (t.includes('constructs')) console.log('constructs:', q('SELECT * FROM constructs'))
   if (t.includes('milestones'))
     console.log('milestones:', q('SELECT day, tier, label FROM milestones ORDER BY day'))

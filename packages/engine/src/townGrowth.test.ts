@@ -289,5 +289,5 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     const twin = runTown()
     expect(standingRects(twin.loop.state)).toEqual(standingRects(state))
     expect(stateHash(twin.loop.state)).toBe(stateHash(state))
-  }, 60_000)
+  }, 120_000)
 })

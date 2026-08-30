@@ -63,7 +63,7 @@ block reach the container.
 | `PORT` | `8080` | The port `pnpm stream` listens on. |
 | `SJ_RINGS` | `1` | How far the town is platted. Ring 1 is the 76-tile showcase, ring 3 a 152-tile square. Cannot change on a town that already exists — the boot refuses. |
 | `SJ_MAP` | `showcase` | `scripted` asks for the frozen G6 test fixture instead of the product town. |
-| `SJ_INTERIORS` | off on `pnpm stream`, on in `dev:world` | Let people go indoors and sleep. |
+| `SJ_INTERIORS` | on | `0` keeps people out of doors. |
 | `SJ_FRESH` | off | `1` throws the town on disk away and starts a new day 0. Never leave it set. |
 | `SJ_LAMPS` | `8` | How many street lamps the lamplighter raises. `0` leaves the streets dark. `pnpm stream` only; `dev:world` raises none. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** Needs `OPENROUTER_API_KEY`. `pnpm stream` only. |
@@ -76,7 +76,7 @@ block reach the container.
 | `SJ_MINDS_DIR` | `data/minds` under `packages/town` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
 | `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
 | `SJ_BUILDERS` | on | `0` stops the founders raising houses. |
-| `SJ_BRIDGE` | off on `pnpm stream`, on in `dev:world` | `1` lets one founder deck the ford. |
+| `SJ_BRIDGE` | on | `0` leaves the river uncrossed. |
 | `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. |
 | `DEV_FAST_FORWARD` | `0` | Step the world synchronously to that tick before the real-time cadence starts. Screenshot and QA convenience — it fast-forwards a resumed town too. |
 

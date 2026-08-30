@@ -3,9 +3,10 @@
 **/node_modules
 **/dist
 # Only the WRITTEN data dirs. Not `**/data` — `packages/engine/src/data/` is source, and
-# dropping it fails the client build on an unresolved import rather than at copy time.
-packages/gateway/data
-packages/agents/data
+# dropping it fails the client build on an unresolved import rather than at copy time. One level
+# under `packages/` is where every writer puts its sqlite: @sj/town owns it now, and a baked
+# `dev-world.db` seeds the named volume on a fresh box with a developer's town.
+packages/*/data
 .git
 .claude
 docs
