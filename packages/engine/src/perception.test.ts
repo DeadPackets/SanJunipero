@@ -1061,3 +1061,410 @@ describe('composePerception: a body carries what ails it, where eyes can reach',
     expect(composePerception(night, DEFAULT_CONFIG, 'a', []).visible.agents).toEqual([])
   })
 })
+
+// A refactor gate, not a behaviour claim: one world touching every channel at once, frozen as
+// the exact bytes a mind is handed. Any split of composePerception must reproduce it verbatim.
+describe('★ composePerception: one packet, every channel, byte for byte', () => {
+  function richWorld(): WorldState {
+    let s = makeWorld([
+      { id: 'a', x: 6, y: 6 },
+      { id: 'b', x: 8, y: 6 },
+      { id: 'far', x: 40, y: 40 },
+    ])
+    const C = DEFAULT_CONFIG
+    const at = (type: string, payload: unknown): void => {
+      s = fold(s, ev(type, payload, NOON), C)
+    }
+
+    // a road under the feet, and a body dressed, ailing and walking
+    s = {
+      ...s,
+      terrain: s.terrain.map((row, y) => row.map((t, x) => (x === 6 && y === 7 ? 7 : t))),
+    }
+    at('item_spawned', { id: 'item_1', kind: 'garment', qty: 1, loc: { t: 'agent', id: 'b' } })
+    at('item_equipped', { agentId: 'b', itemId: 'item_1', slot: 'body' })
+    at('agent_afflicted', { agentId: 'b', kind: 'illness', severity: 2 })
+
+    // a finished house with a door and a bed, a fire pit, and a wall going up with words on it
+    at('structure_planned', {
+      id: 'structure_1',
+      kind: 'house',
+      x: 4,
+      y: 4,
+      w: 2,
+      h: 2,
+      maxHp: 50,
+      flammable: true,
+      builderId: 'a',
+    })
+    at('structure_completed', { id: 'structure_1' })
+    at('structure_planned', {
+      id: 'structure_2',
+      kind: 'fire_pit',
+      x: 8,
+      y: 8,
+      w: 1,
+      h: 1,
+      maxHp: 10,
+      flammable: false,
+      builderId: 'a',
+    })
+    at('structure_completed', { id: 'structure_2' })
+    at('structure_fueled', { structureId: 'structure_2', burnsUntilTick: NOON + 500 })
+    at('structure_planned', {
+      id: 'structure_3',
+      kind: 'storehouse',
+      x: 7,
+      y: 4,
+      w: 2,
+      h: 2,
+      maxHp: 20,
+      flammable: true,
+      builderId: 'a',
+    })
+    at('structure_inscribed', {
+      structureId: 'structure_3',
+      agentId: 'b',
+      text: 'raised in the first spring',
+    })
+
+    // things on the ground, on a shelf, and in hand
+    at('item_spawned', {
+      id: 'item_2',
+      kind: 'bread',
+      qty: 3,
+      loc: { t: 'tile', x: 5, y: 6 },
+      owner: 'b',
+    })
+    at('item_spawned', {
+      id: 'item_3',
+      kind: 'plank',
+      qty: 2,
+      loc: { t: 'structure', id: 'structure_3' },
+    })
+    at('item_spawned', {
+      id: 'item_4',
+      kind: 'axe',
+      qty: 1,
+      loc: { t: 'agent', id: 'a' },
+      owner: 'a',
+      crafterMark: 'b',
+    })
+
+    // the growing, the grazing and the gathering
+    at('crop_planted', { id: 'crop_1', kind: 'wheat', x: 5, y: 8, plantedDay: 0 })
+    at('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 7, y: 8 })
+    at('forageable_spawned', { id: 'forage_1', kind: 'berry_bush', x: 4, y: 7, stock: 4 })
+
+    at('action_started', { agentId: 'a', verb: 'walk', duration: 6, params: { x: 12, y: 9 } })
+    return s
+  }
+
+  const RECENT: SimEvent[] = [
+    ev('agent_spoke', { agentId: 'b', text: 'the bread is yours', x: 8, y: 6 }, NOON),
+    ev(
+      'item_taken',
+      { itemId: 'item_2', kind: 'bread', takerId: 'b', ownerId: 'far', x: 5, y: 6 },
+      NOON,
+    ),
+    ev('agent_expressed', { agentId: 'b', verb: 'sing', x: 8, y: 6, sense: 'sound' }, NOON),
+    ev('mystery_event', { kind: 'stone_hums', x: 7, y: 7 }, NOON),
+    ev('weather_changed', { kind: 'rain', temperatureC: 9, prevKind: 'clear' }, NOON),
+  ]
+
+  it('is the same bytes it has always been', () => {
+    const packet = composePerception(richWorld(), DEFAULT_CONFIG, 'a', RECENT)
+    expect(JSON.stringify(packet, null, 1)).toMatchInlineSnapshot(`
+      "{
+       "time": {
+        "tick": 720,
+        "year": 0,
+        "season": "spring",
+        "dayOfSeason": 1,
+        "dayOfYear": 0,
+        "hour": 12,
+        "minute": 0,
+        "isNight": false
+       },
+       "self": {
+        "body": {
+         "needs": {
+          "hunger": 100,
+          "energy": 100,
+          "warmth": 100,
+          "social": 100
+         },
+         "hp": 100,
+         "injuries": [],
+         "ill": false,
+         "thirst": 100,
+         "afflictions": []
+        },
+        "x": 6,
+        "y": 6,
+        "activity": "walk",
+        "activityToward": {
+         "x": 12,
+         "y": 9
+        },
+        "inventory": [
+         {
+          "id": "item_4",
+          "kind": "axe",
+          "qty": 1,
+          "owner": "a",
+          "crafterMark": "b",
+          "loc": {
+           "t": "agent",
+           "id": "a"
+          },
+          "ownerName": "a",
+          "crafterMarkName": "b"
+         }
+        ]
+       },
+       "weather": {
+        "kind": "sunny",
+        "temperatureC": 14
+       },
+       "ground": {
+        "wellTravelled": true
+       },
+       "light": "bright",
+       "visible": {
+        "agents": [
+         {
+          "id": "b",
+          "name": "b",
+          "x": 8,
+          "y": 6,
+          "activityVerb": null,
+          "collapsed": false,
+          "asleep": false,
+          "ageBand": "adult",
+          "worn": "wrapped in a rough cloak",
+          "condition": "flushed with fever"
+         }
+        ],
+        "structures": [
+         {
+          "id": "structure_1",
+          "kind": "house",
+          "x": 4,
+          "y": 4,
+          "w": 2,
+          "h": 2,
+          "burning": false,
+          "stage": "complete",
+          "door": {
+           "x": 4,
+           "y": 6
+          },
+          "hearth": "cold",
+          "bed": true
+         },
+         {
+          "id": "structure_2",
+          "kind": "fire_pit",
+          "x": 8,
+          "y": 8,
+          "w": 1,
+          "h": 1,
+          "burning": false,
+          "stage": "complete",
+          "hearth": "lit"
+         },
+         {
+          "id": "structure_3",
+          "kind": "storehouse",
+          "x": 7,
+          "y": 4,
+          "w": 2,
+          "h": 2,
+          "burning": false,
+          "stage": "construction",
+          "hasInscription": true,
+          "inscription": {
+           "text": "raised in the first spring",
+           "by": "b"
+          },
+          "raised": {
+           "done": 0,
+           "needs": 1
+          }
+         }
+        ],
+        "items": [
+         {
+          "id": "item_2",
+          "kind": "bread",
+          "qty": 3,
+          "x": 5,
+          "y": 6,
+          "ownerName": "b"
+         },
+         {
+          "id": "item_3",
+          "kind": "plank",
+          "qty": 2,
+          "x": 7,
+          "y": 4
+         }
+        ],
+        "crops": [
+         {
+          "id": "crop_1",
+          "kind": "wheat",
+          "x": 5,
+          "y": 8,
+          "stage": 0,
+          "withered": false
+         }
+        ],
+        "fauna": [
+         {
+          "id": "fauna_1",
+          "kind": "deer",
+          "x": 7,
+          "y": 8
+         }
+        ],
+        "forageables": [
+         {
+          "id": "forage_1",
+          "kind": "berry_bush",
+          "x": 4,
+          "y": 7,
+          "prose": "berry bushes heavy with fruit"
+         }
+        ]
+       },
+       "heard": [
+        {
+         "speakerId": "b",
+         "name": "b",
+         "text": "the bread is yours",
+         "distance": 2
+        }
+       ],
+       "seen": [
+        {
+         "kind": "item_taken",
+         "takerName": "b",
+         "ownerName": "far",
+         "itemKind": "bread"
+        },
+        {
+         "kind": "expression",
+         "actorName": "b",
+         "verb": "sing",
+         "sense": "sound"
+        },
+        {
+         "kind": "mystery",
+         "mystery": "stone_hums",
+         "prose": "The stone here hums, low, and the sound leaves it very slowly."
+        }
+       ],
+       "feltEvents": [
+        "rain_started"
+       ]
+      }"
+    `)
+  })
+
+  // Four walls gate every channel above. `time`, `self.body`, `inventory` and `weather` are
+  // frozen by the case above and do not change indoors, so only what the walls touch is here.
+  it('is the same bytes indoors, where the world shrinks to one room', () => {
+    let s = richWorld()
+    for (const id of ['a', 'b']) {
+      s = fold(s, ev('agent_moved', { id, x: 4, y: 6 }, NOON), DEFAULT_CONFIG)
+      s = fold(
+        s,
+        ev('agent_entered', { agentId: id, structureId: 'structure_1' }, NOON),
+        DEFAULT_CONFIG,
+      )
+    }
+    s = fold(
+      s,
+      ev(
+        'item_spawned',
+        { id: 'item_5', kind: 'bowl', qty: 1, loc: { t: 'structure', id: 'structure_1' } },
+        NOON,
+      ),
+      DEFAULT_CONFIG,
+    )
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [
+      ev(
+        'agent_spoke',
+        { agentId: 'b', text: 'shut the door', x: 4, y: 6, insideId: 'structure_1' },
+        NOON,
+      ),
+      ev('mystery_event', { kind: 'stone_hums', x: 4, y: 6 }, NOON),
+    ])
+    expect(p.self.inside).toEqual({ id: 'structure_1', kind: 'house' })
+    expect(p.ground).toBeUndefined()
+    expect(
+      JSON.stringify({ visible: p.visible, heard: p.heard, seen: p.seen }, null, 1),
+    ).toMatchInlineSnapshot(`
+        "{
+         "visible": {
+          "agents": [
+           {
+            "id": "b",
+            "name": "b",
+            "x": 4,
+            "y": 6,
+            "activityVerb": null,
+            "collapsed": false,
+            "asleep": false,
+            "ageBand": "adult",
+            "worn": "wrapped in a rough cloak",
+            "condition": "flushed with fever"
+           }
+          ],
+          "structures": [
+           {
+            "id": "structure_1",
+            "kind": "house",
+            "x": 4,
+            "y": 4,
+            "w": 2,
+            "h": 2,
+            "burning": false,
+            "stage": "complete",
+            "door": {
+             "x": 4,
+             "y": 6
+            },
+            "full": true,
+            "hearth": "cold",
+            "bed": true
+           }
+          ],
+          "items": [
+           {
+            "id": "item_5",
+            "kind": "bowl",
+            "qty": 1,
+            "x": 4,
+            "y": 4
+           }
+          ],
+          "crops": [],
+          "fauna": [],
+          "forageables": []
+         },
+         "heard": [
+          {
+           "speakerId": "b",
+           "name": "b",
+           "text": "shut the door",
+           "distance": 0
+          }
+         ],
+         "seen": []
+        }"
+      `)
+  })
+})

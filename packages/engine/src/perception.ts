@@ -12,11 +12,12 @@ import {
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
-import { doorTile, roomIsFull } from './interiors.js'
+import { doorTile, insideOf, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import {
   thirstOf,
   type AfflictionKind,
+  type AgentBody,
   type Item,
   type Structure,
   type WorldState,
@@ -318,119 +319,109 @@ export function hears(
   return chebyshev(outdoors.x, outdoors.y, door.x, door.y) <= 1
 }
 
-export function composePerception(
-  state: WorldState,
-  baseConfig: SimConfig,
-  agentId: string,
-  recentEvents: SimEvent[],
-): PerceptionPacket {
-  const self = state.agents[agentId]
-  if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
-  // Derived here, not at the call site: no caller can forget the world's live laws.
-  const config = effectiveConfig(baseConfig, state.laws)
+// Built once per packet, so no two channels can disagree about what this body can reach.
+type Lens = {
+  readonly state: WorldState
+  readonly config: SimConfig
+  readonly self: AgentBody
+  readonly indoors: string | null
+  withinSight(x: number, y: number): boolean
+  sameRoom(otherId: string): boolean
+  nameOf(id: string): string
+}
 
-  // Every sight-class channel below goes through this one horizon, and the horizon is set by
-  // the light ON THE THING SEEN (§19). Hearing does not use it: sound carries in the dark.
-  const withinSight = (x: number, y: number): boolean =>
-    dist(self.x, self.y, x, y) <= visionRadiusAt(state, self, x, y, state.tick, config)
+function itemMarks(lens: Lens, i: Item): OwnerNames & Turning {
+  const out: OwnerNames & Turning = {}
+  if (lens.config.ownership.enabled) {
+    if (i.owner !== undefined) out.ownerName = lens.nameOf(i.owner)
+    if (i.crafterMark !== undefined) out.crafterMarkName = lens.nameOf(i.crafterMark)
+  }
+  if (isSpoiling(lens.state, i, lens.config)) out.spoiling = true
+  return out
+}
 
-  // Four walls are also a horizon: inside, the world shrinks to this one room.
-  const indoors = self.insideId ?? null
-
-  // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
-  const nameOf = (id: string): string => state.agents[id]?.name ?? id
-  const ownerNames = (i: Item): OwnerNames =>
-    config.ownership.enabled
-      ? {
-          ...(i.owner === undefined ? {} : { ownerName: nameOf(i.owner) }),
-          ...(i.crafterMark === undefined ? {} : { crafterMarkName: nameOf(i.crafterMark) }),
+function perceiveAgents(lens: Lens): PerceivedAgent[] {
+  const { state, config, self } = lens
+  return (
+    Object.values(state.agents)
+      // Four walls outrank the light, and inside them the darkness still costs distance.
+      .filter(
+        (a) => a.id !== self.id && a.alive && lens.withinSight(a.x, a.y) && lens.sameRoom(a.id),
+      )
+      .sort(byId)
+      .map((a) => {
+        const worn = wornProse(state, a.id)
+        const condition = conditionProse(state, config, a.id)
+        return {
+          id: a.id,
+          name: a.name,
+          x: a.x,
+          y: a.y,
+          activityVerb: a.activity?.verb ?? null,
+          collapsed: a.collapsedSinceTick !== null,
+          asleep: a.asleep,
+          ageBand: ageBand(config, a.ageDays),
+          ...(worn === undefined ? {} : { worn }),
+          ...(condition === undefined ? {} : { condition }),
         }
-      : {}
+      })
+  )
+}
 
-  const turning = (i: Item): Turning => (isSpoiling(state, i, config) ? { spoiling: true } : {})
+function carved(
+  lens: Lens,
+  s: Structure,
+): Pick<PerceivedStructure, 'hasInscription' | 'inscription'> {
+  if (s.inscription === undefined) return {}
+  const readable =
+    lens.indoors === null ? isAdjacentToRect(lens.self.x, lens.self.y, s) : s.id === lens.indoors
+  return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
+}
 
-  const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
-    // Four walls outrank the light, and inside them the darkness still costs distance.
-    .filter(
-      (a) =>
-        a.id !== agentId &&
-        a.alive &&
-        withinSight(a.x, a.y) &&
-        (indoors === null ? a.insideId === undefined : a.insideId === indoors),
-    )
-    .sort(byId)
-    .map((a) => {
-      const worn = wornProse(state, a.id)
-      const condition = conditionProse(state, config, a.id)
-      return {
-        id: a.id,
-        name: a.name,
-        x: a.x,
-        y: a.y,
-        activityVerb: a.activity?.verb ?? null,
-        collapsed: a.collapsedSinceTick !== null,
-        asleep: a.asleep,
-        ageBand: ageBand(config, a.ageDays),
-        ...(worn === undefined ? {} : { worn }),
-        ...(condition === undefined ? {} : { condition }),
-      }
-    })
+// The way in, from the same function the verb uses. A body that reads this and stands there
+// is a body `enter` accepts.
+function wayIn(lens: Lens, s: Structure): { door?: { x: number; y: number }; full?: true } {
+  if (s.stage !== 'complete' || !isRoofedKind(lens.config, s.kind)) return {}
+  const door = doorTile(lens.state, s)
+  if (door === null) return {}
+  return {
+    door: { x: door.x, y: door.y },
+    ...(roomIsFull(lens.state, s) ? { full: true as const } : {}),
+  }
+}
 
+// Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
+// walls actually are cannot disagree.
+function howFarUp(lens: Lens, s: Structure): { raised?: { done: number; needs: number } } {
+  if (s.stage !== 'construction') return {}
+  const needs = buildTicks(lens.config, s.kind)
+  return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
+}
+
+// The fire in the room, off the same property `stoke` validates against and the same clock
+// `flamesAt` reads — so what a mind is told about a hearth is what the hearth is.
+function theHearth(lens: Lens, s: Structure): { hearth?: 'lit' | 'cold' } {
+  if (s.stage !== 'complete' || !isHearthKind(lens.config, s.kind)) return {}
+  return { hearth: (s.fueledUntilTick ?? 0) > lens.state.tick ? 'lit' : 'cold' }
+}
+
+// Off the same property `sleepRegenPerTick` reads, so what a mind is promised at the door is
+// what the night actually gives it.
+function theBed(lens: Lens, s: Structure): { bed?: true } {
+  return s.stage === 'complete' && isBeddedKind(lens.config, s.kind) ? { bed: true as const } : {}
+}
+
+function perceiveStructures(lens: Lens): PerceivedStructure[] {
+  const { state, self, indoors } = lens
   // Nearest footprint tile, not the anchor: a long structure whose far corner is
   // anchored out of range is still seen when its near edge is within sight.
-  const structureInSight = (s: { x: number; y: number; w: number; h: number }): boolean => {
+  const inSight = (s: Structure): boolean => {
     const nx = Math.min(Math.max(self.x, s.x), s.x + s.w - 1)
     const ny = Math.min(Math.max(self.y, s.y), s.y + s.h - 1)
-    return withinSight(nx, ny)
+    return lens.withinSight(nx, ny)
   }
-
-  const carved = (s: {
-    id: string
-    x: number
-    y: number
-    w: number
-    h: number
-    inscription?: { text: string; by: string }
-  }) => {
-    if (s.inscription === undefined) return {}
-    const readable = indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors
-    return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
-  }
-
-  // The way in, from the same function the verb uses. A body that reads this and stands there
-  // is a body `enter` accepts.
-  const wayIn = (s: Structure): { door?: { x: number; y: number }; full?: true } => {
-    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) return {}
-    const door = doorTile(state, s)
-    if (door === null) return {}
-    return {
-      door: { x: door.x, y: door.y },
-      ...(roomIsFull(state, s) ? { full: true as const } : {}),
-    }
-  }
-
-  // Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
-  // walls actually are cannot disagree.
-  const howFarUp = (s: Structure): { raised?: { done: number; needs: number } } => {
-    if (s.stage !== 'construction') return {}
-    const needs = buildTicks(config, s.kind)
-    return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
-  }
-
-  // The fire in the room, off the same property `stoke` validates against and the same clock
-  // `flamesAt` reads — so what a mind is told about a hearth is what the hearth is.
-  const theHearth = (s: Structure): { hearth?: 'lit' | 'cold' } => {
-    if (s.stage !== 'complete' || !isHearthKind(config, s.kind)) return {}
-    return { hearth: (s.fueledUntilTick ?? 0) > state.tick ? 'lit' : 'cold' }
-  }
-
-  // Off the same property `sleepRegenPerTick` reads, so what a mind is promised at the door is
-  // what the night actually gives it.
-  const theBed = (s: Structure): { bed?: true } =>
-    s.stage === 'complete' && isBeddedKind(config, s.kind) ? { bed: true as const } : {}
-
-  const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
-    .filter((s) => (indoors === null ? structureInSight(s) : s.id === indoors))
+  return Object.values(state.structures)
+    .filter((s) => (indoors === null ? inSight(s) : s.id === indoors))
     .sort(byId)
     .map((s) => ({
       id: s.id,
@@ -441,19 +432,22 @@ export function composePerception(
       h: s.h,
       burning: s.burning,
       stage: s.stage,
-      ...carved(s),
-      ...wayIn(s),
-      ...howFarUp(s),
-      ...theHearth(s),
-      ...theBed(s),
+      ...carved(lens, s),
+      ...wayIn(lens, s),
+      ...howFarUp(lens, s),
+      ...theHearth(lens, s),
+      ...theBed(lens, s),
     }))
+}
 
+function perceiveItems(lens: Lens): PerceivedItem[] {
+  const { state, self, indoors } = lens
   const tileItems: PerceivedItem[] =
     indoors !== null
       ? []
       : Object.values(state.items)
           .filter(isTileItem)
-          .filter((i) => withinSight(i.loc.x, i.loc.y))
+          .filter((i) => lens.withinSight(i.loc.x, i.loc.y))
           .sort(byId)
           .map((i) => ({
             id: i.id,
@@ -461,8 +455,7 @@ export function composePerception(
             qty: i.qty,
             x: i.loc.x,
             y: i.loc.y,
-            ...ownerNames(i),
-            ...turning(i),
+            ...itemMarks(lens, i),
           }))
 
   const structureItems: PerceivedItem[] = Object.values(state.items)
@@ -476,63 +469,63 @@ export function composePerception(
     .sort(byId)
     .map((i) => {
       const s = state.structures[i.loc.id]!
-      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...ownerNames(i), ...turning(i) }
+      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...itemMarks(lens, i) }
     })
 
-  const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
+  return [...tileItems, ...structureItems].sort(byId)
+}
 
-  const visibleCrops: PerceivedCrop[] =
-    indoors !== null
-      ? []
-      : Object.values(state.crops)
-          .filter((c) => withinSight(c.x, c.y))
-          .sort(byId)
-          .map((c) => ({
-            id: c.id,
-            kind: c.kind,
-            x: c.x,
-            y: c.y,
-            stage: c.stage,
-            withered: c.withered,
-          }))
-
-  // Four walls hide the herd as completely as they hide everything else outdoors.
-  const visibleFauna: PerceivedFauna[] =
-    indoors !== null
-      ? []
-      : Object.keys(state.fauna ?? {})
-          .sort()
-          .map((id) => ({ id, ...state.fauna![id]! }))
-          .filter((f) => f.alive && withinSight(f.x, f.y))
-          .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
-
-  const visibleForageables: PerceivedForageable[] =
-    indoors !== null
-      ? []
-      : Object.keys(state.forageables ?? {})
-          .sort()
-          .map((id) => ({ id, ...state.forageables![id]! }))
-          .filter((f) => withinSight(f.x, f.y))
-          .map((f) => ({
-            id: f.id,
-            kind: f.kind,
-            x: f.x,
-            y: f.y,
-            prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
-          }))
-
-  const inventory: InventoryItem[] = Object.values(state.items)
-    .filter((i) => i.loc.t === 'agent' && i.loc.id === agentId)
+function perceiveCrops(lens: Lens): PerceivedCrop[] {
+  if (lens.indoors !== null) return []
+  return Object.values(lens.state.crops)
+    .filter((c) => lens.withinSight(c.x, c.y))
     .sort(byId)
-    .map((i) => ({ ...i, ...ownerNames(i), ...turning(i) }))
+    .map((c) => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
+}
 
+// Four walls hide the herd as completely as they hide everything else outdoors.
+function perceiveFauna(lens: Lens): PerceivedFauna[] {
+  if (lens.indoors !== null) return []
+  const fauna = lens.state.fauna ?? {}
+  return Object.keys(fauna)
+    .sort()
+    .map((id) => ({ id, ...fauna[id]! }))
+    .filter((f) => f.alive && lens.withinSight(f.x, f.y))
+    .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
+}
+
+function perceiveForageables(lens: Lens): PerceivedForageable[] {
+  if (lens.indoors !== null) return []
+  const forageables = lens.state.forageables ?? {}
+  return Object.keys(forageables)
+    .sort()
+    .map((id) => ({ id, ...forageables[id]! }))
+    .filter((f) => lens.withinSight(f.x, f.y))
+    .map((f) => ({
+      id: f.id,
+      kind: f.kind,
+      x: f.x,
+      y: f.y,
+      prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
+    }))
+}
+
+function perceiveInventory(lens: Lens): InventoryItem[] {
+  return Object.values(lens.state.items)
+    .filter((i) => i.loc.t === 'agent' && i.loc.id === lens.self.id)
+    .sort(byId)
+    .map((i) => ({ ...i, ...itemMarks(lens, i) }))
+}
+
+function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
+  const { state, config, self } = lens
   const heard: HeardSpeech[] = []
   for (const ev of recentEvents) {
     if (ev.type !== 'agent_spoke') continue
     const p = ev.payload as { agentId?: unknown; text?: unknown; x?: unknown; y?: unknown }
-    if (p.agentId === agentId) continue // you don't hear yourself
+    if (p.agentId === self.id) continue // you don't hear yourself
     if (typeof p.text !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    if (!hears(state, config, ev, agentId)) continue
+    if (!hears(state, config, ev, self.id)) continue
     const distance = dist(self.x, self.y, p.x, p.y)
     const speakerId = String(p.agentId)
     heard.push({
@@ -542,10 +535,15 @@ export function composePerception(
       distance,
     })
   }
+  return heard
+}
+
+function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
+  const { state, config, self, indoors } = lens
+  const seen: SeenEvent[] = []
 
   // A taking is witnessed by whoever could see the spot — the same horizon that
   // governs sight, so four walls hide it exactly as they hide the taker.
-  const seen: SeenEvent[] = []
   if (config.ownership.enabled) {
     for (const ev of recentEvents) {
       if (ev.type !== 'item_taken') continue
@@ -563,14 +561,12 @@ export function composePerception(
       )
         continue
       if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
-      if (p.takerId === agentId) continue
-      const takerInside = state.agents[p.takerId]?.insideId ?? null
-      const sameSide = indoors === null ? takerInside === null : takerInside === indoors
-      if (!sameSide || !withinSight(p.x, p.y)) continue
+      if (p.takerId === self.id) continue
+      if (!lens.sameRoom(p.takerId) || !lens.withinSight(p.x, p.y)) continue
       seen.push({
         kind: 'item_taken',
-        takerName: nameOf(p.takerId),
-        ownerName: nameOf(p.ownerId),
+        takerName: lens.nameOf(p.takerId),
+        ownerName: lens.nameOf(p.ownerId),
         itemKind: p.kind,
       })
     }
@@ -589,16 +585,14 @@ export function composePerception(
     }
     if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    if (p.agentId === agentId) continue
+    if (p.agentId === self.id) continue
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
-    const actorInside = state.agents[p.agentId]?.insideId ?? null
     const reaches =
       sense === 'sound'
-        ? hears(state, config, ev, agentId)
-        : (indoors === null ? actorInside === null : actorInside === indoors) &&
-          withinSight(p.x, p.y)
+        ? hears(state, config, ev, self.id)
+        : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
     if (!reaches) continue
-    seen.push({ kind: 'expression', actorName: nameOf(p.agentId), verb: p.verb, sense })
+    seen.push({ kind: 'expression', actorName: lens.nameOf(p.agentId), verb: p.verb, sense })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a
@@ -609,8 +603,38 @@ export function composePerception(
     const entry = typeof p.kind === 'string' ? MYSTERY_BY_KIND[p.kind] : undefined
     if (entry?.scope !== 'located') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    if (indoors !== null || !withinSight(p.x, p.y)) continue
+    if (indoors !== null || !lens.withinSight(p.x, p.y)) continue
     seen.push({ kind: 'mystery', mystery: entry.kind, prose: entry.prose })
+  }
+
+  return seen
+}
+
+export function composePerception(
+  state: WorldState,
+  baseConfig: SimConfig,
+  agentId: string,
+  recentEvents: SimEvent[],
+): PerceptionPacket {
+  const self = state.agents[agentId]
+  if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
+  // Derived here, not at the call site: no caller can forget the world's live laws.
+  const config = effectiveConfig(baseConfig, state.laws)
+
+  // Four walls are also a horizon: inside, the world shrinks to this one room.
+  const indoors = insideOf(state, agentId)
+  const lens: Lens = {
+    state,
+    config,
+    self,
+    indoors,
+    // Every sight-class channel goes through this one horizon, and the horizon is set by the
+    // light ON THE THING SEEN (§19). Hearing does not use it: sound carries in the dark.
+    withinSight: (x, y) =>
+      dist(self.x, self.y, x, y) <= visionRadiusAt(state, self, x, y, state.tick, config),
+    sameRoom: (otherId) => insideOf(state, otherId) === indoors,
+    // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
+    nameOf: (id) => state.agents[id]?.name ?? id,
   }
 
   const feltEvents = recentEvents
@@ -646,7 +670,7 @@ export function composePerception(
       activity: self.activity?.verb ?? null,
       ...(toward === undefined ? {} : { activityToward: toward }),
       ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
-      inventory,
+      inventory: perceiveInventory(lens),
     },
     weather: { ...state.weather },
     ...(ground === undefined ? {} : { ground }),
@@ -654,15 +678,15 @@ export function composePerception(
     ...(fumbling ? { fumbling: true as const } : {}),
     ...(walkIsCapped(state, agentId) ? { wayUnclear: true as const } : {}),
     visible: {
-      agents: visibleAgents,
-      structures: visibleStructures,
-      items: visibleItems,
-      crops: visibleCrops,
-      fauna: visibleFauna,
-      forageables: visibleForageables,
+      agents: perceiveAgents(lens),
+      structures: perceiveStructures(lens),
+      items: perceiveItems(lens),
+      crops: perceiveCrops(lens),
+      fauna: perceiveFauna(lens),
+      forageables: perceiveForageables(lens),
     },
-    heard,
-    seen,
+    heard: perceiveHeard(lens, recentEvents),
+    seen: perceiveSeen(lens, recentEvents),
     feltEvents,
   }
 }
