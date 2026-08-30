@@ -1,8 +1,10 @@
 // Measured on a live run, not chosen. Re-run scripts/probe.ts before changing it.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
-// An allow-list, not a preference: a routing hop costs a cold prefix and an unpriced route.
-// The second name is what keeps a rate limit on the first from idling every mind.
-export const PROVIDER_ORDER: string[] = ['Baidu', 'AtlasCloud']
+// An allow-list that LOAD-BALANCES, not a priority order: measured 52/48 at production pace
+// (providers2, 2026-08-30). Budget the second name at half the bill, not as a rare failover.
+export const PROVIDER_ORDER: string[] = ['Baidu', 'Inceptron']
+// Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each returns 100% well-formed
+// Turns with `action: null` on 75-99% of calls, which only the pre-flight act bar catches.
 // The fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
@@ -12,6 +14,8 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // not by the model alone — two back ends for this one model differ 7x.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
+  Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
+  // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
   AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
   // Reconciled against the bill: these are the discounted rates charged, not the list rates.
   Baidu: { input: 0.04494, output: 0.08988, cacheRead: 0.008988 },
@@ -91,4 +95,18 @@ const NO_SETTINGS: CallSettings = {}
 
 export function callSettingsFor(caller: string): CallSettings {
   return SETTINGS_BY_CALLER[caller] ?? NO_SETTINGS
+}
+
+// The slowest sustained output rehearsal 4 measured, over every caller that answered.
+const SLOWEST_OUTPUT_TOKENS_PER_S = 44
+// The floor no caller goes under, however small its ceiling. An arbiter with no bound at all
+// sat for 45 s and returned nothing.
+export const MIN_REQUEST_TIMEOUT_MS = 30_000
+
+/** A call may not outlive the time its own output ceiling needs to fill. Derived rather than
+ *  pinned, so raising a ceiling above cannot silently start aborting honest answers. */
+export function requestTimeoutMsFor(caller: string): number {
+  const ceiling = SETTINGS_BY_CALLER[caller]?.maxOutputTokens
+  if (ceiling === undefined) return MIN_REQUEST_TIMEOUT_MS
+  return Math.max(MIN_REQUEST_TIMEOUT_MS, Math.ceil((ceiling / SLOWEST_OUTPUT_TOKENS_PER_S) * 1000))
 }

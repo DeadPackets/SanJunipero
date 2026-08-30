@@ -11,6 +11,9 @@ export type LlmCallInsert = {
   reasoningTokens: number
   // What the run books, which is the provider's own charge whenever it offered one.
   costUsd: number
+  // OpenRouter's id for this generation, which is the only way to ask it later who served a
+  // call whose answer named nobody.
+  generationId?: string | null
   // What the pinned price table computed for this call, always. `costUsd` becomes the bill the
   // moment the provider names one, so only this column can be reconciled against it.
   estimatedCostUsd: number
@@ -43,9 +46,11 @@ export function migrateLlmTables(db: Database.Database): void {
       ok INTEGER NOT NULL,
       error TEXT,
       provider TEXT,
-      finish_reason TEXT
+      finish_reason TEXT,
+      generation_id TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
+    CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_provider ON llm_calls(provider);
     CREATE TABLE IF NOT EXISTS alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,6 +78,9 @@ export function migrateLlmTables(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === 'finish_reason')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN finish_reason TEXT')
+  }
+  if (!cols.some((c) => c.name === 'generation_id')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN generation_id TEXT')
   }
 }
 
@@ -119,8 +127,8 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
-        error, provider, finish_reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        error, provider, finish_reason, generation_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     Date.now(),
     call.agentId,
@@ -138,6 +146,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     call.error,
     call.provider,
     call.finishReason,
+    call.generationId ?? null,
   )
 }
 
@@ -151,6 +160,52 @@ export function insertAlert(
     alert.kind,
     alert.detail,
   )
+}
+
+/** A call OpenRouter answered without naming its back end. It books at the ceiling and cannot
+ *  be reconciled, so it is the one row shape worth going back and asking about. */
+export type UnattributedCall = {
+  id: number
+  generationId: string
+  agentId: string | null
+  model: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+}
+
+/** Old enough that the provider has written its accounting row, young enough that the provider
+ *  still has one. A row outside the band is never asked about again. */
+export function unattributedCalls(
+  db: Database.Database,
+  window: { from: number; until: number; limit: number },
+): UnattributedCall[] {
+  return db
+    .prepare(
+      `SELECT id, generation_id AS generationId, agent_id AS agentId, model,
+              input_tokens AS inputTokens, output_tokens AS outputTokens,
+              cache_read_tokens AS cacheReadTokens
+         FROM llm_calls
+        WHERE provider IS NULL AND generation_id IS NOT NULL AND ok = 1
+          AND ts >= ? AND ts <= ?
+        ORDER BY id LIMIT ?`,
+    )
+    .all(window.from, window.until, window.limit) as UnattributedCall[]
+}
+
+export type CallPricing = {
+  provider: string
+  reportedCostUsd: number | null
+  estimatedCostUsd: number
+  costUsd: number
+}
+
+export function updateCallPricing(db: Database.Database, id: number, p: CallPricing): void {
+  db.prepare(
+    `UPDATE llm_calls
+        SET provider = ?, reported_cost_usd = ?, estimated_cost_usd = ?, cost_usd = ?
+      WHERE id = ?`,
+  ).run(p.provider, p.reportedCostUsd, p.estimatedCostUsd, p.costUsd, id)
 }
 
 export function sumCostUsd(db: Database.Database, caller: string): number {

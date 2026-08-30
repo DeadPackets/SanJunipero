@@ -28,10 +28,13 @@ import {
   Embedder,
   LlmClient,
   MIND_MODEL,
+  PROVIDER_ORDER,
+  backfillUnattributed,
+  checkProviderMix,
   checkSpend,
   insertAlert,
   migrateLlmTables,
-  projectDailySpend,
+  projectCallRate,
   reportDeadCalls,
   reportProviders,
   reportReconciliation,
@@ -134,7 +137,8 @@ export type LiveCastOpts = {
   /** What a stream does when the cap lands. Default is a loud message and nothing else, so a
    *  test can assert the stop without taking the test runner down with it. */
   onSpendStop?: (spent: number, cap: number) => void
-  /** The rate tripwire's window. A test cannot wait fifteen real minutes to prove a flow. */
+  /** The rate tripwire's window, and the provider-mix window. A test cannot wait fifteen real
+   *  minutes to prove a flow. */
   rateWindowRealMinutes?: number
   /** How often the projected-spend alert may fire. A test cannot wait a real hour for one. */
   spendAlertRealMinutes?: number
@@ -182,16 +186,19 @@ export async function settle(
   return true
 }
 
-/** A per-call cap cannot see a slow leak; this bounds spend per unit time. PER MIND, because the
- *  bill scales with the cast. Above a real failover window: a Baidu queue spell measured
- *  $0.053/mind/sim-day (mixed AtlasCloud + ceiling-booked rows), so $0.05 stopped the town. */
-const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.1
+/** A per-call cap cannot see a slow leak; this bounds CALLS per unit time, PER MIND. Calls, not
+ *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
+ *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 8 clears it. */
+const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 8
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 /** How often the operator hears a projected burn. Well under every hard stop, so a leak is on
  *  the ops surface with an hour left to look at it. */
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
+/** How often unattributed rows are asked about. One sweep drains far more than any town
+ *  produces in a minute, and the endpoint is never asked twice inside one. */
+const LIVE_BACKFILL_REAL_SECONDS = 60
 
 /** The pinned provider is an ALLOW-LIST for every mind-facing call, not a preference: a routing
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
@@ -201,14 +208,14 @@ export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
  *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
 const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
-function rateStopMessage(rate: number, ceiling: number, minds: number): string {
+function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
-    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/sim-day, over its` +
-      ` $${ceiling.toFixed(4)}/sim-day ceiling (${minds} mind(s) x` +
-      ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
-    `        Measured over the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is a RATE`,
-    '        stop, not a budget — the town is nowhere near either line and is burning too fast.',
-    '        Every mind is stopped and no further call will be made. The town on disk is intact.',
+    `STREAM STOPPED: each of the ${minds} live mind(s) is making ${rate.toFixed(1)} calls a` +
+      ` sim-hour, over the ${ceiling} call ceiling.`,
+    `        ${calls} mind calls in the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is`,
+    '        a RATE stop, not a budget — the town is nowhere near either dollar line and is',
+    '        thinking far too often. Every mind is stopped and no further call will be made.',
+    '        The town on disk is intact.',
   ].join('\n')
 }
 
@@ -334,6 +341,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   if (today >= dailyBudget) {
     opsDb.close()
     throw new Error(dailyReachedRefusal(today, dailyBudget))
+  }
+
+  const openRouterKey = process.env.OPENROUTER_API_KEY ?? ''
+
+  /** A row whose answer named no back end books at the ceiling for ever otherwise; asking
+   *  OpenRouter who served it is the only way back to a real price. */
+  const sweepUnattributed = async (): Promise<void> => {
+    if (openRouterKey === '') return
+    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey })
+    if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
   }
 
   const makeClient = (caller: string, agentId?: string): LlmClient =>
@@ -746,6 +763,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
       let nextSpendAlertAt = Date.now() + spendAlertMs
+      const rateWindow = opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES
+      // From the first read, not one window in: an operator wants the routing named while there
+      // is still a run left to re-pin.
+      let nextMixCheckAt = Date.now()
+      let nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
+      let backfilling = false
       bridge.onTick((tick) => {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
@@ -757,12 +780,31 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         // kill the run must be on the ops surface even when this is the tick that kills it.
         if (Date.now() >= nextSpendAlertAt) {
           nextSpendAlertAt = Date.now() + spendAlertMs
-          const projected = checkSpend(opsDb, {
-            windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
-          })
+          const projected = checkSpend(opsDb, { windowRealMinutes: rateWindow })
           if (projected.alerted) {
             log(`stream: spend — projected $${projected.usdPerSimDay.toFixed(2)}/sim-day`)
           }
+        }
+        // One line per window, never a stop: the failover is what keeps a rate limit on the pin
+        // from idling every mind, and only the operator can answer a dear one.
+        if (Date.now() >= nextMixCheckAt) {
+          nextMixCheckAt = Date.now() + rateWindow * 60 * 1000
+          const mix = checkProviderMix(opsDb, {
+            windowRealMinutes: rateWindow,
+            pinned: PROVIDER_ORDER[0] ?? '',
+          })
+          if (mix.alerted) {
+            log(
+              `stream: providers — ${(mix.offPinShare * 100).toFixed(0)}% of mind calls off the pin`,
+            )
+          }
+        }
+        if (Date.now() >= nextBackfillAt && !backfilling) {
+          nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
+          backfilling = true
+          void sweepUnattributed().finally(() => {
+            backfilling = false
+          })
         }
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
@@ -779,18 +821,23 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
-        // The cast, not the founders: a town that has borne children spends for all of them.
+        // The cast, not the founders: a town that has borne children thinks for all of them.
         const castSize = booted?.cast.size ?? cast.length
-        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * castSize
-        // Art is bursty and per discovery; it stays under the daily and lifetime caps, not the mind rate.
         // The projection counts 30 real minutes as one sim-day; the operator's dial changes that.
-        const rate =
-          projectDailySpend(opsDb, {
-            windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
-            excludeCallers: ['forge'],
-          }).usdPerSimDay / loop.speed
-        if (rate <= ceiling) return
-        console.error(rateStopMessage(rate, ceiling, castSize))
+        const projected = projectCallRate(opsDb, {
+          windowRealMinutes: rateWindow,
+          minds: castSize,
+        })
+        const rate = projected.callsPerMindSimHour / loop.speed
+        if (rate <= LIVE_CALL_CEILING_PER_MIND_SIM_HOUR) return
+        console.error(
+          rateStopMessage(
+            rate,
+            LIVE_CALL_CEILING_PER_MIND_SIM_HOUR,
+            castSize,
+            projected.sampledCalls,
+          ),
+        )
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })
@@ -829,6 +876,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           `stream: ${row.provider ?? 'an unnamed back end'} served ${row.calls} call(s), $${row.costUsd.toFixed(4)}`,
         )
       }
+      // Before the reconciliation, not after: the last window's unattributed rows are exactly
+      // the ones that would make the ratio it prints a lie.
+      await sweepUnattributed()
       reportReconciliation(opsDb)
       opsDb.close()
     },

@@ -5,10 +5,14 @@ import { migrateLlmTables } from './callLog.js'
 import {
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
+  MIND_CALLERS,
   REAL_MINUTES_PER_SIM_DAY,
+  REAL_MINUTES_PER_SIM_HOUR,
+  checkProviderMix,
   checkSpend,
   classifyFailure,
   deadCallCounts,
+  projectCallRate,
   projectDailySpend,
   providerCounts,
   reconcileCosts,
@@ -43,6 +47,105 @@ function alerts(db: Database.Database): { kind: string; detail: string }[] {
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+function seedProviderCall(
+  db: Database.Database,
+  opts: { agoMinutes: number; caller: string; provider: string | null; costUsd?: number },
+): void {
+  db.prepare(
+    `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, ?, 0, 1, NULL, ?)`,
+  ).run(NOW - opts.agoMinutes * 60_000, opts.caller, opts.costUsd ?? 0, opts.provider)
+}
+
+// ★ Runs B and C both died on a DOLLAR rate that a provider failover, not the town, had moved.
+// Calls are what the town controls, so calls are what the tripwire measures.
+describe('★ projectCallRate — the tripwire counts calls, not dollars', () => {
+  it('a sim-hour is 1.25 real minutes, so a 15-minute window is 12 sim-hours', () => {
+    const db = openDb()
+    expect(REAL_MINUTES_PER_SIM_HOUR).toBe(1.25)
+    for (let i = 0; i < 24; i++)
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
+
+    const r = projectCallRate(db, { minds: 2, windowRealMinutes: 15, now: NOW })
+    expect(r).toEqual({ callsPerMindSimHour: 1, sampledCalls: 24 })
+  })
+
+  it('counts only what a mind spends its own calls on', () => {
+    const db = openDb()
+    expect(MIND_CALLERS).toEqual(['turn', 'reflection', 'reflection.edit', 'dream', 'recall'])
+    for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'recall']) {
+      seedProviderCall(db, { agoMinutes: 1, caller, provider: 'Baidu' })
+    }
+    for (const caller of ['narrator', 'arbiter', 'semantic', 'forge', 'preflight', 'constructs']) {
+      seedProviderCall(db, { agoMinutes: 1, caller, provider: 'Baidu' })
+    }
+
+    const r = projectCallRate(db, { minds: 1, windowRealMinutes: 15, now: NOW })
+    expect(r.sampledCalls, 'town work was billed to the cast').toBe(5)
+  })
+
+  it('leaves a call older than the window out of the flow', () => {
+    const db = openDb()
+    seedProviderCall(db, { agoMinutes: 16, caller: 'turn', provider: 'Baidu' })
+    expect(projectCallRate(db, { minds: 1, windowRealMinutes: 15, now: NOW }).sampledCalls).toBe(0)
+  })
+})
+
+// ★ `provider.order` load-balances rather than prioritises — measured 52/48 (providers2). Half
+// the window off the first name is the design working, so only a pin being shut out is news.
+describe('★ checkProviderMix — the routing is reported, never enforced', () => {
+  const mixOpts = { pinned: 'Baidu', windowRealMinutes: 15, now: NOW }
+
+  it('says nothing about the measured 52/48 split the allow-list is meant to produce', () => {
+    const db = openDb()
+    for (let i = 0; i < 52; i++) {
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
+    }
+    for (let i = 0; i < 48; i++) {
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Inceptron' })
+    }
+
+    const mix = checkProviderMix(db, mixOpts)
+    expect(mix.offPinShare).toBeCloseTo(0.48, 10)
+    expect(mix.alerted, 'an ordinary load-balanced window raised an alert').toBe(false)
+    expect(alerts(db)).toEqual([])
+  })
+
+  it('writes one row with the shares and the window cost once the pin is shut out', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const db = openDb()
+    for (let i = 0; i < 2; i++) {
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu', costUsd: 0.001 })
+    }
+    for (let i = 0; i < 7; i++) {
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Inceptron', costUsd: 0.01 })
+    }
+    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: null, costUsd: 0.02 })
+
+    const mix = checkProviderMix(db, mixOpts)
+    expect(mix.alerted).toBe(true)
+    expect(mix.offPinShare).toBeCloseTo(0.8, 10)
+    const row = alerts(db)
+    expect(row).toHaveLength(1)
+    expect(row[0]!.kind).toBe('llm_provider_mix_high')
+    expect(row[0]!.detail).toContain('80% of 10 mind calls')
+    expect(row[0]!.detail).toContain('Inceptron 70%')
+    expect(row[0]!.detail).toContain('unattributed 10%')
+    expect(row[0]!.detail).toContain('$0.0920')
+  })
+
+  it('reads the mind callers only, so a narrator on a fallback cannot raise it', () => {
+    const db = openDb()
+    for (let i = 0; i < 5; i++) {
+      seedProviderCall(db, { agoMinutes: 1, caller: 'narrator', provider: 'Inceptron' })
+    }
+    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
+    expect(checkProviderMix(db, mixOpts).alerted).toBe(false)
+  })
 })
 
 describe('projectDailySpend (T24)', () => {
