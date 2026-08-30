@@ -1,20 +1,5 @@
-// One process, one port: the world ticks, the socket serves and the built viewer is handed to a
-// browser from the same origin.
-//
-//   pnpm stream                 RESUME the town that was running (a new one if there is none)
-//   SJ_FRESH=1 pnpm stream      throw that town away and start a new day 0
-//   PORT=9000 SJ_RINGS=3 …      pick the port and how far the town is platted
-//   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
-//   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money.
-//   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
-//   SJ_SPEND_DAILY_USD=3 …      dollars the live cast may burn in a rolling 24 hours
-//   SJ_SPEND_CAP_USD=50 …       dollars over the town's whole life; 0 is no lifetime cap
-//   SJ_MAX_MINDS=15 …           how many minds the town may hold; a birth past it gets no mind
-//   SJ_ADMIN_TOKEN=… …          open the loopback operator channel (/admin/*) behind a bearer
-//   SJ_GIT_SHA=… …              stamped into /admin/export's manifest, so a replay knows the code
-//
-// Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
-// (dynamic import below).
+// One process, one port: world, socket and built viewer on the same origin. Scripted by default
+// at $0.00/hour — the live path is not even imported unless SJ_LIVE=1. Knobs: see README.md.
 import { existsSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
@@ -32,7 +17,6 @@ export const STREAM_MINDS_DIR = 'data/minds'
 export const STREAM_NARRATOR_DB = '_narrator.db'
 export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 
-/** The one instruction a person needs when the viewer has not been built yet. */
 export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 
 /** A number, or undefined when the knob is unset: the defaults live in `liveWorld.ts`, which this
@@ -88,8 +72,7 @@ export async function main(): Promise<void> {
         onSpendStop: () => {
           void world?.stop().then(() => process.exit(1))
         },
-        // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
-        // call, not a per-turn one. It bills the same ledger and dies on the same stops.
+        // Opt-OUT. It fires only on an act the engine has no verb for: per-novelty, not per-turn.
         useArbiter: process.env.SJ_ARBITER !== '0',
       }),
     )
@@ -126,8 +109,6 @@ export async function main(): Promise<void> {
       ? 'stream: this is a new town — SJ_FRESH=1 starts another one over it'
       : `stream: this is the town that was running, resumed at tick ${running.resumedAtTick}`,
   )
-  // Said out loud in both directions, because "is anything actually thinking?" is the one
-  // question a viewer cannot answer by looking.
   console.log(
     running.live
       ? `stream: the cast is LIVE MINDS — this costs money, and memory is kept in ${mindsDir}/`
@@ -135,9 +116,8 @@ export async function main(): Promise<void> {
   )
   console.log(`stream: the town is open at http://localhost:${running.gateway.port}/`)
 
-  // The only write path into the world. The listener stays on loopback; the gateway carries
-  // `/admin/*` to it from the served origin, so the operator's page can reach it (ruling 10)
-  // and the bearer is what refuses everyone else — see deploy/README.md.
+  // The only write path into the world: the listener stays on loopback, the gateway carries
+  // `/admin/*` to it from the served origin, and the bearer is what refuses everyone else.
   const adminToken = process.env.SJ_ADMIN_TOKEN
   const adminPort = adminChannelPort()
   let admin: Server | null = null

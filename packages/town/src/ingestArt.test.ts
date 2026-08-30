@@ -60,25 +60,20 @@ describe('ingestProductionArt', () => {
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(first.map((e) => e.kind)).toContain('character:omar')
     expect(first.map((e) => e.kind)).toContain('standing_stone')
-    // ★ `house`, not `hut`. This line asserted `hut` for a whole merge train after the template
-    // renamed the kind, which is how a test can codify the very seam it was meant to hold.
+    // ★ `house`, not `hut`: the template renamed the kind.
     expect(first.map((e) => e.kind)).toContain('house')
 
-    // the character record carries a parseable v4 atlas manifest with all 24 cells
     const omar = codex.listSince(0).find((r) => r.kind === 'character:omar')!
     expect(omar.class).toBe('rig-part')
     const atlas = parseCharacterAtlasManifest(omar.meta)!
     expect(Object.keys(atlas.cells)).toHaveLength(24)
     expect(atlas.figureH).toBeGreaterThan(0)
 
-    // building record carries the v4-hires-building manifest as-is — and the shed's cell is a
-    // COMMITTED one now, not the scratchpad fixture the old version of this test wrote
     const shed = codex.listSince(0).find((r) => r.kind === 'shed')!
     const shedManifest = parseBuildingManifest(shed.meta)!
     expect(shedManifest.footprint).toEqual({ w: 1, h: 1 })
     expect(shedManifest.cell.feetY).toBeLessThan(shedManifest.cell.h)
 
-    // the founders' home: an authored, committed cell, at the footprint the template gives it
     const home = codex.listSince(0).find((r) => r.kind === 'house')!
     const homeManifest = parseBuildingManifest(home.meta)!
     expect(homeManifest.footprint).toEqual(DWELLING_FOOTPRINTS.house)
@@ -87,10 +82,8 @@ describe('ingestProductionArt', () => {
       codex.listSince(0).some((r) => r.kind === 'hut'),
       'nothing places `hut`',
     ).toBe(false)
-    // and its turned twin, which nothing places yet and everything is ready for
     expect(codex.listSince(0).some((r) => r.kind === 'house:se')).toBe(true)
 
-    // second run: nothing new
     const second = ingestProductionArt(db)
     expect(second.every((e) => e.action === 'unchanged')).toBe(true)
     expect(codex.listSince(0)).toHaveLength(first.length)

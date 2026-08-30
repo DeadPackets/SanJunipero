@@ -13,8 +13,7 @@ import { ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind } from '@sj/sh
 
 export type IngestEntry = {
   kind: string
-  /** `missing` is art a root could not produce. It is REPORTED, never thrown: one absent
-   *  founder used to abort the whole function and the town woke with no art at all. */
+  /** `missing` is art a root could not produce: REPORTED, never thrown. */
   action: 'registered' | 'unchanged' | 'missing'
   id: string
   detail?: string
@@ -49,7 +48,6 @@ export function ingestLibraryArt(db: Database.Database): IngestEntry[] {
   return registerCommittedItems(new AssetCodex(db))
 }
 
-// The five founder sheets, one packed atlas each.
 export function ingestCastArt(db: Database.Database): IngestEntry[] {
   return registerCommittedCast(new AssetCodex(db))
 }

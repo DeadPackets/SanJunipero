@@ -1,9 +1,5 @@
-// @slow — the town a viewer opens can cross its own river.
-//
-// The channel is three tiles wide at every row and the deck recipe spans two, so `showcaseMap`
-// lays a spit of sand across the eastmost column, as `GENESIS_FORD` does for the genesis world.
-//
-// Scripted policies only. No LLM, no network, $0.
+// @slow — the town a viewer opens can cross its own river. Scripted policies, no LLM, $0.
+// The channel is three tiles wide at every row and the deck recipe spans two, so a spit is laid.
 import { describe, expect, it } from 'vitest'
 import { RIVER_HALF, riverLocalDx, stateHash } from '@sj/shared'
 import {
@@ -27,10 +23,7 @@ const WRIGHT = 'omar'
 
 const channelMid = (rings: number): number => SHOWCASE_ANCHOR.x + riverLocalDx(rings)
 
-// ── the sweep: ask the engine, tile by tile, where a deck may stand ──────────────────────────
-
-/** A world with one builder in it who is holding more planks than any deck needs. The builder
- *  is moved tile by tile; nothing else about the world changes. */
+/** One builder holding more planks than any deck needs; nothing else about the world changes. */
 function builderWorld(rings: number): WorldState {
   const terrain = devTerrain('showcase', rings)
   const base = devGenesisState(SHOWCASE_CONFIG, terrain, 'showcase', rings)
@@ -61,8 +54,8 @@ const at = (s: WorldState, x: number, y: number): WorldState => ({
   agents: { ...s.agents, wright: { ...s.agents.wright!, x, y } },
 })
 
-/** The engine's own answer for a deck whose top-left corner is this tile, asked from every tile
- *  a builder could stand on. The best answer wins, so "not close enough" cannot mask a refusal. */
+/** Asked from every tile a builder could stand on: the best answer wins, so "not close enough"
+ *  cannot mask a refusal. */
 function deckAnswerAt(world: WorldState, x: number, y: number): string | null {
   let worst: string | null = 'nowhere to stand'
   for (const [dx, dy] of [
@@ -105,8 +98,7 @@ describe('★ WHERE A DECK MAY STAND IN THE SHOWCASE, asked of the engine and no
       .map(([y]) => y)
       .sort((a, b) => a - b)
     const other = [...widths.values()].filter((n) => n !== 2)
-    // Four rows of two, every other wet row three — the shape `GENESIS_FORD` has and the
-    // showcase did not. Before the ford: `two` is empty and every row is three.
+    // Four rows of two, every other wet row three — the shape `GENESIS_FORD` has.
     expect(two, 'no row of the channel is narrow enough for a two-plank deck').toHaveLength(4)
     expect(new Set(other), 'a row that is neither two nor three tiles wide').toEqual(new Set([3]))
     expect(
@@ -116,7 +108,6 @@ describe('★ WHERE A DECK MAY STAND IN THE SHOWCASE, asked of the engine and no
   })
 
   it('★ AND EXACTLY THE FOUR FORD ROWS ACCEPT A DECK — nowhere else in the channel does', () => {
-    // The whole defect, as a number: this was 0 of 408.
     expect(
       accepted.length,
       `no water tile in the showcase accepts a bridge (of ${answers.length} tried)`,
@@ -202,8 +193,6 @@ describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its
     ).toBeNull()
   })
 })
-
-// ── the run: a founder lays a deck and the town crosses ──────────────────────────────────────
 
 type Run = BaseRun & { deckTick: number | null; crossedTick: number | null }
 

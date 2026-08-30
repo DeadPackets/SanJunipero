@@ -6,8 +6,6 @@ import { FOUNDERS, foundersFor, townStructuresFor } from './founders.js'
 // This half lives in the gateway because `@sj/web` is private, DOM-typed and bundler-resolved,
 // so a gateway test cannot import its modules without breaking `tsc -b`.
 
-// ── U3 · the town the viewer actually sees is the town the template describes ─────────────
-
 describe('U3 — the dev showcase is the REAL town, not a four-building stub', () => {
   const town = devTown()
 
@@ -24,8 +22,6 @@ describe('U3 — the dev showcase is the REAL town, not a four-building stub', (
     expect(new Set(owners).size).toBe(5)
   })
 })
-
-// ── U25 · five people, five roofs ─────────────────────────────────────────────────────────
 
 describe('U25 — "all of the humans were sleeping inside of one house"', () => {
   const town = devTown()

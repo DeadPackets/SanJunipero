@@ -47,8 +47,7 @@ const map = makeShowcaseMap()
 const tileAt = (x: number, y: number): number => map.terrain[y]![x]!
 
 describe('makeShowcaseMap', () => {
-  // ★ THE MAP IS SIZED BY THE TOWN. It was a hard-coded 48 and the town outgrew it the moment
-  // the layout became a grammar — a fixture that pins its own size clips the next ring off.
+  // ★ THE MAP IS SIZED BY THE TOWN: a fixture that pins its own size clips the next ring off.
   it('is a grid the whole town fits in, and it parses under its own schema', () => {
     expect(() => ShowcaseMapSchema.parse(map)).not.toThrow()
     expect(map.terrain).toHaveLength(SHOWCASE_H)
@@ -170,8 +169,7 @@ describe('the road lattice', () => {
     expect(tileAt(PLAZA_TILE.x, PLAZA_TILE.y)).toBe(T_ROAD)
   })
 
-  // The door tile IS the road it opens onto now, on the face the structure's facing names —
-  // so this asks the strict question rather than "is a road somewhere next to the back wall".
+  // The strict question: the door tile IS the road it opens onto, not "a road near the back wall".
   it('connects the plaza to the door of every structure', () => {
     const reached = roadReach(map)
     expect(reached.size).toBeGreaterThan(50)
@@ -218,8 +216,7 @@ describe('devTerrain', () => {
   })
 })
 
-// The property that matters: it never asks for a number, it asks that the map be the size the
-// GRAMMAR says, at any ring count.
+// Never asks for a number: the map must be the size the GRAMMAR says, at any ring count.
 describe('★ the showcase map is sized by the ring count, not by a constant', () => {
   const RINGS = [1, 2, 3, 4, 5, 6]
 
@@ -238,7 +235,6 @@ describe('★ the showcase map is sized by the ring count, not by a constant', (
     for (let i = 1; i < spans.length; i++) {
       expect(spans[i]!, `ring ${RINGS[i]}`).toBeGreaterThan(spans[i - 1]!)
     }
-    // and the numbers a lane needs to reach the chunked baker's own case
     expect(showcaseSpan(1)).toBe(76)
     expect(showcaseSpan(3)).toBe(152)
   })

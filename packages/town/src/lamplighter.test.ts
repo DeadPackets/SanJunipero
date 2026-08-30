@@ -125,8 +125,7 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
     expect(isDark(lit, far!.x, far!.y, MIDNIGHT, CFG)).toBe(true)
   })
 
-  // ONE three-day run through the shipped harness (a ring-3 town, builders on, the lamplighter
-  // also sleeping and building), read by both the tests below.
+  // ONE three-day run through the shipped harness, read by both the tests below.
   const threeDays = (() => {
     const STOOD = 60 // a post that has stood a stoke's walk is one the rounds have had time to reach
     const completedAt = new Map<string, number>()
@@ -165,14 +164,13 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
 
   it('★ keeps them lit EVERY night for the life of the town, not just the first', () => {
     expect(lampsIn(threeDays.state)).toHaveLength(8)
-    // Seven of the eight posts through two full nights of 480 ticks. Eight was the floor until
-    // ruling 22 put the square's pit on the same rounds, which stands the last post ~20 ticks later.
+    // Seven of the eight posts through two full nights of 480 ticks: the square's pit shares
+    // the same rounds, which stands the last post ~20 ticks later.
     expect(threeDays.postTicks, 'no post stood through a night').toBeGreaterThan(2 * 480 * 7)
     expect(threeDays.postsDark).toEqual([])
   })
 
-  // Ruling 22 (2026-08-30): the square's fire pit is fed daily like the lamps, so one armful
-  // covers the whole coming night and the pit burns every night the town stands.
+  // The square's fire pit is fed daily like the lamps: one armful covers the whole coming night.
   it('★ feeds the square fire pit too, and it is lit at every night tick', () => {
     // Nobody can feed a fire they have not walked to: the first armful lands in the first half hour.
     expect(threeDays.pitFirstFed).toBeGreaterThan(0)
@@ -197,8 +195,7 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
   })
 
   it('is OFF unless asked for: the same town with no lamplighter raises none', () => {
-    // The whole opt-in. Every landed gate calls `makeFoundersOnTick` without `lamps` and folds
-    // exactly the events it always did; without this line the opt-in is a claim.
+    // Every landed gate calls `makeFoundersOnTick` without `lamps`; without this the opt-in is a claim.
     expect(lampsIn(runShowcase(0, 1440))).toEqual([])
   })
 

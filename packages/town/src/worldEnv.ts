@@ -1,13 +1,5 @@
 // Every world knob, read HERE and nowhere else, so no test's world can drift with an env var and
-// no entrypoint can answer a knob differently from the other one by accident:
-//   SJ_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
-//   SJ_RINGS=3        plat the showcase town for three rings of blocks instead of one
-//   SJ_INTERIORS=0/1  keep the founders out of doors, or let them go home and sleep
-//   SJ_BUILDERS=0/1   stop or start the founders raising houses on claimed plots
-//   SJ_BRIDGE=0/1     leave the river uncrossed, or let one founder deck the ford
-//   SJ_JOINT=0/1      let a mason lend a hand at a neighbour's walls (off for a measured reason —
-//                     see `jointBuild` on `FoundersOpts`)
-//   SJ_FRESH=1        throw the town on disk away and start a new day 0
+// no entrypoint can answer a knob differently from another by accident. Knobs: see README.md.
 import { TOWN_RINGS_GENESIS } from '@sj/shared'
 import type { DevMapKind } from './devWorld.js'
 
@@ -25,8 +17,7 @@ export type WorldEnv = {
   fresh: boolean
 }
 
-/** What every entrypoint boots when no env var says otherwise. Interiors and the bridge are on
- *  under ruling 14: the shipped town is the world the rehearsal proved. */
+/** Interiors and the bridge are ON: the shipped town is the world the rehearsal proved. */
 const DEFAULTS: Pick<WorldEnv, 'interiors' | 'builders' | 'bridge' | 'jointBuild'> = {
   interiors: true,
   builders: true,

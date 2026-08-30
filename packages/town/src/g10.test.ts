@@ -41,8 +41,7 @@ function openNarratorFixtureDb(path: string): Database.Database {
   return db
 }
 
-// One scripted day the whole read surface can be measured against: a birth of a household,
-// a completed house, a night shared, a death, and two people who went indoors and stayed.
+// One scripted day the whole read surface can be measured against.
 function scriptedWorld(dbPath: string): Database.Database {
   const db = openDb(dbPath)
   const loop = new TickLoop({
@@ -145,7 +144,6 @@ describe('GATE G10 — automated half, gateway side', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  // ── 1. tileset + map ────────────────────────────────────────────────────────────────
   describe('1. tileset + map', () => {
     it('lays a road-connected showcase town the engine can walk', () => {
       const map = makeShowcaseMap()
@@ -202,7 +200,6 @@ describe('GATE G10 — automated half, gateway side', () => {
     })
   })
 
-  // ── 2. determinism ──────────────────────────────────────────────────────────────────
   describe('2. determinism', () => {
     it('paints byte-identical tiles across two fresh codexes', async () => {
       const a = openForgeDb(':memory:'),
@@ -239,7 +236,6 @@ describe('GATE G10 — automated half, gateway side', () => {
     })
   })
 
-  // ── 3. chronicle / bonds / moments parity ───────────────────────────────────────────
   describe('3. chronicle, bonds and moments over one scripted day', () => {
     const get = async <T>(path: string, root = base): Promise<T> => {
       const res = await fetch(`${root}${path}`)
@@ -291,7 +287,6 @@ describe('GATE G10 — automated half, gateway side', () => {
     })
   })
 
-  // ── 4. interior purity (engine side; the pure renderer half is the web g10 file) ─────
   describe('4. interiors are engine truth, never a viewer write', () => {
     it('folds two occupants and a stored item into the house, and reads them back', () => {
       const db = openDb(join(dir, 'world.db'))

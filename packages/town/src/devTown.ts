@@ -46,11 +46,8 @@ export function devTownSquare(
   return { x: anchor.x + townOrigin(rings), y: anchor.y + townOrigin(rings) }
 }
 
-/**
- * Where this array's (0, 0) stands in the authored frame. The engine finds the town by
- * subtracting `state.origin` from the authored `TOWN_SQUARE`; with no origin it silently reads
- * a square for a town three tiles west and ten north of the one that is drawn.
- */
+/** Where this array's (0, 0) stands in the authored frame. The engine subtracts `state.origin`
+ *  from the authored `TOWN_SQUARE`; with no origin it silently reads a square for another town. */
 export function devWorldOrigin(
   rings: number = TOWN_RINGS_GENESIS,
   anchor: { x: number; y: number } = SHOWCASE_ANCHOR,

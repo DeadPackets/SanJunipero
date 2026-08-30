@@ -3,9 +3,6 @@ import { CONSTRUCT_TYPES } from './constructSchema.js'
 // One-way glass, mechanically: the ops plane's own words for what it names — construct types,
 // milestone kinds, tier labels — may never reach a mind.
 
-// Every word the ops plane uses for a THING IT NAMES; only the taxonomy is banned, never a word
-// for a thing in the world. Authored surfaces get the whole list; mid-run only `MID_RUN_ENFORCED`.
-
 // Our jargon for the machinery, not concepts a town invents; all three are ordinary English too.
 const OPS_JARGON_WORDS: readonly string[] = [
   'construct',
@@ -28,9 +25,8 @@ const OPS_KEYS: readonly string[] = [
   'semantic firsts',
 ]
 
-// The construct types are concepts the experiment watches a town reach on its own. Each is also
-// an ordinary English noun, so a mind may hear one from another mouth — but no authored surface
-// may hand one over.
+// Each is also an ordinary English noun: a mind may hear one from another mouth, but no
+// authored surface may hand one over.
 export const CONSTRUCT_VOCABULARY: readonly string[] = [
   ...CONSTRUCT_TYPES,
   ...OPS_JARGON_WORDS,
@@ -104,8 +100,6 @@ const foldChar = (ch: string): string =>
     .toLowerCase()
     .replace(CONFUSABLE, (c) => CONFUSABLE_TO_LATIN[c] ?? c)
 
-// What the scan reads, and for each of its characters the offset in the original it came from,
-// so a span the scan finds can be cut out of text a mind was about to read.
 function foldWithSource(text: string): { folded: string; source: number[] } {
   let folded = ''
   const source: number[] = []
@@ -121,8 +115,8 @@ function foldWithSource(text: string): { folded: string; source: number[] } {
   return { folded, source }
 }
 
-// A payload that breaks `festival` with a zero-width space or spells it with a Cyrillic е
-// reaches a mind as the word; nothing but the scan sees this folded copy.
+// A payload that breaks `festival` with a zero-width space or a Cyrillic е still reaches a mind
+// as the word.
 function fold(text: string): string {
   return foldWithSource(text).folded
 }
@@ -149,34 +143,29 @@ function scan(prompt: string, patterns: readonly Pattern[]): string[] {
   return out
 }
 
-// Every offending term, in the order the list names them, each one once. An empty array is
-// the only acceptable answer for anything an agent will read.
 export function scanPromptForGlassLeak(prompt: string): string[] {
   return scan(fold(prompt), ALL_PATTERNS)
 }
 
-// A ruling is our machinery speaking, not a person: no one to protect, so the full roster applies.
-// The leak is the directive around a verb, never the verb — block 1 teaches every verb by name.
+// The leak is the directive around a verb, never the verb: the mind is taught every verb by name.
 const RULING_DIRECTIVE =
   /\byou (should|must|ought to|need to|could try|may want|will need)\b|\bgo (inside|and)\b|\binstead,? (you|try)\b/i
 
-// The counsel every perception sentence must be free of, and the part of RULING_DIRECTIVE that
-// holds for a mind-facing line too: it hands over a remedy rather than a fact about now.
+// The part of RULING_DIRECTIVE that holds for a mind-facing line: it hands over a remedy
+// rather than a fact about now.
 const PERCEPTION_DIRECTIVE = /\byou (should|must)\b|\bgo (inside|and)\b/gi
 
-/** Every remedy the sentence hands a mind. Empty is the only acceptable answer. */
 export function scanForDirective(text: string): string[] {
   return [...text.matchAll(PERCEPTION_DIRECTIVE)].map((m) => m[0].toLowerCase())
 }
 
-// The banned shapes all encode "X requires Y" — `without a`, `unless you have`, `until you have`,
-// `for lack of`, `requires a`, `once she has`. A bare absence ("You have no reeds here.") is a
+// The banned shapes all encode "X requires Y". A bare absence ("You have no reeds here.") is a
 // world fact and stays allowed: it connects the absence to no method.
 const RULING_NAMES_THE_MISSING_THING =
   /\b(without (a|an|any|the|one)\b|unless you (have|hold|find)\b|until you (have|hold|find)\b|for lack of\b|requires? (a|an|any|the|one)\b|once (you|he|she|they) (have|has|hold|holds|find|finds)\b|there is no \w+ to \w+ (it|this|them) with\b)/i
 
-/** What the town has a word for. A conditional that names one of these hands over nothing the
- *  mind's own perception block does not already list. */
+/** A conditional naming one of these hands over nothing the mind's own perception block
+ *  does not already list. */
 export type RulingVocabulary = {
   itemKinds: readonly string[]
   structureKinds: readonly string[]
@@ -203,9 +192,8 @@ const namesAKnownThing = (rest: string, vocabulary: RulingVocabulary | undefined
   return words.some((w) => known.has(w) || (w.endsWith('s') && known.has(w.slice(0, -1))))
 }
 
-/** Every ops word, directive and named-absence in text a mind will be handed. Empty is the only
- *  acceptable answer. Told the town's vocabulary, a conditional naming a thing the town already
- *  has a word for is a fact rather than a recipe, and passes. */
+/** Told the town's vocabulary, a conditional naming a thing the town already has a word for
+ *  is a fact rather than a recipe, and passes. */
 export function scanRulingForGlassLeak(text: string, vocabulary?: RulingVocabulary): string[] {
   const folded = fold(text)
   const out = scan(folded, ALL_PATTERNS)
@@ -223,7 +211,6 @@ export function scanRulingForGlassLeak(text: string, vocabulary?: RulingVocabula
 
 const LAYOUT_PATTERNS = patternsFor(TOWN_LAYOUT_VOCABULARY)
 
-/** Every layout word an authored agent-visible surface uses. Empty is the only answer. */
 export function scanForLayoutLeak(text: string): string[] {
   const folded = fold(text)
   return LAYOUT_PATTERNS.filter(({ re }) => re.test(folded)).map(({ term }) => term)
@@ -231,8 +218,6 @@ export function scanForLayoutLeak(text: string): string[] {
 
 type Span = { term: string; start: number; end: number }
 
-// Where every offending term sits in the folded copy, earliest first and widest first, so the
-// spans can be cut out of the original in one pass.
 function scanSpans(folded: string, patterns: readonly Pattern[]): Span[] {
   const out: Span[] = []
   const add = (term: string, at: number, match: string): void => {
@@ -247,8 +232,7 @@ function scanSpans(folded: string, patterns: readonly Pattern[]): Span[] {
 
 const REDACTED = '[redacted]'
 
-// A span found in the fold, cut out of the text it was folded from. An overlapping second
-// match is already gone with the first.
+// An overlapping second match is already gone with the first.
 function cutSpans(text: string, spans: readonly Span[], source: readonly number[]): string {
   let out = ''
   let cut = 0
@@ -261,7 +245,6 @@ function cutSpans(text: string, spans: readonly Span[], source: readonly number[
   return out + text.slice(cut)
 }
 
-/** Told what leaked and where, so a run can be read back off the ops plane. */
 export type GlassLeakSink = (leaks: readonly string[], where: string) => void
 
 // Redacted and reported, never thrown and never skipped: an ops-plane word can only reach a
