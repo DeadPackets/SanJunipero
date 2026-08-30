@@ -9,6 +9,8 @@ export type TickHandler = (ctx: {
   emit: (type: string, payload: unknown) => void
 }) => void
 
+// Not the world's cadence, despite the name: the beat is `arm()`/`beat()` in
+// `town/src/devWorld.ts`, which reads `paused` and `speed` off here. `start()` is tests only.
 export class TickLoop {
   #store: EventStore
   #state: WorldState
