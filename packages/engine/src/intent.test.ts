@@ -51,7 +51,7 @@ describe('submitIntent', () => {
 
   it('debuffed duration is 2× when hunger is 20', () => {
     let s = makeWorld()
-    s = fold(s, ev(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -80 }))
+    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(r.ok).toBe(true)
     if (r.ok) expect((r.events[0]!.payload as { duration: number }).duration).toBe(6)
@@ -190,7 +190,7 @@ describe('walk progression (stepWalk)', () => {
 
   it('takes 2× ticks when hunger is 20, still arriving', () => {
     let s = makeWorld()
-    s = fold(s, ev(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -80 }))
+    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 4, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)

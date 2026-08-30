@@ -1,4 +1,5 @@
 import type { SimConfig } from '@sj/shared'
+import type { NeedChange } from './events.def.js'
 import type { RngStreams } from './rng.js'
 import type { WorldState } from './state.js'
 
@@ -7,6 +8,9 @@ import type { WorldState } from './state.js'
 export type TickCtx = {
   readonly config: SimConfig
   readonly rng: RngStreams
+  // Filled by the decay laws and emptied by `flushNeedsSystem`, which SYSTEMS runs straight
+  // after them: one `needs_changed` per body instead of one event per need.
+  readonly needs: Map<string, NeedChange[]>
   state(): WorldState
   emit(type: string, payload: unknown): void
 }

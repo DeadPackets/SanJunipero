@@ -259,7 +259,7 @@ function scriptedTimeline(
       loc: { t: 'structure', id: STOREHOUSE.id },
     })
     // Idler starts food-insecure: hunger 100 -> 4, collapses this tick.
-    emit('need_changed', { id: IDLER, need: 'hunger', delta: -96 })
+    emit('needs_changed', { id: IDLER, changes: [{ need: 'hunger', delta: -96 }] })
   }
   // Day 2 (tick 1440 is the first tick of day index 1): ignite the storehouse, let it
   // spread to the adjacent shed, then scripted rain douses both.
@@ -303,8 +303,13 @@ function scriptedTimeline(
   // so twice a day the fixture puts them back on their feet, on a fixed clock so replay agrees.
   if (tick % UPKEEP_EVERY === 0) {
     for (const id of [THIEF, KEEPER]) {
-      emit('need_changed', { id, need: 'energy', delta: 100 })
-      emit('need_changed', { id, need: 'hunger', delta: 100 })
+      emit('needs_changed', {
+        id,
+        changes: [
+          { need: 'energy', delta: 100 },
+          { need: 'hunger', delta: 100 },
+        ],
+      })
     }
   }
 }
@@ -358,7 +363,7 @@ export function makeScriptedOnTick(
     const builder = getState().agents[BUILDER]
     if (builder && builder.alive && builder.activity?.verb === 'build') {
       if (builder.needs.energy < 30)
-        emit('need_changed', { id: BUILDER, need: 'energy', delta: 70 })
+        emit('needs_changed', { id: BUILDER, changes: [{ need: 'energy', delta: 70 }] })
       const holdsFood = Object.values(getState().items).some(
         (i) =>
           i.loc.t === 'agent' &&

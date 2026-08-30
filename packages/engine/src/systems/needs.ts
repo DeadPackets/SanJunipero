@@ -2,6 +2,7 @@ import { isBeddedKind, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { AgentBody, WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
 import { ageBand } from './aging.js'
+import { queueNeed } from './needsBatch.js'
 
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 
@@ -64,28 +65,21 @@ export function needsSystem(ctx: TickCtx): void {
   for (const id of Object.keys(ctx.state().agents).sort()) {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
-    if (a.needs.hunger > 0) ctx.emit('need_changed', { id, need: 'hunger', delta: -hungerDecay })
+    if (a.needs.hunger > 0) queueNeed(ctx, id, 'hunger', -hungerDecay)
     if (a.asleep) {
-      if (a.needs.energy < 100) {
-        ctx.emit('need_changed', {
-          id,
-          need: 'energy',
-          delta: sleepRegenPerTick(ctx.state(), ctx.config, id),
-        })
-      }
+      if (a.needs.energy < 100)
+        queueNeed(ctx, id, 'energy', sleepRegenPerTick(ctx.state(), ctx.config, id))
     } else if (a.needs.energy > 0) {
-      ctx.emit('need_changed', { id, need: 'energy', delta: -awakeEnergyDecay(ctx.config, a) })
+      queueNeed(ctx, id, 'energy', -awakeEnergyDecay(ctx.config, a))
     }
     if (socialRegenActive(ctx, id)) {
-      if (a.needs.social < 100)
-        ctx.emit('need_changed', { id, need: 'social', delta: cfg.socialRegenConversingPerTick })
+      if (a.needs.social < 100) queueNeed(ctx, id, 'social', cfg.socialRegenConversingPerTick)
     } else if (a.needs.social > 0) {
-      ctx.emit('need_changed', { id, need: 'social', delta: -cfg.socialDecayPerTick })
+      queueNeed(ctx, id, 'social', -cfg.socialDecayPerTick)
     }
     // Warmth changes hands the moment the cold has teeth: warmthSystem owns the number in
     // both directions from there, so a body is never written by two laws in one tick.
     if (ctx.config.warmth.enabled) continue
-    const warmthDelta = (target - a.needs.warmth) * cfg.warmthEqualizeFactorPerTick
-    if (warmthDelta !== 0) ctx.emit('need_changed', { id, need: 'warmth', delta: warmthDelta })
+    queueNeed(ctx, id, 'warmth', (target - a.needs.warmth) * cfg.warmthEqualizeFactorPerTick)
   }
 }

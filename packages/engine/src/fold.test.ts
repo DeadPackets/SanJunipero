@@ -17,18 +17,18 @@ describe('fold', () => {
     let s = genesisState(DEFAULT_CONFIG)
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
     s = fold(s, ev(2, 'agent_moved', { id: 'a1', x: 4, y: 3 }))
-    s = fold(s, ev(3, 'need_changed', { id: 'a1', need: 'hunger', delta: -30 }))
+    s = fold(s, ev(3, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -30 }] }))
     expect(s.agents.a1).toMatchObject({ x: 4, y: 3, needs: { hunger: 70 } })
   })
   it('clamps needs to [0,100]', () => {
     let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
-    s = fold(s, ev(2, 'need_changed', { id: 'a1', need: 'energy', delta: -500 }))
+    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'energy', delta: -500 }] }))
     expect(s.agents.a1!.needs.energy).toBe(0)
   })
   it('accepts the two new need kinds: warmth and social', () => {
     let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
-    s = fold(s, ev(2, 'need_changed', { id: 'a1', need: 'warmth', delta: -10 }))
-    s = fold(s, ev(3, 'need_changed', { id: 'a1', need: 'social', delta: -20 }))
+    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'warmth', delta: -10 }] }))
+    s = fold(s, ev(3, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -20 }] }))
     expect(s.agents.a1!.needs).toEqual({ hunger: 100, energy: 100, warmth: 90, social: 80 })
   })
   it('tick_advanced sets tick from the event', () => {
@@ -74,7 +74,7 @@ describe('fold', () => {
       ev(1, 'tick_advanced', {}, 5),
       ev(2, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
       ev(3, 'agent_moved', { id: 'a1', x: 2, y: 2 }),
-      ev(4, 'need_changed', { id: 'a1', need: 'social', delta: -3 }),
+      ev(4, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -3 }] }),
     ]
     for (const e of branches) {
       const before = stateHash(s)
@@ -97,7 +97,10 @@ describe('fold', () => {
     expect(() => fold(s, ev(2, 'tick_advanced', { extra: 1 }, 1))).toThrow()
     expect(() => fold(s, ev(2, 'agent_moved', { id: 'a1', x: 1, y: 1, extra: 1 }))).toThrow()
     expect(() =>
-      fold(s, ev(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -1, extra: 1 })),
+      fold(
+        s,
+        ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -1, extra: 1 }] }),
+      ),
     ).toThrow()
     void s
   })

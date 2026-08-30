@@ -25,7 +25,7 @@ export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot �
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
 /** The only rows the fold below reads: `foldOne`'s five cases and `HEAT_WEIGHTS`' nine keys.
- *  0.5% of a real log — `need_changed` alone is 56% of it — and `idx_events_type` serves the
+ *  0.5% of a real log — `needs_changed` alone is 59% of it — and `idx_events_type` serves the
  *  filter. `heat.ts` reads the seq gaps this leaves as the events they were. */
 export const FOLD_TYPES: readonly string[] = [
   'action_completed',

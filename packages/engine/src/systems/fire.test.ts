@@ -437,6 +437,7 @@ describe('fire_spread: a source that is gone by its turn is skipped, not crashed
     const ctx = {
       config: { ...CFG, fire: { ...CFG.fire, spreadChancePerTickAdjacent: 1 } },
       rng: new RngStreams('ghost'),
+      needs: new Map(),
       state: () => state,
       emit: (type: string, payload: unknown) => {
         emitted.push({ type, payload })

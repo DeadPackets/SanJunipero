@@ -16,7 +16,7 @@ function seedStore(): { store: EventStore; live: ReturnType<typeof genesisState>
   emit(0, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 })
   emit(1, 'tick_advanced', {})
   emit(1, 'agent_moved', { id: 'a1', x: 2, y: 1 })
-  emit(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -5 })
+  emit(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -5 }] })
   return { store, live }
 }
 

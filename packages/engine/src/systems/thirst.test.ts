@@ -6,7 +6,7 @@ import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev, roundTrips } from '../testutil/world.js'
+import { ev, needChanges, roundTrips } from '../testutil/world.js'
 
 const quiet = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
@@ -35,9 +35,9 @@ function tickOnce(s: WorldState, config = CFG): WorldTickResult {
   )(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 const thirsts = (r: WorldTickResult) =>
-  r.events
-    .filter((e) => e.type === 'thirst_changed')
-    .map((e) => (e.payload as { delta: number }).delta)
+  needChanges(r.events)
+    .filter((c) => c.need === 'thirst')
+    .map((c) => c.delta)
 const parch = (s: WorldState, thirst: number): WorldState => ({
   ...s,
   agents: { ...s.agents, a1: { ...s.agents.a1!, thirst } },

@@ -25,7 +25,10 @@ import { genesisState, thirstOf, type TileId, type WorldState } from './state.js
 import { GROWTH_EDGES } from './systems/mapGrowth.js'
 import { VERBS, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
-import { ev, grid } from './testutil/world.js'
+import { changesOf, ev, grid } from './testutil/world.js'
+
+const billsThirst = (e: { type: string; payload: unknown }): boolean =>
+  changesOf(e).some((c) => c.need === 'thirst')
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -293,7 +296,7 @@ describe('G11a-M3: an operator may move a law, and only the laws the whitelist n
 
     // Before: both laws are live and both are billing.
     const before = pass(s, CFG, 400)
-    expect(before.events.some((e) => e.type === 'thirst_changed')).toBe(true)
+    expect(before.events.some(billsThirst)).toBe(true)
     expect(before.events.some((e) => e.type === 'fauna_moved')).toBe(true)
 
     const queue: LawQueue = []
@@ -306,13 +309,13 @@ describe('G11a-M3: an operator may move a law, and only the laws the whitelist n
       { path: 'fauna.enabled', value: false },
     ])
     // The flip lands at the tick boundary, so the very tick it arrives is already the new world.
-    expect(flipped.events.some((e) => e.type === 'thirst_changed')).toBe(false)
+    expect(flipped.events.some(billsThirst)).toBe(false)
     expect(flipped.events.some((e) => e.type === 'fauna_moved')).toBe(false)
     expect(flipped.state.laws).toEqual({ 'thirst.enabled': false, 'fauna.enabled': false })
 
     // And it holds on the next tick, with nothing queued.
     const after = pass(flipped.state, CFG, 408)
-    expect(after.events.some((e) => e.type === 'thirst_changed')).toBe(false)
+    expect(after.events.some(billsThirst)).toBe(false)
 
     // A log carrying the two events folds to the same laws: the flip is a fact, not a setting.
     const replayed = changes.reduce<WorldState>(
@@ -537,7 +540,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
   it('one collapse leaves a fatigue clock that a full night of sleep does not lift', () => {
     let s = genesisState(CFG, MAP())
     s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }), CFG)
-    s = fold(s, ev('need_changed', { id: 'ada', need: 'energy', delta: -96 }, 0), CFG)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'ada', changes: [{ need: 'energy', delta: -96 }] }, 0),
+      CFG,
+    )
     s = { ...s, tick: 0 }
     const fell = pass(s, CFG, 1, 'ratchet')
     expect(fell.events.some((e) => e.type === 'agent_collapsed')).toBe(true)
@@ -602,7 +609,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     })
 
     // HALF 2 — weary enough, and the bare ground will do. No fall is required to earn it.
-    s = fold(s, ev('need_changed', { id: 'ada', need: 'energy', delta: -75 }, 0), CFG)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'ada', changes: [{ need: 'energy', delta: -75 }] }, 0),
+      CFG,
+    )
     expect(s.agents.ada!.needs.energy).toBeLessThan(CFG.needs.debuffThreshold)
     expect(s.agents.ada!.collapsedSinceTick).toBeNull()
     expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {}).ok).toBe(true)

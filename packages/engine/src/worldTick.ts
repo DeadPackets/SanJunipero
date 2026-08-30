@@ -6,6 +6,7 @@ import type { RngStreams } from './rng.js'
 import type { System, TickCtx } from './tickCtx.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
 import { needsSystem } from './systems/needs.js'
+import { flushNeedsSystem } from './systems/needsBatch.js'
 import { warmthSystem } from './systems/warmth.js'
 import { lightingSystem } from './systems/lighting.js'
 import { regrowthSystem } from './systems/regrowth.js'
@@ -121,6 +122,7 @@ const SYSTEMS: System[] = [
   needsSystem,
   warmthSystem,
   thirstSystem,
+  flushNeedsSystem,
   healthSystem,
   mortalitySystem,
   illnessSystem,
@@ -147,6 +149,7 @@ export function createWorldTick(
         return effectiveConfig(config, state.laws)
       },
       rng,
+      needs: new Map(),
       state: () => state,
       emit: (type, payload) => {
         state = fold(state, { seq: 0, tick: state.tick, type, payload }, config)

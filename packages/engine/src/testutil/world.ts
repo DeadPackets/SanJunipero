@@ -1,4 +1,5 @@
 import type { SimConfig, SimEvent } from '@sj/shared'
+import type { NeedChange } from '../events.def.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import type { TileId, WorldState } from '../state.js'
@@ -29,3 +30,11 @@ export function roundTrips(
   const replayed = out.events.reduce((s, e) => fold(s, ev(e.type, e.payload, at), config), advanced)
   return { replayed, out }
 }
+
+// The need changes one event carries, or none if it is not a batch. Every assertion about what
+// a tick did to a body goes through here, so the payload shape has one reader in the package.
+export const changesOf = (e: { type: string; payload: unknown }): NeedChange[] =>
+  e.type === 'needs_changed' ? (e.payload as { changes: NeedChange[] }).changes : []
+
+export const needChanges = (events: { type: string; payload: unknown }[]): NeedChange[] =>
+  events.flatMap(changesOf)

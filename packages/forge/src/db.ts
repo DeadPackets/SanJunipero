@@ -3,6 +3,9 @@ import Database from 'better-sqlite3'
 export function openForgeDb(path: string): Database.Database {
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
+  // Same trade as engine/db.ts, and it costs more here: a power cut can lose the last
+  // registered asset, which is generated art somebody paid for.
+  db.pragma('synchronous = NORMAL')
   db.exec(`
     CREATE TABLE IF NOT EXISTS assets (
       seq INTEGER PRIMARY KEY AUTOINCREMENT,

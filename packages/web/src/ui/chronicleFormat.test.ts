@@ -119,9 +119,9 @@ describe('isNarratable — the predicate the recent-event ring is filtered by (M
   })
 
   it('drops the plumbing that filled the ring and left the panel empty', () => {
-    expect(isNarratable(ev('need_changed', { agentId: 'farmer', need: 'hunger', value: 79 }))).toBe(
-      false,
-    )
+    expect(
+      isNarratable(ev('needs_changed', { agentId: 'farmer', need: 'hunger', value: 79 })),
+    ).toBe(false)
     expect(isNarratable(ev('tick_advanced', {}))).toBe(false)
     expect(isNarratable(ev('agent_moved', { id: 'farmer', x: 1, y: 2 }))).toBe(false)
   })
@@ -130,7 +130,7 @@ describe('isNarratable — the predicate the recent-event ring is filtered by (M
     const state = fixtureState()
     for (const e of [
       ev('agent_spoke', { agentId: 'farmer', text: 'hm' }),
-      ev('need_changed', { agentId: 'farmer', need: 'hunger', value: 79 }),
+      ev('needs_changed', { agentId: 'farmer', need: 'hunger', value: 79 }),
       ev('action_completed', { agentId: 'farmer', verb: 'give' }),
       ev('action_completed', { agentId: 'farmer', verb: 'fish' }),
     ]) {

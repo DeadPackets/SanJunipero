@@ -150,11 +150,15 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
   })
 
   it('adds the hunger drain when the belly is empty, and not before', () => {
-    const fed = fold(body(), ev('need_changed', { id: 'a1', need: 'hunger', delta: -99 }), CFG)
+    const fed = fold(
+      body(),
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -99 }] }),
+      CFG,
+    )
     expect(hpDeltas(tickOnce(fed))).toEqual([])
     const starving = fold(
       body(),
-      ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }),
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }),
       CFG,
     )
     expect(hpDeltas(tickOnce(starving))).toEqual([-0.1])
@@ -192,7 +196,7 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
 const hurt = (s: WorldState, amount: number) =>
   fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
 const starve = (s: WorldState) =>
-  fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }), CFG)
+  fold(s, ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }), CFG)
 const died = (r: { events: { type: string; payload: unknown }[] }) =>
   r.events.find((e) => e.type === 'agent_died')?.payload
 const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
@@ -372,7 +376,7 @@ describe('a collapse that never recovers becomes fatigue', () => {
   // Hunger under collapseThreshold puts the body down; raising it lifts the collapse so the
   // next fall is a fresh one. Nothing here feeds the body — that is the whole point.
   const hunger = (s: WorldState, delta: number, tick: number, config = CFG) =>
-    fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta }, tick), config)
+    fold(s, ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta }] }, tick), config)
   const fatigueOf = (s: WorldState) =>
     s.agents.a1!.afflictions?.find((x) => x.kind === 'fatigue')?.severity
 

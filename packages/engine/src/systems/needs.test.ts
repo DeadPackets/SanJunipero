@@ -4,7 +4,8 @@ import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev } from '../testutil/world.js'
+import { ev, needChanges } from '../testutil/world.js'
+import { warmthTarget } from './needs.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
@@ -41,6 +42,9 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
   const wt = createWorldTick(config, rng)
   return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
+
+const deltaOf = (r: WorldTickResult, need: string): number | undefined =>
+  needChanges(r.events).find((c) => c.need === need)?.delta
 
 // needsSystem runs at tick = s.tick + 1 (after tick_advanced).
 const REGEN = CFG.needs.socialRegenConversingPerTick // 0.5
@@ -161,15 +165,45 @@ describe('worldTick: social regen via conversation', () => {
   })
 })
 
+// Hunger, energy, social, warmth and thirst are written by three separate laws, and a body
+// still leaves exactly one event behind.
+describe('one needs_changed per body per tick', () => {
+  it("carries every law's change on one event, and never two events for one body", () => {
+    const s = atTick(makeWorld(), 100)
+    const batches = tickOnce(s).events.filter((e) => e.type === 'needs_changed')
+    expect(batches.map((e) => (e.payload as { id: string }).id)).toEqual(['a1', 'a2'])
+    expect(new Set(needChanges(tickOnce(s).events).map((c) => c.need))).toEqual(
+      new Set(['hunger', 'energy', 'social', 'warmth', 'thirst']),
+    )
+  })
+
+  // Warmth equalizes asymptotically, so with no floor a body parked at its target logs a float
+  // epsilon every tick for ever. 2e-5 off target is a 1e-6 delta — under the floor.
+  it('drops a change too small to be one', () => {
+    const mild = SimConfigSchema.parse({
+      weather: { hourlyChangeChance: 0 },
+      warmth: { enabled: false },
+    })
+    let s = atTick(makeWorld(mild), 100)
+    const target = warmthTarget(s)
+    for (const id of ['a1', 'a2']) {
+      s = patchAgent(s, id, { needs: { ...s.agents[id]!.needs, warmth: target - 2e-5 } })
+    }
+    expect(deltaOf(tickOnce(s, mild), 'warmth')).toBeUndefined()
+    s = patchAgent(s, 'a1', { needs: { ...s.agents.a1!.needs, warmth: target - 2 } })
+    expect(deltaOf(tickOnce(s, mild), 'warmth')).toBeCloseTo(
+      2 * mild.needs.warmthEqualizeFactorPerTick,
+      10,
+    )
+  })
+})
+
 // Winter is not a backdrop: it takes more out of a body than any other season.
 describe('winter scarcity: hunger', () => {
   const WINTER = 273 * 1440 // first winter day
   const hungerDeltaAt = (tick: number, config = CFG): number => {
     const s = atTick(makeWorld(config, [{ id: 'a1', x: 0, y: 0 }]), tick)
-    const changed = tickOnce(s, config).events.find(
-      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'hunger',
-    )
-    return (changed!.payload as { delta: number }).delta
+    return deltaOf(tickOnce(s, config), 'hunger')!
   }
 
   it('decays hunger by base × 1.25 exactly through winter', () => {
@@ -200,10 +234,7 @@ describe('elder energy', () => {
   const energyDeltaAt = (ageDays: number, config = CFG): number => {
     let s = makeWorld(config, [{ id: 'a1', x: 0, y: 0 }])
     s = patchAgent(s, 'a1', { ageDays })
-    const changed = tickOnce(s, config).events.find(
-      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'energy',
-    )
-    return (changed!.payload as { delta: number }).delta
+    return deltaOf(tickOnce(s, config), 'energy')!
   }
 
   it('an elder tires by base × 1.2 exactly', () => {
@@ -232,12 +263,6 @@ describe('elder energy', () => {
       asleep: true,
       needs: { ...s.agents.a1!.needs, energy: 50 },
     })
-    const changed = tickOnce(s).events.find(
-      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'energy',
-    )
-    expect((changed!.payload as { delta: number }).delta).toBeCloseTo(
-      CFG.needs.energyRegenAsleepPerTick,
-      10,
-    )
+    expect(deltaOf(tickOnce(s), 'energy')).toBeCloseTo(CFG.needs.energyRegenAsleepPerTick, 10)
   })
 })

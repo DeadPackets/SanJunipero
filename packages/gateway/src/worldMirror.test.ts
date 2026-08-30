@@ -13,7 +13,7 @@ import {
   fold,
   type TileId,
 } from '@sj/engine'
-import { WorldMirror } from './worldMirror.js'
+import { SNAP_AT_OR_BEFORE_SQL, WorldMirror } from './worldMirror.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
@@ -76,6 +76,23 @@ describe('WorldMirror', () => {
     expect(stateHash(mirror.stateAt(6))).toBe(stateHash(ref6))
     expect(stateHash(mirror.stateAt(0))).toBe(stateHash(genesisState(DEFAULT_CONFIG, GRASS)))
     expect(() => mirror.stateAt(9999)).toThrow(RangeError)
+    db.close()
+  })
+
+  // The scrub query used to be a SCAN plus a temp b-tree over rows carrying ~30 KB of state
+  // JSON each, so it slowed as the world aged. idx_snapshots_tick is what keeps it flat.
+  it('finds the scrub snapshot through the index, never by scanning the table', () => {
+    const dbPath = join(dir, 'world3.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 12; i++) loop.step()
+
+    const plan = db.prepare(`EXPLAIN QUERY PLAN ${SNAP_AT_OR_BEFORE_SQL}`).all(6) as {
+      detail: string
+    }[]
+    const detail = plan.map((r) => r.detail).join(' | ')
+    expect(detail).toContain('idx_snapshots_tick')
+    expect(detail).not.toContain('SCAN snapshots')
+    expect(detail).not.toContain('TEMP B-TREE')
     db.close()
   })
 

@@ -127,7 +127,7 @@ describe('chronicleLine', () => {
   })
 
   it('says nothing about a type it has no words for', () => {
-    for (const type of ['tick_advanced', 'agent_moved', 'need_changed', 'some_future_event']) {
+    for (const type of ['tick_advanced', 'agent_moved', 'needs_changed', 'some_future_event']) {
       expect(chronicleLine(ev(type, {}), look), type).toBeNull()
     }
   })
@@ -309,7 +309,7 @@ describe('the C11 vocabulary', () => {
 
   it('reads no temperature anywhere — the cold is a cause of death, never a number', () => {
     expect(NOT_CHRONICLED.has('weather_changed')).toBe(true)
-    expect(NOT_CHRONICLED.has('need_changed')).toBe(true)
+    expect(NOT_CHRONICLED.has('needs_changed')).toBe(true)
     expect(
       chronicleLine(ev('weather_changed', { kind: 'snow', temperatureC: -12 }), look),
     ).toBeNull()

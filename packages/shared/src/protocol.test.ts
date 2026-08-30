@@ -42,8 +42,8 @@ describe('protocol', () => {
     ).toThrow()
     expect(() => ServerMsg.parse({ t: 'mutate_world' })).toThrow()
   })
-  it('is at version 2: the snapshot requires laws, so a v1 client cannot be served', () => {
-    expect(PROTOCOL_VERSION).toBe(3)
+  it('is at version 4: needs_changed batches every need, so a v3 reducer cannot fold a tick', () => {
+    expect(PROTOCOL_VERSION).toBe(4)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })

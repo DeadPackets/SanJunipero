@@ -134,7 +134,7 @@ describe('worldStore', () => {
     expect(store.recentEvents()[0]!.seq).toBe(3)
   })
 
-  // M1: the ring was ~95% need_changed, so the Chronicle badge counted 400 while the panel
+  // M1: the ring was ~95% needs_changed, so the Chronicle badge counted 400 while the panel
   // it labels could render none of them. The ring now holds only what the chronicle narrates.
   it('keeps only narratable events in the ring, while every event still folds and fans out', () => {
     const store = createWorldStore()
@@ -144,8 +144,8 @@ describe('worldStore', () => {
     const noise: SimEvent[] = Array.from({ length: 20 }, (_, i) => ({
       seq: 10 + i,
       tick: 3,
-      type: 'need_changed',
-      payload: { id: 'walker', need: 'hunger', delta: -1 },
+      type: 'needs_changed',
+      payload: { id: 'walker', changes: [{ need: 'hunger', delta: -1 }] },
     }))
     const spoke = {
       seq: 40,

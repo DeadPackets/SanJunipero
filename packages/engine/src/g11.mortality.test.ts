@@ -17,7 +17,7 @@ import { genesisState, thirstOf, type TileId, type WorldState } from './state.js
 import { DEATH_CAUSES, type DeathCause } from './systems/mortality.js'
 import { PALE_MUSHROOM, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
-import { ev, grid } from './testutil/world.js'
+import { changesOf, ev, grid } from './testutil/world.js'
 
 // A quiet sky, no mysteries and no fauna: every event this gate names is one a scripted actor
 // or a named system caused. Old age is switched off except in the one row that is about it.
@@ -146,7 +146,11 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
 
   function parched(config: SimConfig = CFG): WorldState {
     let s = spawn(genesisState(config, MAP()), config, { id: 'dry', x: 5, y: 5 })
-    s = fold(s, ev('thirst_changed', { id: 'dry', delta: -100 }, START - 1), config)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'dry', changes: [{ need: 'thirst', delta: -100 }] }, START - 1),
+      config,
+    )
     return { ...s, tick: START - 1 }
   }
 
@@ -154,12 +158,9 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
     expect(thirstDecayPerTick(CFG)).toBeCloseTo(CFG.needs.hungerDecayPerTick * 0.6, 12)
     const s = spawn(genesisState(CFG, MAP()), CFG, { id: 'dry', x: 5, y: 5 })
     const out = pass({ ...s, tick: START - 1 }, CFG, START)
-    const billed = out.events.filter((e) => e.type === 'thirst_changed')
+    const billed = out.events.flatMap(changesOf).filter((c) => c.need === 'thirst')
     expect(billed).toHaveLength(1)
-    expect((billed[0]!.payload as { delta: number }).delta).toBeCloseTo(
-      -thirstDecayPerTick(CFG),
-      12,
-    )
+    expect(billed[0]!.delta).toBeCloseTo(-thirstDecayPerTick(CFG), 12)
     expect(thirstOf(out.state.agents.dry!)).toBeCloseTo(100 - thirstDecayPerTick(CFG), 12)
   })
 
@@ -469,7 +470,11 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'weary', x: 5, y: 5 })
     // Empty the bar the ladder is climbed on, and leave the belly full so hunger is not the
     // thing that takes her: this row is about the falling, not the fasting.
-    s = fold(s, ev('need_changed', { id: 'weary', need: 'energy', delta: -100 }, 1859), CFG)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'weary', changes: [{ need: 'energy', delta: -100 }] }, 1859),
+      CFG,
+    )
     s = { ...s, tick: 1859 }
     const { state, log } = runUntil(s, CFG, 1860, 40000, (st) => !st.agents.weary!.alive, 'ladder')
     const rungs = log
@@ -492,20 +497,26 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
     // energy bar once the warmth bar is empty, and only while there is energy to take.
     s = fold(
       s,
-      ev('need_changed', { id: 'cold', need: 'warmth', delta: -100 }, WINTER_TICK - 1),
+      ev(
+        'needs_changed',
+        { id: 'cold', changes: [{ need: 'warmth', delta: -100 }] },
+        WINTER_TICK - 1,
+      ),
       CFG,
     )
     s = fold(
       s,
-      ev('need_changed', { id: 'cold', need: 'energy', delta: -80 }, WINTER_TICK - 1),
+      ev(
+        'needs_changed',
+        { id: 'cold', changes: [{ need: 'energy', delta: -80 }] },
+        WINTER_TICK - 1,
+      ),
       CFG,
     )
     s = fold(s, ev('hp_changed', { agentId: 'cold', delta: -80 }, WINTER_TICK - 1), CFG)
     s = { ...s, tick: WINTER_TICK - 1 }
     const first = pass(s, CFG, WINTER_TICK)
-    const chilled = first.events.filter(
-      (e) => e.type === 'need_changed' && (e.payload as { reason?: string }).reason === 'exposure',
-    )
+    const chilled = first.events.flatMap(changesOf).filter((c) => c.reason === 'exposure')
     expect(chilled).toHaveLength(1)
     expect(first.state.agents.cold!.coldTicksSinceRecovery).toBe(1)
 
@@ -526,7 +537,11 @@ describe('G11a-M5: the fatigue ladder, and the winter night that renames it', ()
 describe('G11a-M6: the two clocks with no affliction behind them, and the one that needs no cause', () => {
   it('an empty belly is its own death', () => {
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'starved', x: 5, y: 5 })
-    s = fold(s, ev('need_changed', { id: 'starved', need: 'hunger', delta: -100 }, 1859), CFG)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'starved', changes: [{ need: 'hunger', delta: -100 }] }, 1859),
+      CFG,
+    )
     s = { ...s, tick: 1859 }
     const { log } = runUntil(s, CFG, 1860, 40000, (st) => !st.agents.starved!.alive)
     const death = died(log, 'starved')
