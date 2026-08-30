@@ -126,7 +126,7 @@ describe('the shipped content/tilesets manifest', () => {
     const m = loadTilesetManifest()
     expect(Object.keys(m.seasons).sort()).toEqual(['autumn', 'spring', 'summer', 'winter'])
     for (const s of Object.values(m.seasons)) expect(s.tiles).toHaveLength(16)
-    expect(m.scaffolding.file).toBe('scaffolding.png')
+    expect(m.scaffolding.file).toBe('scaffolding.webp')
     expect(m.tileW).toBe(32)
     expect(Object.keys(m.autotile!.road.tiles).sort()).toEqual([...ROAD_AUTOTILE_KEYS].sort())
   })
@@ -136,11 +136,11 @@ describe('the shipped content/tilesets manifest', () => {
   it('keeps every key the renderer consumes, whoever painted the pixels', () => {
     const m = loadTilesetManifest()
     for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
-      expect(m.seasons[season].file).toBe(`${season}.png`)
+      expect(m.seasons[season].file).toBe(`${season}.webp`)
       expect(m.seasons[season].tiles).toEqual(seasonTileNames())
     }
     expect([m.tileW, m.tileH, m.cols, m.rows]).toEqual([32, 16, 4, 4])
-    expect(m.autotile!.road.file).toBe('road-autotile.png')
+    expect(m.autotile!.road.file).toBe('road-autotile.webp')
     // the strip's column index per key is the renderer's cut, and it must not shuffle
     expect(m.autotile!.road.tiles).toEqual(
       Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i])),

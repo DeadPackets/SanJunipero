@@ -59,9 +59,9 @@ export async function loadMaterialBook(
   const book = new Map<string, RawImage>()
   if (!existsSync(dir)) return book // no generated art yet — the painted tiles stand
   for (const file of readdirSync(dir).sort()) {
-    if (!file.endsWith('.png')) continue
+    if (!file.endsWith('.webp')) continue
     book.set(
-      file.replace(/\.png$/, '').replace(/_/g, ':'),
+      file.replace(/\.webp$/, '').replace(/_/g, ':'),
       await decodePng(readFileSync(join(dir, file))),
     )
   }

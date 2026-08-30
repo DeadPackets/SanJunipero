@@ -40,7 +40,7 @@ export function listCommittedCast(root: string = CAST_CONTENT_DIR): CommittedCha
     .sort()) {
     const base = join(root, id)
     const manifestPath = join(base, 'manifest.json'),
-      atlasPath = join(base, 'atlas.png')
+      atlasPath = join(base, 'atlas.webp')
     for (const p of [manifestPath, atlasPath]) {
       if (!existsSync(p)) throw new Error(`cast/${id}: ${p.split('/').at(-1)} is missing`)
     }

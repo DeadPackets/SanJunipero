@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SEASONS } from '@sj/shared'
-import { encodePng } from '../src/post/raw.js'
+import { encodeWebp } from '../src/post/raw.js'
 import {
   SHEET_COLS,
   SHEET_ROWS,
@@ -16,17 +16,17 @@ import {
 } from '../src/terrainTiles.js'
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
-const SCAFFOLDING_FILE = 'scaffolding.png'
+const SCAFFOLDING_FILE = 'scaffolding.webp'
 
 mkdirSync(DIR, { recursive: true })
 
 const sheets = paintTilesetSheets()
 for (const season of SEASONS) {
   const img = sheets.seasons[season]
-  writeFileSync(join(DIR, `${season}.png`), await encodePng(img))
-  console.log(`wrote ${season}.png — ${img.width}x${img.height}`)
+  writeFileSync(join(DIR, `${season}.webp`), await encodeWebp(img))
+  console.log(`wrote ${season}.webp — ${img.width}x${img.height}`)
 }
-writeFileSync(join(DIR, SCAFFOLDING_FILE), await encodePng(sheets.scaffolding))
+writeFileSync(join(DIR, SCAFFOLDING_FILE), await encodeWebp(sheets.scaffolding))
 console.log(`wrote ${SCAFFOLDING_FILE} — ${sheets.scaffolding.width}x${sheets.scaffolding.height}`)
 
 const tiles = seasonTileNames()
@@ -42,7 +42,7 @@ const merged = {
   tileH: TERRAIN_TILE_H,
   cols: SHEET_COLS,
   rows: SHEET_ROWS,
-  seasons: Object.fromEntries(SEASONS.map((s) => [s, { file: `${s}.png`, tiles }])),
+  seasons: Object.fromEntries(SEASONS.map((s) => [s, { file: `${s}.webp`, tiles }])),
   scaffolding: { file: SCAFFOLDING_FILE },
   ...rest,
 }

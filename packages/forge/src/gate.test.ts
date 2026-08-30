@@ -211,7 +211,7 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   // against that write, not against a candidate dump into a scratch directory.
   const REPAIRS = [
     ['gen-library.ts', /writeFileSync\(join\(dir, 'sprite\.png'\)/, /pixelBarReport\(/],
-    ['recell-buildings.ts', /writeFileSync\(join\(to, 'cell\.png'\)/, /integerScaleGate\(/],
+    ['recell-buildings.ts', /writeFileSync\(join\(to, 'cell\.webp'\)/, /integerScaleGate\(/],
     [
       'recell-characters.ts',
       /writeFileSync\(join\(c\.dest, 'manifest\.json'\)/,

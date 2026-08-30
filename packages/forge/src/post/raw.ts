@@ -7,12 +7,37 @@ export async function decodePng(buf: Buffer): Promise<RawImage> {
   return { width: info.width, height: info.height, data: new Uint8ClampedArray(data) }
 }
 
-export async function encodePng(img: RawImage): Promise<Buffer> {
-  return sharp(Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength), {
+const fromRaw = (img: RawImage): sharp.Sharp =>
+  sharp(Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength), {
     raw: { width: img.width, height: img.height, channels: 4 },
   })
-    .png()
-    .toBuffer()
+
+export async function encodePng(img: RawImage): Promise<Buffer> {
+  return fromRaw(img).png().toBuffer()
+}
+
+/** The shipped art's container. `effort: 6` is sharp's slowest and smallest — ~1 s per character
+ *  atlas, so this belongs at rest and never on a request. */
+export async function encodeWebp(img: RawImage): Promise<Buffer> {
+  return fromRaw(img).webp({ lossless: true, effort: 6 }).toBuffer()
+}
+
+/** libwebp rewrites the RGB under alpha = 0 to whatever compresses, so a byte-for-byte compare
+ *  of two WebP images reports differences no draw of them can ever show. */
+export function visiblePixelDiffs(a: RawImage, b: RawImage): number {
+  let n = 0
+  for (let i = 0; i < a.data.length; i += 4) {
+    const alpha = a.data[i + 3]
+    if (alpha !== b.data[i + 3]) n++
+    else if (
+      alpha !== 0 &&
+      (a.data[i] !== b.data[i] ||
+        a.data[i + 1] !== b.data[i + 1] ||
+        a.data[i + 2] !== b.data[i + 2])
+    )
+      n++
+  }
+  return n
 }
 
 // keeps x/y scale factors equal when a square generation feeds a non-square target

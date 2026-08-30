@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { decodePng, encodePng } from '../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp } from '../src/post/raw.js'
 import {
   gradeMaterial,
   seamReport,
@@ -30,7 +30,7 @@ const MATERIALS = join(
 // a touch darker and damper than bare turned earth.
 export const FARMLAND_GRADE = { targetMean: [150, 104, 62] as const, contrast: 1.1 }
 
-const earth = await decodePng(readFileSync(join(MATERIALS, 'terrain_earth_0.png')))
+const earth = await decodePng(readFileSync(join(MATERIALS, 'terrain_earth_0.webp')))
 const soil = gradeMaterial(earth, {
   targetMean: FARMLAND_GRADE.targetMean,
   contrast: FARMLAND_GRADE.contrast,
@@ -62,7 +62,7 @@ if (veto !== null || bar.length > 0)
       `  The shipped material on disk is untouched.`,
   )
 
-writeFileSync(join(MATERIALS, 'terrain_farmland_0.png'), await encodePng(farmland))
+writeFileSync(join(MATERIALS, 'terrain_farmland_0.webp'), await encodeWebp(farmland))
 mkdirSync(`${S}/fqc2/plough`, { recursive: true })
 writeFileSync(`${S}/fqc2/plough/shipped-3x3.png`, await encodePng(selfTile3x3(farmland)))
-console.log('wrote content/tilesets/materials/terrain_farmland_0.png')
+console.log('wrote content/tilesets/materials/terrain_farmland_0.webp')

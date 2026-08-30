@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROAD_AUTOTILE_KEYS, SEASONS } from '@sj/shared'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
 import {
   SHEET_COLS,
   SHEET_ROWS,
@@ -33,8 +33,8 @@ import { scratch } from './scratch.js'
 
 const C3 = scratch('c3', 'materials')
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
-const SCAFFOLDING_FILE = 'scaffolding.png',
-  STRIP_FILE = 'road-autotile.png'
+const SCAFFOLDING_FILE = 'scaffolding.webp',
+  STRIP_FILE = 'road-autotile.webp'
 
 async function loadBook(): Promise<Map<string, RawImage>> {
   const book = new Map<string, RawImage>()
@@ -60,7 +60,7 @@ mkdirSync(MATERIALS_DIR, { recursive: true })
 // whatever any earlier run left. A stale v1 tile-sized material would otherwise keep being
 // loaded by the gateway and keep failing the shipped-materials check.
 for (const stale of readdirSync(MATERIALS_DIR)) {
-  if (stale.endsWith('.png') && !book.has(stale.replace(/\.png$/, '').replace(/_/g, ':'))) {
+  if (stale.endsWith('.webp') && !book.has(stale.replace(/\.webp$/, '').replace(/_/g, ':'))) {
     rmSync(join(MATERIALS_DIR, stale))
     console.log(`  pruned stale ${stale}`)
   }
@@ -101,7 +101,10 @@ for (const [assetId, raw] of [...book]) {
     wrapH: Number(bar.wrapH.toFixed(2)),
     wrapV: Number(bar.wrapV.toFixed(2)),
   }
-  writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(material))
+  writeFileSync(
+    join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.webp`),
+    await encodeWebp(material),
+  )
   console.log(
     `  ${assetId.padEnd(24)} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)} ` +
       `ring=${border.ringDelta.toFixed(1)} wrap=${bar.wrapH.toFixed(1)}/${bar.wrapV.toFixed(1)}` +
@@ -117,11 +120,11 @@ console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 const sheets = seasonSheets(book)
 for (const season of SEASONS) {
   const img = sheets[season]
-  writeFileSync(join(DIR, `${season}.png`), await encodePng(img))
-  console.log(`wrote ${season}.png — ${img.width}x${img.height}`)
+  writeFileSync(join(DIR, `${season}.webp`), await encodeWebp(img))
+  console.log(`wrote ${season}.webp — ${img.width}x${img.height}`)
 }
 if (!existsSync(join(DIR, SCAFFOLDING_FILE))) {
-  writeFileSync(join(DIR, SCAFFOLDING_FILE), await encodePng(paintScaffolding()))
+  writeFileSync(join(DIR, SCAFFOLDING_FILE), await encodeWebp(paintScaffolding()))
 }
 
 // the 15-cell road strip, every shape cut from ONE generated road surface
@@ -141,7 +144,7 @@ ROAD_AUTOTILE_KEYS.forEach((key, k) => {
     )
   }
 })
-writeFileSync(join(DIR, STRIP_FILE), await encodePng(strip))
+writeFileSync(join(DIR, STRIP_FILE), await encodeWebp(strip))
 console.log(
   `wrote ${STRIP_FILE} — ${width}x${TERRAIN_TILE_H}, ${road === null ? 'CODE-PAINTED (no generated road)' : 'generated surface'}`,
 )
@@ -160,7 +163,7 @@ const merged = {
   cols: SHEET_COLS,
   rows: SHEET_ROWS,
   seasons: Object.fromEntries(
-    SEASONS.map((s) => [s, { file: `${s}.png`, tiles: seasonTileNames() }]),
+    SEASONS.map((s) => [s, { file: `${s}.webp`, tiles: seasonTileNames() }]),
   ),
   scaffolding: { file: SCAFFOLDING_FILE },
   autotile: {

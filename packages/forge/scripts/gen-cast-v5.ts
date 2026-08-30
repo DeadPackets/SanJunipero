@@ -8,7 +8,7 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { PALETTE_WORDS, SWATCH_CLAUSE } from '@sj/forge/gen'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   CELL_V2,
@@ -570,7 +570,7 @@ async function runCharacter(m: CastMember): Promise<void> {
   })
   for (const [name, img] of cells) writeFileSync(`${DIR}/cells/${name}.png`, await encodePng(img))
   const { image, manifest } = packCharacterAtlas(cells, TARGET_H)
-  const atlas = await encodePng(image)
+  const atlas = await encodeWebp(image)
 
   // The palette distance is REPORTED, never a refusal: the cell keeps the model's colours.
   const bar = alphaBinaryGate(image).failures
@@ -589,7 +589,7 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   const dir = join(CAST_CONTENT_DIR, m.id)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'atlas.png'), atlas)
+  writeFileSync(join(dir, 'atlas.webp'), atlas)
   writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 
   const spend = ledger.totalFor(assetId) - spentBefore

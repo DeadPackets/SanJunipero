@@ -1,9 +1,9 @@
 // OFFLINE, $0.00 — re-cell the five production buildings from their cached 1024 raws; every
-// shipped cell.png was matched byte-for-byte to one raw, so this repairs from source.
+// shipped cell was matched byte-for-byte to one raw, so this repairs from source.
 // Writes a LEAN art root: point SJ_ART_ROOT at it to see the repair, remove it to undo.
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { decodePng, encodePng } from '../src/post/raw.js'
+import { decodePng, encodeWebp } from '../src/post/raw.js'
 import { keyBg } from '../src/post/chromaKey.js'
 import { cellAnchor } from '../src/hires.js'
 import { buildingCellPx, spriteCell } from '../src/reCell.js'
@@ -21,7 +21,7 @@ const S = scratch()
 const SRC = `${S}/c5/production`
 const OUT = `${S}/fqc2/art-root/production`
 
-// dir -> the raw the shipped cell.png was proved to come from (out/fqc2/identify-raws.mts)
+// dir -> the raw the shipped cell was proved to come from (out/fqc2/identify-raws.mts)
 const BUILDINGS = [
   { dir: 'building-storehouse', raw: 'building-storehouse-r1', fp: { w: 2, h: 2 } },
   { dir: 'building-wagon', raw: 'building-wagon-r1', fp: { w: 1, h: 2 } },
@@ -50,7 +50,7 @@ for (const b of BUILDINGS) {
   const r = spriteCell(keyBg(raw), { w: cellPx, h: cellPx, anchor: 'feet' })
   const anchor = cellAnchor(r.cell)
 
-  const before = await decodePng(readFileSync(join(from, 'cell.png')))
+  const before = await decodePng(readFileSync(join(from, 'cell.webp')))
   const density = spriteDensity({
     canvas: { w: cellPx, h: cellPx },
     footprint: b.fp,
@@ -71,7 +71,7 @@ for (const b of BUILDINGS) {
     continue
   }
 
-  writeFileSync(join(to, 'cell.png'), await encodePng(r.cell))
+  writeFileSync(join(to, 'cell.webp'), await encodeWebp(r.cell))
   writeFileSync(
     join(to, 'manifest.json'),
     JSON.stringify(
@@ -88,7 +88,7 @@ for (const b of BUILDINGS) {
   // KEEP THE RAWS: the source of this repair travels with its output.
   cpSync(join(from, 'raws', `${b.raw}.png`), join(to, 'raws', `${b.raw}.png`))
   // and the art it replaces, so the before/after is a file comparison, not a memory
-  cpSync(join(from, 'cell.png'), join(to, 'before-cell.png'))
+  cpSync(join(from, 'cell.webp'), join(to, 'before-cell.webp'))
   cpSync(join(from, 'manifest.json'), join(to, 'before-manifest.json'))
 }
 

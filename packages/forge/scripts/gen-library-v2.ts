@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import {
   makeVisionJudge,
@@ -258,8 +258,8 @@ for (const item of items) {
 
   const dir = join(ITEMS_CONTENT_DIR, e.kind)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'sprite.png'), await encodePng(win.sprite))
-  writeFileSync(join(dir, 'icon.png'), await encodePng(win.icon))
+  writeFileSync(join(dir, 'sprite.webp'), await encodeWebp(win.sprite))
+  writeFileSync(join(dir, 'icon.webp'), await encodeWebp(win.icon))
   writeFileSync(
     join(dir, 'manifest.json'),
     `${JSON.stringify(

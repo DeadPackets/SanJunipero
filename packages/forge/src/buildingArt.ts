@@ -59,7 +59,7 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
     .sort()) {
     const base = join(root, dir)
     const manifestPath = join(base, 'manifest.json'),
-      cellPath = join(base, 'cell.png')
+      cellPath = join(base, 'cell.webp')
     for (const p of [manifestPath, cellPath]) {
       if (!existsSync(p)) throw new Error(`buildings/${dir}: ${p.split('/').at(-1)} is missing`)
     }

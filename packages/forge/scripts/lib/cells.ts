@@ -6,7 +6,7 @@ import { BudgetGuard } from '../../src/budget.js'
 import { SpendLedger } from '../../src/spendLedger.js'
 import { keyBg } from '../../src/post/chromaKey.js'
 import { paletteSwatchPng } from '../../src/referenceSheet.js'
-import { decodePng, encodePng, type RawImage } from '../../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp, type RawImage } from '../../src/post/raw.js'
 import { cellAnchor } from '../../src/hires.js'
 import { buildingCellPx, spriteCell, type SpritePlan } from '../../src/reCell.js'
 import { classDensityGate, paletteDistance, spriteDensity } from '../../src/pixelGates.js'
@@ -213,7 +213,7 @@ export async function runCells(o: RunOptions): Promise<void> {
 
     const dir = `${BUILDINGS_CONTENT_DIR}/${job.kind.replace(':', '-')}`
     mkdirSync(dir, { recursive: true })
-    writeFileSync(`${dir}/cell.png`, await encodePng(win.cell))
+    writeFileSync(`${dir}/cell.webp`, await encodeWebp(win.cell))
     writeFileSync(
       `${dir}/manifest.json`,
       `${JSON.stringify(
