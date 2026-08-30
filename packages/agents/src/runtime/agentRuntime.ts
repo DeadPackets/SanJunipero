@@ -3,7 +3,7 @@ import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import type { IdentityCore, AssembledPrompt, PromptBlocks, Recalled } from '../prompt/assemble.js'
-import { assemblePrompt, compactDayLog, JOURNAL_LINES } from '../prompt/assemble.js'
+import { assemblePrompt, compactDayLog, JOURNAL_LINES, splitSentences } from '../prompt/assemble.js'
 import {
   heardProse,
   makeablesLine,
@@ -172,6 +172,7 @@ export class AgentRuntime {
   #agentId = ''
   #mem: MemoryStore | null = null
   #dayLog: string[] = []
+  #prevMomentSentences = new Set<string>()
   #clock: MindClock = freshClock()
   #plan: PlanState = { queue: [], lastResult: 'idle' }
   #planHeadInFlight = false
@@ -224,6 +225,7 @@ export class AgentRuntime {
     this.#agentId = agentId
     this.#mem = new MemoryStore(this.#db, agentId, this.#embedder)
     this.#dayLog = []
+    this.#prevMomentSentences = new Set()
     this.#clock = freshClock()
     this.#plan = { queue: [], lastResult: 'idle' }
     this.#planHeadInFlight = false
@@ -506,6 +508,7 @@ export class AgentRuntime {
         this.#pendingDreamMood = null
       }
       this.#dayLog = []
+      this.#prevMomentSentences = new Set()
     }
     if (isNight && packet.self.asleep) {
       const night = nightOf(tick)
@@ -548,11 +551,16 @@ export class AgentRuntime {
         nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
       },
     )
-    // The prompt keeps another mouth's bytes out of the narrator's block; the day log and this
-    // mind's own memory still hold the whole moment.
+    // The prompt keeps another mouth's bytes out of the narrator's block; this mind's own
+    // memory still holds the whole moment.
     const heard = heardProse(packet)
     const moment = heard.length > 0 ? `${prose} ${heard}` : prose
-    this.#dayLog.push(moment)
+    // Only what the last moment did not already say goes into the day log, which is re-sent
+    // whole every turn. A still scene therefore stops paying for itself twice.
+    const sentences = splitSentences(moment)
+    const fresh = sentences.filter((s) => !this.#prevMomentSentences.has(s))
+    this.#prevMomentSentences = new Set(sentences)
+    if (fresh.length > 0) this.#dayLog.push(fresh.join(' '))
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
     const nowProse = [
