@@ -9,6 +9,87 @@ export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
 // and not a measurement.
 export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
 
+export const REAL_MINUTES_PER_SIM_HOUR = REAL_MINUTES_PER_SIM_DAY / 24
+
+/** The callers a mind's own thinking goes through, and the only ones the per-mind rate counts.
+ *  The narrator, the arbiter, the tier-2.5 pass and the forge are town work at any cast size. */
+export const MIND_CALLERS: string[] = ['turn', 'reflection', 'reflection.edit', 'dream', 'recall']
+
+const MIND_CALLER_SLOTS = MIND_CALLERS.map(() => '?').join(',')
+
+type WindowOpts = { windowRealMinutes?: number; now?: number }
+
+const windowOf = (opts: WindowOpts): { windowRealMinutes: number; cutoff: number } => {
+  const windowRealMinutes = opts.windowRealMinutes ?? DEFAULT_SPEND_WINDOW_REAL_MINUTES
+  return { windowRealMinutes, cutoff: (opts.now ?? Date.now()) - windowRealMinutes * 60_000 }
+}
+
+export type CallRateProjection = { callsPerMindSimHour: number; sampledCalls: number }
+
+/** Calls, not dollars: the flow a runaway shows up in first, and the one number a provider
+ *  failover cannot move. */
+export function projectCallRate(
+  db: Database.Database,
+  opts: WindowOpts & { minds: number },
+): CallRateProjection {
+  const { windowRealMinutes, cutoff } = windowOf(opts)
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM llm_calls
+        WHERE ts >= ? AND caller IN (${MIND_CALLER_SLOTS})`,
+    )
+    .get(cutoff, ...MIND_CALLERS) as { n: number }
+  const simHours = windowRealMinutes / REAL_MINUTES_PER_SIM_HOUR
+  return {
+    callsPerMindSimHour: row.n / Math.max(1, opts.minds) / simHours,
+    sampledCalls: row.n,
+  }
+}
+
+/** `provider.order` LOAD-BALANCES: 52/48 is the measured normal, so half the window off the
+ *  first name says nothing. Above 70% the first name is being shut out, which is worth a line. */
+export const PROVIDER_MIX_ALERT_SHARE = 0.7
+
+export type ProviderMix = {
+  calls: number
+  costUsd: number
+  offPinShare: number
+  alerted: boolean
+}
+
+/** An alert, never a stop: the failover is what keeps a rate limit on the pin from idling every
+ *  mind, and the operator's answer to a dear one is a pin change, not a dead town. */
+export function checkProviderMix(
+  db: Database.Database,
+  opts: WindowOpts & { pinned: string },
+): ProviderMix {
+  const { windowRealMinutes, cutoff } = windowOf(opts)
+  const rows = db
+    .prepare(
+      `SELECT provider, COUNT(*) AS calls, COALESCE(SUM(cost_usd), 0) AS costUsd
+         FROM llm_calls
+        WHERE ts >= ? AND caller IN (${MIND_CALLER_SLOTS})
+        GROUP BY provider ORDER BY calls DESC, provider`,
+    )
+    .all(cutoff, ...MIND_CALLERS) as { provider: string | null; calls: number; costUsd: number }[]
+  const calls = rows.reduce((n, r) => n + r.calls, 0)
+  const costUsd = rows.reduce((n, r) => n + r.costUsd, 0)
+  const offPin = rows.filter((r) => r.provider !== opts.pinned).reduce((n, r) => n + r.calls, 0)
+  const offPinShare = calls === 0 ? 0 : offPin / calls
+  const mix = { calls, costUsd, offPinShare }
+  if (calls === 0 || offPinShare <= PROVIDER_MIX_ALERT_SHARE) return { ...mix, alerted: false }
+  const who = rows
+    .map((r) => `${r.provider ?? 'unattributed'} ${((r.calls / calls) * 100).toFixed(0)}%`)
+    .join(', ')
+  const detail =
+    `${(offPinShare * 100).toFixed(0)}% of ${calls} mind calls in the last ` +
+    `${windowRealMinutes} real minutes were not served by ${opts.pinned} ` +
+    `(${who}); the window cost $${costUsd.toFixed(4)}`
+  insertAlert(db, { agentId: null, kind: 'llm_provider_mix_high', detail })
+  console.warn(`providers: ${detail}`)
+  return { ...mix, alerted: true }
+}
+
 export type SpendProjection = {
   usdPerSimDay: number
   windowRealMinutes: number

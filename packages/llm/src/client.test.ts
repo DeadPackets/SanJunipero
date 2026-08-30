@@ -6,7 +6,13 @@ import { z } from 'zod'
 import { mockModel } from './testutil/mockModel.js'
 import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
 import { BudgetExceededError, LlmClient, defaultExtraBody, servedProvider } from './client.js'
-import { FALLBACK_MODELS, MIND_MODEL, PROVIDER_ORDER } from './pins.js'
+import {
+  FALLBACK_MODELS,
+  MIND_MODEL,
+  MIN_REQUEST_TIMEOUT_MS,
+  PROVIDER_ORDER,
+  callSettingsFor,
+} from './pins.js'
 
 type CallRow = {
   id: number
@@ -36,6 +42,11 @@ function rows(db: Database.Database): CallRow[] {
 }
 
 const SCHEMA = z.object({ mood: z.string(), count: z.number().int() }).strict()
+
+const alertsOf = (db: Database.Database, kind: string): string[] =>
+  (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(
+    (a) => a.detail,
+  )
 
 describe('migrateLlmTables', () => {
   it('is idempotent', () => {
@@ -774,9 +785,9 @@ describe('default OpenRouter path extraBody', () => {
   // Two names so a Baidu rate limit does not idle the minds. Order is the preference;
   // `allow_fallbacks:false` is still what makes it a list.
   it('★ the request body carries both allowed providers, in order', () => {
-    expect(PROVIDER_ORDER).toEqual(['Baidu', 'AtlasCloud'])
+    expect(PROVIDER_ORDER).toEqual(['Baidu', 'Inceptron'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Baidu', 'AtlasCloud'],
+      order: ['Baidu', 'Inceptron'],
       allow_fallbacks: false,
     })
   })
@@ -857,11 +868,6 @@ describe('the back end that answered is written down (C11 R20)', () => {
 // ★ Without this column a ceiling that truncates is indistinguishable from a bad answer, and
 // no cap in `pins.ts` can tell you it is set wrong.
 describe('★ why the provider stopped is on every ledger row', () => {
-  const alertsOf = (db: Database.Database, kind: string): string[] =>
-    (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(
-      (a) => a.detail,
-    )
-
   it('writes finish_reason for an answer that ended, and raises nothing', async () => {
     const db = openDb()
     const model = mockModel([{ json: { mood: 'calm', count: 1 } }])
@@ -893,7 +899,7 @@ describe('★ why the provider stopped is on every ledger row', () => {
 
   it('a call that never came back records no reason rather than a wrong one', async () => {
     const db = openDb()
-    const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
+    const model = mockModel([{ fail: true }, { fail: true }])
     await expect(
       new LlmClient({ model, db, caller: 'turn' }).text({
         messages: [{ role: 'user', content: 'u' }],
@@ -903,7 +909,85 @@ describe('★ why the provider stopped is on every ledger row', () => {
       (db.prepare('SELECT finish_reason AS r FROM llm_calls').all() as { r: string | null }[]).map(
         (x) => x.r,
       ),
-    ).toEqual([null, null, null])
+    ).toEqual([null, null])
+  })
+})
+
+// Run C's one and only arbiter call sat for 45 s, returned nothing, and was written down as
+// 0 tokens with no finish_reason — so the ceiling that caused it looked innocent.
+describe('★ a generation that answered but produced no output still bills what it burned', () => {
+  it('records the tokens and the reason, and names the ceiling that cut it off', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        emptyOutput: true,
+        finishReason: 'length',
+        usage: { inputTokens: 900, outputTokens: 8000 },
+      },
+      {
+        emptyOutput: true,
+        finishReason: 'length',
+        usage: { inputTokens: 900, outputTokens: 8000 },
+      },
+    ])
+    await expect(
+      new LlmClient({ model, db, caller: 'arbiter' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow()
+    const logged = rows(db)
+    expect(logged).toHaveLength(2)
+    expect(logged[0]!.output_tokens, 'a paid generation was written down as free').toBe(8000)
+    expect(logged[0]!.ok).toBe(0)
+    expect(
+      (db.prepare('SELECT finish_reason AS r FROM llm_calls').get() as { r: string | null }).r,
+    ).toBe('length')
+    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('8000 output token ceiling')
+  })
+})
+
+describe('★ one unified call discipline, the arbiter included', () => {
+  // ★ A flat 30 s would abort `reflection.edit` and `arbiter` well inside their own measured
+  // p99s. The bound a caller gets is the time its OWN output ceiling needs, floored at 30 s.
+  it('bounds every caller, and never under the time its own ceiling needs', () => {
+    const db = openDb()
+    const bound = (caller: string): number =>
+      (new LlmClient({ db, caller }) as unknown as { requestTimeoutMs: number }).requestTimeoutMs
+    for (const caller of ['turn', 'reflection', 'constructs', 'nobody-pinned-this']) {
+      expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
+    }
+    for (const caller of ['arbiter', 'reflection.edit', 'narrator', 'semantic', 'dream']) {
+      const ceiling = callSettingsFor(caller).maxOutputTokens ?? 0
+      expect(bound(caller), caller).toBeGreaterThanOrEqual((ceiling / 44) * 1000)
+      expect(bound(caller), caller).toBeGreaterThan(MIN_REQUEST_TIMEOUT_MS)
+    }
+  })
+
+  it('retries once after the abort, then fails with an alert naming the caller', async () => {
+    const db = openDb()
+    const model = mockModel([{ fail: true }, { fail: true }])
+    await expect(
+      new LlmClient({ model, db, caller: 'arbiter' }).text({
+        messages: [{ role: 'user', content: 'u' }],
+      }),
+    ).rejects.toThrow()
+    expect(rows(db), 'a third attempt only spends the stall again').toHaveLength(2)
+    expect(alertsOf(db, 'llm_call_failed')).toEqual([
+      'arbiter: 2 attempt(s) failed, the last bounded at 182s — scripted failure',
+    ])
+  })
+
+  it('writes the generation id, which is the only way to ask who served an unnamed call', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'ok', generationId: 'gen-abc' }])
+    await new LlmClient({ model, db, caller: 'turn' }).text({
+      messages: [{ role: 'user', content: 'u' }],
+    })
+    expect(
+      (db.prepare('SELECT generation_id AS g FROM llm_calls').get() as { g: string | null }).g,
+    ).toBe('gen-abc')
   })
 })
 

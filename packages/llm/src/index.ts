@@ -1,12 +1,16 @@
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './pins.js'
 export { migrateLlmTables, insertAlert, insertLlmCall, sumCostUsd } from './callLog.js'
+export { backfillUnattributed } from './backfill.js'
+export { computeCostUsd } from './pricing.js'
 export {
+  checkProviderMix,
   checkSpend,
   reconcileCosts,
   reportReconciliation,
   RECONCILE_TOLERANCE,
   classifyFailure,
   deadCallCounts,
+  projectCallRate,
   projectDailySpend,
   reportDeadCalls,
   reportProviders,
@@ -20,7 +24,6 @@ export {
 export {
   LlmClient,
   BudgetExceededError,
-  computeCostUsd,
   defaultExtraBody,
   servedProvider,
   type LlmUsage,

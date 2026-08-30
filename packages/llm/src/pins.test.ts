@@ -12,7 +12,7 @@ import {
 
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
-  expect(PROVIDER_ORDER).toEqual(['Baidu', 'AtlasCloud'])
+  expect(PROVIDER_ORDER).toEqual(['Baidu', 'Inceptron'])
   // Never a floating alias: every model names the dated snapshot it was probed at.
   for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
   // Baidu's real charged rate, not its 0.14/0.28/0.028 list rate: the list would over-report

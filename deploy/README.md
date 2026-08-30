@@ -188,54 +188,78 @@ docker compose down -v                          # or: end the town and its volum
 **A sim-day passes every 30 real minutes**, so an hour of wall clock is two sim-days and
 "$/hour" is twice "$/sim-day".
 
-**Expected, to be measured in rehearsal 4**: five minds on the Baidu pin, **$0.019 per
-sim-day** — rehearsal 3's measured $0.47-0.71 recosted call by call with the turn's reasoning
-off, the day log deduped and the new output ceilings, each part of it measured, the stack of
-them not yet.
+**Measured**: five minds at the measured 52/48 routing split, **$0.0369 per sim-day**
+($0.00737/mind, `providers2` 2026-08-30). Rehearsal 4's run C billed far more than that — it ran
+63% on AtlasCloud, now off the allow-list, with 21 calls booked at the ceiling because nothing
+said who served them. Both of those are fixed below; treat the run-C figure as the old routing's.
 
-**If Baidu is out, the town runs on AtlasCloud** — the second name on the allow-list, 7.3x the
-rate. A sustained failover is **$0.035/mind/sim-day, $0.175 for five minds**, which is 9.2x the
-Baidu line and still under the rate tripwire. Nothing else changes; the minds do not stop.
+**`provider.order` load-balances; it does not prioritise.** Measured 52/48 Baidu/Inceptron at
+production pace (`providers2`, 2026-08-30), so budget the second name at half the bill and not as
+a rare failover. The measured mix is **$0.00737/mind/sim-day**; the worst the allow-list permits,
+100% Inceptron, is **$0.01133**. Neither raises anything: the provider-mix alert speaks only when
+the pin is shut out of a window entirely.
+
+**Baidu's pool is shared, and BYOK is the account-level fix.** Baidu's own 429 body says to add
+your own key to accumulate your rate limits. OpenRouter BYOK is 5% of list with the first 1M
+requests a month waived, and it needs a Baidu (Qianfan) provider account of your own — it is the
+only lever that fixes the shared pool rather than routing around it.
 
 | | per hour | per day | per 30-day month |
 |---|---|---|---|
 | **Scripted** (default) | **$0.00** | **$0.00** | **$0.00** |
-| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.038** | **$0.91** | **$27** |
-| Live, sustained failover to AtlasCloud | $0.35 | $8.40 | $252 |
+| **Live** (`SJ_LIVE=1`, 5 minds, measured mix) | **$0.074** | **$1.77** | **$53** |
+| Live, worst mix the allow-list permits (100% Inceptron) | $0.113 | $2.72 | $82 |
 
-Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$50/mo,
+Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$75/mo,
 forever, until you stop it.** A live town is not something to leave running.
 
 **These ARE the numbers the code prints.** `pins.ts` books the rate this account is actually
 charged — reconciled against the bill, not read off a price list — and a call whose bill
 OpenRouter reports is booked at that bill. The dashboards and this page are the same dollars.
 
-### The four guards, and where they trip
+### The five guards, and where they trip
 
-Each is calibrated against the price the ledger books, so each fires at its nominal spend.
+Two kill the process, one stops the minds and leaves the town serving, and two only speak.
 
 | Guard | Set at | Reached, at the expected 5-mind rate | What it does |
 |---|---|---|---|
-| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.91 | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | $50 total | ~1,300 real hours, so 55 days | Kills the process. The town on disk is intact. |
-| Rate tripwire | $0.05/mind/sim-day over 15 min | $0.50/h for five minds — 13x the expected rate, 43% over a sustained AtlasCloud failover | Stops every mind. The town keeps serving. |
+| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $1.77 | Kills the process; a restart refuses until the window rolls. |
+| Anomaly stop | $50 total | ~675 real hours, so 28 days | Kills the process. The town on disk is intact. |
+| Rate tripwire | **8 calls/mind/sim-hour** over 15 min | 1.7x rehearsal 4's measured 4.7 — a runaway, never a price | Stops every mind. The town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | 21x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
+| Provider mix | >70% of mind calls off `PROVIDER_ORDER[0]` | only when the pin is shut out — 52/48 is the measured normal | Prints and files an alert. **Never stops.** |
 
-**Only the tripwire still bites.** The two dollar guards were set against a bill 20x this one and
-were not re-derived with it, so at the expected rate the rate tripwire is the guard that fires
-first and the other two are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you want the daily
-budget back as a working limit.
+**The tripwire counts calls, not dollars.** Rehearsal 4 killed two runs on a dollar rate that the
+routing, not the town, had moved: run C's minds were behaving exactly as designed and the wire
+fired because 63% of the window had gone to the dearer back end. Calls are what the town
+controls, so calls are what the wire measures; the dollars are the two money guards' job.
 
-**The operator alert sits above the tripwire, not before it.** The alert is $0.40/sim-day for the
-whole town and the tripwire is $0.25/sim-day for five minds, so for mind traffic the tripwire
-stops the cast first; the alert is what speaks for the spend the tripwire excludes by design
-(art, the narrator, the arbiter).
+**Only mind callers count against the wire**: `turn`, `reflection`, `reflection.edit`, `dream`,
+`recall`. The narrator, the arbiter, the tier-2.5 pass and the forge are town work that costs
+the same however many minds are alive, so they are the operator alert's business, not the
+tripwire's.
+
+**The two dollar guards were set against a bill 20x this one** and were not re-derived with it,
+so at the expected rate they are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you want the
+daily budget back as a working limit.
 
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;
 the lifetime cap is the disaster ceiling, and `SJ_SPEND_CAP_USD=0` removes it. A town over either
 line refuses to boot live, before the pre-flight spends anything, and says which line it is over.
 That is the intent — but it is also why `_ops.db` must be in your backup.
+
+**Every call is bounded at 30 s, with one retry.** Run C's single arbiter call sat for 45 s,
+returned nothing and was written down as 0 tokens with no reason — the ceiling that caused it
+looked innocent. Now the abort is 30 s for every caller (the chronicle alone gets 600 s, because
+its 22,000-token ceiling cannot finish in less), a generation that answers but produces no output
+still bills what it burned, and a call that fails twice files `llm_call_failed`.
+
+**A call whose answer names no back end is asked about, not guessed at.** 21 of run C's 207 calls
+booked at the ceiling price because nothing said who served them. The ledger now keeps
+OpenRouter's generation id, and the run asks `GET /api/v1/generation` a few seconds later for the
+back end and the real bill, re-prices the row and re-runs its reconciliation. If the endpoint will
+not answer, the ceiling price and its alert stand.
 
 **Before you set `SJ_LIVE=1`:** the scripted town is not a degraded mode. It is the same world,
 the same viewer, the same event log and the same port — only the deciding is scripted. Stream it

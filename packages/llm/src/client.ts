@@ -19,13 +19,13 @@ import {
   type BudgetGuard,
   type LlmCallInsert,
 } from './callLog.js'
+import { bookCostUsd, computeCostUsd } from './pricing.js'
 import {
   FALLBACK_MODELS,
   MIND_MODEL,
   PROVIDER_ORDER,
   callSettingsFor,
-  pricesFor,
-  type PriceSource,
+  requestTimeoutMsFor,
   type ReasoningSetting,
 } from './pins.js'
 import { jsonOrNothing, repairToSchema } from './repair.js'
@@ -41,13 +41,35 @@ export type LlmUsage = {
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
 
-type ExecResult<T> = {
-  usage: LanguageModelUsage
-  value: T
+/** What one attempt is known to have done, recorded the moment the provider answers and BEFORE
+ *  the value is read: a generation that answered but produced no output still billed its
+ *  tokens, and reading its value throws. */
+type StepFacts = {
+  usage?: LanguageModelUsage | undefined
   servedModel?: string | undefined
-  provider?: string | null
-  reportedCostUsd?: number | null
+  provider?: string | null | undefined
+  reportedCostUsd?: number | null | undefined
   finishReason?: FinishReason | undefined
+  generationId?: string | undefined
+}
+
+type Note = (facts: StepFacts) => void
+
+type GeneratedStep = {
+  usage: LanguageModelUsage
+  finishReason: FinishReason
+  finalStep: { response: { id?: string; modelId?: string }; providerMetadata?: unknown }
+}
+
+function stepFacts(r: GeneratedStep): StepFacts {
+  return {
+    usage: r.usage,
+    servedModel: r.finalStep.response.modelId,
+    provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
+    reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
+    finishReason: r.finishReason,
+    generationId: r.finalStep.response.id,
+  }
 }
 
 export class BudgetExceededError extends Error {}
@@ -103,11 +125,6 @@ function reportedCostUsd(meta: unknown): number | null {
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : null
 }
 
-// How far the table may sit from the bill before it is a defect rather than rounding. Sub-cent
-// calls round hard, so a divergence has to clear BOTH bars.
-const COST_DIVERGENCE_FRACTION = 0.2
-const COST_DIVERGENCE_FLOOR_USD = 5e-6
-
 export type LlmClientOpts = {
   model?: LanguageModel
   db: Database.Database
@@ -145,8 +162,9 @@ function tokensOf(raw: LanguageModelUsage | undefined): CallTokens {
 
 const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 
-// Six minutes: ~75% headroom over the slowest call that has ever legitimately answered.
-const DEFAULT_REQUEST_TIMEOUT_MS = 360_000
+// One retry after the abort, then the call fails loudly. A third attempt only spends the
+// stall again.
+const DEFAULT_MAX_RETRIES = 1
 
 export class LlmClient {
   private readonly db: Database.Database
@@ -173,8 +191,8 @@ export class LlmClient {
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? false
     const pinned = callSettingsFor(opts.caller)
     this.reasoning = opts.reasoning === undefined ? (pinned.reasoning ?? null) : opts.reasoning
-    this.maxRetries = opts.maxRetries ?? 2
-    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? requestTimeoutMsFor(opts.caller)
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
@@ -218,7 +236,7 @@ export class LlmClient {
     messages: LlmMessage[],
     schema: z.ZodType<T>,
   ): Promise<{ value: T; usage: LlmUsage }> {
-    return this.invoke(async (model) => {
+    return this.invoke(async (model, note) => {
       try {
         const r = await generateText({
           model,
@@ -229,27 +247,21 @@ export class LlmClient {
           abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
           output: Output.object({ schema }),
         })
-        return {
-          usage: r.usage,
-          value: r.output,
-          servedModel: r.finalStep.response.modelId,
-          provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
-          reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
-          finishReason: r.finishReason,
-        }
+        note(stepFacts(r))
+        return r.output
       } catch (err) {
         // Re-frames the provider's own bytes against the schema; never re-asks, never invents.
         if (!NoObjectGeneratedError.isInstance(err)) throw err
         const repaired = repairToSchema(err.text ?? '', schema)
         if (repaired === undefined) throw err
         this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
-        return {
+        note({
           usage: err.usage ?? EMPTY_USAGE,
-          value: repaired.value,
           servedModel: err.response?.modelId,
           provider: servedProvider(err.response, undefined),
           finishReason: err.finishReason,
-        }
+        })
+        return repaired.value
       }
     })
   }
@@ -260,7 +272,7 @@ export class LlmClient {
   }): Promise<{ text: string; usage: LlmUsage }> {
     const system = opts.system === undefined ? undefined : this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
-    const { value, usage } = await this.invoke(async (model) => {
+    const { value, usage } = await this.invoke(async (model, note) => {
       const r = await generateText({
         model,
         ...(system === undefined ? {} : { system }),
@@ -269,14 +281,8 @@ export class LlmClient {
         ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
         abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
       })
-      return {
-        usage: r.usage,
-        value: r.text,
-        servedModel: r.finalStep.response.modelId,
-        provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
-        reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
-        finishReason: r.finishReason,
-      }
+      note(stepFacts(r))
+      return r.text
     })
     return { text: value, usage }
   }
@@ -318,39 +324,8 @@ export class LlmClient {
     return messages.map((m) => ({ ...m, content: this.seal(m.content) }))
   }
 
-  // The provider's own charge wins when offered: it is the bill. The table stays as the second
-  // opinion — a single source of truth cannot reconcile against itself — and as the fallback.
-  private book(
-    computed: ComputedCost,
-    reported: number | null,
-    served: string,
-    provider: string | null,
-  ): number {
-    // A route nobody has priced must never book cheap: it books at the worst rate any endpoint
-    // charges for this model, and it says so.
-    if (computed.source === 'ceiling') {
-      this.alert(
-        'llm_price_unpriced_route',
-        `${served} served by ${provider ?? 'an unnamed back end'} has no price row; ` +
-          `booked at the ceiling ($${computed.costUsd.toFixed(6)})`,
-      )
-    }
-    if (reported === null) return computed.costUsd
-    const gap = Math.abs(reported - computed.costUsd)
-    const scale = Math.max(reported, computed.costUsd)
-    if (gap > COST_DIVERGENCE_FLOOR_USD && scale > 0 && gap / scale > COST_DIVERGENCE_FRACTION) {
-      this.alert(
-        'llm_price_divergence',
-        `${provider ?? 'unattributed'} charged $${reported.toFixed(6)} for ${served} but the ` +
-          `pinned table computed $${computed.costUsd.toFixed(6)} ` +
-          `(${((gap / scale) * 100).toFixed(0)}% out, prices from ${computed.source}) — the pin is stale`,
-      )
-    }
-    return reported
-  }
-
   private async invoke<T>(
-    exec: (model: LanguageModel) => Promise<ExecResult<T>>,
+    exec: (model: LanguageModel, note: Note) => Promise<T>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
@@ -373,25 +348,24 @@ export class LlmClient {
   }
 
   private async invokeReserved<T>(
-    exec: (model: LanguageModel) => Promise<ExecResult<T>>,
+    exec: (model: LanguageModel, note: Note) => Promise<T>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const start = performance.now()
+      let facts: StepFacts = {}
+      const note: Note = (f) => {
+        facts = f
+      }
       try {
-        const {
-          usage: raw,
-          value,
-          servedModel,
-          provider,
-          reportedCostUsd: reported,
-          finishReason,
-        } = await exec(model)
-        const served = servedModel ?? modelName
-        const tokens = tokensOf(raw)
+        const value = await exec(model, note)
+        const served = facts.servedModel ?? modelName
+        const tokens = tokensOf(facts.usage)
         const { inputTokens, outputTokens, cacheReadTokens } = tokens
+        const provider = facts.provider ?? null
+        const reported = facts.reportedCostUsd ?? null
         const computed = computeCostUsd(
           inputTokens,
           outputTokens,
@@ -399,32 +373,40 @@ export class LlmClient {
           served,
           provider,
         )
-        const costUsd = this.book(computed, reported ?? null, served, provider ?? null)
+        const costUsd = bookCostUsd(this.db, {
+          agentId: this.agentId,
+          computed,
+          reported,
+          served,
+          provider,
+        })
         insertLlmCall(
           this.db,
           this.llmCallRow({
             model: served,
-            provider: provider ?? null,
+            provider,
+            generationId: facts.generationId ?? null,
             ...tokens,
             costUsd,
             estimatedCostUsd: computed.costUsd,
-            reportedCostUsd: reported ?? null,
+            reportedCostUsd: reported,
             latencyMs: performance.now() - start,
-            finishReason: finishReason ?? null,
+            finishReason: facts.finishReason ?? null,
             error: null,
           }),
         )
-        this.warnIfTruncated(finishReason)
+        this.warnIfTruncated(facts.finishReason)
         return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
-        // Priced here rather than through `book`: a dead call was still billed, has no reported
-        // cost to reconcile against, and an unattributed route would alert on every one of them.
+        // Priced here rather than through `bookCostUsd`: a dead call was still billed, has no
+        // reported cost to reconcile against, and an unattributed route would alert every time.
         const dead = NoObjectGeneratedError.isInstance(err) ? err : null
-        const served = dead?.response?.modelId ?? modelName
-        const provider = dead === null ? null : servedProvider(dead.response, undefined)
-        const finishReason = dead?.finishReason ?? null
-        const tokens = tokensOf(dead?.usage)
+        const served = dead?.response?.modelId ?? facts.servedModel ?? modelName
+        const provider =
+          dead === null ? (facts.provider ?? null) : servedProvider(dead.response, undefined)
+        const finishReason = dead?.finishReason ?? facts.finishReason ?? null
+        const tokens = tokensOf(dead?.usage ?? facts.usage)
         const { inputTokens, outputTokens, cacheReadTokens } = tokens
         const deadCost = computeCostUsd(
           inputTokens,
@@ -438,6 +420,7 @@ export class LlmClient {
           this.llmCallRow({
             model: served,
             provider,
+            generationId: facts.generationId ?? null,
             ...tokens,
             costUsd: deadCost,
             estimatedCostUsd: deadCost,
@@ -453,6 +436,12 @@ export class LlmClient {
         if (NoObjectGeneratedError.isInstance(err)) throw err
       }
     }
+    this.alert(
+      'llm_call_failed',
+      `${this.caller}: ${this.maxRetries + 1} attempt(s) failed, the last bounded at ` +
+        `${(this.requestTimeoutMs / 1000).toFixed(0)}s — ` +
+        (lastError instanceof Error ? lastError.message : String(lastError)),
+    )
     throw lastError
   }
 
@@ -481,26 +470,6 @@ export class LlmClient {
     })
     return this.model
   }
-}
-
-export type ComputedCost = { costUsd: number; source: PriceSource }
-
-// `source: 'ceiling'` means nobody priced this route, so the caller must be loud rather than
-// book it cheap.
-export function computeCostUsd(
-  inputTokens: number,
-  outputTokens: number,
-  cacheReadTokens: number,
-  model?: string,
-  provider?: string | null,
-): ComputedCost {
-  const { prices, source } = pricesFor(model, provider)
-  const costUsd =
-    ((inputTokens - cacheReadTokens) * prices.input +
-      cacheReadTokens * prices.cacheRead +
-      outputTokens * prices.output) /
-    1e6
-  return { costUsd, source }
 }
 
 function toModelMessages(messages: LlmMessage[]): ModelMessage[] {

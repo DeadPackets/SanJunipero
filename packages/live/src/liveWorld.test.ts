@@ -203,6 +203,19 @@ const alertsOf = (db: Database.Database, kind: string): string[] =>
     (r) => r.detail,
   )
 
+/** N mind calls inside the rate window, priced at nothing — the tripwire counts calls. */
+const callsTo = (db: Database.Database, caller: string, n: number): void => {
+  const insert = db.prepare(
+    `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, 0, 0, 1, NULL, 'Baidu')`,
+  )
+  db.transaction(() => {
+    for (let i = 0; i < n; i++) insert.run(Date.now(), caller)
+  })()
+}
+
 /** One ledger row at a chosen wall-clock time — the rolling day is the thing under test. */
 const billTo = (db: Database.Database, ts: number, usd: number): void => {
   db.prepare(
@@ -425,8 +438,8 @@ describe('★ the money, inside the served world', () => {
   }, 40_000)
 
   // The total cap stops a lane's mistake and cannot stop a leak on a process meant to run for
-  // weeks. This row spends FAR UNDER the cap and fast, the exact shape the cap is blind to.
-  it('★ stops a town burning too fast even though it is nowhere near its cap', async () => {
+  // weeks. This row thinks FAR UNDER the cap and fast, the exact shape the cap is blind to.
+  it('★ stops a town thinking too fast even though it is nowhere near its cap', async () => {
     const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
@@ -438,25 +451,38 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // TWO minds, so the ceiling is 2 x $0.10 = $0.20/sim-day. $0.60 inside a 15-minute window
-    // projects to $2.40/sim-day — over the flow ceiling and well under the $5 cap this row sets.
-    opsDb
-      .prepare(
-        `INSERT INTO llm_calls
-       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-      )
-      .run(Date.now(), 0.6)
-    expect(ledgerTotalUsd(opsDb)).toBeLessThan(5)
+    // A 15-minute window is 12 sim-hours, so TWO minds may make 2 x 12 x 8 = 192 calls in it.
+    // 240 is over the wire and costs nothing at all — this is a call guard, not a money one.
+    callsTo(opsDb, 'turn', 240)
+    expect(ledgerTotalUsd(opsDb)).toBe(0)
 
     await run(world, 10)
-    expect(stops, 'a fast leak went unnoticed under a distant cap').toHaveLength(1)
+    expect(stops, 'a runaway went unnoticed under a distant cap').toHaveLength(1)
     expect(stops[0]!.spent).toBeLessThan(5)
 
     const atStop = eventsOf(dir, 'agent_spoke').length
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
+  }, 40_000)
+
+  // ★ Run C died at $0.5656/sim-day against a $0.50 ceiling on 203 mind calls — 4.7 a mind a
+  // sim-hour, an ordinary town. The dollars had moved because the ROUTING had.
+  it('★ a failover to the dearest allowed back end costs more and stops nothing', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      spendAlertRealMinutes: 0,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    // Run C's own flow — 113 calls for two minds over one window — at run C's own dollars.
+    callsTo(opsDb, 'turn', 113)
+    billTo(opsDb, Date.now(), 0.28)
+
+    await run(world, 20)
+    expect(stops, 'an ordinary town was stopped for what its provider charged').toHaveLength(0)
   }, 40_000)
 
   // The lifetime cap cannot be the running budget: at the measured 5-mind rate a $5 total kills a
@@ -618,24 +644,18 @@ describe('★ the money, inside the served world', () => {
       rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
-    // The worst measured 15 minutes is the nightly reflection burst, $0.0154 for five minds; two
-    // minds' share is $0.0062, and this row bills DOUBLE it and still must not fire.
-    opsDb
-      .prepare(
-        `INSERT INTO llm_calls
-       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'reflection', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-      )
-      .run(Date.now(), 0.0124)
+    // Run C's measured 4.7 calls a mind a sim-hour, for two minds over a 12-sim-hour window,
+    // and a nightly reflection burst on top of it.
+    callsTo(opsDb, 'turn', 113)
+    callsTo(opsDb, 'reflection', 12)
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
   }, 40_000)
 
-  // ★ The second name on the allow-list is 7.3x the first, so a long outage runs the whole town
-  // on it. The wire has to clear that rate, or the failover it exists for stops the town.
-  it('★ a sustained failover to the dearest allowed provider runs, and does not stop the town', async () => {
+  // The tripwire is per MIND, so town work must not be billed to the cast: the narrator, the
+  // arbiter and the tier-2.5 pass cost the same however many minds are alive.
+  it("★ counts a mind's own calls and no others", async () => {
     const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
@@ -644,11 +664,40 @@ describe('★ the money, inside the served world', () => {
       rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
-    // AtlasCloud's measured $0.035/mind/sim-day, for two minds, billed over one 15-minute window.
-    billTo(opsDb, Date.now(), (0.035 * 2) / 4)
+    for (const caller of ['narrator', 'arbiter', 'semantic', 'forge', 'preflight', 'constructs']) {
+      callsTo(opsDb, caller, 300)
+    }
 
     await run(world, 20)
-    expect(stops, 'a sustained failover stopped the town instead of paying for it').toHaveLength(0)
+    expect(stops, 'town work was charged to the cast').toHaveLength(0)
+  }, 40_000)
+
+  // ★ `provider.order` load-balances, so half a window off the pin is normal. A window the pin
+  // is shut out of is not, and it is still only ever a line on the ops surface.
+  it('★ names a window the pinned provider lost, and never stops the town for it', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.01, 0, 1, NULL, 'Inceptron')`,
+      )
+      .run(Date.now())
+
+    await run(world, 20)
+    const mix = alertsOf(opsDb, 'llm_provider_mix_high')
+    expect(mix.length, 'the routing moved and nobody was told').toBeGreaterThan(0)
+    expect(mix[0]).toContain('Inceptron 100%')
+    expect(mix[0]).toContain('$0.0100')
+    expect(stops, 'a provider mix must never stop a town').toHaveLength(0)
   }, 40_000)
 })
 

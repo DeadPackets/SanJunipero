@@ -10,6 +10,10 @@ export type ScriptedResponse = {
     reasoningTokens?: number
   }
   fail?: boolean
+  /** The generation answered and billed, but carried no text — what a caller that spent its
+   *  whole output ceiling on reasoning looks like. */
+  emptyOutput?: boolean
+  generationId?: string
   servedModelId?: string
   provider?: string
   reportedCostUsd?: number
@@ -31,7 +35,9 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
       const cacheRead = u.cacheReadTokens ?? 0
       const reasoning = u.reasoningTokens ?? 0
       return Promise.resolve({
-        content: [{ type: 'text' as const, text: scripted.text ?? JSON.stringify(scripted.json) }],
+        content: scripted.emptyOutput
+          ? []
+          : [{ type: 'text' as const, text: scripted.text ?? JSON.stringify(scripted.json) }],
         finishReason: { unified: scripted.finishReason ?? ('stop' as const), raw: undefined },
         usage: {
           inputTokens: {
@@ -43,9 +49,16 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
           outputTokens: { total: outputTokens, text: outputTokens - reasoning, reasoning },
         },
         warnings: [],
-        ...(scripted.servedModelId === undefined
+        ...(scripted.servedModelId === undefined && scripted.generationId === undefined
           ? {}
-          : { response: { modelId: scripted.servedModelId } }),
+          : {
+              response: {
+                ...(scripted.servedModelId === undefined
+                  ? {}
+                  : { modelId: scripted.servedModelId }),
+                ...(scripted.generationId === undefined ? {} : { id: scripted.generationId }),
+              },
+            }),
         ...(scripted.provider === undefined && scripted.reportedCostUsd === undefined
           ? {}
           : {

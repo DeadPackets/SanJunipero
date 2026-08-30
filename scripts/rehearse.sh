@@ -12,7 +12,13 @@ SPEED=${SPEED:-1}
 DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 30}")
 export SJ_LIVE=1 SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$ SJ_ADMIN_PORT=8788
-rm -rf "$SJ_MINDS_DIR"; mkdir -p "$SJ_MINDS_DIR"
+# One rotation deep, before SJ_FRESH wipes anything: the run before this one is still readable,
+# the one before that is not.
+PREV=$ROOT/rehearsals-prev
+rm -rf "$PREV"; mkdir -p "$PREV"
+[ -d "$OUT" ] && mv "$OUT" "$PREV/rehearsals"
+for f in "$ROOT"/data/dev-world.db*; do [ -e "$f" ] && mv "$f" "$PREV/"; done
+mkdir -p "$SJ_MINDS_DIR"
 # `--env-file` so the key is never on a command line or in the shell's history.
 node --env-file="$ROOT/.env" --import tsx packages/town/src/serve.ts > "$OUT/stream.log" 2>&1 &
 PID=$!
