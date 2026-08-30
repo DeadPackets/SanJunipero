@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { simTimeFromTick, dayPhaseFromTick, MINUTES_PER_DAY } from './time.js'
+import {
+  simTimeFromTick,
+  dayPhaseFromTick,
+  nextDawnTick,
+  DAWN_HOUR,
+  MINUTES_PER_DAY,
+} from './time.js'
 
 describe('dayPhaseFromTick', () => {
   const at = (h: number, m = 0) => dayPhaseFromTick(h * 60 + m)
@@ -21,6 +27,19 @@ describe('dayPhaseFromTick', () => {
   it('leaves SimTime.isNight exactly as it was', () => {
     expect(simTimeFromTick(20 * 60).isNight).toBe(true)
     expect(dayPhaseFromTick(20 * 60)).toBe('dusk')
+  })
+})
+
+describe('nextDawnTick', () => {
+  const DAWN = DAWN_HOUR * 60
+  it('is the first dawn strictly after the tick, on any day', () => {
+    expect(nextDawnTick(0)).toBe(DAWN)
+    expect(nextDawnTick(DAWN - 1)).toBe(DAWN)
+    expect(nextDawnTick(DAWN)).toBe(MINUTES_PER_DAY + DAWN)
+    expect(nextDawnTick(22 * 60)).toBe(MINUTES_PER_DAY + DAWN)
+    expect(nextDawnTick(9 * MINUTES_PER_DAY + 12 * 60)).toBe(10 * MINUTES_PER_DAY + DAWN)
+    expect(dayPhaseFromTick(nextDawnTick(0) - 1)).toBe('night')
+    expect(dayPhaseFromTick(nextDawnTick(0))).toBe('dusk')
   })
 })
 

@@ -6,7 +6,7 @@
 // `activity` is set, so re-deciding each tick throws the decision away.
 // A journey is costed before it is begun (`walkEnergyCost`); a body that cannot afford to walk
 // anywhere lies down where it is.
-import { doorFrontTile, T_PATH, T_ROAD, type SimConfig } from '@sj/shared'
+import { doorFrontTile, nextDawnTick, T_PATH, T_ROAD, type SimConfig } from '@sj/shared'
 import {
   BRIDGE_KIND,
   awakeEnergyDecay,
@@ -405,7 +405,13 @@ function lampSites(state: WorldState, want: number): LampSite[] {
     const t = state.terrain[y]?.[x]
     return t === T_ROAD || t === T_PATH
   }
-  const seen = new Set<string>()
+  // A post keeps a tile clear of the next: a huddle of posts boxes the middle one in, and a
+  // lamp nobody can stand beside is a lamp nobody can feed.
+  const posts: { x: number; y: number }[] = Object.values(state.structures).filter(
+    (s) => s.kind === LAMP_KIND,
+  )
+  const touchesPost = (x: number, y: number): boolean =>
+    posts.some((p) => isAdjacentToRect(x, y, { x: p.x, y: p.y, w: 1, h: 1 }))
   const out: (LampSite & { d: number })[] = []
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
@@ -418,8 +424,7 @@ function lampSites(state: WorldState, want: number): LampSite[] {
         for (let dx = -r; dx <= r && found === null; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue // this ring only
           const p = { x: door.x + dx, y: door.y + dy }
-          if (isWay(p.x, p.y) || !isPassable(state, p.x, p.y)) continue
-          if (seen.has(`${p.x},${p.y}`)) continue
+          if (isWay(p.x, p.y) || touchesPost(p.x, p.y) || !isPassable(state, p.x, p.y)) continue
           // a body has to be able to stand beside it, and standing IN the street is fine —
           // the street is where feet belong; it is the POST that must keep off it.
           const stand = [
@@ -436,7 +441,7 @@ function lampSites(state: WorldState, want: number): LampSite[] {
       }
     }
     if (found === null) continue
-    seen.add(`${found.x},${found.y}`)
+    posts.push(found)
     out.push({ ...found, d: Math.abs(found.x - square.x) + Math.abs(found.y - square.y) })
   }
   return out
@@ -449,8 +454,8 @@ function lampSites(state: WorldState, want: number): LampSite[] {
  *  never land on the same pair of hands. */
 export const lamplighterOf = (cast: readonly FounderDef[]): string | null => cast.at(-1)?.id ?? null
 
-/** Raise the next lamp the town is short of, or go and feed the one that has burned down.
- *  `null` once every site is standing and lit — a lamplighter with nothing to do walks. */
+/** Raise the next lamp the town is short of, or go and feed one that will not last the coming
+ *  night. `null` once every site is standing and lit — a lamplighter with nothing to do walks. */
 function lamplighterIntent(
   state: WorldState,
   config: SimConfig,
@@ -459,7 +464,6 @@ function lamplighterIntent(
 ): Intent | null {
   const a = state.agents[agentId]
   if (a === undefined || a.insideId !== undefined) return null
-  const sites = lampSites(state, want)
   const standing = new Map(
     Object.values(state.structures)
       .filter((s) => s.kind === LAMP_KIND)
@@ -468,9 +472,10 @@ function lamplighterIntent(
 
   // Feeding walks the lamps that EXIST, never the sites: `lampSites` is recomputed each tick
   // against the buildings standing NOW, so a raised post falls off the site list as the town grows.
+  const dawn = nextDawnTick(state.tick)
   for (const s of [...standing.values()].sort((p, q) => p.id.localeCompare(q.id))) {
     if (s.stage !== 'complete') continue
-    if ((s.fueledUntilTick ?? -1) >= state.tick + config.light.fuelBurnTicks / 4) continue
+    if ((s.fueledUntilTick ?? -1) >= dawn) continue
     if (isAdjacentToRect(a.x, a.y, s)) return { verb: 'stoke', params: { structureId: s.id } }
     const stand = [
       [0, 1],
@@ -488,7 +493,7 @@ function lamplighterIntent(
   // The count is a ceiling, not a target: asking only "is this site free" would light a growing
   // town for ever, one post per new door.
   if (standing.size >= want) return null
-  for (const site of sites) {
+  for (const site of lampSites(state, want)) {
     if (standing.has(`${site.x},${site.y}`)) continue
     const box = { x: site.x, y: site.y, w: 1, h: 1 }
     if (isAdjacentToRect(a.x, a.y, box))
@@ -631,7 +636,9 @@ export function homeIntent(state: WorldState, config: SimConfig, agentId: string
   const cost = walkEnergyCost(state, config, agentId, door)
   if (cost === null) return a.needs.energy < GO_HOME_BELOW ? SLEEP : null
   if (a.needs.energy - cost >= GO_HOME_BELOW) return null // slack left in the day; carry on
-  return a.needs.energy - cost > config.needs.collapseThreshold
+  // The door costs two more awake ticks after the walk: enter, then sleep.
+  const atTheDoor = cost + workEnergyCost(state, config, agentId, 2)!
+  return a.needs.energy - atTheDoor > config.needs.collapseThreshold
     ? { verb: 'walk', params: { x: door.x, y: door.y } }
     : // The deadlock breaker: too late to walk anywhere. `submitIntent` refuses every verb but
       // eat and sleep to a body on the ground, so a WALK here would never get it up again.

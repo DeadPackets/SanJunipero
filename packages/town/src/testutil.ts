@@ -28,6 +28,8 @@ export function runFoundersWorld(
   rings = 3,
   onAfterTick?: (tick: number, state: WorldState) => void,
 ): Run {
+  // Held still on purpose: a storm hour rolls lightning on every roof, and a harness that counts
+  // what the masons raised cannot count through a town that burns.
   const config = STILL_WEATHER_CONFIG
   const terrain = devTerrain('showcase', rings)
   const structures = townStructuresFor('showcase', rings)

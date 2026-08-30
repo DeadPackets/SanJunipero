@@ -63,6 +63,7 @@ import {
   breath,
   createLightPools,
   poolCentre,
+  poolDiscAlpha,
   poolRadiusPx,
   poolStrengthAt,
 } from './lightPools.js'
@@ -165,6 +166,18 @@ describe('the breath (U3) — two incommensurate sines, phased by the id', () =>
     expect(GLOW_BASE_ALPHA + 2 * BREATH_AMP).toBeLessThanOrEqual(0.5)
     expect(BLOOM_ALPHA + BREATH_AMP).toBeLessThan(0.6)
     expect(FIRE_ALPHA + BREATH_AMP).toBeLessThan(0.75)
+  })
+})
+
+describe('two lamp heads side by side', () => {
+  it('★ never add past the authored colour: two blooms, breath on top, dead centre', () => {
+    // The disc falls off from its core, so two coincident heads at full breath are the worst
+    // case. Additive over the head: a sum of 1 is exactly POOL_COLOR; past it the channels clip.
+    const core = poolDiscAlpha(0)
+    expect(core).toBeGreaterThan(0.8)
+    expect(2 * (BLOOM_ALPHA + BREATH_AMP) * core).toBeLessThanOrEqual(1)
+    // not vacuous: the 0.5 this replaced clipped where two posts stood together
+    expect(2 * (0.5 + BREATH_AMP) * core).toBeGreaterThan(1)
   })
 })
 

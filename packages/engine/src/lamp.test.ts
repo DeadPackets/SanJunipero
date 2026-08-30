@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   dayPhaseFromTick,
+  nextDawnTick,
   glowRadiusFor,
   isDark,
   isHearthKind,
@@ -232,12 +233,11 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
     expect(lightBandAt(fed.state, 4, 4, fed.state.tick, CFG)).toBe('bright')
   })
 
-  it('goes out when its fuel does, and takes another armful', () => {
+  it('burns till dawn, goes out when its fuel does, and takes another armful', () => {
     const { state, id, tick } = lampLit()
     const until = state.structures[id]!.fueledUntilTick!
-    expect(until).toBe(tick + CFG.light.fuelBurnTicks)
-    // Read at a tick still inside the same night, so the CLOCK is not what changes the answer:
-    // one armful of wood is 480 ticks and a night is 720, so a lamp wants feeding twice.
+    expect(until).toBe(nextDawnTick(tick))
+    // Read at a tick still inside the same night, so the CLOCK is not what changes the answer.
     const late = tick + 120
     expect(dayPhaseFromTick(late)).toBe('night')
     expect(isDark(state, 5, 4, late, CFG)).toBe(false)

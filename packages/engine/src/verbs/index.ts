@@ -50,6 +50,7 @@ import {
   isRoofedKind,
   isWet,
   isWoody,
+  nextDawnTick,
   sanitizeSpokenText,
   simTimeFromTick,
   structureGlowRadius,
@@ -711,7 +712,11 @@ const stoke: VerbDef = makeVerb({
         type: 'structure_fueled',
         payload: {
           structureId: p.structureId,
-          burnsUntilTick: state.tick + config.light.fuelBurnTicks,
+          // A fire is fed by the armful; a standing light is lit for the night and put out at dawn.
+          burnsUntilTick:
+            isHeatSource(config, s.kind) || s.kind === CITY_HEARTH_KIND
+              ? state.tick + config.light.fuelBurnTicks
+              : nextDawnTick(state.tick),
         },
       },
     ]

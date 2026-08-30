@@ -5,6 +5,7 @@ import { dayPhaseFromTick, isDark, lightBandAt, T_PATH, T_ROAD } from '@sj/share
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, doorTile, isPassable, type WorldState } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
+import { runFoundersWorld } from './testutil.js'
 import {
   LAMP_VERGE_REACH,
   foundersFor,
@@ -120,6 +121,49 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
       .find((p) => burning.every((l) => Math.max(Math.abs(l.x - p.x), Math.abs(l.y - p.y)) > R))
     expect(far, 'every lamp overlaps another — pick a sparser town').toBeDefined()
     expect(isDark(lit, far!.x, far!.y, MIDNIGHT, CFG)).toBe(true)
+  })
+
+  it('★ keeps them lit EVERY night for the life of the town, not just the first', () => {
+    // Three days through the shipped harness (a ring-3 town, builders on, the lamplighter also
+    // sleeping and building). A post that has stood a stoke's walk is lit at every night tick.
+    const STOOD = 60
+    const completedAt = new Map<string, number>()
+    const dark: string[] = []
+    let checked = 0
+    const { state } = runFoundersWorld(
+      { interiors: true, builders: true, holdings: true, lamps: 8 },
+      4320,
+      3,
+      (tick, s) => {
+        const lamps = lampsIn(s)
+        for (const l of lamps) {
+          if (l.stage === 'complete' && !completedAt.has(l.id)) completedAt.set(l.id, tick)
+        }
+        if (dayPhaseFromTick(tick) !== 'night') return
+        for (const l of lamps) {
+          const since = completedAt.get(l.id)
+          if (since === undefined || tick - since < STOOD) continue
+          checked++
+          if ((l.fueledUntilTick ?? -1) < tick) dark.push(`${l.id} at ${l.x},${l.y} tick ${tick}`)
+        }
+      },
+    )
+    expect(lampsIn(state)).toHaveLength(8)
+    // eight posts through at least two full nights of 480 ticks
+    expect(checked, 'no post stood through a night').toBeGreaterThan(2 * 480 * 8)
+    expect(dark).toEqual([])
+  })
+
+  it('★ keeps one tile between posts, so every post has a side to be fed from', () => {
+    const posts = lampsIn(lit)
+    for (const [i, a] of posts.entries()) {
+      for (const b of posts.slice(i + 1)) {
+        expect(
+          Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)),
+          `posts ${a.id} and ${b.id} touch`,
+        ).toBeGreaterThan(1)
+      }
+    }
   })
 
   it('is OFF unless asked for: the same town with no lamplighter raises none', () => {

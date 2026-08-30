@@ -7,13 +7,21 @@ export type Season = (typeof SEASONS)[number]
 
 export type DayPhase = 'day' | 'dusk' | 'night'
 
+export const DAWN_HOUR = 5
+
 // The only phase derivation in the codebase. `SimTime.isNight` is the older two-way
 // clock and every landed caller keeps it — the two disagree at dusk on purpose.
 export function dayPhaseFromTick(tick: number): DayPhase {
   const hour = Math.floor((tick % MINUTES_PER_DAY) / 60)
-  if (hour >= 21 || hour < 5) return 'night'
+  if (hour >= 21 || hour < DAWN_HOUR) return 'night'
   if (hour === 5 || hour === 6 || hour === 19 || hour === 20) return 'dusk'
   return 'day'
+}
+
+/** The first dawn strictly after `tick`. */
+export function nextDawnTick(tick: number): number {
+  const dawn = Math.floor(tick / MINUTES_PER_DAY) * MINUTES_PER_DAY + DAWN_HOUR * 60
+  return tick < dawn ? dawn : dawn + MINUTES_PER_DAY
 }
 
 export type SimTime = {

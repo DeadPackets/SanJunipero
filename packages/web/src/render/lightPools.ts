@@ -35,7 +35,8 @@ export const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
  *  the ground back toward its day value and stops well short of white. */
 export const POOL_MAX_ALPHA = 0.44
 export const GLOW_BASE_ALPHA = 0.3
-export const BLOOM_ALPHA = 0.5
+/** Two heads at full breath must still sum under 1 of POOL_COLOR: 2 · (0.35 + BREATH_AMP) · core. */
+export const BLOOM_ALPHA = 0.35
 export const FIRE_ALPHA = 0.62
 /** world px: a lamp head's halo, and the halo of a lit window */
 export const BLOOM_R = 22
@@ -77,15 +78,27 @@ export function poolCentre(f: Flame): { sx: number; sy: number } {
 
 /** A soft radial disc, authored ONCE and stretched per light. Rings rather than a gradient fill
  *  because pixi's `Graphics` has no radial stop; white, so one texture serves every hue. */
+const POOL_RINGS = 24
+/** squared falloff: bright core, long tail — an inverse-square flame, not a spotlight */
+const poolRingAlpha = (t: number): number => ((1 - t) ** 2 / POOL_RINGS) * 6
+
+/** How opaque the baked disc is at `u` of its radius: the rings stack under normal blend. */
+export function poolDiscAlpha(u: number): number {
+  let clear = 1
+  for (let i = POOL_RINGS; i >= 1; i--) {
+    const t = i / POOL_RINGS
+    if (t >= u) clear *= 1 - poolRingAlpha(t)
+  }
+  return 1 - clear
+}
+
 function poolTexture(scene: Scene): Texture {
-  const RINGS = 24
   return bakeTexture(scene, (g) => {
-    for (let i = RINGS; i >= 1; i--) {
-      const t = i / RINGS
-      // squared falloff: bright core, long tail — an inverse-square flame, not a spotlight
+    for (let i = POOL_RINGS; i >= 1; i--) {
+      const t = i / POOL_RINGS
       g.circle(POOL_TEX_R, POOL_TEX_R, POOL_TEX_R * t).fill({
         color: 0xffffff,
-        alpha: ((1 - t) ** 2 / RINGS) * 6,
+        alpha: poolRingAlpha(t),
       })
     }
   })
