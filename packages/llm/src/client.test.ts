@@ -955,10 +955,17 @@ describe('★ one unified call discipline, the arbiter included', () => {
     const db = openDb()
     const bound = (caller: string): number =>
       (new LlmClient({ db, caller }) as unknown as { requestTimeoutMs: number }).requestTimeoutMs
-    for (const caller of ['turn', 'reflection', 'constructs', 'nobody-pinned-this']) {
+    for (const caller of ['turn', 'constructs', 'nobody-pinned-this']) {
       expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
     }
-    for (const caller of ['arbiter', 'reflection.edit', 'narrator', 'semantic', 'dream']) {
+    for (const caller of [
+      'arbiter',
+      'reflection',
+      'reflection.edit',
+      'narrator',
+      'semantic',
+      'dream',
+    ]) {
       const ceiling = callSettingsFor(caller).maxOutputTokens ?? 0
       expect(bound(caller), caller).toBeGreaterThanOrEqual((ceiling / 44) * 1000)
       expect(bound(caller), caller).toBeGreaterThan(MIN_REQUEST_TIMEOUT_MS)

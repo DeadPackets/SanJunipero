@@ -240,6 +240,32 @@ describe('runSleepReflection pipeline', () => {
     expect(personality.current().version).toBe(1)
   })
 
+  it('a "No change" proposal is skipped quietly: no version bump, no alert', async () => {
+    const { mem, personality } = await makeStores()
+    const memories = await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm({
+      op: 'add',
+      field: 'values',
+      text: 'No change',
+      evidence: [memories[0]!.id],
+    })
+    const alerts: string[] = []
+    const res = await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: DAY,
+      alert: (kind) => alerts.push(kind),
+    })
+
+    expect(res.editApplied).toBe(false)
+    expect(res.editSkipped).toBe(true)
+    expect(res.editRejectedReason).toBeUndefined()
+    expect(alerts).toEqual([])
+    expect(personality.current().version).toBe(1)
+    expect(personality.current().doc.values).not.toContain('No change')
+  })
+
   it('proposeEdit -> null -> no version bump', async () => {
     const { mem, personality } = await makeStores()
     await seedDay(mem, DAY, SINGLE_PERSON_DAY)

@@ -39,6 +39,14 @@ export const PersonalityEditSchema = z.discriminatedUnion('op', [
 
 export type PersonalityEdit = z.infer<typeof PersonalityEditSchema>
 
+// The model is meant to answer `no_proposal` instead, but when it spells the refusal out as a
+// trait this is the write boundary that must not store it. Observed phrasings only, no NLP.
+const NO_OP_EDIT_TEXT = /^(?:no changes?|nothing to change|none|n\/a|no edit)[\s.!?,;:]*$/i
+
+export type NightlyEditOutcome =
+  | { ok: true; version: number }
+  | { ok: false; reason: string; skipped?: true }
+
 export class PersonalityStore {
   constructor(
     readonly db: Database.Database,
@@ -90,14 +98,13 @@ export class PersonalityStore {
       .run(JSON.stringify(doc), this.agentId, row.version)
   }
 
-  applyNightlyEdit(
-    day: number,
-    rawEdit: unknown,
-    mem: MemoryStore,
-  ): { ok: true; version: number } | { ok: false; reason: string } {
+  applyNightlyEdit(day: number, rawEdit: unknown, mem: MemoryStore): NightlyEditOutcome {
     const parsed = PersonalityEditSchema.safeParse(rawEdit)
     if (!parsed.success) return { ok: false, reason: 'invalid_edit_shape' }
     const edit = parsed.data
+    if (edit.op !== 'remove' && NO_OP_EDIT_TEXT.test(edit.text.trim())) {
+      return { ok: false, reason: 'no_op_text', skipped: true }
+    }
 
     const applied = this.db
       .prepare(

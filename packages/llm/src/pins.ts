@@ -77,7 +77,8 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   turn: { reasoning: { enabled: false }, maxOutputTokens: 500 },
   // The five night calls lose nothing without thinking. The sixth, the personality edit, does,
   // and its p99 is 18x theirs — hence a caller of its own rather than one shared ceiling.
-  reflection: { reasoning: { enabled: false }, maxOutputTokens: 700 },
+  // 700 truncated the ledger writes; 1500 clears the longest of them.
+  reflection: { reasoning: { enabled: false }, maxOutputTokens: 1500 },
   'reflection.edit': { maxOutputTokens: 13000 },
   arbiter: { maxOutputTokens: 8000 },
   narrator: { maxOutputTokens: 22000 },

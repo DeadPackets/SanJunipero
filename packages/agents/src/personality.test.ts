@@ -242,4 +242,37 @@ describe('PersonalityStore versioning', () => {
     // no version bump on rejection
     expect(store.current().version).toBe(1)
   })
+
+  // Run D: the model answered "No change" and the store appended it to values as a trait.
+  it('no-op text is skipped, not applied and not rejected', async () => {
+    const { mem, store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    const e = await insertMemory(mem, 1500)
+    for (const text of ['No change', 'nothing to change.', 'NONE', 'n/a', 'no edit!']) {
+      expect(
+        store.applyNightlyEdit(1, { op: 'add', field: 'values', text, evidence: [e] }, mem),
+        text,
+      ).toEqual({ ok: false, reason: 'no_op_text', skipped: true })
+    }
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'revise', field: 'values', index: 0, text: 'no changes', evidence: [e] },
+        mem,
+      ),
+    ).toEqual({ ok: false, reason: 'no_op_text', skipped: true })
+
+    expect(store.current().version).toBe(1)
+    expect(store.current().doc.values).toEqual(BASE_DOC.values)
+
+    // a real trait on the same day still lands
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'add', field: 'values', text: 'no one eats alone', evidence: [e] },
+        mem,
+      ),
+    ).toEqual({ ok: true, version: 2 })
+    expect(store.current().doc.values).toEqual([...BASE_DOC.values, 'no one eats alone'])
+  })
 })

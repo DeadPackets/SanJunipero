@@ -20,9 +20,55 @@ export const ROLE_VERBS: Record<string, string> = {
 
 type Completed = { seq: number; agentId: string; verb: string }
 
-const IRREGULAR_PAST: Record<string, string> = { teach: 'taught', build: 'built' }
-const pastTense = (verb: string): string =>
-  IRREGULAR_PAST[verb] ?? (verb.endsWith('e') ? `${verb}d` : `${verb}ed`)
+// Both call sites read "has/have <verb>", so this is the past participle, not the simple past.
+const IRREGULAR_PARTICIPLE: Record<string, string> = {
+  bring: 'brought',
+  build: 'built',
+  catch: 'caught',
+  cut: 'cut',
+  dig: 'dug',
+  do: 'done',
+  draw: 'drawn',
+  drink: 'drunk',
+  eat: 'eaten',
+  fall: 'fallen',
+  find: 'found',
+  give: 'given',
+  go: 'gone',
+  hold: 'held',
+  leave: 'left',
+  light: 'lit',
+  make: 'made',
+  put: 'put',
+  read: 'read',
+  run: 'run',
+  say: 'said',
+  see: 'seen',
+  sing: 'sung',
+  sit: 'sat',
+  sleep: 'slept',
+  speak: 'spoken',
+  stand: 'stood',
+  swim: 'swum',
+  take: 'taken',
+  teach: 'taught',
+  think: 'thought',
+  wake: 'woken',
+  wear: 'worn',
+  weave: 'woven',
+  write: 'written',
+}
+
+// One vowel between consonants doubles the last one: chop -> chopped, but craft -> crafted.
+const DOUBLES_FINAL_CONSONANT = /^[^aeiou]*[aeiou][^aeiouwxy]$/
+
+export const pastParticiple = (verb: string): string => {
+  const irregular = IRREGULAR_PARTICIPLE[verb]
+  if (irregular !== undefined) return irregular
+  if (verb.endsWith('e')) return `${verb}d`
+  if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ed`
+  return `${verb}ed`
+}
 
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
 // dropped scene. The caller maps it to a store id and must never persist -1.
@@ -60,7 +106,7 @@ export function detectInstitutions(
     out.push({
       kind: 'role',
       name: `the ${label}`,
-      description: `${agentId} has ${pastTense(verb)} ${seqs.length} times`,
+      description: `${agentId} has ${pastParticiple(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [agentId],
       sourceEventIds: seqs,
@@ -127,7 +173,7 @@ export function detectInstitutions(
     out.push({
       kind: 'rule',
       name: `people ${verb}`,
-      description: `${agents.size} people have ${pastTense(verb)} ${seqs.length} times`,
+      description: `${agents.size} people have ${pastParticiple(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [...agents].sort(),
       sourceEventIds: seqs,

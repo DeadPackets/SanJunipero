@@ -95,7 +95,7 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
 it('★ reflection.edit is its own caller: reasoning on, its own ceiling', () => {
   expect(callSettingsFor('reflection.edit').reasoning).toBeUndefined()
   expect(callSettingsFor('reflection.edit').maxOutputTokens).toBe(13000)
-  expect(callSettingsFor('reflection').maxOutputTokens).toBe(700)
+  expect(callSettingsFor('reflection').maxOutputTokens).toBe(1500)
 })
 
 // 14,072 output tokens, 99.5% of it reasoning, to pick one label out of five. With reasoning off

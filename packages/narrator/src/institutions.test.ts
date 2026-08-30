@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
 import type { SceneSegment } from './types.js'
-import { DEFAULT_DETECT_CONFIG, detectInstitutions } from './institutions.js'
+import { DEFAULT_DETECT_CONFIG, detectInstitutions, pastParticiple } from './institutions.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
@@ -125,5 +125,40 @@ describe('detectInstitutions', () => {
     const got = store.institutions()
     expect(got).toHaveLength(out.length)
     expect(got).toEqual(mapped.map((i, n) => ({ ...i, id: ids[n] })))
+  })
+})
+
+// Run D named 9 of 10 institutions with strings like "5 people have taked 21 times".
+describe('past participles in institution descriptions', () => {
+  it('the four verbs run D broke read as English', () => {
+    expect(pastParticiple('take')).toBe('taken')
+    expect(pastParticiple('eat')).toBe('eaten')
+    expect(pastParticiple('sleep')).toBe('slept')
+    expect(pastParticiple('wake')).toBe('woken')
+  })
+
+  // Every other irregular the engine can emit as an `action_completed` verb.
+  it('covers the engine verbs that are not regular', () => {
+    expect(pastParticiple('speak')).toBe('spoken')
+    expect(pastParticiple('build')).toBe('built')
+    expect(pastParticiple('teach')).toBe('taught')
+    expect(pastParticiple('give')).toBe('given')
+    expect(pastParticiple('read')).toBe('read')
+    expect(pastParticiple('wear')).toBe('worn')
+    expect(pastParticiple('write')).toBe('written')
+    expect(pastParticiple('drink')).toBe('drunk')
+  })
+
+  it('regular verbs still inflect, e-drop and doubling included', () => {
+    expect(pastParticiple('fish')).toBe('fished')
+    expect(pastParticiple('forage')).toBe('foraged')
+    expect(pastParticiple('chop')).toBe('chopped')
+    expect(pastParticiple('craft')).toBe('crafted')
+    expect(pastParticiple('harvest')).toBe('harvested')
+  })
+
+  it('the rule description uses the participle', () => {
+    const rule = detectInstitutions(scenes, events).find((i) => i.kind === 'rule')
+    expect(rule!.description).toBe('2 people have fished 5 times')
   })
 })

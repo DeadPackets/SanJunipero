@@ -23,6 +23,8 @@ export type ReflectionResult = {
   ledgersUpdated: string[]
   editApplied: boolean
   editRejectedReason?: string
+  /** The mind declined to change tonight — whether it answered `no_proposal` or proposed a no-op. */
+  editSkipped?: true
   fallback: boolean
 }
 
@@ -157,18 +159,19 @@ export async function runSleepReflection(deps: {
       sceneCount: scenes.length,
       ledgersUpdated,
       editApplied: false,
+      editSkipped: true,
       fallback: false,
     }
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
-    deps.alert?.('personality_edit_rejected', result.reason)
+    if (!result.skipped) alert?.('personality_edit_rejected', result.reason)
     return {
       factCount,
       sceneCount: scenes.length,
       ledgersUpdated,
       editApplied: false,
-      editRejectedReason: result.reason,
+      ...(result.skipped ? { editSkipped: true } : { editRejectedReason: result.reason }),
       fallback: false,
     }
   }
@@ -291,7 +294,7 @@ export function proposeEditPrompt(
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',
-      'Most days hold nothing like that. When yours does not, propose nothing and be done.',
+      'Most days hold nothing like that. When yours does not, propose nothing and be done: an edit whose text says there is no change is not an answer.',
       'When you do propose, `evidence` is the memory numbers from today that show why.',
       'Never change your temperament: it is yours from birth.',
     ].join('\n'),
