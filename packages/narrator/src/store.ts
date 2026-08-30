@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { insertAlert } from '@sj/llm'
 import type { SemanticCandidateRow, SemanticFirstRow } from './semanticFirsts.js'
 import type {
   ChapterRow,
@@ -15,6 +16,11 @@ const parseArr = <T>(s: string): T[] => JSON.parse(s) as T[]
 
 export class NarratorStore {
   constructor(private db: Database.Database) {}
+
+  /** The observatory's own alert row. `openNarratorDb` migrates the llm tables, so it is here. */
+  insertAlert(kind: string, detail: string): void {
+    insertAlert(this.db, { agentId: null, kind, detail })
+  }
 
   insertScenes(scenes: SceneSegment[]): number[] {
     const stmt = this.db.prepare(

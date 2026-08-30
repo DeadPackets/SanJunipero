@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
-import { applyFootnotes } from './chronicle.js'
+import { applyFootnotes, publishClean } from './chronicle.js'
 import type { NarratorStore } from './store.js'
 import type {
   ChapterRow,
@@ -173,7 +173,7 @@ export async function writeBiography(deps: {
         `dangling_citation: biography of ${deps.agentId} cited unknown ledger numbers ${seen.dangling.join(', ')}`,
       )
     title = bio.title
-    body = seen.text
+    body = publishClean(deps, `biography of ${deps.agentId}`, seen.text)
   }
   const id = deps.store.insertPublication({
     day: deps.throughDay,

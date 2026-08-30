@@ -82,6 +82,43 @@ export function proseIdLeaks(text: string): string[] {
   return [...stripFootnotes(text).matchAll(PROSE_ID_LEAK)].map((m) => m[0])
 }
 
+// One sentence at a time, and never across a line break — a list of milestone labels carries no
+// full stop, and one bad line there must not take the whole block with it. Newlines are matched
+// by nothing, so they stay exactly where they were when a sentence between them is dropped.
+const SENTENCE = /[^.!?\n]+[.!?]*/gu
+
+/** The same prose with every sentence that still carries a number taken out whole. */
+export function withoutProseIds(text: string): { text: string; dropped: string[] } {
+  const dropped: string[] = []
+  const kept = text.replace(SENTENCE, (s) => {
+    if (proseIdLeaks(s).length === 0) return s
+    dropped.push(s.trim())
+    return ''
+  })
+  if (dropped.length === 0) return { text, dropped }
+  return { text: kept.replace(/\n{3,}/gu, '\n\n').trim(), dropped }
+}
+
+/**
+ * The guard at the point of publication (commit `0cadae64`): FOOTNOTE_RULE is a prompt line and
+ * a prompt line is not enforcement. A leaking sentence is dropped rather than re-rendered —
+ * a second call for a paragraph the voice already got wrong buys a coin-flip for real money.
+ */
+export function publishClean(
+  deps: { store: NarratorStore; alert?: ((d: string) => void) | undefined },
+  where: string,
+  text: string,
+): string {
+  const { text: clean, dropped } = withoutProseIds(text)
+  if (dropped.length === 0) return text
+  const detail = `${where}: ${dropped.length} sentence(s) dropped for a number in the prose — ${dropped
+    .slice(0, 3)
+    .join(' | ')}`
+  deps.store.insertAlert('prose_id_leak', detail)
+  deps.alert?.(`prose_id_leak: ${detail}`)
+  return clean
+}
+
 export const FOOTNOTE_RULE =
   'Never put a number inside a sentence: no brackets, no tick counts, no event numbers, no parenthesised runs. ' +
   `End every paragraph with a trailing line of its own, spelled exactly "${FOOTNOTE_PREFIX}" and then that ` +
@@ -147,7 +184,7 @@ export async function renderChapter(deps: {
   let citations = seen.citations
   if (citations.length === 0)
     citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
-  const text = seen.text
+  const text = publishClean(deps, `chapter for day ${day}`, seen.text)
   const id = store.insertChapter({ day, title: summary.title, text, citations, sceneIds })
   return { id, day, title: summary.title, text, citations, sceneIds }
 }
@@ -186,7 +223,7 @@ export async function renderEra(deps: {
     )
   let citations = seen.citations
   if (citations.length === 0) citations = chapters[0]!.citations.slice(0, 1)
-  const text = seen.text
+  const text = publishClean(deps, `era days ${startDay}-${endDay}`, seen.text)
   const id = store.insertEra({
     startDay,
     endDay,
