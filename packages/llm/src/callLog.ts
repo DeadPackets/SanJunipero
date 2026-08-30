@@ -19,6 +19,9 @@ export type LlmCallInsert = {
   // What the provider said it charged, when it said.
   reportedCostUsd: number | null
   latencyMs: number
+  // Why the provider stopped. `length` means the answer hit `maxOutputTokens` rather than
+  // ending, which is otherwise indistinguishable from a bad answer.
+  finishReason: string | null
   ok: boolean
   error: string | null
 }
@@ -41,7 +44,8 @@ export function migrateLlmTables(db: Database.Database): void {
       latency_ms INTEGER NOT NULL,
       ok INTEGER NOT NULL,
       error TEXT,
-      provider TEXT
+      provider TEXT,
+      finish_reason TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_provider ON llm_calls(provider);
@@ -70,6 +74,9 @@ export function migrateLlmTables(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === 'estimated_cost_usd')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN estimated_cost_usd REAL')
+  }
+  if (!cols.some((c) => c.name === 'finish_reason')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN finish_reason TEXT')
   }
 }
 
@@ -117,8 +124,8 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
-        error, provider)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        error, provider, finish_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     Date.now(),
     call.agentId,
@@ -135,6 +142,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     call.ok ? 1 : 0,
     call.error,
     call.provider,
+    call.finishReason,
   )
 }
 

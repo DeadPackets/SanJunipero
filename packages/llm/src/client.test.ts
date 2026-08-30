@@ -793,12 +793,12 @@ describe('default OpenRouter path extraBody', () => {
     }
   })
 
-  // Ruling 22 (2026-08-30): two names on the allow-list, so a Baidu rate limit does not idle
+  // Ruling 23 (2026-08-30): two names on the allow-list, so a Baidu rate limit does not idle
   // the minds. Order is the preference; `allow_fallbacks:false` is still what makes it a list.
   it('★ the request body carries both allowed providers, in order', () => {
-    expect(PROVIDER_ORDER).toEqual(['Baidu', 'Wafer'])
+    expect(PROVIDER_ORDER).toEqual(['Baidu', 'AtlasCloud'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Baidu', 'Wafer'],
+      order: ['Baidu', 'AtlasCloud'],
       allow_fallbacks: false,
     })
   })
@@ -826,15 +826,15 @@ describe('default OpenRouter path extraBody', () => {
     expect(defaultExtraBody()).not.toHaveProperty('reasoning')
   })
 
-  // One call inside a pass can need the dial the other five do not — the night's personality
-  // edit is the only one E2 found anything lost on.
-  it('withReasoning moves the reasoning dial and leaves the routing alone', () => {
+  // One call inside a pass can need the dials the other five do not — the night's personality
+  // edit is the only one E2 found anything lost on, and it now asks for them by name.
+  it("★ forCaller takes the new name's pinned settings and leaves the routing alone", () => {
     const db = openDb()
-    const off = new LlmClient({ db, caller: 'reflection' })
-    expect(off.requestBody().reasoning).toEqual({ enabled: false })
-    expect(off.withReasoning(null).requestBody()).not.toHaveProperty('reasoning')
-    expect(off.withReasoning({ effort: 'low' }).requestBody().reasoning).toEqual({ effort: 'low' })
-    expect(off.withReasoning(null).requestBody().provider).toEqual(off.requestBody().provider)
+    const night = new LlmClient({ db, caller: 'reflection' })
+    const edit = night.forCaller('reflection.edit')
+    expect(night.requestBody().reasoning).toEqual({ enabled: false })
+    expect(edit.requestBody()).not.toHaveProperty('reasoning')
+    expect(edit.requestBody().provider).toEqual(night.requestBody().provider)
   })
 })
 
@@ -873,6 +873,59 @@ describe('the back end that answered is written down (C11 R20)', () => {
       { provider: null, ok: 0 },
       { provider: null, ok: 1 },
     ])
+  })
+})
+
+// ★ Ruling 23: without this column a ceiling that truncates is indistinguishable from a bad
+// answer, and every cap in `pins.ts` would be unable to tell you it is wrong.
+describe('★ why the provider stopped is on every ledger row', () => {
+  const alertsOf = (db: Database.Database, kind: string): string[] =>
+    (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(
+      (a) => a.detail,
+    )
+
+  it('writes finish_reason for an answer that ended, and raises nothing', async () => {
+    const db = openDb()
+    const model = mockModel([{ json: { mood: 'calm', count: 1 } }])
+    await new LlmClient({ model, db, caller: 'turn' }).object({
+      system: 's',
+      messages: [{ role: 'user', content: 'u' }],
+      schema: SCHEMA,
+    })
+    expect(db.prepare('SELECT finish_reason FROM llm_calls').get()).toEqual({
+      finish_reason: 'stop',
+    })
+    expect(alertsOf(db, 'llm_output_truncated')).toEqual([])
+  })
+
+  it('writes `length` and raises llm_output_truncated when the ceiling cut the answer off', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'half a sen', finishReason: 'length' }])
+    await new LlmClient({ model, db, caller: 'turn' }).text({
+      messages: [{ role: 'user', content: 'u' }],
+    })
+    expect(db.prepare('SELECT finish_reason FROM llm_calls').get()).toEqual({
+      finish_reason: 'length',
+    })
+    // The caller and its ceiling, so the row says which number in `pins.ts` to move.
+    expect(alertsOf(db, 'llm_output_truncated')).toEqual([
+      'turn: the answer stopped at the 500 output token ceiling — raise it or the answer is a fragment',
+    ])
+  })
+
+  it('a call that never came back records no reason rather than a wrong one', async () => {
+    const db = openDb()
+    const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
+    await expect(
+      new LlmClient({ model, db, caller: 'turn' }).text({
+        messages: [{ role: 'user', content: 'u' }],
+      }),
+    ).rejects.toThrow()
+    expect(
+      (db.prepare('SELECT finish_reason AS r FROM llm_calls').all() as { r: string | null }[]).map(
+        (x) => x.r,
+      ),
+    ).toEqual([null, null, null])
   })
 })
 

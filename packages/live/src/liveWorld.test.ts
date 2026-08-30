@@ -125,7 +125,7 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     alert: (kind: string, detail: string) => {
       insertAlert(db, { agentId, kind, detail })
     },
-    withReasoning() {
+    forCaller() {
       return this
     },
   } as unknown as LlmClient
@@ -441,7 +441,7 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // TWO minds, so the ceiling is 2 x $0.70 = $1.40/sim-day. $0.60 inside a 15-minute window
+    // TWO minds, so the ceiling is 2 x $0.05 = $0.10/sim-day. $0.60 inside a 15-minute window
     // projects to $2.40/sim-day — over the flow ceiling and well under the $5 cap this row sets.
     opsDb
       .prepare(
@@ -470,8 +470,6 @@ describe('★ the money, inside the served world', () => {
     const { world, opsDb } = await liveWorld({
       dir,
       spendCapUsd: 50,
-      // Under the rate tripwire's own ceiling (2 minds x $0.70/sim-day = $0.35 in 15 real
-      // minutes), so only the daily budget can be what stops this row.
       spendDailyUsd: 0.05,
       rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
@@ -484,7 +482,9 @@ describe('★ the money, inside the served world', () => {
     await run(world, 10)
     expect(stops, 'a call a day old was billed to today').toHaveLength(0)
 
-    billTo(opsDb, Date.now(), 0.06)
+    // An hour ago: inside the rolling day, outside the 15-minute rate window, so the daily
+    // budget is the only line this row can cross.
+    billTo(opsDb, Date.now() - 60 * 60 * 1000, 0.06)
     await run(world, 10)
     expect(stops).toHaveLength(1)
     expect(ledgerTotalUsd(opsDb), 'and the lifetime total was never the trigger').toBeLessThan(50)
@@ -635,6 +635,25 @@ describe('★ the money, inside the served world', () => {
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
+  }, 40_000)
+
+  // ★ Ruling 23: the second name on the allow-list is 7.3x the first, so a long Baidu outage
+  // runs the whole town on AtlasCloud. Under the old $0.04 that sat at 88% of the wire and any
+  // ordinary night on top of it tripped; $0.05 leaves 43%.
+  it('★ a sustained failover to the dearest allowed provider runs, and does not stop the town', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    // AtlasCloud's measured $0.035/mind/sim-day, for two minds, billed over one 15-minute window.
+    billTo(opsDb, Date.now(), (0.035 * 2) / 4)
+
+    await run(world, 20)
+    expect(stops, 'a sustained failover stopped the town instead of paying for it').toHaveLength(0)
   }, 40_000)
 })
 

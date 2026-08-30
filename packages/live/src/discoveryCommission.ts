@@ -62,6 +62,7 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       estimatedCostUsd: costUsd,
       reportedCostUsd: null,
       latencyMs: 0,
+      finishReason: null,
       ok: true,
       error: null,
     })

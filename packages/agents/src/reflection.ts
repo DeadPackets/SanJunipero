@@ -338,8 +338,9 @@ export const ProposeEditSchema = z.discriminatedUnion('verdict', [
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   // E2: with the night's thinking off, facts and scenes came back identical and only the
-  // personality edit thinned out — so this one call keeps it and the other five do not.
-  const editClient = client.withReasoning(null)
+  // personality edit thinned out. Its own caller name so the registry holds its reasoning and
+  // its 13,000 ceiling, and the ledger prices the night's one expensive call on its own line.
+  const editClient = client.forCaller('reflection.edit')
   return {
     async extractFacts(dayMemories) {
       const p = extractFactsPrompt(dayMemories)

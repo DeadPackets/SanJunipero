@@ -2,6 +2,7 @@ import {
   generateText,
   NoObjectGeneratedError,
   Output,
+  type FinishReason,
   type LanguageModel,
   type LanguageModelUsage,
   type ModelMessage,
@@ -47,6 +48,7 @@ type ExecResult<T> = {
   provider?: string | null
   // What OpenRouter says it actually charged, when it says so at all.
   reportedCostUsd?: number | null
+  finishReason?: FinishReason | undefined
 }
 
 export class BudgetExceededError extends Error {}
@@ -238,6 +240,7 @@ export class LlmClient {
           servedModel: r.finalStep.response.modelId,
           provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
           reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
+          finishReason: r.finishReason,
         }
       } catch (err) {
         // Re-frames the provider's own bytes against this caller's schema; never re-asks,
@@ -251,6 +254,7 @@ export class LlmClient {
           value: repaired.value,
           servedModel: err.response?.modelId,
           provider: servedProvider(err.response, undefined),
+          finishReason: err.finishReason,
         }
       }
     })
@@ -277,15 +281,16 @@ export class LlmClient {
         servedModel: r.finalStep.response.modelId,
         provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
         reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
+        finishReason: r.finishReason,
       }
     })
     return { text: value, usage }
   }
 
-  /** The same caller, ledger and budget with one dial moved, for the odd call inside a pass that
-   *  needs a different one. `null` sends no reasoning field, which is the endpoint's maximum. */
-  withReasoning(reasoning: ReasoningSetting | null): LlmClient {
-    return new LlmClient({ ...this.opts, reasoning })
+  /** The same ledger, budget and routing under another caller name, for the odd call inside a
+   *  pass whose settings and cost belong on their own row. */
+  forCaller(caller: string): LlmClient {
+    return new LlmClient({ ...this.opts, caller })
   }
 
   totalCostUsd(): number {
@@ -294,6 +299,17 @@ export class LlmClient {
 
   alert(kind: string, detail: string): void {
     insertAlert(this.db, { agentId: this.agentId, kind, detail })
+  }
+
+  // `length` is the ceiling cutting an answer off mid-word. Without this row it reaches the
+  // operator as an ordinary decode failure and the caller's cap looks correct.
+  private warnIfTruncated(finishReason: FinishReason | null | undefined): void {
+    if (finishReason !== 'length') return
+    this.alert(
+      'llm_output_truncated',
+      `${this.caller}: the answer stopped at the ${this.maxOutputTokens ?? 'endpoint'} output ` +
+        'token ceiling — raise it or the answer is a fragment',
+    )
   }
 
   // The one door every provider-bound prompt passes through, whichever of the six callers
@@ -378,6 +394,7 @@ export class LlmClient {
           servedModel,
           provider,
           reportedCostUsd: reported,
+          finishReason,
         } = await exec(model)
         const served = servedModel ?? modelName
         const tokens = tokensOf(raw)
@@ -400,9 +417,11 @@ export class LlmClient {
             estimatedCostUsd: computed.costUsd,
             reportedCostUsd: reported ?? null,
             latencyMs: performance.now() - start,
+            finishReason: finishReason ?? null,
             error: null,
           }),
         )
+        this.warnIfTruncated(finishReason)
         return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
@@ -414,6 +433,7 @@ export class LlmClient {
         // A failure that carries no answer carries no back end to name it by. The
         // per-provider empty-call rate is therefore a rate over the calls that landed.
         const provider = dead === null ? null : servedProvider(dead.response, undefined)
+        const finishReason = dead?.finishReason ?? null
         const tokens = tokensOf(dead?.usage)
         const { inputTokens, outputTokens, cacheReadTokens } = tokens
         const deadCost = computeCostUsd(
@@ -433,9 +453,11 @@ export class LlmClient {
             estimatedCostUsd: deadCost,
             reportedCostUsd: null,
             latencyMs: performance.now() - start,
+            finishReason,
             error: err instanceof Error ? err.message : String(err),
           }),
         )
+        this.warnIfTruncated(finishReason)
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err

@@ -4,8 +4,9 @@ import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
-import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
-import { FakeEmbedder } from '@sj/llm/testutil'
+import Sqlite from 'better-sqlite3'
+import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } from '@sj/llm'
+import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
@@ -511,7 +512,7 @@ describe('makeReflectionLlm prompts', () => {
           usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 },
         }
       },
-      withReasoning() {
+      forCaller() {
         return this
       },
     } as unknown as LlmClient
@@ -633,5 +634,31 @@ describe('makeReflectionLlm prompts', () => {
         edit: { op: 'add', field: 'temperament', text: 'fierce', evidence: [1] },
       }).success,
     ).toBe(false)
+  })
+})
+
+// ★ Ruling 23 / apply-report finding 4: `proposeEdit` shared reflection's 16,000-token ceiling
+// and its ledger line, so nobody could price the night's one reasoning-on call. It is its own
+// caller now — a dimension `/admin/cost` groups by, and `pins.ts` keys its settings off.
+describe('★ the night bills its personality edit under its own name', () => {
+  it('writes reflection.edit rows the by-caller ledger can price on their own', async () => {
+    const db = new Sqlite(':memory:')
+    migrateLlmTables(db)
+    const model = mockModel([{ json: { facts: [] } }, { json: { verdict: 'no_proposal' } }])
+    const llm = makeReflectionLlm(
+      new LlmClient({ model, db, caller: 'reflection', agentId: AGENT }),
+    )
+    await llm.extractFacts([])
+    await llm.proposeEdit('The day was full of deals.', baseDoc(), [])
+
+    expect(
+      db
+        .prepare('SELECT caller, COUNT(*) AS calls FROM llm_calls GROUP BY caller ORDER BY caller')
+        .all(),
+    ).toEqual([
+      { caller: 'reflection', calls: 1 },
+      { caller: 'reflection.edit', calls: 1 },
+    ])
+    db.close()
   })
 })

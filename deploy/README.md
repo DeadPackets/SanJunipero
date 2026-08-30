@@ -187,16 +187,22 @@ docker compose down -v                          # or: end the town and its volum
 
 **One sim-day is one real hour**, so "$/sim-day" and "$/hour" are the same number.
 
-**Expected, to be measured in rehearsal 4**: five minds, **$0.03-0.04 per sim-day**. That is
-rehearsal 3's measured $0.47-0.71 recosted on the Baidu pin, with the turn's reasoning off and
-the day log deduped — a 94% cut, each part of it measured, the stack of them not yet.
+**Expected, to be measured in rehearsal 4**: five minds on the Baidu pin, **$0.019 per
+sim-day** — rehearsal 3's measured $0.47-0.71 recosted call by call with the turn's reasoning
+off, the day log deduped and ruling 23's ceilings, each part of it measured, the stack of them
+not yet.
+
+**If Baidu is out, the town runs on AtlasCloud** — the second name on the allow-list, 7.3x the
+rate. A sustained failover is **$0.035/mind/sim-day, $0.175 for five minds**, which is 9.2x the
+Baidu line and still under the rate tripwire. Nothing else changes; the minds do not stop.
 
 | | per hour | per day | per 30-day month |
 |---|---|---|---|
 | **Scripted** (default) | **$0.00** | **$0.00** | **$0.00** |
-| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.03-0.04** | **$0.65-0.96** | **$19-29** |
+| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.019** | **$0.45** | **$14** |
+| Live, sustained failover to AtlasCloud | $0.175 | $4.20 | $126 |
 
-Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$40-50/mo,
+Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$35-40/mo,
 forever, until you stop it.** A live town is not something to leave running.
 
 **These ARE the numbers the code prints.** `pins.ts` books the rate this account is actually
@@ -209,19 +215,20 @@ Each is calibrated against the price the ledger books, so each fires at its nomi
 
 | Guard | Set at | Reached, at the expected 5-mind rate | What it does |
 |---|---|---|---|
-| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.72-0.96 | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | $50 total | ~1,250-1,700 real hours, so 52-70 days | Kills the process. The town on disk is intact. |
-| Rate tripwire | $0.04/mind/sim-day over 15 min | $0.20/h for five minds — 5x the expected rate | Stops every mind. The town keeps serving. |
-| Operator alert | $0.40/sim-day over 15 min | 10x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
+| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.45 | Kills the process; a restart refuses until the window rolls. |
+| Anomaly stop | $50 total | ~2,600 real hours, so 110 days | Kills the process. The town on disk is intact. |
+| Rate tripwire | $0.05/mind/sim-day over 15 min | $0.25/h for five minds — 13x the expected rate, 43% over a sustained AtlasCloud failover | Stops every mind. The town keeps serving. |
+| Operator alert | $0.40/sim-day over 15 min | 21x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
 
 **Only the tripwire still bites.** The two dollar guards were set against a bill 20x this one and
 were not re-derived with it, so at the expected rate the rate tripwire is the guard that fires
 first and the other two are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you want the daily
 budget back as a working limit.
 
-**The operator alert sits above the tripwire, not before it.** Ruling 22 set it at 10x the expected
-rate and the tripwire at 5x, so for mind traffic the tripwire stops the cast first; the alert is what
-speaks for the spend the tripwire excludes by design (art, the narrator, the arbiter).
+**The operator alert sits above the tripwire, not before it.** The alert is $0.40/sim-day for the
+whole town and the tripwire is $0.25/h for five minds, so for mind traffic the tripwire stops the
+cast first; the alert is what speaks for the spend the tripwire excludes by design (art, the
+narrator, the arbiter).
 
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;

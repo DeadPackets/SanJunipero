@@ -1,9 +1,9 @@
 // Observed by scripts/probe.ts live run 2026-08-15 — not invented. Re-run the probe before changing.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
-// unpriced route. Wafer is the second name so a Baidu rate limit idles nobody — but it is 6.2x
-// Baidu's rate, so a sustained failover is expected to trip the live rate ceiling.
-export const PROVIDER_ORDER: string[] = ['Baidu', 'Wafer']
+// unpriced route. AtlasCloud is the second name so a Baidu rate limit idles nobody — measured
+// 34/36 valid acts and no rate limit in 72 calls, at 7.3x Baidu's rate.
+export const PROVIDER_ORDER: string[] = ['Baidu', 'AtlasCloud']
 // Owner ruling 2026-08-30: the fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
@@ -13,6 +13,9 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // depends on WHO served the call, so the table is keyed by that and not by the model alone.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
+  // AtlasCloud read 2026-08-30 from the same probe that ranked it second on the allow-list
+  // (`llm-audit/raw/providers-2026-08-30/analysis.txt`).
+  AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
   // Baidu re-read 2026-08-30 (`llm-audit/raw/endpoints-2026-08-30.json`) and reconciled against
   // the bill in `raw/e5.json`: these are its 67.9%-discounted rates, not its list rates.
   Baidu: { input: 0.04494, output: 0.08988, cacheRead: 0.008988 },
@@ -66,24 +69,27 @@ export type ReasoningSetting =
 // absent field leaves that dial exactly where it sat before the dial existed.
 export type CallSettings = { reasoning?: ReasoningSetting; maxOutputTokens?: number }
 
-// A ceiling is 2x that caller's rehearsal-3 p99 measured as it will NOW run: the answer alone
+// A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone
 // where reasoning is off below, the whole output where it stays on. Truncation is a hard failure.
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // 94% of a turn's output was thinking that bought nothing: E6's 12 matched pairs held parse at
-  // 100% and moved grounding from 75% to 92% with it off. The answer's own p99 is 266 tokens.
-  turn: { reasoning: { enabled: false }, maxOutputTokens: 800 },
-  // Off for the five night calls that E2 showed lose nothing; `proposeEdit` overrides it back on,
-  // and its 7,846-token p99 is what this ceiling has to clear.
-  reflection: { reasoning: { enabled: false }, maxOutputTokens: 16000 },
+  // 100% and moved grounding from 75% to 92% with it off. The answer's own p99 is 243 tokens.
+  turn: { reasoning: { enabled: false }, maxOutputTokens: 500 },
+  // Off for the five night calls that E2 showed lose nothing. `reflection.edit` is the sixth,
+  // split out because it keeps its reasoning and its p99 is 18x the other five's.
+  reflection: { reasoning: { enabled: false }, maxOutputTokens: 700 },
+  'reflection.edit': { maxOutputTokens: 13000 },
   arbiter: { maxOutputTokens: 8000 },
-  narrator: { maxOutputTokens: 24000 },
-  preflight: { maxOutputTokens: 4000 },
-  dream: { maxOutputTokens: 4000 },
+  narrator: { maxOutputTokens: 22000 },
+  preflight: { maxOutputTokens: 2500 },
+  dream: { maxOutputTokens: 2500 },
   // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
   // spent 31,179 reasoning tokens over 96 s and still answered nothing.
   semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
-  // `constructs` is deliberately absent: it never ran in rehearsal 3, and a guessed ceiling
-  // truncates. Rehearsal 4 measures its p99 and gives it a row.
+  // Picking one label out of five spent 14,072 tokens, 99.5% of it reasoning; with reasoning off
+  // it answered in 20 tokens every time and recognized the same construct. 500 because the schema
+  // returns one ruling per candidate and a busy town has more than one.
+  constructs: { reasoning: { enabled: false }, maxOutputTokens: 500 },
 }
 
 const NO_SETTINGS: CallSettings = {}

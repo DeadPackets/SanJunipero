@@ -12,7 +12,8 @@ import {
 
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
-  expect(PROVIDER_ORDER.length).toBeGreaterThan(0)
+  // Ruling 23: Baidu first, AtlasCloud second — 34/36 valid acts and no rate limit in 72 calls.
+  expect(PROVIDER_ORDER).toEqual(['Baidu', 'AtlasCloud'])
   // Design §1: never a floating alias. Every model this run may be served by names the dated
   // snapshot it was probed at, so nothing can swap under the town.
   for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
@@ -76,21 +77,45 @@ it('the turn and the night are pinned off the thinking preamble', () => {
 })
 
 // An uncapped call once spent 31,544 output tokens on one dead answer. Each ceiling clears 2x
-// that caller's p99 in rehearsal 3, so it stops a runaway and never truncates an honest answer.
-it('every caller that ran in rehearsal 3 has an output ceiling above its measured p99', () => {
-  // The three callers at zero ran two or three times all run, so their p99 is only their max.
+// that caller's measured p99, so it stops a runaway and never truncates an honest answer. Ruling
+// 23's numbers, from `llm-audit/providers.md`: the answer alone where reasoning is off.
+it('every measured caller has an output ceiling above 2x its p99', () => {
   const p99 = {
-    turn: 266,
-    reflection: 7846,
-    arbiter: 3942,
-    narrator: 10616,
-    preflight: 0,
-    dream: 0,
-    semantic: 0,
+    turn: 243,
+    reflection: 337,
+    'reflection.edit': 6120,
+    arbiter: 3904,
+    narrator: 10563,
+    preflight: 1175,
+    dream: 1035,
+    constructs: 20,
   }
   for (const [caller, measured] of Object.entries(p99)) {
     expect(callSettingsFor(caller).maxOutputTokens, caller).toBeGreaterThanOrEqual(measured * 2)
   }
+})
+
+// The night's one reasoning-on call shared reflection's 16,000 and its ledger line. Ruling 23
+// gives it both of its own, so rehearsal 4 can price it.
+it('★ reflection.edit is its own caller: reasoning on, its own ceiling', () => {
+  expect(callSettingsFor('reflection.edit').reasoning).toBeUndefined()
+  expect(callSettingsFor('reflection.edit').maxOutputTokens).toBe(13000)
+  expect(callSettingsFor('reflection').maxOutputTokens).toBe(700)
+})
+
+// 14,072 output tokens, 99.5% of it reasoning, to pick one label out of five. With reasoning off
+// the same probe answered in 20 tokens on all five calls and recognized the same construct.
+it('★ constructs answers without thinking, under a 500-token ceiling', () => {
+  expect(callSettingsFor('constructs')).toEqual({
+    reasoning: { enabled: false },
+    maxOutputTokens: 500,
+  })
+})
+
+// Its p99 is one call, and that call failed after 31,179 reasoning tokens. 4,000 stands until
+// rehearsal 4 gives it a real n.
+it('semantic is left where it was', () => {
+  expect(callSettingsFor('semantic').maxOutputTokens).toBe(4000)
 })
 
 it('an unpinned caller keeps the routing it has always had', () => {

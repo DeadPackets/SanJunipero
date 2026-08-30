@@ -204,6 +204,7 @@ describe('makeDreamLlm', () => {
       estimatedCostUsd: 0.5,
       reportedCostUsd: null,
       latencyMs: 0,
+      finishReason: null,
       ok: true,
       error: null,
     })

@@ -15,6 +15,8 @@ export type ScriptedResponse = {
   provider?: string
   // What OpenRouter says it charged, as `usage.cost` under usage accounting.
   reportedCostUsd?: number
+  // Why the provider stopped; `length` is the answer cut off at the output ceiling.
+  finishReason?: 'stop' | 'length'
 }
 
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
@@ -32,7 +34,7 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
       const reasoning = u.reasoningTokens ?? 0
       return Promise.resolve({
         content: [{ type: 'text' as const, text: scripted.text ?? JSON.stringify(scripted.json) }],
-        finishReason: { unified: 'stop' as const, raw: undefined },
+        finishReason: { unified: scripted.finishReason ?? ('stop' as const), raw: undefined },
         usage: {
           inputTokens: {
             total: inputTokens,

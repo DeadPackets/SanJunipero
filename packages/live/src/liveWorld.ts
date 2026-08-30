@@ -193,10 +193,11 @@ export async function settle(
  * A per-call cap cannot see a slow leak; this bounds spend per unit time.
  * PER MIND, because the bill scales with the cast and not with the world — a total ceiling would
  * false-fire the day somebody streams ten people.
- * 0.04 is 5x the EXPECTED $0.005–0.008/mind/sim-day: rehearsal 3's measured $0.09–0.14 recosted
- * on the Baidu pin with the turn's reasoning off and the day log deduped. Re-derive on rehearsal 4.
+ * 0.05 leaves 43% headroom over a SUSTAINED failover to the dearest allowed provider —
+ * AtlasCloud, measured $0.035/mind/sim-day on 2026-08-30, which sat at 88% of the old $0.04.
+ * On the Baidu pin's expected $0.0037/mind/sim-day it is 13x. Re-derive on rehearsal 4.
  */
-const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.04
+const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.05
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
