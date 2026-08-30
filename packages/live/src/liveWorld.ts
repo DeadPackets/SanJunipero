@@ -188,8 +188,8 @@ export async function settle(
 
 /** A per-call cap cannot see a slow leak; this bounds CALLS per unit time, PER MIND. Calls, not
  *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
- *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 8 clears it. */
-const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 8
+ *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 14 is 3x, per ruling 25. */
+const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 14
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
