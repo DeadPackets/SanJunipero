@@ -1549,6 +1549,60 @@ body {
   .paper-close-key { display: none; }
 }
 
+/* ── the key map: every press the town answers to, on the sheet's own parchment ── */
+.key-map {
+  position: fixed; inset: 0; z-index: 45;
+  display: grid; place-items: center; padding: 5vmin;
+  /* the town keeps living, and a click that misses the sheet still reaches it */
+  pointer-events: none;
+}
+.key-map-sheet {
+  pointer-events: auto;
+  width: min(24rem, 100%); max-height: 100%; overflow-y: auto;
+  overscroll-behavior: contain; padding: var(--s-6);
+  background: var(--parchment) var(--grain); color: var(--ink);
+  box-shadow: var(--frame);
+}
+/* The sheet takes focus so a screen reader announces it, but it is not a control: a ring round
+   the whole parchment says nothing, and the first Tab lands on `close`, which rings properly. */
+.key-map-sheet:focus-visible { outline: none; }
+.key-map-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-6);
+  margin: 0 0 var(--s-5); padding-bottom: var(--s-5);
+  border-bottom: 2px solid var(--ink);
+}
+.key-map-title {
+  margin: 0;
+  font-family: var(--font-title); font-weight: 500; font-size: var(--f-6);
+  line-height: 1.2; letter-spacing: -0.01em;
+}
+/* One shared pair of columns, so the key column is exactly as wide as the widest chord (the
+   arrows) and no row leaves a gutter between the key and what it does. */
+.key-map-list {
+  display: grid; grid-template-columns: max-content 1fr; align-items: baseline;
+  row-gap: var(--s-3); column-gap: var(--s-6); margin: 0;
+}
+/* Right-aligned, because the arrow chord is three times the width of an `S` and left-aligning
+   the column leaves every other row a 50px gutter between the key and what it does. */
+.key-map-keys { display: flex; flex-wrap: wrap; justify-content: end; gap: var(--s-1); margin: 0; }
+.key-map-key {
+  padding: var(--s-1) var(--s-2);
+  font-family: var(--font-px); font-size: var(--f-1); line-height: 16px;
+  background: var(--sand); color: var(--ink);
+  box-shadow: var(--frame-tight);
+}
+.key-map-says { margin: 0; font-size: var(--f-3); text-wrap: pretty; }
+@media (prefers-reduced-motion: no-preference) {
+  .key-map-sheet { animation: key-map-in var(--t-med) var(--ease-enter); }
+  @keyframes key-map-in {
+    from { opacity: 0; translate: 0 8px; }
+  }
+}
+
+/* ── what a page says where an empty state would lie ── */
+.out-of-reach { display: grid; justify-items: start; gap: var(--s-4); }
+.out-of-reach .sheet-note { margin: 0; }
+
 [data-broadcast='on'] .signpost,
 [data-broadcast='on'] .paper,
 [data-broadcast='on'] .town-dim,

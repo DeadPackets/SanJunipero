@@ -281,6 +281,34 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   })
 })
 
+// ── ★ a refused read is not an empty town ─────────────────────────────────────────────────
+// `useEndpoint` settles a refusal as `{ data: null, loaded: true }`, so every one of these
+// branches used to print the product's best writing to assert something false. The empty copy
+// is news about the town; `OutOfReach` is news about the wire.
+describe('★ every page that can be quiet can also be out of reach', () => {
+  const PAGES = [
+    './pages/Found.tsx',
+    './pages/Customs.tsx',
+    './pages/Chronicle.tsx',
+    './pages/Moments.tsx',
+    './pages/BondsGraph.tsx',
+  ]
+
+  it.each(PAGES)('%s branches on the read failing, and offers it again', (page) => {
+    const code = src(page)
+    expect(code, 'no OutOfReach').toContain("from '../../ui/OutOfReach.js'")
+    expect(code, 'no failed branch').toMatch(/\.failed|wireDown/)
+    expect(code, 'no way to ask again').toMatch(/onRetry=\{/)
+  })
+
+  // A page holding a last good answer keeps showing it: only a panel with nothing at all and a
+  // broken wire changes what it says.
+  it('never swaps the copy while there is still an answer to show', () => {
+    expect(src('./pages/Moments.tsx')).toContain('read.failed && moments === null')
+    expect(src('./pages/Chronicle.tsx')).toContain('entries.length === 0 && record.failed')
+  })
+})
+
 // ── no page may blank the town ─────────────────────────────────────────────────────────────
 
 // `renderToStaticMarkup` rethrows rather than catching, so the two branches are asked of the

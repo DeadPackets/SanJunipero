@@ -12,7 +12,8 @@ import {
   type PlayerState,
 } from '../../ui/momentsPlayer.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
 
@@ -227,7 +228,9 @@ function PlayerStripView({
 export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
-  const moments = usePolled('/api/moments', momentRows).data
+  const record = useEndpointFor('/api/moments', momentRows)
+  const read = useFeed(record)
+  const moments = read.data
   // `/moment/:id` names a recorded day, so a link opens the filmstrip on it.
   const [openId, setOpenId] = useState<number | null>(momentId)
   const openMoment = (id: number | null): void => {
@@ -313,7 +316,9 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
 
   return (
     <>
-      {moments !== null && moments.length === 0 ? (
+      {read.failed && moments === null ? (
+        <OutOfReach onRetry={record.retry} />
+      ) : moments !== null && moments.length === 0 ? (
         <p className="feed-empty">{EMPTY_COPY.moments}</p>
       ) : (
         <ol className="strip-list" aria-label="The days the town kept">

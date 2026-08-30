@@ -163,9 +163,14 @@ once.
 ## Accessibility floor
 
 - **Every pointer path has a key.** `S` signpost · `Tab` chrome · `Enter` act · `Esc` down ·
-  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` the frame meter.
+  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` **the key map** ·
+  `Shift+P` the frame meter. `?` is where a person looks for the list, so the list is what it
+  opens; the meter is an instrument and took the chord.
+- **And every key has a pointer path.** Two fingers are the touch screen's wheel
+  (`render/camera.ts:zoomPinch`) — `touch-action: none` on the stage takes the browser's own
+  page-zoom away, so without a pinch the six stops have no way in at all on a phone.
 - **One Escape ladder**, and nothing else in the tree listens for it: `useStageKeys` asks,
-  `ui/interaction.ts:escapeStep` answers — paper → interior → pick → fullscreen.
+  `ui/interaction.ts:escapeStep` answers — keys → paper → interior → pick → fullscreen.
 - **The camera keys and the stage keys are disjoint sets**, asserted by test, so no key fires twice.
 - Focus ring: **2px `--ink`, 2px offset, square**. Ember measured 2.40:1 on parchment and 1.84:1
   on honey — below SC 1.4.11 on every ground the chrome sits on; ink is 9.06 / 10.20 / 7.63 / 6.92.
@@ -183,6 +188,10 @@ once.
   **It does NOT hold for canvas world text** — see the open defect in
   `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the ink it
   asks for, measured at 1.1:1 over its own slab.
+- **A page never prints an empty state over a broken wire.** `Read<T>` carries `failed`, and
+  the seven branches that would otherwise say "the town has not done this yet" say
+  `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news
+  about the wire, and they are not the same sentence.
 - The signpost's arms are a **disclosure set**: `aria-expanded` + `aria-controls="paper-sheet"`,
   never `aria-pressed`. The open arm stays swung out 3px on a second, darker plank — a brightness
   filter took its label to 1.53:1 and flickered 1.2 → 0.94 → 1.2 when a pressed arm was pressed.
