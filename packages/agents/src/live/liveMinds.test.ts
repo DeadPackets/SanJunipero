@@ -52,27 +52,37 @@ const doc: PersonalityDoc = {
   current: { mood: 'settled', worries: [], goals: [] },
 }
 
-// Keyed by the system prompt each caller actually sends, imported rather than re-typed: a
-// prompt reworded in the source must not leave this rehearsal silently answering the wrong call.
-const CANNED: { system: string; answer: unknown }[] = [
-  { system: extractFactsPrompt([]).system, answer: { facts: [] } },
-  { system: summarizeScenesPrompt([]).system, answer: { scenes: [] } },
-  { system: summarizeDayPrompt([]).system, answer: { title: 'A day', text: 'It passed.' } },
-  { system: updateLedgerPrompt('someone', null, []).system, answer: { doc: 'A person.' } },
-  { system: autobiographyPrompt('', doc).system, answer: { paragraph: 'I lived a day.' } },
-  { system: proposeEditPrompt('', doc, []).system, answer: { verdict: 'no_proposal' } },
-  { system: DREAM_PROMPT, answer: { text: DREAM_TEXT, mood: 'unsettled' } },
+// The two night dumps share one system line so the day caches between them; what tells them
+// apart is the instruction that follows it.
+const instruction = (p: { messages: { content: string }[] }): string => p.messages[1]!.content
+
+// Keyed by bytes each caller actually sends, imported rather than re-typed: a prompt reworded
+// in the source must not leave this rehearsal silently answering the wrong call.
+const CANNED: { key: string; answer: unknown }[] = [
+  { key: instruction(extractFactsPrompt([])), answer: { facts: [] } },
+  { key: instruction(summarizeScenesPrompt([])), answer: { scenes: [] } },
+  { key: summarizeDayPrompt([]).system, answer: { title: 'A day', text: 'It passed.' } },
+  { key: updateLedgerPrompt('someone', null, []).system, answer: { doc: 'A person.' } },
+  { key: autobiographyPrompt('', doc).system, answer: { paragraph: 'I lived a day.' } },
+  { key: proposeEditPrompt('', doc, []).system, answer: { verdict: 'no_proposal' } },
+  { key: DREAM_PROMPT, answer: { text: DREAM_TEXT, mood: 'unsettled' } },
 ]
 
 function scriptedModel(): MockLanguageModelV4 {
   return new MockLanguageModelV4({
     doGenerate: async (options) => {
       const parts = options.prompt as { role: string; content: unknown }[]
-      const system = parts
-        .filter((m) => m.role === 'system')
-        .map((m) => (typeof m.content === 'string' ? m.content : ''))
+      // A key is either the system line or the instruction the dump is followed by, so the
+      // day itself never has to be searched.
+      const sent = [parts[0], parts.at(-1)]
+        .filter((m) => m !== undefined)
+        .map((m) =>
+          typeof m.content === 'string'
+            ? m.content
+            : (m.content as { text?: string }[]).map((c) => c.text ?? '').join('\n'),
+        )
         .join('\n')
-      const hit = CANNED.find((c) => system.includes(c.system))
+      const hit = CANNED.find((c) => sent.includes(c.key))
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(hit?.answer ?? SLEEPING_TURN) }],
         finishReason: { unified: 'stop' as const, raw: undefined },

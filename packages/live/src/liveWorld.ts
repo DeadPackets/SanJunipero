@@ -864,6 +864,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
       narratorDb?.close()
+      // Before every report, not between them: a row still booked at the ceiling makes both
+      // the provider table and the reconciliation ratio a lie.
+      await sweepUnattributed()
       // Each of these says nothing about a run with nothing to say, so a quiet ops surface
       // still means a quiet run.
       for (const row of reportDeadCalls(opsDb)) {
@@ -876,9 +879,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           `stream: ${row.provider ?? 'an unnamed back end'} served ${row.calls} call(s), $${row.costUsd.toFixed(4)}`,
         )
       }
-      // Before the reconciliation, not after: the last window's unattributed rows are exactly
-      // the ones that would make the ratio it prints a lie.
-      await sweepUnattributed()
       reportReconciliation(opsDb)
       opsDb.close()
     },

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { NoObjectGeneratedError } from 'ai'
 import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
+import { splitSentences } from './prompt/assemble.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 
 export type ReflectionLlm = {
@@ -188,45 +189,61 @@ export async function runSleepReflection(deps: {
 
 type LlmPrompt = { system: string; messages: LlmMessage[] }
 
-function compactMemories(
-  memories: MemoryRow[],
-): { id: number; text: string; importance: number; tags: MemoryRow['tags'] }[] {
+type CompactMemory = { id: number; text: string; importance: number; tags: MemoryRow['tags'] }
+
+function compactMemories(memories: MemoryRow[]): CompactMemory[] {
   return memories.map((m) => ({ id: m.id, text: m.text, importance: m.importance, tags: m.tags }))
 }
 
-export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
+// The same previous-moment filter the day log runs, per kind: a perception restates nearly all
+// of the perception before it, and the day's rows interleave kinds where the day log holds one.
+function freshMemories(memories: MemoryRow[]): CompactMemory[] {
+  const saidLast = new Map<MemoryRow['kind'], Set<string>>()
+  const kept: MemoryRow[] = []
+  for (const m of memories) {
+    const sentences = splitSentences(m.text)
+    const before = saidLast.get(m.kind) ?? new Set<string>()
+    const fresh = sentences.filter((s) => !before.has(s))
+    saidLast.set(m.kind, new Set(sentences))
+    if (fresh.length > 0) kept.push({ ...m, text: fresh.join(' ') })
+  }
+  return compactMemories(kept)
+}
+
+// Both night dumps open with these same bytes and carry their own instruction after the day,
+// so the day is one prefix they share instead of one each provider must read twice.
+const NIGHT_SYSTEM = 'Before sleep, the day comes back to you.'
+
+function nightPrompt(dayMemories: MemoryRow[], instruction: string[]): LlmPrompt {
   return {
-    system: [
-      'Before sleep, you sort the day into what is solidly true.',
-      // "From each moment" is a pass per memory against an unbounded array; asking for the few
-      // surest ones asks for the same work once.
-      'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
-      'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
-      'Write down only what the memories actually show, never what you merely suspect.',
-    ].join('\n'),
+    system: NIGHT_SYSTEM,
     messages: [
       {
         role: 'user',
-        content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}`,
+        content: `Today, you lived these moments:\n${JSON.stringify(freshMemories(dayMemories))}`,
       },
+      { role: 'user', content: instruction.join('\n') },
     ],
   }
 }
 
+export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
+  return nightPrompt(dayMemories, [
+    'Before sleep, you sort the day into what is solidly true.',
+    // "From each moment" is a pass per memory against an unbounded array; asking for the few
+    // surest ones asks for the same work once.
+    'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
+    'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
+    'Write down only what the memories actually show, never what you merely suspect.',
+  ])
+}
+
 export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
-  return {
-    system: [
-      'Before sleep, you gather the day into scenes.',
-      'Group the moments into a few natural scenes, each with a short title and a short telling of what happened.',
-      'For each scene, list the memories it draws from.',
-    ].join('\n'),
-    messages: [
-      {
-        role: 'user',
-        content: `Today, you lived these moments:\n${JSON.stringify(compactMemories(dayMemories))}`,
-      },
-    ],
-  }
+  return nightPrompt(dayMemories, [
+    'Before sleep, you gather the day into scenes.',
+    'Group the moments into a few natural scenes, each with a short title and a short telling of what happened.',
+    'For each scene, list the memories it draws from.',
+  ])
 }
 
 export function summarizeDayPrompt(scenes: { title: string; text: string }[]): LlmPrompt {

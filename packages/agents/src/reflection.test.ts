@@ -524,6 +524,11 @@ describe('makeReflectionLlm prompts', () => {
   ]
   const doc = baseDoc()
 
+  // The two night dumps moved their instruction behind the day so the dump can cache; every
+  // scan that used to read the system block has to follow it there.
+  const authoredText = (p: { system: string; messages: LlmMessage[] }): string =>
+    [p.system, p.messages.at(-1)?.content ?? ''].join('\n')
+
   function recordingClient(): {
     client: LlmClient
     calls: { system: string; messages: LlmMessage[] }[]
@@ -570,8 +575,8 @@ describe('makeReflectionLlm prompts', () => {
   // `assemblePrompt` reaches. A shorter prompt must not turn a question into an instruction.
   it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
     const authored = [
-      extractFactsPrompt(memories).system,
-      summarizeScenesPrompt(memories).system,
+      authoredText(extractFactsPrompt(memories)),
+      authoredText(summarizeScenesPrompt(memories)),
       summarizeDayPrompt([{ title: 'Trade', text: 'The day was full of deals.' }]).system,
       updateLedgerPrompt('Nadia', null, memories).system,
       autobiographyPrompt('The day was full of deals.', doc).system,
@@ -586,6 +591,59 @@ describe('makeReflectionLlm prompts', () => {
         expect(text.toLowerCase(), `${text.slice(0, 48)} hints "${hint}"`).not.toContain(hint)
       }
     }
+  })
+
+  const dumpOf = (p: { messages: LlmMessage[] }): { id: number; text: string }[] => {
+    const content = p.messages[0]!.content
+    return JSON.parse(content.slice(content.indexOf('\n') + 1)) as { id: number; text: string }[]
+  }
+
+  // ★ The turn path drops what the moment before already said; until the night did the same,
+  // one mind's day dump was 126k tokens of mostly the same perception, sent twice.
+  it('★ the night dump keeps only what the moment before it did not already say', () => {
+    const row = (id: number, kind: MemoryRow['kind'], text: string): MemoryRow => ({
+      id,
+      agentId: AGENT,
+      tick: DAY * TICKS_PER_DAY + id,
+      day: DAY,
+      kind,
+      text,
+      importance: 3,
+      tags: TAGS,
+    })
+    // A thought between two perceptions is the real shape of a day, and the reason the filter
+    // remembers the last moment of each kind rather than the last row.
+    const day = [
+      row(1, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
+      row(2, 'thought', 'I should trade while she is here.'),
+      row(3, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
+      row(4, 'thought', 'I should trade while she is here.'),
+      row(5, 'perception', 'The storehouse door is open. Nadia is here. You are hungry.'),
+      row(6, 'perception', 'The storehouse door is shut.'),
+    ]
+    const expected = [
+      { id: 1, text: 'The storehouse door is open. Nadia is here. Rain falls.' },
+      { id: 2, text: 'I should trade while she is here.' },
+      { id: 5, text: 'You are hungry.' },
+      { id: 6, text: 'The storehouse door is shut.' },
+    ]
+    for (const prompt of [extractFactsPrompt(day), summarizeScenesPrompt(day)]) {
+      expect(dumpOf(prompt).map((m) => ({ id: m.id, text: m.text }))).toEqual(expected)
+    }
+  })
+
+  // ★ System comes first, so a per-call instruction above the dump makes the 126k tokens under
+  // it uncacheable for the call that follows.
+  it('★ both night prompts open with the same bytes, and differ only after the day', () => {
+    const a = extractFactsPrompt(memories)
+    const b = summarizeScenesPrompt(memories)
+    const prefix = (p: { system: string; messages: LlmMessage[] }): string =>
+      `${p.system}\n${p.messages[0]!.content}`
+    expect(prefix(a)).toBe(prefix(b))
+    expect(prefix(a).length).toBeGreaterThan(memories[0]!.text.length)
+    expect(a.messages[1]!.content).not.toBe(b.messages[1]!.content)
+    expect(a.messages[1]!.content).toContain('at most eight')
+    expect(b.messages[1]!.content).toContain('list the memories it draws from')
   })
 
   it("proposeEdit prompt carries today's memory ids and what the schema cannot say", () => {
@@ -633,8 +691,8 @@ describe('makeReflectionLlm prompts', () => {
     }
     // The longest of the six is no longer this one.
     const others = [
-      extractFactsPrompt(memories).system,
-      summarizeScenesPrompt(memories).system,
+      authoredText(extractFactsPrompt(memories)),
+      authoredText(summarizeScenesPrompt(memories)),
       summarizeDayPrompt([{ title: 'Trade', text: 'x' }]).system,
       updateLedgerPrompt('Nadia', null, memories).system,
       autobiographyPrompt('x', doc).system,
