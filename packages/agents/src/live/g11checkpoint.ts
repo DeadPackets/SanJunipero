@@ -71,6 +71,11 @@ const MindSnapshot = z
         reflectedNight: z.number().int().nullable(),
         wasNight: z.boolean(),
         pendingDreamMood: z.string().nullable(),
+        // Optional so a checkpoint written before the recall verb existed still resumes.
+        pendingRecall: z
+          .object({ query: z.string(), memories: z.array(z.string()) })
+          .strict()
+          .nullish(),
       })
       .strict(),
   })

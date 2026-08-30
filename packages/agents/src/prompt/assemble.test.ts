@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FELT_TAGS, MYSTERIES } from '@sj/engine'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
@@ -855,6 +855,7 @@ describe('capabilities', () => {
       'action',
       'plan',
       'journal',
+      'recall',
       'importance',
       'reconsider_at',
     ]) {
@@ -862,5 +863,108 @@ describe('capabilities', () => {
     }
     expect(a.system).toContain('08:30')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
+describe('the book a mind can turn back to', () => {
+  const serialize = (blocks: PromptBlocks): string => {
+    const a = assemblePrompt(blocks)
+    return [a.system, ...a.messages.map((m) => m.content)].join('\n')
+  }
+
+  it('renders the last pages, dated by the day the world counts', () => {
+    const a = assemblePrompt(
+      fixtureBlocks({
+        journal: [
+          { day: 3, text: 'The roof held through the storm.' },
+          { day: 5, text: 'Nadia brought bread again.' },
+        ],
+      }),
+    )
+    expect(a.messages[0]!.content).toBe(
+      'You turn back the pages of your own book:\n' +
+        'Day 3: The roof held through the storm.\n' +
+        'Day 5: Nadia brought bread again.',
+    )
+    // The book is stable, so it sits ahead of the day's own log rather than after it.
+    expect(a.messages[1]!.content).toContain('Woke with the light.')
+  })
+
+  it('says nothing at all when nothing is written yet', () => {
+    const a = assemblePrompt(fixtureBlocks({ journal: [] }))
+    expect(a.messages).toHaveLength(3)
+    expect(serialize(fixtureBlocks({ journal: [] }))).not.toContain('turn back the pages')
+  })
+
+  it('shows at most the last five pages, and never a tick number', () => {
+    const journal = Array.from({ length: 12 }, (_, i) => ({
+      day: i + 1,
+      text: `page ${i + 1}`,
+    }))
+    const page = assemblePrompt(fixtureBlocks({ journal })).messages[0]!.content
+    expect(page.split('\n')).toHaveLength(6) // the opening line plus five pages
+    expect(page).toContain('Day 12: page 12')
+    expect(page).not.toContain('Day 7:')
+    expect(page).not.toMatch(/tick/i)
+  })
+
+  it('drops the oldest page rather than handing a mind an unbounded wall of its own hand', () => {
+    const journal = Array.from({ length: 5 }, (_, i) => ({
+      day: i + 1,
+      text: 'x'.repeat(400),
+    }))
+    const page = assemblePrompt(fixtureBlocks({ journal })).messages[0]!.content
+    expect(page.length).toBeLessThanOrEqual(1300)
+    expect(page).toContain('Day 5:')
+    expect(page).not.toContain('Day 1:')
+  })
+
+  it('cuts one over-long page at a word, and shows the cut', () => {
+    const journal = [{ day: 9, text: `${'word '.repeat(400)}end` }]
+    const page = assemblePrompt(fixtureBlocks({ journal })).messages[0]!.content
+    expect(page.endsWith('word…')).toBe(true)
+    expect(page).not.toContain('end')
+  })
+
+  it('is glass-clean: the book goes through the same door as everything else', () => {
+    const prompt = serialize(
+      fixtureBlocks({
+        journal: [
+          { day: 2, text: 'We laid the last stone of the wall together.' },
+          { day: 4, text: 'I asked what happens after, and nobody knew.' },
+        ],
+      }),
+    )
+    expect(scanPromptForGlassLeak(prompt)).toEqual([])
+  })
+})
+
+describe('what a spent beat brings back', () => {
+  it('carries the found memories under the words the mind cast back with', () => {
+    const a = assemblePrompt(
+      fixtureBlocks({
+        recalled: {
+          query: 'the night the river rose',
+          memories: ['The water came over the fork by dawn.', 'Omar carried the child out.'],
+        },
+      }),
+    )
+    const block = a.messages[2]!.content
+    expect(block).toBe(
+      'You cast your mind back to the night the river rose. What comes back:\n' +
+        'The water came over the fork by dawn.\n' +
+        'Omar carried the child out.',
+    )
+    // Between the scene and the moment: it belongs to this turn and no later one.
+    expect(a.messages[3]!.content).toBe('The sun is high and the meadow is quiet.')
+  })
+
+  it('says nothing comes back rather than leaving the asking unanswered', () => {
+    const a = assemblePrompt(fixtureBlocks({ recalled: { query: 'my mother', memories: [] } }))
+    expect(a.messages[2]!.content).toBe('You cast your mind back to my mother. Nothing comes back.')
+  })
+
+  it('adds no message at all on a turn that cast nothing back', () => {
+    expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
   })
 })

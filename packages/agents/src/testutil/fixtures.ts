@@ -142,6 +142,8 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
         'I have kept bees since my first spring here.',
       ],
     },
+    journal: [],
+    recalled: null,
     scene: {
       ledgers: [{ name: 'Nadia', doc: 'The basket weaver; she shares her bread with me. [mem#2]' }],
       memories,
