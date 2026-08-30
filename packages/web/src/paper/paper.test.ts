@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createWorldStore } from '../state/worldStore.js'
+import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
 import { households } from './families.js'
@@ -128,6 +129,15 @@ describe('the paper', () => {
     )
   })
 
+  it('★ is out of the keyboard’s reach while it is down, not merely out of the pointer’s', () => {
+    // The tabs and the close word stay in the tree for the 300ms slide out, so the sheet keeps
+    // two focusable controls. `aria-hidden` left both reachable; `inert` is what takes them out.
+    const shut = paper()
+    expect(shut).toMatch(/<section class="paper"[^>]*inert=""/)
+    expect(shut).toContain('tabindex="0"')
+    expect(paper({ page: 'folk', tab: 'People' })).not.toMatch(/<section class="paper"[^>]*inert/)
+  })
+
   it('renders no page body while it is down — a shut sheet reads nothing off the town', () => {
     expect(paper()).not.toContain('class="roster"')
     expect(paper()).not.toContain('skeleton-row')
@@ -213,6 +223,25 @@ describe('★ every way the paper goes down, and where focus lands', () => {
       /tabsRef\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\)/,
     )
     expect(code).toMatch(/opener\?\.focus\(\)/)
+  })
+})
+
+// ── no page may blank the town ─────────────────────────────────────────────────────────────
+
+// `renderToStaticMarkup` rethrows rather than catching, so the two branches are asked of the
+// class's own `render` instead of being triggered by a throwing child.
+describe('★ a page that throws costs the viewer the page, not the town', () => {
+  const body = createElement('p', null, 'the roster')
+
+  it('hands back its children until one of them throws, then a line about it', () => {
+    const boundary = new PageBoundary({ children: body })
+    expect(boundary.render()).toBe(body)
+    boundary.state = PageBoundary.getDerivedStateFromError()
+    expect(renderToStaticMarkup(boundary.render())).toContain('This page could not be read')
+  })
+
+  it('wraps the page body, keyed by the page so a tab switch keeps its feeds', () => {
+    expect(src('./Paper.tsx')).toContain('<PageBoundary key={key}>')
   })
 })
 

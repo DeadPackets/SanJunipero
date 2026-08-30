@@ -17,6 +17,22 @@ const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
   steady: 'Holding steady',
 }
 
+/** What an open panel becomes when its tie leaves the feed. The panel is gone either way, so it
+ *  says which of the two happened rather than shutting itself under the reader. */
+export function FadedBond({ onClose }: { onClose: () => void }) {
+  return (
+    <aside className="bond-detail" role="status">
+      <header className="bond-head">
+        <h3 className="bond-title">This bond has faded</h3>
+        <button type="button" className="bond-close" onClick={onClose} aria-label="Close this bond">
+          ×
+        </button>
+      </header>
+      <p className="bond-line">It has dropped out of the town’s ties since you opened it.</p>
+    </aside>
+  )
+}
+
 /** One tie, opened. The bar is gone: it filled toward the closest pair in town, which makes a
  *  relationship a meter with a leader. The level word plus the dated history can also go DOWN. */
 export function BondDetail({

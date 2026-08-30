@@ -11,6 +11,7 @@ import {
   type PlaySpeed,
   type PlayerState,
 } from './momentsPlayer.js'
+import { momentRows } from '../paper/pages/Moments.js'
 
 const START = 100
 const END = 140
@@ -140,5 +141,30 @@ describe('the player’s controls', () => {
     }
     expect(seen).toEqual([...PLAY_SPEEDS])
     expect(nextPlaySpeed(PLAY_SPEEDS[PLAY_SPEEDS.length - 1]!)).toBe(PLAY_SPEEDS[0])
+  })
+})
+
+// `MomentSchema` wants a title of at least one character. Parsed as one array, a single scene
+// the narrator left untitled took every other scene off the filmstrip with it.
+describe('★ one bad scene costs one row', () => {
+  const scene = (id: number, title: string): unknown => ({
+    id,
+    day: 1,
+    startTick: 0,
+    endTick: 10,
+    title,
+    cast: ['amara'],
+    location: null,
+  })
+
+  it('keeps the scenes that read and drops the one that does not', () => {
+    const rows = momentRows({ moments: [scene(1, 'The well'), scene(2, ''), scene(3, 'Dusk')] })
+    expect(rows?.map((m) => m.id)).toEqual([1, 3])
+  })
+
+  it('still refuses a body that is not a list of scenes, so the last good answer stands', () => {
+    expect(momentRows(null)).toBeNull()
+    expect(momentRows({})).toBeNull()
+    expect(momentRows({ moments: 'soon' })).toBeNull()
   })
 })

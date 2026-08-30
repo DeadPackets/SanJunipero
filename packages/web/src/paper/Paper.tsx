@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
+import { PageBoundary } from './PageBoundary.js'
 import { PageBody, type Thing } from './pages/index.js'
 import {
   GRIP_CLOSE_PX,
@@ -101,6 +102,7 @@ export function Paper({
         aria-modal="false"
         aria-hidden={!open}
         aria-labelledby="paper-title"
+        inert={!open}
       >
         <div
           className="paper-grip"
@@ -150,23 +152,27 @@ export function Paper({
         </header>
         <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
           {open ? (
-            <PageBody
-              page={key}
-              tab={current}
-              subject={subject}
-              thing={thing}
-              momentId={momentId}
-              store={store}
-              scene={scene}
-              operatorToken={operatorToken}
-              insideId={insideId}
-              gapTicks={gapTicks}
-              onSubject={onSubject}
-              onInside={onInside}
-              onJump={onJump}
-              onLive={onLive}
-              onMoment={onMoment}
-            />
+            // Keyed by the page, not the tab: a tab switch must not drop the page's feeds and
+            // refetch them, so a caught page clears on the next arm or the next time it is opened.
+            <PageBoundary key={key}>
+              <PageBody
+                page={key}
+                tab={current}
+                subject={subject}
+                thing={thing}
+                momentId={momentId}
+                store={store}
+                scene={scene}
+                operatorToken={operatorToken}
+                insideId={insideId}
+                gapTicks={gapTicks}
+                onSubject={onSubject}
+                onInside={onInside}
+                onJump={onJump}
+                onLive={onLive}
+                onMoment={onMoment}
+              />
+            </PageBoundary>
           ) : null}
         </div>
       </section>

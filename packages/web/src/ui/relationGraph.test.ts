@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { BOND_LEVELS, BOND_TYPES, LEVEL_RANK, bondArc, type LineageLike } from './bondModel2.js'
-import { BondDetail } from '../paper/pages/BondDetail.js'
+import { BondDetail, FadedBond } from '../paper/pages/BondDetail.js'
 import { LegendChip } from './LegendChip.js'
 import {
   ARC_COLOR,
@@ -316,5 +317,21 @@ describe('BondDetail — the arc, the evidence, and NO filled bar', () => {
     )
     expect(plain).not.toContain('bond-evidence')
     expect(plain).not.toContain('bond-type')
+  })
+})
+
+// `api.bonds.find(...)!` over a list that refetches every 30s handed BondDetail `undefined` and
+// took the whole app — town and all — down with the panel.
+describe('★ a bond that decays while its panel is open', () => {
+  it('says which of the two happened, and offers the way out', () => {
+    const html = renderToStaticMarkup(createElement(FadedBond, { onClose: () => {} }))
+    expect(html).toContain('This bond has faded')
+    expect(html).toContain('aria-label="Close this bond"')
+    expect(html).toContain('role="status"')
+  })
+
+  it('is the branch the graph takes when the lookup finds nothing', () => {
+    const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('<FadedBond onClose={closeDetail} />')
   })
 })

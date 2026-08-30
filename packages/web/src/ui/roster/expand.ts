@@ -119,6 +119,11 @@ export function skillBand(xp: number): string {
   return SKILL_BANDS[SKILL_BANDS.length - 1]!.words
 }
 
+/** One skill, said the way the deep-presentation addendum says it — never "fishing, level 2".
+ *  The roster card and the inspector must not word the same person's fishing differently. */
+export const skillPhrase = (track: string, xp: number): string =>
+  `${skillBand(xp)} ${track.replace(/_/g, ' ')}`
+
 /** The bond log and the live feed are both dated records of things that HAPPENED. Nothing here is
  *  inferred from who somebody is. */
 const ACT_WORDS: Readonly<Record<string, string>> = {
@@ -235,7 +240,7 @@ export function becomingOf(input: BecomingInput): Becoming {
 
   const good = Object.entries(input.skills)
     .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
-    .map(([track, xp]) => ({ words: `${skillBand(xp)} ${track.replace(/_/g, ' ')}` }))
+    .map(([track, xp]) => ({ words: skillPhrase(track, xp) }))
 
   const changed = input.changes
     .filter((c) => c.diff.length > 0)

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { MomentsResponseSchema, type Moment } from '@sj/shared'
+import { MomentSchema, type Moment } from '@sj/shared'
 import type { PeopleIndex } from '../../ui/bondModel2.js'
 import { thumbLabel, thumbMotif, thumbTitle } from '../../ui/momentThumb.js'
 import {
@@ -16,9 +16,15 @@ import { usePolled } from '../../ui/useEndpoint.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './index.js'
 
-const momentRows = (body: unknown): Moment[] | null => {
-  const parsed = MomentsResponseSchema.safeParse(body)
-  return parsed.success ? parsed.data.moments : null
+/** Row by row on purpose: the schema wants a title of at least one character, and one untitled
+ *  scene parsed as a whole array took the entire filmstrip with it. */
+export const momentRows = (body: unknown): Moment[] | null => {
+  const rows = (body as { moments?: unknown } | null)?.moments
+  if (!Array.isArray(rows)) return null
+  return rows.flatMap((row) => {
+    const parsed = MomentSchema.safeParse(row)
+    return parsed.success ? [parsed.data] : []
+  })
 }
 
 const MOTIF_PX = 8

@@ -20,7 +20,7 @@ const STAMP_OF: Readonly<Record<BadgeState, StampWord>> = {
 export function stampWord(
   live: boolean,
   awake: boolean,
-  link: LinkState = 'online',
+  link: LinkState,
   paused = false,
 ): StampWord {
   const word = STAMP_OF[tickBadgeState(link, live, awake)]
@@ -36,11 +36,13 @@ export function stampText(tick: number, word: StampWord): string {
 
 /** The time, chiselled in the corner, only while somebody is asking. The town is the picture;
  *  a clock that is always up is a clock nobody reads. */
-export function QuietStamp({ store, link }: { store: WorldStore; link?: LinkState }) {
-  const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
-  const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
-  const paused = useSyncExternalStore(store.subscribe, store.getPaused)
+export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState }) {
+  const isLive = (): boolean => store.getMode().live
+  const isAwake = (): boolean => store.getState() !== null
+  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  const live = useSyncExternalStore(store.subscribe, isLive, isLive)
+  const awake = useSyncExternalStore(store.subscribe, isAwake, isAwake)
+  const paused = useSyncExternalStore(store.subscribe, store.getPaused, store.getPaused)
   const [shown, setShown] = useState(false)
 
   useEffect(() => {
