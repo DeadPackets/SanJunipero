@@ -4,7 +4,7 @@ import { kindWords } from '../../ui/broadcastReady.js'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 type Journal = { tick: number; text: string; kind: 'journal' | 'dream' }
 

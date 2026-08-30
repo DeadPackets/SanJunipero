@@ -5,7 +5,7 @@ import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discover
 import { itemCropDetail, thingKind } from '../../ui/interaction.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const NO_RECORDS: DiscoveryRecord[] = []
 const discoveryRecords = (body: unknown): DiscoveryRecord[] | null => {

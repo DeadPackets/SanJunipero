@@ -14,7 +14,7 @@ import {
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
 import { momentStamp } from '../stamp.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 /** Row by row on purpose: the schema wants a title of at least one character, and one untitled
  *  scene parsed as a whole array took the entire filmstrip with it. */

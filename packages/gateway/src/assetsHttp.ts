@@ -18,7 +18,7 @@ import {
   type RawImage,
   type Rgb,
 } from '@sj/forge'
-import type { Router } from './server.js'
+import type { Router } from './router.js'
 import { notFound, sendJson } from './http.js'
 import { reportOnce } from './degraded.js'
 

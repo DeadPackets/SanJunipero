@@ -18,7 +18,7 @@ import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { toEvent, type EventRow } from './http.js'
 import { BONDS_REBUILD_TICKS, BOND_TYPES, buildBonds, mountBondsApi } from './bonds.js'
-import type { RouteHandler } from './server.js'
+import type { RouteHandler } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))

@@ -28,3 +28,8 @@ export const toEvent = (r: EventRow): SimEvent => ({
   type: r.type,
   payload: JSON.parse(r.payload),
 })
+
+/** Text bound for an XML attribute or an SVG `<text>` body — the share card escapes the same
+ *  four characters, and a chapter title must not be able to close either. */
+export const attr = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

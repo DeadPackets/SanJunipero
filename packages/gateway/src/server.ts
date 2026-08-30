@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
@@ -26,6 +26,7 @@ import { mountShareCard, shareMeta } from './shareCard.js'
 import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
 import { frameText, notFound, sendJson } from './http.js'
+import type { RouteHandler, Router } from './router.js'
 
 export type GatewayOpts = {
   dbPath: string
@@ -45,13 +46,6 @@ export type GatewayOpts = {
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
-
-export type RouteHandler = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  params: Record<string, string>,
-) => void
-export type Router = { route(method: string, pattern: string, fn: RouteHandler): void }
 
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250

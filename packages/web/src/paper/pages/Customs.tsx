@@ -6,7 +6,7 @@ import {
   type ConstructRecord,
 } from '@sj/shared'
 import { usePolled } from '../../ui/useEndpoint.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const NO_CUSTOMS: ConstructRecord[] = []
 const customs = (body: unknown): ConstructRecord[] | null => {

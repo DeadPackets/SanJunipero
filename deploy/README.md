@@ -7,7 +7,7 @@ host — nothing in this repository provisions anything or spends anything on yo
 
 | | |
 |---|---|
-| A VPS | 2 vCPU / 4 GB, Docker installed. ~$20/mo. The image is ~1.2 GB and the build wants the RAM. |
+| A VPS | 2 vCPU / 4 GB, Docker installed. ~$20/mo. The image is ~500 MB and the build wants the RAM. |
 | A domain | An A record for the name you will use, pointed at the box's IP, **already resolving**. |
 | Ports 80 and 443 | Open to the world. Let's Encrypt validates over them; a firewall here is the most common failed first deploy. |
 | An S3 bucket | Only for continuous backup. Optional, and you can add it later. |
@@ -344,3 +344,6 @@ mind in it. A birth is outside the backup for at most one minute.
 Don't add a replica. Each container ticks its own world from its own SQLite file, so a second
 replica is a **second town**, not more capacity for this one. More viewers means a bigger box or a
 CDN in front of the static bundle.
+
+The ceiling is websocket deflate, which `serverNoContextTakeover` pays **per socket**: a measured
+0.251 ms per frame per viewer, so one core saturates near **120 viewers at ×8** and **~1,000 at ×1**.

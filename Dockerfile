@@ -1,5 +1,6 @@
 # The whole workspace is copied: pnpm links @sj/* by symlink and the town runs from TS source
-# under tsx, so there is nothing to prune to. Two stages only to leave vite/react/pixi behind.
+# under tsx, so there is no --prod install to fall back to. Two stages to leave the apt toolchain
+# behind; the browser and lint packages go by hand below.
 
 FROM node:24-slim AS build
 RUN corepack enable
@@ -11,6 +12,25 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @sj/web build
+# The browser and lint toolchains, deleted by hand: `pnpm prune --prod` would take `tsx` with it,
+# and tsx is what runs the town. Deleted HERE, not in the runtime stage — a later layer hides the
+# bytes but still ships them. The viewer is already built into packages/web/dist.
+RUN rm -rf \
+  node_modules/.pnpm/onnxruntime-web@* \
+  node_modules/.pnpm/pixi.js@* \
+  node_modules/.pnpm/@biomejs+* \
+  node_modules/.pnpm/rolldown@* \
+  node_modules/.pnpm/@rolldown+* \
+  node_modules/.pnpm/lightningcss* \
+  node_modules/.pnpm/react-dom@* \
+  node_modules/.pnpm/force-graph@* \
+  node_modules/.pnpm/knip@* \
+  node_modules/.pnpm/*eslint* \
+  node_modules/.pnpm/vite@*
+# onnxruntime-node stays (the live embedder loads it), but `dist/binding.js` requires exactly
+# `bin/napi-v6/${process.platform}/…`, so the win32 and darwin trees can never open here.
+RUN rm -rf node_modules/.pnpm/onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v6/win32 \
+  node_modules/.pnpm/onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v6/darwin
 
 FROM node:24-slim AS runtime
 RUN corepack enable

@@ -8,7 +8,7 @@ import {
   type ConstructRecord,
   type ConstructRow,
 } from '@sj/shared'
-import type { Router } from './server.js'
+import type { Router } from './router.js'
 import { sendJson } from './http.js'
 import { reportOnce } from './degraded.js'
 

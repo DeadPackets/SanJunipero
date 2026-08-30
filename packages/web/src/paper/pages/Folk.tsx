@@ -10,7 +10,7 @@ import { EMPTY_COPY } from '../../ui/townStats.js'
 import { households } from '../families.js'
 import { CustomsPage } from './Customs.js'
 import { RosterListView } from './RosterList.js'
-import type { PageProps } from './index.js'
+import type { PageProps } from './types.js'
 
 const NO_CHANGES: PersonalityRow[] = []
 const personalityRows = (body: unknown): PersonalityRow[] =>

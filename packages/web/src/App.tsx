@@ -29,7 +29,7 @@ import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
 import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
-import type { Thing } from './paper/pages/index.js'
+import type { Thing } from './paper/pages/types.js'
 
 /** What the paper is showing, or `null` while it is down. */
 type Sheet = { page: PageKey; tab: string }
