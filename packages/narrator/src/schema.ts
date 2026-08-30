@@ -43,6 +43,9 @@ export function migrateNarratorTables(db: Database.Database): void {
 export function openNarratorDb(path: string): Database.Database {
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
+  // Same trade as engine/db.ts, and it costs more here: a power cut can lose the last
+  // chapters, which are paid LLM output and cannot be re-derived from the log.
+  db.pragma('synchronous = NORMAL')
   db.pragma('foreign_keys = ON')
   migrateLlmTables(db)
   migrateNarratorTables(db)

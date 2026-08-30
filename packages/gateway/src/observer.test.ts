@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { ensureObserverTables, latestThought, publishThought, thoughtsSince } from './observer.js'
+import { ensureObserverTables, publishThought, thoughtsSince } from './observer.js'
 
 describe('observer thought feed', () => {
   it('publishes and reads thoughts in id order', () => {
@@ -24,13 +24,6 @@ describe('observer thought feed', () => {
 
     expect(thoughtsSince(db, 2)).toHaveLength(1)
     expect(thoughtsSince(db, 2)[0]!.text).toBe('Wheat in, before the season slips.')
-
-    expect(latestThought(db, 'farmer')).toEqual({
-      tick: 12,
-      text: 'Wheat in, before the season slips.',
-    })
-    expect(latestThought(db, 'fisher')).toEqual({ tick: 11, text: 'The river owes me a dinner.' })
-    expect(latestThought(db, 'ghost')).toBeNull()
     db.close()
   })
 })

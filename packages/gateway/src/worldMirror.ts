@@ -13,6 +13,11 @@ const parseEv = (r: EvRow): SimEvent =>
     payload: JSON.parse(r.payload) as unknown,
   })
 
+// Named so the plan test can EXPLAIN the query the mirror actually runs, not a copy of it.
+// It needs idx_snapshots_tick, or it is a scan plus a temp b-tree over 30 KB rows.
+export const SNAP_AT_OR_BEFORE_SQL =
+  'SELECT tick, seq, state FROM snapshots WHERE tick <= ? ORDER BY tick DESC, id DESC LIMIT 1'
+
 // Read-only by construction: the mirror only ever prepares SELECTs. Readonly
 // enforcement lives where the DB is opened (createGateway passes { readonly: true }).
 export class WorldMirror {
@@ -32,9 +37,7 @@ export class WorldMirror {
     this.#selLatestSnap = db.prepare(
       'SELECT tick, seq, state FROM snapshots ORDER BY id DESC LIMIT 1',
     )
-    this.#selSnapAtOrBefore = db.prepare(
-      'SELECT tick, seq, state FROM snapshots WHERE tick <= ? ORDER BY tick DESC, id DESC LIMIT 1',
-    )
+    this.#selSnapAtOrBefore = db.prepare(SNAP_AT_OR_BEFORE_SQL)
     this.#selEventsFrom = db.prepare(
       'SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq',
     )
