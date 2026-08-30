@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
 import type { SceneSegment } from './types.js'
-import { DEFAULT_DETECT_CONFIG, detectInstitutions, pastParticiple } from './institutions.js'
+import {
+  DEFAULT_DETECT_CONFIG,
+  detectInstitutions,
+  pastParticiple,
+  verbPhrase,
+  verbPhrasePast,
+} from './institutions.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
@@ -155,6 +161,21 @@ describe('past participles in institution descriptions', () => {
     expect(pastParticiple('chop')).toBe('chopped')
     expect(pastParticiple('craft')).toBe('crafted')
     expect(pastParticiple('harvest')).toBe('harvested')
+  })
+
+  // Run D: "3 people have express:mourned 7 times". A coined verb is a slug, not a word.
+  it('humanizes a coined verb slug instead of leaking the machine id', () => {
+    expect(verbPhrasePast('express:mourn')).toBe('mourned')
+    expect(verbPhrasePast('recipe:plank')).toBe('made plank')
+    expect(verbPhrasePast('dig_channel')).toBe('dug channel')
+    expect(verbPhrasePast('fish')).toBe('fished')
+  })
+
+  it('the present form names the same slug without a namespace', () => {
+    expect(verbPhrase('express:mourn')).toBe('mourn')
+    expect(verbPhrase('recipe:plank')).toBe('make plank')
+    expect(verbPhrase('dig_channel')).toBe('dig channel')
+    expect(verbPhrase('fish')).toBe('fish')
   })
 
   it('the rule description uses the participle', () => {

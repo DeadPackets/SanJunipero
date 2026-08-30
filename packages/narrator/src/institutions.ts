@@ -70,6 +70,25 @@ export const pastParticiple = (verb: string): string => {
   return `${verb}ed`
 }
 
+// A coined verb arrives as a slug — `recipe:plank`, `express:mourn`, `dig_channel`. The
+// namespace and the separators are machine ids, and `recipe:` names the verb "make".
+const verbWords = (verb: string): [string, ...string[]] => {
+  const coined = verb.startsWith('recipe:')
+  const bare = coined ? verb.slice('recipe:'.length) : verb.replace(/^express:/, '')
+  const [head, ...rest] = bare.split(/[_:]/).filter((w) => w !== '')
+  if (head === undefined) return [verb]
+  return coined ? ['make', head, ...rest] : [head, ...rest]
+}
+
+/** "3 people have express:mourned 7 times" -> "3 people have mourned 7 times". */
+export const verbPhrasePast = (verb: string): string => {
+  const [head, ...rest] = verbWords(verb)
+  return [pastParticiple(head), ...rest].join(' ')
+}
+
+/** The same slug in the present, for a name rather than a count. */
+export const verbPhrase = (verb: string): string => verbWords(verb).join(' ')
+
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
 // dropped scene. The caller maps it to a store id and must never persist -1.
 export function detectInstitutions(
@@ -172,8 +191,8 @@ export function detectInstitutions(
     if (agents.size < cfg.ruleMinAgents || seqs.length < cfg.ruleMinActions) continue
     out.push({
       kind: 'rule',
-      name: `people ${verb}`,
-      description: `${agents.size} people have ${pastParticiple(verb)} ${seqs.length} times`,
+      name: `people ${verbPhrase(verb)}`,
+      description: `${agents.size} people have ${verbPhrasePast(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [...agents].sort(),
       sourceEventIds: seqs,
