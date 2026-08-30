@@ -782,14 +782,37 @@ describe('default OpenRouter path extraBody', () => {
     }
   })
 
-  // Two names so a Baidu rate limit does not idle the minds. Order is the preference;
-  // `allow_fallbacks:false` is still what makes it a list.
-  it('★ the request body carries both allowed providers, in order', () => {
-    expect(PROVIDER_ORDER).toEqual(['Baidu', 'Inceptron'])
+  // One name: `provider.order` load-balances, so a second took 56% of run D at 3x the price and
+  // split the KV cache with the first. A refusal is retried onto the same name.
+  it('★ the request body carries exactly one allowed provider', () => {
+    expect(PROVIDER_ORDER).toEqual(['Baidu'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Baidu', 'Inceptron'],
+      order: ['Baidu'],
       allow_fallbacks: false,
     })
+  })
+
+  // ★ Single-homed, the retry is the whole safety net, so it has to cover a back end that
+  // refused as well as one that stalled — and it must not widen the allow-list to do it.
+  it('★ a provider refusal is retried once, onto the same one name', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { fail: true },
+      { json: { mood: 'ok', count: 1 }, usage: { inputTokens: 10, outputTokens: 5 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'turn' })
+    const { value } = await client.object({
+      system: 's',
+      messages: [{ role: 'user', content: 'u' }],
+      schema: SCHEMA,
+    })
+
+    expect(value).toEqual({ mood: 'ok', count: 1 })
+    const all = rows(db)
+    expect(all, 'the default is one retry, not two').toHaveLength(2)
+    expect(all[0]!.ok).toBe(0)
+    expect(all[1]!.ok).toBe(1)
+    expect(client.requestBody().provider).toEqual({ order: ['Baidu'], allow_fallbacks: false })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the

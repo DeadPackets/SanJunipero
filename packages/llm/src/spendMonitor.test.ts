@@ -95,50 +95,53 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
   })
 })
 
-// ★ `provider.order` load-balances rather than prioritises — measured 52/48 (providers2). Half
-// the window off the first name is the design working, so only a pin being shut out is news.
-describe('★ checkProviderMix — the routing is reported, never enforced', () => {
-  const mixOpts = { pinned: 'Baidu', windowRealMinutes: 15, now: NOW }
+// ★ With one name pinned and `allow_fallbacks:false`, nothing off the allow-list should ever
+// serve a mind call. One that did is a leak past the pin, not a mix.
+describe('★ checkProviderMix — a back end past the allow-list is reported, never enforced', () => {
+  const mixOpts = { allowed: ['Baidu'], windowRealMinutes: 15, now: NOW }
 
-  it('says nothing about the measured 52/48 split the allow-list is meant to produce', () => {
+  it('says nothing about a window the pin served whole', () => {
     const db = openDb()
-    for (let i = 0; i < 52; i++) {
+    for (let i = 0; i < 100; i++) {
       seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
-    }
-    for (let i = 0; i < 48; i++) {
-      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Inceptron' })
     }
 
     const mix = checkProviderMix(db, mixOpts)
-    expect(mix.offPinShare).toBeCloseTo(0.48, 10)
-    expect(mix.alerted, 'an ordinary load-balanced window raised an alert').toBe(false)
+    expect(mix.offPinShare).toBe(0)
+    expect(mix.alerted, 'a window served entirely by the pin raised an alert').toBe(false)
     expect(alerts(db)).toEqual([])
   })
 
-  it('writes one row with the shares and the window cost once the pin is shut out', () => {
+  it('★ writes one row for a single call served off the allow-list', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const db = openDb()
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 9; i++) {
       seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu', costUsd: 0.001 })
     }
-    for (let i = 0; i < 7; i++) {
-      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Inceptron', costUsd: 0.01 })
-    }
-    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: null, costUsd: 0.02 })
+    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Inceptron', costUsd: 0.01 })
 
     const mix = checkProviderMix(db, mixOpts)
     expect(mix.alerted).toBe(true)
-    expect(mix.offPinShare).toBeCloseTo(0.8, 10)
+    expect(mix.offPinShare).toBeCloseTo(0.1, 10)
     const row = alerts(db)
     expect(row).toHaveLength(1)
-    expect(row[0]!.kind).toBe('llm_provider_mix_high')
-    expect(row[0]!.detail).toContain('80% of 10 mind calls')
-    expect(row[0]!.detail).toContain('Inceptron 70%')
-    expect(row[0]!.detail).toContain('unattributed 10%')
-    expect(row[0]!.detail).toContain('$0.0920')
+    expect(row[0]!.kind).toBe('llm_provider_off_allow_list')
+    expect(row[0]!.detail).toContain('1 of 10 mind calls')
+    expect(row[0]!.detail).toContain('[Baidu]')
+    expect(row[0]!.detail).toContain('Inceptron 1')
+    expect(row[0]!.detail).toContain('$0.0190')
   })
 
-  it('reads the mind callers only, so a narrator on a fallback cannot raise it', () => {
+  // The generation-endpoint backfill answers for these; a row that names nobody has not been
+  // shown to have left the pin.
+  it('leaves a call that names no back end to the backfill', () => {
+    const db = openDb()
+    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
+    seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: null, costUsd: 0.02 })
+    expect(checkProviderMix(db, mixOpts).alerted).toBe(false)
+  })
+
+  it('reads the mind callers only, so a narrator elsewhere cannot raise it', () => {
     const db = openDb()
     for (let i = 0; i < 5; i++) {
       seedProviderCall(db, { agoMinutes: 1, caller: 'narrator', provider: 'Inceptron' })

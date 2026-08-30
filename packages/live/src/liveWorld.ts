@@ -785,17 +785,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             log(`stream: spend — projected $${projected.usdPerSimDay.toFixed(2)}/sim-day`)
           }
         }
-        // One line per window, never a stop: the failover is what keeps a rate limit on the pin
-        // from idling every mind, and only the operator can answer a dear one.
+        // One line per window, never a stop: only the operator can answer a back end that got
+        // past the allow-list.
         if (Date.now() >= nextMixCheckAt) {
           nextMixCheckAt = Date.now() + rateWindow * 60 * 1000
           const mix = checkProviderMix(opsDb, {
             windowRealMinutes: rateWindow,
-            pinned: PROVIDER_ORDER[0] ?? '',
+            allowed: PROVIDER_ORDER,
           })
           if (mix.alerted) {
             log(
-              `stream: providers — ${(mix.offPinShare * 100).toFixed(0)}% of mind calls off the pin`,
+              `stream: providers — ${(mix.offPinShare * 100).toFixed(0)}% of mind calls off the allow-list`,
             )
           }
         }

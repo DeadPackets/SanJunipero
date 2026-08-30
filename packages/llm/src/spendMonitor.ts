@@ -46,10 +46,6 @@ export function projectCallRate(
   }
 }
 
-/** `provider.order` LOAD-BALANCES: 52/48 is the measured normal, so half the window off the
- *  first name says nothing. Above 70% the first name is being shut out, which is worth a line. */
-export const PROVIDER_MIX_ALERT_SHARE = 0.7
-
 export type ProviderMix = {
   calls: number
   costUsd: number
@@ -57,11 +53,12 @@ export type ProviderMix = {
   alerted: boolean
 }
 
-/** An alert, never a stop: the failover is what keeps a rate limit on the pin from idling every
- *  mind, and the operator's answer to a dear one is a pin change, not a dead town. */
+/** With one name pinned and `allow_fallbacks` false, a back end off the allow-list is not a mix,
+ *  it is a leak, and one served call is the whole signal. A call that names nobody belongs to the
+ *  backfill, not here. An alert, never a stop: only the operator can answer it. */
 export function checkProviderMix(
   db: Database.Database,
-  opts: WindowOpts & { pinned: string },
+  opts: WindowOpts & { allowed: string[] },
 ): ProviderMix {
   const { windowRealMinutes, cutoff } = windowOf(opts)
   const rows = db
@@ -74,18 +71,16 @@ export function checkProviderMix(
     .all(cutoff, ...MIND_CALLERS) as { provider: string | null; calls: number; costUsd: number }[]
   const calls = rows.reduce((n, r) => n + r.calls, 0)
   const costUsd = rows.reduce((n, r) => n + r.costUsd, 0)
-  const offPin = rows.filter((r) => r.provider !== opts.pinned).reduce((n, r) => n + r.calls, 0)
+  const leaked = rows.filter((r) => r.provider !== null && !opts.allowed.includes(r.provider))
+  const offPin = leaked.reduce((n, r) => n + r.calls, 0)
   const offPinShare = calls === 0 ? 0 : offPin / calls
   const mix = { calls, costUsd, offPinShare }
-  if (calls === 0 || offPinShare <= PROVIDER_MIX_ALERT_SHARE) return { ...mix, alerted: false }
-  const who = rows
-    .map((r) => `${r.provider ?? 'unattributed'} ${((r.calls / calls) * 100).toFixed(0)}%`)
-    .join(', ')
+  if (offPin === 0) return { ...mix, alerted: false }
+  const who = leaked.map((r) => `${r.provider} ${r.calls}`).join(', ')
   const detail =
-    `${(offPinShare * 100).toFixed(0)}% of ${calls} mind calls in the last ` +
-    `${windowRealMinutes} real minutes were not served by ${opts.pinned} ` +
-    `(${who}); the window cost $${costUsd.toFixed(4)}`
-  insertAlert(db, { agentId: null, kind: 'llm_provider_mix_high', detail })
+    `${offPin} of ${calls} mind calls in the last ${windowRealMinutes} real minutes were served ` +
+    `off the allow-list [${opts.allowed.join(', ')}] (${who}); the window cost $${costUsd.toFixed(4)}`
+  insertAlert(db, { agentId: null, kind: 'llm_provider_off_allow_list', detail })
   console.warn(`providers: ${detail}`)
   return { ...mix, alerted: true }
 }
