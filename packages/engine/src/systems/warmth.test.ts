@@ -5,7 +5,7 @@ import { RngStreams } from '../rng.js'
 import { genesisState, type AgentBody, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ambientTempAt, isExposed } from './warmth.js'
-import { ev, grid, roundTrips } from '../testutil/world.js'
+import { changesOf, ev, grid, roundTrips } from '../testutil/world.js'
 
 // The fixture law: nothing may speak at midnight but the law under test, and no weather rolls.
 // The EXCEPTION the Phase-F brief allows is used deliberately — these tests set the sky by hand.
@@ -49,15 +49,12 @@ function tickOnce(s: WorldState, config = CFG): WorldTickResult {
   )(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 
-type NeedEv = { id: string; need: string; delta: number; reason?: string }
+type NeedEv = { id: string; need: string; delta: number; reason?: string | undefined }
+const changed = (r: WorldTickResult): NeedEv[] =>
+  r.events.flatMap((e) => changesOf(e).map((c) => ({ id: (e.payload as { id: string }).id, ...c })))
 const needs = (r: WorldTickResult, need: string): NeedEv[] =>
-  r.events
-    .filter((e) => e.type === 'need_changed' && (e.payload as NeedEv).need === need)
-    .map((e) => e.payload as NeedEv)
-const chills = (r: WorldTickResult): NeedEv[] =>
-  r.events
-    .filter((e) => e.type === 'need_changed' && (e.payload as NeedEv).reason === 'exposure')
-    .map((e) => e.payload as NeedEv)
+  changed(r).filter((c) => c.need === need)
+const chills = (r: WorldTickResult): NeedEv[] => changed(r).filter((c) => c.reason === 'exposure')
 
 const skyOf = (tick: number, kind: string): WorldState => ({
   ...genesisState(CFG, map()),

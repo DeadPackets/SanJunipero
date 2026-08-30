@@ -105,10 +105,13 @@ function runTown(seed = 'far-bank'): Run {
       if (tick % UPKEEP_EVERY === 0) {
         for (const id of ids) {
           if (loop.state.agents[id] === undefined) continue
-          for (const need of ['hunger', 'energy', 'warmth', 'social'] as const) {
-            emit('need_changed', { id, need, delta: 100 })
-          }
-          emit('thirst_changed', { id, delta: 100 })
+          emit('needs_changed', {
+            id,
+            changes: (['hunger', 'energy', 'warmth', 'social', 'thirst'] as const).map((need) => ({
+              need,
+              delta: 100,
+            })),
+          })
         }
       }
       for (const e of worldTick(loop.state).events) emit(e.type, e.payload)

@@ -160,7 +160,10 @@ async function main(): Promise<void> {
   for (const m of MINDS) {
     state = fold(
       state,
-      store.append(state.tick, 'need_changed', { id: m.id, need: 'energy', delta: 0 }),
+      store.append(state.tick, 'needs_changed', {
+        id: m.id,
+        changes: [{ need: 'energy', delta: 0 }],
+      }),
       config,
     )
   }

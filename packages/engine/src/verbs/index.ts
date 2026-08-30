@@ -422,11 +422,10 @@ const eat: VerbDef = makeVerb({
       ...(item.kind === HERB_KIND ? relieveWorst(state, agentId, config.mortality.herbRelief) : []),
       { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
       {
-        type: 'need_changed',
+        type: 'needs_changed',
         payload: {
           id: agentId,
-          need: 'hunger',
-          delta: mealRestore(state, config, agentId, item.kind),
+          changes: [{ need: 'hunger', delta: mealRestore(state, config, agentId, item.kind) }],
         },
       },
     ]

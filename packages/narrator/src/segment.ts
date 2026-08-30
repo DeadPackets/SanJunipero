@@ -8,7 +8,7 @@ export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = {
 }
 
 // Bare payload.id is an AGENT id only on these types; elsewhere it names a structure/item/crop.
-const ID_IS_AGENT = new Set(['agent_spawned', 'agent_moved', 'need_changed'])
+const ID_IS_AGENT = new Set(['agent_spawned', 'agent_moved', 'needs_changed'])
 
 type P = Record<string, unknown>
 

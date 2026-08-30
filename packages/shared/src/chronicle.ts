@@ -70,12 +70,11 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'forageable_stock_changed',
   'forageable_depleted',
   'forageable_regrown',
-  'thirst_changed',
   'traffic_decayed',
   // The body's own bookkeeping, and the ledger's.
   'tick_advanced',
   'agent_moved',
-  'need_changed',
+  'needs_changed',
   'hp_changed',
   'skill_gained',
   'agent_woke',

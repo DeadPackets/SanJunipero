@@ -705,10 +705,10 @@ export function makeFoundersOnTick(
     for (const f of cast) {
       const a = getState().agents[f.id]
       if (!a?.alive) continue
-      if (a.needs.hunger < NEED_TOPUP_BELOW)
-        emit('need_changed', { id: f.id, need: 'hunger', delta: HUNGER_TOPUP })
-      if (a.needs.warmth < NEED_TOPUP_BELOW)
-        emit('need_changed', { id: f.id, need: 'warmth', delta: WARMTH_TOPUP })
+      const topUp: { need: string; delta: number }[] = []
+      if (a.needs.hunger < NEED_TOPUP_BELOW) topUp.push({ need: 'hunger', delta: HUNGER_TOPUP })
+      if (a.needs.warmth < NEED_TOPUP_BELOW) topUp.push({ need: 'warmth', delta: WARMTH_TOPUP })
+      if (topUp.length > 0) emit('needs_changed', { id: f.id, changes: topUp })
       // Scripted timber, on the same footing and for the same declared reason. The id never
       // ends in a digit, because `fold` advances the world's entity counter off any that does.
       if (

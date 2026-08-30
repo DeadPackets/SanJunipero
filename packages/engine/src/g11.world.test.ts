@@ -344,7 +344,11 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     }
     s = fold(
       s,
-      ev('need_changed', { id: 'body', need: 'energy', delta: opts.energy - 100 }, start - 1),
+      ev(
+        'needs_changed',
+        { id: 'body', changes: [{ need: 'energy', delta: opts.energy - 100 }] },
+        start - 1,
+      ),
       CFG,
     )
     s = { ...s, tick: start - 1 }
@@ -435,12 +439,20 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
       // A body at the end of a working day: little energy, and no warmth left to spend.
       s = fold(
         s,
-        ev('need_changed', { id: 'body', need: 'energy', delta: -80 }, AUTUMN_DUSK - 1),
+        ev(
+          'needs_changed',
+          { id: 'body', changes: [{ need: 'energy', delta: -80 }] },
+          AUTUMN_DUSK - 1,
+        ),
         CFG,
       )
       s = fold(
         s,
-        ev('need_changed', { id: 'body', need: 'warmth', delta: -100 }, AUTUMN_DUSK - 1),
+        ev(
+          'needs_changed',
+          { id: 'body', changes: [{ need: 'warmth', delta: -100 }] },
+          AUTUMN_DUSK - 1,
+        ),
         CFG,
       )
       s = { ...s, tick: AUTUMN_DUSK - 1 }

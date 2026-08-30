@@ -93,7 +93,7 @@ function buildWorld(simConfig?: SimConfig) {
     state = fold(state, ev, config)
   }
   emit('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 30 })
-  emit('need_changed', { id: AGENT, need: 'hunger', delta: -70 })
+  emit('needs_changed', { id: AGENT, changes: [{ need: 'hunger', delta: -70 }] })
   emit('structure_planned', {
     id: STRUCTURE_ID,
     kind: 'storehouse',

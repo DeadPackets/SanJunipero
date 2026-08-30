@@ -2,6 +2,7 @@ import { dayPhaseFromTick, isHearthKind, simTimeFromTick, type SimConfig } from 
 import type { WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
 import { awakeEnergyDecay, warmthTargetFromAir } from './needs.js'
+import { needAfterQueued, queueNeed } from './needsBatch.js'
 
 // Cold is not a new way to die: it takes the warmth out of a body, and a body with no warmth
 // left spends energy twice as fast, which walks it down the collapse ladder and nowhere else.
@@ -83,20 +84,15 @@ export function warmthSystem(ctx: TickCtx): void {
     if (!a.alive) continue
     if (!isExposed(ctx.state(), ctx.config, id)) {
       const target = warmthTargetFor(ctx.state(), ctx.config, id)
-      const delta = (target - a.needs.warmth) * ctx.config.needs.warmthEqualizeFactorPerTick
-      if (delta !== 0) ctx.emit('need_changed', { id, need: 'warmth', delta })
+      const warmth = needAfterQueued(ctx, a, 'warmth')
+      queueNeed(ctx, id, 'warmth', (target - warmth) * ctx.config.needs.warmthEqualizeFactorPerTick)
       continue
     }
-    ctx.emit('need_changed', { id, need: 'warmth', delta: -cfg.exposureDecayPerTick })
+    queueNeed(ctx, id, 'warmth', -cfg.exposureDecayPerTick)
     // The cold only costs energy once the body has no warmth left to spend, and `reason` marks
     // exactly that tick — it is what the fold counts, and what names the death that follows.
-    const cold = ctx.state().agents[id]!
-    if (cold.needs.warmth > 0 || cold.asleep || cold.needs.energy <= 0) continue
-    ctx.emit('need_changed', {
-      id,
-      need: 'energy',
-      delta: -awakeEnergyDecay(ctx.config, cold),
-      reason: 'exposure',
-    })
+    if (needAfterQueued(ctx, a, 'warmth') > 0 || a.asleep) continue
+    if (needAfterQueued(ctx, a, 'energy') <= 0) continue
+    queueNeed(ctx, id, 'energy', -awakeEnergyDecay(ctx.config, a), 'exposure')
   }
 }

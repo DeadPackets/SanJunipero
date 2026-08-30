@@ -202,18 +202,22 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     })
     // A pale mushroom is a poor meal as well as a gamble (per-kind nutrition).
     expect(out).toContainEqual({
-      type: 'need_changed',
+      type: 'needs_changed',
       payload: {
         id: 'a1',
-        need: 'hunger',
-        delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
+        changes: [
+          {
+            need: 'hunger',
+            delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
+          },
+        ],
       },
     })
   })
 
   it('spares the eater when the roll goes their way, and the meal still counts', () => {
     const out = eaten(holding('pale_mushroom'), SPARES, illness())
-    expect(out.map((e) => e.type)).toEqual(['item_qty_changed', 'need_changed'])
+    expect(out.map((e) => e.type)).toEqual(['item_qty_changed', 'needs_changed'])
   })
 
   it('rolls on a loaf on its last day, and not one day earlier', () => {
@@ -277,7 +281,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
         type: 'item_owner_changed',
         payload: { id: 'item_1', owner: 'a1' },
       })
-      expect(out.map((e) => e.type)).toContain('need_changed')
+      expect(out.map((e) => e.type)).toContain('needs_changed')
     })
 
     it('a loaf on a shelf the body stands beside is the same', () => {
@@ -1093,8 +1097,9 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
       { itemId },
       new RngStreams('fv').get('illness'),
     )) {
-      if (e.type === 'need_changed' && (e.payload as { need: string }).need === 'hunger') {
-        restored = (e.payload as { delta: number }).delta
+      if (e.type === 'needs_changed') {
+        const changes = (e.payload as { changes: { need: string; delta: number }[] }).changes
+        restored = changes.find((c) => c.need === 'hunger')?.delta ?? restored
       }
       out = fold(out, at(e.type, e.payload, out.tick), config)
     }

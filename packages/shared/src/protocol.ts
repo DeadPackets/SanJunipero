@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 3 // 3: ServerSnapshot.paused — a v2 client's strict parse rejects it
+export const PROTOCOL_VERSION = 4 // 4: needs_changed batches every need — a v3 reducer throws on it
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */

@@ -163,8 +163,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const SEMANTIC_RECORD_CAP = 300
 const NARRATOR_NOISE: ReadonlySet<string> = new Set([
   'tick_advanced',
-  'need_changed',
-  'thirst_changed',
+  'needs_changed',
   'hp_changed',
   'agent_moved',
   'agent_aged',
@@ -681,7 +680,7 @@ async function main(): Promise<void> {
     // A staged thirst, the same device: the clock runs at 0.021 a tick, so a body that starts
     // full does not reach the debuff line until day three and a two-sim-day window can never
     // show the criterion. One founder wakes already dry, and crosses it before noon on day one.
-    emit('thirst_changed', { id: PARCHED_ONE, delta: -65 })
+    emit('needs_changed', { id: PARCHED_ONE, changes: [{ need: 'thirst', delta: -65 }] })
   }
 
   // --- the loop, the bridge, the law channel ---
@@ -1190,7 +1189,7 @@ async function main(): Promise<void> {
       'agent_tended',
       'agent_died',
       'grave_placed',
-      'thirst_changed',
+      'needs_changed',
       'agent_drank',
       'hp_changed',
       'tile_changed',

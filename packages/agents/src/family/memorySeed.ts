@@ -135,7 +135,7 @@ const PHRASINGS: Readonly<Record<string, Say>> = {
 }
 
 /** The log is read one type at a time, so a seeding never parses the 99.5% of it —
- *  `agent_moved`, `need_changed` — that this table has no words for. */
+ *  `agent_moved`, `needs_changed` — that this table has no words for. */
 export const SEED_TYPES: readonly string[] = Object.keys(PHRASINGS)
 
 // The public record of the household, never a line of a parent's own memory store: per-agent

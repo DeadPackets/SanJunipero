@@ -238,7 +238,7 @@ describe('sleep is indoors-only (C9 T2b)', () => {
       ok: false,
       reason: OUTDOORS,
     })
-    s = fold(s, ev(12, 'need_changed', { id: 'a1', need: 'energy', delta: -75 }))
+    s = fold(s, ev(12, 'needs_changed', { id: 'a1', changes: [{ need: 'energy', delta: -75 }] }))
     expect(s.agents.a1!.needs.energy).toBeLessThan(DEFAULT_CONFIG.needs.debuffThreshold)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })

@@ -55,7 +55,7 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'action_completed':
       return p.verb === 'give' ? `${name(p.agentId)} gave something away.` : null
     default:
-      return null // tick_advanced, need_changed, agent_moved, and any future type
+      return null // tick_advanced, needs_changed, agent_moved, and any future type
   }
 }
 

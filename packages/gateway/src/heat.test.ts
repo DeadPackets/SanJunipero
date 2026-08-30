@@ -163,13 +163,13 @@ describe('heat stub', () => {
     // sitting between them — the shape the type filter had to be proved against.
     const log: SimEvent[] = [
       ev(1, 1, 'structure_planned', { id: 's1', kind: 'house', builderId: 'omar' }),
-      ev(2, 2, 'need_changed', { agentId: 'ana', need: 'hunger', delta: -1 }),
+      ev(2, 2, 'needs_changed', { id: 'ana', changes: [{ need: 'hunger', delta: -1 }] }),
       ev(3, 3, 'action_completed', { agentId: 'ana', verb: 'harvest' }),
       ev(4, 3, 'crop_harvested', { cropId: 'c1' }),
       ev(5, 4, 'agent_moved', { id: 'ana', x: 1, y: 1 }),
       ev(6, 5, 'crop_harvested', { cropId: 'c2' }),
       ev(7, 6, 'action_completed', { agentId: 'omar', verb: 'build' }),
-      ev(8, 6, 'need_changed', { agentId: 'omar', need: 'energy', delta: -1 }),
+      ev(8, 6, 'needs_changed', { id: 'omar', changes: [{ need: 'energy', delta: -1 }] }),
       ev(9, 7, 'structure_completed', { id: 's1' }),
       ev(10, 8, 'agent_spoke', { agentId: 'ana', text: 'hi', x: 0, y: 0 }),
       ev(11, 9, 'agent_died', { agentId: 'dan', cause: 'hunger' }),

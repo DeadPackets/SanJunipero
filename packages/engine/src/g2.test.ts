@@ -29,6 +29,7 @@ import {
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs/index.js'
+import { changesOf } from './testutil/world.js'
 // Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
 // witness, regrowth and desire paths are all live on the 3-day run.
 const G2_CONFIG = SimConfigSchema.parse({})
@@ -150,10 +151,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(firstFish).toBeLessThan(G2_CONFIG.needs.eatRestoreHunger)
     const eatEv = evs.find(
       (e) =>
-        e.type === 'need_changed' &&
         (e.payload as Payload).id === IDLER &&
-        (e.payload as Payload).need === 'hunger' &&
-        (e.payload as Payload).delta === firstFish,
+        changesOf(e).some((c) => c.need === 'hunger' && c.delta === firstFish),
     )
     expect(eatEv).toBeDefined()
     expect(giveEv!.tick).toBeLessThan(eatEv!.tick)
@@ -239,7 +238,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(evs.filter((e) => e.type === 'agent_collapsed')).toHaveLength(3)
 
     // Thirst: a second clock runs on every body, every tick, and the Builder is drier than he began.
-    expect(types).toContain('thirst_changed')
+    expect(evs.some((e) => changesOf(e).some((c) => c.need === 'thirst'))).toBe(true)
     expect(state.agents[BUILDER]!.thirst).toBeLessThan(100)
 
     // Fauna: deer and fish are entities on the map now, and they move on their own.

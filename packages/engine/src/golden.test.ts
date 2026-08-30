@@ -21,7 +21,10 @@ function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop
       const mover = `a${rng.get('walk').int(5)}`
       emit('agent_moved', { id: mover, x: rng.get('walk').int(128), y: rng.get('walk').int(128) })
       if (tick % 10 === 0)
-        emit('need_changed', { id: `a${rng.get('meta').int(5)}`, need: 'hunger', delta: -1 })
+        emit('needs_changed', {
+          id: `a${rng.get('meta').int(5)}`,
+          changes: [{ need: 'hunger', delta: -1 }],
+        })
     }
   }
 }

@@ -249,6 +249,10 @@ export function authoredOrigin(state: { origin?: { x: number; y: number } | unde
   return state.origin ?? { x: 0, y: 0 }
 }
 
+// Needs and thirst all live on 0-100. One derivation, because `needsBatch` predicts what the
+// fold will land on and a second copy of the bounds is a prediction that can be wrong.
+export const clampNeed = (v: number): number => Math.max(0, Math.min(100, v))
+
 // The one reader of the field. A body that has never been thirsty is a full one, which
 // is what lets every older log fold to the hash it always had.
 export function thirstOf(a: { thirst?: number }): number {

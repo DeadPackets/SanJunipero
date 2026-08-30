@@ -91,7 +91,7 @@ describe('segmentScenes', () => {
         flammable: true,
         builderId: 'omar',
       }),
-      ev(4, 3, 'need_changed', { id: 'nadia', need: 'hunger', delta: -1 }),
+      ev(4, 3, 'needs_changed', { id: 'nadia', changes: [{ need: 'hunger', delta: -1 }] }),
     ]
     const scenes = segmentScenes(events)
     expect(scenes).toHaveLength(1)

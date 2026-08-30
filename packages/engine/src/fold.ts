@@ -9,6 +9,7 @@ import {
 } from '@sj/shared'
 import {
   fromTileKey,
+  clampNeed,
   INJURY_HEAL_DAYS,
   pairKey,
   thirstOf,
@@ -57,7 +58,6 @@ import {
   FireSpread,
   GravePlaced,
   HpChanged,
-  ThirstChanged,
   ItemBroke,
   ItemBurnedOut,
   ItemEquipped,
@@ -84,7 +84,8 @@ import {
   ItemTextChanged,
   ItemWorn,
   MysteryEvent,
-  NeedChanged,
+  NeedsChanged,
+  type NeedChange,
   SkillGained,
   StructureCompleted,
   StructureDamaged,
@@ -106,7 +107,28 @@ import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
 import { findPath } from './path.js'
 
-const clamp = (v: number) => Math.max(0, Math.min(100, v))
+// One change out of a batch, applied to one body: the old per-event body, kept as its own step
+// so a batch of N folds to exactly the state the N separate events left.
+function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig): AgentBody {
+  if (c.need === 'thirst') return { ...a, thirst: clampNeed(thirstOf(a) + c.delta) }
+  const needs = { ...a.needs, [c.need]: clampNeed(a.needs[c.need] + c.delta) }
+  let zeroHungerSinceTick = a.zeroHungerSinceTick
+  if (c.need === 'hunger')
+    zeroHungerSinceTick = needs.hunger <= 0 ? (zeroHungerSinceTick ?? tick) : null
+  let collapsedSinceTick = a.collapsedSinceTick
+  if (
+    collapsedSinceTick !== null &&
+    needs.hunger >= config.needs.collapseThreshold &&
+    needs.energy >= config.needs.collapseThreshold &&
+    a.hp >= config.health.collapseHp
+  )
+    collapsedSinceTick = null
+  // A tick the cold billed to this body is remembered until it eats or sleeps: it is the
+  // difference between dying tired and dying cold, and nothing else records it.
+  const chilled =
+    c.reason === 'exposure' ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 } : {}
+  return { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
+}
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.
 function bumpCounter(counters: WorldState['counters'], id: string): WorldState['counters'] {
@@ -190,35 +212,12 @@ export function fold(
         traffic: { ...state.traffic, [key]: (state.traffic?.[key] ?? 0) + 1 },
       }
     }
-    case 'need_changed': {
-      const p = NeedChanged.parse(event.payload)
-      const a = state.agents[p.id]
-      if (!a) throw new Error(`need_changed for unknown agent ${p.id}`)
-      const needs = { ...a.needs, [p.need]: clamp(a.needs[p.need] + p.delta) }
-      let zeroHungerSinceTick = a.zeroHungerSinceTick
-      if (p.need === 'hunger')
-        zeroHungerSinceTick = needs.hunger <= 0 ? (zeroHungerSinceTick ?? event.tick) : null
-      let collapsedSinceTick = a.collapsedSinceTick
-      if (
-        collapsedSinceTick !== null &&
-        needs.hunger >= config.needs.collapseThreshold &&
-        needs.energy >= config.needs.collapseThreshold &&
-        a.hp >= config.health.collapseHp
-      )
-        collapsedSinceTick = null
-      // A tick the cold billed to this body is remembered until it eats or sleeps: it is the
-      // difference between dying tired and dying cold, and nothing else records it.
-      const chilled =
-        p.reason === 'exposure'
-          ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 }
-          : {}
-      return {
-        ...state,
-        agents: {
-          ...state.agents,
-          [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled },
-        },
-      }
+    case 'needs_changed': {
+      const p = NeedsChanged.parse(event.payload)
+      let a = state.agents[p.id]
+      if (!a) throw new Error(`needs_changed for unknown agent ${p.id}`)
+      for (const c of p.changes) a = applyNeed(a, c, event.tick, config)
+      return { ...state, agents: { ...state.agents, [p.id]: a } }
     }
     case 'item_spawned': {
       const p = ItemSpawned.parse(event.payload)
@@ -870,22 +869,13 @@ export function fold(
         counters: bumpCounter(state.counters, p.id),
       }
     }
-    case 'thirst_changed': {
-      const p = ThirstChanged.parse(event.payload)
-      const a = state.agents[p.id]
-      if (!a) throw new Error(`thirst_changed for unknown agent ${p.id}`)
-      return {
-        ...state,
-        agents: { ...state.agents, [p.id]: { ...a, thirst: clamp(thirstOf(a) + p.delta) } },
-      }
-    }
     case 'agent_drank': {
       const p = AgentDrank.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_drank for unknown agent ${p.agentId}`)
       const agents = {
         ...state.agents,
-        [p.agentId]: { ...a, thirst: clamp(thirstOf(a) + config.thirst.drinkRestore) },
+        [p.agentId]: { ...a, thirst: clampNeed(thirstOf(a) + config.thirst.drinkRestore) },
       }
       if (p.source !== 'item' || p.itemId === undefined) return { ...state, agents }
       const item = state.items[p.itemId]

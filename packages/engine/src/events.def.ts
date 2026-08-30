@@ -34,16 +34,25 @@ export const AgentBorn = z
   })
   .strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
-// `reason` is optional so every recorded need change still parses. Only the cold sets
-// it, on the one event per tick where a body with no warmth left pays for it in energy.
-export const NeedChanged = z
+// The changes are applied in the order the laws queued them, so a batch folds to exactly the
+// state the separate events left. Only the cold sets `reason`, on the change it bills energy.
+export const NeedsChanged = z
   .object({
     id: z.string(),
-    need: z.enum(['hunger', 'energy', 'warmth', 'social']),
-    delta: z.number(),
-    reason: z.literal('exposure').optional(),
+    changes: z
+      .array(
+        z
+          .object({
+            need: z.enum(['hunger', 'energy', 'warmth', 'social', 'thirst']),
+            delta: z.number(),
+            reason: z.literal('exposure').optional(),
+          })
+          .strict(),
+      )
+      .min(1),
   })
   .strict()
+export type NeedChange = z.infer<typeof NeedsChanged>['changes'][number]
 
 export const ItemLoc = z.discriminatedUnion('t', [
   z.object({ t: z.literal('tile'), x: z.number(), y: z.number() }).strict(),
@@ -274,9 +283,6 @@ export const GravePlaced = z
     y: z.number().int(),
   })
   .strict()
-// Thirst is not one of the four needs: widening the NeedChanged enum would change what every
-// recorded log means. It gets its own event and its own clock.
-export const ThirstChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const AgentDrank = z
   .object({
     agentId: z.string(),

@@ -185,8 +185,8 @@ export function expressiveVerbFromRuling(name: string, ruling: ExpressiveRuling)
       ]
       if (ruling.energyCost > 0) {
         events.push({
-          type: 'need_changed',
-          payload: { id: agentId, need: 'energy', delta: -ruling.energyCost },
+          type: 'needs_changed',
+          payload: { id: agentId, changes: [{ need: 'energy', delta: -ruling.energyCost }] },
         })
       }
       return events

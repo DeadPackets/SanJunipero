@@ -91,25 +91,45 @@ describe('fold: sleep / collapse / death events', () => {
     )
   })
 
-  it('need_changed tracks zeroHungerSinceTick: set when hunger hits 0, cleared when it rises', () => {
+  it('needs_changed tracks zeroHungerSinceTick: set when hunger hits 0, cleared when it rises', () => {
     let s = makeWorld()
-    s = fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }, 7), FAST)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }, 7),
+      FAST,
+    )
     expect(s.agents.a1!.zeroHungerSinceTick).toBe(7)
-    s = fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -5 }, 9), FAST)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -5 }] }, 9),
+      FAST,
+    )
     expect(s.agents.a1!.zeroHungerSinceTick).toBe(7) // already zero: first tick stands
-    s = fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: 60 }, 10), FAST)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: 60 }] }, 10),
+      FAST,
+    )
     expect(s.agents.a1!.zeroHungerSinceTick).toBeNull()
   })
 
-  it('need_changed clears collapsedSinceTick only when hunger AND energy are back at threshold', () => {
+  it('needs_changed clears collapsedSinceTick only when hunger AND energy are back at threshold', () => {
     let s = makeWorld()
     s = patchAgent(s, 'a1', {
       collapsedSinceTick: 3,
       needs: { hunger: 0, energy: 0, warmth: 50, social: 50 },
     })
-    s = fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: 60 }, 5), FAST)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: 60 }] }, 5),
+      FAST,
+    )
     expect(s.agents.a1!.collapsedSinceTick).toBe(3) // energy still below
-    s = fold(s, ev('need_changed', { id: 'a1', need: 'energy', delta: 60 }, 6), FAST)
+    s = fold(
+      s,
+      ev('needs_changed', { id: 'a1', changes: [{ need: 'energy', delta: 60 }] }, 6),
+      FAST,
+    )
     expect(s.agents.a1!.collapsedSinceTick).toBeNull()
   })
 })

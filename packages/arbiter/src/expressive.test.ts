@@ -193,8 +193,8 @@ describe('the coined verb', () => {
         payload: { agentId: 'a1', verb: 'dance', x: 20, y: 20, sense: 'sight' },
       })
       expect(events[1]).toEqual({
-        type: 'need_changed',
-        payload: { id: 'a1', need: 'energy', delta: -2 },
+        type: 'needs_changed',
+        payload: { id: 'a1', changes: [{ need: 'energy', delta: -2 }] },
       })
     } finally {
       unregisterVerb('express:dance')

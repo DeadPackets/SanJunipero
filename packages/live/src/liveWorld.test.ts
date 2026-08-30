@@ -375,7 +375,11 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
 
     expect(eventsOf(dir, 'action_started')).toHaveLength(0)
     // And the scripted larder top-up is gone with it: a live town feeds itself or it does not.
-    expect(eventsOf(dir, 'need_changed').filter((p) => Number(p.delta) > 0)).toHaveLength(0)
+    expect(
+      eventsOf(dir, 'needs_changed')
+        .flatMap((p) => p.changes as { delta: number }[])
+        .filter((c) => c.delta > 0),
+    ).toHaveLength(0)
   }, 30_000)
 
   // Both are spend the scripted path cannot make, and both must be booked in the one ledger the

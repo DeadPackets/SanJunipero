@@ -154,7 +154,10 @@ describe('★ block 1 tells the truth about sleep', () => {
     if (opts.energy !== undefined) {
       s = fold(
         s,
-        ev(5, 'need_changed', { id: 'a1', need: 'energy', delta: opts.energy - 100 }),
+        ev(5, 'needs_changed', {
+          id: 'a1',
+          changes: [{ need: 'energy', delta: opts.energy - 100 }],
+        }),
         CFG,
       )
     }
