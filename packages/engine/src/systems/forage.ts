@@ -1,5 +1,5 @@
 import { simTimeFromTick } from '@sj/shared'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Standing things with a stock, which the town can strip and the ground slowly puts back — never
 // in winter, which is the whole of why a winter larder has to be filled in autumn.

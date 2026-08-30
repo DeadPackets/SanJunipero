@@ -1,6 +1,6 @@
 import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { Item, WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 export type Spoilage = { spawnDay: number; days: number }
 

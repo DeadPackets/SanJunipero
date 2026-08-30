@@ -2,7 +2,7 @@ import { simTimeFromTick } from '@sj/shared'
 import { FAUNA_KINDS, type FaunaKind } from '../data/faunaDefs.js'
 import { mintId, type TileId, type WorldState } from '../state.js'
 import type { RngStream } from '../rng.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Bodies with no minds: they wander where the ground suits them and run from anything alive.
 // Every roll is drawn here at emission and travels in the payload, so fold never touches the stream.

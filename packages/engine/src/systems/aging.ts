@@ -1,6 +1,6 @@
 import { DAYS_PER_YEAR, simTimeFromTick, type SimConfig } from '@sj/shared'
-import { dropHeldItems, type TickCtx } from '../worldTick.js'
-import { placeGrave } from './mortality.js'
+import type { TickCtx } from '../tickCtx.js'
+import { dropHeldItems, placeGrave } from './mortality.js'
 
 export type AgeBand = 'child' | 'adult' | 'elder'
 

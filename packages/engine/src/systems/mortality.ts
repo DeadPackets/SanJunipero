@@ -1,5 +1,5 @@
 import { mintId, thirstOf, type WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 import type { SimConfig } from '@sj/shared'
 import { perimeter } from '../interiors.js'
 import { isPassable, type Point } from '../path.js'
@@ -102,6 +102,17 @@ export function graveTile(state: WorldState, x: number, y: number): Point | null
     }
   }
   return null
+}
+
+// Death would otherwise strand held items: drop them on the death tile first.
+export function dropHeldItems(ctx: TickCtx, agentId: string): void {
+  const a = ctx.state().agents[agentId]!
+  for (const id of Object.keys(ctx.state().items).sort()) {
+    const item = ctx.state().items[id]!
+    if (item.loc.t === 'agent' && item.loc.id === agentId) {
+      ctx.emit('item_moved', { id, loc: { t: 'tile', x: a.x, y: a.y } })
+    }
+  }
 }
 
 // Called straight after every agent_died: the body is already dead, its tile is still its own.

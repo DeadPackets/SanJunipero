@@ -3,6 +3,7 @@ import type { WorldState } from './state.js'
 import { fold } from './fold.js'
 import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
+import type { System, TickCtx } from './tickCtx.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
 import { needsSystem } from './systems/needs.js'
 import { warmthSystem } from './systems/warmth.js'
@@ -11,6 +12,7 @@ import { regrowthSystem } from './systems/regrowth.js'
 import { healthSystem } from './systems/health.js'
 import {
   deathAttribution,
+  dropHeldItems,
   escalateFatigue,
   mortalitySystem,
   placeGrave,
@@ -30,13 +32,6 @@ import { reproductionSystem } from './systems/reproduction.js'
 import { mysterySystem } from './systems/mystery.js'
 import { mapGrowthSystem } from './systems/mapGrowth.js'
 
-export type TickCtx = {
-  readonly config: SimConfig
-  readonly rng: RngStreams
-  state(): WorldState
-  emit(type: string, payload: unknown): void
-}
-export type System = (ctx: TickCtx) => void
 export type WorldTickResult = { state: WorldState; events: PendingEvent[] }
 
 function actionsSystem(ctx: TickCtx): void {
@@ -74,17 +69,6 @@ function actionsSystem(ctx: TickCtx): void {
       ctx.emit(e.type, e.payload)
     if (def.skill)
       ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })
-  }
-}
-
-// Death would otherwise strand held items: drop them on the death tile first.
-export function dropHeldItems(ctx: TickCtx, agentId: string): void {
-  const a = ctx.state().agents[agentId]!
-  for (const id of Object.keys(ctx.state().items).sort()) {
-    const item = ctx.state().items[id]!
-    if (item.loc.t === 'agent' && item.loc.id === agentId) {
-      ctx.emit('item_moved', { id, loc: { t: 'tile', x: a.x, y: a.y } })
-    }
   }
 }
 

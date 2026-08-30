@@ -1,5 +1,5 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Four ways back, all of them arithmetic on one dawn payment. With mortality off the world
 // keeps the old flat rates exactly, which is what holds the scripted fixture still.

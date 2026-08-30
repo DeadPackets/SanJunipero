@@ -1,6 +1,6 @@
 import { simTimeFromTick, type Season, type SimConfig } from '@sj/shared'
 import type { RngStream } from '../rng.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Controller ruling: the per-season allowed set is code, not config.
 export function allowedKinds(config: SimConfig, season: Season): string[] {

@@ -1,6 +1,6 @@
 import { isBeddedKind, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { AgentBody, WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 import { ageBand } from './aging.js'
 
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))

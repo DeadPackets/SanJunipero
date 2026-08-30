@@ -1,0 +1,14 @@
+import type { SimConfig } from '@sj/shared'
+import type { RngStreams } from './rng.js'
+import type { WorldState } from './state.js'
+
+// A leaf, so a system can name what it is handed without importing the hub that runs it:
+// `worldTick.ts` imports every system, and this is the type they all need back.
+export type TickCtx = {
+  readonly config: SimConfig
+  readonly rng: RngStreams
+  state(): WorldState
+  emit(type: string, payload: unknown): void
+}
+
+export type System = (ctx: TickCtx) => void

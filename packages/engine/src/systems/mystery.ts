@@ -1,6 +1,6 @@
 import { simTimeFromTick } from '@sj/shared'
 import { MYSTERIES } from '../data/mysteries.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Midday, not midnight: a global mystery is felt only by the awake, and at midnight
 // there is nobody awake to feel it. One roll per day, from its own named stream.

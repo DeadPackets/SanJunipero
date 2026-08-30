@@ -8,7 +8,7 @@ import {
 import { genesisTerrainAt } from '../genesis/world.js'
 import { authoredOrigin, type WorldState } from '../state.js'
 import { townGroundBox } from '../town.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Growth is a clearance, not a counter against a ceiling: the world owes every side of
 // everything standing one block pitch, and widens whichever side it is short on. No maximum.

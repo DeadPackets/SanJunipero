@@ -1,6 +1,6 @@
 import { dayPhaseFromTick, isHearthKind, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 import { awakeEnergyDecay, warmthTargetFromAir } from './needs.js'
 
 // Cold is not a new way to die: it takes the warmth out of a body, and a body with no warmth

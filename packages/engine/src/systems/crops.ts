@@ -1,5 +1,5 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 export function cropsSystem(ctx: TickCtx): void {
   const tick = ctx.state().tick

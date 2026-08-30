@@ -1,7 +1,7 @@
 import { DAYS_PER_YEAR, MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { BIRTH_NAMES } from '../data/names.js'
 import { mintId, pairKey, type AgentBody, type WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 export type Sex = 'f' | 'm'
 

@@ -1,5 +1,5 @@
 import { simTimeFromTick } from '@sj/shared'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 export function wildlifeSystem(ctx: TickCtx): void {
   const time = simTimeFromTick(ctx.state().tick)

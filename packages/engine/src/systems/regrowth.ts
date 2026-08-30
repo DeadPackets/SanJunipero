@@ -1,6 +1,6 @@
 import { MINUTES_PER_DAY, simTimeFromTick, T_FOREST, T_GRASS, T_SAPLING } from '@sj/shared'
 import { fromTileKey, type TileId, type WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Scarcity is a cycle, not a one-way death. The seeding is a roll from the `regrowth` stream at
 // emission; the maturing is arithmetic on the day the seed was stamped, so the fold stays pure.

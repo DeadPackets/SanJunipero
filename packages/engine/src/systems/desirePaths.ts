@@ -1,6 +1,6 @@
 import { MINUTES_PER_DAY, simTimeFromTick, T_GRASS, T_PATH, type SimConfig } from '@sj/shared'
 import { fromTileKey, tileKey, type WorldState } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Nobody plans a desire path. Feet wear grass to dirt where the town actually goes, and grass
 // takes it back where the town stopped going. Zero RNG anywhere in this law.

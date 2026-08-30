@@ -1,4 +1,4 @@
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // Fuel is the whole of the mechanic: a torch is light for as long as somebody paid for it, and
 // the tick after that it is ash. Zero RNG — the fuel clock is arithmetic on the tick it was lit.

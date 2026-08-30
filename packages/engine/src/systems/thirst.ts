@@ -1,6 +1,6 @@
 import { thirstDecayPerTick } from '@sj/shared'
 import { thirstOf } from '../state.js'
-import type { TickCtx } from '../worldTick.js'
+import type { TickCtx } from '../tickCtx.js'
 
 // The slower clock. Thirst is deliberately not one of the four needs: widening that enum
 // would change what every recorded log means, so it gets its own event and its own decay.
