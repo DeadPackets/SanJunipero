@@ -99,7 +99,8 @@ const WeatherSchema = z
     nightTempDelta: z.number().default(-6),
     rainTempDelta: z.number().default(-4),
     snowOnlyIn: z.string().default('winter'),
-    stormLightningFireChance: z.number().default(0.02),
+    // Rare drama, ruled 2026-08-30: at 0.02 three storm days burned 27 of 42 houses.
+    stormLightningFireChance: z.number().default(0.001),
   })
   .strict()
 

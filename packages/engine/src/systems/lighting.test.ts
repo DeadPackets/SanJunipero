@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { SimConfigSchema, nextDawnTick, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
@@ -19,6 +19,7 @@ const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, light: { enabled: false } })
 const BURN = CFG.light.torchBurnTicks
 const FUEL = CFG.light.fuelBurnTicks
+const DUSK = 20 * 60
 
 const map = (): TileId[][] => grid(12)
 
@@ -136,10 +137,17 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     return fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), config)
   }
 
-  it('costs one wood and buys fuelBurnTicks of fire', () => {
+  // Ruling 22 (2026-08-30): the square's pit is fed daily like the lamps, so one armful covers
+  // the whole coming night. A hearth under a roof still burns the armful and no longer.
+  it('costs one wood, and the pit in the open burns till dawn', () => {
     const fed = apply(holding(withPit(), 'item_1', 'wood'), 'stoke', { structureId: 'structure_1' })
-    expect(fed.structures.structure_1!.fueledUntilTick).toBe(FUEL)
+    expect(fed.structures.structure_1!.fueledUntilTick).toBe(nextDawnTick(0))
     expect(fed.items.item_1).toBeUndefined()
+    // Not the same number by accident: a dusk stoke reaches the NEXT dawn, past one armful's end.
+    const dusk = holding(withPit(), 'item_1', 'wood')
+    const atDusk = apply({ ...dusk, tick: DUSK }, 'stoke', { structureId: 'structure_1' })
+    expect(atDusk.structures.structure_1!.fueledUntilTick).toBe(nextDawnTick(DUSK))
+    expect(nextDawnTick(DUSK)).toBeGreaterThan(DUSK + FUEL)
   })
 
   it('refuses with no wood, at a distance, and at something that is not a fire', () => {

@@ -793,6 +793,16 @@ describe('default OpenRouter path extraBody', () => {
     }
   })
 
+  // Ruling 22 (2026-08-30): two names on the allow-list, so a Baidu rate limit does not idle
+  // the minds. Order is the preference; `allow_fallbacks:false` is still what makes it a list.
+  it('★ the request body carries both allowed providers, in order', () => {
+    expect(PROVIDER_ORDER).toEqual(['Baidu', 'Wafer'])
+    expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
+      order: ['Baidu', 'Wafer'],
+      allow_fallbacks: false,
+    })
+  })
+
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
   // allow-list is a switch a caller has to throw.
   it('opting back into provider fallbacks is possible, and says so in the body', () => {

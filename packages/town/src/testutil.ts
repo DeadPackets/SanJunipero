@@ -27,10 +27,11 @@ export function runFoundersWorld(
   ticks = 4320,
   rings = 3,
   onAfterTick?: (tick: number, state: WorldState) => void,
+  // Held still by default on purpose: a storm hour rolls lightning on every roof, and a harness
+  // that counts what the masons raised cannot count through a town that burns. `storm.test` is
+  // the one arm that wants the weather, because the weather is what it measures.
+  config = STILL_WEATHER_CONFIG,
 ): Run {
-  // Held still on purpose: a storm hour rolls lightning on every roof, and a harness that counts
-  // what the masons raised cannot count through a town that burns.
-  const config = STILL_WEATHER_CONFIG
   const terrain = devTerrain('showcase', rings)
   const structures = townStructuresFor('showcase', rings)
   const store = new EventStore(openDb(':memory:'))

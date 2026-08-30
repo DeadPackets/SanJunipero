@@ -244,13 +244,15 @@ describe('checkSpend (T24)', () => {
     expect(alerts(db)).toEqual([])
   })
 
-  it('the default threshold is the ruled $10 per sim-day', () => {
+  // Ruling 22 (2026-08-30): 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast.
+  // At the old $10 it was ~300x the rate and could not print before the rate tripwire killed the town.
+  it('the default threshold is 10x the expected five-mind rate', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(10)
-    seedCall(db, 1, 2.6)
+    expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(0.4)
+    seedCall(db, 1, 0.11) // 0.11 over 15 real minutes projects to $0.44/sim-day
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(true)
-    seedCall(db, 1, -0.2) // pull the window back under
+    seedCall(db, 1, -0.02) // pull the window back under
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(false)
   })
 })

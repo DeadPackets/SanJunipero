@@ -690,6 +690,11 @@ export function isStokeable(config: SimConfig, kind: string): boolean {
   return structureGlowRadius(config, kind) !== undefined && isStandingLight(config, kind)
 }
 
+// CITY_HEARTH_KIND is a furnishing and has no recipe row, so it is named rather than derived.
+function isRoofedFire(config: SimConfig, kind: string): boolean {
+  return kind === CITY_HEARTH_KIND || (isHeatSource(config, kind) && isRoofedKind(config, kind))
+}
+
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
   validate(state, config, agentId, params) {
@@ -712,11 +717,11 @@ const stoke: VerbDef = makeVerb({
         type: 'structure_fueled',
         payload: {
           structureId: p.structureId,
-          // A fire is fed by the armful; a standing light is lit for the night and put out at dawn.
-          burnsUntilTick:
-            isHeatSource(config, s.kind) || s.kind === CITY_HEARTH_KIND
-              ? state.tick + config.light.fuelBurnTicks
-              : nextDawnTick(state.tick),
+          // A fire under a roof is fed by the armful; a fire in the open — the square's pit, a
+          // lamp post — is lit for the night and put out at dawn.
+          burnsUntilTick: isRoofedFire(config, s.kind)
+            ? state.tick + config.light.fuelBurnTicks
+            : nextDawnTick(state.tick),
         },
       },
     ]

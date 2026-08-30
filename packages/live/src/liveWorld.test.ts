@@ -558,8 +558,8 @@ describe('★ the money, inside the served world', () => {
     expect(mix.length, 'the run closed without naming who served it').toBeGreaterThan(0)
   }, 40_000)
 
-  // The $10/sim-day operator alert: built and tested since C11, and reached from nothing but a
-  // gate script. Only the hard stops ran on a live town.
+  // The operator alert: built and tested since C11, and reached from nothing but a gate script.
+  // Only the hard stops ran on a live town. Ruling 22 (2026-08-30) set it to $0.40/sim-day.
   it('★ warns the operator about a projected burn well before a hard stop kills the run', async () => {
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
@@ -573,20 +573,20 @@ describe('★ the money, inside the served world', () => {
     expect(alertsOf(opsDb, 'spend_projection')).toHaveLength(0)
 
     // Art, which the rate tripwire excludes by design: only the operator alert can speak here.
-    // $3 in a 15-minute window projects to $12/sim-day, over the $10 threshold.
+    // $0.15 in a 15-minute window projects to $0.60/sim-day, over the $0.40 threshold.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 3, 3, 0, 1, NULL, NULL)`,
+       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 0.15, 0.15, 0, 1, NULL, NULL)`,
       )
       .run(Date.now())
 
     await run(world, 12)
     const alerts = alertsOf(opsDb, 'spend_projection')
     expect(alerts.length, 'the operator was never told').toBeGreaterThan(0)
-    expect(alerts[0]).toContain('/sim-day over a $10.00 threshold')
+    expect(alerts[0]).toContain('projected $0.60/sim-day over a $0.40 threshold')
   }, 40_000)
 
   // Ruling 19 (2026-08-30). 9 of rehearsal 3's 309 calls were served by OpenInference, not the

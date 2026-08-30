@@ -212,6 +212,7 @@ Each is calibrated against the price the ledger books, so each fires at its nomi
 | Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.72-0.96 | Kills the process; a restart refuses until the window rolls. |
 | Anomaly stop | $50 total | ~1,250-1,700 real hours, so 52-70 days | Kills the process. The town on disk is intact. |
 | Rate tripwire | $0.04/mind/sim-day over 15 min | $0.20/h for five minds — 5x the expected rate | Stops every mind. The town keeps serving. |
+| Operator alert | $0.40/sim-day over 15 min | 10x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
 
 **Only the tripwire still bites.** The two dollar guards were set against a bill 20x this one and
 were not re-derived with it, so at the expected rate the rate tripwire is the guard that fires

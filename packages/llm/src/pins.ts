@@ -1,8 +1,9 @@
 // Observed by scripts/probe.ts live run 2026-08-15 — not invented. Re-run the probe before changing.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
-// unpriced route. A Baidu outage therefore idles the minds until PROVIDER_ORDER is changed.
-export const PROVIDER_ORDER: string[] = ['Baidu']
+// unpriced route. Wafer is the second name on it so a Baidu rate limit does not idle the minds;
+// both are priced below, so neither can book at the ceiling.
+export const PROVIDER_ORDER: string[] = ['Baidu', 'Wafer']
 // Owner ruling 2026-08-30: the fallback IS the pinned dated model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
@@ -81,6 +82,8 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
   // spent 31,179 reasoning tokens over 96 s and still answered nothing.
   semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
+  // `constructs` is deliberately absent: it never ran in rehearsal 3, and a guessed ceiling
+  // truncates. Rehearsal 4 measures its p99 and gives it a row.
 }
 
 const NO_SETTINGS: CallSettings = {}

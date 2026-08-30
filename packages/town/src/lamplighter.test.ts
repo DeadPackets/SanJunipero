@@ -149,9 +149,40 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
       },
     )
     expect(lampsIn(state)).toHaveLength(8)
-    // eight posts through at least two full nights of 480 ticks
-    expect(checked, 'no post stood through a night').toBeGreaterThan(2 * 480 * 8)
+    // Seven of the eight posts through two full nights of 480 ticks. Eight was the floor until
+    // ruling 22 put the square's pit on the same rounds, which stands the last post ~20 ticks later.
+    expect(checked, 'no post stood through a night').toBeGreaterThan(2 * 480 * 7)
     expect(dark).toEqual([])
+  })
+
+  // Ruling 22 (2026-08-30): the square's fire pit is fed daily like the lamps, so one armful
+  // covers the whole coming night and the pit burns every night the town stands.
+  it('★ feeds the square fire pit too, and it is lit at every night tick', () => {
+    const pitIn = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'fire_pit')
+    let firstFed = -1
+    let nightTicks = 0
+    const dark: number[] = []
+    runFoundersWorld(
+      { interiors: true, builders: true, holdings: true, lamps: 8 },
+      4320,
+      3,
+      (tick, s) => {
+        const pit = pitIn(s)
+        if (pit === undefined) return
+        if (firstFed < 0 && (pit.fueledUntilTick ?? -1) >= tick) firstFed = tick
+        if (firstFed < 0 || dayPhaseFromTick(tick) !== 'night') return
+        nightTicks++
+        if ((pit.fueledUntilTick ?? -1) < tick) dark.push(tick)
+      },
+    )
+    // Nobody can feed a fire they have not walked to: the first armful lands in the first half hour.
+    expect(firstFed).toBeGreaterThan(0)
+    expect(firstFed).toBeLessThan(30)
+    expect(nightTicks, 'the pit stood through no night').toBeGreaterThan(3 * 400)
+    expect(dark).toEqual([])
+    // ★ VACUOUS GUARD: with no lamplighter on the rounds nobody feeds it, and it never lights.
+    const unlit = runFoundersWorld({ interiors: true, builders: true, holdings: true }, 1440, 3)
+    expect(pitIn(unlit.state)?.fueledUntilTick).toBeUndefined()
   })
 
   it('★ keeps one tile between posts, so every post has a side to be fed from', () => {

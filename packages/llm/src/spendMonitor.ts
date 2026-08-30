@@ -5,7 +5,9 @@ import { insertAlert } from './callLog.js'
 // W/60 of a sim-day and its spend scales by 60/W to reach $/sim-day.
 export const REAL_MINUTES_PER_SIM_DAY = 60
 export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
-export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 10
+// 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast (`deploy/README.md`,
+// itself expected and not measured). Re-derive on rehearsal 4.
+export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
 
 export type SpendProjection = {
   usdPerSimDay: number

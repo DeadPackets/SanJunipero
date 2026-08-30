@@ -386,6 +386,7 @@ export function bridgewrightIntent(
 // the buildings already standing, stepped one tile off the way: a post in the road closes it.
 
 const LAMP_KIND = 'lamp_post'
+const FIRE_PIT_KIND = 'fire_pit'
 
 type LampSite = { x: number; y: number; stand: { x: number; y: number } }
 
@@ -470,10 +471,15 @@ function lamplighterIntent(
       .map((s) => [`${s.x},${s.y}`, s]),
   )
 
-  // Feeding walks the lamps that EXIST, never the sites: `lampSites` is recomputed each tick
+  // Feeding walks the fires that EXIST, never the sites: `lampSites` is recomputed each tick
   // against the buildings standing NOW, so a raised post falls off the site list as the town grows.
+  // The square's pit is on the same rounds because it burns by the same rule — one armful at any
+  // hour covers the whole coming night.
   const dawn = nextDawnTick(state.tick)
-  for (const s of [...standing.values()].sort((p, q) => p.id.localeCompare(q.id))) {
+  const toFeed = Object.values(state.structures)
+    .filter((s) => s.kind === LAMP_KIND || s.kind === FIRE_PIT_KIND)
+    .sort((p, q) => p.id.localeCompare(q.id))
+  for (const s of toFeed) {
     if (s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? -1) >= dawn) continue
     if (isAdjacentToRect(a.x, a.y, s)) return { verb: 'stoke', params: { structureId: s.id } }

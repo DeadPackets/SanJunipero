@@ -21,7 +21,9 @@ it('pins are concrete', () => {
   expect(PRICE_PER_M).toEqual({ input: 0.04494, output: 0.08988, cacheRead: 0.008988 })
 })
 
-it('the pinned provider is priced, and is what PRICE_PER_M reports', () => {
+it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
+  // An unpriced name on the allow-list books at the ceiling, which over-reports every call it serves.
+  for (const name of PROVIDER_ORDER) expect(PRICE_PER_M_BY_PROVIDER[name], name).toBeDefined()
   expect(PRICE_PER_M_BY_PROVIDER[PROVIDER_ORDER[0]!]).toEqual(PRICE_PER_M)
 })
 
