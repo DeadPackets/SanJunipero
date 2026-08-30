@@ -8,8 +8,9 @@ pnpm install
 pnpm stream                  # build the viewer, tick the town, serve both on http://localhost:8080
 ```
 
-`pnpm test` runs the suite, `pnpm typecheck` runs both TypeScript projects. To put a town on the
-internet, see [deploy/README.md](deploy/README.md).
+`pnpm test` runs the suite; `pnpm check` runs the whole gate — `typecheck`, `lint`,
+`format:check`, `knip`, then `test`. To put a town on the internet, see
+[deploy/README.md](deploy/README.md).
 
 ## The packages
 
@@ -45,12 +46,16 @@ lifetime anomaly stop. It reads `OPENROUTER_API_KEY` out of `.env` through `--en
 key is never on a command line.
 
 ```
-pnpm rehearse 20                                        # 20 minutes, then Ctrl-C safe
-node --env-file=.env --import tsx scripts/score.mjs      # what the rehearsal produced
+pnpm rehearse                                   # 30 real minutes at SPEED=4 — about 2 sim-days
+pnpm rehearse 10                                # shorter; Ctrl-C is safe at any point
+SPEED=1 pnpm rehearse 60                        # real time: 60 real minutes is one sim-day
+node --import tsx scripts/score.mjs             # what the rehearsal produced
 ```
 
-Both write under `rehearsals/`, which is gitignored. `--import tsx` is not optional: the
-workspace packages are published as TypeScript source.
+A sim-day is 1440 ticks of 2500 ms, so `SPEED` x minutes / 60 is the sim-days a run buys; the
+script prints that number when it starts. The rehearsal writes under `rehearsals/`, which is
+gitignored, and the scorer only reads. `--import tsx` is not optional: the workspace packages are
+published as TypeScript source.
 
 ## Environment
 

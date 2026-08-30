@@ -195,11 +195,13 @@ describe('seasonal sheets', () => {
     expect(SHEET_KINDS).toContain('road')
   })
 
-  const offPalette = (sheet: RawImage): number => {
+  const offPalette = (sheet: { data: Uint8ClampedArray }): number => {
     let n = 0
     for (let i = 0; i < sheet.data.length; i += 4) {
       if (sheet.data[i + 3] === 0) continue
-      if (!PALETTE_HEXES.has((sheet.data[i]! << 16) | (sheet.data[i + 1]! << 8) | sheet.data[i + 2]!))
+      if (
+        !PALETTE_HEXES.has((sheet.data[i]! << 16) | (sheet.data[i + 1]! << 8) | sheet.data[i + 2]!)
+      )
         n++
     }
     return n

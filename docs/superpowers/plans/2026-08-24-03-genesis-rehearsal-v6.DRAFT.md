@@ -9130,7 +9130,7 @@ services:
 volumes: { town: {}, backups: {} }
 ```
 
-`.env.example` lists every variable with a redacted placeholder: `OPENROUTER_API_KEY`, `IMAGE_PROVIDER_KEY`, `SJ_ADMIN_TOKEN`, `SJ_LAWS_TOKEN`, `SJ_SEED`, `SJ_ARM`, `SJ_SPEED`, `SJ_PROVIDER`. **It contains no real value and is the only env file in the repo; `.env` is gitignored and is never read by any task in this plan except through `--env-file`.**
+`.env.example` lists every variable with a redacted placeholder: `OPENROUTER_API_KEY`, `SJ_ADMIN_TOKEN`, `SJ_LAWS_TOKEN`, `SJ_SEED`, `SJ_ARM`, `SJ_SPEED`, `SJ_PROVIDER`. **It contains no real value and is the only env file in the repo; `.env` is gitignored and is never read by any task in this plan except through `--env-file`.**
 
 - [ ] **Step 1: Write the failing check.**
 

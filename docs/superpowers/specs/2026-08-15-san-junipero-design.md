@@ -387,7 +387,7 @@ Docker Compose on one VPS (~$20/mo) + Caddy (TLS, static frontend)
 SQLite (WAL) + Litestream → S3 continuous backup
 Admin panel (private route): pause/resume/speed, token dashboards,
   Arbiter ruling review/revert, asset regen queue, backup status
-Env: OPENROUTER_API_KEY, IMAGE_PROVIDER_KEY
+Env: OPENROUTER_API_KEY
 ```
 
 All-in running cost: LLM ~$1–3/day (minds + Arbiter + narrator, cache-discounted);
