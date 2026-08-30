@@ -3,6 +3,7 @@ import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { screenToTile } from './iso.js'
 import { bakeTexture } from './textures.js'
+import { windNow } from './wind.js'
 import type { Scene } from './scene.js'
 import type { ViewRect } from './cull.js'
 
@@ -21,6 +22,7 @@ export const BANDS: readonly { scale: number; alpha: number; speed: number }[] =
   { scale: 1.4, alpha: 0.85, speed: 1.4 },
 ]
 const SNOW_WOBBLE_PX_S = 42 // a flake falls in a sway, never dead straight
+const WIND_PX_S = 40 // the town's one gust, at full strength
 
 /** The count a stage of `w`×`h` CSS px gets, halved when the viewer asked for less motion. */
 export function particleCount(kind: ParticleKind, w: number, h: number, still: boolean): number {
@@ -196,9 +198,10 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
       const w = scene.app.screen.width
       const h = scene.app.screen.height
       const dt = dtMs / 1000
+      const vx = spec.vx + windNow() * WIND_PX_S
       for (const d of drops) {
         const band = BANDS[d.band]!
-        d.x += spec.vx * band.speed * dt
+        d.x += vx * band.speed * dt
         d.y += spec.vy * band.speed * dt
         if (kind === 'snow') d.x += Math.sin(t / 500 + d.wobble) * SNOW_WOBBLE_PX_S * dt
         if (d.y > h) {

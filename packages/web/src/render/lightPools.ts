@@ -12,7 +12,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import { phaseOf } from './charAnim.js'
 import { rectInView, type ViewRect } from './cull.js'
 import { entitySpriteOf } from './entities.js'
-import { tileToScreen, TILE_W, TILE_H } from './iso.js'
+import { feetOf, TILE_W, TILE_H } from './iso.js'
 import type { Scene } from './scene.js'
 import { bakeTexture, buildingArt, cellPointOf } from './textures.js'
 import { skyLevel } from './tints.js'
@@ -69,10 +69,10 @@ export function poolRadiusPx(radius: number): { rx: number; ry: number } {
   return { rx: (radius + 0.5) * TILE_W, ry: (radius + 0.5) * TILE_H }
 }
 
-/** The centre of a flame's footprint, in screen space. A long hearth pools from its middle. */
+/** Where the flame's sprite stands — the footprint's south vertex, the one anchor law (D29).
+ *  A lamp's pool sits under its plinth and a hearth's under the house's front wall. */
 export function poolCentre(f: Flame): { sx: number; sy: number } {
-  const { sx, sy } = tileToScreen(f.x + (f.w - 1) / 2, f.y + (f.h - 1) / 2)
-  return { sx, sy: sy + TILE_H / 2 }
+  return feetOf(f.x, f.y, f.w, f.h)
 }
 
 /** A soft radial disc, authored ONCE and stretched per light. Rings rather than a gradient fill

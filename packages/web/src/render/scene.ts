@@ -13,7 +13,7 @@ import {
 } from './camera.js'
 import { createCameraRig } from './cameraRig.js'
 import { createGroundBaker } from './groundBake.js'
-import { tileToScreen } from './iso.js'
+import { feetOf } from './iso.js'
 import { groundArtSignature } from './groundField.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
@@ -297,7 +297,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     pointOf: (kind, id) => {
       if (kind === 'structure') {
         const st = store.getState()?.structures[id]
-        return st === undefined ? null : tileToScreen(st.x, st.y)
+        return st === undefined ? null : feetOf(st.x, st.y, st.w, st.h)
       }
       const at = scene.anchorOf?.(id) ?? null
       return at === null ? null : { sx: at.x, sy: at.y }

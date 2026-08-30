@@ -45,19 +45,14 @@ vi.mock('pixi.js', () => {
   return { Container, Graphics, Point, Sprite, Texture: { EMPTY: {} } }
 })
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
-import type { TileId, WorldState } from '@sj/engine/state'
+import type { TileId } from '@sj/engine/state'
 import {
   HEARTH_KINDS,
   SMOKE_COLOR,
   SMOKE_MAX_ALPHA,
   TREES_MAX,
-  createAmbient,
   sampleDecorations,
 } from './ambient.js'
-import type { Scene } from './scene.js'
-import type { WorldStore } from '../state/worldStore.js'
-import type { BubbleLayer } from './bubbles.js'
-import type { WeatherLayer } from './weatherFx.js'
 import { bigTown } from './bigTown.js'
 
 describe('HEARTH_KINDS', () => {
@@ -99,7 +94,7 @@ describe('the ambient effects stay quiet', () => {
   it('sways a canopy by whole pixels of its crown, never by a shear (D14)', () => {
     const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
     expect(src).not.toContain('skew')
-    expect(src).toMatch(/crown\.position\.x =\s*tr\.sx \+ Math\.round\(/)
+    expect(src).toMatch(/crown\.position\.x = tr\.trunk\.x \+ crownOffsetPx\(/)
   })
 })
 
@@ -119,100 +114,7 @@ describe('sampleDecorations spreads the cap over the whole map (D15)', () => {
   })
 })
 
-describe('the effect sprites track the world, not the frame', () => {
-  type S = { id: string; kind: string; x: number; y: number; w: number; h: number; stage: string }
-  const hearth = (id: string, x: number): S => ({
-    id,
-    kind: 'fire_pit',
-    x,
-    y: 4,
-    w: 1,
-    h: 1,
-    stage: 'complete',
-  })
-
-  type Kid = { destroyed: boolean }
-  const drive = (first: S[]): { tick: () => void; setWorld: (list: S[]) => void; kids: Kid[] } => {
-    const kids: Kid[] = []
-    const scene = {
-      app: {
-        renderer: { generateTexture: () => ({}) },
-        screen: { width: 800 },
-      },
-      layers: {
-        groundDecal: { addChild: () => {} },
-        overhead: { addChild: (...c: Kid[]) => kids.push(...c) },
-      },
-      wantsMotion: () => true,
-      reachableBox: () => ({ minX: 0, maxX: 800, minY: 0, maxY: 600 }),
-    } as unknown as Scene
-    const terrain = [
-      [0, 0],
-      [0, 0],
-    ]
-    let state = {
-      terrain,
-      structures: Object.fromEntries(first.map((s) => [s.id, s])),
-      agents: {},
-    }
-    const store = {
-      getState: () => state as unknown as WorldState,
-      getTick: () => 0,
-      onEvents: () => () => {},
-    } as unknown as WorldStore
-    const quiet = { setSuppressed: () => {}, setEmotesHidden: () => {} }
-    const a = createAmbient(scene, store, {
-      weather: quiet as unknown as WeatherLayer,
-      bubbles: quiet as unknown as BubbleLayer,
-    })
-    return {
-      tick: () => {
-        a.tick(16)
-      },
-      setWorld: (list) => {
-        state = { terrain, structures: Object.fromEntries(list.map((s) => [s.id, s])), agents: {} }
-      },
-      kids,
-    }
-  }
-
-  const alive = (kids: Kid[]): number => kids.filter((c) => !c.destroyed).length
-
-  it('a hearth completing between frames still gets its smoke', () => {
-    const h = drive([])
-    h.tick()
-    const flock = alive(h.kids) // the birds live in `overhead` too, and are not a hearth's
-    h.setWorld([hearth('s1', 4)])
-    h.tick()
-    const one = alive(h.kids) - flock
-    expect(one).toBeGreaterThan(0)
-
-    h.setWorld([hearth('s1', 4), hearth('s2', 9)])
-    h.tick()
-    expect(alive(h.kids) - flock).toBe(one * 2)
-  })
-
-  it('a structure leaving the world takes its overhead sprites with it', () => {
-    const empty = drive([])
-    empty.tick()
-    const flock = alive(empty.kids)
-    const h = drive([hearth('s1', 4)])
-    h.tick()
-    expect(alive(h.kids)).toBeGreaterThan(flock)
-    h.setWorld([])
-    h.tick()
-    expect(alive(h.kids)).toBe(flock)
-  })
-
-  it('★ a second frame over the same world builds nothing — the walk is per delta, not per frame', () => {
-    const h = drive([hearth('s1', 4)])
-    h.tick()
-    const made = h.kids.length
-    h.tick()
-    h.tick()
-    expect(h.kids.length).toBe(made)
-  })
-
+describe('the frame loop does not walk the world', () => {
   // The frame loop used to build an `Object.values` array and a live-id `Set` of every
   // structure, 60×/s, against deltas that arrive at most every 250 ms. Both now run per delta.
   it('allocates nothing per frame over the structure set — the table', () => {

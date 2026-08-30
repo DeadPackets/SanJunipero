@@ -2,7 +2,7 @@ import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
 import type { TileId, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { tileToScreen, TILE_H } from './iso.js'
+import { feetOf } from './iso.js'
 import { rectOnGround, type ScreenRect } from './ground.js'
 import type { Scene } from './scene.js'
 import type { WeatherLayer } from './weatherFx.js'
@@ -10,12 +10,10 @@ import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
 import { setEntityScaleMul } from './entities.js'
 import { phaseOf } from './charAnim.js'
+import { crownOffsetPx, windNow } from './wind.js'
 import { isGrave, toneReducer } from './tone.js'
 
-const SMOKE_PUFFS = 3
-const SMOKE_RISE_PX = 14
-const SMOKE_LOOP_MS = 2400
-const SMOKE_PUFF_R = 3 // a round puff, not an 8x8 card
+// the smoke itself is smoke.ts's; these two are the material it is drawn in
 export const SMOKE_MAX_ALPHA = 0.42
 export const SMOKE_COLOR = 0xcfc6bc // warm grey, MASTER_PALETTE — cream read as white glass
 
@@ -30,9 +28,6 @@ export const HEARTH_KINDS: ReadonlySet<string> = new Set([
 export const SHIMMER_MAX = 60
 const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
-/** A canopy sways by a whole pixel of its crown, never by a shear: a sheared 12×20 NEAREST
- *  sprite resamples at fractional texels every frame and its edge crawls (D14). */
-const SWAY_HZ = 0.16
 const BOUNCE_MS = 260
 const BOUNCE_SCALE = 1.18
 const SQUASH_Y = 0.92
@@ -44,7 +39,7 @@ const BIRD_MAX_S = 45
 const WATER: TileId = 2
 const FOREST: TileId = 3
 
-/** The two ground decorations at painted size: a canopy anchors bottom-centre on its tile's centre, a shimmer top-left one pixel to the left of it. */
+/** The two ground decorations at painted size: a canopy anchors bottom-centre on its tile's feet (the south vertex, the one anchor law), a shimmer top-left one pixel to the left of it. */
 export const CANOPY_PX = { w: 12, h: 20 } as const
 export const SHIMMER_PX = { w: 2, h: 2 } as const
 
@@ -106,8 +101,8 @@ export function decorationQuad(d: Decoration): ScreenRect {
 export function sampleDecorations(terrain: TileId[][]): Decoration[] {
   const out: Decoration[] = []
   const place = (kind: Decoration['kind'], x: number, y: number): boolean => {
-    const { sx, sy } = tileToScreen(x, y)
-    const d: Decoration = { kind, x, y, sx, sy: sy + TILE_H / 2 }
+    const { sx, sy } = feetOf(x, y)
+    const d: Decoration = { kind, x, y, sx, sy }
     if (kind === 'shimmer') d.sx = sx - 1
     if (!rectOnGround(terrain, decorationQuad(d))) return false
     out.push(d)
@@ -157,11 +152,6 @@ export function createAmbient(
     g.destroy()
     return t
   }
-  const puffG = new Graphics()
-  puffG.circle(SMOKE_PUFF_R, SMOKE_PUFF_R, SMOKE_PUFF_R)
-  puffG.fill(SMOKE_COLOR)
-  const puffTex = scene.app.renderer.generateTexture(puffG)
-  puffG.destroy()
   const shimmerTex = px(SHIMMER_PX.w, SHIMMER_PX.h, 0xffffff)
   const birdTex = px(3, 2, 0x241f2b)
   const blocks = canopyBlocks()
@@ -196,18 +186,12 @@ export function createAmbient(
     }
   })
 
-  // ── per-structure effect sprites (the lights live in lightPools, above the night grade) ──
-  const smoke = new Map<string, Sprite[]>()
-  /** where a structure's effects hang and whether it is alight — rewritten when the world
-   *  changes, so the frame loop below reads it instead of walking every structure again */
-  const anchors = new Map<string, { sx: number; sy: number; hasFire: boolean }>()
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
   let fxState: WorldState | null = null
   const working: string[] = [] // the bodies a work verb is squashing, refreshed with the world
 
-  /** Create, place and destroy the effect sprites. Deltas arrive at most every 250 ms, so this
-   *  runs on a new world state rather than on every frame. */
-  const syncStructureFx = (state: WorldState): void => {
+  /** Deltas arrive at most every 250 ms, so this runs on a new world state, not every frame. */
+  const syncWorking = (state: WorldState): void => {
     working.length = 0
     for (const a of Object.values(state.agents)) {
       if (
@@ -218,30 +202,6 @@ export function createAmbient(
         working.push(a.id)
       else layers.chars?.setScaleMulY(a.id, 1)
     }
-    const live = new Set<string>()
-    for (const s of Object.values(state.structures)) {
-      live.add(s.id)
-      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
-      const hasFire = s.stage === 'complete' && HEARTH_KINDS.has(s.kind)
-      anchors.set(s.id, { sx: anchor.sx, sy: anchor.sy, hasFire })
-      if (hasFire && !smoke.has(s.id)) {
-        const puffs: Sprite[] = []
-        for (let i = 0; i < SMOKE_PUFFS; i++) {
-          const p = new Sprite(puffTex)
-          p.anchor.set(0.5, 0.5)
-          p.eventMode = 'none'
-          scene.layers.overhead.addChild(p)
-          puffs.push(p)
-        }
-        smoke.set(s.id, puffs)
-      }
-    }
-    for (const [id, puffs] of smoke) {
-      if (live.has(id)) continue
-      for (const p of puffs) p.destroy()
-      smoke.delete(id)
-    }
-    for (const id of anchors.keys()) if (!live.has(id)) anchors.delete(id)
   }
 
   // ── sampled terrain sprites ──
@@ -318,28 +278,15 @@ export function createAmbient(
     }
     if (state !== fxState) {
       fxState = state
-      syncStructureFx(state)
-    }
-
-    // structures: smoke (complete)
-    for (const [id, puffs] of smoke) {
-      const a = anchors.get(id)
-      if (a === undefined) continue
-      puffs.forEach((p, i) => {
-        const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
-        p.position.set(a.sx + 8, a.sy - 34 - prog * SMOKE_RISE_PX)
-        p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
-        p.visible = a.hasFire
-      })
+      syncWorking(state)
     }
 
     // water shimmer + swaying trees
     for (const sh of shimmers)
       sh.sprite.alpha =
         0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
-    for (const tr of trees)
-      tr.crown.position.x =
-        tr.trunk.x + Math.round(Math.sin(2 * Math.PI * SWAY_HZ * (t / 1000) + tr.phase))
+    const w = still ? 0 : windNow()
+    for (const tr of trees) tr.crown.position.x = tr.trunk.x + crownOffsetPx(w, tr.phase)
 
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {
@@ -386,7 +333,6 @@ export function createAmbient(
     setTone: applyTone,
     destroy: () => {
       offEvents()
-      for (const puffs of smoke.values()) for (const p of puffs) p.destroy()
       for (const s of shimmers) s.sprite.destroy()
       for (const tr of trees) {
         tr.crown.destroy()
@@ -394,7 +340,7 @@ export function createAmbient(
       }
       birdV.destroy({ children: true })
       under.destroy({ children: true })
-      for (const tex of [puffTex, shimmerTex, birdTex, crownTex, trunkTex]) tex.destroy(true)
+      for (const tex of [shimmerTex, birdTex, crownTex, trunkTex]) tex.destroy(true)
     },
   }
 }

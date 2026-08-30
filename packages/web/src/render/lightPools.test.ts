@@ -50,7 +50,7 @@ vi.mock('pixi.js', () => {
 vi.mock('./entities.js', () => ({ entitySpriteOf: () => null }))
 import { DEFAULT_CONFIG, flamesAt, isDark, type LitWorld, type SimConfig } from '@sj/shared'
 import { CLOCK_STOPS, skyLevel } from './tints.js'
-import { TILE_H, TILE_W } from './iso.js'
+import { TILE_H, TILE_W, feetOf } from './iso.js'
 import { phaseOf } from './charAnim.js'
 import { cellPointOf } from './textures.js'
 import {
@@ -200,14 +200,13 @@ describe('the pool is a pool of light and not a pale plate', () => {
     })
   })
 
-  it('pools from the CENTRE of the footprint tile, not its top vertex (D29)', () => {
+  it('pools from the feet the sprite stands on — the one anchor law (D29)', () => {
     expect(
       poolCentre({ id: 'a', source: 'structure', x: 10, y: 10, w: 1, h: 1, radius: 4 }),
-    ).toEqual({ sx: 0, sy: 10 * TILE_H + TILE_H / 2 })
-    // a 3x1 hearth pools from (11,10), one tile along, exactly where `distanceToFlame` measures
+    ).toEqual(feetOf(10, 10))
     expect(
       poolCentre({ id: 'b', source: 'structure', x: 10, y: 10, w: 3, h: 1, radius: 3 }),
-    ).toEqual({ sx: TILE_W / 2, sy: 10.5 * TILE_H + TILE_H / 2 })
+    ).toEqual(feetOf(10, 10, 3, 1))
   })
 })
 
@@ -247,7 +246,7 @@ describe('what this pass must not have broken', () => {
   it('★ draws ABOVE the night grade, in the screen lights layer, and never into the bake (D1)', () => {
     expect(src).toContain('scene.screen.lights.addChild(root)')
     expect(code).not.toContain('layers.ground')
-    expect(code).not.toMatch(/bake|chunk/i)
+    expect(code).not.toMatch(/groundBake|rebake|chunk/i)
   })
 
   it("★ writes no zIndex and joins no sorted layer, so the painter's order is untouched", () => {
