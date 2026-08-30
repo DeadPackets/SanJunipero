@@ -82,7 +82,7 @@ describe('★ the town survives a restart', () => {
   it('fresh: true is the ONLY way to throw a town away, and it is explicit', async () => {
     const dbPath = join(dir, 'fresh.db')
     const first = await runTo(dbPath, 20)
-    const second = await runTo(dbPath, 5, { fresh: true })
+    const second = await runTo(dbPath, 5, { world: { fresh: true } })
     expect(second.tick).toBeLessThan(first.tick)
     expect(countEvents(dbPath, 'tick_advanced')).toBe(second.tick)
   }, 90_000)
@@ -113,13 +113,12 @@ describe('★ the town survives a restart', () => {
 
   it('the gateway is handed the terrain the world resumed on, not one recomputed from env', async () => {
     const dbPath = join(dir, 'terrain.db')
-    await runTo(dbPath, 70, { map: 'showcase', rings: 1 }) // past the tick-60 snapshot
+    await runTo(dbPath, 70, { world: { map: 'showcase', rings: 1 } }) // past the tick-60 snapshot
     const dw = await startDevWorld({
       realMsPerTick: 100_000,
       port: 0,
       dbPath,
-      map: 'showcase',
-      rings: 1,
+      world: { map: 'showcase', rings: 1 },
     })
     try {
       expect(dw.resumedAtTick).not.toBeNull()
@@ -141,7 +140,7 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
 
   it('records who the town is on the first boot', async () => {
     const dbPath = join(dir, 'meta.db')
-    await runTo(dbPath, 5, { map: 'showcase', rings: 1, seed: 'g6' })
+    await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 }, seed: 'g6' })
     const db = openDb(dbPath)
     try {
       expect(readWorldMeta(db)).toEqual({ map: 'showcase', rings: 1, seed: 'g6' })
@@ -152,28 +151,28 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
 
   it('refuses a different ring count, and names both sides and the way out', async () => {
     const dbPath = join(dir, 'rings.db')
-    await runTo(dbPath, 5, { map: 'showcase', rings: 1 })
+    await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 } })
+    const three = { map: 'showcase', rings: 3 } as const
     await expect(
-      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }),
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, world: three }),
     ).rejects.toThrow(/rings 1 → 3/)
     await expect(
-      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }),
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, world: three }),
     ).rejects.toThrow(/SJ_FRESH=1/)
   }, 60_000)
 
   it('refuses a different map and a different seed too', async () => {
     const dbPath = join(dir, 'map.db')
-    await runTo(dbPath, 5, { map: 'showcase', rings: 1, seed: 'g6' })
+    await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 }, seed: 'g6' })
     await expect(
-      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'scripted' }),
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, world: { map: 'scripted' } }),
     ).rejects.toThrow(/map/)
     await expect(
       startDevWorld({
         realMsPerTick: 100_000,
         port: 0,
         dbPath,
-        map: 'showcase',
-        rings: 1,
+        world: { map: 'showcase', rings: 1 },
         seed: 'other',
       }),
     ).rejects.toThrow(/seed/)
@@ -181,8 +180,8 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
 
   it('a fresh start re-stamps the identity instead of refusing', async () => {
     const dbPath = join(dir, 'restamp.db')
-    await runTo(dbPath, 5, { map: 'showcase', rings: 1 })
-    await runTo(dbPath, 3, { map: 'showcase', rings: 3, fresh: true })
+    await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 } })
+    await runTo(dbPath, 3, { world: { map: 'showcase', rings: 3, fresh: true } })
     const db = openDb(dbPath)
     try {
       expect(readWorldMeta(db)?.rings).toBe(3)
@@ -208,7 +207,7 @@ describe('★ fresh means fresh for the minds too', () => {
     writeFileSync(omar, 'not really sqlite, but it is a mind file')
     writeFileSync(join(agentDbDir, 'notes.txt'), 'left alone: not a mind')
 
-    await runTo(dbPath, 3, { fresh: true, agentDbDir })
+    await runTo(dbPath, 3, { world: { fresh: true }, agentDbDir })
     expect(existsSync(omar), 'a fresh town must not keep a mind that remembers the old one').toBe(
       false,
     )

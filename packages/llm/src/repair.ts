@@ -133,6 +133,34 @@ const quotedNumber = (v: unknown): number | undefined => {
   return Number.isFinite(n) && String(n) === trimmed ? n : undefined
 }
 
+function dropUnknownKeys(
+  root: unknown,
+  path: readonly PropertyKey[],
+  keys: readonly string[],
+): boolean {
+  const holder = containerAt(root, path)
+  if (!isRecord(holder)) return false
+  let dropped = false
+  for (const key of keys)
+    if (key in holder) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
+      delete holder[key]
+      dropped = true
+    }
+  return dropped
+}
+
+function readQuotedNumber(root: unknown, path: readonly PropertyKey[]): boolean {
+  const key = path.at(-1)
+  const n = quotedNumber(containerAt(root, path))
+  if (key === undefined || n === undefined) return false
+  const holder = containerAt(root, path.slice(0, -1))
+  if (Array.isArray(holder) && typeof key === 'number') holder[key] = n
+  else if (isRecord(holder)) holder[String(key)] = n
+  else return false
+  return true
+}
+
 // The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
 // dropped and a quoted number is read as the number it spells. Nothing is supplied.
 function applySchemaIssues<T>(
@@ -140,41 +168,22 @@ function applySchemaIssues<T>(
   schema: z.ZodType<T>,
 ): { value: T; how: string } | undefined {
   const current = structuredClone(value)
-  const applied: string[] = []
+  const applied = new Set<string>()
   for (let round = 0; round < 4; round += 1) {
     const parsed = schema.safeParse(current)
     if (parsed.success) {
-      return applied.length === 0 ? undefined : { value: parsed.data, how: applied.join('+') }
+      return applied.size === 0 ? undefined : { value: parsed.data, how: [...applied].join('+') }
     }
     let changed = false
     for (const issue of parsed.error.issues) {
       if (issue.code === 'unrecognized_keys') {
-        const holder = containerAt(current, issue.path)
-        if (!isRecord(holder)) continue
-        for (const key of issue.keys)
-          if (key in holder) {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
-            delete holder[key]
-            changed = true
-          }
-        if (changed && !applied.includes('unknown-keys-dropped'))
-          applied.push('unknown-keys-dropped')
-      } else if (issue.code === 'invalid_type' && issue.expected === 'number') {
-        const key = issue.path[issue.path.length - 1]
-        const holder = containerAt(current, issue.path.slice(0, -1))
-        if (key === undefined) continue
-        const n = quotedNumber(
-          Array.isArray(holder) && typeof key === 'number'
-            ? holder[key]
-            : isRecord(holder)
-              ? holder[String(key)]
-              : undefined,
-        )
-        if (n === undefined) continue
-        if (Array.isArray(holder) && typeof key === 'number') holder[key] = n
-        else if (isRecord(holder)) holder[String(key)] = n
+        if (!dropUnknownKeys(current, issue.path, issue.keys)) continue
         changed = true
-        if (!applied.includes('quoted-numbers-read')) applied.push('quoted-numbers-read')
+        applied.add('unknown-keys-dropped')
+      } else if (issue.code === 'invalid_type' && issue.expected === 'number') {
+        if (!readQuotedNumber(current, issue.path)) continue
+        changed = true
+        applied.add('quoted-numbers-read')
       }
     }
     if (!changed) return undefined

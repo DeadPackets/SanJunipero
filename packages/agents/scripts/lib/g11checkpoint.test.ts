@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RuntimeSnapshot } from '../runtime/agentRuntime.js'
+import type { RuntimeSnapshot } from '../../src/runtime/agentRuntime.js'
 import {
   G11_CHECKPOINT_VERSION,
   G11CheckpointSchema,

@@ -77,7 +77,11 @@ describe('dev world server', () => {
   it('★ says which map it loaded, on every boot, in every path', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     // startDevWorld, not the CLI block: a library caller sees the line too
-    const dw = await startDevWorld({ port: 0, dbPath: join(dir, 'boot.db'), map: 'showcase' })
+    const dw = await startDevWorld({
+      port: 0,
+      dbPath: join(dir, 'boot.db'),
+      world: { map: 'showcase' },
+    })
     const said = log.mock.calls.map((c) => String(c[0])).join('\n')
     log.mockRestore()
     try {

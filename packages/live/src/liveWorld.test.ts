@@ -247,10 +247,9 @@ async function liveWorld(opts: {
   const world = await startDevWorld({
     dbPath: join(opts.dir, 'world.db'),
     port: 0,
-    map: 'showcase',
+    world: { map: 'showcase', ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }) },
     realMsPerTick: 10_000_000,
     agentDbDir,
-    ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
     cast: async () => {
       cast = await createLiveCast({
         agentDbDir,
@@ -340,7 +339,7 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     const world = await startDevWorld({
       dbPath: join(dir, 'world.db'),
       port: 0,
-      map: 'showcase',
+      world: { map: 'showcase' },
       realMsPerTick: 10_000_000,
     })
     worlds.push(world)
@@ -876,7 +875,7 @@ describe('★ what the first live boot broke', () => {
         startDevWorld({
           dbPath: join(dir, 'world.db'),
           port: taken,
-          map: 'showcase',
+          world: { map: 'showcase' },
           realMsPerTick: 10_000_000,
           agentDbDir: join(dir, 'minds'),
           cast: async () => ({

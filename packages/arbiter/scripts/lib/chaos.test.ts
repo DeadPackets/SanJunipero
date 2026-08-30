@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VERBS } from '@sj/engine'
-import type { AgentCtx } from '../adjudicate.js'
-import type { CodexEntry } from '../codex.js'
-import { makeArbiterRig, ScriptedLlm } from '../testutil/scriptedLlm.js'
-import type { Recipe, Verdict } from '../verdict.js'
+import type { AgentCtx } from '../../src/adjudicate.js'
+import type { CodexEntry } from '../../src/codex.js'
+import { makeArbiterRig, ScriptedLlm } from '../../src/testutil/scriptedLlm.js'
+import type { Recipe, Verdict } from '../../src/verdict.js'
 import { EXPLOIT_CORPUS } from './corpus.js'
 import { runChaos, type ChaosResult } from './run.js'
 

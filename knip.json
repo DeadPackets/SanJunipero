@@ -13,7 +13,7 @@
     },
     "packages/*": {
       "entry": [
-        "src/**/*.test.ts",
+        "**/*.test.ts",
         "scripts/*.ts"
       ],
       "project": [
