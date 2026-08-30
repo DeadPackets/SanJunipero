@@ -86,17 +86,19 @@ function renderPersonality(p: PromptBlocks['personality']): string {
   return lines.join('\n')
 }
 
+function clipAtWord(text: string, cap: number): string {
+  if (text.length <= cap) return text
+  const cut = text.lastIndexOf(' ', cap)
+  return `${text.slice(0, cut > 0 ? cut : cap)}…`
+}
+
 // Oldest pages drop first, so one long hand cannot flood the page.
 function renderJournal(entries: JournalEntry[]): string {
   const lines = entries.slice(-JOURNAL_LINES).map((e) => `Day ${e.day}: ${e.text}`)
   while (lines.length > 1 && lines.join('\n').length > JOURNAL_MAX_CHARS) lines.shift()
   if (lines.length === 0) return ''
   const page = lines.join('\n')
-  const bounded =
-    page.length <= JOURNAL_MAX_CHARS
-      ? page
-      : `${page.slice(0, page.lastIndexOf(' ', JOURNAL_MAX_CHARS))}…`
-  return `You turn back the pages of your own book:\n${bounded}`
+  return `You turn back the pages of your own book:\n${clipAtWord(page, JOURNAL_MAX_CHARS)}`
 }
 
 // Nothing is said plainly: silence would read to the mind as never having asked.
@@ -106,13 +108,19 @@ function renderRecall(recalled: Recalled): string {
   return `${opening} What comes back:\n${recalled.memories.join('\n')}`
 }
 
+// A memory is recalled for its gist; the whole perception row restates what the day log carries.
+// The A/B's uncapped arm raises this constant and changes nothing else.
+export const AMBIENT_MEMORY_CHAR_CAP = 300
+
 function renderScene(scene: PromptBlocks['scene']): string {
   const parts: string[] = []
   if (scene.ledgers.length > 0) {
     parts.push(`People here:\n${scene.ledgers.map((l) => `${l.name}: ${l.doc}`).join('\n')}`)
   }
   if (scene.memories.length > 0) {
-    parts.push(`What you remember:\n${scene.memories.map((m) => m.text).join('\n')}`)
+    parts.push(
+      `What you remember:\n${scene.memories.map((m) => clipAtWord(m.text, AMBIENT_MEMORY_CHAR_CAP)).join('\n')}`,
+    )
   }
   if (parts.length === 0) return 'Nothing in particular comes back to you.'
   return parts.join('\n\n')

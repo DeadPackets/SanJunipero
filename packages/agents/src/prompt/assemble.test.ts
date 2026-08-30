@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FELT_TAGS, MYSTERIES } from '@sj/engine'
 import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
-import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
+import {
+  AMBIENT_MEMORY_CHAR_CAP,
+  assemblePrompt,
+  compactDayLog,
+  type PromptBlocks,
+} from './assemble.js'
+import { extractFactsPrompt, proposeEditPrompt } from '../reflection.js'
+import type { MemoryRow } from '../memory/store.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
@@ -762,6 +769,45 @@ describe('ambient budget', () => {
     const sceneTokens = Math.ceil(a.messages[1]!.content.length / 4)
     expect(blocks.scene.memories.length).toBe(8)
     expect(sceneTokens).toBeLessThanOrEqual(700)
+  })
+
+  const LONG = Array.from(
+    { length: 40 },
+    (_, i) => `The ${i} reed bent low in the flood water.`,
+  ).join(' ')
+
+  function ambientLine(text: string): string {
+    const base = fixtureBlocks()
+    const memories = [{ ...base.scene.memories[0]!, text }]
+    const a = assemblePrompt({ ...base, scene: { ledgers: [], memories } })
+    return a.messages[1]!.content.replace('What you remember:\n', '')
+  }
+
+  // ★ Eight untruncated perception rows were 42% of a turn's input, restating a day log the
+  // prompt already carries whole.
+  it('★ caps a long ambient memory at a word boundary and marks the cut', () => {
+    const line = ambientLine(LONG)
+    expect(line.length).toBeLessThanOrEqual(AMBIENT_MEMORY_CHAR_CAP + 1)
+    expect(line.endsWith('…')).toBe(true)
+    const shown = line.slice(0, -1)
+    expect(LONG.startsWith(shown)).toBe(true)
+    expect(LONG.charAt(shown.length)).toBe(' ')
+  })
+
+  it('leaves a memory under the cap byte-identical', () => {
+    const short = 'The plum tree has begun to flower.'
+    expect(short.length).toBeLessThan(AMBIENT_MEMORY_CHAR_CAP)
+    expect(ambientLine(short)).toBe(short)
+  })
+
+  // The night reads the day to write facts, scenes and one edit; a gist there loses the evidence.
+  it('sends the night prompts the full memory text', () => {
+    const base = fixtureBlocks()
+    const day: MemoryRow[] = [{ ...base.scene.memories[0]!, text: LONG }]
+    const doc = base.personality.doc
+    for (const prompt of [extractFactsPrompt(day), proposeEditPrompt('a long flood', doc, day)]) {
+      expect(prompt.messages.map((m) => m.content).join('\n')).toContain(LONG)
+    }
   })
 })
 
