@@ -5,12 +5,14 @@ import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
 import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { useFeed, usePolled, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
 import { Moments } from './Moments.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const FEED_MAX = 120
@@ -65,6 +67,7 @@ function FeedJump({
 }) {
   return (
     <button
+      type="button"
       className="feed-jump"
       aria-current={current ? 'true' : undefined}
       aria-label={`${label} ${momentStamp(tick)}. Go to this moment.`}
@@ -148,7 +151,9 @@ function Today({ store, gapTicks, onJump }: PageProps) {
 
       <section className="block">
         <h3 className="feed-head">The paper</h3>
-        {latest === null ? (
+        {latest === null && paper.failed ? (
+          <OutOfReach onRetry={dispatchesFeed.retry} />
+        ) : latest === null ? (
           <p className="feed-empty">{EMPTY_COPY.paper}</p>
         ) : (
           <EditionView e={latest} />
@@ -158,11 +163,9 @@ function Today({ store, gapTicks, onJump }: PageProps) {
       <section className="block">
         <h3 className="feed-head">What mattered</h3>
         {entries.length === 0 && !record.loaded ? (
-          <div aria-busy="true">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="skeleton-row" />
-            ))}
-          </div>
+          <Skeleton />
+        ) : entries.length === 0 && record.failed ? (
+          <OutOfReach onRetry={chronicleFeed.retry} />
         ) : entries.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
         ) : (
@@ -191,7 +194,7 @@ function Today({ store, gapTicks, onJump }: PageProps) {
               : EMPTY_COPY.chronicle}
           </p>
         ) : (
-          <ol className="feed" aria-live="polite">
+          <ol className="feed">
             {lines.map((l) => (
               <li key={l.key} className={`feed-line ${l.kind}`}>
                 <span className="stamp">{momentStamp(l.tick)}</span>
@@ -243,16 +246,10 @@ export function FirstsView({
 }) {
   const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
 
-  if (groups.length === 0)
-    return read.loaded ? (
-      <p className="feed-empty">{EMPTY_COPY.firsts}</p>
-    ) : (
-      <div aria-busy="true">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton-row" />
-        ))}
-      </div>
-    )
+  if (groups.length === 0) {
+    if (read.failed) return <OutOfReach onRetry={milestonesFeed.retry} />
+    return read.loaded ? <p className="feed-empty">{EMPTY_COPY.firsts}</p> : <Skeleton />
+  }
 
   return (
     <>
@@ -305,7 +302,9 @@ function Chapters() {
             ))}
         </section>
       )}
-      {days.length === 0 ? (
+      {days.length === 0 && paper.failed ? (
+        <OutOfReach onRetry={dispatchesFeed.retry} />
+      ) : days.length === 0 ? (
         <p className="feed-empty">{EMPTY_COPY.paper}</p>
       ) : (
         <ol className="paper-run">

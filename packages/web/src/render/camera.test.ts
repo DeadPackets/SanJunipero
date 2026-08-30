@@ -34,6 +34,7 @@ import {
   zoomScaleAt,
   zoomSettled,
   zoomTo,
+  zoomPinch,
   zoomWheel,
   type ZoomState,
   type ZoomStop,
@@ -845,5 +846,48 @@ describe('stageFill — the number R8 is about', () => {
     // the landed first frame centred on the middle of a 48x48 grid, which is not the town
     const landed = boundsCentre(cameraBoundsOf(terrainOf(48, 48)))
     expect(landed).not.toEqual(boundsCentre(TOWN_BOX))
+  })
+})
+
+// E8: `touch-action: none` on the stage took the browser's own page-zoom away, so two fingers
+// were the only way left to the six stops and the rig had no handler for them.
+describe('★ two fingers are the touch screen’s wheel', () => {
+  it('takes the span between them as the scale, not as a push', () => {
+    const spread = zoomPinch(initialZoom(1), 2, 1000)
+    expect(spread.live).toBeCloseTo(2, 3)
+    expect(zoomPinch(initialZoom(1), 0.5, 1000).live).toBeCloseTo(0.5, 3)
+  })
+
+  it('holds the scale to the same quantised grid a wheel gesture lands on', () => {
+    for (const want of [0.31, 1.37, 2.9, 3.71]) {
+      const live = zoomPinch(initialZoom(1), want, 1000).live!
+      expect(quantiseScale(live), `${want}`).toBe(live)
+    }
+  })
+
+  it('never leaves the ladder’s ends, however far the fingers travel', () => {
+    expect(zoomPinch(initialZoom(4), 40, 1000).live).toBe(ZOOM_STOPS[ZOOM_STOPS.length - 1])
+    expect(zoomPinch(initialZoom(1), 0.001, 1000).live).toBe(ZOOM_STOPS[0])
+  })
+
+  // The release is the wheel's own, so a pinch and a notch come to rest on the same six stops.
+  it('remembers where the gesture began, so a small pinch is not a commit', () => {
+    let s = zoomPinch(initialZoom(1), 1.02, 1000)
+    s = zoomPinch(s, 1.05, 1040)
+    expect(s.gestureFrom).toBeCloseTo(1, 3)
+    expect(zoomRelease(s, 1200, true).stop).toBe(1)
+  })
+
+  it('commits a rung when the fingers really moved', () => {
+    let s = zoomPinch(initialZoom(1), 1.5, 1000)
+    s = zoomPinch(s, 1.9, 1040)
+    expect(zoomRelease(s, 1200, true).stop).toBe(2)
+  })
+
+  // A gesture that pauses and resumes past the window is a second gesture, as with the wheel.
+  it('starts over once the fingers have been still longer than the gesture gap', () => {
+    const first = zoomPinch(initialZoom(1), 2, 1000)
+    const later = zoomPinch(first, 2.2, 1000 + WHEEL_GESTURE_GAP_MS + 1)
+    expect(later.gestureFrom).toBeCloseTo(2, 3)
   })
 })

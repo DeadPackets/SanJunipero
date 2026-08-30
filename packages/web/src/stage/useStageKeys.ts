@@ -12,6 +12,8 @@ export type StageKeyHandlers = {
 /** The four keys the stage itself owns. The arrows, `+` and `-` are NOT here: StageMount binds
  *  them to the camera already, and a second binding would pan twice. */
 export function stageKeyFor(key: string): StageKey | null {
+  // `toLowerCase`, so Caps Lock keeps the keys; the SHIFT key is what the listener refuses,
+  // because a capital S typed anywhere outside a field used to open the signpost.
   switch (key.toLowerCase()) {
     case 's':
       return 'signpost'
@@ -52,7 +54,7 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
   })
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
       const h = latest.current

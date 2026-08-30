@@ -26,7 +26,8 @@ import {
 } from '../../ui/societyGraph.js'
 import { EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
-import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 
 /** Two readings of one town: how close people are, and what has actually passed between them.
@@ -70,7 +71,8 @@ export function BondsGraph({
   onSubject: (subject: Subject) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
-  const api = useFeed(bondsFeed).data
+  const bonds = useFeed(bondsFeed)
+  const api = bonds.data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   // What the town has FORMED, from the record the narrator already serves.
   const paper = useFeed(dispatchesFeed).data ?? EMPTY_DISPATCHES
@@ -78,11 +80,13 @@ export function BondsGraph({
   const haloKinds = useMemo(() => institutionLegend(halos), [halos])
   const [view, setView] = useState<SocietyView>('ties')
   // Not fetched until somebody asks for it: `null` is the endpoint layer's own "do not read".
-  const traffic = usePolled(
+  const trafficRead = useEndpointFor(
     view === 'traffic' ? '/api/society' : null,
     societyFrom,
     SOCIETY_REFETCH_MS,
   )
+  const traffic = useFeed(trafficRead)
+  const wireDown = view === 'ties' ? bonds.failed : traffic.failed
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [keyOpen, setKeyOpen] = useState(false)
   const [selected, setSelected] = useState<RelationLink | null>(null)
@@ -197,6 +201,29 @@ export function BondsGraph({
     },
     [onSubject],
   )
+  // The canvas mounts nothing tabbable, so Folk > Bonds was a whole tab of content with no
+  // keyboard path into it. The same people, as a list nothing draws — memoised, because this
+  // component re-renders on every world tick.
+  const roll = useMemo(
+    () => (
+      <ul className="stage-sr" aria-label="Everyone in the graph">
+        {graph.nodes.map((n) => (
+          <li key={n.id}>
+            <button
+              type="button"
+              onClick={() => {
+                onNodeClick(n)
+              }}
+            >
+              {nodeLabel(n)}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ),
+    [graph.nodes, nodeLabel, onNodeClick],
+  )
+
   const drawNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D) => {
       // pixel token: integer-snapped square slab with ink ring, ledge, and bevel. The NAME
@@ -354,12 +381,16 @@ export function BondsGraph({
         </div>
       )}
 
-      {/* A field of unconnected people is what BOTH a tieless town and an unanswered fetch look
-          like, so the wait says so. */}
       {(view === 'ties' ? api : traffic.data) === null ? (
-        <p className="feed-empty" aria-busy="true">
-          Reading the town’s ties…
-        </p>
+        // A field of unconnected people is what BOTH a tieless town and an unanswered fetch
+        // look like, so the wait — and the refusal — say which.
+        wireDown ? (
+          <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
+        ) : (
+          <p className="feed-empty" aria-busy="true">
+            Reading the town’s ties…
+          </p>
+        )
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
         <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
       ) : null}
@@ -380,6 +411,8 @@ export function BondsGraph({
         ) : (
           <FadedBond onClose={closeDetail} />
         ))}
+
+      {roll}
 
       <div className="bonds-canvas" ref={boxRef}>
         <ForceGraph2D

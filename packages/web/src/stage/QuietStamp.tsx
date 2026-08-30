@@ -1,10 +1,14 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { simTimeFromTick, tickToMoment } from '@sj/shared'
 import { tickBadgeState, type BadgeState, type LinkState } from '../ui/broadcastReady.js'
 import type { WorldStore } from '../state/worldStore.js'
 
 /** How long the stamp stays after the last input, and how long it takes to go (chrome.css). */
 export const STAMP_HOLD_MS = 3000
+/** One wake per this, however fast the pointer reports. */
+const WAKE_THROTTLE_MS = 200
+/** Everything that counts as somebody asking. */
+const WAKE_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const
 
 export type StampWord = 'LIVE' | 'REPLAY' | 'OFFLINE' | 'PAUSED'
 
@@ -44,22 +48,34 @@ export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState
   const awake = useSyncExternalStore(store.subscribe, isAwake, isAwake)
   const paused = useSyncExternalStore(store.subscribe, store.getPaused, store.getPaused)
   const [shown, setShown] = useState(false)
+  const isShown = useRef(false)
 
   useEffect(() => {
     let timer = 0
+    let woke = 0
     const wake = (): void => {
-      setShown(true)
+      // A high-poll mouse fires a thousand times a second, and each one cleared and re-set the
+      // timeout.
+      const now = performance.now()
+      if (now - woke < WAKE_THROTTLE_MS) return
+      woke = now
+      if (!isShown.current) {
+        isShown.current = true
+        setShown(true)
+      }
       clearTimeout(timer)
       timer = window.setTimeout(() => {
+        isShown.current = false
         setShown(false)
       }, STAMP_HOLD_MS)
     }
-    window.addEventListener('pointermove', wake, { passive: true })
-    window.addEventListener('keydown', wake)
+    // `pointermove` never fires on a phone that has not been touched, so a phone visitor never
+    // learned the day, the season or that the town is live. The stamp opens the session instead.
+    wake()
+    for (const ev of WAKE_EVENTS) window.addEventListener(ev, wake, { passive: true })
     return () => {
       clearTimeout(timer)
-      window.removeEventListener('pointermove', wake)
-      window.removeEventListener('keydown', wake)
+      for (const ev of WAKE_EVENTS) window.removeEventListener(ev, wake)
     }
   }, [])
 

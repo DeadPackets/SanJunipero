@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react'
 import { stageKeyAllowed } from './useStageKeys.js'
-import './keyMap.css'
 
 /** The key that opens it — where a person looks for exactly this, which is why the frame meter
  *  had to move off it (`ui/FpsOverlay.tsx`). */

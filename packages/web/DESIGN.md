@@ -23,25 +23,41 @@ All in `:root` at the top of `ui/chrome.css`.
 | cream, quiet | `--cream-quiet` | `#C4B8AE` — 8.28:1 on deep |
 | the one accent | `--honey` / `--honey-l` | `#F2C879` / `#F8DCA2` |
 | alarm | `--ember` | `#E8785A` |
-| state | `--sage` `--rose` `--water` `--stone` | `#93B573` `#C47876` `#7FB0C9` `#ABA198` |
+| state | `--sage` `--rose` | `#93B573` `#C47876` |
+| the feed's zebra | `--parchment-zebra` | `#F1E1CC` — the sand-over-parchment composite, computed once |
+
+`--water`, `--stone`, `--panel` and `--accent` were read by no rule in the sheet and are gone.
 
 De-emphasis is **a colour, never `opacity`** — a transparency's ratio is unknowable at the call
 site. The signature shape is the pixel slab: `--frame` = a 2px ink ring over a 4px stepped
-`--ledge` in `--deep`.
+`--ledge` in `--deep`. Under `forced-colors: active` the browser drops every `box-shadow`, so the
+sheet rebuilds those edges as `2px solid CanvasText`.
 
-Sheet geometry: `--paper-w: min(78%, 760px)`, `--paper-h: 66%`; under 640px `--paper-w-narrow: 96%`,
-`--paper-h-narrow: 80%` (78% of a 390px phone is 304px, which no roster row fits in). The town
-behind it dims by `--dim: 0.28`.
+**Two ladders, and nothing off them.** Spacing is `--s-1: 2px` through `--s-8: 40px` on a 2px base
+(4px cannot spell the hairline pads the chips are built from). Type is `--f-1: 12px` through
+`--f-7: 28px` — seven steps, where 12.48, 12.8 and 13 used to be three. `--f-1` is the floor and
+belongs to stamps and pixel chips; a *word* starts at `--f-2`.
+
+Sheet geometry: `--paper-w: min(78%, 760px)`, `--paper-h: min(66%, 100dvh - 96px)`; under 640px
+`--paper-w-narrow: 96%`, `--paper-h-narrow: 80%` (78% of a 390px phone is 304px, which no roster
+row fits in). The town behind it dims by `--dim: 0.28`. Every mark that hangs off an edge takes
+`--mark-inset: clamp(16px, 3vmin, 40px)`, guarded by `max(…, env(safe-area-inset-*))` — a 4% inset
+was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 
 ## Type
 
 | Face | Token | Where |
 |---|---|---|
-| Silkscreen | `--font-px` | the pixel face: signpost arms, the nameplate, section heads, ids |
-| Press Start 2P | `--font-display` | identity moments only |
-| Manrope | `--font-body` | paper body, ring arms, and the two letter-spaced marks — the stamp (0.14em) and the cue (0.18em, uppercase) |
+| Silkscreen | `--font-px` | the pixel face: signpost arms, the nameplate, section heads, chips |
+| Manrope | `--font-body` | paper body, ring arms, roster names, place names, and the two letter-spaced marks — the stamp (0.14em) and the cue (0.18em, uppercase) |
 | Fraunces | `--font-title` | paper headings |
-| system mono | `--font-data` | law paths, ids |
+| system mono | `--font-data` | law paths, stamps, every column of figures |
+
+Press Start 2P is still installed — `render/textFaces.ts` draws with it on the canvas — but no CSS
+rule reads it, so the sheet no longer declares a token for it.
+
+**Silkscreen has no lowercase**, so it may not carry a name or a place: a roster row and a
+`.place-name` are Manrope 600, and "Amara's house" is not "AMARA'S HOUSE".
 
 Self-hosted through `@fontsource`, never a CDN link. **Nothing renders below 12 CSS px** —
 `ui/chromeType.test.ts` is the law, and it outranks any smaller number a sketch asks for.
@@ -55,11 +71,11 @@ overlay sixty times a second.
 
 | Mark | What it is | Where |
 |---|---|---|
-| `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws | bottom-right, 4% inset |
+| `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws | bottom-right, `--mark-inset` |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
-| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, 3% inset; on input, gone 3s later |
-| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, 4% inset |
+| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
+| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
 
 Speech itself is drawn **in the canvas**, not the DOM: `render/bubbles.ts` draws a 2px ink box on
@@ -86,8 +102,35 @@ publishes its box in view coordinates — otherwise a bubble pushed below a figu
 | a place | Provenance · Inside |
 
 `paper/pageModel.ts` is the only place that table exists. Four ways down: the close word, Escape,
-a click on the town, and a grip drag of more than `GRIP_CLOSE_PX` (40px). Focus enters the tab
-strip on open and returns to the opener on close.
+a click on the town, and the grip. Focus enters the tab strip on open, moves with the arm, and
+returns to the opener on close.
+
+**The grip follows the finger.** `pointerdown` captures the pointer and suppresses the sheet's
+transition; every `pointermove` writes `transform: translate(-50%, y)` straight to the DOM — 1:1
+down, rubber-banded to a third upward — and eases `.town-dim` with it, so the town brightens under
+your thumb. On `pointerup`, `gripDismiss(down, speed)` puts it away past `GRIP_CLOSE_PX` (40px) or
+above `GRIP_FLING_PX_MS` (0.5 px/ms), and otherwise hands the spring back to the CSS. Under
+reduced motion the tracking stays — it is direct manipulation, not decoration — and the spring is
+the sheet's own instant snap.
+
+## Breakpoints
+
+One media query in 1,383 lines was a width-only 640px, and **height is what a landscape phone runs
+out of**. Several now, and the sheet's own lists read the sheet rather than the window.
+
+| Query | What it is for |
+|---|---|
+| `max-width: 640px` | the sheet takes 96% × 80%; the arms move to the top edge as a 2×2 block |
+| `max-width: 480px` | the head becomes a grid — title and close on one row, tabs scrolling along the next |
+| `641–1400px` | the sheet steps left far enough to clear the arms, statically, so nothing moves when it opens |
+| `max-height: 620px` | the sheet takes `100dvh - 64px` and 96% of the width; the post is hidden; the arms lie in a row above it |
+| `min-width: 1920px` | `--paper-w` to 1040px, the whole signpost to `scale: 1.5` |
+| `hover: none` | no lift survives the tap; the mark tips open on focus; the close word drops `· Esc` |
+| `forced-colors: active` | every `box-shadow` edge comes back as `2px solid CanvasText` |
+| `@container` on `.paper-sheet` | roster reservations above 26rem, two roster columns above 46rem |
+
+**With the sheet open the signpost stays whole at every width** — 0 px² of overlap measured at
+320, 375, 390, 768, 844×390, 1024, 1440 and 2560, against 36,352 px² (100% hidden) at ≤390 before.
 
 ## Motion
 
@@ -106,23 +149,54 @@ the two disagree.
 **Nothing that answers an input runs longer than 300ms.** Anything past the ceiling carries a row
 in `MOTION_EXEMPT` with its reason, and a test asserts every long motion in the product has one.
 Under `prefers-reduced-motion: reduce` everything becomes a fade or nothing at all — the sheet
-does not slide, the ring does not pop, the plate does not fade in.
+does not slide, the ring does not pop, the plate does not fade in. Every duration lives inside a
+`no-preference` guard or carries its own `reduce` switch-off; `chromeCss.test.ts` fails on a
+non-fade motion outside one.
+
+**A transition reads the duration of the state it goes TO.** The 0s belongs on the base rule and
+the 150ms on `:hover`, or every hover-out lies about where the pointer is for 150ms.
+
+One stagger, one depth: `--stagger-i` on `:nth-child(1…6)` and
+`animation-delay: calc(var(--stagger-i, 6) * 30ms)`, so nothing past the sixth item arrives all at
+once.
 
 ## Accessibility floor
 
 - **Every pointer path has a key.** `S` signpost · `Tab` chrome · `Enter` act · `Esc` down ·
-  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` the frame meter.
+  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` **the key map** ·
+  `Shift+P` the frame meter. `?` is where a person looks for the list, so the list is what it
+  opens; the meter is an instrument and took the chord.
+- **And every key has a pointer path.** Two fingers are the touch screen's wheel
+  (`render/camera.ts:zoomPinch`) — `touch-action: none` on the stage takes the browser's own
+  page-zoom away, so without a pinch the six stops have no way in at all on a phone.
 - **One Escape ladder**, and nothing else in the tree listens for it: `useStageKeys` asks,
-  `ui/interaction.ts:escapeStep` answers — paper → interior → pick → fullscreen.
+  `ui/interaction.ts:escapeStep` answers — keys → paper → interior → pick → fullscreen.
 - **The camera keys and the stage keys are disjoint sets**, asserted by test, so no key fires twice.
-- Focus ring: 2px `--honey`, 2px offset. Every pointer target is at least 40px tall; a signpost
-  arm is 44px.
+- Focus ring: **2px `--ink`, 2px offset, square**. Ember measured 2.40:1 on parchment and 1.84:1
+  on honey — below SC 1.4.11 on every ground the chrome sits on; ink is 9.06 / 10.20 / 7.63 / 6.92.
+  `--honey` stays on `.stage-figure` and the ring's arms, the only two painted on `--deep`.
+- **Every pointer target is 44px.** A bar that must keep its drawn size — the 5px grip, the 12px
+  player track, the 22px day track, the 26px day mark — gets its 44px from a transparent
+  pseudo-element instead of growing.
 - `aria-live` for speech (one line per 800ms, newest kept) and for paper state.
-- Text over art is ≥ 12 CSS px with an ink halo or a plate behind it; 4.5:1 minimum, measured
-  against the night ground as well as the day one. **This holds for every DOM mark and is asserted
-  by `ui/contrast.test.ts`. It does NOT currently hold for canvas world text** — see the open
-  defect in `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the
-  ink it asks for, measured at 1.1:1 over its own slab.
+- Text over art is ≥ 12 CSS px and carries **its own ground**: a 4-way 1px `--deep` halo, or a
+  plate. Cream on the daylight tile is 1.40:1 and on the signpost's own plank 2.13:1, so the halo
+  is load-bearing rather than decorative — the signpost arm was the one mark without it and failed
+  AA on the product's primary navigation. Pixel-sampled at 1440 in daylight, **every glyph pixel of
+  the stamp, the cue and the arm has ink within 2px of it**; `ui/contrast.test.ts` asserts the four
+  shadow offsets, and a token-pair test cannot see this — it must be sampled.
+  **It does NOT hold for canvas world text** — see the open defect in
+  `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the ink it
+  asks for, measured at 1.1:1 over its own slab.
+- **A page never prints an empty state over a broken wire.** `Read<T>` carries `failed`, and
+  the seven branches that would otherwise say "the town has not done this yet" say
+  `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news
+  about the wire, and they are not the same sentence.
+- The signpost's arms are a **disclosure set**: `aria-expanded` + `aria-controls="paper-sheet"`,
+  never `aria-pressed`. The open arm stays swung out 3px on a second, darker plank — a brightness
+  filter took its label to 1.53:1 and flickered 1.2 → 0.94 → 1.2 when a pressed arm was pressed.
+- The document opens with a visually-hidden `<h1>`, a skip link to `#signpost`, and a `<main>`
+  round the stage. `Figures` leaves the tab order entirely while the paper is open.
 - The ring is a `role="menu"` labelled with the subject's name; the plate is `aria-hidden` because
   it is a visual echo of it.
 
@@ -137,3 +211,8 @@ does not slide, the ring does not pop, the plate does not fade in.
   `0.25 0.5 1 2 3 4`; NEAREST everywhere.
 - **Determinism untouched.** Nothing in the chrome moves the world.
 - The first viewport is the town at zoom 1, centred, with the director cutting from there.
+- **Two `<img alt="">` are deliberate.** A person's portrait sits beside their name, and the
+  discovery art is ornament on a card whose `aria-label` already carries the whole record.
+- **The town-dim is a pointer-only dismissal**, `aria-hidden` with no role. Escape is the keyboard
+  path and the close word is the pointer's other one; a third named control for the same act would
+  be noise in the tab order.

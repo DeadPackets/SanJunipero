@@ -12,7 +12,8 @@ import {
   type PlayerState,
 } from '../../ui/momentsPlayer.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
 
@@ -110,6 +111,7 @@ const MomentCardView = memo(function MomentCardView({
   return (
     <li>
       <button
+        type="button"
         className={open ? 'moment-card open' : 'moment-card'}
         aria-current={open ? 'true' : undefined}
         aria-label={`${thumbTitle(moment)}. Day ${label.day}, ${label.cast}, ${where}. Play this day.`}
@@ -177,6 +179,7 @@ function PlayerStripView({
   return (
     <div className="moment-player" role="group" aria-label={`Playing ${thumbTitle(moment)}`}>
       <button
+        type="button"
         className="player-btn"
         aria-pressed={playing}
         aria-label={playing ? 'Pause this day' : 'Play this day'}
@@ -207,13 +210,14 @@ function PlayerStripView({
       </div>
       <span className="player-clock">{momentStamp(player.tick)}</span>
       <button
+        type="button"
         className="player-btn speed"
         aria-label={`Speed ${player.speed} times. Change speed.`}
         onClick={onSpeed}
       >
         {player.speed}×
       </button>
-      <button className="player-btn live" onClick={onLive}>
+      <button type="button" className="player-btn live" onClick={onLive}>
         LIVE
       </button>
     </div>
@@ -224,7 +228,9 @@ function PlayerStripView({
 export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
-  const moments = usePolled('/api/moments', momentRows).data
+  const record = useEndpointFor('/api/moments', momentRows)
+  const read = useFeed(record)
+  const moments = read.data
   // `/moment/:id` names a recorded day, so a link opens the filmstrip on it.
   const [openId, setOpenId] = useState<number | null>(momentId)
   const openMoment = (id: number | null): void => {
@@ -262,21 +268,26 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
   // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
   // socket messages.
   const scrubbedRef = useRef<number | null>(null)
+  const runningRef = useRef<PlayerState>(player)
   useEffect(() => {
     if (open === null || player.status !== 'playing') return
+    // the run starts from what React last committed; the fraction of a tick lives here after
+    runningRef.current = player
     let raf = 0
     let last = performance.now()
     const frame = (now: number): void => {
       const dt = now - last
       last = now
-      setPlayer((prev) => {
-        const next = tickPlayer(prev, dt, open.startTick, open.endTick)
+      const next = tickPlayer(runningRef.current, dt, open.startTick, open.endTick)
+      const was = runningRef.current
+      runningRef.current = next
+      if (next.tick !== was.tick || next.status !== was.status) {
         if (next.tick !== scrubbedRef.current) {
           scrubbedRef.current = next.tick
           onJump(next.tick)
         }
-        return next
-      })
+        setPlayer(() => next)
+      }
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
@@ -290,6 +301,7 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
     setPlayer((prev) => {
       const next = seekPlayer(prev, frac, open.startTick, open.endTick)
       scrubbedRef.current = next.tick
+      runningRef.current = next
       onJump(next.tick)
       return next
     })
@@ -304,7 +316,9 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
 
   return (
     <>
-      {moments !== null && moments.length === 0 ? (
+      {read.failed && moments === null ? (
+        <OutOfReach onRetry={record.retry} />
+      ) : moments !== null && moments.length === 0 ? (
         <p className="feed-empty">{EMPTY_COPY.moments}</p>
       ) : (
         <ol className="strip-list" aria-label="The days the town kept">

@@ -43,17 +43,18 @@ describe('the table', () => {
   })
 })
 
-describe('reduced motion is instant arrival, not the absence of a change', () => {
+describe('reduced motion is a fade or nothing, which is what the sheet does', () => {
   it('takes a movement to zero', () => {
     for (const name of MOTIONS) expect(reduced(MOTION[name], 'translate').ms, name).toBe(0)
     expect(reduced(MOTION.enter, 'left').ms).toBe(0)
   })
 
-  it('keeps a nonzero opacity, so a viewer who opted out still sees that something changed', () => {
+  // The sheet leaves a colour transition unguarded and kills every other one, so the table
+  // may not promise a third of the duration that no rule in it ever implemented.
+  it('keeps a colour at its own duration, so an opted-out viewer still sees the change', () => {
     for (const name of MOTIONS) {
-      const r = reduced(MOTION[name], 'opacity')
-      expect(r.ms, name).toBeGreaterThan(0)
-      expect(r.ms, name).toBeLessThan(MOTION[name].ms)
+      expect(reduced(MOTION[name], 'opacity').ms, name).toBe(MOTION[name].ms)
+      expect(reduced(MOTION[name], 'background-color').ms, name).toBe(MOTION[name].ms)
     }
   })
 

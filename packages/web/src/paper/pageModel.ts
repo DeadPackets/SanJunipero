@@ -43,3 +43,10 @@ export function tabFromKey(page: PageKey, key: string, from: string): string | n
 
 /** The grip has to be dragged this far down before the paper takes it as "put it away". */
 export const GRIP_CLOSE_PX = 40
+/** …or thrown down at this speed. A fast 25px flick is a dismissal; waiting for 40px is not. */
+export const GRIP_FLING_PX_MS = 0.5
+
+/** Whether letting go of the grip here, at this speed, puts the sheet away. */
+export function gripDismiss(downPx: number, downPxMs: number): boolean {
+  return downPx > GRIP_CLOSE_PX || (downPx > 0 && downPxMs > GRIP_FLING_PX_MS)
+}

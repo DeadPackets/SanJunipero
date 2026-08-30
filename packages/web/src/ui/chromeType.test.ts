@@ -24,20 +24,54 @@ const PROSE = [
 
 type Decl = { selectors: string; px: number; raw: string }
 
+/** The type scale, read off `:root` — the sheet names its sizes, so the reader resolves them. */
+function scale(css: string): Readonly<Record<string, number>> {
+  const root = /:root\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+  const out: Record<string, number> = {}
+  for (const [, name, px] of root.matchAll(/--(f-\d+):\s*(\d+)px/g)) out[name!] = Number(px)
+  return out
+}
+
 /** Every size the sheet sets, from `font-size` or from the `font` shorthand, resolved to px. */
 export function fontSizes(css: string): Decl[] {
+  const steps = scale(css)
   const out: Decl[] = []
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const raw =
       /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim() ??
       /(?:^|;)\s*font:\s*([\d.]+(?:rem|px))/.exec(body ?? '')?.[1]?.trim()
     if (raw === undefined) continue
+    const token = /^var\(--(f-\d+)\)$/.exec(raw)?.[1]
     const num = Number.parseFloat(raw)
-    const px = raw.endsWith('rem') ? num * 16 : raw.endsWith('px') ? num : Number.NaN
+    const px =
+      token !== undefined
+        ? (steps[token] ?? Number.NaN)
+        : // `body { font-size: 100% }` IS the 16px reference every rem below is read against
+          raw === '100%'
+          ? 16
+          : raw.endsWith('rem')
+            ? num * 16
+            : raw.endsWith('px')
+              ? num
+              : Number.NaN
     out.push({ selectors: (sel ?? '').trim(), px, raw })
   }
   return out
 }
+
+describe('the type scale the reader resolves against', () => {
+  it('finds all seven steps in the sheet’s own :root', () => {
+    expect(scale(CSS)).toEqual({
+      'f-1': 12,
+      'f-2': 13,
+      'f-3': 14,
+      'f-4': 16,
+      'f-5': 18,
+      'f-6': 22,
+      'f-7': 28,
+    })
+  })
+})
 
 const DECLS = fontSizes(CSS)
 const where = (d: Decl): string => `${d.selectors} { ${d.raw} }`

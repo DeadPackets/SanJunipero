@@ -150,8 +150,9 @@ describe('audit M2, at the source: nothing in the panel is wider than its column
   })
 
   it('holds the human title above the machine path, and both above the floor', () => {
-    expect(ruleBody('.law-title')).toMatch(/font-size:\s*(1(\.\d+)?rem|1[6-9]px|2\dpx)/)
-    expect(ruleBody('.law-path')).toMatch(/font-size:\s*0\.75rem/)
+    // the sheet names its sizes now: --f-4 is 16px, --f-1 the 12px stamp floor
+    expect(ruleBody('.law-title')).toMatch(/font-size:\s*var\(--f-4\)/)
+    expect(ruleBody('.law-path')).toMatch(/font-size:\s*var\(--f-1\)/)
   })
 
   // Silkscreen has no lowercase, so the pixel face renders `aging.deathOfOldAgeEnabled` as one

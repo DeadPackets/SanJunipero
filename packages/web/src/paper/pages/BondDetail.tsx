@@ -21,7 +21,7 @@ const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
  *  says which of the two happened rather than shutting itself under the reader. */
 export function FadedBond({ onClose }: { onClose: () => void }) {
   return (
-    <aside className="bond-detail" role="status">
+    <aside className="bond-detail" role="group" aria-label="This bond has faded">
       <header className="bond-head">
         <h3 className="bond-title">This bond has faded</h3>
         <button type="button" className="bond-close" onClick={onClose} aria-label="Close this bond">
@@ -66,7 +66,7 @@ export function BondDetail({
         <h3 className="bond-title">
           {nameOf(bond.aId)} &amp; {nameOf(bond.bId)}
         </h3>
-        <button className="bond-close" onClick={onClose} aria-label="Close this bond">
+        <button type="button" className="bond-close" onClick={onClose} aria-label="Close this bond">
           ×
         </button>
       </header>

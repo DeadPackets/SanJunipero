@@ -41,11 +41,14 @@ type Placed = { x: number; y: number; w: number; shown: boolean }
 export function Figures({
   scene,
   store,
+  paperOpen,
   onFocus,
   onOpen,
 }: {
   scene: Scene | null
   store: WorldStore
+  /** with the sheet up, Tab out of it must not land on forty invisible figure buttons */
+  paperOpen: boolean
   /** the figure the keyboard is on, or null when it has left the layer */
   onFocus: (subject: Subject | null) => void
   /** Enter on a figure: the ring opens round it */
@@ -55,6 +58,7 @@ export function Figures({
   // The order is read once a world snapshot, not once a frame: a tab order that re-sorted
   // under the finger would move the next stop between two presses.
   const figures = useMemo(() => (scene === null ? [] : figuresInView(scene, state)), [scene, state])
+  const layer = useRef<HTMLDivElement>(null)
   const nodes = useRef(new Map<string, HTMLButtonElement>())
   const placed = useRef(new Map<string, Placed>())
 
@@ -79,32 +83,36 @@ export function Figures({
         // the anchor is where a body stands, so the box rises from its feet
         node.style.margin = `${-h}px 0 0 ${-Math.round(w / 2)}px`
         // A body that has walked out of the picture is not a stop on the way to the signpost.
+        // `visibility` takes the walked-off body out of the tab order too, so the stop set
+        // moves with the snapshot rather than 60 times a second under the finger.
         node.style.visibility = a.onScreen ? 'visible' : 'hidden'
-        node.tabIndex = a.onScreen ? 0 : -1
       }
     })
   }, [scene])
 
   if (scene === null) return null
   return (
-    <div className="stage-figures">
+    <div className="stage-figures" role="group" aria-label="People the camera can see" ref={layer}>
       {figures.map((f) => (
         <button
           key={f.id}
           type="button"
           className="stage-figure"
-          tabIndex={-1}
+          tabIndex={paperOpen ? -1 : 0}
           aria-label={f.name}
           ref={(el) => {
-            if (el === null) {
-              nodes.current.delete(f.id)
-              placed.current.delete(f.id)
-            } else nodes.current.set(f.id, el)
+            // `placed` is keyed by agent and bounded by the town, and every entry is
+            // overwritten on the next frame: dropping it re-wrote 200 styles per sheet open.
+            if (el === null) nodes.current.delete(f.id)
+            else nodes.current.set(f.id, el)
           }}
           onFocus={() => {
             onFocus(f)
           }}
-          onBlur={() => {
+          onBlur={(e) => {
+            // Tabbing between two figures fired blur before focus, which unmounted the plate
+            // and replayed its fade on every press.
+            if (layer.current?.contains(e.relatedTarget) === true) return
             onFocus(null)
           }}
           onClick={() => {

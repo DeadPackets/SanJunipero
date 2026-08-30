@@ -5,7 +5,9 @@ import {
   type ConstructKind,
   type ConstructRecord,
 } from '@sj/shared'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_CUSTOMS: ConstructRecord[] = []
@@ -32,20 +34,15 @@ const EMPTY = 'Nobody keeps anything yet — a custom is a place they keep comin
  *  nothing on this page is ever shown to a mind. */
 export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
-  const read = usePolled('/api/constructs', customs, CUSTOMS_REFETCH_MS)
+  const record = useEndpointFor('/api/constructs', customs, CUSTOMS_REFETCH_MS)
+  const read = useFeed(record)
   const rows = read.data ?? NO_CUSTOMS
   const nameOf = (id: string): string => state?.agents[id]?.name ?? id
 
-  if (rows.length === 0)
-    return read.loaded ? (
-      <p className="feed-empty">{EMPTY}</p>
-    ) : (
-      <div aria-busy="true">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton-row" />
-        ))}
-      </div>
-    )
+  if (rows.length === 0) {
+    if (read.failed) return <OutOfReach onRetry={record.retry} />
+    return read.loaded ? <p className="feed-empty">{EMPTY}</p> : <Skeleton />
+  }
   return (
     <ul className="families">
       {rows.map((c) => (

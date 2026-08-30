@@ -15,6 +15,7 @@ import {
   zoomScaleAt,
   zoomSettled,
   zoomTo,
+  zoomPinch,
   zoomWheel,
 } from './camera.js'
 import { type DragTrack, type Fling, flingFrom, flingStep, isDrag, trackDrag } from './fling.js'
@@ -160,7 +161,8 @@ export function createCameraRig(
     const now = performance.now()
     // reduced motion gets the exact stop immediately; the tracking during the gesture stays,
     // because that was the viewer's own hand and not motion we chose for them.
-    if (zoomGestureEnded(zoom, now)) zoom = zoomRelease(zoom, now, !wantsMotion())
+    // A pinch held still is still a hand on the camera; only a wheel goes quiet mid-gesture.
+    if (pinch === null && zoomGestureEnded(zoom, now)) zoom = zoomRelease(zoom, now, !wantsMotion())
     const s = zoomScaleAt(zoom, now)
     if (s === world.scale.x) return
     world.scale.set(s)
@@ -185,6 +187,19 @@ export function createCameraRig(
   let last = { x: 0, y: 0 }
   let glide: Fling | null = null
 
+  // The touch screen's wheel. Without it `touch-action: none` on the mount leaves the six zoom
+  // stops with no way in at all on a phone.
+  const touches = new Map<number, { x: number; y: number }>()
+  let pinch: { span: number; from: number } | null = null
+  const twoOf = (): [{ x: number; y: number }, { x: number; y: number }] | null => {
+    const both = [...touches.values()]
+    return both.length === 2 ? [both[0]!, both[1]!] : null
+  }
+  const spanOf = (): number => {
+    const both = twoOf()
+    return both === null ? 0 : Math.hypot(both[0].x - both[1].x, both[0].y - both[1].y)
+  }
+
   /** Anything that says where the camera should be outranks something still deciding. */
   const stopGlide = (): void => {
     glide = null
@@ -192,12 +207,29 @@ export function createCameraRig(
 
   app.stage.on('pointerdown', (e: FederatedPointerEvent) => {
     stopGlide() // catching a moving camera stops it, as a hand would
+    touches.set(e.pointerId, { x: e.global.x, y: e.global.y })
+    const both = twoOf()
+    if (both !== null) {
+      dragging = false
+      app.canvas.style.cursor = 'grab'
+      fitted = false
+      breakFollow()
+      captureAnchor((both[0].x + both[1].x) / 2, (both[0].y + both[1].y) / 2)
+      pinch = { span: spanOf(), from: zoomScaleAt(zoom, performance.now()) }
+      return
+    }
     dragging = true
     drag = trackDrag(null, e.global.x, e.global.y, performance.now())
     last = { x: e.global.x, y: e.global.y }
     app.canvas.style.cursor = 'grabbing'
   })
   app.stage.on('pointermove', (e: FederatedPointerEvent) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.global.x, y: e.global.y })
+    if (pinch !== null) {
+      const span = spanOf()
+      if (span > 0) zoom = zoomPinch(zoom, pinch.from * (span / pinch.span), performance.now())
+      return
+    }
     if (!dragging) return
     drag = trackDrag(drag, e.global.x, e.global.y, performance.now())
     if (isDrag(drag)) {
@@ -207,13 +239,17 @@ export function createCameraRig(
     place(cam.x + (e.global.x - last.x), cam.y + (e.global.y - last.y))
     last = { x: e.global.x, y: e.global.y }
   })
-  const endDrag = (): void => {
+  const endDrag = (e?: FederatedPointerEvent): void => {
+    if (e !== undefined) touches.delete(e.pointerId)
+    // The second finger leaving ends the pinch, and the first one left is not a new pan.
+    if (touches.size < 2) pinch = null
     if (dragging && wantsMotion()) glide = flingFrom(drag, performance.now())
     dragging = false
     app.canvas.style.cursor = 'grab'
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
+  app.stage.on('pointercancel', endDrag)
   // The screen-sized `app.stage.hitArea` must stay: drag-to-pan, the fling and the wheel-zoom
   // anchor are all `app.stage` handlers and each needs a target under the pointer.
   app.stage.on('pointertap', (e: FederatedPointerEvent) => {

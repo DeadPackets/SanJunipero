@@ -4,6 +4,7 @@ import { kindWords } from '../../ui/broadcastReady.js'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 type Journal = { tick: number; text: string; kind: 'journal' | 'dream' }
@@ -72,9 +73,7 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
       {settled ? (
         <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (
-        <div aria-busy="true">
-          <div className="skeleton-row" />
-        </div>
+        <Skeleton rows={1} />
       )}
     </section>
   )
@@ -95,7 +94,7 @@ function Inside({
 }) {
   if (card === null) return <p className="feed-empty">{EMPTY_COPY.room}</p>
   return (
-    <div className="room" aria-label={`Inside ${card.title}`}>
+    <section className="room" aria-label={`Inside ${card.title}`}>
       <button
         type="button"
         className="room-door"
@@ -114,8 +113,10 @@ function Inside({
         </p>
       )}
 
-      <div className="room-present">
-        <span className="room-label">In just now</span>
+      <div className="room-present" role="group" aria-labelledby="room-present">
+        <span className="room-label" id="room-present">
+          In just now
+        </span>
         {card.present.length === 0 ? (
           <p className="feed-empty">{card.empty}</p>
         ) : (
@@ -131,8 +132,10 @@ function Inside({
       </div>
 
       {card.holds.length > 0 && (
-        <div className="room-holds">
-          <span className="room-label">Holding</span>
+        <div className="room-holds" role="group" aria-labelledby="room-holds">
+          <span className="room-label" id="room-holds">
+            Holding
+          </span>
           <ul className="hold-grid">
             {card.holds.map((h) => (
               <li key={h.kind} className="hold">
@@ -151,6 +154,6 @@ function Inside({
           {card.more > 0 && <p className="room-more">and {card.more} more</p>}
         </div>
       )}
-    </div>
+    </section>
   )
 }

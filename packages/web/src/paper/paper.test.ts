@@ -10,6 +10,8 @@ import { households } from './families.js'
 import {
   ARMS,
   GRIP_CLOSE_PX,
+  GRIP_FLING_PX_MS,
+  gripDismiss,
   PAGE_TABS,
   PAGE_TITLE,
   firstTab,
@@ -58,21 +60,31 @@ describe('the signpost', () => {
     for (const arm of ARMS) expect(html).toContain(`>${PAGE_TITLE[arm]}<`)
   })
 
-  it('★ says which arm is pressed, and only that one', () => {
+  // Four arms opening one sheet on four pages is a disclosure set, not four toggles.
+  it('★ says which arm is open, and only that one', () => {
     const html = post('found')
-    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
-    expect(html).toMatch(/data-arm="found"[^>]*aria-pressed="true"/)
-    expect(post(null).match(/aria-pressed="true"/g)).toBeNull()
+    expect(html.match(/aria-expanded="true"/g)).toHaveLength(1)
+    expect(html).toMatch(/data-arm="found"[^>]*aria-expanded="true"/)
+    expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(4)
+    expect(post(null).match(/aria-expanded="true"/g)).toBeNull()
   })
 
-  // A person's page opens from the ring, not from an arm: no arm may read as pressed for it.
+  // A person's page opens from the ring, not from an arm: no arm may read as open for it.
   it('leaves every arm unpressed while the paper is on a subject page', () => {
-    expect(post('person').match(/aria-pressed="true"/g)).toBeNull()
-    expect(post('building').match(/aria-pressed="true"/g)).toBeNull()
+    expect(post('person').match(/aria-expanded="true"/g)).toBeNull()
+    expect(post('building').match(/aria-expanded="true"/g)).toBeNull()
+  })
+
+  // The sheet buries the corner it stands in below 1400px, so the arms move to the top edge.
+  it('says whether the sheet is up, so the arms can stand clear of it', () => {
+    expect(post(null)).toContain('data-open="no"')
+    expect(post('folk')).toContain('data-open="yes"')
   })
 
   it('names itself for a screen reader and puts the post under the arms', () => {
-    expect(post(null)).toContain('aria-label="Signpost"')
+    // "Signpost" names the metaphor; a screen reader hears "Signpost, navigation" and learns
+    // nothing about what is behind it.
+    expect(post(null)).toContain('aria-label="Town sections"')
     expect(post(null)).toContain('class="signpost-post"')
   })
 })
@@ -167,7 +179,9 @@ describe('the paper', () => {
 
   it('offers the way out in words, and a grip to pull it down by', () => {
     const html = paper({ page: 'folk', tab: 'People' })
-    expect(html).toContain('close · Esc')
+    expect(html).toContain('close')
+    // a phone is not told to press a key it does not have (@media (hover: none))
+    expect(html).toContain('class="paper-close-key"> · Esc<')
     expect(html).toContain('class="paper-grip"')
   })
 
@@ -212,9 +226,50 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     expect(code).toMatch(/className="paper-close" onClick=\{onClose\}/)
   })
 
-  it(`closes on a grip drag of more than ${GRIP_CLOSE_PX}px, and not on a shorter one`, () => {
+  it(`closes on a grip drag of more than ${GRIP_CLOSE_PX}px, or on a throw`, () => {
     expect(GRIP_CLOSE_PX).toBe(40)
-    expect(code).toMatch(/e\.clientY - from > GRIP_CLOSE_PX\) onClose\(\)/)
+    expect(gripDismiss(GRIP_CLOSE_PX + 1, 0)).toBe(true)
+    expect(gripDismiss(GRIP_CLOSE_PX, 0)).toBe(false)
+    // a fast 25px flick is a dismissal; waiting for 40px is not
+    expect(gripDismiss(25, GRIP_FLING_PX_MS + 0.1)).toBe(true)
+    expect(gripDismiss(25, GRIP_FLING_PX_MS)).toBe(false)
+    // and an upward throw is never one
+    expect(gripDismiss(-60, 2)).toBe(false)
+    expect(code).toMatch(/gripDismiss\(e\.clientY - d\.from, thrown\?\.vy \?\? 0\)/)
+  })
+
+  // The gesture a person compares directly against a native sheet: it followed nothing until
+  // the finger was already off it.
+  it('★ follows the finger, rubber-banded upward, and brightens the town under it', () => {
+    expect(code).toMatch(/onPointerMove/)
+    expect(code).toMatch(/setPointerCapture/)
+    expect(code).toMatch(/transform = `translate\(-50%, \$\{y\}px\)`/)
+    expect(code).toMatch(/down > 0 \? down : down \/ RUBBER_BAND/)
+    // the camera's own tail, so the sheet and the town answer "was that a throw" alike
+    expect(code).toMatch(/trackDrag\(/)
+    expect(code).toMatch(/dimRef\.current\.style\.opacity/)
+  })
+
+  // The sheet is inert while it is down, so its 300ms of held content is not a tab trap in
+  // the town, and `aria-hidden` and `inert` never disagree about whether it is there.
+  it('★ is inert and hidden together while it is down', () => {
+    expect(code).toMatch(/aria-hidden=\{!open\}/)
+    expect(code).toMatch(/inert=\{!open\}/)
+    expect(paper()).toContain('inert=""')
+    expect(paper({ page: 'folk', tab: 'People' })).not.toContain('inert')
+  })
+
+  // Switching arms while the sheet is up unmounted the focused tab and dropped focus to <body>.
+  it('★ re-seats focus when the arm changes, not only when the sheet opens', () => {
+    expect(code).toMatch(/\}, \[open, key\]\)/)
+  })
+
+  // A keyboard instruction inside an accessible name is re-announced on every tab focus.
+  it('★ describes the arrow keys rather than naming the strip with them', () => {
+    const html = paper({ page: 'folk', tab: 'People' })
+    expect(html).toContain('aria-describedby="paper-tabs-keys"')
+    expect(html).toMatch(/id="paper-tabs-keys"[^>]*>Left and right arrow keys/)
+    expect(html).not.toMatch(/aria-label="[^"]*arrow keys/)
   })
 
   it('moves focus to the first tab on the way up, and back to the opener on the way down', () => {
@@ -223,6 +278,34 @@ describe('★ every way the paper goes down, and where focus lands', () => {
       /tabsRef\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\)/,
     )
     expect(code).toMatch(/opener\?\.focus\(\)/)
+  })
+})
+
+// ── ★ a refused read is not an empty town ─────────────────────────────────────────────────
+// `useEndpoint` settles a refusal as `{ data: null, loaded: true }`, so every one of these
+// branches used to print the product's best writing to assert something false. The empty copy
+// is news about the town; `OutOfReach` is news about the wire.
+describe('★ every page that can be quiet can also be out of reach', () => {
+  const PAGES = [
+    './pages/Found.tsx',
+    './pages/Customs.tsx',
+    './pages/Chronicle.tsx',
+    './pages/Moments.tsx',
+    './pages/BondsGraph.tsx',
+  ]
+
+  it.each(PAGES)('%s branches on the read failing, and offers it again', (page) => {
+    const code = src(page)
+    expect(code, 'no OutOfReach').toContain("from '../../ui/OutOfReach.js'")
+    expect(code, 'no failed branch').toMatch(/\.failed|wireDown/)
+    expect(code, 'no way to ask again').toMatch(/onRetry=\{/)
+  })
+
+  // A page holding a last good answer keeps showing it: only a panel with nothing at all and a
+  // broken wire changes what it says.
+  it('never swaps the copy while there is still an answer to show', () => {
+    expect(src('./pages/Moments.tsx')).toContain('read.failed && moments === null')
+    expect(src('./pages/Chronicle.tsx')).toContain('entries.length === 0 && record.failed')
   })
 })
 

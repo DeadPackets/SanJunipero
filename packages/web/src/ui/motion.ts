@@ -69,8 +69,10 @@ export const CSS_EASE_TOKEN: Readonly<Record<MotionName, string>> = {
 }
 
 /**
- * Reduced motion is not "no motion": it is INSTANT ARRIVAL. Opacity survives at a third of the
- * duration and every property that moves a box goes to zero, a stagger with them.
+ * Reduced motion is a FADE OR NOTHING, which is what `chrome.css` does and what DESIGN.md says:
+ * every property that moves a box goes to zero, a stagger with it, and a colour keeps its own
+ * duration so a viewer who opted out still sees that something changed. The table used to
+ * promise a third of the duration instead, which no rule in the sheet ever implemented.
  */
 const OPACITY_PROPS: readonly string[] = [
   'opacity',
@@ -81,8 +83,7 @@ const OPACITY_PROPS: readonly string[] = [
 ]
 
 export function reduced(m: Motion, prop: string): Motion {
-  if (!OPACITY_PROPS.includes(prop)) return { ms: 0, ease: m.ease }
-  return { ms: Math.round(m.ms / 3), ease: m.ease }
+  return { ms: OPACITY_PROPS.includes(prop) ? m.ms : 0, ease: m.ease }
 }
 
 /** A blanket `transition: all` animates whatever a later rule happens to change, which is how a

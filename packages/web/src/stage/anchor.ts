@@ -10,6 +10,20 @@ export type WorldPoint = { sx: number; sy: number }
 
 export type StageAnchor = { x: number; y: number; onScreen: boolean }
 
+/** How much room a mark needs on each side of its anchor to stay whole. */
+export type Reach = { x: number; y: number }
+
+/**
+ * A mark wider than the body it hangs off runs out of the picture near an edge: the ring round a
+ * figure at x = 20 put its left arm at x = -55, off-screen and unreachable. The mark slides in
+ * far enough to stay whole, so it stops being exactly centred before it stops being usable.
+ */
+export function keepOnStage(a: StageAnchor, w: number, h: number, reach: Reach): StageAnchor {
+  const hold = (v: number, span: number, pad: number): number =>
+    span < pad * 2 ? span / 2 : Math.min(Math.max(v, pad), span - pad)
+  return { ...a, x: hold(a.x, w, reach.x), y: hold(a.y, h, reach.y) }
+}
+
 /** World point → CSS pixels inside the stage element, and whether the camera can see it.
  *  `view` is that world space and `zoom` is the scale it is drawn at. */
 export function screenAnchor(
@@ -61,6 +75,7 @@ export function joinStageLoop(step: () => void): () => void {
 function useStageAnchor(
   scene: Scene | null,
   point: (() => WorldPoint | null) | null,
+  reach?: Reach,
 ): RefObject<HTMLDivElement | null> {
   const el = useRef<HTMLDivElement | null>(null)
   const latest = useRef(point)
@@ -75,17 +90,23 @@ function useStageAnchor(
       const node = el.current
       const at = latest.current === null ? null : latest.current()
       if (node === null) return
-      const a =
-        at === null
-          ? { x: 0, y: 0, onScreen: false }
-          : screenAnchor(scene.viewRect(), scene.getZoom(), at.sx, at.sy)
+      let a: StageAnchor = { x: 0, y: 0, onScreen: false }
+      if (at !== null) {
+        // `viewRect()` allocates, so it is read only when there is a point to place
+        const view = scene.viewRect()
+        const zoom = scene.getZoom()
+        a = screenAnchor(view, zoom, at.sx, at.sy)
+        if (reach !== undefined && a.onScreen) {
+          a = keepOnStage(a, view.w * zoom, view.h * zoom, reach)
+        }
+      }
       const was = last.current
       if (a.x === was.x && a.y === was.y && a.onScreen === was.shown) return
       last.current = { x: a.x, y: a.y, shown: a.onScreen }
       node.style.visibility = a.onScreen ? 'visible' : 'hidden'
       node.style.transform = `translate(${a.x}px, ${a.y}px)`
     })
-  }, [scene, idle])
+  }, [scene, idle, reach])
   return el
 }
 
@@ -93,9 +114,11 @@ function useStageAnchor(
 export function useSubjectAnchor(
   scene: Scene | null,
   subject: Subject | null,
+  reach?: Reach,
 ): RefObject<HTMLDivElement | null> {
   return useStageAnchor(
     scene,
     scene === null || subject === null ? null : () => subjectPoint(scene, subject),
+    reach,
   )
 }

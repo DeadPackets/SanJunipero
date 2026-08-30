@@ -12,14 +12,22 @@ export function Signpost({
   ref?: React.Ref<HTMLElement>
 }) {
   return (
-    <nav className="signpost" aria-label="Signpost" ref={ref}>
+    <nav
+      id="signpost"
+      className="signpost"
+      aria-label="Town sections"
+      data-open={open === null ? 'no' : 'yes'}
+      ref={ref}
+    >
       {ARMS.map((arm) => (
         <button
           key={arm}
           type="button"
           className="signpost-arm"
           data-arm={arm}
-          aria-pressed={open === arm}
+          // A disclosure set, not four toggles: each arm opens the one sheet on its own page.
+          aria-expanded={open === arm}
+          aria-controls="paper-sheet"
           onClick={() => {
             onOpen(arm)
           }}

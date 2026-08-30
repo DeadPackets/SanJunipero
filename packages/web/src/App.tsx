@@ -36,6 +36,17 @@ import type { Thing } from './paper/pages/types.js'
 /** What the paper is showing, or `null` while it is down. */
 type Sheet = { page: PageKey; tab: string }
 
+/** Safari throttles history writes to 100 per 30 s and 8x playback asks for sixteen a second.
+ *  A discrete choice — going live, opening a day — writes at once; a playhead waits its turn. */
+const ADDRESS_BAR_MS = 500
+let addressAt = 0
+function writeAddress(next: Route, now: boolean): void {
+  const at = performance.now()
+  if (!now && at - addressAt < ADDRESS_BAR_MS) return
+  addressAt = at
+  history.replaceState(null, '', routeToPath(next))
+}
+
 export function App() {
   const [store] = useState(createWorldStore)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
@@ -144,7 +155,7 @@ export function App() {
       else handle?.scrub(tick)
       setRoute((prev) => {
         const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
-        history.replaceState(null, '', routeToPath(next))
+        writeAddress(next, tick === null)
         return next
       })
     },
@@ -164,7 +175,7 @@ export function App() {
   const onMoment = useCallback((id: number | null) => {
     setRoute((prev) => {
       const next: Route = { ...prev, momentId: id }
-      history.replaceState(null, '', routeToPath(next))
+      writeAddress(next, true)
       return next
     })
   }, [])
@@ -255,24 +266,36 @@ export function App() {
 
   return (
     <div className="app" ref={appRef} data-broadcast={route.broadcast ? 'on' : undefined}>
-      <StageMount
-        store={store}
-        onScene={setScene}
-        onInterior={setInsideId}
-        onPick={(pick) => {
-          if (pick.kind === 'structure') {
-            const s = store.getState()?.structures[pick.id]
-            if (s === undefined) return
-            setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
-            return
-          }
-          // A thing on the ground has no ring; the record it came out of is its surface.
-          setThing({ kind: pick.kind, id: pick.id })
-          openPage('found', 'Things')
-        }}
-      />
+      <h1 className="stage-sr">San Junipero</h1>
+      <a className="skip" href="#signpost">
+        Skip to the signpost
+      </a>
+      <main>
+        <StageMount
+          store={store}
+          onScene={setScene}
+          onInterior={setInsideId}
+          onPick={(pick) => {
+            if (pick.kind === 'structure') {
+              const s = store.getState()?.structures[pick.id]
+              if (s === undefined) return
+              setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
+              return
+            }
+            // A thing on the ground has no ring; the record it came out of is its surface.
+            setThing({ kind: pick.kind, id: pick.id })
+            openPage('found', 'Things')
+          }}
+        />
+      </main>
       <SpeechLive store={store} />
-      <Figures scene={scene} store={store} onFocus={setFocus} onOpen={setSubject} />
+      <Figures
+        scene={scene}
+        store={store}
+        paperOpen={sheet !== null}
+        onFocus={setFocus}
+        onOpen={setSubject}
+      />
       <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
       <QuietStamp store={store} link={link} />

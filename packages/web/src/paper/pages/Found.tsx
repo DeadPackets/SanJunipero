@@ -4,7 +4,9 @@ import { kindWords } from '../../ui/broadcastReady.js'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discoveryModel.js'
 import { itemCropDetail, thingKind } from '../../ui/interaction.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_RECORDS: DiscoveryRecord[] = []
@@ -27,7 +29,8 @@ function Things({ store, thing, onJump }: PageProps) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The archive is history, not a stream: read on a slow beat, so a 2.5s world never
   // re-renders the record underneath the reader's pointer.
-  const read = usePolled('/api/discoveries', discoveryRecords, DISCOVERY_REFETCH_MS)
+  const record = useEndpointFor('/api/discoveries', discoveryRecords, DISCOVERY_REFETCH_MS)
+  const read = useFeed(record)
   const leaves = leavesOf(read.data ?? NO_RECORDS, assets)
   const viewTick = mode.live ? null : mode.tick
 
@@ -55,14 +58,12 @@ function Things({ store, thing, onJump }: PageProps) {
       {read.loaded || leaves.length > 0 ? (
         <p className="sheet-note">{recordSummary(leaves, state?.tick ?? 0)}</p>
       ) : (
-        <div aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="skeleton-row" />
-          ))}
-        </div>
+        <Skeleton />
       )}
       {leaves.length === 0 ? (
-        read.loaded ? (
+        read.failed ? (
+          <OutOfReach onRetry={record.retry} />
+        ) : read.loaded ? (
           <p className="feed-empty">{EMPTY_COPY.discoveries}</p>
         ) : null
       ) : (
@@ -92,15 +93,15 @@ function Things({ store, thing, onJump }: PageProps) {
                   />
                 )}
                 <span className="discovery-body">
-                  <h3>{leaf.record.name}</h3>
-                  <p className="discovery-credit">
+                  <span className="discovery-name">{leaf.record.name}</span>
+                  <span className="discovery-credit">
                     {leaf.when} — {leaf.record.by} worked this out.
-                  </p>
-                  <p className="discovery-quote">“{leaf.record.intent}”</p>
+                  </span>
+                  <span className="discovery-quote">“{leaf.record.intent}”</span>
                   {leaf.record.makes.length > 0 && (
-                    <p className="discovery-makes">
+                    <span className="discovery-makes">
                       After this, anyone could make {leaf.record.makes.map(kindWords).join(', ')}.
-                    </p>
+                    </span>
                   )}
                 </span>
               </button>

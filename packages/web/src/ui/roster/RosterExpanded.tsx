@@ -15,7 +15,7 @@ function Section({
 }) {
   return (
     <section className="rx-block" data-section={name}>
-      <h4 className="rx-title">{SECTION_TITLE[name]}</h4>
+      <h3 className="rx-title">{SECTION_TITLE[name]}</h3>
       {empty ? <p className="rx-empty">{SECTION_EMPTY[name]}</p> : children}
     </section>
   )

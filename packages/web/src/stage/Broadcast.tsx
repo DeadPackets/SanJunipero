@@ -60,7 +60,7 @@ export function LowerThird({ store }: { store: WorldStore }) {
     line.kind === 'speech' ? bustStyle(store.assetRecords(), line.agentId, BUST_PX) : null
 
   return (
-    <div className="lower-third" role="status" aria-live="polite">
+    <div className="lower-third">
       {line.kind === 'speech' && (
         <span
           className={bust === null ? 'lower-third-bust none' : 'lower-third-bust'}
