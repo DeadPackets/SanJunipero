@@ -11,8 +11,9 @@ export function tileToScreen(x: number, y: number): { sx: number; sy: number } {
  *  non-square plan has no single south vertex, so the feet sit under the plan's centre line at
  *  the south row: the sprite's feet mark (bottom-centre of its opaque box) lands there. */
 export function feetOf(x: number, y: number, w = 1, h = 1): { sx: number; sy: number } {
-  const c = tileToScreen(x + w / 2, y + h / 2)
-  return { sx: c.sx, sy: c.sy + ((w + h) * TILE_H) / 4 }
+  const cx = x + w / 2,
+    cy = y + h / 2
+  return { sx: (cx - cy) * (TILE_W / 2), sy: (cx + cy) * (TILE_H / 2) + ((w + h) * TILE_H) / 4 }
 }
 
 /** The tile a screen point stands on. `tileToScreen` returns a tile's TOP vertex, so the

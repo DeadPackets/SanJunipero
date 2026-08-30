@@ -75,7 +75,7 @@ export function groundGrid(
   fieldW: number,
   fieldH: number,
   offsetX: number,
-  offsetY = 0,
+  offsetY: number,
 ): ChunkGrid {
   return {
     cols: Math.max(1, Math.ceil(fieldW / CHUNK_PX_W)),

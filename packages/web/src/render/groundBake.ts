@@ -34,7 +34,9 @@ import { tileKind } from './tileset.js'
 // the square of the ring count and passes `MAX_TEXTURE_SIZE`, where the allocation FAILS.
 export type GroundBaker = {
   rebake(terrain: TileId[][], records: AssetRecord[]): void
-  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it. */
+  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it.
+   *  Called once a frame by the scene, so it is also the pump: `BAKES_PER_FRAME` queued chunks
+   *  bake per call. `rebake` alone bakes unmetered. */
   setView(view: ViewRect): void
   /** What is on the GPU right now. A bound nobody can count is a claim, not a bound. */
   vram(): { chunks: number; bytes: number; maxDimPx: number }
@@ -76,8 +78,8 @@ export function createGroundBaker(
 ): GroundBaker {
   let grid: ChunkGrid | null = null
   /** the field's layers, cut per chunk — one O(shapes) pass per terrain, never per chunk */
+  /** the field's layers with the skirt LAST — drawn first, at that index for its rotation */
   let buckets = new Map<ChunkKey, FieldLayer[]>()
-  let skirtBuckets = new Map<ChunkKey, FieldLayer[]>()
   let kerbPolys = new Map<ChunkKey, number[][]>()
   let headlandPolys = new Map<ChunkKey, number[][]>()
   let furrowPolys = new Map<ChunkKey, number[][]>()
@@ -156,10 +158,9 @@ export function createGroundBaker(
         layer.addChild(oct)
       }
     }
-    // the skirt goes under everything, at an index of its own past the field's layers
-    const skirt = skirtBuckets.get(rect.key)?.[0]
-    if (skirt !== undefined) paint(skirt, stack.length)
-    stack.forEach(paint)
+    // the skirt goes under everything, at the index it was bucketed at
+    if (stack.length > 0) paint(stack[stack.length - 1]!, stack.length - 1)
+    for (let li = 0; li < stack.length - 1; li++) paint(stack[li]!, li)
     // The tile scan that finds these patches lives in the terrain pass, not here: it is O(the
     // map), and running it per chunk would put the whole map into every chunk's bake.
     const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
@@ -189,7 +190,7 @@ export function createGroundBaker(
   let offsetX = 0
   let offsetY = 0
   /** on screen and not yet baked — drained `BAKES_PER_FRAME` at a time by `setView` */
-  const pending: ChunkRect[] = []
+  let pending: ChunkRect[] = []
 
   function bake(rect: ChunkRect): void {
     // resolution 1 and NEAREST, stated rather than inherited: a chunk baked at the device ratio
@@ -208,6 +209,7 @@ export function createGroundBaker(
   }
 
   function drain(limit: number): void {
+    if (pending.length === 0) return
     for (const rect of pending.splice(0, limit)) bake(rect)
   }
 
@@ -222,11 +224,9 @@ export function createGroundBaker(
   function applyResidency(): void {
     const step = residency.update(view)
     pending.push(...step.bake)
-    for (const key of step.evict) {
-      release(key)
-      const i = pending.findIndex((r) => r.key === key)
-      if (i >= 0) pending.splice(i, 1)
-    }
+    const gone = new Set(step.evict)
+    for (const key of gone) release(key)
+    pending = pending.filter((r) => !gone.has(r.key))
   }
 
   function releaseAll(): void {
@@ -241,8 +241,7 @@ export function createGroundBaker(
       offsetX = field.offsetX
       offsetY = field.offsetY
       grid = groundGrid(field.widthPx, field.heightPx, field.offsetX, field.offsetY)
-      buckets = bucketLayers(grid, field.layers)
-      skirtBuckets = bucketLayers(grid, [field.skirt])
+      buckets = bucketLayers(grid, [...field.layers, field.skirt])
 
       const plaza: Tile[] = [],
         farmland: Tile[] = []
@@ -303,7 +302,6 @@ export function createGroundBaker(
       releaseAll()
       grid = null
       buckets = new Map()
-      skirtBuckets = new Map()
       loaded.clear()
     },
   }

@@ -167,7 +167,7 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
       expect(
         slack - tight,
         `zoom ${z} pays ${slack - tight} extra for ${CULL_MARGIN_PX}px of margin`,
-      ).toBeLessThan(Math.max(8, Math.ceil(tight * ring) + 8))
+      ).toBeLessThan(Math.ceil(tight * ring) + 8)
     }
   })
 })

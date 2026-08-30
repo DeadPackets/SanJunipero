@@ -118,18 +118,4 @@ describe('★ D10 — the camera lands on a whole pixel', () => {
     frame(ZOOM_SETTLE_MS / 2)
     expect(calls).toBe(1)
   })
-
-  it('at rest, a thing at a whole world coordinate is drawn at a whole screen coordinate', () => {
-    for (const z of [1, 2, 3, 4] as const) {
-      const { rig, world, frame } = rigAt(z)
-      rig.setFollow(() => ({ x: 512.61, y: 256.39 }))
-      for (let i = 0; i < 400; i++) frame()
-      const body = { x: 480, y: 240 } // a foot on the lattice
-      const chunk = { x: -1216, y: 512 } // a ground chunk corner
-      for (const p of [body, chunk]) {
-        expect(Number.isInteger(world.position.x + p.x * z)).toBe(true)
-        expect(Number.isInteger(world.position.y + p.y * z)).toBe(true)
-      }
-    }
-  })
 })

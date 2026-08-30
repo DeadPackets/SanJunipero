@@ -18,22 +18,28 @@ export const SMOKE_PUFFS = 5
 export const SMOKE_LOOP_MS = 2400
 export const SMOKE_RISE_PX = 26
 const SMOKE_DRIFT_PX = 10
-const PUFF_R = 3
-/** `scale = 0.7 + 0.9·prog` over a 6 px puff spans 4.2–9.6 px: these are its whole-pixel rungs. */
+/** `scale = 0.7 + 0.9·prog` over a 6 px puff spans 4.2–9.6 px: these are its whole-pixel rungs,
+ *  one per quarter of the puff's life. */
 export const PUFF_DIAMETERS = [4, 6, 8, 10] as const
+/** how far a puff can stand from its chimney: the drift plus the largest puff */
+const REACH_PX = SMOKE_DRIFT_PX + PUFF_DIAMETERS[PUFF_DIAMETERS.length - 1]!
 type PuffDiameter = (typeof PUFF_DIAMETERS)[number]
 
-export type Puff = { alpha: number; diameter: PuffDiameter; rise: number; drift: number }
+export type Puff = {
+  alpha: number
+  rung: number
+  diameter: PuffDiameter
+  rise: number
+  drift: number
+}
 
 /** One puff at `prog` ∈ [0, 1) of its life, on wind `w` ∈ [-1, 1]. Pure — the test reads it. */
 export function puffAt(prog: number, w: number): Puff {
-  const scale = 0.7 + 0.9 * prog
-  const want = scale * PUFF_R * 2
-  let diameter: PuffDiameter = PUFF_DIAMETERS[0]
-  for (const d of PUFF_DIAMETERS) if (Math.abs(d - want) < Math.abs(diameter - want)) diameter = d
+  const rung = Math.min(PUFF_DIAMETERS.length - 1, Math.floor(prog * PUFF_DIAMETERS.length))
   return {
     alpha: SMOKE_MAX_ALPHA * Math.sin(Math.PI * prog),
-    diameter,
+    rung,
+    diameter: PUFF_DIAMETERS[rung]!,
     rise: prog * SMOKE_RISE_PX,
     drift: w * SMOKE_DRIFT_PX * prog,
   }
@@ -89,23 +95,27 @@ export type SmokeLayer = {
 }
 
 export function createSmoke(scene: Scene, store: WorldStore): SmokeLayer {
-  const textures = new Map<PuffDiameter, Texture>()
-  for (const d of PUFF_DIAMETERS) {
+  /** one texture per rung, indexed like `PUFF_DIAMETERS` */
+  const textures: Texture[] = PUFF_DIAMETERS.map((d) => {
     const g = new Graphics()
     g.circle(d / 2, d / 2, d / 2).fill(SMOKE_COLOR)
-    textures.set(d, scene.app.renderer.generateTexture({ target: g, resolution: 1 }))
+    const tex = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
+    tex.source.autoGarbageCollect = false // pixi's GCSystem unloads an untouched source — see lightPools
     g.destroy()
-  }
+    return tex
+  })
   const motion = scene.wantsMotion()
   const hearths = new Map<string, Hearth>()
   const free: Sprite[] = []
   let t = 0
-  let seen: WorldState | null = null
+  let seen: WorldState['structures'] | null = null
   let lastAssetsSeq = -1
-  let counts = { drawn: 0, culled: 0 }
+  const counts = { drawn: 0, culled: 0 }
+  /** a chimney depends on the kind, its plan and the codex — not on the structure */
+  const chimneys = new Map<string, { dx: number; dy: number } | null>()
 
   const take = (): Sprite => {
-    const s = free.pop() ?? new Sprite(textures.get(PUFF_DIAMETERS[0]))
+    const s = free.pop() ?? new Sprite(textures[0])
     s.anchor.set(0.5, 0.5)
     s.eventMode = 'none'
     s.visible = true
@@ -123,7 +133,12 @@ export function createSmoke(scene: Scene, store: WorldStore): SmokeLayer {
     const live = new Set<string>()
     for (const s of Object.values(state.structures)) {
       if (s.stage !== 'complete' || !HEARTH_KINDS.has(s.kind)) continue
-      const chimney = chimneyOf(records, s.kind, s.w, s.h, s.facing)
+      const key = `${s.kind}|${s.facing ?? ''}|${s.w}x${s.h}`
+      let chimney = chimneys.get(key)
+      if (chimney === undefined) {
+        chimney = chimneyOf(records, s.kind, s.w, s.h, s.facing)
+        chimneys.set(key, chimney)
+      }
       if (chimney === null) continue
       live.add(s.id)
       const feet = feetOf(s.x, s.y, s.w, s.h)
@@ -152,22 +167,24 @@ export function createSmoke(scene: Scene, store: WorldStore): SmokeLayer {
       const state = store.getState()
       if (state === null) return
       const seq = store.assetsSeq()
-      if (state !== seen || seq !== lastAssetsSeq) {
-        seen = state
+      if (seq !== lastAssetsSeq) chimneys.clear()
+      // the store folds a new state on every tick; the structures table changes far less often
+      if (state.structures !== seen || seq !== lastAssetsSeq) {
+        seen = state.structures
         lastAssetsSeq = seq
         sync(state)
       }
       if (motion) t += dtMs
       const w = windNow()
       const view = scene.viewRect()
-      counts = { drawn: 0, culled: 0 }
+      counts.drawn = 0
+      counts.culled = 0
       for (const h of hearths.values()) {
-        const reach = SMOKE_DRIFT_PX + PUFF_DIAMETERS[PUFF_DIAMETERS.length - 1]!
         const inView = rectInView(
-          h.sx - reach,
-          h.sy - SMOKE_RISE_PX - reach,
-          h.sx + reach,
-          h.sy + reach,
+          h.sx - REACH_PX,
+          h.sy - SMOKE_RISE_PX - REACH_PX,
+          h.sx + REACH_PX,
+          h.sy + REACH_PX,
           view,
           0,
         )
@@ -177,21 +194,22 @@ export function createSmoke(scene: Scene, store: WorldStore): SmokeLayer {
           continue
         }
         counts.drawn += h.puffs.length
-        h.puffs.forEach((p, i) => {
+        for (let i = 0; i < h.puffs.length; i++) {
+          const p = h.puffs[i]!
           const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS + h.phase) % 1
           const puff = puffAt(prog, w)
-          p.texture = textures.get(puff.diameter)!
+          p.texture = textures[puff.rung]!
           p.alpha = puff.alpha
           p.position.set(Math.round(h.sx + puff.drift), Math.round(h.sy - puff.rise))
           p.visible = true
-        })
+        }
       }
     },
-    counts: () => counts,
+    counts: () => ({ ...counts }),
     destroy() {
       for (const h of hearths.values()) for (const p of h.puffs) p.destroy()
       for (const p of free) p.destroy()
-      for (const tex of textures.values()) tex.destroy(true)
+      for (const tex of textures) tex.destroy(true)
     },
   }
 }

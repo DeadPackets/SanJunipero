@@ -133,7 +133,7 @@ describe('★ the seam law: a chunk boundary never lands between two screen pixe
 describe('★ every shape reaches every chunk its paint touches', () => {
   it('a tile straddling a boundary is in BOTH buckets, at the same layer index', () => {
     const f = fieldFor(3)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     let straddling = 0,
       checked = 0
@@ -175,7 +175,7 @@ describe('★ every shape reaches every chunk its paint touches', () => {
 
   it('★ every chunk carries every layer at its ORIGINAL index — the material matrix reads it', () => {
     const f = fieldFor(3)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     expect(buckets.size).toBeGreaterThan(1)
     for (const stack of buckets.values()) {
@@ -190,7 +190,7 @@ describe('★ every shape reaches every chunk its paint touches', () => {
 
   it('loses no shape and invents none', () => {
     const f = fieldFor(1)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     for (const [li, layer] of f.layers.entries()) {
       const seen = new Set<unknown>()
@@ -284,7 +284,7 @@ describe('what stays on the GPU', () => {
 /** A grid for a square terrain of `side` tiles, without paying for its `groundField` — the
  *  landed baker sized its texture from exactly these two numbers. */
 const gridForSide = (side: number) =>
-  groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2))
+  groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2), 0)
 
 /** The WORST a view can do, swept across the whole field: straddling a boundary touches one more column and row than sitting on one, and a view at the edge touches fewer. */
 function peakVisible(
@@ -435,7 +435,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     for (const side of [7, 63, 129, 250, 251, 440, 1001]) {
       const fieldW = (side + side) * (TILE_W / 2),
         fieldH = (side + side) * (TILE_H / 2)
-      const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2))
+      const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2), 0)
       expect(grid.cols).toBe(Math.ceil(fieldW / CHUNK_PX_W))
       expect(grid.rows).toBe(Math.ceil(fieldH / CHUNK_PX_H))
       let covered = 0

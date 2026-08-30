@@ -68,17 +68,17 @@ export function createCameraRig(
   const cam = { x: 0, y: 0 }
 
   /** The one writer of the camera's position, and therefore the one that fires `onCamera` —
-   *  a mover added later cannot forget to announce itself. True when the drawn frame moved. */
-  function place(x: number, y: number): boolean {
+   *  a mover added later cannot forget to announce itself. `announce: false` is for the one
+   *  caller that changes the scale too and announces both at once. */
+  function place(x: number, y: number, announce = true): void {
     const p = clampCamera({ x, y }, world.scale.x, deps.reachable(), screenBox())
     cam.x = p.x
     cam.y = p.y
     const rx = Math.round(p.x),
       ry = Math.round(p.y)
-    if (rx === world.position.x && ry === world.position.y) return false
+    if (rx === world.position.x && ry === world.position.y) return
     world.position.set(rx, ry)
-    notifyCamera()
-    return true
+    if (announce) notifyCamera()
   }
 
   function centerOnScreen(sx: number, sy: number): void {
@@ -165,11 +165,9 @@ export function createCameraRig(
     if (s === world.scale.x) return
     world.scale.set(s)
     // While a follow is running it owns the position; otherwise the anchor stays put.
-    const moved =
-      followFn === null
-        ? place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
-        : place(cam.x, cam.y)
-    if (!moved) notifyCamera() // the scale changed even where the position did not
+    if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s, false)
+    else place(cam.x, cam.y, false)
+    notifyCamera()
   }
 
   // camera: drag to pan, wheel steps integer zoom 1-4; the hand shows it
