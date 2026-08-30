@@ -7,13 +7,14 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
-import { insertAlert, type LlmClient } from '@sj/llm'
+import { LlmClient, insertAlert, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
+  LIVE_ALLOW_PROVIDER_FALLBACKS,
   LIVE_OPS_DB,
   amnesiaRefusal,
   capReachedRefusal,
@@ -222,6 +223,7 @@ async function liveWorld(opts: {
   spendDailyUsd?: number
   onSpendStop?: (spent: number, cap: number) => void
   rateWindowRealMinutes?: number
+  spendAlertRealMinutes?: number
   fresh?: boolean
   /** What the god answers. Absent, the arbiter caller gets the same canned client as a mind,
    *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
@@ -263,6 +265,9 @@ async function liveWorld(opts: {
         ...(opts.rateWindowRealMinutes === undefined
           ? {}
           : { rateWindowRealMinutes: opts.rateWindowRealMinutes }),
+        ...(opts.spendAlertRealMinutes === undefined
+          ? {}
+          : { spendAlertRealMinutes: opts.spendAlertRealMinutes }),
         log: () => {},
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
@@ -430,8 +435,8 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // TWO minds, so the ceiling is 2 x $0.21 = $0.42/sim-day. $0.19 inside a 15-minute window
-    // projects to $0.76/sim-day — over the flow ceiling and well under the $5 cap this row sets.
+    // TWO minds, so the ceiling is 2 x $0.70 = $1.40/sim-day. $0.60 inside a 15-minute window
+    // projects to $2.40/sim-day — over the flow ceiling and well under the $5 cap this row sets.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
@@ -439,7 +444,7 @@ describe('★ the money, inside the served world', () => {
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
       )
-      .run(Date.now(), 0.19)
+      .run(Date.now(), 0.6)
     expect(ledgerTotalUsd(opsDb)).toBeLessThan(5)
 
     await run(world, 10)
@@ -459,7 +464,7 @@ describe('★ the money, inside the served world', () => {
     const { world, opsDb } = await liveWorld({
       dir,
       spendCapUsd: 50,
-      // Under the rate tripwire's own ceiling (2 minds x $0.21/sim-day = $0.105 in 15 real
+      // Under the rate tripwire's own ceiling (2 minds x $0.70/sim-day = $0.35 in 15 real
       // minutes), so only the daily budget can be what stops this row.
       spendDailyUsd: 0.05,
       rateWindowRealMinutes: 15,
@@ -503,8 +508,9 @@ describe('★ the money, inside the served world', () => {
       .prepare(
         `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.01, 0.02, 0, 1, NULL, 'p')`,
+        reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
+        error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.02, 0.01, 0.02, 0, 1, NULL, 'p')`,
       )
       .run(Date.now())
     expect(alertsOf(opsDb, 'llm_price_reconciliation')).toHaveLength(0)
@@ -517,6 +523,81 @@ describe('★ the money, inside the served world', () => {
     expect(alerts, 'the town closed without ever checking its own prices').toHaveLength(1)
     expect(alerts[0]).toContain('2.00x out')
   }, 40_000)
+
+  // ★ minds.md finding 4: 5 failed calls, $0.0652 = 9.2% of rehearsal 3's dollars, and the ops
+  // surface said so nowhere — `reportDeadCalls` and `reportProviders` had no caller at all.
+  it('★ says what the run bought and who served it when the town closes', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({ dir })
+    await run(world, 2)
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, estimated_cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, 'amara', 'turn', 'm', 0, 0, 0, 0, 0.013, 0.013, 0, 0, ?, NULL)`,
+      )
+      .run(Date.now(), 'No output generated.')
+    expect(alertsOf(opsDb, 'llm_dead_calls')).toHaveLength(0)
+
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    const closed = openAgentDb(join(dir, 'minds', LIVE_OPS_DB))
+    const dead = alertsOf(closed, 'llm_dead_calls')
+    const mix = alertsOf(closed, 'llm_provider_mix')
+    closed.close()
+    expect(dead, 'a paid call that bought nothing went unreported').toHaveLength(1)
+    expect(dead[0]).toContain('amara')
+    expect(dead[0]).toContain('1 empty')
+    expect(mix.length, 'the run closed without naming who served it').toBeGreaterThan(0)
+  }, 40_000)
+
+  // The $10/sim-day operator alert: built and tested since C11, and reached from nothing but a
+  // gate script. Only the hard stops ran on a live town.
+  it('★ warns the operator about a projected burn well before a hard stop kills the run', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 50,
+      spendDailyUsd: 50,
+      rateWindowRealMinutes: 15,
+      spendAlertRealMinutes: 0,
+    })
+    await run(world, 4)
+    expect(alertsOf(opsDb, 'spend_projection')).toHaveLength(0)
+
+    // Art, which the rate tripwire excludes by design: only the operator alert can speak here.
+    // $3 in a 15-minute window projects to $12/sim-day, over the $10 threshold.
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, estimated_cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 3, 3, 0, 1, NULL, NULL)`,
+      )
+      .run(Date.now())
+
+    await run(world, 12)
+    const alerts = alertsOf(opsDb, 'spend_projection')
+    expect(alerts.length, 'the operator was never told').toBeGreaterThan(0)
+    expect(alerts[0]).toContain('/sim-day over a $10.00 threshold')
+  }, 40_000)
+
+  // Ruling 19 (2026-08-30). 9 of rehearsal 3's 309 calls were served by OpenInference, not the
+  // pinned Wafer: a cold prefix and an unpriced route each time.
+  it('★ pins the provider as an allow-list for every mind-facing call', () => {
+    const db = new Database(':memory:')
+    migrateLlmTables(db)
+    for (const caller of ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic']) {
+      const body = new LlmClient({
+        db,
+        caller,
+        allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
+      }).requestBody()
+      expect(body.provider.allow_fallbacks, caller).toBe(false)
+    }
+    db.close()
+  })
 
   it('names the amount, the budget and the way out', () => {
     const msg = dailyReachedRefusal(3.1234, 3)

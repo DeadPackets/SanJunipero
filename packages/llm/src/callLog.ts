@@ -11,9 +11,12 @@ export type LlmCallInsert = {
   outputTokens: number
   cacheReadTokens: number
   reasoningTokens: number
+  // What the run books, which is the provider's own charge whenever it offered one.
   costUsd: number
-  // What the provider said it charged, when it said. Kept beside `costUsd` so the two can be
-  // reconciled over a whole run and not only per call.
+  // What the pinned price table computed for this call, always. `costUsd` becomes the bill the
+  // moment the provider names one, so only this column can be reconciled against it.
+  estimatedCostUsd: number
+  // What the provider said it charged, when it said.
   reportedCostUsd: number | null
   latencyMs: number
   ok: boolean
@@ -33,6 +36,7 @@ export function migrateLlmTables(db: Database.Database): void {
       cache_read_tokens INTEGER NOT NULL,
       reasoning_tokens INTEGER NOT NULL,
       cost_usd REAL NOT NULL,
+      estimated_cost_usd REAL,
       reported_cost_usd REAL,
       latency_ms INTEGER NOT NULL,
       ok INTEGER NOT NULL,
@@ -63,6 +67,9 @@ export function migrateLlmTables(db: Database.Database): void {
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
   if (!cols.some((c) => c.name === 'reported_cost_usd')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN reported_cost_usd REAL')
+  }
+  if (!cols.some((c) => c.name === 'estimated_cost_usd')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN estimated_cost_usd REAL')
   }
 }
 
@@ -109,8 +116,9 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
   db.prepare(
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error, provider)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
+        error, provider)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     Date.now(),
     call.agentId,
@@ -121,6 +129,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     call.cacheReadTokens,
     call.reasoningTokens,
     call.costUsd,
+    call.estimatedCostUsd,
     call.reportedCostUsd,
     Math.round(call.latencyMs),
     call.ok ? 1 : 0,

@@ -59,6 +59,8 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       cacheReadTokens: 0,
       reasoningTokens: 0,
       costUsd,
+      // Art is billed by the image, not by a token table: the estimate IS the charge.
+      estimatedCostUsd: costUsd,
       reportedCostUsd: null,
       latencyMs: 0,
       ok: true,

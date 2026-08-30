@@ -335,12 +335,15 @@ describe('providerCounts: which back end answered, and how much of it was worth 
 
 // The whole-run version of the per-call reconciliation: a bill against the ledger.
 describe('price reconciliation over a run', () => {
+  // Written the way the client writes it: `cost_usd` books the bill whenever the provider named
+  // one, and the pinned table's estimate keeps its own column.
   const insert = (db: Database.Database, computed: number, reported: number | null): void => {
     db.prepare(
       `INSERT INTO llm_calls (ts, agent_id, caller, model, input_tokens, output_tokens,
-         cache_read_tokens, reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error)
-       VALUES (?, NULL, 'c', 'm', 0, 0, 0, 0, ?, ?, 0, 1, NULL)`,
-    ).run(NOW, computed, reported)
+         cache_read_tokens, reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd,
+         latency_ms, ok, error)
+       VALUES (?, NULL, 'c', 'm', 0, 0, 0, 0, ?, ?, ?, 0, 1, NULL)`,
+    ).run(NOW, reported ?? computed, computed, reported)
   }
 
   it('is silent when the ledger matches the bill', () => {
@@ -363,6 +366,30 @@ describe('price reconciliation over a run', () => {
     }
     expect(row.kind).toBe('llm_price_reconciliation')
     expect(row.detail).toContain('2.07x out')
+  })
+
+  // ★ The whole check was structurally vacuous: `client.ts` books the reported cost INTO
+  // `cost_usd`, so reconciling against that column compared a column with itself and read
+  // exactly 1.0000 on 304 of 304 rows of rehearsal 3.
+  it('★ compares the pinned table against the bill, never the bill against itself', () => {
+    const db = openDb()
+    insert(db, 0.43, 0.89)
+    expect(
+      db.prepare('SELECT cost_usd AS booked, reported_cost_usd AS bill FROM llm_calls').get(),
+      'the ledger books the bill, which is why it cannot be the second opinion',
+    ).toEqual({ booked: 0.89, bill: 0.89 })
+    expect(reconcileCosts(db).ratio).toBeCloseTo(2.07, 2)
+  })
+
+  it('cannot reconcile a row written before the estimate had a column of its own', () => {
+    const db = openDb()
+    db.prepare(
+      `INSERT INTO llm_calls (ts, agent_id, caller, model, input_tokens, output_tokens,
+         cache_read_tokens, reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error)
+       VALUES (?, NULL, 'c', 'm', 0, 0, 0, 0, 0.89, 0.89, 0, 1, NULL)`,
+    ).run(NOW)
+    const r = reconcileCosts(db)
+    expect(r).toMatchObject({ reconciledCalls: 0, unreconciledCalls: 1, ratio: null })
   })
 
   it('counts the calls it could not reconcile rather than hiding them', () => {

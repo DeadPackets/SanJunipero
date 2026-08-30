@@ -208,6 +208,10 @@ export type Reconciliation = {
 
 export const RECONCILE_TOLERANCE = 0.05
 
+// The pinned table against the bill, never `cost_usd` against the bill: `cost_usd` IS the bill
+// whenever the provider named one, so a run reconciled against it can only ever read 1.0000.
+const BOTH_COSTS = 'reported_cost_usd IS NOT NULL AND estimated_cost_usd IS NOT NULL'
+
 export function reconcileCosts(
   db: Database.Database,
   opts: { since?: number } = {},
@@ -215,10 +219,10 @@ export function reconcileCosts(
   const row = db
     .prepare(
       `SELECT
-       COALESCE(SUM(CASE WHEN reported_cost_usd IS NOT NULL THEN 1 ELSE 0 END), 0) AS reconciled,
-       COALESCE(SUM(CASE WHEN reported_cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unreconciled,
-       COALESCE(SUM(reported_cost_usd), 0) AS reported,
-       COALESCE(SUM(CASE WHEN reported_cost_usd IS NOT NULL THEN cost_usd ELSE 0 END), 0) AS computed
+       COALESCE(SUM(CASE WHEN ${BOTH_COSTS} THEN 1 ELSE 0 END), 0) AS reconciled,
+       COALESCE(SUM(CASE WHEN ${BOTH_COSTS} THEN 0 ELSE 1 END), 0) AS unreconciled,
+       COALESCE(SUM(CASE WHEN ${BOTH_COSTS} THEN reported_cost_usd ELSE 0 END), 0) AS reported,
+       COALESCE(SUM(CASE WHEN ${BOTH_COSTS} THEN estimated_cost_usd ELSE 0 END), 0) AS computed
      FROM llm_calls WHERE ts >= ? AND ok = 1`,
     )
     .get(opts.since ?? 0) as {

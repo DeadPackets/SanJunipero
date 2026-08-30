@@ -709,6 +709,66 @@ describe('pessimistic reservation (T21)', () => {
   })
 })
 
+// ★ Ruling 11 + minds.md finding: `assemblePrompt` scanned the TURN prompt only, and five of the
+// six provider-bound callers went out unscanned. This is the one door they all pass through.
+describe('★ the one-way glass, on every prompt the client sends', () => {
+  const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic'] as const
+
+  const recorder = (): { model: MockLanguageModelV4; sent: string[] } => {
+    const sent: string[] = []
+    const model = new MockLanguageModelV4({
+      doGenerate: (opts) => {
+        sent.push(JSON.stringify(opts.prompt))
+        return Promise.resolve({
+          content: [{ type: 'text' as const, text: 'ok' }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: {
+            inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
+            outputTokens: { total: 0, text: 0, reasoning: 0 },
+          },
+          warnings: [],
+        })
+      },
+    })
+    return { model, sent }
+  }
+
+  it("cuts an ops key out of every caller's prompt and writes the row that names it", async () => {
+    for (const caller of CALLERS) {
+      const db = openDb()
+      const { model, sent } = recorder()
+      const client = new LlmClient({ model, db, caller })
+      await client.text({
+        system: 'You are Amara. The god_afterlife row was written.',
+        messages: [{ role: 'user', content: 'first_bridge fired today.' }],
+      })
+      expect(sent[0], caller).toContain('The [redacted] row was written.')
+      expect(sent[0], caller).toContain('[redacted] fired today.')
+      expect(sent[0], caller).not.toContain('god_afterlife')
+      expect(sent[0], caller).not.toContain('first_bridge')
+      const alert = db.prepare("SELECT detail FROM alerts WHERE kind = 'glass_leak'").get() as
+        | { detail: string }
+        | undefined
+      expect(alert?.detail, caller).toContain(caller)
+      expect(alert?.detail, caller).toContain('god_afterlife')
+    }
+  })
+
+  it('leaves a clean prompt byte-for-byte alone and writes no row', async () => {
+    const db = openDb()
+    const { model, sent } = recorder()
+    const clean = 'The neighbours held a council by the well.'
+    await new LlmClient({ model, db, caller: 'turn' }).text({
+      system: 'You are Amara.',
+      messages: [{ role: 'user', content: clean }],
+    })
+    expect(sent[0]).toContain(clean)
+    expect(db.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'glass_leak'").get()).toEqual({
+      n: 0,
+    })
+  })
+})
+
 describe('default OpenRouter path extraBody', () => {
   it('builds models + provider pinning from pins.ts', () => {
     expect(defaultExtraBody()).toEqual({
@@ -719,6 +779,18 @@ describe('default OpenRouter path extraBody', () => {
       models: [MIND_MODEL, 'x/y'],
       provider: { order: ['P'], allow_fallbacks: true },
     })
+  })
+
+  // Ruling 19 (2026-08-30): a live town pins the provider as an allow-list. 9 of 309 rehearsal-3
+  // calls were served by OpenInference, each one a cold prefix and an unpriced route.
+  it('★ carries allow_fallbacks:false for a mind caller once the client is told to pin', () => {
+    const db = openDb()
+    for (const caller of ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic']) {
+      const body = new LlmClient({ db, caller, allowProviderFallbacks: false }).requestBody()
+      expect(body.provider, caller).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
+      // And no floating alias can answer instead of the pinned dated snapshot.
+      expect(body.models, caller).toEqual([MIND_MODEL])
+    }
   })
 
   it('the allow-list is a switch now, and the default leaves the routing where it was', () => {

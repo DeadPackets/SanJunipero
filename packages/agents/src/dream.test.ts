@@ -201,6 +201,7 @@ describe('makeDreamLlm', () => {
       cacheReadTokens: 0,
       reasoningTokens: 0,
       costUsd: 0.5,
+      estimatedCostUsd: 0.5,
       reportedCostUsd: null,
       latencyMs: 0,
       ok: true,

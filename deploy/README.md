@@ -176,29 +176,30 @@ docker compose down -v                          # or: end the town and its volum
 
 **One sim-day is one real hour**, so "$/sim-day" and "$/hour" are the same number.
 
+Measured over rehearsal 3 (2026-08-30): five minds, one closed sim-day, **$0.47-0.71 per
+sim-day**.
+
 | | per hour | per day | per 30-day month |
 |---|---|---|---|
 | **Scripted** (default) | **$0.00** | **$0.00** | **$0.00** |
-| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.106** | **$2.54** | **$76** |
+| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.47-0.71** | **$11-17** | **$340-510** |
 
-Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$100/mo, forever,
-until you stop it.**
+Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$360-530/mo,
+forever, until you stop it.** A live town is not something to leave running.
 
-**★ These are not the numbers the code prints.** `pins.ts` books input/output/cache at
-`0.14/0.28/0.028` per million tokens while the serving provider charges `0.28/0.56/0.07` — 2x on
-input and output, 2.5x on cache reads. **Every cost this project reports is about half the real
-one.** The table above is the doubled, real figure; the dashboards are not. The `price` lane is
-fixing the pin; until it lands, read every reported dollar as two.
+**These ARE the numbers the code prints.** `pins.ts` books the serving provider's own published
+rate, and a call whose bill OpenRouter reports is booked at that bill. The dashboards and this
+page are the same dollars.
 
-### The two guards, and where they really trip
+### The three guards, and where they trip
 
-Both are calibrated against the booked price, so both fire at **twice** their nominal spend.
+Each is calibrated against the price the ledger books, so each fires at its nominal spend.
 
-| Guard | Nominal | Actually trips at | What it does |
+| Guard | Set at | Reached, at the measured 5-mind rate | What it does |
 |---|---|---|---|
-| Daily budget | $3.00 per rolling 24 h | **$6 of real money**, ~28 h into a 5-mind stream | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | $50 total | **$100 of real money** | Kills the process. The town on disk is intact. |
-| Rate tripwire | $0.10/mind/sim-day over 15 min | **$0.20/mind/real-hour** — $1.00/h for five minds | Stops every mind. The town keeps serving. |
+| Daily budget | $3.00 per rolling 24 h | **4-6 real hours** of live streaming | Kills the process; a restart refuses until the window rolls. |
+| Anomaly stop | $50 total | ~70-105 real hours | Kills the process. The town on disk is intact. |
+| Rate tripwire | $0.70/mind/sim-day over 15 min | $3.50/h for five minds — 5x the measured rate | Stops every mind. The town keeps serving. |
 
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;

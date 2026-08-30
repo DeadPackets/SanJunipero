@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MINUTES_PER_DAY,
+  assertNoGlassLeak,
   assertQuotedName,
   simTimeFromTick,
   CONSTRUCT_VOCABULARY,
@@ -33,12 +34,11 @@ describe('the prompt surfaces are clean', () => {
 
   it('the four words the world also owns are scanned, but never crash a living town', () => {
     // A market district, a council of neighbours, faith, a custom: all real. The scan reports
-    // them for the authored surfaces the gate reads; assembly refuses only ops-only words.
+    // them for the authored surfaces the gate reads; the mid-run gate cuts only ops-only words.
     for (const word of ['faith', 'council', 'market', 'custom']) {
-      expect(scanPromptForGlassLeak(`They spoke of the ${word}.`)).toEqual([word])
-      expect(() =>
-        assemblePrompt(fixtureBlocks({ now: { prose: `They spoke of the ${word}.` } })),
-      ).not.toThrow()
+      const said = `They spoke of the ${word}.`
+      expect(scanPromptForGlassLeak(said)).toEqual([word])
+      expect(assertNoGlassLeak(said, 'turn'), word).toBe(said)
     }
   })
 
@@ -57,10 +57,12 @@ describe('the prompt surfaces are clean', () => {
     }
   })
 
-  it('assemblePrompt itself refuses to hand over a leaking prompt', () => {
-    expect(() =>
-      assemblePrompt(fixtureBlocks({ now: { prose: 'The god_afterlife row was written.' } })),
-    ).toThrow(/god_afterlife/)
+  it('★ the gate cuts the leaked span out and hands the rest over — the turn continues', () => {
+    const leaks: string[][] = []
+    expect(
+      assertNoGlassLeak('The god_afterlife row was written.', 'turn', (l) => leaks.push([...l])),
+    ).toBe('The [redacted] row was written.')
+    expect(leaks).toEqual([['god_afterlife']])
   })
 })
 
@@ -81,24 +83,11 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
     custom: 'It is the custom here to eat after dark.',
   }
 
-  it('the compacted day log may say milestone, tier or construct', () => {
+  it('the compacted day log may say milestone, tier or construct, byte for byte', () => {
     for (const [word, prose] of Object.entries(ordinaryPhrases)) {
-      expect(() => assemblePrompt(fixtureBlocks({ dayLog: [prose] })), word).not.toThrow()
-    }
-  })
-
-  it("and so may another mouth, and the mind's own remembered words", () => {
-    for (const [word, prose] of Object.entries(ordinaryPhrases)) {
-      expect(() => assemblePrompt(fixtureBlocks({ now: { prose } })), word).not.toThrow()
-      expect(
-        () =>
-          assemblePrompt(
-            fixtureBlocks({
-              scene: { ledgers: [{ name: 'Nadia', doc: prose }], memories: [] },
-            }),
-          ),
-        word,
-      ).not.toThrow()
+      const a = assemblePrompt(fixtureBlocks({ dayLog: [prose] }))
+      expect(a.messages[0]!.content, word).toBe(prose)
+      expect(assertNoGlassLeak(prose, 'turn'), word).toBe(prose)
     }
   })
 
@@ -113,21 +102,19 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
     }
   })
 
-  it('★ and the split is not vacuous — the ops keys still throw', () => {
-    for (const term of MID_RUN_ENFORCED) {
-      expect(
-        () => assemblePrompt(fixtureBlocks({ dayLog: [`The ${term} row was written.`] })),
-        term,
-      ).toThrow(new RegExp(term))
+  it('★ and the split is not vacuous — the ops keys are still cut out and reported', () => {
+    for (const term of [...MID_RUN_ENFORCED, 'first_lantern']) {
+      const leaks: string[][] = []
+      const sealed = assertNoGlassLeak(`The ${term} row was written.`, 'turn', (l) =>
+        leaks.push([...l]),
+      )
+      expect(sealed, term).toBe('The [redacted] row was written.')
+      expect(leaks, term).toEqual([[term]])
     }
-    // The shape ban still bites on a kind invented after this file was written.
-    expect(() => assemblePrompt(fixtureBlocks({ dayLog: ['first_lantern fired today.'] }))).toThrow(
-      /first_lantern/,
-    )
   })
 
   it('★ every word on the list is still caught on an authored surface', () => {
-    // Nothing left the scan — only the mid-run throw narrowed. Named rather than iterated,
+    // Nothing left the scan — only the mid-run gate is narrower. Named rather than iterated,
     // because iterating the list makes deleting a word from it pass this test vacuously.
     for (const term of Object.keys(ordinaryPhrases)) {
       expect(CONSTRUCT_VOCABULARY, term).toContain(term)

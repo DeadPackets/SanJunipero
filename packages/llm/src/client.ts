@@ -9,6 +9,7 @@ import {
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
+import { assertNoGlassLeak } from '@sj/shared'
 import {
   insertAlert,
   insertLlmCall,
@@ -178,16 +179,18 @@ export class LlmClient {
     schema: z.ZodType<T>
     repairOnce?: boolean
   }): Promise<{ value: T; usage: LlmUsage }> {
+    const system = this.seal(opts.system)
+    const messages = this.sealAll(opts.messages)
     try {
-      return await this.generateObject(opts.system, opts.messages, opts.schema)
+      return await this.generateObject(system, messages, opts.schema)
     } catch (err) {
       const bad = opts.repairOnce === true ? malformedObjectText(err) : undefined
       if (bad === undefined) throw err
       const why = opts.schema.safeParse(jsonOrNothing(bad)).error
       return await this.generateObject(
-        opts.system,
+        system,
         [
-          ...opts.messages,
+          ...messages,
           { role: 'assistant', content: bad.length > 0 ? bad : '…' },
           {
             role: 'user',
@@ -243,11 +246,13 @@ export class LlmClient {
     system?: string
     messages: LlmMessage[]
   }): Promise<{ text: string; usage: LlmUsage }> {
+    const system = opts.system === undefined ? undefined : this.seal(opts.system)
+    const messages = this.sealAll(opts.messages)
     const { value, usage } = await this.invoke(async (model) => {
       const r = await generateText({
         model,
-        ...(opts.system === undefined ? {} : { system: opts.system }),
-        messages: toModelMessages(opts.messages),
+        ...(system === undefined ? {} : { system }),
+        messages: toModelMessages(messages),
         maxRetries: 0,
         ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
         abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
@@ -269,6 +274,18 @@ export class LlmClient {
 
   alert(kind: string, detail: string): void {
     insertAlert(this.db, { agentId: this.agentId, kind, detail })
+  }
+
+  // The one door every provider-bound prompt passes through, whichever of the six callers
+  // assembled it: an ops-plane word is cut out here and the row says which caller leaked it.
+  private seal(text: string): string {
+    return assertNoGlassLeak(text, this.caller, (leaks, where) => {
+      this.alert('glass_leak', `${where}: ${leaks.join(', ')} — redacted before the call`)
+    })
+  }
+
+  private sealAll(messages: readonly LlmMessage[]): LlmMessage[] {
+    return messages.map((m) => ({ ...m, content: this.seal(m.content) }))
   }
 
   // The provider's own charge wins when offered: it is the bill. The table stays as the second
@@ -365,6 +382,7 @@ export class LlmClient {
           cacheReadTokens,
           reasoningTokens,
           costUsd,
+          estimatedCostUsd: computed.costUsd,
           reportedCostUsd: reported ?? null,
           latencyMs: performance.now() - start,
           ok: true,
@@ -383,6 +401,13 @@ export class LlmClient {
         const inputTokens = raw?.inputTokens ?? 0
         const outputTokens = raw?.outputTokens ?? 0
         const cacheReadTokens = raw?.inputTokenDetails.cacheReadTokens ?? 0
+        const deadCost = computeCostUsd(
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          served,
+          provider,
+        ).costUsd
         insertLlmCall(this.db, {
           agentId: this.agentId,
           caller: this.caller,
@@ -394,8 +419,8 @@ export class LlmClient {
           outputTokens,
           cacheReadTokens,
           reasoningTokens: raw?.outputTokenDetails.reasoningTokens ?? 0,
-          costUsd: computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider)
-            .costUsd,
+          costUsd: deadCost,
+          estimatedCostUsd: deadCost,
           reportedCostUsd: null,
           latencyMs: performance.now() - start,
           ok: false,
@@ -409,6 +434,17 @@ export class LlmClient {
     throw lastError
   }
 
+  /** The routing and reasoning body this client's calls carry. Readable so a test can prove
+   *  what a live call sends without making one. */
+  requestBody(): ReturnType<typeof defaultExtraBody> {
+    return defaultExtraBody(
+      this.fallbackModels,
+      this.providerOrder,
+      this.allowProviderFallbacks,
+      this.reasoning ?? undefined,
+    )
+  }
+
   private resolveModel(): LanguageModel {
     if (this.model !== undefined) return this.model
     const key = process.env.OPENROUTER_API_KEY
@@ -416,12 +452,7 @@ export class LlmClient {
     this.model = openrouter(MIND_MODEL, {
       // Without this OpenRouter omits `usage.cost` and the ledger has no second opinion.
       usage: { include: true },
-      extraBody: defaultExtraBody(
-        this.fallbackModels,
-        this.providerOrder,
-        this.allowProviderFallbacks,
-        this.reasoning ?? undefined,
-      ),
+      extraBody: this.requestBody(),
     })
     return this.model
   }

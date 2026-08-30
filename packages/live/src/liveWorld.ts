@@ -28,9 +28,12 @@ import {
   Embedder,
   LlmClient,
   MIND_MODEL,
+  checkSpend,
   insertAlert,
   migrateLlmTables,
   projectDailySpend,
+  reportDeadCalls,
+  reportProviders,
   reportReconciliation,
 } from '@sj/llm'
 import {
@@ -133,6 +136,8 @@ export type LiveCastOpts = {
   onSpendStop?: (spent: number, cap: number) => void
   /** The rate tripwire's window. A test cannot wait fifteen real minutes to prove a flow. */
   rateWindowRealMinutes?: number
+  /** How often the projected-spend alert may fire. A test cannot wait a real hour for one. */
+  spendAlertRealMinutes?: number
   /** How many minds this town may hold; never fewer than its founders. `SJ_MAX_MINDS`. */
   maxMinds?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
@@ -187,12 +192,20 @@ export async function settle(
  * A per-call cap cannot see a slow leak; this bounds spend per unit time.
  * PER MIND, because the bill scales with the cast and not with the world — a total ceiling would
  * false-fire the day somebody streams ten people.
- * 0.21 is 9.9x the measured 0.0212 $/mind/sim-day and 6.8x the worst measured 15-minute window.
+ * 0.70 is 5x the measured $0.09–0.14/mind/sim-day (rehearsal 3, 2026-08-30).
  */
-const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.21
+const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.7
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
+/** How often the operator hears a projected burn. Well under every hard stop, so a leak is on
+ *  the ops surface with an hour left to look at it. */
+const LIVE_SPEND_ALERT_REAL_MINUTES = 60
+
+/** The pinned provider is an ALLOW-LIST for every mind-facing call, not a preference: a routing
+ *  hop costs a cold prefix and an unpriced route. A Wafer outage idles the minds rather than
+ *  routing around it — an operator who wants it served anyway changes `PROVIDER_ORDER`. */
+export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
 /** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
  *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
@@ -343,6 +356,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           db: opsDb,
           caller,
           ...(agentId === undefined ? {} : { agentId }),
+          allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
           // The per-caller backstop: it stops one caller running away between two reads of the
           // ledger, which the tick watchdog below cannot see.
           ...(cap > 0 ? { budgetUsd: cap } : {}),
@@ -358,7 +372,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     const result = await runPreflight({
       llm: makeClient('preflight'),
       provider: 'default',
-      hardAllowList: false,
+      hardAllowList: !LIVE_ALLOW_PROVIDER_FALLBACKS,
       model: MIND_MODEL,
       identity: founders[0]?.identity,
       personality: founders[0]?.personality,
@@ -723,6 +737,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       // ── the money, on the world's own clock ──
+      const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
+      let nextSpendAlertAt = Date.now() + spendAlertMs
       bridge.onTick((tick) => {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
@@ -730,6 +746,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           if (narratorStore !== null) writeTheDay(narratorStore, tick)
         }
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
+        // The operator's heartbeat, before any hard stop has its say: a burn that is about to
+        // kill the run must be on the ops surface even when this is the tick that kills it.
+        if (Date.now() >= nextSpendAlertAt) {
+          nextSpendAlertAt = Date.now() + spendAlertMs
+          const projected = checkSpend(opsDb, {
+            windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
+          })
+          if (projected.alerted) {
+            log(`stream: spend — projected $${projected.usdPerSimDay.toFixed(2)}/sim-day`)
+          }
+        }
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
           console.error(spendStopMessage(spent, cap))
@@ -783,8 +810,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
       narratorDb?.close()
-      // The run's last word on its own prices: says nothing when the ledger and the provider's
-      // bill agree, and writes an alert row when a pin has gone stale.
+      // The run's last word on its own money: what the calls bought, which back end served
+      // them, and whether the ledger and the provider's bill agree. Each says nothing about a
+      // run with nothing to say, so a quiet ops surface still means a quiet run.
+      for (const row of reportDeadCalls(opsDb)) {
+        log(
+          `stream: ${row.agentId ?? 'the run'} paid for ${row.calls} call(s) that came back with nothing`,
+        )
+      }
+      for (const row of reportProviders(opsDb)) {
+        log(
+          `stream: ${row.provider ?? 'an unnamed back end'} served ${row.calls} call(s), $${row.costUsd.toFixed(4)}`,
+        )
+      }
       reportReconciliation(opsDb)
       opsDb.close()
     },

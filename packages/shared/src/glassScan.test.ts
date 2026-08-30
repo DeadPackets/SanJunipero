@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { CONSTRUCT_VOCABULARY, scanForDirective, scanPromptForGlassLeak } from './glassScan.js'
+import {
+  CONSTRUCT_VOCABULARY,
+  assertNoGlassLeak,
+  scanForDirective,
+  scanPromptForGlassLeak,
+} from './glassScan.js'
 
 describe('scanPromptForGlassLeak', () => {
   it('flags the taxonomy, whatever case it arrives in', () => {
@@ -59,5 +64,65 @@ describe('the counsel a perception sentence may not hand over', () => {
     ])
     expect(scanForDirective('Go and find Amara, you must hurry.')).toEqual(['go and', 'you must'])
     expect(scanForDirective('Its walls are three quarters up.')).toEqual([])
+  })
+})
+
+// ★ Ruling 11 (2026-08-30). The gate used to throw in dev and return silently under
+// `NODE_ENV=production`, which `Dockerfile:18` sets — so the single runtime enforcement point of
+// a binding invariant did nothing in every shipped container.
+describe('★ the mid-run gate: always scan, cut the span out, tell the ops plane', () => {
+  const sealed = (text: string): { text: string; leaks: string[][] } => {
+    const leaks: string[][] = []
+    return { text: assertNoGlassLeak(text, 'turn', (l) => leaks.push([...l])), leaks }
+  }
+
+  it('cuts the leaked span out and reports it, leaving the rest of the sentence alone', () => {
+    expect(sealed('The god_afterlife row was written.')).toEqual({
+      text: 'The [redacted] row was written.',
+      leaks: [['god_afterlife']],
+    })
+    expect(sealed('first_bridge fired, and so did first_roof.')).toEqual({
+      text: '[redacted] fired, and so did [redacted].',
+      leaks: [['first_bridge', 'first_roof']],
+    })
+  })
+
+  it('leaves clean text byte-for-byte alone, and says nothing at all', () => {
+    for (const text of [
+      'The neighbours held a council by the well.',
+      'It is day 3, dusk, early winter.',
+      '',
+    ]) {
+      expect(sealed(text), text).toEqual({ text, leaks: [] })
+    }
+  })
+
+  it('★ behaves identically under NODE_ENV=production — the shipped container is the run', () => {
+    const before = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      expect(sealed('The god_afterlife row was written.')).toEqual({
+        text: 'The [redacted] row was written.',
+        leaks: [['god_afterlife']],
+      })
+      expect(sealed('The neighbours held a council.').text).toBe('The neighbours held a council.')
+    } finally {
+      if (before === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = before
+    }
+  })
+
+  it('★ cuts a span the payload spelled with an invisible character or a lookalike letter', () => {
+    // The fold reads it as the word; the cut has to land on the bytes the mind would have read.
+    expect(sealed('The god_after\u200blife row was written.').text).toBe(
+      'The [redacted] row was written.',
+    )
+    expect(sealed('The gоd_afterlife row was written.').text).toBe(
+      'The [redacted] row was written.',
+    )
+  })
+
+  it('never throws — a false positive may not take a live town down', () => {
+    expect(() => assertNoGlassLeak('The god_afterlife row was written.', 'turn')).not.toThrow()
   })
 })

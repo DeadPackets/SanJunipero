@@ -1,7 +1,11 @@
 // Observed by scripts/probe.ts live run 2026-08-15 — not invented. Re-run the probe before changing.
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
+// An allow-list in a live town, not a preference: a routing hop costs a cold prefix and an
+// unpriced route. A Wafer outage therefore idles the minds until PROVIDER_ORDER is changed.
 export const PROVIDER_ORDER: string[] = ['Wafer']
-export const FALLBACK_MODELS: string[] = ['deepseek/deepseek-chat']
+// Empty on purpose. `deepseek/deepseek-chat` stood here and is a floating alias that can swap
+// under a run, which design §1 forbids; no dated snapshot of a second model has been probed.
+export const FALLBACK_MODELS: string[] = []
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 

@@ -97,28 +97,50 @@ const CONFUSABLE_TO_LATIN: Readonly<Record<string, string>> = {
 }
 const CONFUSABLE = new RegExp(`[${Object.keys(CONFUSABLE_TO_LATIN).join('')}]`, 'gu')
 
-// What the scan reads. A payload that breaks `festival` with a zero-width space or spells it
-// with a Cyrillic е reaches a mind as the word; nothing but the scan sees this folded copy.
-function fold(text: string): string {
-  return text
+const foldChar = (ch: string): string =>
+  ch
     .normalize('NFKD')
     .replace(/[\p{Mn}\p{Cf}]/gu, '')
     .toLowerCase()
     .replace(CONFUSABLE, (c) => CONFUSABLE_TO_LATIN[c] ?? c)
+
+// What the scan reads, and for each of its characters the offset in the original it came from,
+// so a span the scan finds can be cut out of text a mind was about to read.
+function foldWithSource(text: string): { folded: string; source: number[] } {
+  let folded = ''
+  const source: number[] = []
+  let at = 0
+  for (const ch of text) {
+    for (const out of foldChar(ch)) {
+      folded += out
+      source.push(at)
+    }
+    at += ch.length
+  }
+  source.push(at)
+  return { folded, source }
 }
 
-const patternsFor = (terms: readonly string[]): readonly { term: string; re: RegExp }[] =>
-  terms.map((term) => ({
-    term,
-    re: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'iu'),
-  }))
+// A payload that breaks `festival` with a zero-width space or spells it with a Cyrillic е
+// reaches a mind as the word; nothing but the scan sees this folded copy.
+function fold(text: string): string {
+  return foldWithSource(text).folded
+}
+
+type Pattern = { term: string; re: RegExp; all: RegExp }
+
+const patternsFor = (terms: readonly string[]): readonly Pattern[] =>
+  terms.map((term) => {
+    const pattern = `\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
+    return { term, re: new RegExp(pattern, 'iu'), all: new RegExp(pattern, 'giu') }
+  })
 
 export const MID_RUN_ENFORCED: readonly string[] = CONSTRUCT_VOCABULARY.filter(opsKeyShape)
 
 const ALL_PATTERNS = patternsFor(CONSTRUCT_VOCABULARY)
 const OPS_ONLY_PATTERNS = patternsFor(MID_RUN_ENFORCED)
 
-function scan(prompt: string, patterns: readonly { term: string; re: RegExp }[]): string[] {
+function scan(prompt: string, patterns: readonly Pattern[]): string[] {
   const out = patterns.filter(({ re }) => re.test(prompt)).map(({ term }) => term)
   for (const m of prompt.matchAll(MILESTONE_KIND)) {
     const kind = m[0].toLowerCase()
@@ -207,10 +229,47 @@ export function scanForLayoutLeak(text: string): string[] {
   return LAYOUT_PATTERNS.filter(({ re }) => re.test(folded)).map(({ term }) => term)
 }
 
-// Thrown, not logged: an ops-plane word can only reach a prompt through a bug. Production keeps
-// running — a live town is not the place to discover a false positive.
-export function assertNoGlassLeak(text: string, where: string): void {
-  if (process.env.NODE_ENV === 'production') return
-  const leaks = scan(fold(text), OPS_ONLY_PATTERNS)
-  if (leaks.length > 0) throw new Error(`one-way glass leak in ${where}: ${leaks.join(', ')}`)
+type Span = { term: string; start: number; end: number }
+
+// Where every offending term sits in the folded copy, earliest first and widest first, so the
+// spans can be cut out of the original in one pass.
+function scanSpans(folded: string, patterns: readonly Pattern[]): Span[] {
+  const out: Span[] = []
+  const add = (term: string, at: number, match: string): void => {
+    out.push({ term, start: at, end: at + match.length })
+  }
+  for (const { term, all } of patterns) {
+    for (const m of folded.matchAll(all)) add(term, m.index, m[0])
+  }
+  for (const m of folded.matchAll(MILESTONE_KIND)) add(m[0].toLowerCase(), m.index, m[0])
+  return out.sort((a, b) => a.start - b.start || b.end - a.end)
+}
+
+const REDACTED = '[redacted]'
+
+// A span found in the fold, cut out of the text it was folded from. An overlapping second
+// match is already gone with the first.
+function cutSpans(text: string, spans: readonly Span[], source: readonly number[]): string {
+  let out = ''
+  let cut = 0
+  for (const span of spans) {
+    const start = source[span.start] ?? text.length
+    if (start < cut) continue
+    out += text.slice(cut, start) + REDACTED
+    cut = source[span.end] ?? text.length
+  }
+  return out + text.slice(cut)
+}
+
+/** Told what leaked and where, so a run can be read back off the ops plane. */
+export type GlassLeakSink = (leaks: readonly string[], where: string) => void
+
+// Redacted and reported, never thrown and never skipped: an ops-plane word can only reach a
+// prompt through a bug, and a live town is not the place to discover a false positive.
+export function assertNoGlassLeak(text: string, where: string, onLeak?: GlassLeakSink): string {
+  const { folded, source } = foldWithSource(text)
+  const spans = scanSpans(folded, OPS_ONLY_PATTERNS)
+  if (spans.length === 0) return text
+  onLeak?.([...new Set(spans.map((s) => s.term))], where)
+  return cutSpans(text, spans, source)
 }

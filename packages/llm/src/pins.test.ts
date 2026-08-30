@@ -13,7 +13,9 @@ import {
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
   expect(PROVIDER_ORDER.length).toBeGreaterThan(0)
-  expect(FALLBACK_MODELS.length).toBeGreaterThan(0)
+  // Design §1: never a floating alias. Every model this run may be served by names the dated
+  // snapshot it was probed at, so nothing can swap under the town.
+  for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
   // Wafer's real published price. The old pin here was 0.14/0.28/0.028 — that is BAIDU's price,
   // and booking Wafer's calls at it halved every cost the project ever reported.
   expect(PRICE_PER_M).toEqual({ input: 0.28, output: 0.56, cacheRead: 0.07 })
