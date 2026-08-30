@@ -47,6 +47,7 @@
   --ease-ambient: linear;
 
   --font-px: 'Silkscreen', 'Press Start 2P', monospace;
+  --font-sign: 'Press Start 2P', 'Silkscreen', monospace;
   --font-body: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-title: Fraunces, Georgia, serif;
   --font-data: ui-monospace, 'SF Mono', monospace;
@@ -1192,57 +1193,73 @@ body {
   position: absolute; z-index: 25;
   right: max(var(--mark-inset), env(safe-area-inset-right));
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
-  display: grid; gap: var(--s-1); justify-items: start;
+  display: grid; justify-items: start; padding-bottom: calc(10px * var(--px));
+  /* one drawn pixel is --px screen pixels: every size below is a whole number of them */
+  --px: 2;
 }
-/* The plank is a drawn 128x32 raster with 15px of clear at each end; the label is rendered
-   over it rather than painted into it, so a rename never needs a new asset. */
+/* Each arm is cut to its word: an 88x18 plank drawn at native size, sliced at the nailed end and
+   the point so the grain between them repeats instead of stretching. The 18-pixel plank sits
+   centred in a 22-pixel row, which leaves 4 pixels of post showing between arms. */
 .signpost-arm {
   display: flex; align-items: center;
-  /* 88px of content box: 'CHRONICLE' at 13px Silkscreen is 74px and the old pad left 4.4px. */
-  width: 128px; min-height: 44px; padding: 0 var(--s-7) 0 var(--s-6);
-  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
-  text-align: left; color: var(--cream); cursor: pointer;
-  background: url('./px/signpost-arm.webp') no-repeat center / 128px 32px;
+  min-height: calc(22px * var(--px));
+  padding: 0 calc(4px * var(--px)) calc(1px * var(--px)) calc(2px * var(--px));
+  font-family: var(--font-sign); font-size: var(--f-4); line-height: 1; white-space: nowrap;
+  color: var(--deep); cursor: pointer;
+  /* deep ink on the plank's own wood is 8.9:1 idle, 5.5:1 pressed; the 1px light under each
+     glyph is the cut edge of painted lettering, not a halo */
+  text-shadow: 0 1px 0 var(--honey-l);
+  background: none; border-style: solid;
+  border-width: calc(2px * var(--px)) calc(8px * var(--px)) calc(2px * var(--px)) calc(10px * var(--px));
+  border-image: url('./px/signpost-arm.webp') 2 8 2 10 fill / 1 repeat;
   image-rendering: pixelated;
-  border: 0; border-radius: 0;
-  /* Cream on the plank's own wood samples at 2.13:1 — a measured AA failure on the product's
-     primary navigation, invisible to any audit that reads the CSS ancestry. The 4-way ink halo
-     the quiet stamp already uses gives the glyph its own ground at 15:1. */
-  text-shadow:
-    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep);
   transition-property: translate;
   transition-timing-function: var(--ease-tap);
 }
-.signpost-arm:hover { translate: 3px 0; }
-.signpost-arm:active { translate: 1px 1px; box-shadow: none; }
-/* The arm you pulled stays pulled, on a plank drawn darker: two channels, no repaint of the
-   raster layer, and no 1.2 -> 0.94 -> 1.2 flicker when a pressed arm is pressed again. */
+.signpost-arm:hover { translate: 0 -1px; border-image-source: url('./px/signpost-arm-hot.webp'); }
+.signpost-arm:active { translate: 0 1px; box-shadow: none; }
+/* The arm you pulled stays down on a plank drawn darker: two channels, no repaint of the raster
+   layer, and no 1.2 -> 0.94 -> 1.2 flicker when a pressed arm is pressed again. */
 .signpost-arm[aria-expanded='true'] {
-  translate: 3px 0;
-  background-image: url('./px/signpost-arm-on.webp');
+  translate: 0 1px;
+  border-image-source: url('./px/signpost-arm-on.webp');
 }
+/* a ring of deep round a ring of honey: 9.6:1 between them, whatever the town is under it */
+.signpost-arm:focus-visible {
+  outline: 2px solid var(--honey); outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--deep), 0 0 0 6px var(--deep);
+}
+/* The post runs behind every arm from under the top plank to the ground, so the arms overlap it
+   the way they are nailed on, instead of standing on it. */
 .signpost-post {
-  width: 16px; height: 96px; margin-left: var(--s-6);
-  background: url('./px/signpost-post.webp') no-repeat center / 16px 96px;
+  position: absolute; z-index: -1; left: calc(3px * var(--px)); top: calc(4px * var(--px));
+  bottom: 0; width: calc(8px * var(--px));
+  background: url('./px/signpost-post.webp') repeat-y center top / calc(8px * var(--px)) auto;
+  border-bottom: calc(1px * var(--px)) solid var(--deep);
   image-rendering: pixelated;
 }
-/* A 128px plank is 5% of a 2560px viewport and reads as a postage stamp. Whole-number-ish
-   scaling on the whole post, so the arms, the gaps and the pole grow as one sign. */
+/* A 192px arm is 7% of a 2560px viewport and reads as a postage stamp. Three screen pixels per
+   drawn one, so the arms, the gaps and the pole grow as one sign and stay on the grid — a
+   `scale: 1.5` resampled the 2x layer and left the outline one row thick, then two. */
 @media (min-width: 1920px) {
-  .signpost { scale: 1.5; transform-origin: 100% 100%; }
+  .signpost { --px: 3; }
+  /* 3x the face's 8px grid; a size the type ladder does not carry */
+  .signpost-arm { font-size: 24px; }
 }
 /* 284px of a 390px landscape phone is 73% of the screen, and the pole ran off the bottom. */
 @media (max-height: 620px) {
   .signpost-post { display: none; }
 }
-/* With the sheet up there is no corner left under 640px, and no room beside it on a short
-   window. The arms move to the top edge, where all four stay one press from every other:
-   two-by-two on a phone, because a row of four planks is 518px, and in a row where that fits. */
-@media (max-width: 640px), (max-height: 620px) {
+/* With the sheet up there is no corner left: under 640px the sheet takes the width, up to 1000px
+   the sheet pushed to the left edge leaves less beside it than the longest arm (146px at 768
+   against 192px), and a short window has no room under it. The arms move to the top edge, where
+   all four stay one press from every other: two by two, clear of the stamp in the other corner,
+   and in a row on a short window, where two rows would reach the sheet. */
+@media (max-width: 1000px), (max-height: 620px) {
   .signpost[data-open='yes'] {
     top: max(var(--mark-inset), env(safe-area-inset-top)); bottom: auto;
     left: max(var(--mark-inset), env(safe-area-inset-left)); right: auto;
-    grid-template-columns: repeat(2, auto);
+    grid-template-columns: repeat(2, auto); padding-bottom: 0;
   }
   .signpost[data-open='yes'] .signpost-post { display: none; }
 }
@@ -1293,7 +1310,7 @@ body {
   .paper {
     left: clamp(
       calc(var(--paper-w) / 2),
-      calc(100% - var(--paper-w) / 2 - var(--mark-inset) - 136px),
+      calc(100% - var(--paper-w) / 2 - var(--mark-inset) - 200px),
       50%
     );
   }
@@ -1534,7 +1551,8 @@ body {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }
-  .signpost-arm, .signpost-arm[aria-expanded='true'], .signpost-post { background-image: none; }
+  .signpost-arm, .signpost-arm[aria-expanded='true'] { border-image: none; }
+  .signpost-post { background-image: none; border: 2px solid CanvasText; }
   :focus-visible { outline-color: Highlight; }
 }
 
@@ -1544,6 +1562,9 @@ body {
   .live-pill:hover, .key-summary:hover, .legend-chip:hover, .signpost-arm:hover,
   .room-door:hover, .rx-full:hover, .roster-sort:hover, .mark:hover .mark-glyph {
     translate: 0 0;
+  }
+  .signpost-arm:hover:not([aria-expanded='true']) {
+    border-image-source: url('./px/signpost-arm.webp');
   }
   /* a phone has no Escape key to be told to press */
   .paper-close-key { display: none; }

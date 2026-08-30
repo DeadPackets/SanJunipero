@@ -284,15 +284,13 @@ describe('C3, C4, C5 · three marks that were painted below their own floor', ()
 })
 
 describe('C9 · the signpost arm, whose ground is a drawn plank and not a token', () => {
-  // Pixel-sampled off the rendered raster, cream on the plank's own wood is 2.13:1 — a measured
-  // AA failure no CSS-ancestor audit can see, because the first opaque ancestor is `--night`.
-  // The label carries its own ground instead, the way the quiet stamp already does.
-  it('gives the label the four-way ink halo, on every side', () => {
+  // Cream on the plank's own wood sampled at 2.13:1, and a halo smeared the glyphs; the label is
+  // deep ink painted on the wood instead — 7.66:1 idle, 5.46:1 pressed, sampled off the render.
+  it('paints the label in deep ink, with a cut edge and no ink halo', () => {
     const body = ruleBody(CSS, '.signpost-arm')
-    for (const side of ['1px 0 0', '-1px 0 0', '0 1px 0', '0 -1px 0']) {
-      expect(body, side).toContain(`${side} var(--deep)`)
-    }
-    expect(contrast(T.cream!, T.deep!)).toBeGreaterThanOrEqual(AA)
+    expect(body).toMatch(/color:\s*var\(--deep\)/)
+    expect(body).toMatch(/text-shadow:\s*0 1px 0 var\(--honey-l\)/)
+    expect(body).not.toContain('-1px 0 0')
   })
 
   // brightness(1.2) on the pressed arm took the label to 1.53:1 — the arm you are on was the
@@ -300,6 +298,14 @@ describe('C9 · the signpost arm, whose ground is a drawn plank and not a token'
   it('signals the open arm with a second plank, never with a filter', () => {
     expect(CSS).not.toMatch(/\.signpost-arm[^{]*\{[^}]*filter:/)
     expect(ruleBody(CSS, ".signpost-arm[aria-expanded='true']")).toContain('signpost-arm-on.webp')
+  })
+
+  // The ring sits over whatever the town is: honey inside deep is 9.6:1 between its own two rings.
+  it('gives the focus ring its own ground', () => {
+    const body = ruleBody(CSS, '.signpost-arm:focus-visible')
+    expect(body).toMatch(/outline:\s*2px solid var\(--honey\)/)
+    expect(body).toMatch(/box-shadow:[^;]*var\(--deep\)/)
+    expect(contrast(T.honey!, T.deep!)).toBeGreaterThanOrEqual(3)
   })
 })
 

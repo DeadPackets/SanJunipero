@@ -48,13 +48,15 @@ was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 
 | Face | Token | Where |
 |---|---|---|
-| Silkscreen | `--font-px` | the pixel face: signpost arms, the nameplate, section heads, chips |
+| Silkscreen | `--font-px` | the pixel face: the nameplate, section heads, chips |
+| Press Start 2P | `--font-sign` | the signpost's arms only: 16px is twice its 8px grid, a 14px cap, and every stroke lands on the plank's own pixels |
 | Manrope | `--font-body` | paper body, ring arms, roster names, place names, and the two letter-spaced marks — the stamp (0.14em) and the cue (0.18em, uppercase) |
 | Fraunces | `--font-title` | paper headings |
 | system mono | `--font-data` | law paths, stamps, every column of figures |
 
-Press Start 2P is still installed — `render/textFaces.ts` draws with it on the canvas — but no CSS
-rule reads it, so the sheet no longer declares a token for it.
+Silkscreen at 13px had an 8px cap on the arms and read as a smear over the wood; Press Start 2P
+at an integer multiple of its grid is the one place the sheet uses it (`render/textFaces.ts` also
+draws with it on the canvas).
 
 **Silkscreen has no lowercase**, so it may not carry a name or a place: a roster row and a
 `.place-name` are Manrope 600, and "Amara's house" is not "AMARA'S HOUSE".
@@ -71,7 +73,7 @@ overlay sixty times a second.
 
 | Mark | What it is | Where |
 |---|---|---|
-| `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws | bottom-right, `--mark-inset` |
+| `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws, each plank cut to its word | bottom-right, `--mark-inset` |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
 | `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
@@ -122,9 +124,10 @@ out of**. Several now, and the sheet's own lists read the sheet rather than the 
 |---|---|
 | `max-width: 640px` | the sheet takes 96% × 80%; the arms move to the top edge as a 2×2 block |
 | `max-width: 480px` | the head becomes a grid — title and close on one row, tabs scrolling along the next |
+| `641–1000px` | with the sheet open the arms take the top-left corner, 2×2: the sheet at the left edge leaves 146px beside it at 768 and the longest arm is 192px |
 | `641–1400px` | the sheet steps left far enough to clear the arms, statically, so nothing moves when it opens |
 | `max-height: 620px` | the sheet takes `100dvh - 64px` and 96% of the width; the post is hidden; the arms lie in a row above it |
-| `min-width: 1920px` | `--paper-w` to 1040px, the whole signpost to `scale: 1.5` |
+| `min-width: 1920px` | `--paper-w` to 1040px; the signpost's `--px` to 3 — three screen pixels per drawn one, and the label to 24px (`scale: 1.5` resampled the 2× layer and left the outline one row thick, then two) |
 | `hover: none` | no lift survives the tap; the mark tips open on focus; the close word drops `· Esc` |
 | `forced-colors: active` | every `box-shadow` edge comes back as `2px solid CanvasText` |
 | `@container` on `.paper-sheet` | roster reservations above 26rem, two roster columns above 46rem |
@@ -180,11 +183,13 @@ once.
   pseudo-element instead of growing.
 - `aria-live` for speech (one line per 800ms, newest kept) and for paper state.
 - Text over art is ≥ 12 CSS px and carries **its own ground**: a 4-way 1px `--deep` halo, or a
-  plate. Cream on the daylight tile is 1.40:1 and on the signpost's own plank 2.13:1, so the halo
-  is load-bearing rather than decorative — the signpost arm was the one mark without it and failed
-  AA on the product's primary navigation. Pixel-sampled at 1440 in daylight, **every glyph pixel of
-  the stamp, the cue and the arm has ink within 2px of it**; `ui/contrast.test.ts` asserts the four
-  shadow offsets, and a token-pair test cannot see this — it must be sampled.
+  plate. Cream on the daylight tile is 1.40:1, so the halo is load-bearing rather than decorative.
+  Pixel-sampled at 1440 in daylight, **every glyph pixel of the stamp and the cue has ink within
+  2px of it**; `ui/contrast.test.ts` asserts the four shadow offsets, and a token-pair test cannot
+  see this — it must be sampled. The signpost's arm is the exception: its ground IS the plank, so
+  the label is `--deep` ink painted on the wood with a 1px `--honey-l` cut edge under it, no halo.
+  Sampled off the render at 375–2560 and DPR 2: **7.66:1 idle, 10.19:1 hovered, 5.46:1 on the
+  pressed plank**, worst grain pixel under a glyph 5.46:1 (`~/handoff/cleanup/stage8/fix-signpost.md`).
   **It does NOT hold for canvas world text** — see the open defect in
   `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the ink it
   asks for, measured at 1.1:1 over its own slab.
@@ -193,8 +198,15 @@ once.
   `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news
   about the wire, and they are not the same sentence.
 - The signpost's arms are a **disclosure set**: `aria-expanded` + `aria-controls="paper-sheet"`,
-  never `aria-pressed`. The open arm stays swung out 3px on a second, darker plank — a brightness
-  filter took its label to 1.53:1 and flickered 1.2 → 0.94 → 1.2 when a pressed arm was pressed.
+  never `aria-pressed`. Hover lifts an arm 1px onto a warmer plank; the open arm sits 1px down on
+  a darker one — three drawn rasters, two channels each, no filter: a brightness filter took the
+  label to 1.53:1 and flickered 1.2 → 0.94 → 1.2 when a pressed arm was pressed. The focus ring
+  is honey inside deep (9.6:1 between its own two rings), because the ground under it is the town.
+- **The signpost is drawn at native pixel size** — `scripts/gen-signpost.py` writes an 88×18 plank
+  (three states) and an 8×16 post tile from the honey ramp of `MASTER_PALETTE`, and the sheet shows
+  every drawn pixel as `--px` screen pixels (2, or 3 above 1920px) through `border-image` slices
+  at the nailed end and the point, so a plank is as long as its word and the grain between repeats
+  rather than stretches. Planks sit 18 drawn pixels in a 22-pixel row: 4 of post between them.
 - The document opens with a visually-hidden `<h1>`, a skip link to `#signpost`, and a `<main>`
   round the stage. `Figures` leaves the tab order entirely while the paper is open.
 - The ring is a `role="menu"` labelled with the subject's name; the plate is `aria-hidden` because
