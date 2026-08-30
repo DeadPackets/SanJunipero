@@ -773,32 +773,33 @@ describe('default OpenRouter path extraBody', () => {
   it('builds models + provider pinning from pins.ts', () => {
     expect(defaultExtraBody()).toEqual({
       models: [MIND_MODEL, ...FALLBACK_MODELS],
-      provider: { order: PROVIDER_ORDER, allow_fallbacks: true },
+      provider: { order: PROVIDER_ORDER, allow_fallbacks: false },
     })
     expect(defaultExtraBody(['x/y'], ['P'])).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: true },
+      provider: { order: ['P'], allow_fallbacks: false },
     })
   })
 
   // Ruling 19 (2026-08-30): a live town pins the provider as an allow-list. 9 of 309 rehearsal-3
   // calls were served by OpenInference, each one a cold prefix and an unpriced route.
-  it('★ carries allow_fallbacks:false for a mind caller once the client is told to pin', () => {
+  it('★ carries allow_fallbacks:false for every mind caller, with nothing asked for', () => {
     const db = openDb()
     for (const caller of ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic']) {
-      const body = new LlmClient({ db, caller, allowProviderFallbacks: false }).requestBody()
+      const body = new LlmClient({ db, caller }).requestBody()
       expect(body.provider, caller).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
       // And no floating alias can answer instead of the pinned dated snapshot.
       expect(body.models, caller).toEqual([MIND_MODEL])
     }
   })
 
-  it('the allow-list is a switch now, and the default leaves the routing where it was', () => {
-    expect(defaultExtraBody(['x/y'], ['P'], false)).toEqual({
+  // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
+  // allow-list is a switch a caller has to throw.
+  it('opting back into provider fallbacks is possible, and says so in the body', () => {
+    expect(defaultExtraBody(['x/y'], ['P'], true)).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: false },
+      provider: { order: ['P'], allow_fallbacks: true },
     })
-    expect(defaultExtraBody(['x/y'], ['P']).provider.allow_fallbacks).toBe(true)
   })
 
   // The effort rungs are indistinguishable in practice; only `enabled:false` takes reasoning
@@ -813,6 +814,17 @@ describe('default OpenRouter path extraBody', () => {
       effort: 'low',
     })
     expect(defaultExtraBody()).not.toHaveProperty('reasoning')
+  })
+
+  // One call inside a pass can need the dial the other five do not — the night's personality
+  // edit is the only one E2 found anything lost on.
+  it('withReasoning moves the reasoning dial and leaves the routing alone', () => {
+    const db = openDb()
+    const off = new LlmClient({ db, caller: 'reflection' })
+    expect(off.requestBody().reasoning).toEqual({ enabled: false })
+    expect(off.withReasoning(null).requestBody()).not.toHaveProperty('reasoning')
+    expect(off.withReasoning({ effort: 'low' }).requestBody().reasoning).toEqual({ effort: 'low' })
+    expect(off.withReasoning(null).requestBody().provider).toEqual(off.requestBody().provider)
   })
 })
 
