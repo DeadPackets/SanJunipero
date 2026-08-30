@@ -105,6 +105,7 @@ export async function parseTurnWithRepair(
 // Where each part of the day begins, as the one clock everybody shares. Read back through
 // `dayPhaseFromTick` in the tests, so an anchor can never drift out of its own phase.
 const PHASE_START_MINUTE: Readonly<Record<DayPhase, number>> = {
+  dawn: 5 * 60,
   day: 7 * 60,
   dusk: 19 * 60,
   night: 21 * 60,

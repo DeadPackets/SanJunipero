@@ -15,6 +15,7 @@ export type MindConfig = {
   journalTicks: number
   dozeTicks: number
   wakeRetryTicks: number
+  napTicks: number
   dreamChance: number
   ambientK: number
 }
@@ -31,6 +32,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   journalTicks: 10,
   dozeTicks: 60,
   wakeRetryTicks: 25,
+  napTicks: 120,
   dreamChance: 0.35,
   ambientK: 8,
 }
@@ -105,6 +107,9 @@ export function decideWake(
     if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
       return 'morning'
     }
+    // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
+    const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
+    if (!packet.time.isNight && napped >= cfg.napTicks) return 'morning'
     return null
   }
 

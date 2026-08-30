@@ -167,7 +167,13 @@ describe('decideWake — asleep gate', () => {
     // quietMeadowPacket is 10:00 — daylight. First look: morning. Once the
     // runtime marks the day, no more morning wakes until the next day.
     expect(decideWake(cfg, asleep(), clk(), 600, pln())).toBe('morning')
-    expect(decideWake(cfg, asleep(), clk({ morningWokeDay: 0 }), 600, pln())).toBe(null)
+    expect(
+      decideWake(cfg, asleep(), clk({ morningWokeDay: 0, lastTurnTick: 590 }), 600, pln()),
+    ).toBe(null)
+    // A nap in daylight ends after napTicks; a whole day is never lost to one bad morning.
+    expect(
+      decideWake(cfg, asleep(), clk({ morningWokeDay: 0, lastTurnTick: 400 }), 600, pln()),
+    ).toBe('morning')
     expect(decideWake(cfg, asleep(), clk({ morningWokeDay: 0 }), 1440 + 600, pln())).toBe('morning')
   })
 

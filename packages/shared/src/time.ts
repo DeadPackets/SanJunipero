@@ -5,7 +5,7 @@ export const DAYS_PER_YEAR = 364
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]
 
-export type DayPhase = 'day' | 'dusk' | 'night'
+export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 
 export const DAWN_HOUR = 5
 
@@ -14,7 +14,8 @@ export const DAWN_HOUR = 5
 export function dayPhaseFromTick(tick: number): DayPhase {
   const hour = Math.floor((tick % MINUTES_PER_DAY) / 60)
   if (hour >= 21 || hour < DAWN_HOUR) return 'night'
-  if (hour === 5 || hour === 6 || hour === 19 || hour === 20) return 'dusk'
+  if (hour === 5 || hour === 6) return 'dawn'
+  if (hour === 19 || hour === 20) return 'dusk'
   return 'day'
 }
 

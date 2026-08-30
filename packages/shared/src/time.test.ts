@@ -9,10 +9,10 @@ import {
 
 describe('dayPhaseFromTick', () => {
   const at = (h: number, m = 0) => dayPhaseFromTick(h * 60 + m)
-  it('walks night into dusk into day and back', () => {
+  it('walks night into dawn into day into dusk and back', () => {
     expect(at(4, 59)).toBe('night')
-    expect(at(5, 0)).toBe('dusk')
-    expect(at(6, 59)).toBe('dusk')
+    expect(at(5, 0)).toBe('dawn')
+    expect(at(6, 59)).toBe('dawn')
     expect(at(7, 0)).toBe('day')
     expect(at(18, 59)).toBe('day')
     expect(at(19, 0)).toBe('dusk')
@@ -39,7 +39,7 @@ describe('nextDawnTick', () => {
     expect(nextDawnTick(22 * 60)).toBe(MINUTES_PER_DAY + DAWN)
     expect(nextDawnTick(9 * MINUTES_PER_DAY + 12 * 60)).toBe(10 * MINUTES_PER_DAY + DAWN)
     expect(dayPhaseFromTick(nextDawnTick(0) - 1)).toBe('night')
-    expect(dayPhaseFromTick(nextDawnTick(0))).toBe('dusk')
+    expect(dayPhaseFromTick(nextDawnTick(0))).toBe('dawn')
   })
 })
 

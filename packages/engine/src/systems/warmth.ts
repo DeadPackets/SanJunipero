@@ -16,7 +16,8 @@ export function isHeatSource(config: SimConfig, kind: string): boolean {
 export function ambientTempAt(state: WorldState, config: SimConfig): number {
   const band = config.warmth.ambient[simTimeFromTick(state.tick).season]
   const sky = config.warmth.weatherDelta as Record<string, number | undefined>
-  return band[dayPhaseFromTick(state.tick)] + (sky[state.weather.kind] ?? 0)
+  const phase = dayPhaseFromTick(state.tick)
+  return band[phase === 'dawn' ? 'dusk' : phase] + (sky[state.weather.kind] ?? 0)
 }
 
 // What a body is wearing, in degrees of band. Nothing on the slot is bare skin.

@@ -132,7 +132,7 @@ export function lightLevelAt(
   const phase = dayPhaseFromTick(tick)
   if (phase === 'day') return 1
   if (flamesAt(state, tick, config).some((f) => distanceToFlame(f, x, y) <= f.radius)) return 1
-  return phase === 'dusk' ? config.nightWitness.duskFactor : config.nightWitness.nightFactor
+  return phase === 'night' ? config.nightWitness.nightFactor : config.nightWitness.duskFactor
 }
 
 // The viewer is in the signature and unused on purpose: a torch does not let you see into the
@@ -162,7 +162,7 @@ export function lightBandAt(
   if (phase === 'day') return 'bright'
   if (flamesAt(state, tick, config).some((f) => distanceToFlame(f, x, y) <= f.radius))
     return 'bright'
-  return phase === 'dusk' ? 'dim' : 'dark'
+  return phase === 'night' ? 'dark' : 'dim'
 }
 
 // The band's own word, not a second threshold: dusk is not dark, and fumblesInTheDark has always
