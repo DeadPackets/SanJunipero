@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
-import { createWorldStore } from './state/worldStore.js'
+import { createWorldStore, onFirstSnapshot } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
 import { parseRoute, routeToPath, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
@@ -73,32 +73,50 @@ export function App() {
 
     // deep link: once the first snapshot lands, scrub to the linked moment
     const initial = parseRoute(location.pathname, location.search)
-    if (initial.moment) {
-      const off = store.subscribe(() => {
-        if (store.getState() === null) return
-        sock.scrub(momentToTick(initial.moment!.day, initial.moment!.time))
-        off()
-      })
-    }
+    const offMoment =
+      initial.moment === null
+        ? null
+        : onFirstSnapshot(store, () => {
+            sock.scrub(momentToTick(initial.moment!.day, initial.moment!.time))
+          })
 
-    // The canvas picks a figure by writing `?agent=` and firing popstate (render/StageMount).
+    // A pasted `/agent/:id` lands on the person it names: the paper opens on their story and
+    // the camera pins to them. A person merely ringed beside a moment is not that link, and an
+    // id the town does not have is simply the town — the ring's own effect answers for both.
+    const linked = initial.momentId === null && initial.moment === null ? initial.agentId : null
+    const offLink =
+      linked === null
+        ? null
+        : onFirstSnapshot(store, () => {
+            if (store.getState()?.agents[linked] === undefined) return
+            setSheet({ page: 'person', tab: 'Story' })
+            setFollowing(linked)
+          })
+
+    // The canvas picks a figure by writing the person into the address and firing popstate
+    // (render/StageMount).
     const onPop = (): void => {
       setRoute(parseRoute(location.pathname, location.search))
     }
     window.addEventListener('popstate', onPop)
     return () => {
       sock.close()
+      offMoment?.()
+      offLink?.()
       window.removeEventListener('popstate', onPop)
     }
   }, [store])
 
-  // A figure clicked on the canvas becomes the ring's subject.
+  // The one owner of the ring: a figure clicked on the canvas, or a person a pasted link names.
+  // It waits for the world to be able to say who they are, so a stranger's id rings nobody.
   const agentId = route.agentId
   useEffect(() => {
     if (agentId === null) return
-    const name = store.getState()?.agents[agentId]?.name ?? agentId
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the address bar is the canvas's only way to name a pick; this mirrors it into the ring.
-    setSubject({ id: agentId, kind: 'agent', name })
+    return onFirstSnapshot(store, () => {
+      const name = store.getState()?.agents[agentId]?.name
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the address bar is the canvas's only way to name a pick; this mirrors it into the ring.
+      if (name !== undefined) setSubject({ id: agentId, kind: 'agent', name })
+    })
   }, [agentId, store])
 
   // Every viewed moment is shareable: the socket and the address bar move together, so a link

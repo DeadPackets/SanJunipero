@@ -243,6 +243,43 @@ describe('★ a page that throws costs the viewer the page, not the town', () =>
   it('wraps the page body, keyed by the page so a tab switch keeps its feeds', () => {
     expect(src('./Paper.tsx')).toContain('<PageBoundary key={key}>')
   })
+
+  it('says whatever the surface it guards asks it to say', () => {
+    const boundary = new PageBoundary({
+      children: body,
+      fallback: createElement('p', null, 'gone'),
+    })
+    boundary.state = PageBoundary.getDerivedStateFromError()
+    expect(renderToStaticMarkup(boundary.render())).toBe('<p>gone</p>')
+  })
+
+  // The canvas is inside the tree, so nothing can keep it up through an uncaught render. What
+  // the root net owes the viewer is one line of the town's own voice and the way back.
+  it('★ nets the whole tree at the root, in the town’s own words', () => {
+    const main = src('../main.tsx')
+    expect(main).toMatch(/<PageBoundary[\s\S]*<App \/>[\s\S]*<\/PageBoundary>/)
+    expect(main).toContain('className="town-lost"')
+    expect(main).toMatch(/Reload the page/)
+  })
+})
+
+// ── the pasted link ────────────────────────────────────────────────────────────────────────
+
+// Ruling 18. `route.test.ts` owns the parse and `worldStore.test.ts` owns the latch the landing
+// waits on; what is left is one wiring seam inside an effect, pinned where it is written.
+describe('★ a pasted /agent/:id link lands on the person it names', () => {
+  const app = src('../App.tsx')
+
+  it('opens their story and pins the camera, once the world can be asked', () => {
+    expect(app).toContain("setSheet({ page: 'person', tab: 'Story' })")
+    expect(app).toContain('setFollowing(linked)')
+    expect(app).toContain('onFirstSnapshot(store, () => {')
+  })
+
+  it('holds the ring to one owner, so no id rings a person the town does not have', () => {
+    expect(app.match(/setSubject\(\{ id: agentId/g)).toHaveLength(1)
+    expect(app).toContain('if (name !== undefined) setSubject(')
+  })
 })
 
 // ── who came from whom ─────────────────────────────────────────────────────────────────────

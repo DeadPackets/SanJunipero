@@ -62,6 +62,35 @@ describe('route', () => {
     )
   })
 
+  // The share card's own address (ruling 18). A human following it must land on the person,
+  // which starts with the router reading them out of the path.
+  it('parses /agent/:id — the person a share card is pasted from', () => {
+    expect(parseRoute('/agent/amara', '')).toEqual({
+      moment: null,
+      momentId: null,
+      agentId: 'amara',
+      broadcast: false,
+    })
+    expect(parseRoute('/agent/a%20b', '').agentId).toBe('a b')
+  })
+
+  it('takes an address that is not a person as the town, and says nothing about it', () => {
+    for (const path of ['/agent', '/agent/', '/agent/a/b', '/agents/amara'])
+      expect(parseRoute(path, '').agentId, path).toBeNull()
+    // An id the town does not have still parses: the App answers for it, the router does not.
+    expect(parseRoute('/agent/__proto__', '').agentId).toBe('__proto__')
+  })
+
+  it('writes a picked person as the path, and only where no minute outranks them', () => {
+    const r = parseRoute('/agent/amara', '')
+    expect(routeToPath(r)).toBe('/agent/amara')
+    expect(routeToPath({ ...r, agentId: 'a b' })).toBe('/agent/a%20b')
+    expect(routeToPath({ ...r, moment: { day: 3, time: '06:00' } })).toBe(
+      '/moment/3/06:00?agent=amara',
+    )
+    expect(routeToPath({ ...r, momentId: 12 })).toBe('/moment/12?agent=amara')
+  })
+
   it('a broadcast address carries no picked person', () => {
     const r = parseRoute('/', '?broadcast=1&agent=amara')
     expect(r.broadcast).toBe(true)
@@ -74,6 +103,7 @@ describe('route', () => {
       { moment: { day: 41, time: '14:30' }, momentId: null, agentId: 'farmer', broadcast: false },
       { moment: { day: 0, time: '00:05' }, momentId: null, agentId: null, broadcast: false },
       { moment: null, momentId: null, agentId: 'fisher', broadcast: false },
+      { moment: { day: 41, time: '14:30' }, momentId: null, agentId: 'a b', broadcast: false },
       { moment: null, momentId: null, agentId: null, broadcast: true },
       { moment: null, momentId: 12, agentId: null, broadcast: false },
       { moment: null, momentId: 3, agentId: null, broadcast: true },

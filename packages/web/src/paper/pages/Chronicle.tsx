@@ -1,10 +1,12 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { tickToMoment, type ChronicleEntry } from '@sj/shared'
+import { MILESTONE_ICON, tickToMoment, type ChronicleEntry } from '@sj/shared'
+import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
-import { chronicleFeed, dispatchesFeed } from '../../ui/feeds.js'
-import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
+import { firstsByTier } from '../../ui/firsts.js'
+import { useFeed, usePolled, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
@@ -47,7 +49,38 @@ function Glyph({ icon }: { icon: string }) {
   )
 }
 
+/** The way back to one minute of the town's history, wherever the record offers one. */
+function FeedJump({
+  tick,
+  label,
+  icon,
+  current,
+  onJump,
+}: {
+  tick: number
+  label: string
+  icon: string
+  current: boolean
+  onJump: (tick: number) => void
+}) {
+  return (
+    <button
+      className="feed-jump"
+      aria-current={current ? 'true' : undefined}
+      aria-label={`${label} ${momentStamp(tick)}. Go to this moment.`}
+      onClick={() => {
+        onJump(tick)
+      }}
+    >
+      <Glyph icon={icon} />
+      <span className="stamp">{momentStamp(tick)}</span>
+      <span className="feed-text">{label}</span>
+    </button>
+  )
+}
+
 export function ChroniclePage(props: PageProps) {
+  if (props.tab === 'Firsts') return <Firsts {...props} />
   if (props.tab === 'Chapters') return <Chapters />
   if (props.tab === 'Moments') return <Moments {...props} />
   if (props.tab === 'Days') return <Days {...props} />
@@ -136,18 +169,13 @@ function Today({ store, gapTicks, onJump }: PageProps) {
           <ol className="feed important">
             {[...entries].reverse().map((e) => (
               <li key={`${e.type}:${e.seq}`} className="feed-line">
-                <button
-                  className="feed-jump"
-                  aria-current={viewTick === e.tick ? 'true' : undefined}
-                  aria-label={`${e.label} ${momentStamp(e.tick)}. Go to this moment.`}
-                  onClick={() => {
-                    onJump(e.tick)
-                  }}
-                >
-                  <Glyph icon={e.icon} />
-                  <span className="stamp">{momentStamp(e.tick)}</span>
-                  <span className="feed-text">{e.label}</span>
-                </button>
+                <FeedJump
+                  tick={e.tick}
+                  label={e.label}
+                  icon={e.icon}
+                  current={viewTick === e.tick}
+                  onJump={onJump}
+                />
               </li>
             ))}
           </ol>
@@ -175,6 +203,82 @@ function Today({ store, gapTicks, onJump }: PageProps) {
       </section>
     </>
   )
+}
+
+/** One first, and — where the town named the thing itself — the words it was named in. */
+function FirstLine({
+  first,
+  current,
+  onJump,
+}: {
+  first: MilestoneRead
+  current: boolean
+  onJump: (tick: number) => void
+}) {
+  const quote = first.nameProvenance?.quote ?? null
+  return (
+    <li className="feed-line">
+      <FeedJump
+        tick={first.tick}
+        label={first.label}
+        icon={MILESTONE_ICON}
+        current={current}
+        onJump={onJump}
+      />
+      {quote !== null && <p className="discovery-quote">“{quote}”</p>}
+    </li>
+  )
+}
+
+/** The firsts ledger as the chronicle reads it. Rendered from a read rather than from the feed
+ *  so the three states — waiting, empty, written — can be asked of it outside a browser. */
+export function FirstsView({
+  read,
+  viewTick,
+  onJump,
+}: {
+  read: Read<MilestoneRead[]>
+  viewTick: number | null
+  onJump: (tick: number) => void
+}) {
+  const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
+
+  if (groups.length === 0)
+    return read.loaded ? (
+      <p className="feed-empty">{EMPTY_COPY.firsts}</p>
+    ) : (
+      <div aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton-row" />
+        ))}
+      </div>
+    )
+
+  return (
+    <>
+      {groups.map((g) => (
+        <section key={g.tier} className="block">
+          <h3 className="feed-head">{g.head}</h3>
+          <ol className="feed important">
+            {g.rows.map((first) => (
+              <FirstLine
+                key={first.kind}
+                first={first}
+                current={viewTick === first.tick}
+                onJump={onJump}
+              />
+            ))}
+          </ol>
+        </section>
+      ))}
+    </>
+  )
+}
+
+function Firsts({ store, onJump }: PageProps) {
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
+  const read = useFeed(milestonesFeed)
+  return <FirstsView read={read} viewTick={mode.live ? null : mode.tick} onJump={onJump} />
 }
 
 function Chapters() {

@@ -1,7 +1,7 @@
 /** THE ONE TABLE. Every page the paper can carry, its title and its tabs, named once. */
 export const PAGE_TABS = {
   folk: ['People', 'Bonds', 'Families', 'Customs'],
-  chronicle: ['Today', 'Chapters', 'Moments', 'Days'],
+  chronicle: ['Today', 'Firsts', 'Chapters', 'Moments', 'Days'],
   found: ['Things', 'Places'],
   laws: ['World', 'Admin'],
   person: ['Story', 'Bonds', 'Ledger'],
