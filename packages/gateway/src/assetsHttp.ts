@@ -144,18 +144,26 @@ export type AssetRouteDeps = {
   knowsAgent?: (id: string) => boolean
 }
 
-export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
-  // One zod parse per row for the process, not per image GET. The cursor tops itself up from the
-  // codex's own seq at read time, so a sheet registered a millisecond ago is already here.
-  let readySeq = 0
-  const readyByKind = new Map<string, string>()
-  const newestReady = (codex: AssetCodex, kind: string): string | undefined => {
-    for (const r of codex.listSince(readySeq)) {
-      readySeq = r.seq
-      if (r.status === 'ready' && r.kind !== null) readyByKind.set(r.kind, r.id)
+/**
+ * The newest READY asset registered under each kind. One zod parse per row for the process, not
+ * one per image GET: the cursor tops itself up from the codex's own seq at read time, so a sheet
+ * registered a millisecond ago is already here. Shared, so the stage and a share card cannot
+ * disagree about which sheet is a person's.
+ */
+export function makeNewestReady(): (codex: AssetCodex, kind: string) => string | undefined {
+  let seq = 0
+  const byKind = new Map<string, string>()
+  return (codex, kind) => {
+    for (const r of codex.listSince(seq)) {
+      seq = r.seq
+      if (r.status === 'ready' && r.kind !== null) byKind.set(r.kind, r.id)
     }
-    return readyByKind.get(kind)
+    return byKind.get(kind)
   }
+}
+
+export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
+  const newestReady = makeNewestReady()
 
   // The PROMISE is held, not the buffer: N concurrent misses on one key would otherwise run N
   // sharp encodes on libuv's four threads. Oldest-first past the cap — `fold.ts` leaves the dead

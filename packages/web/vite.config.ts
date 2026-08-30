@@ -14,6 +14,8 @@ export default defineConfig({
     proxy: {
       '/ws': { target: 'http://localhost:8787', ws: true },
       '/api': { target: 'http://localhost:8787' },
+      // The gateway forwards this to the loopback operator channel; dev must take the same road.
+      '/admin': { target: 'http://localhost:8787' },
       '/assets': { target: 'http://localhost:8787' },
     },
   },

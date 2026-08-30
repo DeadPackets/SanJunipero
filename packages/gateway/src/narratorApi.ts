@@ -16,7 +16,13 @@ import {
 } from '@sj/shared'
 // Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
 // The contract is declared once, in @sj/shared.
-import type { ChapterRow, MilestoneRow, SceneRow } from '@sj/shared/narratorSchema'
+import {
+  MILESTONE_SELECT,
+  milestoneFromRow,
+  type ChapterRow,
+  type MilestoneRow,
+  type SceneRow,
+} from '@sj/shared/narratorSchema'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './server.js'
@@ -211,13 +217,11 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   })
 
   router.route('GET', '/api/milestones', (_req, res) => {
-    sendJson(
-      res,
-      readOrEmpty<MilestoneRow>(
-        deps.narratorDb,
-        'SELECT kind, label, day, tick FROM milestones ORDER BY id',
-      ),
+    const rows = readOrEmpty<MilestoneRow>(
+      deps.narratorDb,
+      `SELECT ${MILESTONE_SELECT} FROM milestones ORDER BY id`,
     )
+    sendJson(res, rows.map(milestoneFromRow))
   })
 
   // A recorded day, named by its chapter when C7 has written one and by its number when it

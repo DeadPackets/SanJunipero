@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { momentStamp } from '../stamp.js'
 
-/** The admin channel is a separate localhost server, not the viewer's origin. */
-export const ADMIN_ENDPOINT = 'http://127.0.0.1:8788'
+/** The admin channel is a loopback server the browser cannot call directly; the gateway carries
+ *  `/admin/*` across from the page's own origin, so every call here is same-origin and bare. */
+export const ADMIN_ENDPOINT = ''
 /** How often the operator's page re-reads the clock and the ledger. Slow on purpose: these are
  *  numbers to watch, not to animate. */
 const READ_EVERY_MS = 5000
