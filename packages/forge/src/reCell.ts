@@ -58,10 +58,8 @@ function blockSample(
   return [mid(rs), mid(gs), mid(bs), 255]
 }
 
-// `keyed` is already chroma-keyed (the callers sweep the tolerance themselves, because a
-// generation that drifted off #FF00FF needs 110 where a clean one needs 72).
 // The factor is WHOLE and the source is never resampled: a subject too big for one factor takes
-// the next one up and sits smaller in its window rather than being scaled or clipped.
+// the next one up and sits smaller in its window. `keyed` arrives chroma-keyed, tolerance 72–110.
 export function spriteCell(
   keyed: RawImage,
   opts: { w: number; h: number; anchor: 'feet' | 'centre' },

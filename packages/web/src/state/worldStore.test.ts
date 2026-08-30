@@ -134,8 +134,8 @@ describe('worldStore', () => {
     expect(store.recentEvents()[0]!.seq).toBe(3)
   })
 
-  // M1: the ring was ~95% needs_changed, so the Chronicle badge counted 400 while the panel
-  // it labels could render none of them. The ring now holds only what the chronicle narrates.
+  // A ring of ~95% needs_changed made the Chronicle badge count 400 events the panel it labels
+  // could render none of.
   it('keeps only narratable events in the ring, while every event still folds and fans out', () => {
     const store = createWorldStore()
     store.applyServer(makeSnapshot())

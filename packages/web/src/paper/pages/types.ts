@@ -25,7 +25,6 @@ export type PageProps = {
   onInside: (structureId: string | null) => void
   /** Go to one minute of the town's history: the socket scrubs and the address bar follows. */
   onJump: (tick: number) => void
-  /** Back to the live edge. */
   onLive: () => void
   /** The recorded day the filmstrip has open, so the address bar names it. */
   onMoment: (id: number | null) => void

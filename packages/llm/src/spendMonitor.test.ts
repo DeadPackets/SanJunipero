@@ -25,7 +25,6 @@ function openDb(): Database.Database {
   return db
 }
 
-// One llm_calls row at a chosen wall-clock instant. Only ts and cost matter here.
 function seedCall(db: Database.Database, agoMinutes: number, costUsd: number, now = NOW): void {
   db.prepare(
     `INSERT INTO llm_calls
@@ -108,8 +107,6 @@ describe('projectDailySpend (T24)', () => {
   })
 })
 
-// The repair path and the client retry absorb an empty answer in silence, so the ops surface
-// has to be able to say one happened.
 describe('dead calls — paid for, and nothing came back', () => {
   const fail = (
     db: Database.Database,
@@ -216,8 +213,7 @@ describe('checkSpend (T24)', () => {
     expect(alerts(db)[0]!.detail).toContain('10')
     expect(warn).toHaveBeenCalledTimes(1)
 
-    // A second check over the same threshold alerts again — the operator wants a heartbeat,
-    // not a one-shot that goes quiet while the burn continues.
+    // A second check over the same threshold alerts again: an operator wants a heartbeat.
     checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
     expect(alerts(db)).toHaveLength(2)
   })
@@ -244,8 +240,6 @@ describe('checkSpend (T24)', () => {
     expect(alerts(db)).toEqual([])
   })
 
-  // Ruling 22 (2026-08-30): 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast.
-  // At the old $10 it was ~300x the rate and could not print before the rate tripwire killed the town.
   it('the default threshold is 10x the expected five-mind rate', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -335,10 +329,8 @@ describe('providerCounts: which back end answered, and how much of it was worth 
   })
 })
 
-// The whole-run version of the per-call reconciliation: a bill against the ledger.
 describe('price reconciliation over a run', () => {
-  // Written the way the client writes it: `cost_usd` books the bill whenever the provider named
-  // one, and the pinned table's estimate keeps its own column.
+  // Written the way the client writes it: `cost_usd` books the bill when the provider named one.
   const insert = (db: Database.Database, computed: number, reported: number | null): void => {
     db.prepare(
       `INSERT INTO llm_calls (ts, agent_id, caller, model, input_tokens, output_tokens,
@@ -370,9 +362,6 @@ describe('price reconciliation over a run', () => {
     expect(row.detail).toContain('2.07x out')
   })
 
-  // ★ The whole check was structurally vacuous: `client.ts` books the reported cost INTO
-  // `cost_usd`, so reconciling against that column compared a column with itself and read
-  // exactly 1.0000 on 304 of 304 rows of rehearsal 3.
   it('★ compares the pinned table against the bill, never the bill against itself', () => {
     const db = openDb()
     insert(db, 0.43, 0.89)

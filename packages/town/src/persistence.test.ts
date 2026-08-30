@@ -9,7 +9,6 @@ import { thoughtsSince } from '@sj/gateway'
 import { readWorldMeta } from './worldMeta.js'
 import { until } from '@sj/gateway/testutil'
 
-/** Boot, run to at least `toTick`, close cleanly. Returns what the town looked like at the end. */
 const runTo = async (
   dbPath: string,
   toTick: number,
@@ -45,9 +44,8 @@ const countEvents = (dbPath: string, type: string): number => {
   }
 }
 
-/** Removing the world-db delete ALONE is strictly worse than the wipe: the loop was built from
- *  `genesisState` unconditionally, so boot 2 would append a SECOND town's events at tick 1 into a
- *  db already holding 10 000 ticks. These tests pin both halves together. */
+/** Removing the world-db delete ALONE is strictly worse than the wipe: the loop is built from
+ *  `genesisState` unconditionally, so boot 2 appends a SECOND town's events into the same db. */
 describe('★ the town survives a restart', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-persist-'))
   afterAll(() => {
@@ -130,8 +128,7 @@ describe('★ the town survives a restart', () => {
 })
 
 /** `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map while the
- *  gateway is handed one recomputed from the environment: one map scrubbed, another simulated,
- *  with no error anywhere. */
+ *  gateway is handed one recomputed from the environment — with no error anywhere. */
 describe('★ a resumed world refuses a boot that is not the same world', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-identity-'))
   afterAll(() => {

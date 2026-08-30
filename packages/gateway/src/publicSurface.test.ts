@@ -70,8 +70,7 @@ function makeWorld(dbPath: string) {
   return { db, loop }
 }
 
-/** The close code, or 'open' if the socket is still up after `ms` — so "was not closed" is an
- *  assertion rather than a timeout. */
+/** Resolves 'open' rather than hanging, so "was not closed" is an assertion and not a timeout. */
 const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> =>
   new Promise((resolve) => {
     const t = setTimeout(() => {
@@ -143,12 +142,11 @@ describe('the public surface a stranger reaches', () => {
       expect(r.status, path).toBe(404)
       await r.text()
     }
-    // The town is still serving, which is the whole point.
     expect((await fetch(`${base}/api/agent/walker/journal`)).status).toBe(200)
   })
 
-  // Ruling 10 put `/admin/*` on the served origin. A town whose operator opened no channel must
-  // not answer it at all — a 401 would tell a stranger there is a door.
+  // A town whose operator opened no channel must not answer `/admin/*` at all: a 401 would tell
+  // a stranger there is a door.
   it('has no operator channel to reach when no token opened one', async () => {
     const gw = await gwPromise
     const base = `http://127.0.0.1:${gw.port}`
@@ -207,8 +205,6 @@ describe('the public surface a stranger reaches', () => {
     }
   })
 
-  /** The cap used to be read off the hub, which a socket joins only after a valid `hello` — so
-   *  a stranger who opens sockets and says nothing was never counted and never timed out. */
   it('★ counts sockets, not greetings, toward the viewer cap', async () => {
     const gw = await gwPromise
     const silent = await Promise.all([connect(gw.port), connect(gw.port), connect(gw.port)])
@@ -346,7 +342,6 @@ describe('★ the scrub bar spends from one budget, not one per viewer', () => {
 
   it('answers an over-budget ask at the live moment rather than folding for it', async () => {
     const spent = await ask(0)
-    // The SAME frame shape, so nothing about the viewer changes but the moment it is shown.
     expect(spent.t).toBe('scrubbed')
     expect(spent.reqId, 'the answer must be to the ask that was made').toBe(7)
     expect(spent.tick, 'an over-budget ask was folded anyway').toBe(12)

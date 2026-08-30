@@ -1,8 +1,3 @@
-/**
- * What actually PASSED between people, from `/api/society`: the read fold counts every word
- * within earshot, every gift, every lesson and every blow. The Bonds lens' other view draws
- * how close two people are; this one draws what they did to each other, and how often.
- */
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
 import type { LegendRow } from './relationGraph.js'
 
@@ -62,18 +57,14 @@ export type TrafficLink = {
   dash: readonly number[] | null
   strokeCount: 1 | 2
   color: string
-  /** the tooltip and the spoken label */
   words: string
 }
 
 const isKind = (k: string): k is TrafficKind => (TRAFFIC_KINDS as readonly string[]).includes(k)
 const times = (n: number): string => (n === 1 ? 'once' : `${n} times`)
 
-/**
- * Every living person is a node, so somebody nobody has spoken to is visible as the island they
- * are. A link nobody has a word for — a kind this viewer does not know — is dropped rather than
- * drawn in a colour that means nothing.
- */
+/** Every person is a node, so somebody nobody has spoken to is visible as the island they are.
+ *  A link of a kind with no word is dropped, never drawn in a colour that means nothing. */
 export function trafficGraph(
   api: SocietyResponse,
   people: PeopleIndex,
@@ -114,7 +105,6 @@ export function trafficGraph(
   return { nodes, links }
 }
 
-/** One axis, four rows: each carries the mark it means, so the key is a key and not a paragraph. */
 export function trafficLegend(): LegendRow[] {
   return TRAFFIC_KINDS.map((kind) => ({
     axis: 'kind',
@@ -126,12 +116,6 @@ export function trafficLegend(): LegendRow[] {
   }))
 }
 
-// ── what people have FORMED, drawn as a ring round the people in it ───────────────────────
-//
-// The narrator names groups, roles and rules and says who is in each (`/api/dispatches`
-// institutions). On the picture that is a halo: you can see a thing exists before you can
-// read what it is called.
-
 /** The ring a person who is no longer living wears. Named here so the institution rings can be
  *  proved not to borrow it. */
 export const GONE_RING = '#F4E289'
@@ -140,8 +124,7 @@ export const INSTITUTION_KINDS = ['group', 'role', 'rule'] as const
 export type InstitutionKind = (typeof INSTITUTION_KINDS)[number]
 
 /** Colour AND line both, so two kinds of belonging are told apart with the colour taken away.
- *  All three are MASTER_PALETTE tokens, and none is a colour already drawn ON a node — the
- *  two fills or the ring a person who is no longer living wears. */
+ *  None is a colour already drawn ON a node. */
 export const INSTITUTION_RING: Readonly<
   Record<InstitutionKind, { color: string; dash: readonly number[] | null; words: string }>
 > = {
@@ -156,9 +139,8 @@ export type Institution = {
   memberIds: readonly string[]
 }
 
-/** What one person wears: one ring per KIND of thing they belong to, outermost last, and the
- *  names behind them for the label. Never one ring per membership — a person in four groups
- *  would be a bullseye nobody can read. */
+/** One ring per KIND of thing a person belongs to, outermost last. Never one per membership:
+ *  a person in four groups would be a bullseye nobody can read. */
 export type Halo = { kinds: InstitutionKind[]; names: string[] }
 
 const isInstitutionKind = (k: string): k is InstitutionKind =>

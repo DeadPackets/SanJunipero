@@ -50,7 +50,6 @@ function spyOnEventReads(db: Database.Database): EventRead[] {
 
 const rowsRead = (reads: EventRead[]): number => reads.reduce((a, r) => a + r.rows, 0)
 
-/** How many rows past `seq` the fold's own SELECT can see — its whole cost. */
 const foldRows = (db: Database.Database, seq: number): number =>
   (
     db

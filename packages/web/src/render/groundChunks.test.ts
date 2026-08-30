@@ -480,7 +480,7 @@ type Bake = {
   bounds: Bounds
 }
 
-/** D17 meters a moving view to `BAKES_PER_FRAME`; this is the view held for enough frames. */
+/** A moving view is metered to `BAKES_PER_FRAME`; this holds it for enough frames. */
 function settle(baker: GroundBaker, view: ViewRect): void {
   for (let i = 0; i < 64; i++) baker.setView(view)
 }

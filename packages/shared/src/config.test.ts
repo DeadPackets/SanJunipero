@@ -222,7 +222,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.thirst.waterskinCharges).toBe(4)
   })
 
-  // Deviation 1: mortality reads health.maxHp. Deviation 3: the per-tick contagion is retired.
+  // Mortality reads health.maxHp, and the per-tick contagion is retired.
   it('mortality has no maxHp of its own, and health lost its contagion dials', () => {
     expect(DEFAULT_CONFIG.mortality).not.toHaveProperty('maxHp')
     expect(DEFAULT_CONFIG.health).not.toHaveProperty('contagionRadius')
@@ -230,7 +230,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(DEFAULT_CONFIG.health.maxHp).toBe(100)
   })
 
-  // Deviation 2: the spec writes thirst decay as a derivation, so it is exported once.
+  // The spec writes thirst decay as a derivation, so it is exported once.
   it('thirstDecayPerTick is the one derivation of the slower clock', () => {
     expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.021, 10)
     const fast = SimConfigSchema.parse({

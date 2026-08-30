@@ -73,17 +73,16 @@ export type SemanticCandidateRow = {
   reason: string
 }
 
-// The verdict shape, `.strict()`. A hit cites either a logged event or a remembered record —
-// never neither, because a claim with no provenance cannot be checked. `.refine()` cannot be
-// written as JSON Schema, so every field says its own part in a `describe()` the model does see.
+// The verdict shape, `.strict()`: a hit cites a logged event or a remembered record, never
+// neither. `.refine()` is not expressible as JSON Schema, so each field says its part in `describe()`.
 const SemanticHitSchema = z
   .object({
     conceptKind: z.string().min(1).describe('The id from the list, exactly as written there.'),
     agentId: z.string().min(1).describe("The name in the record's header."),
     day: z.number().int().nonnegative().describe("The day in the record's header."),
     sourceKind: z.enum(['speech', 'thought', 'journal']),
-    // Optional, these were simply omitted: `required` is the only part of the shape the
-    // provider enforces, so both are asked for and one of them comes back null.
+    // `required` is the only part of the shape the provider enforces, so both are asked for
+    // and one of them comes back null.
     eventSeq: z
       .number()
       .int()
@@ -192,15 +191,12 @@ export type SemanticPassDeps = {
   config?: Partial<SemanticConfig>
 }
 
-/** What a caller supplies; `store` and `day` come from the night being closed. */
 export type SemanticDeps = Omit<SemanticPassDeps, 'store' | 'day'>
 
 // Nine open questions in one ask and the model answers `{"hits": []}`; three at a time and it
 // does the work. Measured on one live day, not guessed.
 const CONCEPTS_PER_ASK = 3
 
-// One ask, and one correction if the answer comes back the wrong shape. A batch nobody can
-// read is an alert and no hits, not a lost night.
 async function readBatch(
   llm: LlmClient,
   db: Database.Database,
@@ -226,8 +222,7 @@ async function readBatch(
   }
 }
 
-// One pass per night, after the chapters, a few concepts to an ask. Cost decays toward nothing
-// on its own: a concept already found is never scanned for again.
+// Cost decays on its own: a concept already found is never scanned for again.
 export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Milestone[]> {
   const cfg: SemanticConfig = { ...DEFAULT_SEMANTIC_CONFIG, ...deps.config }
   if (!cfg.enabled) return []

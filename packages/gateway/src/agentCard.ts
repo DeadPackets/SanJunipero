@@ -4,27 +4,19 @@ import type { AssetCodex } from '@sj/forge'
 import { makeNewestReady } from './assetsHttp.js'
 import { attr } from './http.js'
 
-/** The box every share card is drawn in — `@sj/narrator`'s `renderShareCard` uses the same one,
- *  and `og:image:width/height` claims it for both. */
+/** `@sj/narrator`'s `renderShareCard` draws the same box, and `og:image:width/height` claims it. */
 export const CARD_WIDTH = 1080
 export const CARD_HEIGHT = 565
 
-/** The cell of the character atlas a person is shown by: facing the camera, standing still. */
 const SPRITE_CELL = 'idle-se'
 const PAD = 72
 const GAP = 60
-/** The square the cell is drawn into, `<image>`'s own aspect fit deciding the rest. */
 const SPRITE_BOX = 288
 
-/** What the card says about one person. `line` is the town's own record, or null where the town
- *  has written none — nothing here composes prose about anybody. */
 export type AgentRead = { id: string; name: string; line: string | null }
 
-/**
- * The newest READY atlas the forge drew for a person, cropped to one cell. A sheet with no v4
- * manifest — the built placeholder the stage falls back to — is deliberately not offered: a card
- * is a face or it is type, and neither is better than a test pattern in a chat thread.
- */
+/** A sheet with no v4 manifest — the built placeholder — is deliberately not offered: a card is
+ *  a face or it is type, never a test pattern. */
 export function makeSpriteReader(
   getCodex: () => AssetCodex | null,
 ): (agentId: string) => Promise<string | null> {
@@ -54,7 +46,6 @@ export function makeSpriteReader(
   }
 }
 
-/** The person's own card, in the same cream and ember the day's card is drawn in. */
 export function renderAgentCard(read: AgentRead, sprite: string | null, town: string): string {
   const textX = sprite === null ? PAD : PAD + SPRITE_BOX + GAP
   const text = (y: number, size: number, fill: string, s: string): string =>

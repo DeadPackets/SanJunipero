@@ -65,7 +65,6 @@ const LIVE_SPEND_DAILY_USD = 3
 /** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
  *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
 const LIVE_SPEND_STOP_USD = 50
-/** The daily budget's window. */
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's 2.5 s tick this is every
  *  25 s of wall clock — far tighter than one turn, so nothing can outrun it. */
@@ -154,16 +153,12 @@ export type LiveCastOpts = {
   /** Only a test passes this: the real one needs the bridge and the tick, which do not exist
    *  until `attach`. */
   arbiter?: SeamArbiter
-  /**
-   * On by default: the arbiter fires only once the world has already refused an intent with
-   * `unknown verb:`, so it is a per-NOVELTY call and not a per-turn one. `SJ_ARBITER=0` is off.
-   */
+  /** The arbiter fires only once the world has already refused an intent with `unknown verb:`,
+   *  so it is a per-NOVELTY call and not a per-turn one. On by default; `SJ_ARBITER=0` is off. */
   useArbiter?: boolean
   log?: (line: string) => void
 }
 
-/** A new town whose minds remember an older one is refused rather than served: it is strictly
- *  worse than either a clean reset or a clean resume. */
 export function amnesiaRefusal(remembering: readonly { id: string; memories: number }[]): string {
   const who = remembering.map((r) => `${r.id} (${r.memories})`).join(', ')
   return [
@@ -174,8 +169,6 @@ export function amnesiaRefusal(remembering: readonly { id: string; memories: num
   ].join('\n')
 }
 
-/** Wait for something to stop being busy, but never for longer than `deadlineMs`. Returns whether
- *  it settled. */
 export async function settle(
   busy: () => boolean,
   deadlineMs: number,
@@ -206,8 +199,7 @@ const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
 
 /** The pinned provider is an ALLOW-LIST for every mind-facing call, not a preference: a routing
- *  hop costs a cold prefix and an unpriced route. A Baidu outage idles the minds rather than
- *  routing around it — an operator who wants it served anyway changes `PROVIDER_ORDER`. */
+ *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
 /** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
@@ -254,8 +246,6 @@ export function dailyReachedRefusal(spent: number, budget: number): string {
   ].join('\n')
 }
 
-/** The cap is per TOWN, not per process — the ledger resumes with the town, so a resumed boot can
- *  be over the line before its first tick, and is told so in one sentence rather than a trace. */
 export function capReachedRefusal(spent: number, cap: number, agentDbDir: string): string {
   return [
     `stream: could not start — this town has already spent $${spent.toFixed(4)} of its` +
@@ -267,8 +257,8 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
   ].join('\n')
 }
 
-/** Total dollars in a call ledger, across every caller, since `sinceMs`. `sumCostUsd` is
- *  per-caller and the cap is not: five minds on two callers each would clear one ten times over. */
+/** Not `sumCostUsd`, which is per-caller where the cap is not: five minds on two callers each
+ *  would clear one ten times over. */
 export function ledgerTotalUsd(db: Database.Database, sinceMs = 0): number {
   const row = db
     .prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE ts >= ?')
@@ -315,9 +305,8 @@ const countMemories = (db: Database.Database): number => {
   }
 }
 
-/** Build a cast of minds for `startDevWorld`. Async because the embedder load and the provider
- *  pre-flight both run first and either can refuse the whole run; everything that needs the world
- *  happens in `attach`, because a bridge needs the loop and the loop needs the bridge's handler. */
+/** Async because the embedder load and the pre-flight run first and either can refuse the run.
+ *  Everything needing the world waits for `attach`: a bridge needs the loop, the loop the bridge. */
 export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const log =
     opts.log ??
@@ -369,8 +358,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     if (!process.env.OPENROUTER_API_KEY) {
       throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     }
-    // Scoped to THIS boot's pre-flight rows: the ledger is resumed with the town, so the whole
-    // sum would be the whole history of the town and not the cost of these twelve calls.
     const startedAt = Date.now()
     const result = await runPreflight({
       llm: makeClient('preflight'),
@@ -409,7 +396,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     return db
   }
 
-  // ── the god layer's own database, opened before a mind boots and closed with them ──
   // Opened here rather than in `attach` so a failure to open it refuses the run instead of
   // taking down a world that is already ticking.
   const wantsArbiter = opts.useArbiter !== false
@@ -438,8 +424,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     bridge?.drain('the moment passes')
   }
 
-  // The operator's read of this run: the ledger the caps are enforced against and the queue of
-  // rulings awaiting a person. Nothing here is ever rendered into a prompt.
+  // Nothing on the operator's surface is ever rendered into a prompt.
   const ops: LiveOps = {
     opsDb,
     caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
@@ -458,7 +443,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           detail: `this town is at its ${maxMinds}-mind ceiling; a birth past it gets a body and no mind`,
         })
 
-      // ── the guard, before a single mind is booted ──
       const remembering = cast
         .map((m) => ({ id: m.id, memories: countMemories(dbFor(m.id)) }))
         .filter((r) => r.memories > 0)
@@ -480,8 +464,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (snap !== null) restoring.set(m.id, snap)
       }
 
-      // A discovered item is drawn once, out of the same budget and into the same ledger the
-      // minds bill; until it lands the viewer keeps serving the placeholder.
       const art = createDiscoveryArt({
         codex: new AssetCodex(db),
         opsDb,
@@ -496,9 +478,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         },
       })
 
-      // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
-      // `onCodified` needs the bridge, and neither exists until a loop does. `makeClient` points
-      // at `opsDb`: an arbiter billing its own db would spend outside the anomaly stop.
+      // Not built in `createLiveCast`: `makeArbiter` needs the tick and `onCodified` the bridge.
+      // `makeClient` points at `opsDb` — an arbiter on its own db spends outside the anomaly stop.
       const arbiter: SeamArbiter | undefined =
         opts.arbiter ??
         (arbiterDb === null
@@ -600,7 +581,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${ARBITER_DB_FILE}`,
       )
 
-      // ── the chronicle, on the day boundary ──
       // Dispatched OFF this handler: awaiting two provider calls here would stall the socket
       // for as long as they take. The day just ended is the one being written.
       let narratedThroughSeq = store.lastSeq()
@@ -672,7 +652,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           .slice(-SEMANTIC_RECORD_CAP)
       }
 
-      // ── the recognizer, on the same boundary and off the same thread ──
       // OBSERVER-SIDE: what it writes lives in the arbiter's db and reaches no prompt or memory.
       const recognizeTheDay = (
         arb: Database.Database,
@@ -699,8 +678,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             laws: loop.state.laws,
           })
             .then((constructs) => {
-              // The registry lives in the arbiter's db, which the chronicle cannot read. A
-              // tier-3 milestone row is the bridge into the record (ledger A7).
+              // The registry lives in the arbiter's db, which the chronicle cannot read; a
+              // tier-3 milestone row is the only bridge into the record.
               if (chronicle === null) return
               for (const m of constructMilestones(constructs, chronicle.milestoneKinds()))
                 chronicle.insertMilestone(m)
@@ -770,7 +749,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         })
       }
 
-      // ── the money, on the world's own clock ──
       const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
       let nextSpendAlertAt = Date.now() + spendAlertMs
       bridge.onTick((tick) => {
@@ -844,9 +822,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
       narratorDb?.close()
-      // The run's last word on its own money: what the calls bought, which back end served
-      // them, and whether the ledger and the provider's bill agree. Each says nothing about a
-      // run with nothing to say, so a quiet ops surface still means a quiet run.
+      // Each of these says nothing about a run with nothing to say, so a quiet ops surface
+      // still means a quiet run.
       for (const row of reportDeadCalls(opsDb)) {
         log(
           `stream: ${row.agentId ?? 'the run'} paid for ${row.calls} call(s) that came back with nothing`,

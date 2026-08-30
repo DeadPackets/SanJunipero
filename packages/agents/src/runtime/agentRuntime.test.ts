@@ -489,8 +489,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().dozes).toBe(1)
   })
 
-  // ★ The alerts table is where an operator reads why the town went quiet. A crossed cap and a
-  // dead back end are different problems and were the same row.
+  // ★ A crossed cap and a dead back end are different problems; the alert row must say which.
   it('★ a doze names its own cause: a crossed cap is not a dead provider', async () => {
     const { loop, agentDb } = await setup({
       model: turnModel([]),
@@ -819,8 +818,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(dayLogB.startsWith(dayLogA)).toBe(true)
   })
 
-  // D4: the whole day log is re-sent every turn, and 82% of rehearsal 3's was sentences the
-  // mind had already read. Only what the last moment did not say goes in — and all of it does.
+  // The whole day log is re-sent every turn, and 82% of rehearsal 3's was already-read sentences.
   it('the day log drops what the last moment already said, and keeps what it did not', async () => {
     const { loop, runtime, agentDb } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 6, 200)
@@ -832,7 +830,6 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // It shrinks: a still scene renders the same sentences every turn and pays for them once.
     expect(logged.length).toBeLessThan(moments.join(' ').length / 2)
 
-    // And nothing new is dropped: every sentence a moment added over the one before it is there.
     const kept = new Set(splitSentences(logged))
     for (const [i, moment] of moments.entries()) {
       const before = new Set(i === 0 ? [] : splitSentences(moments[i - 1]!))
@@ -1274,8 +1271,7 @@ describe('arbiter wiring expansion (T20)', () => {
     )
   })
 
-  // ★ Four voided promises with no rejection sink, in a process with no `unhandledRejection`
-  // handler. A failed action-memory write took the whole gateway down instead of an alert row.
+  // ★ The gateway process installs no `unhandledRejection` handler: a voided promise kills it.
   it('★ a failed action-memory write lands as an alert, not as an unhandled rejection', async () => {
     const base = await FakeEmbedder.create()
     const embedder = {
@@ -1402,8 +1398,7 @@ describe('refusal prose teaches a path (T18)', () => {
     expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
   })
 
-  // ★ The engine's reasons are machinery: its registry's word for itself and its param schemas.
-  // `refusalMemoryText` wrote them verbatim into a retrievable memory.
+  // ★ One-way glass: the engine's registry names and param schemas must never enter a memory.
   it("★ never writes the engine's own words into a mind's memory", () => {
     for (const reason of [
       'unknown verb: dance',
@@ -1468,7 +1463,6 @@ describe("a beat spent on one's own past", () => {
     expect(spokeTexts(world.engineDb)).toEqual([])
     expect(startedVerbs(world.engineDb)).toEqual([])
     expect(journalRows(agentDb)).toEqual([])
-    // The thought is still the mind's, and still remembered, and the letting-go is counted.
     expect(memoriesOfKind(agentDb, 'thought').map((m) => m.text)).toContain(
       'I have stood here before.',
     )

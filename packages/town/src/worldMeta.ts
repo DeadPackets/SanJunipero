@@ -1,8 +1,7 @@
 import type Database from 'better-sqlite3'
 
 /** `WorldState.terrain` rides in the snapshot, so a resumed world keeps its real map while
- *  everything derived from the environment is drawn for another one — and nothing errors. One
- *  row, three fields, compared on every resume. */
+ *  everything derived from the environment is drawn for another one — and nothing errors. */
 export type WorldMeta = { map: string; rings: number; seed: string }
 
 export function ensureWorldMetaTable(db: Database.Database): void {
@@ -28,7 +27,6 @@ export function writeWorldMeta(db: Database.Database, meta: WorldMeta): void {
   ).run(meta.map, meta.rings, meta.seed)
 }
 
-/** The one instruction that gets an operator past a refused boot. */
 const FRESH_HINT = 'start a new town instead with SJ_FRESH=1'
 
 /** Throws when the town on disk is not the town this boot asked for. Names both sides, because

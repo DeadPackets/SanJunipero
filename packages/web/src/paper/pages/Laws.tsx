@@ -23,7 +23,7 @@ export function LawsPage(props: PageProps) {
   return props.tab === 'Admin' ? <Admin {...props} /> : <World {...props} />
 }
 
-/** Every law of this town and every time it changed. Read-only: there is no write path. */
+/** Read-only: there is no write path. */
 function WorldLawsView({ rows, operator }: { rows: readonly LawRow[]; operator: boolean }) {
   const byGroup = LAW_GROUPS.map((group) => ({
     group,
@@ -79,8 +79,7 @@ function WorldLawsView({ rows, operator }: { rows: readonly LawRow[]; operator: 
   )
 }
 
-/** A law moves when a law moves, not when the clock does. Subscribing to the tick rebuilt
- *  every row of every group of the whole config once a tick, with the sheet open. */
+/** Subscribing to the tick instead rebuilds every row of the whole config once a tick. */
 function useLawsSeq(store: PageProps['store']): string {
   const seq = (): string =>
     `${store.getConfig() === null ? 'wait' : 'have'}:${store.lawHistory().length}`

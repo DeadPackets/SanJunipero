@@ -150,7 +150,7 @@ describe('audit M2, at the source: nothing in the panel is wider than its column
   })
 
   it('holds the human title above the machine path, and both above the floor', () => {
-    // the sheet names its sizes now: --f-4 is 16px, --f-1 the 12px stamp floor
+    // --f-4 is 16px, --f-1 the 12px stamp floor
     expect(ruleBody('.law-title')).toMatch(/font-size:\s*var\(--f-4\)/)
     expect(ruleBody('.law-path')).toMatch(/font-size:\s*var\(--f-1\)/)
   })

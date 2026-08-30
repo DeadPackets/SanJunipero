@@ -28,8 +28,7 @@ describe('scanPromptForGlassLeak', () => {
     expect(CONSTRUCT_VOCABULARY).toContain('milestone')
   })
 
-  // ★ A live payload spelled `festival` with a zero-width space and a mind said the word back.
-  // The scan saw nothing, so a whispered-to town was indistinguishable from a clean one.
+  // ★ A payload spelling `festival` with a zero-width space reached a mind and the scan saw nothing.
   it('★ reads a word a payload broke with an invisible character', () => {
     expect(scanPromptForGlassLeak('they are gathering for the fes​tival')).toEqual(['festival'])
     expect(scanPromptForGlassLeak('the mar‌ket opens')).toEqual(['market'])
@@ -67,9 +66,8 @@ describe('the counsel a perception sentence may not hand over', () => {
   })
 })
 
-// ★ Ruling 11 (2026-08-30). The gate used to throw in dev and return silently under
-// `NODE_ENV=production`, which `Dockerfile:18` sets — so the single runtime enforcement point of
-// a binding invariant did nothing in every shipped container.
+// ★ Throwing in dev but returning silently under `NODE_ENV=production`, which the Dockerfile
+// sets, leaves the one runtime enforcement point of a binding invariant dead in every container.
 describe('★ the mid-run gate: always scan, cut the span out, tell the ops plane', () => {
   const sealed = (text: string): { text: string; leaks: string[][] } => {
     const leaks: string[][] = []

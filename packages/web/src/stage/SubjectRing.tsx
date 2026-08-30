@@ -5,7 +5,6 @@ import { useSubjectAnchor, type Reach, type Subject } from './anchor.js'
 export const RING_VERBS = ['follow', 'story', 'bonds', 'home'] as const
 export type RingVerb = (typeof RING_VERBS)[number]
 
-/** The word on the arm, in the town's own language: what the viewer asks the person for. */
 export const RING_LABEL: Readonly<Record<RingVerb, string>> = {
   follow: 'Follow',
   story: 'Story',
@@ -13,9 +12,8 @@ export const RING_LABEL: Readonly<Record<RingVerb, string>> = {
   home: 'Home',
 }
 
-/** Which arm a key moves to, or null when the ring does not own the press. The arms stand at
- *  12, 3, 6 and 9 o'clock, so an arrow POINTS at one rather than stepping round a list: every
- *  arm is one press away from every other, and the key agrees with what the viewer can see. */
+/** The arms stand at 12, 3, 6 and 9 o'clock, so an arrow points at one rather than stepping
+ *  round a list: every arm is one press away from every other. */
 export function armFor(key: string): number | null {
   switch (key) {
     case 'ArrowUp':
@@ -37,7 +35,6 @@ export function armFor(key: string): number | null {
  *  the 26px the whole mark is lifted by (chrome.css `.stage-ring`, `.stage-ring-arms`). */
 const RING_REACH: Reach = { x: 100, y: 110 }
 
-/** Four things to ask, standing round the person you asked. */
 export function SubjectRing({
   subject,
   scene,

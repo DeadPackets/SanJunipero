@@ -11,8 +11,8 @@ const tilesOf = (s: DevStructure): { x: number; y: number }[] => {
   return out
 }
 
-// The G6/G10 fixture town, frozen as a literal so a careless edit to founders.ts fails HERE
-// rather than moving a gate's world silently (plan P20).
+// The fixture town, frozen as a literal so a careless edit to founders.ts fails HERE rather
+// than moving a gate's world silently.
 const FROZEN_TOWN_STRUCTURES = [
   { id: 'structure_storehouse', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 },
   { id: 'structure_shed', kind: 'shed', x: 23, y: 20, w: 1, h: 1 },
@@ -39,8 +39,7 @@ describe('devTown — one town, not two', () => {
       return out
     }
     expect(count(town.structures)).toEqual(count(cityStructures()))
-    // Six kinds over eleven roofs, where the eleven used to be five copies of one home and a
-    // matched pair of sheds. The cottage, the cabin and the farmhouse are unowned fixtures.
+    // Six kinds over eleven roofs; the cottage, the cabin and the farmhouse are unowned.
     expect(count(town.structures)).toEqual({
       house: 5,
       cottage: 1,
@@ -71,8 +70,7 @@ describe('devTown — one town, not two', () => {
     }
   })
 
-  // THE ASSERTION THAT WOULD HAVE CAUGHT THE TWO-TOWNS BUG: buildings and terrain must come
-  // from the same derivation, so no building can be standing in the middle of its own road.
+  // Buildings and terrain must come from the same derivation, or one stands in its own road.
   it('never stands a building on the roads that serve it', () => {
     for (const s of town.structures) {
       for (const t of tilesOf(s)) {

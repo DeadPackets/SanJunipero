@@ -29,8 +29,7 @@ const emptyUsage = (): LlmUsage => ({
   costUsd: 0,
 })
 
-// The pass asks a few concepts at a time, so the scripted answer lands on the first batch and
-// the rest come back empty — as they would, the concepts having been answered already.
+// The scripted answer lands on the first batch; later batches come back empty.
 class ScriptedLlm {
   objectCalls = 0
   systems: string[] = []
@@ -111,8 +110,7 @@ describe('a verdict nobody can read', () => {
       day: DAY,
       records: AUTHORED_DAY,
     })
-    // Nine concepts, three to an ask, and not one of them is worth a second try: this is a
-    // provider fault and not a wrong answer.
+    // Nine concepts, three to an ask; a provider fault is not a wrong answer, so none is retried.
     expect(llm.objectCalls).toBe(3)
     expect(milestones).toEqual([])
     expect(store.semanticFirsts()).toEqual([])
@@ -123,8 +121,8 @@ describe('a verdict nobody can read', () => {
     ])
   })
 
-  // The live failure this lane closed: `.refine()` cannot be written as JSON Schema, so the
-  // model never saw that a hit must cite its record, and every verdict was refused unread.
+  // `.refine()` cannot be written as JSON Schema, so the model never saw that a hit must cite
+  // its record, and every verdict was refused unread.
   it('a hit with no provenance is corrected once, and the night is saved', async () => {
     const { db, store } = rig()
     migrateLlmTables(db)
@@ -302,8 +300,7 @@ describe('the nightly pass', () => {
       day: DAY,
       records: AUTHORED_DAY,
     })
-    // Nine concepts, three to an ask; what shrinks night to night is the catalog, not the
-    // number of asks it takes to read it.
+    // Nine concepts, three to an ask; what shrinks night to night is the catalog, not the asks.
     expect(llm.objectCalls).toBe(3)
     expect(llm.systems.join('\n')).toContain('metaphor: not the plain')
     const second = await detectSemanticFirsts({

@@ -19,10 +19,8 @@ export function FoundPage(props: PageProps) {
   return props.tab === 'Places' ? <Places {...props} /> : <Things {...props} />
 }
 
-/**
- * The one place the agent's own words are printed. The chronicle never quotes them: a chronicle
- * line is agent-visible and this page is not.
- */
+/** The one place the agent's own words are printed: a chronicle line is agent-visible and this
+ *  page is not. */
 function Things({ store, thing, onJump }: PageProps) {
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
@@ -34,8 +32,7 @@ function Things({ store, thing, onJump }: PageProps) {
   const leaves = leavesOf(read.data ?? NO_RECORDS, assets)
   const viewTick = mode.live ? null : mode.tick
 
-  // What was clicked on the town, and the leaf of the record that made it — a thing on the
-  // ground has no page of its own, so the record it came out of is where it is answered.
+  // A thing on the ground has no page of its own, so the record it came out of answers for it.
   const clicked = thing === null ? null : itemCropDetail(state, thing)
   const clickedKind = thing === null ? null : thingKind(state, thing)
   const madeBy =
@@ -113,7 +110,6 @@ function Things({ store, thing, onJump }: PageProps) {
   )
 }
 
-/** Everything that stands, and who put it there. The whole provenance is one tap away. */
 function Places({ store, onSubject }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const standing = Object.values(state?.structures ?? {}).filter((s) => s.stage === 'complete')

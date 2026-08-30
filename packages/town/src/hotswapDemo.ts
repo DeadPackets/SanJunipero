@@ -6,7 +6,6 @@ import { DEV_DB_PATH } from './devWorld.js'
 
 export const HOUSE_PX = 64
 
-// master-palette picks: cream wall, honey-wood gable, dark ink outline, honey door
 const P = paletteRgb()
 const CREAM: Rgb = P[1]! // #F6E8D5
 const WOOD: Rgb = P[7]! // #C68A48
@@ -33,7 +32,6 @@ function fillRect(
   }
 }
 
-// a deterministic timber house: honey gable roof over a cream body, ink base line, wood door
 export function drawHouse(): RawImage {
   const img: RawImage = {
     width: HOUSE_PX,

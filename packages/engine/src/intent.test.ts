@@ -249,7 +249,6 @@ describe('verb registry', () => {
 
 // One policy over the whole registry: interruption is something the world does to a body, never
 // something a mind can ask for. VerbDef used to declare it and nothing read it.
-// Implementing it instead — submitIntent honouring a flag — moves the G2 pin, so it is a ruling, not a call to make here.
 describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
   const CFG = DEFAULT_CONFIG
   const busyWith = (verb: string): WorldState =>

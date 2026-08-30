@@ -261,8 +261,6 @@ describe('roomPlan', () => {
 })
 
 describe('bedSlots', () => {
-  // The plan a caller holds; `bedCells` is the room's half of the answer and `bedSlots` the
-  // sleepers' half, so the room's half is derived once per plan change.
   const lay = (kind: InteriorKind, sleeping: string[], records: AssetRecord[] = []) =>
     bedSlots(sleeping, bedCells(kind, roomPlan(kind, records)))
 
@@ -303,8 +301,8 @@ describe('bedSlots', () => {
   it('★ reads the bed off the plan it is HANDED, and never derives one of its own', () => {
     const plan = roomPlan('house', [])
     const moved = plan.map((p) => (p.kind === 'bed' ? { ...p, slot: { x: 0, y: 0 } } : p))
-    // A plan no codex could answer with. Same answer for both = the cells were re-derived behind
-    // the caller's back, which is the per-frame `roomPlan` `layoutRoom` used to pay for.
+    // A plan no codex could answer with: the same answer for both would mean the cells were
+    // re-derived behind the caller's back.
     expect(bedCells('house', moved)).not.toEqual(bedCells('house', plan))
   })
 
@@ -803,11 +801,6 @@ describe('★ a shared room and a private room, and the difference is the ladder
   })
 })
 
-// ── ★ THE ROOM PLANS ONCE PER PLAN CHANGE, NOT ONCE A FRAME ──────────────────────────────
-//
-// `roomPlan` scans every asset record and runs `JSON.parse` + a zod parse per furnishing.
-// `replan()` already holds the answer under `plannedFor`/`plannedSeq`, and the frame path
-// spends it rather than asking for a second one.
 describe('interiorScene builds one room plan per plan change', () => {
   const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
 

@@ -40,8 +40,6 @@ const HealthSchema = z
       .strict()
       .prefault({}),
     infectionChancePerInjuryPerDay: z.number().default(0.2),
-    // The per-tick contagion dials are gone with the loop that read them.
-    // Contagion is one midnight roll now, on `illness`, so the world has one contagion system.
     recoveryHpPerDay: z.number().default(5),
     tendedRecoveryHpPerDay: z.number().default(15),
     collapseHp: z.number().default(15),
@@ -99,7 +97,7 @@ const WeatherSchema = z
     nightTempDelta: z.number().default(-6),
     rainTempDelta: z.number().default(-4),
     snowOnlyIn: z.string().default('winter'),
-    // Rare drama, ruled 2026-08-30: at 0.02 three storm days burned 27 of 42 houses.
+    // Rare drama: at 0.02 three storm days burned 27 of 42 houses.
     stormLightningFireChance: z.number().default(0.001),
   })
   .strict()
@@ -443,7 +441,6 @@ const MortalitySchema = z
   })
   .strict()
 
-// Contagion is ON at a low dial from genesis (§13 option A). §13 is closed.
 const IllnessSchema = z
   .object({
     enabled: z.boolean().default(true),

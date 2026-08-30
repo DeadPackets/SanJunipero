@@ -1,5 +1,4 @@
-// The world's ground vocabulary. Every renderer, pathfinder, perception channel and
-// town-grammar test reads its tile numbers from here.
+// The world's ground vocabulary: every renderer, pathfinder and test reads its tile numbers here.
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
 export const T_GRASS = 0,
@@ -17,7 +16,7 @@ export const T_GRASS = 0,
 /** Standing water and a dug channel are the same thing to a root, a mouth and a bucket. */
 export const isWet = (t: number): boolean => t === T_WATER || t === T_CHANNEL
 
-/** Road and worn path both — the move cost roads changed is already real. */
+/** Road and worn path both, which move at the same cost. */
 export const isTravelled = (t: number): boolean => t === T_ROAD || t === T_PATH
 
 /** Ground a street may be laid over: grass, bare earth, and the dirt feet already wore. */

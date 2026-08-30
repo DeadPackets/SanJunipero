@@ -23,8 +23,6 @@ describe('clock tint LUT', () => {
   })
 })
 
-// The three clocks the picture used to read — a boolean at 20:00, a phase step at 19:00 and
-// 21:00, a continuous tint — are replaced by this one curve (D4).
 describe('skyLevel — the one day clock', () => {
   it('is 0 through the night and 1 through the day', () => {
     for (const m of [0, 120, 300, 1230, 1439]) expect(skyLevel(m)).toBe(0)

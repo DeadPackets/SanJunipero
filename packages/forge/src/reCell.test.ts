@@ -71,8 +71,6 @@ describe('CHAR_FIGURE_PX', () => {
   })
 })
 
-// ---------------------------------------------------------------- the cell
-
 const CREAM = [0xff, 0xf6, 0xe9, 255] as const
 
 // spriteCell takes an already-keyed generation: clear background, one solid subject
@@ -124,8 +122,7 @@ describe('spriteCell', () => {
     expect(Math.abs(255 - centred.y1 - centred.y0)).toBeLessThanOrEqual(2)
   })
 
-  // ★ The 4-frame rig sheet: 128x32, and a subject taller than that aspect. A square cell cut
-  // down to the target used to take 16 rows off the top and the bottom.
+  // ★ The 4-frame rig sheet: a 128x32 target, and a subject taller than that aspect.
   it('★ a NON-SQUARE target keeps a tall subject whole, head and feet', () => {
     const src: RawImage = { width: 512, height: 512, data: new Uint8ClampedArray(512 * 512 * 4) }
     for (let y = 224; y < 288; y++)
@@ -149,10 +146,7 @@ describe('spriteCell', () => {
   })
 })
 
-// ------------------------------------------------- the chain, on one real provider generation
-
-// `stages/00-raw.png` from the 2026-08-27 sprite-chain trace: the house/sw generation that cost
-// $0.1027, untouched provider bytes. The only fixture in this package that a model actually drew.
+// `stages/00-raw.png` from a sprite-chain trace: the house/sw generation, untouched provider bytes.
 describe('keyBg → spriteCell on a real 2048 generation', () => {
   it('lands a 512 cell on a whole factor, binary alpha and the model’s own colours', async () => {
     const raw = await decodePng(
@@ -174,7 +168,7 @@ describe('keyBg → spriteCell on a real 2048 generation', () => {
       if (r.cell.data[i + 3] === 0) continue
       colours.add((r.cell.data[i]! << 16) | (r.cell.data[i + 1]! << 8) | r.cell.data[i + 2]!)
     }
-    // the old chain quantized this same cell to 29 colours, which is what the user saw as mush
+    // 29 colours is what quantizing this cell gives, so 1000+ means it was not quantized
     expect(colours.size).toBeGreaterThan(1000)
 
     expect(bbox(r.cell).y1).toBe(511)

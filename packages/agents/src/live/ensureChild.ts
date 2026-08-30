@@ -37,8 +37,8 @@ const writtenSeedTags = (db: Database.Database, agentId: string): Set<string> =>
     ).map((r) => r.tag),
   )
 
-/** The household a child was born into, written down as its first memories. Idempotent by the
- *  event each entry came from, so a seeding a crash cut short resumes without repeating one. */
+/** Idempotent by the event each entry came from, so a seeding a crash cut short resumes
+ *  without repeating one. */
 export async function ensureHousehold(
   deps: HouseholdDeps,
   born: AgentBornPayload,
@@ -73,7 +73,6 @@ export type EnsureChildrenOpts = {
   opsDb: Database.Database
   embedder: { embed(t: string): Promise<Float32Array> }
   namingLlm: LlmClient
-  /** Bring up a child whose household this call had to finish. */
   boot: (spec: MindSpec) => void
 }
 

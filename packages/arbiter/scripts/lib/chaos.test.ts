@@ -7,12 +7,10 @@ import type { Recipe, Verdict } from '../../src/verdict.js'
 import { EXPLOIT_CORPUS } from './corpus.js'
 import { runChaos, type ChaosResult } from './run.js'
 
-// A credit for a test that is not about the credit; the two-argument codify is required so
-// an uncredited discovery cannot be minted in silence.
+// The two-argument codify is required so an uncredited discovery cannot be minted in silence.
 const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
 
-// The exploit the scripted LLM tries to sneak past the gate: gunpowder is not
-// on any rung of this town's codex, and a gun is not something the town can make.
+// Gunpowder is on no rung of this town's codex, and a gun is not something it can make.
 const EXPLOIT_RECIPE: Recipe = {
   id: 'recipe:gunpowder',
   name: 'Craft Black Powder and a Gun',
@@ -31,8 +29,7 @@ const EXPLOIT_RECIPE: Recipe = {
   canon: ['gunpowder'],
 }
 
-// The legitimate novel intent's recipe: canon cooking is earned, so it is
-// the only attempt the gate may let through.
+// Cooking is earned canon, so this is the only attempt that may pass.
 const EARNED_RECIPE: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
@@ -52,8 +49,7 @@ const EARNED_RECIPE: Recipe = {
   canon: ['cooking'],
 }
 
-// The exploit script: physics-breaking for everything except free will, which
-// the LLM may map to an ordinary Tier-1 verb.
+// Physics-breaking for everything except free will, which may map to an ordinary Tier-1 verb.
 function exploitVerdict(intent: string): Verdict {
   if (intent.toLowerCase().includes('nuclear engineer')) {
     return {
@@ -103,8 +99,6 @@ describe('runChaos exploit corpus', () => {
     expect(results).toHaveLength(EXPLOIT_CORPUS.length)
     for (const r of results) expect(r.physicsBreaking).toBe(false)
 
-    // Join with the corpus: every expected-impossible intent must resolve to
-    // an impossible beyond_adjacency ruling, never a codifiable attempt.
     for (const entry of EXPLOIT_CORPUS) {
       if (entry.expected !== 'impossible') continue
       const verdict = byIntent.get(entry.intent)!.verdict

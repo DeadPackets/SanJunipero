@@ -165,8 +165,6 @@ describe('worldTick: social regen via conversation', () => {
   })
 })
 
-// Hunger, energy, social, warmth and thirst are written by three separate laws, and a body
-// still leaves exactly one event behind.
 describe('one needs_changed per body per tick', () => {
   it("carries every law's change on one event, and never two events for one body", () => {
     const s = atTick(makeWorld(), 100)

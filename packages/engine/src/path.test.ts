@@ -281,8 +281,6 @@ describe('findPath (A*)', () => {
   })
 })
 
-// ------------------------------------------- the admissible heuristic
-
 // The straight grass line home is 13 steps at 1 each; the road runs 19 and still costs less,
 // because a road is 0.6. An A* charging a full grass tile per remaining step cannot believe that.
 const ROAD_RING = ['..............', 'R............R', 'R............R', 'RRRRRRRRRRRRRR']
@@ -314,8 +312,6 @@ describe('the A* heuristic is admissible (Task 37a)', () => {
     )
   })
 })
-
-// ------------------------------------------------------- the node budget
 
 const withMaxNodes = (config: SimConfig, maxNodes: number): SimConfig => ({
   ...config,
@@ -430,8 +426,6 @@ describe('the A* node budget', () => {
     )
     expect(s.agents.a1!.activity!.path).toEqual(partial)
     expect(composePerception(s, tight, 'a1', []).wayUnclear).toBe(true)
-    // The same walk under a budget that could finish it is an ordinary walk — the route the
-    // fold stored is the whole one, so the body has nothing to tell.
     let open = genesisState(UNBOUNDED, serpentineMaze())
     open = fold(
       open,
@@ -468,7 +462,6 @@ describe('the A* node budget', () => {
       }),
       tight,
     )
-    // The legs walk the stored route to its end. It still stops short of where the mind aimed.
     const last = partial[partial.length - 1]!
     s = fold(s, ev(3, 'agent_moved', { id: 'a1', x: last[0], y: last[1] }), tight)
     expect([s.agents.a1!.x, s.agents.a1!.y]).not.toEqual([MAZE_TO.x, MAZE_TO.y])

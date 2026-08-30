@@ -102,7 +102,7 @@ describe('the Firsts tab', () => {
     expect(html).toContain('Go to this moment.')
   })
 
-  // G9: a name the town gave itself is printed with the words it came out of, verbatim.
+  // A name the town gave itself is printed with the words it came out of, verbatim.
   it('★ quotes the naming under a first the town named, and only there', () => {
     const named = first({
       kind: 'first_name_c1',

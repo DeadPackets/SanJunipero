@@ -23,8 +23,7 @@ const parseLineage = (body: unknown): LineageLike | null => {
   return Array.isArray(lineage?.parentOf) ? lineage : null
 }
 
-/** One read of the ties for the whole page: the Bonds lens and the roster used to poll this on
- *  a clock each, for one dataset that changes about once a tick. */
+/** One read of the ties for the whole page: the Bonds lens and the roster share it. */
 export const bondsFeed = endpoint('/api/bonds', parseBonds, BONDS_REFETCH_MS)
 
 /** Who came from whom, read once: a town gains a parent only when a child is born, and a
@@ -56,7 +55,6 @@ const FIRSTS_REFETCH_MS = 30_000
 const parseFirsts = (body: unknown): MilestoneRead[] | null =>
   Array.isArray(body) ? (body as MilestoneRead[]) : null
 
-/** The firsts ledger the narrator keeps (`@sj/shared`'s `MilestoneRead`), read once for the
- *  whole page: the Chronicle's Firsts tab and the day strip's marks share these rows, on a
- *  slow beat, because a first is a thing that already happened. */
+/** Read once for the whole page: the Chronicle's Firsts tab and the day strip's marks share
+ *  these rows, on a slow beat, because a first is a thing that already happened. */
 export const milestonesFeed = endpoint('/api/milestones', parseFirsts, FIRSTS_REFETCH_MS)

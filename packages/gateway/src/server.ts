@@ -52,8 +52,7 @@ const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
 export const CLOSE_TOO_MANY = 4429
 
-/** How long a socket may hold a seat without greeting. A viewer sends `hello` on open, so this
- *  is only ever reached by a socket that has nothing to say. */
+/** A viewer sends `hello` on open, so only a socket with nothing to say ever reaches this. */
 export const HELLO_DEADLINE_MS = 5_000
 
 /** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
@@ -72,12 +71,8 @@ const DEFAULT_MAX_VIEWERS = 500
  */
 export const SCRUB_MIN_MS = 100
 
-/**
- * Milliseconds of scrub work the whole process will do per second of wall clock — 4% of one core.
- * The per-socket floor above is per SOCKET: at a measured 6-11 ms a scrub, ten viewers dragging
- * at once stop the town ticking and DEFAULT_MAX_VIEWERS is 500. Over budget, a viewer is answered
- * at the live moment instead of being queued.
- */
+/** 4% of one core. The floor above is per SOCKET: at a measured 6-11 ms a scrub, ten of the 500
+ *  viewers dragging at once stop the town ticking. Over budget a viewer gets the live moment. */
 const SCRUB_BUDGET_MS_PER_S = 40
 
 /** Frames under this go out raw: a `thought` or an `asset` is smaller than the deflate header. */
@@ -194,15 +189,12 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── snapshot string, cached per pump generation ──
   let snapJson: string | null = null
-  // The asset catch-up, built once for the process as ONE frame: a greeted socket used to take
-  // one send per record — 189 of them on the dev codex, inside the connection handler. Topped up
-  // from the codex's own seq rather than the pump's: a hello landing between two pumps must still
-  // see a just-registered sheet.
+  // ONE frame, not one send per record — 189 of them on the dev codex, in the connection handler.
+  // Topped up from the codex's own seq, so a hello landing between two pumps sees a new sheet.
   const catchUp: AssetRecord[] = []
   let catchUpJson: string | null = null
   let catchUpSeq = 0
-  // The over-budget scrub answer: the live moment in the shape a scrub is already answered in,
-  // stringified once per generation, because only `reqId` differs between the sockets turned away.
+  // Stringified once per generation: only `reqId` differs between the sockets turned away.
   let busyHead: string | null = null
   const busyScrubJson = (reqId: number): string => {
     busyHead ??= JSON.stringify({
@@ -235,8 +227,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     path: '/ws',
     maxPayload: MAX_CLIENT_FRAME,
     // Caddy's `encode` covers HTTP and never a proxied socket, so without this every frame goes
-    // out raw. `memLevel`/`windowBits` are the memory lever: a shared dictionary per socket is
-    // what 500 viewers cannot afford, and no-context-takeover plus a small window bounds it.
+    // out raw. A shared dictionary per socket is what 500 viewers cannot afford, hence the levers.
     perMessageDeflate: {
       serverNoContextTakeover: true,
       clientNoContextTakeover: true,
@@ -367,9 +358,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let lastAssetSeq = 0
   let observerSeen = false
   const pump = (): void => {
-    // A stopped clock sends no deltas, so the one thing a viewer cannot see by waiting is that
-    // it has stopped. Its own frame: re-broadcasting the snapshot would yank a scrubbing viewer
-    // back to the live edge.
+    // A stopped clock sends no deltas. Its own frame, because re-broadcasting the snapshot would
+    // yank a scrubbing viewer back to the live edge.
     if (isPaused() !== wasPaused) {
       wasPaused = isPaused()
       snapJson = null

@@ -3,15 +3,8 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// The engine's tick graph is a DAG, and it is the hub-and-spoke shape that makes that worth
-// asserting: `worldTick.ts` imports all 21 systems, and every system needs the type it is
-// handed back. Until `TickCtx` and `dropHeldItems` moved off the hub, that closed an 8-module
-// runtime cycle and a 24-module type-only one — 21 strongly-connected components in all.
-//
-// Wider than the one edge that closed them, on the C12a R2 principle `browserGraph.test.ts`
-// states: a guard that only sees the exact defect already fixed buys false confidence. Every
-// non-test source under `src` is a root, `import type` counts (it is a cycle for a reader and
-// for every graph tool), and any relative edge is followed — not just `systems/ → worldTick`.
+// Every non-test source under `src` is a root and `import type` counts: a type-only cycle is
+// still a cycle for a reader and for every graph tool.
 
 const SRC = dirname(fileURLToPath(import.meta.url))
 
@@ -29,8 +22,7 @@ function specifiersOf(file: string): string[] {
   return out
 }
 
-// './x.js' → './x.ts'; a directory → its index. Anything else (`@sj/shared`, `node:*`) is a
-// leaf as far as this graph is concerned: no cycle can leave the package and come back.
+// A non-relative specifier is a leaf: no cycle can leave the package and come back.
 function resolveRelative(spec: string, fromFile: string): string | null {
   if (!spec.startsWith('.')) return null
   const base = resolve(dirname(fromFile), spec)

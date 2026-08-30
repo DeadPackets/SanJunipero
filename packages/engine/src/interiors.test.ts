@@ -230,8 +230,6 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     expect(submitIntent(owned, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
-  // The law is about a bed, not about a punishment. A body under the sky that is
-  // weary enough to be walking badly may lie down on the ground without falling over first.
   it('a body weary enough to stumble may lie down under the sky', () => {
     let s = withAgent(withHouse(world()), 'a1', 2, 3)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({

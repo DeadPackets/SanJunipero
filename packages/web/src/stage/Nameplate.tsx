@@ -24,8 +24,6 @@ function plateRect(scene: Scene, at: WorldPoint, size: { w: number; h: number })
   }
 }
 
-/** A plate nailed under the figure, the way a name is written on a thing in the town — not a
- *  tooltip about it. */
 export function Nameplate({ subject, scene }: { subject: Subject | null; scene: Scene | null }) {
   const ref = useSubjectAnchor(scene, subject)
   // Measured once a name, not once a frame: reading a layout box inside the loop would force

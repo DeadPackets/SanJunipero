@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { FIRST_FRAME_COPY } from './firstFrame.js'
 import { MOTION } from './motion.js'
 
-// The card is static HTML so it can paint on the first byte, which puts three of its facts in a
-// file no import reaches. Each one below is a real drift: the wrong sentence on arrival, a
-// removal timer that fires at the wrong moment, or a browser chrome that is not the town's.
+// The card is static HTML so it can paint on the first byte, which puts three of its facts
+// in a file no import reaches.
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const SRC = readFileSync(new URL('./firstFrame.ts', import.meta.url), 'utf8')
 

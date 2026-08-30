@@ -40,7 +40,7 @@ const farmland = ploughFurrows(soil)
 const s = seamReport(farmland),
   b = borderReport(farmland)
 const veto = materialVeto(farmland)
-// Palette MEMBERSHIP was the quantize's signature; the grade keeps the soil's own colours now.
+// The grade keeps the soil's own colours, so what is measured is DISTANCE, not membership.
 const dist = paletteDistance(farmland)
 const bar =
   dist <= PALETTE_DISTANCE_MAX

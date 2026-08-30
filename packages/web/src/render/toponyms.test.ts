@@ -101,7 +101,7 @@ describe('a name stays with the thing it is cut into', () => {
     expect(src).toMatch(/if \(!hits\(rect, leashAt\([\s\S]{0,80}cut\.node\.visible = false/)
   })
 
-  // The glyph's own colour is the one channel this renderer is measured to drop (stage 7 I7).
+  // The glyph's own colour is the one channel this renderer is measured to drop.
   it('carries its ink as a drawn slab, never as a halo of glyphs', () => {
     expect(src).toContain('plate.fill(LANDMARK_INK)')
     expect(src).not.toContain('HALO')

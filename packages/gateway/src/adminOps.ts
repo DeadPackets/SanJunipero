@@ -4,7 +4,7 @@ import { writeRunTar, type ExportOpts } from './exportRun.js'
 import { sendJson } from './http.js'
 import type { LiveOps } from './liveCast.js'
 
-/** The world clock, as the operator holds it. `TickLoop` satisfies this. */
+/** `TickLoop` satisfies this. */
 export type Clock = {
   readonly paused: boolean
   readonly speed: number
@@ -16,12 +16,10 @@ export type Clock = {
 
 export type OpsDeps = ExportOpts & {
   clock: Clock
-  /** A thunk, not a value: a cast attached after the channel opened is still seen. Null while
-   *  the stream is scripted, which spends nothing and codifies nothing. */
+  /** A thunk, not a value: a cast attached after the channel opened is still seen. */
   ops: () => LiveOps | null
 }
 
-/** Faster than a mind can think and slower than the disk can write are both useless. */
 const MIN_SPEED = 0.1
 export const MAX_SPEED = 60
 /** The gateway reads the ledger with SQL rather than importing `@sj/llm`'s spend monitor: that
@@ -31,8 +29,7 @@ const REAL_MINUTES_PER_SIM_DAY = 60
 const DAY_MS = 24 * 60 * 60 * 1000
 const TOP_MINDS = 10
 const RECENT_ALERTS = 10
-/** One sim-day is one real hour, so the motive number moves far slower than a page polls. It is
- *  the only read here that walks the whole world log. */
+/** One sim-day is one real hour, so this number moves far slower than the page polls. */
 const ANSWER_RATE_TTL_MS = 60_000
 
 const bodyJson = (text: string | null): Record<string, unknown> => {
@@ -43,18 +40,15 @@ const bodyJson = (text: string | null): Record<string, unknown> => {
   }
 }
 
-// ── the money ───────────────────────────────────────────────────────────────────────────────
-
 type Spend = { calls: number; usd: number }
 export type CostReport = {
-  /** False on a scripted stream: there is no ledger because nothing was ever bought. */
   live: boolean
   today: Spend
   lifetime: Spend
   projection: { usdPerSimDay: number; windowRealMinutes: number; sampledCalls: number }
   byCaller: (Spend & { caller: string })[]
   byMind: (Spend & { agentId: string })[]
-  /** Cached input tokens over all input tokens, or null when nothing has been bought yet. */
+  /** Cached input tokens over all input tokens. */
   cacheReadShare: number | null
   caps: { dailyUsd: number; lifetimeUsd: number }
   stop: { dailyReached: boolean; lifetimeReached: boolean }
@@ -78,7 +72,7 @@ const NOTHING_BOUGHT: Money = {
   alerts: [],
 }
 
-// One pass for three windows and the token share: four `SELECT`s walked the same pages four times.
+// One pass for three windows and the token share: four `SELECT`s walk the same pages four times.
 type Totals = {
   todayCalls: number
   todayUsd: number
@@ -138,12 +132,7 @@ function ledger(db: Database.Database, caps: LiveOps['caps'], now: number): Mone
   }
 }
 
-// ── the motive number ───────────────────────────────────────────────────────────────────────
-
-/**
- * `honest.md` §1's answer rate, as near as this branch can measure it: of the acts a body
- * STARTED, the share that finished. A mind that abandons everything it begins wanted none of it.
- */
+/** Of the acts a body STARTED, the share it finished. */
 export type AnswerRate = {
   stated: number
   answered: number
@@ -203,8 +192,6 @@ export function answerRate(worldDbPath: string): AnswerRate {
   }
 }
 
-// ── the routes ──────────────────────────────────────────────────────────────────────────────
-
 const clockState = (c: Clock) => ({ paused: c.paused, speed: c.speed, tick: c.tick })
 
 function rulingRoute(deps: OpsDeps, verdict: 'approve' | 'revert'): AdminRoute['handle'] {
@@ -238,7 +225,6 @@ function rulingRoute(deps: OpsDeps, verdict: 'approve' | 'revert'): AdminRoute['
   }
 }
 
-/** The operator's own routes, mounted beside `/admin/laws` on the same loopback bearer channel. */
 export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
   // The whole world log, aggregated, is the one costly read on this channel; the number it
   // yields moves on a sim-day timescale and the page polls every few seconds.

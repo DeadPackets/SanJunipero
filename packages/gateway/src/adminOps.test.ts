@@ -227,7 +227,6 @@ describe('the cost dashboard', () => {
       expect(cost.live).toBe(false)
       expect(cost.lifetime).toEqual({ calls: 0, usd: 0 })
       expect(cost.byCaller).toEqual([])
-      // The world still ran, so the motive number is still measurable.
       expect(cost.answerRate.stated).toBe(2)
     } finally {
       ops = live

@@ -35,18 +35,15 @@ import { tileKind } from './tileset.js'
 // the square of the ring count and passes `MAX_TEXTURE_SIZE`, where the allocation FAILS.
 export type GroundBaker = {
   rebake(terrain: TileId[][], records: AssetRecord[]): void
-  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it.
-   *  Called once a frame by the scene, so it is also the pump: `BAKES_PER_FRAME` queued chunks
-   *  bake per call. `rebake` alone bakes unmetered. */
+  /** Which chunks are worth holding, in world space. Also the pump: `BAKES_PER_FRAME` queued
+   *  chunks bake per call, so the scene must call it once a frame. `rebake` bakes unmetered. */
   setView(view: ViewRect): void
-  /** What is on the GPU right now. A bound nobody can count is a claim, not a bound. */
   vram(): { chunks: number; bytes: number; maxDimPx: number }
   destroy(): void
 }
 
-/** D3: a diamond rasterised on its own composites fractional edge coverage against the
- *  transparent bake target, and every shared edge read as a dark line (×0.845 luma measured).
- *  Half a pixel of outset makes neighbours overlap, so no pixel is left half-covered. */
+/** A diamond rasterised on its own composites fractional edge coverage against the transparent
+ *  bake target, and every shared edge reads as a dark line (×0.845 luma measured). */
 export const TILE_EDGE_OUTSET_PX = 0.5
 
 /** A tile's diamond as `poly()` points, top vertex at (cx, cy), outset on every side. */
@@ -63,8 +60,8 @@ export function tileDiamond(cx: number, cy: number, outset = TILE_EDGE_OUTSET_PX
   ]
 }
 
-/** D17: a zoom-out can put a whole grid on screen in one tick; this many bake per frame and
- *  the rest on the frames after. A new map still bakes whole — see `rebake`. */
+/** A zoom-out can put a whole grid on screen in one tick; this many bake per frame and the rest
+ *  on the frames after. A new map still bakes whole — see `rebake`. */
 export const BAKES_PER_FRAME = 2
 
 /** The one thing the baker needs a live GPU for, named so a test can drive the real baker. */
@@ -78,7 +75,6 @@ export function createGroundBaker(
   book: TextureBook,
 ): GroundBaker {
   let grid: ChunkGrid | null = null
-  /** the field's layers, cut per chunk — one O(shapes) pass per terrain, never per chunk */
   /** the field's layers with the skirt LAST — drawn first, at that index for its rotation */
   let buckets = new Map<ChunkKey, FieldLayer[]>()
   let kerbPolys = new Map<ChunkKey, number[][]>()
@@ -87,7 +83,7 @@ export function createGroundBaker(
   const live = new Map<ChunkKey, { rect: ChunkRect; tex: RenderTexture; sprite: Sprite }>()
   const residency = createChunkResidency()
   let view: ViewRect = { x: 0, y: 0, w: 0, h: 0 }
-  // one Texture per TERRAIN now — at most eight, whatever the size of the map
+  // one Texture per terrain: at most eight, whatever the size of the map
   const loaded = new Map<string, Texture>()
   let generation = 0
 
@@ -122,7 +118,6 @@ export function createGroundBaker(
           layer.addChild(sh)
         }
       }
-      // the layer's mask, laid down once per pass
       const shapesInto = (g: Graphics): void => {
         for (const shape of l.shapes) {
           const cx = shape.sx + offX,
@@ -190,7 +185,6 @@ export function createGroundBaker(
 
   let offsetX = 0
   let offsetY = 0
-  /** on screen and not yet baked — drained `BAKES_PER_FRAME` at a time by `setView` */
   let pending: ChunkRect[] = []
 
   function bake(rect: ChunkRect): void {

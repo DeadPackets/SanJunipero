@@ -1,8 +1,5 @@
-// Reads a rehearsal's databases. Prints spend per caller, chapters, dreams, births, alerts, and
-// runs the glass scan over every mind-facing artifact the run produced. Reads only, writes nothing.
-// `@sj/shared` is published as TypeScript source, so plain node cannot load it: `--import tsx`.
-//     node --import tsx scripts/score.mjs
-//     SJ_MINDS_DIR=... node --import tsx scripts/score.mjs
+// `@sj/shared` is published as TypeScript source, so plain node cannot load it:
+//     [SJ_MINDS_DIR=...] node --import tsx scripts/score.mjs
 import Database from 'better-sqlite3'
 import { readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'

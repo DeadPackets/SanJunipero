@@ -154,9 +154,8 @@ export async function writeBiography(deps: {
   let title = deps.name
   let body = 'Nothing is known of them yet.'
   if (record.length > 0) {
-    // Asked twice at most. The roster bans world words a true record can force — a town whose
-    // first tool is a tier-1 milestone makes `tool` the honest draft — so one refused draft is
-    // a sampling accident, and two is the answer.
+    // Asked twice at most: the roster bans world words a true record can force, so one refused
+    // draft is a sampling accident and two is the answer.
     let bio = await deps.llm.biography(deps.agentId, deps.name, record)
     if (framingViolated(bio)) bio = await deps.llm.biography(deps.agentId, deps.name, record)
     if (framingViolated(bio)) {
@@ -165,8 +164,6 @@ export async function writeBiography(deps: {
       )
       throw new Error(`framing_violation: biography of ${deps.agentId} rejected`)
     }
-    // A life cites the same way a chapter does: the footnote line, checked against the record
-    // it was written from.
     const seen = applyFootnotes(bio.body, [], new Set(record.map((r) => r.eventSeq)))
     if (seen.dangling.length > 0)
       deps.alert?.(

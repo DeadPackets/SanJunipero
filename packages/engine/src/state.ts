@@ -35,8 +35,7 @@ export function recipeTileKind(tile: TileId): string | null {
   return RECIPE_TILE_KIND_BY_ID.get(tile) ?? null
 }
 
-// The four ways a body can be failing. A named affliction is a cause with a clock on it —
-// `ill: boolean` stays for the older logs that only ever knew the one word.
+// `ill: boolean` stays alongside these, for the older logs that only knew the one word.
 export const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison'] as const
 export type AfflictionKind = (typeof AFFLICTION_KINDS)[number]
 // `sourceId` is the hand behind it, absent when nobody is: a death has to be able to name
@@ -210,8 +209,8 @@ export type WorldState = {
   counters: { nextEntityId: number }
 }
 
-// The one spelling of a tile's name in the sparse traffic and sapling maps above: a 128x128
-// array of nothing is a hash of nothing.
+// One spelling of a tile's key for the sparse maps above: a 128x128 array of nothing is a
+// hash of nothing.
 export function tileKey(x: number, y: number): string {
   return `${x},${y}`
 }
@@ -249,18 +248,16 @@ export function authoredOrigin(state: { origin?: { x: number; y: number } | unde
   return state.origin ?? { x: 0, y: 0 }
 }
 
-// Needs and thirst all live on 0-100. One derivation, because `needsBatch` predicts what the
-// fold will land on and a second copy of the bounds is a prediction that can be wrong.
+// One derivation of the 0-100 bounds: `needsBatch` predicts what the fold will land on, and a
+// second copy of them is a prediction that can be wrong.
 export const clampNeed = (v: number): number => Math.max(0, Math.min(100, v))
 
-// The one reader of the field. A body that has never been thirsty is a full one, which
-// is what lets every older log fold to the hash it always had.
+// Absent is full, which is what lets every older log fold to the hash it always had.
 export function thirstOf(a: { thirst?: number }): number {
   return a.thirst ?? 100
 }
 
-// `offset` is for the rare emitter that mints two ids before either has folded — a carcass
-// that yields meat and a hide. One derivation of an id, still.
+// `offset` is for the rare emitter that mints two ids before either has folded.
 export function mintId(state: WorldState, prefix: string, offset = 0): string {
   return `${prefix}_${state.counters.nextEntityId + offset}`
 }

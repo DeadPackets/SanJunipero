@@ -62,8 +62,6 @@ describe('route', () => {
     )
   })
 
-  // The share card's own address (ruling 18). A human following it must land on the person,
-  // which starts with the router reading them out of the path.
   it('parses /agent/:id — the person a share card is pasted from', () => {
     expect(parseRoute('/agent/amara', '')).toEqual({
       moment: null,

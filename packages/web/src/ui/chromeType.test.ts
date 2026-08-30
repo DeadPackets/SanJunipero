@@ -109,8 +109,7 @@ describe('B4 (partial) — the chrome type floors', () => {
 })
 
 // The sheet styles no bare `h2` outside `.digest-modal`, so an unclassed one is the browser's
-// system-ui bold at 21px — and RosterPanel's own skeleton used `.px-title`, so the heading
-// changed face and size the moment the data landed.
+// system-ui bold at 21px.
 describe('every page heading is the sheet\u2019s own face', () => {
   const HERE = new URL('../paper/pages/', import.meta.url)
   const views = readdirSync(HERE).filter((f) => f.endsWith('.tsx'))

@@ -1,7 +1,5 @@
 import { type WorldState } from '../state.js'
 
-// What more than one verb module needs: the event shape verbs emit, and the two questions
-// every verb asks about reach and about what a pair of hands is holding.
 export type PendingEvent = { type: string; payload: unknown }
 
 export function isAdjacentToRect(
@@ -51,7 +49,6 @@ export function nearRect(
   return isAdjacentToRect(a.x, a.y, { x, y, w, h })
 }
 
-// The in-progress construction site at exactly (x, y), if any.
 export function siteAt(state: WorldState, x: number, y: number) {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!

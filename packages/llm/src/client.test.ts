@@ -46,8 +46,6 @@ describe('migrateLlmTables', () => {
   })
 })
 
-// The second rung of the repair `object` already does in-process. Off unless asked for, so a
-// caller that has never wanted a wrong answer corrected still pays for exactly one generation.
 describe('LlmClient.object, one correction', () => {
   const EMPTY_USAGE = {
     inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
@@ -96,11 +94,9 @@ describe('LlmClient.object, one correction', () => {
       repairOnce: true,
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
-    // The provider's own bytes come back as its own turn, the correction as the user's.
     expect(seen[1]).toContain('mood')
     expect(seen[1]).toContain('Your answer was rejected')
     expect(seen[1]).toContain('count')
-    // Both generations are billed: a wrong answer was still served.
     expect(rows(db).map((r) => r.ok)).toEqual([0, 1])
   })
 
@@ -143,7 +139,6 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    // Wafer's real price: ((1000-600)*0.28 + 600*0.07 + 50*0.56) / 1e6 = 0.000182
     const expectedCost = ((1000 - 600) * 0.28 + 600 * 0.07 + 50 * 0.56) / 1e6
     expect(expectedCost).toBeCloseTo(0.000182, 10)
     expect(usage).toEqual({
@@ -240,8 +235,6 @@ describe('LlmClient.object', () => {
     expect(all[0]!.ok).toBe(0)
   })
 
-  // ★ A generation that came back with nothing was still billed. The retry path booked six
-  // hardcoded zeros, so ~10% of the mini-rehearsal's spend was invisible to every guard.
   it('★ books a paid-but-empty generation at what it cost, not at zero', async () => {
     const db = openDb()
     const model = mockModel([
@@ -262,15 +255,12 @@ describe('LlmClient.object', () => {
     expect(all[0]!.input_tokens).toBe(1000)
     expect(all[0]!.output_tokens).toBe(50)
     expect(all[0]!.cache_read_tokens).toBe(600)
-    // A dead call names no back end, so it books at the ceiling — the same rule a landed call
-    // with an unattributed route follows: ((1000-600)*0.44 + 600*0.114 + 50*1.32) / 1e6.
+    // A dead call names no back end, so it books at the ceiling.
     const ceiling = ((1000 - 600) * 0.44 + 600 * 0.114 + 50 * 1.32) / 1e6
     expect(all[0]!.cost_usd).toBeCloseTo(ceiling, 12)
     expect(all[0]!.reported_cost_usd).toBeNull()
-    // And the per-caller guard can now see the money it burned.
     expect(client.totalCostUsd()).toBeCloseTo(ceiling, 12)
-    // No `llm_price_unpriced_route` alert: a failure has no bill to reconcile, so it never
-    // goes through `book`, and ~10% of calls would otherwise be an alert flood.
+    // No `llm_price_unpriced_route` alert: a failure never goes through `book`.
     expect(db.prepare('SELECT kind FROM alerts').all()).toEqual([])
   })
 
@@ -310,7 +300,6 @@ describe('LlmClient.object', () => {
     const all = rows(db)
     expect(all).toHaveLength(1)
     expect(all[0]!.ok).toBe(1)
-    // The tokens were spent whether or not the shape was right, so they are reported.
     expect(all[0]!.input_tokens).toBe(1000)
     expect(usage.costUsd).toBeGreaterThan(0)
     const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as {
@@ -382,8 +371,8 @@ describe('budget guard', () => {
       { text: 'first', usage: { inputTokens: 1000, outputTokens: 1000 } },
       { text: 'never reached' },
     ])
-    // expectedCallCostUsd 0 isolates the booked-spend cap: this budget is
-    // smaller than one expected call, which T21's reservation refuses outright.
+    // expectedCallCostUsd 0 isolates the booked-spend cap: this budget is smaller than one
+    // expected call, which the reservation refuses outright.
     const client = new LlmClient({
       model,
       db,
@@ -398,7 +387,6 @@ describe('budget guard', () => {
     await expect(
       client.text({ messages: [{ role: 'user', content: 'u' }] }),
     ).rejects.toBeInstanceOf(BudgetExceededError)
-    // model was NOT invoked a second time
     expect(model.doGenerateCalls).toHaveLength(1)
     expect(rows(db)).toHaveLength(1)
   })
@@ -417,8 +405,7 @@ describe('budget guard', () => {
 })
 
 describe('served model attribution', () => {
-  // An unknown model is a different product at an unknown price, so it books at the worst rate
-  // any endpoint charges and raises an alert. It can only over-report.
+  // An unknown model is a different product at an unknown price: the ceiling can only over-report.
   it('logs the model that actually answered, costed at the ceiling when unpriced', async () => {
     const db = openDb()
     const model = mockModel([
@@ -438,8 +425,6 @@ describe('served model attribution', () => {
   })
 })
 
-// OpenRouter reports what it charged on the response that carries the tokens; the pinned table
-// computes a second opinion; the two are compared every call.
 describe('price reconciliation', () => {
   const kinds = (db: Database.Database): string[] =>
     (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as { kind: string }[]).map(
@@ -465,7 +450,6 @@ describe('price reconciliation', () => {
     expect(usage.costUsd).toBeCloseTo(0.00099, 12)
   })
 
-  // The defect: a table half the endpoint's real price books half the spend.
   it('alerts when the table disagrees with what the provider charged', async () => {
     const db = openDb()
     // Wafer's real price for these tokens is (1000*0.28 + 1000*0.56)/1e6 = $0.00084.
@@ -475,7 +459,6 @@ describe('price reconciliation', () => {
         provider: 'Wafer',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        // ...but suppose the provider actually charges double what the table believes.
         reportedCostUsd: 0.00168,
       },
     ])
@@ -493,7 +476,6 @@ describe('price reconciliation', () => {
     expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.00168, 12)
   })
 
-  // A reconciliation that alerts on every call is one people mute inside a week.
   it('is silent when the table agrees with the provider', async () => {
     const db = openDb()
     const model = mockModel([
@@ -528,7 +510,6 @@ describe('price reconciliation', () => {
     expect(kinds(db)).toEqual([])
   })
 
-  // A `served` value with no price row must not fall through to somebody else's cheap rate.
   it('books an unpriced provider at the ceiling and complains, never at the pinned rate', async () => {
     const db = openDb()
     const model = mockModel([
@@ -634,7 +615,6 @@ describe('pessimistic reservation (T21)', () => {
       expectedCallCostUsd: 0.005,
     })
 
-    // All five reserve synchronously before any of them can answer.
     const calls = Array.from({ length: 5 }, () =>
       client.object({ schema: SCHEMA, system: 's', messages: [{ role: 'user', content: 'u' }] }),
     )
@@ -709,8 +689,6 @@ describe('pessimistic reservation (T21)', () => {
   })
 })
 
-// ★ Ruling 11 + minds.md finding: `assemblePrompt` scanned the TURN prompt only, and five of the
-// six provider-bound callers went out unscanned. This is the one door they all pass through.
 describe('★ the one-way glass, on every prompt the client sends', () => {
   const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic'] as const
 
@@ -781,8 +759,8 @@ describe('default OpenRouter path extraBody', () => {
     })
   })
 
-  // Ruling 19 (2026-08-30): a live town pins the provider as an allow-list. 9 of 309 rehearsal-3
-  // calls were served by OpenInference, each one a cold prefix and an unpriced route.
+  // A live town pins the provider as an allow-list: 9 of 309 rehearsal-3 calls hopped to
+  // OpenInference, each one a cold prefix and an unpriced route.
   it('★ carries allow_fallbacks:false for every mind caller, with nothing asked for', () => {
     const db = openDb()
     for (const caller of ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic']) {
@@ -793,8 +771,8 @@ describe('default OpenRouter path extraBody', () => {
     }
   })
 
-  // Ruling 23 (2026-08-30): two names on the allow-list, so a Baidu rate limit does not idle
-  // the minds. Order is the preference; `allow_fallbacks:false` is still what makes it a list.
+  // Two names so a Baidu rate limit does not idle the minds. Order is the preference;
+  // `allow_fallbacks:false` is still what makes it a list.
   it('★ the request body carries both allowed providers, in order', () => {
     expect(PROVIDER_ORDER).toEqual(['Baidu', 'AtlasCloud'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
@@ -826,8 +804,8 @@ describe('default OpenRouter path extraBody', () => {
     expect(defaultExtraBody()).not.toHaveProperty('reasoning')
   })
 
-  // One call inside a pass can need the dials the other five do not — the night's personality
-  // edit is the only one E2 found anything lost on, and it now asks for them by name.
+  // The night's personality edit is the one call inside the pass that needs other dials,
+  // and it now asks for them by name rather than moving one by hand.
   it("★ forCaller takes the new name's pinned settings and leaves the routing alone", () => {
     const db = openDb()
     const night = new LlmClient({ db, caller: 'reflection' })
@@ -876,8 +854,8 @@ describe('the back end that answered is written down (C11 R20)', () => {
   })
 })
 
-// ★ Ruling 23: without this column a ceiling that truncates is indistinguishable from a bad
-// answer, and every cap in `pins.ts` would be unable to tell you it is wrong.
+// ★ Without this column a ceiling that truncates is indistinguishable from a bad answer, and
+// no cap in `pins.ts` can tell you it is set wrong.
 describe('★ why the provider stopped is on every ledger row', () => {
   const alertsOf = (db: Database.Database, kind: string): string[] =>
     (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(

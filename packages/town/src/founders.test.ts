@@ -33,7 +33,6 @@ import {
   walkEnergyCost,
 } from './founders.js'
 
-// The dev world after its first tick: five founders, six finished buildings.
 function townAtTick1(): WorldState {
   let state = genesisState(SHOWCASE_CONFIG, makeFixtureMap())
   const events: { type: string; payload: unknown }[] = []
@@ -124,8 +123,7 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
       path.length * tired * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick,
       10,
     )
-    // Priced at the TIRED rate: a body that sets out fresh is under the debuff threshold long
-    // before it arrives, and quoting today's speed under-prices exactly the long late journeys.
+    // Priced at the TIRED rate: quoting today's speed under-prices the long late journeys.
     expect(tired).toBeGreaterThan(SHOWCASE_CONFIG.movement.baseTicksPerTile)
     expect(walkEnergyCost(at(door.x, door.y, 50), SHOWCASE_CONFIG, 'omar', door)).toBe(0)
   })
@@ -153,8 +151,7 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
   })
 
   it('★ prices the two ticks at the door, so the walk never ends in a collapse on the step', () => {
-    // Enough for the walk and nothing more: enter and sleep would take the body under the
-    // threshold, and a body on the step that cannot sleep is the collapse the storm run found.
+    // Enough for the walk and nothing more: enter and sleep would take the body under the threshold.
     const far = at(6, 32, GO_HOME_BELOW - 1)
     const decay = awakeEnergyDecay(SHOWCASE_CONFIG, far.agents.omar!)
     const need = walkEnergyCost(far, SHOWCASE_CONFIG, 'omar', door)! + 2 * decay
@@ -195,8 +192,7 @@ describe('makeFoundersOnTick interiors switch', () => {
     return putAt(s, 'omar', door.x, door.y)
   }
 
-  // `enter` is a timed verb: the tick that accepts it emits action_started, and
-  // agent_entered lands when the action completes.
+  // `enter` is a timed verb: agent_entered lands when the action completes, not when it starts.
   const verbsStarted = (interiors: boolean): string[] => {
     const state = spent()
     const out: string[] = []
@@ -250,11 +246,8 @@ describe('makeFoundersOnTick interiors switch', () => {
   })
 })
 
-// ---------------------------------------------------------------- U25: five roofs, not one
-
 const SHOWCASE_STRUCTURES = devTown().structures
 
-// The real town at tick 1: five founders and eleven buildings, five of them owned.
 function showcaseTownAtTick1(): WorldState {
   let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
   const events: { type: string; payload: unknown }[] = []
@@ -292,8 +285,7 @@ describe('homeOf', () => {
 })
 
 describe('U25 — the humans were all sleeping inside one house', () => {
-  // The user's sentence, as an assertion. Every founder is kept spent so home is the only
-  // errand any of them has; the run ends when all five are indoors.
+  // Every founder is kept spent so home is the only errand; the run ends when all five are indoors.
   it('puts five tired founders under five different roofs', () => {
     let state = showcaseTownAtTick1()
     const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
@@ -393,7 +385,6 @@ describe('the storerooms hold something', () => {
   /** the web card's cap — packages/web/src/ui/interiorModel.ts ROOM_HOLDS_MAX */
   const ROOM_HOLDS_MAX = 8
 
-  /** the showcase town after its first tick, which is the town a viewer actually opens */
   function showcaseAtTick1(): WorldState {
     const structures = townStructuresFor('showcase')
     let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
@@ -418,12 +409,10 @@ describe('the storerooms hold something', () => {
     Object.values(state.items).filter((i) => i.loc.t === 'structure' && i.loc.id === structureId)
 
   it('THE BEFORE-STATE: the town stored nothing at all, in any building', () => {
-    // the landed script emits agents and buildings and not one item, which is why a panel
-    // with passing tests had never rendered against data
     expect(devHoldings([]).length).toBe(0)
     expect(
       Object.values(showcaseAtTick1().items).filter((i) => i.loc.t === 'structure').length,
-    ).toBeGreaterThan(0) // RED against the landed script, which stores zero
+    ).toBeGreaterThan(0)
   })
 
   it('fills the public storehouse past the card’s cap, so "and N more" is real', () => {
@@ -510,8 +499,7 @@ describe('the storerooms hold something', () => {
     for (const h of a) expect(h.id, h.id).not.toMatch(/_\d+$/)
   })
 
-  // The seed is OFF unless asked for, so every landed gate folds exactly the world it always
-  // did — the scripted fixture is frozen and this is a demo town's larder, not world law.
+  // The seed is OFF unless asked for: the scripted fixture is frozen and this is a demo larder.
   it('leaves the frozen scripted fixture exactly as every landed gate folded it', () => {
     expect(Object.keys(townAtTick1().items)).toEqual([])
   })

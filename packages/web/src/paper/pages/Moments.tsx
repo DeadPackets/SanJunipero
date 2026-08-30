@@ -224,7 +224,6 @@ function PlayerStripView({
   )
 }
 
-/** The filmstrip and its player, on the page instead of across the bottom of the town. */
 export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The town is still watchable without its record, so a refused read stays `null`.
@@ -259,7 +258,6 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
     setPlayerOf((prev) => ({ id: liveId, state: step(playerFor(prev)) }))
   }
 
-  // Opening a day parks the view at its first minute.
   useEffect(() => {
     if (open === null) return
     onJump(open.startTick)

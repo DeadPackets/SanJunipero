@@ -63,8 +63,7 @@ export class TickLoop {
     return this.#speed
   }
 
-  /** The world clock stops. Nothing else does: the store, the socket and the viewer keep going.
-   *  The CADENCE honours this, never `step()` — a primitive that sometimes does nothing turns
+  /** The CADENCE honours this, never `step()` — a primitive that sometimes does nothing turns
    *  every counted advance in the repo into a spin. */
   pause(): void {
     this.#paused = true

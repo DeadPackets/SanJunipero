@@ -1,23 +1,21 @@
 import { STEW_KIND } from '../food.js'
 import { inputName, type RecipeDef, type SimConfig, type StructureRecipeDef } from '@sj/shared'
 
-// What can be built at all: a row with materials on it. An empty `inputs` marks a kind the
-// world places and nobody raises — a grave is not a building project.
+// An empty `inputs` marks a kind the world places and nobody raises.
 export function buildableRecipe(config: SimConfig, kind: string): StructureRecipeDef | null {
   const row = config.structures.recipes[kind]
   return row !== undefined && Object.keys(row.inputs).length > 0 ? row : null
 }
 
-// The house keeps its own dial as the duration source; every other kind reads its row. The two
-// are asserted equal in config.test.ts, so this is one number under two names, not two numbers.
+// The house has its own dial; config.test.ts asserts it equals its recipe row, so this is one
+// number under two names.
 export function buildTicks(config: SimConfig, kind: string): number {
   return kind === 'house'
     ? config.construction.houseTicks
     : (config.structures.recipes[kind]?.durationTicks ?? 0)
 }
 
-// Code and not a dial, because SimConfigSchema is closed — and it wants two things a config row
-// cannot say: a fire somebody is feeding, and a vessel with water in it.
+// Code and not a dial: SimConfigSchema is closed, and a row cannot say "at a fire" or "with water".
 export type SeedRecipe = RecipeDef & { atFire?: true; water?: number }
 
 export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
@@ -28,15 +26,12 @@ export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
     atFire: true,
     water: 1,
   },
-  // crafting.recipes holds the weaver's road (fiber → cloth → garment) and is closed, so the road
-  // that skips the loom lives here. The name has to differ from that row; the thing it makes does not.
+  // The key must differ from the closed `crafting.recipes` row; the product it makes need not.
   hide_garment: {
     inputs: { hide: 2 },
     output: { kind: 'garment', qty: 1 },
     skill: 'tailoring',
   },
-  // A stick and a wrap of dry reed. Until this row the only flame in the world was the one
-  // the founders were given, and `kindle` had nothing to strike.
   torch: {
     inputs: { wood: 1, fiber: 1 },
     output: { kind: 'torch', qty: 1 },
@@ -48,8 +43,8 @@ export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefin
   return config.crafting.recipes[name] ?? SEED_RECIPES[name]
 }
 
-// A mind asks for the THING, not the road to it: "craft garment" with two hides in hand must not
-// be told there is no cloth. The row that owns the name is tried first; order is by key.
+// A mind asks for the THING, not the road: "craft garment" with two hides in hand must not be
+// told there is no cloth.
 export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
   const named = recipeFor(config, name)
   const product = named?.output.kind ?? name
@@ -61,8 +56,7 @@ export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
   return routes
 }
 
-// Off the same two tables build and craft already validate against. No new physics: the vocabulary
-// those verbs have always accepted, gathered in one place so somebody can be told it.
+// Off the same two tables build and craft validate against — no vocabulary of its own.
 export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
 export type Makeables = {
   builds: { kind: string; inputs: Record<string, number> }[]
@@ -76,8 +70,7 @@ export function makeables(config: SimConfig): Makeables {
       const row = buildableRecipe(config, kind)
       return row === null ? [] : [{ kind, inputs: row.inputs }]
     })
-  // One word per product, because `craftRoutes` already lets one word reach every road to it:
-  // "garment" finds the loom and the hide, where `hide_garment` would have found only the hide.
+  // One word per product: `craftRoutes` reaches every road to it from the product's own name.
   const products = new Set<string>()
   for (const name of [...Object.keys(config.crafting.recipes), ...Object.keys(SEED_RECIPES)]) {
     products.add(recipeFor(config, name)?.output.kind ?? name)
@@ -93,8 +86,7 @@ export function makeables(config: SimConfig): Makeables {
   return { builds, crafts }
 }
 
-// Where a material comes from, for the refusal that says a pair of hands is short of one: the
-// live gate answered "not enough meat" to a town that had never seen an animal.
+// "not enough meat" means nothing to a town that has never seen an animal.
 const MATERIAL_SOURCE: Readonly<Record<string, string>> = {
   meat: 'meat comes off an animal you have hunted, or a fish out of the water',
   vegetables:

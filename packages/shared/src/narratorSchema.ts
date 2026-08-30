@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS publications (
   rendered_at TEXT NOT NULL DEFAULT (datetime('now')));
 `
 
-/** The firsts ledger, whole: `@sj/narrator` writes every column and the gateway serves them. */
 const MILESTONE_COLUMNS = [
   'kind',
   'label',
@@ -87,8 +86,7 @@ export type MilestoneRow = {
   name_provenance: string | null
 }
 
-/** The row decoded, as `/api/milestones` serves it. `@sj/narrator`'s own `Milestone` is the
- *  writer's shape of the same nine columns; this is the reader's. */
+/** `@sj/narrator`'s own `Milestone` is the writer's shape of these columns; this is the reader's. */
 export type MilestoneRead = {
   kind: string
   label: string
@@ -112,8 +110,7 @@ const jsonColumn = <T>(text: string | null, fallback: T): T => {
   }
 }
 
-/** Declared beside the row, so no reader of narrator.db can decide on its own what a JSON
- *  column or a TEXT tier means. */
+/** Declared beside the row, so no reader decides on its own what a JSON column or TEXT tier means. */
 export const milestoneFromRow = (r: MilestoneRow): MilestoneRead => ({
   kind: r.kind,
   label: r.label,

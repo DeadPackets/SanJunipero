@@ -192,7 +192,6 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
   })
 })
 
-// ---------------------------------------------------------------- cause and grave
 const hurt = (s: WorldState, amount: number) =>
   fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
 const starve = (s: WorldState) =>
@@ -221,8 +220,7 @@ const SCENARIOS: [DeathCause, () => WorldState][] = [
       return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, thirst: 0 } } }
     },
   ],
-  // The same fatigue rung, on a body the cold has been billing. The ladder is the
-  // only road the cold takes, so the drain is identical and only the name changes.
+  // The same fatigue rung, on a body the cold has been billing: only the name changes.
   [
     'exposure',
     () => {
@@ -371,7 +369,6 @@ describe('a grave where the life ended', () => {
   })
 })
 
-// ------------------------------------------------- the collapse ladder gets a floor
 describe('a collapse that never recovers becomes fatigue', () => {
   // Hunger under collapseThreshold puts the body down; raising it lifts the collapse so the
   // next fall is a fresh one. Nothing here feeds the body — that is the whole point.

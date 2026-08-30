@@ -9,10 +9,8 @@ import type { Scene } from './scene.js'
 import { BUILDING_PX_PER_TILE, facingCellKind, resolveAssetId } from './textures.js'
 import { windNow } from './wind.js'
 
-// U8: smoke that behaves like smoke. A puff is born faint at the chimney, swells as it rises,
-// leans on the town's one wind and fades out — never a pop at full opacity (D13). Puffs are
-// NEAREST textures on the integer grid, one per diameter, so "growing" is a texture swap and
-// never a resample. Pooled, culled to the view (D21), still under reduced motion.
+// Puffs are NEAREST textures on the integer grid, one per diameter, so "growing" is a texture
+// swap and never a resample.
 
 export const SMOKE_PUFFS = 5
 export const SMOKE_LOOP_MS = 2400
@@ -21,7 +19,6 @@ const SMOKE_DRIFT_PX = 10
 /** `scale = 0.7 + 0.9·prog` over a 6 px puff spans 4.2–9.6 px: these are its whole-pixel rungs,
  *  one per quarter of the puff's life. */
 export const PUFF_DIAMETERS = [4, 6, 8, 10] as const
-/** how far a puff can stand from its chimney: the drift plus the largest puff */
 const REACH_PX = SMOKE_DRIFT_PX + PUFF_DIAMETERS[PUFF_DIAMETERS.length - 1]!
 type PuffDiameter = (typeof PUFF_DIAMETERS)[number]
 
@@ -45,9 +42,8 @@ export function puffAt(prog: number, w: number): Puff {
   }
 }
 
-/** Where a kind's chimney is, relative to its feet, in world px — or null, which is "no
- *  smoke". Read leniently off the manifest's own JSON, so a codex without `points.chimney`
- *  (or one whose schema has not learned it yet) draws nothing rather than guessing. */
+/** Relative to its feet, in world px, or null for "no smoke". Read leniently off the manifest's
+ *  own JSON, so a codex without `points.chimney` draws nothing rather than guessing. */
 export function chimneyOf(
   records: AssetRecord[],
   kind: string,
@@ -89,7 +85,6 @@ type Hearth = { sx: number; sy: number; phase: number; puffs: Sprite[] }
 
 export type SmokeLayer = {
   tick(dtMs: number): void
-  /** how many puffs are drawn and how many the view let it skip — a cull nobody can count is a claim */
   counts(): { drawn: number; culled: number }
   destroy(): void
 }

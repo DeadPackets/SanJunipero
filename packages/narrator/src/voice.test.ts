@@ -25,8 +25,7 @@ const scenes: SceneSegment[] = [
   { day: 1, startTick: 1500, endTick: 1510, eventIds: [4, 5], cast: ['nadia'], location: null },
 ]
 
-// What each voice is asked for, written the way it was asked: no number in a sentence, one
-// footnote line under each paragraph.
+// Written the way each voice is asked: no number in a sentence, one footnote line a paragraph.
 const CLEAN: Record<NarratorVoice, string> = {
   chronicler:
     'Omar raised the wall by the storehouse and Nadia carried water to him twice.\nSeen: 1, 2\n\nBy evening the quarrel had gone quiet.\nSeen: 4, 5',
@@ -62,8 +61,7 @@ describe('footnote parsing', () => {
     expect(footnoteSeqs('The eleven frames stood.\nSeen: 7')).toEqual([7])
   })
 
-  // Asked for a trailing line, the narrator as often hangs the footnote off the last sentence,
-  // or writes one after every sentence in the paragraph.
+  // Asked for a trailing line, the narrator as often hangs the footnote off a sentence instead.
   it('reads a footnote wherever the narrator put it', () => {
     const tail = 'She walked without hurry.  Seen: 285, 286, 12126'
     expect(footnoteSeqs(tail)).toEqual([285, 286, 12126])
@@ -73,7 +71,6 @@ describe('footnote parsing', () => {
     expect(stripFootnotes(mid)).toBe('Fair at first light. They gathered at the fork.')
   })
 
-  // A span of six thousand seqs is not a citation; it parses to nothing and is pruned away.
   it('takes a range as no citation at all', () => {
     const ranged = 'The ground took the shape of a town.     Seen: 1-6009, 6010-11647'
     expect(footnoteSeqs(ranged)).toEqual([])

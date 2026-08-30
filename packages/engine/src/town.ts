@@ -63,8 +63,8 @@ export function standingRects(state: WorldState): WorldRect[] {
     .map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h }))
 }
 
-// Open water and a dug channel, named from the shared alphabet but kept as a local set: the
-// lattice search asks this per tile of every claim, and a cross-package call there is measurable.
+// A local set, not the shared helper: the lattice search asks this per tile of every claim,
+// and a cross-package call there is measurable.
 const WET: ReadonlySet<number> = new Set([T_WATER, T_CHANNEL])
 
 /** Unions the grammar's channel with the world's water: the fork reaches the lattice at ring 3,
@@ -142,8 +142,7 @@ export function layBlock(
     for (const t of tiles) {
       const from = state.terrain[t.y]?.[t.x]
       if (from === undefined) return 'off the map'
-      // A field and a street are somebody's work; a channel is not spared, because it is
-      // impassable and a plot the town can never build on is worse than a lost ditch.
+      // A channel is not spared: a plot the town can never build on is worse than a lost ditch.
       if (reason === 'levelled' && (from === T_FARMLAND || from === T_ROAD)) continue
       if (from !== to) out.push({ x: t.x, y: t.y, from, to, reason })
     }

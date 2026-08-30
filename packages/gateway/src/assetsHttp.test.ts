@@ -112,7 +112,6 @@ describe('asset http routes', () => {
     } finally {
       PLACEHOLDER_PX.crop = real
     }
-    // and the failure was not remembered as this key's answer for the life of the process
     expect((await fetch(`${base}/assets/placeholder/crop.png`)).status).toBe(200)
   })
 

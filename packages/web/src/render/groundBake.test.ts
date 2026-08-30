@@ -11,17 +11,10 @@ import { groundField, SKIRT_KIND } from './groundField.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { TextureBook } from './textures.js'
 
-// D3: a diamond per tile, each rasterised on its own, leaves every shared edge half-covered —
-// a 50/50 pixel composites to alpha 0.75 over the transparent bake target and the stage
-// colour shows through as a dark lattice (×0.845 luma measured on the shipped frame). The
-// test below is that rasteriser, in miniature: coverage-antialiased polygons composited
-// `over` one another, read back as luma over the stage colour.
-
 const SS = 8 // sub-samples per axis
 const FIELD_LUMA = 148.6 // the grass field the critique measured
 const STAGE_LUMA = 46 // BACKGROUND 0x322b38
 
-/** A convex diamond's inside test from its `tileDiamond` points. */
 function insideDiamond(pts: number[], x: number, y: number): boolean {
   const cx = pts[0]!,
     top = pts[1]!,
@@ -74,7 +67,6 @@ function edgeLumaRatio(outset: number): number {
   let worst = 1
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
-      // inside the big diamond the n × n patch forms, by a 2 px margin
       const dx = Math.abs(px + 0.5 - cx) / (n * (TILE_W / 2) - 2)
       const dy = Math.abs(py + 0.5 - (1 + n * (TILE_H / 2))) / (n * (TILE_H / 2) - 2)
       if (dx + dy > 1) continue
@@ -107,8 +99,6 @@ describe('★ D3 — the tile-edge dark line', () => {
     expect([x3, y3]).toEqual([83.5, 58])
   })
 })
-
-// ── the baker, driven without a GPU ────────────────────────────────────────────────────────
 
 type Bake = { at: { x: number; y: number }; kids: Container[] }
 

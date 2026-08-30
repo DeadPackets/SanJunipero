@@ -2,7 +2,6 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { rectInView } from '../render/cull.js'
 import type { Scene } from '../render/scene.js'
 
-/** Who a stage mark is about. */
 export type Subject = { id: string; kind: 'agent' | 'structure'; name: string }
 
 /** A point in the space `tileToScreen` returns. */
@@ -13,11 +12,8 @@ export type StageAnchor = { x: number; y: number; onScreen: boolean }
 /** How much room a mark needs on each side of its anchor to stay whole. */
 export type Reach = { x: number; y: number }
 
-/**
- * A mark wider than the body it hangs off runs out of the picture near an edge: the ring round a
- * figure at x = 20 put its left arm at x = -55, off-screen and unreachable. The mark slides in
- * far enough to stay whole, so it stops being exactly centred before it stops being usable.
- */
+/** A mark wider than the body it hangs off runs out of the picture near an edge: the ring round
+ *  a figure at x = 20 puts its left arm at x = -55. It slides in far enough to stay whole. */
 export function keepOnStage(a: StageAnchor, w: number, h: number, reach: Reach): StageAnchor {
   const hold = (v: number, span: number, pad: number): number =>
     span < pad * 2 ? span / 2 : Math.min(Math.max(v, pad), span - pad)
@@ -50,7 +46,6 @@ export function subjectPoint(scene: Scene, subject: Subject): WorldPoint | null 
 const steps = new Set<() => void>()
 let raf = 0
 
-/** Run `step` on the stage's own frame, until the returned function is called. */
 export function joinStageLoop(step: () => void): () => void {
   steps.add(step)
   if (raf === 0) {
@@ -68,10 +63,8 @@ export function joinStageLoop(step: () => void): () => void {
   }
 }
 
-/**
- * Puts a DOM mark over a world point, every frame, by writing the node's own style. A camera
- * moving at 60 fps through React state would re-render the whole overlay 60 times a second.
- */
+/** Written to the node's own style every frame: a camera moving at 60 fps through React state
+ *  would re-render the whole overlay 60 times a second. */
 function useStageAnchor(
   scene: Scene | null,
   point: (() => WorldPoint | null) | null,
@@ -110,7 +103,6 @@ function useStageAnchor(
   return el
 }
 
-/** The anchor every mark about a person or a building uses. */
 export function useSubjectAnchor(
   scene: Scene | null,
   subject: Subject | null,

@@ -6,8 +6,8 @@ import { queueNeed } from './needsBatch.js'
 
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 
-// The one derivation of the warmth a body drifts toward: warmthSystem takes the number
-// over the moment the cold has teeth, and it must be the same number in both places.
+// The one derivation of the warmth a body drifts toward; warmthSystem takes it over the moment
+// the cold has teeth, and must land on the same number.
 export function warmthTarget(state: WorldState): number {
   return warmthTargetFromAir(state.weather.temperatureC)
 }

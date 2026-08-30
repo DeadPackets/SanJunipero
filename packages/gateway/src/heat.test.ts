@@ -17,8 +17,7 @@ const ev = (
   payload: Record<string, unknown>,
 ): SimEvent => ({ seq, tick, type, payload })
 
-// The read path's own fold, assembled from the pieces it uses — one score map, one context, and
-// the plan map it keeps as it goes. See `readFold` in api.ts; there is no second scorer to drift.
+// The read path's own fold; see `readFold` in api.ts — there is no second scorer to drift.
 const score = (events: readonly SimEvent[]): HeatWindow[] => {
   const scores: HeatScores = new Map()
   const plans = new Map<string, string>()
@@ -122,7 +121,6 @@ describe('heat stub', () => {
     })
 
     it('scores nobody rather than guessing when the log names nobody at all', () => {
-      // no plan, no completion in front of them — the honest answer is silence
       expect(
         score([
           ev(1, 0, 'fire_ignited', { structureId: 'ghost', cause: 'lightning' }),
@@ -159,8 +157,7 @@ describe('heat stub', () => {
   })
 
   it('★ scoring the narrowed log is scoring the whole log', () => {
-    // One of every weighted type, a completion, its result, and the rows api.ts's SELECT drops
-    // sitting between them — the shape the type filter had to be proved against.
+    // One of every weighted type, a completion, its result, and the rows api.ts's SELECT drops.
     const log: SimEvent[] = [
       ev(1, 1, 'structure_planned', { id: 's1', kind: 'house', builderId: 'omar' }),
       ev(2, 2, 'needs_changed', { id: 'ana', changes: [{ need: 'hunger', delta: -1 }] }),

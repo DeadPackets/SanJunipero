@@ -1,5 +1,3 @@
-// The half of a building/structure generator run that is the same whichever subjects it draws:
-// the palette reference, the provider call, the candidate loop, the commit and the report.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { Footprint } from '@sj/shared'
 import { BudgetGuard } from '../../src/budget.js'
@@ -50,13 +48,8 @@ export async function imageGen(o: {
 
 export const GEN_MODEL = MODEL
 
-// ★ `integerScaleGate(GEN_PX, cellPx)` used to stand here, and it refused cells that are provably
-// clean: `spriteCell` divides by `ceil(subjectPx / cellPx)`, so the divide is ALWAYS whole and the
-// window ALWAYS contains the subject — GEN_PX needing to be a multiple of cellPx was never the
-// property. Measured on the cached raws: cottage (cellPx 640, window 1920 INSIDE the 2048 source)
-// was refused, and farmhouse (window 2304, overrunning by 256) came out 630x651 = exactly its
-// source subject divided by 3, binary alpha, feet on the last row. What can really go wrong is a
-// subject too SMALL for its canvas, so that is what refuses one now.
+// Not `integerScaleGate(GEN_PX, cellPx)`: `spriteCell` divides by `ceil(subjectPx / cellPx)`, so
+// the divide is always whole. What can really go wrong is a subject too SMALL for its canvas.
 const CELL_FILL_MIN = 0.6
 
 // The palette, in words, for the calls that carry no building reference.
@@ -68,7 +61,6 @@ export const PALETTE_WORDS = [
   'Flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
 ].join(' ')
 
-/** One cell to draw: a subject in one facing, already resolved to its prompt and reference. */
 export type CellJob = {
   label: string // the content directory and the report row, e.g. `house-sw`
   kind: string // what the manifest calls it, e.g. `house:sw`
@@ -93,8 +85,7 @@ export async function runCells(o: RunOptions): Promise<void> {
   const cap = Number(env('CAP') ?? o.defaultCap)
   const maxAttempts = Number(env('ATTEMPTS') ?? '3')
   const dry = env('DRY') === '1'
-  // A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
-  // clean its numbers are. The eye is the gate the gates cannot be.
+  // A candidate named here was refused by eye, so it is never chosen however clean its numbers are.
   const rejected = new Set(
     (env('REJECTED') ?? '')
       .split(',')
@@ -125,8 +116,8 @@ export async function runCells(o: RunOptions): Promise<void> {
   const rows: string[] = []
   const members: { name: string; density: number }[] = []
   const lines: string[] = []
-  // Cells this run refused to ship. Collected, not thrown on the spot: the unit of work is ONE
-  // CELL, and the report of every attempt is worth more than an early exit.
+  // Collected, not thrown on the spot: the unit of work is ONE CELL, and a report of every
+  // attempt is worth more than an early exit.
   const refusedCells: string[] = []
 
   for (const job of o.jobs) {
@@ -189,9 +180,7 @@ export async function runCells(o: RunOptions): Promise<void> {
       }
     }
 
-    // Among the CLEAN candidates only (user ruling; the shape and reason are in src/gate.ts).
     // Choosing is not deciding: the ranker picks from a pool that cannot contain a failure.
-    // The winner is the one whose subject fills the most of its window.
     const clean = cands.filter((c) => c.fails.length === 0)
     const win = clean
       .sort((a, b) => a.plan.subjectPx / a.plan.window - b.plan.subjectPx / b.plan.window)
@@ -208,7 +197,6 @@ export async function runCells(o: RunOptions): Promise<void> {
       continue
     }
 
-    // contact sheet of every candidate, beside the raws, so the eye can compare before signing
     for (const c of cands) writeFileSync(`${o.scratch}/cells/${c.key}.png`, await encodePng(c.cell))
 
     const dir = `${BUILDINGS_CONTENT_DIR}/${job.kind.replace(':', '-')}`
@@ -260,8 +248,8 @@ export async function runCells(o: RunOptions): Promise<void> {
   writeFileSync(`${o.scratch}/reports/${o.reportFile}`, md)
   console.log(`\n${md}`)
 
-  // The report is written FIRST and then the run fails: it is what tells an operator whether the
-  // model or the threshold is wrong. `classDensityGate` is a class property, judged by artCoverage.
+  // The report is written before the run fails: it is what tells whether the model or the
+  // threshold is wrong.
   const stopped = [
     ...(refusedCells.length === 0
       ? []

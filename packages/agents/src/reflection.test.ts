@@ -380,8 +380,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     expect(sink.alerts).toHaveLength(1)
   })
 
-  // ★ Live, 2026-08-26: three attempts stalled past the per-attempt timeout, `invokeReserved`
-  // rethrew the raw `TimeoutError`, and the whole night was lost with one `reflection_failed`.
+  // ★ A raw `TimeoutError` rethrown by `invokeReserved` lost a whole night to one alert row.
   it('★ a provider stall degrades the night instead of losing it', async () => {
     for (const name of ['TimeoutError', 'AbortError']) {
       const { mem, personality } = await makeStores()

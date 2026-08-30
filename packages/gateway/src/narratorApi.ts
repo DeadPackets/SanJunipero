@@ -38,12 +38,10 @@ export type NarratorApiDeps = {
   agentDbDir?: string | undefined // agent memory, for the days a personality moved
 }
 
-/** How many entries `/api/chronicle` sends. Every open panel refetches the feed on a 20 s timer,
- *  and unbounded that is the whole town history per viewer per poll. */
+/** Every open panel refetches the feed on a 20 s timer; unbounded that is the whole history. */
 export const CHRONICLE_MAX = 200
 
-/** How many days of the town's own paper `/api/dispatches` sends. The record grows one row a
- *  day forever and every open panel refetches it, so the panel reads the recent run. */
+/** The record grows one row a day forever and every open panel refetches it. */
 const DISPATCH_MAX = 30
 
 /** The five things the world's own log records that the town would remember. Anything else is
@@ -96,9 +94,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     }
   }
 
-  // Clamped because a free key is a cache a stranger can miss on purpose: unclamped,
-  // `?toTick=1000000000` is a scan of a range the world never had. The clamped pair is also the
-  // memo key, so every over-long window collapses onto the same entry.
+  // A free key is a cache a stranger can miss on purpose. The clamped pair is also the memo key,
+  // so every over-long window collapses onto the same entry.
   const windowOf = (url: URL): { fromTick: number; toTick: number } => {
     const liveTick = deps.mirror.state().tick
     const pin = (raw: string | null, fallback: number): number => {
@@ -165,9 +162,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
-  // The town's own paper and everything written beside it. Memoised on the world DAY, not on
-  // `mirror.seq()`: nothing here changes between day boundaries, and a seq-keyed memo would
-  // rescan six tables on every pump.
+  // Memoised on the world DAY, not `mirror.seq()`: nothing here changes between day boundaries,
+  // and a seq-keyed memo would rescan six tables on every pump.
   let dispatchedDay = -1
   let dispatched: unknown = null
   router.route('GET', '/api/dispatches', (_req, res) => {
@@ -186,8 +182,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
           `SELECT day, body AS caption FROM publications WHERE kind = 'timelapse_caption'
            ORDER BY day DESC LIMIT ${DISPATCH_MAX}`,
         ),
-        // Only the newest of each life: a biography is rewritten as its subject lives longer,
-        // and the older drafts are superseded rather than news.
+        // Only the newest of each life: a biography is rewritten as its subject lives longer.
         biographies: readOrEmpty(
           db,
           `SELECT subject_id AS subjectId, MAX(day) AS day, title, body FROM publications

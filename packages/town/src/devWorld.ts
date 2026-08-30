@@ -64,7 +64,7 @@ export const STILL_WEATHER_CONFIG: SimConfig = {
   weather: { ...SHOWCASE_CONFIG.weather, hourlyChangeChance: 0 },
 }
 
-// The G6 "live thought" source — human framing, no AI vocabulary.
+// Human framing, no AI vocabulary: one-way glass holds for canned lines too.
 export const THOUGHT_LINES: Record<string, string> = {
   walk: 'The path is clear enough.',
   till: 'This earth wants turning.',
@@ -84,26 +84,18 @@ export type DevWorld = {
   /** The map the world actually runs on — the resumed one when there is a town on disk, and
    *  the same array the gateway was handed, so the viewer can never render a different map. */
   terrain: TileId[][]
-  /** The tick a resumed town woke at, or `null` when this boot is a new day 0. */
   resumedAtTick: number | null
-  /** True when a live cast is driving the bodies. `false` is the scripted puppets, and the
-   *  distinction is the whole seam — a caller that cannot read it cannot tell the two apart. */
   live: boolean
-  /** The live cast's ledger and ruling queue, for the operator's channel; `null` when scripted. */
   ops: LiveOps | null
-  /** ONE WHOLE TICK the way the wall clock takes it: the loop step AND the observer scan that
-   *  follows it. `loop.step()` is most of a tick and not all of it. */
+  /** ONE WHOLE TICK: the loop step AND the observer scan after it — `loop.step()` is not all of one. */
   tick(): void
-  /** Enqueue a world law. It lands as one `config_changed` at the next tick boundary, hashed,
-   *  snapshotted and replayed like every other fact. See `adminLaws.ts` for the only caller. */
+  /** Lands as one `config_changed` at the next tick boundary, replayed like every other fact. */
   submitLaw: (path: string, value: unknown) => void
   stop(): Promise<void>
 }
 
-/**
- * Agent memory is a separate `<id>.db` per mind, not the world db, so world and mind are wiped
- * as ONE unit. Only `*.db` goes — the rest of the directory is not this function's to delete.
- */
+/** Agent memory is a separate `<id>.db` per mind, so world and mind are wiped as ONE unit.
+ *  Only `*.db` goes — the rest of the directory is not this function's to delete. */
 function wipeAgentMemory(agentDbDir: string | undefined): number {
   if (agentDbDir === undefined) return 0
   let gone = 0
@@ -121,10 +113,7 @@ function wipeAgentMemory(agentDbDir: string | undefined): number {
   return gone
 }
 
-/**
- * `scripted` is a FROZEN TEST FIXTURE — `g6.test.ts` and `devWorld.test.ts` hash the world it
- * folds, so it may never change. The library default stays `scripted`; a person gets the product.
- */
+/** `scripted` is a FROZEN TEST FIXTURE: the gates hash the world it folds, so it may never change. */
 export type DevMapKind = 'scripted' | 'showcase'
 /** For `startDevWorld()` called as a library, i.e. by the gates. Never by a person. */
 export const DEV_MAP_DEFAULT: DevMapKind = 'scripted'
@@ -136,11 +125,8 @@ export function devTerrain(
   return map === 'showcase' ? showcaseTerrain(undefined, rings) : makeFixtureMap()
 }
 
-/**
- * `state.origin` is where the array's (0, 0) sits in the AUTHORED frame, and the engine's claim
- * seam hangs off it. The frozen fixture gets none deliberately — an absent field keeps its fold
- * byte-identical.
- */
+/** `state.origin` is where the array's (0, 0) sits in the AUTHORED frame. The frozen fixture
+ *  gets none deliberately — an absent field keeps its fold byte-identical. */
 export function devGenesisState(
   config: SimConfig,
   terrain: ReturnType<typeof makeFixtureMap>,
@@ -161,22 +147,15 @@ export async function startDevWorld(
     /** Every world knob at once, the way `parseWorldEnv()` hands them over. An absent knob takes
      *  the LIBRARY default, which is not the env default: off, so a frozen gate folds unchanged. */
     world?: Partial<WorldEnv>
-    /** dev/demo only: how many lamp posts one founder raises along the street and keeps fed.
-     *  ABSENT by default — the stream asks for them; no gate does. */
     lamps?: number
-    /** The narrator db, opened readonly. Absent, every narrated surface — chapters, milestones,
-     *  moments — answers typed-empty. */
+    /** Opened readonly. Absent, every narrated surface answers typed-empty. */
     narratorDbPath?: string
-    /** The built `@sj/web`. Present, this process is the whole stream — world, socket and
-     *  viewer on one port. Absent, it is the API/socket half and vite proxies to it. */
+    /** Present, this process serves world, socket and viewer on one port; absent, vite proxies. */
     staticDir?: string
-    /** Per-mind memory dbs (`<id>.db`). Served read-only by the gateway, and — see
-     *  `wipeAgentMemory` — thrown away together with the world when `fresh` is asked for. */
+    /** Per-mind memory dbs (`<id>.db`), thrown away with the world when `fresh` is asked for. */
     agentDbDir?: string
-    /**
-     * Minds instead of puppets; absent, the founders are the scripted cast. A FACTORY, not a
-     * cast: one built before this call has already opened the per-mind dbs that `fresh` deletes.
-     */
+    /** A FACTORY, not a cast: one built before this call has already opened the per-mind dbs
+     *  that `fresh` deletes. */
     cast?: () => Promise<LiveCast>
   } = {},
 ): Promise<DevWorld> {
@@ -223,14 +202,12 @@ export async function startDevWorld(
       console.log(
         `dev world: ingested production art (${entries.length - gone.length} of ${entries.length} assets)`,
       )
-      // A scratchpad that lost its files used to abort the whole ingest silently; say which.
       for (const e of gone) console.log(`dev world:   NO ART for ${e.kind} — ${e.detail ?? ''}`)
     } catch (e) {
       console.log(
         `dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`,
       )
     }
-    // the premade library: the furniture the interior scenes place on their slots
     try {
       const lib = ingestLibraryArt(forgeDb)
       console.log(`dev world: ingested library art (${lib.length} items, furniture included)`)
@@ -247,22 +224,16 @@ export async function startDevWorld(
   writeWorldMeta(db, identity)
 
   const genesisTerrain = devTerrain(map, rings)
-  // Terrain and buildings are read from the SAME map kind AND the same ring count, so the town
-  // can never again be an overlay of two unrelated layouts.
+  // Same map kind AND the same ring count as the terrain, or the town is an overlay of two layouts.
   const structures = townStructuresFor(map, rings)
 
-  /**
-   * The fold starts at the latest snapshot, never at genesis, so resume is flat in world age.
-   * `WorldState.terrain` rides in the snapshot, which is why the gateway must be handed THIS
-   * array and not `devTerrain(map, rings)` recomputed from the environment.
-   */
+  // `WorldState.terrain` rides in the snapshot, so the gateway must be handed THIS array and
+  // not `devTerrain(map, rings)` recomputed from the environment.
   const store = new EventStore(db)
   const resumed = store.lastSeq() > 0 ? replayLatest(store, config, genesisTerrain, seed) : null
   const terrain = resumed ? resumed.state.terrain : genesisTerrain
   const rng = resumed ? resumed.rng : new RngStreams(seed)
 
-  // Said out loud on every boot, in every path, because a lane that does not know which world
-  // it is looking at reports a finding about the wrong one.
   console.log(
     `dev world: map=${map} rings=${map === 'showcase' ? rings : 'n/a (frozen fixture)'} ` +
       `terrain=${terrain[0]?.length ?? 0}x${terrain.length} structures=${structures.length}` +
@@ -270,8 +241,7 @@ export async function startDevWorld(
   )
   if (resumed) {
     const t = simTimeFromTick(resumed.state.tick)
-    // A resumed world says which tick it woke at rather than pretending it never stopped: a
-    // SIGKILL rolls back the tick that was in flight, so this number can be one behind.
+    // A SIGKILL rolls back the tick that was in flight, so this number can be one behind.
     console.log(
       `dev world: RESUMED at tick ${resumed.state.tick} — year ${t.year} ${t.season} day ${t.dayOfSeason}, ` +
         `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}, ` +
@@ -295,7 +265,6 @@ export async function startDevWorld(
       handler?.(ctx)
     },
   })
-  // the founders showcase town
   const lawQueue: LawQueue = []
   const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
     laws: lawQueue,
@@ -303,15 +272,9 @@ export async function startDevWorld(
     interiors: world.interiors === true,
     structures,
     founders: foundersFor(structures),
-    // the showcase town is what a viewer opens, and an empty storeroom is why the room
-    // card's holdings grid had never been seen
     holdings: map === 'showcase',
-    // and a lattice nobody ever builds in is why merge train 3 called a ring-3 town empty
     builders: world.builders === true && map === 'showcase',
-    // two pairs of hands on one roof — reachable, and off unless asked for
     jointBuild: world.jointBuild === true && map === 'showcase',
-    // the streets, lit: one founder raises lamp posts on the verge and keeps them fed.
-    // ABSENT unless asked for, so every landed gate folds exactly the world it always did.
     ...(opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase'
       ? { lamps: opts.lamps }
       : {}),
@@ -319,8 +282,7 @@ export async function startDevWorld(
     ...(world.bridge === true && map === 'showcase'
       ? { deck: showcaseDeck(undefined, rings) }
       : {}),
-    // ★ AND THE PUPPET STRINGS COME OFF THE MOMENT A LIVE CAST IS ATTACHED. The town on
-    // tick 1 and the world systems stay; the patrols, the masons and the need top-ups go.
+    // ★ A live cast keeps the town on tick 1 and the world systems; the patrols and top-ups go.
     minds: opts.cast !== undefined,
   })
   const cast = opts.cast === undefined ? null : await opts.cast()
@@ -347,9 +309,8 @@ export async function startDevWorld(
     throw e
   }
 
-  // The cursor starts at the END of the log, not at 0: a resumed world would otherwise
-  // re-publish every thought the town ever had. A live cast publishes real ones to the same
-  // table, so these canned lines go off.
+  // The cursor starts at the END of the log: a resumed world would otherwise re-publish every
+  // thought the town ever had.
   let lastSeq = store.lastSeq()
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
@@ -368,8 +329,7 @@ export async function startDevWorld(
       })
     }
   }
-  // DEV_FAST_FORWARD=<tick>: step the world synchronously to a moment (e.g. 490 = Day 0
-  // 08:10 daylight) before the real-time cadence starts — screenshot/QA convenience only
+  // DEV_FAST_FORWARD=<tick>: step synchronously to a moment before the real-time cadence starts.
   const ff = Number(process.env.DEV_FAST_FORWARD ?? '0')
   if (Number.isFinite(ff) && ff > 0) {
     while (loop.state.tick < ff) tickOnce()
@@ -402,8 +362,7 @@ export async function startDevWorld(
     },
     stop: async () => {
       clearTimeout(timer)
-      // The cast first: a mind holding a promise on an intent the loop will never step is a
-      // mind that never returns, and a reflection half-written is a night paid for twice.
+      // The cast first: a mind holding a promise on an intent the loop will never step never returns.
       await cast?.stop()
       await gateway.close()
       db.close()
@@ -412,7 +371,6 @@ export async function startDevWorld(
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  // The dev loop's answers: doors open, the ford decked. `serve.ts` names its own.
   const env = parseWorldEnv()
   void startDevWorld({ ingest: true, world: env }).then(({ gateway }) => {
     const showcase = env.map === 'showcase'

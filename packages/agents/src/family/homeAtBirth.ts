@@ -2,8 +2,7 @@ import { AgentEntered } from '@sj/engine'
 import type { EventStore } from '@sj/engine/store'
 import type { SimEvent } from '@sj/shared'
 
-// Walked backwards and stopped at the first hit, so a town that has been indoors for a year still
-// only reads one payload. The rest are matched on the raw field, not parsed.
+// Backwards, stopping at the first hit: only one payload is parsed however long the log is.
 function lastBefore(
   store: EventStore,
   type: string,
@@ -19,13 +18,8 @@ function lastBefore(
   return null
 }
 
-/**
- * The structure a child was born inside, read back out of the log — the fold gives a newborn its
- * mother's `insideId`, so where she was standing at the birth seq is where the child was born.
- * Live world state cannot answer this: by the time a crashed seeding is repaired she has walked
- * out, and the seed would be a different list than the birth would have written.
- * `''` when the child was born under the sky.
- */
+/** The structure a child was born inside, read from the log: live state cannot answer it, since
+ *  a repaired seeding runs after the mother walked out. `''` when born under the sky. */
 export function homeAtBirth(store: EventStore, motherId: string, bornSeq: number): string {
   const entered = lastBefore(store, 'agent_entered', motherId, bornSeq)
   if (entered === null) return ''

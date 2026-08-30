@@ -6,9 +6,8 @@ const PAGES = new URL('../paper/pages/', import.meta.url)
 const pages = readdirSync(PAGES).filter((f) => f.endsWith('.tsx'))
 
 describe('one feed per endpoint', () => {
-  // /api/bonds carries a Bond's whole history: two panels polling it on two clocks was one
-  // dataset downloaded twice a minute per viewer, and a count badge that could disagree with
-  // the graph beside it.
+  // /api/bonds carries a Bond's whole history: two panels polling it on two clocks downloaded
+  // one dataset twice a minute per viewer, and two counts that could disagree with each other.
   it('★ no page fetches the shared endpoints for itself', () => {
     for (const file of pages) {
       const src = readFileSync(new URL(file, PAGES), 'utf8')

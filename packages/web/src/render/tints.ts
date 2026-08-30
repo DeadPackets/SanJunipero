@@ -10,9 +10,8 @@ export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] =
   { minute: 1440, tint: [0.45, 0.52, 0.95] },
 ]
 
-/** Blue held at 1.00, red pulled, green near the shipped value: a blue cast instead of the
- *  grey-green one, at the same luma. The night contrast floor is met by grading the picture
- *  and not the words (D5), never by this table. */
+/** Blue held at 1.00, red pulled: a blue cast instead of the grey-green one, at the same luma.
+ *  The night contrast floor is met by grading the picture and not the words, never by this. */
 export const WEATHER_DIAG: Readonly<Record<string, [number, number, number]>> = {
   cloudy: [0.94, 0.96, 1.0],
   rain: [0.84, 0.92, 1.0],
@@ -44,9 +43,8 @@ export function clockTint(minuteOfDay: number): number {
 const relLum = ([r, g, b]: [number, number, number]): number => 0.2126 * r + 0.7152 * g + 0.0722 * b
 const NIGHT_LUM = relLum(CLOCK_STOPS[0]!.tint)
 
-/** THE ONE DAY CLOCK for the picture: 0 at deep night, 1 at full day, read off the tint's own
- *  luminance. Pool strength, window glow and the sky gradient all take it, so nothing steps
- *  on an hour the sky has not reached. The engine's `dayPhaseFromTick` stays sim truth. */
+/** THE ONE DAY CLOCK for the picture: 0 at deep night, 1 at full day, off the tint's own
+ *  luminance. Pool strength, window glow and the sky gradient all take it. */
 export function skyLevel(minuteOfDay: number): number {
   if (minuteOfDay !== lastMinute) {
     const l = relLum(clockStops(minuteOfDay))

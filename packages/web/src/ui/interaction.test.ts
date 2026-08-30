@@ -116,11 +116,6 @@ describe('hoverLabel', () => {
   })
 })
 
-// ── ★ ONE ESCAPE LADDER ──────────────────────────────────────────────────────────────────
-//
-// Escape used to be owned three times over: the stage hook, the sheet's own window listener
-// and the ring's key handler. Three owners cannot agree an order, so a sheet over a pick came
-// down together with the pick.
 describe('escape puts down one thing at a time, topmost first', () => {
   const up = (over: Partial<StageUp> = {}): StageUp => ({
     keys: false,

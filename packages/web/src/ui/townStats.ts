@@ -43,8 +43,6 @@ export const EMPTY_COPY = {
     'record here.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
   discoveries: 'The town has not worked anything out yet.',
-  // Describes rather than promises: on a scripted stream nobody is writing, and this panel is
-  // correctly and permanently empty.
   // The read fold counts these four acts and nothing else, so a town of walkers is honestly empty.
   traffic:
     'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
@@ -64,9 +62,8 @@ export const EMPTY_COPY = {
     'the law channel’s key.',
 } as const
 
-// The third read state, and the reason it is not up there. An empty state says what the TOWN has
-// not done; this says what the WIRE has not carried. A refused read used to print the empty copy,
-// which is the product's best writing deployed to assert something false.
+// An empty state says what the TOWN has not done; this says what the WIRE has not carried.
+// A refused read printing the empty copy asserts something false.
 export const OUT_OF_REACH = {
   says: 'The town’s record is out of reach. Nothing here is missing — it has not been read.',
   again: 'Look again',

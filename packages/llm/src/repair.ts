@@ -111,8 +111,6 @@ export function repairCandidates(text: string): RepairCandidate[] {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
-// Walk a path and hand back the container holding its last segment, so a fix can be applied
-// where the schema said the fault was.
 function containerAt(root: unknown, path: readonly PropertyKey[]): unknown {
   let cur: unknown = root
   for (const key of path) {
@@ -161,8 +159,6 @@ function readQuotedNumber(root: unknown, path: readonly PropertyKey[]): boolean 
   return true
 }
 
-// The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
-// dropped and a quoted number is read as the number it spells. Nothing is supplied.
 function applySchemaIssues<T>(
   value: unknown,
   schema: z.ZodType<T>,
@@ -191,8 +187,6 @@ function applySchemaIssues<T>(
   return undefined
 }
 
-// The whole pass: reframe, then let the schema name what is left. Returns the repaired value
-// and the name of the repair that worked, or nothing at all.
 export function repairToSchema<T>(
   text: string,
   schema: z.ZodType<T>,

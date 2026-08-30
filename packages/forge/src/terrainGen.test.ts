@@ -221,8 +221,8 @@ describe('seamlessMaterial', () => {
     expect(materialVeto(seamlessMaterial(road))).toBeNull()
   })
 
-  // Palette-TRUE was the quantize's signature. The wrap blends two rolled copies, so the material
-  // keeps the model's own colours and is only measured for its DISTANCE to the palette.
+  // The wrap blends two rolled copies, so the material keeps the model's own colours and is
+  // only measured for its DISTANCE to the palette.
   it('keeps the material opaque, near the palette and the same size', async () => {
     const m = seamlessMaterial(await offender('farmland'))
     expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])

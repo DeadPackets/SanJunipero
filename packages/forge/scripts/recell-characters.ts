@@ -1,7 +1,5 @@
-// OFFLINE, $0.00 — re-cell all five founders from the raws their sheets were authored from.
-// Raws: `master/master.png` plus the walk and sleep files named on report.txt's `chosen:` line.
-// ONE WHOLE FACTOR PER CELL and no source correction: the figure lands where the factor puts
-// it, and the report's figure spread is what says whether the walk cycle still reads.
+// OFFLINE, $0.00 — re-cells the five founders from the raws named on report.txt's `chosen:` line.
+// ONE WHOLE FACTOR PER CELL and no source correction: the figure lands where the factor puts it.
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

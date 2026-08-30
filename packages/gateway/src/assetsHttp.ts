@@ -149,12 +149,8 @@ export type AssetRouteDeps = {
   knowsAgent?: (id: string) => boolean
 }
 
-/**
- * The newest READY asset registered under each kind. One zod parse per row for the process, not
- * one per image GET: the cursor tops itself up from the codex's own seq at read time, so a sheet
- * registered a millisecond ago is already here. Shared, so the stage and a share card cannot
- * disagree about which sheet is a person's.
- */
+/** One zod parse per row for the process, not one per image GET; the cursor tops up from the
+ *  codex's own seq at read time. Shared, so the stage and a share card cannot disagree. */
 export function makeNewestReady(): (codex: AssetCodex, kind: string) => string | undefined {
   let seq = 0
   const byKind = new Map<string, string>()

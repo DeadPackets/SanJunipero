@@ -3,8 +3,8 @@ import { thirstOf } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
 import { queueNeed } from './needsBatch.js'
 
-// The slower clock. Thirst is deliberately not one of the four needs — it keeps its own field
-// on the body and its own decay — but it rides the same batch, so a tick is one event per body.
+// Thirst is deliberately not one of the four needs: its own field, its own decay. It rides the
+// same batch, so a tick is still one event per body.
 export function thirstSystem(ctx: TickCtx): void {
   if (!ctx.config.thirst.enabled) return
   const decay = thirstDecayPerTick(ctx.config)

@@ -33,11 +33,9 @@ import { Signpost } from './paper/Signpost.js'
 import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
 import type { Thing } from './paper/pages/types.js'
 
-/** What the paper is showing, or `null` while it is down. */
 type Sheet = { page: PageKey; tab: string }
 
-/** Safari throttles history writes to 100 per 30 s and 8x playback asks for sixteen a second.
- *  A discrete choice — going live, opening a day — writes at once; a playhead waits its turn. */
+/** Safari throttles history writes to 100 per 30 s, and 8x playback asks for sixteen a second. */
 const ADDRESS_BAR_MS = 500
 let addressAt = 0
 function writeAddress(next: Route, now: boolean): void {
@@ -57,16 +55,12 @@ export function App() {
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
   const [subject, setSubject] = useState<Subject | null>(null)
-  // the figure the keyboard is on; the plate follows it, and Enter opens the ring round it
   const [focus, setFocus] = useState<Subject | null>(null)
-  // an item or a crop the viewer clicked: it has no ring, so the record answers for it
   const [thing, setThing] = useState<Thing | null>(null)
-  // `/moment/:id` is a link to a recorded day, so the sheet comes up on the filmstrip.
   const [sheet, setSheet] = useState<Sheet | null>(() =>
     route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
   )
   const [cue, setCue] = useState<string | null>(null)
-  // the help sheet, and the top rung of the Escape ladder while it is up
   const [keysOpen, setKeysOpen] = useState(false)
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
@@ -95,9 +89,8 @@ export function App() {
             sock.scrub(momentToTick(initial.moment!.day, initial.moment!.time))
           })
 
-    // A pasted `/agent/:id` lands on the person it names: the paper opens on their story and
-    // the camera pins to them. A person merely ringed beside a moment is not that link, and an
-    // id the town does not have is simply the town — the ring's own effect answers for both.
+    // A person ringed beside a moment link is not a pasted `/agent/:id`, and an id the town does
+    // not have is simply the town — the ring's own effect answers for both.
     const linked = initial.momentId === null && initial.moment === null ? initial.agentId : null
     const offLink =
       linked === null
@@ -122,8 +115,7 @@ export function App() {
     }
   }, [store])
 
-  // The static title card hands over the moment the town can be seen, and until then it says
-  // what it is waiting for. One way only: a socket that drops later is the stamp's news.
+  // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
     if (scene !== null && link === 'online') dismissFirstFrame()
     else firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
@@ -135,8 +127,7 @@ export function App() {
     document.title = titleFor(route, named)
   }, [route, named])
 
-  // The one owner of the ring: a figure clicked on the canvas, or a person a pasted link names.
-  // It waits for the world to be able to say who they are, so a stranger's id rings nobody.
+  // Waits for the world to be able to say who they are, so a stranger's id rings nobody.
   const agentId = route.agentId
   useEffect(() => {
     if (agentId === null) return
@@ -147,8 +138,7 @@ export function App() {
     })
   }, [agentId, store])
 
-  // Every viewed moment is shareable: the socket and the address bar move together, so a link
-  // a viewer copies mid-playback reopens the minute they were watching.
+  // Every viewed moment is shareable: a link copied mid-playback reopens that minute.
   const goTo = useCallback(
     (tick: number | null): void => {
       if (tick === null) handle?.goLive()
@@ -171,7 +161,6 @@ export function App() {
     goTo(null)
   }, [goTo])
 
-  /** The recorded day the filmstrip has open, in the address bar. */
   const onMoment = useCallback((id: number | null) => {
     setRoute((prev) => {
       const next: Route = { ...prev, momentId: id }
@@ -200,7 +189,6 @@ export function App() {
     scene?.interior?.setActive(structureId)
   }
 
-  // ONE place where a ring verb becomes a thing that happens.
   const onVerb = (verb: RingVerb): void => {
     if (subject === null) return
     if (subject.kind === 'structure') {

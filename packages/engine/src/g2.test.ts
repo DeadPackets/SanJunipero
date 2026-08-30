@@ -64,8 +64,8 @@ describe('GATE G2: 3-day scripted world run', () => {
   it('survival, rescue, death, build, fire, and crops all land in 3 sim days', () => {
     const { state, evs } = G2
 
-    // 1. Neither the Farmer nor the Fisher ever runs the hunger clock down — an old line, and
-    // still true. What takes them is in the death table below.
+    // 1. Neither the Farmer nor the Fisher runs the hunger clock down; what takes them is in
+    // the death table below.
     expect(state.agents[FARMER]!.zeroHungerSinceTick).toBeNull()
     expect(state.agents[FISHER]!.zeroHungerSinceTick).toBeNull()
     expect(state.agents[FARMER]!.needs.hunger).toBeGreaterThan(0)
@@ -204,8 +204,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[FARMER]!.sex).toBe('f')
   })
 
-  // The same argument as the row above. The two that do not fire here — a desire-path tile
-  // wearing through and a fauna kill — need a walker with a route and a hunter with a knife.
+  // The two that do not fire here need a walker with a route and a hunter with a knife.
   it('C11 is live in this run: bodies thirst, wear out, are poisoned, and are buried', () => {
     const { state, evs } = G2
     const types = evs.map((e) => e.type)
@@ -271,8 +270,7 @@ describe('GATE G2: 3-day scripted world run', () => {
   // Two takings of the same knife off the same shelf by the same pair of hands, watched from the
   // same six tiles — the only difference between them is the light.
   it('the same theft is invisible at night and plain at noon (§19)', () => {
-    // Folded from the shared log, not re-simulated: replayFromGenesis above pins that the fold
-    // lands on the live state.
+    // Folded from the shared log, not re-simulated: replayFromGenesis above pins the two equal.
     const seen = (tick: number) => {
       const upTo = G2.evs.filter((e) => e.tick <= tick)
       const taken = upTo.filter((e) => e.type === 'item_taken')

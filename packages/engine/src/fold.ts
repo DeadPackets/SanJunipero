@@ -107,8 +107,7 @@ import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
 import { findPath } from './path.js'
 
-// One change out of a batch, applied to one body: the old per-event body, kept as its own step
-// so a batch of N folds to exactly the state the N separate events left.
+// Kept as its own step so a batch of N folds to exactly the state the N separate events left.
 function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig): AgentBody {
   if (c.need === 'thirst') return { ...a, thirst: clampNeed(thirstOf(a) + c.delta) }
   const needs = { ...a.needs, [c.need]: clampNeed(a.needs[c.need] + c.delta) }
@@ -123,8 +122,7 @@ function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig)
     a.hp >= config.health.collapseHp
   )
     collapsedSinceTick = null
-  // A tick the cold billed to this body is remembered until it eats or sleeps: it is the
-  // difference between dying tired and dying cold, and nothing else records it.
+  // Nothing else records this: it is the difference between dying tired and dying cold.
   const chilled =
     c.reason === 'exposure' ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 } : {}
   return { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
@@ -1037,8 +1035,7 @@ export function fold(
       const terrain = state.terrain.map((r, y) =>
         y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r,
       )
-      // The maturity clock is stamped where the seed fell and dropped however the sapling
-      // leaves — grown, chopped, paved or tilled. Nothing else is stored about it.
+      // The maturity clock is stamped where the seed fell and dropped however the sapling leaves.
       if (p.from !== T_SAPLING && p.to !== T_SAPLING) return { ...state, terrain }
       const key = tileKey(p.x, p.y)
       const saplings = { ...state.saplings }

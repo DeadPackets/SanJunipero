@@ -70,11 +70,10 @@ const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [
 // earns it: a thing nobody can do teaches no one a false path.
 export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 
-// The engine's own words for its registry and for its parameter schemas. An arbiter reason is
-// scanned before it gets here; an engine reason was scanned by nothing.
+// Engine-side words: registry names and param schemas. An arbiter reason is scanned upstream,
+// an engine reason by nothing, so it must never reach a mind.
 const MACHINE_REASON = /[{}]|^(unknown verb:|no such agent)/
 
-// What a mind reads instead. It states that the asking failed and connects that to no method.
 export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
 
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
@@ -714,8 +713,7 @@ export class AgentRuntime {
     })
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 
-    // The beat is spent casting back: whatever else the answer carried goes nowhere, and what
-    // comes up waits for the next turn. The plan stands — the body is not what is busy.
+    // The beat is spent casting back: whatever else the answer carried is let go, plan aside.
     if (recalled !== null) {
       this.#pendingRecall = recalled
       const alsoCarried = [turn.speech, turn.action, turn.plan, turn.journal, turn.reconsider_at]

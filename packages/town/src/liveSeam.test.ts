@@ -1,5 +1,4 @@
-// The live seam is a fact of the package graph, not a list of filenames: `@sj/town` declares
-// none of the mind packages, and a static-import walk from `serve.ts` reaches none of them.
+// The seam is a fact of the package graph, not a list of filenames.
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +7,6 @@ import { describe, expect, it } from 'vitest'
 const REPO = fileURLToPath(new URL('../../../', import.meta.url))
 const HERE = dirname(fileURLToPath(import.meta.url))
 
-/** What the scripted stream must never load: the mind stack and the SDKs behind it. */
 const BANNED = [
   '@sj/agents',
   '@sj/arbiter',
@@ -19,7 +17,7 @@ const BANNED = [
   '@openrouter/ai-sdk-provider',
   '@huggingface/transformers',
 ]
-/** All but the transformer, which `Embedder.create` await-imports — see `followDynamic` below. */
+/** All but the transformer, which `Embedder.create` await-imports rather than loads statically. */
 const BANNED_STATICALLY = BANNED.filter((b) => b !== '@huggingface/transformers').sort()
 
 // `[^;'"]` crosses newlines but not another statement's specifier, so every multi-line form is
@@ -36,7 +34,6 @@ const manifest = (pkg: string): Record<string, unknown> =>
     unknown
   >
 
-/** The file a specifier loads: relative by path, workspace by the package's `exports` map. */
 function resolveSpec(spec: string, fromFile: string): string | null {
   if (spec.startsWith('.')) {
     const stem = resolve(dirname(fromFile), spec).replace(/\.js$/, '')
@@ -58,7 +55,6 @@ function resolveSpec(spec: string, fromFile: string): string | null {
 
 type Walk = { banned: string[]; unresolved: string[] }
 
-/** Every banned specifier a `from '<entry>'` actually loads, walking the whole static graph. */
 function walkFrom(entry: string): Walk {
   const seen = new Set<string>()
   const banned = new Set<string>()

@@ -41,10 +41,8 @@ function fitForGate(img: RawImage): RawImage {
         Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))),
       )
 }
-// TRIMMED first, which is `gen-cast-v5`'s own gate view (RULING 2026-08-28): the fit below then
-// normalises scale, and the gates stop reading a figure's position in its 256 canvas as a broken
-// head. `gen-cast-v5` also quantizes here for measurement — no gate answer on this cast changes
-// either way, and the ruling says no palette snap anywhere.
+// Trimmed first, which is `gen-cast-v5`'s own gate view: the fit below then normalises scale,
+// so a figure's position in its 256 canvas does not read as a broken head.
 const gateView = (img: RawImage): RawImage =>
   anchorToCanvas(fitForGate(trimToFigure(img)), CELL_V2, CELL_V2, FEET_Y_V2)
 
@@ -118,9 +116,7 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   return found
 }
 
-/** EMPTY, measured 2026-08-28: on the generator's own view the shipped cast fails nothing.
- *  The two entries this held were both the untrimmed view alone. Adding one back requires a
- *  written reason. */
+/** Empty: adding an entry back requires a written reason. */
 export const KNOWN_GATE_DEBT: Record<string, string> = {}
 
 const cast = listCommittedCast()
@@ -168,9 +164,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
     ).toEqual([])
   })
 
-  // The tightest margin on the shipped cast, so a re-cut that eats it shows up here: yusuf
-  // ne/contact-a silhouette 1.1687 against the 1.18 bar, and the worst head is nadia ne/contact-b
-  // at 0.1963 against 0.20.
+  // The tightest margins on the shipped cast: yusuf ne/contact-a silhouette 1.1687 against the
+  // 1.18 bar, and nadia ne/contact-b head 0.1963 against 0.20.
   it('★ and the debt is NOTHING, so a jump shows up in the diff', () => {
     expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(0)
   })
@@ -253,9 +248,8 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
   })
 })
 
-// A sleeping villager is where the model likes to draw floating "z"s, and nadia shipped with two:
-// 145 px over 3 islands, which is 0.748% and passes the 1% detached bound. ONE island is the
-// property that has no threshold to slip under, and every other cell in the cast already had it.
+// The model likes to draw floating "z"s on a sleeping villager: nadia shipped 145 px over 3
+// islands, 0.748%, inside the 1% detached bound. ONE island is the property with no threshold.
 describe('every committed sleep cell is ONE shape — no captions, no props', () => {
   it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
     const crop = cropper(c, await atlasOf(c))

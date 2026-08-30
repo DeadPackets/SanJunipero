@@ -1,5 +1,5 @@
-/** The wait, at the height of the thing that is coming. `aria-busy` on a role-less div exposes
- *  no busy state at all, so the shape is a status region and says the word once. */
+/** `aria-busy` on a role-less div exposes no busy state at all, so the shape is a status
+ *  region and says the word once. */
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div role="status" aria-busy="true">

@@ -54,12 +54,10 @@ export const ELLIPSIS = '…'
 export const BUBBLE_NEAREST = 3
 /** At the widest stop a person is eight pixels tall and a bubble is the whole street. */
 export const GLYPH_ZOOM: number = ZOOM_STOPS[0]
-/** How far the cream leans toward the speaker's own colour. */
 export const SPEAKER_TINT = 0.15
-/** A bubble leaves on the reveal motion, the same one its art arrives on. */
 export const BUBBLE_FADE_MS = MOTION.reveal.ms
-/** How far that colour is washed out before it is leaned into. Measured, not chosen: cream
- *  clears night AA at only 5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
+/** How far the speaker's colour is washed out first. Measured: cream clears night AA at only
+ *  5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
 const SPEAKER_WASH = 0.5
 
 export function bubbleLife(text: string): number {
@@ -127,9 +125,8 @@ export function dominantColor(rgba: ArrayLike<number>): number | null {
   return (avg(best.r) << 16) | (avg(best.g) << 8) | avg(best.b)
 }
 
-/** The speaker's colour as a pale wash. A bubble leans toward WHO is speaking, never toward
- *  how dark their coat is — sprite ink mixed straight into the cream takes the paper under
- *  the night AA floor, and a person in black would be the one nobody can read. */
+/** A bubble leans toward WHO is speaking, never toward how dark their coat is: sprite ink mixed
+ *  straight into the cream takes the paper under the night AA floor. */
 export function speakerWash(rgb: number): number {
   const r = (rgb >> 16) & 0xff
   const g = (rgb >> 8) & 0xff
@@ -156,14 +153,12 @@ export function nearestSpeakers(
   )
 }
 
-/** A bubble is only spelled out when it is one of the nearest and the town is not a map. */
 export function bubbleShown(zoom: number, isNearest: boolean): boolean {
   return isNearest && zoom > GLYPH_ZOOM
 }
 
 /** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
- *  a "…" pinned to the viewport corner with nobody under it. A bubble that no longer touches
- *  its own speaker's box — the speaker's size around the anchor — is not shown. */
+ *  a "…" pinned to the viewport corner with nobody under it. */
 export function onLeash(
   rect: Rect,
   sx: number,
@@ -173,8 +168,7 @@ export function onLeash(
   return overlaps(rect, { x: sx - size.w, y: sy - size.h, w: size.w * 2, h: size.h * 2 })
 }
 
-/** The opacity a bubble has `msLeft` before it dies: the reveal motion run backwards, so it
- *  leaves on the curve it arrived on. */
+/** The opacity a bubble has `msLeft` before it dies: the reveal motion run backwards. */
 export function bubbleAlpha(msLeft: number): number {
   return 1 - progress('reveal', 0, BUBBLE_FADE_MS - msLeft)
 }
@@ -262,7 +256,6 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     tail.stroke({ width: 1, color: BUBBLE_EDGE })
   }
 
-  /** The "…" a bubble collapses to: an ink pill with the speaker's own paper for dots. */
   const glyphNode = (isThought: boolean): Graphics => {
     const g = new Graphics()
     g.roundRect(0, 0, GLYPH_W, GLYPH_H, GLYPH_H / 2)

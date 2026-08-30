@@ -12,11 +12,8 @@ const OTHER_HEAD = 'What else was first'
 
 type FirstsGroup = { tier: number; head: string; rows: MilestoneRead[] }
 
-/**
- * The ledger in reading order: what the town did for itself heads the page, and inside a
- * heading the firsts run in the order they happened. A tier these words do not cover keeps a
- * heading of its own rather than vanishing off the page.
- */
+/** Highest tier first, and inside a heading the firsts run in the order they happened. A tier
+ *  these words do not cover keeps a heading of its own rather than vanishing off the page. */
 export function firstsByTier(rows: readonly MilestoneRead[]): FirstsGroup[] {
   const byTier = new Map<number, MilestoneRead[]>()
   for (const row of rows) {

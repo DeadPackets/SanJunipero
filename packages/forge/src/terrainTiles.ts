@@ -163,8 +163,8 @@ export function seasonTileNames(): string[] {
   )
 }
 
-// Spec §7 atmosphere read seasonally. The tint is the last thing the sheet gets: ruling 13
-// takes the quantize off it, so a tinted tile keeps the colour the tint gave it.
+// The tint is the last thing the sheet gets and nothing quantizes after it, so a tinted tile
+// keeps the colour the tint gave it.
 export const SEASON_TINTS: Record<Season, Tint> = {
   spring: { r: 0.9, g: 1.12, b: 0.9 },
   summer: { r: 1.0, g: 1.0, b: 1.0 },

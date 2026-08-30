@@ -49,8 +49,7 @@ describe('reduced motion is a fade or nothing, which is what the sheet does', ()
     expect(reduced(MOTION.enter, 'left').ms).toBe(0)
   })
 
-  // The sheet leaves a colour transition unguarded and kills every other one, so the table
-  // may not promise a third of the duration that no rule in it ever implemented.
+  // The sheet leaves a colour transition unguarded and kills every other one.
   it('keeps a colour at its own duration, so an opted-out viewer still sees the change', () => {
     for (const name of MOTIONS) {
       expect(reduced(MOTION[name], 'opacity').ms, name).toBe(MOTION[name].ms)

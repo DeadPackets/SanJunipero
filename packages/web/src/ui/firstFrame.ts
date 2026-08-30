@@ -1,7 +1,5 @@
 import { MOTION } from './motion.js'
 
-/** What the card says while the town is still on its way. Not a spinner: a loading surface in
- *  this world has a shape and a sentence. */
 export const FIRST_FRAME_COPY = {
   looking: 'Looking for the town…',
   lost: 'The town is out of reach. Reconnecting.',
@@ -10,11 +8,8 @@ export const FIRST_FRAME_COPY = {
 let card: HTMLElement | null = null
 let done = false
 
-/**
- * The title card is static HTML inside `#root`, so it paints on the first byte and is what LCP
- * measures. React clears its own container on mount, so the card steps out of it first and the
- * town comes up underneath — then the card fades and goes.
- */
+/** React clears `#root` on mount, so the static title card — the LCP element — steps out of
+ *  it first and the town comes up underneath. */
 export function detachFirstFrame(): void {
   card = document.getElementById('first-frame')
   if (card !== null) document.body.append(card)

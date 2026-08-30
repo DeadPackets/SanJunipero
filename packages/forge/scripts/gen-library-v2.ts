@@ -176,8 +176,6 @@ for (const item of items) {
       const sprite = spriteCell(keyed, { w: e.spritePx, h: e.spritePx, anchor: 'centre' })
       const icon = spriteCell(keyed, { w: ICON_PX, h: ICON_PX, anchor: 'centre' })
       const { islands, opaqueFrac } = silhouetteStats(sprite.cell)
-      // Nothing mechanical can refuse this cell: the factor is whole and the alpha binary by
-      // construction. The judge below is the only gate left.
       // The mechanical gates cannot tell a pail from a market stall. One vision call per
       // candidate can, and it is 6% of the cost of the generation it is judging.
       let verdict: VisionVerdict | null = null

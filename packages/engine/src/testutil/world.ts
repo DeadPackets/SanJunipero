@@ -17,8 +17,7 @@ export const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 export const grid = (n: number): TileId[][] =>
   Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
-// Advance one tick, run the world, then fold what it emitted back over the advanced state: the
-// two must agree, or a live run and its replay are two different towns.
+// A live run and its replay must land on the same state, or they are two different towns.
 export function roundTrips(
   state: WorldState,
   config: SimConfig,
@@ -31,8 +30,7 @@ export function roundTrips(
   return { replayed, out }
 }
 
-// The need changes one event carries, or none if it is not a batch. Every assertion about what
-// a tick did to a body goes through here, so the payload shape has one reader in the package.
+// One reader of the batch payload shape for the whole package.
 export const changesOf = (e: { type: string; payload: unknown }): NeedChange[] =>
   e.type === 'needs_changed' ? (e.payload as { changes: NeedChange[] }).changes : []
 

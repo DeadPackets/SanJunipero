@@ -1,6 +1,5 @@
-// LIVE — the seven interior floor and wall pieces, COMMITTED. Cap $INT_CAP.
-// The seven were hand-committed from a mock round and had no producer at all; this is it.
-// Controls: INT_ONLY=<comma ids>, INT_ATTEMPTS, INT_DRY=1, INT_REJECTED=<candidate keys>.
+// The seven interior floor and wall pieces, written as COMMITTED content.
+// Controls: INT_ONLY, INT_ATTEMPTS, INT_DRY=1, INT_REJECTED.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BudgetGuard } from '../src/budget.js'
@@ -26,8 +25,7 @@ const ONLY = (process.env.INT_ONLY ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
-// A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
-// clean its numbers are. The eye is the gate the gates cannot be.
+// A candidate named here was refused by eye, so it is never chosen however clean its numbers are.
 const REJECTED = new Set(
   (process.env.INT_REJECTED ?? '')
     .split(',')
@@ -45,8 +43,8 @@ const CHROMA_BAND_PX = 4
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)
 
-// A wall is an ELEVATION seen square-on; a floor is a material sampled continuously. The two
-// need opposite instructions, and neither is a sprite on a background.
+// A wall is an ELEVATION seen square-on; a floor is a material sampled continuously, so the two
+// need opposite instructions.
 const ROLE_CLAUSE: Record<InteriorPiece['role'], string> = {
   'floor-material':
     'A seamless, edge-wrapping, top-down FLOOR material, drawn flat and filling the whole ' +
@@ -61,8 +59,8 @@ const ROLE_CLAUSE: Record<InteriorPiece['role'], string> = {
     'the ceiling line is at the very top of the frame and the floor line at the very bottom. ' +
     'NO floor is visible, NO ceiling is visible, NO side walls, NO furniture standing in front ' +
     'of it, NO people. Lit evenly from the upper left. ' +
-    // Measured: the first round came back with a mean of 184,97,115 — the plaster had drifted
-    // onto the dusty-rose ramp, which is what the terrain path used to spend a palette guard on.
+    // Measured: without this clause the plaster came back at a mean of 184,97,115, on the
+    // dusty-rose ramp.
     'The plaster is CREAM and the timber is HONEY-BROWN: warm, but on the cream-and-wood side ' +
     'of the palette. NOT pink, NOT rose, NOT mauve, NOT salmon, NOT terracotta anywhere.',
 }
@@ -77,15 +75,13 @@ function prompt(p: InteriorPiece): string {
   )
 }
 
-/** The whole factor this piece is cut on, and the window it is cut from. */
 const cutPlan = (p: InteriorPiece, gen: RawImage): { factor: number; window: string } => {
   const factor = Math.max(1, Math.min(Math.floor(gen.width / p.w), Math.floor(gen.height / p.h)))
   return { factor, window: `${p.w * factor}x${p.h * factor}` }
 }
 
-// The DRAWN wall, not the frame: STYLE_PROMPT puts every subject on a magenta field, and a
-// window centred on the frame takes that field in with it — the first round shipped five walls
-// with a magenta bar down both edges. Keyed and eroded, the bbox is the wall face itself.
+// STYLE_PROMPT puts every subject on a magenta field and a window centred on the frame takes
+// that field in with it, so the face is bboxed after keying and eroding.
 function wallFace(gen: RawImage): { img: RawImage; x0: number; y0: number } {
   let keyed: RawImage
   try {
@@ -105,9 +101,7 @@ function wallFace(gen: RawImage): { img: RawImage; x0: number; y0: number } {
   return { img, x0: b.x0, y0: b.y0 }
 }
 
-// The generation's own pixels, divided by a whole factor and never resampled: the wall's window
-// is the largest whole multiple of its shape that fits inside the drawn face, and a floor
-// material is cut to a whole multiple of its own grid.
+// Whole-factor division of the generation's own pixels, never resampled.
 function cut(p: InteriorPiece, gen: RawImage): RawImage {
   if (p.role === 'floor-material')
     return seamlessMaterial(toMaterialGrid(cropToGrid(gen, p.w), p.w))
@@ -141,7 +135,6 @@ function cut(p: InteriorPiece, gen: RawImage): RawImage {
   return out
 }
 
-/** What may refuse a piece: the size it must be, and the opacity every interior piece has. */
 function gateOf(p: InteriorPiece, img: RawImage): string[] {
   const fails: string[] = []
   if (img.width !== p.w || img.height !== p.h)
@@ -156,8 +149,7 @@ function gateOf(p: InteriorPiece, img: RawImage): string[] {
   for (let i = 0; i < img.data.length; i += 4)
     if (img.data[i]! > 200 && img.data[i + 1]! < 70 && img.data[i + 2]! > 200) magenta++
   if (magenta > 0) fails.push(`${magenta} background pixels survived the cut`)
-  // The piece keeps the model's colours, but one this far from the town's forty is not in the
-  // town. The pieces measure 12.2-22.5 once the background is out of the cut.
+  // Measured: the pieces sit at 12.2-22.5 once the background is out of the cut.
   const dist = paletteDistance(img)
   if (dist > PALETTE_DISTANCE_MAX)
     fails.push(`palette distance ${dist.toFixed(1)} over ${PALETTE_DISTANCE_MAX}`)
@@ -176,8 +168,8 @@ mkdirSync(`${S}/cells`, { recursive: true })
 
 const rows: string[] = []
 const lines: string[] = []
-// Pieces this run refused to ship. Collected, not thrown on the spot: the unit of work is ONE
-// PIECE, and the report of every attempt is worth more than an early exit.
+// Collected, not thrown on the spot: the unit of work is ONE PIECE, and a report of every
+// attempt is worth more than an early exit.
 const refused: string[] = []
 
 for (const p of pieces) {
@@ -239,8 +231,6 @@ for (const p of pieces) {
     }
   }
 
-  // Among the CLEAN candidates only (the ruling and its reason are in src/gate.ts). Choosing is
-  // not deciding: the pool the winner comes from cannot contain a failure.
   const clean = cands.filter((c) => c.fails.length === 0)
   const win = clean[0]
   if (!win) {
@@ -281,8 +271,8 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/interiors.md`, md)
 console.log(`\n${md}`)
 
-// The report is written FIRST and then the run fails: the margins are what tell an operator a
-// threshold from a bad drawing, and they are worthless if the failure eats them.
+// The report is written before the throw: its margins are what separate a threshold from a bad
+// drawing, and a failure that eats them is worthless.
 if (refused.length > 0)
   throw new Error(
     `${refused.length} piece(s) shipped nothing: ${refused.join(', ')}\n  Raise INT_ATTEMPTS ` +

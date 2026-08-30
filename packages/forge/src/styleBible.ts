@@ -27,8 +27,8 @@ const CLASS_HINTS: Record<AssetClass, string> = {
 export const STYLE_ANCHOR_CLAUSE =
   'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
 
-/** Two halves because a redraw puts the eye's feedback BETWEEN them (addendum §1); joined in
- *  that order they are the whole prompt. */
+/** Two halves because a redraw puts the eye's feedback BETWEEN them; joined in that order
+ *  they are the whole prompt. */
 export function assetPromptParts(
   desc: string,
   footprint: Footprint,

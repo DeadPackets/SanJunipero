@@ -26,8 +26,8 @@ describe('adminChannelPort — where the channel is, if there is one', () => {
   })
 })
 
-/** The whole point of ruling 10: the page's own origin answers `/admin/*`, so the browser never
- *  makes the cross-origin call it would refuse, and the channel stays on loopback behind a bearer. */
+/** The page's own origin answers `/admin/*`, so the browser never makes the cross-origin call it
+ *  would refuse, and the channel stays on loopback behind a bearer. */
 describe('/admin/* through the gateway origin', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-adminproxy-'))
   let gw: Gateway

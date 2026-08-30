@@ -1,7 +1,5 @@
-// The perception packet is O(world) — every agent, every structure and every item through a
-// per-tile visibility test — and the scripted tick built one per free-handed founder per tick
-// whether or not the patrol policy that reads it was ever reached. The REAL function is
-// counted here, not replaced by a stub.
+// The perception packet is O(world) — every agent, structure and item through a per-tile
+// visibility test. The REAL function is counted here, not replaced by a stub.
 import { describe, expect, it, vi } from 'vitest'
 import type { TickLoop as TickLoopType } from '@sj/engine'
 

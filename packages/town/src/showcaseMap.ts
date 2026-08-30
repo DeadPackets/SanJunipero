@@ -19,15 +19,12 @@ import {
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 
-// The designed showcase town: this module rasterises `makeCityTemplate()` onto a dev world
-// rather than hand-authoring a rival layout. A fixture — genesis proper takes the template.
+// Rasterises `makeCityTemplate()` onto a dev world rather than hand-authoring a rival layout.
 
 /** The wild the town is set in. Sized by the town, not the other way round: a fixture that
  *  pinned its own span would clip the next ring off. */
 export const SHOWCASE_MARGIN = 8
 
-/** Every showcase dimension is a function of the ring count rather than a constant, and the
- *  ring-1 answers are unchanged to the tile. */
 export const showcaseSpan = (rings: number): number => townSpan(rings) + 2 * SHOWCASE_MARGIN
 export const SHOWCASE_W = showcaseSpan(TOWN_RINGS_GENESIS)
 export const SHOWCASE_H = showcaseSpan(TOWN_RINGS_GENESIS)
@@ -47,21 +44,15 @@ export const rockHill = (rings: number): { x0: number; y0: number; x1: number; y
 })
 export const ROCK_HILL = rockHill(TOWN_RINGS_GENESIS)
 
-// Reserved, not placed: the fixture only keeps the standing stone's meadow tile clear, in the
-// open ground between the last street and the forest.
+// Reserved, not placed: the fixture only keeps this meadow tile clear.
 export const standingStoneTile = (rings: number): { x: number; y: number } => ({
   x: SHOWCASE_ANCHOR.x + townSpan(rings) + 1,
   y: SHOWCASE_ANCHOR.y + 1,
 })
 export const STANDING_STONE_TILE = standingStoneTile(TOWN_RINGS_GENESIS)
 
-/**
- * The ford is the only place a deck can span: the channel runs three tiles and
- * `structures.recipes.bridge` spans two. Fix the MAP, not the recipe — widening the recipe moves
- * the forge pin.
- * The spit is still terrain WATER on purpose, so `townGroundOf` never plats on it while
- * `townWalkOf` lets feet stand.
- */
+/** The ford is the only place a deck can span: the channel runs three tiles and the bridge
+ *  recipe spans two. The spit stays terrain WATER, so `townGroundOf` never plats on it. */
 export const FORD_ROWS = 4
 export const showcaseFord = (
   anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
@@ -71,8 +62,7 @@ export const showcaseFord = (
   return { x: anchor.x + riverLocalDx(rings) + RIVER_HALF, y0, y1: y0 + FORD_ROWS - 1 }
 }
 
-/** The top-left plank of the only deck that can stand here. Derived from the ford, so the map
- *  and anything that walks to it cannot disagree. */
+/** Derived from the ford, so the map and anything that walks to it cannot disagree. */
 export const showcaseDeck = (
   anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
   rings: number = TOWN_RINGS_GENESIS,
@@ -81,7 +71,6 @@ export const showcaseDeck = (
   return { x: f.x - 2 * RIVER_HALF, y: f.y0 + 1, w: 2 * RIVER_HALF, h: 1 }
 }
 
-/** The tile a bridgewright stands on to reach the deck: the spit itself. */
 export const showcaseFordStand = (
   anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
   rings: number = TOWN_RINGS_GENESIS,
@@ -105,8 +94,7 @@ const ShowcaseStructureSchema = z
     y: z.number().int().min(0),
     w: z.number().int().min(1).max(4),
     h: z.number().int().min(1).max(4),
-    // The facing rides along because a door is on the face the building presents, and half this
-    // town's buildings present the +x one.
+    // A door is on the face the building presents, and half this town's buildings present +x.
     facing: z.enum(['sw', 'se']),
   })
   .strict()
@@ -155,8 +143,7 @@ export function makeShowcaseMap(
     if (x < 0 || y < 0 || x >= span || y >= span) continue
     terrain[y]![x] = toTileId(t.to)
   }
-  // After the template, not before: `cityTerrainTiles` paints the whole extent, so a spit laid
-  // first would be painted back to water.
+  // After the template: `cityTerrainTiles` paints the whole extent, so a spit laid first is lost.
   const ford = showcaseFord(anchor, rings)
   for (let y = ford.y0; y <= ford.y1; y++) {
     if (y < 0 || y >= span || ford.x < 0 || ford.x >= span) continue
@@ -179,8 +166,6 @@ export function showcaseTerrain(
 ): TileId[][] {
   return makeShowcaseMap(anchor, rings).terrain as TileId[][]
 }
-
-// ------------------------------------------------------------------ invariants (tests + gate)
 
 /** The tile the door OPENS ONTO, on the face the structure's facing names. The well and the
  *  fire pit have no door and answer with their own tile — they stand in the paving. */
@@ -205,7 +190,6 @@ export const showcaseDoorTile = (
 export const showcaseStructureTiles = (s: ShowcaseStructure): { x: number; y: number }[] =>
   structureTiles({ w: s.w, h: s.h, dx: s.x, dy: s.y }).map((t) => ({ x: t.dx, y: t.dy }))
 
-/** Every road tile reachable from the plaza centre, walking road to road. */
 export function roadReach(
   map: ShowcaseMap,
   from: { x: number; y: number } = plazaTile(TOWN_RINGS_GENESIS),

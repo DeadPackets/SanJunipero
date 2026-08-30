@@ -200,7 +200,6 @@ export type PerceptionPacket = {
     forageables: PerceivedForageable[]
   }
   ground?: PerceivedGround
-  // How much light is on the ground this body stands on. Three words, never a number.
   light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
   // so a packet from a town that never worked at night reads exactly as it always did.
@@ -300,7 +299,7 @@ export function hears(
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
 
-  // Occlusion off drops the wall, not the distance: plain earshot, as it was before.
+  // Occlusion off drops the wall, not the distance: plain earshot.
   if (!config.occlusion.enabled)
     return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
 
@@ -342,30 +341,25 @@ function itemMarks(lens: Lens, i: Item): OwnerNames & Turning {
 
 function perceiveAgents(lens: Lens): PerceivedAgent[] {
   const { state, config, self } = lens
-  return (
-    Object.values(state.agents)
-      // Four walls outrank the light, and inside them the darkness still costs distance.
-      .filter(
-        (a) => a.id !== self.id && a.alive && lens.withinSight(a.x, a.y) && lens.sameRoom(a.id),
-      )
-      .sort(byId)
-      .map((a) => {
-        const worn = wornProse(state, a.id)
-        const condition = conditionProse(state, config, a.id)
-        return {
-          id: a.id,
-          name: a.name,
-          x: a.x,
-          y: a.y,
-          activityVerb: a.activity?.verb ?? null,
-          collapsed: a.collapsedSinceTick !== null,
-          asleep: a.asleep,
-          ageBand: ageBand(config, a.ageDays),
-          ...(worn === undefined ? {} : { worn }),
-          ...(condition === undefined ? {} : { condition }),
-        }
-      })
-  )
+  return Object.values(state.agents)
+    .filter((a) => a.id !== self.id && a.alive && lens.withinSight(a.x, a.y) && lens.sameRoom(a.id))
+    .sort(byId)
+    .map((a) => {
+      const worn = wornProse(state, a.id)
+      const condition = conditionProse(state, config, a.id)
+      return {
+        id: a.id,
+        name: a.name,
+        x: a.x,
+        y: a.y,
+        activityVerb: a.activity?.verb ?? null,
+        collapsed: a.collapsedSinceTick !== null,
+        asleep: a.asleep,
+        ageBand: ageBand(config, a.ageDays),
+        ...(worn === undefined ? {} : { worn }),
+        ...(condition === undefined ? {} : { condition }),
+      }
+    })
 }
 
 function carved(
@@ -378,8 +372,7 @@ function carved(
   return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
 }
 
-// The way in, from the same function the verb uses. A body that reads this and stands there
-// is a body `enter` accepts.
+// The same door `enter` validates against, so a mind is never shown a way in it cannot use.
 function wayIn(lens: Lens, s: Structure): { door?: { x: number; y: number }; full?: true } {
   if (s.stage !== 'complete' || !isRoofedKind(lens.config, s.kind)) return {}
   const door = doorTile(lens.state, s)
@@ -390,31 +383,27 @@ function wayIn(lens: Lens, s: Structure): { door?: { x: number; y: number }; ful
   }
 }
 
-// Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
-// walls actually are cannot disagree.
+// The same two numbers `stepBuild` runs down, so the packet cannot disagree with the walls.
 function howFarUp(lens: Lens, s: Structure): { raised?: { done: number; needs: number } } {
   if (s.stage !== 'construction') return {}
   const needs = buildTicks(lens.config, s.kind)
   return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
 }
 
-// The fire in the room, off the same property `stoke` validates against and the same clock
-// `flamesAt` reads — so what a mind is told about a hearth is what the hearth is.
+// The same property `stoke` validates against and the same clock `flamesAt` reads.
 function theHearth(lens: Lens, s: Structure): { hearth?: 'lit' | 'cold' } {
   if (s.stage !== 'complete' || !isHearthKind(lens.config, s.kind)) return {}
   return { hearth: (s.fueledUntilTick ?? 0) > lens.state.tick ? 'lit' : 'cold' }
 }
 
-// Off the same property `sleepRegenPerTick` reads, so what a mind is promised at the door is
-// what the night actually gives it.
+// The same property `sleepRegenPerTick` reads.
 function theBed(lens: Lens, s: Structure): { bed?: true } {
   return s.stage === 'complete' && isBeddedKind(lens.config, s.kind) ? { bed: true as const } : {}
 }
 
 function perceiveStructures(lens: Lens): PerceivedStructure[] {
   const { state, self, indoors } = lens
-  // Nearest footprint tile, not the anchor: a long structure whose far corner is
-  // anchored out of range is still seen when its near edge is within sight.
+  // Nearest footprint tile, not the anchor: a long structure is seen by its near edge.
   const inSight = (s: Structure): boolean => {
     const nx = Math.min(Math.max(self.x, s.x), s.x + s.w - 1)
     const ny = Math.min(Math.max(self.y, s.y), s.y + s.h - 1)
@@ -483,7 +472,6 @@ function perceiveCrops(lens: Lens): PerceivedCrop[] {
     .map((c) => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
 }
 
-// Four walls hide the herd as completely as they hide everything else outdoors.
 function perceiveFauna(lens: Lens): PerceivedFauna[] {
   if (lens.indoors !== null) return []
   const fauna = lens.state.fauna ?? {}
@@ -621,15 +609,14 @@ export function composePerception(
   // Derived here, not at the call site: no caller can forget the world's live laws.
   const config = effectiveConfig(baseConfig, state.laws)
 
-  // Four walls are also a horizon: inside, the world shrinks to this one room.
   const indoors = insideOf(state, agentId)
   const lens: Lens = {
     state,
     config,
     self,
     indoors,
-    // Every sight-class channel goes through this one horizon, and the horizon is set by the
-    // light ON THE THING SEEN (§19). Hearing does not use it: sound carries in the dark.
+    // Set by the light ON THE THING SEEN, not on the viewer. Hearing does not use it: sound
+    // carries in the dark.
     withinSight: (x, y) =>
       dist(self.x, self.y, x, y) <= visionRadiusAt(state, self, x, y, state.tick, config),
     sameRoom: (otherId) => insideOf(state, otherId) === indoors,

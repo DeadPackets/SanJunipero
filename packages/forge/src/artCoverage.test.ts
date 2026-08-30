@@ -304,8 +304,7 @@ describe('the committed items', () => {
         'the world sprite is the size its footprint covers',
       ).toEqual([item.entry.spritePx, item.entry.spritePx])
       expect([icon.width, icon.height], 'the icon is the C-level icon').toEqual([ICON_PX, ICON_PX])
-      // INTEGER DOWNSCALE ONLY: the icon must be a whole divide of the sprite, or it came off
-      // a fractional resample and ships the mush this bar exists to keep out.
+      // INTEGER DOWNSCALE ONLY: the icon must be a whole divide of the sprite, never a resample.
       expect(item.entry.spritePx % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
       for (const img of [sprite, icon]) {
         expect(alphaBinaryGate(img).failures).toEqual([])
@@ -361,7 +360,6 @@ describe('the committed cast', () => {
   )
 })
 
-// ── ★ THE CELL POINTS THE LIGHTS AND THE SMOKE LAND ON ─────────────────────────────────────
 describe('★ every hearth kind names where its chimney and its flame are painted', () => {
   const buildings = listCommittedBuildings()
   const hearthKinds = new Set([

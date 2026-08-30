@@ -200,7 +200,6 @@ describe('laws in the viewer protocol (T25b)', () => {
     if (first.t !== 'snapshot') throw new Error('unreachable')
     expect(first.laws).toEqual({})
 
-    // An operator flips a law through the admin channel's injected submitLaw.
     const admin = createLawsAdmin({
       submitLaw: (path, value) => laws.push({ path, value }),
       token: TOKEN,
@@ -226,8 +225,7 @@ describe('laws in the viewer protocol (T25b)', () => {
   })
 })
 
-/** The channel was built, tested and reachable from no entrypoint. This is the wire: a law an
- *  operator posts has to land in the world the stream is serving. */
+/** The wire: a law an operator posts has to land in the world the stream is serving. */
 describe('★ the law channel reaches the served world', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-adminwire-'))
   afterAll(() => {

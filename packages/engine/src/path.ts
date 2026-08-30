@@ -3,10 +3,8 @@ import type { TileId, WorldState } from './state.js'
 
 export type Point = { x: number; y: number }
 
-// grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel.
-// A channel is impassable but drinkable; a sapling walks like the grass it grew from.
-// The keys stay literal rather than the T_* names: computed keys leave the object in
-// dictionary mode, and findPath reads this table once per neighbour per node.
+// Keys are tile ids in order: grass, dirt, water, forest, rock, sand, farmland, road, path,
+// sapling, channel — literal, not T_*: computed keys drop the object into dictionary mode.
 export function terrainCostFor(config: SimConfig): Record<TileId, number> {
   return {
     0: 1,
@@ -83,8 +81,7 @@ export function isPassable(state: WorldState, x: number, y: number, ctx?: PathCt
   return !underStructure(state, x, y, ctx)
 }
 
-// The single place that prices a step. Terrain is what the map says; a bridge deck is
-// what the town built over it, and it walks like the road it is.
+// The single place that prices a step: a bridge deck walks like the road it is.
 export function stepCostAt(
   state: WorldState,
   x: number,

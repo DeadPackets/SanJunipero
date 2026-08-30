@@ -106,9 +106,8 @@ describe('the focus box is a keyboard stop and nothing else', () => {
     expect(src('./Figures.tsx')).toContain('RING_MIN_W')
   })
 
-  // `tabIndex` inside the rAF loop rewrote the stop set 60 times a second, so a person who
-  // walked off between two Tab presses silently changed the next stop. `visibility: hidden`
-  // takes a walked-off body out of the tab order on its own.
+  // `tabIndex` inside the rAF loop would rewrite the stop set 60 times a second; `visibility:
+  // hidden` takes a walked-off body out of the tab order on its own.
   it('is off the tab order until the loop has seen it on screen', () => {
     expect(rule('.stage-figure')).toMatch(/visibility:\s*hidden/)
     expect(src('./Figures.tsx')).not.toContain('node.tabIndex')

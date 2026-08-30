@@ -207,8 +207,8 @@ describe('seasonal sheets', () => {
     expect(new Set(sheets.map((s) => s.data.join(','))).size).toBe(SEASONS.length)
   })
 
-  // Ruling 13: no palette quantize anywhere. Summer's tint is the identity, so its sheet is
-  // still palette-true — the painter paints FROM the palette; the other three keep their tint.
+  // Summer's tint is the identity, so its sheet is still palette-true — the painter paints FROM
+  // the palette; the other three keep their tint.
   it('★ keeps the colour the tint gave it — nothing snaps back to MASTER_PALETTE', () => {
     expect(paletteGate(paintSeasonSheet('summer')).offPalette).toBe(0)
     for (const season of ['spring', 'autumn', 'winter'] as const) {

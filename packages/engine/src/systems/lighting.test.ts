@@ -137,8 +137,6 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     return fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), config)
   }
 
-  // Ruling 22 (2026-08-30): the square's pit is fed daily like the lamps, so one armful covers
-  // the whole coming night. A hearth under a roof still burns the armful and no longer.
   it('costs one wood, and the pit in the open burns till dawn', () => {
     const fed = apply(holding(withPit(), 'item_1', 'wood'), 'stoke', { structureId: 'structure_1' })
     expect(fed.structures.structure_1!.fueledUntilTick).toBe(nextDawnTick(0))

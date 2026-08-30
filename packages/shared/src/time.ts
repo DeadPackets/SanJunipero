@@ -18,7 +18,6 @@ export function dayPhaseFromTick(tick: number): DayPhase {
   return 'day'
 }
 
-/** The first dawn strictly after `tick`. */
 export function nextDawnTick(tick: number): number {
   const dawn = Math.floor(tick / MINUTES_PER_DAY) * MINUTES_PER_DAY + DAWN_HOUR * 60
   return tick < dawn ? dawn : dawn + MINUTES_PER_DAY

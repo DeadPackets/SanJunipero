@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# One short SJ_LIVE rehearsal. SPENDS REAL MONEY, under the lifetime anomaly stop and a $2 daily
-# budget. Writes the log and the mind databases under `rehearsals/`, which is gitignored.
-# Usage: pnpm rehearse [minutes]      Then: node --import tsx scripts/score.mjs
-# A sim-day is 1440 ticks of 2500 ms: 60 real minutes at SPEED=1. The defaults below cross two sim
-# day boundaries, which is the only way a rehearsal sees a night, a dawn and a day rollover. The $2
-# budget is a rolling 24 REAL hours, so it is one ceiling over the whole run however fast it runs.
+# SPENDS REAL MONEY: `pnpm rehearse [minutes]`, under the lifetime anomaly stop and a $2 budget
+# over a rolling 24 REAL hours — one ceiling over the whole run however fast it runs.
 set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 OUT=$ROOT/rehearsals
+# A sim-day is 1440 ticks of 2500 ms: 60 real minutes at SPEED=1. These defaults cross two sim-day
+# boundaries, the only way a rehearsal sees a night, a dawn and a rollover.
 MINUTES=${1:-30}
 SPEED=${SPEED:-4}
 DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 60}")

@@ -15,7 +15,6 @@ export const PARTICLES = {
 } as const
 export type ParticleKind = keyof typeof PARTICLES
 
-/** Three depths: far drops are small, faint and slow; near ones long, bright and fast. */
 export const BANDS: readonly { scale: number; alpha: number; speed: number }[] = [
   { scale: 0.6, alpha: 0.35, speed: 0.7 },
   { scale: 1, alpha: 0.6, speed: 1 },
@@ -24,7 +23,6 @@ export const BANDS: readonly { scale: number; alpha: number; speed: number }[] =
 const SNOW_WOBBLE_PX_S = 42 // a flake falls in a sway, never dead straight
 const WIND_PX_S = 40 // the town's one gust, at full strength
 
-/** The count a stage of `w`×`h` CSS px gets, halved when the viewer asked for less motion. */
 export function particleCount(kind: ParticleKind, w: number, h: number, still: boolean): number {
   const n = Math.round((PARTICLES[kind].perMpx * w * h) / 1e6)
   return still ? Math.round(n / 2) : n
@@ -83,7 +81,6 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
   let t = 0
   const streaks = new Map<string, Texture>()
 
-  // the two frames of a splash, and the ring a drop leaves on water
   const splashTex = [
     bakeTexture(scene, (g) => g.rect(0, 0, 3, 2).fill(0xcfe3ee)),
     bakeTexture(scene, (g) => g.rect(0, 0, 5, 1).fill(0xcfe3ee)),
@@ -113,7 +110,6 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
   const rollFlashGap = (): number =>
     (FLASH_MIN_GAP_S + Math.random() * (FLASH_MAX_GAP_S - FLASH_MIN_GAP_S)) * 1000
 
-  /** Grow or shrink the pool to the stage's count and dress every drop for the kind. */
   const dress = (): void => {
     const w = scene.app.screen.width
     const h = scene.app.screen.height

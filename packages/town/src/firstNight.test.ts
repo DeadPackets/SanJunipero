@@ -1,9 +1,5 @@
-// @slow — the town survives its first night and somebody sleeps indoors.
-//
-// The two rules that keep this green are in the header of `founders.ts`.
-//
-// This is the dev world a viewer actually boots, minus the HTTP: same config, same terrain,
-// same structures, same `makeFoundersOnTick`. Scripted policies only. No LLM, no network, $0.
+// @slow — the town survives its first night and somebody sleeps indoors. Scripted, no LLM, $0.
+// The dev world a viewer boots minus the HTTP: same config, terrain, structures and tick.
 import { describe, expect, it } from 'vitest'
 import { stateHash } from '@sj/shared'
 import { fold } from '@sj/engine'
@@ -11,8 +7,7 @@ import { SHOWCASE_CONFIG, devGenesisState } from './devWorld.js'
 import { FOUNDERS } from './founders.js'
 import { type Run, type Seen, runFoundersWorld } from './testutil.js'
 
-/** Three sim days, the far-bank lane's standard, so a night is a thing this test has seen
- *  three of rather than argued about once. */
+/** Three sim days, so a night is a thing this test has seen three of. */
 const TICKS = 4320
 const RINGS = 3
 
@@ -31,8 +26,7 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
 
   it('★ NOBODY SPENDS A NIGHT ON THE GROUND — not one collapse in three days', () => {
     const down = of(run, 'agent_collapsed')
-    // The failure names the tick and the clock, because 17:02 is the arithmetic and saying so
-    // is what stops the next reader treating it as a bad roll.
+    // The failure names the tick and the clock: 17:02 is arithmetic, not a bad roll.
     expect(
       down.map((e) => `${who(e)}@${e.tick}`),
       'a founder went down in the street',

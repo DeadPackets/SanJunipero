@@ -51,7 +51,6 @@ function Glyph({ icon }: { icon: string }) {
   )
 }
 
-/** The way back to one minute of the town's history, wherever the record offers one. */
 function FeedJump({
   tick,
   label,
@@ -208,7 +207,6 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   )
 }
 
-/** One first, and — where the town named the thing itself — the words it was named in. */
 function FirstLine({
   first,
   current,
@@ -233,8 +231,8 @@ function FirstLine({
   )
 }
 
-/** The firsts ledger as the chronicle reads it. Rendered from a read rather than from the feed
- *  so the three states — waiting, empty, written — can be asked of it outside a browser. */
+/** From a read rather than from the feed, so the three states — waiting, empty, written — can
+ *  be asked of it outside a browser. */
 export function FirstsView({
   read,
   viewTick,

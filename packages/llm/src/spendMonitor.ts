@@ -5,8 +5,8 @@ import { insertAlert } from './callLog.js'
 // W/60 of a sim-day and its spend scales by 60/W to reach $/sim-day.
 export const REAL_MINUTES_PER_SIM_DAY = 60
 export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
-// 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast (`deploy/README.md`,
-// itself expected and not measured). Re-derive on rehearsal 4.
+// 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast — itself an expectation
+// and not a measurement.
 export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
 
 export type SpendProjection = {
@@ -41,8 +41,8 @@ export function projectDailySpend(
   }
 }
 
-// A call that came back with nothing was still paid for. The provider says it one of two ways,
-// and the retry path swallows both: 10.4% of the mini-rehearsal's calls, ~$0.24, one alert.
+// A call that came back with nothing was still paid for, and the provider says so one of two
+// ways; the retry path swallows both.
 export type FailureClass = 'empty_output' | 'unparseable' | 'other'
 
 export function classifyFailure(error: string | null): FailureClass {
@@ -65,8 +65,7 @@ const NO_DEAD_CALLS: DeadCalls = { calls: 0, emptyOutput: 0, unparseable: 0, oth
 // The wall-clock day, which is the only day `llm_calls` knows: it carries no tick.
 const dayOf = (ts: number): string => new Date(ts).toISOString().slice(0, 10)
 
-// Every failed call, folded per mind per day. Sorted by mind then day so two runs of the same
-// ledger report in the same order.
+// Sorted by mind then day so two runs of the same ledger report in the same order.
 export function deadCallCounts(
   db: Database.Database,
   opts: { since?: number } = {},
@@ -104,8 +103,7 @@ const sumDeadCalls = (rows: DeadCallRow[]): DeadCalls =>
     NO_DEAD_CALLS,
   )
 
-// One alert row and one line per mind per day. Says nothing at all about a run with nothing
-// to say, so a quiet ops surface still means a quiet run.
+// Silent on a run with nothing to say, so a quiet ops surface still means a quiet run.
 export function reportDeadCalls(
   db: Database.Database,
   opts: { since?: number } = {},
@@ -133,7 +131,6 @@ export function checkSpend(
   const cutoff = (opts.now ?? Date.now()) - windowRealMinutes * 60_000
   const deadCalls = sumDeadCalls(deadCallCounts(db, { since: cutoff }))
   if (projection.usdPerSimDay <= threshold) return { ...projection, alerted: false, deadCalls }
-  // The projection alone said the mini-rehearsal was clean while a tenth of it bought nothing.
   const dead = deadCalls.emptyOutput + deadCalls.unparseable
   const wasted =
     dead === 0 ? '' : `; ${dead} of ${projection.sampledCalls} calls came back empty or unparseable`
@@ -197,14 +194,13 @@ export function providerCounts(
   return [...byProvider.values()].sort((a, b) => (a.provider ?? '').localeCompare(b.provider ?? ''))
 }
 
-// The per-call reconciliation over a whole run, which is where a small per-call bias shows.
 // A run where nothing can be reconciled is itself the finding: the ledger has no second opinion.
 export type Reconciliation = {
   reconciledCalls: number
   unreconciledCalls: number
   reportedUsd: number
   computedUsd: number
-  // reported / computed. 1 is agreement; the defect this exists for read ~2.
+  // reported / computed; 1 is agreement.
   ratio: number | null
 }
 
@@ -242,7 +238,6 @@ export function reconcileCosts(
   }
 }
 
-// Says nothing when the ledger and the bill agree, so a quiet ops surface still means a quiet run.
 export function reportReconciliation(
   db: Database.Database,
   opts: { since?: number; tolerance?: number } = {},
@@ -259,8 +254,6 @@ export function reportReconciliation(
   return r
 }
 
-// One alert row and one line per back end. A run served by one provider says one line; a run
-// that fell through says how far.
 export function reportProviders(
   db: Database.Database,
   opts: { since?: number } = {},

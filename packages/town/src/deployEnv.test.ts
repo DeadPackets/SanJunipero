@@ -1,6 +1,5 @@
-// A knob documented as a `.env` toggle that `compose.yaml` never passes through is a setting an
-// operator can set, read back in the docs, and watch do nothing. The docs are the specification
-// and compose.yaml is the answer to it.
+// A knob documented as a `.env` toggle that `compose.yaml` never passes through is one an
+// operator can set, read back in the docs, and watch do nothing.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -13,8 +12,7 @@ const DEPLOY_README = read('deploy/README.md')
 const ENV_EXAMPLE = read('deploy/.env.example')
 const COMPOSE = read('compose.yaml')
 
-/** The env table in README.md: one row per knob. `dev:world`-only rows would be excluded, but
- *  one env parse means there are none left — every knob reaches the container. */
+/** `dev:world`-only rows would be excluded, but one env parse means there are none left. */
 function documentedKnobs(): string[] {
   const names = new Set<string>()
   for (const line of README.split('\n')) {
@@ -28,13 +26,11 @@ function documentedKnobs(): string[] {
   return [...names].sort()
 }
 
-/** Named on a line of compose.yaml's `environment:` — as `NAME: …`, `- NAME=…` or a bare
- *  `- NAME` pass-through. */
 const passedThrough = (name: string): boolean =>
   COMPOSE.split('\n').some((l) => new RegExp(`^\\s*-?\\s*${name}\\s*(=|:|$)`).test(l))
 
-/** Properties, not rosters — in ops config too. A named five-founder backup puts every child born
- *  in play outside it, and the failure is invisible until a restore. */
+/** Properties, not rosters: a named five-founder backup puts every child born in play outside
+ *  it, and the failure is invisible until a restore. */
 describe('★ the backup covers the minds that exist, not the minds that were planned', () => {
   const SH = read('deploy/litestream.sh')
 
@@ -81,7 +77,7 @@ describe('★ every knob the docs promise reaches the container', () => {
   })
 
   /** The one knob that must NOT follow `.env`: a stray `SJ_FRESH=1` left over from a reset
-   *  would delete the world on every restart. See deploy/README.md. */
+   *  would delete the world on every restart. */
   it('pins SJ_FRESH to 0 rather than passing it through', () => {
     const settings = COMPOSE.split('\n').filter((l) => !/^\s*#/.test(l))
     expect(settings.some((l) => /SJ_FRESH\s*[:=]\s*"?0"?\s*$/.test(l))).toBe(true)

@@ -53,8 +53,7 @@ describe('★ lightning is rare drama: a storm-heavy town keeps its roofs', () =
     expect(ruled.lost).toBeLessThanOrEqual(2)
   })
 
-  // ★ VACUOUS GUARD: the same world, the same seed, the old dial. The town it burned down is
-  // the whole reason the number moved (ruling 22, 2026-08-30).
+  // ★ VACUOUS GUARD: the same world and the same seed with the old dial burns the town down.
   it('is the dial doing it: at the old 0.02 the same three days take a third of the town', () => {
     const before = stormyDays(0.02)
     expect(before.spells).toBe(ruled.spells)

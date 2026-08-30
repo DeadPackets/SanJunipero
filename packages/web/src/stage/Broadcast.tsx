@@ -21,11 +21,6 @@ const BUST_PX = 96
 
 const NO_ENTRIES: ChronicleEntry[] = []
 
-/**
- * The lower third: who is talking, or — when nobody is — the newest thing the town's own paper
- * said. A plate of parchment with an ink rule under it, the way every other mark over the town
- * is a thing of the town.
- */
 export function LowerThird({ store }: { store: WorldStore }) {
   const [spoken, setSpoken] = useState<SpokenLine | null>(null)
   const paper = useFeed(dispatchesFeed).data
@@ -76,11 +71,8 @@ export function LowerThird({ store }: { store: WorldStore }) {
   )
 }
 
-/**
- * The chronicle crawling along the bottom letterbox edge. The line is written twice so the wrap
- * is seamless, and it is moved on the stage's own frame rather than by a keyframe — the sheet's
- * motion table names response times, and a crawl is not a response to anything.
- */
+/** The line is written twice so the wrap is seamless, and it is moved on the stage's own frame
+ *  rather than by a keyframe: a crawl is not a response to anything the motion table names. */
 export function Ticker({ scene }: { scene: Scene | null }) {
   const entries = useFeed(chronicleFeed).data ?? NO_ENTRIES
   const text = useMemo(() => tickerText(entries), [entries])

@@ -4,10 +4,9 @@ import { momentStamp } from '../stamp.js'
 /** The admin channel is a loopback server the browser cannot call directly; the gateway carries
  *  `/admin/*` across from the page's own origin, so every call here is same-origin and bare. */
 export const ADMIN_ENDPOINT = ''
-/** How often the operator's page re-reads the clock and the ledger. Slow on purpose: these are
- *  numbers to watch, not to animate. */
+/** Slow on purpose: these are numbers to watch, not to animate. */
 const READ_EVERY_MS = 5000
-/** The stops the speed control offers. `/admin/speed` takes anything between 0.1 and 60. */
+/** `/admin/speed` takes anything between 0.1 and 60; these are the stops offered. */
 export const SPEED_STOPS = [0.5, 1, 2, 4, 8] as const
 
 export type ClockState = { paused: boolean; speed: number; tick: number }
@@ -34,13 +33,9 @@ export type CostReport = {
 }
 export type PendingRuling = { id: number; ruleId: number; recipeId: string; tick: number }
 
-// ── formatting ──────────────────────────────────────────────────────────────────────────────
-
 /** Four places everywhere, so a column of dollars stays a column. */
 export const usd = (n: number): string => `$${n.toFixed(4)}`
 export const pct = (r: number | null): string => (r === null ? '—' : `${Math.round(r * 100)}%`)
-
-// ── the channel ─────────────────────────────────────────────────────────────────────────────
 
 async function ask<T>(
   fetchFn: typeof fetch,
@@ -88,8 +83,6 @@ function useAdminRead<T>(token: string, path: string): [T | null, () => void] {
   }, [read])
   return [data, read]
 }
-
-// ── the clock ───────────────────────────────────────────────────────────────────────────────
 
 export function ClockView({
   clock,
@@ -166,8 +159,6 @@ export function ClockSection({
   )
 }
 
-// ── the money, and the one number that is not money ─────────────────────────────────────────
-
 function Ledger({ rows }: { rows: readonly { label: string; value: string }[] }) {
   return (
     <dl className="ops-ledger">
@@ -187,7 +178,6 @@ export function SpendView({ cost }: { cost: CostReport }) {
     <section className="ops-block" aria-label="Spend">
       <h3 className="feed-head">Spend</h3>
 
-      {/* Money is what the question cost; this is the answer to it. */}
       <p className="ops-answer">
         <span className="ops-figure">{pct(answer.rate)}</span>
         <span className="ops-answer-says">
@@ -274,8 +264,6 @@ export function SpendSection({ token }: { token: string }) {
   if (cost === null) return <p className="feed-empty">Reading the ledger…</p>
   return <SpendView cost={cost} />
 }
-
-// ── the rulings a person still owes an answer to ────────────────────────────────────────────
 
 export function RulingsView({
   pending,
@@ -371,8 +359,6 @@ export function RulingsSection({
     />
   )
 }
-
-// ── the whole run, as one file ──────────────────────────────────────────────────────────────
 
 /** A link that carries a bearer, which an anchor cannot: the channel refuses an unauthorized
  *  GET, so the file is fetched and then handed to the browser to save. */

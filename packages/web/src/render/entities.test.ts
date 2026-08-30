@@ -629,8 +629,8 @@ describe('pipsFilled', () => {
   })
 })
 
-// An effect that captured the scale it found, then wrote it back when it ended, reverted a
-// building to its pre-art size for good if the art landed inside the effect's 260 ms.
+// An effect that writes back the scale it captured reverts a building whose art lands inside
+// the effect's 260 ms.
 describe('★ an effect multiplies the scale the layer owns, and never replaces it', () => {
   const HOUSE_ART = {
     id: 'asset_house',

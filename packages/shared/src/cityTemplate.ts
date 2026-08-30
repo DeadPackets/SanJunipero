@@ -113,8 +113,8 @@ export const CityStructureSchema = z
     dy: z.number().int(),
     w: z.number().int().min(1).max(4),
     h: z.number().int().min(1).max(4),
-    // USER RULING 1: the five houses are owned, one founder each; every public building is null.
-    // The field is REQUIRED; only its value may be null.
+    // The five houses are owned, one founder each; every public building is null. The field is
+    // REQUIRED; only its value may be null.
     owner: z.string().min(1).nullable(),
     // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
     // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.

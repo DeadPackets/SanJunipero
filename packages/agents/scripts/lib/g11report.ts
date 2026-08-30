@@ -1,12 +1,9 @@
 import { z } from 'zod'
 
-// Shared schema for `data/g11-report.json`: writer and offline checker in one module so they
-// cannot drift. Criteria are deep-world addendum §18's.
+// Writer and offline checker live in one module so the report schema cannot drift.
 
 export const G11_MIN_SIM_DAYS = 2
 
-// What a turn was for: a town that spends its whole day staying alive is a failed tuning
-// outcome. Movement is nobody's purpose, so it gets its own bucket.
 const SURVIVAL_VERBS: readonly string[] = [
   'eat',
   'drink',
@@ -44,8 +41,6 @@ const SOCIAL_VERBS: readonly string[] = ['speak', 'give', 'teach', 'read', 'atta
 
 export type TurnClass = 'survival' | 'production' | 'social' | 'other'
 
-// A coined expressive verb is `express:<word>` and is social by construction; a codified
-// recipe is `recipe:<name>` and is production. Everything unlisted is movement or idling.
 export function classifyVerb(verb: string): TurnClass {
   if (verb.startsWith('express:')) return 'social'
   if (verb.startsWith('recipe:')) return 'production'
@@ -80,7 +75,6 @@ const G11MindSchema = z
   })
   .strict()
 
-// One mind, one sim-day: a town with no full-need moments has no window for society.
 const G11DiscretionSchema = z
   .object({
     agentId: z.string(),
@@ -135,8 +129,7 @@ const G11SpendSchema = z
     requestedProviderOrder: z.array(z.string()),
     // `provider.order` with allow_fallbacks:true is a preference, not an allow-list.
     hardProviderAllowList: z.boolean(),
-    // Which back end served each call, and how much of it was worth paying for. `provider: null`
-    // is the row for calls that never came back, which carry no answer to read a back end off.
+    // `provider: null` is a call that never came back, so no back end can be read off it.
     providerMix: z.array(
       z
         .object({
@@ -171,38 +164,30 @@ const G11ConstructsSchema = z
 
 const G11EvidenceSchema = z
   .object({
-    // 1 — the run itself
     ticksRun: z.number().int(),
     crashAlerts: z.number().int(),
     drainedIntents: z.number().int(),
     drainedAgainCount: z.number().int(),
     minds: z.array(G11MindSchema),
     overBudgetTicks: z.number().int(),
-    // 2 — thirst reaches an act
     unpromptedDrinks: z.number().int(),
-    // 3 — food gathered and then eaten
     foodGathered: z.number().int(),
     gatheredFoodEaten: z.number().int(),
-    // 4 — the staged affliction draws a visible response
     stagedAfflictionAgentId: z.string().nullable(),
     stagedAfflictionResponses: z.array(z.string()),
     stagedAfflictionResolved: z.enum(['recovered', 'died', 'standing']),
-    // 5 — the chronicle over every C11 event that fired
     c11EventTypes: z.array(z.string()),
     chronicleLines: z.number().int(),
     chronicleViolations: z.array(z.string()),
-    // 6 — feet wear the routes feet actually take
     wearThreshold: z.number(),
     maxTileTraffic: z.number().int(),
     tilesWorn: z.number().int(),
-    // 7 — the world laws panel, one flip, and the replay
     worldLawPaths: z.array(z.string()),
     lawFlips: z.array(
       z.object({ tick: z.number().int(), path: z.string(), value: z.unknown() }).strict(),
     ),
     lawHistoryEntries: z.number().int(),
     replayHashMatches: z.boolean(),
-    // 8 — spend and the reflections
     reflectionsStarted: z.number().int(),
     reflectionsResolved: z.number().int(),
     deadCalls: z
@@ -214,21 +199,16 @@ const G11EvidenceSchema = z
       })
       .strict(),
     deadCallAlertRows: z.number().int(),
-    // 9 — constructs live
     constructs: G11ConstructsSchema,
     tier1Milestones: z.array(z.string()),
-    // 10 — a night a mind actually stood in
     darkPerceptions: z.number().int(),
-    // 11 — the nightly semantic pass
     semanticPassRan: z.boolean(),
     semanticHits: z.array(z.string()),
     semanticPassErrors: z.number().int(),
     // Reported, never gated: hiding a refused verdict would make a silent night look clean.
     semanticUnreadableNights: z.number().int(),
-    // Reported, never gated: a night whose pass never ran. Must read 0 now the pass and the
-    // chronicle render are independent.
+    // Reported, never gated; must read 0 — the pass and the chronicle render are independent.
     semanticSkippedNights: z.number().int(),
-    // the brief's three named world assertions
     fordBridge: z
       .object({
         x: z.number().int(),
@@ -245,7 +225,6 @@ const G11EvidenceSchema = z
       })
       .strict(),
     clothedSurviveLadder: z.boolean(),
-    // the controller's discretionary-time ruling
     discretion: z.array(G11DiscretionSchema),
     mealsNeededPerMindPerDay: z.number(),
     fullNeedMoments: z.number().int(),
@@ -260,8 +239,6 @@ const G11EvidenceSchema = z
   })
   .strict()
 
-// The three calls the gate refused to start without. Recorded so a run can never again be
-// read without knowing whether its provider could emit an act.
 const G11PreflightSchema = z
   .object({
     provider: z.string(),
@@ -282,8 +259,7 @@ const G11PreflightSchema = z
   })
   .strict()
 
-// Reported, never gated: a resumed run must read as one, or a checkpoint becomes a way to
-// launder a failure into a pass.
+// Reported, never gated: a resume must read as one, or a checkpoint launders a failure into a pass.
 const G11ResumeSchema = z
   .object({
     resumed: z.boolean(),
@@ -320,8 +296,7 @@ export const G11ReportSchema = z
   .strict()
 export type G11Report = z.infer<typeof G11ReportSchema>
 
-// Moments a body had nothing wrong with it, kept per mind AND per sim-day — per mind alone
-// gives every row of the table the same number.
+// Kept per mind AND per sim-day: per mind alone gives every row of the table the same number.
 export class FullNeedTally {
   readonly #counts = new Map<string, number>()
 
@@ -340,8 +315,8 @@ export class FullNeedTally {
     return [...this.#counts.values()].reduce((a, b) => a + b, 0) * this.ticksPerSample
   }
 
-  // The samples, so a checkpoint can put them back. A resumed run that started this tally at
-  // zero would report a day's full-need moments as the fraction taken after the resume.
+  // Raw samples so a checkpoint can restore them: a resume that restarted this tally at zero
+  // would report a day's full-need moments as the fraction taken after the resume.
   entries(): [string, number][] {
     return [...this.#counts.entries()]
   }
@@ -356,8 +331,7 @@ export class FullNeedTally {
   }
 }
 
-// Nights whose close errored, each counted once: `semanticErrors` is a strict subset of
-// `narrateErrors`, so summing them counts one bad night as two.
+// `semanticErrors` is a strict subset of `narrateErrors`, so summing them counts one bad night twice.
 export const semanticPassErrorCount = (counters: {
   narrateErrors: number
   semanticErrors: number
@@ -370,15 +344,13 @@ export const median = (xs: readonly number[]): number => {
   return s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!
 }
 
-// The share of a mind's day that went on staying alive, as a fraction of the turns it took.
 export function survivalTax(rows: readonly G11Discretion[]): number {
   const turns = rows.reduce((t, r) => t + r.turns, 0)
   if (turns === 0) return 0
   return rows.reduce((t, r) => t + r.survival, 0) / turns
 }
 
-// The executable form of §18's list plus the brief's binding additions. A null detail
-// means PASS. Every criterion reads evidence the run wrote down; none of them reads a mock.
+// A null detail means PASS.
 export function checkG11Report(report: G11Report): Record<string, string | null> {
   const e = report.evidence
   const o = report.opsPlane
@@ -430,7 +402,6 @@ export function checkG11Report(report: G11Report): Record<string, string | null>
         : `paths=${e.worldLawPaths.length} flips=${e.lawFlips.length}` +
             ` history=${e.lawHistoryEntries} replay=${e.replayHashMatches}`
     })(),
-    // No cap by ruling; what is gated is that nothing was lost and the burn was reported.
     '8.spend-reported-nothing-lost': (() => {
       const lost = e.reflectionsStarted - e.reflectionsResolved
       const ok =
@@ -462,7 +433,6 @@ export function checkG11Report(report: G11Report): Record<string, string | null>
       e.semanticPassRan && e.semanticPassErrors === 0
         ? null
         : `ran=${e.semanticPassRan} errors=${e.semanticPassErrors}`,
-    // --- the brief's binding additions ---
     'A.ops-plane-wired': Object.values(o).every((v) => v === 'wired')
       ? null
       : Object.entries(o)
@@ -491,7 +461,6 @@ export function checkG11Report(report: G11Report): Record<string, string | null>
     'E.the-clothed-come-through-the-night': e.clothedSurviveLadder
       ? null
       : 'a clothed, sheltered or fireside body did not come through the winter night',
-    // Reported, never gated: the controller wants the numbers read, not a threshold guessed.
     'F.discretionary-time-reported':
       e.discretion.length >= 1 ? null : 'no per-mind, per-day breakdown was recorded',
   }

@@ -267,8 +267,7 @@ function scriptedTimeline(
   if (tick === 1443) emit('fire_spread', { fromId: STOREHOUSE.id, toId: SHED.id })
   if (tick === 1445) emit('weather_changed', { kind: 'rain', temperatureC: 10 })
 
-  // The theft rides the witness flag the way the sexes ride the reproduction flag: a fixture
-  // with §19 off runs the earlier timeline body for body and event for event.
+  // The theft rides the witness flag: with it off the fixture runs the earlier timeline exactly.
   if (!config.nightWitness.enabled) return
   if (tick === 1) {
     emit('agent_spawned', {

@@ -257,7 +257,7 @@ export async function registerGeneratedTerrain(
 // ------------------------------------------------------------------ seasonal sheets
 
 // The tint is measured off the GENERATED seasonal materials rather than hand-guessed, then applied
-// to the generated ground. No quantize — ruling 13.
+// to the generated ground. No quantize.
 export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
   const width = SHEET_COLS * TERRAIN_TILE_W,
     height = SHEET_ROWS * TERRAIN_TILE_H

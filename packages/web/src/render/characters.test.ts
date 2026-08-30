@@ -277,8 +277,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
-  // An effect that wrote scale.y itself only held because chars ticked before ambient. The
-  // multiplier is re-applied by this layer, so tick order stops being load-bearing.
+  // The multiplier is re-applied by this layer, so tick order stops being load-bearing.
   it('★ composes an effect multiplier with the scale it owns, and re-applies it every tick', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('nadia')!

@@ -25,7 +25,6 @@ const NEED_LOW = 30
 export type LedgerRow = { personId: string; doc: string; updatedDay: number }
 export type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
 
-/** A document of one person's, read only while the tab that prints it is the open one. */
 const docUrl = (agentId: string | null, doc: string): string | null =>
   agentId === null ? null : `/api/agent/${encodeURIComponent(agentId)}/${doc}`
 
@@ -69,9 +68,7 @@ function NeedBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-/** What a run has made of this person: what they thought, what was written of them, what has
- *  changed. Every section is sourced to something the run recorded, and where the record is
- *  empty it says the RECORD is empty. */
+/** Every section is sourced to the run's record; where it is empty, it says the record is empty. */
 export function PersonStoryView({
   thought,
   journal,
@@ -159,7 +156,6 @@ export type LedgerAgent = AgentView & { skills: Record<string, number> } & {
   activity: null | { verb: string; ticksRemaining: number }
 }
 
-/** What they carry, what they can do, how they are, and what they have written of others. */
 export function PersonLedgerView({
   agent,
   tick,
@@ -239,7 +235,6 @@ export function PersonLedgerView({
   )
 }
 
-/** One person's own page. */
 export function PersonPage({ tab, subject, store }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
@@ -308,7 +303,6 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   )
 }
 
-/** This person's own edges, in the sentence the graph already writes for them. */
 function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] }) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)

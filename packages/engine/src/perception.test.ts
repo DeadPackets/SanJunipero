@@ -8,8 +8,8 @@ import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
 
-// Noon by default: the witness radius scales with the light on the thing seen,
-// and every row below the night-witness block is about a horizon, not about the dark.
+// Noon: the witness radius scales with the light on the thing seen, so these rows are about
+// the horizon, not about the dark.
 const NOON = 720
 
 function makeWorld(agents: { id: string; x: number; y: number }[]): WorldState {
@@ -227,8 +227,6 @@ describe('composePerception: packet shape', () => {
       ev('item_spawned', { id: 'item_2', kind: 'stone', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }),
       DEFAULT_CONFIG,
     )
-    // A blow is two events and one subtraction: the hp comes off through
-    // `agent_harmed` and the wound goes on the record through `agent_injured`.
     s = fold(
       s,
       ev('agent_harmed', {
@@ -331,8 +329,6 @@ describe('composePerception: structure contents', () => {
     expect(s.items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
   })
 })
-
-// --- occlusion, interior sight, witnessed channel ---------------
 
 // A complete 2x2 house anchored at (10,10); its door is the tile south of centre, (10,12).
 const HOUSE = { id: 'structure_1', kind: 'house', x: 10, y: 10, w: 2, h: 2 }
@@ -562,8 +558,6 @@ describe('composePerception: seen channel', () => {
   })
 })
 
-// --- ownership prose + witnessed takings -------------------------
-
 const taken = (
   takerId: string,
   ownerId: string,
@@ -746,7 +740,6 @@ describe('the ground underfoot: a benefit stated, never a rule given', () => {
   })
 })
 
-// ------------------------- the dark is a price change, and it is paid at the target
 describe('night-witness: a torch does not let you see, it lets the dark see you', () => {
   const CFG = DEFAULT_CONFIG
   const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })
@@ -1062,8 +1055,8 @@ describe('composePerception: a body carries what ails it, where eyes can reach',
   })
 })
 
-// A refactor gate, not a behaviour claim: one world touching every channel at once, frozen as
-// the exact bytes a mind is handed. Any split of composePerception must reproduce it verbatim.
+// A refactor gate, not a behaviour claim: any split of composePerception must reproduce these
+// bytes verbatim.
 describe('★ composePerception: one packet, every channel, byte for byte', () => {
   function richWorld(): WorldState {
     let s = makeWorld([
@@ -1076,7 +1069,6 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
       s = fold(s, ev(type, payload, NOON), C)
     }
 
-    // a road under the feet, and a body dressed, ailing and walking
     s = {
       ...s,
       terrain: s.terrain.map((row, y) => row.map((t, x) => (x === 6 && y === 7 ? 7 : t))),
@@ -1085,7 +1077,6 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
     at('item_equipped', { agentId: 'b', itemId: 'item_1', slot: 'body' })
     at('agent_afflicted', { agentId: 'b', kind: 'illness', severity: 2 })
 
-    // a finished house with a door and a bed, a fire pit, and a wall going up with words on it
     at('structure_planned', {
       id: 'structure_1',
       kind: 'house',
@@ -1128,7 +1119,6 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
       text: 'raised in the first spring',
     })
 
-    // things on the ground, on a shelf, and in hand
     at('item_spawned', {
       id: 'item_2',
       kind: 'bread',
@@ -1151,7 +1141,6 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
       crafterMark: 'b',
     })
 
-    // the growing, the grazing and the gathering
     at('crop_planted', { id: 'crop_1', kind: 'wheat', x: 5, y: 8, plantedDay: 0 })
     at('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 7, y: 8 })
     at('forageable_spawned', { id: 'forage_1', kind: 'berry_bush', x: 4, y: 7, stock: 4 })
@@ -1373,8 +1362,8 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
     `)
   })
 
-  // Four walls gate every channel above. `time`, `self.body`, `inventory` and `weather` are
-  // frozen by the case above and do not change indoors, so only what the walls touch is here.
+  // `time`, `self.body`, `inventory` and `weather` do not change indoors, so only what the
+  // walls touch is asserted here.
   it('is the same bytes indoors, where the world shrinks to one room', () => {
     let s = richWorld()
     for (const id of ['a', 'b']) {

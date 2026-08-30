@@ -1,5 +1,3 @@
-// How the town sounds. One word here changes every chapter, week and life; the citation
-// machinery underneath is the same in all three.
 export type NarratorVoice = 'chronicler' | 'neighbour' | 'almanac'
 
 export const NARRATOR_VOICE: NarratorVoice = 'chronicler'

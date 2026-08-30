@@ -371,7 +371,6 @@ export class NarratorStore {
     title: string
     body: string
     citations: number[] | null
-    /** Who it is about. Only a biography has one — it is how a reader finds theirs. */
     subjectId?: string | null
   }): number {
     return this.db

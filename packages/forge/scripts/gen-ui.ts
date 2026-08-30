@@ -1,7 +1,5 @@
-// LIVE — the Signpost UI's rasters (stage 7). Cap $UI_CAP. Every piece lands twice: in
-// `content/ui` beside its manifest, and in `packages/web/src/ui/px`, which is the directory the
-// web bundler resolves `frame-cream.webp` and its siblings from.
-// Controls: UI_ONLY=<comma ids>, UI_ATTEMPTS, UI_DRY=1, UI_REJECTED=<candidate keys>.
+// Every piece lands twice: `content/ui`, and `packages/web/src/ui/px` where the web bundler
+// resolves it from. Controls: UI_ONLY, UI_ATTEMPTS, UI_DRY=1, UI_REJECTED.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -28,8 +26,7 @@ const ONLY = (process.env.UI_ONLY ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
-// A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
-// clean its numbers are. The eye is the gate the gates cannot be.
+// A candidate named here was refused by eye, so it is never chosen however clean its numbers are.
 const REJECTED = new Set(
   (process.env.UI_REJECTED ?? '')
     .split(',')
@@ -46,7 +43,6 @@ const FILL_MIN = 0.7
 // The same blend band `spriteCell` erodes: a JPEG magenta field rings into the subject's edge.
 const CHROMA_BAND_PX = 4
 
-// ── the palette, as the approved sketch uses it ───────────────────────────────────────────
 type RGBA = readonly [number, number, number, number]
 const INK: RGBA = [0x32, 0x2b, 0x38, 255]
 const PARCHMENT: RGBA = [0xf6, 0xe8, 0xd5, 255]
@@ -57,7 +53,6 @@ const PLATE_TOP: RGBA = [0xa6, 0x6e, 0x38, 255]
 const HONEY: RGBA = [0xc6, 0x8a, 0x48, 255]
 const HONEY_LIT: RGBA = [0xf2, 0xc8, 0x79, 255]
 
-// ── the painters ──────────────────────────────────────────────────────────────────────────
 const canvas = (w: number, h: number): RawImage => ({
   width: w,
   height: h,
@@ -69,8 +64,6 @@ function put(img: RawImage, x: number, y: number, c: RGBA): void {
   img.data.set(c, (y * img.width + x) * 4)
 }
 
-/** A nine-slice panel: an ink border, an optional inner ring and a flat field, with a corner
- *  notch as deep as the border — the notch is what makes a pixel frame read as rounded. */
 function panel(
   w: number,
   h: number,
@@ -88,13 +81,10 @@ function panel(
   return img
 }
 
-/** One row of a panel's field, inside its one-pixel border. */
 function band(img: RawImage, y: number, c: RGBA): void {
   for (let x = 1; x < img.width - 1; x++) put(img, x, y, c)
 }
 
-/** The ring marker: the town's 2:1 diamond — `size` across and half that tall — ink-edged, its
- *  top facet catching the north-west light every other diamond on the stage catches. */
 function pip(size: number): RawImage {
   const img = canvas(size, size)
   const rows = size / 2
@@ -108,7 +98,6 @@ function pip(size: number): RawImage {
   return img
 }
 
-/** The nameplate: a plate with a lit top row and a darker bottom lip inside its ink border. */
 function nameplate(w: number, h: number): RawImage {
   const img = panel(w, h, { border: 1, edge: INK, fill: PLATE })
   band(img, 1, PLATE_TOP)
@@ -117,9 +106,6 @@ function nameplate(w: number, h: number): RawImage {
   return img
 }
 
-// ── pieces ────────────────────────────────────────────────────────────────────────────────
-/** A piece is EITHER drawn by the model from a `gen` subject or code-painted here, never both:
- *  the two halves of the run below are the two halves of this union. */
 type UiPiece = { id: string; w: number; h: number; slice?: number; note: string } & (
   | { gen: string; paint?: never }
   | { gen?: never; paint: () => RawImage }
@@ -183,14 +169,11 @@ const PIECES: readonly UiPiece[] = [
   },
 ]
 
-// The roster W1 and W2 import and the subjects drawn here are one decision, so a piece that
-// drifts off either list is a failure of this script and not a surprise in the gate later.
 if (PIECES.map((p) => p.id).join() !== UI_PIECE_IDS.join())
   throw new Error(`PIECES: ${PIECES.map((p) => p.id).join()} is not UI_PIECE_IDS`)
 
-// ── the generated pieces ──────────────────────────────────────────────────────────────────
-// STYLE_PROMPT draws the town in 2:1 dimetric. A signpost the chrome hangs in a corner is a flat
-// cut-out, so this overrides the projection the way the interior wall clause does.
+// STYLE_PROMPT draws the town in 2:1 dimetric; chrome hung in a corner is a flat cut-out, so
+// this overrides the projection.
 const FLAT_CLAUSE =
   'A SQUARE-ON, FACE-ON view of ONE small wooden object, drawn perfectly FLAT with NO ' +
   'perspective, NO isometric angle and NO three-dimensional turn — the object is seen straight ' +
@@ -198,8 +181,8 @@ const FLAT_CLAUSE =
   'the frame on its long axis. NOTHING else is in the frame: no ground, no post, no signboard, ' +
   'no second object, no scenery, no cast shadow.'
 
-// The setting, positively and in detail — naming the period is what stands between a swatch and
-// a fairytale signpost. Verbatim from gen-structures-v5.ts, which is where it was measured.
+// Naming the period is what stops the model drawing a fairytale signpost. Verbatim from
+// gen-structures-v5.ts, where it was measured.
 const PERIOD = [
   'PRESENT DAY, not historical: this is a small remote modern farming village, the kind of',
   'place that still mends its own tools but has electric light and glazed windows.',
@@ -222,10 +205,8 @@ function prompt(p: UiPiece): string {
   )
 }
 
-/** The audited chain cuts a SQUARE cell and takes its factor from the subject's LONG side; a
- *  signpost arm is 4:1, so that factor overflows the short side. The factor a non-square piece
- *  needs is whichever axis wants the bigger one, and `spriteCell` yields it for a cell of
- *  `subjectPx / factor`. Then trim to the subject and centre it — still one whole division. */
+// `spriteCell` takes its factor from the subject's LONG side, which overflows the short side of
+// a 4:1 piece; a non-square piece needs whichever axis wants the bigger factor.
 function cut(p: UiPiece, gen: RawImage): { img: RawImage; factor: number; fill: number } {
   const keyed = keyBg(gen)
   const src = opaqueBbox(erodeAlpha(keyed, CHROMA_BAND_PX))
@@ -250,8 +231,6 @@ function cut(p: UiPiece, gen: RawImage): { img: RawImage; factor: number; fill: 
   return { img, factor: r.plan.factor, fill: Math.min(bw / p.w, bh / p.h) }
 }
 
-/** What may refuse a generated piece, and the distance the report prints either way. A painted
- *  piece is refused by the eye, not by arithmetic. */
 function gateOf(img: RawImage, fill: number): { fails: string[]; dist: number } {
   const fails: string[] = []
   if (fill < FILL_MIN)
@@ -264,7 +243,6 @@ function gateOf(img: RawImage, fill: number): { fails: string[]; dist: number } 
   return { fails, dist }
 }
 
-// ── the contact sheet ─────────────────────────────────────────────────────────────────────
 function blit(dst: RawImage, src: RawImage, x0: number, y0: number, zoom: number): void {
   for (let y = 0; y < src.height * zoom; y++)
     for (let x = 0; x < src.width * zoom; x++) {
@@ -274,8 +252,6 @@ function blit(dst: RawImage, src: RawImage, x0: number, y0: number, zoom: number
     }
 }
 
-/** A nine-slice drawn at a size it will really be used at: corners fixed, edges and middle
- *  stretched, which is what makes a seam in the art show up as a seam on the sheet. */
 function stretch(src: RawImage, slice: number, w: number, h: number): RawImage {
   const out = canvas(w, h)
   const map = (i: number, n: number, sn: number): number =>
@@ -295,8 +271,6 @@ function stretch(src: RawImage, slice: number, w: number, h: number): RawImage {
   return out
 }
 
-/** Every shipped piece at 6x beside, for a nine-slice, the same art stretched to a size it will
- *  really be drawn at and then doubled. The eye judges this before anything is signed. */
 function contactSheet(shipped: readonly { p: UiPiece; img: RawImage }[]): RawImage {
   const ZOOM = 6
   const PAD = 16
@@ -328,7 +302,6 @@ function contactSheet(shipped: readonly { p: UiPiece; img: RawImage }[]): RawIma
   return sheet
 }
 
-// ── the run ───────────────────────────────────────────────────────────────────────────────
 type Provenance =
   | { source: 'code-painted'; painter: string }
   | {
@@ -423,7 +396,6 @@ for (const p of pieces) {
       }
     }
 
-    // Among the CLEAN candidates only (the ruling and its reason are in src/gate.ts).
     const win = cands.find((c) => c.fails.length === 0)
     if (!win) {
       const why =
@@ -443,7 +415,7 @@ for (const p of pieces) {
       genPx: GEN_PX,
       factor: win.factor,
       promptSha256: createHash('sha256').update(text).digest('hex'),
-      // What the SHIPPED piece cost, which is every attempt it took and not only the winner.
+      // Every attempt the piece took, not only the winner.
       usd: Number(ledger.totalFor(assetId).toFixed(4)),
       candidate: win.key,
     }
@@ -487,8 +459,8 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/ui.md`, md)
 console.log(`\n${md}`)
 
-// The report is written FIRST and then the run fails: the margins are what tell an operator a
-// threshold from a bad drawing, and they are worthless if the failure eats them.
+// The report is written before the throw: its margins are what separate a threshold from a bad
+// drawing, and a failure that eats them is worthless.
 if (refused.length > 0)
   throw new Error(
     `${refused.length} piece(s) shipped nothing: ${refused.join(', ')}\n  Raise UI_ATTEMPTS ` +

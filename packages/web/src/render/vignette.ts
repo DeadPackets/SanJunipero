@@ -1,8 +1,8 @@
 import { type Application, Graphics, Rectangle, Sprite, type Texture } from 'pixi.js'
 import { over } from './legibility.js'
 
-// U7's second half: a multiply vignette on its own sprite over the whole stage, so the 0.25
-// overview's void reads as the edge of a picture rather than as an unfinished canvas.
+// A multiply vignette over the whole stage, so the 0.25 overview's void reads as the edge of a
+// picture rather than as an unfinished canvas.
 
 const VIGNETTE_ALPHA = 0.18
 const VIGNETTE_COLOR = 0x241f2b // --deep

@@ -89,9 +89,8 @@ export function buildingArt(
   }
 }
 
-/** A manifest cell point, in the space the sprite stands in: read off the sprite the entity
- *  layer placed, so whatever anchor convention that layer applies, an effect lands on the art.
- *  `null` until the art itself has landed — `Texture.EMPTY` is one pixel wide. */
+/** A manifest cell point in the space the sprite stands in, read off the sprite the entity
+ *  layer placed. `null` until the art has landed — `Texture.EMPTY` is one pixel wide. */
 export function cellPointOf(
   sprite: Pick<Sprite, 'x' | 'y' | 'anchor' | 'scale' | 'texture'>,
   pt: CellPoint,
@@ -104,9 +103,8 @@ export function cellPointOf(
   }
 }
 
-/** Draw once, upload once, keep forever. Pixi's `GCSystem` calls `unload()` on any source with
- *  `autoGarbageCollect` that goes `maxUnusedTime` untouched — a light hidden all day, a puff on
- *  a town with no hearth — and an unloaded source is a null one that takes the stage down. */
+/** Pixi's `GCSystem` calls `unload()` on any source with `autoGarbageCollect` that goes
+ *  `maxUnusedTime` untouched, and an unloaded source is a null one that takes the stage down. */
 export function bakeTexture(
   scene: {
     app: { renderer: { generateTexture(o: { target: Graphics; resolution: number }): Texture } }

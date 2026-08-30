@@ -134,7 +134,6 @@ describe('the narrator vocabulary (§12)', () => {
   })
 })
 
-// The guard behind commit 0cadae64, at the point of publication rather than in a hand-run script.
 // `openNarratorDb` is what production opens, and it is what carries the alerts table.
 const watched = (): { store: NarratorStore; alerts: () => { kind: string; detail: string }[] } => {
   const db = openNarratorDb(':memory:')

@@ -1,9 +1,5 @@
-// @slow — the proof that something in the running app can build.
-//
-// The engine locates the town by reading the authored `TOWN_SQUARE` less `state.origin`. The
-// agreement test below is what makes `devWorldOrigin` a derivation, not a number that works once.
-//
-// Scripted masons, declared as such in `founders.ts`. No LLM, no network, $0.
+// @slow — the proof that something in the running app can build. Scripted masons, no LLM, $0.
+// The engine locates the town by reading the authored `TOWN_SQUARE` less `state.origin`.
 import { describe, expect, it } from 'vitest'
 import {
   CITY_GROUND,
@@ -35,8 +31,6 @@ const GENESIS_STRUCTURES = 11
 function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild = false): Run {
   return runFoundersWorld({ interiors: true, builders, holdings: true, jointBuild }, ticks, rings)
 }
-
-// ── the frame, which everything below stands on ──────────────────────────────────────────────
 
 describe('★ the dev world says where its array stands, so the engine can find its town', () => {
   it('★ THE AGREEMENT: under this origin the showcase channel IS the grammar’s channel', () => {
@@ -79,8 +73,6 @@ describe('★ the dev world says where its array stands, so the engine can find 
   })
 })
 
-// ── the mason ────────────────────────────────────────────────────────────────────────────────
-
 describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', () => {
   const run = runDevWorld(true)
   const raised = run.events.filter((e) => e.type === 'structure_planned' && e.tick > 1)
@@ -90,8 +82,7 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     expect(raised.length, 'nothing was built').toBeGreaterThan(20)
     expect(finished.length, 'nothing was finished').toBeGreaterThan(20)
     expect(standingRects(run.state).length).toBe(GENESIS_STRUCTURES + raised.length)
-    // ★ AND EVERY ONE OF THEM WAS UNDER SCAFFOLDING FOR A WHILE, which is the thing a viewer
-    // is meant to catch: a roof that appears between one frame and the next was never built.
+    // ★ Every one was under scaffolding for a while: a roof that appears between frames was never built.
     const planned = new Map(raised.map((e) => [String(e.payload.id), e.tick]))
     for (const e of finished) {
       const at = planned.get(String(e.payload.id))
@@ -166,17 +157,13 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
   })
 })
 
-// ── ★ TWO MASONS, ONE HOUSE ──────────────────────────────────────────────────────────────────
-//
-// Off by default for a measured reason — see `jointBuild` on `FoundersOpts`. A "with the flag
-// off this is the landed world" row is deliberately absent: it would compare two runs of the
-// same policy and pass even when the policy ignores the flag.
+// A "with the flag off this is the landed world" row is deliberately absent: it would compare
+// two runs of the same policy and pass even when the policy ignores the flag.
 describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickLoop', () => {
   const TICKS_J = 1440
   const on = runDevWorld(true, RINGS, TICKS_J, true)
   const off = runDevWorld(true, RINGS, TICKS_J, false)
 
-  /** How many pairs of hands were on one site in one tick, at the most. */
   const mostHands = (r: Run): number => {
     const perTick = new Map<string, number>()
     for (const e of r.events) {
@@ -198,7 +185,6 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       2,
     )
 
-    // The same run with the policy off: the town this lane did not change.
     expect(builds(off).length - planted(off).length).toBe(0)
     expect(mostHands(off)).toBe(1)
 
@@ -221,7 +207,6 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       peak.who.size,
       'no site had two different bodies on it in one tick',
     ).toBeGreaterThanOrEqual(2)
-    // Every one of them is a founder, and every one of them is alive and distinct.
     for (const id of peak.who) expect(FOUNDERS.map((f) => f.id)).toContain(id)
     const [peakTick, peakId] = peak.key.split(':')
     expect(
@@ -266,7 +251,6 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
   // Asked of the pure function instead: in a run a founder only decides with its hands free and
   // `homeIntent` has taken it to bed by then, so the reserve looks inert.
   describe('the mason, asked directly', () => {
-    /** A showcase town with `a` raising a house and `b` standing at the same walls. */
     function twoAtOneSite(): WorldState {
       const cfg = SHOWCASE_CONFIG
       let n = 0
@@ -297,7 +281,6 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
 
     it('★ the DEFAULT walks away from a neighbour’s walls — this lane changed no default', () => {
       const s = twoAtOneSite()
-      // Away to the town's NEXT plot, which is the whole of OD22 in one line.
       const next = claimInWorld(s, { along: 2, deep: 2 })!
       expect(masonIntent(s, SHOWCASE_CONFIG, 'b')).toEqual({
         verb: 'walk',

@@ -193,7 +193,6 @@ export async function narrateWeek(deps: {
   })
 }
 
-/** Which week `day` closes, or null on the other six. */
 const weekClosedBy = (day: number): { startDay: number; endDay: number } | null =>
   day % 7 === 6 ? { startDay: day - 6, endDay: day } : null
 
@@ -204,12 +203,8 @@ const seqsBetweenDays = (world: Database.Database, from: number, to: number): nu
       .all(from * MINUTES_PER_DAY, (to + 1) * MINUTES_PER_DAY - 1) as { seq: number }[]
   ).map((r) => r.seq)
 
-/**
- * Everything the town publishes when a day closes: the chapter, that day's paper and its
- * caption, one townsperson's life so far, and on the seventh day the week's arc. Only the
- * chapter, the biography and the week cost a call; the paper and the caption are composed from
- * what is already written down. Idempotent per day, like `narrateDay` under it.
- */
+/** Idempotent per day. Only the chapter, the biography and the week cost a call; the paper and
+ *  the caption are composed from what is already written down. */
 export async function closeDay(deps: {
   store: NarratorStore
   llm: NarratorLlm
@@ -218,11 +213,9 @@ export async function closeDay(deps: {
   events: SimEvent[]
   rulebookCount: number
   privateCounts: { thoughts: number; journals: number }
-  /** Written up one a night in turn, so a cast of five is five nights and then a deeper record. */
   cast: readonly { id: string; name: string }[]
   world?: { config: SimConfig; state?: WorldState }
-  /** The tier-2.5 pass, passed straight through to `narrateDay`. Absent, the night has no
-   *  semantic firsts and costs nothing. */
+  /** Absent, the night has no semantic firsts and costs nothing. */
   semantic?: SemanticDeps
   alert?: (d: string) => void
 }): Promise<ChapterRow> {

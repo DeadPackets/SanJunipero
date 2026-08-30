@@ -58,8 +58,7 @@ export const ServerThought = z
   .object({ t: z.literal('thought'), agentId: z.string().min(1), tick, text: z.string() })
   .strict()
 // An ARRAY, because a greeted socket is handed the whole codex: one frame per record was 189
-// sends per viewer inside the connection handler, on the thread that ticks the town.
-// The png travels over HTTP, never the socket.
+// sends per viewer on the thread that ticks the town. The png travels over HTTP, never the socket.
 export const ServerAssets = z
   .object({ t: z.literal('assets'), records: z.array(AssetRecordSchema) })
   .strict()

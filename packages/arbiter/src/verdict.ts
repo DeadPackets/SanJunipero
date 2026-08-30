@@ -58,7 +58,7 @@ export type RecipeRequirement = z.infer<typeof RecipeRequirementSchema>
 
 export const RecipeSchema = z
   .object({
-    id: z.string().regex(/^recipe:[a-z0-9_]+$/), // deterministic slug (Task 6 slugify)
+    id: z.string().regex(/^recipe:[a-z0-9_]+$/), // deterministic slug
     name: z.string().min(1), // in-world name
     skillCheck: z
       .object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) })

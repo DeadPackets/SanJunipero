@@ -11,7 +11,6 @@ export type StageUp = Readonly<Record<EscapeRung, boolean>>
 
 /** ONE ladder, topmost first — every Escape in the app resolves through this and nothing else. */
 export function escapeStep(up: StageUp): EscapeRung | null {
-  // The key map is the top rung: it is the sheet a lost viewer opened, over everything else.
   if (up.keys) return 'keys'
   if (up.paper) return 'paper'
   if (up.interior) return 'interior'
@@ -60,8 +59,7 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
   }
 }
 
-/** What a thing on the ground is, in full: the click line the Found page prints over the record.
- *  A structure is not here — it has a place of its own, with its whole provenance on it. */
+/** A structure is not here: it has a place of its own, with its whole provenance on it. */
 export function itemCropDetail(
   state: WorldState | null,
   thing: { kind: 'item' | 'crop'; id: string },
@@ -80,7 +78,6 @@ export function itemCropDetail(
   return `${kindWords(c.kind)}, planted on day ${c.plantedDay}, ${growth}`
 }
 
-/** The engine kind behind a clicked thing, which is what the record names it by. */
 export function thingKind(
   state: WorldState | null,
   thing: { kind: 'item' | 'crop'; id: string },

@@ -71,8 +71,8 @@ export function wordTainted(word: string): boolean {
 // its own `ImpossibleClassSchema` token.
 const MACHINE_TOKEN = /^[A-Z0-9_]+$/
 
-// The law prompt.ts states and the validation loop never checked: a refusal whose own words
-// say the act can be begun. Subject-led, so an honest "no one can begin this" is not a match.
+// The law prompt.ts states: a refusal whose own words say the act can be begun. Subject-led,
+// so an honest "no one can begin this" is not a match.
 const REASON_AFFIRMS_THE_ATTEMPT =
   /\b(you|he|she|they|it|this) (can|could|may|might) (attempt|try|begin|start)\b/i
 

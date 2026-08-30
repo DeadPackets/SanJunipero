@@ -10,7 +10,6 @@ const dir = mkdtempSync(join(tmpdir(), 'sj-export-'))
 const WORLD = join(dir, 'world.db')
 const MINDS = join(dir, 'minds')
 
-/** Every entry's name and body, read back the way `tar -x` reads them. */
 function untar(tar: Buffer): Map<string, Buffer> {
   const out = new Map<string, Buffer>()
   for (let at = 0; at + 512 <= tar.length; ) {

@@ -1,9 +1,8 @@
 import { MINUTES_PER_DAY, type ConstructKind, type QuotedName } from '@sj/shared'
 import type { Milestone } from '../types.js'
 
-// Tier 3 — the constructs the arbiter recognizes. The registry lives in the arbiter's own db,
-// which the chronicle structurally cannot read; a milestone row is the one bridge into the
-// record (ledger A7). Structural input, so the narrator never imports the arbiter.
+// The construct registry lives in the arbiter's own db, which the chronicle cannot read: a
+// milestone row is the one bridge, and the narrator never imports the arbiter.
 
 export type RecognizedConstruct = {
   id: string
@@ -14,8 +13,7 @@ export type RecognizedConstruct = {
   recurrences: readonly { tick: number }[]
 }
 
-// The observer's voice, one sentence a kind, the way the Customs pane says it: what they do,
-// never the id, which is ours. A label carrying `festival` would be a glass leak.
+// What they do, never the id: a label carrying `festival` would be a glass leak.
 const KIND_LABELS: Readonly<Record<ConstructKind, string>> = {
   festival: 'the first time they gathered to celebrate',
   faith: 'the first time they gathered over something they hold sacred',
@@ -24,11 +22,7 @@ const KIND_LABELS: Readonly<Record<ConstructKind, string>> = {
   custom: 'the first thing they took to doing over and over',
 }
 
-/**
- * One row for the first gathering of each kind the town ever keeps, and one for each gathering
- * it gives a name — the two the arbiter already records as `construct_recognized` and
- * `construct_named`. `seen` is the ledger's own kinds, so a kind is never milestoned twice.
- */
+/** `seen` is the ledger's own kinds, so a kind is never milestoned twice. */
 export function constructMilestones(
   constructs: readonly RecognizedConstruct[],
   seen: ReadonlySet<string>,

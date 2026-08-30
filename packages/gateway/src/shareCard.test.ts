@@ -134,7 +134,6 @@ describe('withShareTags', () => {
   it('escapes the attribute, so a chapter title cannot close it', () => {
     expect(html).toContain('&quot;quotes&quot; &amp; &lt;angles&gt;')
     expect(html).not.toContain('<angles>')
-    // and cannot close the JSON-LD block either
     expect(html).not.toContain('</angles>')
   })
 })
@@ -297,7 +296,6 @@ describe('a person’s own card', () => {
   let gw: Gateway
   let base: string
 
-  /** A two-cell v4 atlas whose `idle-se` half — the one the card crops — is the only thing in it. */
   const CELL = 128
   const ATLAS = { w: CELL * 2, h: CELL }
   const MANIFEST = JSON.stringify({
@@ -412,7 +410,6 @@ describe('a person’s own card', () => {
     expect(html).toContain('Someone the town no longer has — San Junipero')
     expect(html).toContain('<meta property="og:type" content="profile" />')
     expect(html).toContain('/agent/nobody" />')
-    // there is still no card of a person nobody has
     expect((await fetch(`${base}/card/agent/nobody.png`)).status).toBe(404)
     expect((await fetch(`${base}/card/agent/__proto__.svg`)).status).toBe(404)
   })

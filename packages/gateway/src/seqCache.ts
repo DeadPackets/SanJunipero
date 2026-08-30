@@ -11,9 +11,8 @@ export const MAX_KEYS = 32
  *  not shared, so one route's churn cannot evict another's memo. */
 export const MAX_BYTES = 4 * 1024 * 1024
 
-/** Intermediates cannot be weighed without serialising them, so they get no share of the byte
- *  budget and a cap of ~one instead: the panel and its badge ask for the same window, and a
- *  stranger varying the window evicts rather than accumulates. */
+/** Intermediates cannot be weighed without serialising them, so they get a count cap instead of
+ *  a share of the byte budget: a stranger varying the window evicts rather than accumulates. */
 export const MAX_VALUES = 2
 
 export type SeqCache = {

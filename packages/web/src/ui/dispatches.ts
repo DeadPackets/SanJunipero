@@ -1,7 +1,5 @@
-/**
- * What the narrator publishes, folded into one edition per recorded day. The gateway sends six
- * flat lists (`/api/dispatches`); a reader wants one day at a time, newest first.
- */
+/** The gateway sends six flat lists (`/api/dispatches`); this folds them into one edition
+ *  per recorded day, newest first. */
 
 export type DispatchesFeed = {
   papers: readonly { day: number; title: string; body: string }[]
@@ -61,7 +59,6 @@ export type Edition = {
   caption: string | null
   /** What the day felt like, from the hottest scene the narrator scored. Null where none was. */
   temper: string | null
-  /** The week this day closed, where it closed one. */
   era: { title: string; text: string } | null
   formed: readonly { name: string; description: string }[]
 }
@@ -103,7 +100,6 @@ export function editions(feed: DispatchesFeed): Edition[] {
     })
 }
 
-/** The newest life written of this person, or null while nobody has written one. */
 export function biographyOf(
   feed: DispatchesFeed,
   agentId: string,

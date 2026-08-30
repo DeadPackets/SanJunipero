@@ -11,12 +11,10 @@ import { progress } from '../ui/motion.js'
 
 export type Atmosphere = { update(state: WorldState): void; destroy(): void }
 
-/** The sky gradient's ceiling. It peaks at dawn and dusk, when the sky and the ground differ
- *  most, and sits at a third of that at noon and at midnight. */
+/** The ceiling, reached at dawn and dusk when sky and ground differ most. */
 export const SKY_MAX_ALPHA = 0.16
 export const SKY_TEX_H = 64
 
-/** How much of the sky to lay over the roofs at this level of day. */
 export function skyAlpha(sky: number): number {
   return SKY_MAX_ALPHA * (0.35 + 0.65 * (1 - Math.abs(0.5 - sky) * 2))
 }
@@ -33,8 +31,7 @@ function skyTexture(scene: Scene): Texture {
 }
 
 /** Cross-fades the day tint: `clockTint` steps once a sim minute, which arrives every 2.5 real
- *  seconds and reads as a jump. Also owns the weather grade and the sky gradient, because all
- *  three are the same colour read three ways. */
+ *  seconds and reads as a jump. */
 export function createAtmosphere(scene: Scene): Atmosphere {
   // the deep-blue night IS this multiply quad over the whole screen
   const quad = new Sprite(Texture.WHITE)
@@ -42,9 +39,8 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   quad.eventMode = 'none' // full-screen overlay must never swallow stage hit-tests
   scene.screen.night.addChild(quad)
 
-  // The sky, screened over the world so the roofs catch it while the bases keep the ground's
-  // colour. Masked to the map's own diamond: an unmasked box lightens the void and leaves a
-  // hard edge on it.
+  // Screened so the roofs catch it while the bases keep the ground's colour. Masked to the
+  // map's own diamond: an unmasked box lightens the void and leaves a hard edge on it.
   const sky = new Sprite(skyTexture(scene))
   sky.blendMode = 'screen'
   sky.eventMode = 'none'

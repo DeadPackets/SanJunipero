@@ -185,7 +185,6 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
       'there is no edge to cut it with',
       // Verbatim from a live ruling: `without one` is the same conditional as `without a rack`.
       'The town lacks a marker, and the action cannot even be started without one.',
-      // ★ `requires X` is the shape the comment above always claimed to ban and never did.
       // Live, mind-facing: "The action requires 'green wood' as a resource…".
       'this requires a sharpened axe you do not carry',
       'digging that requires an iron shovel',
