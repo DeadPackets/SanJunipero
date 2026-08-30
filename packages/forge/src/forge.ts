@@ -1,13 +1,13 @@
 import type { Candidate, ImageClient } from './imageClient.js'
 import { mechanicalGate } from './gate.js'
-import { postProcess } from './post/postProcess.js'
+import { postProcessRaw } from './post/postProcess.js'
 import { decodePng, encodePng, type RawImage } from './post/raw.js'
 import { makePlaceholder } from './placeholder.js'
 import { assetPromptParts, targetSize } from './styleBible.js'
-import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
+import { loadForgeConfig, type ForgeConfig } from './forgeConfig.js'
 import { SpendLedger } from './spendLedger.js'
 import { runVisionGate } from './visionQa/gate.js'
-import { CRITERIA, type VisionVerdict } from './visionQa/verdict.js'
+import { CRITERIA, totalScore } from './visionQa/verdict.js'
 import type { VisionJudgeFn } from './visionQa/visionJudge.js'
 import type { AssetCodex } from './codex.js'
 import type { AssetClass, AssetRecord, Footprint } from '@sj/shared'
@@ -22,20 +22,27 @@ export type Forge = {
   onAssetReady(cb: (rec: AssetRecord) => void): void
 }
 
-const CONFIG = DEFAULT_FORGE_CONFIG
-/** The codex `attempts` column accepts 1..3, which is exactly this ceiling. */
-const MAX_TRIES = CONFIG.visionQa.maxRetries + 1
-
-/** The codex keeps one 1-10 score; the rubric keeps eight. */
-const overallScore = (v: VisionVerdict): number =>
-  Math.max(1, CRITERIA.reduce((s, k) => s + v.criteria[k].score, 0) / CRITERIA.length)
+/** The codex `attempts` column accepts 1..3, so the eye never gets a longer leash than that. */
+const MAX_ATTEMPTS = 3
+/** Separate from the eye's retries: a generation the chain cannot cut is worth one more roll. */
+const DRAW_TRIES = 2
 
 export function createForge(deps: {
   client: ImageClient
   judge: VisionJudgeFn
   codex: AssetCodex
   refs: Buffer[]
+  config?: ForgeConfig
 }): Forge {
+  const asked = deps.config ?? loadForgeConfig()
+  const config: ForgeConfig = {
+    ...asked,
+    visionQa: {
+      ...asked.visionQa,
+      maxRetries: Math.min(asked.visionQa.maxRetries, MAX_ATTEMPTS - 1),
+    },
+  }
+
   async function commission(
     desc: string,
     footprint: Footprint,
@@ -47,9 +54,9 @@ export function createForge(deps: {
     const assetId = `${klass}:${kind}`
     const ledger = new SpendLedger(null)
 
-    async function cut(cand: Candidate): Promise<RawImage | null> {
+    function cut(gen: RawImage): RawImage | null {
       try {
-        const sprite = await decodePng(await postProcess(cand.png, klass, target))
+        const sprite = postProcessRaw(gen, klass, target)
         return mechanicalGate(sprite, { w: target.w, h: target.h, requireAlpha }).ok ? sprite : null
       } catch {
         return null
@@ -63,7 +70,7 @@ export function createForge(deps: {
       costUsd: number
       model: string
     }> {
-      for (let t = 0; t < MAX_TRIES; t++) {
+      for (let t = 0; t < DRAW_TRIES; t++) {
         let cand: Candidate | undefined
         try {
           const out = await deps.client.generateCandidates(prompt, deps.refs, 1)
@@ -72,46 +79,31 @@ export function createForge(deps: {
           continue
         }
         if (cand === undefined) continue
-        const sprite = await cut(cand)
+        const sprite = cut(await decodePng(cand.png))
         if (sprite !== null) return { sprite, costUsd: cand.costUsd, model: cand.model }
         ledger.append({ assetId, kind: 'image_gen', model: cand.model, usd: cand.costUsd })
       }
-      throw new Error(`${assetId}: no generation survived the chain in ${MAX_TRIES} tries`)
+      throw new Error(`${assetId}: no generation survived the chain in ${DRAW_TRIES} tries`)
     }
 
     // contract: commission never rejects on generation failure — every path registers an asset
-    try {
-      const res = await runVisionGate({
-        assetId,
-        klass,
-        commission: desc,
-        basePrompt: assetPromptParts(desc, footprint, klass),
-        judge: deps.judge,
-        ledger,
-        config: CONFIG,
-        footprint,
-        regenerate: draw,
-      })
-      const last = res.verdicts.at(-1)
-      if (res.status === 'pass')
-        return deps.codex.register({
-          class: klass,
-          desc,
-          kind,
-          footprint,
-          png: await encodePng(res.sprite),
-          widthPx: target.w,
-          heightPx: target.h,
-          status: 'ready',
-          score: last === undefined ? null : overallScore(last),
-          attempts: res.attempts,
-          costUsd: res.spendUsd,
-        })
-    } catch {
-      // nothing the chain could cut, or the wallet said stop
-    }
-    // blocked by the eye or undrawable → placeholder, flagged (status) for silent regeneration
-    const png = await encodePng(makePlaceholder(klass, target))
+    const res = await runVisionGate({
+      assetId,
+      klass,
+      commission: desc,
+      basePrompt: assetPromptParts(desc, footprint, klass),
+      judge: deps.judge,
+      ledger,
+      config,
+      footprint,
+      regenerate: draw,
+    }).catch(() => null)
+
+    const last = res?.verdicts.at(-1)
+    const png =
+      res?.status === 'pass'
+        ? await encodePng(res.sprite)
+        : await encodePng(makePlaceholder(klass, target))
     return deps.codex.register({
       class: klass,
       desc,
@@ -120,9 +112,13 @@ export function createForge(deps: {
       png,
       widthPx: target.w,
       heightPx: target.h,
-      status: 'placeholder',
-      score: null,
-      attempts: MAX_TRIES,
+      // blocked by the eye, or nothing the chain could cut → placeholder, flagged for regeneration
+      status: res?.status === 'pass' ? 'ready' : 'placeholder',
+      score:
+        res?.status === 'pass' && last !== undefined
+          ? Math.max(1, totalScore(last) / CRITERIA.length)
+          : null,
+      attempts: res?.attempts ?? MAX_ATTEMPTS,
       costUsd: ledger.totalFor(assetId),
     })
   }

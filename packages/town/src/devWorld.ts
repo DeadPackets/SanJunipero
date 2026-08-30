@@ -424,7 +424,7 @@ export async function startDevWorld(
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   // The dev loop's answers: doors open, the ford decked. `serve.ts` names its own.
-  const env = parseWorldEnv({ interiors: true, builders: true, bridge: true, jointBuild: false })
+  const env = parseWorldEnv()
   void startDevWorld({ ingest: true, ...env }).then(({ gateway }) => {
     const showcase = env.map === 'showcase'
     console.log(

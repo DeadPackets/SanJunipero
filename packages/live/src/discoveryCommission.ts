@@ -83,13 +83,15 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       refs: sheet,
       client: {
         async generateCandidates(prompt, candidateRefs, n) {
+          // Reserved with the picture, not after it: a balance that cannot pay for both must
+          // refuse before the picture is bought.
+          budget.spend(EST_COST_PER_VISION_CALL)
           const out = await client.generateCandidates(prompt, candidateRefs, n)
           for (const c of out) book(c.model, c.costUsd)
           return out
         },
       },
       judge: async (a) => {
-        budget.spend(EST_COST_PER_VISION_CALL)
         const reviewed = await judge(a)
         book(reviewed.verdict.model, reviewed.costUsd)
         return reviewed

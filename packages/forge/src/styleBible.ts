@@ -27,7 +27,8 @@ const CLASS_HINTS: Record<AssetClass, string> = {
 export const STYLE_ANCHOR_CLAUSE =
   'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
 
-/** Split in two because a redraw puts the eye's feedback BETWEEN them (addendum §1). */
+/** Two halves because a redraw puts the eye's feedback BETWEEN them (addendum §1); joined in
+ *  that order they are the whole prompt. */
 export function assetPromptParts(
   desc: string,
   footprint: Footprint,
@@ -39,11 +40,6 @@ export function assetPromptParts(
     boilerplate: `${STYLE_PROMPT} ${CLASS_HINTS[klass]}${anchor}`,
     commissionText: `Subject: ${desc}. World footprint: ${footprint.w}x${footprint.h} tiles on a 32x16 pixel tile grid.`,
   }
-}
-
-export function buildAssetPrompt(desc: string, footprint: Footprint, klass: AssetClass): string {
-  const { boilerplate, commissionText } = assetPromptParts(desc, footprint, klass)
-  return `${boilerplate} ${commissionText}`
 }
 
 // Final sprite canvas sizes, post NEAREST downscale. Buildings are 32·(w+h) px square, so a 1x1 is

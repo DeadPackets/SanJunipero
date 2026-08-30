@@ -60,15 +60,7 @@ export async function main(): Promise<void> {
   }
   const port = intEnv('PORT', STREAM_PORT, 1)
   const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
-  // The served town's answers to the four the dev loop answers differently. Turning any of them
-  // on changes what the world folds, so each is a product decision and not a parse.
-  // Interiors and the bridge are on: ruling 14 ships the world the rehearsal proved.
-  const env = parseWorldEnv({
-    interiors: true,
-    builders: true,
-    bridge: true,
-    jointBuild: false,
-  })
+  const env = parseWorldEnv()
 
   // The import itself is behind the flag: `@sj/live` pulls in the mind stack and the `ai` SDK,
   // and a scripted stream should pay for neither.

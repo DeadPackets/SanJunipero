@@ -25,9 +25,14 @@ export type WorldEnv = {
   fresh: boolean
 }
 
-/** The four knobs the served town and the dev world still answer differently. Passed at each
- *  entrypoint so the divergence is four literals side by side and not two files of `!==`. */
-export type WorldDefaults = Pick<WorldEnv, 'interiors' | 'builders' | 'bridge' | 'jointBuild'>
+/** What every entrypoint boots when no env var says otherwise. Interiors and the bridge are on
+ *  under ruling 14: the shipped town is the world the rehearsal proved. */
+const DEFAULTS: Pick<WorldEnv, 'interiors' | 'builders' | 'bridge' | 'jointBuild'> = {
+  interiors: true,
+  builders: true,
+  bridge: true,
+  jointBuild: false,
+}
 
 export const intEnv = (name: string, fallback: number, min: number): number => {
   const asked = Number(process.env[name] ?? fallback)
@@ -40,14 +45,14 @@ export const intEnv = (name: string, fallback: number, min: number): number => {
 const boolEnv = (name: string, fallback: boolean): boolean =>
   process.env[name] === undefined ? fallback : process.env[name] !== '0'
 
-export function parseWorldEnv(defaults: WorldDefaults): WorldEnv {
+export function parseWorldEnv(): WorldEnv {
   return {
     map: process.env.SJ_MAP === 'scripted' ? 'scripted' : DEV_MAP_HUMAN,
     rings: intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1),
-    interiors: boolEnv('SJ_INTERIORS', defaults.interiors),
-    builders: boolEnv('SJ_BUILDERS', defaults.builders),
-    bridge: boolEnv('SJ_BRIDGE', defaults.bridge),
-    jointBuild: boolEnv('SJ_JOINT', defaults.jointBuild),
+    interiors: boolEnv('SJ_INTERIORS', DEFAULTS.interiors),
+    builders: boolEnv('SJ_BUILDERS', DEFAULTS.builders),
+    bridge: boolEnv('SJ_BRIDGE', DEFAULTS.bridge),
+    jointBuild: boolEnv('SJ_JOINT', DEFAULTS.jointBuild),
     fresh: process.env.SJ_FRESH === '1',
   }
 }

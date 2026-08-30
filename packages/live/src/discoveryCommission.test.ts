@@ -9,7 +9,12 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { migrateLlmTables } from '@sj/llm'
 import { AssetCodex, encodePng, openForgeDb, type RawImage } from '@sj/forge'
-import { CRITERIA, type VisionCriteria, type VisionJudgeFn } from '@sj/forge/gen'
+import {
+  CRITERIA,
+  EST_COST_PER_VISION_CALL,
+  type VisionCriteria,
+  type VisionJudgeFn,
+} from '@sj/forge/gen'
 import { FORGE_CALLER, createDiscoveryArt } from './discoveryCommission.js'
 import { ledgerTotalUsd } from './liveWorld.js'
 import { createGateway } from '@sj/gateway'
@@ -17,7 +22,7 @@ import { createGateway } from '@sj/gateway'
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const WATERSKIN = { name: 'stitch a waterskin', makes: ['waterskin'] }
 /** One picture at $0.045 plus the one vision-QA call that gates it. */
-const JUDGE_USD = 0.0055
+const JUDGE_USD = EST_COST_PER_VISION_CALL
 const ONE_COMMISSION_USD = 0.045 + JUDGE_USD
 
 // A valid 512×512 "generation": magenta field (chroma-keyed away), sage square centred.
@@ -152,14 +157,14 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(codex.listSince(0)).toHaveLength(1)
   }, 30_000)
 
-  it('★ the budget is consulted per call: $0.05 buys the picture but not the eye', async () => {
-    // 0.045 fits; the vision call that gates it would total 0.0505 and is refused, so nothing
-    // reaches the codex but the placeholder.
+  it('★ a balance that cannot pay for the picture AND its eye buys neither', async () => {
+    // 0.045 fits on its own; with the eye reserved beside it the pair is 0.0505 and refused,
+    // so no money goes out and the placeholder stands.
     const art = artFor(0.05)
     art.onDiscovery(WATERSKIN)
     await art.settle()
 
-    expect(calls).toEqual(['image'])
+    expect(calls).toEqual([])
     expect(codex.listSince(0).map((r) => r.status)).toEqual(['placeholder'])
   }, 30_000)
 

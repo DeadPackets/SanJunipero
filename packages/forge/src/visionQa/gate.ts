@@ -2,7 +2,7 @@ import type { Footprint } from '@sj/shared'
 import type { RawImage } from '../post/raw.js'
 import type { ForgeConfig } from '../forgeConfig.js'
 import type { SpendLedger } from '../spendLedger.js'
-import { CRITERIA, type VisionVerdict } from './verdict.js'
+import { totalScore, type VisionVerdict } from './verdict.js'
 import type { VisionJudgeFn } from './visionJudge.js'
 
 export type VisionGateArgs = {
@@ -29,9 +29,6 @@ export type VisionGateResult = {
   spendUsd: number
   overQaCap: boolean
 }
-
-const totalScore = (v: VisionVerdict): number =>
-  CRITERIA.reduce((s, k) => s + v.criteria[k].score, 0)
 
 export async function runVisionGate(a: VisionGateArgs): Promise<VisionGateResult> {
   const { boilerplate, commissionText } = a.basePrompt

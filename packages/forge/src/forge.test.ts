@@ -149,7 +149,7 @@ describe('createForge().commission', () => {
     expect(rec.score).toBeNull()
     expect(rec.attempts).toBe(3)
     expect(rec.costUsd).toBe(0)
-    expect(calls).toBe(3) // each throw consumed one try
+    expect(calls).toBe(2) // each throw consumed one draw try
     expect(codex.get(rec.id)).not.toBeNull()
   })
   it('a generation throw is a failed try; the next try still reaches the eye', async () => {
@@ -190,6 +190,6 @@ describe('createForge().commission', () => {
     const rec = await forge.commission('vapor', { w: 1, h: 1 }, 'item', 'vapor')
     expect(rec.status).toBe('placeholder')
     expect(judgeCalls).toBe(0)
-    expect(rec.costUsd).toBeCloseTo(3 * 0.045, 6) // the three refused generations are still billed
+    expect(rec.costUsd).toBeCloseTo(2 * 0.045, 6) // the refused generations are still billed
   })
 })
