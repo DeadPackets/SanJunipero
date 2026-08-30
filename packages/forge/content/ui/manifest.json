@@ -2,7 +2,7 @@
   "version": "v1-signpost-ui",
   "pieces": {
     "signpost-arm": {
-      "file": "signpost-arm.png",
+      "file": "signpost-arm.webp",
       "w": 128,
       "h": 32,
       "slice": null,
@@ -18,7 +18,7 @@
       }
     },
     "signpost-post": {
-      "file": "signpost-post.png",
+      "file": "signpost-post.webp",
       "w": 16,
       "h": 96,
       "slice": null,
@@ -34,7 +34,7 @@
       }
     },
     "paper": {
-      "file": "paper.png",
+      "file": "paper.webp",
       "w": 96,
       "h": 96,
       "slice": 24,
@@ -45,7 +45,7 @@
       }
     },
     "nameplate": {
-      "file": "nameplate.png",
+      "file": "nameplate.webp",
       "w": 32,
       "h": 16,
       "slice": 4,
@@ -56,7 +56,7 @@
       }
     },
     "ring-pip": {
-      "file": "ring-pip.png",
+      "file": "ring-pip.webp",
       "w": 24,
       "h": 24,
       "slice": null,

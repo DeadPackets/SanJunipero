@@ -7,7 +7,7 @@ import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
 import { keyBg } from '../src/post/chromaKey.js'
 import { erodeAlpha, opaqueBbox } from '../src/sheet.js'
 import { INTERIORS_CONTENT_DIR, INTERIOR_PIECES, type InteriorPiece } from '../src/interiorArt.js'
@@ -256,7 +256,7 @@ for (const p of pieces) {
   }
 
   mkdirSync(INTERIORS_CONTENT_DIR, { recursive: true })
-  writeFileSync(join(INTERIORS_CONTENT_DIR, `${p.id}.png`), await encodePng(win.img))
+  writeFileSync(join(INTERIORS_CONTENT_DIR, `${p.id}.webp`), await encodeWebp(win.img))
   rows.push(
     `| ${p.id} | ${p.role} | ${p.w}x${p.h} | ${GEN_PX}/${win.factor} (window ${win.window}) | ` +
       `${paletteDistance(win.img).toFixed(1)} | ${win.key} | ` +

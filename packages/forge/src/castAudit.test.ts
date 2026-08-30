@@ -1,6 +1,6 @@
 // Pins the cells that would fail the gate today; the list may only get shorter.
 import { describe, expect, it } from 'vitest'
-import { decodePng, type RawImage } from './post/raw.js'
+import { decodePng, visiblePixelDiffs, type RawImage } from './post/raw.js'
 import {
   CELL_V2,
   FEET_Y_V2,
@@ -193,9 +193,10 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
             [a.width, a.height],
             `${p}-${derived} is not the size of flip(${p}-${authored})`,
           ).toEqual([b.width, b.height])
-          let diff = 0
-          for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) diff++
-          expect(diff, `${p}-${derived} is not an exact flip of ${p}-${authored}`).toBe(0)
+          expect(
+            visiblePixelDiffs(a, b),
+            `${p}-${derived} is not an exact flip of ${p}-${authored}`,
+          ).toBe(0)
         }
       }
     },

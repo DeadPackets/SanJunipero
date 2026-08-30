@@ -50,10 +50,10 @@
   --ledge: 4px 4px 0 0 var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
-  --px-cream: url('./px/frame-cream.png') 10 repeat;
-  --px-night: url('./px/frame-night.png') 10 repeat;
-  --px-paper: url('./px/paper.png') 24 repeat;
-  --grain: url('./px/dither-warm.png');
+  --px-cream: url('./px/frame-cream.webp') 10 repeat;
+  --px-night: url('./px/frame-night.webp') 10 repeat;
+  --px-paper: url('./px/paper.webp') 24 repeat;
+  --grain: url('./px/dither-warm.webp');
 
   /* the paper: one sheet, sized off the stage it rises over */
   --paper-w: min(78%, 760px);
@@ -1004,7 +1004,7 @@ body {
   background: #7E512B;
   padding: 0 3px;
   /* the plate's ink edge, lit top row and bottom lip are drawn in the raster's own slices */
-  border: 4px solid transparent; border-image: url('./px/nameplate.png') 4 repeat;
+  border: 4px solid transparent; border-image: url('./px/nameplate.webp') 4 repeat;
   opacity: 0;
   animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
 }
@@ -1111,7 +1111,7 @@ body {
   width: 128px; min-height: 44px; padding: 0 2rem 0 1.1rem;
   font-family: var(--font-px); font-size: 0.8125rem; letter-spacing: 0.03em;
   text-align: left; color: var(--cream); cursor: pointer;
-  background: url('./px/signpost-arm.png') no-repeat center / 128px 32px;
+  background: url('./px/signpost-arm.webp') no-repeat center / 128px 32px;
   image-rendering: pixelated;
   border: 0; border-radius: 0;
   text-shadow: 0 1px 0 rgba(36, 31, 43, 0.85);
@@ -1123,7 +1123,7 @@ body {
 .signpost-arm[aria-pressed='true'] { filter: brightness(1.2) saturate(1.15); }
 .signpost-post {
   width: 16px; height: 96px; margin-left: 1.2rem;
-  background: url('./px/signpost-post.png') no-repeat center / 16px 96px;
+  background: url('./px/signpost-post.webp') no-repeat center / 16px 96px;
   image-rendering: pixelated;
 }
 @media (prefers-reduced-motion: reduce) {

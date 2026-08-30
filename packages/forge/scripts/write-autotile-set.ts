@@ -4,16 +4,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROAD_AUTOTILE_KEYS } from '@sj/shared'
-import { encodePng } from '../src/post/raw.js'
+import { encodeWebp } from '../src/post/raw.js'
 import { paintRoadStrip } from '../src/roadTiles.js'
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
-const FILE = 'road-autotile.png'
+const FILE = 'road-autotile.webp'
 
 mkdirSync(DIR, { recursive: true })
 
 const strip = paintRoadStrip()
-writeFileSync(join(DIR, FILE), await encodePng(strip))
+writeFileSync(join(DIR, FILE), await encodeWebp(strip))
 console.log(
   `wrote ${join(DIR, FILE)} — ${strip.width}x${strip.height}, ${ROAD_AUTOTILE_KEYS.length} tiles`,
 )

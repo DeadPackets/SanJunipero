@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 // The Signpost UI's rasters, drawn by `scripts/gen-ui.ts`. They ship TWICE: `content/ui` holds
 // the authored piece beside its manifest, and `packages/web/src/ui/px` is the directory the web
-// bundler resolves `frame-cream.png` and its siblings from. The producer runs a live generation
+// bundler resolves `frame-cream.webp` and its siblings from. The producer runs a live generation
 // at import time, so the roster cannot live in it — it lives here, where web and test both reach.
 export const UI_CONTENT_DIR = fileURLToPath(new URL('../content/ui', import.meta.url))
 export const UI_PX_DIR = fileURLToPath(new URL('../../web/src/ui/px', import.meta.url))

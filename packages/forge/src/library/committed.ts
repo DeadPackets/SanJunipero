@@ -1,4 +1,4 @@
-// Items are committed under `content/items/<kind>/` — sprite.png, icon.png and the manifest the
+// Items are committed under `content/items/<kind>/` — sprite.webp, icon.webp and the manifest the
 // renderer's `parseLibraryItemManifest` reads back — and this module is the one place reading them.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -31,8 +31,8 @@ export function listCommittedItems(root: string = ITEMS_CONTENT_DIR): CommittedI
     const base = join(root, kind)
     const paths = {
       manifest: join(base, 'manifest.json'),
-      sprite: join(base, 'sprite.png'),
-      icon: join(base, 'icon.png'),
+      sprite: join(base, 'sprite.webp'),
+      icon: join(base, 'icon.webp'),
     }
     for (const [name, p] of Object.entries(paths)) {
       if (!existsSync(p)) throw new Error(`items/${kind}: ${name} is missing`)

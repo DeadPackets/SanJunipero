@@ -5,7 +5,7 @@
   "rows": 4,
   "seasons": {
     "spring": {
-      "file": "spring.png",
+      "file": "spring.webp",
       "tiles": [
         "grass-0",
         "grass-1",
@@ -26,7 +26,7 @@
       ]
     },
     "summer": {
-      "file": "summer.png",
+      "file": "summer.webp",
       "tiles": [
         "grass-0",
         "grass-1",
@@ -47,7 +47,7 @@
       ]
     },
     "autumn": {
-      "file": "autumn.png",
+      "file": "autumn.webp",
       "tiles": [
         "grass-0",
         "grass-1",
@@ -68,7 +68,7 @@
       ]
     },
     "winter": {
-      "file": "winter.png",
+      "file": "winter.webp",
       "tiles": [
         "grass-0",
         "grass-1",
@@ -90,11 +90,11 @@
     }
   },
   "scaffolding": {
-    "file": "scaffolding.png"
+    "file": "scaffolding.webp"
   },
   "autotile": {
     "road": {
-      "file": "road-autotile.png",
+      "file": "road-autotile.webp",
       "tiles": {
         "straight-ns": 0,
         "straight-ew": 1,

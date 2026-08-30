@@ -10,6 +10,7 @@ import {
   EMOTE_KINDS,
   decodePng,
   encodePng,
+  encodeWebp,
   openForgeDb,
   paletteRgb,
   type RawImage,
@@ -244,8 +245,34 @@ describe('asset http routes', () => {
     })
     const res = await fetch(`${base}/assets/${rec.id}.png`)
     expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/png')
     expect(res.headers.get('cache-control')).toContain('immutable')
     expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
+  })
+
+  // The shipped art is lossless WebP and the placeholders are PNG, on the same `.png` route.
+  it('answers image/webp for a webp codex row, off the bytes not the url', async () => {
+    const webp = await encodeWebp({
+      width: 6,
+      height: 3,
+      data: new Uint8ClampedArray(6 * 3 * 4).fill(37),
+    })
+    const rec = codex.register({
+      class: 'item',
+      desc: 'basket: woven reed',
+      footprint: { w: 1, h: 1 },
+      png: webp,
+      widthPx: 6,
+      heightPx: 3,
+      status: 'ready',
+      score: 8,
+      attempts: 1,
+      costUsd: 0,
+    })
+    const res = await fetch(`${base}/assets/${rec.id}.png`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/webp')
+    expect(Buffer.from(await res.arrayBuffer()).equals(webp)).toBe(true)
   })
 
   it('404s an unknown codex id', async () => {

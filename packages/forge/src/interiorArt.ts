@@ -88,8 +88,8 @@ export type CommittedInterior = InteriorPiece & { png: Buffer; kind: string }
 export function listCommittedInteriors(root: string = INTERIORS_CONTENT_DIR): CommittedInterior[] {
   if (!existsSync(root)) return []
   return INTERIOR_PIECES.map((piece) => {
-    const path = join(root, `${piece.id}.png`)
-    if (!existsSync(path)) throw new Error(`interiors/${piece.id}.png is missing`)
+    const path = join(root, `${piece.id}.webp`)
+    if (!existsSync(path)) throw new Error(`interiors/${piece.id}.webp is missing`)
     return { ...piece, png: readFileSync(path), kind: interiorCodexKind(piece) }
   })
 }

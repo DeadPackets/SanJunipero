@@ -121,8 +121,13 @@ function buildEmoteAtlas(): RawImage {
   return atlas
 }
 
-const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {
-  const headers: Record<string, string> = { 'content-type': 'image/png' }
+/** A codex row holds the shipped art as lossless WebP or this process's own PNG, so the container
+ *  is read off the bytes — the `.png` in the URL is a suffix on an id, not a promise. */
+const contentType = (buf: Buffer): string =>
+  buf.length >= 12 && buf.toString('ascii', 8, 12) === 'WEBP' ? 'image/webp' : 'image/png'
+
+const sendImage = (res: ServerResponse, buf: Buffer, immutable = false): void => {
+  const headers: Record<string, string> = { 'content-type': contentType(buf) }
   if (immutable) headers['cache-control'] = 'public, max-age=31536000, immutable'
   res.writeHead(200, headers)
   res.end(buf)
@@ -212,7 +217,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       `placeholder:${klass}`,
       () => makePlaceholder(klass as AssetClass, size),
       (buf) => {
-        sendPng(res, buf)
+        sendImage(res, buf)
       },
     )
   })
@@ -233,7 +238,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       const id = newestReady(codex, `character:${agentId}`)
       const hit = id === undefined ? null : codex.get(id)
       if (hit) {
-        sendPng(res, hit.png)
+        sendImage(res, hit.png)
         return
       }
     }
@@ -242,7 +247,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       `character:${agentId}`,
       () => buildPlaceholderSheet(agentId),
       (buf) => {
-        sendPng(res, buf)
+        sendImage(res, buf)
       },
     )
   })
@@ -251,7 +256,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
     const file = params.file ?? ''
     if (file === 'emotes.png') {
       onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => {
-        sendPng(res, buf)
+        sendImage(res, buf)
       })
       return
     }
@@ -266,6 +271,6 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       notFound(res)
       return
     }
-    sendPng(res, hit.png, true) // codex rows never mutate; replacements get new ids
+    sendImage(res, hit.png, true) // codex rows never mutate; replacements get new ids
   })
 }

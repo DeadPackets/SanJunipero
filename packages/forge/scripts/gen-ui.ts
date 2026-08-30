@@ -1,6 +1,6 @@
 // LIVE — the Signpost UI's rasters (stage 7). Cap $UI_CAP. Every piece lands twice: in
 // `content/ui` beside its manifest, and in `packages/web/src/ui/px`, which is the directory the
-// web bundler resolves `frame-cream.png` and its siblings from.
+// web bundler resolves `frame-cream.webp` and its siblings from.
 // Controls: UI_ONLY=<comma ids>, UI_ATTEMPTS, UI_DRY=1, UI_REJECTED=<candidate keys>.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -9,7 +9,7 @@ import { BudgetGuard } from '../src/budget.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
 import { keyBg } from '../src/post/chromaKey.js'
 import { erodeAlpha, opaqueBbox } from '../src/sheet.js'
 import { spriteCell } from '../src/reCell.js'
@@ -449,10 +449,10 @@ for (const p of pieces) {
     }
   }
 
-  const file = `${p.id}.png`
-  const png = await encodePng(img)
-  writeFileSync(join(UI_CONTENT_DIR, file), png)
-  writeFileSync(join(UI_PX_DIR, file), png)
+  const file = `${p.id}.webp`
+  const raster = await encodeWebp(img)
+  writeFileSync(join(UI_CONTENT_DIR, file), raster)
+  writeFileSync(join(UI_PX_DIR, file), raster)
   manifest[p.id] = { file, w: p.w, h: p.h, slice: p.slice ?? null, note: p.note, provenance: prov }
   shipped.push({ p, img })
   rows.push(

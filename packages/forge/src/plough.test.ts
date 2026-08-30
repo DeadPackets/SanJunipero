@@ -39,7 +39,7 @@ function furrowPeriodicity(
 }
 
 const material = (name: string): Promise<RawImage> =>
-  decodePng(readFileSync(new URL(`../content/tilesets/materials/${name}.png`, import.meta.url)))
+  decodePng(readFileSync(new URL(`../content/tilesets/materials/${name}.webp`, import.meta.url)))
 
 describe('ploughFurrows', () => {
   it('RED-proves the rejected art: it has no furrow in it at all', async () => {

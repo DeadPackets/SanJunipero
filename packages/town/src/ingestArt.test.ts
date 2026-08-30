@@ -109,7 +109,7 @@ describe('ingestProductionArt', () => {
     expect(registerCommittedBuildings(codex, { root }).map((e) => e.action)).toEqual(['registered'])
     expect(registerCommittedBuildings(codex, { root }).map((e) => e.action)).toEqual(['unchanged'])
 
-    appendFileSync(join(root, one.dir, 'cell.png'), Buffer.from([0]))
+    appendFileSync(join(root, one.dir, 'cell.webp'), Buffer.from([0]))
     expect(registerCommittedBuildings(codex, { root }).map((e) => e.action)).toEqual(['registered'])
     const rows = codex.listSince(0).filter((r) => r.kind === one.codexKind)
     expect(rows).toHaveLength(2)
@@ -121,8 +121,8 @@ describe('ingestProductionArt', () => {
     const root = mkdtempSync(join(dir, 'half-'))
     const one = listCommittedBuildings()[0]!
     cpSync(join(BUILDINGS_CONTENT_DIR, one.dir), join(root, one.dir), { recursive: true })
-    rmSync(join(root, one.dir, 'cell.png'))
-    expect(() => listCommittedBuildings(root)).toThrow(new RegExp(`${one.dir}.*cell\\.png`))
+    rmSync(join(root, one.dir, 'cell.webp'))
+    expect(() => listCommittedBuildings(root)).toThrow(new RegExp(`${one.dir}.*cell\\.webp`))
   })
 
   // `structureArt.ts` cannot see `TOWN_STRUCTURES` in `founders.ts` — `@sj/forge` must not import
