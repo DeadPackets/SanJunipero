@@ -7,6 +7,7 @@ import {
   FALLBACK_TURN,
   IntentSchema,
   TurnSchema,
+  actWithoutItsDetail,
   parseTurnWithRepair,
   reconsiderTick,
 } from './turn.js'
@@ -187,8 +188,32 @@ describe('parseTurnWithRepair', () => {
     expect(turn).toEqual(FALLBACK_TURN)
     expect(repair).toHaveBeenCalledTimes(1)
     expect(alert).toHaveBeenCalledTimes(1)
-    const detail = alert.mock.calls[0]![0] as string
-    expect(detail).toContain('importance')
+    expect(alert.mock.calls[0]![0]).toBe('turn_fallback')
+    expect(alert.mock.calls[0]![1]).toContain('importance')
+  })
+
+  it('spends the same one correction on an act that parsed but named nothing', async () => {
+    const empty = { ...validTurn, plan: null, action: { verb: 'speak', params: {} } }
+    const filled = { ...empty, action: { verb: 'speak', params: { text: 'Here.' } } }
+    const repair = vi.fn(async (issues: string) => {
+      expect(issues).toContain('left speak empty')
+      return filled
+    })
+    const alert = vi.fn()
+    const turn = await parseTurnWithRepair(empty, repair, alert)
+    expect(turn.action).toEqual({ verb: 'speak', params: { text: 'Here.' } })
+    expect(repair).toHaveBeenCalledTimes(1)
+    expect(alert).not.toHaveBeenCalled()
+  })
+
+  it('keeps the turn and says so once when the act comes back empty twice', async () => {
+    const empty = { ...validTurn, plan: null, action: { verb: 'eat', params: {} } }
+    const repair = vi.fn(async () => empty)
+    const alert = vi.fn()
+    const turn = await parseTurnWithRepair(empty, repair, alert)
+    expect(turn.thought).toBe(validTurn.thought)
+    expect(repair).toHaveBeenCalledTimes(1)
+    expect(alert).toHaveBeenCalledWith('empty_act_detail', expect.stringContaining('eat'))
   })
 })
 
@@ -245,5 +270,46 @@ describe('reconsiderTick', () => {
     expect(reconsiderTick(MINUTES_PER_DAY * 3 + 14 * 60 + 30, '14:30')).toBe(
       MINUTES_PER_DAY * 4 + 14 * 60 + 30,
     )
+  })
+})
+
+// K20: 164 of run E's 368 refusals were one act emitted with nothing in it, `speak` with no
+// words 66 times. Both halves of the answer are here: the decoder is told, and the turn is read.
+describe('an act with nothing named in it', () => {
+  const turn = (action: unknown) => TurnSchema.parse({ ...validTurn, plan: null, action })
+
+  it('is named by the verb that carries it', () => {
+    expect(actWithoutItsDetail(turn({ verb: 'speak', params: {} }))).toBe('speak')
+    expect(actWithoutItsDetail(turn({ verb: 'eat', params: {} }))).toBe('eat')
+  })
+
+  it('is not raised for an act that asks for nothing, nor for one that is filled', () => {
+    for (const verb of ['sleep', 'wake', 'exit', 'doff', 'drink', 'forage']) {
+      expect(actWithoutItsDetail(turn({ verb, params: {} })), verb).toBeNull()
+    }
+    expect(
+      actWithoutItsDetail(turn({ verb: 'eat', params: { itemId: 'item_bread_04' } })),
+    ).toBeNull()
+    expect(actWithoutItsDetail(turn({ verb: 'walk', params: { x: 0, y: 0 } }))).toBeNull()
+    expect(actWithoutItsDetail(turn({ freeform: 'I lean on the fence and watch' }))).toBeNull()
+    expect(actWithoutItsDetail(TurnSchema.parse({ ...validTurn, action: null }))).toBeNull()
+  })
+
+  it('cannot arrive as a blank string at all: the decoder is given the floor', () => {
+    expect(
+      TurnSchema.safeParse({ ...validTurn, action: { verb: 'speak', params: { text: '' } } })
+        .success,
+    ).toBe(false)
+    expect(
+      TurnSchema.safeParse({ ...validTurn, action: { verb: 'eat', params: { itemId: '' } } })
+        .success,
+    ).toBe(false)
+    const json = JSON.stringify(z.toJSONSchema(TurnSchema, { io: 'output' }))
+    expect(json).toContain('minLength')
+  })
+
+  it('is still caught when a blank one gets in another way', () => {
+    const blank = { ...validTurn, plan: null, action: { verb: 'speak', params: { text: '   ' } } }
+    expect(actWithoutItsDetail(blank as never)).toBe('speak')
   })
 })

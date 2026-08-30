@@ -911,6 +911,41 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(userMsg.text).toContain('importance')
   })
 
+  // K20: 164 of run E's 368 refusals were an act named with nothing in it, and the world only
+  // says so a beat later, with the moment already spent.
+  it('asks again once when an act comes back with nothing named in it', async () => {
+    const empty = {
+      thought: 'I would speak.',
+      action: { verb: 'speak', params: {} },
+      importance: 3,
+    }
+    const filled = {
+      thought: 'I would speak.',
+      action: { verb: 'speak', params: { text: 'The bread is yours.' } },
+      importance: 3,
+    }
+    const { model, prompts } = capturingModel([empty, filled])
+    const { world, loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(prompts.length).toBe(2)
+    const again = prompts[1]!
+    expect(again[again.length - 2]!.role).toBe('assistant')
+    expect(again[again.length - 1]!.text).toContain('left speak empty')
+    expect(spokeTexts(world.engineDb)).toContain('The bread is yours.')
+    expect(alertKinds(agentDb)).not.toContain('empty_act_detail')
+  })
+
+  it('gives up after the one retry, and says so where an operator can see it', async () => {
+    const empty = { thought: 'I would eat.', action: { verb: 'eat', params: {} }, importance: 3 }
+    const { model, prompts } = capturingModel([empty, empty])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(prompts.length).toBe(2)
+    expect(alertKinds(agentDb)).toContain('empty_act_detail')
+  })
+
   it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)

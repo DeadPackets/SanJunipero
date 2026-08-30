@@ -32,12 +32,24 @@ export type AssembledAdjudicationPrompt = {
   estTokens: number
 }
 
+// The town's routines, with what each one asks for. Authored rather than read off the registry
+// so the system prefix stays byte-stable while recipe verbs are minted mid-run.
+export const VERB_ROSTER = `The town's routines, and what each asks for. A "map" verdict names one of these words and fills exactly its parameters, taken from the asker's own block above; a parameter the block does not carry is a format error, not a routine. A word that is not on this list is not a routine, so it cannot be mapped.
+walk (x, y) — sleep (nothing) — wake (nothing) — enter (structureId) — exit (nothing)
+eat (itemId) — drink (nothing, or itemId for a vessel in hand) — fill (itemId) — take (itemId) — drop (itemId)
+give (itemId, targetId) — stow (itemId, structureId) — speak (text) — write (text, and itemId to write on one in hand) — read (itemId)
+inscribe (structureId, text) — teach (targetId, track) — tend (targetId) — attack (targetId) — experiment (description)
+wear (itemId) — doff (nothing) — kindle (itemId) — snuff (itemId) — stoke (structureId) — extinguish (structureId)
+till (x, y) — plant (x, y, kind) — harvest (cropId) — fish (x, y) — forage (nodeId, or nothing where trees stand) — hunt (faunaId)
+chop (x, y) — pave (x, y) — dig_channel (x, y) — douse (x, y) — build (kind, and x, y only for a thing smaller than a building) — craft (recipe)`
+
 // Operator-facing instruction appended after the canon block. Canon + instruction is
 // byte-stable across every adjudication, so the provider's prefix cache stays warm.
 export const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
 "map" only if the town already performs this exact action as a routine;
 "attempt" if the action is new but the agent can physically try it with the town's fire, current, wood, fiber, stone, the stock and scrap its sheds already hold, and the river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.
+${VERB_ROSTER}
 Between attempt and impossible, decide by whether the first step can be taken with what the town has at hand; a craft is not impossible merely because no one has done it yet.
 The verdict word must agree with the reasoning that reached it: if your own reasoning concludes the action can be begun, the verdict is "attempt" and no other word will do.
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".

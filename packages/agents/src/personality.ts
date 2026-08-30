@@ -42,6 +42,14 @@ export type PersonalityEdit = z.infer<typeof PersonalityEditSchema>
 // The model is meant to answer `no_proposal` instead, but when it spells the refusal out as a
 // trait this is the write boundary that must not store it. Observed phrasings only, no NLP.
 const NO_OP_EDIT_TEXT = /^(?:no changes?|nothing to change|none|n\/a|no edit)[\s.!?,;:]*$/i
+// The same refusal said in prose and buried in a sentence, which the anchored form above lets
+// through. A trait that declares nothing moved is not a trait. Observed phrasings only.
+const NO_OP_EDIT_PHRASE = /\b(?:not a change|no different|unchanged|stays the same|keeps? as is)\b/i
+
+function isNoOpEditText(text: string): boolean {
+  const trimmed = text.trim()
+  return NO_OP_EDIT_TEXT.test(trimmed) || NO_OP_EDIT_PHRASE.test(trimmed)
+}
 
 export type NightlyEditOutcome =
   | { ok: true; version: number }
@@ -102,7 +110,7 @@ export class PersonalityStore {
     const parsed = PersonalityEditSchema.safeParse(rawEdit)
     if (!parsed.success) return { ok: false, reason: 'invalid_edit_shape' }
     const edit = parsed.data
-    if (edit.op !== 'remove' && NO_OP_EDIT_TEXT.test(edit.text.trim())) {
+    if (edit.op !== 'remove' && isNoOpEditText(edit.text)) {
       return { ok: false, reason: 'no_op_text', skipped: true }
     }
 

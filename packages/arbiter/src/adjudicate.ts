@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import { registerVerb, VERBS } from '@sj/engine'
+import { IntentParamsSchema, registerVerb, VERBS } from '@sj/engine'
 import {
   FORBIDDEN_FRAMING,
   type DiscoveryCredit,
@@ -53,6 +53,45 @@ const PRECEDENT_SUMMARY_MAX = 100
 export const FALLBACK_IMPOSSIBLE = {
   kind: 'impossible',
   reason: 'you turn it over and it will not come together as it stands',
+  class: 'physically_impossible',
+} satisfies Verdict
+
+// The words a turn is made of, spilled into the act slot: the name of an act, the keys it takes,
+// the parts of an answer. An intent made of nothing else is a decode slip, not an attempt.
+const DEBRIS_WORDS: ReadonlySet<string> = new Set([
+  ...Object.keys(IntentParamsSchema.shape).map((k) => k.toLowerCase()),
+  'thought',
+  'speech',
+  'action',
+  'plan',
+  'journal',
+  'recall',
+  'importance',
+  'reconsider',
+  'reconsider_at',
+  'freeform',
+  'verb',
+  'params',
+  'to',
+  'at',
+  'and',
+])
+
+/** True when every word of the intent is one of those, so there is no sentence to rule on. */
+export function isDecodeDebris(intent: string): boolean {
+  const words = intent
+    .toLowerCase()
+    .split(/[\s,.!?]+/)
+    .filter((w) => w.length > 0)
+  if (words.length === 0) return true
+  return words.every((w) => VERBS[w] !== undefined || DEBRIS_WORDS.has(w) || /^-?\d+$/.test(w))
+}
+
+// Returned, never recorded: a decode slip that became precedent seeded three of run E's four
+// retrieved rulings, one of them a real attempt at water.
+const DECODE_DEBRIS_REFUSAL = {
+  kind: 'impossible',
+  reason: 'you reach for it and find only the word, with no act behind it',
   class: 'physically_impossible',
 } satisfies Verdict
 
@@ -242,6 +281,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
   return {
     async adjudicate(intent, agentCtx) {
+      // Stage 0 — debris the decoder shed, bounced before anything can remember it.
+      if (isDecodeDebris(intent)) return DECODE_DEBRIS_REFUSAL
+
       // Stage 1 — deterministic rulebook lookup (exact normalized-name match).
       const hit = rulebook.lookup(intent)
       if (hit) return { kind: 'map', verb: hit.verb, params: {} }

@@ -5,7 +5,13 @@ import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EMBEDDING_DIM, FORBIDDEN_FRAMING } from '@sj/shared'
-import { FALLBACK_IMPOSSIBLE, makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
+import {
+  FALLBACK_IMPOSSIBLE,
+  isDecodeDebris,
+  makeArbiter,
+  type AgentCtx,
+  type Arbiter,
+} from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
 import { CodexStore } from './codex.js'
@@ -155,6 +161,38 @@ class LexicalEmbedder {
     return v
   }
 }
+
+// Run E ruling #4 was the bare token `walk`, refused and then recorded as physics; three of the
+// four rulings that cleared the precedent floor descend from it, one a real attempt at water.
+describe('decode debris never becomes precedent', () => {
+  it('reads a bare verb, a verb list and a spilled key as debris', () => {
+    for (const intent of ['walk', 'take,', 'walk, drop, drink', 'walk x y', 'reconsider at']) {
+      expect(isDecodeDebris(intent), intent).toBe(true)
+    }
+  })
+
+  it('leaves a sentence alone, however short', () => {
+    for (const intent of [
+      'I weave a basket from reeds',
+      'walk to the well and fill the waterskin',
+      'stand still and listen',
+      'I take the bread',
+    ]) {
+      expect(isDecodeDebris(intent), intent).toBe(false)
+    }
+  })
+
+  it('bounces it before the arbiter, with no call and no row', async () => {
+    const llm = new ScriptedLlm(() => basketVerdict)
+    const { db, arbiter } = await makeArbiterRig({ llm })
+
+    const verdict = await arbiter.adjudicate('walk, drop, drink', TAMAR_CTX)
+    expect(verdict.kind).toBe('impossible')
+    expect(FORBIDDEN_FRAMING.test(verdict.kind === 'impossible' ? verdict.reason : '')).toBe(false)
+    expect(llm.objectCalls).toBe(0)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM rulings').get()).toEqual({ n: 0 })
+  })
+})
 
 describe('makeArbiter adjudicate three-stage funnel', () => {
   it('rulebook short-circuit returns map with zero LLM calls', async () => {

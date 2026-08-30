@@ -140,6 +140,22 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     expect(await drinking).toEqual({ ok: true })
   })
 
+  // Run E: `Water lies within reach` printed 0 times in 3,343 ticks and `Your mouth is dry`
+  // once, four ticks from the end. Thirst decays 1.67x slower than hunger and shared its 30.
+  it('opens the water road long before the mouth is dry, and the two are separate', async () => {
+    const { bridge, loop } = wild()
+    loop.state.agents[AGENT]!.thirst = 45
+    const early = proseFor(bridge)
+    expect(early).toContain('The nearest water you know of lies at (12, 8)')
+    expect(early).not.toContain('Your mouth is dry')
+
+    loop.state.agents[AGENT]!.thirst = 55
+    expect(proseFor(bridge)).not.toContain('The nearest water you know of')
+
+    loop.state.agents[AGENT]!.thirst = 25
+    expect(proseFor(bridge)).toContain('Your mouth is dry')
+  })
+
   it('reproduces the run: with no node named, forage still needs a wood at the elbow', async () => {
     const { bridge, step } = wild()
     const blind = bridge.submit(AGENT, { verb: 'forage', params: {} })

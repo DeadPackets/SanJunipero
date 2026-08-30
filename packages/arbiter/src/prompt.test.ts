@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { VERBS } from '@sj/engine'
 import { assembleAdjudicationPrompt, type AdjudicationBlocks } from './prompt.js'
 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
@@ -124,6 +125,41 @@ describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
     const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
     expect(a.system).toBe(b.system)
     expect(a.messages[0]!.content).not.toContain('format error')
+  })
+})
+
+// `map` was defined and never given a list of what a routine is: 0 of run D's 6 maps and at
+// most 1 of run E's 2 produced a valid engine action.
+describe('the roster of routines a map may name', () => {
+  it('lands in the system prefix with each routine and what it asks for', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    for (const routine of [
+      'walk (x, y)',
+      'forage (nodeId, or nothing where trees stand)',
+      'sleep (nothing)',
+      'speak (text)',
+      'eat (itemId)',
+      'stow (itemId, structureId)',
+      'drop (itemId)',
+    ]) {
+      expect(system, routine).toContain(routine)
+    }
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('names every routine the registry answers to', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    // Recipe and expressive verbs are minted mid-run; the roster is the tier-1 registry.
+    for (const verb of Object.keys(VERBS).filter((v) => !v.includes(':'))) {
+      expect(system, verb).toContain(`${verb} (`)
+    }
+  })
+
+  it('stays byte-stable, so the prefix cache is untouched', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I walk to the well.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I forage for twigs.' }))
+    expect(a.system).toBe(b.system)
+    expect(a.messages[0]!.content).not.toContain('walk (x, y)')
   })
 })
 

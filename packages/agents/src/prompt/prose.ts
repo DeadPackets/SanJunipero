@@ -507,8 +507,9 @@ export function perceptionToProse(
       lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
   }
 
-  // Said whenever the body is dry, and never as a refusal.
-  if (thirst < 30) {
+  // Never a refusal, and opened well before the dryness is felt: thirst decays 1.67x slower
+  // than hunger, so the 30 both once shared left the water road 10 ticks of runway.
+  if (thirst < 50) {
     if (world?.waterAtHand?.() === true) {
       lines.push(
         'Water lies within reach of your hands. You could drink here, or fill what you carry.',

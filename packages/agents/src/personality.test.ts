@@ -275,4 +275,40 @@ describe('PersonalityStore versioning', () => {
     ).toEqual({ ok: true, version: 2 })
     expect(store.current().doc.values).toEqual([...BASE_DOC.values, 'no one eats alone'])
   })
+
+  // Run E, salma v2: the refusal said in prose and buried mid-sentence, which the anchored
+  // form let straight through and stored as a belief.
+  it('a trait that says nothing moved is skipped however it is phrased', async () => {
+    const { mem, store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    const e = await insertMemory(mem, 1500)
+    const softNoOps = [
+      'I have walked further than I meant to. Yet this is not a change in what I value or believe; it is only a change in where I stand.',
+      'What I hold is no different from yesterday.',
+      'My belief is unchanged.',
+      'Everything stays the same.',
+      'Keep as is.',
+    ]
+    for (const text of softNoOps) {
+      expect(
+        store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text, evidence: [e] }, mem),
+        text,
+      ).toEqual({ ok: false, reason: 'no_op_text', skipped: true })
+    }
+    expect(store.current().version).toBe(1)
+
+    // Salma v3, the real reversal from the same run, still lands.
+    expect(
+      store.applyNightlyEdit(
+        1,
+        {
+          op: 'add',
+          field: 'beliefs',
+          text: 'A thing named is a thing I can reach. Naming opens, it does not worsen.',
+          evidence: [e],
+        },
+        mem,
+      ),
+    ).toEqual({ ok: true, version: 2 })
+  })
 })

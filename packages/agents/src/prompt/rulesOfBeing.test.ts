@@ -75,6 +75,24 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   it('never names the machinery', () => {
     expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
   })
+
+  // K20: one fault across nine verbs, 164 of 368 refusals. The schema carries the shape; this
+  // line carries what the shape cannot say, which is that a blank one is a moment thrown away.
+  it('says that an act must carry what it asks for, in the static prefix', () => {
+    expect(CAPABILITIES).toContain('Every act carries what it asks for')
+    expect(CAPABILITIES).toContain('An act named with nothing in it does not\nhappen')
+    expect(block1()).toContain('Every act carries what it asks for')
+  })
+
+  // A shared block that hands every mind the same example makes five copies of one actor, so
+  // the one exemplar is abstract and names nobody.
+  it('spends exactly one exemplar, and it names no founder', () => {
+    expect(CAPABILITIES).toContain('A mind who means to speak')
+    expect(CAPABILITIES.match(/A mind who/g)).toHaveLength(1)
+    for (const founder of ['Omar', 'Salma', 'Nadia', 'Amara', 'Yusuf']) {
+      expect(CAPABILITIES, founder).not.toContain(founder)
+    }
+  })
 })
 
 // Discovery by schema is not knowledge: a verb registered and nameable but shown to nobody is

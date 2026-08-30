@@ -651,9 +651,12 @@ export class AgentRuntime {
       const { raw, badText } = answer
       turn = await parseTurnWithRepair(
         raw,
-        (issues) => this.#repair(assembled, badText, issues),
-        (detail) => {
-          this.#llm.alert('turn_fallback', detail)
+        // A shape the schema refused comes back as the provider's own bytes; an act with
+        // nothing in it parsed cleanly, so the answer itself is what goes back.
+        (issues) =>
+          this.#repair(assembled, badText.length > 0 ? badText : JSON.stringify(raw), issues),
+        (kind, detail) => {
+          this.#llm.alert(kind, detail)
         },
       )
     } catch (err) {

@@ -79,6 +79,18 @@ export const FALLBACK_TURN: Turn = {
   importance: 1,
 }
 
+// The acts that ask for nothing of their own. A verb minted at runtime is one too: the arbiter
+// only ever hands those over with nothing in them.
+const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'exit', 'doff', 'drink', 'forage'])
+
+/** The verb this turn began with nothing named, or null when the act carries its detail. */
+export function actWithoutItsDetail(turn: Turn): string | null {
+  const action = turn.action
+  if (action === null || action === undefined || 'freeform' in action) return null
+  if (ACTS_ASKING_NOTHING.has(action.verb) || action.verb.includes(':')) return null
+  return Object.values(action.params).every(isBlankAnswer) ? action.verb : null
+}
+
 // Nothing came back at all, as against something wrong coming back. The two need different
 // answers: a wrong answer is worth correcting, and a blank one is worth only asking again.
 export function isBlankAnswer(raw: unknown): boolean {
@@ -91,15 +103,25 @@ export function isBlankAnswer(raw: unknown): boolean {
 export async function parseTurnWithRepair(
   raw: unknown,
   repair: (issues: string) => Promise<unknown>,
-  alert: (detail: string) => void,
+  alert: (kind: string, detail: string) => void,
 ): Promise<Turn> {
   const first = TurnSchema.safeParse(raw)
-  if (first.success) return first.data
-  const repaired = await repair(z.prettifyError(first.error))
-  const second = TurnSchema.safeParse(repaired)
-  if (second.success) return second.data
-  alert(z.prettifyError(second.error))
-  return FALLBACK_TURN
+  if (!first.success) {
+    const second = TurnSchema.safeParse(await repair(z.prettifyError(first.error)))
+    if (second.success) return second.data
+    alert('turn_fallback', z.prettifyError(second.error))
+    return FALLBACK_TURN
+  }
+  // The same one correction, spent on the other way an answer comes back unusable: the world
+  // refuses an act with nothing in it a beat later, with the moment already gone (K20).
+  const empty = actWithoutItsDetail(first.data)
+  if (empty === null) return first.data
+  const again = TurnSchema.safeParse(
+    await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
+  )
+  if (again.success && actWithoutItsDetail(again.data) === null) return again.data
+  alert('empty_act_detail', `${empty} came back empty twice`)
+  return first.data
 }
 
 // Where each part of the day begins, as the one clock everybody shares. Read back through
