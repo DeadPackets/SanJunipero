@@ -94,7 +94,9 @@ describe('DirectorMode reads the heat window through the one endpoint layer', ()
 
   it('★ hand-rolls no fetch of its own, and beats at the measured interval', () => {
     expect(SRC).not.toContain('fetch(')
-    expect(SRC).toMatch(/usePolled<HeatWindow\[\]>\([\s\S]*?HEAT_POLL_MS,?\s*\)/)
+    expect(SRC).toMatch(/useEndpointFor<HeatWindow\[\]>\([\s\S]*?HEAT_POLL_MS,?\s*\)/)
+    // and the round turns on the poll landing, not on the numbers moving
+    expect(SRC).toContain('feed.beat')
   })
 
   it('★ the first viewport is the town at zoom 1, centred before the stop moves', () => {

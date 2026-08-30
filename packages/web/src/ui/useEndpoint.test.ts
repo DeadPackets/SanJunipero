@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import { endpoint, feedFor } from './useEndpoint.js'
+import { endpoint, feedFor, type Read } from './useEndpoint.js'
 
 /** One reply per read, the last one repeating; `null` is a read the gateway refused. */
 const answers = (bodies: unknown[]): ReturnType<typeof vi.fn> => {
@@ -7,10 +7,15 @@ const answers = (bodies: unknown[]): ReturnType<typeof vi.fn> => {
   return vi.fn(() => {
     const body = bodies[Math.min(i++, bodies.length - 1)]
     return Promise.resolve(
-      body === null ? { ok: false } : { ok: true, json: () => Promise.resolve(body) },
+      body === null
+        ? { ok: false }
+        : { ok: true, text: () => Promise.resolve(JSON.stringify(body)) },
     )
   })
 }
+
+const good = <T>(data: T): Read<T> => ({ data, loaded: true, failed: false })
+const refused = <T>(data: T | null): Read<T> => ({ data, loaded: true, failed: true })
 
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 4; i++) await Promise.resolve()
@@ -26,12 +31,12 @@ describe('endpoint', () => {
     const fetchFn = answers([{ n: 1 }])
     vi.stubGlobal('fetch', fetchFn)
     const feed = endpoint<{ n: number }>('/api/thing')
-    expect(feed.get()).toEqual({ data: null, loaded: false })
+    expect(feed.get()).toEqual({ data: null, loaded: false, failed: false })
 
     feed.subscribe(() => {})
     await settle()
     expect(fetchFn).toHaveBeenCalledTimes(1)
-    expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
+    expect(feed.get()).toEqual(good({ n: 1 }))
   })
 
   it('★ serves every subscriber from ONE read — the point of a shared feed', async () => {
@@ -55,8 +60,11 @@ describe('endpoint', () => {
     await settle()
     expect(fetchFn).toHaveBeenCalledTimes(1)
 
-    vi.advanceTimersByTime(2000)
-    expect(fetchFn).toHaveBeenCalledTimes(3)
+    for (const n of [2, 3]) {
+      vi.advanceTimersByTime(1000)
+      await settle()
+      expect(fetchFn).toHaveBeenCalledTimes(n)
+    }
     off()
     vi.advanceTimersByTime(5000)
     expect(fetchFn).toHaveBeenCalledTimes(3)
@@ -78,11 +86,11 @@ describe('endpoint', () => {
     const feed = endpoint<{ n: number }>('/api/thing', undefined, 1000)
     feed.subscribe(() => {})
     await settle()
-    expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
+    expect(feed.get()).toEqual(good({ n: 1 }))
 
     vi.advanceTimersByTime(1000)
     await settle()
-    expect(feed.get()).toEqual({ data: { n: 1 }, loaded: true })
+    expect(feed.get()).toEqual(refused({ n: 1 }))
   })
 
   it('★ wakes its readers on EVERY settled read, refused ones included', async () => {
@@ -114,7 +122,7 @@ describe('endpoint', () => {
     const feed = endpoint('/api/chronicle')
     feed.subscribe(() => {})
     await settle()
-    expect(feed.get()).toEqual({ data: null, loaded: true })
+    expect(feed.get()).toEqual(refused(null))
   })
 
   it('does not publish a body the parser rejects', async () => {
@@ -122,7 +130,8 @@ describe('endpoint', () => {
     const feed = endpoint<number>('/api/thing', () => null)
     feed.subscribe(() => {})
     await settle()
-    expect(feed.get()).toEqual({ data: null, loaded: true })
+    // a body that arrived is not a refused read: the wire is fine, this panel has nothing
+    expect(feed.get()).toEqual({ data: null, loaded: true, failed: false })
   })
 
   it('never reads at all when there is nothing to read', async () => {
@@ -132,7 +141,7 @@ describe('endpoint', () => {
     feed.subscribe(() => {})
     await settle()
     expect(fetchFn).not.toHaveBeenCalled()
-    expect(feed.get()).toEqual({ data: null, loaded: false })
+    expect(feed.get()).toEqual({ data: null, loaded: false, failed: false })
   })
 
   it('hands back the SAME read object until a new answer lands', async () => {
@@ -141,6 +150,137 @@ describe('endpoint', () => {
     feed.subscribe(() => {})
     await settle()
     expect(feed.get()).toBe(feed.get())
+  })
+})
+
+describe('the third read state — a refused wire is not an empty town', () => {
+  it('★ says a read FAILED, so a page can stop printing its empty state as a fact', async () => {
+    vi.stubGlobal('fetch', answers([null]))
+    const feed = endpoint('/api/bonds')
+    feed.subscribe(() => {})
+    await settle()
+    expect(feed.get().failed).toBe(true)
+    expect(feed.get().loaded).toBe(true)
+  })
+
+  it('★ clears it on the next good answer, and keeps the last good one meanwhile', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', answers([{ n: 1 }, null, { n: 2 }]))
+    const feed = endpoint<{ n: number }>('/api/bonds', undefined, 1000)
+    feed.subscribe(() => {})
+    await settle()
+    expect(feed.get()).toEqual(good({ n: 1 }))
+
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get()).toEqual(refused({ n: 1 }))
+
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get()).toEqual(good({ n: 2 }))
+  })
+
+  it('★ reads again on demand — the viewer who asks after the wire dropped', async () => {
+    const fetchFn = answers([null, { n: 7 }])
+    vi.stubGlobal('fetch', fetchFn)
+    const feed = endpoint<{ n: number }>('/api/found')
+    feed.subscribe(() => {})
+    await settle()
+    expect(feed.get().failed).toBe(true)
+
+    feed.retry()
+    await settle()
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    expect(feed.get()).toEqual(good({ n: 7 }))
+  })
+})
+
+describe('a poll over an unchanged answer', () => {
+  it('★ hands back the SAME read, so an unchanged body re-renders nothing', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', answers([{ n: 1 }]))
+    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    feed.subscribe(() => {})
+    await settle()
+    const first = feed.get()
+
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get()).toBe(first)
+  })
+
+  it('★ still lands as a BEAT, so a round driven by the poll keeps turning', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', answers([{ n: 1 }]))
+    const feed = endpoint('/api/heat', undefined, 1000)
+    feed.subscribe(() => {})
+    await settle()
+    expect(feed.beat()).toBe(1)
+
+    for (const n of [2, 3]) {
+      vi.advanceTimersByTime(1000)
+      await settle()
+      expect(feed.beat()).toBe(n)
+    }
+  })
+
+  it('parses a changed body and hands back a new read', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', answers([{ n: 1 }, { n: 2 }]))
+    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    feed.subscribe(() => {})
+    await settle()
+    const first = feed.get()
+
+    vi.advanceTimersByTime(1000)
+    await settle()
+    expect(feed.get()).not.toBe(first)
+    expect(feed.get()).toEqual(good({ n: 2 }))
+  })
+})
+
+describe('one read at a time', () => {
+  /** A read that only answers when the test says so. */
+  const held = (): { fetchFn: ReturnType<typeof vi.fn>; answer: (n: number) => void } => {
+    const waiting: ((v: unknown) => void)[] = []
+    const fetchFn = vi.fn(() => new Promise((ok) => waiting.push(ok)))
+    return {
+      fetchFn,
+      answer: (n) => {
+        waiting.shift()?.({ ok: true, text: () => Promise.resolve(JSON.stringify({ n })) })
+      },
+    }
+  }
+
+  it('★ a beat that lands while a read is in the air waits its turn, never races it', async () => {
+    vi.useFakeTimers()
+    const { fetchFn, answer } = held()
+    vi.stubGlobal('fetch', fetchFn)
+    const feed = endpoint<{ n: number }>('/api/thing', undefined, 1000)
+    feed.subscribe(() => {})
+    vi.advanceTimersByTime(3000)
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+
+    answer(1)
+    await settle()
+    expect(feed.get()).toEqual(good({ n: 1 }))
+
+    vi.advanceTimersByTime(1000)
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('abandons the read in the air when the last subscriber leaves', async () => {
+    const aborted: boolean[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init: { signal: AbortSignal }) => {
+        init.signal.addEventListener('abort', () => aborted.push(true))
+        return new Promise(() => {})
+      }),
+    )
+    const off = endpoint('/api/thing').subscribe(() => {})
+    off()
+    expect(aborted).toEqual([true])
   })
 })
 

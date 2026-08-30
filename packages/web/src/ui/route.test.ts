@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRoute, routeToPath, type Route } from './route.js'
+import { TOWN_TITLE, parseRoute, routeToPath, titleFor, type Route } from './route.js'
 
 describe('route', () => {
   it('parses a deep link with the picked person', () => {
@@ -115,5 +115,26 @@ describe('route', () => {
       const search = q === -1 ? '' : full.slice(q)
       expect(parseRoute(pathname, search), full).toEqual(r)
     }
+  })
+})
+
+describe('the tab’s own name for where the viewer is', () => {
+  const at = (over: Partial<Route> = {}): Route => ({
+    moment: null,
+    momentId: null,
+    agentId: null,
+    broadcast: false,
+    ...over,
+  })
+
+  it('★ renames the tab when the address moves — a scrub used to leave it on the town', () => {
+    expect(titleFor(at(), null)).toBe(TOWN_TITLE)
+    expect(titleFor(at({ agentId: 'amara' }), 'Amara')).toBe('Amara — San Junipero')
+    expect(titleFor(at({ moment: { day: 4, time: '19:31' } }), null)).toBe('Day 4 — San Junipero')
+    expect(titleFor(at({ momentId: 7 }), null)).toBe('A recorded day — San Junipero')
+  })
+
+  it('★ never shows an id: a person the world cannot name is just the town', () => {
+    expect(titleFor(at({ agentId: 'amara' }), null)).toBe(TOWN_TITLE)
   })
 })

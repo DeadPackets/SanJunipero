@@ -29,12 +29,29 @@ export const CharacterAtlasManifestSchema = z
   .strict()
 export type CharacterAtlasManifest = z.infer<typeof CharacterAtlasManifestSchema>
 
+// A cell point is a pixel on the painted cell, hand-measured, so an effect lands ON the art
+// (the flame, the chimney mouth, a window painted lit) and never beside it.
+export const CellPointSchema = z
+  .object({ x: z.number().int().min(0), y: z.number().int().min(0) })
+  .strict()
+export type CellPoint = z.infer<typeof CellPointSchema>
+
+export const BuildingPointsSchema = z
+  .object({
+    flame: CellPointSchema.optional(),
+    chimney: CellPointSchema.optional(),
+    window: CellPointSchema.optional(),
+  })
+  .strict()
+export type BuildingPoints = z.infer<typeof BuildingPointsSchema>
+
 export const BuildingManifestSchema = z
   .object({
     version: z.literal('v4-hires-building'),
     kind: z.string().min(1),
     footprint: FootprintSchema,
     cell: CellAnchorSchema,
+    points: BuildingPointsSchema.optional(),
   })
   .strict()
 export type BuildingManifest = z.infer<typeof BuildingManifestSchema>

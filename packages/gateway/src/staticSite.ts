@@ -3,7 +3,7 @@ import { join, normalize, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CARD_HEIGHT, CARD_WIDTH } from './agentCard.js'
 import { attr } from './http.js'
-import type { ShareMeta } from './shareCard.js'
+import { TITLE_JOIN, TOWN_NAME, type ShareMeta } from './shareCard.js'
 
 // `/assets/:file` is the codex PNG route and 404s anything that is not a png, so the built client
 // may not live under /assets. `@sj/web` emits to `client/` (vite.config.ts `build.assetsDir`).
@@ -48,22 +48,67 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
 
 export type StaticSite = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean
 
-/** The share tags for one deep link, written into the head a crawler reads. A crawler never runs
- *  the app, so a single-page title is the only title it would otherwise ever see. */
-export function withShareTags(html: string, meta: ShareMeta): string {
+/** The schema.org type each page shape is, in the vocabulary a crawler reads. */
+const SCHEMA = { website: 'WebSite', profile: 'Person', article: 'Article' } as const
+
+/** The structured data a crawler reads instead of running the app. Built from the same
+ *  `ShareMeta` the tags are, so the two can never disagree. */
+function jsonLd(meta: ShareMeta, url: string, image: string): string {
+  const type = SCHEMA[meta.type]
+  const base = { '@context': 'https://schema.org', '@type': type, url, image }
+  const graph =
+    type === 'Person'
+      ? { ...base, name: meta.title.split(TITLE_JOIN)[0], description: meta.description }
+      : type === 'Article'
+        ? { ...base, headline: meta.title, description: meta.description }
+        : { ...base, name: TOWN_NAME, description: meta.description }
+  // `</script` inside a value would close the block; nothing else in JSON can escape it.
+  return `<script type="application/ld+json">${JSON.stringify(graph).replace(/</g, '\\u003c')}</script>`
+}
+
+/**
+ * The head one deep link is served with, written where a crawler reads it. A crawler never runs
+ * the app, so without this the single-page title and description are the only ones it ever sees.
+ * `origin` makes the card absolute — several crawlers refuse a relative `og:image`.
+ */
+export function withShareTags(html: string, meta: ShareMeta, origin = ''): string {
+  const image = meta.image.startsWith('http') ? meta.image : origin + meta.image
+  const url = origin + meta.canonical
   const tags = [
-    `<meta property="og:type" content="website" />`,
+    `<meta name="description" content="${attr(meta.description)}" />`,
+    `<link rel="canonical" href="${attr(url)}" />`,
+    `<meta property="og:type" content="${meta.type}" />`,
+    `<meta property="og:site_name" content="${TOWN_NAME}" />`,
+    `<meta property="og:locale" content="en_US" />`,
+    `<meta property="og:url" content="${attr(url)}" />`,
     `<meta property="og:title" content="${attr(meta.title)}" />`,
     `<meta property="og:description" content="${attr(meta.description)}" />`,
-    `<meta property="og:image" content="${attr(meta.image)}" />`,
+    `<meta property="og:image" content="${attr(image)}" />`,
     `<meta property="og:image:width" content="${CARD_WIDTH}" />`,
     `<meta property="og:image:height" content="${CARD_HEIGHT}" />`,
+    `<meta property="og:image:alt" content="${attr(meta.imageAlt)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${attr(meta.title)}" />`,
     `<meta name="twitter:description" content="${attr(meta.description)}" />`,
-    `<meta name="twitter:image" content="${attr(meta.image)}" />`,
+    `<meta name="twitter:image" content="${attr(image)}" />`,
+    `<meta name="twitter:image:alt" content="${attr(meta.imageAlt)}" />`,
+    jsonLd(meta, url, image),
   ].join('\n    ')
-  return html.replace('</head>', `  ${tags}\n  </head>`)
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${attr(meta.title)}</title>`)
+    .replace('</head>', `  ${tags}\n  </head>`)
+}
+
+/** The origin this request arrived on, as a crawler must be able to fetch it back. */
+export function originOf(req: IncomingMessage): string {
+  const header = (name: string): string | null => {
+    const v = req.headers[name]
+    const first = (Array.isArray(v) ? v[0] : v)?.split(',')[0]?.trim()
+    return first === undefined || first === '' ? null : first
+  }
+  const host = header('x-forwarded-host') ?? header('host')
+  if (host === null) return ''
+  return `${header('x-forwarded-proto') ?? 'http'}://${host}`
 }
 
 /** A handler for everything the route table did not claim; returns false when the request was not
@@ -74,6 +119,9 @@ export function makeStaticSite(
   shareMeta?: (pathname: string) => ShareMeta | null,
 ): StaticSite {
   const indexPath = join(resolve(root), 'index.html')
+  // The page is a build artifact inside the image: it cannot change under a running process, and
+  // re-reading it per request puts a blocking syscall on the first byte of every visit.
+  let page: string | null = null
 
   const sendFile = (res: ServerResponse, path: string, immutable: boolean): boolean => {
     let size: number
@@ -94,18 +142,19 @@ export function makeStaticSite(
     return true
   }
 
-  /** The app, with this link's own share tags in its head. Falls back to the file on disk when
-   *  the page is not one a link is pasted from, or when index.html cannot be read. */
-  const sendApp = (res: ServerResponse, pathname: string): boolean => {
-    const meta = shareMeta?.(pathname) ?? null
-    if (meta === null) return sendFile(res, indexPath, false)
-    let html: string
+  /** The app, with this link's own head. A path that resolves to no page of this product still
+   *  gets the app — it is a single page and the client must be able to say so — but with a 404,
+   *  so a crawler stops indexing every typo as a soft duplicate of the town. */
+  const sendApp = (req: IncomingMessage, res: ServerResponse, pathname: string): boolean => {
+    if (shareMeta === undefined) return sendFile(res, indexPath, false)
+    const meta = shareMeta(pathname)
     try {
-      html = withShareTags(readFileSync(indexPath, 'utf8'), meta)
+      page ??= readFileSync(indexPath, 'utf8')
     } catch {
       return false
     }
-    res.writeHead(200, {
+    const html = meta === null ? page : withShareTags(page, meta, originOf(req))
+    res.writeHead(meta === null ? 404 : 200, {
       'content-type': 'text/html; charset=utf-8',
       'content-length': String(Buffer.byteLength(html)),
       'cache-control': 'no-cache',
@@ -127,6 +176,6 @@ export function makeStaticSite(
     // Deep links get the app; a missed API or asset call keeps its honest 404.
     if (pathname.startsWith('/api/') || pathname.startsWith('/assets/') || pathname === '/ws')
       return false
-    return sendApp(res, pathname)
+    return sendApp(req, res, pathname)
   }
 }

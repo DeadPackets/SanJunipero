@@ -22,13 +22,15 @@ export const BROWSER_SAFE_IMPORTS: readonly string[] = [
   'pixi.js',
   'zod',
   'node:crypto',
-  '@fontsource/press-start-2p',
-  '@fontsource/silkscreen',
-  '@fontsource/silkscreen/700.css',
-  '@fontsource/fraunces/500.css',
-  '@fontsource/fraunces/700.css',
-  '@fontsource/manrope/400.css',
-  '@fontsource/manrope/600.css',
+  // the latin subset alone: the town's copy is latin, and the full packages are 28 @font-face
+  // blocks the browser parses and can never reach
+  '@fontsource/press-start-2p/latin-400.css',
+  '@fontsource/silkscreen/latin-400.css',
+  '@fontsource/silkscreen/latin-700.css',
+  '@fontsource/fraunces/latin-500.css',
+  '@fontsource/fraunces/latin-700.css',
+  '@fontsource/manrope/latin-400.css',
+  '@fontsource/manrope/latin-600.css',
 ]
 
 // The three the controller's blank page actually died on, named so a regression reads plainly.

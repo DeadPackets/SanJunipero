@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BUBBLE_FADE_MS,
+  bubbleAlpha,
+  onLeash,
   BUBBLE_FONT_PX,
   BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
@@ -245,5 +248,29 @@ describe('two speakers standing together do not composite into one pile', () => 
       { id: 'b', sx: 310, sy: 305, size: { w: 150, h: 40 } },
     ]
     expect(placeBubbles(want, view)).toEqual(placeBubbles(want, view))
+  })
+})
+
+describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
+  const size = { w: 60, h: 24 }
+
+  it('is shown while the placed box still touches the speaker’s own box', () => {
+    expect(onLeash({ x: 70, y: 100, w: 60, h: 24 }, 100, 140, size)).toBe(true)
+  })
+
+  it('is hidden once `placeTag` has pinned it a screen away from the speaker', () => {
+    expect(onLeash({ x: 0, y: 0, w: 60, h: 24 }, 900, 700, size)).toBe(false)
+    expect(onLeash({ x: 0, y: 0, w: 60, h: 24 }, 100, 140, size)).toBe(false)
+  })
+
+  it('fades over the reveal motion before it dies — monotone, on the curve it arrived on', () => {
+    expect(bubbleAlpha(BUBBLE_FADE_MS * 10)).toBe(1)
+    expect(bubbleAlpha(BUBBLE_FADE_MS)).toBe(1)
+    for (let ms = BUBBLE_FADE_MS; ms > 0; ms -= 10)
+      expect(bubbleAlpha(ms - 10)).toBeLessThanOrEqual(bubbleAlpha(ms))
+    expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeGreaterThan(0)
+    expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeLessThan(1)
+    expect(bubbleAlpha(0)).toBe(0)
+    expect(bubbleAlpha(-40)).toBe(0)
   })
 })

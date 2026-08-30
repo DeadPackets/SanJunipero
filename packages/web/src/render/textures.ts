@@ -1,10 +1,12 @@
-import { Assets, type Texture } from 'pixi.js'
+import { Assets, Graphics, type Sprite, type Texture } from 'pixi.js'
 import { progress, type MotionName } from '../ui/motion.js'
 import {
   parseBuildingManifest,
   parseCharacterAtlasManifest,
   type AssetClass,
   type AssetRecord,
+  type BuildingPoints,
+  type CellPoint,
   type CharacterAtlasManifest,
 } from '@sj/shared'
 
@@ -54,6 +56,8 @@ export type BuildingArt = {
   url: string | null
   anchor: { x: number; y: number } | null
   scale: number | null
+  /** the manifest's hand-measured cell points, in cell px; `null` when the art has none */
+  points: BuildingPoints | null
 }
 
 // v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
@@ -73,15 +77,48 @@ export function buildingArt(
   const rec =
     resolveAsset(records, 'building', facingCellKind(kind, facing)) ??
     resolveAsset(records, 'building', kind)
-  if (rec === null) return { url: null, anchor: null, scale: null }
+  if (rec === null) return { url: null, anchor: null, scale: null, points: null }
   const m = parseBuildingManifest(rec.meta)
-  if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }
+  if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null, points: null }
   const target = (fw + fh) * BUILDING_PX_PER_TILE
   return {
     url: `/assets/${rec.id}.png`,
     anchor: { x: m.cell.feetX / m.cell.w, y: m.cell.feetY / m.cell.h },
     scale: Math.min(target / m.cell.w, target / m.cell.h),
+    points: m.points ?? null,
   }
+}
+
+/** A manifest cell point, in the space the sprite stands in: read off the sprite the entity
+ *  layer placed, so whatever anchor convention that layer applies, an effect lands on the art.
+ *  `null` until the art itself has landed — `Texture.EMPTY` is one pixel wide. */
+export function cellPointOf(
+  sprite: Pick<Sprite, 'x' | 'y' | 'anchor' | 'scale' | 'texture'>,
+  pt: CellPoint,
+): { sx: number; sy: number } | null {
+  const { width, height } = sprite.texture
+  if (width <= 1) return null
+  return {
+    sx: sprite.x + (pt.x - sprite.anchor.x * width) * sprite.scale.x,
+    sy: sprite.y + (pt.y - sprite.anchor.y * height) * sprite.scale.y,
+  }
+}
+
+/** Draw once, upload once, keep forever. Pixi's `GCSystem` calls `unload()` on any source with
+ *  `autoGarbageCollect` that goes `maxUnusedTime` untouched — a light hidden all day, a puff on
+ *  a town with no hearth — and an unloaded source is a null one that takes the stage down. */
+export function bakeTexture(
+  scene: {
+    app: { renderer: { generateTexture(o: { target: Graphics; resolution: number }): Texture } }
+  },
+  draw: (g: Graphics) => void,
+): Texture {
+  const g = new Graphics()
+  draw(g)
+  const tex = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
+  tex.source.autoGarbageCollect = false
+  g.destroy()
+  return tex
 }
 
 export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: string): string {

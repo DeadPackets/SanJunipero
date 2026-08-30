@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLOCK_STOPS, clockTint, gradingMatrix } from './tints.js'
+import { CLOCK_STOPS, WEATHER_DIAG, clockTint, gradingMatrix, skyLevel } from './tints.js'
 
 describe('clock tint LUT', () => {
   it('pins the calibrated stops', () => {
@@ -23,29 +23,59 @@ describe('clock tint LUT', () => {
   })
 })
 
+// The three clocks the picture used to read — a boolean at 20:00, a phase step at 19:00 and
+// 21:00, a continuous tint — are replaced by this one curve (D4).
+describe('skyLevel — the one day clock', () => {
+  it('is 0 through the night and 1 through the day', () => {
+    for (const m of [0, 120, 300, 1230, 1439]) expect(skyLevel(m)).toBe(0)
+    for (const m of [480, 720, 1050]) expect(skyLevel(m)).toBe(1)
+  })
+
+  it('rises monotonically through dawn and falls monotonically through dusk', () => {
+    for (let m = 300; m < 480; m++) expect(skyLevel(m + 1)).toBeGreaterThanOrEqual(skyLevel(m))
+    for (let m = 1050; m < 1230; m++) expect(skyLevel(m + 1)).toBeLessThanOrEqual(skyLevel(m))
+  })
+
+  it('is continuous: no minute steps by more than a ramp minute is worth', () => {
+    const maxStep = 1 / 60 // the shortest ramp is 90 minutes; 1/60 leaves slack for rounding
+    for (let m = 0; m < 1440; m++)
+      expect(Math.abs(skyLevel(m + 1) - skyLevel(m)), `minute ${m}`).toBeLessThanOrEqual(maxStep)
+  })
+
+  it('reads dusk at 19:00 as mostly day still — the lamps come on as the sky goes, not at once', () => {
+    const dusk = skyLevel(1140)
+    expect(dusk).toBeGreaterThan(0.8)
+    expect(dusk).toBeLessThan(1)
+    expect(skyLevel(1200)).toBeGreaterThan(0)
+    expect(skyLevel(1200)).toBeLessThan(dusk)
+  })
+})
+
 describe('weather grading', () => {
-  it('storm/rain greys toward green, any season', () => {
-    const m = gradingMatrix('storm', 'spring')!
+  it('holds blue at 1.00 and pulls red, so a storm is a blue cast and not a green one', () => {
+    for (const [kind, [r, g, b]] of Object.entries(WEATHER_DIAG)) {
+      expect(b, kind).toBe(1)
+      expect(r, kind).toBeLessThan(g)
+      expect(g, kind).toBeLessThanOrEqual(b)
+    }
+    expect(WEATHER_DIAG.storm).toEqual([0.72, 0.84, 1.0])
+    expect(WEATHER_DIAG.rain).toEqual([0.84, 0.92, 1.0])
+  })
+
+  it('lays the diagonal on the pixi 4×5 matrix', () => {
+    const m = gradingMatrix('storm')!
     expect(m).toBeInstanceOf(Float32Array)
     expect(m[0]).toBeCloseTo(0.72, 6)
-    expect(m[6]).toBeCloseTo(0.82, 6)
-    expect(m[12]).toBeCloseTo(0.76, 6)
+    expect(m[6]).toBeCloseTo(0.84, 6)
+    expect(m[12]).toBeCloseTo(1.0, 6)
     expect(m[18]).toBe(1)
-    expect(gradingMatrix('rain', 'summer')![0]).toBeCloseTo(0.72, 6)
   })
 
-  it('winter snow/clear cools toward blue, clamped to 1.0 headroom', () => {
-    for (const kind of ['snow', 'clear']) {
-      const m = gradingMatrix(kind, 'winter')!
-      expect(m[0]).toBeCloseTo(0.86, 6)
-      expect(m[6]).toBeCloseTo(0.93, 6)
-      expect(m[12]).toBeCloseTo(1.0, 6)
-    }
+  it('cloudy is no longer identical to sunny', () => {
+    expect(gradingMatrix('cloudy')).not.toBeNull()
   })
 
-  it('clear outside winter is identity (no filter)', () => {
-    expect(gradingMatrix('sunny', 'summer')).toBeNull()
-    expect(gradingMatrix('clear', 'spring')).toBeNull()
-    expect(gradingMatrix('snow', 'summer')).toBeNull()
+  it('sunny is identity (no filter)', () => {
+    expect(gradingMatrix('sunny')).toBeNull()
   })
 })

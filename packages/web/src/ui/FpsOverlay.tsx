@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import { stageKeyAllowed } from '../stage/useStageKeys.js'
 
 const FPS_WINDOW_MS = 60_000
 const FPS_SAMPLE_MS = 500
 
-// The town's own health meter — ships in every build, toggled with `?`. NOT `f`: that is
-// fullscreen, and both listeners are on the window, so `f` used to fire both.
+// The town's own health meter — ships in every build, toggled with Shift+P. NOT `?`: that is
+// where a person looks for the key map, and NOT `f`, which is fullscreen on the same window.
 export function FpsOverlay() {
   const [visible, setVisible] = useState(false)
   const [current, setCurrent] = useState(0)
@@ -12,7 +13,10 @@ export function FpsOverlay() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) setVisible((v) => !v)
+      if (!e.shiftKey || e.key.toLowerCase() !== 'p' || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
+      setVisible((v) => !v)
     }
     window.addEventListener('keydown', onKey)
     return () => {

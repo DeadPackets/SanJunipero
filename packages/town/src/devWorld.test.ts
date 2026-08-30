@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
-import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
+import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import { openDb } from '@sj/engine/store'
 import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
 import {
@@ -20,11 +20,14 @@ import { frameText, publishThought } from '@sj/gateway'
 import { until } from '@sj/gateway/testutil'
 
 describe('showcase weather', () => {
-  it('freezes the weather system so the town never greys out', () => {
-    expect(SHOWCASE_CONFIG.weather.hourlyChangeChance).toBe(0)
+  it('runs the weather system — the storm grade was re-tuned, so nothing freezes it (D9)', () => {
+    expect(SHOWCASE_CONFIG.weather.hourlyChangeChance).toBe(
+      DEFAULT_CONFIG.weather.hourlyChangeChance,
+    )
+    expect(SHOWCASE_CONFIG.weather.hourlyChangeChance).toBeGreaterThan(0)
     expect(genesisState(SHOWCASE_CONFIG).weather).toEqual({ kind: 'sunny', temperatureC: 14 })
 
-    // A full day of world ticks under seed g6 never rolls the kind off sunny.
+    // A full day of world ticks under seed g6 rolls the kind off sunny at least once.
     const rng = new RngStreams('g6')
     const worldTick = createWorldTick(SHOWCASE_CONFIG, rng)
     let s = genesisState(SHOWCASE_CONFIG)
@@ -33,7 +36,7 @@ describe('showcase weather', () => {
       s = worldTick(s).state
       kinds.add(s.weather.kind)
     }
-    expect([...kinds]).toEqual(['sunny'])
+    expect(kinds.size).toBeGreaterThan(1)
   })
 })
 

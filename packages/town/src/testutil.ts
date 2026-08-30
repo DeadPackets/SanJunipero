@@ -1,7 +1,7 @@
 // Fixture code shared by the town tests. Assertions live in the test files.
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, type WorldState } from '@sj/engine'
-import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
+import { STILL_WEATHER_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import {
   type FoundersOpts,
   foundersFor,
@@ -28,7 +28,7 @@ export function runFoundersWorld(
   rings = 3,
   onAfterTick?: (tick: number, state: WorldState) => void,
 ): Run {
-  const config = SHOWCASE_CONFIG
+  const config = STILL_WEATHER_CONFIG
   const terrain = devTerrain('showcase', rings)
   const structures = townStructuresFor('showcase', rings)
   const store = new EventStore(openDb(':memory:'))

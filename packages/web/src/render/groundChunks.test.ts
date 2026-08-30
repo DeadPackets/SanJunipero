@@ -24,7 +24,7 @@ import { CULL_MARGIN_PX, boxInView, rectInView, type ViewRect } from './cull.js'
 import { groundField, type GroundField } from './groundField.js'
 import { bigTownTerrain } from './bigTown.js'
 import { TILE_H, TILE_W } from './iso.js'
-import { createGroundBaker } from './groundBake.js'
+import { createGroundBaker, type GroundBaker } from './groundBake.js'
 import { TextureBook } from './textures.js'
 import type { DepthBox } from './depth.js'
 
@@ -51,7 +51,7 @@ const gridFor = (rings: number): ChunkGrid => {
   let g = GRIDS.get(rings)
   if (g === undefined) {
     const f = fieldFor(rings)
-    GRIDS.set(rings, (g = groundGrid(f.widthPx, f.heightPx, f.offsetX)))
+    GRIDS.set(rings, (g = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)))
   }
   return g
 }
@@ -133,7 +133,7 @@ describe('★ the seam law: a chunk boundary never lands between two screen pixe
 describe('★ every shape reaches every chunk its paint touches', () => {
   it('a tile straddling a boundary is in BOTH buckets, at the same layer index', () => {
     const f = fieldFor(3)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     let straddling = 0,
       checked = 0
@@ -175,7 +175,7 @@ describe('★ every shape reaches every chunk its paint touches', () => {
 
   it('★ every chunk carries every layer at its ORIGINAL index — the material matrix reads it', () => {
     const f = fieldFor(3)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     expect(buckets.size).toBeGreaterThan(1)
     for (const stack of buckets.values()) {
@@ -190,7 +190,7 @@ describe('★ every shape reaches every chunk its paint touches', () => {
 
   it('loses no shape and invents none', () => {
     const f = fieldFor(1)
-    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX)
+    const grid = groundGrid(f.widthPx, f.heightPx, f.offsetX, f.offsetY)
     const buckets = bucketLayers(grid, f.layers)
     for (const [li, layer] of f.layers.entries()) {
       const seen = new Set<unknown>()
@@ -284,7 +284,7 @@ describe('what stays on the GPU', () => {
 /** A grid for a square terrain of `side` tiles, without paying for its `groundField` — the
  *  landed baker sized its texture from exactly these two numbers. */
 const gridForSide = (side: number) =>
-  groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2))
+  groundGrid((side + side) * (TILE_W / 2), (side + side) * (TILE_H / 2), side * (TILE_W / 2), 0)
 
 /** The WORST a view can do, swept across the whole field: straddling a boundary touches one more column and row than sitting on one, and a view at the edge touches fewer. */
 function peakVisible(
@@ -435,7 +435,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     for (const side of [7, 63, 129, 250, 251, 440, 1001]) {
       const fieldW = (side + side) * (TILE_W / 2),
         fieldH = (side + side) * (TILE_H / 2)
-      const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2))
+      const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2), 0)
       expect(grid.cols).toBe(Math.ceil(fieldW / CHUNK_PX_W))
       expect(grid.rows).toBe(Math.ceil(fieldH / CHUNK_PX_H))
       let covered = 0
@@ -478,6 +478,11 @@ type Bake = {
   texH: number
   kids: number
   bounds: Bounds
+}
+
+/** D17 meters a moving view to `BAKES_PER_FRAME`; this is the view held for enough frames. */
+function settle(baker: GroundBaker, view: ViewRect): void {
+  for (let i = 0; i < 64; i++) baker.setView(view)
 }
 
 function drive(rings: number) {
@@ -555,9 +560,9 @@ describe('★ what the real baker puts on the GPU', () => {
     d.baker.setView(viewAt(4, mid.x, mid.y, d.grid.offsetX))
     d.baker.rebake(d.terrain, [])
     const tight = d.baker.vram()
-    d.baker.setView(viewAt(0.25, mid.x, mid.y, d.grid.offsetX))
+    settle(d.baker, viewAt(0.25, mid.x, mid.y, d.grid.offsetX))
     const wide = d.baker.vram()
-    d.baker.setView(viewAt(4, mid.x, mid.y, d.grid.offsetX))
+    settle(d.baker, viewAt(4, mid.x, mid.y, d.grid.offsetX))
     const back = d.baker.vram()
     expect(wide.chunks).toBeGreaterThan(tight.chunks)
     expect(back.chunks).toBeLessThanOrEqual(tight.chunks + CHUNK_RETAIN)
@@ -575,9 +580,9 @@ describe('★ what the real baker puts on the GPU', () => {
       // default anchor: a chunk whose texture hangs off its own origin shifts the whole ground
       expect(s.anchor.x).toBe(0)
       expect(s.anchor.y).toBe(0)
-      // the sprite's top-left IS its chunk's top-left in bake space, less the offset
+      // the sprite's top-left IS its chunk's top-left in bake space, less the offsets
       const bakeX = s.position.x + d.grid.offsetX,
-        bakeY = s.position.y
+        bakeY = s.position.y + d.grid.offsetY
       expect(bakeX % CHUNK_PX_W).toBe(0)
       expect(bakeY % CHUNK_PX_H).toBe(0)
       for (const [dx, dy] of [
@@ -586,7 +591,7 @@ describe('★ what the real baker puts on the GPU', () => {
         [CHUNK_PX_W - 1, CHUNK_PX_H - 1],
       ] as const) {
         // where the single whole-map sprite put bake point B, against where this chunk puts it
-        const whole = { x: bakeX + dx - d.grid.offsetX, y: bakeY + dy }
+        const whole = { x: bakeX + dx - d.grid.offsetX, y: bakeY + dy - d.grid.offsetY }
         const chunked = { x: s.position.x + dx, y: s.position.y + dy }
         expect(chunked).toEqual(whole)
         probes++
@@ -669,6 +674,7 @@ describe('the prediction and the allocation are the same number', () => {
         const d = drive(rings)
         d.baker.setView(view)
         d.baker.rebake(d.terrain, [])
+        settle(d.baker, view)
         expect(d.baker.vram().bytes).toBe(res.bytes())
         expect(res.bytes()).toBe(
           chunksInView(grid, view).reduce((n, k) => n + chunkTextureBytes(k), 0),

@@ -51,7 +51,7 @@ import {
   wallStripWidth,
   wallTransform,
 } from './interiorTileset.js'
-import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
+import { SCENE_TOTAL_MS, transitionAlpha } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
@@ -236,8 +236,7 @@ export function createInteriorScene(
 
   // A cut, not a fade, for a viewer who asked for less motion — the destination is the
   // point, and 260ms of dissolve is the part they opted out of.
-  const reduced = (): boolean =>
-    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduced = (): boolean => !scene.wantsMotion()
 
   const notify = (): void => {
     for (const cb of changeCbs) cb(activeId)
@@ -808,18 +807,25 @@ export function createInteriorScene(
       ? { phase: entered ? 'inside' : 'town', sinceMs: now }
       : advanceInterior(phase, entered, now)
 
-    const t =
-      phase.phase === 'inside'
-        ? 1
-        : phase.phase === 'town'
-          ? 0
-          : Math.min(1, Math.max(0, (now - phase.sinceMs) / SCENE_TOTAL_MS))
-    const alpha =
-      phase.phase === 'entering' ? t : phase.phase === 'exiting' ? 1 - t : entered ? 1 : 0
+    // OUT THEN IN, never both: the veil rises over the first 120 ms and the room arrives over
+    // the next 180, or the room leaves first and the veil follows. One alpha on the root put
+    // the town through a half-drawn room for the whole 300 ms (D22).
+    const elapsed = now - phase.sinceMs
+    const moving =
+      (phase.phase === 'entering' || phase.phase === 'exiting') && elapsed < SCENE_TOTAL_MS
+    let veilAlpha = entered ? 1 : 0
+    let roomAlpha = veilAlpha
+    if (moving) {
+      const pair = transitionAlpha(elapsed)
+      // in: the veil rises as the town goes out, then the room comes in. Out: the reverse.
+      veilAlpha = phase.phase === 'entering' ? 1 - pair.out : 1 - pair.in
+      roomAlpha = phase.phase === 'entering' ? pair.in : pair.out
+    }
 
-    root.visible = alpha > 0
+    root.visible = veilAlpha > 0 || roomAlpha > 0
     if (!root.visible) return
-    root.alpha = alpha
+    veil.alpha = veilAlpha
+    room.alpha = roomAlpha
     veil.clear()
     veil.rect(0, 0, app.screen.width, app.screen.height)
     veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })

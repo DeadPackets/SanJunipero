@@ -6,6 +6,16 @@ export function tileToScreen(x: number, y: number): { sx: number; sy: number } {
   return { sx: (x - y) * (TILE_W / 2), sy: (x + y) * (TILE_H / 2) }
 }
 
+/** THE anchor law: a thing that stands on tiles `[x, x+w] × [y, y+h]` puts its feet on the
+ *  footprint's SOUTH vertex — for a body, item or crop that is its own tile's bottom corner. A
+ *  non-square plan has no single south vertex, so the feet sit under the plan's centre line at
+ *  the south row: the sprite's feet mark (bottom-centre of its opaque box) lands there. */
+export function feetOf(x: number, y: number, w = 1, h = 1): { sx: number; sy: number } {
+  const cx = x + w / 2,
+    cy = y + h / 2
+  return { sx: (cx - cy) * (TILE_W / 2), sy: (cx + cy) * (TILE_H / 2) + ((w + h) * TILE_H) / 4 }
+}
+
 /** The tile a screen point stands on. `tileToScreen` returns a tile's TOP vertex, so the
  *  containing tile is the FLOOR of the continuous coordinates, not the nearest vertex. */
 export function screenToTile(sx: number, sy: number): { x: number; y: number } {

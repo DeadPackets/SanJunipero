@@ -13,15 +13,17 @@ import {
 } from './camera.js'
 import { createCameraRig } from './cameraRig.js'
 import { createGroundBaker } from './groundBake.js'
-import { tileToScreen } from './iso.js'
+import { feetOf } from './iso.js'
 import { groundArtSignature } from './groundField.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
   applyDepthOrder,
   createLayers,
+  createScreenLayers,
   type DepthCounts,
   type DepthEntry,
   type LayerSet,
+  type ScreenLayerSet,
 } from './layers.js'
 import { TextureBook } from './textures.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
@@ -61,6 +63,10 @@ export type Scene = {
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
+  /** the picture half of `world` (`ground`…`overhead`): the only node a grade filter goes on */
+  graded: Container
+  /** the stack over `world` on `app.stage`; `screen.lights` follows the world's transform */
+  screen: ScreenLayerSet
   /** the only depth-sorted layer; `layers.entities`, named for the code that lives in it */
   entities: Container
   /** register what this module draws into `entities`; returns the unregister */
@@ -142,6 +148,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // `resizeTo` only tracks window resizes, but a panel opening changes the root element itself,
   // and a stage that got smaller can leave the camera showing outside the world.
   const ro = new ResizeObserver(() => {
+    // Browser zoom or a monitor change moves the DPR under a canvas whose backing scale was
+    // read once at init, and NEAREST art is then resampled — the one thing the law forbids.
+    const dpr = rendererOptions(rootEl, globalThis.devicePixelRatio).resolution ?? 1
+    if (app.renderer.resolution !== dpr) app.renderer.resolution = dpr
     app.resize()
     rig.onResize()
   })
@@ -150,13 +160,14 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const world = new Container()
   // One table decides what is over what (layers.ts). Every layer but `entities` is event-inert,
   // so a label can never steal a click from the building it names.
-  const layers = createLayers(world)
+  const { layers, graded } = createLayers(world)
 
   // The ground is a grid of chunk sprites now, not one sprite the size of the map. `layers.ground`
   // is their only parent, so nothing else in the scene had to learn that the bake was cut up.
   const groundChunkRoot = new Container()
   layers.ground.addChild(groundChunkRoot)
   app.stage.addChild(world)
+  const screen = createScreenLayers(app.stage)
 
   const viewRect = (): { x: number; y: number; w: number; h: number } => {
     const k = world.scale.x || 1
@@ -204,6 +215,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     reachable: () => bounds,
     town: () => townBounds,
   })
+  // After the rig's own ticks, before the render: the lights land on the frame's camera.
+  const mirrorLights = (): void => {
+    screen.lights.position.copyFrom(world.position)
+    screen.lights.scale.copyFrom(world.scale)
+  }
+  app.ticker.add(mirrorLights)
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
@@ -266,6 +283,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     textScale: 1,
     world,
     layers,
+    graded,
+    screen,
     entities: layers.entities,
     overlay: layers.overlay,
     addDepthSource: (fn) => {
@@ -278,7 +297,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     pointOf: (kind, id) => {
       if (kind === 'structure') {
         const st = store.getState()?.structures[id]
-        return st === undefined ? null : tileToScreen(st.x, st.y)
+        return st === undefined ? null : feetOf(st.x, st.y, st.w, st.h)
       }
       const at = scene.anchorOf?.(id) ?? null
       return at === null ? null : { sx: at.x, sy: at.y }
@@ -313,6 +332,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       ro.disconnect()
       rig.destroy()
       app.ticker.remove(bakeTick)
+      app.ticker.remove(mirrorLights)
       tags.destroy()
       baker.destroy()
       app.destroy(true, { children: true })

@@ -32,6 +32,8 @@ import {
   materialTone,
   roadReadsAt,
   roadShoulderBands,
+  SKIRT_KIND,
+  skirtTiles,
 } from './groundField.js'
 
 const material = (kind: string, seq: number): AssetRecord => ({
@@ -116,11 +118,29 @@ describe('groundField', () => {
     expect(f.layers[0]!.fallback).toBe(0x7fb0c9)
   })
 
-  it('sizes the bake to the whole map', () => {
+  it('sizes the bake to the whole map plus the skirt', () => {
     const f = groundField(field(10, 0), records)
-    expect(f.widthPx).toBe(20 * (TILE_W / 2))
-    expect(f.heightPx).toBe(20 * (TILE_H / 2))
-    expect(f.offsetX).toBe(10 * (TILE_W / 2))
+    expect(f.widthPx).toBe(24 * (TILE_W / 2))
+    expect(f.heightPx).toBe(24 * (TILE_H / 2))
+    expect(f.offsetX).toBe(12 * (TILE_W / 2))
+    expect(f.offsetY).toBe(2 * (TILE_H / 2))
+  })
+
+  it('U7: the skirt is one ring of earth tiles outside the map, under every layer', () => {
+    expect(skirtTiles(3, 2)).toHaveLength(5 * 4 - 3 * 2)
+    expect(skirtTiles(0, 0)).toHaveLength(0)
+    for (const t of skirtTiles(3, 2)) expect(t.x < 0 || t.y < 0 || t.x >= 3 || t.y >= 2).toBe(true)
+    const f = groundField(field(10, 0), records)
+    expect(f.skirt.kind).toBe(SKIRT_KIND)
+    expect(f.skirt.shapes).toHaveLength(12 * 12 - 10 * 10)
+    expect(f.layers.map((l) => l.id)).not.toContain('skirt') // never a layer: indices stay
+    // every skirt diamond fits the bake once shifted by the offsets
+    for (const s of f.skirt.shapes) {
+      expect(s.sx + f.offsetX - TILE_W / 2).toBeGreaterThanOrEqual(0)
+      expect(s.sx + f.offsetX + TILE_W / 2).toBeLessThanOrEqual(f.widthPx)
+      expect(s.sy + f.offsetY).toBeGreaterThanOrEqual(0)
+      expect(s.sy + f.offsetY + TILE_H).toBeLessThanOrEqual(f.heightPx)
+    }
   })
 
   it('is deterministic', () => {

@@ -216,8 +216,12 @@ describe('10 · a world with nothing happening still breathes', () => {
   it('keeps at least one moving thing in every season and every phase', () => {
     expect(src('../render/ambient.ts')).toMatch(/SHIMMER_MAX|TREES_MAX/)
     // the ambient population is a positive constant in every band, asserted as a finish line
-    for (const n of ['SHIMMER_MAX', 'TREES_MAX', 'SMOKE_PUFFS']) {
-      const v = new RegExp(`\\bconst ${n} = (\\d+)`).exec(src('../render/ambient.ts'))
+    for (const [n, file] of [
+      ['SHIMMER_MAX', 'ambient'],
+      ['TREES_MAX', 'ambient'],
+      ['SMOKE_PUFFS', 'smoke'],
+    ] as const) {
+      const v = new RegExp(`\\bconst ${n} = (\\d+)`).exec(src(`../render/${file}.ts`))
       expect(v, n).not.toBeNull()
       expect(Number(v![1]), n).toBeGreaterThan(0)
     }

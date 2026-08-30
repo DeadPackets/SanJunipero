@@ -45,11 +45,8 @@ export const DEV_SNAPSHOT_EVERY_TICKS = 60
 // tick. `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
 export const DEV_HOUSE_TICKS = 240
 
-// The founders showcase is an art demo: freeze weather to sunny so the storm
-// grading matrix never greys the town (seed g6 rolls rain within the first day).
 export const SHOWCASE_CONFIG: SimConfig = {
   ...DEFAULT_CONFIG,
-  weather: { ...DEFAULT_CONFIG.weather, hourlyChangeChance: 0 },
   construction: { ...DEFAULT_CONFIG.construction, houseTicks: DEV_HOUSE_TICKS },
   structures: {
     ...DEFAULT_CONFIG.structures,
@@ -58,6 +55,13 @@ export const SHOWCASE_CONFIG: SimConfig = {
       house: { ...DEFAULT_CONFIG.structures.recipes.house!, durationTicks: DEV_HOUSE_TICKS },
     },
   },
+}
+
+/** The showcase with its weather held still. The test harnesses that count houses and
+ *  bridges were tuned on a sunny run; the shipped town runs the weather. */
+export const STILL_WEATHER_CONFIG: SimConfig = {
+  ...SHOWCASE_CONFIG,
+  weather: { ...SHOWCASE_CONFIG.weather, hourlyChangeChance: 0 },
 }
 
 // The G6 "live thought" source — human framing, no AI vocabulary.

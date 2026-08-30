@@ -66,12 +66,12 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
-// `provider.order` is a preference; only `allow_fallbacks:false` makes it an allow-list.
-// The default stays `true`: this exposes the switch, it does not throw one.
+// `provider.order` is only an allow-list with `allow_fallbacks:false`, the default here: 8 of the
+// 30 endpoints serving MIND_MODEL cannot do structured output, so a hop to one is a hard failure.
 export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
   providerOrder: string[] = PROVIDER_ORDER,
-  allowFallbacks = true,
+  allowFallbacks = false,
   reasoning?: ReasoningSetting,
 ): {
   models: string[]
@@ -114,8 +114,7 @@ export type LlmClientOpts = {
   caller: string
   agentId?: string
   providerOrder?: string[]
-  // False turns `providerOrder` from a preference into an allow-list. Absent leaves the
-  // routing exactly as it has always been.
+  // True turns `providerOrder` back into a preference; absent keeps it the allow-list.
   allowProviderFallbacks?: boolean
   // Both of these fall back to the caller's row in `pins.ts` when absent; `reasoning: null`
   // sends nothing at all.
@@ -163,14 +162,16 @@ export class LlmClient {
   private readonly maxOutputTokens: number | undefined
   private readonly expectedCallCostUsd: number
   private readonly guard: BudgetGuard
+  private readonly opts: LlmClientOpts
   private model: LanguageModel | undefined
 
   constructor(opts: LlmClientOpts) {
+    this.opts = { ...opts }
     this.db = opts.db
     this.caller = opts.caller
     this.agentId = opts.agentId ?? null
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
-    this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
+    this.allowProviderFallbacks = opts.allowProviderFallbacks ?? false
     const pinned = callSettingsFor(opts.caller)
     this.reasoning = opts.reasoning === undefined ? (pinned.reasoning ?? null) : opts.reasoning
     this.maxRetries = opts.maxRetries ?? 2
@@ -279,6 +280,12 @@ export class LlmClient {
       }
     })
     return { text: value, usage }
+  }
+
+  /** The same caller, ledger and budget with one dial moved, for the odd call inside a pass that
+   *  needs a different one. `null` sends no reasoning field, which is the endpoint's maximum. */
+  withReasoning(reasoning: ReasoningSetting | null): LlmClient {
+    return new LlmClient({ ...this.opts, reasoning })
   }
 
   totalCostUsd(): number {

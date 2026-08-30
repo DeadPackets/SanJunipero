@@ -162,11 +162,17 @@ describe('buildingArt (v4-hires-building manifest)', () => {
       url: '/assets/housev2.png',
       anchor: null,
       scale: null,
+      points: null,
     })
   })
 
   it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
-    expect(buildingArt([], 'house', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
+    expect(buildingArt([], 'house', 2, 2)).toEqual({
+      url: null,
+      anchor: null,
+      scale: null,
+      points: null,
+    })
     expect(buildingArt([], 'well', 1, 1).url).toBeNull()
   })
 

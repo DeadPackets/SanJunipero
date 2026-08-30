@@ -23,11 +23,12 @@ import {
   type BubbleSide,
 } from './textFaces.js'
 import { over } from './legibility.js'
-import { placeTag, type Rect } from './tooltip.js'
+import { overlaps, placeTag, type Rect } from './tooltip.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
-import { characterArt } from './textures.js'
+import { characterArt, fadeArtIn } from './textures.js'
+import { MOTION, progress } from '../ui/motion.js'
 import { characterCell } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
@@ -55,6 +56,8 @@ export const BUBBLE_NEAREST = 3
 export const GLYPH_ZOOM: number = ZOOM_STOPS[0]
 /** How far the cream leans toward the speaker's own colour. */
 export const SPEAKER_TINT = 0.15
+/** A bubble leaves on the reveal motion, the same one its art arrives on. */
+export const BUBBLE_FADE_MS = MOTION.reveal.ms
 /** How far that colour is washed out before it is leaned into. Measured, not chosen: cream
  *  clears night AA at only 5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
 const SPEAKER_WASH = 0.5
@@ -156,6 +159,24 @@ export function nearestSpeakers(
 /** A bubble is only spelled out when it is one of the nearest and the town is not a map. */
 export function bubbleShown(zoom: number, isNearest: boolean): boolean {
   return isNearest && zoom > GLYPH_ZOOM
+}
+
+/** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
+ *  a "…" pinned to the viewport corner with nobody under it. A bubble that no longer touches
+ *  its own speaker's box — the speaker's size around the anchor — is not shown. */
+export function onLeash(
+  rect: Rect,
+  sx: number,
+  sy: number,
+  size: { w: number; h: number },
+): boolean {
+  return overlaps(rect, { x: sx - size.w, y: sy - size.h, w: size.w * 2, h: size.h * 2 })
+}
+
+/** The opacity a bubble has `msLeft` before it dies: the reveal motion run backwards, so it
+ *  leaves on the curve it arrived on. */
+export function bubbleAlpha(msLeft: number): number {
+  return 1 - progress('reveal', 0, BUBBLE_FADE_MS - msLeft)
 }
 
 /** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
@@ -319,6 +340,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const now = performance.now()
     const built = build(agentId, text, isThought)
     scene.layers.bubbles.addChild(built.node)
+    fadeArtIn(built.node) // NOTHING POPS IN — speech included
     bubbles.push({
       agentId,
       ...built,
@@ -387,8 +409,15 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       })
       const boxes: Rect[] = []
       for (const placed of placeBubbles(want, view, scene.tags.occupied('bubbles'))) {
-        const b = bubbles[Number(placed.id)]!
+        const i = Number(placed.id)
+        const b = bubbles[i]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
+        const p = want[i]!
+        b.node.visible = onLeash(placed.rect, p.sx, p.sy, p.size)
+        if (!b.node.visible) continue
+        // the last frames fade; the fade-in is a rAF on the node and is left alone once done
+        const leaving = bubbleAlpha(b.dieMs - nowMs)
+        if (leaving < 1) b.node.alpha = leaving
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {
