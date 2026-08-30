@@ -54,7 +54,7 @@ export function zoomScaleAt(s: ZoomState, nowMs: number): number {
   const t = (nowMs - s.startedMs) / ZOOM_SETTLE_MS
   if (t >= 1) return s.stop
   if (t <= 0) return s.from
-  return s.from + (s.stop - s.from) * easeOutCubic(t)
+  return quantiseScale(s.from + (s.stop - s.from) * easeOutCubic(t))
 }
 
 /** At rest on an exact stop. A gesture in flight is never settled, however long it is held. */

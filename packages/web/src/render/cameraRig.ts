@@ -62,13 +62,23 @@ export function createCameraRig(
     for (const cb of cameraCbs) cb()
   }
 
+  // The camera's own position is a float, so a lerp and a fling keep their curves; the world
+  // container lands on a whole pixel, so `roundPixels` cannot snap the ground and the bodies
+  // on different frames.
+  const cam = { x: 0, y: 0 }
+
   /** The one writer of the camera's position, and therefore the one that fires `onCamera` —
-   *  a mover added later cannot forget to announce itself. */
-  function place(x: number, y: number): void {
+   *  a mover added later cannot forget to announce itself. True when the drawn frame moved. */
+  function place(x: number, y: number): boolean {
     const p = clampCamera({ x, y }, world.scale.x, deps.reachable(), screenBox())
-    if (p.x === world.position.x && p.y === world.position.y) return
-    world.position.set(p.x, p.y)
+    cam.x = p.x
+    cam.y = p.y
+    const rx = Math.round(p.x),
+      ry = Math.round(p.y)
+    if (rx === world.position.x && ry === world.position.y) return false
+    world.position.set(rx, ry)
     notifyCamera()
+    return true
   }
 
   function centerOnScreen(sx: number, sy: number): void {
@@ -119,10 +129,7 @@ export function createCameraRig(
     const ty = app.screen.height / 2 - t.y * world.scale.y
     // frame-rate independent lerp (~12%/frame at 60fps)
     const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
-    place(
-      world.position.x + (tx - world.position.x) * k,
-      world.position.y + (ty - world.position.y) * k,
-    )
+    place(cam.x + (tx - cam.x) * k, cam.y + (ty - cam.y) * k)
   }
   app.ticker.add(followTick)
 
@@ -133,7 +140,7 @@ export function createCameraRig(
 
   function captureAnchor(sx: number, sy: number): void {
     const k = world.scale.x || 1
-    anchor = { sx, sy, wx: (sx - world.position.x) / k, wy: (sy - world.position.y) / k }
+    anchor = { sx, sy, wx: (sx - cam.x) / k, wy: (sy - cam.y) / k }
   }
 
   function setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void {
@@ -158,9 +165,11 @@ export function createCameraRig(
     if (s === world.scale.x) return
     world.scale.set(s)
     // While a follow is running it owns the position; otherwise the anchor stays put.
-    if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
-    else place(world.position.x, world.position.y)
-    notifyCamera()
+    const moved =
+      followFn === null
+        ? place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
+        : place(cam.x, cam.y)
+    if (!moved) notifyCamera() // the scale changed even where the position did not
   }
 
   // camera: drag to pan, wheel steps integer zoom 1-4; the hand shows it
@@ -197,7 +206,7 @@ export function createCameraRig(
       fitted = false
       breakFollow() // the viewer takes the camera back
     }
-    place(world.position.x + (e.global.x - last.x), world.position.y + (e.global.y - last.y))
+    place(cam.x + (e.global.x - last.x), cam.y + (e.global.y - last.y))
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
@@ -224,9 +233,9 @@ export function createCameraRig(
     if (glide === null) return
     const step = flingStep(glide, app.ticker.deltaMS)
     glide = step.next
-    const before = { x: world.position.x, y: world.position.y }
+    const before = { x: cam.x, y: cam.y }
     place(before.x + step.dx, before.y + step.dy)
-    if (world.position.x === before.x && world.position.y === before.y) stopGlide()
+    if (cam.x === before.x && cam.y === before.y) stopGlide()
   }
   app.ticker.add(glideTick)
 
@@ -253,13 +262,13 @@ export function createCameraRig(
     onResize: () => {
       const intent = resizeIntent(fitted, deps.town(), screenBox())
       if (intent.kind === 'refit') fitTo(intent.stop)
-      else place(world.position.x, world.position.y)
+      else place(cam.x, cam.y)
     },
     panBy: (dx, dy) => {
       stopGlide()
       fitted = false
       breakFollow()
-      place(world.position.x + dx, world.position.y + dy)
+      place(cam.x + dx, cam.y + dy)
     },
     travelTo: (sx, sy) => {
       stopGlide()
