@@ -79,7 +79,7 @@ publishes its box in view coordinates — otherwise a bubble pushed below a figu
 | Arm | Tabs |
 |---|---|
 | Folk | People · Bonds · Families |
-| Chronicle | Today · Chapters · Moments · Days |
+| Chronicle | Today · Firsts · Chapters · Moments · Days |
 | Found | Things · Places |
 | Laws | World · Admin |
 | a person | Story · Bonds · Ledger |

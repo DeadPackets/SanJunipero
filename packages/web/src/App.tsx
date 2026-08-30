@@ -81,7 +81,24 @@ export function App() {
       })
     }
 
-    // The canvas picks a figure by writing `?agent=` and firing popstate (render/StageMount).
+    // A pasted `/agent/:id` lands on the person it names: their sheet comes up and the camera
+    // pins to them. An id the town does not have is simply the town, with nothing said.
+    const linked = initial.agentId
+    if (linked !== null) {
+      const off = store.subscribe(() => {
+        const state = store.getState()
+        if (state === null) return
+        off()
+        const name = state.agents[linked]?.name
+        if (name === undefined) return
+        setSubject({ id: linked, kind: 'agent', name })
+        setSheet({ page: 'person', tab: 'Story' })
+        setFollowing(linked)
+      })
+    }
+
+    // The canvas picks a figure by writing the person into the address and firing popstate
+    // (render/StageMount).
     const onPop = (): void => {
       setRoute(parseRoute(location.pathname, location.search))
     }

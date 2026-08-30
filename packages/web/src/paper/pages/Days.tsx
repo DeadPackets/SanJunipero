@@ -12,7 +12,8 @@ import {
   type Mark,
   type MarkSources,
 } from '../../ui/timelineMarks.js'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { milestonesFeed } from '../../ui/feeds.js'
+import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './index.js'
 
 const KEY_STEP_TICKS = 10
@@ -46,8 +47,6 @@ const markSources = (body: unknown): WireSources => {
 }
 
 const NO_FIRSTS: MarkSources['milestones'] = []
-const firstRows = (body: unknown): MarkSources['milestones'] | null =>
-  Array.isArray(body) ? (body as MarkSources['milestones']) : null
 
 function MarkGlyph({ mark }: { mark: Mark }) {
   return (
@@ -193,7 +192,7 @@ export function Days({ store, onJump, onLive }: PageProps) {
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
     usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
-  const firsts = usePolled('/api/milestones', firstRows, MARKS_REFETCH_MS).data ?? NO_FIRSTS
+  const firsts = useFeed(milestonesFeed).data ?? NO_FIRSTS
 
   const edge = Math.max(liveEdge, 1)
   const viewTick = mode.live ? edge : mode.tick

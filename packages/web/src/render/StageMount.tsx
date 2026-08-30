@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
+import { parseRoute, routeToPath } from '../ui/route.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { installFaces } from './textFaces.js'
@@ -110,8 +111,8 @@ export function StageMount({
         nameTown()
         chars = createCharacterLayer(s, book, store, (agentId) => {
           // click-to-inspect: the G6 check — route change only, React owns the chrome
-          const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`
-          history.pushState(null, '', url)
+          const route = parseRoute(location.pathname, location.search)
+          history.pushState(null, '', routeToPath({ ...route, agentId }))
           window.dispatchEvent(new PopStateEvent('popstate'))
         })
         bubbles = createBubbleLayer(s, store)

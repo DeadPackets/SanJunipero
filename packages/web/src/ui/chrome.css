@@ -240,6 +240,8 @@ body {
 /* the entry you are standing in — a rail as well as a colour, never colour alone */
 .feed-jump[aria-current='true'] { background: var(--cream); border-left-color: var(--ember); }
 .feed-glyph { flex: none; display: block; }
+/* a first the town named itself: the words it was named in, set in clear of the glyph */
+.feed-line .discovery-quote { margin: 0 0 0.35rem 2.1rem; }
 @media (prefers-reduced-motion: no-preference) {
   .feed-jump {
     transition: background-color var(--t-fast) var(--ease-enter),
@@ -1091,6 +1093,11 @@ body {
    read the arms of, and a sheet of paper that rises from the bottom edge when you ask it one. */
 
 .app { position: relative; display: block; height: 100%; overflow: hidden; background: var(--night); }
+/* the root boundary's line: the canvas is gone with the tree, so this sits on the bare ground */
+.town-lost {
+  display: grid; place-content: center; height: 100%; margin: 0; padding: 2rem;
+  font-size: 0.875rem; color: var(--cream-quiet); text-align: center; text-wrap: pretty;
+}
 
 /* ── the signpost: four arms on a post, bottom-right ── */
 .signpost {

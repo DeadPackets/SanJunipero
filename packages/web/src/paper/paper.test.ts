@@ -243,6 +243,45 @@ describe('★ a page that throws costs the viewer the page, not the town', () =>
   it('wraps the page body, keyed by the page so a tab switch keeps its feeds', () => {
     expect(src('./Paper.tsx')).toContain('<PageBoundary key={key}>')
   })
+
+  it('says whatever the surface it guards asks it to say', () => {
+    const boundary = new PageBoundary({
+      children: body,
+      fallback: createElement('p', null, 'gone'),
+    })
+    boundary.state = PageBoundary.getDerivedStateFromError()
+    expect(renderToStaticMarkup(boundary.render())).toBe('<p>gone</p>')
+  })
+
+  // The canvas is inside the tree, so nothing can keep it up through an uncaught render. What
+  // the root net owes the viewer is one line of the town's own voice and the way back.
+  it('★ nets the whole tree at the root, in the town’s own words', () => {
+    const main = src('../main.tsx')
+    expect(main).toMatch(/<PageBoundary[\s\S]*<App \/>[\s\S]*<\/PageBoundary>/)
+    expect(main).toContain('className="town-lost"')
+    expect(main).toMatch(/Reload the page/)
+  })
+})
+
+// ── the pasted link ────────────────────────────────────────────────────────────────────────
+
+// Ruling 18. `route.test.ts` owns the parse; this is the half only App can do, and it is an
+// effect, so it is pinned where it is written rather than left unasserted.
+describe('★ a pasted /agent/:id link lands on the person it names', () => {
+  // From the initial address, once the first snapshot says the person is real: their sheet
+  // comes up, the ring goes round them, and the camera pins to them.
+  const LANDING =
+    /const linked = initial\.agentId[\s\S]{0,600}?store\.subscribe[\s\S]{0,600}?setSubject\([\s\S]{0,200}?setSheet\(\{ page: 'person', tab: 'Story' \}\)[\s\S]{0,80}?setFollowing\(linked\)/
+
+  it('opens their story, rings them, and follows them', () => {
+    expect(src('../App.tsx')).toMatch(LANDING)
+  })
+
+  it('says nothing at all about an id the town does not have', () => {
+    expect(src('../App.tsx')).toMatch(
+      /const name = state\.agents\[linked\]\?\.name\n\s*if \(name === undefined\) return/,
+    )
+  })
 })
 
 // ── who came from whom ─────────────────────────────────────────────────────────────────────

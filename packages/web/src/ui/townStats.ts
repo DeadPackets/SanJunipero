@@ -49,6 +49,7 @@ export const EMPTY_COPY = {
   traffic:
     'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
   paper: 'Nothing printed yet. The chronicler writes a day up once it has closed.',
+  firsts: 'No firsts yet. The chronicler adds one the night a thing happens for the first time.',
   families: 'No families yet — nobody walking the town was born to anyone in it.',
   places: 'Nothing stands here yet.',
   ties: 'No ties yet.',
