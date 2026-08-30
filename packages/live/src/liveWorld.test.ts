@@ -451,9 +451,9 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // A 15-minute window is 12 sim-hours, so TWO minds may make 2 x 12 x 8 = 192 calls in it.
-    // 240 is over the wire and costs nothing at all — this is a call guard, not a money one.
-    callsTo(opsDb, 'turn', 240)
+    // A 15-minute window is 12 sim-hours, so TWO minds may make 2 x 12 x 14 = 336 calls in it.
+    // 400 is over the wire and costs nothing at all — this is a call guard, not a money one.
+    callsTo(opsDb, 'turn', 400)
     expect(ledgerTotalUsd(opsDb)).toBe(0)
 
     await run(world, 10)
