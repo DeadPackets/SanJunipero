@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { applyFootnotes, publishClean } from './chronicle.js'
+import { verbPhrase } from './institutions.js'
 import type { NarratorStore } from './store.js'
 import type {
   ChapterRow,
@@ -82,7 +83,7 @@ export function publicRecordText(ev: SimEvent): string {
     case 'agent_spoke':
       return `was heard to say: "${strOr(p.text, '')}"`
     case 'action_completed':
-      return `was seen to ${strOr(p.verb, 'act')}`
+      return `was seen to ${verbPhrase(strOr(p.verb, 'act'))}`
     case 'structure_planned':
       return 'laid out plans for a structure'
     case 'agent_died':

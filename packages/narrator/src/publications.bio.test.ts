@@ -108,6 +108,15 @@ describe('publicRecordText', () => {
       }),
     ).toContain('was seen to eat')
   })
+
+  // A verb the town coined is a slug: the record says what it means, not its id.
+  it('reads a coined verb slug instead of printing it', () => {
+    const seen = (verb: string): string =>
+      publicRecordText({ seq: 4, tick: 400, type: 'action_completed', payload: { verb } })
+    expect(seen('express:mourn')).toBe('was seen to mourn')
+    expect(seen('recipe:plank')).toBe('was seen to make plank')
+    expect(seen('dig_channel')).toBe('was seen to dig channel')
+  })
 })
 
 describe('writeBiography', () => {
