@@ -51,6 +51,8 @@ vi.mock('./entities.js', () => ({ entitySpriteOf: () => null }))
 import { DEFAULT_CONFIG, flamesAt, isDark, type LitWorld, type SimConfig } from '@sj/shared'
 import { CLOCK_STOPS, skyLevel } from './tints.js'
 import { TILE_H, TILE_W } from './iso.js'
+import { phaseOf } from './charAnim.js'
+import { cellPointOf } from './textures.js'
 import {
   BLOOM_ALPHA,
   BREATH_AMP,
@@ -59,7 +61,6 @@ import {
   POOL_COLOR,
   POOL_MAX_ALPHA,
   breath,
-  cellPointOf,
   createLightPools,
   poolCentre,
   poolRadiusPx,
@@ -133,17 +134,18 @@ describe('the breath (U3) — two incommensurate sines, phased by the id', () =>
   it('stays inside BREATH_AMP for every light at every instant', () => {
     for (const id of ['lamp_1', 'hearth_7', 'fire_pit_2', 'torch:omar'])
       for (let t = 0; t < 30; t += 0.01)
-        expect(Math.abs(breath(id, t)), `${id} @ ${t}`).toBeLessThanOrEqual(BREATH_AMP)
+        expect(Math.abs(breath(phaseOf(id), t)), `${id} @ ${t}`).toBeLessThanOrEqual(BREATH_AMP)
   })
 
   it('no two lamps agree — the phase comes off hash32(id)', () => {
-    const a = Array.from({ length: 50 }, (_, i) => breath('lamp_a', i / 10))
-    const b = Array.from({ length: 50 }, (_, i) => breath('lamp_b', i / 10))
+    const a = Array.from({ length: 50 }, (_, i) => breath(phaseOf('lamp_a'), i / 10))
+    const b = Array.from({ length: 50 }, (_, i) => breath(phaseOf('lamp_b'), i / 10))
     expect(a).not.toEqual(b)
+    expect(phaseOf('lamp_a')).not.toBe(phaseOf('lamp_b'))
   })
 
   it('is deterministic — the same id at the same instant breathes the same', () => {
-    expect(breath('x', 1.234)).toBe(breath('x', 1.234))
+    expect(breath(phaseOf('x'), 1.234)).toBe(breath(phaseOf('x'), 1.234))
   })
 
   it('never reaches the photosensitive band: 1.7 Hz and 2.9 Hz, not 7', () => {
@@ -261,7 +263,7 @@ describe('what this pass must not have broken', () => {
 
   it('honours prefers-reduced-motion through the scene, the one owner of the question', () => {
     expect(src).toContain('const still = !scene.wantsMotion()')
-    expect(src).toContain('const tSec = still ? 0 : t / 1000')
+    expect(src).toContain('still ? 0 : breath(')
   })
 
   it('never swallows a pointer: a decoration that takes a click is a picking bug', () => {
@@ -276,7 +278,7 @@ describe('what this pass must not have broken', () => {
   })
 
   it("★ pins BOTH the texture and the sprites against pixi's GC", () => {
-    expect(src).toContain('tex.source.autoGarbageCollect = false')
+    expect(src).toContain('bakeTexture(') // the one baker pins the source
     expect(src).toContain('s.autoGarbageCollect = false')
   })
 
@@ -286,7 +288,7 @@ describe('what this pass must not have broken', () => {
     )
     expect(code).not.toMatch(/strength === 0 \? \[\]/)
     for (const m of code.match(/(\w+)\.destroy\(([^)]*)\)/g) ?? []) {
-      if (/^(root|g|tex|fireTex)\.destroy/.test(m)) continue
+      if (/^(root|tex|fireTex)\.destroy/.test(m)) continue
       expect(m, `${m} could destroy the texture every sprite shares`).toContain('texture: false')
     }
   })

@@ -9,7 +9,7 @@ import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
 import { setEntityScaleMul } from './entities.js'
-import { hash32 } from './charAnim.js'
+import { phaseOf } from './charAnim.js'
 import { isGrave, toneReducer } from './tone.js'
 
 const SMOKE_PUFFS = 3
@@ -119,7 +119,8 @@ export function sampleDecorations(terrain: TileId[][]): Decoration[] {
     const found: { x: number; y: number; h: number }[] = []
     for (let y = 0; y < terrain.length; y++)
       for (let x = 0; x < terrain[y]!.length; x++)
-        if (terrain[y]![x] === id) found.push({ x, y, h: hash32(`${x},${y}`) })
+        if (terrain[y]![x] === id)
+          found.push({ x, y, h: (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0 })
     found.sort((a, b) => a.h - b.h || a.y - b.y || a.x - b.x)
     let placed = 0
     for (const f of found) {
@@ -246,7 +247,7 @@ export function createAmbient(
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
   const shimmers: { sprite: Sprite; phase: number }[] = []
-  const trees: { crown: Sprite; trunk: Sprite; sx: number; phase: number }[] = []
+  const trees: { crown: Sprite; trunk: Sprite; phase: number }[] = []
 
   const sampleTerrain = (terrain: TileId[][]): void => {
     for (const s of shimmers) s.sprite.destroy()
@@ -259,7 +260,7 @@ export function createAmbient(
     // `sampleDecorations` is the whole placement decision, caps and ground law included, so
     // there is nothing here for a test to be unable to see.
     for (const d of sampleDecorations(terrain)) {
-      const phase = (hash32(`${d.x},${d.y}`) % 628) / 100 // deterministic phase, no RNG
+      const phase = phaseOf(`${d.x},${d.y}`) // deterministic, no RNG
       if (d.kind === 'shimmer') {
         const sprite = new Sprite(shimmerTex)
         sprite.position.set(d.sx, d.sy)
@@ -274,7 +275,7 @@ export function createAmbient(
       crown.anchor.set(0.5, 1)
       crown.position.set(d.sx, d.sy - trunk.h)
       under.addChild(trunkS, crown)
-      trees.push({ crown, trunk: trunkS, sx: d.sx, phase })
+      trees.push({ crown, trunk: trunkS, phase })
     }
   }
 
@@ -338,7 +339,7 @@ export function createAmbient(
         0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
     for (const tr of trees)
       tr.crown.position.x =
-        tr.sx + Math.round(Math.sin(2 * Math.PI * SWAY_HZ * (t / 1000) + tr.phase))
+        tr.trunk.x + Math.round(Math.sin(2 * Math.PI * SWAY_HZ * (t / 1000) + tr.phase))
 
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {

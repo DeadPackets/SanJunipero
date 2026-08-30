@@ -31,11 +31,8 @@ function clockStops(minuteOfDay: number): [number, number, number] {
     }
   }
   const t = hi.minute === lo.minute ? 0 : (m - lo.minute) / (hi.minute - lo.minute)
-  return [0, 1, 2].map((i) => lo.tint[i]! + (hi.tint[i]! - lo.tint[i]!) * t) as [
-    number,
-    number,
-    number,
-  ]
+  const ch = (i: 0 | 1 | 2): number => lo.tint[i] + (hi.tint[i] - lo.tint[i]) * t
+  return [ch(0), ch(1), ch(2)]
 }
 
 export function clockTint(minuteOfDay: number): number {
@@ -51,9 +48,16 @@ const NIGHT_LUM = relLum(CLOCK_STOPS[0]!.tint)
  *  luminance. Pool strength, window glow and the sky gradient all take it, so nothing steps
  *  on an hour the sky has not reached. The engine's `dayPhaseFromTick` stays sim truth. */
 export function skyLevel(minuteOfDay: number): number {
-  const l = relLum(clockStops(minuteOfDay))
-  return Math.min(1, Math.max(0, (l - NIGHT_LUM) / (1 - NIGHT_LUM)))
+  if (minuteOfDay !== lastMinute) {
+    const l = relLum(clockStops(minuteOfDay))
+    lastMinute = minuteOfDay
+    lastSky = Math.min(1, Math.max(0, (l - NIGHT_LUM) / (1 - NIGHT_LUM)))
+  }
+  return lastSky
 }
+// asked every frame by every light for a value that moves once a sim minute
+let lastMinute = -1
+let lastSky = 0
 
 function diagMatrix([r, g, b]: [number, number, number]): Float32Array {
   // pixi ColorMatrixFilter layout: 4 rows × 5 columns

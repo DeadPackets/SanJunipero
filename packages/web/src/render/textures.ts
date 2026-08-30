@@ -1,4 +1,4 @@
-import { Assets, type Texture } from 'pixi.js'
+import { Assets, Graphics, type Sprite, type Texture } from 'pixi.js'
 import { progress, type MotionName } from '../ui/motion.js'
 import {
   parseBuildingManifest,
@@ -6,6 +6,7 @@ import {
   type AssetClass,
   type AssetRecord,
   type BuildingPoints,
+  type CellPoint,
   type CharacterAtlasManifest,
 } from '@sj/shared'
 
@@ -86,6 +87,38 @@ export function buildingArt(
     scale: Math.min(target / m.cell.w, target / m.cell.h),
     points: m.points ?? null,
   }
+}
+
+/** A manifest cell point, in the space the sprite stands in: read off the sprite the entity
+ *  layer placed, so whatever anchor convention that layer applies, an effect lands on the art.
+ *  `null` until the art itself has landed — `Texture.EMPTY` is one pixel wide. */
+export function cellPointOf(
+  sprite: Pick<Sprite, 'x' | 'y' | 'anchor' | 'scale' | 'texture'>,
+  pt: CellPoint,
+): { sx: number; sy: number } | null {
+  const { width, height } = sprite.texture
+  if (width <= 1) return null
+  return {
+    sx: sprite.x + (pt.x - sprite.anchor.x * width) * sprite.scale.x,
+    sy: sprite.y + (pt.y - sprite.anchor.y * height) * sprite.scale.y,
+  }
+}
+
+/** Draw once, upload once, keep forever. Pixi's `GCSystem` calls `unload()` on any source with
+ *  `autoGarbageCollect` that goes `maxUnusedTime` untouched — a light hidden all day, a puff on
+ *  a town with no hearth — and an unloaded source is a null one that takes the stage down. */
+export function bakeTexture(
+  scene: {
+    app: { renderer: { generateTexture(o: { target: Graphics; resolution: number }): Texture } }
+  },
+  draw: (g: Graphics) => void,
+): Texture {
+  const g = new Graphics()
+  draw(g)
+  const tex = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
+  tex.source.autoGarbageCollect = false
+  g.destroy()
+  return tex
 }
 
 export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: string): string {

@@ -52,14 +52,21 @@ export function sceneAlpha(
   reducedMotion = false,
 ): { out: number; in: number } {
   if (s.phase === 'idle') return { out: 0, in: 1 }
-  const elapsed = nowMs - s.startedMs
-  if (s.phase === 'out') {
-    if (reducedMotion) return { out: elapsed >= SCENE_OUT_MS ? 0 : 1, in: 0 }
-    const t = Math.min(1, Math.max(0, elapsed / SCENE_OUT_MS))
-    return { out: 1 - easeFn('scene')(t), in: 0 }
+  return transitionAlpha(nowMs - s.startedMs, reducedMotion)
+}
+
+/** The curve itself, for a caller with its own phase machine: the outgoing opacity over the
+ *  first `SCENE_OUT_MS`, the incoming over the `SCENE_IN_MS` after. */
+export function transitionAlpha(
+  elapsedMs: number,
+  reducedMotion = false,
+): { out: number; in: number } {
+  if (elapsedMs < SCENE_OUT_MS) {
+    if (reducedMotion) return { out: 1, in: 0 }
+    return { out: 1 - easeFn('scene')(Math.max(0, elapsedMs / SCENE_OUT_MS)), in: 0 }
   }
   if (reducedMotion) return { out: 0, in: 1 }
-  const t = Math.min(1, Math.max(0, (elapsed - SCENE_OUT_MS) / SCENE_IN_MS))
+  const t = Math.min(1, (elapsedMs - SCENE_OUT_MS) / SCENE_IN_MS)
   return { out: 0, in: easeFn('scene')(t) }
 }
 

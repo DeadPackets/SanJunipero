@@ -51,7 +51,7 @@ import {
   wallStripWidth,
   wallTransform,
 } from './interiorTileset.js'
-import { SCENE_OUT_MS, SCENE_TOTAL_MS, sceneAlpha } from '../ui/sceneTransition.js'
+import { SCENE_TOTAL_MS, transitionAlpha } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
@@ -236,8 +236,7 @@ export function createInteriorScene(
 
   // A cut, not a fade, for a viewer who asked for less motion — the destination is the
   // point, and 260ms of dissolve is the part they opted out of.
-  const reduced = (): boolean =>
-    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduced = (): boolean => !scene.wantsMotion()
 
   const notify = (): void => {
     for (const cb of changeCbs) cb(activeId)
@@ -814,24 +813,14 @@ export function createInteriorScene(
     const elapsed = now - phase.sinceMs
     const moving =
       (phase.phase === 'entering' || phase.phase === 'exiting') && elapsed < SCENE_TOTAL_MS
-    const pair = sceneAlpha(
-      {
-        name: 'interior',
-        phase: elapsed < SCENE_OUT_MS ? 'out' : 'in',
-        startedMs: phase.sinceMs,
-        from: '',
-        to: '',
-      },
-      now,
-    )
-    const veilAlpha = !moving
-      ? entered
-        ? 1
-        : 0
-      : phase.phase === 'entering'
-        ? 1 - pair.out
-        : 1 - pair.in
-    const roomAlpha = !moving ? (entered ? 1 : 0) : phase.phase === 'entering' ? pair.in : pair.out
+    let veilAlpha = entered ? 1 : 0
+    let roomAlpha = veilAlpha
+    if (moving) {
+      const pair = transitionAlpha(elapsed)
+      // in: the veil rises as the town goes out, then the room comes in. Out: the reverse.
+      veilAlpha = phase.phase === 'entering' ? 1 - pair.out : 1 - pair.in
+      roomAlpha = phase.phase === 'entering' ? pair.in : pair.out
+    }
 
     root.visible = veilAlpha > 0 || roomAlpha > 0
     if (!root.visible) return

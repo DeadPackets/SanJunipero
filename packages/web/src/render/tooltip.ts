@@ -29,7 +29,7 @@ export type Anchor = { sx: number; sy: number; halfW: number; topY: number }
 export type Rect = { x: number; y: number; w: number; h: number }
 export type Placed = { sx: number; sy: number; side: 'above' | 'below' | 'left' | 'right' }
 
-const overlaps = (a: Rect, b: Rect): boolean =>
+export const overlaps = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
 const clamp = (v: number, lo: number, hi: number): number =>

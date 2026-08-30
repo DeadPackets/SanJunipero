@@ -1,8 +1,10 @@
-import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Container, Sprite, Texture } from 'pixi.js'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { screenToTile } from './iso.js'
+import { bakeTexture } from './textures.js'
 import type { Scene } from './scene.js'
+import type { ViewRect } from './cull.js'
 
 /** Density, not count: 220 drops on a 1440×900 stage was 4× thinner on a 3840×2160 one. */
 export const PARTICLES = {
@@ -79,20 +81,14 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
   let t = 0
   const streaks = new Map<string, Texture>()
 
-  const tex = (draw: (g: Graphics) => void): Texture => {
-    const g = new Graphics()
-    draw(g)
-    const out = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
-    out.source.autoGarbageCollect = false
-    g.destroy()
-    return out
-  }
   // the two frames of a splash, and the ring a drop leaves on water
   const splashTex = [
-    tex((g) => g.rect(0, 0, 3, 2).fill(0xcfe3ee)),
-    tex((g) => g.rect(0, 0, 5, 1).fill(0xcfe3ee)),
+    bakeTexture(scene, (g) => g.rect(0, 0, 3, 2).fill(0xcfe3ee)),
+    bakeTexture(scene, (g) => g.rect(0, 0, 5, 1).fill(0xcfe3ee)),
   ]
-  const ringTex = tex((g) => g.ellipse(4, 2, 3.5, 1.5).stroke({ width: 1, color: 0xfff6e9 }))
+  const ringTex = bakeTexture(scene, (g) =>
+    g.ellipse(4, 2, 3.5, 1.5).stroke({ width: 1, color: 0xfff6e9 }),
+  )
 
   const streakTexture = (k: ParticleKind, band: number): Texture => {
     const key = `${k}:${band}`
@@ -100,7 +96,7 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
     if (hit === undefined) {
       const spec = PARTICLES[k]
       const s = BANDS[band]!.scale
-      hit = tex((g) =>
+      hit = bakeTexture(scene, (g) =>
         g
           .moveTo(0, 0)
           .lineTo((spec.vx / 60) * s, spec.len * s)
@@ -147,12 +143,11 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
   const wet = (): boolean => kind === 'rain' || kind === 'storm'
 
   /** A splash lands where the camera can see ground; off the map it waits a cycle, hidden. */
-  const respawn = (s: Splash): void => {
-    const view = scene.viewRect()
+  const respawn = (s: Splash, view: ViewRect, terrain: TileId[][] | undefined): void => {
     const sx = view.x + Math.random() * view.w
     const sy = view.y + Math.random() * view.h
     const tile = screenToTile(sx, sy)
-    const id = store.getState()?.terrain[tile.y]?.[tile.x]
+    const id = terrain?.[tile.y]?.[tile.x]
     s.ageMs = 0
     s.sprite.visible = id !== undefined
     if (id === undefined) return
@@ -162,6 +157,8 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
 
   const dressSplashes = (): void => {
     const want = wet() && !suppressed && !still ? SPLASH_COUNT : 0
+    const view = scene.viewRect()
+    const terrain = store.getState()?.terrain
     while (splashes.length < want) {
       const sprite = new Sprite(splashTex[0])
       sprite.anchor.set(0.5, 0.5)
@@ -169,7 +166,7 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
       sprite.autoGarbageCollect = false
       ground.addChild(sprite)
       const s = { sprite, ageMs: 0, water: false }
-      respawn(s)
+      respawn(s, view, terrain)
       s.ageMs = Math.random() * SPLASH_MS // staggered, so the first frame is not forty pops
       splashes.push(s)
     }
@@ -213,10 +210,12 @@ export function createWeatherLayer(scene: Scene, store: WorldStore): WeatherLaye
         // on the pixel grid: a streak at a fractional position is a soft one
         d.sprite.position.set(Math.round(d.x), Math.round(d.y))
       }
+      const view = scene.viewRect()
+      const terrain = store.getState()?.terrain
       for (const s of splashes) {
         s.ageMs += dtMs
         if (s.ageMs >= SPLASH_MS) {
-          respawn(s)
+          respawn(s, view, terrain)
           continue
         }
         const p = s.ageMs / SPLASH_MS

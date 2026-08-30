@@ -1,20 +1,20 @@
-import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Container, Sprite, type Texture } from 'pixi.js'
 import {
+  type BuildingPoints,
   type CellPoint,
   DEFAULT_CONFIG,
   type Flame,
   flamesAt,
   MINUTES_PER_DAY,
-  type BuildingPoints,
 } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { hash32 } from './charAnim.js'
-import { rectInView } from './cull.js'
+import { phaseOf } from './charAnim.js'
+import { rectInView, type ViewRect } from './cull.js'
 import { entitySpriteOf } from './entities.js'
 import { tileToScreen, TILE_W, TILE_H } from './iso.js'
 import type { Scene } from './scene.js'
-import { buildingArt } from './textures.js'
+import { bakeTexture, buildingArt, cellPointOf } from './textures.js'
 import { skyLevel } from './tints.js'
 
 /**
@@ -41,17 +41,17 @@ export const FIRE_ALPHA = 0.62
 export const BLOOM_R = 22
 export const WINDOW_R = 16
 
-/** The breath the critique wrote for the fire; the pools and the glow take it rescaled to
- *  their own base, so the swing is proportionate at each light. */
-export const BREATH_AMP = 0.06 + 0.035
+/** Two incommensurate sines: no two lamps agree, and none of them strobes. Written for the
+ *  fire's alpha; the pool takes it rescaled to its own base and the window glow doubled. */
+const BREATH_SLOW = 0.06
+const BREATH_FAST = 0.035
+export const BREATH_AMP = BREATH_SLOW + BREATH_FAST
 
-/** Two incommensurate sines, phased by the light's own id: no two lamps agree, and none of
- *  them strobes. Bounded by `BREATH_AMP`; flat under reduced motion (the caller passes t = 0). */
-export function breath(id: string, tSec: number): number {
-  const p = ((hash32(id) % 1000) / 1000) * Math.PI * 2
+/** The swing at `tSec`, for a light whose phase is `phase` (from `phaseOf(id)`). */
+export function breath(phase: number, tSec: number): number {
   return (
-    0.06 * Math.sin(2 * Math.PI * 1.7 * tSec + p) +
-    0.035 * Math.sin(2 * Math.PI * 2.9 * tSec + 1.7 * p)
+    BREATH_SLOW * Math.sin(2 * Math.PI * 1.7 * tSec + phase) +
+    BREATH_FAST * Math.sin(2 * Math.PI * 2.9 * tSec + 1.7 * phase)
   )
 }
 
@@ -75,35 +75,20 @@ export function poolCentre(f: Flame): { sx: number; sy: number } {
   return { sx, sy: sy + TILE_H / 2 }
 }
 
-/** A manifest cell point, in the space the sprite stands in: read off the sprite the entity
- *  layer placed, so whatever anchor convention that layer applies, the light lands on the art.
- *  `null` until the art itself has landed — `Texture.EMPTY` is one pixel wide. */
-export function cellPointOf(
-  sprite: Pick<Sprite, 'x' | 'y' | 'anchor' | 'scale' | 'texture'>,
-  pt: CellPoint,
-): { sx: number; sy: number } | null {
-  const { width, height } = sprite.texture
-  if (width <= 1) return null
-  return {
-    sx: sprite.x + (pt.x - sprite.anchor.x * width) * sprite.scale.x,
-    sy: sprite.y + (pt.y - sprite.anchor.y * height) * sprite.scale.y,
-  }
-}
-
 /** A soft radial disc, authored ONCE and stretched per light. Rings rather than a gradient fill
  *  because pixi's `Graphics` has no radial stop; white, so one texture serves every hue. */
 function poolTexture(scene: Scene): Texture {
-  const g = new Graphics()
   const RINGS = 24
-  for (let i = RINGS; i >= 1; i--) {
-    const t = i / RINGS
-    // squared falloff: bright core, long tail — an inverse-square flame, not a spotlight
-    g.circle(POOL_TEX_R, POOL_TEX_R, POOL_TEX_R * t).fill({
-      color: 0xffffff,
-      alpha: ((1 - t) ** 2 / RINGS) * 6,
-    })
-  }
-  return pin(scene.app.renderer.generateTexture({ target: g, resolution: 1 }), g)
+  return bakeTexture(scene, (g) => {
+    for (let i = RINGS; i >= 1; i--) {
+      const t = i / RINGS
+      // squared falloff: bright core, long tail — an inverse-square flame, not a spotlight
+      g.circle(POOL_TEX_R, POOL_TEX_R, POOL_TEX_R * t).fill({
+        color: 0xffffff,
+        alpha: ((1 - t) ** 2 / RINGS) * 6,
+      })
+    }
+  })
 }
 
 /** Three stacked cells at the painted flame: a tongue, not a card. Drawn about the flame
@@ -113,22 +98,22 @@ export const FLAME_CELLS: readonly [number, number, number, number][] = [
   [-4, 0, 8, 5],
   [-3, -4, 6, 4],
 ]
-function flameTexture(scene: Scene): Texture {
-  const g = new Graphics()
-  for (const [x, y, w, h] of FLAME_CELLS) g.rect(x + 4, y + 4, w, h)
-  g.fill(POOL_COLOR)
-  return pin(scene.app.renderer.generateTexture({ target: g, resolution: 1 }), g)
-}
+const FLAME_W = 8,
+  FLAME_H = 12
+const flameTexture = (scene: Scene): Texture =>
+  bakeTexture(scene, (g) => {
+    for (const [x, y, w, h] of FLAME_CELLS) g.rect(x + 4, y + 4, w, h)
+    g.fill(POOL_COLOR)
+  })
 
-/** Pixi's `GCSystem` calls `unload()` on any resource with `autoGarbageCollect` that goes
- *  `maxUnusedTime` untouched, and an unloaded source is a null one that takes the stage down. */
-function pin(tex: Texture, g: Graphics): Texture {
-  tex.source.autoGarbageCollect = false
-  g.destroy()
-  return tex
+type Light = {
+  pool: Sprite
+  bloom: Sprite | null
+  glow: Sprite | null
+  phase: number
+  sprite: Sprite | null
 }
-
-type Lit = { pool: Sprite; bloom: Sprite | null; glow: Sprite | null }
+type Fire = { sprite: Sprite; phase: number; entity: Sprite | null }
 
 export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   const root = new Container()
@@ -136,20 +121,20 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   scene.screen.lights.addChild(root)
   const tex = poolTexture(scene)
   const fireTex = flameTexture(scene)
-  const lights = new Map<string, Lit>()
-  const fires = new Map<string, Sprite>()
-  /** the manifest points of every structure with art — rewritten when the world changes */
-  const points = new Map<string, BuildingPoints>()
-  const burning = new Set<string>()
+  const lights = new Map<string, Light>()
+  const fires = new Map<string, Fire>()
+  /** the manifest points of every structure with art, keyed by id and rewritten only when the
+   *  asset set changes — a manifest is parsed once, not once a sim tick */
+  const points = new Map<string, { kind: string; points: BuildingPoints | null }>()
   let synced: WorldState | null = null
   let syncedRecords: unknown = null
   const still = !scene.wantsMotion()
   let t = 0
   let drawn = 0
 
-  const light = (tint: number, anchorY = 0.5): Sprite => {
-    const s = new Sprite(tex)
-    s.anchor.set(0.5, anchorY)
+  const light = (texture: Texture, tint: number): Sprite => {
+    const s = new Sprite(texture)
+    s.anchor.set(0.5, 0.5)
     s.tint = tint
     s.blendMode = 'add'
     s.eventMode = 'none'
@@ -161,62 +146,60 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   }
   const drop = (s: Sprite | null): void => s?.destroy({ texture: false, textureSource: false })
 
+  /** The entity layer's sprite for a structure, looked up once and again only if it was torn down. */
+  const entityOf = (id: string, held: Sprite | null): Sprite | null =>
+    held !== null && !held.destroyed ? held : entitySpriteOf(scene, 'structure', id)
+
   const sync = (state: WorldState): void => {
     const records = store.assetRecords()
-    points.clear()
-    burning.clear()
+    if (records !== syncedRecords) points.clear()
+    syncedRecords = records
     for (const s of Object.values(state.structures)) {
-      if (s.burning) burning.add(s.id)
-      const p = buildingArt(records, s.kind, s.w, s.h, s.facing).points
-      if (p !== null) points.set(s.id, p)
-    }
-    for (const id of burning) {
-      if (fires.has(id)) continue
-      const f = new Sprite(fireTex)
-      f.anchor.set(0.5, 0.5)
-      f.blendMode = 'add'
-      f.eventMode = 'none'
-      f.autoGarbageCollect = false
-      root.addChild(f)
-      fires.set(id, f)
+      if (points.get(s.id)?.kind !== s.kind)
+        points.set(s.id, {
+          kind: s.kind,
+          points: buildingArt(records, s.kind, s.w, s.h, s.facing).points,
+        })
+      if (s.burning && !fires.has(s.id))
+        fires.set(s.id, { sprite: light(fireTex, 0xffffff), phase: phaseOf(s.id), entity: null })
     }
     for (const [id, f] of fires) {
-      if (burning.has(id)) continue
-      drop(f)
+      if (state.structures[id]?.burning === true) continue
+      drop(f.sprite)
       fires.delete(id)
     }
+    for (const id of points.keys()) if (state.structures[id] === undefined) points.delete(id)
   }
 
-  /** Place a light on a cell point, or hide it while the art has not landed. */
+  /** Place a light, or hide it: `at` is null while the art has not landed. */
   const place = (
     s: Sprite,
-    sprite: Sprite | null,
-    pt: CellPoint | undefined,
-    r: number,
+    at: { sx: number; sy: number } | null,
+    rx: number,
+    ry: number,
     alpha: number,
-    view: ReturnType<Scene['viewRect']>,
-  ): boolean => {
-    const at = sprite === null || pt === undefined ? null : cellPointOf(sprite, pt)
+    view: ViewRect,
+  ): void => {
     const seen =
-      at !== null && alpha > 0 && rectInView(at.sx - r, at.sy - r, at.sx + r, at.sy + r, view)
+      at !== null && alpha > 0 && rectInView(at.sx - rx, at.sy - ry, at.sx + rx, at.sy + ry, view)
     s.visible = seen
-    if (!seen) return false
+    if (!seen) return
     s.position.set(at.sx, at.sy)
-    s.width = r * 2
-    s.height = r * 2
+    s.width = rx * 2
+    s.height = ry * 2
     s.alpha = alpha
-    return true
+    drawn++
   }
+  const pointOn = (sprite: Sprite | null, pt: CellPoint | undefined) =>
+    sprite === null || pt === undefined ? null : cellPointOf(sprite, pt)
 
   return {
     tick(dtMs) {
       const state = store.getState()
       if (state === null) return
       if (!still) t += dtMs
-      const records = store.assetRecords()
-      if (state !== synced || records !== syncedRecords) {
+      if (state !== synced || store.assetRecords() !== syncedRecords) {
         synced = state
-        syncedRecords = records
         sync(state)
       }
       const tick = store.getTick()
@@ -226,49 +209,60 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
       const flames = flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)
       const view = scene.viewRect()
       const live = new Set<string>()
-      const tSec = still ? 0 : t / 1000
+      const tSec = t / 1000
       drawn = 0
       for (const f of flames) {
         live.add(f.id)
         let l = lights.get(f.id)
         if (l === undefined) {
-          l = { pool: light(POOL_COLOR), bloom: null, glow: null }
+          l = {
+            pool: light(tex, POOL_COLOR),
+            bloom: null,
+            glow: null,
+            phase: phaseOf(f.id),
+            sprite: null,
+          }
           lights.set(f.id, l)
         }
-        const b = still ? 0 : breath(f.id, tSec)
+        if (strength === 0) {
+          l.pool.visible = false
+          if (l.bloom !== null) l.bloom.visible = false
+          if (l.glow !== null) l.glow.visible = false
+          continue
+        }
+        const b = still ? 0 : breath(l.phase, tSec)
         const { rx, ry } = poolRadiusPx(f.radius)
-        const { sx, sy } = poolCentre(f)
         // The pool is outside `applyDepthOrder` and cannot reorder anything — but it must still
         // not be drawn where nobody is looking.
-        const seen = strength > 0 && rectInView(sx - rx, sy - ry, sx + rx, sy + ry, view)
-        l.pool.visible = seen
-        if (seen) {
-          l.pool.position.set(sx, sy)
-          l.pool.width = rx * 2
-          l.pool.height = ry * 2
-          l.pool.alpha = Math.max(
-            0,
-            Math.min(
-              POOL_MAX_ALPHA,
-              (POOL_MAX_ALPHA + (b * POOL_MAX_ALPHA) / FIRE_ALPHA) * strength,
-            ),
-          )
-          drawn++
-        }
-        const pts = f.source === 'structure' ? points.get(f.id) : undefined
-        if (pts === undefined) continue
-        const sprite = entitySpriteOf(scene, 'structure', f.id)
+        const poolAlpha = Math.min(
+          POOL_MAX_ALPHA,
+          (POOL_MAX_ALPHA + (b * POOL_MAX_ALPHA) / FIRE_ALPHA) * strength,
+        )
+        place(l.pool, poolCentre(f), rx, ry, poolAlpha, view)
+        const pts = f.source === 'structure' ? points.get(f.id)?.points : undefined
+        if (pts === undefined || pts === null) continue
+        l.sprite = entityOf(f.id, l.sprite)
         if (pts.flame !== undefined) {
-          l.bloom ??= light(POOL_COLOR)
-          if (place(l.bloom, sprite, pts.flame, BLOOM_R, (BLOOM_ALPHA + b) * strength, view))
-            drawn++
+          l.bloom ??= light(tex, POOL_COLOR)
+          place(
+            l.bloom,
+            pointOn(l.sprite, pts.flame),
+            BLOOM_R,
+            BLOOM_R,
+            (BLOOM_ALPHA + b) * strength,
+            view,
+          )
         }
         if (pts.window !== undefined) {
-          l.glow ??= light(GLOW_COLOR)
-          if (
-            place(l.glow, sprite, pts.window, WINDOW_R, (GLOW_BASE_ALPHA + 2 * b) * strength, view)
+          l.glow ??= light(tex, GLOW_COLOR)
+          place(
+            l.glow,
+            pointOn(l.sprite, pts.window),
+            WINDOW_R,
+            WINDOW_R,
+            (GLOW_BASE_ALPHA + 2 * b) * strength,
+            view,
           )
-            drawn++
         }
       }
       // Only a flame that has left the WORLD takes its light with it — a torch burnt to ash, a
@@ -282,20 +276,22 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
       }
       // A structure on fire burns by day too, on its painted flame or ten px over its feet.
       for (const [id, f] of fires) {
-        const sprite = entitySpriteOf(scene, 'structure', id)
-        const pt = points.get(id)?.flame
+        f.entity = entityOf(id, f.entity)
         const at =
-          sprite === null
+          f.entity === null
             ? null
-            : ((pt === undefined ? null : cellPointOf(sprite, pt)) ?? {
-                sx: sprite.x,
-                sy: sprite.y - 10,
+            : (pointOn(f.entity, points.get(id)?.points?.flame) ?? {
+                sx: f.entity.x,
+                sy: f.entity.y - 10,
               })
-        f.visible = at !== null && rectInView(at.sx - 4, at.sy - 8, at.sx + 4, at.sy + 8, view)
-        if (!f.visible || at === null) continue
-        f.position.set(at.sx, at.sy)
-        f.alpha = FIRE_ALPHA + (still ? 0 : breath(id, tSec))
-        drawn++
+        place(
+          f.sprite,
+          at,
+          FLAME_W / 2,
+          FLAME_H / 2,
+          FIRE_ALPHA + (still ? 0 : breath(f.phase, tSec)),
+          view,
+        )
       }
     },
     count() {
@@ -307,7 +303,7 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
         drop(l.bloom)
         drop(l.glow)
       }
-      for (const f of fires.values()) drop(f)
+      for (const f of fires.values()) drop(f.sprite)
       lights.clear()
       fires.clear()
       root.destroy()

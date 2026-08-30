@@ -263,10 +263,13 @@ describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
     expect(onLeash({ x: 0, y: 0, w: 60, h: 24 }, 100, 140, size)).toBe(false)
   })
 
-  it('fades over the reveal motion before it dies, and never below zero', () => {
+  it('fades over the reveal motion before it dies — monotone, on the curve it arrived on', () => {
     expect(bubbleAlpha(BUBBLE_FADE_MS * 10)).toBe(1)
     expect(bubbleAlpha(BUBBLE_FADE_MS)).toBe(1)
-    expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeCloseTo(0.5, 6)
+    for (let ms = BUBBLE_FADE_MS; ms > 0; ms -= 10)
+      expect(bubbleAlpha(ms - 10)).toBeLessThanOrEqual(bubbleAlpha(ms))
+    expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeGreaterThan(0)
+    expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeLessThan(1)
     expect(bubbleAlpha(0)).toBe(0)
     expect(bubbleAlpha(-40)).toBe(0)
   })

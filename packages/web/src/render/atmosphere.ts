@@ -2,7 +2,8 @@ import { ColorMatrixFilter, Graphics, Sprite, Texture } from 'pixi.js'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import type { TileId, WorldState } from '@sj/engine/state'
 import { cameraBoundsOf } from './camera.js'
-import { patchOutline } from './patches.js'
+import { tileToScreen } from './iso.js'
+import { bakeTexture } from './textures.js'
 import type { Scene } from './scene.js'
 import { clockTint, gradingMatrix, skyLevel } from './tints.js'
 import { crossTint } from '../ui/sceneTransition.js'
@@ -23,13 +24,11 @@ export function skyAlpha(sky: number): number {
 /** A 1×64 vertical ramp, white at the top and clear at the bottom. The ONE texture in the
  *  renderer sampled linearly: a 64-step ramp stretched over a town would band at NEAREST. */
 function skyTexture(scene: Scene): Texture {
-  const g = new Graphics()
-  for (let i = 0; i < SKY_TEX_H; i++)
-    g.rect(0, i, 1, 1).fill({ color: 0xffffff, alpha: 1 - i / (SKY_TEX_H - 1) })
-  const tex = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
+  const tex = bakeTexture(scene, (g) => {
+    for (let i = 0; i < SKY_TEX_H; i++)
+      g.rect(0, i, 1, 1).fill({ color: 0xffffff, alpha: 1 - i / (SKY_TEX_H - 1) })
+  })
   tex.source.scaleMode = 'linear'
-  tex.source.autoGarbageCollect = false
-  g.destroy()
   return tex
 }
 
@@ -44,7 +43,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   scene.screen.night.addChild(quad)
 
   // The sky, screened over the world so the roofs catch it while the bases keep the ground's
-  // colour. Masked to the ground's own outline: an unmasked box lightens the void and leaves a
+  // colour. Masked to the map's own diamond: an unmasked box lightens the void and leaves a
   // hard edge on it.
   const sky = new Sprite(skyTexture(scene))
   sky.blendMode = 'screen'
@@ -56,10 +55,16 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   let maskedTerrain: TileId[][] | null = null
   const fitSky = (terrain: TileId[][]): void => {
     maskedTerrain = terrain
-    const tiles: { x: number; y: number }[] = []
-    terrain.forEach((row, y) => row.forEach((_, x) => tiles.push({ x, y })))
+    const h = terrain.length
+    const w = terrain[0]?.length ?? 0
+    const corner = (x: number, y: number): number[] => {
+      const { sx, sy } = tileToScreen(x, y)
+      return [sx, sy]
+    }
     skyMask.clear()
-    for (const poly of patchOutline(tiles)) skyMask.poly(poly).fill(0xffffff)
+    skyMask
+      .poly([...corner(0, 0), ...corner(w, 0), ...corner(w, h), ...corner(0, h)])
+      .fill(0xffffff)
     const b = cameraBoundsOf(terrain)
     sky.position.set(b.minX, b.minY)
     sky.width = b.maxX - b.minX

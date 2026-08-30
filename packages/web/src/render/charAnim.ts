@@ -47,6 +47,9 @@ export function nameTagText(name: string): string {
 
 /** FNV-1a, 32-bit. Small, stable, and dependency-free: the same id gives the same number in
  *  every process, every session and every replay, which is the whole requirement. */
+/** A phase in [0, 2π) off the hash, so no two things named differently swing together. */
+export const phaseOf = (id: string): number => ((hash32(id) % 1000) / 1000) * Math.PI * 2
+
 export function hash32(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {

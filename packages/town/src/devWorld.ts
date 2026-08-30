@@ -57,6 +57,13 @@ export const SHOWCASE_CONFIG: SimConfig = {
   },
 }
 
+/** The showcase with its weather held still. The test harnesses that count houses and
+ *  bridges were tuned on a sunny run; the shipped town runs the weather. */
+export const STILL_WEATHER_CONFIG: SimConfig = {
+  ...SHOWCASE_CONFIG,
+  weather: { ...SHOWCASE_CONFIG.weather, hourlyChangeChance: 0 },
+}
+
 // The G6 "live thought" source — human framing, no AI vocabulary.
 export const THOUGHT_LINES: Record<string, string> = {
   walk: 'The path is clear enough.',

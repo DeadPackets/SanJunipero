@@ -23,12 +23,12 @@ import {
   type BubbleSide,
 } from './textFaces.js'
 import { over } from './legibility.js'
-import { placeTag, type Rect } from './tooltip.js'
+import { overlaps, placeTag, type Rect } from './tooltip.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { characterArt, fadeArtIn } from './textures.js'
-import { MOTION } from '../ui/motion.js'
+import { MOTION, progress } from '../ui/motion.js'
 import { characterCell } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
@@ -170,18 +170,13 @@ export function onLeash(
   sy: number,
   size: { w: number; h: number },
 ): boolean {
-  const leash = { x: sx - size.w, y: sy - size.h, w: size.w * 2, h: size.h * 2 }
-  return (
-    rect.x < leash.x + leash.w &&
-    rect.x + rect.w > leash.x &&
-    rect.y < leash.y + leash.h &&
-    rect.y + rect.h > leash.y
-  )
+  return overlaps(rect, { x: sx - size.w, y: sy - size.h, w: size.w * 2, h: size.h * 2 })
 }
 
-/** The opacity a bubble has `msLeft` before it dies: a fade, never a cut. */
+/** The opacity a bubble has `msLeft` before it dies: the reveal motion run backwards, so it
+ *  leaves on the curve it arrived on. */
 export function bubbleAlpha(msLeft: number): number {
-  return Math.min(1, Math.max(0, msLeft / BUBBLE_FADE_MS))
+  return 1 - progress('reveal', 0, BUBBLE_FADE_MS - msLeft)
 }
 
 /** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
@@ -414,9 +409,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       })
       const boxes: Rect[] = []
       for (const placed of placeBubbles(want, view, scene.tags.occupied('bubbles'))) {
-        const b = bubbles[Number(placed.id)]!
+        const i = Number(placed.id)
+        const b = bubbles[i]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
-        const p = want[Number(placed.id)]!
+        const p = want[i]!
         b.node.visible = onLeash(placed.rect, p.sx, p.sy, p.size)
         if (!b.node.visible) continue
         // the last frames fade; the fade-in is a rAF on the node and is left alone once done
