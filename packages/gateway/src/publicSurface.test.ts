@@ -106,6 +106,7 @@ describe('the public surface a stranger reaches', () => {
     db,
     agentDbDir,
     maxViewers: 3,
+    adminPort: null,
   })
 
   it('cannot read a file outside agentDbDir through a %2f in an agent id', async () => {
@@ -137,19 +138,32 @@ describe('the public surface a stranger reaches', () => {
     const base = `http://127.0.0.1:${gw.port}`
     // `decodeURIComponent('%')` throws URIError, and the router decodes inside the createServer
     // listener — unguarded this is an uncaughtException that takes the whole stream down.
-    for (const path of ['/assets/%', '/api/agent/%/profile', '/assets/character/%ZZ.png']) {
+    for (const path of ['/assets/%', '/api/agent/%/journal', '/assets/character/%ZZ.png']) {
       const r = await fetch(`${base}${path}`)
       expect(r.status, path).toBe(404)
       await r.text()
     }
     // The town is still serving, which is the whole point.
-    expect((await fetch(`${base}/api/agent/walker/profile`)).status).toBe(200)
+    expect((await fetch(`${base}/api/agent/walker/journal`)).status).toBe(200)
   })
 
-  it('answers nothing for __proto__, which is a truthy agent that does not exist', async () => {
+  // Ruling 10 put `/admin/*` on the served origin. A town whose operator opened no channel must
+  // not answer it at all — a 401 would tell a stranger there is a door.
+  it('has no operator channel to reach when no token opened one', async () => {
     const gw = await gwPromise
-    const r = await fetch(`http://127.0.0.1:${gw.port}/api/agent/__proto__/profile`)
-    expect(r.status).toBe(404)
+    const base = `http://127.0.0.1:${gw.port}`
+    for (const path of ['/admin/cost', '/admin/rulings/pending', '/admin']) {
+      const r = await fetch(`${base}${path}`, { headers: { authorization: 'Bearer guessed' } })
+      expect(r.status, path).toBe(404)
+      await r.text()
+    }
+  })
+
+  it('reads no memory for __proto__, which is a truthy agent that does not exist', async () => {
+    const gw = await gwPromise
+    const r = await fetch(`http://127.0.0.1:${gw.port}/api/agent/__proto__/journal`)
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual([])
   })
 
   it('will not encode a sprite sheet for an agent the world does not have', async () => {

@@ -156,6 +156,9 @@ importers:
       better-sqlite3:
         specifier: ^13.0.0
         version: 13.0.3
+      sharp:
+        specifier: ^0.34.0
+        version: 0.34.5
       ws:
         specifier: ^8.18.0
         version: 8.21.3

@@ -107,8 +107,28 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       )
       .run(1, 'What the Fire Took', 'It burned.', '[]', '[]')
     ndb
-      .prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
-      .run('first_death', 'The first death', 9000, 0, 50)
+      .prepare(
+        `INSERT INTO milestones (kind, label, event_seq, day, tick, tier, domain, agent_ids,
+         construct_id, name_provenance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'first_death',
+        'The first death',
+        9000,
+        0,
+        50,
+        '3',
+        'ritual',
+        '["alice","bob"]',
+        'construct_7',
+        JSON.stringify({
+          name: 'the Long Sit',
+          sourceKind: 'speech',
+          eventSeq: 8999,
+          quote: 'we should call it the Long Sit',
+          byId: 'alice',
+        }),
+      )
     const scene = ndb.prepare(
       'INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)',
     )
@@ -268,9 +288,28 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(body.heat).toEqual([{ day: 0, total: 9 }])
   })
 
-  it('reads the firsts ledger', async () => {
+  // Four of nine columns used to reach a viewer, which is why no panel could filter by tier or
+  // quote the town's own naming.
+  it('reads the firsts ledger to its full width, JSON columns already parsed', async () => {
     expect(await (await fetch(`${base}/api/milestones`)).json()).toEqual([
-      { kind: 'first_death', label: 'The first death', day: 0, tick: 50 },
+      {
+        kind: 'first_death',
+        label: 'The first death',
+        eventSeq: 9000,
+        day: 0,
+        tick: 50,
+        tier: 3,
+        domain: 'ritual',
+        agentIds: ['alice', 'bob'],
+        constructId: 'construct_7',
+        nameProvenance: {
+          name: 'the Long Sit',
+          sourceKind: 'speech',
+          eventSeq: 8999,
+          quote: 'we should call it the Long Sit',
+          byId: 'alice',
+        },
+      },
     ])
   })
 

@@ -58,7 +58,6 @@ describe('observer data apis', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-gwapi-'))
   let gw: Gateway
   let base: string
-  let liveAgents: Record<string, unknown>
 
   beforeAll(async () => {
     const dbPath = join(dir, 'world.db')
@@ -123,7 +122,6 @@ describe('observer data apis', () => {
       },
     })
     for (let i = 0; i < 80; i++) loop.step()
-    liveAgents = JSON.parse(JSON.stringify(loop.state.agents)) as Record<string, unknown>
 
     const adb = openAgentFixtureDb(join(dir, 'alice.db'))
     adb
@@ -166,28 +164,6 @@ describe('observer data apis', () => {
   afterAll(async () => {
     await gw.close()
     rmSync(dir, { recursive: true, force: true })
-  })
-
-  it('profile: straight from WorldState, 404 for unknown', async () => {
-    const res = await fetch(`${base}/api/agent/alice/profile`)
-    expect(res.status).toBe(200)
-    const a = liveAgents.alice as Record<string, unknown>
-    expect(await res.json()).toEqual({
-      id: 'alice',
-      name: 'Alice',
-      alive: true,
-      asleep: a.asleep,
-      x: 0,
-      y: 0,
-      needs: a.needs,
-      hp: a.hp,
-      injuries: a.injuries,
-      ill: a.ill,
-      ageDays: a.ageDays,
-      skills: a.skills,
-      activity: a.activity,
-    })
-    expect((await fetch(`${base}/api/agent/nobody/profile`)).status).toBe(404)
   })
 
   it('journal / ledgers / personality read the agent db; missing db → []', async () => {

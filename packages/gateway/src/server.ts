@@ -23,6 +23,7 @@ import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
 import { mountShareCard, shareMeta } from './shareCard.js'
+import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
 import { frameText, notFound, sendJson } from './http.js'
 
@@ -37,6 +38,9 @@ export type GatewayOpts = {
   narratorDbPath?: string // C7's narrator.db; absent or unwritten → typed empties
   staticDir?: string // built @sj/web; absent → API/socket only (the dev split)
   maxViewers?: number // default DEFAULT_MAX_VIEWERS
+  /** The loopback operator channel `/admin/*` is forwarded to. `null` refuses every admin path;
+   *  absent, `SJ_ADMIN_TOKEN`/`SJ_ADMIN_PORT` decide. */
+  adminPort?: number | null
   paused?: () => boolean // the world clock's own state; absent → the town is always running
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
@@ -131,16 +135,27 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
-  mountShareCard(router, { mirror, narratorDb })
+  const shareDeps = { mirror, narratorDb, getCodex }
+  mountShareCard(router, shareDeps)
 
   // The built client, served from the world's own origin so the stream is one address.
   const site =
     opts.staticDir === undefined
       ? null
-      : makeStaticSite(opts.staticDir, (pathname) => shareMeta({ mirror, narratorDb }, pathname))
+      : makeStaticSite(opts.staticDir, (pathname) => shareMeta(shareDeps, pathname))
+
+  // Off the route table on purpose: the operator's channel owns its own paths, at whatever
+  // depth, on whatever method, and the gateway only carries them across the origin.
+  const proxyAdmin = makeAdminProxy(
+    opts.adminPort === undefined ? adminChannelPort() : opts.adminPort,
+  )
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
+    if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+      proxyAdmin(req, res)
+      return
+    }
     const segs = url.pathname.split('/').filter(Boolean)
     for (const r of routes) {
       if (r.method !== (req.method ?? 'GET') || r.segs.length !== segs.length) continue

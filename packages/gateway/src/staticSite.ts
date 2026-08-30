@@ -1,6 +1,7 @@
 import { createReadStream, readFileSync, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { CARD_HEIGHT, CARD_WIDTH } from './agentCard.js'
 import type { ShareMeta } from './shareCard.js'
 
 // `/assets/:file` is the codex PNG route and 404s anything that is not a png, so the built client
@@ -45,7 +46,9 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
 
 export type StaticSite = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean
 
-const attr = (s: string): string =>
+/** Text bound for an XML attribute or an SVG `<text>` body — the share card escapes the same
+ *  four characters, and a chapter title must not be able to close either. */
+export const attr = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 /** The share tags for one deep link, written into the head a crawler reads. A crawler never runs
@@ -56,6 +59,8 @@ export function withShareTags(html: string, meta: ShareMeta): string {
     `<meta property="og:title" content="${attr(meta.title)}" />`,
     `<meta property="og:description" content="${attr(meta.description)}" />`,
     `<meta property="og:image" content="${attr(meta.image)}" />`,
+    `<meta property="og:image:width" content="${CARD_WIDTH}" />`,
+    `<meta property="og:image:height" content="${CARD_HEIGHT}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${attr(meta.title)}" />`,
     `<meta name="twitter:description" content="${attr(meta.description)}" />`,

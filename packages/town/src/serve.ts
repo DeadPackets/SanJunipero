@@ -16,9 +16,10 @@
 // Scripted by default at $0.00/hour — the live path is not even imported unless SJ_LIVE=1
 // (dynamic import below).
 import { existsSync } from 'node:fs'
+import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { adminOpsRoutes, createLawsAdmin, type LiveCast } from '@sj/gateway'
+import { adminChannelPort, adminOpsRoutes, createLawsAdmin, type LiveCast } from '@sj/gateway'
 import { DEV_DB_PATH, SHOWCASE_CONFIG, startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
@@ -29,9 +30,6 @@ export const STREAM_MINDS_DIR = 'data/minds'
 /** The chronicle. Inside the minds directory, so `SJ_FRESH=1` throws the town's story away with
  *  the town; underscore-prefixed to stay out of the `<mindId>.db` namespace. */
 export const STREAM_NARRATOR_DB = '_narrator.db'
-/** The operator's law channel. LOOPBACK ONLY and off unless `SJ_ADMIN_TOKEN` is set: it is the
- *  one write path into the world this process has, and Caddy must never proxy it. */
-export const STREAM_ADMIN_PORT = 8788
 export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 
 /** The one instruction a person needs when the viewer has not been built yet. */
@@ -144,27 +142,29 @@ export async function main(): Promise<void> {
   )
   console.log(`stream: the town is open at http://localhost:${running.gateway.port}/`)
 
-  // The only write path into the world. Loopback-bound, bearer-authed, and absent entirely
-  // unless an operator sets the token — see deploy/README.md.
+  // The only write path into the world. The listener stays on loopback; the gateway carries
+  // `/admin/*` to it from the served origin, so the operator's page can reach it (ruling 10)
+  // and the bearer is what refuses everyone else — see deploy/README.md.
   const adminToken = process.env.SJ_ADMIN_TOKEN
-  const admin =
-    adminToken === undefined || adminToken === ''
-      ? null
-      : createLawsAdmin({
-          submitLaw: running.submitLaw,
-          token: adminToken,
-          routes: adminOpsRoutes({
-            clock: running.loop,
-            ops: () => running.ops,
-            worldDbPath: DEV_DB_PATH,
-            mindsDir,
-            config: SHOWCASE_CONFIG,
-          }),
-        })
-  if (admin !== null) {
-    const adminPort = intEnv('SJ_ADMIN_PORT', STREAM_ADMIN_PORT, 1)
+  const adminPort = adminChannelPort()
+  let admin: Server | null = null
+  if (adminToken !== undefined && adminPort !== null) {
+    admin = createLawsAdmin({
+      submitLaw: running.submitLaw,
+      token: adminToken,
+      routes: adminOpsRoutes({
+        clock: running.loop,
+        ops: () => running.ops,
+        worldDbPath: DEV_DB_PATH,
+        mindsDir,
+        config: SHOWCASE_CONFIG,
+      }),
+    })
     admin.listen(adminPort, '127.0.0.1', () => {
-      console.log(`stream: the operator's channel is open on http://127.0.0.1:${adminPort}/admin/`)
+      console.log(
+        `stream: the operator's channel is open on 127.0.0.1:${adminPort},` +
+          ` and the town serves it at http://localhost:${running.gateway.port}/admin/`,
+      )
     })
   } else {
     console.log('stream: no law channel — SJ_ADMIN_TOKEN opens one on loopback')

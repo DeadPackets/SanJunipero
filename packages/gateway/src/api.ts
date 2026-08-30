@@ -204,31 +204,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     }
   }
 
-  router.route('GET', '/api/agent/:id/profile', (_req, res, params) => {
-    const id = params.id ?? ''
-    // `agents['__proto__']` is truthy and answers a body of nulls; a slug never is.
-    const a = AGENT_ID.test(id) ? deps.mirror.state().agents[id] : undefined
-    if (!a) {
-      notFound(res)
-      return
-    }
-    sendJson(res, {
-      id: a.id,
-      name: a.name,
-      alive: a.alive,
-      asleep: a.asleep,
-      x: a.x,
-      y: a.y,
-      needs: a.needs,
-      hp: a.hp,
-      injuries: a.injuries,
-      ill: a.ill,
-      ageDays: a.ageDays,
-      skills: a.skills,
-      activity: a.activity,
-    })
-  })
-
   // A dream is a memory row and not a journal row, so the feed is two reads merged. Each half
   // reads its newest `JOURNAL_MAX` and is turned back the right way up before the merge.
   router.route('GET', '/api/agent/:id/journal', (_req, res, params) => {
