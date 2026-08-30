@@ -195,21 +195,34 @@ describe('seasonal sheets', () => {
     expect(SHEET_KINDS).toContain('road')
   })
 
-  it('paints a 128x64 palette-true sheet per season, and the seasons differ', () => {
+  const offPalette = (sheet: RawImage): number => {
+    let n = 0
+    for (let i = 0; i < sheet.data.length; i += 4) {
+      if (sheet.data[i + 3] === 0) continue
+      if (!PALETTE_HEXES.has((sheet.data[i]! << 16) | (sheet.data[i + 1]! << 8) | sheet.data[i + 2]!))
+        n++
+    }
+    return n
+  }
+
+  it('paints a 128x64 sheet per season, and the seasons differ', () => {
     const sheets = SEASONS.map((s) => paintSeasonSheet(s))
     for (const sheet of sheets) {
       expect([sheet.width, sheet.height]).toEqual([
         SHEET_COLS * TERRAIN_TILE_W,
         SHEET_ROWS * TERRAIN_TILE_H,
       ])
-      for (let i = 0; i < sheet.data.length; i += 4) {
-        if (sheet.data[i + 3] === 0) continue
-        expect(PALETTE_HEXES).toContain(
-          (sheet.data[i]! << 16) | (sheet.data[i + 1]! << 8) | sheet.data[i + 2]!,
-        )
-      }
     }
     expect(new Set(sheets.map((s) => s.data.join(','))).size).toBe(SEASONS.length)
+  })
+
+  // Ruling 13: no palette quantize anywhere. Summer's tint is the identity, so its sheet is
+  // still palette-true — the painter paints FROM the palette; the other three keep their tint.
+  it('★ keeps the colour the tint gave it — nothing snaps back to MASTER_PALETTE', () => {
+    expect(offPalette(paintSeasonSheet('summer'))).toBe(0)
+    for (const season of ['spring', 'autumn', 'winter'] as const) {
+      expect(offPalette(paintSeasonSheet(season)), season).toBeGreaterThan(0)
+    }
   })
 })
 
