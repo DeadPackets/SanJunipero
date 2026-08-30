@@ -59,17 +59,17 @@ import {
 import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
 import { createDiscoveryArt } from './discoveryCommission.js'
 
-/** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on: one
- *  sim-day IS one real hour here, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
+/** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
+ *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
 const LIVE_SPEND_DAILY_USD = 3
 /** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
  *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
 const LIVE_SPEND_STOP_USD = 50
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
-/** How often the ledger is read, in world ticks. At the dev world's 2.5 s tick this is every
- *  25 s of wall clock — far tighter than one turn, so nothing can outrun it. */
+/** How often the ledger is read, in world ticks. At the dev world's tick this is every 12 s
+ *  of wall clock — far tighter than one turn, so nothing can outrun it. */
 const LIVE_SPEND_CHECK_TICKS = 10
-/** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
+/** How often each mind's clock and half-run plan are written down. ~1 min of wall clock. */
 const LIVE_RUNTIME_SAVE_TICKS = 48
 /** The only event types `detectCandidates` reads. `events(type)` is indexed, so four narrow
  *  reads beat one full-log read whose rows the recognizer then drops. */
@@ -182,14 +182,8 @@ export async function settle(
   return true
 }
 
-/**
- * A per-call cap cannot see a slow leak; this bounds spend per unit time.
- * PER MIND, because the bill scales with the cast and not with the world — a total ceiling would
- * false-fire the day somebody streams ten people.
- * 0.05 leaves 43% headroom over a SUSTAINED failover to the dearest allowed provider —
- * AtlasCloud, measured $0.035/mind/sim-day on 2026-08-30, which sat at 88% of the old $0.04.
- * On the Baidu pin's expected $0.0037/mind/sim-day it is 13x. Re-derive on rehearsal 4.
- */
+/** A per-call cap cannot see a slow leak; this bounds spend per unit time. PER MIND, because the
+ *  bill scales with the cast, and above a SUSTAINED failover to the dearest allowed provider. */
 const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.05
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
@@ -788,7 +782,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         const castSize = booted?.cast.size ?? cast.length
         const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * castSize
         // Art is bursty and per discovery; it stays under the daily and lifetime caps, not the mind rate.
-        // The projection counts one real hour as one sim-day; the operator's dial changes that.
+        // The projection counts 30 real minutes as one sim-day; the operator's dial changes that.
         const rate =
           projectDailySpend(opsDb, {
             windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,

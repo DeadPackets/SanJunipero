@@ -25,11 +25,11 @@ export const MAX_SPEED = 60
 /** The gateway reads the ledger with SQL rather than importing `@sj/llm`'s spend monitor: that
  *  package pulls the model SDK, which the scripted path must never load. */
 const SPEND_WINDOW_REAL_MINUTES = 15
-const REAL_MINUTES_PER_SIM_DAY = 60
+const REAL_MINUTES_PER_SIM_DAY = 30
 const DAY_MS = 24 * 60 * 60 * 1000
 const TOP_MINDS = 10
 const RECENT_ALERTS = 10
-/** One sim-day is one real hour, so this number moves far slower than the page polls. */
+/** One sim-day is 30 real minutes, so this number moves far slower than the page polls. */
 const ANSWER_RATE_TTL_MS = 60_000
 
 const bodyJson = (text: string | null): Record<string, unknown> => {

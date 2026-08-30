@@ -5,11 +5,11 @@ set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 OUT=$ROOT/rehearsals
-# A sim-day is 1440 ticks of 2500 ms: 60 real minutes at SPEED=1. These defaults cross two sim-day
+# A sim-day is 1440 ticks of 1250 ms: 30 real minutes at SPEED=1. These defaults cross two sim-day
 # boundaries, the only way a rehearsal sees a night, a dawn and a rollover.
 MINUTES=${1:-30}
-SPEED=${SPEED:-4}
-DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 60}")
+SPEED=${SPEED:-2}
+DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 30}")
 export SJ_LIVE=1 SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$ SJ_ADMIN_PORT=8788
 rm -rf "$SJ_MINDS_DIR"; mkdir -p "$SJ_MINDS_DIR"

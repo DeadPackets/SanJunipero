@@ -206,8 +206,8 @@ describe('the cost dashboard', () => {
     expect(cost.cacheReadShare).toBeCloseTo(100 / 300)
     expect(cost.caps).toEqual({ dailyUsd: 3, lifetimeUsd: 50 })
     expect(cost.stop).toEqual({ dailyReached: false, lifetimeReached: false })
-    // 15 real minutes is a quarter of a sim-day, so $0.08 in the window projects to $0.32.
-    expect(cost.projection.usdPerSimDay).toBeCloseTo(0.32)
+    // 15 real minutes is half a sim-day, so $0.08 in the window projects to $0.16.
+    expect(cost.projection.usdPerSimDay).toBeCloseTo(0.16)
   })
 
   it('★ carries the answer rate: of the acts begun, the share that finished', async () => {

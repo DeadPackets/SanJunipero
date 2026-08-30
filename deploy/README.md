@@ -185,12 +185,13 @@ docker compose down -v                          # or: end the town and its volum
 
 ## ★ What it costs
 
-**One sim-day is one real hour**, so "$/sim-day" and "$/hour" are the same number.
+**A sim-day passes every 30 real minutes**, so an hour of wall clock is two sim-days and
+"$/hour" is twice "$/sim-day".
 
 **Expected, to be measured in rehearsal 4**: five minds on the Baidu pin, **$0.019 per
 sim-day** — rehearsal 3's measured $0.47-0.71 recosted call by call with the turn's reasoning
-off, the day log deduped and ruling 23's ceilings, each part of it measured, the stack of them
-not yet.
+off, the day log deduped and the new output ceilings, each part of it measured, the stack of
+them not yet.
 
 **If Baidu is out, the town runs on AtlasCloud** — the second name on the allow-list, 7.3x the
 rate. A sustained failover is **$0.035/mind/sim-day, $0.175 for five minds**, which is 9.2x the
@@ -199,10 +200,10 @@ Baidu line and still under the rate tripwire. Nothing else changes; the minds do
 | | per hour | per day | per 30-day month |
 |---|---|---|---|
 | **Scripted** (default) | **$0.00** | **$0.00** | **$0.00** |
-| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.019** | **$0.45** | **$14** |
-| Live, sustained failover to AtlasCloud | $0.175 | $4.20 | $126 |
+| **Live** (`SJ_LIVE=1`, 5 minds) | **$0.038** | **$0.91** | **$27** |
+| Live, sustained failover to AtlasCloud | $0.35 | $8.40 | $252 |
 
-Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$35-40/mo,
+Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$50/mo,
 forever, until you stop it.** A live town is not something to leave running.
 
 **These ARE the numbers the code prints.** `pins.ts` books the rate this account is actually
@@ -215,9 +216,9 @@ Each is calibrated against the price the ledger books, so each fires at its nomi
 
 | Guard | Set at | Reached, at the expected 5-mind rate | What it does |
 |---|---|---|---|
-| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.45 | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | $50 total | ~2,600 real hours, so 110 days | Kills the process. The town on disk is intact. |
-| Rate tripwire | $0.05/mind/sim-day over 15 min | $0.25/h for five minds — 13x the expected rate, 43% over a sustained AtlasCloud failover | Stops every mind. The town keeps serving. |
+| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $0.91 | Kills the process; a restart refuses until the window rolls. |
+| Anomaly stop | $50 total | ~1,300 real hours, so 55 days | Kills the process. The town on disk is intact. |
+| Rate tripwire | $0.05/mind/sim-day over 15 min | $0.50/h for five minds — 13x the expected rate, 43% over a sustained AtlasCloud failover | Stops every mind. The town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | 21x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
 
 **Only the tripwire still bites.** The two dollar guards were set against a bill 20x this one and
@@ -226,9 +227,9 @@ first and the other two are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you
 budget back as a working limit.
 
 **The operator alert sits above the tripwire, not before it.** The alert is $0.40/sim-day for the
-whole town and the tripwire is $0.25/h for five minds, so for mind traffic the tripwire stops the
-cast first; the alert is what speaks for the spend the tripwire excludes by design (art, the
-narrator, the arbiter).
+whole town and the tripwire is $0.25/sim-day for five minds, so for mind traffic the tripwire
+stops the cast first; the alert is what speaks for the spend the tripwire excludes by design
+(art, the narrator, the arbiter).
 
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;

@@ -1,11 +1,11 @@
 import type Database from 'better-sqlite3'
 import { insertAlert } from './callLog.js'
 
-// The sim runs one day per real hour, so a window of W real minutes covers
-// W/60 of a sim-day and its spend scales by 60/W to reach $/sim-day.
-export const REAL_MINUTES_PER_SIM_DAY = 60
+// The sim runs one day per 30 real minutes, so a window of W real minutes covers
+// W/30 of a sim-day and its spend scales by 30/W to reach $/sim-day.
+export const REAL_MINUTES_PER_SIM_DAY = 30
 export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
-// 10x the expected $0.03-0.04/sim-day for the shipped five-mind cast — itself an expectation
+// 21x the expected $0.019/sim-day for the shipped five-mind cast — itself an expectation
 // and not a measurement.
 export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
 

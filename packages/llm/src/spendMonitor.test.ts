@@ -46,14 +46,14 @@ afterEach(() => {
 })
 
 describe('projectDailySpend (T24)', () => {
-  it('one sim-day is one real hour, so a window scales by 60/window', () => {
+  it('one sim-day is 30 real minutes, so a window scales by 30/window', () => {
     const db = openDb()
-    expect(REAL_MINUTES_PER_SIM_DAY).toBe(60)
+    expect(REAL_MINUTES_PER_SIM_DAY).toBe(30)
     seedCall(db, 1, 0.5)
     seedCall(db, 2, 0.25)
 
     const p = projectDailySpend(db, { windowRealMinutes: 15, now: NOW })
-    expect(p).toEqual({ usdPerSimDay: 3, windowRealMinutes: 15, sampledCalls: 2 })
+    expect(p).toEqual({ usdPerSimDay: 1.5, windowRealMinutes: 15, sampledCalls: 2 })
   })
 
   it('counts only calls inside the window, boundary included', () => {
@@ -64,7 +64,7 @@ describe('projectDailySpend (T24)', () => {
 
     const p = projectDailySpend(db, { windowRealMinutes: 15, now: NOW })
     expect(p.sampledCalls).toBe(1)
-    expect(p.usdPerSimDay).toBe(4)
+    expect(p.usdPerSimDay).toBe(2)
   })
 
   it('leaves an excluded caller out of the rate, but still in the ledger', () => {
@@ -83,8 +83,8 @@ describe('projectDailySpend (T24)', () => {
       now: NOW,
       excludeCallers: ['forge'],
     })
-    expect(all).toEqual({ usdPerSimDay: 4, windowRealMinutes: 15, sampledCalls: 2 })
-    expect(minds).toEqual({ usdPerSimDay: 2, windowRealMinutes: 15, sampledCalls: 1 })
+    expect(all).toEqual({ usdPerSimDay: 2, windowRealMinutes: 15, sampledCalls: 2 })
+    expect(minds).toEqual({ usdPerSimDay: 1, windowRealMinutes: 15, sampledCalls: 1 })
   })
 
   it('an idle window projects zero, not NaN', () => {
@@ -94,10 +94,10 @@ describe('projectDailySpend (T24)', () => {
     expect(p).toEqual({ usdPerSimDay: 0, windowRealMinutes: 15, sampledCalls: 0 })
   })
 
-  it('a full-hour window is the measured sim-day itself, multiplier 1', () => {
+  it('a half-hour window is the measured sim-day itself, multiplier 1', () => {
     const db = openDb()
-    seedCall(db, 30, 2.5)
-    expect(projectDailySpend(db, { windowRealMinutes: 60, now: NOW }).usdPerSimDay).toBe(2.5)
+    seedCall(db, 20, 2.5)
+    expect(projectDailySpend(db, { windowRealMinutes: 30, now: NOW }).usdPerSimDay).toBe(2.5)
   })
 
   it('defaults to a quarter-hour window', () => {
@@ -188,7 +188,7 @@ describe('dead calls — paid for, and nothing came back', () => {
   it('rides along with the spend projection, so a clean-looking burn cannot hide them', () => {
     const db = openDb()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    seedCall(db, 1, 4)
+    seedCall(db, 1, 8)
     fail(db, 'omar', 'No output generated.')
 
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
@@ -202,7 +202,7 @@ describe('checkSpend (T24)', () => {
   it('over the threshold: one alert row per check, naming the projection', () => {
     const db = openDb()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    seedCall(db, 1, 4)
+    seedCall(db, 1, 8)
 
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
     expect(r.usdPerSimDay).toBe(16)
@@ -221,7 +221,7 @@ describe('checkSpend (T24)', () => {
   it('under the threshold: no alert, no console line', () => {
     const db = openDb()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    seedCall(db, 1, 1)
+    seedCall(db, 1, 2)
 
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
     expect(r.usdPerSimDay).toBe(4)
@@ -233,20 +233,20 @@ describe('checkSpend (T24)', () => {
   it('sitting exactly on the threshold is not over it', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    seedCall(db, 1, 2.5)
+    seedCall(db, 1, 5)
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
     expect(r.usdPerSimDay).toBe(10)
     expect(r.alerted).toBe(false)
     expect(alerts(db)).toEqual([])
   })
 
-  it('the default threshold is 10x the expected five-mind rate', () => {
+  it('the default threshold is 21x the expected five-mind rate', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(0.4)
-    seedCall(db, 1, 0.11) // 0.11 over 15 real minutes projects to $0.44/sim-day
+    seedCall(db, 1, 0.22) // 0.22 over 15 real minutes projects to $0.44/sim-day
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(true)
-    seedCall(db, 1, -0.02) // pull the window back under
+    seedCall(db, 1, -0.04) // pull the window back under
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(false)
   })
 })

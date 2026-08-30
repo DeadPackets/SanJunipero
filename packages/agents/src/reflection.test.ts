@@ -636,9 +636,8 @@ describe('makeReflectionLlm prompts', () => {
   })
 })
 
-// ★ Ruling 23 / apply-report finding 4: `proposeEdit` shared reflection's 16,000-token ceiling
-// and its ledger line, so nobody could price the night's one reasoning-on call. It is its own
-// caller now — a dimension `/admin/cost` groups by, and `pins.ts` keys its settings off.
+// ★ `proposeEdit` shared reflection's ceiling and its ledger line, so the night's one
+// reasoning-on call could not be priced. The caller name is what both are keyed off.
 describe('★ the night bills its personality edit under its own name', () => {
   it('writes reflection.edit rows the by-caller ledger can price on their own', async () => {
     const db = new Sqlite(':memory:')

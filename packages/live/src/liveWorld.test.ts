@@ -569,13 +569,13 @@ describe('★ the money, inside the served world', () => {
     expect(alertsOf(opsDb, 'spend_projection')).toHaveLength(0)
 
     // Art, which the rate tripwire excludes by design: only the operator alert can speak here.
-    // $0.15 in a 15-minute window projects to $0.60/sim-day, over the $0.40 threshold.
+    // $0.30 in a 15-minute window projects to $0.60/sim-day, over the $0.40 threshold.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 0.15, 0.15, 0, 1, NULL, NULL)`,
+       VALUES (?, NULL, 'forge', 'm', 0, 0, 0, 0, 0.3, 0.3, 0, 1, NULL, NULL)`,
       )
       .run(Date.now())
 
@@ -633,9 +633,8 @@ describe('★ the money, inside the served world', () => {
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
   }, 40_000)
 
-  // ★ Ruling 23: the second name on the allow-list is 7.3x the first, so a long Baidu outage
-  // runs the whole town on AtlasCloud. Under the old $0.04 that sat at 88% of the wire and any
-  // ordinary night on top of it tripped; $0.05 leaves 43%.
+  // ★ The second name on the allow-list is 7.3x the first, so a long outage runs the whole town
+  // on it. The wire has to clear that rate, or the failover it exists for stops the town.
   it('★ a sustained failover to the dearest allowed provider runs, and does not stop the town', async () => {
     const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
@@ -1102,7 +1101,7 @@ describe('the ops db sits inside the minds directory', () => {
   })
 })
 
-// One sim-day IS one real hour here, so this rehearsal is the whole of what a live stream does
+// A sim-day passes every 30 real minutes, so this rehearsal is the whole of what a live stream does
 // at the top of every hour — with a scripted client, and for $0.00.
 describe('★ the chronicle, written on the day boundary', () => {
   /** A day of ticks without `run`'s per-tick microtask drain: this rehearsal is about the day
