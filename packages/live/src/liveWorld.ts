@@ -183,8 +183,9 @@ export async function settle(
 }
 
 /** A per-call cap cannot see a slow leak; this bounds spend per unit time. PER MIND, because the
- *  bill scales with the cast, and above a SUSTAINED failover to the dearest allowed provider. */
-const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.05
+ *  bill scales with the cast. Above a real failover window: a Baidu queue spell measured
+ *  $0.053/mind/sim-day (mixed AtlasCloud + ceiling-booked rows), so $0.05 stopped the town. */
+const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.1
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
@@ -202,8 +203,8 @@ const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
 function rateStopMessage(rate: number, ceiling: number, minds: number): string {
   return [
-    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/hour, over its` +
-      ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x` +
+    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/sim-day, over its` +
+      ` $${ceiling.toFixed(4)}/sim-day ceiling (${minds} mind(s) x` +
       ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
     `        Measured over the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is a RATE`,
     '        stop, not a budget — the town is nowhere near either line and is burning too fast.',

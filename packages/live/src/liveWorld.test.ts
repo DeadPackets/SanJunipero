@@ -438,7 +438,7 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // TWO minds, so the ceiling is 2 x $0.05 = $0.10/sim-day. $0.60 inside a 15-minute window
+    // TWO minds, so the ceiling is 2 x $0.10 = $0.20/sim-day. $0.60 inside a 15-minute window
     // projects to $2.40/sim-day — over the flow ceiling and well under the $5 cap this row sets.
     opsDb
       .prepare(
