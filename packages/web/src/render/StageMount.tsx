@@ -117,7 +117,7 @@ export function StageMount({
         })
         bubbles = createBubbleLayer(s, store)
         atmosphere = createAtmosphere(s)
-        weather = createWeatherLayer(s)
+        weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
         sceneRef.current = s

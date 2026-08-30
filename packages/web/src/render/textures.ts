@@ -5,6 +5,7 @@ import {
   parseCharacterAtlasManifest,
   type AssetClass,
   type AssetRecord,
+  type BuildingPoints,
   type CharacterAtlasManifest,
 } from '@sj/shared'
 
@@ -54,6 +55,8 @@ export type BuildingArt = {
   url: string | null
   anchor: { x: number; y: number } | null
   scale: number | null
+  /** the manifest's hand-measured cell points, in cell px; `null` when the art has none */
+  points: BuildingPoints | null
 }
 
 // v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
@@ -73,14 +76,15 @@ export function buildingArt(
   const rec =
     resolveAsset(records, 'building', facingCellKind(kind, facing)) ??
     resolveAsset(records, 'building', kind)
-  if (rec === null) return { url: null, anchor: null, scale: null }
+  if (rec === null) return { url: null, anchor: null, scale: null, points: null }
   const m = parseBuildingManifest(rec.meta)
-  if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }
+  if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null, points: null }
   const target = (fw + fh) * BUILDING_PX_PER_TILE
   return {
     url: `/assets/${rec.id}.png`,
     anchor: { x: m.cell.feetX / m.cell.w, y: m.cell.feetY / m.cell.h },
     scale: Math.min(target / m.cell.w, target / m.cell.h),
+    points: m.points ?? null,
   }
 }
 

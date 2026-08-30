@@ -28,7 +28,12 @@ export function runFoundersWorld(
   rings = 3,
   onAfterTick?: (tick: number, state: WorldState) => void,
 ): Run {
-  const config = SHOWCASE_CONFIG
+  // The shipped town runs weather; these harnesses measure masonry and bridging, and their
+  // counts were tuned on a sunny run, so the weather is held still here and nowhere else.
+  const config = {
+    ...SHOWCASE_CONFIG,
+    weather: { ...SHOWCASE_CONFIG.weather, hourlyChangeChance: 0 },
+  }
   const terrain = devTerrain('showcase', rings)
   const structures = townStructuresFor('showcase', rings)
   const store = new EventStore(openDb(':memory:'))

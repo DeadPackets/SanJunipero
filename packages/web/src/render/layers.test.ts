@@ -17,11 +17,14 @@ vi.mock('pixi.js', () => {
 
 const { Container: MockContainer } = await import('pixi.js')
 const {
+  GRADED_LAYERS,
   LAYERS,
+  SCREEN_LAYERS,
   SORTED_LAYER,
   Z_AUTHORISED,
   applyDepthOrder,
   createLayers,
+  createScreenLayers,
   literalZIndexOffenders,
 } = await import('./layers.js')
 const { structureDepthBox } = await import('./depth.js')
@@ -47,8 +50,7 @@ function sourcesUnder(dir: string): { path: string; source: string }[] {
 describe('createLayers', () => {
   it('adds exactly the eight layers, in the order they paint', () => {
     const world = new MockContainer()
-    const set = createLayers(world)
-    expect(world.children).toHaveLength(8)
+    const { layers: set, graded } = createLayers(world)
     expect(LAYERS).toEqual([
       'ground',
       'groundDecal',
@@ -59,11 +61,21 @@ describe('createLayers', () => {
       'bubbles',
       'overlay',
     ])
-    expect(LAYERS.map((n) => set[n])).toEqual(world.children)
+    // the picture layers sit inside `graded`, the word layers beside it: one paint order
+    const painted = [...graded.children, ...world.children.slice(1)]
+    expect(world.children[0]).toBe(graded)
+    expect(LAYERS.map((n) => set[n])).toEqual(painted)
+  })
+
+  it('★ grades the picture and never the words (D5)', () => {
+    const { layers: set, graded } = createLayers(new MockContainer())
+    expect(GRADED_LAYERS).toEqual(['ground', 'groundDecal', 'shadow', 'entities', 'overhead'])
+    for (const n of LAYERS)
+      expect(graded.children.includes(set[n]), n).toBe(GRADED_LAYERS.includes(n))
   })
 
   it('depth-sorts ONE layer and no other', () => {
-    const set = createLayers(new MockContainer())
+    const { layers: set } = createLayers(new MockContainer())
     const sorted = LAYERS.filter(
       (n) => (set[n] as unknown as { sortableChildren: boolean }).sortableChildren,
     )
@@ -72,7 +84,7 @@ describe('createLayers', () => {
   })
 
   it('leaves only the sorted layer able to take a pointer', () => {
-    const set = createLayers(new MockContainer())
+    const { layers: set } = createLayers(new MockContainer())
     for (const name of LAYERS) {
       const mode = (set[name] as unknown as { eventMode: string }).eventMode
       expect(mode, name).toBe(name === SORTED_LAYER ? '' : 'none')
@@ -80,8 +92,23 @@ describe('createLayers', () => {
   })
 
   it('hands back a distinct container per layer', () => {
-    const set = createLayers(new MockContainer())
+    const { layers: set } = createLayers(new MockContainer())
     expect(new Set(LAYERS.map((n) => set[n])).size).toBe(LAYERS.length)
+  })
+})
+
+describe('createScreenLayers — the stack over the world', () => {
+  it('paints the flash under the night quad and the lights over it, then the weather', () => {
+    expect(SCREEN_LAYERS).toEqual(['flash', 'night', 'lights', 'weather'])
+    const stage = new MockContainer()
+    const set = createScreenLayers(stage)
+    expect(SCREEN_LAYERS.map((n) => set[n])).toEqual(stage.children)
+  })
+
+  it('is event-inert throughout: a full-screen quad that took a click would end panning', () => {
+    const set = createScreenLayers(new MockContainer())
+    for (const n of SCREEN_LAYERS)
+      expect((set[n] as unknown as { eventMode: string }).eventMode, n).toBe('none')
   })
 })
 

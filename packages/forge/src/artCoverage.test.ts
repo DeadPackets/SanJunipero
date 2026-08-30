@@ -1,6 +1,12 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { FOUNDER_IDS, parseCharacterAtlasManifest, parseLibraryItemManifest } from '@sj/shared'
+import {
+  CITY_HEARTH_KIND,
+  FOUNDER_IDS,
+  cityStructures,
+  parseCharacterAtlasManifest,
+  parseLibraryItemManifest,
+} from '@sj/shared'
 import { BUILDINGS_CONTENT_DIR, STRUCTURE_FACINGS, listCommittedBuildings } from './buildingArt.js'
 import { loadReferenceSheet, paletteSwatchPng } from './referenceSheet.js'
 import { openForgeDb } from './db.js'
@@ -353,4 +359,40 @@ describe('the committed cast', () => {
       expect(bad).toEqual([])
     },
   )
+})
+
+// ── ★ THE CELL POINTS THE LIGHTS AND THE SMOKE LAND ON ─────────────────────────────────────
+describe('★ every hearth kind names where its chimney and its flame are painted', () => {
+  const buildings = listCommittedBuildings()
+  const hearthKinds = new Set([
+    ...cityStructures()
+      .filter((c) => c.furnishings.some((f) => f.kind === CITY_HEARTH_KIND))
+      .map((c) => c.kind),
+    'fire_pit',
+  ])
+
+  it('a house with a hearth has a chimney cell point, in both facings', () => {
+    const roofed = buildings.filter((b) => hearthKinds.has(b.kind) && b.kind !== 'fire_pit')
+    expect(roofed.length).toBeGreaterThanOrEqual(8)
+    for (const b of roofed) {
+      const c = b.manifest.points?.chimney
+      expect(c, `${b.dir} has no points.chimney`).toBeDefined()
+      expect(c!.x).toBeLessThan(b.manifest.cell.w)
+      expect(c!.y).toBeLessThan(b.manifest.cell.feetY / 2) // a chimney is on the roof, not the floor
+    }
+  })
+
+  it('the open fire and the lamp post point at their painted flame', () => {
+    for (const dir of ['fire_pit', 'lamp_post']) {
+      const b = buildings.find((x) => x.dir === dir)!
+      const f = b.manifest.points?.flame
+      expect(f, `${dir} has no points.flame`).toBeDefined()
+      expect(f!.y).toBeLessThan(b.manifest.cell.feetY)
+    }
+  })
+
+  it('a window glow is only ever on a cell painted lit — one kind today', () => {
+    const lit = buildings.filter((b) => b.manifest.points?.window !== undefined).map((b) => b.dir)
+    expect(lit).toEqual(['cabin'])
+  })
 })

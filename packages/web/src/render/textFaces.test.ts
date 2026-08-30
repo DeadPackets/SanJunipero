@@ -219,9 +219,12 @@ describe('the tail points at the speaker, in three steps', () => {
 describe('a thought is a different material, never a thinner one', () => {
   it('leaves no alpha on a bubble node', () => {
     // comments stripped: the source SAYS `alpha: 0.55` where it explains what it stopped doing
+    // the fade out (D19) is a motion on the way to nothing, not a thinner material: its one
+    // write goes through `bubbleAlpha`, and that line is the only alpha allowed
     const text = src('./bubbles.ts')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '')
+      .replace(/^.*b\.node\.alpha = leaving$/m, '')
     expect(text).not.toMatch(/\.alpha\s*=/)
     expect(text).not.toMatch(/THOUGHT_ALPHA/)
     expect(text).not.toMatch(/alpha:\s*0\.\d/)

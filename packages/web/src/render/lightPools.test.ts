@@ -17,6 +17,7 @@ vi.mock('pixi.js', () => {
     alpha = 1
     width = 0
     height = 0
+    tint = 0xffffff
     eventMode = ''
     blendMode = ''
     autoGarbageCollect = true
@@ -36,6 +37,9 @@ vi.mock('pixi.js', () => {
     circle(): this {
       return this
     }
+    rect(): this {
+      return this
+    }
     fill(): this {
       return this
     }
@@ -43,22 +47,19 @@ vi.mock('pixi.js', () => {
   const Texture = { EMPTY: {} }
   return { Container, Graphics, Point, Sprite, Texture }
 })
-import {
-  DEFAULT_CONFIG,
-  flamesAt,
-  isDark,
-  lightBandAt,
-  type LitWorld,
-  type SimConfig,
-} from '@sj/shared'
-import { FIRE_COLOR, SMOKE_COLOR } from './ambient.js'
-import { CLOCK_STOPS } from './tints.js'
+vi.mock('./entities.js', () => ({ entitySpriteOf: () => null }))
+import { DEFAULT_CONFIG, flamesAt, isDark, type LitWorld, type SimConfig } from '@sj/shared'
+import { CLOCK_STOPS, skyLevel } from './tints.js'
 import { TILE_H, TILE_W } from './iso.js'
 import {
+  BLOOM_ALPHA,
+  BREATH_AMP,
+  FIRE_ALPHA,
+  GLOW_BASE_ALPHA,
   POOL_COLOR,
-  POOL_DUSK_SCALE,
   POOL_MAX_ALPHA,
-  POOL_SWING,
+  breath,
+  cellPointOf,
   createLightPools,
   poolCentre,
   poolRadiusPx,
@@ -101,12 +102,9 @@ describe('the picture and the query cannot disagree about what is alight', () =>
   it('paints a pool for exactly the flames `isDark` answers to, and for no others', () => {
     const lit = lamp(10, 10, MIDNIGHT + 500)
     const cold = lamp(10, 10)
-    for (const tick of [NOON, DUSK, MIDNIGHT]) {
-      const painted = poolStrengthAt(tick) > 0 ? flamesAt(lit, tick, CFG).length : 0
-      const queried = isDark(lit, 10, 10, tick, CFG) ? 0 : flamesAt(lit, tick, CFG).length
-      // At night the flame is the only reason the tile is not dark, and both sides see it.
-      if (tick === MIDNIGHT) expect([painted, queried]).toEqual([1, 1])
-    }
+    const painted = poolStrengthAt(MIDNIGHT) > 0 ? flamesAt(lit, MIDNIGHT, CFG).length : 0
+    const queried = isDark(lit, 10, 10, MIDNIGHT, CFG) ? 0 : flamesAt(lit, MIDNIGHT, CFG).length
+    expect([painted, queried]).toEqual([1, 1])
     // A post nobody fed: no flame, no pool, and the query says dark.
     expect(flamesAt(cold, MIDNIGHT, CFG)).toEqual([])
     expect(isDark(cold, 10, 10, MIDNIGHT, CFG)).toBe(true)
@@ -119,32 +117,63 @@ describe('the picture and the query cannot disagree about what is alight', () =>
     expect(flamesAt(lit, MIDNIGHT, CFG)).toHaveLength(1)
   })
 
-  it('brightens on the same word the band changes on: dark, dim, then nothing at all', () => {
-    expect(lightBandAt(world(), 0, 0, MIDNIGHT, CFG)).toBe('dark')
+  // The old strength stepped at 19:00 / 21:00 / 05:00 / 07:00 while the sky ramped between
+  // 19:00 and 20:30: six hard steps a day. Now it is the sky's own curve, inverted (D4, U4).
+  it('is the inverse of the one sky curve: full at midnight, nothing at noon, partway at dusk', () => {
     expect(poolStrengthAt(MIDNIGHT)).toBe(1)
-    expect(lightBandAt(world(), 0, 0, DUSK, CFG)).toBe('dim')
-    expect(poolStrengthAt(DUSK)).toBe(POOL_DUSK_SCALE)
-    expect(lightBandAt(world(), 0, 0, NOON, CFG)).toBe('bright')
-    expect(poolStrengthAt(NOON)).toBe(0) // the day needs no help
-    expect(POOL_DUSK_SCALE).toBeGreaterThan(0)
-    expect(POOL_DUSK_SCALE).toBeLessThan(1)
+    expect(poolStrengthAt(NOON)).toBe(0)
+    expect(poolStrengthAt(DUSK)).toBeCloseTo(1 - skyLevel(DUSK), 12)
+    expect(poolStrengthAt(DUSK)).toBeGreaterThan(0)
+    expect(poolStrengthAt(DUSK)).toBeLessThan(1)
+    expect(poolStrengthAt(MIDNIGHT + 1440 * 3)).toBe(1) // any day, the same clock
+  })
+})
+
+describe('the breath (U3) — two incommensurate sines, phased by the id', () => {
+  it('stays inside BREATH_AMP for every light at every instant', () => {
+    for (const id of ['lamp_1', 'hearth_7', 'fire_pit_2', 'torch:omar'])
+      for (let t = 0; t < 30; t += 0.01)
+        expect(Math.abs(breath(id, t)), `${id} @ ${t}`).toBeLessThanOrEqual(BREATH_AMP)
+  })
+
+  it('no two lamps agree — the phase comes off hash32(id)', () => {
+    const a = Array.from({ length: 50 }, (_, i) => breath('lamp_a', i / 10))
+    const b = Array.from({ length: 50 }, (_, i) => breath('lamp_b', i / 10))
+    expect(a).not.toEqual(b)
+  })
+
+  it('is deterministic — the same id at the same instant breathes the same', () => {
+    expect(breath('x', 1.234)).toBe(breath('x', 1.234))
+  })
+
+  it('never reaches the photosensitive band: 1.7 Hz and 2.9 Hz, not 7', () => {
+    const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
+    expect(src).toContain('2 * Math.PI * 1.7 * tSec')
+    expect(src).toContain('2 * Math.PI * 2.9 * tSec')
+    expect(src).not.toMatch(/FIRE_HZ|\* 7 \*/)
+  })
+
+  it('keeps every light under its ceiling with the breath on top', () => {
+    // the pool breathes about its ceiling and is clamped to it, so it only ever dips
+    const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(
+      /Math\.min\(\s*POOL_MAX_ALPHA,\s*\(POOL_MAX_ALPHA \+ \(b \* POOL_MAX_ALPHA\) \/ FIRE_ALPHA\) \* strength/,
+    )
+    expect(POOL_MAX_ALPHA).toBeLessThanOrEqual(0.5)
+    expect(GLOW_BASE_ALPHA + 2 * BREATH_AMP).toBeLessThanOrEqual(0.5)
+    expect(BLOOM_ALPHA + BREATH_AMP).toBeLessThan(0.6)
+    expect(FIRE_ALPHA + BREATH_AMP).toBeLessThan(0.75)
   })
 })
 
 describe('the pool is a pool of light and not a pale plate', () => {
-  it('cannot reach full brightness, the same ceiling the window glow answers to', () => {
-    expect(POOL_MAX_ALPHA + POOL_SWING).toBeLessThanOrEqual(0.5)
+  it('is the one warm-light token, never cream', () => {
+    expect(POOL_COLOR).toBe(0xf7a66b)
   })
 
-  it('is the same warm token the fire already uses, never cream', () => {
-    expect(POOL_COLOR).toBe(FIRE_COLOR) // one warm-light token in the render, not two
-    expect(POOL_COLOR).not.toBe(SMOKE_COLOR) // cream read as white glass; that is the round-3 defect
-  })
-
-  // `atmosphere.ts` multiplies the whole stage by the clock tint, and at deep night that tint
-  // keeps 95% of blue against 45% of red — so honey `#F2C879` comes out BLUE-dominant and reads
-  // as moonlight. This is the arithmetic, so nobody has to re-derive it by eye.
-  it('★ still reads WARM after the night multiply — measured, not chosen', () => {
+  // Above the night quad now (U1), so the multiply no longer touches it — but the token is
+  // still the one that would survive it, which is why it was chosen.
+  it('★ reads WARM even under the night multiply — measured, not chosen', () => {
     const NIGHT_TINT = CLOCK_STOPS.find((s) => s.minute === 0)!.tint
     const after = (rgb: number): [number, number, number] => [
       ((rgb >> 16) & 0xff) * NIGHT_TINT[0],
@@ -152,22 +181,16 @@ describe('the pool is a pool of light and not a pale plate', () => {
       (rgb & 0xff) * NIGHT_TINT[2],
     ]
     const [r, , b] = after(POOL_COLOR)
-    expect(
-      r - b,
-      'the pool reads cold at midnight — a lamp that reads cold is not relief',
-    ).toBeGreaterThan(0)
-    // and the colour it replaced is the counter-example that makes this test mean something
+    expect(r - b).toBeGreaterThan(0)
     const [hr, , hb] = after(0xf2c879)
     expect(hr - hb).toBeLessThan(0)
   })
 
   it("covers the flame's own reach on the iso ground, wide as it is tall by the tile ratio", () => {
-    // `sx = (dx-dy)*16, sy = (dx+dy)*8`, so a chebyshev square is a diamond twice as wide as
-    // it is tall. A pool that ignored that would be a circle on a dimetric floor.
     for (const r of [3, 4, 5]) {
       const { rx, ry } = poolRadiusPx(r)
       expect(rx / ry).toBe(TILE_W / TILE_H)
-      expect(rx).toBeGreaterThan(r * TILE_W) // reaches past the last lit tile's centre
+      expect(rx).toBeGreaterThan(r * TILE_W)
     }
     expect(poolRadiusPx(CFG.light.glowRadius.lamp_post)).toEqual({
       rx: 4.5 * TILE_W,
@@ -175,33 +198,53 @@ describe('the pool is a pool of light and not a pale plate', () => {
     })
   })
 
-  it('pools from the middle of a long footprint, not from its anchor corner', () => {
+  it('pools from the CENTRE of the footprint tile, not its top vertex (D29)', () => {
     expect(
       poolCentre({ id: 'a', source: 'structure', x: 10, y: 10, w: 1, h: 1, radius: 4 }),
-    ).toEqual({ sx: 0, sy: 10 * TILE_H })
+    ).toEqual({ sx: 0, sy: 10 * TILE_H + TILE_H / 2 })
     // a 3x1 hearth pools from (11,10), one tile along, exactly where `distanceToFlame` measures
     expect(
       poolCentre({ id: 'b', source: 'structure', x: 10, y: 10, w: 3, h: 1, radius: 3 }),
-    ).toEqual({ sx: TILE_W / 2, sy: 10.5 * TILE_H })
+    ).toEqual({ sx: TILE_W / 2, sy: 10.5 * TILE_H + TILE_H / 2 })
+  })
+})
+
+describe('a cell point lands on the art wherever the entity layer put the sprite', () => {
+  const sprite = (texW: number) => ({
+    x: 100,
+    y: 200,
+    anchor: { x: 0.5, y: 255 / 256 },
+    scale: { x: 0.25, y: 0.25 },
+    texture: { width: texW, height: texW },
+  })
+
+  it('maps the fire pit flame (130, 120) to 2 px right and 34 px up from the feet', () => {
+    const at = cellPointOf(sprite(256) as never, { x: 130, y: 120 })
+    expect(at).toEqual({ sx: 100 + (130 - 128) * 0.25, sy: 200 + (120 - 255) * 0.25 })
+  })
+
+  it('answers null until the art has landed — Texture.EMPTY is a pixel wide', () => {
+    expect(cellPointOf(sprite(1) as never, { x: 130, y: 120 })).toBeNull()
+  })
+
+  it('follows the sprite: move the feet and the flame moves with them', () => {
+    const a = cellPointOf(sprite(256) as never, { x: 100, y: 84 })!
+    const b = cellPointOf({ ...sprite(256), y: 208 } as never, { x: 100, y: 84 })!
+    expect(b.sy - a.sy).toBe(8)
   })
 })
 
 describe('what this pass must not have broken', () => {
   const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
-  // The guard below first read the whole file and tripped on its own explanation of why it does
-  // not touch the bake, so everything asserted as ABSENT reads comment-stripped source.
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .filter((l) => !l.trim().startsWith('//'))
     .join('\n')
 
-  it('★ does not touch the ground bake: it draws on groundDecal, never on `ground`', () => {
-    // The bake is chunked and `MAX_TEXTURE_SIZE` 2048 is crossed between ring one and ring two.
-    // A pool painted INTO the bake would be in that budget and would be re-baked every time a
-    // torch moved. It is a sprite on the decoration layer instead.
-    expect(src).toContain('scene.layers.groundDecal.addChild(root)')
-    expect(code).not.toContain('layers.ground.')
+  it('★ draws ABOVE the night grade, in the screen lights layer, and never into the bake (D1)', () => {
+    expect(src).toContain('scene.screen.lights.addChild(root)')
+    expect(code).not.toContain('layers.ground')
     expect(code).not.toMatch(/bake|chunk/i)
   })
 
@@ -211,14 +254,14 @@ describe('what this pass must not have broken', () => {
     expect(code).not.toContain('layers.entities')
   })
 
-  it('★ culls: an offscreen flame is not drawn, through the one function everything asks', () => {
+  it('★ culls: an offscreen light is not drawn, through the one function everything asks', () => {
     expect(src).toContain('rectInView(')
     expect(src).toContain('scene.viewRect()')
   })
 
-  it('honours prefers-reduced-motion — a breathing lamp is a motion decision', () => {
-    expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-    expect(src).toContain('const breath = still ? 0 :')
+  it('honours prefers-reduced-motion through the scene, the one owner of the question', () => {
+    expect(src).toContain('const still = !scene.wantsMotion()')
+    expect(src).toContain('const tSec = still ? 0 : t / 1000')
   })
 
   it('never swallows a pointer: a decoration that takes a click is a picking bug', () => {
@@ -226,46 +269,44 @@ describe('what this pass must not have broken', () => {
     expect(src).toContain("s.eventMode = 'none'")
   })
 
-  // Pixi's `GCSystem` unloads any resource with `autoGarbageCollect` that goes untouched for
-  // `maxUnusedTime`, and an unloaded source is a null one that takes the whole stage down. A
-  // source-text guard is weak, so these say exactly which line they stand on.
+  it('★ NO door glow: light comes only from a source the art shows lit (ruling 21)', () => {
+    expect(code).not.toMatch(/door/i)
+    expect(src).toContain('pts.flame')
+    expect(src).toContain('pts.window')
+  })
+
   it("★ pins BOTH the texture and the sprites against pixi's GC", () => {
-    // Two resources, two defaults, one crash: `TextureSource` and `ViewContainer` are both
-    // GC-managed, and a pool at `visible = false` through a day is untouched on both counts.
     expect(src).toContain('tex.source.autoGarbageCollect = false')
     expect(src).toContain('s.autoGarbageCollect = false')
   })
 
   it('★ does not churn the pool on a clock boundary — that churn is what fed the GC', () => {
-    // `flamesAt` is asked EVERY frame, day included; the day only sets `visible`.
     expect(src).toContain(
       'const flames = flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)',
     )
     expect(code).not.toMatch(/strength === 0 \? \[\]/)
-    expect(src).toContain('s.visible = seen')
-    // Every destroy on a SPRITE must spare the shared texture. `root` and the throwaway Graphics
-    // own nothing shared, so they are named exemptions rather than a blanket skip.
     for (const m of code.match(/(\w+)\.destroy\(([^)]*)\)/g) ?? []) {
-      if (m.startsWith('root.destroy') || m.startsWith('g.destroy') || m.startsWith('tex.destroy'))
-        continue
+      if (/^(root|g|tex|fireTex)\.destroy/.test(m)) continue
       expect(m, `${m} could destroy the texture every sprite shares`).toContain('texture: false')
     }
   })
 })
 
 describe('the pool is priced by the world the store describes, not by the defaults', () => {
-  const painted = (config: SimConfig | null): { width: number; height: number } => {
-    const children: { children: { width: number; height: number }[] }[] = []
-    const decal = { children, addChild: (c: (typeof children)[0]) => children.push(c) }
+  const painted = (config: SimConfig | null): { width: number; height: number; tint: number } => {
+    const children: { children: { width: number; height: number; tint: number }[] }[] = []
+    const lights = { children, addChild: (c: (typeof children)[0]) => children.push(c) }
     const scene = {
       app: { renderer: { generateTexture: () => ({ source: {} }) } },
-      layers: { groundDecal: decal },
+      screen: { lights },
       viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+      wantsMotion: () => true,
     } as unknown as Scene
     const store = {
       getState: () => lamp(10, 10, MIDNIGHT + 500),
       getTick: () => MIDNIGHT,
       getConfig: () => config,
+      assetRecords: () => [],
     } as unknown as WorldStore
     createLightPools(scene, store).tick(16)
     return children[0]!.children[0]!
@@ -287,5 +328,9 @@ describe('the pool is priced by the world the store describes, not by the defaul
   it('falls back to the defaults for the frames before the snapshot lands', () => {
     const r = DEFAULT_CONFIG.light.glowRadius.lamp_post
     expect(painted(null).width).toBeCloseTo(poolRadiusPx(r).rx * 2)
+  })
+
+  it('tints the white radial with the warm token', () => {
+    expect(painted(null).tint).toBe(POOL_COLOR)
   })
 })

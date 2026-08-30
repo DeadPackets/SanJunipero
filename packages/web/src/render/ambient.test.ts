@@ -45,14 +45,14 @@ vi.mock('pixi.js', () => {
   return { Container, Graphics, Point, Sprite, Texture: { EMPTY: {} } }
 })
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
-import type { WorldState } from '@sj/engine/state'
+import type { TileId, WorldState } from '@sj/engine/state'
 import {
-  GLOW_BASE_ALPHA,
-  GLOW_SWING,
   HEARTH_KINDS,
   SMOKE_COLOR,
   SMOKE_MAX_ALPHA,
+  TREES_MAX,
   createAmbient,
+  sampleDecorations,
 } from './ambient.js'
 import type { Scene } from './scene.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -85,8 +85,37 @@ describe('the ambient effects stay quiet', () => {
     expect(SMOKE_MAX_ALPHA).toBeLessThan(0.5)
   })
 
-  it('the additive night glow cannot reach full brightness', () => {
-    expect(GLOW_BASE_ALPHA + GLOW_SWING).toBeLessThanOrEqual(0.5)
+  it('draws no light of its own — every additive glow lives above the night grade (D1)', () => {
+    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
+    expect(src).not.toContain("blendMode = 'add'")
+  })
+
+  it('★ holds every oscillator at base under prefers-reduced-motion (D6)', () => {
+    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
+    expect(src).toContain('const still = !scene.wantsMotion()')
+    expect(src).toContain('if (!grave && !still) t += dtMs')
+  })
+
+  it('sways a canopy by whole pixels of its crown, never by a shear (D14)', () => {
+    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
+    expect(src).not.toContain('skew')
+    expect(src).toMatch(/crown\.position\.x =\s*tr\.sx \+ Math\.round\(/)
+  })
+})
+
+describe('sampleDecorations spreads the cap over the whole map (D15)', () => {
+  it('woods the last rows as well as the first when the forest is over the cap', () => {
+    const FOREST: TileId = 3
+    const side = 40 // 1600 forest tiles against a cap of 80
+    const terrain: TileId[][] = Array.from({ length: side }, () =>
+      Array.from({ length: side }, () => FOREST),
+    )
+    const trees = sampleDecorations(terrain).filter((d) => d.kind === 'tree')
+    expect(trees.length).toBeLessThanOrEqual(TREES_MAX)
+    expect(trees.length).toBeGreaterThan(TREES_MAX / 2)
+    const rows = new Set(trees.map((d) => d.y))
+    expect(Math.max(...rows)).toBeGreaterThan(side / 2)
+    expect(Math.min(...rows)).toBeLessThan(side / 2)
   })
 })
 
@@ -109,12 +138,13 @@ describe('the effect sprites track the world, not the frame', () => {
       app: {
         renderer: { generateTexture: () => ({}) },
         screen: { width: 800 },
-        stage: { addChild: () => {} },
       },
       layers: {
         groundDecal: { addChild: () => {} },
         overhead: { addChild: (...c: Kid[]) => kids.push(...c) },
       },
+      wantsMotion: () => true,
+      reachableBox: () => ({ minX: 0, maxX: 800, minY: 0, maxY: 600 }),
     } as unknown as Scene
     const terrain = [
       [0, 0],
@@ -148,28 +178,30 @@ describe('the effect sprites track the world, not the frame', () => {
 
   const alive = (kids: Kid[]): number => kids.filter((c) => !c.destroyed).length
 
-  it('a hearth completing between frames still gets its smoke and glow', () => {
+  it('a hearth completing between frames still gets its smoke', () => {
     const h = drive([])
     h.tick()
-    expect(alive(h.kids)).toBe(0)
-
+    const flock = alive(h.kids) // the birds live in `overhead` too, and are not a hearth's
     h.setWorld([hearth('s1', 4)])
     h.tick()
-    const one = alive(h.kids)
+    const one = alive(h.kids) - flock
     expect(one).toBeGreaterThan(0)
 
     h.setWorld([hearth('s1', 4), hearth('s2', 9)])
     h.tick()
-    expect(alive(h.kids)).toBe(one * 2)
+    expect(alive(h.kids) - flock).toBe(one * 2)
   })
 
   it('a structure leaving the world takes its overhead sprites with it', () => {
+    const empty = drive([])
+    empty.tick()
+    const flock = alive(empty.kids)
     const h = drive([hearth('s1', 4)])
     h.tick()
-    expect(alive(h.kids)).toBeGreaterThan(0)
+    expect(alive(h.kids)).toBeGreaterThan(flock)
     h.setWorld([])
     h.tick()
-    expect(alive(h.kids)).toBe(0)
+    expect(alive(h.kids)).toBe(flock)
   })
 
   it('★ a second frame over the same world builds nothing — the walk is per delta, not per frame', () => {

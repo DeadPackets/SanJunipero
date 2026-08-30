@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
-import { CITY_HEARTH_KIND, cityStructures, simTimeFromTick } from '@sj/shared'
+import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
 import type { TileId, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen, TILE_H } from './iso.js'
@@ -9,6 +9,7 @@ import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
 import { setEntityScaleMul } from './entities.js'
+import { hash32 } from './charAnim.js'
 import { isGrave, toneReducer } from './tone.js'
 
 const SMOKE_PUFFS = 3
@@ -29,14 +30,9 @@ export const HEARTH_KINDS: ReadonlySet<string> = new Set([
 export const SHIMMER_MAX = 60
 const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
-const TREE_SKEW = 0.06
-const GLOW_R = 4 // a round pool of light, not a 6x6 card
-const GLOW_COLOR = 0xf4e289
-// additive blending drives a honey square to near-white; this is the ceiling that keeps it
-// reading as lamplight rather than as a pale rectangle stuck to the wall
-export const GLOW_BASE_ALPHA = 0.3
-export const GLOW_SWING = 0.12
-const GLOW_HZ = 0.4
+/** A canopy sways by a whole pixel of its crown, never by a shear: a sheared 12×20 NEAREST
+ *  sprite resamples at fractional texels every frame and its edge crawls (D14). */
+const SWAY_HZ = 0.16
 const BOUNCE_MS = 260
 const BOUNCE_SCALE = 1.18
 const SQUASH_Y = 0.92
@@ -44,9 +40,6 @@ const SQUASH_HZ = 0.3
 const SQUASH_VERBS = ['build', 'till', 'harvest', 'fish'] as const
 const BIRD_MIN_S = 20
 const BIRD_MAX_S = 45
-export const FIRE_COLOR = 0xf7a66b
-const FIRE_HZ = 7
-const FIRE_FROZEN_ALPHA = 0.6
 
 const WATER: TileId = 2
 const FOREST: TileId = 3
@@ -65,7 +58,8 @@ const CANOPY_SHADE = 0x4f7040
 /** Half-width of the canopy per row, top to bottom: a round crown over a two-pixel trunk. */
 const CANOPY_ROWS: readonly number[] = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 2]
 
-/** The tree, as flat blocks with hard edges — one row of the crown at a time. */
+/** The tree, as flat blocks with hard edges — one row of the crown at a time. The trunk is
+ *  the last block, so the crown can be drawn on its own and swayed over a still trunk. */
 function canopyBlocks(): {
   x: number
   y: number
@@ -119,14 +113,22 @@ export function sampleDecorations(terrain: TileId[][]): Decoration[] {
     out.push(d)
     return true
   }
-  let trees = 0,
-    shimmers = 0
-  for (let y = 0; y < terrain.length && shimmers < SHIMMER_MAX; y++)
-    for (let x = 0; x < terrain[y]!.length && shimmers < SHIMMER_MAX; x++)
-      if (terrain[y]![x] === WATER && place('shimmer', x, y)) shimmers++
-  for (let y = 0; y < terrain.length && trees < TREES_MAX; y++)
-    for (let x = 0; x < terrain[y]!.length && trees < TREES_MAX; x++)
-      if (terrain[y]![x] === FOREST && place('tree', x, y)) trees++
+  // Chosen by hash, not by scan order: a scan that stops at the cap woods the north-west rows
+  // and leaves the southern forest bare (D15). The hash spreads the cap over the whole map.
+  const spread = (kind: Decoration['kind'], id: TileId, cap: number): void => {
+    const found: { x: number; y: number; h: number }[] = []
+    for (let y = 0; y < terrain.length; y++)
+      for (let x = 0; x < terrain[y]!.length; x++)
+        if (terrain[y]![x] === id) found.push({ x, y, h: hash32(`${x},${y}`) })
+    found.sort((a, b) => a.h - b.h || a.y - b.y || a.x - b.x)
+    let placed = 0
+    for (const f of found) {
+      if (placed >= cap) break
+      if (place(kind, f.x, f.y)) placed++
+    }
+  }
+  spread('shimmer', WATER, SHIMMER_MAX)
+  spread('tree', FOREST, TREES_MAX)
   return out
 }
 
@@ -160,21 +162,21 @@ export function createAmbient(
   const puffTex = scene.app.renderer.generateTexture(puffG)
   puffG.destroy()
   const shimmerTex = px(SHIMMER_PX.w, SHIMMER_PX.h, 0xffffff)
-  const glowG = new Graphics()
-  glowG.circle(GLOW_R, GLOW_R, GLOW_R)
-  glowG.fill(GLOW_COLOR)
-  const glowTex = scene.app.renderer.generateTexture(glowG)
-  glowG.destroy()
   const birdTex = px(3, 2, 0x241f2b)
-  const canopyG = new Graphics()
-  for (const b of canopyBlocks()) {
-    canopyG.rect(b.x, b.y, b.w, b.h)
-    canopyG.fill(b.color)
+  const blocks = canopyBlocks()
+  const trunk = blocks.at(-1)!
+  const crownG = new Graphics()
+  for (const b of blocks.slice(0, -1)) {
+    crownG.rect(b.x, b.y, b.w, b.h)
+    crownG.fill(b.color)
   }
-  const canopyTex = scene.app.renderer.generateTexture(canopyG)
-  canopyG.destroy()
-  const fireTex = px(10, 12, FIRE_COLOR)
+  const crownTex = scene.app.renderer.generateTexture(crownG)
+  crownG.destroy()
+  const trunkTex = px(trunk.w, trunk.h, trunk.color)
 
+  // Under `prefers-reduced-motion` the director clock never advances: every oscillator holds
+  // at its base, and a bounce or a squash arrives at rest instead of travelling.
+  const still = !scene.wantsMotion()
   let t = 0 // director clock — freezes under grave tone, so every animator stills mid-frame
   let grave = false
   let tone = { graveUntil: 0 }
@@ -193,10 +195,8 @@ export function createAmbient(
     }
   })
 
-  // ── per-structure effect sprites ──
+  // ── per-structure effect sprites (the lights live in lightPools, above the night grade) ──
   const smoke = new Map<string, Sprite[]>()
-  const glows = new Map<string, Sprite>()
-  const fires = new Map<string, Sprite>()
   /** where a structure's effects hang and whether it is alight — rewritten when the world
    *  changes, so the frame loop below reads it instead of walking every structure again */
   const anchors = new Map<string, { sx: number; sy: number; hasFire: boolean }>()
@@ -234,40 +234,11 @@ export function createAmbient(
         }
         smoke.set(s.id, puffs)
       }
-      if (hasFire && !glows.has(s.id)) {
-        const g = new Sprite(glowTex)
-        g.anchor.set(0.5, 1)
-        g.blendMode = 'add'
-        g.eventMode = 'none'
-        scene.layers.overhead.addChild(g)
-        glows.set(s.id, g)
-      }
-      // the door face — "deep blue night, warm window glow"
-      glows.get(s.id)?.position.set(anchor.sx, anchor.sy - 2)
-      if (s.burning && !fires.has(s.id)) {
-        const f = new Sprite(fireTex)
-        f.anchor.set(0.5, 1)
-        f.blendMode = 'add'
-        f.eventMode = 'none'
-        scene.layers.overhead.addChild(f)
-        fires.set(s.id, f)
-      }
-      const fire = fires.get(s.id)
-      if (fire !== undefined) {
-        if (s.burning) fire.position.set(anchor.sx, anchor.sy - 8)
-        else {
-          fire.destroy()
-          fires.delete(s.id)
-        }
-      }
     }
-    for (const map of [smoke, glows, fires] as const) {
-      for (const [id, v] of map) {
-        if (live.has(id)) continue
-        if (Array.isArray(v)) for (const p of v) p.destroy()
-        else v.destroy()
-        map.delete(id)
-      }
+    for (const [id, puffs] of smoke) {
+      if (live.has(id)) continue
+      for (const p of puffs) p.destroy()
+      smoke.delete(id)
     }
     for (const id of anchors.keys()) if (!live.has(id)) anchors.delete(id)
   }
@@ -275,22 +246,35 @@ export function createAmbient(
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
   const shimmers: { sprite: Sprite; phase: number }[] = []
-  const trees: { sprite: Sprite; phase: number }[] = []
+  const trees: { crown: Sprite; trunk: Sprite; sx: number; phase: number }[] = []
 
   const sampleTerrain = (terrain: TileId[][]): void => {
     for (const s of shimmers) s.sprite.destroy()
-    for (const s of trees) s.sprite.destroy()
+    for (const tr of trees) {
+      tr.crown.destroy()
+      tr.trunk.destroy()
+    }
     shimmers.length = 0
     trees.length = 0
     // `sampleDecorations` is the whole placement decision, caps and ground law included, so
     // there is nothing here for a test to be unable to see.
     for (const d of sampleDecorations(terrain)) {
-      const sprite = new Sprite(d.kind === 'tree' ? canopyTex : shimmerTex)
-      if (d.kind === 'tree') sprite.anchor.set(0.5, 1)
-      sprite.position.set(d.sx, d.sy)
-      under.addChild(sprite)
-      const phase = ((d.x * 7 + d.y * 13) % 628) / 100 // deterministic phase, no RNG
-      ;(d.kind === 'tree' ? trees : shimmers).push({ sprite, phase })
+      const phase = (hash32(`${d.x},${d.y}`) % 628) / 100 // deterministic phase, no RNG
+      if (d.kind === 'shimmer') {
+        const sprite = new Sprite(shimmerTex)
+        sprite.position.set(d.sx, d.sy)
+        under.addChild(sprite)
+        shimmers.push({ sprite, phase })
+        continue
+      }
+      const trunkS = new Sprite(trunkTex)
+      trunkS.anchor.set(0.5, 1)
+      trunkS.position.set(d.sx, d.sy)
+      const crown = new Sprite(crownTex)
+      crown.anchor.set(0.5, 1)
+      crown.position.set(d.sx, d.sy - trunk.h)
+      under.addChild(trunkS, crown)
+      trees.push({ crown, trunk: trunkS, sx: d.sx, phase })
     }
   }
 
@@ -307,7 +291,8 @@ export function createAmbient(
   }
   birdV.visible = false
   birdV.eventMode = 'none'
-  scene.app.stage.addChild(birdV)
+  // In the world, over the town: a flock on `app.stage` neither parallaxed nor darkened (D24).
+  scene.layers.overhead.addChild(birdV)
   let birdAt = -1 // director-time when the current flight started; <0 → waiting
   let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
   const BIRD_FLIGHT_MS = 10_000
@@ -317,7 +302,6 @@ export function createAmbient(
     layers.weather.setSuppressed(v)
     layers.bubbles.setSuppressed(v)
     layers.chars?.setEmotesHidden(v)
-    if (v) for (const f of fires.values()) f.alpha = FIRE_FROZEN_ALPHA // fire stays visible, only its animation stills
   }
 
   const tick = (dtMs: number): void => {
@@ -325,7 +309,7 @@ export function createAmbient(
     if (state === null) return
     const nowGrave = isGrave(tone, store.getTick())
     if (nowGrave !== grave) applyTone(nowGrave)
-    if (!grave) t += dtMs
+    if (!grave && !still) t += dtMs
 
     if (state.terrain !== sampledTerrain) {
       sampledTerrain = state.terrain
@@ -336,9 +320,7 @@ export function createAmbient(
       syncStructureFx(state)
     }
 
-    const night = simTimeFromTick(store.getTick()).isNight
-
-    // structures: smoke (complete), night glow (complete), fire (burning)
+    // structures: smoke (complete)
     for (const [id, puffs] of smoke) {
       const a = anchors.get(id)
       if (a === undefined) continue
@@ -349,47 +331,40 @@ export function createAmbient(
         p.visible = a.hasFire
       })
     }
-    const glowAlpha =
-      GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
-    for (const [id, glow] of glows) {
-      glow.visible = (anchors.get(id)?.hasFire ?? false) && night
-      glow.alpha = glowAlpha
-    }
-    if (!grave) {
-      const fireAlpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
-      for (const f of fires.values()) f.alpha = fireAlpha
-    }
 
     // water shimmer + swaying trees
     for (const sh of shimmers)
       sh.sprite.alpha =
         0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
-    for (const tr of trees) tr.sprite.skew.x = TREE_SKEW * Math.sin(t / 1000 + tr.phase)
+    for (const tr of trees)
+      tr.crown.position.x =
+        tr.sx + Math.round(Math.sin(2 * Math.PI * SWAY_HZ * (t / 1000) + tr.phase))
 
     // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {
       const b = bounces[i]!
       const p = (t - b.at) / BOUNCE_MS
-      const done = p >= 1 || p < 0
+      const done = still || p >= 1 || p < 0
       const k = done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
       const subject = setEntityScaleMul(scene, b.kind, b.id, k)
       if (done || !subject) bounces.splice(i, 1)
     }
 
     // squash-and-stretch while a work verb persists — a grave town stills mid-squash
-    if (!grave && layers.chars !== undefined) {
+    if (!grave && !still && layers.chars !== undefined) {
       const k = 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
       for (const id of working) layers.chars.setScaleMulY(id, k)
     }
 
-    // birds across the sky band
-    if (!grave) {
+    // birds across the town, in world px, so they scale and darken with everything else
+    if (!grave && !still) {
+      const box = scene.reachableBox()
       if (birdAt < 0) {
         nextBirdIn -= dtMs
         if (nextBirdIn <= 0) {
           birdAt = t
           birdV.visible = true
-          birdV.position.set(-20, 30 + Math.random() * 60)
+          birdV.position.set(box.minX - 20, box.minY + 30 + Math.random() * 60)
         }
       }
       if (birdAt >= 0) {
@@ -399,7 +374,7 @@ export function createAmbient(
           birdV.visible = false
           nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
         } else {
-          birdV.position.x = -20 + p * (scene.app.screen.width + 40)
+          birdV.position.x = box.minX - 20 + p * (box.maxX - box.minX + 40)
         }
       }
     }
@@ -411,14 +386,14 @@ export function createAmbient(
     destroy: () => {
       offEvents()
       for (const puffs of smoke.values()) for (const p of puffs) p.destroy()
-      for (const g of glows.values()) g.destroy()
-      for (const f of fires.values()) f.destroy()
       for (const s of shimmers) s.sprite.destroy()
-      for (const tr of trees) tr.sprite.destroy()
+      for (const tr of trees) {
+        tr.crown.destroy()
+        tr.trunk.destroy()
+      }
       birdV.destroy({ children: true })
       under.destroy({ children: true })
-      for (const tex of [puffTex, shimmerTex, glowTex, birdTex, canopyTex, fireTex])
-        tex.destroy(true)
+      for (const tex of [puffTex, shimmerTex, birdTex, crownTex, trunkTex]) tex.destroy(true)
     },
   }
 }

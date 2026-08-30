@@ -106,8 +106,13 @@ describe('one filter for the whole town', () => {
     expect(sources().length).toBeGreaterThan(40)
   })
 
-  it('leaves nothing opted out of NEAREST', () => {
-    expect(smoothingOffenders(sources())).toEqual([])
+  // The sky ramp is a 1×64 gradient stretched over the whole town: at NEAREST it is 64 hard
+  // bands, and it carries no art. It is the ONE exemption, and it is named here so a second
+  // one cannot arrive quietly.
+  it('leaves nothing but the sky ramp opted out of NEAREST', () => {
+    expect(smoothingOffenders(sources()).map((o) => o.replace(/:\d+ —/, ' —'))).toEqual([
+      "render/atmosphere.ts — tex.source.scaleMode = 'linear'",
+    ])
   })
 
   it('still sets the global law in one place', () => {
