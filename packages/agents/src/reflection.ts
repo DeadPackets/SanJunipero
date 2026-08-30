@@ -273,7 +273,7 @@ export function updateLedgerPrompt(
         content: [
           `Person: ${personName}`,
           existing === null ? 'No earlier note.' : `Your earlier note:\n${existing}`,
-          `What you saw of them today:\n${JSON.stringify(compactMemories(relevant))}`,
+          `What you saw of them today:\n${JSON.stringify(freshMemories(relevant))}`,
         ].join('\n\n'),
       },
     ],
@@ -304,7 +304,9 @@ export function proposeEditPrompt(
   doc: PersonalityDoc,
   dayMemories: MemoryRow[],
 ): LlmPrompt {
-  const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
+  const memoryLines = freshMemories(dayMemories)
+    .map((m) => `[${m.id}] ${m.text}`)
+    .join('\n')
   return {
     // `ProposeEditSchema` is sent on every call, so only what it cannot say stays: `evidence`
     // is today's memory numbers, and temperament is not on the table.

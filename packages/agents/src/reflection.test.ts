@@ -593,6 +593,28 @@ describe('makeReflectionLlm prompts', () => {
     }
   })
 
+  const row = (id: number, kind: MemoryRow['kind'], text: string): MemoryRow => ({
+    id,
+    agentId: AGENT,
+    tick: DAY * TICKS_PER_DAY + id,
+    day: DAY,
+    kind,
+    text,
+    importance: 3,
+    tags: TAGS,
+  })
+
+  // A thought between two perceptions is the real shape of a day, and the reason the filter
+  // remembers the last moment of each kind rather than the last row.
+  const repeatedDay = [
+    row(1, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
+    row(2, 'thought', 'I should trade while she is here.'),
+    row(3, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
+    row(4, 'thought', 'I should trade while she is here.'),
+    row(5, 'perception', 'The storehouse door is open. Nadia is here. You are hungry.'),
+    row(6, 'perception', 'The storehouse door is shut.'),
+  ]
+
   const dumpOf = (p: { messages: LlmMessage[] }): { id: number; text: string }[] => {
     const content = p.messages[0]!.content
     return JSON.parse(content.slice(content.indexOf('\n') + 1)) as { id: number; text: string }[]
@@ -601,33 +623,13 @@ describe('makeReflectionLlm prompts', () => {
   // ★ The turn path drops what the moment before already said; until the night did the same,
   // one mind's day dump was 126k tokens of mostly the same perception, sent twice.
   it('★ the night dump keeps only what the moment before it did not already say', () => {
-    const row = (id: number, kind: MemoryRow['kind'], text: string): MemoryRow => ({
-      id,
-      agentId: AGENT,
-      tick: DAY * TICKS_PER_DAY + id,
-      day: DAY,
-      kind,
-      text,
-      importance: 3,
-      tags: TAGS,
-    })
-    // A thought between two perceptions is the real shape of a day, and the reason the filter
-    // remembers the last moment of each kind rather than the last row.
-    const day = [
-      row(1, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
-      row(2, 'thought', 'I should trade while she is here.'),
-      row(3, 'perception', 'The storehouse door is open. Nadia is here. Rain falls.'),
-      row(4, 'thought', 'I should trade while she is here.'),
-      row(5, 'perception', 'The storehouse door is open. Nadia is here. You are hungry.'),
-      row(6, 'perception', 'The storehouse door is shut.'),
-    ]
     const expected = [
       { id: 1, text: 'The storehouse door is open. Nadia is here. Rain falls.' },
       { id: 2, text: 'I should trade while she is here.' },
       { id: 5, text: 'You are hungry.' },
       { id: 6, text: 'The storehouse door is shut.' },
     ]
-    for (const prompt of [extractFactsPrompt(day), summarizeScenesPrompt(day)]) {
+    for (const prompt of [extractFactsPrompt(repeatedDay), summarizeScenesPrompt(repeatedDay)]) {
       expect(dumpOf(prompt).map((m) => ({ id: m.id, text: m.text }))).toEqual(expected)
     }
   })
@@ -644,6 +646,21 @@ describe('makeReflectionLlm prompts', () => {
     expect(a.messages[1]!.content).not.toBe(b.messages[1]!.content)
     expect(a.messages[1]!.content).toContain('at most eight')
     expect(b.messages[1]!.content).toContain('list the memories it draws from')
+  })
+
+  // ★ The per-person slice and the edit's `[id] text` lines are the night's two largest dumps
+  // — 162k and 114k tokens on run D — and both sent every repeat the two above now drop.
+  it('★ the ledger and the personality edit send the same deduped day', () => {
+    const ledger = updateLedgerPrompt('Nadia', null, repeatedDay).messages[0]!.content
+    for (const kept of ['"id":1', '"id":2', '"id":5', '"id":6']) expect(ledger).toContain(kept)
+    for (const dropped of ['"id":3', '"id":4']) expect(ledger).not.toContain(dropped)
+    expect(ledger).toContain('"text":"You are hungry."')
+
+    const edit = proposeEditPrompt('A still day.', doc, repeatedDay).messages[0]!.content
+    expect(edit).toContain("Today's memories:\n[1] The storehouse door is open.")
+    expect(edit).toContain('[5] You are hungry.')
+    expect(edit).not.toContain('[3]')
+    expect(edit).not.toContain('[4]')
   })
 
   it("proposeEdit prompt carries today's memory ids and what the schema cannot say", () => {
