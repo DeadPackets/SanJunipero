@@ -13,30 +13,8 @@
     },
     "packages/*": {
       "entry": [
-        "src/**/*.test.ts",
+        "**/*.test.ts",
         "scripts/*.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "scripts/**/*.ts"
-      ]
-    },
-    "packages/agents": {
-      "entry": [
-        "src/**/*.test.ts",
-        "scripts/*.ts",
-        "scripts/lib/*.test.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "scripts/**/*.ts"
-      ]
-    },
-    "packages/arbiter": {
-      "entry": [
-        "src/**/*.test.ts",
-        "scripts/*.ts",
-        "scripts/lib/*.test.ts"
       ],
       "project": [
         "src/**/*.ts",

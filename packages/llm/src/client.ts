@@ -136,7 +136,7 @@ type CallTokens = Pick<
 >
 
 // Absent on a call that died before it reported anything; every column is still written, as 0.
-function callTokens(raw: LanguageModelUsage | undefined): CallTokens {
+function tokensOf(raw: LanguageModelUsage | undefined): CallTokens {
   return {
     inputTokens: raw?.inputTokens ?? 0,
     outputTokens: raw?.outputTokens ?? 0,
@@ -373,7 +373,7 @@ export class LlmClient {
           reportedCostUsd: reported,
         } = await exec(model)
         const served = servedModel ?? modelName
-        const tokens = callTokens(raw)
+        const tokens = tokensOf(raw)
         const { inputTokens, outputTokens, cacheReadTokens } = tokens
         const computed = computeCostUsd(
           inputTokens,
@@ -388,7 +388,7 @@ export class LlmClient {
           this.llmCallRow({
             model: served,
             provider: provider ?? null,
-            tokens,
+            ...tokens,
             costUsd,
             estimatedCostUsd: computed.costUsd,
             reportedCostUsd: reported ?? null,
@@ -407,11 +407,12 @@ export class LlmClient {
         // A failure that carries no answer carries no back end to name it by. The
         // per-provider empty-call rate is therefore a rate over the calls that landed.
         const provider = dead === null ? null : servedProvider(dead.response, undefined)
-        const tokens = callTokens(dead?.usage)
+        const tokens = tokensOf(dead?.usage)
+        const { inputTokens, outputTokens, cacheReadTokens } = tokens
         const deadCost = computeCostUsd(
-          tokens.inputTokens,
-          tokens.outputTokens,
-          tokens.cacheReadTokens,
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
           served,
           provider,
         ).costUsd
@@ -420,7 +421,7 @@ export class LlmClient {
           this.llmCallRow({
             model: served,
             provider,
-            tokens,
+            ...tokens,
             costUsd: deadCost,
             estimatedCostUsd: deadCost,
             reportedCostUsd: null,
@@ -436,19 +437,8 @@ export class LlmClient {
     throw lastError
   }
 
-  private llmCallRow(
-    call: Omit<LlmCallInsert, 'agentId' | 'caller' | 'ok' | keyof CallTokens> & {
-      tokens: CallTokens
-    },
-  ): LlmCallInsert {
-    const { tokens, ...rest } = call
-    return {
-      agentId: this.agentId,
-      caller: this.caller,
-      ...tokens,
-      ...rest,
-      ok: call.error === null,
-    }
+  private llmCallRow(call: Omit<LlmCallInsert, 'agentId' | 'caller' | 'ok'>): LlmCallInsert {
+    return { agentId: this.agentId, caller: this.caller, ...call, ok: call.error === null }
   }
 
   /** The routing and reasoning body this client's calls carry. Readable so a test can prove

@@ -133,7 +133,6 @@ const quotedNumber = (v: unknown): number | undefined => {
   return Number.isFinite(n) && String(n) === trimmed ? n : undefined
 }
 
-// Drop the keys strict zod named, in the container it named them in.
 function dropUnknownKeys(
   root: unknown,
   path: readonly PropertyKey[],
@@ -151,24 +150,15 @@ function dropUnknownKeys(
   return dropped
 }
 
-// Read the quoted number in the slot the schema wanted a number in.
 function readQuotedNumber(root: unknown, path: readonly PropertyKey[]): boolean {
-  const key = path[path.length - 1]
-  if (key === undefined) return false
+  const key = path.at(-1)
+  const n = quotedNumber(containerAt(root, path))
+  if (key === undefined || n === undefined) return false
   const holder = containerAt(root, path.slice(0, -1))
-  if (Array.isArray(holder) && typeof key === 'number') {
-    const n = quotedNumber(holder[key])
-    if (n === undefined) return false
-    holder[key] = n
-    return true
-  }
-  if (isRecord(holder)) {
-    const n = quotedNumber(holder[String(key)])
-    if (n === undefined) return false
-    holder[String(key)] = n
-    return true
-  }
-  return false
+  if (Array.isArray(holder) && typeof key === 'number') holder[key] = n
+  else if (isRecord(holder)) holder[String(key)] = n
+  else return false
+  return true
 }
 
 // The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
@@ -178,22 +168,22 @@ function applySchemaIssues<T>(
   schema: z.ZodType<T>,
 ): { value: T; how: string } | undefined {
   const current = structuredClone(value)
-  const applied: string[] = []
+  const applied = new Set<string>()
   for (let round = 0; round < 4; round += 1) {
     const parsed = schema.safeParse(current)
     if (parsed.success) {
-      return applied.length === 0 ? undefined : { value: parsed.data, how: applied.join('+') }
+      return applied.size === 0 ? undefined : { value: parsed.data, how: [...applied].join('+') }
     }
     let changed = false
     for (const issue of parsed.error.issues) {
       if (issue.code === 'unrecognized_keys') {
         if (!dropUnknownKeys(current, issue.path, issue.keys)) continue
         changed = true
-        if (!applied.includes('unknown-keys-dropped')) applied.push('unknown-keys-dropped')
+        applied.add('unknown-keys-dropped')
       } else if (issue.code === 'invalid_type' && issue.expected === 'number') {
         if (!readQuotedNumber(current, issue.path)) continue
         changed = true
-        if (!applied.includes('quoted-numbers-read')) applied.push('quoted-numbers-read')
+        applied.add('quoted-numbers-read')
       }
     }
     if (!changed) return undefined

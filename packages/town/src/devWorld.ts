@@ -154,11 +154,8 @@ export async function startDevWorld(
     realMsPerTick?: number
     seed?: string
     ingest?: boolean
-    /** Every world knob at once, the way `parseWorldEnv()` hands them over; `worldEnv.ts` says
-     *  what each one means. The absent ones do NOT take the env defaults: the map is `scripted`
-     *  and interiors, builders, the bridge and joint building are all off, so every frozen gate
-     *  folds exactly the events it always did. `fresh` is off for its own reason — a function
-     *  handed a path to a database does not get to delete it without being asked. */
+    /** Every world knob at once, the way `parseWorldEnv()` hands them over. An absent knob takes
+     *  the LIBRARY default, which is not the env default: off, so a frozen gate folds unchanged. */
     world?: Partial<WorldEnv>
     /** dev/demo only: how many lamp posts one founder raises along the street and keeps fed.
      *  ABSENT by default — the stream asks for them; no gate does. */
