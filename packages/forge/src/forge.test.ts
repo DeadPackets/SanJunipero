@@ -3,8 +3,12 @@ import sharp from 'sharp'
 import { createForge } from './forge.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
+import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
 import type { ImageClient, Candidate } from './imageClient.js'
-import type { JudgeFn } from './judge.js'
+import { CRITERIA, deriveOverall, type VisionCriteria } from './visionQa/verdict.js'
+import type { VisionJudgeFn } from './visionQa/visionJudge.js'
+
+const JUDGE_USD = 0.0025
 
 // a valid 512x512 "generation": magenta field, sage square centered
 async function goodPng(): Promise<Buffer> {
@@ -39,13 +43,35 @@ function fakeClient(png: Buffer, log: number[]): ImageClient {
     },
   }
 }
-function scriptedJudge(scores: number[]): JudgeFn {
+
+/** One rubric verdict per call, every criterion on the same score. */
+function scriptedJudge(scores: number[]): VisionJudgeFn {
   let i = 0
-  return async () => ({ score: scores[Math.min(i++, scores.length - 1)]!, notes: 'scripted' })
+  return async (a) => {
+    const score = scores[Math.min(i++, scores.length - 1)]!
+    const criteria = Object.fromEntries(
+      CRITERIA.map((k) => [k, { pass: score >= 7, score, evidence: 'seen' }]),
+    ) as VisionCriteria
+    return {
+      costUsd: JUDGE_USD,
+      verdict: {
+        assetId: a.assetId,
+        model: 'google/gemini-3.7-flash',
+        rubricVersion: 'v1',
+        criteria,
+        feedback: 'raise the roof',
+        overall: deriveOverall(criteria, {
+          minScore: DEFAULT_FORGE_CONFIG.visionQa.minScore,
+          attempt: a.attempt ?? 1,
+          maxRetries: DEFAULT_FORGE_CONFIG.visionQa.maxRetries,
+        }),
+      },
+    }
+  }
 }
 
 describe('createForge().commission', () => {
-  it('ships on first attempt when a candidate scores >= 7', async () => {
+  it('ships on first attempt when the eye passes, on ONE vision call', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const gens: number[] = []
     const ready: string[] = []
@@ -63,22 +89,37 @@ describe('createForge().commission', () => {
     expect(rec.score).toBe(8)
     expect(rec.attempts).toBe(1)
     expect(rec.widthPx).toBe(64) // 1x1 building = 64px per Style Bible
-    expect(gens).toEqual([3]) // one attempt, 3 candidates
+    expect(gens).toEqual([1]) // one generation, one eye — never a per-candidate fan-out
     expect(ready).toEqual(['ready'])
-    expect(rec.costUsd).toBeGreaterThan(0.13) // 3 gens + judges
+    expect(rec.costUsd).toBeCloseTo(0.045 + JUDGE_USD, 6)
   })
-  it('retries on low scores and ships on a later attempt', async () => {
+  it('the eye is shown the commission and its own feedback on a redraw', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const prompts: string[] = []
+    const png = await goodPng()
+    const client: ImageClient = {
+      async generateCandidates(prompt) {
+        prompts.push(prompt)
+        return [{ png, model: 'fake', costUsd: 0.045 }]
+      },
+    }
+    const forge = createForge({ client, judge: scriptedJudge([4, 9]), codex, refs: [] })
+    await forge.commission('a leaning shed', { w: 1, h: 1 }, 'building', 'shed')
+    expect(prompts[0]).not.toContain('raise the roof')
+    // position is law: style boilerplate, then the fix, then the commission
+    expect(prompts[1]).toMatch(/Stardew.*raise the roof.*Subject: a leaning shed/s)
+  })
+  it('retries on a failed verdict and ships on a later attempt', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const gens: number[] = []
-    // attempts 1+2: all 3 candidates score 5; attempt 3: scores 9
-    const judge = scriptedJudge([5, 5, 5, 5, 5, 5, 9])
+    const judge = scriptedJudge([5, 5, 9])
     const forge = createForge({ client: fakeClient(await goodPng(), gens), judge, codex, refs: [] })
     const rec = await forge.commission('a stubborn barn', { w: 2, h: 1 }, 'building', 'barn')
     expect(rec.status).toBe('ready')
     expect(rec.attempts).toBe(3)
-    expect(gens).toEqual([3, 3, 3])
+    expect(gens).toEqual([1, 1, 1])
   })
-  it('falls back to a placeholder after 3 failed attempts', async () => {
+  it('falls back to a placeholder when the eye blocks every attempt', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const forge = createForge({
       client: fakeClient(await goodPng(), []),
@@ -93,7 +134,7 @@ describe('createForge().commission', () => {
     expect(rec.kind).toBe('relic') // the kind is recorded, so the town does not pay again on the next boot
     expect(codex.get(rec.id)).not.toBeNull() // placeholder is registered and hot-loadable
   })
-  it('a generateCandidates throw on every attempt still yields a placeholder, never a rejection', async () => {
+  it('a generateCandidates throw on every try still yields a placeholder, never a rejection', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     let calls = 0
     const client: ImageClient = {
@@ -108,27 +149,28 @@ describe('createForge().commission', () => {
     expect(rec.score).toBeNull()
     expect(rec.attempts).toBe(3)
     expect(rec.costUsd).toBe(0)
-    expect(calls).toBe(3) // each throw consumed one attempt
+    expect(calls).toBe(3) // each throw consumed one try
     expect(codex.get(rec.id)).not.toBeNull()
   })
-  it('a generation throw counts as a failed attempt; a later attempt can still ship', async () => {
+  it('a generation throw is a failed try; the next try still reaches the eye', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const png = await goodPng()
     let calls = 0
     const client: ImageClient = {
-      async generateCandidates(_p, _r, n = 3) {
+      async generateCandidates() {
         if (++calls === 1) throw new Error('transient outage')
-        return Array.from({ length: n }, (): Candidate => ({ png, model: 'fake', costUsd: 0.045 }))
+        return [{ png, model: 'fake', costUsd: 0.045 }]
       },
     }
     const forge = createForge({ client, judge: scriptedJudge([9]), codex, refs: [] })
     const rec = await forge.commission('a resilient tent', { w: 1, h: 1 }, 'building', 'tent')
     expect(rec.status).toBe('ready')
-    expect(rec.attempts).toBe(2)
+    expect(rec.attempts).toBe(1)
+    expect(calls).toBe(2)
   })
-  it('mechanical-gate failures never reach the judge', async () => {
+  it('mechanical-gate failures never reach the eye', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
-    // all-magenta generation → chroma-keys to fully transparent → gate fails (no opaque pixels ⇒ size ok but requireAlpha ok; palette ok; BUT judge must not run)
+    // all-magenta generation → chroma-keys to fully transparent → the gate refuses it
     const allMagenta = await sharp({
       create: {
         width: 512,
@@ -140,13 +182,14 @@ describe('createForge().commission', () => {
       .png()
       .toBuffer()
     let judgeCalls = 0
-    const judge: JudgeFn = async () => {
+    const judge: VisionJudgeFn = (a) => {
       judgeCalls++
-      return { score: 10, notes: '' }
+      return scriptedJudge([10])(a)
     }
     const forge = createForge({ client: fakeClient(allMagenta, []), judge, codex, refs: [] })
     const rec = await forge.commission('vapor', { w: 1, h: 1 }, 'item', 'vapor')
     expect(rec.status).toBe('placeholder')
     expect(judgeCalls).toBe(0)
+    expect(rec.costUsd).toBeCloseTo(3 * 0.045, 6) // the three refused generations are still billed
   })
 })

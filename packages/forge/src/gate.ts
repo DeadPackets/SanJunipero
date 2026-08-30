@@ -1,9 +1,5 @@
 import type { RawImage } from './post/raw.js'
 
-export const PASS_SCORE = 7
-export const MAX_ATTEMPTS = 3
-export const CANDIDATES_PER_ATTEMPT = 3
-
 export function mechanicalGate(
   img: RawImage,
   expected: { w: number; h: number; requireAlpha: boolean },
