@@ -32,11 +32,12 @@ export const GLOW_COLOR = 0xf4e289
 export const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
 
 /** Additive over a darkened ground is exactly when a pale shape shows most, so the pool lifts
- *  the ground back toward its day value and stops well short of white. */
-export const POOL_MAX_ALPHA = 0.44
+ *  the ground back toward its day value and stops well short of white. Measured at 0.44 a pair
+ *  of posts washed the cottage wall behind them to (255,255,255); 0.32 keeps it under 0.9. */
+export const POOL_MAX_ALPHA = 0.32
 export const GLOW_BASE_ALPHA = 0.3
-/** Two heads at full breath must still sum under 1 of POOL_COLOR: 2 · (0.35 + BREATH_AMP) · core. */
-export const BLOOM_ALPHA = 0.35
+/** Two heads at full breath must still sum under 1 of POOL_COLOR: 2 · (0.22 + BREATH_AMP) · core. */
+export const BLOOM_ALPHA = 0.22
 export const FIRE_ALPHA = 0.62
 /** world px: a lamp head's halo, and the halo of a lit window */
 export const BLOOM_R = 22
@@ -79,8 +80,9 @@ export function poolCentre(f: Flame): { sx: number; sy: number } {
 /** A soft radial disc, authored ONCE and stretched per light. Rings rather than a gradient fill
  *  because pixi's `Graphics` has no radial stop; white, so one texture serves every hue. */
 const POOL_RINGS = 24
-/** squared falloff: bright core, long tail — an inverse-square flame, not a spotlight */
-const poolRingAlpha = (t: number): number => ((1 - t) ** 2 / POOL_RINGS) * 6
+/** Quartic falloff: the disc is stretched to the flame's whole reach (4.5 tiles for a lamp), so
+ *  the visible pool must die well inside it — 0.27 of the core at 1.5 tiles, 0.11 at 2. */
+const poolRingAlpha = (t: number): number => ((1 - t) ** 4 / POOL_RINGS) * 10
 
 /** How opaque the baked disc is at `u` of its radius: the rings stack under normal blend. */
 export function poolDiscAlpha(u: number): number {

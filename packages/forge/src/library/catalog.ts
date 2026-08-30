@@ -170,8 +170,10 @@ const FOODS: LibraryEntry[] = [
 ]
 
 const MATERIALS: LibraryEntry[] = [
+  // `wood`, the kind the recipes consume and the one a death drops — as `timber` this art was
+  // never resolved and every dropped log drew the placeholder checkerboard.
   material(
-    'timber',
+    'wood',
     'a short stack of squared honey-wood planks, three high, with visible end grain',
   ),
   material(
