@@ -6,6 +6,7 @@ import {
   MINUTES_PER_DAY,
   assertQuotedName,
   type ConstructKind,
+  type QuotedName,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -21,6 +22,8 @@ export const ConstructSchema = z
     name: z.string().min(1).nullable(),
     nameProvenance: z
       .object({
+        name: z.string().min(1),
+        sourceKind: z.enum(['speech', 'inscription']),
         eventSeq: z.number().int().nonnegative(),
         quote: z.string().min(1),
         byId: z.string().min(1),
@@ -57,7 +60,7 @@ export type ConstructOpsEvent = {
 const ANCHOR_CELL = 4
 
 export type Gathering = { tick: number; participants: string[] }
-export type CandidateName = { eventSeq: number; quote: string; byId: string; name: string }
+export type CandidateName = QuotedName
 export type Candidate = {
   key: string
   anchor: { x: number; y: number }
@@ -149,7 +152,7 @@ const NAME_PATTERNS: readonly RegExp[] = [
   /\bthis is (?:the )?([\p{Lu}][\p{L}' -]{1,39})/u,
 ]
 
-function nameIn(ev: SimEvent): CandidateName | null {
+function nameIn(ev: SimEvent): QuotedName | null {
   const p = ev.payload as { agentId?: unknown; text?: unknown } | null
   if (typeof p?.text !== 'string' || typeof p.agentId !== 'string') return null
   const source = { sourceKind: 'speech' as const, text: p.text, eventSeq: ev.seq, byId: p.agentId }
@@ -161,13 +164,7 @@ function nameIn(ev: SimEvent): CandidateName | null {
     if (found === undefined || found.length < 2) continue
     // Verbatim or nothing, through the one enforcement point of the naming law (G9).
     const quoted = assertQuotedName(found, [source])
-    if (quoted !== null)
-      return {
-        eventSeq: quoted.eventSeq,
-        quote: quoted.quote,
-        byId: quoted.byId,
-        name: quoted.name,
-      }
+    if (quoted !== null) return quoted
   }
   return null
 }
@@ -360,10 +357,7 @@ export async function runConstructPass(deps: ConstructPassDeps): Promise<Constru
       id: c.key,
       type: known?.type ?? type,
       name: c.name?.name ?? known?.name ?? null,
-      nameProvenance:
-        c.name === null
-          ? (known?.nameProvenance ?? null)
-          : { eventSeq: c.name.eventSeq, quote: c.name.quote, byId: c.name.byId },
+      nameProvenance: c.name ?? known?.nameProvenance ?? null,
       anchor: c.anchor,
       participants: c.participants,
       firstTick: c.firstTick,

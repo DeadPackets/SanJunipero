@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine'
-import { renderChapter, renderEra } from './chronicle.js'
+import { publishClean, renderChapter, renderEra } from './chronicle.js'
 import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
 import { detectFirsts } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
@@ -248,7 +248,7 @@ export async function closeDay(deps: {
       day,
       kind: 'newspaper',
       title: paper.headline,
-      body: paper.body,
+      body: publishClean(deps, `newspaper for day ${day}`, paper.body),
       citations: paper.citations,
     })
     for (const c of timelapseCaptions([chapter]))
@@ -256,7 +256,7 @@ export async function closeDay(deps: {
         day,
         kind: 'timelapse_caption',
         title: `Day ${c.day}`,
-        body: c.caption,
+        body: publishClean(deps, `caption for day ${c.day}`, c.caption),
         citations: null,
       })
   }

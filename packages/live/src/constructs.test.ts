@@ -11,6 +11,7 @@ import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { openDb } from '@sj/engine/store'
 import type { TileId } from '@sj/engine'
 import { ConstructStore, openArbiterDb, runConstructPass } from '@sj/arbiter'
+import { NarratorStore, constructMilestones, openNarratorDb } from '@sj/narrator'
 import { createGateway, type Gateway } from '@sj/gateway'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
@@ -40,7 +41,20 @@ const naming = (day: number): SimEvent =>
     y: 20,
   })
 
-const TRANSCRIPT: SimEvent[] = [...gathering(0), ...gathering(1), ...gathering(2), naming(2)]
+/** The three of them arriving, so the same log folds into a world the observatory can serve. */
+const SPAWNS: SimEvent[] = THREE.map((id, i) =>
+  ev(0, 'agent_spawned', { id, name: id, x: 20 + i, y: 20, ageDays: 7300 }),
+)
+
+const TRANSCRIPT: SimEvent[] = [
+  ...SPAWNS,
+  ...gathering(0),
+  ...gathering(1),
+  ...gathering(2),
+  naming(2),
+  // The clock the observatory reads its window from; only this event moves it.
+  ev(2 * MINUTES_PER_DAY + 19 * 60 + 2, 'tick_advanced', {}),
+]
 
 const NO_USAGE: LlmUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
 
@@ -66,14 +80,24 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
     // The arbiter's own file, in the minds directory, exactly where the live cast opens it.
     mkdirSync(minds, { recursive: true })
     arbiterDb = openArbiterDb(join(minds, '_arbiter.db'))
-    await runConstructPass({
+    const recognized = await runConstructPass({
       events: TRANSCRIPT,
       baseConfig: DEFAULT_CONFIG,
       store: new ConstructStore(arbiterDb),
       llm: scriptedLlm(),
     })
 
+    // What the day boundary does next: the registry is the arbiter's, so the milestone row is
+    // the only way the chronicle ever hears about it.
+    const narratorDb = openNarratorDb(join(minds, '_narrator.db'))
+    const chronicle = new NarratorStore(narratorDb)
+    for (const m of constructMilestones(recognized, chronicle.milestoneKinds()))
+      chronicle.insertMilestone(m)
+    narratorDb.close()
+
     worldDb = openDb(join(dir, 'world.db'))
+    const ins = worldDb.prepare('INSERT INTO events (seq, tick, type, payload) VALUES (?, ?, ?, ?)')
+    for (const e of TRANSCRIPT) ins.run(e.seq, e.tick, e.type, JSON.stringify(e.payload))
     gw = await createGateway({
       dbPath: join(dir, 'world.db'),
       port: 0,
@@ -81,6 +105,7 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
       pollMs: 3_600_000,
       db: worldDb,
       agentDbDir: minds,
+      narratorDbPath: join(minds, '_narrator.db'),
     })
     base = `http://127.0.0.1:${gw.port}`
   })
@@ -118,6 +143,16 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
         quote: NAMING,
         saidBy: 'bex',
       },
+    ])
+  })
+
+  it('★ the keystone: the chronicle carries the first of its kind, and the name they gave it', async () => {
+    const res = await fetch(`${base}/api/chronicle`)
+    expect(res.status).toBe(200)
+    const { entries } = (await res.json()) as { entries: { label: string }[] }
+    expect(entries.map((e) => e.label)).toEqual([
+      'the first time they gathered to celebrate',
+      'the day they had a word of their own for it: Long Table',
     ])
   })
 

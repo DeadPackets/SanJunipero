@@ -51,6 +51,7 @@ import { AssetCodex } from '@sj/forge'
 import {
   NarratorStore,
   closeDay,
+  constructMilestones,
   makeNarratorLlm,
   openNarratorDb,
   type TranscriptRecord,
@@ -671,7 +672,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       // ── the recognizer, on the same boundary and off the same thread ──
       // OBSERVER-SIDE: what it writes lives in the arbiter's db and reaches no prompt or memory.
-      const recognizeTheDay = (arb: Database.Database, tick: number): void => {
+      const recognizeTheDay = (
+        arb: Database.Database,
+        chronicle: NarratorStore | null,
+        tick: number,
+      ): void => {
         const day = tick / MINUTES_PER_DAY - 1
         if (stopped || spentToday() >= dailyBudget) {
           log(`stream: day ${day} goes unrecognized — the recognizer is outside today's budget`)
@@ -691,6 +696,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             llm: makeClient('constructs', 'town'),
             laws: loop.state.laws,
           })
+            .then((constructs) => {
+              // The registry lives in the arbiter's db, which the chronicle cannot read. A
+              // tier-3 milestone row is the bridge into the record (ledger A7).
+              if (chronicle === null) return
+              for (const m of constructMilestones(constructs, chronicle.milestoneKinds()))
+                chronicle.insertMilestone(m)
+            })
             .catch((e: unknown) => {
               log(
                 `stream: day ${day} went unrecognized — ${e instanceof Error ? e.message : String(e)}`,
@@ -762,7 +774,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       bridge.onTick((tick) => {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
-          if (arbiterDb !== null) recognizeTheDay(arbiterDb, tick)
+          if (arbiterDb !== null) recognizeTheDay(arbiterDb, narratorStore, tick)
           if (narratorStore !== null) writeTheDay(narratorStore, tick)
         }
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return

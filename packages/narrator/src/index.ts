@@ -7,6 +7,7 @@ export { CONFLICT_WEIGHT, STAKES_WEIGHT, scoreHeat } from './heat.js'
 export { FIRST_DEFS, detectFirsts } from './firsts.js'
 export { DEATH_CAUSE_LABELS, TIER1_DEFS } from './milestones/tier1.js'
 export { detectTier2, type Tier2Ctx } from './milestones/tier2.js'
+export { constructMilestones, type RecognizedConstruct } from './milestones/tier3.js'
 export {
   DEFAULT_SEMANTIC_CONFIG,
   SEMANTIC_CONCEPTS,

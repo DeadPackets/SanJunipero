@@ -121,6 +121,8 @@ describe('the daily pass', () => {
     expect(row.type).toBe('festival')
     expect(row.name).toBe('Long Turning')
     expect(row.nameProvenance).toEqual({
+      name: 'Long Turning',
+      sourceKind: 'speech',
       eventSeq: expect.any(Number) as number,
       quote: 'Every seventh night now. We call it the Long Turning.',
       byId: 'bex',
