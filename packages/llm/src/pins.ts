@@ -79,7 +79,9 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // and its p99 is 18x theirs — hence a caller of its own rather than one shared ceiling.
   reflection: { reasoning: { enabled: false }, maxOutputTokens: 700 },
   'reflection.edit': { maxOutputTokens: 13000 },
-  arbiter: { maxOutputTokens: 8000 },
+  // 98.7% of its output was reasoning and the two halves disagreed with each other. Run D's
+  // answer-only figure is not measurable (the subtraction goes negative), so 2,000 stands.
+  arbiter: { reasoning: { enabled: false }, maxOutputTokens: 2000 },
   narrator: { maxOutputTokens: 22000 },
   preflight: { maxOutputTokens: 2500 },
   dream: { maxOutputTokens: 2500 },

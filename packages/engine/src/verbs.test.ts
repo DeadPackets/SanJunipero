@@ -94,6 +94,7 @@ const TIER1 = [
   'speak',
   'give',
   'take',
+  'drop',
   'stow',
   'write',
   'read',
@@ -144,6 +145,17 @@ describe('verb registry seam', () => {
     const r = submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'ghost' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).not.toBe('unknown verb: eat')
+  })
+
+  // ★ A param-shape refusal reaches the mind whole now, so a brace in one is the schema
+  // talking. Run D erased 36 refusals that way and taught five minds nothing.
+  it('★ no built-in verb answers a malformed ask with its own parameter schema', () => {
+    const s = makeWorld()
+    for (const kind of TIER1) {
+      const reason = VERBS[kind]!.validate(s, DEFAULT_CONFIG, 'a1', {})
+      if (reason === null) continue
+      expect(reason, kind).not.toMatch(/[{}]/)
+    }
   })
 
   it('VerbDef.kind is a string that accepts a literal Tier-1 verb unchanged', () => {

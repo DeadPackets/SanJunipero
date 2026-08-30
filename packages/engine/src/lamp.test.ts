@@ -156,14 +156,14 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     // The lamp is the opposite, in the same town, in the same breath.
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'lamp_post' })).toEqual({
       ok: false,
-      reason: 'build needs {kind, x, y}',
+      reason: 'building needs the thing to raise, and the ground to raise it on',
     })
   })
 
   it('is refused without a coordinate even where there is no town at all', () => {
     expect(submitIntent(wright(), CFG, 'wright', 'build', { kind: 'lamp_post' })).toEqual({
       ok: false,
-      reason: 'build needs {kind, x, y}',
+      reason: 'building needs the thing to raise, and the ground to raise it on',
     })
   })
 

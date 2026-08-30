@@ -70,8 +70,14 @@ const MUTATING_STEMS: readonly string[] = [
   'harvest',
   'fish',
   'stow',
+  'drop',
   'wear',
   'douse',
+  'hold',
+  'place',
+  'put',
+  'set',
+  'draw',
 ]
 
 const hasStem = (text: string, stems: readonly string[]): boolean =>

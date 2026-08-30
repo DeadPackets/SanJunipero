@@ -842,7 +842,7 @@ describe('capabilities', () => {
     const a = assemblePrompt(fixtureBlocks())
     expect(a.system).toMatch(/give: [^\n]*living person[^\n]*never a building/)
     expect(a.system).toMatch(/wake: [^\n]*rise/)
-    expect(a.system).toContain('no way to set a thing down on bare ground')
+    expect(a.system).toMatch(/drop: name it drop/)
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 

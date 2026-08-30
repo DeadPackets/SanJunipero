@@ -79,7 +79,6 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
     turn: 243,
     reflection: 337,
     'reflection.edit': 6120,
-    arbiter: 3904,
     narrator: 10563,
     preflight: 1175,
     dream: 1035,
@@ -88,6 +87,16 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
   for (const [caller, measured] of Object.entries(p99)) {
     expect(callSettingsFor(caller).maxOutputTokens, caller).toBeGreaterThanOrEqual(measured * 2)
   }
+})
+
+// 11,996 reasoning tokens against 12,160 output tokens over run D's 13 calls, and the hidden
+// half disagreed with the written half. Its reasoning-on p99 of 3,904 no longer describes it,
+// and the answer alone is not measurable from that run, so the ceiling is the standing default.
+it('★ the arbiter judges without the thinking preamble, under a 2,000-token ceiling', () => {
+  expect(callSettingsFor('arbiter')).toEqual({
+    reasoning: { enabled: false },
+    maxOutputTokens: 2000,
+  })
 })
 
 // The night's one reasoning-on call shared reflection's ceiling and its ledger line, so what

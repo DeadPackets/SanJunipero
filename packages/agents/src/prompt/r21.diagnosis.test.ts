@@ -445,7 +445,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     for (const [verb, params, reason] of [
       ['fish', { x: 62, y: 62 }, 'no water there'],
       ['douse', { x: 62, y: 62 }, 'nothing is burning there'],
-      ['hunt', {}, 'hunt needs a {faunaId}'],
+      ['hunt', {}, 'a hunt needs the animal named'],
     ] as readonly [string, Record<string, unknown>, string][]) {
       expect(submitIntent(s, CFG, 'amara', verb, params)).toEqual({ ok: false, reason })
     }

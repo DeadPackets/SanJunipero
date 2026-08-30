@@ -86,7 +86,8 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: 67, y: 92 })).toEqual({
       ok: false,
-      reason: "build needs {kind} — where a house stands is the town's to say, not yours",
+      reason:
+        "where a house stands is the town's to say, not yours — name the thing to raise and nothing else",
     })
   })
 
@@ -191,7 +192,7 @@ describe('the bridge is the one thing a builder still sites', () => {
     // And it is still refused without a coordinate, because water is not a plot.
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'bridge' })).toEqual({
       ok: false,
-      reason: 'build needs {kind, x, y}',
+      reason: 'building needs the thing to raise, and the ground to raise it on',
     })
   })
 })
@@ -204,7 +205,7 @@ describe('a world with no town in it builds the way it always did', () => {
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: 30, y: 20 }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' })).toEqual({
       ok: false,
-      reason: 'build needs {kind, x, y}',
+      reason: 'building needs the thing to raise, and the ground to raise it on',
     })
   })
 })

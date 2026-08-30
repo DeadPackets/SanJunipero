@@ -1125,6 +1125,36 @@ describe('arbiter seam (T19)', () => {
     expect(REFUSAL_MEMORY_TICKS).toBeLessThan(MINUTES_PER_DAY)
   })
 
+  // ★ Run D spent 3 of its 9 rulings on `stand`, `think` and `none player`, ~11 ticks of
+  // silence each. The body was already standing still; there is nothing for a god to rule on.
+  it('★ a word for standing still is a quiet beat, not a ruling and not a refusal', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold',
+        class: 'physically_impossible',
+      }
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        { thought: 'I stand a while.', action: { verb: 'stand', params: {} }, importance: 2 },
+        { thought: 'I let it be.', action: { verb: 'think', params: {} }, importance: 2 },
+        { thought: 'Nothing for it.', action: { verb: 'none', params: {} }, importance: 2 },
+        freeformTurn,
+      ]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => seen.length >= 1, 400)
+
+    expect(seen).toEqual(['weave reeds into a basket'])
+    expect(
+      memoriesOfKind(agentDb, 'action').filter((m) => m.text.includes(OPAQUE_REFUSAL)),
+    ).toEqual([])
+  })
+
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {
     const { loop, agentDb } = await setup({
       model: turnModel([freeformTurn]),
@@ -1417,6 +1447,13 @@ describe('refusal prose teaches a path (T18)', () => {
       'the dead do not act',
       'the roof is beyond mending',
       'you have not the hands for it',
+      // The 31 param-shape refusals: the act exists, only the ask was malformed. They used to
+      // be erased with the machinery, and five minds learned nothing from 36 of them.
+      'a walk needs a place to end',
+      'stowing needs the thing and the store to leave it in',
+      'taking needs the thing to lift',
+      'setting a thing down needs the thing named',
+      'building needs the thing to raise, and the ground to raise it on',
     ]) {
       expect(refusalMemoryText(reason), reason).toBe(`You realize you cannot: ${reason}`)
     }

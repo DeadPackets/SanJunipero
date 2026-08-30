@@ -158,7 +158,7 @@ describe('verb: stow', () => {
     ).toMatchObject({ ok: false, reason: 'there is nothing there to put it in' })
     expect(
       submitIntent(withHolder(world(), 4, 2), DEFAULT_CONFIG, 'a1', 'stow', { itemId: 'item_1' }),
-    ).toMatchObject({ ok: false, reason: 'stow needs {itemId, structureId}' })
+    ).toMatchObject({ ok: false, reason: 'stowing needs the thing and the store to leave it in' })
   })
 
   it('a wall stops hands — indoors you can only shelve the room you are in', () => {
