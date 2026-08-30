@@ -1328,6 +1328,26 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          }
         ]
        },
+       "reach": {
+        "atHand": [
+         "item_2",
+         "item_3"
+        ],
+        "noFooting": [
+         {
+          "x": 7,
+          "y": 4
+         },
+         {
+          "x": 4,
+          "y": 4
+         },
+         {
+          "x": 8,
+          "y": 8
+         }
+        ]
+       },
        "heard": [
         {
          "speakerId": "b",

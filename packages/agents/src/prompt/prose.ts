@@ -133,6 +133,9 @@ export type PerceptionPacket = {
     fauna?: PerceptionFauna[]
     forageables?: PerceptionForageable[]
   }
+  // What the hands can touch and which named spots no foot can take, both read off the verbs'
+  // own tests. Absent on a packet from before it was composed, which reads as it always did.
+  reach?: { atHand: string[]; noFooting: { x: number; y: number }[] }
   heard: { speakerId: string; name: string; text: string; distance: number }[]
   seen: PerceptionSeen[]
   feltEvents: string[]
@@ -393,6 +396,60 @@ export function heardProse(packet: PerceptionPacket): string {
   return packet.heard.map((h) => heardLine(h.name, h.text)).join('\n')
 }
 
+// Long enough to name the walls a mind keeps aiming at, short enough that a crowded square
+// does not spend the block on ground.
+const NO_FOOTING_MAX = 4
+
+function itemPhrase(i: { qty: number; kind: string; id: string }): string {
+  return `${i.qty} ${i.kind} (${i.id})`
+}
+
+/** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
+ *  own test. Forty-four of run B's refusals were these facts going unsaid (rehearsal4). */
+function affordanceLines(packet: PerceptionPacket): string[] {
+  const { x, y } = packet.self
+  const inside = packet.self.inside
+  const lines: string[] = []
+
+  if (inside === undefined) {
+    const barred = (packet.reach?.noFooting ?? []).slice(0, NO_FOOTING_MAX)
+    const walls =
+      barred.length === 0
+        ? ''
+        : ` Wall or water covers ${barred.map((p) => `(${p.x}, ${p.y})`).join(', ')}; no walk of yours can end there.`
+    lines.push(
+      `No walls are around you: there is nothing to step out of, and no walk can end where you already stand, at (${x}, ${y}).${walls}`,
+    )
+  } else {
+    const door = packet.visible.structures.find((s) => s.id === inside.id)?.door
+    const out =
+      door === undefined
+        ? 'you can see no way back out under the sky'
+        : `the doorway at (${door.x}, ${door.y}) is the way back out under the sky`
+    lines.push(
+      `Four walls are around you: while you are inside the ${inside.kind} (${inside.id}) you can walk nowhere and enter nothing, and ${out}.`,
+    )
+  }
+
+  const atHand = new Set(packet.reach?.atHand ?? [])
+  const near = packet.visible.items.filter((i) => atHand.has(i.id))
+  const held = packet.self.inventory
+  let hands =
+    held.length === 0
+      ? 'Your hands are empty'
+      : `Your hands hold ${held.map(itemPhrase).join(', ')}`
+  // No `reach` at all is a packet composed before the block existed: it says nothing about
+  // reach rather than claiming there is none.
+  if (packet.reach !== undefined) {
+    hands +=
+      near.length === 0
+        ? `; nothing${held.length === 0 ? '' : ' else'} is close enough for them to touch`
+        : `; close enough for them to touch, but not yet in them: ${near.map(itemPhrase).join(', ')}`
+  }
+  lines.push(`${hands}.`)
+  return lines
+}
+
 export function perceptionToProse(
   packet: PerceptionPacket,
   alert?: (detail: string) => void,
@@ -407,10 +464,7 @@ export function perceptionToProse(
   lines.push(
     `You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'}${where} at (${x}, ${y}).`,
   )
-  // Said out loud because a body that cannot tell it is under a roof walks into the wall
-  // twice a turn: fifty-nine of the live run's refusals were this one silence (R21).
-  if (inside !== undefined)
-    lines.push('Four walls are around you; step out under the sky before you can go anywhere else.')
+  lines.push(...affordanceLines(packet))
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
 
@@ -552,7 +606,7 @@ export function perceptionToProse(
 
   for (const i of packet.visible.items) {
     const pos = i.loc.t === 'tile' ? ` at (${i.loc.x}, ${i.loc.y})` : ''
-    lines.push(`You can see ${i.qty} ${i.kind} (${i.id})${pos}${claimPhrase(i)}.`)
+    lines.push(`You can see ${itemPhrase(i)}${pos}${claimPhrase(i)}.`)
   }
 
   for (const c of packet.visible.crops) {
@@ -572,7 +626,7 @@ export function perceptionToProse(
   }
 
   for (const it of packet.self.inventory) {
-    lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id})${claimPhrase(it)}.`)
+    lines.push(`You are carrying ${itemPhrase(it)}${claimPhrase(it)}.`)
   }
 
   for (const s of packet.seen) {

@@ -14,6 +14,7 @@ import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile, insideOf, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
+import { isPassable, pathCtx } from './path.js'
 import {
   thirstOf,
   type AfflictionKind,
@@ -24,7 +25,13 @@ import {
 } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs/index.js'
+import {
+  buildTicks,
+  isAdjacentToRect,
+  itemWithinReach,
+  walkIsCapped,
+  workPenalty,
+} from './verbs/index.js'
 
 // A pure projection of what one agent can sense: it never mutates state and never draws
 // randomness, so identical inputs produce bit-identical packets.
@@ -177,6 +184,17 @@ export type PerceivedGround = { wellTravelled: true }
 // never went in reads exactly as it always did.
 export type PerceivedInterior = { id: string; kind: string }
 
+// What the hands and the feet can act on from where the body stands, read off the verbs' own
+// tests so the prose and a refusal can never disagree about the same body.
+export type PerceivedReach = {
+  // Ids `itemWithinReach` accepts — the one reach `take` and `eat` measure by.
+  atHand: string[]
+  // Spots this packet names that are not ground: `findPath` refuses every one of them, so
+  // `walk` can never end on one. Composed here rather than asked of the prose seam, because
+  // only the packet knows which spots it named.
+  noFooting: { x: number; y: number }[]
+}
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -199,6 +217,7 @@ export type PerceptionPacket = {
     fauna: PerceivedFauna[]
     forageables: PerceivedForageable[]
   }
+  reach: PerceivedReach
   ground?: PerceivedGround
   light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
@@ -498,6 +517,43 @@ function perceiveForageables(lens: Lens): PerceivedForageable[] {
     }))
 }
 
+// Only over what this body can already see, so the block never names a thing the packet does
+// not: `take` still reaches a little further than the eye does in the dark, and never less far.
+function perceiveReach(lens: Lens, visible: PerceptionPacket['visible']): PerceivedReach {
+  const atHand = visible.items
+    .filter((i) => {
+      const item = lens.state.items[i.id]
+      return item !== undefined && itemWithinReach(lens.state, lens.self.id, item)
+    })
+    .map((i) => i.id)
+
+  // Indoors a walk is refused for the walls before ever reaching the ground, so the scan is
+  // work with nothing to say.
+  if (lens.indoors !== null) return { atHand, noFooting: [] }
+
+  // One walk of the structures for the whole block: `isPassable` without it scans them all
+  // again for every spot, and this runs per body per tick.
+  const ctx = pathCtx(lens.state, lens.config)
+  const spots = new Map<number, { x: number; y: number }>()
+  for (const p of [
+    ...visible.structures,
+    ...visible.items,
+    ...visible.crops,
+    ...visible.fauna,
+    ...visible.forageables,
+  ]) {
+    spots.set(p.y * ctx.width + p.x, { x: p.x, y: p.y })
+  }
+  // Nearest first, because the prose keeps only the first few and the wall a body is about to
+  // walk into is the one it needs named.
+  const away = (p: { x: number; y: number }): number =>
+    Math.abs(p.x - lens.self.x) + Math.abs(p.y - lens.self.y)
+  const noFooting = [...spots.values()]
+    .filter((p) => !isPassable(lens.state, p.x, p.y, ctx))
+    .sort((a, b) => away(a) - away(b) || a.y - b.y || a.x - b.x)
+  return { atHand, noFooting }
+}
+
 function perceiveInventory(lens: Lens): InventoryItem[] {
   return Object.values(lens.state.items)
     .filter((i) => i.loc.t === 'agent' && i.loc.id === lens.self.id)
@@ -641,6 +697,15 @@ export function composePerception(
       ? { x: walkTo.x, y: walkTo.y }
       : undefined
 
+  const visible = {
+    agents: perceiveAgents(lens),
+    structures: perceiveStructures(lens),
+    items: perceiveItems(lens),
+    crops: perceiveCrops(lens),
+    fauna: perceiveFauna(lens),
+    forageables: perceiveForageables(lens),
+  }
+
   return {
     time: simTimeFromTick(state.tick),
     self: {
@@ -664,14 +729,8 @@ export function composePerception(
     light: lightBandAt(state, self.x, self.y, state.tick, config),
     ...(fumbling ? { fumbling: true as const } : {}),
     ...(walkIsCapped(state, agentId) ? { wayUnclear: true as const } : {}),
-    visible: {
-      agents: perceiveAgents(lens),
-      structures: perceiveStructures(lens),
-      items: perceiveItems(lens),
-      crops: perceiveCrops(lens),
-      fauna: perceiveFauna(lens),
-      forageables: perceiveForageables(lens),
-    },
+    visible,
+    reach: perceiveReach(lens, visible),
     heard: perceiveHeard(lens, recentEvents),
     seen: perceiveSeen(lens, recentEvents),
     feltEvents,

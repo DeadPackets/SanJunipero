@@ -44,7 +44,7 @@ export type PathCtx = {
   width: number
 }
 
-function pathCtx(state: WorldState, config: SimConfig): PathCtx {
+export function pathCtx(state: WorldState, config: SimConfig): PathCtx {
   const width = state.terrain[0]!.length
   const decks = new Set<number>()
   const blocked = new Set<number>()
