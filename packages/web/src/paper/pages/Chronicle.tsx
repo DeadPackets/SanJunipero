@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { tickToMoment, type ChronicleEntry } from '@sj/shared'
+import { MILESTONE_ICON, tickToMoment, type ChronicleEntry } from '@sj/shared'
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
@@ -25,7 +25,6 @@ const GLYPH: Record<string, string> = {
 
 const NO_ENTRIES: ChronicleEntry[] = []
 const NO_EDITIONS: Edition[] = []
-const NO_FIRSTS: MilestoneRead[] = []
 
 type Chapter = { day: number; title: string; text: string }
 const NO_CHAPTERS: Chapter[] = []
@@ -47,6 +46,36 @@ function Glyph({ icon }: { icon: string }) {
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
       ))}
     </svg>
+  )
+}
+
+/** The way back to one minute of the town's history, wherever the record offers one. */
+function FeedJump({
+  tick,
+  label,
+  icon,
+  current,
+  onJump,
+}: {
+  tick: number
+  label: string
+  icon: string
+  current: boolean
+  onJump: (tick: number) => void
+}) {
+  return (
+    <button
+      className="feed-jump"
+      aria-current={current ? 'true' : undefined}
+      aria-label={`${label} ${momentStamp(tick)}. Go to this moment.`}
+      onClick={() => {
+        onJump(tick)
+      }}
+    >
+      <Glyph icon={icon} />
+      <span className="stamp">{momentStamp(tick)}</span>
+      <span className="feed-text">{label}</span>
+    </button>
   )
 }
 
@@ -140,18 +169,13 @@ function Today({ store, gapTicks, onJump }: PageProps) {
           <ol className="feed important">
             {[...entries].reverse().map((e) => (
               <li key={`${e.type}:${e.seq}`} className="feed-line">
-                <button
-                  className="feed-jump"
-                  aria-current={viewTick === e.tick ? 'true' : undefined}
-                  aria-label={`${e.label} ${momentStamp(e.tick)}. Go to this moment.`}
-                  onClick={() => {
-                    onJump(e.tick)
-                  }}
-                >
-                  <Glyph icon={e.icon} />
-                  <span className="stamp">{momentStamp(e.tick)}</span>
-                  <span className="feed-text">{e.label}</span>
-                </button>
+                <FeedJump
+                  tick={e.tick}
+                  label={e.label}
+                  icon={e.icon}
+                  current={viewTick === e.tick}
+                  onJump={onJump}
+                />
               </li>
             ))}
           </ol>
@@ -194,18 +218,13 @@ function FirstLine({
   const quote = first.nameProvenance?.quote ?? null
   return (
     <li className="feed-line">
-      <button
-        className="feed-jump"
-        aria-current={current ? 'true' : undefined}
-        aria-label={`${first.label} ${momentStamp(first.tick)}. Go to this moment.`}
-        onClick={() => {
-          onJump(first.tick)
-        }}
-      >
-        <Glyph icon="star" />
-        <span className="stamp">{momentStamp(first.tick)}</span>
-        <span className="feed-text">{first.label}</span>
-      </button>
+      <FeedJump
+        tick={first.tick}
+        label={first.label}
+        icon={MILESTONE_ICON}
+        current={current}
+        onJump={onJump}
+      />
       {quote !== null && <p className="discovery-quote">“{quote}”</p>}
     </li>
   )
@@ -222,7 +241,7 @@ export function FirstsView({
   viewTick: number | null
   onJump: (tick: number) => void
 }) {
-  const groups = useMemo(() => firstsByTier(read.data ?? NO_FIRSTS), [read.data])
+  const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
 
   if (groups.length === 0)
     return read.loaded ? (

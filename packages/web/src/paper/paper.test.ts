@@ -265,22 +265,20 @@ describe('★ a page that throws costs the viewer the page, not the town', () =>
 
 // ── the pasted link ────────────────────────────────────────────────────────────────────────
 
-// Ruling 18. `route.test.ts` owns the parse; this is the half only App can do, and it is an
-// effect, so it is pinned where it is written rather than left unasserted.
+// Ruling 18. `route.test.ts` owns the parse and `worldStore.test.ts` owns the latch the landing
+// waits on; what is left is one wiring seam inside an effect, pinned where it is written.
 describe('★ a pasted /agent/:id link lands on the person it names', () => {
-  // From the initial address, once the first snapshot says the person is real: their sheet
-  // comes up, the ring goes round them, and the camera pins to them.
-  const LANDING =
-    /const linked = initial\.agentId[\s\S]{0,600}?store\.subscribe[\s\S]{0,600}?setSubject\([\s\S]{0,200}?setSheet\(\{ page: 'person', tab: 'Story' \}\)[\s\S]{0,80}?setFollowing\(linked\)/
+  const app = src('../App.tsx')
 
-  it('opens their story, rings them, and follows them', () => {
-    expect(src('../App.tsx')).toMatch(LANDING)
+  it('opens their story and pins the camera, once the world can be asked', () => {
+    expect(app).toContain("setSheet({ page: 'person', tab: 'Story' })")
+    expect(app).toContain('setFollowing(linked)')
+    expect(app).toContain('onFirstSnapshot(store, () => {')
   })
 
-  it('says nothing at all about an id the town does not have', () => {
-    expect(src('../App.tsx')).toMatch(
-      /const name = state\.agents\[linked\]\?\.name\n\s*if \(name === undefined\) return/,
-    )
+  it('holds the ring to one owner, so no id rings a person the town does not have', () => {
+    expect(app.match(/setSubject\(\{ id: agentId/g)).toHaveLength(1)
+    expect(app).toContain('if (name !== undefined) setSubject(')
   })
 })
 

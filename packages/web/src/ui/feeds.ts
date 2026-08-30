@@ -51,13 +51,12 @@ const parseChronicle = (body: unknown): ChronicleEntry[] | null => {
  *  broadcast frame's ticker are looking at the same list. */
 export const chronicleFeed = endpoint('/api/chronicle', parseChronicle, CHRONICLE_REFETCH_MS)
 
-/** A first is a thing that already happened, so the ledger is read on the same slow beat the
- *  day strip reads its other marks on. */
 const FIRSTS_REFETCH_MS = 30_000
 
 const parseFirsts = (body: unknown): MilestoneRead[] | null =>
   Array.isArray(body) ? (body as MilestoneRead[]) : null
 
 /** The firsts ledger the narrator keeps (`@sj/shared`'s `MilestoneRead`), read once for the
- *  whole page: the Chronicle's Firsts tab and the day strip's marks share these rows. */
+ *  whole page: the Chronicle's Firsts tab and the day strip's marks share these rows, on a
+ *  slow beat, because a first is a thing that already happened. */
 export const milestonesFeed = endpoint('/api/milestones', parseFirsts, FIRSTS_REFETCH_MS)

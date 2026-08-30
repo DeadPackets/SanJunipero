@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, stateHash, type AssetRecord, type SimEvent } from '@sj/shared'
 import { fold, genesisState, type TileId } from '@sj/engine'
-import { createWorldStore } from './worldStore.js'
+import { createWorldStore, onFirstSnapshot } from './worldStore.js'
 
 const GRASS: TileId[][] = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => 0))
 
@@ -199,5 +199,36 @@ describe('worldStore', () => {
       if (had) g.requestAnimationFrame = prev
       else delete g.requestAnimationFrame
     }
+  })
+})
+
+// Every deep link reads an address before the town can answer for what is in it.
+describe('onFirstSnapshot', () => {
+  it('runs the moment the world can be asked, and exactly once', () => {
+    const store = createWorldStore()
+    let ran = 0
+    onFirstSnapshot(store, () => ran++)
+    expect(ran).toBe(0)
+    store.applyServer(makeSnapshot())
+    expect(ran).toBe(1)
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 2, text: 'again' })
+    expect(ran).toBe(1)
+  })
+
+  it('runs at once on a world that already has a state', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    let ran = 0
+    onFirstSnapshot(store, () => ran++)
+    expect(ran).toBe(1)
+  })
+
+  // ★ A caller that goes away before the first snapshot must not leave a listener behind.
+  it('★ hands back the way to stop waiting', () => {
+    const store = createWorldStore()
+    let ran = 0
+    onFirstSnapshot(store, () => ran++)()
+    store.applyServer(makeSnapshot())
+    expect(ran).toBe(0)
   })
 })

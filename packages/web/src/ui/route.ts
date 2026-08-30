@@ -40,20 +40,20 @@ export function parseRoute(pathname: string, search: string): Route {
   return { moment, momentId, agentId, broadcast: false }
 }
 
+// An open recorded day outranks the minute inside it, and both outrank the person: the player
+// owns which minute is on screen, and with no minute named the person IS the address.
+function pathFor(r: Route): string {
+  if (r.momentId !== null) return `/moment/${r.momentId}`
+  if (r.moment !== null) return `/moment/${r.moment.day}/${r.moment.time}`
+  if (r.agentId !== null) return `/agent/${encodeURIComponent(r.agentId)}`
+  return '/'
+}
+
 export function routeToPath(r: Route): string {
-  // An open recorded day outranks the minute inside it, and both outrank the person: the
-  // player owns which minute is on screen, and with no minute named the person IS the address.
-  const linked = r.momentId === null && r.moment === null ? r.agentId : null
-  const path =
-    r.momentId !== null
-      ? `/moment/${r.momentId}`
-      : r.moment !== null
-        ? `/moment/${r.moment.day}/${r.moment.time}`
-        : linked === null
-          ? '/'
-          : `/agent/${encodeURIComponent(linked)}`
+  const path = pathFor(r)
   const params = new URLSearchParams()
-  if (r.agentId !== null && linked === null) params.set('agent', r.agentId)
+  // A person the path already names needs no parameter saying so again.
+  if (r.agentId !== null && !path.startsWith('/agent/')) params.set('agent', r.agentId)
   // Every scrub rewrites the address bar in place. Drop the flag here and the first minute
   // that passes takes the stream frame away with it.
   if (r.broadcast) params.set(BROADCAST_PARAM, '1')

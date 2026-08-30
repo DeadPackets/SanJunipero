@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { CHRONICLE_FALLBACK_ICON, MILESTONE_ICON } from '@sj/shared'
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { FirstsView } from '../paper/pages/Chronicle.js'
 import { firstsByTier } from './firsts.js'
+import { chronicleGlyph } from './importantFeed.js'
 import { EMPTY_COPY } from './townStats.js'
 import type { Read } from './useEndpoint.js'
 
@@ -76,6 +78,16 @@ describe('the Firsts tab', () => {
     expect(html).toContain('the first fire')
     expect(html).toContain('Day 1 01:00')
     expect(html).toContain('class="feed-head"')
+  })
+
+  // The curated feed already draws a milestone with `MILESTONE_ICON`; a second glyph for the
+  // same thing would read as a second kind of thing.
+  it('★ draws a first with the glyph the record already gives one', () => {
+    expect(chronicleGlyph(MILESTONE_ICON).label).toBe('a first')
+    expect(MILESTONE_ICON).not.toBe(CHRONICLE_FALLBACK_ICON)
+    const html = view({ data: [first()], loaded: true })
+    for (const [x, y] of chronicleGlyph(MILESTONE_ICON).pixels)
+      expect(html, `${x},${y}`).toContain(`x="${x}" y="${y}"`)
   })
 
   it('★ makes every first a way back to the minute it happened in', () => {

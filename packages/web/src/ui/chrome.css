@@ -240,8 +240,6 @@ body {
 /* the entry you are standing in — a rail as well as a colour, never colour alone */
 .feed-jump[aria-current='true'] { background: var(--cream); border-left-color: var(--ember); }
 .feed-glyph { flex: none; display: block; }
-/* a first the town named itself: the words it was named in, set in clear of the glyph */
-.feed-line .discovery-quote { margin: 0 0 0.35rem 2.1rem; }
 @media (prefers-reduced-motion: no-preference) {
   .feed-jump {
     transition: background-color var(--t-fast) var(--ease-enter),
@@ -969,6 +967,8 @@ body {
   font-size: 0.75rem; color: var(--cream-quiet); background: var(--deep);
   padding: 0.35rem 0.5rem; border-radius: 0; margin: 0.35rem 0;
 }
+/* a first the town named itself: the words it was named in, set in clear of the glyph */
+.feed-line .discovery-quote { margin: 0 0 0.35rem 2.1rem; }
 .discovery-makes { color: var(--ink-quiet); }
 .discovery-art {
   width: 48px; height: 48px; image-rendering: pixelated; flex: 0 0 48px;
