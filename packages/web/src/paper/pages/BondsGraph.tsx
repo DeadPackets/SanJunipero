@@ -5,7 +5,7 @@ import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import { TEXT_MIN_PX } from '../../textFloor.js'
 import { LegendChip } from '../../ui/LegendChip.js'
-import { BondDetail } from './BondDetail.js'
+import { BondDetail, FadedBond } from './BondDetail.js'
 import { EMPTY_LINEAGE, type BondNode, type PeopleIndex } from '../../ui/bondModel2.js'
 import {
   relationLegend,
@@ -86,6 +86,11 @@ export function BondsGraph({
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [keyOpen, setKeyOpen] = useState(false)
   const [selected, setSelected] = useState<RelationLink | null>(null)
+  // The feed refetches every 30s, so the open panel's own tie can leave it mid-read.
+  const openBond = useMemo(() => api?.bonds.find((b) => b.id === selected?.id), [api, selected])
+  const closeDetail = (): void => {
+    setSelected(null)
+  }
   const boxRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined)
   const [dims, setDims] = useState({ w: 480, h: 320 })
@@ -359,19 +364,22 @@ export function BondsGraph({
         <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
       ) : null}
 
-      {view === 'ties' && selected !== null && api !== null && (
-        <BondDetail
-          bond={api.bonds.find((b) => b.id === selected.id)!}
-          people={people}
-          type={selected.type}
-          level={selected.level}
-          arc={selected.arc}
-          words={selected.words}
-          onClose={() => {
-            setSelected(null)
-          }}
-        />
-      )}
+      {view === 'ties' &&
+        selected !== null &&
+        api !== null &&
+        (openBond ? (
+          <BondDetail
+            bond={openBond}
+            people={people}
+            type={selected.type}
+            level={selected.level}
+            arc={selected.arc}
+            words={selected.words}
+            onClose={closeDetail}
+          />
+        ) : (
+          <FadedBond onClose={closeDetail} />
+        ))}
 
       <div className="bonds-canvas" ref={boxRef}>
         <ForceGraph2D

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore } from './state/worldStore.js'
-import { connectObservatory, type ObservatoryHandle } from './net/socket.js'
+import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
 import { parseRoute, routeToPath, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
@@ -39,6 +39,7 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
+  const [link, setLink] = useState<LinkStatus>('connecting')
   const [gapTicks, setGapTicks] = useState<number | null>(null)
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
@@ -65,9 +66,7 @@ export function App() {
       url: `${proto}://${location.host}/ws`,
       store,
       onGap: setGapTicks,
-      onStatus: () => {
-        /* the stamp reads the link; nothing here has to */
-      },
+      onStatus: setLink,
     })
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(sock)
@@ -239,7 +238,7 @@ export function App() {
       <Figures scene={scene} store={store} onFocus={setFocus} onOpen={setSubject} />
       <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
-      <QuietStamp store={store} />
+      <QuietStamp store={store} link={link} />
       <DirectorCue text={cue} />
       {route.broadcast && <LowerThird store={store} />}
       {route.broadcast && <Ticker scene={scene} />}

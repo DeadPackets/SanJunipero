@@ -16,6 +16,7 @@ import {
   type PersonalityRow,
 } from '../../ui/becoming.js'
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
+import { skillPhrase } from '../../ui/roster/expand.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import type { PageProps } from './index.js'
 
@@ -44,8 +45,6 @@ function ageBand(ageDays: number): string {
   if (years < 60) return 'grown'
   return 'elder'
 }
-
-const level = (xp: number): number => Math.floor(Math.sqrt(xp / 100))
 
 function NeedBar({ label, value }: { label: string; value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
@@ -216,9 +215,7 @@ export function PersonLedgerView({
         ) : (
           <ul>
             {Object.entries(agent.skills).map(([track, xp]) => (
-              <li key={track}>
-                {track} — level {level(xp)}
-              </li>
+              <li key={track}>{skillPhrase(track, xp)}</li>
             ))}
           </ul>
         )}

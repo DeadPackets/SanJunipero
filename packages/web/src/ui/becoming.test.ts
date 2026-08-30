@@ -294,6 +294,20 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(busy.match(/Building/g)?.length).toBe(1)
   })
 
+  // ★ The page printed `fishing — level 2`; the addendum bans a numeric skill outright.
+  it('says a skill as a phrase, never as a level', () => {
+    const skilled = renderToStaticMarkup(
+      createElement(PersonLedgerView, {
+        agent: { ...a, skills: { fire_making: 50 } },
+        tick: 0,
+        carrying: [],
+        ledger: [],
+      }),
+    )
+    expect(skilled).toContain('is relied on for fire making')
+    expect(skilled.replace(/<[^>]*>/g, ' ')).not.toMatch(GAMIFICATION_BAN)
+  })
+
   it('shows no profile prose and no authored-looking sheet', () => {
     const text = (story + ledger).replace(/<[^>]*>/g, ' ')
     expect(text).not.toMatch(GAMIFICATION_BAN)

@@ -25,6 +25,7 @@ import {
   becomingOf,
   expandReducer,
   skillBand,
+  skillPhrase,
   type BecomingInput,
   type ExpandState,
 } from './expand.js'
@@ -295,6 +296,13 @@ describe('skillBand — five bands and no arithmetic reaches a viewer', () => {
       last = w
     }
     expect(seen).toEqual(SKILL_BANDS.map((b) => b.words))
+  })
+
+  // The inspector printed `fishing — level 2` off a second ladder of its own.
+  it('is the ONE phrase the roster card and the inspector both say', () => {
+    expect(skillPhrase('fire_making', 50)).toBe('is relied on for fire making')
+    expect(skillPhrase('fishing', 0)).toBe('has just started fishing')
+    expect(skillPhrase('fishing', 10_000)).toBe('is the one the town asks about fishing')
   })
 })
 

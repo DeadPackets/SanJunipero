@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { PLATE_DROP_PX } from '../stage/Nameplate.js'
+import { rulesFor } from './finish.test.js'
 
 // A union merge that drops one side's block is invisible to tsc and to every other test in the
 // suite: the remaining CSS still parses, and the surface it styled just stops being styled.
@@ -76,6 +77,16 @@ describe('★ the signpost and the paper hold their own shape', () => {
     const end = lines.indexOf('}', start)
     return end < 0 ? '' : lines.slice(start, end + 1).join('\n')
   }
+
+  // Customs, Folk, Building and Laws hang their headings outside any `.block`, so `.block h3`
+  // styled four of the sketch's pages by accident and left the rest a UA-default h3.
+  it('★ styles `.feed-head` itself, not only through `.block h3`', () => {
+    const head = rulesFor(BARE, '.feed-head')
+    expect(head, '.feed-head has no rule of its own').not.toBe('')
+    expect(head).toMatch(/font-family:\s*var\(--font-px\)/)
+    expect(head).toMatch(/text-transform:\s*uppercase/)
+    expect(rulesFor(BARE, '.feed-head::after')).toMatch(/content:/)
+  })
 
   it('hangs the signpost in the corner the direction picked, at the inset it picked', () => {
     const post = topRule('.signpost')
