@@ -72,7 +72,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 |---|---|---|
 | `SJ_SITE_ADDRESS` | `:80` | The Caddy hostname. A real name gets a real certificate. |
 | `SJ_RINGS` | `1` | How far the town is platted. **Cannot change on a town that already exists.** |
-| `SJ_INTERIORS` | `0` | `1` lets people go indoors and sleep. |
+| `SJ_INTERIORS` | on | `0` keeps people out of doors. |
 | `SJ_MAP` | `showcase` | `scripted` serves the frozen test fixture instead of the product town. |
 | `SJ_LAMPS` | `8` | Street lamps the lamplighter raises. `0` leaves the streets dark. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
@@ -85,7 +85,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is folded into the world with no mind booted for it. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
-| `SJ_MODELS_DIR` | baked into the image | Where the memory embedder's model is cached. |
+| `SJ_MODELS_DIR` | `/app/data/models` | Where the memory embedder's model is cached. **Not in the image and not in a volume** — the `Dockerfile` copies `packages/` only, so the first `SJ_LIVE=1` boot pulls the model from the HuggingFace CDN onto the container's writable layer and pulls it again on every recreate. Point it inside `/app/packages/town/data` to cache it once. |
 | `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |
 
 `SJ_FRESH` is deliberately NOT in that list — see below.
@@ -242,9 +242,12 @@ finishes nothing reads as the rut it is.
 ```
 docker compose exec town node -e "fetch('http://127.0.0.1:8788/admin/export',\
   {headers:{authorization:'Bearer '+process.env.SJ_ADMIN_TOKEN}}).then(r=>r.arrayBuffer())\
-  .then(b=>require('fs').writeFileSync('/data/run.tar',Buffer.from(b)))"
-docker compose cp town:/data/run.tar ./run.tar
+  .then(b=>require('fs').writeFileSync('/app/packages/town/data/run.tar',Buffer.from(b)))"
+docker compose cp town:/app/packages/town/data/run.tar ./run.tar
 ```
+
+`/data` is the **litestream** container's mount, not the town's: the town's only writable path is
+`/app/packages/town/data`, and writing the tar anywhere else raises ENOENT.
 
 Every database is read with SQLite's own `serialize()` under one transaction, so the copy is
 consistent against a town that is still ticking — it is not a file copy racing the WAL.

@@ -10,12 +10,11 @@ import {
   type Forge,
 } from '@sj/forge'
 import {
-  EST_COST_PER_JUDGE,
-  JUDGE_MODEL,
+  EST_COST_PER_VISION_CALL,
   createForge,
   makeImageClient,
-  makeVlmJudge,
-  type JudgeFn,
+  makeVisionJudge,
+  type VisionJudgeFn,
 } from '@sj/forge/gen'
 import { noDiscoveryArt, watchDiscoveryArt, type DiscoveryArtWatcher } from './discoveryArt.js'
 
@@ -34,8 +33,8 @@ export type CommissionArtOpts = {
   onError?: (kind: string, err: unknown) => void
   /** The rehearsal's provider: the real `makeImageClient` runs, the network does not. */
   fetchFn?: typeof fetch
-  /** The rehearsal's style judge, in place of the SDK-backed one. */
-  judge?: JudgeFn
+  /** The rehearsal's art reviewer, in place of the SDK-backed one. */
+  judge?: VisionJudgeFn
 }
 
 /** Discoveries drawn for real, on the minds' budget. */
@@ -80,22 +79,24 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
     const sheet = await (refs ??= loadReferenceSheet())
-    const judge = opts.judge ?? makeVlmJudge({ apiKey, refSheets: sheet })
+    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet })
     return createForge({
       codex: opts.codex,
       refs: sheet,
       client: {
         async generateCandidates(prompt, candidateRefs, n) {
+          // Reserved with the picture, not after it: a balance that cannot pay for both must
+          // refuse before the picture is bought.
+          budget.spend(EST_COST_PER_VISION_CALL)
           const out = await client.generateCandidates(prompt, candidateRefs, n)
           for (const c of out) book(c.model, c.costUsd)
           return out
         },
       },
-      judge: async (png) => {
-        budget.spend(EST_COST_PER_JUDGE)
-        const verdict = await judge(png)
-        book(JUDGE_MODEL, EST_COST_PER_JUDGE)
-        return verdict
+      judge: async (a) => {
+        const reviewed = await judge(a)
+        book(reviewed.verdict.model, reviewed.costUsd)
+        return reviewed
       },
     }).commission(desc, footprint, klass, kind)
   }

@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildAssetPrompt, targetSize, STYLE_PROMPT } from './styleBible.js'
+import { assetPromptParts, targetSize, STYLE_PROMPT } from './styleBible.js'
+import type { AssetClass, Footprint } from '@sj/shared'
+
+// The gate joins the two halves with the eye's feedback between them; with no feedback that
+// join IS the prompt a first attempt sends.
+const prompt = (desc: string, fp: Footprint, klass: AssetClass): string => {
+  const p = assetPromptParts(desc, fp, klass)
+  return `${p.boilerplate} ${p.commissionText}`
+}
 
 // The bible wraps its lines, so every scan runs over whitespace-collapsed text —
 // otherwise a law can be "absent" purely because it straddles a newline.
@@ -30,21 +38,21 @@ describe('style bible prompts', () => {
     expect(STYLE_PROMPT.toLowerCase()).toContain('no anti-aliasing')
   })
   it('asset prompt embeds boilerplate, description, and footprint', () => {
-    const p = buildAssetPrompt('a stone bakery with a fat chimney', { w: 2, h: 2 }, 'building')
+    const p = prompt('a stone bakery with a fat chimney', { w: 2, h: 2 }, 'building')
     expect(p).toContain(STYLE_PROMPT)
     expect(p).toContain('stone bakery')
     expect(p).toContain('2x2')
   })
   it('crop prompts ask for 4 growth stages', () => {
-    expect(buildAssetPrompt('wheat', { w: 1, h: 1 }, 'crop')).toMatch(/4 growth stages/i)
+    expect(prompt('wheat', { w: 1, h: 1 }, 'crop')).toMatch(/4 growth stages/i)
   })
   it('non-character prompts carry the style-anchor density clause; character prompts do not', () => {
     const clause =
       'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
     for (const klass of ['building', 'item', 'crop', 'terrain'] as const)
-      expect(buildAssetPrompt('x', { w: 1, h: 1 }, klass)).toContain(clause)
+      expect(prompt('x', { w: 1, h: 1 }, klass)).toContain(clause)
     for (const klass of ['rig-part', 'portrait'] as const)
-      expect(buildAssetPrompt('x', { w: 1, h: 1 }, klass)).not.toContain(clause)
+      expect(prompt('x', { w: 1, h: 1 }, klass)).not.toContain(clause)
   })
   it('targetSize: 1x1 building is 64px, per Style Bible', () => {
     expect(targetSize('building', { w: 1, h: 1 })).toEqual({ w: 64, h: 64 })

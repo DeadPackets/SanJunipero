@@ -77,8 +77,11 @@ function flatSheet(img: RawImage, target: Target): RawImage {
 }
 
 /** Throws on a generation the chain cannot cut; the caller treats that as a failed candidate. */
-export async function postProcess(png: Buffer, klass: AssetClass, target: Target): Promise<Buffer> {
-  const img = await decodePng(png)
+export function postProcessRaw(img: RawImage, klass: AssetClass, target: Target): RawImage {
   const anchor = ANCHOR[klass]
-  return encodePng(anchor === null ? flatSheet(img, target) : keyedSprite(img, anchor, target))
+  return anchor === null ? flatSheet(img, target) : keyedSprite(img, anchor, target)
+}
+
+export async function postProcess(png: Buffer, klass: AssetClass, target: Target): Promise<Buffer> {
+  return encodePng(postProcessRaw(await decodePng(png), klass, target))
 }

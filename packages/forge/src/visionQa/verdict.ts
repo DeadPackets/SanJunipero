@@ -89,3 +89,7 @@ export function deriveOverall(
   if (!failed) return 'pass'
   return o.attempt > o.maxRetries ? 'blocked' : 'retry'
 }
+
+/** A verdict's aggregate: summed for choosing between attempts, divided for the codex's 1-10. */
+export const totalScore = (v: VisionVerdict): number =>
+  CRITERIA.reduce((s, k) => s + v.criteria[k].score, 0)

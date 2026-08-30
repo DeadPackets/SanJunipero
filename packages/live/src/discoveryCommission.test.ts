@@ -9,15 +9,21 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { migrateLlmTables } from '@sj/llm'
 import { AssetCodex, encodePng, openForgeDb, type RawImage } from '@sj/forge'
-import type { JudgeFn } from '@sj/forge/gen'
+import {
+  CRITERIA,
+  EST_COST_PER_VISION_CALL,
+  type VisionCriteria,
+  type VisionJudgeFn,
+} from '@sj/forge/gen'
 import { FORGE_CALLER, createDiscoveryArt } from './discoveryCommission.js'
 import { ledgerTotalUsd } from './liveWorld.js'
 import { createGateway } from '@sj/gateway'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const WATERSKIN = { name: 'stitch a waterskin', makes: ['waterskin'] }
-/** 3 images at $0.045 plus 3 style judges at $0.0004. */
-const ONE_COMMISSION_USD = 0.1362
+/** One picture at $0.045 plus the one vision-QA call that gates it. */
+const JUDGE_USD = EST_COST_PER_VISION_CALL
+const ONE_COMMISSION_USD = 0.045 + JUDGE_USD
 
 // A valid 512×512 "generation": magenta field (chroma-keyed away), sage square centred.
 function generationPng(): Promise<Buffer> {
@@ -49,9 +55,22 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
       { status: 200, headers: { 'content-type': 'application/json' } },
     )
   }
-  const judge: JudgeFn = async () => {
+  const judge: VisionJudgeFn = async (a) => {
     calls.push('judge')
-    return { score: 9, notes: 'scripted' }
+    const criteria = Object.fromEntries(
+      CRITERIA.map((k) => [k, { pass: true, score: 9, evidence: 'scripted' }]),
+    ) as VisionCriteria
+    return {
+      costUsd: JUDGE_USD,
+      verdict: {
+        assetId: a.assetId,
+        model: 'google/gemini-3.7-flash',
+        rubricVersion: 'v1',
+        criteria,
+        feedback: '',
+        overall: 'pass' as const,
+      },
+    }
   }
 
   const forgeRows = (): { model: string; cost_usd: number }[] =>
@@ -138,26 +157,27 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(codex.listSince(0)).toHaveLength(1)
   }, 30_000)
 
-  it('★ the budget is consulted per image: a day with $0.05 left buys one, not three', async () => {
-    // 0.045 fits; the second reservation would total 0.09 and is refused, so the commission
-    // ships on the one candidate that was paid for.
+  it('★ a balance that cannot pay for the picture AND its eye buys neither', async () => {
+    // 0.045 fits on its own; with the eye reserved beside it the pair is 0.0505 and refused,
+    // so no money goes out and the placeholder stands.
     const art = artFor(0.05)
     art.onDiscovery(WATERSKIN)
     await art.settle()
 
-    expect(calls.filter((c) => c === 'image')).toHaveLength(1)
-    expect(codex.listSince(0).map((r) => r.status)).toEqual(['ready'])
+    expect(calls).toEqual([])
+    expect(codex.listSince(0).map((r) => r.status)).toEqual(['placeholder'])
   }, 30_000)
 
   it('★ two kinds in one breath cannot both spend the last dollar', async () => {
-    // $0.14 buys exactly one commission. Run side by side, both would read the same balance
-    // and buy three images each.
-    const art = artFor(0.14)
+    // $0.09 buys exactly one commission ($0.0505). Run side by side, both would read the same
+    // balance and both would draw.
+    const art = artFor(0.09)
     art.onDiscovery({ name: 'stitch a waterskin', makes: ['waterskin', 'cord'] })
     await art.settle()
 
-    expect(calls.filter((c) => c === 'image')).toHaveLength(3)
+    expect(calls.filter((c) => c === 'image')).toHaveLength(1)
     expect(codex.listSince(0).filter((r) => r.status === 'ready')).toHaveLength(1)
+    expect(codex.listSince(0).filter((r) => r.status === 'placeholder')).toHaveLength(1)
   }, 30_000)
 
   it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
@@ -207,6 +227,15 @@ describe('the commission path is live-only, and it IS wired', () => {
     // not load it, which `town/src/liveSeam.test.ts` walks the package graph for.
     expect(importsOf('discoveryArt.ts')).not.toContain('@sj/forge/gen')
     expect(importsOf('liveWorld.ts')).toContain('discoveryCommission')
+  })
+
+  it('the eye it hands the forge is the 7-criterion rubric, not a single score', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'discoveryCommission.ts'),
+      'utf8',
+    )
+    expect(src).toContain('makeVisionJudge')
+    expect(src).not.toContain('makeVlmJudge')
   })
 
   it('liveWorld commissions on the codification', () => {

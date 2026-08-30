@@ -10,7 +10,6 @@ import {
 import { paletteRgb } from './palette.js'
 import type { RawImage } from './post/raw.js'
 import { encodePng } from './post/raw.js'
-import { quantize } from './post/quantize.js'
 import { applyTint, type Tint } from './tints.js'
 import { paintRoadAutotile } from './roadTiles.js'
 import type { AssetCodex } from './codex.js'
@@ -164,11 +163,9 @@ export function seasonTileNames(): string[] {
   )
 }
 
-// Spec §7 atmosphere read seasonally; the sheet is re-quantized to MASTER_PALETTE after the
-// tint, so a tinted tile is still palette-true.
+// Spec §7 atmosphere read seasonally. The tint is the last thing the sheet gets: ruling 13
+// takes the quantize off it, so a tinted tile keeps the colour the tint gave it.
 export const SEASON_TINTS: Record<Season, Tint> = {
-  // spring must clear a full palette rung, not half of one: quantize would snap a subtle
-  // tint straight back onto summer's colours and the two sheets would come out identical.
   spring: { r: 0.9, g: 1.12, b: 0.9 },
   summer: { r: 1.0, g: 1.0, b: 1.0 },
   autumn: { r: 1.1, g: 0.94, b: 0.8 },
@@ -188,7 +185,7 @@ export function paintSeasonSheet(season: Season): RawImage {
       }
     }
   })
-  return quantize(applyTint(sheet, SEASON_TINTS[season]))
+  return applyTint(sheet, SEASON_TINTS[season])
 }
 
 export const SCAFFOLD_W = 32,

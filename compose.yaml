@@ -21,12 +21,12 @@ services:
       # Ring 3 is a 152-tile square, ring 1 the 76-tile showcase. Changing it on a running town
       # refuses the boot; a new ring count needs a new town (SJ_FRESH=1).
       - SJ_RINGS=${SJ_RINGS:-1}
-      - SJ_INTERIORS=${SJ_INTERIORS:-0}
       # Named with NO value: compose reads `.env` and passes these on only when they are SET, so
       # an unset knob keeps the code's own default. Written as `${SJ_LAMPS:-}` it would arrive as
       # an empty string, and `Number('')` is 0 — an unlit town nobody asked for.
       - SJ_MAP
       - SJ_LAMPS
+      - SJ_INTERIORS
       - SJ_BUILDERS
       - SJ_BRIDGE
       - SJ_JOINT
