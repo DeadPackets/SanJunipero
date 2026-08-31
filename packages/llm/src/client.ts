@@ -265,8 +265,7 @@ export class LlmClient {
           tools: {
             turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }),
           },
-          toolChoice:
-            this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
+          toolChoice: this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
         })
         note(stepFacts(r))
         const parsed = schema.safeParse(r.toolCalls[0]?.input)

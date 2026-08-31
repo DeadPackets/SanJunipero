@@ -56,10 +56,10 @@ export const ACT_NEAREST = 3
  * begin with: 0.14 read well on a desk and fell to 4.17:1 after dark. 0.08 holds 4.58:1 with a
  * margin, and `acts.test.ts` fails the build if a later hand pushes it back up.
  */
-export const ACT_WASH = 0.08
+const ACT_WASH = 0.08
 export const ACT_FILL: number = over(SPEECH_INK, SPEECH_FILL, ACT_WASH)
 /** Clear of the feet, and clear of the contact shadow under them. */
-export const ACT_DROP_PX = 10
+const ACT_DROP_PX = 10
 
 /** What we know about the act one person is in the middle of. */
 export type ActRun = { verb: string; total: number; left: number }
