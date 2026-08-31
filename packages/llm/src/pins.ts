@@ -2,8 +2,8 @@
 // OpenRouter publishes no dated snapshot for this model, so the bare id is the only id there
 // is; see the pins test for the dated-pin exception.
 export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
-// Single-homed by necessity, not by the load-balancing law: 19 of the 20 endpoints serving this
-// model return a Turn with no action on 75-100% of calls. Wafer alone cleared 36/36 acts.
+// Single-homed by necessity, not by the load-balancing law: probed on the nullable-act schema,
+// 19 of 20 endpoints returned a Turn with no action on 75-100% of calls; Wafer cleared 36/36 acts.
 export const PROVIDER_ORDER: string[] = ['Wafer']
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
@@ -11,8 +11,8 @@ export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
 export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
-// Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each returns 100% well-formed
-// Turns with `action: null` on 75-99% of calls, which only the pre-flight act bar catches.
+// Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: on the nullable-act probe each
+// returned 100% well-formed Turns, `action: null` on 75-99%; only pre-flight's act bar catches it.
 // The fallback IS the pinned model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
