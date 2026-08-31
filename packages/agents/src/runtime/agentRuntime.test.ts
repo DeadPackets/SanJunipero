@@ -481,6 +481,102 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(loop.state.agents[AGENT]!.needs.hunger).toBeGreaterThan(30)
   })
 
+  // The prompt teaches `wait`, so a mind writes it into a plan. The world has no such verb, and
+  // a refused head drops the whole queue: the steps after the pause were never reached.
+  it('carries a plan past a wait written into the middle of it', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk over, sit a moment, then take the bread.',
+          plan: [
+            { verb: 'walk', params: { x: 5, y: 6 } },
+            { verb: 'wait', params: {} },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 2, 100)
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take'])
+  })
+
+  // `wait` is stripped before the world ever sees it, but nine other words for standing still
+  // are not, and each of them used to take the rest of the plan down with it.
+  it('spends a step on a word for standing still and carries the plan on past it', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk over, rest a moment, then take the bread.',
+          plan: [
+            { verb: 'walk', params: { x: 5, y: 6 } },
+            { verb: 'rest', params: {} },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 2, 100)
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take'])
+  })
+
+  it('walks a plan of nothing but standing still all the way to its end', async () => {
+    const { world, loop, bridge } = await setup({
+      model: turnModel([
+        {
+          thought: 'I will stand a while and look about me.',
+          plan: [
+            { verb: 'rest', params: {} },
+            { verb: 'look', params: {} },
+          ],
+          importance: 2,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    // Neither step leaves a trace in the world, so what the queue did is only visible at the
+    // seam: a plan dropped at the first refusal never asks the world about the second.
+    const submitted: string[] = []
+    const real = bridge.submit.bind(bridge)
+    bridge.submit = (agentId, intent, onResult) => {
+      submitted.push(intent.verb)
+      return real(agentId, intent, onResult)
+    }
+    await stepUntil(loop, () => submitted.includes('look'), 200)
+    expect(submitted.filter((v) => v === 'rest' || v === 'look')).toEqual(['rest', 'look'])
+    expect(startedVerbs(world.engineDb)).toEqual([])
+  })
+
+  it('still drops the whole plan for an invented verb that is not a word for standing still', async () => {
+    const { world, loop, runtime, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'I will make the thing, then take the bread.',
+          plan: [
+            { verb: 'frobnicate', params: {} },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    for (let i = 0; i < 15; i++) {
+      loop.step()
+      await flush()
+    }
+    // Both halves are what the noop path does NOT do: it would have spent the step, run `take`
+    // and remembered nothing. The queue is dropped and the refusal is the mind's to read back.
+    expect(runtime.snapshot().plan.queue).toEqual([])
+    expect(startedVerbs(world.engineDb)).toEqual([])
+    expect(completedVerbs(world.engineDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action')).toHaveLength(1)
+  })
+
   // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
   // no refusal and no alert. This row is the only trace such a turn ever leaves.
   it('books what each turn produced against the back end that served it', async () => {

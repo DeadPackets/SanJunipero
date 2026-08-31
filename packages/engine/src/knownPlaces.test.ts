@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, T_WATER, type SimConfig } from '@sj/shared'
 import { openDb } from './db.js'
 import { GENESIS_BUILDER_ID } from './genesis/world.js'
+import { doorTile } from './interiors.js'
+import { isAdjacentToRect } from './verbs/common.js'
 import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -121,8 +123,8 @@ describe('★ walk takes the mark of a place, and the world finds the way', () =
   const walkTo = (s: WorldState, params: Record<string, unknown>) =>
     submitIntent(s, CFG, 'a1', 'walk', params)
 
-  function town(): WorldState {
-    let s = genesisState(CFG, grid(24))
+  function town(rows = grid(24)): WorldState {
+    let s = genesisState(CFG, rows)
     s = plant(s, 'structure_1', { x: 10, y: 10 })
     s = spawn(s, 'a1', 2, 2)
     return fold(s, ev('places_seen', { agentId: 'a1', structureIds: ['structure_1'] }), CFG)
@@ -133,9 +135,51 @@ describe('★ walk takes the mark of a place, and the world finds the way', () =
     expect(out.ok).toBe(true)
     const started = out.ok ? out.events.find((e) => e.type === 'action_started') : undefined
     const p = started?.payload as { params: Record<string, unknown> }
-    // Beside the footprint, never on it, and nearest the body: the near corner of the ring. The
-    // place the mind actually named rides along, so the log still knows where she was going.
-    expect(p.params).toEqual({ structureId: 'structure_1', x: 9, y: 9 })
+    // Beside the footprint, never on it, and beside the DOOR, which is what `enter` measures
+    // from; nearest the body only breaks the tie.
+    expect(p.params).toEqual({ structureId: 'structure_1', x: 9, y: 11 })
+  })
+
+  it('lands within reach of the door however far around the walls the body starts', () => {
+    // The door of this house faces south; the body is away to the north-west, so the corner
+    // nearest her is three tiles from the door and `enter` would be refused from it.
+    const s = town()
+    const out = walkTo(s, { structureId: 'structure_1' })
+    expect(out.ok).toBe(true)
+    const started = out.ok ? out.events.find((e) => e.type === 'action_started') : undefined
+    const to = (started?.payload as { params: { x: number; y: number } }).params
+    const door = doorTile(s, s.structures.structure_1!)!
+    expect(isAdjacentToRect(to.x, to.y, { ...door, w: 1, h: 1 })).toBe(true)
+    // And the step it was sent for actually goes through from where the walk ends.
+    const arrived = fold(s, ev('agent_moved', { id: 'a1', x: to.x, y: to.y }), CFG)
+    expect(submitIntent(arrived, CFG, 'a1', 'enter', { structureId: 'structure_1' }).ok).toBe(true)
+  })
+
+  it('falls back to the tile nearest the body when no foot can reach the door', () => {
+    const rows = grid(24)
+    // The south face and its ring are sealed into a pocket of water: the door still stands and
+    // is still passable, and nothing outside can walk to it or to anything beside it.
+    for (let x = 8; x <= 13; x++) rows[13]![x] = T_WATER
+    for (const [x, y] of [
+      [8, 12],
+      [13, 12],
+      [8, 11],
+      [9, 11],
+      [12, 11],
+      [13, 11],
+    ] as const)
+      rows[y]![x] = T_WATER
+    const s = town(rows)
+    const door = doorTile(s, s.structures.structure_1!)!
+    expect(door).toEqual({ x: 10, y: 12 })
+    const out = walkTo(s, { structureId: 'structure_1' })
+    expect(out.ok).toBe(true)
+    const started = out.ok ? out.events.find((e) => e.type === 'action_started') : undefined
+    expect((started?.payload as { params: unknown }).params).toEqual({
+      structureId: 'structure_1',
+      x: 9,
+      y: 9,
+    })
   })
 
   it('the two numbers still work exactly as they did', () => {
@@ -262,9 +306,9 @@ describe('★ a place is called what is written on it', () => {
 })
 
 describe('★ a place named aloud travels to whoever hears it', () => {
-  function pair(): WorldState {
+  function pair(name = 'the Old Mill'): WorldState {
     let s = genesisState(CFG, grid(24))
-    s = plant(s, 'structure_1', { x: 10, y: 10, name: 'the Old Mill' })
+    s = plant(s, 'structure_1', { x: 10, y: 10, name })
     s = spawn(s, 'speaker', 2, 2)
     s = spawn(s, 'hearer', 3, 2)
     return fold(s, ev('places_seen', { agentId: 'speaker', structureIds: ['structure_1'] }), CFG)
@@ -333,6 +377,15 @@ describe('★ a place named aloud travels to whoever hears it', () => {
     expect(told(s, 'I am going up to the Mill.')).toEqual([
       { agentId: 'hearer', structureIds: ['structure_1'] },
     ])
+  })
+
+  // A carved name is stored exactly as the chisel cut it, and every mind is shown it flattened.
+  // Matched raw, a name with a line break in it was one no mouth could ever say.
+  it.each([
+    ['a line break', 'the Old\n  Mill', 'I am going up to the Old Mill before dark.'],
+    ['a curled quote', '\u201cthe Old Mill\u201d', "I am going up to 'the Old Mill' before dark."],
+  ])('a name carved with %s travels in the shape every mind is shown it', (_what, name, said) => {
+    expect(told(pair(name), said)).toEqual([{ agentId: 'hearer', structureIds: ['structure_1'] }])
   })
 
   it('and telling somebody what they already know says nothing twice', () => {

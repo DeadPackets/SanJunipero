@@ -564,9 +564,16 @@ export class AgentRuntime {
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     if (res.ok) return
+    // A word for standing still is a step spent, not a plan refused: the body was already doing
+    // it, so the queue carries on from the next step instead of dying at this one.
+    if (isBodyNoOp(res.reason, head.verb)) {
+      this.#plan.queue.shift()
+      this.#planHeadInFlight = false
+      if (this.#plan.queue.length === 0) this.#plan.lastResult = 'done'
+      return
+    }
     this.#clearPlanQueue()
     this.#plan.lastResult = 'blocked'
-    if (isBodyNoOp(res.reason, head.verb)) return
     if (this.#reroutesUnknownVerb(res.reason)) {
       void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
         this.#sink('adjudicate_crash'),

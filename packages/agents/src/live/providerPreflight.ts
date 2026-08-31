@@ -2,10 +2,11 @@ import { NoObjectGeneratedError } from 'ai'
 import { assemblePrompt, type AssembledPrompt, type IdentityCore } from '../prompt/assemble.js'
 import type { PersonalityDoc } from '../personality.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import { TurnSchema, type Turn } from '../turn.js'
+import { TurnSchemaActionRequired, waitIsRest, type Turn } from '../turn.js'
 
-// Asks the real `TurnSchema` with the real system prompt and model id — a grammar-constrained
-// provider can return only a schema's required properties, so a toy schema proves nothing.
+// Asks the real schema the runtime asks with, the real system prompt and the real model id — a
+// grammar-constrained provider can return only a schema's required properties, and a bar measured
+// through a laxer shape than the run uses is not a measurement of the run.
 
 export const PREFLIGHT_CALLS = 3
 // `action` on every call is the bar — it separated four candidates cleanly over 48 probe calls;
@@ -105,9 +106,11 @@ export function scorePreflight(opts: {
   servedProviders?: readonly string[]
 }): PreflightResult {
   const answered = opts.answers.filter((a) => a.ok).length
-  // `?? null`, not `!== undefined`: the turn schema takes null for an optional field, and a
-  // provider writing `"action": null` has emitted no act.
-  const actions = opts.answers.filter((a) => a.ok && (a.turn.action ?? null) !== null).length
+  // Read exactly as the runtime reads it: a provider writing `"action": null` has emitted no
+  // act, and neither has one writing `wait`, which is the turn path's rest.
+  const actions = opts.answers.filter(
+    (a) => a.ok && (waitIsRest(a.turn).action ?? null) !== null,
+  ).length
   const speeches = opts.answers.filter((a) => a.ok && (a.turn.speech ?? null) !== null).length
   // Over several rounds the bar is "one round cleared it", never "three acts turned up
   // somewhere": a provider that emits one act per round has not cleared a 3-of-3 bar.
@@ -190,15 +193,15 @@ export async function runPreflight(opts: {
         const { value } = await opts.llm.object({
           system: prompt.system,
           messages: prompt.messages,
-          schema: TurnSchema,
+          schema: TurnSchemaActionRequired,
         })
-        const parsed = TurnSchema.safeParse(value)
+        const parsed = TurnSchemaActionRequired.safeParse(value)
         record(
           parsed.success
             ? { ok: true, turn: parsed.data }
             : {
                 ok: false,
-                error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}`,
+                error: `answer did not fit TurnSchemaActionRequired: ${JSON.stringify(value).slice(0, 200)}`,
               },
         )
       } catch (err) {

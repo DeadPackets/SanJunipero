@@ -104,10 +104,19 @@ const namedAct = (turn: Turn): z.infer<typeof IntentSchema> | null => {
   return action === null || action === undefined || 'freeform' in action ? null : action
 }
 
-// A wait is a rest, not an act: the body keeps to whatever carried it (a plan runs on, stillness
-// stays still). Normalized to the old null before anything downstream reads the action.
-const waitIsRest = (turn: Turn): Turn =>
-  namedAct(turn)?.verb === 'wait' ? { ...turn, action: null } : turn
+/** A turn as the body will carry it out. A wait is a rest, not an act: as the action it becomes
+ *  the old null (a plan runs on, stillness stays still), and as a plan step it is dropped, since
+ *  the world has no such verb and a refused step takes the whole queue down with it. */
+export const waitIsRest = (turn: Turn): Turn => {
+  const rested = namedAct(turn)?.verb === 'wait' ? { ...turn, action: null } : turn
+  const plan = rested.plan ?? null
+  if (plan === null) return rested
+  const kept = plan.filter((step) => step.verb !== 'wait')
+  if (kept.length === plan.length) return rested
+  // An empty plan is not no plan: the runtime reads `[]` as a queue to clear and null as one to
+  // leave running, so a plan that was nothing but a wait has to come back as null.
+  return { ...rested, plan: kept.length > 0 ? kept : null }
+}
 
 /** The verb this turn began with nothing named, or null when the act carries its detail. */
 export function actWithoutItsDetail(turn: Turn): string | null {
@@ -152,21 +161,24 @@ export async function parseTurnWithRepair(
   }
   // The same one correction, spent on the other way an answer comes back unusable: the world
   // refuses an act with nothing in it a beat later, with the moment already gone (K20).
-  const empty = actWithoutItsDetail(waitIsRest(first.data))
-  if (empty === null) return waitIsRest(first.data)
+  const rested = waitIsRest(first.data)
+  const empty = actWithoutItsDetail(rested)
+  if (empty === null) return rested
   // One reading beats one more call: the world fills the act's one candidate in when it takes
   // it, so a mind is not asked again for a word it had no choice about.
   if (hasOneReading?.(empty) === true) {
     alert('act_detail_filled_in', `${empty} has one candidate and was read as that`)
-    return first.data
+    return rested
   }
   const again = TurnSchemaActionRequired.safeParse(
     await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
   )
-  if (again.success && actWithoutItsDetail(waitIsRest(again.data)) === null)
-    return waitIsRest(again.data)
+  if (again.success) {
+    const retried = waitIsRest(again.data)
+    if (actWithoutItsDetail(retried) === null) return retried
+  }
   alert('empty_act_detail', `${empty} came back empty twice`)
-  return waitIsRest(first.data)
+  return rested
 }
 
 // Where each part of the day begins, as the one clock everybody shares. Read back through
