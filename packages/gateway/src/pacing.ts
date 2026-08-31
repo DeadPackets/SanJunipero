@@ -14,7 +14,7 @@ export const DEFAULT_IDLE_SPEED = 0.25
 /** Speed only. Pacing never pauses a town, so `/admin/pause` is never its business. */
 export type PacingOpts = {
   clock: Pick<Clock, 'speed' | 'setSpeed'>
-  env?: Record<string, string | undefined>
+  env?: NodeJS.ProcessEnv
 }
 
 export type Pacing = {
@@ -23,12 +23,14 @@ export type Pacing = {
   stop(): void
 }
 
+const noop = (): void => undefined
+
 const numEnv = (
-  env: Record<string, string | undefined>,
+  env: NodeJS.ProcessEnv,
   name: string,
   fallback: number,
   min: number,
-  max: number,
+  max = Number.POSITIVE_INFINITY,
 ): number => {
   const raw = env[name]
   if (raw === undefined) return fallback
@@ -42,9 +44,9 @@ export function createPacing(opts: PacingOpts): Pacing {
   const env = opts.env ?? process.env
   // Rehearsals and probes measure the town at one speed; a clock that moves under them is a
   // measurement of nothing. Off means off — no timer, no transition, no log line.
-  if (env['SJ_IDLE_PACING'] === '0') return { viewers() {}, stop() {} }
+  if (env.SJ_IDLE_PACING === '0') return { viewers: noop, stop: noop }
 
-  const afterMs = numEnv(env, 'SJ_IDLE_AFTER_MS', DEFAULT_IDLE_AFTER_MS, 1, Number.MAX_SAFE_INTEGER)
+  const afterMs = numEnv(env, 'SJ_IDLE_AFTER_MS', DEFAULT_IDLE_AFTER_MS, 1)
   // Bounded by what the operator's own endpoint accepts: pacing must never put the clock
   // somewhere a person could not have put it by hand.
   const idleSpeed = numEnv(env, 'SJ_IDLE_SPEED', DEFAULT_IDLE_SPEED, MIN_SPEED, MAX_SPEED)
@@ -55,6 +57,11 @@ export function createPacing(opts: PacingOpts): Pacing {
   // leaves that transition alone.
   const full = opts.clock.speed
   let idled = false
+
+  const cancel = (): void => {
+    if (timer !== null) clearTimeout(timer)
+    timer = null
+  }
 
   const goIdle = (): void => {
     timer = null
@@ -72,20 +79,12 @@ export function createPacing(opts: PacingOpts): Pacing {
         timer ??= setTimeout(goIdle, afterMs).unref()
         return
       }
-      if (timer !== null) {
-        clearTimeout(timer)
-        timer = null
-      }
+      cancel()
       if (!idled || opts.clock.speed !== idleSpeed) return
       idled = false
       opts.clock.setSpeed(full)
       console.error(`pacing: viewer connected, speed -> ${full}`)
     },
-    stop(): void {
-      if (timer !== null) {
-        clearTimeout(timer)
-        timer = null
-      }
-    },
+    stop: cancel,
   }
 }

@@ -35,6 +35,9 @@ services:
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
       - SJ_MAX_MINDS
+      - SJ_IDLE_PACING
+      - SJ_IDLE_AFTER_MS
+      - SJ_IDLE_SPEED
       # The channel listens on loopback INSIDE the container; the served origin proxies
       # `/admin/*` to it behind the bearer token, so the operator's page reaches it (ruling 10).
       - SJ_ADMIN_TOKEN

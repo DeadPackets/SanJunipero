@@ -148,32 +148,35 @@ describe('viewer-aware pacing', () => {
 })
 
 describe('pacing rides the operator clock', () => {
-  it('★ drives the same TickLoop.setSpeed that POST /admin/speed drives', () => {
+  beforeEach(() => {
     vi.useFakeTimers()
-    try {
-      const db = openDb(':memory:')
-      const loop = new TickLoop({
-        store: new EventStore(db),
-        state: genesisState(DEFAULT_CONFIG, GRASS),
-        rng: new RngStreams('pacing-clock'),
-        onTick: () => {},
-      })
-      const p = createPacing({ clock: loop })
-      expect(loop.speed).toBe(1)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
-      p.viewers(0)
-      vi.advanceTimersByTime(DEFAULT_IDLE_AFTER_MS)
-      expect(loop.speed).toBe(DEFAULT_IDLE_SPEED)
-      // The beat divides by `loop.speed`, so a quarter-speed town ticks a quarter as often.
-      expect(loop.paused).toBe(false)
+  it('★ drives the same TickLoop.setSpeed that POST /admin/speed drives', () => {
+    const db = openDb(':memory:')
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('pacing-clock'),
+      onTick: () => {},
+    })
+    const p = createPacing({ clock: loop, env: {} })
+    expect(loop.speed).toBe(1)
 
-      p.viewers(1)
-      expect(loop.speed).toBe(1)
-      p.stop()
-      db.close()
-    } finally {
-      vi.useRealTimers()
-    }
+    p.viewers(0)
+    vi.advanceTimersByTime(DEFAULT_IDLE_AFTER_MS)
+    expect(loop.speed).toBe(DEFAULT_IDLE_SPEED)
+    // The beat divides by `loop.speed`, so a quarter-speed town ticks a quarter as often, and
+    // pacing never touches the other dimension.
+    expect(loop.paused).toBe(false)
+
+    p.viewers(1)
+    expect(loop.speed).toBe(1)
+    p.stop()
+    db.close()
   })
 })
 
