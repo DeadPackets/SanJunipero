@@ -231,10 +231,15 @@ export function walkDestination(
   // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
   // measures against are picked off the same tiles in the same order.
   const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  // A named place is walked to in order to enter it, and `enter` measures from the door. Without
+  // the door first, the walk ends at the back wall and the step through the door is refused.
+  const door = doorTile(state, s)
+  const offDoor = (p: Point): number =>
+    door === null || isAdjacentToRect(p.x, p.y, { ...door, w: 1, h: 1 }) ? 0 : 1
   const ctx = pathCtx(state, config)
   const ring = perimeter(s)
     .filter((t) => isPassable(state, t.x, t.y, ctx))
-    .sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+    .sort((p, q) => offDoor(p) - offDoor(q) || near(p) - near(q) || p.y - q.y || p.x - q.x)
   // Nearest first, so the common case is one search and a ring of walls costs none at all.
   for (const t of ring) if (findPath(state, a, t, config) !== null) return t
   return { refusal: 'no path to that spot' }

@@ -228,6 +228,41 @@ describe('parseTurnWithRepair', () => {
     expect(alert).toHaveBeenCalledWith('empty_act_detail', expect.stringContaining('eat'))
   })
 
+  it('drops a wait out of a plan and keeps the steps on either side of it', async () => {
+    const raw = {
+      ...validTurn,
+      plan: [
+        { verb: 'gather', params: { kind: 'reeds' } },
+        { verb: 'wait', params: {} },
+        { verb: 'chop', params: { x: 4, y: 9 } },
+      ],
+    }
+    const turn = await parseTurnWithRepair(raw, vi.fn(), vi.fn())
+    expect(turn.plan).toEqual([
+      { verb: 'gather', params: { kind: 'reeds' } },
+      { verb: 'chop', params: { x: 4, y: 9 } },
+    ])
+  })
+
+  it('leaves no plan at all when the whole plan was a wait', async () => {
+    const raw = { ...validTurn, plan: [{ verb: 'wait', params: {} }] }
+    const turn = await parseTurnWithRepair(raw, vi.fn(), vi.fn())
+    expect(turn.plan ?? null).toBeNull()
+  })
+
+  it('a wait for the act is still a rest, and the plan it came with runs on', async () => {
+    const raw = {
+      ...validTurn,
+      action: { verb: 'wait', params: {} },
+      plan: [{ verb: 'chop', params: { x: 4, y: 9 } }],
+    }
+    const repair = vi.fn()
+    const turn = await parseTurnWithRepair(raw, repair, vi.fn())
+    expect(turn.action).toBeNull()
+    expect(turn.plan).toEqual([{ verb: 'chop', params: { x: 4, y: 9 } }])
+    expect(repair).not.toHaveBeenCalled()
+  })
+
   it('keeps the turn and says so once when the act comes back empty twice', async () => {
     const empty = { ...validTurn, plan: null, action: { verb: 'eat', params: {} } }
     const repair = vi.fn(async () => empty)

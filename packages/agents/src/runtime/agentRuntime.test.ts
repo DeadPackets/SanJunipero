@@ -481,6 +481,27 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(loop.state.agents[AGENT]!.needs.hunger).toBeGreaterThan(30)
   })
 
+  // The prompt teaches `wait`, so a mind writes it into a plan. The world has no such verb, and
+  // a refused head drops the whole queue: the steps after the pause were never reached.
+  it('carries a plan past a wait written into the middle of it', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk over, sit a moment, then take the bread.',
+          plan: [
+            { verb: 'walk', params: { x: 5, y: 6 } },
+            { verb: 'wait', params: {} },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 2, 100)
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take'])
+  })
+
   // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
   // no refusal and no alert. This row is the only trace such a turn ever leaves.
   it('books what each turn produced against the back end that served it', async () => {

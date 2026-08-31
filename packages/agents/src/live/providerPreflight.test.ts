@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { CAPABILITIES } from '../prompt/rulesOfBeing.js'
-import { TurnSchema } from '../turn.js'
+import { TurnSchema, TurnSchemaActionRequired } from '../turn.js'
 import {
   PREFLIGHT_BAR,
   PREFLIGHT_CALLS,
@@ -74,6 +74,15 @@ describe('the provider pre-flight asks the real question', () => {
     expect(json).toContain('"action"')
     expect(json).toContain('"speech"')
     expect((JSON.parse(json) as { required: string[] }).required).toEqual(['thought', 'importance'])
+  })
+
+  // The bar measures the pair the run will use, and the shape asked for is half of that pair: a
+  // provider that blanks only under the required action would pass a probe asked the lax way.
+  it('asks with the shape the runtime asks with, in which the act is required', () => {
+    const json = JSON.stringify(
+      z.toJSONSchema(TurnSchemaActionRequired, { io: 'input', unrepresentable: 'any' }),
+    )
+    expect((JSON.parse(json) as { required: string[] }).required).toContain('action')
   })
 })
 
@@ -257,6 +266,33 @@ describe('runPreflight', () => {
     })
     expect(seen).toHaveLength(PREFLIGHT_CALLS)
     expect(seen.every((a) => a.ok)).toBe(true)
+  })
+
+  it('fails a back end that answers with the required properties and no act at all', async () => {
+    const r = await runPreflight({
+      llm: fakeLlm([REQUIRED_ONLY, REQUIRED_ONLY, REQUIRED_ONLY]),
+      provider: 'DeepInfra',
+      hardAllowList: true,
+      model: 'm',
+    })
+    // Not a turn at all under the shape the run asks with: refused at the schema, not scored.
+    expect(r.answered).toBe(0)
+    expect(r.actions).toBe(0)
+    expect(r.passed).toBe(false)
+    expect(r.failures).toHaveLength(PREFLIGHT_CALLS)
+  })
+
+  it('counts a wait as answered and not as acting, exactly as a turn does', async () => {
+    const waited = { thought: 'I stand and let it pass.', action: { verb: 'wait' }, importance: 2 }
+    const r = await runPreflight({
+      llm: fakeLlm([waited, waited, waited]),
+      provider: 'DeepInfra',
+      hardAllowList: true,
+      model: 'm',
+    })
+    expect(r.answered).toBe(PREFLIGHT_CALLS)
+    expect(r.actions).toBe(0)
+    expect(r.passed).toBe(false)
   })
 
   it('treats an answer that does not fit the turn shape as a failed call', async () => {

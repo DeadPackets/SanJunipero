@@ -1,8 +1,8 @@
-import type { SimConfig } from '@sj/shared'
+import { sanitizeSpokenText, type SimConfig } from '@sj/shared'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { nameTravels } from './naming.js'
-import type { WorldState } from './state.js'
+import { placeName, type WorldState } from './state.js'
 
 // What travels on the air, and what it carries. A leaf, so the mouth that speaks and the ear
 // the packet is built from read one rule and never two.
@@ -68,9 +68,11 @@ export function placesNamedAloud(
 ): { agentId: string; structureIds: string[] }[] {
   const speaker = state.agents[spoke.agentId]
   if (!speaker) return []
-  const lowered = spoke.text.toLowerCase()
+  // Both sides in the one shape a mind is ever shown: a carved name is stored exactly as the
+  // chisel cut it, and a world resumed from an older log carries speech that was never flattened.
+  const lowered = sanitizeSpokenText(spoke.text).toLowerCase()
   const named = (speaker.knownPlaces ?? []).filter((id) => {
-    const name = state.structures[id]?.name
+    const name = placeName(state.structures[id] ?? {})
     return name !== undefined && nameTravels(name) && saidAloud(lowered, name)
   })
   if (named.length === 0) return []
