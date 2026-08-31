@@ -34,7 +34,7 @@ drop: name it drop; give itemId, the mark of the thing you hold, and it rests on
 stow: name it stow; give itemId, the mark of the thing you hold, and structureId, the building you leave it in
 write: name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
 read: name it read; give itemId, the mark of the writing you hold
-inscribe: name it inscribe; give structureId, the mark of the thing you mark, and text, the words you cut into it
+inscribe: name it inscribe; give structureId, the mark of the thing you mark, and text, the words you cut into it. Words cut into a building you raised yourself become what it is called, when they read as a name and not as a sentence; what you cut into another's walls stays writing on the wall
 teach: name it teach; give targetId, the person, and track, the craft you pass on
 tend: name it tend; give targetId, the hurt or ill person at your side
 till: name it till; give x and y as two numbers for ground within reach

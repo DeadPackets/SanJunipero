@@ -9,16 +9,18 @@ import { faceFor, worldTextScale } from './textFaces.js'
 import { placeTag, type Rect } from './tooltip.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 
-// A landmark name is the viewer's legend, derived from what is standing; a toponym is what
-// somebody carved, kept verbatim, standing where they cut it.
+// A landmark name is the viewer's legend, derived from what is standing; a toponym is what the
+// place is CALLED, standing where the town calls it that.
 
 export type Toponym = { id: string; name: string; x: number; y: number }
 
-/** Every name cut into something that stands, in one order — so two calls agree. */
+/** Every place with a name, in one order — so two calls agree. The name the world settled on
+ *  comes first: the map and the minds read one set of names, or they are two towns. Falls back
+ *  to the raw carving, which is what a wall says when nothing has named it. */
 export function toponymsOf(state: WorldState | null): Toponym[] {
   const out: Toponym[] = []
   for (const s of Object.values(state?.structures ?? {})) {
-    const text = s.inscription?.text.trim() ?? ''
+    const text = (s.name ?? s.inscription?.text ?? '').trim()
     if (s.stage !== 'complete' || text === '') continue
     out.push({ id: s.id, name: text, x: s.x, y: s.y })
   }

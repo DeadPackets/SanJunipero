@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, T_WATER, type SimConfig } from '@sj/shared'
 import { openDb } from './db.js'
+import { GENESIS_BUILDER_ID } from './genesis/world.js'
 import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -22,7 +23,7 @@ const CFG: SimConfig = SimConfigSchema.parse({
 function plant(
   s: WorldState,
   id: string,
-  at: { x: number; y: number; w?: number; h?: number; name?: string },
+  at: { x: number; y: number; w?: number; h?: number; name?: string; by?: string },
   config = CFG,
 ): WorldState {
   const planned = fold(
@@ -36,7 +37,7 @@ function plant(
       h: at.h ?? 2,
       maxHp: 50,
       flammable: true,
-      builderId: 'b',
+      builderId: at.by ?? 'b',
       ...(at.name === undefined ? {} : { name: at.name }),
     }),
     config,
@@ -188,20 +189,67 @@ describe('★ a place is called what is written on it', () => {
     expect(s.structures.structure_1!.name).toBe('the old farmhouse')
   })
 
-  it('a hand cutting a word into a wall names the thing it marked', () => {
-    let s = plant(genesisState(CFG, grid(16)), 'structure_1', { x: 4, y: 4 })
-    expect(s.structures.structure_1!.name).toBeUndefined()
-    s = fold(
-      s,
-      ev('structure_inscribed', {
-        structureId: 'structure_1',
-        text: 'the Old Mill',
-        agentId: 'a1',
-      }),
+  /** One carving, and what the wall and the name look like afterwards. */
+  function carve(
+    at: { by?: string; name?: string },
+    text: string,
+    hand = 'a1',
+  ): { name: string | undefined; inscription: { text: string; by: string } | undefined } {
+    const s = fold(
+      plant(genesisState(CFG, grid(16)), 'structure_1', { x: 4, y: 4, ...at }),
+      ev('structure_inscribed', { structureId: 'structure_1', text, agentId: hand }),
       CFG,
     )
-    expect(s.structures.structure_1!.name).toBe('the Old Mill')
-    expect(s.structures.structure_1!.inscription).toEqual({ text: 'the Old Mill', by: 'a1' })
+    const built = s.structures.structure_1!
+    return { name: built.name, inscription: built.inscription }
+  }
+
+  it('the hand that raised a building names it, when the words read as a name', () => {
+    expect(carve({ by: 'a1' }, 'House of Brilliant Things!')).toEqual({
+      name: 'House of Brilliant Things!',
+      inscription: { text: 'House of Brilliant Things!', by: 'a1' },
+    })
+  })
+
+  it("another's walls take the writing and keep their own name", () => {
+    // The wall still says it. It is simply not what anybody calls the place.
+    expect(carve({ by: 'someone_else' }, 'the Old Mill')).toEqual({
+      inscription: { text: 'the Old Mill', by: 'a1' },
+    })
+  })
+
+  it('★ "I miss the sea" is a carving on anything, including your own wall', () => {
+    expect(carve({ by: 'a1' }, 'I miss the sea')).toEqual({
+      inscription: { text: 'I miss the sea', by: 'a1' },
+    })
+    // The apostrophe hides nothing: the first person is read off the letters.
+    expect(carve({ by: 'a1' }, "I'm cold").name).toBeUndefined()
+    expect(carve({ by: 'a1' }, 'this roof kept us dry all winter').name).toBeUndefined()
+  })
+
+  it('a name is short enough to say: past five words it is a sentence', () => {
+    expect(carve({ by: 'a1' }, 'One Two Three Four Five').name).toBe('One Two Three Four Five')
+    expect(carve({ by: 'a1' }, 'One Two Three Four Five Six').name).toBeUndefined()
+  })
+
+  it('★ the founding eleven keep their names whatever anybody carves on them', () => {
+    // Not a second rule: no mind's id is the genesis builder's, so no mind can rename one.
+    expect(carve({ by: GENESIS_BUILDER_ID, name: 'the old farmhouse' }, 'Amara Was Here')).toEqual({
+      name: 'the old farmhouse',
+      inscription: { text: 'Amara Was Here', by: 'a1' },
+    })
+  })
+
+  it('and the builder may name the same wall again', () => {
+    let s = plant(genesisState(CFG, grid(16)), 'structure_1', { x: 4, y: 4, by: 'a1' })
+    for (const text of ['First Name', 'Second Name']) {
+      s = fold(
+        s,
+        ev('structure_inscribed', { structureId: 'structure_1', text, agentId: 'a1' }),
+        CFG,
+      )
+    }
+    expect(s.structures.structure_1!.name).toBe('Second Name')
   })
 
   it("and the town's own eleven all arrive named, no two alike", async () => {
@@ -258,6 +306,33 @@ describe('★ a place named aloud travels to whoever hears it', () => {
     let s = pair()
     s = fold(s, ev('agent_moved', { id: 'hearer', x: 23, y: 23 }), CFG)
     expect(told(s, 'I am going up to the Old Mill.')).toEqual([])
+  })
+
+  // A name has to be a name before it can be passed on: "the" carved on a shed would otherwise
+  // teach that shed to everyone in earshot of every sentence anybody ever says.
+  it('★ a name too short or too plain to be one never travels, though it still stands', () => {
+    for (const name of ['hut', 'the', 'a', 'have']) {
+      let s = genesisState(CFG, grid(24))
+      s = plant(s, 'structure_1', { x: 10, y: 10, name })
+      s = spawn(s, 'speaker', 2, 2)
+      s = spawn(s, 'hearer', 3, 2)
+      s = fold(s, ev('places_seen', { agentId: 'speaker', structureIds: ['structure_1'] }), CFG)
+      // Said plainly, and still nobody learns a place from it.
+      expect(told(s, `Meet me at the ${name}.`), name).toEqual([])
+      // And the wall has not stopped saying it: the floor is on the air, not on the stone.
+      expect(s.structures.structure_1!.name, name).toBe(name)
+    }
+  })
+
+  it('and a real name of four letters or more travels exactly as it did', () => {
+    let s = genesisState(CFG, grid(24))
+    s = plant(s, 'structure_1', { x: 10, y: 10, name: 'Mill' })
+    s = spawn(s, 'speaker', 2, 2)
+    s = spawn(s, 'hearer', 3, 2)
+    s = fold(s, ev('places_seen', { agentId: 'speaker', structureIds: ['structure_1'] }), CFG)
+    expect(told(s, 'I am going up to the Mill.')).toEqual([
+      { agentId: 'hearer', structureIds: ['structure_1'] },
+    ])
   })
 
   it('and telling somebody what they already know says nothing twice', () => {

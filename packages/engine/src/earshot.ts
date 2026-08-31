@@ -1,6 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
+import { nameTravels } from './naming.js'
 import type { WorldState } from './state.js'
 
 // What travels on the air, and what it carries. A leaf, so the mouth that speaks and the ear
@@ -70,7 +71,7 @@ export function placesNamedAloud(
   const lowered = spoke.text.toLowerCase()
   const named = (speaker.knownPlaces ?? []).filter((id) => {
     const name = state.structures[id]?.name
-    return name !== undefined && saidAloud(lowered, name)
+    return name !== undefined && nameTravels(name) && saidAloud(lowered, name)
   })
   if (named.length === 0) return []
 
