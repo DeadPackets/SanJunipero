@@ -1,6 +1,7 @@
 // Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
+import { promptText } from '../memory/gist.js'
 import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
 
 export type IdentityCore = {
@@ -132,7 +133,7 @@ function renderScene(scene: PromptBlocks['scene']): string {
     parts.push(`People here:\n${scene.ledgers.map((l) => `${l.name}: ${l.doc}`).join('\n')}`)
   }
   if (scene.memories.length > 0) {
-    parts.push(`What you remember:\n${scene.memories.map((m) => m.text).join('\n')}`)
+    parts.push(`What you remember:\n${scene.memories.map(promptText).join('\n')}`)
   }
   if (parts.length === 0) return 'Nothing in particular comes back to you.'
   return parts.join('\n\n')

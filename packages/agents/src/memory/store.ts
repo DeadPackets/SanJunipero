@@ -24,6 +24,8 @@ export type MemoryRow = {
   day: number
   kind: MemoryKind
   text: string
+  /** The night's short form of `text`, or null while the row is still raw. */
+  gist: string | null
   importance: number
   tags: MemoryTags
 }
@@ -58,9 +60,14 @@ type RawMemory = {
   day: number
   kind: MemoryKind
   text: string
+  gist: string | null
   importance: number
   tags: string
 }
+
+// Every read of a memory carries its gist, so no caller has to remember to ask for one.
+const SELECT_MEMORY =
+  'SELECT m.*, g.text AS gist FROM memories m LEFT JOIN memory_gists g ON g.memory_id = m.id'
 
 function toMemoryRow(r: RawMemory): MemoryRow {
   return {
@@ -70,6 +77,7 @@ function toMemoryRow(r: RawMemory): MemoryRow {
     day: r.day,
     kind: r.kind,
     text: r.text,
+    gist: r.gist,
     importance: r.importance,
     tags: JSON.parse(r.tags) as MemoryTags,
   }
@@ -128,7 +136,7 @@ export class MemoryStore {
 
   getMemory(id: number): MemoryRow | null {
     const row = this.db
-      .prepare('SELECT * FROM memories WHERE id = ? AND agent_id = ?')
+      .prepare(`${SELECT_MEMORY} WHERE m.id = ? AND m.agent_id = ?`)
       .get(id, this.agentId) as RawMemory | undefined
     return row ? toMemoryRow(row) : null
   }
@@ -137,16 +145,25 @@ export class MemoryStore {
     if (ids.length === 0) return []
     const placeholders = ids.map(() => '?').join(', ')
     const rows = this.db
-      .prepare(`SELECT * FROM memories WHERE agent_id = ? AND id IN (${placeholders})`)
+      .prepare(`${SELECT_MEMORY} WHERE m.agent_id = ? AND m.id IN (${placeholders})`)
       .all(this.agentId, ...ids) as RawMemory[]
     return rows.map(toMemoryRow)
   }
 
   memoriesOfDay(day: number): MemoryRow[] {
     const rows = this.db
-      .prepare('SELECT * FROM memories WHERE agent_id = ? AND day = ? ORDER BY id')
+      .prepare(`${SELECT_MEMORY} WHERE m.agent_id = ? AND m.day = ? ORDER BY m.id`)
       .all(this.agentId, day) as RawMemory[]
     return rows.map(toMemoryRow)
+  }
+
+  putGist(memoryId: number, text: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO memory_gists (memory_id, text) VALUES (?, ?)
+         ON CONFLICT (memory_id) DO UPDATE SET text = excluded.text`,
+      )
+      .run(memoryId, text)
   }
 
   insertFact(f: {

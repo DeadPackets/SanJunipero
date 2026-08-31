@@ -739,6 +739,35 @@ describe('perceptionToProse', () => {
   })
 })
 
+describe('the scene renders the night’s gist, and the pinned wants ride the stable prefix', () => {
+  it('a gisted memory renders as its gist; an ungisted one renders raw', () => {
+    const base = fixtureBlocks()
+    const memories = base.scene.memories.map((m, i) =>
+      i === 0 ? { ...m, gist: 'The well ran clear.' } : m,
+    )
+    const text = fullSerialization({ ...base, scene: { ...base.scene, memories } })
+
+    expect(text).toContain('The well ran clear.')
+    expect(text).not.toContain('The well water ran clear this morning.')
+    expect(text).toContain('Nadia waved from across the field.')
+  })
+
+  it('the wants the night pinned ride the stable system prefix, not a per-turn message', () => {
+    const base = fixtureBlocks()
+    const doc = base.personality.doc
+    const withWants = assemblePrompt({
+      ...base,
+      personality: {
+        ...base.personality,
+        doc: { ...doc, current: { ...doc.current, goals: ['Finish the roof before the rain.'] } },
+      },
+    })
+
+    expect(withWants.system).toContain('Goals: Finish the roof before the rain.')
+    expect(withWants.messages).toEqual(assemblePrompt(base).messages)
+  })
+})
+
 describe('compaction', () => {
   it('flags 1000 dayLog entries and compacts to 11 entries', () => {
     const dayLog = Array.from(

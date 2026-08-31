@@ -23,6 +23,8 @@ export { heardProse, worldDay } from './prompt/prose.js'
 export { appendMoment, assemblePrompt, JOURNAL_LINES } from './prompt/assemble.js'
 export { RULES_OF_BEING } from './prompt/rulesOfBeing.js'
 export { MemoryStore } from './memory/store.js'
+export { gistMemories, type GistLlm } from './memory/gist.js'
+export { makeReflectionLlm } from './reflection.js'
 export { retrieveAmbient } from './memory/retrieve.js'
 export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
 export {

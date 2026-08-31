@@ -24,6 +24,7 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
+import { promptText } from '../memory/gist.js'
 import {
   isBlankAnswer,
   parseTurnWithRepair,
@@ -807,7 +808,7 @@ export class AgentRuntime {
     const recalled = turn.recall
       ? {
           query: turn.recall,
-          memories: (await retrieveRecall(mem, turn.recall, tick)).map((m) => m.text),
+          memories: (await retrieveRecall(mem, turn.recall, tick)).map(promptText),
         }
       : null
     await mem.insertMemory({

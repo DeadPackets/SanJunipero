@@ -114,6 +114,7 @@ function makeMemory(
     day: 1,
     kind: 'perception',
     text,
+    gist: null,
     importance,
     tags: { people, place: 'meadow', objects: [], topics: ['day'] },
     score: 1 - id * 0.05,
