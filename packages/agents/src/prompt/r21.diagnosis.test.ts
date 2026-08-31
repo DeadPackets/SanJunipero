@@ -390,9 +390,10 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(CAPABILITIES).toContain('the torch or lamp you hold')
     const s = genesisTown()
     const everyProse = FOUNDER_IDS.map((id) => proseFor(s, id)).join(' ')
-    // The id is READ from the world, not retyped: a template edit renumbers the mints.
-    const wellId = Object.values(s.structures).find((x) => x.kind === 'well')!.id
-    expect(everyProse).toContain(`A well (${wellId}) stands at`)
+    // The id is READ from the world, not retyped: a template edit renumbers the mints. A named
+    // place is called by its name now, so the sentence opens with what the town calls it.
+    const well = Object.values(s.structures).find((x) => x.kind === 'well')!
+    expect(everyProse).toContain(`The well (${well.id}) stands at`)
     for (const noun of ['house', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
       expect(everyProse).not.toMatch(
         new RegExp(`(build|craft|raise|shape|make)[^.]{0,40}${noun}`, 'i'),

@@ -60,7 +60,13 @@ export function claimPlotWhere(a: {
   return null
 }
 
-export type Wanted = { kind: string; along: number; deep: number; owner: string | null }
+export type Wanted = {
+  kind: string
+  along: number
+  deep: number
+  owner: string | null
+  name?: string
+}
 
 /** Raise a list of buildings, each on its own claim, from a town already standing. The ONE
  *  function that builds a town, so there is no special case for the start. */
@@ -78,7 +84,10 @@ export function claimAll(a: {
     if (c === null) break
     taken.add(plotKey(c.plot))
     rings = Math.max(rings, c.rings)
-    built.push(place(c.plot, w.kind, w.along, w.deep, w.owner))
+    built.push({
+      ...place(c.plot, w.kind, w.along, w.deep, w.owner),
+      ...(w.name === undefined ? {} : { name: w.name }),
+    })
   }
   return { built, rings }
 }

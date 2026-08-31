@@ -6,6 +6,7 @@ import {
   T_ROCK,
   T_SAND,
   T_WATER,
+  sanitizeSpokenText,
   type SimConfig,
   type TileId,
   type TownFacing,
@@ -217,6 +218,12 @@ export type WorldState = {
 
 // One spelling of a tile's key for the sparse maps above: a 128x128 array of nothing is a
 // hash of nothing.
+/** What to call a place where a mind will read it. A carved name is one mind's words landing in
+ *  another mind's prompt, so it is flattened and capped exactly as speech is. */
+export function placeName(s: { name?: string }): string | undefined {
+  return s.name === undefined ? undefined : sanitizeSpokenText(s.name)
+}
+
 export function tileKey(x: number, y: number): string {
   return `${x},${y}`
 }

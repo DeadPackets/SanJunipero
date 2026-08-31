@@ -17,6 +17,7 @@ import { doorTile, insideOf, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
 import {
+  placeName,
   thirstOf,
   type AfflictionKind,
   type AgentBody,
@@ -248,8 +249,6 @@ function groundUnderfoot(
   return undefined
 }
 
-export { hears }
-
 const dist = (x1: number, y1: number, x2: number, y2: number): number =>
   Math.hypot(x2 - x1, y2 - y1)
 
@@ -388,7 +387,14 @@ function theBed(lens: Lens, s: Structure): { bed?: true } {
   return s.stage === 'complete' && isBeddedKind(lens.config, s.kind) ? { bed: true as const } : {}
 }
 
-function perceiveStructures(lens: Lens): PerceivedStructure[] {
+/** The walls this body's eyes reach, and the one place that rule is written. Indoors there is
+ *  exactly one: the room you are standing in. */
+const named = (s: Structure): { name?: string } => {
+  const name = placeName(s)
+  return name === undefined ? {} : { name }
+}
+
+function structuresSeen(lens: Lens): Structure[] {
   const { state, self, indoors } = lens
   // Nearest footprint tile, not the anchor: a long structure is seen by its near edge.
   const inSight = (s: Structure): boolean => {
@@ -399,21 +405,25 @@ function perceiveStructures(lens: Lens): PerceivedStructure[] {
   return Object.values(state.structures)
     .filter((s) => (indoors === null ? inSight(s) : s.id === indoors))
     .sort(byId)
-    .map((s) => ({
-      id: s.id,
-      kind: s.kind,
-      x: s.x,
-      y: s.y,
-      w: s.w,
-      h: s.h,
-      burning: s.burning,
-      stage: s.stage,
-      ...carved(lens, s),
-      ...wayIn(lens, s),
-      ...howFarUp(lens, s),
-      ...theHearth(lens, s),
-      ...theBed(lens, s),
-    }))
+}
+
+function perceiveStructures(lens: Lens): PerceivedStructure[] {
+  return structuresSeen(lens).map((s) => ({
+    id: s.id,
+    kind: s.kind,
+    ...named(s),
+    x: s.x,
+    y: s.y,
+    w: s.w,
+    h: s.h,
+    burning: s.burning,
+    stage: s.stage,
+    ...carved(lens, s),
+    ...wayIn(lens, s),
+    ...howFarUp(lens, s),
+    ...theHearth(lens, s),
+    ...theBed(lens, s),
+  }))
 }
 
 function perceiveItems(lens: Lens): PerceivedItem[] {
@@ -537,7 +547,7 @@ function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
     const p = ev.payload as { agentId?: unknown; text?: unknown; x?: unknown; y?: unknown }
     if (p.agentId === self.id) continue // you don't hear yourself
     if (typeof p.text !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    if (!hears(state, config, ev, self.id)) continue
+    if (!hears(state, config, ev.payload, self.id)) continue
     const distance = dist(self.x, self.y, p.x, p.y)
     const speakerId = String(p.agentId)
     heard.push({
@@ -601,7 +611,7 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
     const reaches =
       sense === 'sound'
-        ? hears(state, config, ev, self.id)
+        ? hears(state, config, ev.payload, self.id)
         : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
     if (!reaches) continue
     seen.push({ kind: 'expression', actorName: lens.nameOf(p.agentId), verb: p.verb, sense })
@@ -643,12 +653,8 @@ function lensFor(state: WorldState, config: SimConfig, agentId: string): Lens {
 
 /** The places this body's eyes reach right now, by id. The same horizon the packet is built on,
  *  because what a mind comes to know of the town cannot be a second opinion about seeing. */
-export function structuresInSight(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-): string[] {
-  return perceiveStructures(lensFor(state, config, agentId)).map((s) => s.id)
+export function structuresInSight(state: WorldState, config: SimConfig, agentId: string): string[] {
+  return structuresSeen(lensFor(state, config, agentId)).map((s) => s.id)
 }
 
 export function composePerception(

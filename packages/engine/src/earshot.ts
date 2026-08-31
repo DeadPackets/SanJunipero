@@ -1,4 +1,4 @@
-import type { SimConfig, SimEvent } from '@sj/shared'
+import type { SimConfig } from '@sj/shared'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
@@ -17,11 +17,11 @@ const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
 export function hears(
   state: WorldState,
   baseConfig: SimConfig,
-  speakerEv: SimEvent,
+  spoken: unknown,
   hearerId: string,
 ): boolean {
   const config = effectiveConfig(baseConfig, state.laws)
-  const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
+  const p = spoken as { x?: unknown; y?: unknown; insideId?: unknown } | null
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
 
@@ -47,33 +47,37 @@ export function hears(
 const RE_META = /[.*+?^${}()|[\]\\]/g
 
 // Whole name only. A mind that says "the wellspring" has not said "the well", and a place is
-// learned by being named, never by sharing letters with one.
-function saidAloud(text: string, name: string): boolean {
-  const escaped = name.replace(RE_META, '\\$&')
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text)
+// learned by being named, never by sharing letters with one. The cheap test runs first: nearly
+// every sentence names no place at all, and that answer costs no pattern.
+function saidAloud(lowered: string, name: string): boolean {
+  const lower = name.toLowerCase()
+  if (!lowered.includes(lower)) return false
+  const escaped = lower.replace(RE_META, '\\$&')
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(lowered)
 }
+
+export type Spoken = { agentId: string; text: string; x: number; y: number; insideId?: string }
 
 /** The places a mouth just put into other heads. Only names the speaker itself knows travel:
  *  you cannot tell anyone about a mill you have never heard of. */
 export function placesNamedAloud(
   state: WorldState,
   config: SimConfig,
-  spoke: SimEvent,
+  spoke: Spoken,
 ): { agentId: string; structureIds: string[] }[] {
-  const p = spoke.payload as { agentId?: unknown; text?: unknown }
-  if (typeof p.agentId !== 'string' || typeof p.text !== 'string') return []
-  const speaker = state.agents[p.agentId]
+  const speaker = state.agents[spoke.agentId]
   if (!speaker) return []
+  const lowered = spoke.text.toLowerCase()
   const named = (speaker.knownPlaces ?? []).filter((id) => {
     const name = state.structures[id]?.name
-    return name !== undefined && saidAloud(p.text as string, name)
+    return name !== undefined && saidAloud(lowered, name)
   })
   if (named.length === 0) return []
 
   const out: { agentId: string; structureIds: string[] }[] = []
   for (const id of Object.keys(state.agents).sort()) {
     const a = state.agents[id]!
-    if (id === speaker.id || !a.alive) continue
+    if (id === spoke.agentId || !a.alive) continue
     if (!hears(state, config, spoke, id)) continue
     const known = new Set(a.knownPlaces ?? [])
     const fresh = named.filter((s) => !known.has(s))

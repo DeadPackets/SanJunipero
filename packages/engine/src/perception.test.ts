@@ -3,7 +3,8 @@ import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
-import { composePerception, hears } from './perception.js'
+import { hears } from './earshot.js'
+import { composePerception } from './perception.js'
 import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
@@ -471,10 +472,10 @@ describe('composePerception: earshot occlusion', () => {
     )
     s = goInside(s, 'a')
     const fromInside = spoke('a', 'hush', DOOR.x, DOOR.y, HOUSE.id)
-    expect(hears(s, DEFAULT_CONFIG, fromInside, 'b')).toBe(true)
-    expect(hears(s, DEFAULT_CONFIG, fromInside, 'a')).toBe(true) // the rule itself is speaker-agnostic
+    expect(hears(s, DEFAULT_CONFIG, fromInside.payload, 'b')).toBe(true)
+    expect(hears(s, DEFAULT_CONFIG, fromInside.payload, 'a')).toBe(true) // the rule itself is speaker-agnostic
     const far = spoke('b', 'oi', 20, 20)
-    expect(hears(s, DEFAULT_CONFIG, far, 'a')).toBe(false)
+    expect(hears(s, DEFAULT_CONFIG, far.payload, 'a')).toBe(false)
   })
 
   it('speak stamps the speaker insideId, and only when indoors', () => {
@@ -1266,6 +1267,7 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          {
           "id": "structure_3",
           "kind": "storehouse",
+          "name": "raised in the first spring",
           "x": 7,
           "y": 4,
           "w": 2,

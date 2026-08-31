@@ -6,7 +6,7 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { replayLatest } from './replay.js'
 import { RngStreams } from './rng.js'
-import { genesisState, type TileId, type WorldState } from './state.js'
+import { genesisState, type WorldState } from './state.js'
 import { ev, grid, roundTrips } from './testutil/world.js'
 import { TickLoop } from './tickLoop.js'
 import { createWorldTick } from './worldTick.js'
@@ -131,9 +131,10 @@ describe('★ walk takes the mark of a place, and the world finds the way', () =
     const out = walkTo(town(), { structureId: 'structure_1' })
     expect(out.ok).toBe(true)
     const started = out.ok ? out.events.find((e) => e.type === 'action_started') : undefined
-    const p = started?.payload as { params: { x: number; y: number } }
-    // Beside the footprint, never on it, and nearest the body: the near corner of the ring.
-    expect(p.params).toEqual({ x: 9, y: 9 })
+    const p = started?.payload as { params: Record<string, unknown> }
+    // Beside the footprint, never on it, and nearest the body: the near corner of the ring. The
+    // place the mind actually named rides along, so the log still knows where she was going.
+    expect(p.params).toEqual({ structureId: 'structure_1', x: 9, y: 9 })
   })
 
   it('the two numbers still work exactly as they did', () => {
@@ -161,7 +162,7 @@ describe('★ walk takes the mark of a place, and the world finds the way', () =
   it('a known place with no dry ground to it keeps the refusal the tiles always gave', () => {
     const rows = grid(24)
     // An island: the ring around the walls is water, so no foot reaches it.
-    for (let y = 9; y <= 13; y++) for (let x = 9; x <= 13; x++) rows[y]![x] = T_WATER as TileId
+    for (let y = 9; y <= 13; y++) for (let x = 9; x <= 13; x++) rows[y]![x] = T_WATER
     let s = genesisState(CFG, rows)
     s = plant(s, 'structure_1', { x: 10, y: 10, w: 3, h: 3 })
     s = spawn(s, 'a1', 2, 2)
@@ -192,7 +193,11 @@ describe('★ a place is called what is written on it', () => {
     expect(s.structures.structure_1!.name).toBeUndefined()
     s = fold(
       s,
-      ev('structure_inscribed', { structureId: 'structure_1', text: 'the Old Mill', agentId: 'a1' }),
+      ev('structure_inscribed', {
+        structureId: 'structure_1',
+        text: 'the Old Mill',
+        agentId: 'a1',
+      }),
       CFG,
     )
     expect(s.structures.structure_1!.name).toBe('the Old Mill')

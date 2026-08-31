@@ -159,9 +159,16 @@ export const FireExtinguished = z
   })
   .strict()
 
-export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
-// The other way to name where a walk ends: a place this body already knows. The tile it
-// settles on is found once, at the seam, so the log and the legs read the same two numbers.
+// `structureId` is the place the mind actually named, kept beside the tile it settled on: the
+// legs read the two numbers, and the log still knows she set out for the mill.
+export const WalkParams = z
+  .object({
+    x: z.number().int(),
+    y: z.number().int(),
+    structureId: z.string().min(1).optional(),
+  })
+  .strict()
+// The other way to say it, before the tile is found. Settled once, at the intent seam.
 export const WalkToPlace = z.object({ structureId: z.string().min(1) }).strict()
 
 export const ActionStarted = z

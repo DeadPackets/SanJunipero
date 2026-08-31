@@ -11,8 +11,8 @@ import {
   nutritionOf,
 } from '../food.js'
 import { placesNamedAloud } from '../earshot.js'
-import { doorTile, occupantsOf, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable } from '../path.js'
+import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
+import { findPath, isPassable, pathCtx, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -228,24 +228,15 @@ export function walkDestination(
   // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
   if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
     return { refusal: 'you know no such place' }
-  // First reachable tile of the ring, nearest first, so the answer is one search on the common
-  // case and deterministic on every other.
-  const ring: { x: number; y: number }[] = []
-  for (let y = s.y - 1; y <= s.y + s.h; y++) {
-    for (let x = s.x - 1; x <= s.x + s.w; x++) {
-      if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) continue
-      ring.push({ x, y })
-    }
-  }
-  ring.sort(
-    (p, q) =>
-      Math.abs(p.x - a.x) + Math.abs(p.y - a.y) - (Math.abs(q.x - a.x) + Math.abs(q.y - a.y)) ||
-      p.y - q.y ||
-      p.x - q.x,
-  )
-  for (const t of ring) {
-    if ((a.x === t.x && a.y === t.y) || findPath(state, a, t, config) !== null) return t
-  }
+  // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
+  // measures against are picked off the same tiles in the same order.
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const ctx = pathCtx(state, config)
+  const ring = perimeter(s)
+    .filter((t) => isPassable(state, t.x, t.y, ctx))
+    .sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  // Nearest first, so the common case is one search and a ring of walls costs none at all.
+  for (const t of ring) if (findPath(state, a, t, config) !== null) return t
   return { refusal: 'no path to that spot' }
 }
 
@@ -257,6 +248,8 @@ const walk: VerbDef = makeVerb({
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
     if (a.x === to.x && a.y === to.y) return 'already at that spot'
+    // A memo hit for a named place, which already proved this tile: the two numbers are what
+    // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'
     return null
   },
@@ -1588,7 +1581,7 @@ const spoken = (
   }
   // A place named aloud is a place the room now knows of. Hearsay is how a town gets bigger
   // than any one pair of eyes.
-  const told = placesNamedAloud(state, config, { seq: 0, tick: state.tick, ...spoke })
+  const told = placesNamedAloud(state, config, spoke.payload)
   return [spoke, ...told.map((t) => ({ type: 'places_seen', payload: t }))]
 }
 

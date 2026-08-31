@@ -13,6 +13,7 @@ import {
   isPassable,
   loneCandidateFor,
   makeables,
+  placeName,
   recipeTileKind,
   submitIntent,
   waterWithinReach,
@@ -259,7 +260,8 @@ export class EngineBridge {
     return (state.agents[agentId]?.knownPlaces ?? []).flatMap((id) => {
       const s = state.structures[id]
       if (s === undefined) return []
-      return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(s.name === undefined ? {} : { name: s.name }) }]
+      const name = placeName(s)
+      return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(name === undefined ? {} : { name }) }]
     })
   }
 

@@ -53,6 +53,9 @@ type PerceptionAgent = {
 type PerceptionStructure = {
   id: string
   kind: string
+  // What the town calls it. Absent on a roof nobody has named; a mind is shown the name where
+  // it stands, or it cannot say "meet me at the well" while standing at the well.
+  name?: string
   x: number
   y: number
   w: number
@@ -558,7 +561,12 @@ function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
 /** A place a mind carries in its head: what it is called, if anything, and where it stands. */
 export type KnownPlace = { id: string; kind: string; x: number; y: number; name?: string }
 
-// Screen frame: north is up the map, so the smaller y is the further north.
+// One spelling of a place for the whole prompt: a named one is called by its name, an unnamed
+// one is only ever pointed at. `words` keeps a lamp_post from reaching a mind with the underscore.
+const placeSaid = (p: { kind: string; name?: string }): string => p.name ?? `a ${words(p.kind)}`
+const opening = (said: string): string => `${said.charAt(0).toUpperCase()}${said.slice(1)}`
+
+// Map frame, which is the frame a body walks in: the smaller y is the further north.
 const COMPASS = [
   'north',
   'north-east',
@@ -594,10 +602,7 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
     .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
     .sort((a, b) => a.d - b.d || (a.p.id < b.p.id ? -1 : 1))
     .slice(0, PLACES_SHOWN)
-    .map(
-      ({ p, d }) =>
-        `${p.name ?? `a ${p.kind}`} (${p.id}), ${howFar(d)} ${bearing(p.x - x, p.y - y)}`,
-    )
+    .map(({ p, d }) => `${placeSaid(p)} (${p.id}), ${howFar(d)} ${bearing(p.x - x, p.y - y)}`)
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
@@ -853,7 +858,7 @@ export function perceptionToProse(
     // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
     lines.push(
-      `A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
+      `${opening(placeSaid(s))} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
         approach
       }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`,
     )
