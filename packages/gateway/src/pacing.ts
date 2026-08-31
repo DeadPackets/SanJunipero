@@ -1,9 +1,8 @@
 import { MAX_SPEED, MIN_SPEED, type Clock } from './adminOps.js'
 
-// ★ AN UNWATCHED TOWN STILL BILLS. Minds only spend when the loop steps, so a stream nobody has
-// opened in hours pays full price for a performance with no audience. This turns the operator's
-// own dial down when the last viewer leaves and back up the instant one arrives — the same
-// `setSpeed` POST /admin/speed drives, so there are never two hands on one clock.
+// ★ AN UNWATCHED TOWN STILL BILLS: minds only spend when the loop steps. This turns the
+// operator's own dial down when the last viewer leaves and back up the instant one arrives —
+// the same `setSpeed` POST /admin/speed drives, so there are never two hands on one clock.
 
 /** Five minutes of nobody. Long enough that a viewer reloading the page never trips it. */
 export const DEFAULT_IDLE_AFTER_MS = 300_000
@@ -52,9 +51,8 @@ export function createPacing(opts: PacingOpts): Pacing {
   const idleSpeed = numEnv(env, 'SJ_IDLE_SPEED', DEFAULT_IDLE_SPEED, MIN_SPEED, MAX_SPEED)
 
   let timer: ReturnType<typeof setTimeout> | null = null
-  // ★ THE OWNER'S HAND WINS. Pacing owns exactly one full speed — the one the town started at.
-  // A dial reading anything pacing did not itself write means an operator moved it, and pacing
-  // leaves that transition alone.
+  // ★ THE OWNER'S HAND WINS: pacing owns one full speed — the one the town started at — and
+  // a dial reading anything pacing did not write means an operator moved it; leave it alone.
   const full = opts.clock.speed
   let idled = false
 

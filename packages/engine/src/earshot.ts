@@ -47,9 +47,8 @@ export function hears(
 
 const RE_META = /[.*+?^${}()|[\]\\]/g
 
-// Whole name only. A mind that says "the wellspring" has not said "the well", and a place is
-// learned by being named, never by sharing letters with one. The cheap test runs first: nearly
-// every sentence names no place at all, and that answer costs no pattern.
+// Whole name only: "the wellspring" has not said "the well". The cheap `includes` runs first —
+// nearly every sentence names no place at all, and that answer costs no pattern.
 function saidAloud(lowered: string, name: string): boolean {
   const lower = name.toLowerCase()
   if (!lowered.includes(lower)) return false

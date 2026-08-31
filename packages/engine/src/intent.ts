@@ -28,9 +28,8 @@ export function submitIntent(
   // never refused for busy-ness. Nothing here can end a running activity early.
   const usesHands = def.atOnce === undefined
   if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
-  // A mind may name a place instead of a pair of numbers. It settles to the tile before anybody
-  // judges the act, so validate, duration and the fold all read the same two numbers. A place it
-  // cannot settle is left as it was said, for validate to refuse in the town's own words.
+  // A named place settles to its tile before anybody judges the act, so validate, duration and
+  // the fold read the same two numbers; one it cannot settle is left for validate to refuse.
   let p = params
   if (verb === 'walk') {
     const to = walkDestination(state, config, agentId, params)

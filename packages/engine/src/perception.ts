@@ -191,9 +191,8 @@ export type PerceivedInterior = { id: string; kind: string }
 export type PerceivedReach = {
   // Ids `itemWithinReach` accepts — the one reach `take` and `eat` measure by.
   atHand: string[]
-  // Spots this packet names that are not ground: `findPath` refuses every one of them, so
-  // `walk` can never end on one. Composed here rather than asked of the prose seam, because
-  // only the packet knows which spots it named.
+  // Spots this packet names that are not ground: `findPath` refuses them all, so `walk` can
+  // never end on one. Composed here because only the packet knows which spots it named.
   noFooting: { x: number; y: number }[]
 }
 
@@ -387,13 +386,13 @@ function theBed(lens: Lens, s: Structure): { bed?: true } {
   return s.stage === 'complete' && isBeddedKind(lens.config, s.kind) ? { bed: true as const } : {}
 }
 
-/** The walls this body's eyes reach, and the one place that rule is written. Indoors there is
- *  exactly one: the room you are standing in. */
 const named = (s: Structure): { name?: string } => {
   const name = placeName(s)
   return name === undefined ? {} : { name }
 }
 
+/** The walls this body's eyes reach, and the one place that rule is written. Indoors there is
+ *  exactly one: the room you are standing in. */
 function structuresSeen(lens: Lens): Structure[] {
   const { state, self, indoors } = lens
   // Nearest footprint tile, not the anchor: a long structure is seen by its near edge.

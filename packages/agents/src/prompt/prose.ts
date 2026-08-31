@@ -458,8 +458,7 @@ function wantsOf(
   if (road?.atFire === true && !atAFire)
     wants.push({ say: 'a fire someone is feeding', gap: 1, kinds: [], cond: 'fire' })
   // Perception never composes a vessel's charges, so a full skin and an empty one read alike.
-  // Counted as wanted either way: over-counting costs a redundant sentence, under-counting
-  // ranks a pot a mind cannot fill above a roof it could raise today.
+  // Over-counting costs a redundant sentence; under-counting ranks a pot above a raisable roof.
   if (road?.water !== undefined)
     wants.push({ say: 'water in something you carry', gap: 1, kinds: [], cond: 'water' })
   return wants

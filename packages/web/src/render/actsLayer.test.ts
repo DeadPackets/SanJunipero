@@ -5,10 +5,9 @@ import type { Rect } from './tooltip.js'
 import type { Scene } from './scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 
-// Pixi measures a label through `document.createElement('canvas')`, and these tests run with no
-// DOM. The measurements do not matter here — every assertion below is about which chips exist,
-// not how wide they are — so the smallest thing that lets a label be built is the right stub,
-// and it is cheaper than a jsdom dependency the rest of the suite has done without.
+// Pixi measures labels through `document.createElement('canvas')` and these tests run with no
+// DOM. Every assertion is about which chips exist, never how wide, so the smallest stub that
+// lets a label build beats a jsdom dependency.
 beforeAll(() => {
   if (typeof globalThis.document !== 'undefined') return
   const ctx = {
@@ -43,11 +42,8 @@ beforeAll(() => {
   })
 })
 
-/**
- * The layer, driven the way the ticker drives it. The pure rules are measured in `acts.test.ts`;
- * this asks the questions only the wiring can answer — does a chip appear on the right person,
- * does it go when the work does, and does it tell the rest of the stage where it is sitting.
- */
+/** The layer, driven the way the ticker drives it. Pure rules are measured in `acts.test.ts`;
+ *  here, only what the wiring can answer: right person, gone with the work, space claimed. */
 
 type Act = { verb: string; ticksRemaining: number } | null
 
@@ -140,9 +136,7 @@ describe('a chip appears on the person doing the work', () => {
   })
 })
 
-// ★ THE STATE ENDS THE CHIP, NEVER AN EVENT. `action_completed` and all four reasons an act can
-// be interrupted arrive as one fact — `activity` is null — and `action_interrupted` does not
-// even carry the verb it stopped, so an event-chasing version would have had to guess.
+// Pins the acts.ts law: the STATE ends a chip, never an event — every ending is one fact.
 describe('the chip goes when the work does', () => {
   it('is gone the moment the activity clears, however it ended', () => {
     const h = harness()

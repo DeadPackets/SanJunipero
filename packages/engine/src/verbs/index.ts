@@ -1689,9 +1689,8 @@ const take: VerbDef = makeVerb({
   },
 })
 
-// The other half of `take`, and its mirror: the thing leaves the hand onto the tile the body
-// stands on, which is always within reach. Title is untouched — setting a thing down is not
-// parting with it.
+// The mirror of `take`: onto the tile the body stands on, always within reach. Title is
+// untouched — setting a thing down is not parting with it.
 const drop: VerbDef = makeVerb({
   kind: 'drop',
   validate(state, _config, agentId, params) {

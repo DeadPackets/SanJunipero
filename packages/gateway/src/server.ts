@@ -64,12 +64,8 @@ const MAX_CLIENT_FRAME = 4096
  *  code is a stream at capacity; accepting it and degrading for the other 500 is an outage. */
 const DEFAULT_MAX_VIEWERS = 500
 
-/**
- * A 40-byte `scrub` frame makes the gateway load a snapshot, fold every event to the asked tick
- * and stringify the whole world back out — ~120 KB of work on the thread that ticks the town.
- * Coalesced rather than rejected: a drag fires continuously and only the position the finger
- * stopped at is worth answering.
- */
+/** A 40-byte `scrub` frame costs ~120 KB of fold-and-stringify on the thread that ticks the
+ *  town. Coalesced rather than rejected: only where the finger stopped is worth answering. */
 export const SCRUB_MIN_MS = 100
 
 /** 4% of one core. The floor above is per SOCKET: at a measured 6-11 ms a scrub, ten of the 500
@@ -309,8 +305,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         greeted = true
         removers.set(sock, hub.add(sock, snapshotJson))
         // Ahead of the first frame, so a waking town is already at full speed inside it. Counted
-        // at the hello rather than the raw connection, so the number means watchers and not
-        // sockets — a handshake that never completes is not an audience.
+        // at the hello, so the number means watchers, not sockets.
         opts.onViewers?.(hub.size())
         sock.send(snapshotJson())
         // asset catch-up: late joiners must not render placeholders the codex already replaced
