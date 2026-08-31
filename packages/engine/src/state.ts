@@ -6,6 +6,7 @@ import {
   T_ROCK,
   T_SAND,
   T_WATER,
+  sanitizeSpokenText,
   type SimConfig,
   type TileId,
   type TownFacing,
@@ -84,6 +85,9 @@ export type AgentBody = {
   tendedTick?: number // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number // absent until first speech: keeps golden hashes stable
   insideId?: string // absent until first entry: keeps golden hashes stable
+  // Every place this body has ever had in sight, sorted and only ever growing. Absent until
+  // the first one comes into view, so a mind that has seen no building hashes as it always did.
+  knownPlaces?: string[]
   skills: Record<string, number> // track → xp
   activity: null | {
     verb: string
@@ -111,6 +115,9 @@ export type Structure = {
   burning: boolean
   burnTicks: number
   owner?: string // absent = public; the hash-stable form of `agentId | null`
+  // What the town calls it. Authored at genesis or cut into the wall by a hand; absent means
+  // the thing has no name yet and is only ever pointed at by its id.
+  name?: string
   // Absent means `sw`. A turned 2x2 is byte-identical to an unturned one, so w/h cannot answer
   // for a house the way they do for a deck; absent-means-default keeps every old world's hash.
   facing?: TownFacing
@@ -211,6 +218,12 @@ export type WorldState = {
 
 // One spelling of a tile's key for the sparse maps above: a 128x128 array of nothing is a
 // hash of nothing.
+/** What to call a place where a mind will read it. A carved name is one mind's words landing in
+ *  another mind's prompt, so it is flattened and capped exactly as speech is. */
+export function placeName(s: { name?: string }): string | undefined {
+  return s.name === undefined ? undefined : sanitizeSpokenText(s.name)
+}
+
 export function tileKey(x: number, y: number): string {
   return `${x},${y}`
 }

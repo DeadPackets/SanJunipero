@@ -123,7 +123,7 @@ function renderUnderway(u: Underway): string {
   const step = u.of > 1 ? ` (step ${u.step} of ${u.of})` : ''
   return (
     `You are in the middle of: ${u.what}${step}. Your body carries it on by itself.\n` +
-    'Name no action and it goes on. Name one and you break off, and what was left of it is let go.'
+    'Answer wait and it goes on. Name another act and you break off, and what was left of it is let go.'
   )
 }
 

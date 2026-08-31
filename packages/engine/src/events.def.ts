@@ -128,6 +128,9 @@ export const StructurePlanned = z
     flammable: z.boolean(),
     builderId: z.string(),
     owner: z.string().optional(),
+    // Only the authored ones arrive named. A raised roof is nameless until somebody cuts a
+    // word into it, so every recorded plan still parses.
+    name: z.string().min(1).optional(),
     // NE and NW are unauthored and must stay unrepresentable. Written only when the plot turned it.
     facing: z.enum(TOWN_FACINGS).optional(),
   })
@@ -156,7 +159,17 @@ export const FireExtinguished = z
   })
   .strict()
 
-export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
+// `structureId` is the place the mind actually named, kept beside the tile it settled on: the
+// legs read the two numbers, and the log still knows she set out for the mill.
+export const WalkParams = z
+  .object({
+    x: z.number().int(),
+    y: z.number().int(),
+    structureId: z.string().min(1).optional(),
+  })
+  .strict()
+// The other way to say it, before the tile is found. Settled once, at the intent seam.
+export const WalkToPlace = z.object({ structureId: z.string().min(1) }).strict()
 
 export const ActionStarted = z
   .object({
@@ -181,6 +194,11 @@ export const SkillGained = z
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
 export const AgentSlept = z.object({ agentId: z.string() }).strict()
 export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
+// Places this body now knows of, whether its own eyes found them or another mouth named them.
+// The set only ever grows, so a repeat is harmless and an empty one is never emitted.
+export const PlacesSeen = z
+  .object({ agentId: z.string(), structureIds: z.array(z.string().min(1)).min(1) })
+  .strict()
 export const AgentExited = z.object({ agentId: z.string(), structureId: z.string() }).strict()
 // insideId replays the doorway rule from the event alone — absent when the speaker was outdoors.
 export const AgentSpoke = z

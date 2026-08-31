@@ -2,7 +2,7 @@ import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { VERBS, workPenalty, type PendingEvent } from './verbs/index.js'
+import { VERBS, walkDestination, workPenalty, type PendingEvent } from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
@@ -28,16 +28,23 @@ export function submitIntent(
   // never refused for busy-ness. Nothing here can end a running activity early.
   const usesHands = def.atOnce === undefined
   if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
-  const refusal = def.validate(state, config, agentId, params)
+  // A mind may name a place instead of a pair of numbers. It settles to the tile before anybody
+  // judges the act, so validate, duration and the fold all read the same two numbers. A place it
+  // cannot settle is left as it was said, for validate to refuse in the town's own words.
+  let p = params
+  if (verb === 'walk') {
+    const to = walkDestination(state, config, agentId, params)
+    if (!('refusal' in to)) p = { ...params, ...to }
+  }
+  const refusal = def.validate(state, config, agentId, p)
   // The mind chose the verb; where the world holds one thing that verb would take, read it in
   // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
-  let p = params
   if (refusal !== null) {
     // What the mind named outranks what the world would have guessed: the id it gave is right
     // 152 times in 154, and only a mark that fits nowhere falls through to the lone candidate.
     const filled =
-      markUnderAnotherKey(state, config, agentId, verb, params) ??
-      loneCandidateFor(state, config, agentId, verb, params)
+      markUnderAnotherKey(state, config, agentId, verb, p) ??
+      loneCandidateFor(state, config, agentId, verb, p)
     if (filled === null) return { ok: false, reason: refusal }
     p = filled
   }

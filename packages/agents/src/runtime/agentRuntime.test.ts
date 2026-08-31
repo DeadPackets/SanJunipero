@@ -89,7 +89,12 @@ function baseDoc(): PersonalityDoc {
   }
 }
 
-function buildWorld(simConfig?: SimConfig) {
+// A named place well out of sight that this mind has already been shown. Opt-in, because
+// anything in sight is named by the packet instead and would never reach the places block.
+const FAR_PLACE_ID = 'structure_2'
+const FAR_PLACE_NAME = 'the old farmhouse'
+
+function buildWorld(simConfig?: SimConfig, knownAfar = false) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -122,8 +127,31 @@ function buildWorld(simConfig?: SimConfig) {
     qty: 6,
     loc: { t: 'structure', id: STRUCTURE_ID },
   })
+  if (knownAfar) {
+    emit('structure_planned', {
+      id: FAR_PLACE_ID,
+      kind: 'farmhouse',
+      x: 22,
+      y: 22,
+      w: 2,
+      h: 2,
+      maxHp: 50,
+      flammable: true,
+      builderId: AGENT,
+      name: FAR_PLACE_NAME,
+    })
+    emit('structure_completed', { id: FAR_PLACE_ID })
+    emit('places_seen', { agentId: AGENT, structureIds: [FAR_PLACE_ID] })
+  }
   return { config, terrain, engineDb, store, rng, state }
 }
+
+// The required-action schema: a fixture that names no act is answering the old shape, and the
+// real contract now is "name wait when nothing new begins" — added here once, not at 20 sites.
+const askedShape = (r: unknown): unknown =>
+  r !== null && typeof r === 'object' && 'thought' in r && !('action' in r)
+    ? { ...r, action: { verb: 'wait', params: {} } }
+    : r
 
 function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockLanguageModelV4 {
   let i = 0
@@ -132,7 +160,7 @@ function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockL
       const r = i < responses.length ? responses[i]! : fallback
       i += 1
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(askedShape(r)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -167,7 +195,7 @@ function capturingModel(responses: unknown[]): {
       const r = responses[Math.min(i, responses.length - 1)]!
       i += 1
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(askedShape(r)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -198,7 +226,7 @@ function blankModel(
       const blank = i < blanks
       i += 1
       return {
-        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(then) }],
+        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(askedShape(then)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -301,8 +329,9 @@ async function setup(opts: {
   onThought?: (t: { tick: number; agentId: string; text: string }) => void
   adjudicator?: Adjudicator
   budgetUsd?: number
+  knownAfar?: boolean
 }) {
-  const world = buildWorld(opts.simConfig)
+  const world = buildWorld(opts.simConfig, opts.knownAfar)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -572,7 +601,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Nothing was underway on the first turn, so the open framing stands.
     expect(first).not.toContain('You are in the middle of:')
     expect(second).toContain('You are in the middle of: walk 5 6 (step 1 of 3).')
-    expect(second).toContain('Name no action and it goes on.')
+    expect(second).toContain('Answer wait and it goes on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {
@@ -1053,6 +1082,24 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // would compact the day out of the mind that lived it.
     expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a house (10 wood)')
     expect(b.find((m) => m.role === 'user')!.text).not.toContain('a house (10 wood)')
+  })
+
+  it('the places a mind knows ride the volatile block and never the frozen prefix (C11 R-H)', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND, knownAfar: true })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+
+    const [a, b] = [prompts[0]!, prompts[1]!]
+    const said = `${FAR_PLACE_NAME} (${FAR_PLACE_ID})`
+    // Last user message is block 6, `now`. It is the one place the words appear.
+    const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
+    expect(nowA).toContain('Places you know:')
+    expect(nowA).toContain(`${said}, far to the south-east`)
+    expect(a.find((m) => m.role === 'system')!.text).not.toContain(said)
+    // And not in the day log, which is the day's events: a place a mind has known since
+    // yesterday is a standing fact, and repeating it every turn compacts out the day.
+    expect(runtime.dayLogSnapshot().join(' ')).not.toContain(said)
+    expect(b.find((m) => m.role === 'user')!.text).not.toContain(said)
   })
 
   // A blank answer is not a wrong answer: charging a mind a whole turn for one leaves a drift

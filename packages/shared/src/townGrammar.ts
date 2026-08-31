@@ -161,6 +161,8 @@ export type PlacedStructure = {
   h: number
   owner: string | null
   facing: TownFacing
+  // What the town calls it, when whoever asked for it said. Absent on anything raised later.
+  name?: string
   block: BlockId
   slot: string
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { FAUNA_YIELD, type FaunaKind } from '../data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from '../data/forageables.js'
-import { WalkParams } from '../events.def.js'
+import { WalkParams, WalkToPlace } from '../events.def.js'
 import {
   FISH_KIND,
   FORAGE_KIND,
@@ -10,8 +10,9 @@ import {
   isFoodKind,
   nutritionOf,
 } from '../food.js'
-import { doorTile, occupantsOf, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable } from '../path.js'
+import { placesNamedAloud } from '../earshot.js'
+import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
+import { findPath, isPassable, pathCtx, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -209,15 +210,47 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
   })
 }
 
+/** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
+ *  it that this body can actually reach; the refusal comes from here too, so the seam that
+ *  settles the act and the test that judges it can never disagree. */
+export function walkDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  params: Record<string, unknown>,
+): { x: number; y: number } | { refusal: string } {
+  const tile = WalkParams.safeParse(params)
+  if (tile.success) return tile.data
+  const named = WalkToPlace.safeParse(params)
+  if (!named.success) return { refusal: 'a walk needs a place to end' }
+  const a = state.agents[agentId]!
+  const s = state.structures[named.data.structureId]
+  // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
+  if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
+    return { refusal: 'you know no such place' }
+  // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
+  // measures against are picked off the same tiles in the same order.
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const ctx = pathCtx(state, config)
+  const ring = perimeter(s)
+    .filter((t) => isPassable(state, t.x, t.y, ctx))
+    .sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  // Nearest first, so the common case is one search and a ring of walls costs none at all.
+  for (const t of ring) if (findPath(state, a, t, config) !== null) return t
+  return { refusal: 'no path to that spot' }
+}
+
 const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
-    const p = WalkParams.safeParse(params)
-    if (!p.success) return 'a walk needs a place to end'
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
-    if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
-    if (findPath(state, a, p.data, config) === null) return 'no path to that spot'
+    const to = walkDestination(state, config, agentId, params)
+    if ('refusal' in to) return to.refusal
+    if (a.x === to.x && a.y === to.y) return 'already at that spot'
+    // A memo hit for a named place, which already proved this tile: the two numbers are what
+    // still have to be judged, and they are judged the way they always were.
+    if (findPath(state, a, to, config) === null) return 'no path to that spot'
     return null
   },
   duration(state, config, agentId, params) {
@@ -1528,7 +1561,7 @@ export const AttackParams = z.object({ targetId: z.string() }).strict()
 // One composer for both spoken paths, so a busy body's word and an idle one's cannot drift.
 const spoken = (
   state: WorldState,
-  _config: SimConfig,
+  config: SimConfig,
   agentId: string,
   params: Record<string, unknown>,
 ): PendingEvent[] => {
@@ -1536,18 +1569,20 @@ const spoken = (
   const a = state.agents[agentId]!
   // Sanitized where speech ENTERS the world, so the event log, the viewer and every listener
   // hold the same words. The render sanitizes again — old logs on disk carry raw text.
-  return [
-    {
-      type: 'agent_spoke',
-      payload: {
-        agentId,
-        text: sanitizeSpokenText(p.text),
-        x: a.x,
-        y: a.y,
-        ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
-      },
+  const spoke = {
+    type: 'agent_spoke',
+    payload: {
+      agentId,
+      text: sanitizeSpokenText(p.text),
+      x: a.x,
+      y: a.y,
+      ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
     },
-  ]
+  }
+  // A place named aloud is a place the room now knows of. Hearsay is how a town gets bigger
+  // than any one pair of eyes.
+  const told = placesNamedAloud(state, config, spoke.payload)
+  return [spoke, ...told.map((t) => ({ type: 'places_seen', payload: t }))]
 }
 
 const speak: VerbDef = makeVerb({

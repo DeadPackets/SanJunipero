@@ -38,6 +38,7 @@ import {
   AgentInjured,
   AgentMoved,
   AgentEntered,
+  PlacesSeen,
   AgentExited,
   AgentExpressed,
   DiscoveryMade,
@@ -417,6 +418,7 @@ export function fold(
             burnTicks: 0,
             ...(p.owner === undefined ? {} : { owner: p.owner }),
             ...(p.facing === undefined ? {} : { facing: p.facing }),
+            ...(p.name === undefined ? {} : { name: p.name }),
           },
         },
         counters: bumpCounter(state.counters, p.id),
@@ -452,7 +454,7 @@ export function fold(
         ...state,
         structures: {
           ...state.structures,
-          [p.structureId]: { ...s, inscription: { text: p.text, by: p.agentId } },
+          [p.structureId]: { ...s, name: p.text, inscription: { text: p.text, by: p.agentId } },
         },
       }
     }
@@ -593,6 +595,14 @@ export function fold(
         ...state,
         agents: { ...state.agents, [p.agentId]: { ...a, insideId: p.structureId } },
       }
+    }
+    case 'places_seen': {
+      const p = PlacesSeen.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`places_seen for unknown agent ${p.agentId}`)
+      // Sorted, so two bodies that learned the same places in different orders hash alike.
+      const knownPlaces = [...new Set([...(a.knownPlaces ?? []), ...p.structureIds])].sort()
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, knownPlaces } } }
     }
     case 'agent_exited': {
       const p = AgentExited.parse(event.payload)

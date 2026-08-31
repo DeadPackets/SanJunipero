@@ -12,10 +12,12 @@ import {
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
+import { hears } from './earshot.js'
 import { doorTile, insideOf, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
 import {
+  placeName,
   thirstOf,
   type AfflictionKind,
   type AgentBody,
@@ -302,41 +304,6 @@ function globalMysteryTag(asleep: boolean, ev: SimEvent): string | null {
   return entry?.scope === 'global' ? entry.kind : null
 }
 
-const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
-  Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
-
-// A wall stops sound: speech carries iff both share an interior, both are outdoors within
-// earshot, or the one outdoors is standing in the other's doorway.
-export function hears(
-  state: WorldState,
-  baseConfig: SimConfig,
-  speakerEv: SimEvent,
-  hearerId: string,
-): boolean {
-  const config = effectiveConfig(baseConfig, state.laws)
-  const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
-  const hearer = state.agents[hearerId]
-  if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
-
-  // Occlusion off drops the wall, not the distance: plain earshot.
-  if (!config.occlusion.enabled)
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
-
-  const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
-  const hearerInside = hearer.insideId ?? null
-  if (speakerInside !== null && hearerInside !== null) return speakerInside === hearerInside
-  if (speakerInside === null && hearerInside === null) {
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
-  }
-
-  const structure = state.structures[speakerInside ?? hearerInside!]
-  if (!structure) return false
-  const door = doorTile(state, structure)
-  if (!door) return false
-  const outdoors = speakerInside !== null ? { x: hearer.x, y: hearer.y } : { x: p.x, y: p.y }
-  return chebyshev(outdoors.x, outdoors.y, door.x, door.y) <= 1
-}
-
 // Built once per packet, so no two channels can disagree about what this body can reach.
 type Lens = {
   readonly state: WorldState
@@ -420,7 +387,14 @@ function theBed(lens: Lens, s: Structure): { bed?: true } {
   return s.stage === 'complete' && isBeddedKind(lens.config, s.kind) ? { bed: true as const } : {}
 }
 
-function perceiveStructures(lens: Lens): PerceivedStructure[] {
+/** The walls this body's eyes reach, and the one place that rule is written. Indoors there is
+ *  exactly one: the room you are standing in. */
+const named = (s: Structure): { name?: string } => {
+  const name = placeName(s)
+  return name === undefined ? {} : { name }
+}
+
+function structuresSeen(lens: Lens): Structure[] {
   const { state, self, indoors } = lens
   // Nearest footprint tile, not the anchor: a long structure is seen by its near edge.
   const inSight = (s: Structure): boolean => {
@@ -431,21 +405,25 @@ function perceiveStructures(lens: Lens): PerceivedStructure[] {
   return Object.values(state.structures)
     .filter((s) => (indoors === null ? inSight(s) : s.id === indoors))
     .sort(byId)
-    .map((s) => ({
-      id: s.id,
-      kind: s.kind,
-      x: s.x,
-      y: s.y,
-      w: s.w,
-      h: s.h,
-      burning: s.burning,
-      stage: s.stage,
-      ...carved(lens, s),
-      ...wayIn(lens, s),
-      ...howFarUp(lens, s),
-      ...theHearth(lens, s),
-      ...theBed(lens, s),
-    }))
+}
+
+function perceiveStructures(lens: Lens): PerceivedStructure[] {
+  return structuresSeen(lens).map((s) => ({
+    id: s.id,
+    kind: s.kind,
+    ...named(s),
+    x: s.x,
+    y: s.y,
+    w: s.w,
+    h: s.h,
+    burning: s.burning,
+    stage: s.stage,
+    ...carved(lens, s),
+    ...wayIn(lens, s),
+    ...howFarUp(lens, s),
+    ...theHearth(lens, s),
+    ...theBed(lens, s),
+  }))
 }
 
 function perceiveItems(lens: Lens): PerceivedItem[] {
@@ -569,7 +547,7 @@ function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
     const p = ev.payload as { agentId?: unknown; text?: unknown; x?: unknown; y?: unknown }
     if (p.agentId === self.id) continue // you don't hear yourself
     if (typeof p.text !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    if (!hears(state, config, ev, self.id)) continue
+    if (!hears(state, config, ev.payload, self.id)) continue
     const distance = dist(self.x, self.y, p.x, p.y)
     const speakerId = String(p.agentId)
     heard.push({
@@ -633,7 +611,7 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
     const reaches =
       sense === 'sound'
-        ? hears(state, config, ev, self.id)
+        ? hears(state, config, ev.payload, self.id)
         : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
     if (!reaches) continue
     seen.push({ kind: 'expression', actorName: lens.nameOf(p.agentId), verb: p.verb, sense })
@@ -654,19 +632,11 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
   return seen
 }
 
-export function composePerception(
-  state: WorldState,
-  baseConfig: SimConfig,
-  agentId: string,
-  recentEvents: SimEvent[],
-): PerceptionPacket {
+function lensFor(state: WorldState, config: SimConfig, agentId: string): Lens {
   const self = state.agents[agentId]
   if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
-  // Derived here, not at the call site: no caller can forget the world's live laws.
-  const config = effectiveConfig(baseConfig, state.laws)
-
   const indoors = insideOf(state, agentId)
-  const lens: Lens = {
+  return {
     state,
     config,
     self,
@@ -679,6 +649,24 @@ export function composePerception(
     // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
     nameOf: (id) => state.agents[id]?.name ?? id,
   }
+}
+
+/** The places this body's eyes reach right now, by id. The same horizon the packet is built on,
+ *  because what a mind comes to know of the town cannot be a second opinion about seeing. */
+export function structuresInSight(state: WorldState, config: SimConfig, agentId: string): string[] {
+  return structuresSeen(lensFor(state, config, agentId)).map((s) => s.id)
+}
+
+export function composePerception(
+  state: WorldState,
+  baseConfig: SimConfig,
+  agentId: string,
+  recentEvents: SimEvent[],
+): PerceptionPacket {
+  // Derived here, not at the call site: no caller can forget the world's live laws.
+  const config = effectiveConfig(baseConfig, state.laws)
+  const lens = lensFor(state, config, agentId)
+  const { self, indoors } = lens
 
   const feltEvents = recentEvents
     .map((ev) =>

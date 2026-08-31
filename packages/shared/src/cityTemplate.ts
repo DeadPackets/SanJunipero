@@ -116,6 +116,9 @@ export const CityStructureSchema = z
     // The five houses are owned, one founder each; every public building is null. The field is
     // REQUIRED; only its value may be null.
     owner: z.string().min(1).nullable(),
+    // What the town calls it. Every genesis building has one; a roof raised later is nameless
+    // until a hand cuts a word into it, so the field is optional.
+    name: z.string().min(1).optional(),
     // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
     // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.
     facing: z.enum(TOWN_FACINGS),
@@ -372,16 +375,28 @@ const mass = (m: { w: number; h: number }): { along: number; deep: number } => (
 
 // Genesis asks for buildings in the order they are raised, never for positions: each claims the free
 // plot nearest the square, so moving a line moves a building and cannot move it onto a road or a neighbour.
+// The name rides the ask: what the town calls a building is authored on the same line that
+// asks for it, so a mind can say where it is going and be understood.
 export const GENESIS_WANTED: readonly Wanted[] = [
-  { kind: STOREHOUSE_KIND, ...mass(DWELLING_FOOTPRINTS.house), owner: null },
-  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'amara' },
-  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'yusuf' },
-  { kind: 'cottage', ...mass(DWELLING_FOOTPRINTS.cottage), owner: null },
-  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'nadia' },
-  { kind: 'cabin', ...mass(DWELLING_FOOTPRINTS.cabin), owner: null },
-  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'omar' },
-  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'salma' },
-  { kind: 'farmhouse', ...mass(DWELLING_FOOTPRINTS.farmhouse), owner: null },
+  {
+    kind: STOREHOUSE_KIND,
+    ...mass(DWELLING_FOOTPRINTS.house),
+    owner: null,
+    name: 'the storehouse',
+  },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'amara', name: "Amara's house" },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'yusuf', name: "Yusuf's house" },
+  { kind: 'cottage', ...mass(DWELLING_FOOTPRINTS.cottage), owner: null, name: 'the old cottage' },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'nadia', name: "Nadia's house" },
+  { kind: 'cabin', ...mass(DWELLING_FOOTPRINTS.cabin), owner: null, name: 'the cabin' },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'omar', name: "Omar's house" },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'salma', name: "Salma's house" },
+  {
+    kind: 'farmhouse',
+    ...mass(DWELLING_FOOTPRINTS.farmhouse),
+    owner: null,
+    name: 'the old farmhouse',
+  },
 ]
 
 // A kind whose row says `hearth` is furnished with one, or it is a fire a mind can feed and
@@ -410,7 +425,7 @@ export function cityPlacements(): PlacedStructure[] {
 // Eleven: nine buildings on nine claimed plots plus the two monuments. The standing stone is
 // deliberately absent. Only structures.privateKinds (house) separates a home from a bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
-  const monument = (kind: string, at: { dx: number; dy: number }): CityStructure => ({
+  const monument = (kind: string, at: { dx: number; dy: number }, name: string): CityStructure => ({
     kind,
     dx: at.dx,
     dy: at.dy,
@@ -418,6 +433,7 @@ export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructur
     h: 1,
     owner: null,
     facing: 'sw',
+    name,
     furnishings: [],
   })
   return [
@@ -431,11 +447,12 @@ export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructur
         h: l.h,
         owner: l.owner,
         facing: l.facing,
+        ...(l.name === undefined ? {} : { name: l.name }),
         furnishings: furnishingsFor(l.kind),
       }
     }),
-    monument('well', wellAt(rings)),
-    monument('fire_pit', firePitAt(rings)),
+    monument('well', wellAt(rings), 'the well'),
+    monument('fire_pit', firePitAt(rings), 'the fire pit'),
   ]
 }
 

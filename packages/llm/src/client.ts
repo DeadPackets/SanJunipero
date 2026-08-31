@@ -2,6 +2,7 @@ import {
   generateText,
   NoObjectGeneratedError,
   Output,
+  tool,
   type FinishReason,
   type LanguageModel,
   type LanguageModelUsage,
@@ -146,6 +147,10 @@ export type LlmClientOpts = {
   temperature?: number
   // Pre-booked per call while it is in flight. ~3x the observed mean call.
   expectedCallCostUsd?: number
+  // Experiment lever: 'tool' moves the schema through the tools API instead of response_format.
+  transport?: 'response_format' | 'tool'
+  // Tool transport only. 'named' forces the turn tool; Z.AI-class endpoints 404 on anything but auto.
+  toolChoice?: 'named' | 'auto'
 }
 
 type CallTokens = Pick<
@@ -182,6 +187,8 @@ export class LlmClient {
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
   private readonly temperature: number | undefined
+  private readonly transport: 'response_format' | 'tool'
+  private readonly toolChoice: 'named' | 'auto'
   private readonly expectedCallCostUsd: number
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
@@ -202,6 +209,8 @@ export class LlmClient {
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.temperature = opts.temperature ?? pinned.temperature
+    this.transport = opts.transport ?? 'response_format'
+    this.toolChoice = opts.toolChoice ?? 'named'
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
@@ -244,6 +253,27 @@ export class LlmClient {
     schema: z.ZodType<T>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     return this.invoke(async (model, note) => {
+      if (this.transport === 'tool') {
+        const r = await generateText({
+          model,
+          system,
+          messages: toModelMessages(messages),
+          maxRetries: 0,
+          ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
+          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
+          abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
+          tools: { turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }) },
+          toolChoice:
+            this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' as never } : 'auto',
+        })
+        note(stepFacts(r))
+        const parsed = schema.safeParse(r.toolCalls[0]?.input)
+        if (!parsed.success)
+          throw new Error(
+            `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`,
+          )
+        return parsed.data
+      }
       try {
         const r = await generateText({
           model,

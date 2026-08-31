@@ -161,6 +161,7 @@ function plannedPayload(
     builderId: GENESIS_BUILDER_ID,
     // Absent, never null: an unowned building is the hash-stable shape.
     ...(s.owner === null ? {} : { owner: s.owner }),
+    ...(s.name === undefined ? {} : { name: s.name }),
   }
 }
 
