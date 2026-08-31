@@ -105,15 +105,17 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   reflection: { ...ON_GLM, maxOutputTokens: 1750 },
   // Sized around a thinking preamble larger than this model's, so neither of these moves.
   'reflection.edit': { ...ON_GLM, maxOutputTokens: 13000 },
+  // A dream is prose, but it is a mind caller: one allow-list guards everything a mind thinks
+  // through, and that one-line law is worth more than a stylist's dreams at 1% of the bill.
   dream: { ...ON_GLM, maxOutputTokens: 2500 },
   // Pre-flight's act bar gates exactly the pair the turn will run on. It never leaves that pair.
   preflight: { ...ON_GLM, maxOutputTokens: 2500 },
   // One long memory set down short at the night boundary. The ask is two or three sentences;
   // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
   'reflection.gist': { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 200 },
-  // 11,996 reasoning tokens against 12,160 output over run D's 13 calls, and the two halves
-  // disagreed. The answer alone is not measurable from that run, so 2,000 is the standing default.
-  arbiter: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 2000 },
+  // The court writes permanent law, so it gets the mind model: a ruling's params carry the same
+  // binding GLM fills 100% and DeepSeek blanked. Its mandatory reasoning bills inside the 4,000.
+  arbiter: { ...ON_GLM, maxOutputTokens: 4000 },
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000 },
   naming: ON_DEEPSEEK,

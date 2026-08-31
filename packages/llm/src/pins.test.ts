@@ -65,9 +65,9 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
 // GLM refuses `enabled:false` on every endpoint and answers worse under `effort:'minimal'`, so
 // no caller routed to it may name the field at all. DeepSeek's callers keep their pins.
 it('★ no caller on the GLM half asks for a reasoning setting — that model refuses all of them', () => {
-  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight'])
+  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight', 'arbiter'])
     expect(callSettingsFor(caller).reasoning, caller).toBeUndefined()
-  for (const caller of ['arbiter', 'semantic', 'constructs'])
+  for (const caller of ['semantic', 'constructs'])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ enabled: false })
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   expect(callSettingsFor('narrator').reasoning).toBeUndefined()
@@ -82,7 +82,8 @@ it('★ the fleet: which model and which back end answers for each caller', () =
     'reflection.edit': [MIND_MODEL, PROVIDER_ORDER],
     dream: [MIND_MODEL, PROVIDER_ORDER],
     preflight: [MIND_MODEL, PROVIDER_ORDER],
-    arbiter: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    // The court writes permanent law: its map verdicts bind params the way a turn does.
+    arbiter: [MIND_MODEL, PROVIDER_ORDER],
     narrator: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     naming: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     // The voice-comparison script must render the voice that ships, not the mind's model.
@@ -111,6 +112,7 @@ it('★ a GLM caller is bounded by its provider tail, not only by its output cei
   expect(requestTimeoutMsFor('constructs')).toBe(MIN_REQUEST_TIMEOUT_MS)
   // Above the floor the ceiling still rules: 2,500 tokens at 44 tok/s.
   expect(requestTimeoutMsFor('dream')).toBe(Math.ceil((2500 / 44) * 1000))
+  expect(requestTimeoutMsFor('narrator')).toBe(Math.ceil((22000 / 44) * 1000))
 })
 
 // The turn is the one caller that samples freely: temperature 1 is what the bake-off measured
@@ -153,14 +155,14 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
   }
 })
 
-// 11,996 reasoning tokens against 12,160 output over run D's 13 calls, and the hidden half
-// disagreed with the written half. It stays on the model that lets the preamble be switched off.
-it('★ the arbiter judges without the thinking preamble, under a 2,000-token ceiling', () => {
+// The court's rulings are permanent physics and its map verdicts bind object params — the two
+// things the mind model measurably does best. Its mandatory preamble bills inside the 4,000.
+it('★ the arbiter judges on the mind model, under a 4,000-token ceiling', () => {
   expect(callSettingsFor('arbiter')).toEqual({
-    model: PROSE_MODEL,
-    providerOrder: PROSE_PROVIDER_ORDER,
-    reasoning: { enabled: false },
-    maxOutputTokens: 2000,
+    model: MIND_MODEL,
+    providerOrder: PROVIDER_ORDER,
+    minTimeoutMs: 45_000,
+    maxOutputTokens: 4000,
   })
 })
 
