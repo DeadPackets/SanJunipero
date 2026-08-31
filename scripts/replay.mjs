@@ -202,9 +202,19 @@ migrateLlmTables(ops)
 const client = (caller) =>
   new LlmClient({ db: ops, caller, providerOrder: PROVIDER_ORDER, budgetUsd: args.cap })
 
+// A refused prep call leaves that turn without a gist or without its wants; it must not end
+// the run, or a throttled provider costs the whole arm.
+const standingFrom = async (scenes) => {
+  try {
+    return (await nightLlm.summarizeDay(scenes)).standing
+  } catch {
+    return []
+  }
+}
+
 // Arm prep, and the only place an arm spends outside the turn itself. Gists go into the working
 // copy of the mind db, so the second assembly below renders them without knowing an arm exists.
-const prep = { gists: 0, standing: new Map() }
+const prep = { gists: 0, ungisted: 0, standing: new Map() }
 const nightLlm = makeReflectionLlm(client('reflection'))
 if (args.arm !== 'raw' && !args.dry) {
   for (const { p, row } of turns) {
@@ -214,7 +224,11 @@ if (args.arm !== 'raw' && !args.dry) {
       row.tick,
       DEFAULT_MIND_CONFIG.ambientK,
     )
-    prep.gists += await gistMemories(p.mem, nightLlm, ambient)
+    try {
+      prep.gists += await gistMemories(p.mem, nightLlm, ambient)
+    } catch {
+      prep.ungisted += 1
+    }
   }
 }
 if (args.arm === 'wants' && !args.dry) {
@@ -229,10 +243,7 @@ if (args.arm === 'wants' && !args.dry) {
       .filter((n) => n.day < day)
       .slice(-8)
       .map((n) => ({ title: n.title, text: n.text }))
-    prep.standing.set(
-      key,
-      scenes.length === 0 ? [] : (await nightLlm.summarizeDay(scenes)).standing,
-    )
+    prep.standing.set(key, scenes.length === 0 ? [] : await standingFrom(scenes))
   }
 }
 
@@ -246,7 +257,7 @@ const compacting = prompts.filter((p) => p.assembled.needsCompaction).length
 console.log(
   `replay: ${prompts.length} turns from ${pools.map((p) => p.mind.id).join(', ')} — ${args.filter}` +
     ` (${heardSkipped} skipped for heard speech, ${compacting} over the compaction bar)` +
-    `\nreplay: arm '${args.arm}' — ${prep.gists} gists written, ` +
+    `\nreplay: arm '${args.arm}' — ${prep.gists} gists written, ${prep.ungisted} turns left raw, ` +
     `${[...prep.standing.values()].filter((l) => l.length > 0).length} wants blocks pinned` +
     '\nreplay: the makeables and standing-walls lines are absent — they read world state no' +
     ' mind db holds, so a build-verb rate measured here is a floor, not the shipped one.',
