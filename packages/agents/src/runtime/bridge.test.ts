@@ -244,63 +244,64 @@ describe('EngineBridge.drain (T23)', () => {
   })
 })
 
+function larder(plant?: (terrain: TileId[][]) => void): EngineBridge {
+  const config = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+  const terrain: TileId[][] = Array.from({ length: 40 }, () =>
+    Array.from({ length: 40 }, (): TileId => 0),
+  )
+  plant?.(terrain)
+  const store = new EventStore(openDb(':memory:'))
+  const rng = new RngStreams('bridge-larder')
+  let state = genesisState(config, terrain)
+  const put = (type: string, payload: unknown) => {
+    state = fold(state, store.append(state.tick, type, payload), config)
+  }
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
+  put('structure_planned', {
+    id: 'shed_1',
+    kind: 'storehouse',
+    x: 24,
+    y: 20,
+    w: 1,
+    h: 1,
+    maxHp: 20,
+    flammable: true,
+    builderId: 'g',
+  })
+  put('structure_completed', { id: 'shed_1' })
+  put('item_spawned', {
+    id: 'loaf',
+    kind: 'bread',
+    qty: 1,
+    loc: { t: 'structure', id: 'shed_1' },
+  })
+  put('item_spawned', { id: 'plank', kind: 'plank', qty: 1, loc: { t: 'tile', x: 21, y: 20 } })
+  put('forageable_spawned', {
+    id: 'bush',
+    kind: 'berry_bush',
+    x: 30,
+    y: 20,
+    stock: 6,
+    fullStock: 6,
+  })
+  put('forageable_spawned', {
+    id: 'rocks',
+    kind: 'stone_outcrop',
+    x: 21,
+    y: 21,
+    stock: 6,
+    fullStock: 6,
+  })
+  const loop = new TickLoop({ store, state, rng, config, onTick: () => {} })
+  return new EngineBridge({ loop, store, simConfig: config })
+}
+
 // The road to a meal. Thirst has had `nearestWater` and hunger
 // had nothing, and the live run drank fifteen times and ate once.
 describe('nearestFood: the nearest thing worth walking to for a meal', () => {
-  function larder(): EngineBridge {
-    const config = SimConfigSchema.parse({
-      weather: { hourlyChangeChance: 0 },
-      mystery: { chancePerDay: 0 },
-    })
-    const terrain: TileId[][] = Array.from({ length: 40 }, () =>
-      Array.from({ length: 40 }, (): TileId => 0),
-    )
-    const store = new EventStore(openDb(':memory:'))
-    const rng = new RngStreams('bridge-larder')
-    let state = genesisState(config, terrain)
-    const put = (type: string, payload: unknown) => {
-      state = fold(state, store.append(state.tick, type, payload), config)
-    }
-    put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
-    put('structure_planned', {
-      id: 'shed_1',
-      kind: 'storehouse',
-      x: 24,
-      y: 20,
-      w: 1,
-      h: 1,
-      maxHp: 20,
-      flammable: true,
-      builderId: 'g',
-    })
-    put('structure_completed', { id: 'shed_1' })
-    put('item_spawned', {
-      id: 'loaf',
-      kind: 'bread',
-      qty: 1,
-      loc: { t: 'structure', id: 'shed_1' },
-    })
-    put('item_spawned', { id: 'plank', kind: 'plank', qty: 1, loc: { t: 'tile', x: 21, y: 20 } })
-    put('forageable_spawned', {
-      id: 'bush',
-      kind: 'berry_bush',
-      x: 30,
-      y: 20,
-      stock: 6,
-      fullStock: 6,
-    })
-    put('forageable_spawned', {
-      id: 'rocks',
-      kind: 'stone_outcrop',
-      x: 21,
-      y: 21,
-      stock: 6,
-      fullStock: 6,
-    })
-    const loop = new TickLoop({ store, state, rng, config, onTick: () => {} })
-    return new EngineBridge({ loop, store, simConfig: config })
-  }
-
   it('names the kind and the place of the nearest meal, shelves and patches alike', () => {
     const bridge = larder()
     // The loaf on the shelf at four tiles beats the bushes at ten.
@@ -318,6 +319,29 @@ describe('nearestFood: the nearest thing worth walking to for a meal', () => {
   it('nothing beyond the horizon is a meal', () => {
     const bridge = larder()
     expect(bridge.nearestFood(20, 20, 2)).toBeNull()
+  })
+})
+
+// The same road, for the stuff a want is priced in. A cost with no place to go is the want the
+// arm-B experiment measured as worse than no want at all.
+describe('nearestSource: where the missing material stands', () => {
+  it('names a patch by what it is, and a stack by where somebody left it', () => {
+    const bridge = larder()
+    // Loose rock at the foot of the outcrop, two tiles off.
+    expect(bridge.nearestSource('stone', 20, 20)).toEqual({ x: 21, y: 21, from: 'stone_outcrop' })
+    // A plank is nobody's node: it is only ever a stack lying where it was put down.
+    expect(bridge.nearestSource('plank', 20, 20)).toEqual({ x: 21, y: 20, from: 'stack' })
+    expect(bridge.nearestSource('fiber', 20, 20)).toBeNull()
+    expect(bridge.nearestSource('stone', 20, 20, 1)).toBeNull()
+  })
+
+  it('finds wood standing in the ground, which no item and no node ever holds', () => {
+    const bridge = larder((t) => {
+      t[24]![26] = 3
+    })
+    expect(bridge.nearestSource('wood', 20, 20)).toEqual({ x: 26, y: 24, from: 'tree' })
+    // Only wood is ever read off the ground; clay has neither a stack nor a node here.
+    expect(bridge.nearestSource('clay', 20, 20)).toBeNull()
   })
 })
 

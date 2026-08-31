@@ -319,11 +319,16 @@ export function fold(
       const p = StructureFueled.parse(event.payload)
       const s = state.structures[p.structureId]
       if (!s) throw new Error(`structure_fueled for unknown structure ${p.structureId}`)
+      // Never shortens. A roofed fire is told a window from now and an open one an absolute
+      // dawn, so neither may be summed — but feeding a fire must not put it out sooner.
       return {
         ...state,
         structures: {
           ...state.structures,
-          [p.structureId]: { ...s, fueledUntilTick: p.burnsUntilTick },
+          [p.structureId]: {
+            ...s,
+            fueledUntilTick: Math.max(s.fueledUntilTick ?? 0, p.burnsUntilTick),
+          },
         },
       }
     }

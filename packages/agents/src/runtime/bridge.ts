@@ -9,6 +9,7 @@ import {
   insulationOf,
   isExposed,
   isFoodKind,
+  FUEL_KIND,
   isPassable,
   loneCandidateFor,
   makeables,
@@ -21,8 +22,8 @@ import {
   type WorldState,
 } from '@sj/engine'
 import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
-import { isWet, type SimConfig, type SimEvent } from '@sj/shared'
-import type { PerceptionPacket } from '../prompt/prose.js'
+import { isWet, isWoody, type SimConfig, type SimEvent } from '@sj/shared'
+import type { PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
@@ -293,35 +294,84 @@ export class EngineBridge {
     return best
   }
 
-  // The nearest thing worth walking to for a meal. Kind and place only: the mark is still
-  // earned by going and looking, as `nearestWater` names a bank and never a well's id.
-  nearestFood(x: number, y: number, radius = 24): { x: number; y: number; kind: string } | null {
+  // Where stuff in this world can be, enumerated once: a stack on the ground, a stack on a
+  // shelf, then a node still standing. Ties fall to items before nodes before ground, by id.
+  #nearestYield(
+    x: number,
+    y: number,
+    radius: number,
+    wanted: (kind: string) => boolean,
+  ): { x: number; y: number; kind: string; from: SourceKind } | null {
     const state = this.#loop.state
-    let best: { x: number; y: number; kind: string } | null = null
+    let best: { x: number; y: number; kind: string; from: SourceKind } | null = null
     let bestD = Infinity
-    const offer = (px: number, py: number, kind: string): void => {
+    const offer = (px: number, py: number, kind: string, from: SourceKind): void => {
       const d = Math.abs(px - x) + Math.abs(py - y)
       if (d > radius || d >= bestD) return
       bestD = d
-      best = { x: px, y: py, kind }
+      best = { x: px, y: py, kind, from }
     }
     for (const id of Object.keys(state.items).sort()) {
       const item = state.items[id]!
-      if (!isFoodKind(this.#simConfig, item.kind)) continue
-      if (item.loc.t === 'tile') offer(item.loc.x, item.loc.y, item.kind)
+      if (!wanted(item.kind)) continue
+      if (item.loc.t === 'tile') offer(item.loc.x, item.loc.y, item.kind, 'stack')
       else if (item.loc.t === 'structure') {
-        const s = state.structures[item.loc.id]
-        if (s !== undefined) offer(s.x, s.y, item.kind)
+        const st = state.structures[item.loc.id]
+        if (st !== undefined) offer(st.x, st.y, item.kind, 'stack')
       }
     }
     for (const id of Object.keys(state.forageables ?? {}).sort()) {
       const node = state.forageables![id]!
       if (node.stock <= 0) continue
       const kind = FORAGEABLE_YIELD[node.kind]
-      if (!isFoodKind(this.#simConfig, kind)) continue
-      offer(node.x, node.y, kind)
+      if (!wanted(kind)) continue
+      offer(node.x, node.y, kind, node.kind)
+    }
+    // Wood is the one material that is neither item nor node until somebody fells it. The box
+    // shrinks to the best distance so far, so a settled town scans a few paces, not the horizon.
+    if (wanted(FUEL_KIND)) {
+      const box = Math.min(radius, bestD)
+      for (let py = y - box; py <= y + box; py++) {
+        const row = state.terrain[py]
+        if (row === undefined) continue
+        for (let px = x - box; px <= x + box; px++) {
+          const tile = row[px]
+          if (tile !== undefined && isWoody(tile)) offer(px, py, FUEL_KIND, 'tree')
+        }
+      }
     }
     return best
+  }
+
+  // The nearest thing worth walking to for a meal. Kind and place only: the mark is still
+  // earned by going and looking, as `nearestWater` names a bank and never a well's id.
+  nearestFood(x: number, y: number, radius = 24): { x: number; y: number; kind: string } | null {
+    const hit = this.#nearestYield(x, y, radius, (k) => isFoodKind(this.#simConfig, k))
+    return hit === null ? null : { x: hit.x, y: hit.y, kind: hit.kind }
+  }
+
+  // Where the missing material stands, in the same terms `take`, `forage` and `chop` accept.
+  // A deficit with no place to go is a want with no road, which is worse than no want at all.
+  nearestSource(
+    kind: string,
+    x: number,
+    y: number,
+    radius = 24,
+  ): { x: number; y: number; from: SourceKind } | null {
+    const hit = this.#nearestYield(x, y, radius, (k) => k === kind)
+    return hit === null ? null : { x: hit.x, y: hit.y, from: hit.from }
+  }
+
+  // `isExposed`'s own test, asked of an hour the world has not reached yet — same band, same
+  // coat, same comfort line — so a mind in a garment is never sent for wood it does not need.
+  nightWillBeCold(agentId: string): boolean {
+    const cfg = this.#simConfig
+    if (!cfg.warmth.enabled) return false
+    const state = this.#loop.state
+    return (
+      ambientTempAt(state, cfg, 'night') + insulationOf(state, cfg, agentId) <
+      cfg.warmth.comfortBand
+    )
   }
 
   // The ground within sight in the words a recipe may ask for, silent about tiles the recipe

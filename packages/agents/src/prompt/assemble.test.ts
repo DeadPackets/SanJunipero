@@ -5,6 +5,7 @@ import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
+import { lastTurnLine, OPAQUE_REFUSAL, TRIED_FREEFORM } from '../runtime/agentRuntime.js'
 
 function fullSerialization(blocks: PromptBlocks): string {
   const a = assemblePrompt(blocks)
@@ -982,5 +983,58 @@ describe('a mind that is already in the middle of something', () => {
       'You are in the middle of: eat item_bread. Your body',
     )
     expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
+  })
+})
+
+// A refusal used to reach the next turn only by winning ambient retrieval, and mostly did not:
+// the row is written with no tags at all, so it scores zero on the heaviest term (rehearsal4 K20).
+describe('the refusal the next turn is actually told about', () => {
+  const line = lastTurnLine('eat', 'the food must be in your hands')
+
+  it("says the verb and the reason the engine gave, in the engine's own words", () => {
+    expect(line).toBe('Last turn: eat did not take — the food must be in your hands.')
+  })
+
+  it('flattens a reason spelled the way only a schema spells it', () => {
+    expect(lastTurnLine('stow', 'needs {itemId, structureId}')).toBe(
+      `Last turn: stow did not take — ${OPAQUE_REFUSAL}.`,
+    )
+  })
+
+  it('rides its own message, after the scene and before what the eyes can reach', () => {
+    const a = assemblePrompt({ ...fixtureBlocks(), lastOutcome: line })
+    const at = a.messages.findIndex((m) => m.content === line)
+    expect(at).toBeGreaterThan(-1)
+    expect(a.messages[at + 1]!.content).toContain(fixtureBlocks().now.prose)
+  })
+
+  it('costs nothing and shifts nothing on a turn that had no refusal', () => {
+    const base = fixtureBlocks()
+    const quiet = assemblePrompt(base)
+    for (const absent of [
+      { ...base },
+      { ...base, lastOutcome: null },
+      { ...base, lastOutcome: '' },
+    ]) {
+      const a = assemblePrompt(absent)
+      expect(a.messages.map((m) => m.content)).toEqual(quiet.messages.map((m) => m.content))
+      expect(a.estTokens).toBe(quiet.estTokens)
+    }
+  })
+
+  it('is volatile: it never touches the cached system prefix', () => {
+    const base = fixtureBlocks()
+    expect(assemblePrompt({ ...base, lastOutcome: line }).system).toBe(assemblePrompt(base).system)
+  })
+
+  it("names the words the mind used when there was no verb, not a schema's blank", () => {
+    expect(lastTurnLine(TRIED_FREEFORM, 'the reeds will not hold that shape')).toBe(
+      'Last turn: what you tried did not take — the reeds will not hold that shape.',
+    )
+  })
+
+  it('is clean prompt text under both standing laws', () => {
+    expect(scanPromptForGlassLeak(line)).toEqual([])
+    expect(FORBIDDEN_FRAMING.test(line)).toBe(false)
   })
 })
