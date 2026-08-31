@@ -284,10 +284,10 @@ export class MemoryStore {
       .run(this.agentId, day, paragraph)
   }
 
-  autobiography(): string[] {
+  autobiography(asOfDay = Number.MAX_SAFE_INTEGER): string[] {
     const rows = this.db
-      .prepare('SELECT paragraph FROM autobiography WHERE agent_id = ? ORDER BY id')
-      .all(this.agentId) as { paragraph: string }[]
+      .prepare('SELECT paragraph FROM autobiography WHERE agent_id = ? AND day <= ? ORDER BY id')
+      .all(this.agentId, asOfDay) as { paragraph: string }[]
     return rows.map((r) => r.paragraph)
   }
 

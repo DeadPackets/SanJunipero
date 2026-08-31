@@ -168,7 +168,7 @@ export function deadCallCounts(
   )
 }
 
-const sumDeadCalls = (rows: DeadCallRow[]): DeadCalls =>
+export const sumDeadCalls = (rows: DeadCallRow[]): DeadCalls =>
   rows.reduce(
     (acc, r) => ({
       calls: acc.calls + r.calls,

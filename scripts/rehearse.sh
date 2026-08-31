@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # SPENDS REAL MONEY: `pnpm rehearse [minutes]`, under the lifetime anomaly stop and a $2 budget
 # over a rolling 24 REAL hours — one ceiling over the whole run however fast it runs.
+# Two cadences: `rehearse.sh 35` is one full sim-day, night 1 included; `rehearse.sh 70` is the
+# two-day launch proof. PORT and SJ_ADMIN_PORT are honoured, so two worktrees can rehearse at once.
 set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$ROOT"
+cd "$ROOT" || exit 1
 OUT=$ROOT/rehearsals
 # A sim-day is 1440 ticks of 1250 ms: 30 real minutes at SPEED=1. Faster than SPEED=1 puts a
 # mind's 4-tick turn gap under the model's 4.45 s p95, so the default buys days with minutes.
@@ -11,7 +13,8 @@ MINUTES=${1:-65}
 SPEED=${SPEED:-1}
 DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 30}")
 export SJ_LIVE=1 SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
-export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$ SJ_ADMIN_PORT=8788
+export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$
+export SJ_ADMIN_PORT=${SJ_ADMIN_PORT:-8788}
 # One rotation deep, before SJ_FRESH wipes anything: the run before this one is still readable,
 # the one before that is not.
 PREV=$ROOT/rehearsals-prev

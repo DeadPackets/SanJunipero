@@ -14,6 +14,7 @@ export {
   projectDailySpend,
   reportDeadCalls,
   reportProviders,
+  sumDeadCalls,
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
   REAL_MINUTES_PER_SIM_DAY,

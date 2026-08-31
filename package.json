@@ -18,6 +18,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
+    "@sj/agents": "workspace:*",
+    "@sj/llm": "workspace:*",
     "@sj/shared": "workspace:*",
     "better-sqlite3": "^13.0.0",
     "@types/node": "^24.0.0",

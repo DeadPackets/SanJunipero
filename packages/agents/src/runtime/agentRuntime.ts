@@ -3,7 +3,7 @@ import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import type { IdentityCore, AssembledPrompt, PromptBlocks, Recalled } from '../prompt/assemble.js'
-import { assemblePrompt, compactDayLog, JOURNAL_LINES, splitSentences } from '../prompt/assemble.js'
+import { appendMoment, assemblePrompt, compactDayLog, JOURNAL_LINES } from '../prompt/assemble.js'
 import {
   heardProse,
   makeablesLine,
@@ -48,7 +48,7 @@ const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 // The night running from dusk of day d to dawn of day d+1 is night d, so an
 // agent asleep past midnight still reflects (once) over the day that ended.
 const DAWN_MINUTES = 6 * 60
-function nightOf(tick: number): number {
+export function nightOf(tick: number): number {
   return Math.max(0, Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY))
 }
 
@@ -575,12 +575,7 @@ export class AgentRuntime {
     // memory still holds the whole moment.
     const heard = heardProse(packet)
     const moment = heard.length > 0 ? `${prose} ${heard}` : prose
-    // Only what the last moment did not already say goes into the day log, which is re-sent
-    // whole every turn. A still scene therefore stops paying for itself twice.
-    const sentences = splitSentences(moment)
-    const fresh = sentences.filter((s) => !this.#prevMomentSentences.has(s))
-    this.#prevMomentSentences = new Set(sentences)
-    if (fresh.length > 0) this.#dayLog.push(fresh.join(' '))
+    this.#prevMomentSentences = appendMoment(this.#dayLog, this.#prevMomentSentences, moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
     const nowProse = [

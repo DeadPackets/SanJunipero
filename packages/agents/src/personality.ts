@@ -79,6 +79,23 @@ export class PersonalityStore {
     return { version: row.version, doc: JSON.parse(row.doc) as PersonalityDoc }
   }
 
+  /** What this mind was before the night that rewrote it — the doc a replayed turn had. */
+  docBefore(night: number): PersonalityDoc {
+    const row = this.db
+      .prepare(
+        `SELECT doc FROM personality_versions WHERE agent_id = ? AND day < ?
+         ORDER BY version DESC LIMIT 1`,
+      )
+      .get(this.agentId, night) as { doc: string } | undefined
+    const seed =
+      row ??
+      (this.db
+        .prepare('SELECT doc FROM personality_versions WHERE agent_id = ? ORDER BY version LIMIT 1')
+        .get(this.agentId) as { doc: string } | undefined)
+    if (!seed) throw new Error(`personality not initialized for ${this.agentId}`)
+    return JSON.parse(seed.doc) as PersonalityDoc
+  }
+
   history(): { version: number; day: number; edit: PersonalityEdit | null }[] {
     const rows = this.db
       .prepare(

@@ -124,6 +124,8 @@ async function retrieve(
   const rawBm25 = new Map<number, number>()
   const cosine = new Map<number, number>()
 
+  // Every pool stops at `nowTick`. Live that is a no-op, because nothing is written past it;
+  // replaying an archived turn, it is what keeps a mind's own future out of its 50 candidates.
   const terms = keywords(query)
   if (terms.length > 0) {
     const matchExpr = terms.map((t) => `"${t}"`).join(' AND ')
@@ -132,11 +134,11 @@ async function retrieve(
         `SELECT m.id AS id, bm25(memories_fts) AS raw
          FROM memories_fts
          JOIN memories m ON m.id = memories_fts.rowid
-         WHERE memories_fts MATCH ? AND m.agent_id = ?
+         WHERE memories_fts MATCH ? AND m.agent_id = ? AND m.tick <= ?
          ORDER BY bm25(memories_fts)
          LIMIT ?`,
       )
-      .all(matchExpr, agentId, FTS_POOL) as { id: number; raw: number }[]
+      .all(matchExpr, agentId, nowTick, FTS_POOL) as { id: number; raw: number }[]
     for (const r of rows) {
       rawBm25.set(r.id, r.raw)
       candidates.add(r.id)
@@ -150,9 +152,14 @@ async function retrieve(
         `SELECT rowid AS id, distance AS dist
          FROM memory_vec
          WHERE embedding MATCH ? AND k = ?
-           AND rowid IN (SELECT id FROM memories WHERE agent_id = ?)`,
+           AND rowid IN (SELECT id FROM memories WHERE agent_id = ? AND tick <= ?)`,
       )
-      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as {
+      .all(
+        Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength),
+        VEC_POOL,
+        agentId,
+        nowTick,
+      ) as {
       id: number
       dist: number
     }[]
@@ -170,9 +177,9 @@ async function retrieve(
         `SELECT DISTINCT t.memory_id AS id
          FROM memory_tags t
          JOIN memories m ON m.id = t.memory_id
-         WHERE t.tag IN (${placeholders}) AND m.agent_id = ?`,
+         WHERE t.tag IN (${placeholders}) AND m.agent_id = ? AND m.tick <= ?`,
       )
-      .all(...[...qTags], agentId) as { id: number }[]
+      .all(...[...qTags], agentId, nowTick) as { id: number }[]
     for (const r of rows) candidates.add(r.id)
   }
 

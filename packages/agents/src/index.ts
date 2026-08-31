@@ -2,6 +2,8 @@ export {
   IntentSchema,
   TurnSchema,
   FALLBACK_TURN,
+  actWithoutItsDetail,
+  isBlankAnswer,
   parseTurnWithRepair,
   reconsiderTick,
   type Turn,
@@ -10,11 +12,18 @@ export {
 // exported by package name so a served world does not have to reach in by relative path.
 export {
   AgentRuntime,
+  nightOf,
   OPAQUE_REFUSAL,
   type RuntimeSnapshot,
   type RuntimeStats,
 } from './runtime/agentRuntime.js'
-export { heardProse } from './prompt/prose.js'
+export { heardProse, worldDay } from './prompt/prose.js'
+// The pieces `scripts/replay.mjs` reassembles a real turn out of: it renders the shipped bytes
+// through the shipped assembly, never a copy of it.
+export { appendMoment, assemblePrompt, JOURNAL_LINES } from './prompt/assemble.js'
+export { RULES_OF_BEING } from './prompt/rulesOfBeing.js'
+export { MemoryStore } from './memory/store.js'
+export { retrieveAmbient } from './memory/retrieve.js'
 export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
 export {
   wireArbiter,
@@ -36,7 +45,7 @@ export {
 export { wireBirths, type BirthsOpts } from './live/newborn.js'
 export { resolveCast } from './live/resolveCast.js'
 export { ensureChildren, needsHousehold } from './live/ensureChild.js'
-export { type MindConfig } from './wake.js'
+export { DEFAULT_MIND_CONFIG, type MindConfig } from './wake.js'
 export { FOUNDER_MINDS, type Mind } from './live/founderMinds.js'
 export {
   PREFLIGHT_BAR,

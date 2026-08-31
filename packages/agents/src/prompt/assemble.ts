@@ -156,6 +156,15 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   }
 }
 
+/** Appends only what the last moment did not already say, and returns the new previous set: a
+ *  still scene stops paying for itself twice, and a replay rebuilds the same log. */
+export function appendMoment(log: string[], prev: Set<string>, moment: string): Set<string> {
+  const sentences = splitSentences(moment)
+  const fresh = sentences.filter((s) => !prev.has(s))
+  if (fresh.length > 0) log.push(fresh.join(' '))
+  return new Set(sentences)
+}
+
 export function splitSentences(text: string): string[] {
   return text
     .split(/(?<=\.)\s+/)
