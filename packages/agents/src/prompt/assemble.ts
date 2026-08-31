@@ -165,7 +165,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const heard = blocks.now.heard ?? ''
   // Stable before volatile — the book changes only when the mind writes in it, dayLog is
   // append-only, the scene changes every turn — so the byte prefix stays cacheable.
-  const underway = blocks.underway === null ? '' : renderUnderway(blocks.underway)
+  const underway = blocks.underway == null ? '' : renderUnderway(blocks.underway)
   const ordered = [journal, dayLog, scene, recalled, lastOutcome, now, heard, underway]
   const messages = ordered
     .filter((content) => content.length > 0)
