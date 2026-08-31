@@ -654,19 +654,11 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
   return seen
 }
 
-export function composePerception(
-  state: WorldState,
-  baseConfig: SimConfig,
-  agentId: string,
-  recentEvents: SimEvent[],
-): PerceptionPacket {
+function lensFor(state: WorldState, config: SimConfig, agentId: string): Lens {
   const self = state.agents[agentId]
   if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
-  // Derived here, not at the call site: no caller can forget the world's live laws.
-  const config = effectiveConfig(baseConfig, state.laws)
-
   const indoors = insideOf(state, agentId)
-  const lens: Lens = {
+  return {
     state,
     config,
     self,
@@ -679,6 +671,28 @@ export function composePerception(
     // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
     nameOf: (id) => state.agents[id]?.name ?? id,
   }
+}
+
+/** The places this body's eyes reach right now, by id. The same horizon the packet is built on,
+ *  because what a mind comes to know of the town cannot be a second opinion about seeing. */
+export function structuresInSight(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+): string[] {
+  return perceiveStructures(lensFor(state, config, agentId)).map((s) => s.id)
+}
+
+export function composePerception(
+  state: WorldState,
+  baseConfig: SimConfig,
+  agentId: string,
+  recentEvents: SimEvent[],
+): PerceptionPacket {
+  // Derived here, not at the call site: no caller can forget the world's live laws.
+  const config = effectiveConfig(baseConfig, state.laws)
+  const lens = lensFor(state, config, agentId)
+  const { self, indoors } = lens
 
   const feltEvents = recentEvents
     .map((ev) =>

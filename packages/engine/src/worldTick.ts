@@ -32,6 +32,7 @@ import { spoilageSystem } from './systems/spoilage.js'
 import { reproductionSystem } from './systems/reproduction.js'
 import { mysterySystem } from './systems/mystery.js'
 import { mapGrowthSystem } from './systems/mapGrowth.js'
+import { sightSystem } from './systems/sight.js'
 
 export type WorldTickResult = { state: WorldState; events: PendingEvent[] }
 
@@ -132,6 +133,9 @@ const SYSTEMS: System[] = [
   agingSystem,
   actionsSystem,
   collapseDeathSystem,
+  // Last: the legs have already moved and the door has already opened, so what a body learned
+  // this tick is learned on the tick it happened.
+  sightSystem,
 ]
 
 // Each emit folds immediately, so every system is generated against the already-folded state.

@@ -2,7 +2,7 @@ import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { VERBS, workPenalty, type PendingEvent } from './verbs/index.js'
+import { VERBS, walkDestination, workPenalty, type PendingEvent } from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
@@ -40,6 +40,12 @@ export function submitIntent(
       loneCandidateFor(state, config, agentId, verb, params)
     if (filled === null) return { ok: false, reason: refusal }
     p = filled
+  }
+  // A mind may name a place instead of a pair of numbers. It settles to the tile here, once, so
+  // the log, the fold and the legs all read the same two numbers from here on.
+  if (verb === 'walk') {
+    const to = walkDestination(state, config, agentId, p)
+    if (!('refusal' in to)) p = to
   }
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })

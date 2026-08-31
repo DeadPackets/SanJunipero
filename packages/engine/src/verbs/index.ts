@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { FAUNA_YIELD, type FaunaKind } from '../data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from '../data/forageables.js'
-import { WalkParams } from '../events.def.js'
+import { WalkParams, WalkToPlace } from '../events.def.js'
 import {
   FISH_KIND,
   FORAGE_KIND,
@@ -209,15 +209,54 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
   })
 }
 
+/** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
+ *  it that this body can actually reach; the refusal comes from here too, so the seam that
+ *  settles the act and the test that judges it can never disagree. */
+export function walkDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  params: Record<string, unknown>,
+): { x: number; y: number } | { refusal: string } {
+  const tile = WalkParams.safeParse(params)
+  if (tile.success) return tile.data
+  const named = WalkToPlace.safeParse(params)
+  if (!named.success) return { refusal: 'a walk needs a place to end' }
+  const a = state.agents[agentId]!
+  const s = state.structures[named.data.structureId]
+  // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
+  if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
+    return { refusal: 'you know no such place' }
+  // First reachable tile of the ring, nearest first, so the answer is one search on the common
+  // case and deterministic on every other.
+  const ring: { x: number; y: number }[] = []
+  for (let y = s.y - 1; y <= s.y + s.h; y++) {
+    for (let x = s.x - 1; x <= s.x + s.w; x++) {
+      if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) continue
+      ring.push({ x, y })
+    }
+  }
+  ring.sort(
+    (p, q) =>
+      Math.abs(p.x - a.x) + Math.abs(p.y - a.y) - (Math.abs(q.x - a.x) + Math.abs(q.y - a.y)) ||
+      p.y - q.y ||
+      p.x - q.x,
+  )
+  for (const t of ring) {
+    if ((a.x === t.x && a.y === t.y) || findPath(state, a, t, config) !== null) return t
+  }
+  return { refusal: 'no path to that spot' }
+}
+
 const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
-    const p = WalkParams.safeParse(params)
-    if (!p.success) return 'a walk needs a place to end'
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
-    if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
-    if (findPath(state, a, p.data, config) === null) return 'no path to that spot'
+    const to = walkDestination(state, config, agentId, params)
+    if ('refusal' in to) return to.refusal
+    if (a.x === to.x && a.y === to.y) return 'already at that spot'
+    if (findPath(state, a, to, config) === null) return 'no path to that spot'
     return null
   },
   duration(state, config, agentId, params) {

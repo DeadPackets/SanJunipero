@@ -71,6 +71,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'forageable_depleted',
   'forageable_regrown',
   'traffic_decayed',
+  'places_seen',
   // The body's own bookkeeping, and the ledger's.
   'tick_advanced',
   'agent_moved',
