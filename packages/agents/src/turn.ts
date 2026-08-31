@@ -78,7 +78,9 @@ export const TurnSchemaActionRequired = TurnSchema.extend({
   action: z
     .union([
       IntentSchema,
-      z.object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') }).strict(),
+      z
+        .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
+        .strict(),
     ])
     .describe(
       "One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new. If you truly do nothing this turn, answer { verb: 'wait', params: {} }.",

@@ -262,9 +262,11 @@ export class LlmClient {
           ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
           ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
           abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
-          tools: { turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }) },
+          tools: {
+            turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }),
+          },
           toolChoice:
-            this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' as never } : 'auto',
+            this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
         })
         note(stepFacts(r))
         const parsed = schema.safeParse(r.toolCalls[0]?.input)
