@@ -84,13 +84,13 @@ lifetime anomaly stop. It reads `OPENROUTER_API_KEY` out of `.env` through `--en
 key is never on a command line.
 
 ```
-pnpm rehearse                                   # 30 real minutes at SPEED=4 — about 2 sim-days
+pnpm rehearse                                   # 65 real minutes at SPEED=1 — about 1.4 sim-days
 pnpm rehearse 10                                # shorter; Ctrl-C is safe at any point
-SPEED=1 pnpm rehearse 30                        # real time: 30 real minutes is one sim-day
+SPEED=1 pnpm rehearse 48                        # real time: 48 real minutes is one sim-day
 node --import tsx scripts/score.mjs             # what the rehearsal produced
 ```
 
-A sim-day is 1440 ticks of 1250 ms, so `SPEED` x minutes / 30 is the sim-days a run buys; the
+A sim-day is 1440 ticks of 2000 ms, so `SPEED` x minutes / 48 is the sim-days a run buys; the
 script prints that number when it starts. The rehearsal writes under `rehearsals/`, which is
 gitignored, and the scorer only reads. `--import tsx` is not optional: the workspace packages are
 published as TypeScript source.
@@ -111,7 +111,7 @@ block reach the container.
 | `SJ_LAMPS` | `8` | How many street lamps the lamplighter raises. `0` leaves the streets dark. `pnpm stream` only; `dev:world` raises none. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** Needs `OPENROUTER_API_KEY`. `pnpm stream` only. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. `pnpm stream` only. |
-| `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. A sim-day passes every 30 real minutes, so this is the stream's running cost per day. `pnpm stream` only. |
+| `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. A sim-day passes every 48 real minutes, so this is the stream's running cost per day. `pnpm stream` only. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. Reaching it stops the minds and kills the process. `pnpm stream` only. |
 | `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is still folded into the world — the child has a body and no mind, and an alert row says so. `pnpm stream` only. |
 | `SJ_ADMIN_TOKEN` | unset | Set it to open the loopback law channel (`POST /admin/laws`) behind that bearer token. Unset, no write path into the world exists. `pnpm stream` only. |

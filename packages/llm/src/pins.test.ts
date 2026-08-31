@@ -3,21 +3,27 @@ import {
   CEILING_PRICE_PER_M,
   FALLBACK_MODELS,
   MIND_MODEL,
+  MIN_REQUEST_TIMEOUT_MS,
   PRICE_PER_M,
   PRICE_PER_M_BY_PROVIDER,
+  PROSE_MODEL,
+  PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
   callSettingsFor,
+  modelFor,
   pricesFor,
+  requestTimeoutMsFor,
 } from './pins.js'
 
 it('pins are concrete', () => {
-  expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
-  expect(PROVIDER_ORDER).toEqual(['Inceptron'])
+  expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
+  expect(PROVIDER_ORDER).toEqual(['Wafer'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
-  // Never a floating alias: every model names the dated snapshot it was probed at.
-  for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
-  expect(PRICE_PER_M).toEqual({ input: 0.13, output: 0.28, cacheRead: 0.03 })
+  // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
+  // glm-5.3-flash, only the bare id and a `:batch` variant, so there is no date to pin to.
+  for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
+  expect(PRICE_PER_M).toEqual({ input: 0.15, output: 0.5, cacheRead: 0.03 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
@@ -56,27 +62,85 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
   expect(pricesFor(MIND_MODEL, 'SomeNewProvider').prices).toEqual(CEILING_PRICE_PER_M)
 })
 
-// The nightly pass once spent 31,179 reasoning tokens over 96 s to answer nothing at all. Only
-// `enabled:false` moves this endpoint, so an effort rung here would be a placebo.
-it('the semantic pass is pinned off the thinking preamble and under an output ceiling', () => {
-  expect(callSettingsFor('semantic').reasoning).toEqual({ enabled: false })
-  expect(callSettingsFor('semantic').maxOutputTokens).toBeLessThanOrEqual(4000)
-})
-
-// Over 12 matched pairs, reasoning was 94% of a turn's output; holding it off left parse at
-// 100% and moved grounding from 75% to 92%.
-it('the turn and the night are pinned off the thinking preamble', () => {
-  expect(callSettingsFor('turn').reasoning).toEqual({ enabled: false })
-  expect(callSettingsFor('reflection').reasoning).toEqual({ enabled: false })
+// GLM refuses `enabled:false` on every endpoint and answers worse under `effort:'minimal'`, so
+// no caller routed to it may name the field at all. DeepSeek's callers keep their pins.
+it('★ no caller on the GLM half asks for a reasoning setting — that model refuses all of them', () => {
+  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight'])
+    expect(callSettingsFor(caller).reasoning, caller).toBeUndefined()
+  for (const caller of ['arbiter', 'semantic', 'constructs'])
+    expect(callSettingsFor(caller).reasoning, caller).toEqual({ enabled: false })
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   expect(callSettingsFor('narrator').reasoning).toBeUndefined()
+})
+
+// GLM only earns its premium where a mind must NAME what it acts on. Text-only callers cannot
+// emit a blank act, so they keep the model that wrote the best prose of the three.
+it('★ the fleet: which model and which back end answers for each caller', () => {
+  const fleet: Record<string, [string, string[]]> = {
+    turn: [MIND_MODEL, PROVIDER_ORDER],
+    reflection: [MIND_MODEL, PROVIDER_ORDER],
+    'reflection.edit': [MIND_MODEL, PROVIDER_ORDER],
+    dream: [MIND_MODEL, PROVIDER_ORDER],
+    preflight: [MIND_MODEL, PROVIDER_ORDER],
+    arbiter: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    narrator: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    naming: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    // The voice-comparison script must render the voice that ships, not the mind's model.
+    voice: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    semantic: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    constructs: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+  }
+  for (const [caller, [model, order]] of Object.entries(fleet)) {
+    expect(modelFor(caller), caller).toBe(model)
+    expect(callSettingsFor(caller).providerOrder, caller).toEqual(order)
+  }
+})
+
+// The act bar gates exactly one model on exactly one back end. Pre-flight measured anywhere else
+// would pass a pair the turn never runs on, and the gate would be blind.
+it("★ pre-flight runs the turn's own model on the turn's own back end", () => {
+  expect(modelFor('preflight')).toBe(modelFor('turn'))
+  expect(callSettingsFor('preflight').providerOrder).toEqual(callSettingsFor('turn').providerOrder)
+})
+
+// Wafer's tail is prefill, not decode: 14.7 s p95 and 41.0 s max on 300-token answers. A bound
+// derived from a 600-token ceiling alone is 13.6 s, floored at 30 s — and still aborts them.
+it('★ a GLM caller is bounded by its provider tail, not only by its output ceiling', () => {
+  expect(requestTimeoutMsFor('turn')).toBe(45_000)
+  expect(requestTimeoutMsFor('reflection')).toBe(45_000)
+  expect(requestTimeoutMsFor('constructs')).toBe(MIN_REQUEST_TIMEOUT_MS)
+  // Above the floor the ceiling still rules: 2,500 tokens at 44 tok/s.
+  expect(requestTimeoutMsFor('dream')).toBe(Math.ceil((2500 / 44) * 1000))
+})
+
+// The turn is the one caller that samples freely: temperature 1 is what the bake-off measured
+// its voice and its 100% named-object act rate at.
+it('★ the turn samples at temperature 1, and no other caller pins one', () => {
+  expect(callSettingsFor('turn').temperature).toBe(1)
+  for (const caller of ['reflection', 'narrator', 'arbiter', 'preflight', 'semantic'])
+    expect(callSettingsFor(caller).temperature, caller).toBeUndefined()
+})
+
+// Two models on two back ends bill side by side in one ledger, and neither may book at the
+// ceiling: an over-report is as wrong as an under-report once the fleet is mixed.
+it('★ both fleet models price by who served them, in the same ledger', () => {
+  expect(pricesFor(MIND_MODEL, 'Wafer')).toEqual({
+    prices: { input: 0.15, output: 0.5, cacheRead: 0.03 },
+    source: 'provider',
+  })
+  expect(pricesFor(PROSE_MODEL, 'Inceptron')).toEqual({
+    prices: { input: 0.13, output: 0.28, cacheRead: 0.03 },
+    source: 'provider',
+  })
+  expect(pricesFor(PROSE_MODEL, null).source).toBe('ceiling')
 })
 
 // An uncapped call once spent 31,544 output tokens on one dead answer. Each ceiling clears 2x
 // that caller's measured p99, so it stops a runaway and never truncates an honest answer.
 it('every measured caller has an output ceiling above 2x its p99', () => {
   const p99 = {
-    turn: 243,
+    // GLM's own measured turn p99, the mandatory reasoning preamble included.
+    turn: 287,
     reflection: 337,
     'reflection.edit': 6120,
     narrator: 10563,
@@ -89,28 +153,30 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
   }
 })
 
-// 11,996 reasoning tokens against 12,160 output tokens over run D's 13 calls, and the hidden
-// half disagreed with the written half. Its reasoning-on p99 of 3,904 no longer describes it,
-// and the answer alone is not measurable from that run, so the ceiling is the standing default.
+// 11,996 reasoning tokens against 12,160 output over run D's 13 calls, and the hidden half
+// disagreed with the written half. It stays on the model that lets the preamble be switched off.
 it('★ the arbiter judges without the thinking preamble, under a 2,000-token ceiling', () => {
   expect(callSettingsFor('arbiter')).toEqual({
+    model: PROSE_MODEL,
+    providerOrder: PROSE_PROVIDER_ORDER,
     reasoning: { enabled: false },
     maxOutputTokens: 2000,
   })
 })
 
-// The night's one reasoning-on call shared reflection's ceiling and its ledger line, so what
-// it costs could never be read off. It has both of its own now.
-it('★ reflection.edit is its own caller: reasoning on, its own ceiling', () => {
-  expect(callSettingsFor('reflection.edit').reasoning).toBeUndefined()
+// The night's one reasoning-on call has its own ceiling and its own ledger line. 13,000 was
+// already sized around a larger preamble than this model writes, so only reflection moves.
+it('★ reflection.edit is its own caller, with its own ceiling', () => {
   expect(callSettingsFor('reflection.edit').maxOutputTokens).toBe(13000)
-  expect(callSettingsFor('reflection').maxOutputTokens).toBe(1500)
+  expect(callSettingsFor('reflection').maxOutputTokens).toBe(1750)
 })
 
 // 14,072 output tokens, 99.5% of it reasoning, to pick one label out of five. With reasoning off
 // the same probe answered in 20 tokens on all five calls and recognized the same construct.
 it('★ constructs answers without thinking, under a 500-token ceiling', () => {
   expect(callSettingsFor('constructs')).toEqual({
+    model: PROSE_MODEL,
+    providerOrder: PROSE_PROVIDER_ORDER,
     reasoning: { enabled: false },
     maxOutputTokens: 500,
   })
@@ -123,5 +189,6 @@ it('semantic is left where it was', () => {
 })
 
 it('an unpinned caller keeps the routing it has always had', () => {
-  expect(callSettingsFor('naming')).toEqual({})
+  expect(callSettingsFor('nobody-pinned-this')).toEqual({})
+  expect(modelFor('nobody-pinned-this')).toBe(MIND_MODEL)
 })

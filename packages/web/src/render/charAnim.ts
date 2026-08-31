@@ -123,7 +123,7 @@ export function charPose(
 /** How far one four-frame cycle carries a body, in tiles: the v4 cadence's 720 ms cycle at the dev world's 400 ms a tile, so the shipped look is reproduced exactly. */
 export const STRIDE_TILES = 1.8
 
-/** Outside this band the legs slide on purpose: a body crossing a tile in 1.25 s would otherwise cycle its legs once every 2.25 s, which reads as a freeze rather than an amble.
+/** Outside this band the legs slide on purpose: a body crossing a tile in 2 s would otherwise cycle its legs once every 3.6 s, which reads as a freeze rather than an amble.
  *  The band bounds the world's NOMINAL cadence, not a body's own — see `strideFrameMs`. */
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
@@ -132,7 +132,7 @@ export const WALK_FRAME_MAX_MS = 360
  * The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed.
  *
  * Scales the CLAMPED cadence, not the ideal — inside the clamp all five founders came out at
- * exactly 360 ms at the product's real 1250 ms a tile (5 of 5 distinct only at the dev world's 400 ms).
+ * exactly 360 ms at the product's real 2000 ms a tile (5 of 5 distinct only at the dev world's 400 ms).
  */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
   const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length

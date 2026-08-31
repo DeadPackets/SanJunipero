@@ -1,7 +1,13 @@
 import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, simTimeFromTick, type SimConfig } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  TICK_REAL_MS,
+  TOWN_RINGS_GENESIS,
+  simTimeFromTick,
+  type SimConfig,
+} from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
   RngStreams,
@@ -37,11 +43,11 @@ import {
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
-export const DEV_MS_PER_TICK = 1250
+export const DEV_MS_PER_TICK = TICK_REAL_MS
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
 
-// `construction.houseTicks` defaults to two sim days — one REAL HOUR at the dev world's tick.
+// `construction.houseTicks` defaults to two sim days — 96 REAL MINUTES at the dev world's tick.
 // `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
 export const DEV_HOUSE_TICKS = 240
 

@@ -1,4 +1,4 @@
-export const TICK_REAL_MS = 1250
+export const TICK_REAL_MS = 2000
 export const MINUTES_PER_DAY = 1440
 export const DAYS_PER_SEASON = 91
 export const DAYS_PER_YEAR = 364

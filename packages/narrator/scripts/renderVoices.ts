@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
-import { LlmClient, PROVIDER_ORDER } from '@sj/llm'
+import { LlmClient } from '@sj/llm'
 import { applyFootnotes, proseIdLeaks, sceneDigests } from '../src/chronicle.js'
 import { scanPromptForGlassLeak } from '@sj/shared'
 import { makeNarratorLlm } from '../src/llm/narratorLlm.js'
@@ -72,7 +72,6 @@ const spent = (): { usd: number; inTok: number; outTok: number } => {
 const client = new LlmClient({
   db,
   caller: 'voice',
-  providerOrder: PROVIDER_ORDER,
   budgetUsd: BUDGET_USD,
   expectedCallCostUsd: 0.05,
 })

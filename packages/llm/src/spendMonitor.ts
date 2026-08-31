@@ -1,9 +1,10 @@
 import type Database from 'better-sqlite3'
+import { MINUTES_PER_DAY, TICK_REAL_MS } from '@sj/shared'
 import { insertAlert } from './callLog.js'
 
-// The sim runs one day per 30 real minutes, so a window of W real minutes covers
-// W/30 of a sim-day and its spend scales by 30/W to reach $/sim-day.
-export const REAL_MINUTES_PER_SIM_DAY = 30
+// Derived, never typed: a window of W real minutes covers W/48 of a sim-day at the shipped
+// tick, and its spend scales by 48/W to reach $/sim-day. Moving the tick moves this with it.
+export const REAL_MINUTES_PER_SIM_DAY = (MINUTES_PER_DAY * TICK_REAL_MS) / 60_000
 export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
 // 21x the expected $0.019/sim-day for the shipped five-mind cast — itself an expectation
 // and not a measurement.

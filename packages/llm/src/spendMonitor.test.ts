@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import { insertTurnOutcome, migrateLlmTables } from './callLog.js'
+import { MIND_MODEL, PROVIDER_ORDER, callSettingsFor, modelFor } from './pins.js'
 import {
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
@@ -67,14 +68,14 @@ function seedProviderCall(
 // ★ Runs B and C both died on a DOLLAR rate that a provider failover, not the town, had moved.
 // Calls are what the town controls, so calls are what the tripwire measures.
 describe('★ projectCallRate — the tripwire counts calls, not dollars', () => {
-  it('a sim-hour is 1.25 real minutes, so a 15-minute window is 12 sim-hours', () => {
+  it('a sim-hour is 2 real minutes, so a 16-minute window is 8 sim-hours', () => {
     const db = openDb()
-    expect(REAL_MINUTES_PER_SIM_HOUR).toBe(1.25)
-    for (let i = 0; i < 24; i++)
+    expect(REAL_MINUTES_PER_SIM_HOUR).toBe(2)
+    for (let i = 0; i < 16; i++)
       seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
 
-    const r = projectCallRate(db, { minds: 2, windowRealMinutes: 15, now: NOW })
-    expect(r).toEqual({ callsPerMindSimHour: 1, sampledCalls: 24 })
+    const r = projectCallRate(db, { minds: 2, windowRealMinutes: 16, now: NOW })
+    expect(r).toEqual({ callsPerMindSimHour: 1, sampledCalls: 16 })
   })
 
   it('counts only what a mind spends its own calls on', () => {
@@ -102,6 +103,18 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
 // serve a mind call. One that did is a leak past the pin, not a mix.
 describe('★ checkProviderMix — a back end past the allow-list is reported, never enforced', () => {
   const mixOpts = { allowed: ['Baidu'], windowRealMinutes: 15, now: NOW }
+
+  // The live town hands this one global `PROVIDER_ORDER` as the allow-list, and it reads only
+  // the mind callers. Move one of them to the fleet's other back end and every call it makes
+  // would alert — so the two lists are pinned to agree here rather than in a run.
+  it('★ every mind caller is served by the pin the allow-list names', () => {
+    for (const caller of MIND_CALLERS) {
+      expect(modelFor(caller), caller).toBe(MIND_MODEL)
+      expect(callSettingsFor(caller).providerOrder ?? PROVIDER_ORDER, caller).toEqual(
+        PROVIDER_ORDER,
+      )
+    }
+  })
 
   it('says nothing about a window the pin served whole', () => {
     const db = openDb()
@@ -155,14 +168,15 @@ describe('★ checkProviderMix — a back end past the allow-list is reported, n
 })
 
 describe('projectDailySpend (T24)', () => {
-  it('one sim-day is 30 real minutes, so a window scales by 30/window', () => {
+  it('one sim-day is 48 real minutes, so a window scales by 48/window', () => {
     const db = openDb()
-    expect(REAL_MINUTES_PER_SIM_DAY).toBe(30)
+    expect(REAL_MINUTES_PER_SIM_DAY).toBe(48)
     seedCall(db, 1, 0.5)
     seedCall(db, 2, 0.25)
 
     const p = projectDailySpend(db, { windowRealMinutes: 15, now: NOW })
-    expect(p).toEqual({ usdPerSimDay: 1.5, windowRealMinutes: 15, sampledCalls: 2 })
+    expect(p.usdPerSimDay).toBeCloseTo(2.4, 10)
+    expect(p).toMatchObject({ windowRealMinutes: 15, sampledCalls: 2 })
   })
 
   it('counts only calls inside the window, boundary included', () => {
@@ -173,7 +187,7 @@ describe('projectDailySpend (T24)', () => {
 
     const p = projectDailySpend(db, { windowRealMinutes: 15, now: NOW })
     expect(p.sampledCalls).toBe(1)
-    expect(p.usdPerSimDay).toBe(2)
+    expect(p.usdPerSimDay).toBe(3.2)
   })
 
   it('leaves an excluded caller out of the rate, but still in the ledger', () => {
@@ -192,8 +206,8 @@ describe('projectDailySpend (T24)', () => {
       now: NOW,
       excludeCallers: ['forge'],
     })
-    expect(all).toEqual({ usdPerSimDay: 2, windowRealMinutes: 15, sampledCalls: 2 })
-    expect(minds).toEqual({ usdPerSimDay: 1, windowRealMinutes: 15, sampledCalls: 1 })
+    expect(all).toEqual({ usdPerSimDay: 3.2, windowRealMinutes: 15, sampledCalls: 2 })
+    expect(minds).toEqual({ usdPerSimDay: 1.6, windowRealMinutes: 15, sampledCalls: 1 })
   })
 
   it('an idle window projects zero, not NaN', () => {
@@ -203,10 +217,10 @@ describe('projectDailySpend (T24)', () => {
     expect(p).toEqual({ usdPerSimDay: 0, windowRealMinutes: 15, sampledCalls: 0 })
   })
 
-  it('a half-hour window is the measured sim-day itself, multiplier 1', () => {
+  it('a window one sim-day long is the measured sim-day itself, multiplier 1', () => {
     const db = openDb()
     seedCall(db, 20, 2.5)
-    expect(projectDailySpend(db, { windowRealMinutes: 30, now: NOW }).usdPerSimDay).toBe(2.5)
+    expect(projectDailySpend(db, { windowRealMinutes: 48, now: NOW }).usdPerSimDay).toBe(2.5)
   })
 
   it('defaults to a quarter-hour window', () => {
@@ -314,11 +328,11 @@ describe('checkSpend (T24)', () => {
     seedCall(db, 1, 8)
 
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
-    expect(r.usdPerSimDay).toBe(16)
+    expect(r.usdPerSimDay).toBe(25.6)
     expect(r.alerted).toBe(true)
     expect(alerts(db)).toHaveLength(1)
     expect(alerts(db)[0]!.kind).toBe('spend_projection')
-    expect(alerts(db)[0]!.detail).toContain('16')
+    expect(alerts(db)[0]!.detail).toContain('25.6')
     expect(alerts(db)[0]!.detail).toContain('10')
     expect(warn).toHaveBeenCalledTimes(1)
 
@@ -333,7 +347,7 @@ describe('checkSpend (T24)', () => {
     seedCall(db, 1, 2)
 
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
-    expect(r.usdPerSimDay).toBe(4)
+    expect(r.usdPerSimDay).toBe(6.4)
     expect(r.alerted).toBe(false)
     expect(alerts(db)).toEqual([])
     expect(warn).not.toHaveBeenCalled()
@@ -342,7 +356,7 @@ describe('checkSpend (T24)', () => {
   it('sitting exactly on the threshold is not over it', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    seedCall(db, 1, 5)
+    seedCall(db, 1, 3.125)
     const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
     expect(r.usdPerSimDay).toBe(10)
     expect(r.alerted).toBe(false)
@@ -353,9 +367,9 @@ describe('checkSpend (T24)', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(0.4)
-    seedCall(db, 1, 0.22) // 0.22 over 15 real minutes projects to $0.44/sim-day
+    seedCall(db, 1, 0.22) // 0.22 over 15 real minutes projects to $0.704/sim-day
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(true)
-    seedCall(db, 1, -0.04) // pull the window back under
+    seedCall(db, 1, -0.1) // pull the window back under
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(false)
   })
 })
