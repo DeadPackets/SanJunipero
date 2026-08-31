@@ -6,7 +6,7 @@ import {
   heardLine,
   type SimTime,
 } from '@sj/shared'
-import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
+import { MYSTERIES, type ForageableKind, type MakeableRoad, type Makeables } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
 // reconciles in. Keep the field shapes identical to @sj/engine's so the mapping stays 1:1.
@@ -245,6 +245,9 @@ function footprintPhrase(w: number, h: number): string {
 
 // Answers about the world the packet cannot carry: whether ground is open to
 // stand on, and whether a carried kind is food. Both come from the bridge.
+/** What a material can be found as: a node still standing, a tree, or a stack somebody left. */
+export type SourceKind = ForageableKind | 'tree' | 'stack'
+
 export type ProseWorld = {
   isWalkable?: (x: number, y: number) => boolean
   isEdible?: (kind: string) => boolean
@@ -255,6 +258,16 @@ export type ProseWorld = {
   // Where the food is. The same answer thirst has had since the last batch, for the need that
   // never got one: the run that drank fifteen times ate once (R21).
   nearestFood?: (x: number, y: number) => { x: number; y: number; kind: string } | null
+  // Where a material comes from. The same answer food and water have; wanting to build was the
+  // only drive left with a cost and no place to go.
+  nearestSource?: (
+    kind: string,
+    x: number,
+    y: number,
+  ) => { x: number; y: number; from: SourceKind } | null
+  // Whether the night now coming is one the cold gets into. Read off the season's own band, so
+  // a summer evening is never told to go for wood.
+  nightWillBeCold?: () => boolean
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -292,6 +305,13 @@ function claimPhrase(i: PerceptionItem): string {
 
 // What a thing costs, in the words a refusal already uses for it. `inputName` turns the two
 // canon classes into plain words; the singular is only ever needed by "vegetables".
+/** A recipe key as a person says it. Five sites in this file spelled it out by hand. */
+const words = (kind: string): string => kind.replace(/_/g, ' ')
+
+const pushIf = (lines: string[], line: string): void => {
+  if (line.length > 0) lines.push(line)
+}
+
 function costPhrase(inputs: Record<string, number>): string {
   return Object.keys(inputs)
     .sort()
@@ -336,9 +356,10 @@ export function standingWallsLine(
   w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null,
 ): string {
   if (w === undefined || w === null) return ''
-  return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${w.kind.replace(/_/g, ' ')}, ${howFarUp(
-    { done: w.done, needs: w.needs },
-  ).replace(/^its walls are /, '')}.`
+  return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${words(w.kind)}, ${howFarUp({
+    done: w.done,
+    needs: w.needs,
+  }).replace(/^its walls are /, '')}.`
 }
 
 export function makeablesLine(
@@ -349,7 +370,7 @@ export function makeablesLine(
   if (m.builds.length > 0) {
     parts.push(
       `What your hands know how to raise, given the stuff and a spot to put it: ${m.builds
-        .map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`)
+        .map((b) => `a ${words(b.kind)} (${costPhrase(b.inputs)})`)
         .join(', ')}.`,
     )
     // "to begin a new one", never "to raise one": this ground is where a roof starts, and walls
@@ -363,11 +384,79 @@ export function makeablesLine(
   if (m.crafts.length > 0) {
     parts.push(
       `What they know how to shape: ${m.crafts
-        .map((c) => `${c.name.replace(/_/g, ' ')} (${c.roads.map(roadPhrase).join(', or ')})`)
+        .map((c) => `${words(c.name)} (${c.roads.map(roadPhrase).join(', or ')})`)
         .join(', ')}.`,
     )
   }
   return parts.join(' ')
+}
+
+// What a source looks like when you get there, keyed off the engine's own roster so a node kind
+// added there cannot quietly be described here as a stack somebody left on the ground.
+const SOURCE_PHRASE: Readonly<Record<Exclude<SourceKind, 'stack'>, string>> = {
+  tree: 'standing tree',
+  stone_outcrop: 'stone outcrop',
+  clay_deposit: 'clay bank',
+  reed_bed: 'reed bed',
+  berry_bush: 'berry bush',
+  herb_patch: 'herb patch',
+  mushroom_patch: 'mushroom ground',
+  pale_mushroom_patch: 'pale mushroom ground',
+}
+
+/** The road the makeables list never had: one cost this mind is short of, and where that stuff
+ *  stands. The build nearest to standing wins, so the road shortens as the hands fill.
+ *  Roofs only — a craft's alternate roads and its fire-and-water conditions need their own pick. */
+export function buildRoadLine(
+  builds: Makeables['builds'],
+  packet: PerceptionPacket,
+  world?: ProseWorld,
+): string {
+  if (world?.nearestSource === undefined) return ''
+  const held = new Map<string, number>()
+  for (const i of packet.self.inventory) held.set(i.kind, (held.get(i.kind) ?? 0) + i.qty)
+
+  let best: { build: Makeables['builds'][number]; short: string; gap: number } | null = null
+  for (const build of builds) {
+    const missing = Object.keys(build.inputs)
+      .sort()
+      .map((kind) => ({ kind, short: build.inputs[kind]! - (held.get(kind) ?? 0) }))
+      .filter((m) => m.short > 0)
+    // Nothing missing means the hands can raise it now; block 6 already says where.
+    if (missing.length === 0) continue
+    const gap = missing.reduce((total, m) => total + m.short, 0)
+    if (best === null || gap < best.gap) best = { build, short: missing[0]!.kind, gap }
+  }
+  if (best === null) return ''
+
+  const at = world.nearestSource(best.short, packet.self.x, packet.self.y)
+  if (at === null) return ''
+  const wants = best.build.inputs[best.short]!
+  // A stack is the stuff itself and names no source; everything else stands somewhere.
+  const source =
+    at.from === 'stack'
+      ? `${inputName(best.short)} lying where it was left`
+      : SOURCE_PHRASE[at.from]
+  return `A ${words(best.build.kind)} wants ${costPhrase({ [best.short]: wants })}; the nearest ${source} is at (${at.x}, ${at.y}).`
+}
+
+/** The road to a fed fire, opened while there is still light to walk it by. The cold is real —
+ *  warmth zero burns energy at twice the rate, which is the collapse ladder. */
+function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
+  const { x, y } = packet.self
+  if (packet.time.hour < EVENING_HOUR || packet.time.isNight) return ''
+  if (world?.nightWillBeCold?.() !== true) return ''
+  let near: PerceptionStructure | null = null
+  let bestD = Infinity
+  for (const s of packet.visible.structures) {
+    if (s.hearth !== 'cold') continue
+    const d = Math.abs(s.x - x) + Math.abs(s.y - y)
+    if (d >= bestD) continue
+    bestD = d
+    near = s
+  }
+  if (near === null) return ''
+  return `The night will be cold; the hearth in the ${words(near.kind)} at (${near.x}, ${near.y}) is cold and wants wood.`
 }
 
 /** Inside, both states; from outside only a lit one — firelight through a doorway is what eyes
@@ -399,6 +488,10 @@ export function heardProse(packet: PerceptionPacket): string {
 // Long enough to name the walls a mind keeps aiming at, short enough that a crowded square
 // does not spend the block on ground.
 const NO_FOOTING_MAX = 4
+
+// Five hours of light left, not the two that dusk is: fetching wood and walking back with it is
+// the road, and thirst proved what a road opened ten ticks before the need is worth.
+const EVENING_HOUR = 16
 
 function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
@@ -533,6 +626,8 @@ export function perceptionToProse(
       if (f !== null) lines.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
     }
   }
+
+  pushIf(lines, coldHearthLine(packet, world))
 
   lines.push(weatherLine(packet.weather, packet.time.isNight))
 

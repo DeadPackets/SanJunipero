@@ -141,6 +141,12 @@ function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockL
   })
 }
 
+/** Everything the mind was told on one turn, as one string. */
+const saidOn = (prompts: CapturedMessage[][], turn: number): string =>
+  prompts[turn]!.filter((m) => m.role === 'user')
+    .map((m) => m.text)
+    .join('\n')
+
 type CapturedMessage = { role: string; text: string }
 
 function capturingModel(responses: unknown[]): {
@@ -581,6 +587,25 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     ).toBe(true)
     // A plain physics refusal is not a craft the town can teach.
     expect(memoriesOfKind(agentDb, 'action').some((m) => m.text.includes(CRAFT_HINT))).toBe(false)
+  })
+
+  // ★ The memory row alone was never enough: it is written with no tags, so it scores zero on
+  // retrieval's heaviest term and mostly never came back. The next turn is told outright.
+  it('★ tells the NEXT turn what did not take, and tells it once', async () => {
+    const { model, prompts } = capturingModel([
+      {
+        thought: 'I will try to eat.',
+        action: { verb: 'eat', params: { itemId: 'nope' } },
+        importance: 3,
+      },
+      BENIGN_TURN,
+      BENIGN_TURN,
+    ])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 3, 120)
+    expect(saidOn(prompts, 0)).not.toContain('Last turn:')
+    expect(saidOn(prompts, 1)).toContain('Last turn: eat did not take —')
+    expect(saidOn(prompts, 2)).not.toContain('Last turn:')
   })
 
   it('runs reflection once per night, dreams, and resets the day at dawn', async () => {
@@ -1616,13 +1641,9 @@ describe("a beat spent on one's own past", () => {
     const { model, prompts } = capturingModel([RECALL_TURN, BENIGN_TURN, BENIGN_TURN])
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 90)
-    const said = (turn: number): string =>
-      prompts[turn]!.filter((m) => m.role === 'user')
-        .map((m) => m.text)
-        .join('\n')
-    expect(said(0)).not.toContain('You cast your mind back')
-    expect(said(1)).toContain('You cast your mind back to the storehouse.')
-    expect(said(2)).not.toContain('You cast your mind back')
+    expect(saidOn(prompts, 0)).not.toContain('You cast your mind back')
+    expect(saidOn(prompts, 1)).toContain('You cast your mind back to the storehouse.')
+    expect(saidOn(prompts, 2)).not.toContain('You cast your mind back')
   })
 
   it('reads its own book back, dated by the day the world counts', async () => {

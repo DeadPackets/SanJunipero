@@ -31,6 +31,9 @@ export type PromptBlocks = {
   scene: { ledgers: { name: string; doc: string }[]; memories: ScoredMemory[] } // block 4 — per scene
   dayLog: string[] // block 5 — append-only all day
   recalled: Recalled | null // only on the turn after a mind cast its mind back
+  // Only on the turn after an act the engine turned away. Absent everywhere else, so a packet
+  // built before it existed reads exactly as it always did.
+  lastOutcome?: string | null
   // block 6 — every turn. `heard` is another mouth's bytes and rides its own message, so no
   // utterance can ever read as a sentence the narrator wrote.
   now: { prose: string; heard?: string }
@@ -139,11 +142,12 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
   const recalled = blocks.recalled === null ? '' : renderRecall(blocks.recalled)
+  const lastOutcome = blocks.lastOutcome ?? ''
   const now = blocks.now.prose
   const heard = blocks.now.heard ?? ''
   // Stable before volatile — the book changes only when the mind writes in it, dayLog is
   // append-only, the scene changes every turn — so the byte prefix stays cacheable.
-  const ordered = [journal, dayLog, scene, recalled, now, heard]
+  const ordered = [journal, dayLog, scene, recalled, lastOutcome, now, heard]
   const messages = ordered
     .filter((content) => content.length > 0)
     .map((content) => ({ role: 'user' as const, content }))

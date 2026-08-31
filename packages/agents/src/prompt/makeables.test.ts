@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { craftRoutes, makeables } from '@sj/engine'
 import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
-import { makeablesLine } from './prose.js'
+import { buildRoadLine, makeablesLine } from './prose.js'
+import { quietMeadowPacket } from '../testutil/fixtures.js'
 
 // `build` and `craft` are useless without the nouns they take. The vocabulary is derived from
 // the two tables the verbs validate against, and it lives in the volatile block.
@@ -84,5 +85,65 @@ describe('the sentence a mind reads', () => {
 
   it('is deterministic — the same config says the same sentence', () => {
     expect(makeablesLine(makeables(C))).toBe(line)
+  })
+})
+
+// A cost with no place to go is a want with no road, which the want experiment measured as worse
+// than no want at all. This is the road under the list.
+describe('the road under the makeables list', () => {
+  const trees = {
+    nearestSource: (kind: string) =>
+      kind === 'wood' ? { x: 31, y: 44, from: 'tree' as const } : null,
+  }
+  const holding = (kind: string, qty: number) => ({
+    ...quietMeadowPacket,
+    self: {
+      ...quietMeadowPacket.self,
+      inventory: [{ id: 'i1', kind, qty, loc: { t: 'agent' as const, id: 'a' } }],
+    },
+  })
+
+  it('names the nearest thing to standing that the hands cannot yet raise, and where its stuff is', () => {
+    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket, trees)).toBe(
+      'A lamp post wants 2 wood; the nearest standing tree is at (31, 44).',
+    )
+  })
+
+  it('climbs to the next want as the hands fill — the road shortens, it does not repeat', () => {
+    // Six wood covers the lamp post and the bridge outright; the house is four short and so is
+    // now the nearest roof to standing.
+    expect(buildRoadLine(makeables(C).builds, holding('wood', 6), trees)).toBe(
+      'A house wants 10 wood; the nearest standing tree is at (31, 44).',
+    )
+  })
+
+  it('crosses to another material once every wooden thing is covered', () => {
+    const stone = { nearestSource: () => ({ x: 22, y: 100, from: 'stone_outcrop' as const }) }
+    expect(buildRoadLine(makeables(C).builds, holding('wood', 20), stone)).toBe(
+      'A well wants 8 stone; the nearest stone outcrop is at (22, 100).',
+    )
+  })
+
+  it('a stack somebody already put down is named for what it is, not for a source', () => {
+    const lying = { nearestSource: () => ({ x: 5, y: 6, from: 'stack' as const }) }
+    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket, lying)).toBe(
+      'A lamp post wants 2 wood; the nearest wood lying where it was left is at (5, 6).',
+    )
+  })
+
+  it('stays silent when the stuff is nowhere within reach of the eyes — a road, never a refusal', () => {
+    expect(
+      buildRoadLine(makeables(C).builds, quietMeadowPacket, { nearestSource: () => null }),
+    ).toBe('')
+  })
+
+  it('stays silent with no world to ask, so a packet from before it reads as it always did', () => {
+    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket)).toBe('')
+  })
+
+  it('is world text: no machinery word survives the human-framing law', () => {
+    expect(
+      FORBIDDEN_FRAMING.test(buildRoadLine(makeables(C).builds, quietMeadowPacket, trees)),
+    ).toBe(false)
   })
 })

@@ -1,4 +1,10 @@
-import { dayPhaseFromTick, isHearthKind, simTimeFromTick, type SimConfig } from '@sj/shared'
+import {
+  dayPhaseFromTick,
+  isHearthKind,
+  simTimeFromTick,
+  type DayPhase,
+  type SimConfig,
+} from '@sj/shared'
 import type { WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
 import { awakeEnergyDecay, warmthTargetFromAir } from './needs.js'
@@ -12,11 +18,15 @@ export function isHeatSource(config: SimConfig, kind: string): boolean {
   return isHearthKind(config, kind)
 }
 
-// The one derivation of what the air is doing.
-export function ambientTempAt(state: WorldState, config: SimConfig): number {
+// The one derivation of what the air is doing. `phase` names an hour the world has not reached
+// yet, which is how a body can be told about the cold before it is standing in it.
+export function ambientTempAt(
+  state: WorldState,
+  config: SimConfig,
+  phase: DayPhase = dayPhaseFromTick(state.tick),
+): number {
   const band = config.warmth.ambient[simTimeFromTick(state.tick).season]
   const sky = config.warmth.weatherDelta as Record<string, number | undefined>
-  const phase = dayPhaseFromTick(state.tick)
   return band[phase === 'dawn' ? 'dusk' : phase] + (sky[state.weather.kind] ?? 0)
 }
 

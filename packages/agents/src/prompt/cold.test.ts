@@ -9,8 +9,14 @@ import {
   type TickLoop,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, scanForDirective } from '@sj/shared'
-import { FLAT_WORLD, wireTown } from '../testutil/fixtures.js'
+import {
+  DAYS_PER_SEASON,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  scanForDirective,
+  simTimeFromTick,
+} from '@sj/shared'
+import { FLAT_WORLD, quietMeadowPacket, wireTown } from '../testutil/fixtures.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
 
@@ -220,5 +226,80 @@ describe('food that is turning', () => {
     const carried = packet.self.inventory.find((i) => i.id === 'item_fresh_fish')
     expect(carried?.spoiling).toBe(true)
     expect(proseFor(bridge, 'amara')).toContain('1 fish (item_fresh_fish); it is turning')
+  })
+})
+
+// The cold is real: warmth zero burns energy at twice the rate, and that is the collapse ladder.
+// It was never illegible either — what it lacked was a road opened while there was still light.
+describe('the road to a fed fire, opened before the light goes', () => {
+  const evening = (hour: number, hearth?: 'lit' | 'cold'): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    time: simTimeFromTick(hour * 60),
+    visible: {
+      ...quietMeadowPacket.visible,
+      structures:
+        hearth === undefined
+          ? []
+          : [
+              {
+                id: 'structure_fire_pit_12_11',
+                kind: 'fire_pit',
+                x: 12,
+                y: 11,
+                w: 1,
+                h: 1,
+                burning: false,
+                stage: 'complete' as const,
+                hearth,
+              },
+            ],
+    },
+  })
+  const coldNight = { ...FLAT_WORLD, nightWillBeCold: () => true }
+  const LINE =
+    'The night will be cold; the hearth in the fire pit at (12, 11) is cold and wants wood.'
+
+  it('names the unlit fire and where it stands, hours before the cold arrives', () => {
+    expect(perceptionToProse(evening(17, 'cold'), () => {}, coldNight)).toContain(LINE)
+  })
+
+  it('says nothing at noon: a road opened all day is a sentence nobody reads', () => {
+    expect(perceptionToProse(evening(12, 'cold'), () => {}, coldNight)).not.toContain(LINE)
+  })
+
+  it('says nothing about a fire somebody is already feeding', () => {
+    expect(perceptionToProse(evening(17, 'lit'), () => {}, coldNight)).not.toContain('wants wood')
+  })
+
+  it('says nothing when no hearth is in sight — a want with no road is not spoken', () => {
+    expect(perceptionToProse(evening(17), () => {}, coldNight)).not.toContain('wants wood')
+  })
+
+  it('says nothing on a night the cold never gets into', () => {
+    expect(
+      perceptionToProse(evening(17, 'cold'), () => {}, {
+        ...FLAT_WORLD,
+        nightWillBeCold: () => false,
+      }),
+    ).not.toContain('wants wood')
+  })
+
+  it('is silent for a world that cannot answer, so an older packet reads as it always did', () => {
+    expect(perceptionToProse(evening(17, 'cold'), () => {}, FLAT_WORLD)).not.toContain('wants wood')
+  })
+
+  it("names no act and gives no counsel — the inference stays the mind's", () => {
+    expect(scanForDirective(LINE)).toEqual([])
+  })
+
+  it('the bridge prices the coming night off the season band the body will actually lose to', () => {
+    // Spring nights sit at 5 against a comfort band of 8; summer nights at 15 and never bite.
+    const asked = (startTick: number): boolean => {
+      const { bridge, loop } = town(startTick)
+      loop.step()
+      return bridge.nightWillBeCold('amara')
+    }
+    expect(asked(17 * 60)).toBe(true)
+    expect(asked(DAYS_PER_SEASON * MINUTES_PER_DAY + 17 * 60)).toBe(false)
   })
 })

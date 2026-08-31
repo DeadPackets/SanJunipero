@@ -7,7 +7,9 @@ import { appendMoment, assemblePrompt, compactDayLog, JOURNAL_LINES } from '../p
 import {
   heardProse,
   makeablesLine,
+  buildRoadLine,
   perceptionToProse,
+  type ProseWorld,
   standingWallsLine,
   worldDay,
   type PerceptionPacket,
@@ -96,11 +98,24 @@ function isBodyNoOp(reason: string, verb: string): boolean {
 
 export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
 
+// Whether the reason can be said out loud at all. Asked once, so the memory and the next turn
+// cannot drift apart the day the pattern changes.
+const sayable = (reason: string): string => (MACHINE_REASON.test(reason) ? OPAQUE_REFUSAL : reason)
+
 export function refusalMemoryText(reason: string, impossibleClass?: string): string {
-  if (MACHINE_REASON.test(reason)) return `You realize you cannot: ${OPAQUE_REFUSAL}`
-  const hint = impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
-  return `You realize you cannot: ${reason}${hint}`
+  const said = sayable(reason)
+  const hint = said === reason && impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
+  return `You realize you cannot: ${said}${hint}`
 }
+
+/** The same refusal, said to the next turn instead of only to the memory store. A reason that
+ *  reached a memory row had to win retrieval to be seen, and mostly did not (rehearsal4 K20). */
+export function lastTurnLine(what: string, reason: string): string {
+  return `Last turn: ${what} did not take — ${sayable(reason)}.`
+}
+
+// A freeform intent has no verb to name, only the words the mind used.
+export const TRIED_FREEFORM = 'what you tried'
 
 // The second ask inside the window is answered from the mind's own history, not from the god.
 // It names the repetition and nothing else: a mind's own past is not a hint.
@@ -159,6 +174,8 @@ export type RuntimeSnapshot = {
   pendingDreamMood: string | null
   // Optional so a checkpoint written before the recall verb existed still resumes.
   pendingRecall?: Recalled | null | undefined
+  // The same, for the refusal owed to the next turn.
+  lastOutcome?: string | null | undefined
 }
 
 function freshClock(): MindClock {
@@ -209,6 +226,7 @@ export class AgentRuntime {
   #reflectionInFlight = false
   #pendingDreamMood: string | null = null
   #pendingRecall: Recalled | null = null
+  #lastOutcome: string | null = null
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -256,6 +274,7 @@ export class AgentRuntime {
     this.#reflectedNight = null
     this.#pendingDreamMood = null
     this.#pendingRecall = null
+    this.#lastOutcome = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     this.#started = true
     if (this.#offTick === null) {
@@ -282,6 +301,7 @@ export class AgentRuntime {
       wasNight: this.#wasNight,
       pendingDreamMood: this.#pendingDreamMood,
       pendingRecall: this.#pendingRecall,
+      lastOutcome: this.#lastOutcome,
     }
   }
 
@@ -299,6 +319,7 @@ export class AgentRuntime {
     this.#wasNight = s.wasNight
     this.#pendingDreamMood = s.pendingDreamMood
     this.#pendingRecall = s.pendingRecall ?? null
+    this.#lastOutcome = s.lastOutcome ?? null
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -424,9 +445,7 @@ export class AgentRuntime {
           )
           return
         }
-        void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(
-          this.#sink('memory_write_failed'),
-        )
+        this.#recordRefusal(intent.verb, res.reason)
       })
       .then(() => undefined)
   }
@@ -472,6 +491,7 @@ export class AgentRuntime {
       return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
     if (verdict.kind === 'impossible') {
       this.#rememberRefusal(description)
+      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
@@ -515,7 +535,14 @@ export class AgentRuntime {
       )
       return
     }
-    void this.#writeActionMemory(refusalMemoryText(res.reason)).catch(
+    this.#recordRefusal(head.verb, res.reason)
+  }
+
+  // Every refusal goes both ways at once: into the mind's own history, and into the very next
+  // turn. A row alone is written with no tags and mostly never wins retrieval back.
+  #recordRefusal(what: string, reason: string, impossibleClass?: string): void {
+    this.#lastOutcome = lastTurnLine(what, reason)
+    void this.#writeActionMemory(refusalMemoryText(reason, impossibleClass)).catch(
       this.#sink('memory_write_failed'),
     )
   }
@@ -559,18 +586,23 @@ export class AgentRuntime {
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
 
+    // `Required` on purpose: a road the prose reads and the runtime forgets to wire is a
+    // sentence no mind ever sees, and it fails as silence rather than as an error.
+    const world: Required<ProseWorld> = {
+      isWalkable: (x: number, y: number) => this.#bridge.isWalkable(x, y),
+      isEdible: (kind: string) => this.#bridge.isEdible(kind),
+      waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
+      nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
+      nearestFood: (x: number, y: number) => this.#bridge.nearestFood(x, y),
+      nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
+      nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
+    }
     const prose = perceptionToProse(
       packet,
       (detail) => {
         this.#llm.alert('prose', detail)
       },
-      {
-        isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
-        isEdible: (kind) => this.#bridge.isEdible(kind),
-        waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
-        nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
-        nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
-      },
+      world,
     )
     // The prompt keeps another mouth's bytes out of the narrator's block; this mind's own
     // memory still holds the whole moment.
@@ -579,9 +611,11 @@ export class AgentRuntime {
     this.#prevMomentSentences = appendMoment(this.#dayLog, this.#prevMomentSentences, moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
+    const canMake = this.#bridge.makeables()
     const nowProse = [
       prose,
-      makeablesLine(this.#bridge.makeables(), this.#bridge.groundForBuilding()),
+      makeablesLine(canMake, this.#bridge.groundForBuilding()),
+      buildRoadLine(canMake.builds, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
     ]
       .filter((p) => p.length > 0)
@@ -619,6 +653,7 @@ export class AgentRuntime {
       scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
       dayLog: this.#dayLog,
       recalled: this.#pendingRecall,
+      lastOutcome: this.#lastOutcome,
       now: { prose: nowProse, heard },
     }
     let assembled = assemblePrompt(blocks)
@@ -668,8 +703,10 @@ export class AgentRuntime {
       acted: (turn.action ?? null) !== null,
       spoke: !isBlankAnswer(turn.speech),
     })
-    // Read once: a cast back that has been answered is not answered again next turn.
+    // Read once: a cast back that has been answered is not answered again next turn, and a
+    // refusal the mind has now been told about is not told twice.
     this.#pendingRecall = null
+    this.#lastOutcome = null
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
