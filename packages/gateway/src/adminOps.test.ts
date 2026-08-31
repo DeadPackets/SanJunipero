@@ -103,6 +103,7 @@ beforeAll(async () => {
   ops = {
     opsDb: ledger,
     caps: { dailyUsd: 3, lifetimeUsd: 50 },
+    alert: () => {},
     rulings: {
       pending: () => pending,
       approve: (ruleId) => {

@@ -237,40 +237,6 @@ describe('parseTurnWithRepair', () => {
     expect(repair).toHaveBeenCalledTimes(1)
     expect(alert).toHaveBeenCalledWith('empty_act_detail', expect.stringContaining('eat'))
   })
-
-  it('reads the one mark it named under the word the act does not use', async () => {
-    const raw = {
-      ...validTurn,
-      plan: null,
-      action: { verb: 'eat', params: { targetId: 'item_b1' } },
-    }
-    const repair = vi.fn()
-    const alert = vi.fn()
-    const turn = await parseTurnWithRepair(raw, repair, alert)
-    expect(turn.action).toEqual({ verb: 'eat', params: { itemId: 'item_b1' } })
-    expect(repair).not.toHaveBeenCalled()
-  })
-
-  it('reads the marks a plan named under the wrong word too', async () => {
-    const raw = {
-      ...validTurn,
-      action: null,
-      plan: [{ verb: 'enter', params: { itemId: 'house_4' } }],
-    }
-    const turn = await parseTurnWithRepair(raw, vi.fn(), vi.fn())
-    expect(turn.plan).toEqual([{ verb: 'enter', params: { structureId: 'house_4' } }])
-  })
-
-  it.each([
-    ['two marks are a guess, not a choice', 'eat', { targetId: 'omar', structureId: 'house_4' }],
-    ['the act already named its own object', 'eat', { itemId: 'item_b1' }],
-    ['the act asks for more than one mark', 'give', { itemId: 'item_b1' }],
-    ['words are never read as a mark', 'eat', { text: 'the bread' }],
-  ])('leaves the act as it came when %s', async (_why, verb, params) => {
-    const raw = { ...validTurn, plan: null, action: { verb, params } }
-    const turn = await parseTurnWithRepair(raw, vi.fn(), vi.fn())
-    expect(turn.action).toEqual({ verb, params })
-  })
 })
 
 describe('reconsiderTick on an absolute day and phase', () => {

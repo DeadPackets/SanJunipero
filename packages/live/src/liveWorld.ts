@@ -442,6 +442,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     opsDb,
     caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
     rulings: arbiterDb === null ? null : new ReviewStore(arbiterDb),
+    alert: (kind, detail) => {
+      insertAlert(opsDb, { agentId: null, kind, detail })
+    },
   }
 
   return {

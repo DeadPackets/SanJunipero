@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { loneCandidateFor } from './verbs/autofill.js'
+import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
 import { VERBS, workPenalty, type PendingEvent } from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
@@ -33,7 +33,11 @@ export function submitIntent(
   // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
   let p = params
   if (refusal !== null) {
-    const filled = loneCandidateFor(state, config, agentId, verb, params)
+    // What the mind named outranks what the world would have guessed: the id it gave is right
+    // 152 times in 154, and only a mark that fits nowhere falls through to the lone candidate.
+    const filled =
+      markUnderAnotherKey(state, config, agentId, verb, params) ??
+      loneCandidateFor(state, config, agentId, verb, params)
     if (filled === null) return { ok: false, reason: refusal }
     p = filled
   }

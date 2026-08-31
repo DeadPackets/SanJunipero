@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
-import { loneCandidateFor } from './verbs/autofill.js'
+import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1
@@ -84,6 +84,44 @@ describe('loneCandidateFor', () => {
   })
 })
 
+const rekey = (s: WorldState, verb: string, params: Record<string, unknown>) =>
+  markUnderAnotherKey(s, DEFAULT_CONFIG, 'a1', verb, params)
+
+describe('markUnderAnotherKey', () => {
+  it('reads the mark the act named under a word the verb does not use', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(rekey(s, 'eat', { targetId: 'item_bread_1' })).toEqual({ itemId: 'item_bread_1' })
+  })
+
+  it('reads a building named under the wrong word too, not only a held thing', () => {
+    const s = withHouse(withAgent(world(), 2, 3), 'structure_1', 2)
+    expect(rekey(s, 'enter', { itemId: 'structure_1' })).toEqual({ structureId: 'structure_1' })
+  })
+
+  it('does not guess when two marks are named', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(rekey(s, 'eat', { targetId: 'item_bread_1', nodeId: 'item_bread_1' })).toBeNull()
+  })
+
+  it('leaves an act that named its own object, and one that named nothing', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(rekey(s, 'eat', { itemId: 'item_bread_1' })).toBeNull()
+    expect(rekey(s, 'eat', {})).toBeNull()
+  })
+
+  it('never reads words or numbers as a mark', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(rekey(s, 'eat', { text: 'item_bread_1' })).toBeNull()
+    expect(rekey(s, 'walk', { x: 1 })).toBeNull()
+  })
+
+  it('leaves a mark that fits nowhere, so the world still refuses it', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(rekey(s, 'eat', { targetId: 'item_nothing' })).toBeNull()
+    expect(rekey(s, 'sneeze', { targetId: 'item_bread_1' })).toBeNull()
+  })
+})
+
 describe('submitIntent', () => {
   it('starts the filled act as if the mind had named the loaf', () => {
     const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
@@ -112,6 +150,20 @@ describe('submitIntent', () => {
     // At the bank the paramless act is already good, so nothing is read into it.
     const bank = holding(withAgent(world(['.~......', '........']), 1, 1), 'i2', 'waterskin', 1)
     expect(started(bank)!.params).toEqual({})
+  })
+
+  it('starts the act on the mark it named, whatever word it arrived under', () => {
+    let s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    s = holding(s, 'item_fish_2', 'fish')
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', { targetId: 'item_fish_2' })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    // Two edibles, so nothing could have been read in: only the mind's own naming got this act
+    // started, and it got the fish it asked for rather than the loaf.
+    expect(r.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      verb: 'eat',
+      params: { itemId: 'item_fish_2' },
+    })
   })
 
   it('still refuses an act the world cannot read one way', () => {

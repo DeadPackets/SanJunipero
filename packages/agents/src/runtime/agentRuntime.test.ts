@@ -48,6 +48,15 @@ const AGENT = 'tamar'
 const BREAD_ID = 'item_1'
 const STRUCTURE_ID = 'structure_1'
 const DAWN_TICK = 360 // 06:00 of day 0
+// Night 0 runs from dusk of day 0 to dawn of day 1. Ticks 0..359 are the pre-dawn of day 0 —
+// night -1, a night nobody lived — so a fresh town must not reflect there.
+const NIGHT_0_TICK = 1350
+const DAY_1_DAWN_TICK = 1440 + DAWN_TICK
+const SLOW_BODY = SimConfigSchema.parse({
+  needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+  structures: { sleepIndoorsOnly: false },
+  warmth: { enabled: false },
+})
 
 const BENIGN_TURN = { thought: 'I rest.', importance: 1 }
 
@@ -577,21 +586,22 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   it('runs reflection once per night, dreams, and resets the day at dawn', async () => {
     const reflection = new ScriptedReflectionLlm()
     const dream = new ScriptedDreamLlm()
-    const { loop, runtime, mem, personality, agentDb } = await setup({
-      model: turnModel([
-        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
-      ]),
-      mindConfig: { ...FAST_MIND, dreamChance: 1 },
+    const { loop, runtime, mem, personality, agentDb, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000, dreamChance: 1 },
       reflectionLlm: reflection,
       dreamLlm: dream,
+      simConfig: SLOW_BODY,
     })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
     await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 100)
     expect(runtime.stats().reflections).toBe(1)
     expect(dream.calls).toBe(1)
     expect(memoriesOfKind(agentDb, 'dream').length).toBe(1)
     expect(runtime.dayLogSnapshot().length).toBeGreaterThanOrEqual(1)
 
-    await stepUntil(loop, () => loop.tick >= DAWN_TICK, 2000)
+    await stepUntil(loop, () => loop.tick >= DAY_1_DAWN_TICK, 2000)
     expect(runtime.stats().reflections).toBe(1)
     expect(personality.current().doc.current.mood).toBe('peaceful')
     // The dawn reset drops yesterday's log; the morning wake may already have
@@ -599,18 +609,37 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.dayLogSnapshot().length).toBeLessThanOrEqual(1)
   })
 
+  // Every archived run edited its founders' authored personalities minutes after boot, over a
+  // day log of one line, because the clamp folded night -1 onto night 0.
+  it('does not reflect on the pre-dawn of a fresh world, which is a night nobody lived', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem, personality, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => loop.tick >= DAWN_TICK, 2000)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+    expect(runtime.stats().reflections).toBe(0)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(0)
+    expect(personality.current().version).toBe(1)
+  })
+
   it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
     const reflection = new ScriptedReflectionLlm()
     const dream = new ScriptedDreamLlm()
     dream.composeDream = () => Promise.reject(new Error('the dream is over budget'))
-    const { loop, mem, agentDb } = await setup({
-      model: turnModel([
-        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
-      ]),
-      mindConfig: { ...FAST_MIND, dreamChance: 1 },
+    const { loop, mem, agentDb, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000, dreamChance: 1 },
       reflectionLlm: reflection,
       dreamLlm: dream,
+      simConfig: SLOW_BODY,
     })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
     await stepUntil(loop, () => alertKinds(agentDb).includes('dream_failed'), 100)
 
     expect(alertKinds(agentDb)).not.toContain('reflection_failed')
@@ -721,13 +750,14 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       }
     }
     const reflection = new GatedReflectionLlm()
-    const { loop, runtime, mem } = await setup({
-      model: turnModel([
-        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
-      ]),
-      mindConfig: FAST_MIND,
+    const { loop, runtime, mem, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
       reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
     })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
     await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
     expect(runtime.reflectionInFlight()).toBe(true)
     expect(mem.summaryNodes('day', 0)).toHaveLength(0)

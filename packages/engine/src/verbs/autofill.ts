@@ -23,6 +23,32 @@ function isBlank(raw: unknown): boolean {
   return raw === null || raw === undefined || (typeof raw === 'string' && raw.trim().length === 0)
 }
 
+// Words that name a mark. Prose and numbers are never re-read as one: a sentence moved into an
+// id would name nothing, and would cost the act its blank-object reading below as well.
+const MARK_KEYS = ['itemId', 'structureId', 'targetId', 'cropId', 'nodeId', 'faunaId']
+
+/** The one mark this act named, moved to the word the verb actually reads (K20). The verb's own
+ *  validate is the judge, so no table here has to know what each act asks for; a mark that fits
+ *  nowhere is left where it was. */
+export function markUnderAnotherKey(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const def = VERBS[verb]
+  if (def === undefined) return null
+  const named = MARK_KEYS.filter((k) => !isBlank(params[k]))
+  const from = named[0]
+  if (from === undefined || named.length !== 1) return null
+  const { [from]: mark, ...rest } = params
+  const fits = MARK_KEYS.filter((k) => k !== from)
+    .map((k) => ({ ...rest, [k]: mark }))
+    .filter((p) => def.validate(state, config, agentId, p) === null)
+  return fits.length === 1 ? fits[0]! : null
+}
+
 /** The params this act would have carried had it named its object, or null when the world does
  *  not answer with exactly one thing. Only ever asked of an act the world has already refused,
  *  which is what keeps `drink` at a riverbank from reaching for the skin instead. */

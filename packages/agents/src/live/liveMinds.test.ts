@@ -93,6 +93,10 @@ function scriptedModel(): MockLanguageModelV4 {
   })
 }
 
+// Dusk of day 0. A world booted in the pre-dawn is in night -1, which nobody lived and no mind
+// reflects over, so the night these rows are about would never come.
+const DUSK_DAY_0 = 1200
+
 function buildWorld() {
   const config = SimConfigSchema.parse({
     needs: { hungerDecayPerTick: 0.5 },
@@ -122,6 +126,7 @@ function buildWorld() {
     state,
     rng,
     config,
+    startTick: DUSK_DAY_0,
     onTick: (ctx) => {
       handler(ctx)
     },
