@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { craftRoutes, makeables } from '@sj/engine'
 import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
-import { buildRoadLine, makeablesLine } from './prose.js'
+import {
+  makeablesLine,
+  roadLine,
+  type PerceptionPacket,
+  type ProseWorld,
+  type SourceKind,
+} from './prose.js'
 import { quietMeadowPacket } from '../testutil/fixtures.js'
 
 // `build` and `craft` are useless without the nouns they take. The vocabulary is derived from
@@ -89,61 +95,120 @@ describe('the sentence a mind reads', () => {
 })
 
 // A cost with no place to go is a want with no road, which the want experiment measured as worse
-// than no want at all. This is the road under the list.
+// than no want at all. This is the road under the list — roofs and pots ranked together.
 describe('the road under the makeables list', () => {
-  const trees = {
-    nearestSource: (kind: string) =>
-      kind === 'wood' ? { x: 31, y: 44, from: 'tree' as const } : null,
+  const at = (from: SourceKind, x: number, y: number) => () => ({ x, y, from })
+  const trees: ProseWorld = {
+    nearestSource: (kind) => (kind === 'wood' ? { x: 31, y: 44, from: 'tree' } : null),
   }
-  const holding = (kind: string, qty: number) => ({
+  const holding = (...carried: { kind: string; qty: number }[]): PerceptionPacket => ({
     ...quietMeadowPacket,
     self: {
       ...quietMeadowPacket.self,
-      inventory: [{ id: 'i1', kind, qty, loc: { t: 'agent' as const, id: 'a' } }],
+      inventory: carried.map((c, n) => ({
+        id: `i${n}`,
+        ...c,
+        loc: { t: 'agent' as const, id: 'a' },
+      })),
     },
   })
+  const road = (packet: PerceptionPacket, world: ProseWorld): string =>
+    roadLine(makeables(C), packet, world)
 
-  it('names the nearest thing to standing that the hands cannot yet raise, and where its stuff is', () => {
-    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket, trees)).toBe(
-      'A lamp post wants 2 wood; the nearest standing tree is at (31, 44).',
+  // Everything cheaper than a pot of stew, so stew is the only thing left wanting.
+  const larderFull = [
+    { kind: 'wood', qty: 20 },
+    { kind: 'fiber', qty: 2 },
+    { kind: 'cloth', qty: 2 },
+    { kind: 'stone', qty: 8 },
+  ]
+  const wet: ProseWorld = { nearestSource: () => null, nearestWater: () => ({ x: 34, y: 35 }) }
+
+  it('★ ranks roofs and pots in one list: the cheapest thing overall is a plank, not a post', () => {
+    expect(road(quietMeadowPacket, trees)).toBe(
+      'Plank wants 1 wood; the nearest standing tree is at (31, 44).',
     )
   })
 
-  it('climbs to the next want as the hands fill — the road shortens, it does not repeat', () => {
-    // Six wood covers the lamp post and the bridge outright; the house is four short and so is
-    // now the nearest roof to standing.
-    expect(buildRoadLine(makeables(C).builds, holding('wood', 6), trees)).toBe(
-      'A house wants 10 wood; the nearest standing tree is at (31, 44).',
+  it('★ a roof outranks a pot when the two are equally short, and the order never wobbles', () => {
+    // One wood covers the plank. A lamp post and a torch are both one thing short; builds run
+    // first and the comparison is strict, so the post wins and wins again every turn.
+    const line = road(holding({ kind: 'wood', qty: 1 }), trees)
+    expect(line).toBe('A lamp post wants 2 wood; the nearest standing tree is at (31, 44).')
+    expect(road(holding({ kind: 'wood', qty: 1 }), trees)).toBe(line)
+  })
+
+  it('climbs to the next want as the hands fill, and says nothing about a place it cannot see', () => {
+    // Six wood covers every wooden thing this cheap; the torch is one fiber short, and this
+    // world only knows where wood is.
+    expect(road(holding({ kind: 'wood', qty: 6 }), trees)).toBe('Torch wants 1 fiber.')
+  })
+
+  it('★ takes the route with fewest things missing, not the first one listed', () => {
+    // A garment is two cloth or two hide. One hide in hand makes the hide road the shorter one.
+    const line = road(
+      holding({ kind: 'wood', qty: 20 }, { kind: 'fiber', qty: 2 }, { kind: 'hide', qty: 1 }),
+      {
+        nearestSource: at('stack', 9, 9),
+      },
+    )
+    expect(line).toBe(
+      'Garment wants 2 hide; the nearest hide lying where it was left is at (9, 9).',
     )
   })
 
-  it('crosses to another material once every wooden thing is covered', () => {
-    const stone = { nearestSource: () => ({ x: 22, y: 100, from: 'stone_outcrop' as const }) }
-    expect(buildRoadLine(makeables(C).builds, holding('wood', 20), stone)).toBe(
-      'A well wants 8 stone; the nearest stone outcrop is at (22, 100).',
+  it('★ counts a class input as one thing, and any member of it answers', () => {
+    // Nothing meaty in hand: the pot asks for meat by its class name, not for a fish by name.
+    expect(road(holding(...larderFull, { kind: 'berries', qty: 1 }), wet)).toBe(
+      'Stew wants 1 meat.',
+    )
+    // A fish IS meat, so that want closes and the fire is the next thing short.
+    expect(
+      road(holding(...larderFull, { kind: 'berries', qty: 1 }, { kind: 'fish', qty: 1 }), wet),
+    ).toBe('Stew wants a fire someone is feeding.')
+  })
+
+  it('★ a condition names where it can be met, so it is a road and not just a lack', () => {
+    const packet = holding(...larderFull, { kind: 'berries', qty: 1 }, { kind: 'fish', qty: 1 })
+    const byTheFire: PerceptionPacket = {
+      ...packet,
+      visible: {
+        ...packet.visible,
+        structures: [
+          {
+            id: 'structure_house_5_4',
+            kind: 'house',
+            x: 5,
+            y: 4,
+            w: 2,
+            h: 2,
+            burning: false,
+            stage: 'complete',
+            hearth: 'lit',
+          },
+        ],
+      },
+    }
+    expect(road(byTheFire, wet)).toBe(
+      'Stew wants water in something you carry; the nearest water lies at (34, 35).',
     )
   })
 
   it('a stack somebody already put down is named for what it is, not for a source', () => {
-    const lying = { nearestSource: () => ({ x: 5, y: 6, from: 'stack' as const }) }
-    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket, lying)).toBe(
-      'A lamp post wants 2 wood; the nearest wood lying where it was left is at (5, 6).',
+    expect(road(quietMeadowPacket, { nearestSource: at('stack', 5, 6) })).toBe(
+      'Plank wants 1 wood; the nearest wood lying where it was left is at (5, 6).',
     )
   })
 
-  it('stays silent when the stuff is nowhere within reach of the eyes — a road, never a refusal', () => {
-    expect(
-      buildRoadLine(makeables(C).builds, quietMeadowPacket, { nearestSource: () => null }),
-    ).toBe('')
+  it('still names the want when nothing in sight answers it — a road, never a refusal', () => {
+    expect(road(quietMeadowPacket, { nearestSource: () => null })).toBe('Plank wants 1 wood.')
   })
 
   it('stays silent with no world to ask, so a packet from before it reads as it always did', () => {
-    expect(buildRoadLine(makeables(C).builds, quietMeadowPacket)).toBe('')
+    expect(roadLine(makeables(C), quietMeadowPacket)).toBe('')
   })
 
   it('is world text: no machinery word survives the human-framing law', () => {
-    expect(
-      FORBIDDEN_FRAMING.test(buildRoadLine(makeables(C).builds, quietMeadowPacket, trees)),
-    ).toBe(false)
+    expect(FORBIDDEN_FRAMING.test(road(quietMeadowPacket, trees))).toBe(false)
   })
 })

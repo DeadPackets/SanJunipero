@@ -367,3 +367,38 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
     expect(seen('cabin')?.bed).toBeUndefined()
   })
 })
+
+// Feeding a fire may never put it out sooner. Both formulas the verb uses happen to rise with
+// the tick, so no live log holds a shortening row — the guard belongs on the field regardless.
+describe('a fed fire never burns for less time than it already had', () => {
+  const T = WINTER_NIGHT
+
+  it('keeps the longer burn when a shorter one is folded over it', () => {
+    let s = houseAndBody(T)
+    s = fold(s, ev('structure_fueled', { structureId: 'house_1', burnsUntilTick: T + 100 }, T), CFG)
+    expect(s.structures.house_1!.fueledUntilTick).toBe(T + 100)
+    s = fold(s, ev('structure_fueled', { structureId: 'house_1', burnsUntilTick: T + 50 }, T), CFG)
+    expect(s.structures.house_1!.fueledUntilTick).toBe(T + 100)
+  })
+
+  it('still takes the longer burn when the new one reaches further', () => {
+    let s = houseAndBody(T)
+    s = fold(s, ev('structure_fueled', { structureId: 'house_1', burnsUntilTick: T + 50 }, T), CFG)
+    s = fold(s, ev('structure_fueled', { structureId: 'house_1', burnsUntilTick: T + 300 }, T), CFG)
+    expect(s.structures.house_1!.fueledUntilTick).toBe(T + 300)
+  })
+
+  // An armful is a window from when you feed it, not a bank you pay into: a roofed fire stoked
+  // twice in an hour is lit for one armful from the second feed, never two stacked end to end.
+  it('the verb itself is monotonic, so the guard changes no stoke a mind can make', () => {
+    let s = indoors(holding(holding(houseAndBody(T), 'w1', 'wood'), 'w2', 'wood'))
+    s = apply(s, 'stoke', { structureId: 'house_1' })
+    const first = s.structures.house_1!.fueledUntilTick!
+    expect(first).toBe(T + FUEL)
+
+    // An hour on, with the first armful still burning: the window moves with the feeding.
+    s = fold(s, ev('tick_advanced', {}, T + 60), CFG)
+    s = apply(s, 'stoke', { structureId: 'house_1' })
+    expect(s.structures.house_1!.fueledUntilTick).toBe(first + 60)
+  })
+})

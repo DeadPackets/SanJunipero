@@ -17,8 +17,9 @@ import {
   simTimeFromTick,
 } from '@sj/shared'
 import { FLAT_WORLD, quietMeadowPacket, wireTown } from '../testutil/fixtures.js'
+import { makeables } from '@sj/engine'
 import type { EngineBridge } from '../runtime/bridge.js'
-import { perceptionToProse, type PerceptionPacket } from './prose.js'
+import { perceptionToProse, roadLine, type PerceptionPacket, type ProseWorld } from './prose.js'
 
 // A roof is worth the whole of a body's warmth (57.4 -> 0.0 under the sky by midnight, 38.4 held
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
@@ -232,9 +233,21 @@ describe('food that is turning', () => {
 // The cold is real: warmth zero burns energy at twice the rate, and that is the collapse ladder.
 // It was never illegible either — what it lacked was a road opened while there was still light.
 describe('the road to a fed fire, opened before the light goes', () => {
-  const evening = (hour: number, hearth?: 'lit' | 'cold'): PerceptionPacket => ({
+  const evening = (
+    hour: number,
+    hearth?: 'lit' | 'cold',
+    carried: { kind: string; qty: number }[] = [],
+  ): PerceptionPacket => ({
     ...quietMeadowPacket,
     time: simTimeFromTick(hour * 60),
+    self: {
+      ...quietMeadowPacket.self,
+      inventory: carried.map((c, n) => ({
+        id: `i${n}`,
+        ...c,
+        loc: { t: 'agent' as const, id: 'a' },
+      })),
+    },
     visible: {
       ...quietMeadowPacket.visible,
       structures:
@@ -255,41 +268,73 @@ describe('the road to a fed fire, opened before the light goes', () => {
             ],
     },
   })
-  const coldNight = { ...FLAT_WORLD, nightWillBeCold: () => true }
-  const LINE =
+  const coldNight: ProseWorld = {
+    ...FLAT_WORLD,
+    nightWillBeCold: () => true,
+    nearestSource: (kind) => (kind === 'wood' ? { x: 31, y: 44, from: 'tree' } : null),
+  }
+  const NEEDS_WOOD =
     'The night will be cold; the hearth in the fire pit at (12, 11) is cold and wants wood.'
+  const cold = (packet: PerceptionPacket, world = coldNight): string =>
+    roadLine(makeables(CFG), packet, world)
 
-  it('names the unlit fire and where it stands, hours before the cold arrives', () => {
-    expect(perceptionToProse(evening(17, 'cold'), () => {}, coldNight)).toContain(LINE)
+  it('names the unlit fire, and where the wood for it stands', () => {
+    expect(cold(evening(17, 'cold'))).toBe(
+      `${NEEDS_WOOD} The nearest standing tree is at (31, 44).`,
+    )
+  })
+
+  it('sends nobody to a tree who is already carrying the wood', () => {
+    expect(cold(evening(17, 'cold', [{ kind: 'wood', qty: 3 }]))).toBe(NEEDS_WOOD)
+  })
+
+  it('names the fire alone when no wood is anywhere in sight', () => {
+    // Both a world that cannot be asked and one that answers nothing leave the fire named.
+    expect(cold(evening(17, 'cold'), { ...FLAT_WORLD, nightWillBeCold: () => true })).toBe(
+      NEEDS_WOOD,
+    )
+    expect(
+      cold(evening(17, 'cold'), {
+        ...FLAT_WORLD,
+        nightWillBeCold: () => true,
+        nearestSource: () => null,
+      }),
+    ).toBe(NEEDS_WOOD)
+  })
+
+  it('★ the cold outranks a project: only one road is spoken, and survival takes it', () => {
+    // The same packet with no cold night to answer falls through to the makeables road.
+    const warm: ProseWorld = { ...coldNight, nightWillBeCold: () => false }
+    expect(cold(evening(17, 'cold'))).toContain('The night will be cold')
+    expect(cold(evening(17, 'cold'), warm)).toBe(
+      'Plank wants 1 wood; the nearest standing tree is at (31, 44).',
+    )
   })
 
   it('says nothing at noon: a road opened all day is a sentence nobody reads', () => {
-    expect(perceptionToProse(evening(12, 'cold'), () => {}, coldNight)).not.toContain(LINE)
+    expect(cold(evening(12, 'cold'))).not.toContain('The night will be cold')
   })
 
   it('says nothing about a fire somebody is already feeding', () => {
-    expect(perceptionToProse(evening(17, 'lit'), () => {}, coldNight)).not.toContain('wants wood')
+    expect(cold(evening(17, 'lit'))).not.toContain('wants wood')
   })
 
   it('says nothing when no hearth is in sight — a want with no road is not spoken', () => {
-    expect(perceptionToProse(evening(17), () => {}, coldNight)).not.toContain('wants wood')
+    expect(cold(evening(17))).not.toContain('The night will be cold')
   })
 
   it('says nothing on a night the cold never gets into', () => {
-    expect(
-      perceptionToProse(evening(17, 'cold'), () => {}, {
-        ...FLAT_WORLD,
-        nightWillBeCold: () => false,
-      }),
-    ).not.toContain('wants wood')
+    expect(cold(evening(17, 'cold'), { ...coldNight, nightWillBeCold: () => false })).not.toContain(
+      'The night will be cold',
+    )
   })
 
   it('is silent for a world that cannot answer, so an older packet reads as it always did', () => {
-    expect(perceptionToProse(evening(17, 'cold'), () => {}, FLAT_WORLD)).not.toContain('wants wood')
+    expect(roadLine(makeables(CFG), evening(17, 'cold'), FLAT_WORLD)).toBe('')
   })
 
   it("names no act and gives no counsel — the inference stays the mind's", () => {
-    expect(scanForDirective(LINE)).toEqual([])
+    expect(scanForDirective(NEEDS_WOOD)).toEqual([])
   })
 
   it('the bridge prices the coming night off the season band the body will actually lose to', () => {

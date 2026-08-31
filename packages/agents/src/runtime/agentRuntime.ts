@@ -7,7 +7,7 @@ import { appendMoment, assemblePrompt, compactDayLog, JOURNAL_LINES } from '../p
 import {
   heardProse,
   makeablesLine,
-  buildRoadLine,
+  roadLine,
   perceptionToProse,
   type ProseWorld,
   standingWallsLine,
@@ -615,7 +615,7 @@ export class AgentRuntime {
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
-      buildRoadLine(canMake.builds, packet, world),
+      roadLine(canMake, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
     ]
       .filter((p) => p.length > 0)
