@@ -21,7 +21,7 @@ export type OpsDeps = ExportOpts & {
   ops: () => LiveOps | null
 }
 
-const MIN_SPEED = 0.1
+export const MIN_SPEED = 0.1
 export const MAX_SPEED = 60
 /** The gateway reads the ledger with SQL rather than importing `@sj/llm`'s spend monitor: that
  *  package pulls the model SDK, which the scripted path must never load. */

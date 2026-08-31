@@ -44,6 +44,7 @@ export type GatewayOpts = {
    *  absent, `SJ_ADMIN_TOKEN`/`SJ_ADMIN_PORT` decide. */
   adminPort?: number | null
   paused?: () => boolean // the world clock's own state; absent → the town is always running
+  onViewers?: (count: number) => void // live viewer count, as one greets and as one leaves
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
@@ -307,6 +308,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         }
         greeted = true
         removers.set(sock, hub.add(sock, snapshotJson))
+        // Ahead of the first frame, so a waking town is already at full speed inside it. Counted
+        // at the hello rather than the raw connection, so the number means watchers and not
+        // sockets — a handshake that never completes is not an audience.
+        opts.onViewers?.(hub.size())
         sock.send(snapshotJson())
         // asset catch-up: late joiners must not render placeholders the codex already replaced
         const cdx = getCodex()
@@ -346,6 +351,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (scrubTimer !== null) clearTimeout(scrubTimer)
       removers.get(sock)?.()
       removers.delete(sock)
+      opts.onViewers?.(hub.size())
     })
     // A viewer's connection dying mid-frame must not throw out of the socket server.
     sock.on('error', () => {
