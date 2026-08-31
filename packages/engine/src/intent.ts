@@ -1,6 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
+import { loneCandidateFor } from './verbs/autofill.js'
 import { VERBS, workPenalty, type PendingEvent } from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
@@ -27,20 +28,27 @@ export function submitIntent(
   // never refused for busy-ness. Nothing here can end a running activity early.
   const usesHands = def.atOnce === undefined
   if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
-  const invalid = def.validate(state, config, agentId, params)
-  if (invalid) return { ok: false, reason: invalid }
+  const refusal = def.validate(state, config, agentId, params)
+  // The mind chose the verb; where the world holds one thing that verb would take, read it in
+  // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
+  let p = params
+  if (refusal !== null) {
+    const filled = loneCandidateFor(state, config, agentId, verb, params)
+    if (filled === null) return { ok: false, reason: refusal }
+    p = filled
+  }
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
   if (def.atOnce !== undefined) {
-    events.push(...def.atOnce(state, config, agentId, params))
+    events.push(...def.atOnce(state, config, agentId, p))
     return { ok: true, events }
   }
   // The one place a duration is settled, so the dark can charge for work without every verb
   // having to remember that it is night.
   const penalty = workPenalty(state, config, agentId, verb)
-  const base = def.duration(state, config, agentId, params)
+  const base = def.duration(state, config, agentId, p)
   const duration = penalty === 1 ? base : Math.ceil(base * penalty)
-  events.push({ type: 'action_started', payload: { agentId, verb, params, duration } })
-  if (def.onStart) events.push(...def.onStart(state, config, agentId, params))
+  events.push({ type: 'action_started', payload: { agentId, verb, params: p, duration } })
+  if (def.onStart) events.push(...def.onStart(state, config, agentId, p))
   return { ok: true, events }
 }

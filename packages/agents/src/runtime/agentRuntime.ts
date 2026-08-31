@@ -658,6 +658,7 @@ export class AgentRuntime {
         (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
+        (verb) => this.#bridge.actHasOneReading(this.#agentId, verb),
       )
     } catch (err) {
       this.#doze(tick, err)

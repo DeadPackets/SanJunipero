@@ -311,4 +311,43 @@ describe('PersonalityStore versioning', () => {
       ),
     ).toEqual({ ok: true, version: 2 })
   })
+
+  // Run F, yusuf v2: the refusal said in the first person as a loop — the existing trait
+  // restated, then affirmed. 199 chars, so no length anchor would have caught it.
+  it('a trait that only affirms the trait it already holds is skipped', async () => {
+    const { mem, store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    const e = await insertMemory(mem, 1500)
+    const affirmations = [
+      'I have always believed a job done once is a job done, and I still do. This day held no collapse, no conflict, no hunger that changed my mind, only the cold and the rain and the strange inability to do',
+      'I continue to believe so.',
+      'As I always have.',
+    ]
+    for (const text of affirmations) {
+      expect(
+        store.applyNightlyEdit(1, { op: 'add', field: 'beliefs', text, evidence: [e] }, mem),
+        text,
+      ).toEqual({ ok: false, reason: 'no_op_text', skipped: true })
+    }
+    expect(store.current().version).toBe(1)
+
+    // A belief that adds its own content still lands, "still" and all.
+    for (const text of [
+      'I still believe the well must be dug before the frost, whatever Omar says about the ground.',
+      'I have always held that a roof comes before a fence.',
+      'I continue to believe the roof must be raised before the rains, and the fence can wait.',
+    ]) {
+      const fresh = await makeStore()
+      fresh.store.init(BASE_DOC, 0)
+      const ev = await insertMemory(fresh.mem, 1500)
+      expect(
+        fresh.store.applyNightlyEdit(
+          1,
+          { op: 'add', field: 'beliefs', text, evidence: [ev] },
+          fresh.mem,
+        ),
+        text,
+      ).toEqual({ ok: true, version: 2 })
+    }
+  })
 })

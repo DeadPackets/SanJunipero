@@ -100,10 +100,14 @@ export function isBlankAnswer(raw: unknown): boolean {
   return false
 }
 
+/** Whether the world holds exactly one thing this verb's blank object could have meant. */
+export type ActHasOneReading = (verb: string) => boolean
+
 export async function parseTurnWithRepair(
   raw: unknown,
   repair: (issues: string) => Promise<unknown>,
   alert: (kind: string, detail: string) => void,
+  hasOneReading?: ActHasOneReading,
 ): Promise<Turn> {
   const first = TurnSchema.safeParse(raw)
   if (!first.success) {
@@ -116,6 +120,12 @@ export async function parseTurnWithRepair(
   // refuses an act with nothing in it a beat later, with the moment already gone (K20).
   const empty = actWithoutItsDetail(first.data)
   if (empty === null) return first.data
+  // One reading beats one more call: the world fills the act's one candidate in when it takes
+  // it, so a mind is not asked again for a word it had no choice about.
+  if (hasOneReading?.(empty) === true) {
+    alert('act_detail_filled_in', `${empty} has one candidate and was read as that`)
+    return first.data
+  }
   const again = TurnSchema.safeParse(
     await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
   )
