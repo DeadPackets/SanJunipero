@@ -36,6 +36,7 @@ import {
   LlmClient,
   migrateLlmTables,
   modelFor,
+  PROVIDER_ORDER,
   sumCostUsd,
   sumDeadCalls,
 } from '@sj/llm'
@@ -270,14 +271,7 @@ if (args.dry) {
   process.exit(0)
 }
 
-mkdirSync(outDir, { recursive: true })
-const ops = new Database(join(outDir, 'ops.db'))
-migrateLlmTables(ops)
-const llm = new LlmClient({
-  db: ops,
-  caller: args.settings,
-  budgetUsd: args.cap,
-})
+const llm = client(args.settings)
 
 const answers = []
 const queue = prompts.flatMap((p) => Array.from({ length: args.rounds }, (_, r) => ({ ...p, r })))
