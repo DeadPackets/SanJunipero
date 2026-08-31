@@ -10,6 +10,7 @@ import {
   isFoodKind,
   nutritionOf,
 } from '../food.js'
+import { placesNamedAloud } from '../earshot.js'
 import { doorTile, occupantsOf, roomIsFull, sameInterior } from '../interiors.js'
 import { findPath, isPassable } from '../path.js'
 import { type RngStream } from '../rng.js'
@@ -1567,7 +1568,7 @@ export const AttackParams = z.object({ targetId: z.string() }).strict()
 // One composer for both spoken paths, so a busy body's word and an idle one's cannot drift.
 const spoken = (
   state: WorldState,
-  _config: SimConfig,
+  config: SimConfig,
   agentId: string,
   params: Record<string, unknown>,
 ): PendingEvent[] => {
@@ -1575,18 +1576,20 @@ const spoken = (
   const a = state.agents[agentId]!
   // Sanitized where speech ENTERS the world, so the event log, the viewer and every listener
   // hold the same words. The render sanitizes again — old logs on disk carry raw text.
-  return [
-    {
-      type: 'agent_spoke',
-      payload: {
-        agentId,
-        text: sanitizeSpokenText(p.text),
-        x: a.x,
-        y: a.y,
-        ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
-      },
+  const spoke = {
+    type: 'agent_spoke',
+    payload: {
+      agentId,
+      text: sanitizeSpokenText(p.text),
+      x: a.x,
+      y: a.y,
+      ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
     },
-  ]
+  }
+  // A place named aloud is a place the room now knows of. Hearsay is how a town gets bigger
+  // than any one pair of eyes.
+  const told = placesNamedAloud(state, config, { seq: 0, tick: state.tick, ...spoke })
+  return [spoke, ...told.map((t) => ({ type: 'places_seen', payload: t }))]
 }
 
 const speak: VerbDef = makeVerb({

@@ -116,6 +116,9 @@ export const CityStructureSchema = z
     // The five houses are owned, one founder each; every public building is null. The field is
     // REQUIRED; only its value may be null.
     owner: z.string().min(1).nullable(),
+    // What the town calls it. Every genesis building has one; a roof raised later is nameless
+    // until a hand cuts a word into it, so the field is optional.
+    name: z.string().min(1).optional(),
     // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
     // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.
     facing: z.enum(TOWN_FACINGS),
@@ -384,6 +387,28 @@ export const GENESIS_WANTED: readonly Wanted[] = [
   { kind: 'farmhouse', ...mass(DWELLING_FOOTPRINTS.farmhouse), owner: null },
 ]
 
+// What the founders call the eleven, so a mind can say where it is going and be understood.
+// Keyed by kind and owner, which the eleven make unique between them: cityStructures asserts it.
+const GENESIS_NAMES: Readonly<Record<string, string>> = {
+  'storehouse|': 'the storehouse',
+  'house|amara': "Amara's house",
+  'house|yusuf': "Yusuf's house",
+  'cottage|': 'the old cottage',
+  'house|nadia': "Nadia's house",
+  'cabin|': 'the cabin',
+  'house|omar': "Omar's house",
+  'house|salma': "Salma's house",
+  'farmhouse|': 'the old farmhouse',
+  'well|': 'the well',
+  'fire_pit|': 'the fire pit',
+}
+
+const genesisName = (kind: string, owner: string | null): string => {
+  const name = GENESIS_NAMES[`${kind}|${owner ?? ''}`]
+  if (name === undefined) throw new Error(`cityStructures: no name for ${kind} of ${owner}`)
+  return name
+}
+
 // A kind whose row says `hearth` is furnished with one, or it is a fire a mind can feed and
 // nobody can see; config.test.ts holds the two halves equal.
 const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
@@ -418,9 +443,10 @@ export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructur
     h: 1,
     owner: null,
     facing: 'sw',
+    name: genesisName(kind, null),
     furnishings: [],
   })
-  return [
+  const all = [
     ...cityPlacements().map((s): CityStructure => {
       const l = toLocal(s, rings)
       return {
@@ -431,12 +457,18 @@ export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructur
         h: l.h,
         owner: l.owner,
         facing: l.facing,
+        name: genesisName(l.kind, l.owner),
         furnishings: furnishingsFor(l.kind),
       }
     }),
     monument('well', wellAt(rings)),
     monument('fire_pit', firePitAt(rings)),
   ]
+  // Two buildings sharing a name is two places a mouth cannot tell apart, and the kind/owner
+  // key that names them would have silently collapsed them into one.
+  if (new Set(all.map((s) => s.name)).size !== all.length)
+    throw new Error('cityStructures: two genesis buildings share a name')
+  return all
 }
 
 // Geometry only: both take the four numbers they read rather than a whole CityStructure, so a

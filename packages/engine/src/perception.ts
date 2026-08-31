@@ -12,6 +12,7 @@ import {
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
+import { hears } from './earshot.js'
 import { doorTile, insideOf, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
@@ -247,6 +248,8 @@ function groundUnderfoot(
   return undefined
 }
 
+export { hears }
+
 const dist = (x1: number, y1: number, x2: number, y2: number): number =>
   Math.hypot(x2 - x1, y2 - y1)
 
@@ -300,41 +303,6 @@ function globalMysteryTag(asleep: boolean, ev: SimEvent): string | null {
   if (typeof kind !== 'string') return null
   const entry = MYSTERY_BY_KIND[kind]
   return entry?.scope === 'global' ? entry.kind : null
-}
-
-const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
-  Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
-
-// A wall stops sound: speech carries iff both share an interior, both are outdoors within
-// earshot, or the one outdoors is standing in the other's doorway.
-export function hears(
-  state: WorldState,
-  baseConfig: SimConfig,
-  speakerEv: SimEvent,
-  hearerId: string,
-): boolean {
-  const config = effectiveConfig(baseConfig, state.laws)
-  const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
-  const hearer = state.agents[hearerId]
-  if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
-
-  // Occlusion off drops the wall, not the distance: plain earshot.
-  if (!config.occlusion.enabled)
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
-
-  const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
-  const hearerInside = hearer.insideId ?? null
-  if (speakerInside !== null && hearerInside !== null) return speakerInside === hearerInside
-  if (speakerInside === null && hearerInside === null) {
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
-  }
-
-  const structure = state.structures[speakerInside ?? hearerInside!]
-  if (!structure) return false
-  const door = doorTile(state, structure)
-  if (!door) return false
-  const outdoors = speakerInside !== null ? { x: hearer.x, y: hearer.y } : { x: p.x, y: p.y }
-  return chebyshev(outdoors.x, outdoors.y, door.x, door.y) <= 1
 }
 
 // Built once per packet, so no two channels can disagree about what this body can reach.
