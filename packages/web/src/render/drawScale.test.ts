@@ -8,14 +8,10 @@ import { CHAR_TARGET_PX } from './charAnim.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 import { TILE_W } from './iso.js'
 
-/**
- * Coverage proves a record exists; this proves the art reaches the screen at a whole-number
- * downscale of its authored size.
- *
- * The authored sizes are read off `packages/forge/src` at runtime because `@sj/web` cannot
- * depend on `@sj/forge` — a restated constant would drift in silence, which is the defect this
- * gate is for. Every read asserts it matched.
- */
+/** Coverage proves a record exists; this proves the art reaches the screen at a whole-number
+ *  downscale of its authored size. The authored sizes are read off `packages/forge/src` at
+ *  runtime because `@sj/web` cannot depend on `@sj/forge` — a restated constant would drift in
+ *  silence, which is the defect this gate is for. Every read asserts it matched. */
 
 const FORGE = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../forge/src')
 

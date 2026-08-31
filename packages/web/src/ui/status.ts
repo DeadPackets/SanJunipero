@@ -16,11 +16,8 @@ export type AgentView = {
   thirst?: number
 }
 
-/**
- * STATE: exactly ONE per person per surface, first match wins in this order. Someone crossing the
- * square mid-conversation is in a conversation, so `talking` precedes `walking` and the array stays
- * the single priority table.
- */
+/** Exactly ONE state per person per surface, first match wins: this array IS the priority table.
+ *  Someone crossing the square mid-conversation is talking, so `talking` precedes `walking`. */
 export const STATES = [
   'gone',
   'collapsed',

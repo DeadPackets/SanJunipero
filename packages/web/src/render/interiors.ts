@@ -260,12 +260,10 @@ export function furnishingScale(): number {
   return 1 / furnishingDivisor()
 }
 
-/**
- * `INTERIOR_PX_SCALE` is the PIXEL factor and it is not the WORLD factor: furniture is authored
- * against a tile that means a METRE, where a town tile means a corner of a plot. So the room
- * asks for the height the ROOM says a person is, and the factor between the two scales is the
- * factor between the two heights and nothing else.
- */
+/** `INTERIOR_PX_SCALE` is the PIXEL factor and it is not the WORLD factor: furniture is authored
+ *  against a tile that means a METRE, where a town tile means a corner of a plot. So the room
+ *  asks for the height the ROOM says a person is, and the factor between the two scales is the
+ *  factor between the two heights and nothing else. */
 export function interiorBodyScale(townCellScale: number): number {
   return townCellScale * (INTERIOR_BODY_PX / CHAR_TARGET_PX)
 }
@@ -283,12 +281,10 @@ export type RoomPiece = {
   size: TileSize
   /** which half of an 'in' furnishing this is; `null` for anything drawn whole */
   half: 'back' | 'front' | null
-  /**
-   * The ground the sprite is anchored on — and for a split piece it is the WHOLE piece's.
-   * `tile`/`size` are the DEPTH box, with the front half pushed half a footprint nearer, and
-   * spending that a second time as a POSITION tears the piece in two. Both halves are cut from
-   * ONE texture, so both stand where that texture stands.
-   */
+  /** The ground the sprite is anchored on — and for a split piece it is the WHOLE piece's.
+   *  `tile`/`size` are the DEPTH box, with the front half pushed half a footprint nearer, and
+   *  spending that a second time as a POSITION tears the piece in two. Both halves are cut from
+   *  ONE texture, so both stand where that texture stands. */
   anchor: { tile: Tile; size: TileSize }
 }
 

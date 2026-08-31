@@ -1,8 +1,7 @@
 import { BOND_LEVEL_LABEL, SECTION_EMPTY, SECTION_TITLE, type Becoming } from './expand.js'
 
-// The list stays mounted behind the expansion, so the way back is never gone — it is the row the
-// viewer just clicked. The `wants` section does not render while empty: an empty chip rail is a
-// promise the product has not kept.
+// The list stays mounted behind the expansion, so the way back is the row the viewer just
+// clicked. An empty `wants` section does not render: an empty chip rail is a promise not kept.
 
 function Section({
   name,

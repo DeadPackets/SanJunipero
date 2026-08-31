@@ -92,11 +92,9 @@ export function slotToTile(
   }
 }
 
-/**
- * Where inside its own block a piece sits: on the side its neighbour's slot is on, so two
- * adjacent slots do not land two tiles apart. Only the depth axis — a block is four tiles
- * across, where two pieces side by side already read as a pair, and two deep, where they do not.
- */
+/** Where inside its own block a piece sits: on the side its neighbour's slot is on, so two
+ *  adjacent slots do not land two tiles apart. Only the depth axis — a block is four tiles
+ *  across, where two pieces side by side already read as a pair, and two deep, where they do not. */
 export function seatInBlock(
   slot: Slot,
   others: readonly Slot[],
@@ -314,11 +312,9 @@ export function interiorPath(map: RoomMap, from: Tile, to: Tile): Tile[] | null 
 
 // ── WHAT A BODY CAN DO WITH EACH PIECE ───────────────────────────────────────────────────
 
-/**
- * The engine has no furnishings: every verb addresses a structure or a held item, and a body
- * inside one carries `insideId` and no interior position. So `verb` is the CLOSEST verb that
- * exists, `via` what it actually addresses, and `needs` the engine change still missing.
- */
+/** The engine has no furnishings: every verb addresses a structure or a held item, and a body
+ *  inside one carries `insideId` and no interior position. So `verb` is the CLOSEST verb that
+ *  exists, `via` what it actually addresses, and `needs` the engine change still missing. */
 export type PieceAct = {
   kind: string
   /** the closest verb the engine already has, or `null` when there is none at all */

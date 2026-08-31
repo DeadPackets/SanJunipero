@@ -47,11 +47,8 @@ const ageWordsOf = (ageDays: number): RosterRow2['ageWords'] => {
   return years < 18 ? 'young' : years < 60 ? 'grown' : 'elder'
 }
 
-/**
- * What the run has made of this person, from what the roster can actually see. `personalityVersions`
- * and `changeDays` are zero here and non-zero in the expansion, which fetches them, so a row's
- * substance is a LOWER BOUND on the panel's rather than a different number.
- */
+/** `personalityVersions` and `changeDays` are zero here and non-zero in the expansion, which
+ *  fetches them, so a row's substance is a LOWER BOUND on the panel's, never a different number. */
 function substanceFor(
   state: WorldState,
   agentId: string,
