@@ -14,11 +14,8 @@ import { mountDataApi, type Footprint } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler } from './router.js'
 
-/**
- * Growth is the property, so the measurement is the SECOND tranche: three times the events of
- * the first, and the heap must barely move. The bodies are checked too — "grew by 0 MB" is
- * satisfiable by a read path that answers `[]`.
- */
+/** Growth is the property, so the measurement is the SECOND tranche: 3x the first's events, and
+ *  the heap must barely move. Bodies are checked too — "grew by 0 MB" is satisfiable by `[]`. */
 const GRASS: TileId[][] = Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0))
 const AGENTS = 12
 const FIRST_TRANCHE_TICKS = 2_000

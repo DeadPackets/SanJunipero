@@ -104,9 +104,8 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
 describe('★ checkProviderMix — a back end past the allow-list is reported, never enforced', () => {
   const mixOpts = { allowed: ['Baidu'], windowRealMinutes: 15, now: NOW }
 
-  // The live town hands this one global `PROVIDER_ORDER` as the allow-list, and it reads only
-  // the mind callers. Move one of them to the fleet's other back end and every call it makes
-  // would alert — so the two lists are pinned to agree here rather than in a run.
+  // The live town hands this one global `PROVIDER_ORDER` as the mind callers' allow-list; a caller
+  // moved to the other back end would alert every call, so the lists are pinned to agree here.
   it('★ every mind caller is served by the pin the allow-list names', () => {
     for (const caller of MIND_CALLERS) {
       expect(modelFor(caller), caller).toBe(MIND_MODEL)

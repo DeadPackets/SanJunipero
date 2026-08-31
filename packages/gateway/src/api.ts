@@ -17,11 +17,8 @@ import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
 export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot → one talk weight
 
-/**
- * `server.ts` decodes each path segment AFTER splitting on `/`, so a `%2f` a stranger writes
- * becomes a path separator only once routing has finished. Refusing the SHAPE — every id this
- * world mints is a slug — beats sanitising the path.
- */
+/** `server.ts` decodes each path segment AFTER splitting on `/`, so a stranger's `%2f` becomes a
+ *  separator only once routing is done. Refusing the shape — every id is a slug — beats sanitising. */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
 /** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`.
@@ -283,10 +280,8 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
-  /**
-   * The running map stays whole — a viewer-picked window must be exact however far back it
-   * reaches — but what is SENT is the last sim-day, bounded by population not by the town's age.
-   */
+  /** The running map stays whole — a viewer-picked window must be exact however far back it
+   *  reaches — but what is SENT is the last sim-day, bounded by population, not the town's age. */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()
     sendPrebuilt(
