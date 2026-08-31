@@ -1004,7 +1004,7 @@ describe('a mind that is already in the middle of something', () => {
     const a = assemblePrompt(fixtureBlocks({ underway: { what: 'walk 62 70', step: 2, of: 4 } }))
     const last = a.messages.at(-1)!.content
     expect(last).toContain('You are in the middle of: walk 62 70 (step 2 of 4).')
-    expect(last).toContain('Name no action and it goes on.')
+    expect(last).toContain('Answer wait and it goes on.')
   })
 
   it('prints no step for a one-act plan, and nothing at all for a mind with its hands free', () => {

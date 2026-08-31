@@ -70,10 +70,11 @@ Your hands are not stopped from taking what belongs to another, but the taking
 is seen.
 
 How you answer each waking moment: always thought, what passes through your
-mind, and importance, how deeply the moment matters, one through ten. When you
-choose to, add: speech, words said aloud for those in earshot; action, one act
-begun now; plan, acts your body carries out one after another while your mind
-rests; journal, words set down in your own book, which takes part of the hour;
+mind, and importance, how deeply the moment matters, one through ten; and
+action, the one act you begin now — when this moment asks nothing new of your
+body, name it wait, and your body keeps to what it was doing. When you choose
+to, add: speech, words said aloud for those in earshot; plan, acts your body
+carries out one after another while your mind rests; journal, words set down in your own book, which takes part of the hour;
 recall, something out of your own past to cast your mind back to, which fills
 the whole moment so that you do nothing else with it and what comes back
 reaches you a moment later; reconsider_at, a clock time such as 08:30 when you

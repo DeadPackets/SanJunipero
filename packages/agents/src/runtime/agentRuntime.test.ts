@@ -125,6 +125,13 @@ function buildWorld(simConfig?: SimConfig) {
   return { config, terrain, engineDb, store, rng, state }
 }
 
+// The required-action schema: a fixture that names no act is answering the old shape, and the
+// real contract now is "name wait when nothing new begins" — added here once, not at 20 sites.
+const askedShape = (r: unknown): unknown =>
+  r !== null && typeof r === 'object' && 'thought' in r && !('action' in r)
+    ? { ...r, action: { verb: 'wait', params: {} } }
+    : r
+
 function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockLanguageModelV4 {
   let i = 0
   return new MockLanguageModelV4({
@@ -132,7 +139,7 @@ function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockL
       const r = i < responses.length ? responses[i]! : fallback
       i += 1
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(askedShape(r)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -167,7 +174,7 @@ function capturingModel(responses: unknown[]): {
       const r = responses[Math.min(i, responses.length - 1)]!
       i += 1
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(askedShape(r)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -198,7 +205,7 @@ function blankModel(
       const blank = i < blanks
       i += 1
       return {
-        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(then) }],
+        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(askedShape(then)) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -572,7 +579,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Nothing was underway on the first turn, so the open framing stands.
     expect(first).not.toContain('You are in the middle of:')
     expect(second).toContain('You are in the middle of: walk 5 6 (step 1 of 3).')
-    expect(second).toContain('Name no action and it goes on.')
+    expect(second).toContain('Answer wait and it goes on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {

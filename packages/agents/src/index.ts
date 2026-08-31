@@ -1,6 +1,7 @@
 export {
   IntentSchema,
   TurnSchema,
+  TurnSchemaActionRequired,
   FALLBACK_TURN,
   actWithoutItsDetail,
   isBlankAnswer,

@@ -30,7 +30,7 @@ import {
   parseTurnWithRepair,
   reconsiderTick,
   turnSpeaks,
-  TurnSchema,
+  TurnSchemaActionRequired,
   type Turn,
 } from '../turn.js'
 import {
@@ -768,7 +768,7 @@ export class AgentRuntime {
   async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchema,
+        schema: TurnSchemaActionRequired,
         system: assembled.system,
         messages: assembled.messages,
       })
@@ -785,7 +785,7 @@ export class AgentRuntime {
   async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchema,
+        schema: TurnSchemaActionRequired,
         system: assembled.system,
         messages: [
           ...assembled.messages,
