@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
-import { LlmClient, insertAlert, migrateLlmTables } from '@sj/llm'
+import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
@@ -124,6 +124,9 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     totalCostUsd: () => 0,
     alert: (kind: string, detail: string) => {
       insertAlert(db, { agentId, kind, detail })
+    },
+    noteTurnOutcome: (outcome: { acted: boolean; spoke: boolean }) => {
+      insertTurnOutcome(db, { agentId, provider: null, ...outcome })
     },
     forCaller() {
       return this

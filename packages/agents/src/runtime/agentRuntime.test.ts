@@ -381,6 +381,14 @@ function journalRows(db: Database.Database): { tick: number; text: string }[] {
   }[]
 }
 
+function turnOutcomes(db: Database.Database): { agent_id: string; acted: number; spoke: number }[] {
+  return db.prepare('SELECT agent_id, acted, spoke FROM turn_outcomes ORDER BY id').all() as {
+    agent_id: string
+    acted: number
+    spoke: number
+  }[]
+}
+
 function alertKinds(db: Database.Database): string[] {
   return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as { kind: string }[]).map(
     (r) => r.kind,
@@ -414,6 +422,27 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 100)
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
     expect(loop.state.agents[AGENT]!.needs.hunger).toBeGreaterThan(30)
+  })
+
+  // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
+  // no refusal and no alert. This row is the only trace such a turn ever leaves.
+  it('books what each turn produced against the back end that served it', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'The bread is right there.',
+          action: { verb: 'take', params: { itemId: BREAD_ID } },
+          importance: 3,
+        },
+        { thought: 'I stand and think of nothing at all.', importance: 1 },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => turnOutcomes(agentDb).length >= 2, 200)
+    expect(turnOutcomes(agentDb).slice(0, 2)).toEqual([
+      { agent_id: AGENT, acted: 1, spoke: 0 },
+      { agent_id: AGENT, acted: 0, spoke: 0 },
+    ])
   })
 
   it('submits speech and records a thought memory with its importance', async () => {

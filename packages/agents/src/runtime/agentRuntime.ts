@@ -666,6 +666,12 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
+    // What the answer produced, booked before the world sees it: an act:null turn is legal and
+    // leaves no refusal, no event and no alert of its own (K26).
+    this.#llm.noteTurnOutcome({
+      acted: (turn.action ?? null) !== null,
+      spoke: !isBlankAnswer(turn.speech),
+    })
     // Read once: a cast back that has been answered is not answered again next turn.
     this.#pendingRecall = null
     await this.#applyTurn(turn, tick, day)

@@ -1,8 +1,16 @@
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './pins.js'
-export { migrateLlmTables, insertAlert, insertLlmCall, sumCostUsd } from './callLog.js'
+export {
+  migrateLlmTables,
+  insertAlert,
+  insertLlmCall,
+  insertTurnOutcome,
+  sumCostUsd,
+} from './callLog.js'
 export { backfillUnattributed } from './backfill.js'
 export { computeCostUsd } from './pricing.js'
 export {
+  actRate,
+  checkActRate,
   checkProviderMix,
   checkSpend,
   reconcileCosts,
@@ -14,9 +22,12 @@ export {
   projectDailySpend,
   reportDeadCalls,
   reportProviders,
+  ACT_RATE_WINDOW_TURNS,
+  DEFAULT_SILENT_TURN_THRESHOLD,
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
   REAL_MINUTES_PER_SIM_DAY,
+  type ActRate,
   type DeadCallRow,
   type DeadCalls,
   type SpendProjection,

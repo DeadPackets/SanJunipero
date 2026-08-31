@@ -4,6 +4,7 @@ import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryTags } from './memory/store.js'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
+import { proposeEditPrompt } from './reflection.js'
 
 const TAGS: MemoryTags = {
   people: [],
@@ -217,6 +218,30 @@ describe('PersonalityStore versioning', () => {
     ).toEqual({ ok: true, version: 3 })
     expect(store.current().doc.beliefs).toEqual([])
     expect(store.current().doc.temperament).toBe('calm')
+  })
+
+  // The night's four rejected edits in run G were all index_out_of_range: the prompt showed the
+  // lists without the numbers, so a mind aimed at a coordinate it had never been given.
+  it('the numbers proposeEdit shows are the numbers applyNightlyEdit reads', async () => {
+    const { mem, store } = await makeStore()
+    const doc = {
+      ...BASE_DOC,
+      values: ['loyalty', 'a full store'],
+      beliefs: ['feet make the road'],
+    }
+    store.init(doc, 0)
+    const shown = proposeEditPrompt('A long day.', doc, []).messages[0]!.content
+    expect(shown).toContain('What you value now:\n[0] loyalty\n[1] a full store')
+    expect(shown).toContain('What you believe now:\n[0] feet make the road')
+    const e = await insertMemory(mem, 1500)
+    expect(
+      store.applyNightlyEdit(
+        1,
+        { op: 'revise', field: 'values', index: 1, text: 'a fuller store', evidence: [e] },
+        mem,
+      ),
+    ).toEqual({ ok: true, version: 2 })
+    expect(store.current().doc.values).toEqual(['loyalty', 'a fuller store'])
   })
 
   it('revise/remove with index out of range -> index_out_of_range (after evidence passes)', async () => {

@@ -37,7 +37,7 @@ it('narrator has no write grant on world tables', () => {
     .all()
     .map((r) => (r as { name: string }).name)
     .sort()
-  const LLM_PLUMBING = ['llm_calls', 'llm_reservations', 'alerts']
+  const LLM_PLUMBING = ['llm_calls', 'llm_reservations', 'turn_outcomes', 'alerts']
   expect(owned.filter((t) => !LLM_PLUMBING.includes(t) && !t.startsWith('sqlite_')).sort()).toEqual(
     [...NARRATOR_TABLES].sort(),
   )

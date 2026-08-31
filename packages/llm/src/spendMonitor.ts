@@ -46,6 +46,57 @@ export function projectCallRate(
   }
 }
 
+// Turns, not minutes: an act rate is a property of the answers, and a real-time window over a
+// paused or slowed loop measures the loop instead.
+export const ACT_RATE_WINDOW_TURNS = 40
+// Run E ran at 1.6% silent; run G at 44.5%. Anything past a third is a collapse, not a mood.
+export const DEFAULT_SILENT_TURN_THRESHOLD = 0.3
+
+export type ActRate = {
+  turns: number
+  silent: number
+  silentShare: number
+  providers: string[]
+}
+
+/** How many of the last turns produced neither an act nor a word, and who served them. */
+export function actRate(db: Database.Database, opts: { windowTurns?: number } = {}): ActRate {
+  const rows = db
+    .prepare('SELECT provider, acted, spoke FROM turn_outcomes ORDER BY id DESC LIMIT ?')
+    .all(opts.windowTurns ?? ACT_RATE_WINDOW_TURNS) as {
+    provider: string | null
+    acted: number
+    spoke: number
+  }[]
+  const silent = rows.filter((r) => r.acted === 0 && r.spoke === 0).length
+  const providers = [...new Set(rows.map((r) => r.provider ?? 'unattributed'))].sort()
+  return {
+    turns: rows.length,
+    silent,
+    silentShare: rows.length === 0 ? 0 : silent / rows.length,
+    providers,
+  }
+}
+
+/** Silent under a full window only: a short window early in a run says nothing yet. Fires every
+ *  time it is called over the threshold, like the spend heartbeat. */
+export function checkActRate(
+  db: Database.Database,
+  opts: { windowTurns?: number; threshold?: number } = {},
+): ActRate & { alerted: boolean } {
+  const windowTurns = opts.windowTurns ?? ACT_RATE_WINDOW_TURNS
+  const threshold = opts.threshold ?? DEFAULT_SILENT_TURN_THRESHOLD
+  const rate = actRate(db, { windowTurns })
+  if (rate.turns < windowTurns || rate.silentShare <= threshold) return { ...rate, alerted: false }
+  const detail =
+    `${rate.silent} of the last ${rate.turns} mind turns produced no act and no word ` +
+    `(${(rate.silentShare * 100).toFixed(0)}%, over ${(threshold * 100).toFixed(0)}%), ` +
+    `served by ${rate.providers.join(', ')}`
+  insertAlert(db, { agentId: null, kind: 'act_rate_collapsed', detail })
+  console.warn(`acts: ${detail}`)
+  return { ...rate, alerted: true }
+}
+
 export type ProviderMix = {
   calls: number
   costUsd: number

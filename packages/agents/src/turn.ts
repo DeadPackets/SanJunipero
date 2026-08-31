@@ -18,6 +18,7 @@ export const IntentSchema = z
     ),
   })
   .strict()
+type Intent = z.infer<typeof IntentSchema>
 // Every optional field takes null as well as absence, and not via `.transform()`, which
 // `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
 export const TurnSchema = z
@@ -103,6 +104,44 @@ export function isBlankAnswer(raw: unknown): boolean {
 /** Whether the world holds exactly one thing this verb's blank object could have meant. */
 export type ActHasOneReading = (verb: string) => boolean
 
+// Acts whose whole object is one mark. The word for that mark is the one the verb reads.
+const OBJECT_KEY: Readonly<Record<string, 'itemId' | 'structureId'>> = {
+  eat: 'itemId',
+  take: 'itemId',
+  drop: 'itemId',
+  wear: 'itemId',
+  read: 'itemId',
+  fill: 'itemId',
+  kindle: 'itemId',
+  snuff: 'itemId',
+  enter: 'structureId',
+  stoke: 'structureId',
+  extinguish: 'structureId',
+}
+// Words that name a mark. Prose and numbers are left where they are: a sentence read as an id
+// would name nothing and would cost the act its one blank-object reading as well.
+const MARK_KEYS = Object.keys(IntentParamsSchema.shape).filter((k) => k.endsWith('Id'))
+
+// The right mark under a word the verb does not read (K20). One mark is the object it meant;
+// two is a guess. Whether the mark is real is still the world's to say a beat later.
+function withObjectNamed(intent: Intent): Intent {
+  const want = OBJECT_KEY[intent.verb]
+  if (want === undefined) return intent
+  const [from, ...also] = MARK_KEYS.filter((k) => !isBlankAnswer(intent.params[k]))
+  if (from === undefined || also.length > 0 || from === want) return intent
+  const { [from]: mark, ...rest } = intent.params
+  return { ...intent, params: { ...rest, [want]: mark } }
+}
+
+function withObjectsNamed(turn: Turn): Turn {
+  const { action, plan } = turn
+  return {
+    ...turn,
+    action: action && 'verb' in action ? withObjectNamed(action) : action,
+    plan: plan ? plan.map(withObjectNamed) : plan,
+  }
+}
+
 export async function parseTurnWithRepair(
   raw: unknown,
   repair: (issues: string) => Promise<unknown>,
@@ -112,26 +151,27 @@ export async function parseTurnWithRepair(
   const first = TurnSchema.safeParse(raw)
   if (!first.success) {
     const second = TurnSchema.safeParse(await repair(z.prettifyError(first.error)))
-    if (second.success) return second.data
+    if (second.success) return withObjectsNamed(second.data)
     alert('turn_fallback', z.prettifyError(second.error))
     return FALLBACK_TURN
   }
+  const turn = withObjectsNamed(first.data)
   // The same one correction, spent on the other way an answer comes back unusable: the world
   // refuses an act with nothing in it a beat later, with the moment already gone (K20).
-  const empty = actWithoutItsDetail(first.data)
-  if (empty === null) return first.data
+  const empty = actWithoutItsDetail(turn)
+  if (empty === null) return turn
   // One reading beats one more call: the world fills the act's one candidate in when it takes
   // it, so a mind is not asked again for a word it had no choice about.
   if (hasOneReading?.(empty) === true) {
     alert('act_detail_filled_in', `${empty} has one candidate and was read as that`)
-    return first.data
+    return turn
   }
   const again = TurnSchema.safeParse(
     await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
   )
-  if (again.success && actWithoutItsDetail(again.data) === null) return again.data
+  if (again.success && actWithoutItsDetail(again.data) === null) return withObjectsNamed(again.data)
   alert('empty_act_detail', `${empty} came back empty twice`)
-  return first.data
+  return turn
 }
 
 // Where each part of the day begins, as the one clock everybody shares. Read back through

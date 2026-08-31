@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
-import { migrateLlmTables } from './callLog.js'
+import { insertTurnOutcome, migrateLlmTables } from './callLog.js'
 import {
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
   MIND_CALLERS,
   REAL_MINUTES_PER_SIM_DAY,
   REAL_MINUTES_PER_SIM_HOUR,
+  ACT_RATE_WINDOW_TURNS,
+  actRate,
+  checkActRate,
   checkProviderMix,
   checkSpend,
   classifyFailure,
@@ -498,5 +501,54 @@ describe('price reconciliation over a run', () => {
     expect(r.unreconciledCalls).toBe(1)
     // The unreconcilable call is excluded from BOTH sides, so it cannot skew the ratio.
     expect(r.computedUsd).toBeCloseTo(0.001, 10)
+  })
+})
+
+describe('the act rate', () => {
+  const seedTurns = (db: Database.Database, n: number, acted: boolean, provider = 'Inceptron') => {
+    for (let i = 0; i < n; i++) {
+      insertTurnOutcome(db, { agentId: 'nadia', provider, acted, spoke: false })
+    }
+  }
+
+  it('reads the share of the last turns that did nothing, and who served them', () => {
+    const db = openDb()
+    seedTurns(db, 30, true)
+    seedTurns(db, 10, false)
+    const r = actRate(db)
+    expect(r).toMatchObject({ turns: 40, silent: 10, providers: ['Inceptron'] })
+    expect(r.silentShare).toBeCloseTo(0.25)
+  })
+
+  it('counts a turn that says something without acting as an outcome', () => {
+    const db = openDb()
+    insertTurnOutcome(db, { agentId: 'omar', provider: 'Inceptron', acted: false, spoke: true })
+    expect(actRate(db).silent).toBe(0)
+  })
+
+  it('says nothing until the window is full, however silent the run so far', () => {
+    const db = openDb()
+    seedTurns(db, ACT_RATE_WINDOW_TURNS - 1, false)
+    expect(checkActRate(db).alerted).toBe(false)
+    expect(alerts(db)).toEqual([])
+  })
+
+  it('alerts once the last window is more silent than the threshold, naming the back end', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const db = openDb()
+    seedTurns(db, 20, true)
+    seedTurns(db, 20, false)
+    const r = checkActRate(db)
+    expect(r.alerted).toBe(true)
+    expect(alerts(db)[0]!.kind).toBe('act_rate_collapsed')
+    expect(alerts(db)[0]!.detail).toContain('Inceptron')
+    expect(alerts(db)[0]!.detail).toContain('20 of the last 40')
+  })
+
+  it('reads the window that just ended, so a recovered run stops alerting', () => {
+    const db = openDb()
+    seedTurns(db, 40, false)
+    seedTurns(db, 40, true)
+    expect(checkActRate(db).alerted).toBe(false)
   })
 })
