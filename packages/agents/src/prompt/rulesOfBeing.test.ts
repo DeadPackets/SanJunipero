@@ -85,10 +85,12 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   })
 
   // A shared block that hands every mind the same example makes five copies of one actor, so
-  // the one exemplar is abstract and names nobody.
-  it('spends exactly one exemplar, and it names no founder', () => {
+  // every exemplar is abstract and names nobody: no founder, and no thing anyone holds.
+  it('spends its exemplars on the acts that come back empty, and names no founder', () => {
     expect(CAPABILITIES).toContain('A mind who means to speak')
-    expect(CAPABILITIES.match(/A mind who/g)).toHaveLength(1)
+    expect(CAPABILITIES).toContain('A mind who means to eat')
+    expect(CAPABILITIES).toContain('a mind who means\nto go in')
+    expect(CAPABILITIES.match(/mind who means/g)).toHaveLength(3)
     for (const founder of ['Omar', 'Salma', 'Nadia', 'Amara', 'Yusuf']) {
       expect(CAPABILITIES, founder).not.toContain(founder)
     }

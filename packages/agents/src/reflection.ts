@@ -299,6 +299,10 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
   }
 }
 
+// Each entry under the number that names it: an edit aimed at a line the mind was never shown
+// the coordinate of lands out of range and is thrown away.
+const numbered = (lines: string[]): string => lines.map((t, i) => `[${i}] ${t}`).join('\n')
+
 export function proposeEditPrompt(
   daySummary: string,
   doc: PersonalityDoc,
@@ -322,8 +326,8 @@ export function proposeEditPrompt(
         role: 'user',
         content: [
           `Your day:\n${daySummary}`,
-          `What you value now: ${doc.values.join(', ')}.`,
-          `What you believe now: ${doc.beliefs.join(', ') || 'nothing in particular yet.'}`,
+          `What you value now:\n${numbered(doc.values) || 'nothing in particular yet.'}`,
+          `What you believe now:\n${numbered(doc.beliefs) || 'nothing in particular yet.'}`,
           `Today's memories:\n${memoryLines}`,
         ].join('\n'),
       },

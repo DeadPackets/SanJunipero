@@ -45,10 +45,20 @@ const NO_OP_EDIT_TEXT = /^(?:no changes?|nothing to change|none|n\/a|no edit)[\s
 // The same refusal said in prose and buried in a sentence, which the anchored form above lets
 // through. A trait that declares nothing moved is not a trait. Observed phrasings only.
 const NO_OP_EDIT_PHRASE = /\b(?:not a change|no different|unchanged|stays the same|keeps? as is)\b/i
+// "I have always believed X, and I still do" — a trait whose whole content is that it has not
+// moved. Both ends are needed: "I still believe X" alone is a live belief (K22, yusuf v2).
+const NO_OP_STILL_HOLDS =
+  /\bi (?:have )?always (?:believed|held|thought|felt)\b[\s\S]{0,180}?\bi still\b/i
+// The same affirmation with no clause of its own. Anchored whole, so a trait that ADDS content
+// while affirming still lands.
+const NO_OP_AFFIRMATION =
+  /^(?:as i (?:always|ever) have|i still do|i continue to (?:believe|hold|think|feel) (?:so|this|that|it))[\s.!?,;:]*$/i
 
 function isNoOpEditText(text: string): boolean {
   const trimmed = text.trim()
-  return NO_OP_EDIT_TEXT.test(trimmed) || NO_OP_EDIT_PHRASE.test(trimmed)
+  return [NO_OP_EDIT_TEXT, NO_OP_EDIT_PHRASE, NO_OP_STILL_HOLDS, NO_OP_AFFIRMATION].some((re) =>
+    re.test(trimmed),
+  )
 }
 
 export type NightlyEditOutcome =

@@ -30,6 +30,7 @@ import {
   MIND_MODEL,
   PROVIDER_ORDER,
   backfillUnattributed,
+  checkActRate,
   checkProviderMix,
   checkSpend,
   insertAlert,
@@ -441,6 +442,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     opsDb,
     caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
     rulings: arbiterDb === null ? null : new ReviewStore(arbiterDb),
+    alert: (kind, detail) => {
+      insertAlert(opsDb, { agentId: null, kind, detail })
+    },
   }
 
   return {
@@ -798,6 +802,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               `stream: providers — ${(mix.offPinShare * 100).toFixed(0)}% of mind calls off the allow-list`,
             )
           }
+        }
+        // The sustained act bar. Pre-flight's three calls cannot see a rate that collapses over
+        // a run, so this window is what the gate really rests on: a collapse inside the first
+        // sim-hour is the signal that the back end passed the bar and then stopped acting.
+        const acts = checkActRate(opsDb)
+        if (acts.alerted) {
+          log(`stream: acts — ${(acts.silentShare * 100).toFixed(0)}% of mind turns did nothing`)
         }
         if (Date.now() >= nextBackfillAt && !backfilling) {
           nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000

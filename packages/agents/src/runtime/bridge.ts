@@ -10,6 +10,7 @@ import {
   isExposed,
   isFoodKind,
   isPassable,
+  loneCandidateFor,
   makeables,
   recipeTileKind,
   submitIntent,
@@ -230,6 +231,12 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // Whether an act that named no object has exactly one thing it could mean. Asked before the
+  // decode retry, so a mind that named the verb is not made to answer for it twice (K20).
+  actHasOneReading(agentId: string, verb: string): boolean {
+    return loneCandidateFor(this.#loop.state, this.#simConfig, agentId, verb, {}) !== null
   }
 
   // The words `build` and `craft` accept. Handed over whole, because the tables behind them do

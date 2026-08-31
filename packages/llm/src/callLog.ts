@@ -59,6 +59,14 @@ export function migrateLlmTables(db: Database.Database): void {
       kind TEXT NOT NULL,
       detail TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS turn_outcomes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      agent_id TEXT,
+      provider TEXT,
+      acted INTEGER NOT NULL,
+      spoke INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS llm_reservations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ts INTEGER NOT NULL,
@@ -82,6 +90,17 @@ export function migrateLlmTables(db: Database.Database): void {
   if (!cols.some((c) => c.name === 'generation_id')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN generation_id TEXT')
   }
+}
+
+/** What one paid turn produced, against the back end that answered it. A turn that acts on
+ *  nothing and says nothing is legal and leaves no other trace; without this row it is invisible. */
+export function insertTurnOutcome(
+  db: Database.Database,
+  row: { agentId: string | null; provider: string | null; acted: boolean; spoke: boolean },
+): void {
+  db.prepare(
+    'INSERT INTO turn_outcomes (ts, agent_id, provider, acted, spoke) VALUES (?, ?, ?, ?, ?)',
+  ).run(Date.now(), row.agentId, row.provider, row.acted ? 1 : 0, row.spoke ? 1 : 0)
 }
 
 export function sumReserved(db: Database.Database, caller: string): number {

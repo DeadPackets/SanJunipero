@@ -339,8 +339,22 @@ export async function startDevWorld(
   // A self-arming beat, not an interval: the operator's dial (POST /admin/speed, /admin/pause)
   // moves `loop.speed` and `loop.paused`, and an interval already armed cannot be re-timed.
   const beatMs = opts.realMsPerTick ?? DEV_MS_PER_TICK
+  // A throw out of one tick must not take the beat with it: skipping `arm()` freezes the world
+  // for good, with no line anywhere. One alert per distinct fault, so a repeating one is quiet.
+  let lastFault = ''
+  const beatFailed = (err: unknown): void => {
+    const why = err instanceof Error ? err.message : String(err)
+    if (why === lastFault) return
+    lastFault = why
+    console.error(`dev world: tick ${loop.state.tick} threw — ${why}`)
+    cast?.ops?.alert('tick_failed', why)
+  }
   const beat = (): void => {
-    if (!loop.paused) tickOnce()
+    try {
+      if (!loop.paused) tickOnce()
+    } catch (err) {
+      beatFailed(err)
+    }
     arm()
   }
   const arm = (): void => {

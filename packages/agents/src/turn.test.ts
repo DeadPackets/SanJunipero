@@ -206,6 +206,28 @@ describe('parseTurnWithRepair', () => {
     expect(alert).not.toHaveBeenCalled()
   })
 
+  it('keeps the act and spends no correction when the world reads it one way', async () => {
+    const empty = { ...validTurn, plan: null, action: { verb: 'eat', params: {} } }
+    const repair = vi.fn()
+    const alert = vi.fn()
+    const hasOneReading = vi.fn(() => true)
+    const turn = await parseTurnWithRepair(empty, repair, alert, hasOneReading)
+    expect(turn.action).toEqual({ verb: 'eat', params: {} })
+    expect(hasOneReading).toHaveBeenCalledWith('eat')
+    expect(repair).not.toHaveBeenCalled()
+    expect(alert).toHaveBeenCalledWith('act_detail_filled_in', expect.stringContaining('eat'))
+  })
+
+  it('still spends the correction when the world offers no single candidate', async () => {
+    const empty = { ...validTurn, plan: null, action: { verb: 'eat', params: {} } }
+    const repair = vi.fn(async () => empty)
+    const alert = vi.fn()
+    const turn = await parseTurnWithRepair(empty, repair, alert, () => false)
+    expect(turn.thought).toBe(validTurn.thought)
+    expect(repair).toHaveBeenCalledTimes(1)
+    expect(alert).toHaveBeenCalledWith('empty_act_detail', expect.stringContaining('eat'))
+  })
+
   it('keeps the turn and says so once when the act comes back empty twice', async () => {
     const empty = { ...validTurn, plan: null, action: { verb: 'eat', params: {} } }
     const repair = vi.fn(async () => empty)

@@ -10,6 +10,7 @@ import { TurnSchema, type Turn } from '../turn.js'
 export const PREFLIGHT_CALLS = 3
 // `action` on every call is the bar — it separated four candidates cleanly over 48 probe calls;
 // `speech` measures a mind's choice, not a provider's capability, so it is reported and never gates.
+// Three calls cannot see a rate that decays over a run; `checkActRate` is the sustained half.
 export const PREFLIGHT_BAR = { action: 3 } as const
 // How many times the bar is repeated before the gate gives up: one probe concludes nothing.
 export const PREFLIGHT_ROUNDS = 4

@@ -47,9 +47,10 @@ const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
 // The night running from dusk of day d to dawn of day d+1 is night d, so an
 // agent asleep past midnight still reflects (once) over the day that ended.
+// Ticks 0..359 are the pre-dawn of day 0, which belongs to night -1: a night nobody lived.
 const DAWN_MINUTES = 6 * 60
 export function nightOf(tick: number): number {
-  return Math.max(0, Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY))
+  return Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY)
 }
 
 function messageOf(err: unknown): string {
@@ -532,7 +533,7 @@ export class AgentRuntime {
     }
     if (isNight && packet.self.asleep) {
       const night = nightOf(tick)
-      if (this.#reflectedNight !== night) void this.#runNight(night)
+      if (night >= 0 && this.#reflectedNight !== night) void this.#runNight(night)
     }
     this.#wasNight = isNight
   }
@@ -653,6 +654,7 @@ export class AgentRuntime {
         (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
+        (verb) => this.#bridge.actHasOneReading(this.#agentId, verb),
       )
     } catch (err) {
       this.#doze(tick, err)
@@ -660,6 +662,12 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
+    // What the answer produced, booked before the world sees it: an act:null turn is legal and
+    // leaves no refusal, no event and no alert of its own (K26).
+    this.#llm.noteTurnOutcome({
+      acted: (turn.action ?? null) !== null,
+      spoke: !isBlankAnswer(turn.speech),
+    })
     // Read once: a cast back that has been answered is not answered again next turn.
     this.#pendingRecall = null
     await this.#applyTurn(turn, tick, day)

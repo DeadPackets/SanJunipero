@@ -94,6 +94,32 @@ describe('dev world server', () => {
     }
   })
 
+  // One throw out of a tick used to skip `arm()`, freezing the world for good with no line
+  // anywhere and taking the process down from inside the timer.
+  it('a tick that throws does not stop the beat, and says so once', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath: join(dir, 'throw.db') })
+    try {
+      await until(() => dw.loop.state.tick >= 1, 12_000)
+      const step = dw.loop.step.bind(dw.loop)
+      let thrown = 0
+      dw.loop.step = () => {
+        if (thrown < 3) {
+          thrown += 1
+          throw new Error('the observer scan fell over')
+        }
+        step()
+      }
+      await until(() => thrown >= 3, 12_000)
+      const frozenAt = dw.loop.state.tick
+      await until(() => dw.loop.state.tick > frozenAt, 12_000)
+      // Three identical throws, one line: a repeating fault does not fill the log.
+      expect(err.mock.calls.filter((c) => String(c[0]).includes('fell over'))).toHaveLength(1)
+    } finally {
+      await dw.stop()
+    }
+  })
+
   it('serves the founders town live with observer thoughts', async () => {
     // 5 ms, not 1: the socket is compressed and zlib finishes on the event loop, so a tick loop
     // that never yields starves those callbacks and the hub reads the backlog as a lagging viewer.

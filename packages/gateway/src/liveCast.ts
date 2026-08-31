@@ -23,6 +23,8 @@ export type LiveOps = {
   opsDb: Database.Database
   caps: { dailyUsd: number; lifetimeUsd: number }
   rulings: RulingsAdmin | null
+  /** One row on the ops surface, for a host that must not import the ledger's own package. */
+  alert(kind: string, detail: string): void
 }
 
 /** A port, not an import: `@sj/town` hands the bodies to whatever satisfies this and only
