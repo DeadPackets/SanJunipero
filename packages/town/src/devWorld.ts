@@ -23,6 +23,7 @@ import {
 import { openForgeDb } from '@sj/forge'
 import {
   createGateway,
+  createPacing,
   ensureObserverTables,
   publishThought,
   type Gateway,
@@ -295,6 +296,10 @@ export async function startDevWorld(
   handler =
     cast === null ? scriptedOnTick : cast.attach({ loop, store, config, db, world: scriptedOnTick })
 
+  // The same dial POST /admin/speed turns, so an idle town and an operator never fight over
+  // two clocks. The beat below re-reads `loop.speed` each arm, so nothing else need know.
+  const pacing = createPacing({ clock: loop })
+
   let gateway: Gateway
   try {
     gateway = await createGateway({
@@ -304,6 +309,9 @@ export async function startDevWorld(
       config,
       db,
       paused: () => loop.paused,
+      onViewers: (n) => {
+        pacing.viewers(n)
+      },
       ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
       ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
       ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
@@ -381,6 +389,7 @@ export async function startDevWorld(
       applyLaw(lawQueue, path, value)
     },
     stop: async () => {
+      pacing.stop()
       clearTimeout(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step never returns.
       await cast?.stop()
