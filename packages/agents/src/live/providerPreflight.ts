@@ -65,6 +65,7 @@ export function preflightPrompts(
       scene: { ledgers: [], memories: [] },
       dayLog: ['The morning is bright and the valley is awake.'],
       now: { prose },
+      underway: null,
     }),
   )
 }

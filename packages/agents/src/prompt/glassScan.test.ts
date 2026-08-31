@@ -57,6 +57,11 @@ describe('the prompt surfaces are clean', () => {
     }
   })
 
+  it('the line a mind is handed while something is already underway', () => {
+    const a = assemblePrompt(fixtureBlocks({ underway: { what: 'walk 62 70', step: 2, of: 4 } }))
+    expect(scanPromptForGlassLeak(a.messages.map((m) => m.content).join('\n'))).toEqual([])
+  })
+
   it('★ the gate cuts the leaked span out and hands the rest over — the turn continues', () => {
     const leaks: string[][] = []
     expect(

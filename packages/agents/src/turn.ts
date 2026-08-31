@@ -83,10 +83,16 @@ export const FALLBACK_TURN: Turn = {
 // only ever hands those over with nothing in them.
 const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'exit', 'doff', 'drink', 'forage'])
 
+// A try at something new carries no verb of its own, so neither reader below can speak for it.
+const namedAct = (turn: Turn): z.infer<typeof IntentSchema> | null => {
+  const action = turn.action
+  return action === null || action === undefined || 'freeform' in action ? null : action
+}
+
 /** The verb this turn began with nothing named, or null when the act carries its detail. */
 export function actWithoutItsDetail(turn: Turn): string | null {
-  const action = turn.action
-  if (action === null || action === undefined || 'freeform' in action) return null
+  const action = namedAct(turn)
+  if (action === null) return null
   if (ACTS_ASKING_NOTHING.has(action.verb) || action.verb.includes(':')) return null
   return Object.values(action.params).every(isBlankAnswer) ? action.verb : null
 }
@@ -98,6 +104,14 @@ export function isBlankAnswer(raw: unknown): boolean {
   if (typeof raw === 'string') return raw.trim().length === 0
   if (typeof raw === 'object') return Object.keys(raw).length === 0
   return false
+}
+
+/** Whether this answer puts words into the world. The capabilities list offers two doors, the
+ *  `speech` field and a `speak` action, and w1a sent 35 of its 104 speeches through the second. */
+export function turnSpeaks(turn: Turn): boolean {
+  if (!isBlankAnswer(turn.speech)) return true
+  const action = namedAct(turn)
+  return action !== null && action.verb === 'speak' && !isBlankAnswer(action.params.text)
 }
 
 /** Whether the world holds exactly one thing this verb's blank object could have meant. */

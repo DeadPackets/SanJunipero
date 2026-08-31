@@ -967,3 +967,20 @@ describe('what a spent beat brings back', () => {
     expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
   })
 })
+
+describe('a mind that is already in the middle of something', () => {
+  it('names the step it is on, last of all, and asks it to carry on or break off', () => {
+    const a = assemblePrompt(fixtureBlocks({ underway: { what: 'walk 62 70', step: 2, of: 4 } }))
+    const last = a.messages.at(-1)!.content
+    expect(last).toContain('You are in the middle of: walk 62 70 (step 2 of 4).')
+    expect(last).toContain('Name no action and it goes on.')
+  })
+
+  it('prints no step for a one-act plan, and nothing at all for a mind with its hands free', () => {
+    const one = fixtureBlocks({ underway: { what: 'eat item_bread', step: 1, of: 1 } })
+    expect(assemblePrompt(one).messages.at(-1)!.content).toContain(
+      'You are in the middle of: eat item_bread. Your body',
+    )
+    expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
+  })
+})

@@ -2,7 +2,13 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import type { IdentityCore, AssembledPrompt, PromptBlocks, Recalled } from '../prompt/assemble.js'
+import type {
+  IdentityCore,
+  AssembledPrompt,
+  PromptBlocks,
+  Recalled,
+  Underway,
+} from '../prompt/assemble.js'
 import { appendMoment, assemblePrompt, compactDayLog, JOURNAL_LINES } from '../prompt/assemble.js'
 import {
   heardProse,
@@ -20,6 +26,7 @@ import {
   isBlankAnswer,
   parseTurnWithRepair,
   reconsiderTick,
+  turnSpeaks,
   TurnSchema,
   type Turn,
 } from '../turn.js'
@@ -174,6 +181,8 @@ function freshClock(): MindClock {
   }
 }
 
+const idlePlan = (): PlanState => ({ queue: [], lastResult: 'idle', size: 0 })
+
 export class AgentRuntime {
   readonly #db: Database.Database
   readonly #llm: LlmClient
@@ -193,7 +202,7 @@ export class AgentRuntime {
   #dayLog: string[] = []
   #prevMomentSentences = new Set<string>()
   #clock: MindClock = freshClock()
-  #plan: PlanState = { queue: [], lastResult: 'idle' }
+  #plan: PlanState = idlePlan()
   #planHeadInFlight = false
   #pendingIntent: Intent | null = null
   #pendingInFlight = false
@@ -246,7 +255,7 @@ export class AgentRuntime {
     this.#dayLog = []
     this.#prevMomentSentences = new Set()
     this.#clock = freshClock()
-    this.#plan = { queue: [], lastResult: 'idle' }
+    this.#plan = idlePlan()
     this.#planHeadInFlight = false
     this.#pendingIntent = null
     this.#pendingInFlight = false
@@ -275,7 +284,11 @@ export class AgentRuntime {
         alarmArmed: { ...this.#clock.alarmArmed },
         prevVisibleIds: [...this.#clock.prevVisibleIds],
       },
-      plan: { queue: this.#plan.queue.map((i) => ({ ...i })), lastResult: this.#plan.lastResult },
+      plan: {
+        queue: this.#plan.queue.map((i) => ({ ...i })),
+        lastResult: this.#plan.lastResult,
+        size: this.#plan.size,
+      },
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
       reflectedNight: this.#reflectedNight,
@@ -292,7 +305,11 @@ export class AgentRuntime {
       alarmArmed: { ...s.clock.alarmArmed },
       prevVisibleIds: [...s.clock.prevVisibleIds],
     }
-    this.#plan = { queue: s.plan.queue.map((i) => ({ ...i })), lastResult: s.plan.lastResult }
+    this.#plan = {
+      queue: s.plan.queue.map((i) => ({ ...i })),
+      lastResult: s.plan.lastResult,
+      size: s.plan.size,
+    }
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
     this.#reflectedNight = s.reflectedNight
@@ -311,7 +328,7 @@ export class AgentRuntime {
   stop(): void {
     this.#started = false
     this.#turnInFlight = false
-    this.#plan = { queue: [], lastResult: 'idle' }
+    this.#plan = idlePlan()
     this.#pendingIntent = null
     this.#pendingInFlight = false
   }
@@ -399,6 +416,26 @@ export class AgentRuntime {
       void this.#bridge.submit(this.#agentId, head, (res) => {
         this.#onPlanHeadResult(res, head)
       })
+    }
+  }
+
+  #clearPlanQueue(): void {
+    this.#plan.queue = []
+    this.#plan.size = 0
+    this.#planHeadInFlight = false
+  }
+
+  /** The plan this mind is partway through, in its own words for the act. A body mid-act with
+   *  no plan is not here: the moment prose already says so, and holds an act rather than drops it. */
+  #underway(): Underway | null {
+    const head = this.#plan.queue[0]
+    if (this.#plan.lastResult !== 'running' || head === undefined) return null
+    // A checkpoint written before the count existed resumes with what is left of the queue.
+    const of = this.#plan.size ?? this.#plan.queue.length
+    return {
+      what: humanizeIntent(head.verb, head.params),
+      step: of - this.#plan.queue.length + 1,
+      of,
     }
   }
 
@@ -505,9 +542,8 @@ export class AgentRuntime {
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     if (res.ok) return
+    this.#clearPlanQueue()
     this.#plan.lastResult = 'blocked'
-    this.#plan.queue = []
-    this.#planHeadInFlight = false
     if (isBodyNoOp(res.reason, head.verb)) return
     if (this.#reroutesUnknownVerb(res.reason)) {
       void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
@@ -620,6 +656,7 @@ export class AgentRuntime {
       dayLog: this.#dayLog,
       recalled: this.#pendingRecall,
       now: { prose: nowProse, heard },
+      underway: this.#underway(),
     }
     let assembled = assemblePrompt(blocks)
 
@@ -663,10 +700,15 @@ export class AgentRuntime {
 
     this.#clock.lastTurnTick = tick
     // What the answer produced, booked before the world sees it: an act:null turn is legal and
-    // leaves no refusal, no event and no alert of its own (K26).
+    // leaves no refusal, no event and no alert of its own (K26). The fourth outcome is the one
+    // run G read as silence: named nothing because a plan is already carrying the body.
+    const acted = (turn.action ?? null) !== null
+    const spoke = turnSpeaks(turn)
     this.#llm.noteTurnOutcome({
-      acted: (turn.action ?? null) !== null,
-      spoke: !isBlankAnswer(turn.speech),
+      acted,
+      spoke,
+      planContinued:
+        !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
     })
     // Read once: a cast back that has been answered is not answered again next turn.
     this.#pendingRecall = null
@@ -753,8 +795,7 @@ export class AgentRuntime {
     // A turn that speaks or acts directly preempts whatever plan was running.
     if ((turn.speech ?? null) !== null || (turn.action ?? null) !== null) {
       if (this.#plan.lastResult === 'running') this.#plan.lastResult = 'idle'
-      this.#plan.queue = []
-      this.#planHeadInFlight = false
+      this.#clearPlanQueue()
     }
 
     if (turn.speech) {
@@ -783,6 +824,7 @@ export class AgentRuntime {
 
     if (turn.plan) {
       this.#plan.queue = [...turn.plan]
+      this.#plan.size = turn.plan.length
       this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
       this.#planHeadInFlight = false
       this.#pumpPlan(this.#bridge.perception(this.#agentId).self.activity)

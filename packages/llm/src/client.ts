@@ -304,7 +304,7 @@ export class LlmClient {
 
   /** Books what the last answer produced against the back end that served it. A well-formed
    *  turn that does nothing is the one failure the ledger cannot see from the call row alone. */
-  noteTurnOutcome(outcome: { acted: boolean; spoke: boolean }): void {
+  noteTurnOutcome(outcome: { acted: boolean; spoke: boolean; planContinued: boolean }): void {
     const row = this.db
       .prepare(
         'SELECT provider FROM llm_calls WHERE caller = ? AND agent_id IS ? ORDER BY id DESC LIMIT 1',

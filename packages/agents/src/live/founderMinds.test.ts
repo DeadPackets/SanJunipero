@@ -16,6 +16,7 @@ const promptFor = (mind: (typeof FOUNDER_MINDS)[number]): string => {
     scene: { ledgers: [], memories: [] },
     dayLog: ['The morning is bright and the valley is awake.'],
     now: { prose: 'You are standing on the road outside your own door.' },
+    underway: null,
   })
   return [p.system, ...p.messages.map((m) => m.content)].join('\n')
 }

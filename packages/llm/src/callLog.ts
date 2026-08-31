@@ -65,7 +65,8 @@ export function migrateLlmTables(db: Database.Database): void {
       agent_id TEXT,
       provider TEXT,
       acted INTEGER NOT NULL,
-      spoke INTEGER NOT NULL
+      spoke INTEGER NOT NULL,
+      plan_continued INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS llm_reservations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,17 +91,36 @@ export function migrateLlmTables(db: Database.Database): void {
   if (!cols.some((c) => c.name === 'generation_id')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN generation_id TEXT')
   }
+  const outcomeCols = db.prepare('PRAGMA table_info(turn_outcomes)').all() as { name: string }[]
+  if (!outcomeCols.some((c) => c.name === 'plan_continued')) {
+    db.exec('ALTER TABLE turn_outcomes ADD COLUMN plan_continued INTEGER NOT NULL DEFAULT 0')
+  }
 }
 
 /** What one paid turn produced, against the back end that answered it. A turn that acts on
- *  nothing and says nothing is legal and leaves no other trace; without this row it is invisible. */
+ *  nothing and says nothing is legal and leaves no other trace; without this row it is invisible.
+ *  `planContinued` is the fourth outcome: the turn added nothing of its own because a plan is
+ *  carrying the body — one already running, or one this same answer committed. */
 export function insertTurnOutcome(
   db: Database.Database,
-  row: { agentId: string | null; provider: string | null; acted: boolean; spoke: boolean },
+  row: {
+    agentId: string | null
+    provider: string | null
+    acted: boolean
+    spoke: boolean
+    planContinued: boolean
+  },
 ): void {
   db.prepare(
-    'INSERT INTO turn_outcomes (ts, agent_id, provider, acted, spoke) VALUES (?, ?, ?, ?, ?)',
-  ).run(Date.now(), row.agentId, row.provider, row.acted ? 1 : 0, row.spoke ? 1 : 0)
+    'INSERT INTO turn_outcomes (ts, agent_id, provider, acted, spoke, plan_continued) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(
+    Date.now(),
+    row.agentId,
+    row.provider,
+    row.acted ? 1 : 0,
+    row.spoke ? 1 : 0,
+    row.planContinued ? 1 : 0,
+  )
 }
 
 export function sumReserved(db: Database.Database, caller: string): number {

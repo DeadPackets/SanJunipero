@@ -150,6 +150,7 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
     },
     dayLog: ['Woke with the light.', 'Drew water and fed the hens.', 'Sat a while by the gate.'],
     now: { prose: 'The sun is high and the meadow is quiet.' },
+    underway: null,
   }
   return { ...base, ...overrides }
 }

@@ -74,6 +74,9 @@ type Intent = z.infer<typeof IntentSchema>
 export type PlanState = {
   queue: Intent[]
   lastResult: 'idle' | 'running' | 'done' | 'blocked'
+  // How many acts the plan was committed with, so a running one can say which step it is on.
+  // Optional: a checkpoint written before it existed still resumes, and prints no step.
+  size?: number | undefined
 }
 
 export type WakeReason =

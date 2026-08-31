@@ -390,11 +390,16 @@ function journalRows(db: Database.Database): { tick: number; text: string }[] {
   }[]
 }
 
-function turnOutcomes(db: Database.Database): { agent_id: string; acted: number; spoke: number }[] {
-  return db.prepare('SELECT agent_id, acted, spoke FROM turn_outcomes ORDER BY id').all() as {
+function turnOutcomes(
+  db: Database.Database,
+): { agent_id: string; acted: number; spoke: number; plan_continued: number }[] {
+  return db
+    .prepare('SELECT agent_id, acted, spoke, plan_continued FROM turn_outcomes ORDER BY id')
+    .all() as {
     agent_id: string
     acted: number
     spoke: number
+    plan_continued: number
   }[]
 }
 
@@ -448,10 +453,112 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => turnOutcomes(agentDb).length >= 2, 200)
+    // The second row is the honest idle: no plan, no act, no word, and it stays counted.
     expect(turnOutcomes(agentDb).slice(0, 2)).toEqual([
-      { agent_id: AGENT, acted: 1, spoke: 0 },
-      { agent_id: AGENT, acted: 0, spoke: 0 },
+      { agent_id: AGENT, acted: 1, spoke: 0, plan_continued: 0 },
+      { agent_id: AGENT, acted: 0, spoke: 0, plan_continued: 0 },
     ])
+  })
+
+  // w1a put 35 of its 104 speeches through `action`, and every one of them booked spoke: 0.
+  it('books words as spoken whichever door they came through', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'They should know.',
+          action: { verb: 'speak', params: { text: 'The storehouse is stocked.' } },
+          importance: 3,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => spokeTexts(world.engineDb).length >= 1, 100)
+    expect(turnOutcomes(agentDb)[0]).toEqual({
+      agent_id: AGENT,
+      acted: 1,
+      spoke: 1,
+      plan_continued: 0,
+    })
+  })
+
+  // Run G booked 610 turns as silence. A mind whose body is already walking somewhere has
+  // nothing to add, and the queue drains whether it speaks up or not.
+  it('carries a running plan on through a turn that names nothing, and books it as such', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel(
+        [
+          {
+            thought: 'Walk over, take the bread, eat it.',
+            plan: [
+              { verb: 'walk', params: { x: 5, y: 6 } },
+              { verb: 'take', params: { itemId: BREAD_ID } },
+              { verb: 'eat', params: { itemId: BREAD_ID } },
+            ],
+            importance: 4,
+            reconsider_at: '00:05',
+          },
+        ],
+        { thought: 'My hands are already at it. I let them work.', importance: 2 },
+      ),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 200)
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
+    const rows = turnOutcomes(agentDb)
+    // The turn that set the plan going, and the turn that let it run on: neither is silence.
+    expect(rows[0]).toEqual({ agent_id: AGENT, acted: 0, spoke: 0, plan_continued: 1 })
+    expect(rows[1]).toEqual({ agent_id: AGENT, acted: 0, spoke: 0, plan_continued: 1 })
+  })
+
+  it('books an interrupting act as an act, not as the plan it just threw away', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk the long way round.',
+          plan: [
+            { verb: 'walk', params: { x: 12, y: 12 } },
+            { verb: 'walk', params: { x: 3, y: 3 } },
+          ],
+          importance: 4,
+          reconsider_at: '00:05',
+        },
+        {
+          thought: 'No — I am spent. I lie down where I stand.',
+          action: { verb: 'sleep', params: {} },
+          importance: 6,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 2, 80)
+    expect(turnOutcomes(agentDb).slice(0, 2)).toEqual([
+      { agent_id: AGENT, acted: 0, spoke: 0, plan_continued: 1 },
+      { agent_id: AGENT, acted: 1, spoke: 0, plan_continued: 0 },
+    ])
+  })
+
+  it('tells a mind what it is in the middle of, and asks it to carry on or break off', async () => {
+    const { model, prompts } = capturingModel([
+      {
+        thought: 'Walk over, take the bread, eat it.',
+        plan: [
+          { verb: 'walk', params: { x: 5, y: 6 } },
+          { verb: 'take', params: { itemId: BREAD_ID } },
+          { verb: 'eat', params: { itemId: BREAD_ID } },
+        ],
+        importance: 4,
+        reconsider_at: '00:05',
+      },
+      { thought: 'I let my hands work.', importance: 2 },
+    ])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 200)
+    const first = prompts[0]!.map((m) => m.text).join('\n')
+    const second = prompts[1]!.map((m) => m.text).join('\n')
+    // Nothing was underway on the first turn, so the open framing stands.
+    expect(first).not.toContain('You are in the middle of:')
+    expect(second).toContain('You are in the middle of: walk 5 6 (step 1 of 3).')
+    expect(second).toContain('Name no action and it goes on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {

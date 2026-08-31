@@ -49,30 +49,39 @@ export function projectCallRate(
 // Turns, not minutes: an act rate is a property of the answers, and a real-time window over a
 // paused or slowed loop measures the loop instead.
 export const ACT_RATE_WINDOW_TURNS = 40
-// Run E ran at 1.6% silent; run G at 44.5%. Anything past a third is a collapse, not a mood.
-export const DEFAULT_SILENT_TURN_THRESHOLD = 0.3
+// Run E ran at 1.6% silent; run G at 44.5%. The w1 rehearsals sat at a 0.28-0.40 median per
+// window with the town working, so only two fifths is a collapse and a third is a mood.
+export const DEFAULT_SILENT_TURN_THRESHOLD = 0.4
 
 export type ActRate = {
   turns: number
   silent: number
+  planContinued: number
   silentShare: number
   providers: string[]
 }
 
-/** How many of the last turns produced neither an act nor a word, and who served them. */
+/** How many of the last turns produced neither an act nor a word, and who served them. A turn
+ *  that named nothing because a committed plan is still running is not one of them: the body is
+ *  working, and counting it as silence would read a working town as a collapsed one. */
 export function actRate(db: Database.Database, opts: { windowTurns?: number } = {}): ActRate {
   const rows = db
-    .prepare('SELECT provider, acted, spoke FROM turn_outcomes ORDER BY id DESC LIMIT ?')
+    .prepare(
+      'SELECT provider, acted, spoke, plan_continued AS planContinued FROM turn_outcomes ORDER BY id DESC LIMIT ?',
+    )
     .all(opts.windowTurns ?? ACT_RATE_WINDOW_TURNS) as {
     provider: string | null
     acted: number
     spoke: number
+    planContinued: number
   }[]
-  const silent = rows.filter((r) => r.acted === 0 && r.spoke === 0).length
+  const silent = rows.filter((r) => r.acted === 0 && r.spoke === 0 && r.planContinued === 0).length
+  const planContinued = rows.filter((r) => r.planContinued === 1).length
   const providers = [...new Set(rows.map((r) => r.provider ?? 'unattributed'))].sort()
   return {
     turns: rows.length,
     silent,
+    planContinued,
     silentShare: rows.length === 0 ? 0 : silent / rows.length,
     providers,
   }
@@ -88,10 +97,11 @@ export function checkActRate(
   const threshold = opts.threshold ?? DEFAULT_SILENT_TURN_THRESHOLD
   const rate = actRate(db, { windowTurns })
   if (rate.turns < windowTurns || rate.silentShare <= threshold) return { ...rate, alerted: false }
+  const carried = rate.planContinued === 0 ? '' : `; ${rate.planContinued} more carried a plan on`
   const detail =
     `${rate.silent} of the last ${rate.turns} mind turns produced no act and no word ` +
     `(${(rate.silentShare * 100).toFixed(0)}%, over ${(threshold * 100).toFixed(0)}%), ` +
-    `served by ${rate.providers.join(', ')}`
+    `served by ${rate.providers.join(', ')}${carried}`
   insertAlert(db, { agentId: null, kind: 'act_rate_collapsed', detail })
   console.warn(`acts: ${detail}`)
   return { ...rate, alerted: true }

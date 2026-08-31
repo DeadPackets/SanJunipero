@@ -23,6 +23,10 @@ type JournalEntry = { day: number; text: string }
 
 export type Recalled = { query: string; memories: string[] }
 
+/** What the mind already committed to and is partway through: the head of a running plan, or
+ *  the act its body is still carrying out. `of` at one is a single act, and prints no step. */
+export type Underway = { what: string; step: number; of: number }
+
 export type PromptBlocks = {
   rulesOfBeing: string // block 1 — never changes, identical for all agents
   identity: IdentityCore // block 2 — never changes
@@ -34,6 +38,9 @@ export type PromptBlocks = {
   // block 6 — every turn. `heard` is another mouth's bytes and rides its own message, so no
   // utterance can ever read as a sentence the narrator wrote.
   now: { prose: string; heard?: string }
+  // Last of all, and only while something is already running: a mind holding an intention is
+  // asked whether to carry on or break off, never asked afresh whether to act at all.
+  underway: Underway | null
 }
 
 export type AssembledPrompt = {
@@ -106,6 +113,16 @@ function renderRecall(recalled: Recalled): string {
   return `${opening} What comes back:\n${recalled.memories.join('\n')}`
 }
 
+// Said in the mind's own words for the act, and honest about the cost of breaking off: naming
+// an action drops what is left of the plan.
+function renderUnderway(u: Underway): string {
+  const step = u.of > 1 ? ` (step ${u.step} of ${u.of})` : ''
+  return (
+    `You are in the middle of: ${u.what}${step}. Your body carries it on by itself.\n` +
+    'Name no action and it goes on. Name one and you break off, and what was left of it is let go.'
+  )
+}
+
 function renderScene(scene: PromptBlocks['scene']): string {
   const parts: string[] = []
   if (scene.ledgers.length > 0) {
@@ -143,7 +160,8 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const heard = blocks.now.heard ?? ''
   // Stable before volatile — the book changes only when the mind writes in it, dayLog is
   // append-only, the scene changes every turn — so the byte prefix stays cacheable.
-  const ordered = [journal, dayLog, scene, recalled, now, heard]
+  const underway = blocks.underway === null ? '' : renderUnderway(blocks.underway)
+  const ordered = [journal, dayLog, scene, recalled, now, heard, underway]
   const messages = ordered
     .filter((content) => content.length > 0)
     .map((content) => ({ role: 'user' as const, content }))

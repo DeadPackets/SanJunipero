@@ -507,7 +507,13 @@ describe('price reconciliation over a run', () => {
 describe('the act rate', () => {
   const seedTurns = (db: Database.Database, n: number, acted: boolean, provider = 'Inceptron') => {
     for (let i = 0; i < n; i++) {
-      insertTurnOutcome(db, { agentId: 'nadia', provider, acted, spoke: false })
+      insertTurnOutcome(db, {
+        agentId: 'nadia',
+        provider,
+        acted,
+        spoke: false,
+        planContinued: false,
+      })
     }
   }
 
@@ -520,9 +526,33 @@ describe('the act rate', () => {
     expect(r.silentShare).toBeCloseTo(0.25)
   })
 
+  // Run G's 44.5% "silence" is the number this row exists to stop overstating: a mind whose
+  // body is working through a committed plan has nothing to add, and that is not a collapse.
+  it('does not count a turn that let a running plan carry on as silence', () => {
+    const db = openDb()
+    seedTurns(db, 20, true)
+    for (let i = 0; i < 20; i++) {
+      insertTurnOutcome(db, {
+        agentId: 'nadia',
+        provider: 'Inceptron',
+        acted: false,
+        spoke: false,
+        planContinued: true,
+      })
+    }
+    expect(actRate(db)).toMatchObject({ turns: 40, silent: 0, planContinued: 20 })
+    expect(checkActRate(db).alerted).toBe(false)
+  })
+
   it('counts a turn that says something without acting as an outcome', () => {
     const db = openDb()
-    insertTurnOutcome(db, { agentId: 'omar', provider: 'Inceptron', acted: false, spoke: true })
+    insertTurnOutcome(db, {
+      agentId: 'omar',
+      provider: 'Inceptron',
+      acted: false,
+      spoke: true,
+      planContinued: false,
+    })
     expect(actRate(db).silent).toBe(0)
   })
 

@@ -57,6 +57,8 @@ const MindSnapshot = z
           .object({
             queue: z.array(IntentSchema),
             lastResult: z.enum(['idle', 'running', 'done', 'blocked']),
+            // Optional so a checkpoint written before the step count existed still resumes.
+            size: z.number().int().optional(),
           })
           .strict(),
         stats: z
