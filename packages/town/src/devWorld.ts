@@ -37,11 +37,11 @@ import {
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
-export const DEV_MS_PER_TICK = 1250
+export const DEV_MS_PER_TICK = 1600
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
 
-// `construction.houseTicks` defaults to two sim days — one REAL HOUR at the dev world's tick.
+// `construction.houseTicks` defaults to two sim days — 76.8 REAL MINUTES at the dev world's tick.
 // `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
 export const DEV_HOUSE_TICKS = 240
 

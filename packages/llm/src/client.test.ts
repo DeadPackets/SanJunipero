@@ -150,8 +150,8 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    const expectedCost = ((1000 - 600) * 0.28 + 600 * 0.07 + 50 * 0.56) / 1e6
-    expect(expectedCost).toBeCloseTo(0.000182, 10)
+    const expectedCost = ((1000 - 600) * 0.15 + 600 * 0.03 + 50 * 0.5) / 1e6
+    expect(expectedCost).toBeCloseTo(0.000103, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -193,7 +193,7 @@ describe('LlmClient.object', () => {
     expect(row.reasoning_tokens).toBe(6100)
     expect(row.output_tokens).toBe(6168)
     // reasoning bills as output: cost formula unchanged
-    const expectedCost = (500 * 0.28 + 6168 * 0.56) / 1e6
+    const expectedCost = (500 * 0.15 + 6168 * 0.5) / 1e6
     expect(Math.abs(row.cost_usd - expectedCost)).toBeLessThan(1e-6)
     expect(usage.costUsd).toBe(row.cost_usd)
   })
@@ -495,7 +495,7 @@ describe('price reconciliation', () => {
         provider: 'Wafer',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: (1000 * 0.28 + 1000 * 0.56) / 1e6,
+        reportedCostUsd: (1000 * 0.15 + 1000 * 0.5) / 1e6,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -785,9 +785,9 @@ describe('default OpenRouter path extraBody', () => {
   // One name: `provider.order` load-balances, so a second took 56% of run D at 3x the price and
   // split the KV cache with the first. A refusal is retried onto the same name.
   it('★ the request body carries exactly one allowed provider', () => {
-    expect(PROVIDER_ORDER).toEqual(['Inceptron'])
+    expect(PROVIDER_ORDER).toEqual(['Wafer'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Inceptron'],
+      order: ['Wafer'],
       allow_fallbacks: false,
     })
   })
@@ -812,7 +812,7 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: ['Inceptron'], allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({ order: ['Wafer'], allow_fallbacks: false })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
@@ -844,7 +844,7 @@ describe('default OpenRouter path extraBody', () => {
     const db = openDb()
     const night = new LlmClient({ db, caller: 'reflection' })
     const edit = night.forCaller('reflection.edit')
-    expect(night.requestBody().reasoning).toEqual({ enabled: false })
+    expect(night.requestBody()).not.toHaveProperty('reasoning')
     expect(edit.requestBody()).not.toHaveProperty('reasoning')
     expect(edit.requestBody().provider).toEqual(night.requestBody().provider)
   })
@@ -916,7 +916,7 @@ describe('★ why the provider stopped is on every ledger row', () => {
     })
     // The caller and its ceiling, so the row says which number in `pins.ts` to move.
     expect(alertsOf(db, 'llm_output_truncated')).toEqual([
-      'turn: the answer stopped at the 500 output token ceiling — raise it or the answer is a fragment',
+      'turn: the answer stopped at the 2000 output token ceiling — raise it or the answer is a fragment',
     ])
   })
 
@@ -967,7 +967,7 @@ describe('★ a generation that answered but produced no output still bills what
     expect(
       (db.prepare('SELECT finish_reason AS r FROM llm_calls').get() as { r: string | null }).r,
     ).toBe('length')
-    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('2000 output token ceiling')
+    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('4000 output token ceiling')
   })
 })
 
@@ -978,10 +978,10 @@ describe('★ one unified call discipline, the arbiter included', () => {
     const db = openDb()
     const bound = (caller: string): number =>
       (new LlmClient({ db, caller }) as unknown as { requestTimeoutMs: number }).requestTimeoutMs
-    for (const caller of ['turn', 'constructs', 'nobody-pinned-this']) {
-      expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
-    }
+    expect(bound('nobody-pinned-this')).toBe(MIN_REQUEST_TIMEOUT_MS)
     for (const caller of [
+      'turn',
+      'constructs',
       'arbiter',
       'reflection',
       'reflection.edit',
@@ -1005,7 +1005,7 @@ describe('★ one unified call discipline, the arbiter included', () => {
     ).rejects.toThrow()
     expect(rows(db), 'a third attempt only spends the stall again').toHaveLength(2)
     expect(alertsOf(db, 'llm_call_failed')).toEqual([
-      'arbiter: 2 attempt(s) failed, the last bounded at 45s — scripted failure',
+      'arbiter: 2 attempt(s) failed, the last bounded at 91s — scripted failure',
     ])
   })
 

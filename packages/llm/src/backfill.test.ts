@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { insertLlmCall, migrateLlmTables } from './callLog.js'
+import { MIND_MODEL } from './pins.js'
 import { backfillUnattributed } from './backfill.js'
 
 const NOW = 1_700_000_000_000
@@ -18,7 +19,7 @@ function seedUnattributed(db: Database.Database, generationId: string | null): v
   insertLlmCall(db, {
     agentId: 'amara',
     caller: 'turn',
-    model: 'deepseek/deepseek-v4-flash-0731',
+    model: MIND_MODEL,
     provider: null,
     generationId,
     inputTokens: 1000,

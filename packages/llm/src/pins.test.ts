@@ -11,13 +11,14 @@ import {
 } from './pins.js'
 
 it('pins are concrete', () => {
-  expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
-  expect(PROVIDER_ORDER).toEqual(['Inceptron'])
+  expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
+  expect(PROVIDER_ORDER).toEqual(['Wafer'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
-  // Never a floating alias: every model names the dated snapshot it was probed at.
-  for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
-  expect(PRICE_PER_M).toEqual({ input: 0.13, output: 0.28, cacheRead: 0.03 })
+  // TEST BRANCH exception to the dated-pin law: OpenRouter publishes no dated snapshot of
+  // glm-5.3-flash, only the bare id and a `:batch` variant, so there is no date to pin to.
+  for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
+  expect(PRICE_PER_M).toEqual({ input: 0.15, output: 0.5, cacheRead: 0.03 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
@@ -56,20 +57,28 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
   expect(pricesFor(MIND_MODEL, 'SomeNewProvider').prices).toEqual(CEILING_PRICE_PER_M)
 })
 
-// The nightly pass once spent 31,179 reasoning tokens over 96 s to answer nothing at all. Only
-// `enabled:false` moves this endpoint, so an effort rung here would be a placebo.
-it('the semantic pass is pinned off the thinking preamble and under an output ceiling', () => {
-  expect(callSettingsFor('semantic').reasoning).toEqual({ enabled: false })
-  expect(callSettingsFor('semantic').maxOutputTokens).toBeLessThanOrEqual(4000)
+// TEST BRANCH: `enabled:false` is refused by every endpoint of this model and `effort:'minimal'`
+// measured worse than sending nothing, so no caller may name the field at all.
+it('★ no caller asks for a reasoning setting, because this model refuses every one of them', () => {
+  const callers = [
+    'turn',
+    'reflection',
+    'reflection.edit',
+    'arbiter',
+    'narrator',
+    'preflight',
+    'dream',
+    'semantic',
+    'constructs',
+  ]
+  for (const caller of callers) expect(callSettingsFor(caller).reasoning, caller).toBeUndefined()
 })
 
-// Over 12 matched pairs, reasoning was 94% of a turn's output; holding it off left parse at
-// 100% and moved grounding from 75% to 92%.
-it('the turn and the night are pinned off the thinking preamble', () => {
-  expect(callSettingsFor('turn').reasoning).toEqual({ enabled: false })
-  expect(callSettingsFor('reflection').reasoning).toEqual({ enabled: false })
-  // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
-  expect(callSettingsFor('narrator').reasoning).toBeUndefined()
+// The owner's order for the rehearsal: the turn is the one caller that samples freely.
+it('★ the turn samples at temperature 1, and no other caller pins one', () => {
+  expect(callSettingsFor('turn').temperature).toBe(1)
+  for (const caller of ['reflection', 'narrator', 'arbiter', 'preflight'])
+    expect(callSettingsFor(caller).temperature, caller).toBeUndefined()
 })
 
 // An uncapped call once spent 31,544 output tokens on one dead answer. Each ceiling clears 2x
@@ -89,37 +98,25 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
   }
 })
 
-// 11,996 reasoning tokens against 12,160 output tokens over run D's 13 calls, and the hidden
-// half disagreed with the written half. Its reasoning-on p99 of 3,904 no longer describes it,
-// and the answer alone is not measurable from that run, so the ceiling is the standing default.
-it('★ the arbiter judges without the thinking preamble, under a 2,000-token ceiling', () => {
-  expect(callSettingsFor('arbiter')).toEqual({
-    reasoning: { enabled: false },
-    maxOutputTokens: 2000,
-  })
+// Reasoning cannot be switched off here and bills inside `max_tokens`, so 2,000 became 4,000.
+it('★ the arbiter judges under a 4,000-token ceiling that its own reasoning bills inside', () => {
+  expect(callSettingsFor('arbiter')).toEqual({ maxOutputTokens: 4000 })
 })
 
-// The night's one reasoning-on call shared reflection's ceiling and its ledger line, so what
-// it costs could never be read off. It has both of its own now.
-it('★ reflection.edit is its own caller: reasoning on, its own ceiling', () => {
-  expect(callSettingsFor('reflection.edit').reasoning).toBeUndefined()
-  expect(callSettingsFor('reflection.edit').maxOutputTokens).toBe(13000)
-  expect(callSettingsFor('reflection').maxOutputTokens).toBe(1500)
+// The night's one reasoning-on call has its own ceiling and its own ledger line.
+it('★ reflection.edit is its own caller, with its own ceiling', () => {
+  expect(callSettingsFor('reflection.edit').maxOutputTokens).toBe(15000)
+  expect(callSettingsFor('reflection').maxOutputTokens).toBe(3000)
 })
 
-// 14,072 output tokens, 99.5% of it reasoning, to pick one label out of five. With reasoning off
-// the same probe answered in 20 tokens on all five calls and recognized the same construct.
-it('★ constructs answers without thinking, under a 500-token ceiling', () => {
-  expect(callSettingsFor('constructs')).toEqual({
-    reasoning: { enabled: false },
-    maxOutputTokens: 500,
-  })
+// The answer is 20 tokens; the rest of the ceiling is the preamble this model always writes.
+it('★ constructs picks one label out of five, under a 1,500-token ceiling', () => {
+  expect(callSettingsFor('constructs')).toEqual({ maxOutputTokens: 1500 })
 })
 
-// Its p99 is one call, and that call failed after 31,179 reasoning tokens. 4,000 stands until
-// rehearsal 4 gives it a real n.
-it('semantic is left where it was', () => {
-  expect(callSettingsFor('semantic').maxOutputTokens).toBe(4000)
+// Its p99 is one call, and that call failed after 31,179 reasoning tokens.
+it('semantic carries its reasoning inside its ceiling', () => {
+  expect(callSettingsFor('semantic').maxOutputTokens).toBe(5000)
 })
 
 it('an unpinned caller keeps the routing it has always had', () => {

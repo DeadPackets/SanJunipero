@@ -141,6 +141,7 @@ export type LlmClientOpts = {
   requestTimeoutMs?: number
   budgetUsd?: number
   maxOutputTokens?: number
+  temperature?: number
   // Pre-booked per call while it is in flight. ~3x the observed mean call.
   expectedCallCostUsd?: number
 }
@@ -177,6 +178,7 @@ export class LlmClient {
   private readonly requestTimeoutMs: number
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
+  private readonly temperature: number | undefined
   private readonly expectedCallCostUsd: number
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
@@ -195,6 +197,7 @@ export class LlmClient {
     this.requestTimeoutMs = opts.requestTimeoutMs ?? requestTimeoutMsFor(opts.caller)
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
+    this.temperature = opts.temperature ?? pinned.temperature
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
@@ -244,6 +247,7 @@ export class LlmClient {
           messages: toModelMessages(messages),
           maxRetries: 0,
           ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
+          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
           abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
           output: Output.object({ schema }),
         })
@@ -279,6 +283,7 @@ export class LlmClient {
         messages: toModelMessages(messages),
         maxRetries: 0,
         ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
+        ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
         abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
       })
       note(stepFacts(r))

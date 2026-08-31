@@ -1,11 +1,9 @@
-// Measured on a live run, not chosen. Re-run scripts/probe.ts before changing it.
-export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
-// One name, because `provider.order` LOAD-BALANCES rather than prioritises: a second name took
-// 56% of run D at 3x the price and split the KV cache with it — 47.5% cache share on a turn that
-// kept the same back end against 37.8% on one that switched. A refusal retries onto the same name.
-// Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
-// 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
-export const PROVIDER_ORDER: string[] = ['Inceptron']
+// TEST BRANCH: the GLM rehearsal. OpenRouter publishes no dated snapshot for this model, so
+// the bare id is the only id there is; see the pins test for the dated-pin exception.
+export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
+// Single-homed by necessity, not by the load-balancing law: 19 of the 20 endpoints serving this
+// model return a Turn with no action on 75-100% of calls. Wafer alone cleared 36/36 acts.
+export const PROVIDER_ORDER: string[] = ['Wafer']
 // Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each returns 100% well-formed
 // Turns with `action: null` on 75-99% of calls, which only the pre-flight act bar catches.
 // The fallback IS the pinned dated model; no alias ever answers for it.
@@ -16,7 +14,8 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // $/M tokens. The price depends on WHO served the call, so the table is keyed by that and
 // not by the model alone — two back ends for this one model differ 3x.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
-  Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
+  // Wafer's GLM tier, measured against its own bill: the $0.075 list tier refuses json_schema.
+  Wafer: { input: 0.15, output: 0.5, cacheRead: 0.03 },
   Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
   // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
   AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
@@ -31,7 +30,7 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
 // The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Inceptron!
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.
@@ -62,39 +61,33 @@ export function pricesFor(
   return { prices: CEILING_PRICE_PER_M, source: 'ceiling' }
 }
 
-// Unset bills the same thinking preamble as `effort:'high'` — the endpoint default IS the
-// maximum — and the four effort rungs are indistinguishable; only `enabled:false` moves anything.
+// TEST BRANCH: this model refuses `enabled:false` on every endpoint and answers worse under
+// `effort:'minimal'`, so no caller below sets the field at all and the client omits it.
 export type ReasoningSetting =
   | { enabled: false }
   | { effort: 'minimal' | 'low' | 'medium' | 'high' }
 
 // What one caller's calls are pinned to, over and above the routing every call shares. An
 // absent field leaves that dial exactly where it sat before the dial existed.
-export type CallSettings = { reasoning?: ReasoningSetting; maxOutputTokens?: number }
+export type CallSettings = {
+  reasoning?: ReasoningSetting
+  maxOutputTokens?: number
+  temperature?: number
+}
 
-// A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone
-// where reasoning is off, the whole output where it stays on. Truncation is a hard failure.
+// A ceiling is 2x that caller's measured p99, taken as it will NOW run. Reasoning tokens bill
+// inside `max_tokens` here and cannot be turned off, so every ceiling carries them too.
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
-  // Reasoning was 94% of a turn's output and bought nothing: with it off, parse held at 100%
-  // and grounding rose. The answer alone has a p99 of 243 tokens.
-  turn: { reasoning: { enabled: false }, maxOutputTokens: 500 },
-  // The five night calls lose nothing without thinking. The sixth, the personality edit, does,
-  // and its p99 is 18x theirs — hence a caller of its own rather than one shared ceiling.
-  // 700 truncated the ledger writes; 1500 clears the longest of them.
-  reflection: { reasoning: { enabled: false }, maxOutputTokens: 1500 },
-  'reflection.edit': { maxOutputTokens: 13000 },
-  // 98.7% of its output was reasoning and the two halves disagreed with each other. Run D's
-  // answer-only figure is not measurable (the subtraction goes negative), so 2,000 stands.
-  arbiter: { reasoning: { enabled: false }, maxOutputTokens: 2000 },
+  turn: { maxOutputTokens: 2000, temperature: 1 },
+  // The five night calls and the sixth, the personality edit, whose p99 is 18x theirs.
+  reflection: { maxOutputTokens: 3000 },
+  'reflection.edit': { maxOutputTokens: 15000 },
+  arbiter: { maxOutputTokens: 4000 },
   narrator: { maxOutputTokens: 22000 },
-  preflight: { maxOutputTokens: 2500 },
-  dream: { maxOutputTokens: 2500 },
-  // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
-  // spent 31,179 reasoning tokens and still answered nothing. 4,000 stands on one call.
-  semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
-  // Picking one label out of five spent 14,072 output tokens, 99.5% of it reasoning; off, it
-  // answers in 20. 500 and not 100: the schema returns one ruling per candidate.
-  constructs: { reasoning: { enabled: false }, maxOutputTokens: 500 },
+  preflight: { maxOutputTokens: 4000 },
+  dream: { maxOutputTokens: 4000 },
+  semantic: { maxOutputTokens: 5000 },
+  constructs: { maxOutputTokens: 1500 },
 }
 
 const NO_SETTINGS: CallSettings = {}
