@@ -209,7 +209,7 @@ const callsTo = (db: Database.Database, caller: string, n: number): void => {
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, 0, 0, 1, NULL, 'Baidu')`,
+     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, 0, 0, 1, NULL, 'Inceptron')`,
   )
   db.transaction(() => {
     for (let i = 0; i < n; i++) insert.run(Date.now(), caller)
@@ -688,15 +688,15 @@ describe('★ the money, inside the served world', () => {
         `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.01, 0, 1, NULL, 'Inceptron')`,
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.01, 0, 1, NULL, 'Baidu')`,
       )
       .run(Date.now())
 
     await run(world, 20)
     const mix = alertsOf(opsDb, 'llm_provider_off_allow_list')
     expect(mix.length, 'the routing left the pin and nobody was told').toBeGreaterThan(0)
-    expect(mix[0]).toContain('Inceptron 1')
-    expect(mix[0]).toContain('[Baidu]')
+    expect(mix[0]).toContain('Baidu 1')
+    expect(mix[0]).toContain('[Inceptron]')
     expect(mix[0]).toContain('$0.0100')
     expect(stops, 'a leaked back end must never stop a town').toHaveLength(0)
   }, 40_000)

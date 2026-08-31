@@ -785,9 +785,9 @@ describe('default OpenRouter path extraBody', () => {
   // One name: `provider.order` load-balances, so a second took 56% of run D at 3x the price and
   // split the KV cache with the first. A refusal is retried onto the same name.
   it('★ the request body carries exactly one allowed provider', () => {
-    expect(PROVIDER_ORDER).toEqual(['Baidu'])
+    expect(PROVIDER_ORDER).toEqual(['Inceptron'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Baidu'],
+      order: ['Inceptron'],
       allow_fallbacks: false,
     })
   })
@@ -812,7 +812,7 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: ['Baidu'], allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({ order: ['Inceptron'], allow_fallbacks: false })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the

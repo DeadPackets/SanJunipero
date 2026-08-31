@@ -13,7 +13,7 @@ function openDb(): Database.Database {
 }
 
 /** A call the ceiling priced because its answer named no back end: 1,000 in and 1,000 out at
- *  the ceiling is $0.00176, where Baidu's own rate is $0.000135. */
+ *  the ceiling is $0.00176, where Baidu's own rate is $0.00042. */
 function seedUnattributed(db: Database.Database, generationId: string | null): void {
   insertLlmCall(db, {
     agentId: 'amara',
@@ -55,19 +55,16 @@ describe('★ an unattributed row is asked about, not ceiling-priced for ever', 
   it('names the back end, takes its bill, and re-prices the row off the ceiling', async () => {
     const db = openDb()
     seedUnattributed(db, 'gen-1')
-    const fetchFn = answering({ data: { provider_name: 'Baidu', total_cost: 0.000135 } })
+    const fetchFn = answering({ data: { provider_name: 'Baidu', total_cost: 0.00042 } })
 
     const r = await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW })
 
     expect(r).toEqual({ attempted: 1, backfilled: 1 })
     const row = rowOf(db)
     expect(row.provider).toBe('Baidu')
-    expect(row.cost_usd, 'the provider bill did not become the booked cost').toBeCloseTo(
-      0.000135,
-      9,
-    )
+    expect(row.cost_usd, 'the provider bill did not become the booked cost').toBeCloseTo(0.00042, 9)
     expect(row.estimated_cost_usd, 'the pinned table was not re-run at the real rate').toBeCloseTo(
-      0.00013482,
+      0.00042,
       9,
     )
     expect(alertKinds(db)).toEqual(['llm_price_backfilled'])

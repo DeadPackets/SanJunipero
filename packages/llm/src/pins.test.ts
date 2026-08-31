@@ -12,14 +12,12 @@ import {
 
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('deepseek/deepseek-v4-flash-0731')
-  expect(PROVIDER_ORDER).toEqual(['Baidu'])
-  // Dropped from the call path, kept in the price table: run D's rows still reconcile against it.
-  expect(PRICE_PER_M_BY_PROVIDER.Inceptron).toBeDefined()
+  expect(PROVIDER_ORDER).toEqual(['Inceptron'])
+  // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
+  expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
   // Never a floating alias: every model names the dated snapshot it was probed at.
   for (const id of [MIND_MODEL, ...FALLBACK_MODELS]) expect(id, id).toMatch(/-\d{4}$/)
-  // Baidu's real charged rate, not its 0.14/0.28/0.028 list rate: the list would over-report
-  // every call 3x.
-  expect(PRICE_PER_M).toEqual({ input: 0.04494, output: 0.08988, cacheRead: 0.008988 })
+  expect(PRICE_PER_M).toEqual({ input: 0.13, output: 0.28, cacheRead: 0.03 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
@@ -44,9 +42,9 @@ it('prices the pinned model by who served it', () => {
     prices: PRICE_PER_M_BY_PROVIDER.Baidu,
     source: 'provider',
   })
-  // Two back ends for one model at prices that differ 6x. A model-keyed table cannot say this.
-  expect(PRICE_PER_M_BY_PROVIDER.Wafer!.input).toBeGreaterThan(
-    PRICE_PER_M_BY_PROVIDER.Baidu!.input * 6,
+  // Two back ends for one model at prices that differ 3x. A model-keyed table cannot say this.
+  expect(PRICE_PER_M_BY_PROVIDER.AtlasCloud!.input).toBeGreaterThan(
+    PRICE_PER_M_BY_PROVIDER.Inceptron!.input * 3,
   )
 })
 

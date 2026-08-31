@@ -2,8 +2,10 @@
 export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // One name, because `provider.order` LOAD-BALANCES rather than prioritises: a second name took
 // 56% of run D at 3x the price and split the KV cache with it — 47.5% cache share on a turn that
-// kept the same back end against 37.8% on one that switched. A refusal retries onto Baidu again.
-export const PROVIDER_ORDER: string[] = ['Baidu']
+// kept the same back end against 37.8% on one that switched. A refusal retries onto the same name.
+// Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
+// 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
+export const PROVIDER_ORDER: string[] = ['Inceptron']
 // Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each returns 100% well-formed
 // Turns with `action: null` on 75-99% of calls, which only the pre-flight act bar catches.
 // The fallback IS the pinned dated model; no alias ever answers for it.
@@ -12,15 +14,14 @@ export const FALLBACK_MODELS: string[] = []
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
 // $/M tokens. The price depends on WHO served the call, so the table is keyed by that and
-// not by the model alone — two back ends for this one model differ 7x.
+// not by the model alone — two back ends for this one model differ 3x.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
-  // Off the call path since the pin went single-homed; the row stays so run D's rows reconcile.
   Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
   // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
   AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
-  // Reconciled against the bill: these are the discounted rates charged, not the list rates.
-  Baidu: { input: 0.04494, output: 0.08988, cacheRead: 0.008988 },
+  // Tripled overnight 2026-08-31 (was 0.04494/0.08988/0.008988); confirmed against a real bill.
+  Baidu: { input: 0.14, output: 0.28, cacheRead: 0.028 },
   StreamLake: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
   DeepInfra: { input: 0.08, output: 0.18, cacheRead: 0.016 },
 }
@@ -30,7 +31,7 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
 // The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Baidu!
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Inceptron!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.
