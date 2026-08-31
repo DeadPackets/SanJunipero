@@ -83,6 +83,9 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // 700 truncated the ledger writes; 1500 clears the longest of them.
   reflection: { reasoning: { enabled: false }, maxOutputTokens: 1500 },
   'reflection.edit': { maxOutputTokens: 13000 },
+  // One long memory set down short at the night boundary. The ask is two or three sentences;
+  // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
+  'reflection.gist': { reasoning: { enabled: false }, maxOutputTokens: 200 },
   // 98.7% of its output was reasoning and the two halves disagreed with each other. Run D's
   // answer-only figure is not measurable (the subtraction goes negative), so 2,000 stands.
   arbiter: { reasoning: { enabled: false }, maxOutputTokens: 2000 },

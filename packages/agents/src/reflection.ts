@@ -2,17 +2,20 @@ import { z } from 'zod'
 import { NoObjectGeneratedError } from 'ai'
 import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
+import { GIST_SYSTEM, gistMemories, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 
-export type ReflectionLlm = {
+export type ReflectionLlm = GistLlm & {
   extractFacts(
     dayMemories: MemoryRow[],
   ): Promise<{ subject: string; predicate: string; object: string; srcMemoryId: number }[]>
   summarizeScenes(
     dayMemories: MemoryRow[],
   ): Promise<{ title: string; text: string; memoryIds: number[] }[]>
-  summarizeDay(scenes: { title: string; text: string }[]): Promise<{ title: string; text: string }>
+  summarizeDay(
+    scenes: { title: string; text: string }[],
+  ): Promise<{ title: string; text: string; standing: string[] }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
   proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown>
@@ -26,6 +29,7 @@ export type ReflectionResult = {
   editRejectedReason?: string
   /** The mind declined to change tonight — whether it answered `no_proposal` or proposed a no-op. */
   editSkipped?: true
+  gistsWritten: number
   fallback: boolean
 }
 
@@ -123,6 +127,11 @@ export async function runSleepReflection(deps: {
     memoryIds: [],
   })
   const daySummaryText = daySummary?.text ?? ''
+  // What the mind is about rides the fluid layer of its own doc, beside its mood: one nightly
+  // want-list in the stable prefix, not two.
+  if (daySummary !== null) {
+    personality.updateCurrent({ ...personality.current().doc.current, goals: daySummary.standing })
+  }
 
   // 5. Ledgers — once per distinct person tag in the day's memories.
   const ledgersUpdated: string[] = []
@@ -144,45 +153,30 @@ export async function runSleepReflection(deps: {
 
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
+
+  // 8. Gists — the long rows of the day get a short form tomorrow's turns can carry. Last,
+  //    because it is the one step the night can lose without losing what it learned.
+  const gistsWritten = (await step(() => gistMemories(mem, llm, dayMemories))) ?? 0
+
+  const base = { factCount, sceneCount: scenes.length, ledgersUpdated, gistsWritten }
   if (degraded.reason !== null) {
     alert?.('reflection_fallback', degraded.reason)
-    return {
-      factCount,
-      sceneCount: scenes.length,
-      ledgersUpdated,
-      editApplied: false,
-      fallback: true,
-    }
+    return { ...base, editApplied: false, fallback: true }
   }
   if (proposal == null) {
-    return {
-      factCount,
-      sceneCount: scenes.length,
-      ledgersUpdated,
-      editApplied: false,
-      editSkipped: true,
-      fallback: false,
-    }
+    return { ...base, editApplied: false, editSkipped: true, fallback: false }
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
     if (!result.skipped) alert?.('personality_edit_rejected', result.reason)
     return {
-      factCount,
-      sceneCount: scenes.length,
-      ledgersUpdated,
+      ...base,
       editApplied: false,
       ...(result.skipped ? { editSkipped: true } : { editRejectedReason: result.reason }),
       fallback: false,
     }
   }
-  return {
-    factCount,
-    sceneCount: scenes.length,
-    ledgersUpdated,
-    editApplied: true,
-    fallback: false,
-  }
+  return { ...base, editApplied: true, fallback: false }
 }
 
 // --- Real implementation: one structured-output call per method, z.strict() schemas. ---
@@ -246,11 +240,19 @@ export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   ])
 }
 
+export function gistPrompt(text: string): LlmPrompt {
+  return { system: GIST_SYSTEM, messages: [{ role: 'user', content: text }] }
+}
+
 export function summarizeDayPrompt(scenes: { title: string; text: string }[]): LlmPrompt {
   return {
     system: [
       'Before sleep, you look back over the whole day.',
       'Give the day a single title and a short telling that holds its scenes together.',
+      'Then name what you carry into tomorrow, as `standing`: at most three short lines, one each',
+      'for what you want, what you promised or owe, and what you are in the middle of making.',
+      'Leave `standing` empty rather than invent one; write each line as a thing you are about,',
+      'not as a report of the day.',
     ].join('\n'),
     messages: [{ role: 'user', content: `The day held these scenes:\n${JSON.stringify(scenes)}` }],
   }
@@ -354,7 +356,13 @@ const SCENE_SCHEMA = z
   })
   .strict()
 const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
-const DAY_SUMMARY_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1) }).strict()
+const DAY_SUMMARY_SCHEMA = z
+  .object({
+    title: z.string().min(1),
+    text: z.string().min(1),
+    standing: z.array(z.string().min(1)).max(3),
+  })
+  .strict()
 const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
 const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
 export const ProposeEditSchema = z.discriminatedUnion('verdict', [
@@ -366,7 +374,13 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   // With the night's thinking off, facts and scenes came back identical and only the personality
   // edit thinned out, so this one call has its own name, its own ceiling and its own ledger line.
   const editClient = client.forCaller('reflection.edit')
+  const gistClient = client.forCaller('reflection.gist')
   return {
+    async gist(text) {
+      const p = gistPrompt(text)
+      const { text: answer } = await gistClient.text({ system: p.system, messages: p.messages })
+      return answer
+    },
     async extractFacts(dayMemories) {
       const p = extractFactsPrompt(dayMemories)
       const { value } = await client.object({

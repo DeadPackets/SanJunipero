@@ -10,6 +10,7 @@ import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
+  gistPrompt,
   makeReflectionLlm,
   extractFactsPrompt,
   summarizeScenesPrompt,
@@ -87,6 +88,11 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   calls: string[] = []
   constructor(private readonly edit: unknown) {}
 
+  async gist(text: string) {
+    this.calls.push('gist')
+    return `gist: ${text.slice(0, 20)}`
+  }
+
   async extractFacts(dayMemories: MemoryRow[]) {
     this.calls.push('extractFacts')
     return [
@@ -123,7 +129,11 @@ class ScriptedReflectionLlm implements ReflectionLlm {
 
   async summarizeDay() {
     this.calls.push('summarizeDay')
-    return { title: 'Trade and promises', text: 'The day was full of deals.' }
+    return {
+      title: 'Trade and promises',
+      text: 'The day was full of deals.',
+      standing: ['Omar owes me three firewood by tomorrow.'],
+    }
   }
 
   async updateLedger(personName: string, _existing: string | null, relevant: MemoryRow[]) {
@@ -143,6 +153,23 @@ class ScriptedReflectionLlm implements ReflectionLlm {
 }
 
 describe('runSleepReflection pipeline', () => {
+  it('the night gists the day’s long rows and pins what the mind is about', async () => {
+    const { mem, personality } = await makeStores()
+    const long = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(20)}`
+    await seedDay(mem, DAY, [{ text: long, people: ['Omar'], importance: 6 }, ...SINGLE_PERSON_DAY])
+    const llm = new ScriptedReflectionLlm(null)
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
+
+    expect([res.gistsWritten, llm.calls.filter((c) => c === 'gist').length]).toEqual([1, 1])
+    const rows = mem.memoriesOfDay(DAY)
+    expect(rows[0]!.gist).toBe(`gist: ${long.slice(0, 20).trim()}`)
+    expect(rows[0]!.text).toBe(long)
+    expect(rows[1]!.gist).toBeNull()
+    expect(personality.current().doc.current.goals).toEqual([
+      'Omar owes me three firewood by tomorrow.',
+    ])
+  })
+
   it('runs steps in spec order: facts strictly before any summarize', async () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
@@ -508,6 +535,7 @@ describe('makeReflectionLlm prompts', () => {
       day: DAY,
       kind: 'perception',
       text: 'Nadia and I bartered grain for firewood.',
+      gist: null,
       importance: 7,
       tags: { ...TAGS, people: ['Nadia'] },
     },
@@ -517,6 +545,7 @@ describe('makeReflectionLlm prompts', () => {
       tick: DAY * TICKS_PER_DAY + 1,
       day: DAY,
       kind: 'perception',
+      gist: null,
       text: 'Nadia promised to help mend the storehouse.',
       importance: 8,
       tags: { ...TAGS, people: ['Nadia'] },
@@ -542,6 +571,13 @@ describe('makeReflectionLlm prompts', () => {
           usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 },
         }
       },
+      async text(opts: { system: string; messages: LlmMessage[] }) {
+        calls.push({ system: opts.system, messages: opts.messages })
+        return {
+          text: 'A short form.',
+          usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 },
+        }
+      },
       forCaller() {
         return this
       },
@@ -558,8 +594,9 @@ describe('makeReflectionLlm prompts', () => {
     await llm.updateLedger('Nadia', null, memories)
     await llm.autobiographyParagraph('The day was full of deals.', doc)
     await llm.proposeEdit('The day was full of deals.', doc, memories)
+    await llm.gist('A very long moment that the night sets down in short.')
 
-    expect(calls).toHaveLength(6)
+    expect(calls).toHaveLength(7)
     for (const c of calls) {
       expect(c.system).toMatch(/\byou\b/i)
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
@@ -571,7 +608,7 @@ describe('makeReflectionLlm prompts', () => {
       )
     }
   })
-  // Six authored surfaces every mind reads every night, which neither the card scan nor
+  // Seven authored surfaces every mind reads every night, which neither the card scan nor
   // `assemblePrompt` reaches. A shorter prompt must not turn a question into an instruction.
   it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
     const authored = [
@@ -581,6 +618,7 @@ describe('makeReflectionLlm prompts', () => {
       updateLedgerPrompt('Nadia', null, memories).system,
       autobiographyPrompt('The day was full of deals.', doc).system,
       proposeEditPrompt('The day was full of deals.', doc, memories).system,
+      gistPrompt('A very long moment that the night sets down in short.').system,
     ]
     for (const text of authored) {
       expect(scanPromptForGlassLeak(text), text.slice(0, 48)).toEqual([])
@@ -600,6 +638,7 @@ describe('makeReflectionLlm prompts', () => {
     day: DAY,
     kind,
     text,
+    gist: null,
     importance: 3,
     tags: TAGS,
   })

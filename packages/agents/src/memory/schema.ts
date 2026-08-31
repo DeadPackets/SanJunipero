@@ -31,6 +31,13 @@ export function migrateAgentTables(db: Database.Database): void {
     CREATE TRIGGER IF NOT EXISTS memories_no_delete BEFORE DELETE ON memories
       BEGIN SELECT RAISE(ABORT,'memories are immutable'); END;
 
+    -- A memory is immutable, so its short form lives beside it: the raw row is never rewritten
+    -- and a gist can be dropped to restore what the mind actually saw.
+    CREATE TABLE IF NOT EXISTS memory_gists (
+      memory_id INTEGER PRIMARY KEY REFERENCES memories(id),
+      text TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS memory_tags (
       memory_id INTEGER NOT NULL REFERENCES memories(id),
       kind TEXT NOT NULL,

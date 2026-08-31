@@ -237,6 +237,10 @@ function gatedModel(): {
 
 class ScriptedReflectionLlm implements ReflectionLlm {
   calls: string[] = []
+  async gist(text: string) {
+    this.calls.push('gist')
+    return `gist: ${text.slice(0, 20)}`
+  }
   async extractFacts(dayMemories: MemoryRow[]) {
     this.calls.push('extractFacts')
     return dayMemories.length > 0
@@ -251,7 +255,11 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   }
   async summarizeDay() {
     this.calls.push('summarizeDay')
-    return { title: 'First day', text: 'A first day at the meadow.' }
+    return {
+      title: 'First day',
+      text: 'A first day at the meadow.',
+      standing: ['Keep the fire in.'],
+    }
   }
   async updateLedger() {
     this.calls.push('updateLedger')

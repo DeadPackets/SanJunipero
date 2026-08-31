@@ -2,6 +2,10 @@
 // fix is what gets measured. SPENDS REAL MONEY unless --dry.
 //     node --env-file=.env --import tsx scripts/replay.mjs \
 //       --minds rehearsals/minds --filter hunger-scene --n 20 --rounds 3 [--settings turn] [--dry]
+//
+// `--arm` picks what the scene block carries: `raw` is every retrieved memory in full, `gist`
+// replaces the long ones with a gist generated here, `wants` adds the pinned wants block on top.
+// The three arms share one set of turns, so they are paired rather than merely comparable.
 
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -13,8 +17,10 @@ import {
   assemblePrompt,
   DEFAULT_MIND_CONFIG,
   FOUNDER_MINDS,
+  gistMemories,
   isBlankAnswer,
   JOURNAL_LINES,
+  makeReflectionLlm,
   MemoryStore,
   nightOf,
   openAgentDb,
@@ -55,12 +61,21 @@ const PRESETS = {
 function usage(why) {
   console.error(
     `replay: ${why}\n  --minds <dir> --filter <${Object.keys(PRESETS).join('|')}|SQL>` +
-      '\n  --n --rounds --settings --cap --out --dry',
+      `\n  --arm <${ARMS.join('|')}> --n --rounds --settings --cap --out --dry`,
   )
   process.exit(1)
 }
 
-const args = { filter: 'hunger-scene', n: 20, rounds: 3, settings: 'turn', cap: 0.5, dry: false }
+const ARMS = ['raw', 'gist', 'wants']
+const args = {
+  filter: 'hunger-scene',
+  n: 20,
+  rounds: 3,
+  settings: 'turn',
+  cap: 0.5,
+  arm: 'raw',
+  dry: false,
+}
 for (let i = 2; i < process.argv.length; i++) {
   const flag = process.argv[i]
   if (flag === '--dry') args.dry = true
@@ -68,6 +83,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (flag === '--filter') args.filter = process.argv[++i]
   else if (flag === '--out') args.out = process.argv[++i]
   else if (flag === '--settings') args.settings = process.argv[++i]
+  else if (flag === '--arm') args.arm = process.argv[++i]
   else if (flag === '--n') args.n = Number(process.argv[++i])
   else if (flag === '--rounds') args.rounds = Number(process.argv[++i])
   else if (flag === '--cap') args.cap = Number(process.argv[++i])
@@ -76,6 +92,7 @@ for (let i = 2; i < process.argv.length; i++) {
 if (args.minds === undefined) usage('--minds is required')
 if (!Number.isInteger(args.n) || args.n < 1) usage('--n must be a positive integer')
 if (!Number.isInteger(args.rounds) || args.rounds < 1) usage('--rounds must be a positive integer')
+if (!ARMS.includes(args.arm)) usage(`--arm must be one of ${ARMS.join(', ')}`)
 
 const where = PRESETS[args.filter] ?? args.filter
 const outDir = args.out ?? join(ROOT, 'replays', new Date().toISOString().replace(/[:.]/g, '-'))
@@ -114,8 +131,9 @@ function dayLogAt(moments, tick) {
   return log
 }
 
-async function blocksAt(pool, row) {
+async function blocksAt(pool, row, wants) {
   const { mind, mem, personality } = pool
+  const doc = personality.docBefore(nightOf(row.tick))
   const cues = JSON.parse(row.tags)
   const day = worldDay(row.tick)
   const ledgers = cues.people
@@ -126,7 +144,7 @@ async function blocksAt(pool, row) {
     rulesOfBeing: RULES_OF_BEING,
     identity: mind.identity,
     personality: {
-      doc: personality.docBefore(nightOf(row.tick)),
+      doc: wants.length === 0 ? doc : { ...doc, current: { ...doc.current, goals: wants } },
       autobiography: mem.autobiography(day),
     },
     journal: mem
@@ -173,19 +191,63 @@ if (pools.length === 0) usage(`the filter matched no turn in ${args.minds}`)
 
 // Every mind that saw the scene is drawn from, so one long-lived mind cannot own the sample.
 const quota = Math.ceil(args.n / pools.length)
-const built = []
-for (const p of pools) {
-  for (const row of spread(p.matched, quota)) {
-    built.push({ mind: p.mind.id, tick: row.tick, assembled: await blocksAt(p, row) })
+const sample = []
+for (const p of pools) for (const row of spread(p.matched, quota)) sample.push({ p, row })
+const turns = sample.slice(0, args.n)
+const heardSkipped = pools.reduce((n, p) => n + p.heard, 0)
+
+mkdirSync(outDir, { recursive: true })
+const ops = new Database(join(outDir, 'ops.db'))
+migrateLlmTables(ops)
+const client = (caller) =>
+  new LlmClient({ db: ops, caller, providerOrder: PROVIDER_ORDER, budgetUsd: args.cap })
+
+// Arm prep, and the only place an arm spends outside the turn itself. Gists go into the working
+// copy of the mind db, so the second assembly below renders them without knowing an arm exists.
+const prep = { gists: 0, standing: new Map() }
+const nightLlm = makeReflectionLlm(client('reflection'))
+if (args.arm !== 'raw' && !args.dry) {
+  for (const { p, row } of turns) {
+    const ambient = await retrieveAmbient(
+      p.mem,
+      JSON.parse(row.tags),
+      row.tick,
+      DEFAULT_MIND_CONFIG.ambientK,
+    )
+    prep.gists += await gistMemories(p.mem, nightLlm, ambient)
   }
 }
-const prompts = built.slice(0, args.n)
-const heardSkipped = pools.reduce((n, p) => n + p.heard, 0)
+if (args.arm === 'wants' && !args.dry) {
+  for (const { p, row } of turns) {
+    const day = worldDay(row.tick)
+    const key = `${p.mind.id}:${day}`
+    if (prep.standing.has(key)) continue
+    // The scenes the mind's own night wrote, one day back: the same input the shipped
+    // `summarizeDay` reads, so the wants block is generated the way the runtime generates it.
+    const scenes = p.mem
+      .summaryNodes('scene')
+      .filter((n) => n.day < day)
+      .slice(-8)
+      .map((n) => ({ title: n.title, text: n.text }))
+    prep.standing.set(
+      key,
+      scenes.length === 0 ? [] : (await nightLlm.summarizeDay(scenes)).standing,
+    )
+  }
+}
+
+const prompts = []
+for (const { p, row } of turns) {
+  const standing = prep.standing.get(`${p.mind.id}:${worldDay(row.tick)}`) ?? []
+  prompts.push({ mind: p.mind.id, tick: row.tick, assembled: await blocksAt(p, row, standing) })
+}
 
 const compacting = prompts.filter((p) => p.assembled.needsCompaction).length
 console.log(
   `replay: ${prompts.length} turns from ${pools.map((p) => p.mind.id).join(', ')} — ${args.filter}` +
     ` (${heardSkipped} skipped for heard speech, ${compacting} over the compaction bar)` +
+    `\nreplay: arm '${args.arm}' — ${prep.gists} gists written, ` +
+    `${[...prep.standing.values()].filter((l) => l.length > 0).length} wants blocks pinned` +
     '\nreplay: the makeables and standing-walls lines are absent — they read world state no' +
     ' mind db holds, so a build-verb rate measured here is a floor, not the shipped one.',
 )
@@ -198,15 +260,7 @@ if (args.dry) {
   process.exit(0)
 }
 
-mkdirSync(outDir, { recursive: true })
-const ops = new Database(join(outDir, 'ops.db'))
-migrateLlmTables(ops)
-const llm = new LlmClient({
-  db: ops,
-  caller: args.settings,
-  providerOrder: PROVIDER_ORDER,
-  budgetUsd: args.cap,
-})
+const llm = client(args.settings)
 
 const answers = []
 const queue = prompts.flatMap((p) => Array.from({ length: args.rounds }, (_, r) => ({ ...p, r })))
@@ -246,22 +300,26 @@ for (const a of asking) {
   const [n, e] = byVerb.get(a.verb) ?? [0, 0]
   byVerb.set(a.verb, [n + 1, e + (a.blank === null ? 0 : 1)])
 }
+const spoke = answers.filter((a) => a.turn !== undefined && !isBlankAnswer(a.turn.speech))
 const dead = sumDeadCalls(deadCallCounts(ops))
 const tokens = ops
-  .prepare('SELECT AVG(input_tokens) i, AVG(output_tokens) o FROM llm_calls WHERE ok = 1')
-  .get()
+  .prepare(`SELECT AVG(input_tokens) i, AVG(output_tokens) o FROM llm_calls
+     WHERE ok = 1 AND caller = ?`)
+  .get(args.settings)
 const spent = sumCostUsd(ops, args.settings)
+const prepSpent = ['reflection', 'reflection.gist'].reduce((n, c) => n + sumCostUsd(ops, c), 0)
 const answered = answers.filter((a) => a.turn !== undefined).length
 const pct = (n, d) => (d === 0 ? '—' : `${((100 * n) / d).toFixed(1)}%`)
 
 writeFileSync(join(outDir, 'answers.jsonl'), answers.map((a) => JSON.stringify(a)).join('\n'))
 console.log(`
-model        ${MIND_MODEL} via ${PROVIDER_ORDER.join(', ')}, settings '${args.settings}'
+model        ${MIND_MODEL} via ${PROVIDER_ORDER.join(', ')}, settings '${args.settings}', arm '${args.arm}'
 calls        ${queue.length} — ${answered} answered, ${queue.length - answered} dead
 act rate     ${pct(acts.length, answered)} (${acts.length} acts, ${asking.length} asking for something)
-empty param  ${pct(empty.length, asking.length)} (${empty.length}/${asking.length})
+param filled ${pct(asking.length - empty.length, asking.length)} (${asking.length - empty.length}/${asking.length})
+speech rate  ${pct(spoke.length, answered)} (${spoke.length} spoke)
 by verb      ${[...byVerb].map(([v, [n, e]]) => `${v} ${e}/${n}`).join(', ') || '—'}
 dead calls   empty ${dead.emptyOutput}, unparseable ${dead.unparseable}, other ${dead.otherFailures}
 mean tokens  ${Math.round(tokens.i ?? 0)} in, ${Math.round(tokens.o ?? 0)} out
-spent        $${spent.toFixed(5)} of a $${args.cap.toFixed(2)} cap
+spent        $${spent.toFixed(5)} on turns, $${prepSpent.toFixed(5)} on arm prep, cap $${args.cap.toFixed(2)}
 out          ${outDir}`)
