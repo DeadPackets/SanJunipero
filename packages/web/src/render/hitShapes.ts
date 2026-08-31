@@ -56,11 +56,9 @@ export function polygonBounds(poly: number[]): { w: number; h: number; cx: numbe
   return { w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 }
 }
 
-/**
- * Grow a capsule about its own centroid to at least `minPx` of TOTAL on-screen scale — sprite
- * scale times camera zoom — capped by `maxWidthPx`, the pitch to the nearest neighbour of the
- * same class: a rank of bodies all grown to the floor is one contest the viewer cannot settle.
- */
+/** Grow a capsule about its own centroid to at least `minPx` at TOTAL on-screen scale — sprite
+ *  scale times camera zoom — capped by `maxWidthPx`, the pitch to the nearest neighbour of the
+ *  same class: a rank of bodies all grown to the floor is one contest the viewer cannot settle. */
 export function inflateToMin(
   poly: number[],
   minPx: number,
@@ -100,10 +98,8 @@ export function hitTightness(
  *  thing for the drawn volumes). Restated here so `hitShapes` stays free of the art modules. */
 export const BUILDING_UNIT_PX = 32
 
-/**
- * A ground diamond swept upward. `base` is four points in N, E, S, W order; the result is the
- * SIX-point outer silhouette, because the raised south vertex is inside the shape.
- */
+/** A ground diamond swept upward. `base` is four points in N, E, S, W order; the result is the
+ *  SIX-point outer silhouette, because the raised south vertex is inside the shape. */
 export function extrudeDiamond(base: number[], heightPx: number): number[] {
   const [nx, ny, ex, ey, sx, sy, wx, wy] = base as [
     number,
@@ -119,11 +115,9 @@ export function extrudeDiamond(base: number[], heightPx: number): number[] {
   return [wx, wy, sx, sy, ex, ey, ex, ey - h, nx, ny - h, wx, wy - h]
 }
 
-/**
- * The hit prism for a building drawn from ART, in the sprite's LOCAL space: the drawn ground
- * diamond's SOUTH vertex sits on the feet point, `side` wide and `side / 2` tall, and the body
- * rises to `side`. Points are pre-divided by `scale` because Pixi scales `hitArea`.
- */
+/** The hit prism for a building drawn from ART, in the sprite's LOCAL space: the drawn ground
+ *  diamond's SOUTH vertex sits on the feet point, `side` wide and `side / 2` tall, and the body
+ *  rises to `side`. Points are pre-divided by `scale` because Pixi scales `hitArea`. */
 export function artPrismPolygon(w: number, h: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale
   const side = (w + h) * BUILDING_UNIT_PX

@@ -151,10 +151,8 @@ describe('the archive — every discovery, in order, with its credit', () => {
   })
 })
 
-/**
- * `readDiscoveries` skips any row that fails `DiscoveryRecordSchema` and is right to, but a
- * silent skip is a schema drift nobody can see: a 200 and a well-formed body, one entry short.
- */
+/** `readDiscoveries` skips any row that fails `DiscoveryRecordSchema` and is right to, but a
+ *  silent skip is a schema drift nobody can see: a 200 and a well-formed body, one entry short. */
 describe('★ a dropped discovery row is said out loud, once', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-drift-'))
   afterAll(() => {

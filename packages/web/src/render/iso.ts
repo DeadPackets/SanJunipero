@@ -32,12 +32,10 @@ export function depthKey(x: number, y: number): number {
 export const FACINGS = ['sw', 'se', 'ne', 'nw'] as const
 export type Facing = (typeof FACINGS)[number]
 
-/**
- * Facing is classified in SCREEN space from the signs of `dx−dy` and `dx+dy` — the compass
- * name is a screen name. The two ties break so that negating the motion negates the facing:
- * pure depth takes the right hand both ways, pure sideways keeps the face to the camera. A
- * zero delta has no facing and returns `null`.
- */
+/** Facing is classified in SCREEN space from the signs of `dx−dy` and `dx+dy` — the compass
+ *  name is a screen name. The two ties break so that negating the motion negates the facing:
+ *  pure depth takes the right hand both ways, pure sideways keeps the face to the camera.
+ *  A zero delta has no facing and returns `null`. */
 export function facingFrom(dx: number, dy: number): Facing | null {
   const sx = dx - dy // sign of the screen x
   const sy = dx + dy // sign of the screen y, positive toward the viewer

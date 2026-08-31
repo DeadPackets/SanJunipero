@@ -738,9 +738,9 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
-    // What the answer produced, booked before the world sees it: an act:null turn is legal and
-    // leaves no refusal, no event and no alert of its own (K26). The fourth outcome is the one
-    // run G read as silence: named nothing because a plan is already carrying the body.
+    // What the answer produced, booked before the world sees it: a wait arrives here as act:null
+    // and leaves no refusal, no event and no alert of its own (K26) — the shape run G read as
+    // silence when a plan was already carrying the body.
     const acted = (turn.action ?? null) !== null
     const spoke = turnSpeaks(turn)
     this.#llm.noteTurnOutcome({

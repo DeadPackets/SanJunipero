@@ -240,9 +240,8 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
     const late = tick + 120
     expect(dayPhaseFromTick(late)).toBe('night')
     expect(isDark(state, 5, 4, late, CFG)).toBe(false)
-    // Now burn the fuel down to that same tick and the street is dark again — the flame is what
-    // is doing the work, not the hour. Set on the state, not folded: `structure_fueled` only ever
-    // feeds a fire, and the fold refuses to let a feeding shorten one.
+    // Burn the fuel down to that same tick: the flame does the work, not the hour. Set on the
+    // state, not folded — `structure_fueled` only feeds a fire, and a feeding never shortens one.
     const spent: WorldState = {
       ...state,
       structures: {

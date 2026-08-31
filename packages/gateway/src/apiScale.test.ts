@@ -100,10 +100,8 @@ const bodyOf = (db: Database.Database, mirror: WorldMirror, path: string): strin
   return body
 }
 
-/**
- * A memo keyed on `mirror.seq()` buys nothing: the generation changes every tick, so the whole
- * table is re-read and re-`JSON.parse`d on the tick thread.
- */
+/** A memo keyed on `mirror.seq()` buys nothing: the generation changes every tick, so the whole
+ *  table is re-read and re-`JSON.parse`d on the tick thread. */
 describe('★ the read API reads the tick, not the history', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-apiscale-'))
   afterAll(() => {

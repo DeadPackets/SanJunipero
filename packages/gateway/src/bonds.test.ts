@@ -189,10 +189,8 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     }
   })
 
-  /**
-   * `buildBonds` folds exactly `BOND_TYPES`; every other row falls through its chain, so the
-   * SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log.
-   */
+  /** `buildBonds` folds exactly `BOND_TYPES`; every other row falls through its chain, so the
+   *  SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log. */
   it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
     const rows = db
       .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
@@ -290,10 +288,8 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
   })
 })
 
-/**
- * A spoke older than `TALK_WINDOW_TICKS` can pair with nothing ever again, so dropping it is
- * the same answer in bounded time; this proves the "same answer" half.
- */
+/** A spoke older than `TALK_WINDOW_TICKS` can pair with nothing ever again, so dropping it is
+ *  the same answer in bounded time; this proves the "same answer" half. */
 describe('★ the talk window is a window, not the whole log', () => {
   const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent => ({
     seq,

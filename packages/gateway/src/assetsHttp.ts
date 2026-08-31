@@ -138,11 +138,8 @@ const stripPng = (file: string): string | null => (file.endsWith('.png') ? file.
 /** Encoded sheets held at once. A character sheet is 5 938 B here, so this is about 760 KB. */
 const MAX_ENCODED = 128
 
-/**
- * The key is the stranger's to choose and `sharp` runs on libuv's four-thread pool, which the
- * whole process shares with every file read. Two guards: the id must name somebody the world
- * actually has, and each sheet is encoded once.
- */
+/** The key is the stranger's to choose and `sharp` runs on libuv's four-thread pool the whole
+ *  process shares — so the id must name somebody the world has, and each sheet is encoded once. */
 export type AssetRouteDeps = {
   getCodex(): AssetCodex | null
   /** Absent → every id is served, which is only ever right for a test fixture. */
@@ -166,9 +163,8 @@ export function makeNewestReady(): (codex: AssetCodex, kind: string) => string |
 export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
   const newestReady = makeNewestReady()
 
-  // The PROMISE is held, not the buffer: N concurrent misses on one key would otherwise run N
-  // sharp encodes on libuv's four threads. Oldest-first past the cap — `fold.ts` leaves the dead
-  // in `state.agents` for ever and `knowsAgent` lets them all through.
+  // The PROMISE is held, not the buffer: N concurrent misses on one key would run N sharp encodes.
+  // Oldest-first past the cap — the fold keeps the dead in `state.agents`, and `knowsAgent` lets them through.
   const encoded = new Map<string, Promise<Buffer>>()
   const onceEncoded = (
     res: ServerResponse,

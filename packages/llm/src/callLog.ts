@@ -97,10 +97,9 @@ export function migrateLlmTables(db: Database.Database): void {
   }
 }
 
-/** What one paid turn produced, against the back end that answered it. A turn that acts on
- *  nothing and says nothing is legal and leaves no other trace; without this row it is invisible.
- *  `planContinued` is the fourth outcome: the turn added nothing of its own because a plan is
- *  carrying the body — one already running, or one this same answer committed. */
+/** What one paid turn produced, against the back end that answered it — a turn that acts on
+ *  nothing and says nothing is legal, and this row is its only trace. `planContinued` is the
+ *  fourth outcome: a plan, running or committed by this same answer, is carrying the body. */
 export function insertTurnOutcome(
   db: Database.Database,
   row: {

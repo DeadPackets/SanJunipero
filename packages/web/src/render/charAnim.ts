@@ -128,12 +128,9 @@ export const STRIDE_TILES = 1.8
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
 
-/**
- * The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed.
- *
- * Scales the CLAMPED cadence, not the ideal — inside the clamp all five founders came out at
- * exactly 360 ms at the product's real 2000 ms a tile (5 of 5 distinct only at the dev world's 400 ms).
- */
+/** The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed. Scales the
+ *  CLAMPED cadence, not the ideal — inside the clamp all five founders came out at exactly
+ *  360 ms at the product's real 2000 ms a tile (5 of 5 distinct only at the dev world's 400 ms). */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
   const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length
   return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal)) * strideScale

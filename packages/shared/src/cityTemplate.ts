@@ -375,8 +375,7 @@ const mass = (m: { w: number; h: number }): { along: number; deep: number } => (
 
 // Genesis asks for buildings in the order they are raised, never for positions: each claims the free
 // plot nearest the square, so moving a line moves a building and cannot move it onto a road or a neighbour.
-// The name rides the ask: what the town calls a building is authored on the same line that
-// asks for it, so a mind can say where it is going and be understood.
+// The name rides the ask, so a mind can say where it is going and be understood.
 export const GENESIS_WANTED: readonly Wanted[] = [
   {
     kind: STOREHOUSE_KIND,

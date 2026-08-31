@@ -36,11 +36,9 @@ export function pickCut(
  *  turn are the same length of town time. `CUT_MIN_MS` still gates how fast either can land. */
 export const QUIET_TURN_TICKS = 60
 
-/**
- * `pickCut` answers null when nothing has scored, which for a lens a person is steering is right
- * and for an unattended stream is an empty frame. A quiet town still has people in it, so the round
- * below turns over one heat window at a time and the caption always has a name in it.
- */
+/** `pickCut` answers null when nothing has scored — right for a lens a person is steering, an
+ *  empty frame for an unattended stream. The round turns over one heat window at a time, so the
+ *  caption always has a name in it. */
 export function quietSubject(people: readonly string[], nowTick: number): string | null {
   if (people.length === 0) return null
   const tick = Number.isFinite(nowTick) ? Math.max(0, nowTick) : 0

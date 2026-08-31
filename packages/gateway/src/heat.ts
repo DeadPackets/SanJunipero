@@ -30,11 +30,8 @@ export type HeatScores = Map<string, number>
 const heatKey = (tick: number, agentId: string): string =>
   `${Math.floor(tick / HEAT_WINDOW_TICKS)}\n${agentId}`
 
-/**
- * An event either names a person or scores nothing — `/api/heat` is the camera's subject, and a
- * camera cannot follow "the town". `fire_spread` scores the destination ONLY, so one fire cannot
- * pay the same person again at every link of the chain.
- */
+/** An event either names a person or scores nothing — heat is the camera's subject, and a camera
+ *  cannot follow "the town". `fire_spread` scores the destination ONLY: one fire pays a person once. */
 export type HeatContext = {
   /** Who raised a structure, for the events that name a place and no person. */
   builderOf(structureId: string): string | null

@@ -39,11 +39,9 @@ export function wallStripWidth(wall: WallKind, atTiles: number, room = ROOM_TILE
 
 export type WallCourse = { wall: WallKind; piece: string; atTiles: number }
 
-/**
- * Every wall is plain from end to end first, so there is never a gap; a FEATURE is drawn over
- * it. A hearth becomes the chimney breast — drawn ONCE as the wall it is built into, and never
- * again as an object standing in front of it.
- */
+/** Every wall is plain from end to end first, so there is never a gap; a FEATURE is drawn over
+ *  it. A hearth becomes the chimney breast — drawn ONCE as the wall it is built into, and never
+ *  again as an object standing in front of it. */
 export const FURNISHING_WALL_PIECE: Readonly<Record<string, string>> = {
   hearth: 'wall-chimney',
   shelf: 'wall-dresser',

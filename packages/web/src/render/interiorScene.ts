@@ -295,11 +295,9 @@ export function createInteriorScene(
     drawFloorLight(floorLight, pools(m), roomTiles, ceilingBeams(WALL_STRIP_TILES, roomTiles))
   }
 
-  /**
-   * Every wall is laid plain end to end first so there is never a gap, then each feature is
-   * drawn over it. When the codex holds no tileset this draws nothing and the code-painted shell
-   * stands — the same art-independence law the ground answers to.
-   */
+  /** Every wall is laid plain end to end first so there is never a gap, then each feature is
+   *  drawn over it. When the codex holds no tileset this draws nothing and the code-painted
+   *  shell stands — the same art-independence law the ground answers to. */
   function paintWalls(m: RoomMap, records: AssetRecord[]): void {
     wallArt.removeChildren().forEach((c) => {
       c.destroy()
@@ -416,11 +414,9 @@ export function createInteriorScene(
     if (half === 'back') sprite.position.y -= (f.height - cut) * sprite.scale.y
   }
 
-  /**
-   * A wall furnishing is drawn once, and the wall decides which way it faces: the wall is the
-   * one the piece's TILE is against, the facing is that wall's own (`WALL_FACING`), and a piece
-   * that reaches the ground STANDS at the foot of its wall instead of hanging over it.
-   */
+  /** A wall furnishing is drawn once, and the wall decides which way it faces: the wall is the
+   *  one the piece's TILE is against, the facing is that wall's own (`WALL_FACING`), and a piece
+   *  that reaches the ground STANDS at the foot of its wall instead of hanging over it. */
   function placeFurniture(m: RoomMap, items: RoomItem[], asElevation: ReadonlySet<string>): void {
     const onFloor: { piece: MapPiece; item: RoomItem }[] = []
     m.pieces.forEach((piece, i) => {

@@ -91,12 +91,10 @@ const SINGLE_NAME: Partial<Record<TownKind, string>> = {
   storehouse: 'the storehouse',
 }
 
-/**
- * Labels are a map legend for the wide view and clutter on the way in. Every threshold is
- * chosen so that at EVERY resting `ZOOM_STOP` the layer is 1 or 0 and never between — a plate
- * drawn at 0.5 has a contrast ratio nobody can state. This is only the fade on the way IN;
- * `legendFits` and `placeLandmarks` own the wide end, on geometry.
- */
+/** Labels are a map legend for the wide view and clutter on the way in. Every threshold is
+ *  chosen so that at EVERY resting `ZOOM_STOP` the layer is 1 or 0 and never between — a plate
+ *  drawn at 0.5 has a contrast ratio nobody can state. This is only the fade on the way IN;
+ *  `legendFits` and `placeLandmarks` own the wide end, on geometry. */
 export const LANDMARK_SHOW_BELOW_SCALE = 1
 const LANDMARK_FULL_BELOW_SCALE = 0.75
 
@@ -228,12 +226,10 @@ export const leashOf = (of: readonly Rect[], size: { w: number; h: number }): Re
   return { x: e.x - size.w, y: e.y - size.h, w: e.w + size.w * 2, h: e.h + size.h * 2 }
 }
 
-/**
- * Plates place in rank order, so the centre keeps its slot and `placeTag` steps clear of what
- * is already there. Only places ON SCREEN are ever passed in: `placeTag` clamps into the view,
- * so a town larger than the viewport would drag every name into it and stack them, O(n²) with n
- * unbounded. A plate that lands on a named place, or outside its own leash, is not drawn.
- */
+/** Plates place in rank order, so the centre keeps its slot and `placeTag` steps clear of what
+ *  is already there. Only places ON SCREEN are ever passed in: `placeTag` clamps into the view,
+ *  so a town larger than the viewport would drag every name into it and stack them, O(n²) with n
+ *  unbounded. A plate that lands on a named place, or outside its own leash, is not drawn. */
 export function placeLandmarks(
   marks: readonly PlaceableMark[],
   view: Rect,
@@ -261,12 +257,10 @@ export function placeLandmarks(
   return out
 }
 
-/**
- * A plate holds a CONSTANT screen size while the settlement shrinks with the camera, so the
- * legend's ink measured against the town's drawn area ON SCREEN is scale-free — right for any
- * zoom, any stop ladder, any plate count and any town. `1 / 6` sits between the 12.8 % that
- * reads and the 51.2 % that does not.
- */
+/** A plate holds a CONSTANT screen size while the settlement shrinks with the camera, so the
+ *  legend's ink measured against the town's drawn area ON SCREEN is scale-free — right for any
+ *  zoom, any stop ladder, any plate count and any town. `1 / 6` sits between the 12.8 % that
+ *  reads and the 51.2 % that does not. */
 export const LEGEND_INK_SHARE = 1 / 6
 
 /** Both areas in SCREEN px². A settlement with no drawn area has no map to explain. */

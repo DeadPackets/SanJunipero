@@ -1,7 +1,4 @@
-/**
- * Two served readers are deliberately forgiving; this makes the forgiveness visible instead of
- * silent.
- */
+/** Two served readers are deliberately forgiving; this makes the forgiveness visible, not silent. */
 export type Degradation = { key: string; line: string }
 
 const said = new Map<string, Degradation>()

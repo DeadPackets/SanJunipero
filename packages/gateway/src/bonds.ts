@@ -41,10 +41,8 @@ export type BondsDeps = {
   config: SimConfig
 }
 
-/**
- * A bond is folded, not accumulated (`foldBond` in `@sj/shared`): what is kept per pair is a
- * 24-act window, six rollup rows and three scalars — a constant, whatever the town's age.
- */
+/** A bond is folded, not accumulated (`foldBond` in `@sj/shared`): what is kept per pair is a
+ *  24-act window, six rollup rows and three scalars — a constant, whatever the town's age. */
 export function buildBonds(
   events: Iterable<SimEvent>,
   earshot: number,
@@ -63,9 +61,8 @@ export function buildBonds(
     fold.add(kind, tick)
   }
 
-  // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than
-  // the talk window can pair with nothing ever again, so dropping it is the same answer in
-  // bounded time.
+  // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than the
+  // talk window can pair with nothing again, so dropping it is the same answer in bounded time.
   let spokes: { agentId: string; tick: number; x: number; y: number }[] = []
   const started = new Map<string, Record<string, unknown>>() // `${agentId}\n${verb}` → params
 

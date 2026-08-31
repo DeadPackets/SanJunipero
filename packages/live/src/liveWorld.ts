@@ -804,9 +804,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             )
           }
         }
-        // The sustained act bar. Pre-flight's three calls cannot see a rate that collapses over
-        // a run, so this window is what the gate really rests on: a collapse inside the first
-        // sim-hour is the signal that the back end passed the bar and then stopped acting.
+        // The sustained act bar: pre-flight's three calls cannot see a rate that collapses over a
+        // run — a collapse inside the first sim-hour means the back end passed the bar, then quit.
         const acts = checkActRate(opsDb)
         if (acts.alerted) {
           log(`stream: acts — ${(acts.silentShare * 100).toFixed(0)}% of mind turns did nothing`)
