@@ -106,6 +106,7 @@ import { countsAsFootfall, decayTraffic, quietPathsAt } from './systems/desirePa
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
+import { renames } from './naming.js'
 import { findPath } from './path.js'
 
 // Kept as its own step so a batch of N folds to exactly the state the N separate events left.
@@ -454,7 +455,12 @@ export function fold(
         ...state,
         structures: {
           ...state.structures,
-          [p.structureId]: { ...s, name: p.text, inscription: { text: p.text, by: p.agentId } },
+          [p.structureId]: {
+            ...s,
+            // Writing is never refused. It becoming the building's name is the part with a law.
+            ...(renames(s, p.text, p.agentId) ? { name: p.text } : {}),
+            inscription: { text: p.text, by: p.agentId },
+          },
         },
       }
     }

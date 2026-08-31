@@ -168,6 +168,29 @@ describe('★ block 1 tells the truth about walking to a place', () => {
     expect(CAPABILITIES).toContain('you know it for good and can go back to it from anywhere')
   })
 
+  // The guide half of the naming ruling: a mind can only learn the law from the world's rules,
+  // and the law is what HAPPENS, never what would make a good name.
+  const inscribeLine = CAPABILITIES.split('\n').find((l) => l.startsWith('inscribe: '))!
+
+  it('teaches the naming law as physics: whose wall, and what reads as a name', () => {
+    expect(inscribeLine).toContain('a building you raised yourself become what it is called')
+    expect(inscribeLine).toContain('read as a name and not as a sentence')
+    expect(inscribeLine).toContain("what you cut into another's walls stays writing on the wall")
+  })
+
+  it('and spends not one word on taste', () => {
+    expect(inscribeLine).not.toMatch(/\b(short|evocative|memorable|good|better|choose|avoid)\b/i)
+    expect(inscribeLine).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  // The hearsay floor is a fact about the air, not about the chisel. A mind told "four letters
+  // or it will not travel" is a mind authoring its town's names to a rule nobody in it can feel.
+  it('never names the hearsay floor, which is physics a mind cannot act on', () => {
+    for (const tell of ['four letters', 'stopword', 'hearsay']) {
+      expect(CAPABILITIES, tell).not.toContain(tell)
+    }
+  })
+
   // Physics, never outcomes: the block says what a name DOES, and never asks for one.
   it('never tells a mind to name a place or to spread one', () => {
     expect(CAPABILITIES).not.toMatch(/\b(name your|should inscribe|tell others|spread the)\b/i)

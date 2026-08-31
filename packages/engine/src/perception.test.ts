@@ -1267,7 +1267,6 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          {
           "id": "structure_3",
           "kind": "storehouse",
-          "name": "raised in the first spring",
           "x": 7,
           "y": 4,
           "w": 2,

@@ -13,6 +13,7 @@ function carved(
   y: number,
   inscription?: { text: string; by: string },
   stage: 'construction' | 'complete' = 'complete',
+  name?: string,
 ): WorldState['structures'][string] {
   return {
     id,
@@ -30,6 +31,7 @@ function carved(
     burning: false,
     burnTicks: 0,
     ...(inscription === undefined ? {} : { inscription }),
+    ...(name === undefined ? {} : { name }),
   }
 }
 
@@ -61,6 +63,27 @@ describe('toponymsOf — the names the town cut for itself', () => {
       a: carved('a', 1, 1, { text: 'first', by: 'o' }),
     })
     expect(toponymsOf(state).map((t) => t.id)).toEqual(['a', 'z'])
+  })
+
+  // The map and the minds have to read one set of names. A founding building nobody has ever
+  // carved on has a name, and the map could not see it while it only read the carvings.
+  it('★ shows what a place is CALLED, so a founding name reaches the map uncarved', () => {
+    const s = town({ a: carved('a', 3, 4, undefined, 'complete', 'the old farmhouse') })
+    expect(toponymsOf(s)).toEqual([{ id: 'a', name: 'the old farmhouse', x: 3, y: 4 }])
+  })
+
+  it('and the name outranks a carving that never became one', () => {
+    const s = town({
+      a: carved(
+        'a',
+        3,
+        4,
+        { text: 'I miss the sea', by: 'amara' },
+        'complete',
+        'the old farmhouse',
+      ),
+    })
+    expect(toponymsOf(s)[0]!.name).toBe('the old farmhouse')
   })
 
   it('has nothing to say before the first snapshot', () => {
