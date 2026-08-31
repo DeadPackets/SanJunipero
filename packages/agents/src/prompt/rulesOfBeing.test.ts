@@ -76,21 +76,17 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
     expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
   })
 
-  // K20: one fault across nine verbs, 164 of 368 refusals. The schema carries the shape; this
-  // line carries what the shape cannot say, which is that a blank one is a moment thrown away.
-  it('says that an act must carry what it asks for, in the static prefix', () => {
-    expect(CAPABILITIES).toContain('Every act carries what it asks for')
-    expect(CAPABILITIES).toContain('An act named with nothing in it does not\nhappen')
-    expect(block1()).toContain('Every act carries what it asks for')
+  // The K20 empty-act paragraph treated a DeepSeek fault. The back end the town now runs fills
+  // its params on every call, so the prefix pays no bytes for it and the schema carries it.
+  it('spends no bytes on the empty-act paragraph or its exemplars', () => {
+    expect(CAPABILITIES).not.toContain('Every act carries what it asks for')
+    expect(CAPABILITIES).not.toContain('An act named with nothing in it')
+    expect(CAPABILITIES).not.toMatch(/mind who means/)
+    expect(block1()).not.toContain('Every act carries what it asks for')
   })
 
-  // A shared block that hands every mind the same example makes five copies of one actor, so
-  // every exemplar is abstract and names nobody: no founder, and no thing anyone holds.
-  it('spends its exemplars on the acts that come back empty, and names no founder', () => {
-    expect(CAPABILITIES).toContain('A mind who means to speak')
-    expect(CAPABILITIES).toContain('A mind who means to eat')
-    expect(CAPABILITIES).toContain('a mind who means\nto go in')
-    expect(CAPABILITIES.match(/mind who means/g)).toHaveLength(3)
+  // A shared block that hands every mind the same example makes five copies of one actor.
+  it('names no founder', () => {
     for (const founder of ['Omar', 'Salma', 'Nadia', 'Amara', 'Yusuf']) {
       expect(CAPABILITIES, founder).not.toContain(founder)
     }

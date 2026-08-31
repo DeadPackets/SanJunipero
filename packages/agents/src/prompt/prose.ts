@@ -259,6 +259,9 @@ export type ProseWorld = {
   // Where the food is. The same answer thirst has had since the last batch, for the need that
   // never got one: the run that drank fifteen times ate once (R21).
   nearestFood?: (x: number, y: number) => { x: number; y: number; kind: string } | null
+  // Who is out there. The same answer food and water have, for the last want that had none:
+  // the low band said only that it was lonely.
+  nearestPerson?: (x: number, y: number) => { x: number; y: number; name: string } | null
   // Where a material comes from. The same answer food and water have; wanting to build was the
   // only drive left with a cost and no place to go.
   nearestSource?: (
@@ -531,17 +534,23 @@ function makeableRoadLine(m: Makeables, packet: PerceptionPacket, world?: ProseW
   return `${best.subject} wants ${best.want.say}${placeOf(best.want, packet, world)}.`
 }
 
+/** The hearth the cold road would name tonight, or null when it has nothing to say. The roads
+ *  that wait below the cold read this and not the sentence, so neither pays for the other. */
+function coldRoadHearth(packet: PerceptionPacket, world?: ProseWorld): PerceptionStructure | null {
+  if (packet.time.hour < EVENING_HOUR || packet.time.isNight) return null
+  if (world?.nightWillBeCold?.() !== true) return null
+  return nearestHearth(packet, 'cold')
+}
+
 /** The road to a fed fire, opened while there is still light to walk it by. The cold is real —
  *  warmth zero burns energy at twice the rate, which is the collapse ladder. */
 function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
-  if (packet.time.hour < EVENING_HOUR || packet.time.isNight) return ''
-  if (world?.nightWillBeCold?.() !== true) return ''
-  const near = nearestHearth(packet, 'cold')
+  const near = coldRoadHearth(packet, world)
   if (near === null) return ''
   const line = `The night will be cold; the hearth in the ${words(near.kind)} at (${near.x}, ${near.y}) is cold and wants wood.`
   // Hands that already hold the wood need no road to a tree, only the fire it is wanted at.
   if (packet.self.inventory.some((i) => i.kind === FUEL_ITEM)) return line
-  const at = world.nearestSource?.(FUEL_ITEM, packet.self.x, packet.self.y) ?? null
+  const at = world?.nearestSource?.(FUEL_ITEM, packet.self.x, packet.self.y) ?? null
   if (at === null) return line
   return `${line} The nearest ${sourcePhrase(at.from, FUEL_ITEM)} is at (${at.x}, ${at.y}).`
 }
@@ -672,10 +681,11 @@ export function perceptionToProse(
   else if (hunger < 30) lines.push('Your stomach gnaws at you.')
   // The same ladder hunger uses. A packet from before thirst existed reads as a full body.
   const thirst = packet.self.body.thirst ?? 100
-  if (thirst < 5) lines.push('Your throat burns; you must drink.')
+  if (thirst < 5) lines.push('Your throat burns with thirst.')
   else if (thirst < 30) lines.push('Your mouth is dry.')
-  if (energy < 10) lines.push('You are about to collapse; sleep NOW.')
-  else if (energy < 25) lines.push('Your legs tremble. You can barely stand; you must sleep.')
+  if (energy < 10) lines.push('You are about to collapse; sleep is taking you where you stand.')
+  else if (energy < 25)
+    lines.push('Your legs tremble. You can barely stand, and your eyes keep closing.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
   // Where the cold is, and what stands between: the pair is the whole of what there is to learn.
@@ -695,16 +705,18 @@ export function perceptionToProse(
       lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
   }
 
+  const roads: string[] = []
+
   // Never a refusal, and opened well before the dryness is felt: thirst decays 1.67x slower
   // than hunger, so the 30 both once shared left the water road 10 ticks of runway.
   if (thirst < 50) {
     if (world?.waterAtHand?.() === true) {
-      lines.push(
+      roads.push(
         'Water lies within reach of your hands. You could drink here, or fill what you carry.',
       )
     } else {
       const w = world?.nearestWater?.(x, y) ?? null
-      if (w !== null) lines.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
+      if (w !== null) roads.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
     }
   }
 
@@ -715,12 +727,20 @@ export function perceptionToProse(
       world?.isEdible === undefined
         ? undefined
         : packet.self.inventory.find((i) => world.isEdible!(i.kind))
-    if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}). You could eat it now.`)
+    if (food) roads.push(`Your satchel holds ${food.kind} (${food.id}). You could eat it now.`)
     else {
       const f = world?.nearestFood?.(x, y) ?? null
-      if (f !== null) lines.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
+      if (f !== null) roads.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
     }
   }
+
+  // The last want with no road. It waits below the survival ones, and speaks only in the turns
+  // where the cold, the water and the food have nothing to say.
+  if (social < 30 && roads.length === 0 && coldRoadHearth(packet, world) === null) {
+    const p = world?.nearestPerson?.(x, y) ?? null
+    if (p !== null) roads.push(`The nearest person you know of is ${p.name}, at (${p.x}, ${p.y}).`)
+  }
+  lines.push(...roads)
 
   lines.push(weatherLine(packet.weather, packet.time.isNight))
 

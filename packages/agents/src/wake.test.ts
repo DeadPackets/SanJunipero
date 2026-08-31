@@ -354,13 +354,13 @@ describe('decideWake — doze backoff', () => {
 
 describe('decideWake — conversation cadence and reconsider', () => {
   it('conversation_beat follows its cadence then falls back to idle', () => {
-    const base = { lastTurnTick: 100, conversationUntilTick: 160 }
+    const base = { lastTurnTick: 100, conversationUntilTick: 130 }
     const packet = pkt()
     const plan = pln()
     expect(decideWake(cfg, packet, clk(base), 101, plan)).toBe(null)
     expect(decideWake(cfg, packet, clk(base), 102, plan)).toBe('conversation_beat')
     expect(decideWake(cfg, packet, clk(base), 104, plan)).toBe('conversation_beat')
-    expect(decideWake(cfg, packet, clk(base), 161, plan)).toBe(null)
+    expect(decideWake(cfg, packet, clk(base), 131, plan)).toBe(null)
   })
 
   it('reconsider fires once at the scheduled tick; caller clears it after acting', () => {
@@ -380,6 +380,6 @@ describe('a mind that has never taken a turn', () => {
 
   it('waits out the floor again once it HAS taken one', () => {
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 2, pln())).toBe(null)
-    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 121, pln())).toBe('boredom')
+    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 61, pln())).toBe('boredom')
   })
 })

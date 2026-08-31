@@ -632,6 +632,7 @@ export class AgentRuntime {
       nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
       nearestFood: (x: number, y: number) => this.#bridge.nearestFood(x, y),
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
+      nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),
       nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
     }
     const prose = perceptionToProse(

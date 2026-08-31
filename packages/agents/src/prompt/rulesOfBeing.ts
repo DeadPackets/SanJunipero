@@ -56,12 +56,6 @@ extinguish: name it extinguish; give structureId, the mark of the burning thing
 attack: name it attack; give targetId, the mark of the person you strike
 experiment: name it experiment; give description, what you attempt
 
-Every act carries what it asks for. An act named with nothing in it does not
-happen: the moment passes and nothing is done. A mind who means to speak gives
-the words themselves, not the wish to say something. A mind who means to eat
-names the thing in its own hands by the mark it was told, and a mind who means
-to go in names the building by its mark.
-
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
 stand beside where it rests and see it; until then you cannot name it.
 

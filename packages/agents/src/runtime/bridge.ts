@@ -350,6 +350,29 @@ export class EngineBridge {
     return hit === null ? null : { x: hit.x, y: hit.y, kind: hit.kind }
   }
 
+  // The road loneliness never had. Names and places only, as `nearestFood` names a kind and
+  // never a mark; ties fall to the lowest id so two bodies equally far stay deterministic.
+  nearestPerson(
+    agentId: string,
+    x: number,
+    y: number,
+    radius = 24,
+  ): { x: number; y: number; name: string } | null {
+    const state = this.#loop.state
+    let best: { x: number; y: number; name: string } | null = null
+    let bestD = Infinity
+    for (const id of Object.keys(state.agents).sort()) {
+      if (id === agentId) continue
+      const a = state.agents[id]!
+      if (!a.alive) continue
+      const d = Math.abs(a.x - x) + Math.abs(a.y - y)
+      if (d > radius || d >= bestD) continue
+      bestD = d
+      best = { x: a.x, y: a.y, name: a.name }
+    }
+    return best
+  }
+
   // Where the missing material stands, in the same terms `take`, `forage` and `chop` accept.
   // A deficit with no place to go is a want with no road, which is worse than no want at all.
   nearestSource(

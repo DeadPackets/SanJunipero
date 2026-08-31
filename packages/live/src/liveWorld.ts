@@ -150,7 +150,7 @@ export type LiveCastOpts = {
    *  client bills a different ledger proves nothing about the stop. */
   makeClient?: (opsDb: Database.Database, caller: string, agentId?: string) => LlmClient
   embedder?: { embed(t: string): Promise<Float32Array> }
-  /** For a harness that cannot wait 120 ticks for the boredom floor. Absent in every real run. */
+  /** For a harness that cannot wait out the boredom floor. Absent in every real run. */
   mindConfig?: Partial<MindConfig>
   /** Never dispatch a live run without it — a provider that silently returns garbage has
    *  burned a lane before. Off only for a test, which spends nothing to preflight. */

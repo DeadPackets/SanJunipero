@@ -159,6 +159,20 @@ describe('EngineBridge carries ownership through to the mind', () => {
   })
 })
 
+describe('nearestPerson', () => {
+  it('names the nearest other body, and never the one asking', () => {
+    const { bridge } = ownedWorld()
+    expect(bridge.nearestPerson(AGENT, 3, 3)).toEqual({ x: 4, y: 3, name: 'Bex' })
+    // Tamar and Cass are both one tile off: the lower id wins, so the pick never drifts.
+    expect(bridge.nearestPerson('bex', 4, 3)).toEqual({ x: 5, y: 3, name: 'Cass' })
+  })
+
+  it('is silent when nobody stands inside the radius', () => {
+    const { bridge } = ownedWorld()
+    expect(bridge.nearestPerson(AGENT, 3, 3, 0)).toBe(null)
+  })
+})
+
 describe('the default perception window outlasts the gap between turns (D-28-6)', () => {
   it('covers the longest an awake mind can go without a turn, with margin', () => {
     expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThanOrEqual(DEFAULT_MIND_CONFIG.boredomTicks)

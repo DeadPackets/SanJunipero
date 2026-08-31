@@ -550,7 +550,7 @@ describe('perceptionToProse', () => {
 
   // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
   // to rest can only ever try one and be refused.
-  it('escalates weariness severity so the mind knows to sleep', () => {
+  it('escalates weariness as felt fact, never as an order', () => {
     const tired = {
       ...quietMeadowPacket,
       self: {
@@ -561,8 +561,9 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(tired)).toContain('you must sleep')
+    expect(perceptionToProse(tired)).toContain('your eyes keep closing')
     expect(perceptionToProse(tired)).not.toContain('rest')
+    expect(perceptionToProse(tired)).not.toContain('you must')
 
     const collapsing = {
       ...quietMeadowPacket,
@@ -574,7 +575,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(collapsing)).toContain('sleep NOW')
+    expect(perceptionToProse(collapsing)).toContain('sleep is taking you where you stand')
   })
 
   it('renders structure footprint and advises walking beside it', () => {

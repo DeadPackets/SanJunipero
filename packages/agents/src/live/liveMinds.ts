@@ -50,8 +50,8 @@ export type BootMindsOpts = {
   reflectionLlm?: (agentId: string) => LlmClient
   /** Absent, a mind sleeps without dreaming. Rolled per night against `dreamChance`. */
   dreamLlm?: (agentId: string) => LlmClient
-  /** The wake cadence. Absent in every real run; a harness that cannot wait out the 120-tick
-   *  boredom floor to see a mind take one turn sets it. */
+  /** The wake cadence. Absent in every real run; a harness that cannot wait out the boredom
+   *  floor to see a mind take one turn sets it. */
   mindConfig?: Partial<MindConfig>
   /** The sim day a first personality is stamped with. See `hasPersonality`. */
   day?: number

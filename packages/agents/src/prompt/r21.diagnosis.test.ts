@@ -317,6 +317,30 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(fed).not.toContain('The nearest food you know of')
   })
 
+  it('loneliness is given a road, and it waits below the survival ones', () => {
+    const s = genesisTown()
+    const world = { ...WORLD, nearestPerson: () => ({ x: 62, y: 55, name: 'Omar' }) }
+    const lonely: WorldState = {
+      ...s,
+      agents: {
+        ...s.agents,
+        nadia: { ...s.agents.nadia!, needs: { ...s.agents.nadia!.needs, social: 10 } },
+      },
+    }
+    const prose = perceptionToProse(prosePacket(lonely, 'nadia'), undefined, world)
+    expect(prose).toContain('Loneliness settles over you.')
+    expect(prose).toContain('The nearest person you know of is Omar, at (62, 55).')
+
+    // One road a turn: a dry throat outranks a lonely one and the social line goes quiet.
+    const dry: WorldState = {
+      ...lonely,
+      agents: { ...lonely.agents, nadia: { ...lonely.agents.nadia!, thirst: 10 } },
+    }
+    const thirsty = perceptionToProse(prosePacket(dry, 'nadia'), undefined, world)
+    expect(thirsty).toContain('The nearest water you know of lies at (50, 62)')
+    expect(thirsty).not.toContain('The nearest person you know of')
+  })
+
   it('a founder wakes with an empty satchel and the loaves on a shelf behind a wall', () => {
     const s = genesisTown()
     const p = composePerception(s, CFG, 'amara', [])
