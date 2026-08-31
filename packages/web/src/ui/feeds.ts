@@ -30,7 +30,7 @@ export const bondsFeed = endpoint('/api/bonds', parseBonds, BONDS_REFETCH_MS)
  *  childless town answers with a typed empty. */
 export const lineageFeed = endpoint('/api/lineage', parseLineage)
 
-/** The narrator publishes once a sim-day, every 30 real minutes, so a minute is generous. */
+/** The narrator publishes once a sim-day, every 48 real minutes, so a minute is generous. */
 const DISPATCHES_REFETCH_MS = 60_000
 
 /** The town's paper, its captions, its weeks and its written lives, read once for the whole
@@ -38,7 +38,7 @@ const DISPATCHES_REFETCH_MS = 60_000
 export const dispatchesFeed = endpoint('/api/dispatches', dispatchesFrom, DISPATCHES_REFETCH_MS)
 
 /** The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
- *  every tick, so a 1.25 s world never re-renders the sheet underneath the reader's pointer. */
+ *  every tick, so a 2 s world never re-renders the sheet underneath the reader's pointer. */
 const CHRONICLE_REFETCH_MS = 20_000
 
 const parseChronicle = (body: unknown): ChronicleEntry[] | null => {

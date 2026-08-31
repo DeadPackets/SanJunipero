@@ -807,7 +807,7 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
     for (const [i, n] of buckets.entries()) expect(n, `bucket ${i}`).toBeGreaterThan(20)
   })
 
-  // Every rate, not just the dev world's: at the shipped 1250 ms a tile the clamp binds, so a
+  // Every rate, not just the dev world's: at the shipped 2000 ms a tile the clamp binds, so a
   // guard made only at 400 ms passes while all five founders share one cadence.
   it('★ five founders keep five cadences at EVERY rate, the shipped one included', () => {
     const rows: string[] = [],

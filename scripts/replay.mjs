@@ -28,9 +28,8 @@ import {
   deadCallCounts,
   Embedder,
   LlmClient,
-  MIND_MODEL,
   migrateLlmTables,
-  PROVIDER_ORDER,
+  modelFor,
   sumCostUsd,
   sumDeadCalls,
 } from '@sj/llm'
@@ -204,7 +203,6 @@ migrateLlmTables(ops)
 const llm = new LlmClient({
   db: ops,
   caller: args.settings,
-  providerOrder: PROVIDER_ORDER,
   budgetUsd: args.cap,
 })
 
@@ -256,7 +254,7 @@ const pct = (n, d) => (d === 0 ? '—' : `${((100 * n) / d).toFixed(1)}%`)
 
 writeFileSync(join(outDir, 'answers.jsonl'), answers.map((a) => JSON.stringify(a)).join('\n'))
 console.log(`
-model        ${MIND_MODEL} via ${PROVIDER_ORDER.join(', ')}, settings '${args.settings}'
+model        ${modelFor(args.settings)} via ${llm.requestBody().provider.order.join(', ')}, settings '${args.settings}'
 calls        ${queue.length} — ${answered} answered, ${queue.length - answered} dead
 act rate     ${pct(acts.length, answered)} (${acts.length} acts, ${asking.length} asking for something)
 empty param  ${pct(empty.length, asking.length)} (${empty.length}/${asking.length})

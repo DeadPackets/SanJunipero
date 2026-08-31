@@ -185,8 +185,13 @@ docker compose down -v                          # or: end the town and its volum
 
 ## ★ What it costs
 
-**A sim-day passes every 30 real minutes**, so an hour of wall clock is two sim-days and
-"$/hour" is twice "$/sim-day".
+**A sim-day passes every 48 real minutes**, so an hour of wall clock is 1.25 sim-days and
+"$/hour" is 1.25x "$/sim-day".
+
+**Every measurement below predates the GLM fleet** (`z-ai/glm-5.3-flash` on Wafer for the
+mind's own callers, `deepseek-v4-flash-0731` on Inceptron for the prose ones). The bake-off puts
+GLM's turn at $0.000487 a call against DeepSeek's $0.000289; re-measure on a rehearsal before
+budgeting off this page.
 
 **Measured**: five minds at the measured 52/48 routing split, **$0.0369 per sim-day**
 ($0.00737/mind, `providers2` 2026-08-30). Rehearsal 4's run C billed far more than that — it ran
@@ -207,11 +212,11 @@ only lever that fixes the shared pool rather than routing around it.
 | | per hour | per day | per 30-day month |
 |---|---|---|---|
 | **Scripted** (default) | **$0.00** | **$0.00** | **$0.00** |
-| **Live** (`SJ_LIVE=1`, 5 minds, measured mix) | **$0.074** | **$1.77** | **$53** |
-| Live, worst mix the allow-list permits (100% Inceptron) | $0.113 | $2.72 | $82 |
+| **Live** (`SJ_LIVE=1`, 5 minds, measured mix) | **$0.046** | **$1.11** | **$33** |
+| Live, worst mix the allow-list permits (100% Inceptron) | $0.071 | $1.70 | $51 |
 
-Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$75/mo,
-forever, until you stop it.** A live town is not something to leave running.
+Add the box (~$20/mo) and S3 (a few dollars). **Scripted: ~$20-25/mo. Live: ~$55/mo on the old
+pin, forever, until you stop it.** A live town is not something to leave running.
 
 **These ARE the numbers the code prints.** `pins.ts` books the rate this account is actually
 charged — reconciled against the bill, not read off a price list — and a call whose bill

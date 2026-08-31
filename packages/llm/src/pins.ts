@@ -1,14 +1,19 @@
-// Measured on a live run, not chosen. Re-run scripts/probe.ts before changing it.
-export const MIND_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
-// One name, because `provider.order` LOAD-BALANCES rather than prioritises: a second name took
-// 56% of run D at 3x the price and split the KV cache with it — 47.5% cache share on a turn that
-// kept the same back end against 37.8% on one that switched. A refusal retries onto the same name.
+// Measured on a live bake-off, not chosen. Re-run scripts/probe.ts before changing it.
+// OpenRouter publishes no dated snapshot for this model, so the bare id is the only id there
+// is; see the pins test for the dated-pin exception.
+export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
+// Single-homed by necessity, not by the load-balancing law: 19 of the 20 endpoints serving this
+// model return a Turn with no action on 75-100% of calls. Wafer alone cleared 36/36 acts.
+export const PROVIDER_ORDER: string[] = ['Wafer']
+// The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
+// DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
+export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
-export const PROVIDER_ORDER: string[] = ['Inceptron']
+export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
 // Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each returns 100% well-formed
 // Turns with `action: null` on 75-99% of calls, which only the pre-flight act bar catches.
-// The fallback IS the pinned dated model; no alias ever answers for it.
+// The fallback IS the pinned model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
@@ -16,7 +21,8 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // $/M tokens. The price depends on WHO served the call, so the table is keyed by that and
 // not by the model alone — two back ends for this one model differ 3x.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
-  Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
+  // Wafer's GLM tier, measured against its own bill: the $0.075 list tier refuses json_schema.
+  Wafer: { input: 0.15, output: 0.5, cacheRead: 0.03 },
   Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
   // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
   AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
@@ -26,18 +32,21 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   DeepInfra: { input: 0.08, output: 0.18, cacheRead: 0.016 },
 }
 
-// The per-component maximum over every endpoint serving MIND_MODEL, peak legs included, so an
-// unpriced back end can only ever OVER-report.
+// The per-component maximum over every endpoint the ledger has ever routed to, peak legs
+// included, so an unpriced back end can only ever OVER-report.
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
 // The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Inceptron!
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.
 const PRICE_PER_M_BY_MODEL: Record<string, ModelPrices> = {
   [MIND_MODEL]: PRICE_PER_M,
 }
+
+// Either fleet model prices by WHO served it; anything else is a different product.
+const PINNED_MODELS: string[] = [MIND_MODEL, PROSE_MODEL]
 
 export type PriceSource = 'provider' | 'model' | 'ceiling'
 export type PriceLookup = { prices: ModelPrices; source: PriceSource }
@@ -48,7 +57,7 @@ export function pricesFor(
   model: string | undefined,
   provider: string | null | undefined,
 ): PriceLookup {
-  const servedPinnedModel = model === undefined || model === MIND_MODEL
+  const servedPinnedModel = model === undefined || PINNED_MODELS.includes(model)
   if (servedPinnedModel && provider != null) {
     const row = PRICE_PER_M_BY_PROVIDER[provider]
     if (row !== undefined) return { prices: row, source: 'provider' }
@@ -62,45 +71,67 @@ export function pricesFor(
   return { prices: CEILING_PRICE_PER_M, source: 'ceiling' }
 }
 
-// Unset bills the same thinking preamble as `effort:'high'` — the endpoint default IS the
-// maximum — and the four effort rungs are indistinguishable; only `enabled:false` moves anything.
+// GLM refuses `enabled:false` on every endpoint and answers worse under `effort:'minimal'`, so
+// no caller on that half of the fleet names the field; the DeepSeek half keeps its own pins.
 export type ReasoningSetting =
   | { enabled: false }
   | { effort: 'minimal' | 'low' | 'medium' | 'high' }
 
 // What one caller's calls are pinned to, over and above the routing every call shares. An
 // absent field leaves that dial exactly where it sat before the dial existed.
-export type CallSettings = { reasoning?: ReasoningSetting; maxOutputTokens?: number }
+export type CallSettings = {
+  reasoning?: ReasoningSetting
+  maxOutputTokens?: number
+  temperature?: number
+  model?: string
+  providerOrder?: string[]
+  // Raises the derived request bound where the tail is prefill and not decode.
+  minTimeoutMs?: number
+}
 
-// A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone
-// where reasoning is off, the whole output where it stays on. Truncation is a hard failure.
+// Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
+// answers, so a bound derived from the output ceiling alone aborts honest answers and re-bills.
+const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 45_000 }
+const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
+
+// A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone where
+// reasoning is off, the whole output where it stays on. On GLM it can never be off, so each of
+// those ceilings carries 2x87 tokens more of mandatory preamble. Truncation is a hard failure.
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
-  // Reasoning was 94% of a turn's output and bought nothing: with it off, parse held at 100%
-  // and grounding rose. The answer alone has a p99 of 243 tokens.
-  turn: { reasoning: { enabled: false }, maxOutputTokens: 500 },
-  // The five night calls lose nothing without thinking. The sixth, the personality edit, does,
-  // and its p99 is 18x theirs — hence a caller of its own rather than one shared ceiling.
-  // 700 truncated the ledger writes; 1500 clears the longest of them.
-  reflection: { reasoning: { enabled: false }, maxOutputTokens: 1500 },
-  'reflection.edit': { maxOutputTokens: 13000 },
-  // 98.7% of its output was reasoning and the two halves disagreed with each other. Run D's
-  // answer-only figure is not measurable (the subtraction goes negative), so 2,000 stands.
-  arbiter: { reasoning: { enabled: false }, maxOutputTokens: 2000 },
-  narrator: { maxOutputTokens: 22000 },
-  preflight: { maxOutputTokens: 2500 },
-  dream: { maxOutputTokens: 2500 },
+  // GLM's own turn p99 is 287 output tokens, preamble included. Temperature 1 is the sampling
+  // the bake-off measured its voice and its 100% named-object act rate at.
+  turn: { ...ON_GLM, maxOutputTokens: 600, temperature: 1 },
+  // 700 truncated the ledger writes and 1500 cleared the longest of them; +174 for the preamble.
+  reflection: { ...ON_GLM, maxOutputTokens: 1750 },
+  // Sized around a thinking preamble larger than this model's, so neither of these moves.
+  'reflection.edit': { ...ON_GLM, maxOutputTokens: 13000 },
+  dream: { ...ON_GLM, maxOutputTokens: 2500 },
+  // Pre-flight's act bar gates exactly the pair the turn will run on. It never leaves that pair.
+  preflight: { ...ON_GLM, maxOutputTokens: 2500 },
+  // 11,996 reasoning tokens against 12,160 output over run D's 13 calls, and the two halves
+  // disagreed. The answer alone is not measurable from that run, so 2,000 is the standing default.
+  arbiter: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 2000 },
+  // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
+  narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000 },
+  naming: ON_DEEPSEEK,
+  voice: ON_DEEPSEEK,
   // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
   // spent 31,179 reasoning tokens and still answered nothing. 4,000 stands on one call.
-  semantic: { reasoning: { enabled: false }, maxOutputTokens: 4000 },
+  semantic: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 4000 },
   // Picking one label out of five spent 14,072 output tokens, 99.5% of it reasoning; off, it
   // answers in 20. 500 and not 100: the schema returns one ruling per candidate.
-  constructs: { reasoning: { enabled: false }, maxOutputTokens: 500 },
+  constructs: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 500 },
 }
 
 const NO_SETTINGS: CallSettings = {}
 
 export function callSettingsFor(caller: string): CallSettings {
   return SETTINGS_BY_CALLER[caller] ?? NO_SETTINGS
+}
+
+/** Which of the fleet's models answers for this caller. An unpinned caller keeps the mind's. */
+export function modelFor(caller: string): string {
+  return SETTINGS_BY_CALLER[caller]?.model ?? MIND_MODEL
 }
 
 // The slowest sustained output rehearsal 4 measured, over every caller that answered.
@@ -112,7 +143,9 @@ export const MIN_REQUEST_TIMEOUT_MS = 30_000
 /** A call may not outlive the time its own output ceiling needs to fill. Derived rather than
  *  pinned, so raising a ceiling above cannot silently start aborting honest answers. */
 export function requestTimeoutMsFor(caller: string): number {
-  const ceiling = SETTINGS_BY_CALLER[caller]?.maxOutputTokens
-  if (ceiling === undefined) return MIN_REQUEST_TIMEOUT_MS
-  return Math.max(MIN_REQUEST_TIMEOUT_MS, Math.ceil((ceiling / SLOWEST_OUTPUT_TOKENS_PER_S) * 1000))
+  const pinned = SETTINGS_BY_CALLER[caller]
+  const floor = pinned?.minTimeoutMs ?? MIN_REQUEST_TIMEOUT_MS
+  const ceiling = pinned?.maxOutputTokens
+  if (ceiling === undefined) return floor
+  return Math.max(floor, Math.ceil((ceiling / SLOWEST_OUTPUT_TOKENS_PER_S) * 1000))
 }

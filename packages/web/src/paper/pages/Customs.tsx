@@ -16,7 +16,7 @@ const customs = (body: unknown): ConstructRecord[] | null => {
   return parsed.success ? parsed.data : null
 }
 
-/** The recognizer runs once a sim-day, which is every 30 real minutes. */
+/** The recognizer runs once a sim-day, which is every 48 real minutes. */
 const CUSTOMS_REFETCH_MS = 60_000
 
 /** What each kind is, in the observer's voice. Never the id, which is ours. */

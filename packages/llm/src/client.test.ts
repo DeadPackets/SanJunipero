@@ -10,8 +10,10 @@ import {
   FALLBACK_MODELS,
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
+  PROSE_MODEL,
   PROVIDER_ORDER,
   callSettingsFor,
+  modelFor,
 } from './pins.js'
 
 type CallRow = {
@@ -150,8 +152,8 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    const expectedCost = ((1000 - 600) * 0.28 + 600 * 0.07 + 50 * 0.56) / 1e6
-    expect(expectedCost).toBeCloseTo(0.000182, 10)
+    const expectedCost = ((1000 - 600) * 0.15 + 600 * 0.03 + 50 * 0.5) / 1e6
+    expect(expectedCost).toBeCloseTo(0.000103, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -193,7 +195,7 @@ describe('LlmClient.object', () => {
     expect(row.reasoning_tokens).toBe(6100)
     expect(row.output_tokens).toBe(6168)
     // reasoning bills as output: cost formula unchanged
-    const expectedCost = (500 * 0.28 + 6168 * 0.56) / 1e6
+    const expectedCost = (500 * 0.15 + 6168 * 0.5) / 1e6
     expect(Math.abs(row.cost_usd - expectedCost)).toBeLessThan(1e-6)
     expect(usage.costUsd).toBe(row.cost_usd)
   })
@@ -463,7 +465,7 @@ describe('price reconciliation', () => {
 
   it('alerts when the table disagrees with what the provider charged', async () => {
     const db = openDb()
-    // Wafer's real price for these tokens is (1000*0.28 + 1000*0.56)/1e6 = $0.00084.
+    // Wafer's real price for these tokens is (1000*0.15 + 1000*0.5)/1e6 = $0.00065.
     const model = mockModel([
       {
         text: 'a',
@@ -495,7 +497,7 @@ describe('price reconciliation', () => {
         provider: 'Wafer',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: (1000 * 0.28 + 1000 * 0.56) / 1e6,
+        reportedCostUsd: (1000 * 0.15 + 1000 * 0.5) / 1e6,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -505,7 +507,7 @@ describe('price reconciliation', () => {
 
   it('stays silent on sub-cent rounding rather than crying wolf', async () => {
     const db = openDb()
-    const exact = (10 * 0.28 + 2 * 0.56) / 1e6
+    const exact = (10 * 0.15 + 2 * 0.5) / 1e6
     const model = mockModel([
       {
         text: 'a',
@@ -536,7 +538,7 @@ describe('price reconciliation', () => {
     const row = rows(db)[0]!
     expect(row.cost_usd).toBeCloseTo((1000 * 0.44 + 1000 * 1.32) / 1e6, 12)
     // Strictly more than the pinned route would have charged: it can only over-report.
-    expect(row.cost_usd).toBeGreaterThan((1000 * 0.28 + 1000 * 0.56) / 1e6)
+    expect(row.cost_usd).toBeGreaterThan((1000 * 0.15 + 1000 * 0.5) / 1e6)
     expect(row.reported_cost_usd).toBeNull()
     const detail = (
       db.prepare("SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'").get() as {
@@ -776,18 +778,32 @@ describe('default OpenRouter path extraBody', () => {
     const db = openDb()
     for (const caller of ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic']) {
       const body = new LlmClient({ db, caller }).requestBody()
-      expect(body.provider, caller).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
-      // And no floating alias can answer instead of the pinned dated snapshot.
-      expect(body.models, caller).toEqual([MIND_MODEL])
+      expect(body.provider.allow_fallbacks, caller).toBe(false)
+      // And no floating alias can answer instead of the model this caller was pinned to.
+      expect(body.models, caller).toEqual([modelFor(caller)])
     }
+  })
+
+  // ★ Two models on two back ends: the body a caller sends must name its own pair and no other,
+  // or a GLM caller's json_schema lands on a back end that answers with a thought and no act.
+  it('★ each caller sends its own fleet row, model and back end together', () => {
+    const db = openDb()
+    const body = (caller: string): { models: string[]; order: string[] } => {
+      const b = new LlmClient({ db, caller }).requestBody()
+      return { models: b.models, order: b.provider.order }
+    }
+    expect(body('turn')).toEqual({ models: [MIND_MODEL], order: ['Wafer'] })
+    expect(body('preflight')).toEqual(body('turn'))
+    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: ['Inceptron'] })
+    expect(body('arbiter')).toEqual(body('narrator'))
   })
 
   // One name: `provider.order` load-balances, so a second took 56% of run D at 3x the price and
   // split the KV cache with the first. A refusal is retried onto the same name.
   it('★ the request body carries exactly one allowed provider', () => {
-    expect(PROVIDER_ORDER).toEqual(['Inceptron'])
+    expect(PROVIDER_ORDER).toEqual(['Wafer'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Inceptron'],
+      order: ['Wafer'],
       allow_fallbacks: false,
     })
   })
@@ -812,7 +828,7 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: ['Inceptron'], allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({ order: ['Wafer'], allow_fallbacks: false })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
@@ -844,7 +860,7 @@ describe('default OpenRouter path extraBody', () => {
     const db = openDb()
     const night = new LlmClient({ db, caller: 'reflection' })
     const edit = night.forCaller('reflection.edit')
-    expect(night.requestBody().reasoning).toEqual({ enabled: false })
+    expect(night.requestBody()).not.toHaveProperty('reasoning')
     expect(edit.requestBody()).not.toHaveProperty('reasoning')
     expect(edit.requestBody().provider).toEqual(night.requestBody().provider)
   })
@@ -916,7 +932,7 @@ describe('★ why the provider stopped is on every ledger row', () => {
     })
     // The caller and its ceiling, so the row says which number in `pins.ts` to move.
     expect(alertsOf(db, 'llm_output_truncated')).toEqual([
-      'turn: the answer stopped at the 500 output token ceiling — raise it or the answer is a fragment',
+      'turn: the answer stopped at the 600 output token ceiling — raise it or the answer is a fragment',
     ])
   })
 
@@ -978,9 +994,12 @@ describe('★ one unified call discipline, the arbiter included', () => {
     const db = openDb()
     const bound = (caller: string): number =>
       (new LlmClient({ db, caller }) as unknown as { requestTimeoutMs: number }).requestTimeoutMs
-    for (const caller of ['turn', 'constructs', 'nobody-pinned-this']) {
+    for (const caller of ['constructs', 'nobody-pinned-this']) {
       expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
     }
+    // Wafer's tail is prefill, not decode: the turn's 600-token ceiling needs 13.6 s and its
+    // answers have taken 41.0 s, so this one caller is bounded by the provider instead.
+    expect(bound('turn')).toBe(45_000)
     for (const caller of [
       'arbiter',
       'reflection',

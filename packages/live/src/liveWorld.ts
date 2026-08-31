@@ -28,6 +28,7 @@ import {
   Embedder,
   LlmClient,
   MIND_MODEL,
+  modelFor,
   PROVIDER_ORDER,
   backfillUnattributed,
   checkActRate,
@@ -70,10 +71,10 @@ const LIVE_SPEND_DAILY_USD = 3
  *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
 const LIVE_SPEND_STOP_USD = 50
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
-/** How often the ledger is read, in world ticks. At the dev world's tick this is every 12 s
+/** How often the ledger is read, in world ticks. At the dev world's tick this is every 20 s
  *  of wall clock — far tighter than one turn, so nothing can outrun it. */
 const LIVE_SPEND_CHECK_TICKS = 10
-/** How often each mind's clock and half-run plan are written down. ~1 min of wall clock. */
+/** How often each mind's clock and half-run plan are written down. ~96 s of wall clock. */
 const LIVE_RUNTIME_SAVE_TICKS = 48
 /** The only event types `detectCandidates` reads. `events(type)` is indexed, so four narrow
  *  reads beat one full-log read whose rows the recognizer then drops. */
@@ -376,7 +377,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       llm: makeClient('preflight'),
       provider: 'default',
       hardAllowList: !LIVE_ALLOW_PROVIDER_FALLBACKS,
-      model: MIND_MODEL,
+      model: modelFor('preflight'),
       identity: founders[0]?.identity,
       personality: founders[0]?.personality,
       rounds: PREFLIGHT_ROUNDS,
@@ -834,7 +835,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         // The flow, not the total. A leak is visible here four days before it is visible above.
         // The cast, not the founders: a town that has borne children thinks for all of them.
         const castSize = booted?.cast.size ?? cast.length
-        // The projection counts 30 real minutes as one sim-day; the operator's dial changes that.
+        // The projection counts 48 real minutes as one sim-day; the operator's dial changes that.
         const projected = projectCallRate(opsDb, {
           windowRealMinutes: rateWindow,
           minds: castSize,

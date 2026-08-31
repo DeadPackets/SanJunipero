@@ -212,7 +212,7 @@ const callsTo = (db: Database.Database, caller: string, n: number): void => {
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, 0, 0, 1, NULL, 'Inceptron')`,
+     VALUES (?, NULL, ?, 'm', 0, 0, 0, 0, 0, 0, 1, NULL, 'Wafer')`,
   )
   db.transaction(() => {
     for (let i = 0; i < n; i++) insert.run(Date.now(), caller)
@@ -598,7 +598,7 @@ describe('★ the money, inside the served world', () => {
     expect(alertsOf(opsDb, 'spend_projection')).toHaveLength(0)
 
     // Art, which the rate tripwire excludes by design: only the operator alert can speak here.
-    // $0.30 in a 15-minute window projects to $0.60/sim-day, over the $0.40 threshold.
+    // $0.30 in a 15-minute window projects to $0.96/sim-day, over the $0.40 threshold.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
@@ -611,7 +611,7 @@ describe('★ the money, inside the served world', () => {
     await run(world, 12)
     const alerts = alertsOf(opsDb, 'spend_projection')
     expect(alerts.length, 'the operator was never told').toBeGreaterThan(0)
-    expect(alerts[0]).toContain('projected $0.60/sim-day over a $0.40 threshold')
+    expect(alerts[0]).toContain('projected $0.96/sim-day over a $0.40 threshold')
   }, 40_000)
 
   // 9 of rehearsal 3's 309 calls were served off the pin: a cold prefix and an unpriced route
@@ -699,7 +699,7 @@ describe('★ the money, inside the served world', () => {
     const mix = alertsOf(opsDb, 'llm_provider_off_allow_list')
     expect(mix.length, 'the routing left the pin and nobody was told').toBeGreaterThan(0)
     expect(mix[0]).toContain('Baidu 1')
-    expect(mix[0]).toContain('[Inceptron]')
+    expect(mix[0]).toContain('[Wafer]')
     expect(mix[0]).toContain('$0.0100')
     expect(stops, 'a leaked back end must never stop a town').toHaveLength(0)
   }, 40_000)
@@ -1154,7 +1154,7 @@ describe('the ops db sits inside the minds directory', () => {
   })
 })
 
-// A sim-day passes every 30 real minutes, so this rehearsal is the whole of what a live stream does
+// A sim-day passes every 48 real minutes, so this rehearsal is the whole of what a live stream does
 // at the top of every hour — with a scripted client, and for $0.00.
 describe('★ the chronicle, written on the day boundary', () => {
   /** A day of ticks without `run`'s per-tick microtask drain: this rehearsal is about the day
