@@ -15,6 +15,7 @@ import {
   makeablesLine,
   roadLine,
   perceptionToProse,
+  placesKnownLine,
   type ProseWorld,
   standingWallsLine,
   worldDay,
@@ -654,6 +655,7 @@ export class AgentRuntime {
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
       roadLine(canMake, packet, world),
+      placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
     ]
       .filter((p) => p.length > 0)

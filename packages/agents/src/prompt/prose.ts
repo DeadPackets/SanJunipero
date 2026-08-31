@@ -555,6 +555,52 @@ function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
   return `${line} The nearest ${sourcePhrase(at.from, FUEL_ITEM)} is at (${at.x}, ${at.y}).`
 }
 
+/** A place a mind carries in its head: what it is called, if anything, and where it stands. */
+export type KnownPlace = { id: string; kind: string; x: number; y: number; name?: string }
+
+// Screen frame: north is up the map, so the smaller y is the further north.
+const COMPASS = [
+  'north',
+  'north-east',
+  'east',
+  'south-east',
+  'south',
+  'south-west',
+  'west',
+  'north-west',
+] as const
+
+function bearing(dx: number, dy: number): string {
+  const octant = Math.round(Math.atan2(dx, -dy) / (Math.PI / 4))
+  return COMPASS[((octant % 8) + 8) % 8]!
+}
+
+// How far, as a body would say it and never as a number: a mind walking by name has no use
+// for the tile, and a count of tiles is the guessing this was built to end.
+const howFar = (d: number): string =>
+  d <= 10 ? 'close to the' : d <= 25 ? 'a way to the' : 'far to the'
+
+// A whole town read back every turn is a page of standing facts. The nearest dozen is what a
+// person holds in their head anyway.
+const PLACES_SHOWN = 12
+
+/** Where this mind could go without seeing it first: everything it knows of that is not already
+ *  in front of it, nearest first. The block a mind names a place out of. */
+export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket): string {
+  const inSight = new Set(packet.visible.structures.map((s) => s.id))
+  const { x, y } = packet.self
+  const lines = places
+    .filter((p) => !inSight.has(p.id))
+    .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
+    .sort((a, b) => a.d - b.d || (a.p.id < b.p.id ? -1 : 1))
+    .slice(0, PLACES_SHOWN)
+    .map(
+      ({ p, d }) =>
+        `${p.name ?? `a ${p.kind}`} (${p.id}), ${howFar(d)} ${bearing(p.x - x, p.y - y)}`,
+    )
+  return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
+}
+
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
 export function roadLine(m: Makeables, packet: PerceptionPacket, world?: ProseWorld): string {
   return coldHearthLine(packet, world) || makeableRoadLine(m, packet, world)

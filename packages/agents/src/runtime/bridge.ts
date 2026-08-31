@@ -23,7 +23,7 @@ import {
 } from '@sj/engine'
 import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import { isWet, isWoody, type SimConfig, type SimEvent } from '@sj/shared'
-import type { PerceptionPacket, SourceKind } from '../prompt/prose.js'
+import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
@@ -250,6 +250,17 @@ export class EngineBridge {
   // the prose names is the place `build` accepts and no other — a mind is never told two.
   groundForBuilding(): { x: number; y: number } | null {
     return groundForBuilding(this.#loop.state)
+  }
+
+  // Every place this body has ever laid eyes on or been told of, whether or not it can see one
+  // now. The prose drops the ones in sight; the walls are already in front of it.
+  knownPlaces(agentId: string): KnownPlace[] {
+    const state = this.#loop.state
+    return (state.agents[agentId]?.knownPlaces ?? []).flatMap((id) => {
+      const s = state.structures[id]
+      if (s === undefined) return []
+      return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(s.name === undefined ? {} : { name: s.name }) }]
+    })
   }
 
   // The other place work can go: free ground moves to a fresh plot the moment somebody plants

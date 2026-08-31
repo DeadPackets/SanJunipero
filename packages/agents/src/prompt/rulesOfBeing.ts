@@ -17,7 +17,7 @@ choose echoes in the lives around you. Live as yourself.`
 // never hears a mechanics word. Every prompt opens with this same prefix; its bytes are free.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
-walk: name it walk; give x and y as two numbers, the spot you go to
+walk: name it walk; give x and y as two numbers, the spot you go to, or give structureId, the mark of a place you know, and your legs find their own way to it
 sleep: name it sleep when weary; a roof over you is what it takes, unless you are worn down so far that the bare ground will do
 wake: name it wake to rise from sleep; nothing more is needed
 enter: name it enter; give structureId, the mark of the building whose doorway you stand beside
@@ -57,7 +57,9 @@ attack: name it attack; give targetId, the mark of the person you strike
 experiment: name it experiment; give description, what you attempt
 
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
-stand beside where it rests and see it; until then you cannot name it.
+stand beside where it rests and see it; until then you cannot name it. A place
+is the exception: once you have laid eyes on it, or heard someone say its name,
+you know it for good and can go back to it from anywhere.
 
 What you carry stays with you until you part with it. You may drop it and it
 rests on the ground where you stand, or stow it in a building you stand beside
