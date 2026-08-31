@@ -8,6 +8,7 @@ import { TextureBook } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
+import { createActLayer, type ActLayer } from './acts.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
@@ -64,6 +65,7 @@ export function StageMount({
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
+    let acts: ActLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
@@ -121,6 +123,7 @@ export function StageMount({
           window.dispatchEvent(new PopStateEvent('popstate'))
         })
         bubbles = createBubbleLayer(s, store)
+        acts = createActLayer(s, store)
         atmosphere = createAtmosphere(s)
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
@@ -145,6 +148,11 @@ export function StageMount({
             if (ev.type === 'agent_spoke') {
               const p = ev.payload as { agentId: string; text: string }
               bubbles?.spawnSpeech(p.agentId, p.text)
+            } else if (ev.type === 'action_started') {
+              // The one place the act's TRUE length exists: the world state carries what is
+              // left to run, never what was asked for, and the night penalty is already in it.
+              const p = ev.payload as { agentId: string; verb: string; duration: number }
+              acts?.noteStart(p.agentId, p.verb, p.duration)
             }
           }
         })
@@ -158,6 +166,7 @@ export function StageMount({
           chars?.tick(now)
           s.sortDepth() // one painter's order for the whole frame, after every box is published
           bubbles?.tick(now)
+          acts?.tick()
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
@@ -194,6 +203,7 @@ export function StageMount({
       interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()
+      acts?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
       smoke?.destroy()

@@ -102,7 +102,7 @@ type TagOwner = 'hover' | 'door' | 'selection'
 
 /** Who else is holding screen space a label must keep off. `plate` is DOM over the canvas,
  *  so nothing on the canvas can see it without being told. */
-type LabelOwner = 'bubbles' | 'plate' | 'toponyms'
+type LabelOwner = 'bubbles' | 'plate' | 'toponyms' | 'acts'
 
 export type TooltipLayer = {
   show(owner: TagOwner, text: string, a: Anchor): void
