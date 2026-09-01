@@ -113,14 +113,13 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
   // "Not on water, not on a street tile" PASSES with the square ten rows out — a plot shifted by
   // a third of a block still mostly lands on grass. PLOT CONTAINMENT is what does not pass.
   it('★ and every roof the town raised sits INSIDE a plot of the lattice that is drawn', () => {
-    const square = devTownSquare(RINGS)
+    // Read in ONE frame. A night of map growth shifts every standing thing and the square with
+    // it, and a seat quoted from the plan event is a coordinate in the frame that has moved.
+    const square = townSquareOf(run.state)!
     const plots = freePlots(RINGS + 2, townGroundOf(run.state, square)).map((p) => plotExtent(p))
     const tiles = new Set<string>()
     for (const e of raised) {
-      const x = Number(e.payload.x),
-        y = Number(e.payload.y)
-      const w = Number(e.payload.w),
-        h = Number(e.payload.h)
+      const { x, y, w, h } = run.state.structures[String(e.payload.id)]!
       const g = grammarOf(square, { x, y })
       const inside = plots.some(
         (p) => p.dx <= g.dx && g.dx + w <= p.dx + p.w && p.dy <= g.dy && g.dy + h <= p.dy + p.h,
