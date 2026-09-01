@@ -79,6 +79,16 @@ overlay sixty times a second.
 | `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
 | `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
+| `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
+
+**The sun arc is the one permanent mark.** `ui/skyModel.ts` puts one traveller on one curve —
+the sun from 05:00 to 21:00, then the moon over the same road — and the boundary is
+`dayPhaseFromTick`'s own, so the arc and the light on the town cannot disagree about when it got
+dark. The token's position says the hour before the words beside it are read; the words are the
+day, the season, the weather kind and the temperature, in `WEATHER_GLYPH`'s 8×8 pixels rather
+than an emoji. It eases its position on the world's tick and runs no loop at all. Below 900px the
+arc flattens and the position stops meaning anything, so the road goes and the two chips close
+up. The quiet stamp sits 30px under it, still owning the wire's own word.
 
 **The hover is a footprint plate.** `render/plate.ts` draws it and `ui/plateModel.ts` decides
 its words: a cream pixel slab welded to the thing's own ground point — `placeTag` is asked for

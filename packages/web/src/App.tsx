@@ -15,6 +15,7 @@ import {
   SpeechLive,
   SubjectRing,
   QuietStamp,
+  SkyArc,
   toggleFullscreen,
   useStageKeys,
   type RingVerb,
@@ -302,6 +303,7 @@ export function App() {
       />
       <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
+      <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
       <DirectorCue text={cue} />
       {route.broadcast && <LowerThird store={store} />}
