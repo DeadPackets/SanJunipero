@@ -89,9 +89,9 @@ export function ChroniclePage(props: PageProps) {
   return <Today {...props} />
 }
 
-function EditionView({ e }: { e: Edition }) {
+function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
   return (
-    <article className="edition">
+    <article className={lead ? 'edition lead' : 'edition'}>
       <p className="edition-head">
         <span className="edition-day">Day {e.day}</span>
         {e.temper !== null && <span className="edition-temper">{e.temper}</span>}
@@ -148,61 +148,70 @@ function Today({ store, gapTicks, onJump }: PageProps) {
         </p>
       )}
 
-      <section className="block">
-        <h3 className="feed-head">The paper</h3>
-        {latest === null && paper.failed ? (
-          <OutOfReach onRetry={dispatchesFeed.retry} />
-        ) : latest === null ? (
-          <p className="feed-empty">{EMPTY_COPY.paper}</p>
-        ) : (
-          <EditionView e={latest} />
-        )}
-      </section>
+      {/* THE FRONT PAGE: the day's own paper is the lead story and the live feed is the column
+          beside it. Below the sheet's own 44rem the two stack, which is what a narrow broadsheet
+          has always done. */}
+      <div className="bs-front">
+        <section className="block bs-lead">
+          {/* The edition carries its own headline, so the section name is for the reader who
+              cannot see that it is one. */}
+          <h3 className="stage-sr">The day’s paper</h3>
+          {latest === null && paper.failed ? (
+            <OutOfReach onRetry={dispatchesFeed.retry} />
+          ) : latest === null ? (
+            <p className="feed-empty">{EMPTY_COPY.paper}</p>
+          ) : (
+            <EditionView e={latest} lead />
+          )}
+        </section>
 
-      <section className="block">
-        <h3 className="feed-head">What mattered</h3>
-        {entries.length === 0 && !record.loaded ? (
-          <Skeleton />
-        ) : entries.length === 0 && record.failed ? (
-          <OutOfReach onRetry={chronicleFeed.retry} />
-        ) : entries.length === 0 ? (
-          <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
-        ) : (
-          <ol className="feed important">
-            {[...entries].reverse().map((e) => (
-              <li key={`${e.type}:${e.seq}`} className="feed-line">
-                <FeedJump
-                  tick={e.tick}
-                  label={e.label}
-                  icon={e.icon}
-                  current={viewTick === e.tick}
-                  onJump={onJump}
-                />
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+        <div className="bs-column">
+          <section className="block">
+            <h3 className="feed-head">What mattered</h3>
+            {entries.length === 0 && !record.loaded ? (
+              <Skeleton />
+            ) : entries.length === 0 && record.failed ? (
+              <OutOfReach onRetry={chronicleFeed.retry} />
+            ) : entries.length === 0 ? (
+              <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
+            ) : (
+              <ol className="feed important">
+                {[...entries].reverse().map((e) => (
+                  <li key={`${e.type}:${e.seq}`} className="feed-line">
+                    <FeedJump
+                      tick={e.tick}
+                      label={e.label}
+                      icon={e.icon}
+                      current={viewTick === e.tick}
+                      onJump={onJump}
+                    />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
 
-      <section className="block">
-        <h3 className="feed-head">Since you arrived</h3>
-        {lines.length === 0 ? (
-          <p className="feed-empty">
-            {tickToMoment(store.getTick()).day >= 1
-              ? EMPTY_COPY.chronicleQuiet
-              : EMPTY_COPY.chronicle}
-          </p>
-        ) : (
-          <ol className="feed">
-            {lines.map((l) => (
-              <li key={l.key} className={`feed-line ${l.kind}`}>
-                <span className="stamp">{momentStamp(l.tick)}</span>
-                <span className="feed-text">{l.text}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+          <section className="block">
+            <h3 className="feed-head">Since you arrived</h3>
+            {lines.length === 0 ? (
+              <p className="feed-empty">
+                {tickToMoment(store.getTick()).day >= 1
+                  ? EMPTY_COPY.chronicleQuiet
+                  : EMPTY_COPY.chronicle}
+              </p>
+            ) : (
+              <ol className="feed">
+                {lines.map((l) => (
+                  <li key={l.key} className={`feed-line ${l.kind}`}>
+                    <span className="stamp">{momentStamp(l.tick)}</span>
+                    <span className="feed-text">{l.text}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      </div>
     </>
   )
 }

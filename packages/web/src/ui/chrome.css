@@ -1278,8 +1278,8 @@ body {
     left: 50%; width: min(96%, 1040px);
     height: calc(100dvh - 64px); border-top-width: 12px;
   }
-  .paper-head { padding-block: var(--s-2); }
-  .paper-title { font-size: var(--f-4); }
+  .paper-head { padding-block: var(--s-2) 0; }
+  .paper-title { font-size: var(--f-5); }
 }
 /* short AND narrow: the arms are two rows there, so the sheet leaves two rows of room */
 @media (max-width: 640px) and (max-height: 620px) {
@@ -1299,21 +1299,34 @@ body {
 .paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
 .paper-grip:active { cursor: grabbing; }
 
-.paper-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: var(--s-4) var(--s-6); flex-wrap: wrap;
-  padding: var(--s-5) var(--s-6);
-  border-bottom: 2px solid var(--sand);
-}
+/* ── the broadsheet head: a masthead, then a dated rule with the sections along it ── */
+.paper-head { display: grid; gap: var(--s-3); padding: var(--s-5) var(--s-6) 0; }
+/* The masthead. Fraunces at its heaviest and tightest, centred: the one place on the sheet
+   where the type is the ornament. */
 .paper-title {
-  margin: 0;
-  font-family: var(--font-title); font-weight: 500; font-size: var(--f-6);
-  letter-spacing: -0.01em; line-height: 1.2; text-wrap: balance;
+  margin: 0; text-align: center;
+  font-family: var(--font-title); font-weight: 700; font-size: var(--f-7);
+  letter-spacing: -0.02em; line-height: 1; text-wrap: balance;
 }
-.paper-tabs { display: flex; gap: var(--s-1); flex: 0 1 auto; flex-wrap: wrap; }
+/* Two rules of different weights is what a dateline IS — heavy over the sections, hairline
+   under them. */
+.paper-dateline {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center; column-gap: var(--s-5);
+  border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink);
+  margin-bottom: var(--s-2);
+}
+.paper-date, .paper-clock {
+  margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
+  color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.paper-tabs { display: flex; gap: var(--s-1); justify-self: center; flex-wrap: wrap; }
+/* Manrope, not the pixel face: Silkscreen at 13px reads as a smear, and these are words. */
 .paper-tab {
   min-height: 44px; padding: 0 var(--s-4);
-  font: inherit; font-size: var(--f-3); color: var(--ink-quiet);
+  font: inherit; font-size: var(--f-2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-quiet);
   background: transparent; border: 0; border-bottom: 2px solid transparent;
   cursor: pointer;
   transition-property: color, border-color; transition-duration: var(--t-fast);
@@ -1323,13 +1336,40 @@ body {
    whole strip sideways on every change. */
 .paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .paper-close {
-  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-6);
-  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.04em;
+  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-5);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
   color: var(--ink-quiet); background: none; cursor: pointer;
   /* A divider and a rem of clear, or the close word reads as a fifth tab at every width. */
   border: 0; border-left: 2px solid var(--sand);
 }
 .paper-close:hover { color: var(--ink); }
+
+/* ── the front page: the lead story, and the live feed as the column beside it ── */
+.bs-front { display: grid; gap: var(--s-6); }
+.bs-column { display: grid; align-content: start; gap: var(--s-5); }
+/* Two columns need width or they are two gutters. The sheet measures itself, never the window:
+   at 44rem the lead runs about 46 characters, which is a newspaper column and not a ribbon. */
+@container (min-width: 44rem) {
+  .bs-front {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    /* the column rule IS the page's spine, so it is drawn on the gap and not on a card */
+    column-gap: var(--s-7);
+  }
+  .bs-column {
+    padding-left: var(--s-7); margin-left: calc(var(--s-7) * -1);
+    border-left: 1px solid var(--sand);
+  }
+}
+.bs-front .block { margin: 0; }
+/* The lead story is set as one: no slab, no frame, just the headline and the measure. */
+.edition.lead { background: none; padding: 0; box-shadow: none; }
+.edition.lead .edition-title { font-family: var(--font-title); font-size: var(--f-6); }
+.edition.lead .edition-body { font-size: var(--f-3); }
+/* A drop cap is the front page's own signature, and it belongs to the lead alone. */
+.edition.lead .edition-body::first-letter {
+  font-family: var(--font-title); font-weight: 700; font-size: var(--f-7);
+  float: left; line-height: 0.86; padding: 2px var(--s-2) 0 0;
+}
 
 .paper-sheet {
   container-type: inline-size;
@@ -1342,19 +1382,16 @@ body {
 /* Under 480px the head wrapped onto three rows and took a third of the sheet: the tabs get the
    second row to themselves and scroll along it. */
 @media (max-width: 480px) {
-  .paper-head {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline; gap: var(--s-2) var(--s-4);
-  }
+  .paper-title { font-size: var(--f-6); }
+  .paper-dateline { grid-template-columns: auto minmax(0, 1fr) auto; }
   .paper-tabs {
-    grid-column: 1 / -1; flex-wrap: nowrap;
+    grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
     overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+    border-top: 1px solid var(--sand);
   }
   .paper-tab { flex: none; scroll-snap-align: start; }
-  .paper-close {
-    grid-row: 1; grid-column: 2; justify-self: end;
-    border-left: 0; padding-left: var(--s-3);
-  }
+  .paper-clock { grid-row: 1; grid-column: 2; justify-self: end; }
+  .paper-close { grid-row: 1; grid-column: 3; }
 }
 .paper-sheet > :first-child { margin-top: 0; }
 

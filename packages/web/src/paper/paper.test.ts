@@ -21,6 +21,8 @@ import {
   type PageKey,
 } from './pageModel.js'
 
+import { dateline } from './stamp.js'
+
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const PAGES = Object.keys(PAGE_TABS) as PageKey[]
 
@@ -190,6 +192,46 @@ describe('the paper', () => {
     // a phone is not told to press a key it does not have (@media (hover: none))
     expect(html).toContain('class="paper-close-key"> · Esc<')
     expect(html).toContain('class="paper-grip"')
+  })
+
+  // ★ 4A — the sheet is a dated front page, so the head is a masthead over a dateline rule and
+  // the tabs run along it as the section line.
+  it('★ prints a masthead, and dates it off the town’s own clock', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    expect(html).toContain('class="paper-dateline"')
+    expect(html).toMatch(/class="paper-title" id="paper-title">Chronicle</)
+    const { day, time } = dateline(0)
+    expect(html).toContain(`class="paper-date">${day}<`)
+    expect(html).toContain(`class="paper-clock">${time}<`)
+  })
+
+  it('★ runs the section line INSIDE the dateline, with the keyboard path untouched', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    const line = html.slice(html.indexOf('paper-dateline'), html.indexOf('</header>'))
+    expect(line).toContain('role="tablist"')
+    expect(line).toContain('aria-describedby="paper-tabs-keys"')
+    expect(line.match(/tabindex="0"/g)).toHaveLength(1)
+    expect(line).toContain('class="paper-close"')
+  })
+
+  it('★ every arm wears the same chrome, not the Chronicle alone', () => {
+    for (const page of ARMS) {
+      const html = paper({ page, tab: firstTab(page) })
+      expect(html, page).toContain('class="paper-dateline"')
+      expect(html, page).toContain('class="paper-date">')
+    }
+  })
+
+  // The lead story and the live feed, one beside the other — and the lead keeps a real heading
+  // for a reader who cannot see that the headline is one.
+  it('★ lays the Chronicle out as a front page: a lead story and a column beside it', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    expect(html).toContain('class="bs-front"')
+    expect(html).toContain('class="block bs-lead"')
+    expect(html).toContain('class="bs-column"')
+    expect(html).toMatch(/class="stage-sr">The day’s paper</)
+    expect(html).toContain('What mattered')
+    expect(html).toContain('Since you arrived')
   })
 
   it('hangs the dim over the town as a sibling, opening with the sheet', () => {

@@ -122,6 +122,20 @@ publishes its box in view coordinates — otherwise a bubble pushed below a figu
 a click on the town, and the grip. Focus enters the tab strip on open, moves with the arm, and
 returns to the opener on close.
 
+**The sheet is a dated front page.** The head is a masthead — Fraunces 700 at `--f-7`, centred,
+the one place the type is the ornament — over a dateline rule: a 2px line above and a hairline
+below, `DAY n · SEASON` at one end and the clock at the other (`paper/stamp.ts:dateline`), with
+**the tabs running along it as the section line**. They are still the same tablist: same roles,
+same one tab stop, same arrow keys, same close word at the end. Every arm wears it, not the
+Chronicle alone.
+
+Chronicle › Today is laid out as the front page it now looks like: the day's edition is the lead
+story and the live feed is the column beside it, split at `44rem` of the sheet's **own**
+container — below that they stack, because two columns of a 760px sheet are two gutters. The
+lead drops its slab and its frame and takes a Fraunces drop cap; its section heading stays in
+the tree as a visually-hidden `h3`, because the edition's own headline is what a sighted reader
+sees.
+
 **The grip follows the finger.** `pointerdown` captures the pointer and suppresses the sheet's
 transition; every `pointermove` writes `transform: translate(-50%, y)` straight to the DOM — 1:1
 down, rubber-banded to a third upward — and eases `.town-dim` with it, so the town brightens under

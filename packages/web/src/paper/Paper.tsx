@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { flingFrom, trackDrag, type DragTrack } from '../render/fling.js'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
+import { dateline } from './stamp.js'
 import { PageBody } from './pages/index.js'
 import type { Thing } from './pages/types.js'
 import {
@@ -100,6 +101,10 @@ export function Paper({
     }
   }
 
+  // The dateline is the sheet's own clock: it moves with the town, or with the scrub.
+  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  const date = dateline(tick)
+
   const tabs = PAGE_TABS[key] as readonly string[]
   const current = hasTab(key, tab) ? tab : tabs[0]!
   const title =
@@ -174,48 +179,53 @@ export function Paper({
           }}
         />
         <header className="paper-head">
+          {/* The masthead, then the dated rule under it: the tabs ARE the section line. */}
           <h2 className="paper-title" id="paper-title">
             {title}
           </h2>
-          <div
-            className="paper-tabs"
-            role="tablist"
-            aria-label={title}
-            aria-describedby="paper-tabs-keys"
-            ref={tabsRef}
-            onKeyDown={(e) => {
-              const next = tabFromKey(key, e.key, current)
-              if (next === null) return
-              e.preventDefault()
-              onTab(next)
-              e.currentTarget.querySelector<HTMLButtonElement>(`#paper-tab-${next}`)?.focus()
-            }}
-          >
-            {tabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                id={`paper-tab-${t}`}
-                aria-selected={t === current}
-                aria-controls="paper-sheet"
-                tabIndex={t === current ? 0 : -1}
-                className={t === current ? 'paper-tab on' : 'paper-tab'}
-                onClick={() => {
-                  onTab(t)
-                }}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="paper-dateline">
+            <p className="paper-date">{date.day}</p>
+            <div
+              className="paper-tabs"
+              role="tablist"
+              aria-label={title}
+              aria-describedby="paper-tabs-keys"
+              ref={tabsRef}
+              onKeyDown={(e) => {
+                const next = tabFromKey(key, e.key, current)
+                if (next === null) return
+                e.preventDefault()
+                onTab(next)
+                e.currentTarget.querySelector<HTMLButtonElement>(`#paper-tab-${next}`)?.focus()
+              }}
+            >
+              {tabs.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`paper-tab-${t}`}
+                  aria-selected={t === current}
+                  aria-controls="paper-sheet"
+                  tabIndex={t === current ? 0 : -1}
+                  className={t === current ? 'paper-tab on' : 'paper-tab'}
+                  onClick={() => {
+                    onTab(t)
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            {/* A hint, not a name: as the label it was re-announced on every tab focus. */}
+            <p className="stage-sr" id="paper-tabs-keys">
+              Left and right arrow keys move between pages
+            </p>
+            <p className="paper-clock">{date.time}</p>
+            <button type="button" className="paper-close" onClick={onClose}>
+              close<span className="paper-close-key"> · Esc</span>
+            </button>
           </div>
-          {/* A hint, not a name: as the label it was re-announced on every tab focus. */}
-          <p className="stage-sr" id="paper-tabs-keys">
-            Left and right arrow keys move between pages
-          </p>
-          <button type="button" className="paper-close" onClick={onClose}>
-            close<span className="paper-close-key"> · Esc</span>
-          </button>
         </header>
         <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
           {open ? (
