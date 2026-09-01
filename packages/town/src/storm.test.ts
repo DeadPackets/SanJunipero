@@ -9,7 +9,8 @@ type StormRun = { spells: number; roofs: number; struck: number; lost: number }
 function stormyDays(stormLightningFireChance: number): StormRun {
   const config: SimConfig = {
     ...SHOWCASE_CONFIG,
-    weather: { ...SHOWCASE_CONFIG.weather, stormLightningFireChance },
+    // The founding-week mercy (harshFromDay) would blank the storms this test exists to measure.
+    weather: { ...SHOWCASE_CONFIG.weather, stormLightningFireChance, harshFromDay: 0 },
   }
   const { events } = runFoundersWorld(
     { interiors: true, builders: true, holdings: true },
