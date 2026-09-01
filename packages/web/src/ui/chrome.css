@@ -1405,7 +1405,11 @@ body {
 /* Two equal flanks: the tabs sit on the sheet's own centre line, under the masthead, at every
    width — with `auto` sides the strip hung 21px left of the title it belongs to. */
 .paper-dateline {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* Three tracks, and each one's floor is its own words. `1fr` sides balance so the strip is
+     centred on the masthead; `max-content` in the middle because a wrapping flex row's
+     min-content is ONE tab, and a plain `auto` track collapsed the section line to a column. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
   align-items: center; column-gap: var(--s-5);
   border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink);
   /* The tabs' own underline landed 1px off the hairline and the two read as one thick smear. */
@@ -1415,6 +1419,9 @@ body {
 .paper-marginalia {
   display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5); min-width: 0;
 }
+/* Both flanks are flexible tracks now, and neither may break its own line: "close · Esc" wrapped
+   to "close ·" over "Esc" the moment the track was narrower than the words. */
+.paper-date, .paper-close { white-space: nowrap; }
 .paper-date, .paper-clock {
   margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -1460,6 +1467,11 @@ body {
     padding-left: var(--s-7); margin-left: calc(var(--s-7) * -1);
     border-left: 1px solid var(--ink-quiet);
   }
+  /* The rail is a newspaper sidebar, not a second page: a 6.2rem stamp column beside the words
+     leaves them 19 characters. The stamp takes the line above its own entry instead. */
+  .bs-column .feed-jump { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-1); }
+  .bs-column .feed-jump .stamp { width: auto; }
+  .bs-column .feed-text { grid-column: 1 / -1; }
 }
 .bs-front .block { margin: 0; }
 /* The lead story is set as one: no slab, no frame, just the headline and the measure. */
@@ -1480,9 +1492,10 @@ body {
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* Under 480px the head wrapped onto three rows and took a third of the sheet: the tabs get the
-   second row to themselves and scroll along it. */
-@media (max-width: 480px) {
+/* The one-row section line needs about 677px of head: five tabs, the date, the clock and the
+   close word. A 78% sheet only reaches that around a 970px window, so below the 1000px the
+   signpost already breaks at, the tabs take the second row to themselves and scroll along it. */
+@media (max-width: 1000px) {
   .paper-title { font-size: var(--f-6); }
   .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
