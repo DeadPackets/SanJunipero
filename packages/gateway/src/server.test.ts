@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { connect as netConnect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -209,5 +210,51 @@ describe('gateway server', () => {
     )
     d.send(JSON.stringify({ t: 'hello', v: 999, lastSeenTick: null }))
     expect(await closedD).toBe(4400)
+  }, 20000)
+})
+
+/** Every request here is one a stranger can make from the open internet, and every one of them
+ *  used to reach the thread that ticks the town as an uncaughtException or as unbounded memory. */
+describe('what a stranger cannot do to the town', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwhard-'))
+  const open: (WebSocket | Gateway)[] = []
+  let made = 0
+
+  const gateway = async (maxViewers?: number): Promise<Gateway> => {
+    const dbPath = join(dir, `world-${made++}.db`)
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 6; i++) loop.step()
+    const gw = await createGateway({
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      maxViewers,
+    })
+    open.push(gw)
+    return gw
+  }
+
+  afterAll(async () => {
+    for (const o of open) {
+      if (o instanceof WebSocket) o.terminate()
+      else await o.close()
+    }
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('★ answers a request target `URL` refuses with 400, and keeps serving', async () => {
+    const gw = await gateway()
+    const sock = netConnect(gw.port, '127.0.0.1')
+    const reply = new Promise<string>((resolve, reject) => {
+      let text = ''
+      sock.on('data', (c: Buffer) => (text += c.toString()))
+      sock.on('end', () => resolve(text))
+      sock.on('error', reject)
+    })
+    sock.write('GET //x:99999/ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n')
+    expect(await reply).toContain('400')
+    expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
   }, 20000)
 })

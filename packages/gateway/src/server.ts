@@ -139,7 +139,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   )
 
   const httpServer = createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
+    // `//x:99999/` is a target llhttp accepts and `URL` refuses, and unguarded that throw is an
+    // uncaughtException on the thread that ticks the town.
+    let url: URL
+    try {
+      url = new URL(req.url ?? '/', 'http://localhost')
+    } catch {
+      sendJson(res, { error: 'bad request' }, 400)
+      return
+    }
     if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
       proxyAdmin(req, res)
       return
