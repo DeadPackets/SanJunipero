@@ -157,6 +157,19 @@ export class MemoryStore {
     return rows.map(toMemoryRow)
   }
 
+  /** Long rows still waiting for a short form, newest first — the backlog a refused night
+   *  leaves behind. `minChars` is passed in rather than imported, to keep gist.ts downstream. */
+  ungistedMemories(minChars: number, limit: number): MemoryRow[] {
+    const rows = this.db
+      .prepare(
+        `${SELECT_MEMORY} WHERE m.agent_id = ? AND g.text IS NULL
+         AND m.kind IN ('perception', 'action') AND length(m.text) > ?
+         ORDER BY m.id DESC LIMIT ?`,
+      )
+      .all(this.agentId, minChars, limit) as RawMemory[]
+    return rows.map(toMemoryRow)
+  }
+
   putGist(memoryId: number, text: string): void {
     this.db
       .prepare(
