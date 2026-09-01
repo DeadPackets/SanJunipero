@@ -1,4 +1,11 @@
-import { MINUTES_PER_DAY, sanitizeSpokenText, simTimeFromTick } from '@sj/shared'
+import {
+  BOND_RECENT_ACTS,
+  MINUTES_PER_DAY,
+  sanitizeSpokenText,
+  simTimeFromTick,
+  warmthOf,
+  type BondAct,
+} from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
@@ -22,6 +29,8 @@ import {
   roadLine,
   perceptionToProse,
   placesKnownLine,
+  absenceLine,
+  type Company,
   type ProseWorld,
   standingWallsLine,
   stasisLine,
@@ -253,6 +262,13 @@ export class AgentRuntime {
   // Where the feet have been standing, and since when. Null while asleep and after any act
   // the world took that was not a walk or a word.
   #still: Stillness | null = null
+  // Who this mind has been with, when it last had them, and the acts it witnessed between
+  // them. The engine keeps no bonds and the gateway folds a log no mind can read, so a mind's
+  // own tie is folded here — out of the one act perception can witness, which is a word.
+  #company = new Map<string, { name: string; lastSeenTick: number; acts: BondAct[] }>()
+  // Last tick's utterances. The recent window holds one for as long as it is recent, so only a
+  // key that was not there a tick ago is a new word rather than the same word again.
+  #heardKeys = new Set<string>()
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -393,6 +409,7 @@ export class AgentRuntime {
     this.#still = packet.self.asleep
       ? null
       : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
+    this.#noteCompany(packet, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
@@ -459,6 +476,40 @@ export class AgentRuntime {
         this.#onPlanHeadResult(res, head)
       })
     }
+  }
+
+  #noteCompany(packet: PerceptionPacket, tick: number): void {
+    const met = (id: string, name: string): { lastSeenTick: number; acts: BondAct[] } => {
+      const was = this.#company.get(id)
+      if (was !== undefined) return was
+      const fresh = { name, lastSeenTick: tick, acts: [] as BondAct[] }
+      this.#company.set(id, fresh)
+      return fresh
+    }
+    for (const a of packet.visible.agents) {
+      if (a.id !== this.#agentId) met(a.id, a.name).lastSeenTick = tick
+    }
+    const keys = new Set<string>()
+    for (const h of packet.heard) {
+      const key = `${h.speakerId}\u0000${h.text}`
+      keys.add(key)
+      const them = met(h.speakerId, h.name)
+      them.lastSeenTick = tick
+      if (this.#heardKeys.has(key)) continue
+      them.acts.push({ tick, kind: 'friend' })
+      if (them.acts.length > BOND_RECENT_ACTS) them.acts.shift()
+    }
+    this.#heardKeys = keys
+  }
+
+  // Read at the parting, never at now: a tie that decayed while the two were apart would take
+  // the line away exactly as the absence grew worth saying.
+  #missed(): Company[] {
+    return [...this.#company.values()].map((c) => ({
+      name: c.name,
+      lastSeenTick: c.lastSeenTick,
+      warmth: warmthOf(c.acts, c.lastSeenTick),
+    }))
   }
 
   // What the WORLD took, not what the model wrote: the words are sanitized the way the verb
@@ -702,6 +753,7 @@ export class AgentRuntime {
       placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       stasisLine(this.#still, tick),
+      absenceLine(this.#missed(), tick),
     ]
       .filter((p) => p.length > 0)
       .join(' ')

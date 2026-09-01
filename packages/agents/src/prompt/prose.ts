@@ -1,4 +1,5 @@
 import {
+  bondLevel,
   dayPhaseFromTick,
   DAYS_PER_SEASON,
   inputName,
@@ -616,17 +617,8 @@ export type Stillness = { x: number; y: number; sinceTick: number; spoke: boolea
 
 /** The count carries on while the feet stay inside the radius, and starts again the moment
  *  they leave it. The caller drops it to null when an act the world took changed something. */
-export function stillnessAt(
-  was: Stillness | null,
-  x: number,
-  y: number,
-  tick: number,
-): Stillness {
-  if (
-    was === null ||
-    Math.abs(x - was.x) > STASIS_RADIUS ||
-    Math.abs(y - was.y) > STASIS_RADIUS
-  ) {
+export function stillnessAt(was: Stillness | null, x: number, y: number, tick: number): Stillness {
+  if (was === null || Math.abs(x - was.x) > STASIS_RADIUS || Math.abs(y - was.y) > STASIS_RADIUS) {
     return { x, y, sinceTick: tick, spoke: false }
   }
   return was
@@ -641,6 +633,27 @@ export function stasisLine(still: Stillness | null, tick: number): string {
   const how = held >= STASIS_LONG_TICKS ? 'half the morning' : 'an hour'
   const words = still.spoke ? ', saying much the same things' : ''
   return `You have been in this same spot for ${how}${words}; nothing has come of it.`
+}
+
+/** Somebody this mind has a tie to, when it last had them in sight or earshot, and how warm
+ *  the tie stood when they parted. Warmth is read at the parting, not now: a tie that decays
+ *  while the two are apart would take the line away exactly as the absence grew long. */
+export type Company = { name: string; lastSeenTick: number; warmth: number }
+
+/** One line, or none. A roll-call of everybody out of sight is a list; the person most missed
+ *  is a pull. Longest gone wins, then warmest, then the name, so two equal absences are stable. */
+export function absenceLine(company: readonly Company[], tick: number): string {
+  const missed = company
+    .filter((c) => bondLevel(c.warmth) !== 'strangers' && tick - c.lastSeenTick >= MINUTES_PER_DAY)
+    .sort(
+      (a, b) =>
+        a.lastSeenTick - b.lastSeenTick || b.warmth - a.warmth || (a.name < b.name ? -1 : 1),
+    )[0]
+  if (missed === undefined) return ''
+  const days = Math.floor((tick - missed.lastSeenTick) / MINUTES_PER_DAY)
+  return days === 1
+    ? `You have not seen ${missed.name} since yesterday.`
+    : `You have not seen ${missed.name} for ${days} days.`
 }
 
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
