@@ -81,9 +81,12 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   // The agent-db sweep behind `/api/timeline/marks` is memoised on the DAY instead — see below.
   const cache = makeSeqCache(() => deps.mirror.seq())
   const placeholders = CHRONICLE_TYPES.map(() => '?').join(', ')
+  // Newest first with a LIMIT, then reversed: a stranger picks the window, and every distinct
+  // pair is a cache miss, so an unbounded miss is an O(history) scan on the tick thread.
   const selWeighted = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events
-     WHERE type IN (${placeholders}) AND tick BETWEEN ? AND ? ORDER BY tick, seq`,
+     WHERE type IN (${placeholders}) AND tick BETWEEN ? AND ?
+     ORDER BY tick DESC, seq DESC LIMIT ${CHRONICLE_MAX}`,
   )
 
   const lookup = (): ChronicleLookup => {
@@ -121,12 +124,14 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
     cache.value(`chronicle:${fromTick}:${toTick}`, () => {
       const look = lookup()
-      const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as {
-        seq: number
-        tick: number
-        type: string
-        payload: string
-      }[]
+      const rows = (
+        selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as {
+          seq: number
+          tick: number
+          type: string
+          payload: string
+        }[]
+      ).reverse()
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
         const label = chronicleLine(toEvent(r), look)

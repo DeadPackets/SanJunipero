@@ -602,10 +602,32 @@ describe('the days a personality moved', () => {
   })
 })
 
+/** How many rows the chronicle's own SELECT hands back. A stranger picks the window, so an
+ *  unbounded miss is the whole weighted history formatted on the thread that ticks the town. */
+function spyOnChronicleReads(db: Database.Database): number[] {
+  const rows: number[] = []
+  const realPrepare = db.prepare.bind(db)
+  Object.defineProperty(db, 'prepare', {
+    value: (sql: string) => {
+      const st = realPrepare(sql) as { all: (...a: unknown[]) => unknown[] }
+      if (!sql.includes('tick BETWEEN')) return st
+      const realAll = st.all.bind(st)
+      st.all = (...a: unknown[]): unknown[] => {
+        const r = realAll(...a)
+        rows.push(r.length)
+        return r
+      }
+      return st
+    },
+  })
+  return rows
+}
+
 describe('a town with more history than a viewer can read', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-long-'))
   let gw: Gateway
   let base: string
+  let reads: number[]
 
   beforeAll(async () => {
     const dbPath = join(dir, 'world.db')
@@ -624,6 +646,7 @@ describe('a town with more history than a viewer can read', () => {
       },
     })
     for (let i = 0; i < CHRONICLE_MAX * 2; i++) loop.step()
+    reads = spyOnChronicleReads(db)
     gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
     base = `http://127.0.0.1:${gw.port}`
   })
@@ -644,5 +667,13 @@ describe('a town with more history than a viewer can read', () => {
       }
     ).entries
     expect(entries[entries.length - 1]!.seq).toBe(all[all.length - 1]!.seq)
+  })
+
+  it('★ a window nobody asked for before costs one page, not the whole history', async () => {
+    reads.length = 0
+    await fetch(`${base}/api/chronicle?fromTick=1&toTick=999999`)
+    await fetch(`${base}/api/chronicle?fromTick=2&toTick=999998`)
+    expect(reads, 'a distinct window is a miss by construction').toHaveLength(2)
+    for (const n of reads) expect(n).toBeLessThanOrEqual(CHRONICLE_MAX)
   })
 })
