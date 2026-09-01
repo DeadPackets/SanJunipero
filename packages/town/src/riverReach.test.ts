@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest'
+import { isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { EventStore, openDb } from '@sj/engine/store'
+import {
+  createWorldTick,
+  fold,
+  isPassable,
+  naturalPlaces,
+  RngStreams,
+  submitIntent,
+  walkDestination,
+  type WorldState,
+} from '@sj/engine'
+import { devGenesisState, devTerrain } from './devWorld.js'
+
+// The map rehearsal 5 ran on: ring 1 of the showcase grammar, whose window crops the channel to
+// array rows 8..67 and leaves dry corners north and south of it. Quiet, and the window never
+// grows: this is a proof about where the water is, not about weather or a wider map.
+const config: SimConfig = SimConfigSchema.parse({
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
+})
+const genesis = devGenesisState(config, devTerrain('showcase', 1), 'showcase', 1) as WorldState
+
+const AGENT = 'p'
+const store = new EventStore(openDb(':memory:'))
+
+function bodyAt(x: number, y: number): WorldState {
+  return fold(
+    genesis,
+    store.append(genesis.tick, 'agent_spawned', { id: AGENT, name: AGENT, x, y, ageDays: 7300 }),
+    config,
+  )
+}
+
+const touchesWater = (state: WorldState, p: { x: number; y: number }): boolean => {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const t = state.terrain[p.y + dy]?.[p.x + dx]
+      if (t !== undefined && isWet(t)) return true
+    }
+  }
+  return false
+}
+
+/** Where a walk to the river ends for a body here, refusing to guess if the world refused. */
+function bankFor(state: WorldState, from: string): { x: number; y: number } {
+  const to = walkDestination(state, config, AGENT, { structureId: 'river' })
+  expect(to, from).not.toHaveProperty('refusal')
+  return to as { x: number; y: number }
+}
+
+/** The channel tile this body reads the river off, which is what a bank is a bank of. */
+const channelFor = (state: WorldState, x: number, y: number): { x: number; y: number } => {
+  const river = naturalPlaces(state, x, y).find((p) => p.id === 'river')
+  expect(river, `river named at (${x}, ${y})`).toBeDefined()
+  return river!
+}
+
+// The southwest corner three minds camped in, the last column world A parked Nadia against, and
+// rows that do hold water, so a fix that only helped the dead zone would still be caught.
+const FROM: readonly (readonly [number, number])[] = [
+  [1, 70],
+  [0, 75],
+  [2, 62],
+  [40, 74],
+  [70, 5],
+  [75, 44],
+  [75, 8],
+  [2, 65],
+]
+
+describe('★ the river a ring-1 body can actually get to', () => {
+  it('★ lands every body on ground at the water, from the dead corners too', () => {
+    for (const [x, y] of FROM) {
+      const state = bodyAt(x, y)
+      const at = `from (${x}, ${y})`
+      channelFor(state, x, y)
+      const bank = bankFor(state, at)
+      expect(isPassable(state, bank.x, bank.y), `footing ${at}`).toBe(true)
+      expect(touchesWater(state, bank), `water at the bank ${at}`).toBe(true)
+    }
+  })
+
+  // ★ The walk and the water verbs have to mean the same thing by "beside": world B refused
+  // `fill` and `drink` 105 times while the mind believed it had walked to the river.
+  it('★ leaves the legs somewhere a body can drink and fill', () => {
+    for (const [x, y] of [
+      [1, 70],
+      [2, 62],
+      [70, 5],
+    ] as const) {
+      const at = `from (${x}, ${y})`
+      let state = fold(
+        bodyAt(x, y),
+        store.append(genesis.tick, 'item_spawned', {
+          id: 'skin',
+          kind: 'waterskin',
+          qty: 1,
+          loc: { t: 'agent', id: AGENT },
+        }),
+        config,
+      )
+      const bank = bankFor(state, at)
+      const go = submitIntent(state, config, AGENT, 'walk', { structureId: 'river' })
+      expect(go.ok, `walk ${at}`).toBe(true)
+      if (!go.ok) return
+      for (const e of go.events)
+        state = fold(state, store.append(state.tick, e.type, e.payload), config)
+
+      const worldTick = createWorldTick(config, new RngStreams('river-reach'))
+      for (let i = 0; i < 200 && state.agents[AGENT]!.activity !== null; i++) {
+        state = worldTick({ ...state, tick: state.tick + 1 }).state
+      }
+      const body = state.agents[AGENT]!
+      expect({ x: body.x, y: body.y }, `landed, ${at}`).toEqual(bank)
+      expect(submitIntent(state, config, AGENT, 'drink', {}).ok, `drink ${at}`).toBe(true)
+      expect(submitIntent(state, config, AGENT, 'fill', { itemId: 'skin' }).ok, `fill ${at}`).toBe(
+        true,
+      )
+    }
+  })
+
+  it('picks the bank on the body’s own side of the channel', () => {
+    const west = bodyAt(2, 40)
+    const east = bodyAt(75, 40)
+    expect(bankFor(west, 'west').x).toBeLessThan(channelFor(west, 2, 40).x)
+    expect(bankFor(east, 'east').x).toBeGreaterThan(channelFor(east, 75, 40).x)
+  })
+})

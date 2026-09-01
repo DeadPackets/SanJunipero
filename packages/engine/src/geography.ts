@@ -98,8 +98,16 @@ const NATURAL_FEATURES: readonly NaturalFeature[] = [
     id: 'river',
     name: 'the river',
     water: true,
-    // A body reads the river off the channel abreast of it, never off a middle it cannot see.
-    near: (g, _x, y) => ({ x: arrayAt(g, GENESIS_RIVER_X, 0).x, y }),
+    // Abreast where the channel reaches, off its nearest end where it does not: a body south of
+    // the last water still has a river, and reading it at its own y would say the valley has none.
+    near: (g, _x, y) => {
+      const x = arrayAt(g, GENESIS_RIVER_X, 0).x
+      for (let d = 0; d < g.terrain.length; d++) {
+        if (wet(g, x, y - d)) return { x, y: y - d }
+        if (wet(g, x, y + d)) return { x, y: y + d }
+      }
+      return { x, y }
+    },
     has: (g, x, y) =>
       Math.abs(authoredAt(g, x, y).x - GENESIS_RIVER_X) <= RIVER_REACH && wet(g, x, y),
   },

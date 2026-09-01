@@ -86,10 +86,12 @@ async function refusal(
 }
 
 describe('the affordance block says what the validators would otherwise refuse', () => {
-  it('`already at that spot` — the tile under the feet is named as no destination', async () => {
+  // The block still steers a mind off the wasted intent; the world no longer spends a turn
+  // refusing one, because the body is already standing where it was sent.
+  it('the tile under the feet is named as no destination, and costs nothing when named anyway', async () => {
     const t = town()
     expect(await refusal(t, { verb: 'walk', params: { x: 10, y: 10 } })).toBe(
-      'already at that spot',
+      'the world allowed it',
     )
     expect(proseFor(t.bridge)).toContain('no walk can end where you already stand, at (10, 10)')
   })
