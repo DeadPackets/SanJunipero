@@ -192,6 +192,9 @@ export async function settle(
  *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
  *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 14 is 3x, per ruling 25. */
 const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 14
+// A rate needs a span to be a rate: two sim-hours is four real minutes at 1x and a burst of
+// night reflections spread thin enough not to read as a runaway.
+const LIVE_RATE_MIN_SPAN_SIM_HOURS = 2
 /** The projection window. Long enough that one reflection burst cannot carry it, short enough
  *  that a runaway dies in minutes. */
 const LIVE_RATE_WINDOW_REAL_MINUTES = 15
@@ -769,12 +772,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
       let nextSpendAlertAt = Date.now() + spendAlertMs
       const rateWindow = opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES
+      // One sample a tick, trimmed to the window: the rate is judged over the sim-hours these
+      // ticks covered, so a loop slowed by idle pacing or paused is not read as a runaway.
+      const tickHistory: { ms: number; tick: number }[] = []
       // From the first read, not one window in: an operator wants the routing named while there
       // is still a run left to re-pin.
       let nextMixCheckAt = Date.now()
       let nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
       let backfilling = false
       bridge.onTick((tick) => {
+        tickHistory.push({ ms: Date.now(), tick })
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
           if (arbiterDb !== null) recognizeTheDay(arbiterDb, narratorStore, tick)
@@ -834,12 +841,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         // The flow, not the total. A leak is visible here four days before it is visible above.
         // The cast, not the founders: a town that has borne children thinks for all of them.
         const castSize = booted?.cast.size ?? cast.length
-        // The projection counts 48 real minutes as one sim-day; the operator's dial changes that.
+        const now = Date.now()
+        const cutoff = now - rateWindow * 60_000
+        while (tickHistory.length > 1 && tickHistory[1]!.ms <= cutoff) tickHistory.shift()
+        const anchor = tickHistory[0]!
+        const simHours = (tick - anchor.tick) / 60
+        if (simHours < LIVE_RATE_MIN_SPAN_SIM_HOURS) return
         const projected = projectCallRate(opsDb, {
-          windowRealMinutes: rateWindow,
+          windowRealMinutes: (now - anchor.ms) / 60_000,
+          now,
           minds: castSize,
+          simHours,
         })
-        const rate = projected.callsPerMindSimHour / loop.speed
+        const rate = projected.callsPerMindSimHour
         if (rate <= LIVE_CALL_CEILING_PER_MIND_SIM_HOUR) return
         console.error(
           rateStopMessage(

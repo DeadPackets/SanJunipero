@@ -78,6 +78,16 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     expect(r).toEqual({ callsPerMindSimHour: 1, sampledCalls: 16 })
   })
 
+  // The loop knows what its ticks covered; a window that spanned one sim-hour at a slowed pace
+  // holds the same 16 calls at sixteen times the rate, and no speed divides anything.
+  it('judges the calls against the sim-hours the caller measured, when it gives them', () => {
+    const db = openDb()
+    for (let i = 0; i < 16; i++)
+      seedProviderCall(db, { agoMinutes: 1, caller: 'turn', provider: 'Baidu' })
+    const r = projectCallRate(db, { minds: 2, windowRealMinutes: 16, now: NOW, simHours: 1 })
+    expect(r).toEqual({ callsPerMindSimHour: 8, sampledCalls: 16 })
+  })
+
   it('counts only what a mind spends its own calls on', () => {
     const db = openDb()
     expect(MIND_CALLERS).toEqual(['turn', 'reflection', 'reflection.edit', 'dream', 'recall'])

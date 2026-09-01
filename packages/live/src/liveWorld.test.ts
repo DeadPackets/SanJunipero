@@ -454,12 +454,13 @@ describe('★ the money, inside the served world', () => {
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    // A 15-minute window is 12 sim-hours, so TWO minds may make 2 x 12 x 14 = 336 calls in it.
-    // 400 is over the wire and costs nothing at all — this is a call guard, not a money one.
+    // The guard judges a span of at least two sim-hours (120 ticks), in which TWO minds may
+    // make 2 x 2 x 14 = 56 calls. 400 is far over the wire and costs nothing at all — this is a
+    // call guard, not a money one.
     callsTo(opsDb, 'turn', 400)
     expect(ledgerTotalUsd(opsDb)).toBe(0)
 
-    await run(world, 10)
+    await run(world, 130)
     expect(stops, 'a runaway went unnoticed under a distant cap').toHaveLength(1)
     expect(stops[0]!.spent).toBeLessThan(5)
 
@@ -486,6 +487,26 @@ describe('★ the money, inside the served world', () => {
 
     await run(world, 20)
     expect(stops, 'an ordinary town was stopped for what its provider charged').toHaveLength(0)
+  }, 40_000)
+
+  // ★ The guard once divided a real-time window by the loop's CURRENT speed, so idle pacing
+  // dropping to 0.1x read a healthy town as ten times too fast and stopped it. The rate is
+  // calls over the sim-hours the ticks covered, and the dial has nothing to divide.
+  it('★ a loop slowed by idle pacing is not read as a runaway', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    await run(world, 4)
+    world.loop.setSpeed(0.1)
+    // 40 calls by TWO minds over the ~130 ticks (2.2 sim-hours) below: 9 an hour, under 14.
+    callsTo(opsDb, 'turn', 40)
+    await run(world, 130)
+    expect(stops, 'a slowed loop was read as a runaway').toHaveLength(0)
   }, 40_000)
 
   // The lifetime cap cannot be the running budget: at the measured 5-mind rate a $5 total kills a

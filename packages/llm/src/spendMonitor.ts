@@ -31,7 +31,7 @@ export type CallRateProjection = { callsPerMindSimHour: number; sampledCalls: nu
  *  failover cannot move. */
 export function projectCallRate(
   db: Database.Database,
-  opts: WindowOpts & { minds: number },
+  opts: WindowOpts & { minds: number; simHours?: number },
 ): CallRateProjection {
   const { windowRealMinutes, cutoff } = windowOf(opts)
   const row = db
@@ -40,7 +40,8 @@ export function projectCallRate(
         WHERE ts >= ? AND caller IN (${MIND_CALLER_SLOTS})`,
     )
     .get(cutoff, ...MIND_CALLERS) as { n: number }
-  const simHours = windowRealMinutes / REAL_MINUTES_PER_SIM_HOUR
+  // Without the loop's own count of what its ticks covered, the window assumes the shipped 1x pace.
+  const simHours = opts.simHours ?? windowRealMinutes / REAL_MINUTES_PER_SIM_HOUR
   return {
     callsPerMindSimHour: row.n / Math.max(1, opts.minds) / simHours,
     sampledCalls: row.n,
