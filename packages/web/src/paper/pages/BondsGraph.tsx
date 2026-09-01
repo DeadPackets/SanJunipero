@@ -35,6 +35,7 @@ import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import { sessionStore } from '../../ui/storage.js'
 
 /** Views, not layers on one picture: how close people are and what has passed between them are
  *  different questions. */
@@ -125,7 +126,7 @@ export function BondsGraph({
   const traffic = useFeed(trafficRead)
   const wireDown = view === 'ties' ? bonds.failed : traffic.failed
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [keyOpen, setKeyOpen] = useState(() => keyOpensBy(sessionStorage))
+  const [keyOpen, setKeyOpen] = useState(() => keyOpensBy(sessionStore()))
   const [selected, setSelected] = useState<RelationLink | null>(null)
   // Whose orbit is open below the town graph. Null until somebody picks one, and then it is
   // the person the town has the most to say about.
@@ -403,7 +404,7 @@ export function BondsGraph({
               aria-controls="bonds-key"
               onClick={() => {
                 setKeyOpen(!keyOpen)
-                rememberKey(sessionStorage, !keyOpen)
+                rememberKey(sessionStore(), !keyOpen)
               }}
             >
               {keyOpen ? 'Hide the key' : 'How to read this'}

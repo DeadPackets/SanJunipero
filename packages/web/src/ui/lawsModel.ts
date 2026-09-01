@@ -74,9 +74,9 @@ export function editRows(rows: readonly LawRow[], token: string | null): EditRow
   })
 }
 
-export function adminToken(storage: { getItem(key: string): string | null }): string | null {
+export function adminToken(storage: { getItem(key: string): string | null } | null): string | null {
   try {
-    const raw = storage.getItem(ADMIN_TOKEN_KEY)
+    const raw = storage?.getItem(ADMIN_TOKEN_KEY) ?? null
     const token = raw === null ? '' : raw.trim()
     return token.length === 0 ? null : token
   } catch {

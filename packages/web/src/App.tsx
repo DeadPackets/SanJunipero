@@ -29,6 +29,7 @@ import { useAutoCut } from './ui/autoCut.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
+import { sessionStore } from './ui/storage.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
 import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
@@ -65,7 +66,7 @@ export function App() {
   const [keysOpen, setKeysOpen] = useState(false)
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
-  const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
+  const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
   const { autoCut, toggle: toggleDirector } = useAutoCut(route.broadcast)
