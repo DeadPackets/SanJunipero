@@ -7,7 +7,13 @@ import { bodyDepthBox } from './depth.js'
 import { facingFrom, feetOf, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
-import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
+import {
+  HIT_MIN_PX,
+  SHOULDER_W,
+  bodyHitPolygon,
+  inflateToMin,
+  lyingHitPolygon,
+} from './hitShapes.js'
 import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
@@ -72,6 +78,8 @@ type CharEntry = {
   hitScale: number
   /** standing in a rank, so the 24 px floor may not grow this capsule past one pitch */
   ranked: boolean
+  /** asleep or collapsed: the same body, lying across its ground point rather than standing on it */
+  lying: boolean
   emoteUntil: number
   facing: Facing
   path: Waypoint[]
@@ -242,13 +250,21 @@ export function createCharacterLayer(
   // a Fitts's-law floor for a target in open space, so a `ranked` body caps its WIDTH at the rank
   // pitch — hitting the wrong person is worse than a small target — and keeps the whole height.
   let hitZoom = 1
-  const setHitScale = (e: CharEntry, scale: number, figureH: number, ranked = e.ranked): void => {
-    if (e.hitScale === scale && e.figureH === figureH && e.ranked === ranked) return
+  const setHitScale = (
+    e: CharEntry,
+    scale: number,
+    figureH: number,
+    ranked = e.ranked,
+    lying = e.lying,
+  ): void => {
+    if (e.hitScale === scale && e.figureH === figureH && e.ranked === ranked && e.lying === lying)
+      return
     e.hitScale = scale
     e.figureH = figureH
     e.ranked = ranked
+    e.lying = lying
     e.hit.points = inflateToMin(
-      bodyHitPolygon(figureH, scale),
+      lying ? lyingHitPolygon(figureH, scale) : bodyHitPolygon(figureH, scale),
       HIT_MIN_PX,
       scale * hitZoom,
       ranked ? CROWD_PITCH_PX * hitZoom : Infinity,
@@ -324,6 +340,7 @@ export function createCharacterLayer(
       figureH: 0,
       hitScale: 0,
       ranked: false,
+      lying: false,
       emoteUntil: 0,
       facing: 'sw',
       gait: gaitOf(agentId),
@@ -446,7 +463,7 @@ export function createCharacterLayer(
           e.sprite.texture = cell.texture
           e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
           e.sprite.scale.set(cell.scale) // smooth downscale to world footprint
-          setHitScale(e, cell.scale, cell.figureH)
+          setHitScale(e, cell.scale, cell.figureH, e.ranked, pose.row === 'sleep')
         }
       }
       standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })

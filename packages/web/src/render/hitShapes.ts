@@ -35,6 +35,29 @@ export function bodyHitPolygon(figureH: number, scale: number): number[] {
   return [...right, ...left].flatMap(([x, y]) => [x / k, y / k])
 }
 
+/** A body that has lain down is as long as it stood tall and rises about a third of that off
+ *  the ground; the ends are the shoulder and the shin, so neither is square. Fractions of the
+ *  DRAWN figure height, exactly as the standing capsule is. */
+export const LYING_LEN = 0.9
+const LYING_TOP = 0.34
+const LYING_END = 0.85
+
+/** The capsule of a sleeper or a collapsed body, in LOCAL sprite space — the ground point at
+ *  (0,0), the body lying across it. Pre-divided by `scale` because Pixi scales `hitArea`. */
+export function lyingHitPolygon(figureH: number, scale: number): number[] {
+  const k = scale === 0 ? 1 : scale
+  const drawnH = figureH * k
+  const halfL = (LYING_LEN * drawnH) / 2
+  const top = LYING_TOP * drawnH
+  const right: [number, number][] = [
+    [halfL * LYING_END, 0],
+    [halfL, -top / 2],
+    [halfL * LYING_END, -top],
+  ]
+  const left = [...right].reverse().map(([x, y]): [number, number] => [-x, y])
+  return [...right, ...left].flatMap(([x, y]) => [x / k, y / k])
+}
+
 /** Shoelace area of a flat point list. */
 export function polygonArea(poly: number[]): number {
   let a = 0
