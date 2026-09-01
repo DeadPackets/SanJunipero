@@ -19,6 +19,7 @@ import {
   isStokeable,
   submitIntent,
   townSquareOf,
+  walkTicks,
   type PerceptionPacket,
   type RngStreams,
   type Structure,
@@ -223,7 +224,7 @@ export function walkEnergyCost(
   const path = findPath(state, at, to, config)
   if (path === null) return null
   const tired = Math.min(config.movement.baseTilesPerTick, config.movement.debuffTilesPerTick)
-  return Math.ceil(path.length / tired) * awakeEnergyDecay(config, a)
+  return walkTicks(path.length, tired) * awakeEnergyDecay(config, a)
 }
 
 /** The reserve is the collapse floor itself — arriving at exactly the floor is arriving face-down. */

@@ -202,6 +202,12 @@ export function tilesPerTickFor(
   return debuffed ? cfg.debuff : cfg.base
 }
 
+/** A path's cost in ticks. The rounding lives here alone, so the town's price for a walk and
+ *  the walk's own length cannot come to disagree by a tick. */
+export function walkTicks(pathLen: number, tilesPerTick: number): number {
+  return Math.ceil(pathLen / tilesPerTick)
+}
+
 export function tilesPerTick(state: WorldState, config: SimConfig, agentId: string): number {
   return tilesPerTickFor(state.agents[agentId]!.needs, {
     debuffThreshold: config.needs.debuffThreshold,
@@ -263,7 +269,7 @@ const walk: VerbDef = makeVerb({
     const a = state.agents[agentId]!
     const path = findPath(state, a, p, config)
     if (!path) throw new Error(`walk.duration: no path for ${agentId}`)
-    return Math.ceil(path.length / tilesPerTick(state, config, agentId))
+    return walkTicks(path.length, tilesPerTick(state, config, agentId))
   },
   onComplete() {
     return []
@@ -2041,8 +2047,6 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   // when the clock runs out however the two were nudged apart.
   const stride = Math.min(tilesLeft, Math.ceil(tilesLeft / act.ticksRemaining))
   const moves: PendingEvent[] = []
-  // Every tile of the stride is judged the way a lone step is: speed can never carry a body
-  // through a wall, and the first refusal ends the tick where a single step would have stopped.
   for (let i = 0; i < stride; i++) {
     const [nx, ny] = act.path[done + i]!
     if (!isPassable(state, nx, ny)) break

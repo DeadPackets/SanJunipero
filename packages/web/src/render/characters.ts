@@ -327,7 +327,7 @@ export function createCharacterLayer(
       emoteUntil: 0,
       facing: 'sw',
       gait: gaitOf(agentId),
-      legMs: clock.periodMs,
+      legMs: clock.periodMs / MOVEMENT_FALLBACK.base,
       path: [{ x, y, atMs: now }],
       depth: { box: bodyDepthBox(agentId, x, y), node: sprite },
       crowd: NO_OFFSET,
@@ -366,7 +366,7 @@ export function createCharacterLayer(
       const dy = p.y - last.y
       e.facing = facingFrom(dx, dy) ?? e.facing // a body that has not moved keeps its facing
       // The leg's length comes from the record: `tilesPerTickFor` is the engine's own rule, and
-      // a tick that carried three tiles is three legs of a third of it each.
+      // a tick is shared out among the tiles it carried.
       const perTick = tilesPerTickFor(state.agents[p.id]?.needs ?? {}, cfg)
       e.legMs = clock.periodMs / perTick
       e.path = scheduleLeg(e.path, p.x, p.y, {

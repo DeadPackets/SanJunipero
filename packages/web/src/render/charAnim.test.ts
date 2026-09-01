@@ -423,6 +423,7 @@ function replay(opts: {
   jitterMs?: number
   landed: boolean
   perTile?: number
+  tilesPerTick?: number
 }): {
   maxLagTiles: number
   endLagTiles: number
@@ -434,16 +435,22 @@ function replay(opts: {
   const { tickMs, tiles, stillMsBefore, landed } = opts
   const jitter = opts.jitterMs ?? 0
   const perTile = opts.perTile ?? 1
+  const tilesPerTick = opts.tilesPerTick ?? 1
   const b: Body = { path: [{ x: 0, y: 0, atMs: 0 }], lastMoveArrival: 0, legMs: tickMs }
   let clock = initialTickClock()
-  // one delta batch per tick; the body advances a tile every `perTile` of them
-  const batches: { at: number; moved: number | null }[] = []
-  for (let i = 0; i < tiles * perTile; i++) {
+  // One delta batch per tick. Either the body takes `perTile` batches to cross one tile, or one
+  // batch carries `tilesPerTick` of them — the world can do one or the other, never both.
+  const ticks = tilesPerTick > 1 ? Math.ceil(tiles / tilesPerTick) : tiles * perTile
+  const batches: { at: number; moves: number[] }[] = []
+  for (let i = 0; i < ticks; i++) {
     const wobble = jitter === 0 ? 0 : ((i * 2654435761) % (2 * jitter + 1)) - jitter
-    batches.push({
-      at: stillMsBefore + i * tickMs + wobble,
-      moved: (i + 1) % perTile === 0 ? Math.floor(i / perTile) + 1 : null,
-    })
+    const at = stillMsBefore + i * tickMs + wobble
+    const moves: number[] = []
+    if (tilesPerTick > 1) {
+      for (let k = 1; k <= tilesPerTick && i * tilesPerTick + k <= tiles; k++)
+        moves.push(i * tilesPerTick + k)
+    } else if ((i + 1) % perTile === 0) moves.push(Math.floor(i / perTile) + 1)
+    batches.push({ at, moves })
   }
   let bi = 0
   const samples: { t: number; x: number; sim: number }[] = []
@@ -452,11 +459,11 @@ function replay(opts: {
     while (bi < batches.length && batches[bi]!.at <= t) {
       const ba = batches[bi]!
       if (!landed) clock = observeTick(clock, ba.at, 1)
-      if (ba.moved !== null) {
-        if (landed) landedPush(b, ba.moved, 0, ba.at)
+      for (const moved of ba.moves) {
+        if (landed) landedPush(b, moved, 0, ba.at)
         else {
-          b.legMs = clock.periodMs * perTile
-          b.path = scheduleLeg(b.path, ba.moved, 0, {
+          b.legMs = (clock.periodMs * perTile) / tilesPerTick
+          b.path = scheduleLeg(b.path, moved, 0, {
             nowMs: ba.at,
             legMs: b.legMs,
             leadMs: clock.periodMs * WALK_LEAD_TICKS,
@@ -468,7 +475,7 @@ function replay(opts: {
     b.path = prunePath(b.path, t)
     const pos = interpolatePos(b.path, t)
     let sim = 0
-    for (const ba of batches) if (ba.at <= t && ba.moved !== null) sim = ba.moved
+    for (const ba of batches) if (ba.at <= t && ba.moves.length > 0) sim = ba.moves.at(-1)!
     samples.push({ t, x: pos.x, sim })
   }
   // The renderer cannot know the world's tick rate until it has seen two batches, so the first
@@ -536,6 +543,29 @@ describe('★ B1 — positions WERE interpolated; the jank was the schedule', ()
     expect(
       replay({ tickMs: 400, tiles: 12, stillMsBefore: 20_000, landed: true }).maxLagTiles,
     ).toBeGreaterThan(9)
+  })
+
+  it('★ and it holds when ONE TICK CARRIES THREE TILES — the speed the world now walks at', () => {
+    const rows: string[] = []
+    let worstAll = 0,
+      worstSettled = 0
+    for (const tickMs of [400, 1000, TICK_REAL_MS, 2500]) {
+      for (const stillMsBefore of [0, 5000, 60_000]) {
+        const a = replay({ tickMs, tiles: 30, stillMsBefore, landed: false, tilesPerTick: 3 })
+        rows.push(
+          `${String(tickMs).padStart(4)}ms/tick after ${String(stillMsBefore).padStart(5)}ms still: ` +
+            `worst ${a.maxLagTiles.toFixed(2)} tiles, settled ${a.settled.maxLagTiles.toFixed(2)}`,
+        )
+        worstAll = Math.max(worstAll, a.maxLagTiles)
+        worstSettled = Math.max(worstSettled, a.settled.maxLagTiles)
+      }
+    }
+    console.log('LAG AT THREE TILES A TICK, tiles\n  ' + rows.join('\n  '))
+    // The bound is on TIME and always was: `legMs + leadMs` is now `periodMs/3 + periodMs`, and
+    // three tiles fit in a tick, so the same buffer counts out as three times the tiles. At the
+    // world's own 2000 ms it comes to exactly 3.00 — one tick of lead, and nothing compressed.
+    expect(worstSettled).toBeLessThanOrEqual(5)
+    expect(worstAll).toBeLessThanOrEqual(6)
   })
 
   it('★ the schedule can never hold more than two ticks of future — the structural bound', () => {
@@ -807,12 +837,13 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
     for (const [i, n] of buckets.entries()) expect(n, `bucket ${i}`).toBeGreaterThan(20)
   })
 
-  // Every rate, not just the dev world's: at the shipped 2000 ms a tile the clamp binds, so a
-  // guard made only at 400 ms passes while all five founders share one cadence.
+  // Every rate, not just the dev world's. The shipped ones are a tick divided by the tiles it
+  // carries — 667 ms hale, 1000 ms under the debuff — and a guard made at one rate alone passes
+  // while all five founders share a cadence at another.
   it('★ five founders keep five cadences at EVERY rate, the shipped one included', () => {
     const rows: string[] = [],
       inStep: string[] = []
-    for (const msPerTile of [120, 400, 1000, TICK_REAL_MS, 6000]) {
+    for (const msPerTile of [120, 400, TICK_REAL_MS / 3, 1000, TICK_REAL_MS, 6000]) {
       const ms = FOUNDERS.map((id) => strideFrameMs(msPerTile, gaitOf(id).stride))
       const distinct = new Set(ms.map((v) => v.toFixed(4))).size
       rows.push(
@@ -873,10 +904,10 @@ describe('★ gait follows what a person is DOING, from state that already exist
       `debuffThreshold: z.number().default(${MOVEMENT_FALLBACK.debuffThreshold})`,
     )
     expect(SHARED_CONFIG_SRC).toContain(
-      `baseTilesPerTick: z.number().default(${MOVEMENT_FALLBACK.base})`,
+      `baseTilesPerTick: z.number().positive().default(${MOVEMENT_FALLBACK.base})`,
     )
     expect(SHARED_CONFIG_SRC).toContain(
-      `debuffTilesPerTick: z.number().default(${MOVEMENT_FALLBACK.debuff})`,
+      `debuffTilesPerTick: z.number().positive().default(${MOVEMENT_FALLBACK.debuff})`,
     )
   })
 })

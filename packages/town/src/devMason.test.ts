@@ -138,7 +138,12 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
   })
 
   it('★ and the town claims a DIFFERENT plot each time — the register is not frozen at genesis', () => {
-    const seats = new Set(raised.map((e) => `${String(e.payload.x)},${String(e.payload.y)}`))
+    const seats = new Set(
+      raised.map((e) => {
+        const s = run.state.structures[String(e.payload.id)]!
+        return `${s.x},${s.y}`
+      }),
+    )
     expect(seats.size).toBe(raised.length)
     // the claim still has somewhere to offer at the end, so the run did not stop for want of one
     expect(claimInWorld(run.state, { along: 2, deep: 2 })).not.toBeNull()

@@ -227,8 +227,10 @@ describe('makeFoundersOnTick interiors switch', () => {
     const HERE = { x: 5, y: 5 },
       YONDER = { x: 58, y: 60 } // opposite corners of the fixture
     const far = FOUNDERS.map((f) => ({ ...f, patrol: [HERE, YONDER] as FounderDef['patrol'] }))
+    const at = (energy: number): WorldState =>
+      putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
     const started = (energy: number): string[] => {
-      const state = putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
+      const state = at(energy)
       const out: string[] = []
       makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('leg'), () => state, { founders: far })({
         tick: 2,
@@ -243,8 +245,6 @@ describe('makeFoundersOnTick interiors switch', () => {
     // what it did, so the energy it can no longer be paid for out of sits UNDER the patrol's own
     // sleep line — the gate is asked directly, because the policy can no longer be asked alone.
     expect(started(100)).toEqual(['walk'])
-    const at = (energy: number): WorldState =>
-      putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
     expect(arrivesStanding(at(24), SHOWCASE_CONFIG, 'omar', YONDER)).toBe(true)
     expect(arrivesStanding(at(10), SHOWCASE_CONFIG, 'omar', YONDER)).toBe(false)
     expect(started(10)).toEqual(['sleep'])

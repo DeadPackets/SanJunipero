@@ -165,6 +165,22 @@ describe('fold: action + skill + wake events', () => {
 })
 
 describe('walk progression (stepWalk)', () => {
+  const planWall = (s: WorldState, x: number, y: number): WorldState =>
+    fold(
+      s,
+      ev(seq++, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x,
+        y,
+        w: 1,
+        h: 1,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+    )
+
   function walkUntilDone(s: WorldState, maxTicks = 100): { s: WorldState; ticks: number } {
     let ticks = 0
     while (s.agents.a1!.activity) {
@@ -235,20 +251,7 @@ describe('walk progression (stepWalk)', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     s = applyAll(s, stepWalk(s, 'a1')) // a1 now at (2,0): two tiles this tick
-    s = fold(
-      s,
-      ev(seq++, 'structure_planned', {
-        id: 'structure_1',
-        kind: 'house',
-        x: 3,
-        y: 0,
-        w: 1,
-        h: 1,
-        maxHp: 50,
-        flammable: true,
-        builderId: 'a1',
-      }),
-    )
+    s = planWall(s, 3, 0)
     const blocked = stepWalk(s, 'a1')
     expect(blocked).toEqual([
       { type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } },
@@ -264,20 +267,7 @@ describe('walk progression (stepWalk)', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     // The wall lands on the SECOND tile of a three-tile stride, after the path was already stored.
-    s = fold(
-      s,
-      ev(seq++, 'structure_planned', {
-        id: 'structure_1',
-        kind: 'house',
-        x: 2,
-        y: 0,
-        w: 1,
-        h: 1,
-        maxHp: 50,
-        flammable: true,
-        builderId: 'a1',
-      }),
-    )
+    s = planWall(s, 2, 0)
     const step = stepWalk(s, 'a1')
     expect(step.map((e) => e.type)).toEqual(['action_progressed', 'agent_moved'])
     s = applyAll(s, step)
