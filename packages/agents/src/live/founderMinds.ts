@@ -61,8 +61,8 @@ export const FOUNDER_MINDS: Mind[] = [
           'Just put it back where it was, please.',
           'You said soon three days ago.',
         ],
-        10,
-        20,
+        9,
+        18,
       ),
     },
     personality: NEUTRAL(
@@ -95,8 +95,8 @@ export const FOUNDER_MINDS: Mind[] = [
           "This rain's miserable. Anyway.",
           "My first bridge went in the river. This one won't.",
         ],
-        9,
-        18,
+        7,
+        14,
       ),
     },
     personality: NEUTRAL(
@@ -117,20 +117,20 @@ export const FOUNDER_MINDS: Mind[] = [
         'Walks the whole valley most days and knows where the berries are before anyone else does.',
       temperament: 'restless, cheerful, impatient',
       voiceCard: voice(
-        'fast and chatty: thinks out loud, gets ahead of herself, doubles back',
-        'starts one thought, jumps to a better one, circles back; "wait" and "okay so" hold it together',
+        'quick but low-key: thinks out loud in a murmur, gets ahead of herself, trails off',
+        'a thought, then a better one, then a shrug; sentences end early',
         [
-          'opens news with "okay so"',
-          'interrupts herself: "wait, no, listen"',
-          'asks a question and answers it herself',
+          'drops "anyway" mid-thought when she catches herself rambling',
+          'asks a question and answers it herself, quietly',
+          'delivers big news like it is nothing, and waits for you to catch it',
         ],
         ['self-pity', 'the tidy short version'],
         [
-          "Okay so the east bushes are ridiculous right now. Wait, did you bring a basket? Doesn't matter, take my bag.",
-          "I was going to come straight back, and then I didn't, obviously.",
+          "East bushes are ridiculous right now. You'll see. Bring a basket, or don't, mine's big enough.",
+          "I was going to come straight back. Then I didn't, obviously.",
         ],
-        26,
-        45,
+        18,
+        32,
       ),
     },
     personality: NEUTRAL(
@@ -152,7 +152,7 @@ export const FOUNDER_MINDS: Mind[] = [
       temperament: 'gentle, unhurried, hard to alarm',
       voiceCard: voice(
         'warm and a little over-explaining: checks in first, gives one reason too many, catches himself',
-        'unhurried; a question, then the reasoning behind it, then "anyway"',
+        'unhurried and level; a question, a beat, then whatever actually needs saying',
         [
           'opens with a check-in before any business',
           'explains a bit more than needed, then stops himself with "anyway"',
@@ -160,11 +160,11 @@ export const FOUNDER_MINDS: Mind[] = [
         ],
         ['alarm', 'hurry', 'a diagnosis he isn\'t sure of'],
         [
-          "How's the hand? You were holding it funny yesterday. Probably nothing. Anyway.",
+          "How's the hand. You were holding it funny yesterday.",
           "Sit down a minute, there's no rush.",
         ],
-        20,
-        34,
+        16,
+        28,
       ),
     },
     personality: NEUTRAL(
@@ -197,8 +197,8 @@ export const FOUNDER_MINDS: Mind[] = [
           "You ran the whole way? That's embarrassing. For me, I mean.",
           "It's fine. It's basically fine.",
         ],
-        10,
-        20,
+        9,
+        18,
       ),
     },
     personality: NEUTRAL(
