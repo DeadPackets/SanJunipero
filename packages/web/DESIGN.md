@@ -147,6 +147,20 @@ lead drops its slab and its frame and takes a Fraunces drop cap; its section hea
 the tree as a visually-hidden `h3`, because the edition's own headline is what a sighted reader
 sees.
 
+**Bonds is one vertical sheet**, never two pictures crammed side by side. The whole town's graph
+first — every edge drawn twice, a deep casing then the colour on it, at 3px and 5px rather than
+1.5 and 3, because a hairline over a night ground crossing a slab is not a connection anyone can
+follow; names carry ink on all four sides. Then **one person's orbit**: ego-centric, and the ring
+radii ARE `ui/relationGraph.ts`'s `LEVEL_DISTANCE`, so distance is the number the town graph is
+laid out with rather than a drawing. Each spoke carries three channels at once — the dash is the
+family tie, the colour is which way it is going, the weight is how much of it there is — and a
+stranger gets a node and **no line**, the same rule the town graph follows. Then the **level
+matrix**: a fixed grid where every pair has one address, the level as a fill and the warmth as a
+number beside it so the ladder survives without colour, and an empty cell is two people who have
+never met. Clicking a node in the town graph, or a name down the matrix, moves the orbit; the
+orbit's own head opens that person's page. Names are HTML over the plot, not SVG text — a glyph
+inside the viewBox is 10px on a 300px phone.
+
 **The grip follows the finger.** `pointerdown` captures the pointer and suppresses the sheet's
 transition; every `pointermove` writes `transform: translate(-50%, y)` straight to the DOM — 1:1
 down, rubber-banded to a third upward — and eases `.town-dim` with it, so the town brightens under

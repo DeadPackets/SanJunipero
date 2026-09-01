@@ -27,6 +27,10 @@ import {
   type Halo,
 } from '../../ui/societyGraph.js'
 import { EMPTY_DISPATCHES } from '../../ui/dispatches.js'
+import { busiestPerson, orbitOf } from '../../ui/bondOrbit.js'
+import { levelMatrix } from '../../ui/bondMatrix.js'
+import { BondOrbit, EmptyOrbit } from './BondOrbit.js'
+import { LevelMatrixTable } from './LevelMatrix.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
@@ -48,6 +52,12 @@ const EMPTY_API: BondsResponse = { bonds: [], asOfTick: 0 }
  *  4px ring a person who is no longer living already wears. */
 const HALO_STEP = 4
 const HALO_FIRST = 8
+/** Doubled from 1.5/3: a hairline over a night ground crossing a slab is not a connection a
+ *  viewer can follow. */
+const LINK_WIDTH: Readonly<Record<1 | 2, number>> = { 1: 3, 2: 5 }
+/** The deep casing every edge is drawn on, so the colour is never read against the ground. */
+const LINK_CASING = 1.5
+const LINK_CASING_COLOR = '#241F2B'
 const NO_HALO: Halo = { kinds: [], names: [] }
 
 type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
@@ -63,6 +73,15 @@ const AXIS_NAME: Readonly<Record<LegendRow['axis'], string>> = {
 type PositionedNode = BondNode & { x?: number; y?: number }
 
 const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.size) * 5))
+
+/** A name over the graph, one step up from the 12px floor, with ink on all four sides of it. */
+const NAME_PX = TEXT_MIN_PX + 1
+const HALO_OFFSETS: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+]
 
 export function BondsGraph({
   store,
@@ -90,6 +109,9 @@ export function BondsGraph({
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [keyOpen, setKeyOpen] = useState(() => keyOpensBy(sessionStorage))
   const [selected, setSelected] = useState<RelationLink | null>(null)
+  // Whose orbit is open below the town graph. Null until somebody picks one, and then it is
+  // the person the town has the most to say about.
+  const [picked, setPicked] = useState<string | null>(null)
   // The feed refetches every 30s, so the open panel's own tie can leave it mid-read.
   const openBond = useMemo(() => api?.bonds.find((b) => b.id === selected?.id), [api, selected])
   const closeDetail = (): void => {
@@ -148,6 +170,19 @@ export function BondsGraph({
     [traffic.data, people],
   )
   const graph = view === 'ties' ? ties : passed
+  const asOf = api?.asOfTick ?? 0
+  const centreId = useMemo(
+    () => (picked !== null && picked in people ? picked : busiestPerson(people, api ?? EMPTY_API)),
+    [picked, people, api],
+  )
+  const orbit = useMemo(
+    () => (centreId === null ? null : orbitOf(centreId, api ?? EMPTY_API, lineage, people, asOf)),
+    [centreId, api, lineage, people, asOf],
+  )
+  const matrix = useMemo(
+    () => levelMatrix(api ?? EMPTY_API, lineage, people, asOf),
+    [api, lineage, people, asOf],
+  )
   const legend = useMemo(() => (view === 'ties' ? relationLegend() : trafficLegend()), [view])
   const axes = view === 'ties' ? (['level', 'type', 'arc'] as const) : (['kind'] as const)
   const key = (r: LegendRow): string => `${r.axis}:${r.key}`
@@ -181,9 +216,32 @@ export function BondsGraph({
     [halos],
   )
   const linkColor = useCallback((l: object) => (l as Drawn).color, [])
-  const linkWidth = useCallback((l: object) => ((l as Drawn).strokeCount === 2 ? 3 : 1.5), [])
+  const linkWidth = useCallback((l: object) => LINK_WIDTH[(l as Drawn).strokeCount], [])
   const linkLineDash = useCallback((l: object) => (l as Drawn).dash as number[] | null, [])
   const linkLabel = useCallback((l: object) => (l as Drawn).words, [])
+  // ★ THE COMPLAINT: "really hard to see what the connections are". A 1.5px stone line on a
+  // night ground, crossing a slab, is a line nobody can follow. Every edge is drawn twice —
+  // a deep casing, then the colour on it — which is the same law every mark over the town
+  // follows: bring your own ground.
+  const drawLink = useCallback((link: object, ctx: CanvasRenderingContext2D) => {
+    // Optional on purpose: force-graph hands over the raw id until the simulation resolves it.
+    const l = link as Drawn & { source?: PositionedNode; target?: PositionedNode }
+    const [a, b] = [l.source, l.target]
+    if (a?.x === undefined || a.y === undefined || b?.x === undefined || b.y === undefined) return
+    const width = LINK_WIDTH[l.strokeCount]
+    ctx.save()
+    ctx.lineCap = 'butt'
+    for (const pass of [0, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+      ctx.setLineDash(pass === 0 || l.dash === null ? [] : [...l.dash].map((d) => d * 2))
+      ctx.lineWidth = pass === 0 ? width + LINK_CASING * 2 : width
+      ctx.strokeStyle = pass === 0 ? LINK_CASING_COLOR : l.color
+      ctx.stroke()
+    }
+    ctx.restore()
+  }, [])
   const nodeMode = useCallback(() => 'replace' as const, [])
   const onLinkClick = useCallback(
     (l: object) => {
@@ -192,18 +250,16 @@ export function BondsGraph({
     },
     [view],
   )
-  const onNodeClick = useCallback(
-    (n: object) => {
-      const node = n as BondNode
-      onSubject({ id: node.id, kind: 'agent', name: node.name })
-    },
-    [onSubject],
-  )
+  // ★ A node opens the ORBIT below, not the person's page: the graph's job is to hand the
+  // reader a person, and the orbit is what answers "who is this one to everybody else".
+  const onNodeClick = useCallback((n: object) => {
+    setPicked((n as BondNode).id)
+  }, [])
   // The canvas mounts nothing tabbable, so this list is the keyboard's only path in. Memoised:
   // the component re-renders on every world tick.
   const roll = useMemo(
     () => (
-      <ul className="stage-sr" aria-label="Everyone in the graph">
+      <ul className="stage-sr" aria-label="Everyone in the graph. Choose one to open their orbit.">
         {graph.nodes.map((n) => (
           <li key={n.id}>
             <button
@@ -263,19 +319,22 @@ export function BondsGraph({
   const drawNames = useCallback(
     (ctx: CanvasRenderingContext2D, globalScale: number) => {
       // Every slab is down by now, so no name can be buried by a neighbour drawn later.
-      const fontSize = Math.max(TEXT_MIN_PX / globalScale, 4)
+      const fontSize = Math.max(NAME_PX / globalScale, 4)
       ctx.imageSmoothingEnabled = false
       ctx.font = `${fontSize}px Silkscreen, monospace`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
+      const halo = Math.max(1, fontSize / 6)
       const nodes: PositionedNode[] = graphData.nodes
       for (const n of nodes) {
         if (n.x === undefined || n.y === undefined) continue
         const side = slabSide(n)
         const lx = Math.round(n.x)
         const ly = Math.round(n.y) - Math.round(side / 2) + side + 4
+        // A FOUR-WAY halo, not one offset: a name over a graph carries its own ground on every
+        // side, or the edge it crosses eats a stroke of it.
         ctx.fillStyle = '#241F2B'
-        ctx.fillText(n.name, lx + 1, ly + 1)
+        for (const [dx, dy] of HALO_OFFSETS) ctx.fillText(n.name, lx + dx * halo, ly + dy * halo)
         ctx.fillStyle = '#FFF6E9'
         ctx.fillText(n.name, lx, ly)
       }
@@ -293,144 +352,195 @@ export function BondsGraph({
   }
 
   return (
-    <div className="bonds-graph">
-      {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow keys,
-          and a second tablist nested in its panel would be one the keyboard cannot walk. */}
-      <div className="bonds-views" role="group" aria-label="What the picture shows">
-        {SOCIETY_VIEWS.map((v) => (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={v === view}
-            className={v === view ? 'feed-tab active' : 'feed-tab'}
-            onClick={() => {
-              setView(v)
-              setHidden(new Set())
-            }}
-          >
-            {SOCIETY_VIEW_LABEL[v]}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="key-summary"
-          aria-expanded={keyOpen}
-          aria-controls="bonds-key"
-          onClick={() => {
-            setKeyOpen(!keyOpen)
-            rememberKey(sessionStorage, !keyOpen)
-          }}
-        >
-          {keyOpen ? 'Hide the key' : 'How to read this'}
-          {hidden.size > 0 && <span className="key-filtered">{hidden.size} hidden</span>}
-        </button>
-      </div>
-      {keyOpen && (
-        <div id="bonds-key" className="bonds-legend" role="group" aria-label="How to read this">
-          {axes.map((axis) => (
-            <div className="legend-axis" key={axis} data-axis={axis}>
-              <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
-              {legend
-                .filter((r) => r.axis === axis)
-                .map((r) => (
-                  <LegendChip
-                    key={key(r)}
-                    row={r}
-                    off={hidden.has(key(r))}
-                    onToggle={() => {
-                      toggle(key(r))
-                    }}
-                  />
-                ))}
-            </div>
-          ))}
-          {haloKinds.length > 0 && (
-            <div className="legend-axis" data-axis="formed">
-              <span className="legend-axis-name">What they formed</span>
-              {haloKinds.map((kind) => (
-                <span className="legend-halo" key={kind}>
-                  {/* a ring, drawn at the size the graph draws it, so a dotted one is not a
-                      solid one at swatch scale */}
-                  <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-                    <rect x="4" y="4" width="14" height="14" fill="var(--night)" />
-                    <rect
-                      x="2"
-                      y="2"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      stroke={INSTITUTION_RING[kind].color}
-                      strokeWidth="2"
-                      strokeDasharray={INSTITUTION_RING[kind].dash?.join(' ')}
-                    />
-                  </svg>
-                  <span className="legend-word">{INSTITUTION_RING[kind].words}</span>
-                </span>
+    // ★ A VERTICAL SHEET, never two pictures crammed side by side: the whole town first, then
+    // one person's orbit, then the grid every pair has an address in.
+    <div className="bonds-sheet">
+      <section className="bonds-section">
+        <h4 className="feed-head">Everyone, and who they are to each other</h4>
+        <div className="bonds-graph">
+          {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
+              keys, and a second tablist nested in its panel would be one the keyboard cannot
+              walk. */}
+          <div className="bonds-views" role="group" aria-label="What the picture shows">
+            {SOCIETY_VIEWS.map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={v === view}
+                className={v === view ? 'feed-tab active' : 'feed-tab'}
+                onClick={() => {
+                  setView(v)
+                  setHidden(new Set())
+                }}
+              >
+                {SOCIETY_VIEW_LABEL[v]}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="key-summary"
+              aria-expanded={keyOpen}
+              aria-controls="bonds-key"
+              onClick={() => {
+                setKeyOpen(!keyOpen)
+                rememberKey(sessionStorage, !keyOpen)
+              }}
+            >
+              {keyOpen ? 'Hide the key' : 'How to read this'}
+              {hidden.size > 0 && <span className="key-filtered">{hidden.size} hidden</span>}
+            </button>
+          </div>
+          {keyOpen && (
+            <div id="bonds-key" className="bonds-legend" role="group" aria-label="How to read this">
+              {axes.map((axis) => (
+                <div className="legend-axis" key={axis} data-axis={axis}>
+                  <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
+                  {legend
+                    .filter((r) => r.axis === axis)
+                    .map((r) => (
+                      <LegendChip
+                        key={key(r)}
+                        row={r}
+                        off={hidden.has(key(r))}
+                        onToggle={() => {
+                          toggle(key(r))
+                        }}
+                      />
+                    ))}
+                </div>
               ))}
+              {haloKinds.length > 0 && (
+                <div className="legend-axis" data-axis="formed">
+                  <span className="legend-axis-name">What they formed</span>
+                  {haloKinds.map((kind) => (
+                    <span className="legend-halo" key={kind}>
+                      {/* a ring, drawn at the size the graph draws it, so a dotted one is not a
+                          solid one at swatch scale */}
+                      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+                        <rect x="4" y="4" width="14" height="14" fill="var(--night)" />
+                        <rect
+                          x="2"
+                          y="2"
+                          width="18"
+                          height="18"
+                          fill="none"
+                          stroke={INSTITUTION_RING[kind].color}
+                          strokeWidth="2"
+                          strokeDasharray={INSTITUTION_RING[kind].dash?.join(' ')}
+                        />
+                      </svg>
+                      <span className="legend-word">{INSTITUTION_RING[kind].words}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {api !== null && (
+                <span className="legend-stamp">
+                  as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
+                </span>
+              )}
             </div>
           )}
-          {api !== null && (
-            <span className="legend-stamp">
-              as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
-            </span>
+
+          {(view === 'ties' ? api : traffic.data) === null ? (
+            // A field of unconnected people is what BOTH a tieless town and an unanswered fetch
+            // look like, so the wait — and the refusal — say which.
+            wireDown ? (
+              <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
+            ) : (
+              <p className="feed-empty" aria-busy="true">
+                Reading the town’s ties…
+              </p>
+            )
+          ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
+            <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
+          ) : null}
+
+          {view === 'ties' &&
+            selected !== null &&
+            api !== null &&
+            (openBond ? (
+              <BondDetail
+                bond={openBond}
+                people={people}
+                type={selected.type}
+                level={selected.level}
+                arc={selected.arc}
+                words={selected.words}
+                onClose={closeDetail}
+              />
+            ) : (
+              <FadedBond onClose={closeDetail} />
+            ))}
+
+          {roll}
+
+          <div className="bonds-canvas" ref={boxRef}>
+            <ForceGraph2D
+              width={dims.w}
+              height={dims.h}
+              backgroundColor="rgba(0,0,0,0)"
+              graphData={graphData}
+              nodeVal={nodeVal}
+              nodeLabel={nodeLabel}
+              ref={fgRef}
+              nodeCanvasObjectMode={nodeMode}
+              nodeCanvasObject={drawNode}
+              linkCanvasObject={drawLink}
+              onRenderFramePost={drawNames}
+              nodeColor={nodeColor}
+              linkColor={linkColor}
+              linkWidth={linkWidth}
+              linkLineDash={linkLineDash}
+              linkLabel={linkLabel}
+              onLinkClick={onLinkClick}
+              onNodeClick={onNodeClick}
+            />
+          </div>
+          <p className="bonds-hint">Choose anyone above to open their orbit.</p>
+        </div>
+      </section>
+
+      <section className="bonds-section">
+        <div className="bonds-section-head">
+          <h4 className="feed-head">
+            {orbit === null ? 'One person’s orbit' : `${orbit.name}, and everyone`}
+          </h4>
+          {orbit !== null && (
+            <button
+              type="button"
+              className="feed-tab"
+              onClick={() => {
+                onSubject({ id: orbit.id, kind: 'agent', name: orbit.name })
+              }}
+            >
+              Open {orbit.name}’s story
+            </button>
           )}
         </div>
-      )}
-
-      {(view === 'ties' ? api : traffic.data) === null ? (
-        // A field of unconnected people is what BOTH a tieless town and an unanswered fetch
-        // look like, so the wait — and the refusal — say which.
-        wireDown ? (
-          <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
+        {orbit === null ? (
+          bonds.failed ? (
+            <OutOfReach onRetry={bondsFeed.retry} />
+          ) : (
+            <p className="feed-empty" aria-busy={!bonds.loaded}>
+              {EMPTY_COPY.bonds}
+            </p>
+          )
+        ) : orbit.ties.length === 0 ? (
+          <EmptyOrbit name={orbit.name} />
         ) : (
-          <p className="feed-empty" aria-busy="true">
-            Reading the town’s ties…
-          </p>
-        )
-      ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-        <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
-      ) : null}
+          <BondOrbit orbit={orbit} onCentre={setPicked} />
+        )}
+      </section>
 
-      {view === 'ties' &&
-        selected !== null &&
-        api !== null &&
-        (openBond ? (
-          <BondDetail
-            bond={openBond}
-            people={people}
-            type={selected.type}
-            level={selected.level}
-            arc={selected.arc}
-            words={selected.words}
-            onClose={closeDetail}
-          />
+      <section className="bonds-section">
+        <h4 className="feed-head">Every pair has one address</h4>
+        {matrix.rows.length === 0 ? (
+          <p className="feed-empty">{EMPTY_COPY.bonds}</p>
         ) : (
-          <FadedBond onClose={closeDetail} />
-        ))}
-
-      {roll}
-
-      <div className="bonds-canvas" ref={boxRef}>
-        <ForceGraph2D
-          width={dims.w}
-          height={dims.h}
-          backgroundColor="rgba(0,0,0,0)"
-          graphData={graphData}
-          nodeVal={nodeVal}
-          nodeLabel={nodeLabel}
-          ref={fgRef}
-          nodeCanvasObjectMode={nodeMode}
-          nodeCanvasObject={drawNode}
-          onRenderFramePost={drawNames}
-          nodeColor={nodeColor}
-          linkColor={linkColor}
-          linkWidth={linkWidth}
-          linkLineDash={linkLineDash}
-          linkLabel={linkLabel}
-          onLinkClick={onLinkClick}
-          onNodeClick={onNodeClick}
-        />
-      </div>
+          <LevelMatrixTable matrix={matrix} centreId={centreId} onCentre={setPicked} />
+        )}
+      </section>
     </div>
   )
 }

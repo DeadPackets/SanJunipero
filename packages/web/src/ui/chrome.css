@@ -1523,16 +1523,113 @@ body {
   border: 2px solid var(--deep); box-shadow: var(--ledge);
 }
 
-.bonds-graph {
-  position: relative; display: flex; flex-direction: column; gap: var(--s-3);
-  height: min(30rem, 100%);
+/* ── the bonds tab: ONE VERTICAL SHEET, never two pictures crammed side by side ──
+   The whole town first, then one person's orbit, then the grid every pair has an address in. */
+.bonds-sheet { display: grid; gap: var(--s-8); }
+.bonds-section { display: grid; gap: var(--s-4); align-content: start; }
+.bonds-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-5); flex-wrap: wrap;
 }
-/* `flex-basis: 0` and `overflow: hidden` stop force-graph measuring itself bigger every frame;
+.bonds-section-head .feed-head { margin: 0; }
+.bonds-hint { margin: 0; font-size: var(--f-1); color: var(--ink-quiet); }
+
+.bonds-graph { position: relative; display: flex; flex-direction: column; gap: var(--s-3); }
+/* `overflow: hidden` and a stated height stop force-graph measuring itself bigger every frame;
    the night ground is the CELL's, because force-graph writes the canvas's own background. */
 .bonds-canvas {
-  position: relative; flex: 1 1 0; min-height: 14rem; overflow: hidden;
-  background: var(--night);
+  position: relative; flex: none; height: min(24rem, 60vh); min-height: 14rem;
+  overflow: hidden; background: var(--night);
 }
+
+/* ── one person's orbit ──────────────────────────────────────────────────────────────────── */
+.orbit { display: grid; gap: var(--s-4); justify-items: center; }
+.orbit-plot {
+  position: relative; width: min(100%, 28rem); aspect-ratio: 1;
+  background: var(--night); box-shadow: var(--frame-tight);
+}
+.orbit-lines { display: block; width: 100%; height: 100%; overflow: visible; }
+/* 8.28:1 on the deep ground the plot is drawn on. The rings are the scale, not decoration, so
+   every level is drawn on every orbit and an empty one is as much of an answer as a full one. */
+.orbit-ring { fill: none; stroke: var(--cream-quiet); stroke-width: 1.5; stroke-dasharray: 2 6; }
+/* The marks are HTML, not SVG text: a glyph inside the viewBox is 10px on a 300px phone. */
+.orbit-mark {
+  position: absolute; translate: -50% -50%;
+  display: grid; justify-items: center; gap: var(--s-1);
+}
+.orbit-node {
+  width: 13px; height: 13px; background: var(--sage);
+  box-shadow: 0 0 0 2px var(--ink); flex: none;
+}
+.orbit-me .orbit-node { width: 19px; height: 19px; background: var(--honey); }
+.orbit-name {
+  font-family: var(--font-body); font-weight: 600; font-size: var(--f-2);
+  line-height: 1; white-space: nowrap; color: var(--cream);
+  text-shadow:
+    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep);
+}
+.orbit-me .orbit-name { color: var(--honey-l); }
+.orbit-key { margin: 0; font-size: var(--f-1); color: var(--ink-quiet); text-wrap: pretty; }
+
+/* ── the level matrix: a fixed grid with fixed addresses ────────────────────────────────── */
+.matrix { display: grid; gap: var(--s-4); }
+/* Wide content scrolls in its own box; the sheet never scrolls sideways. */
+.matrix-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+.matrix-grid { border-collapse: collapse; font-size: var(--f-1); }
+.matrix-head, .matrix-name {
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.04em; color: var(--ink-quiet); text-align: left;
+}
+.matrix-head { padding: 0 0 var(--s-2); text-align: center; }
+.matrix-head abbr { text-decoration: none; }
+.matrix-name { padding: 0 var(--s-4) 0 0; }
+.matrix-name button {
+  min-height: 44px; padding: 0 var(--s-2); font: inherit; color: var(--ink);
+  background: none; border: 0; cursor: pointer; white-space: nowrap;
+}
+.matrix-name button:hover { background: var(--sand); }
+.matrix-row.on .matrix-name button { background: var(--honey); }
+.matrix-cell { width: 34px; padding: var(--s-1); }
+.matrix-fill {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  background: var(--parchment); box-shadow: 0 0 0 1px var(--ink);
+}
+/* The number is the SECOND channel, so the ladder survives a reader who cannot separate honey
+   from sand — and an empty cell is two people who have never met. */
+.matrix-warmth {
+  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.matrix-fill[data-level='self'] {
+  background: repeating-linear-gradient(45deg, var(--ink) 0 1px, transparent 1px 5px);
+}
+.matrix-fill[data-level='strangers'], .matrix-swatch[data-level='strangers'] {
+  background: repeating-linear-gradient(45deg, var(--sand) 0 2px, var(--parchment) 2px 4px);
+}
+.matrix-fill[data-level='acquaintances'], .matrix-swatch[data-level='acquaintances'] {
+  background: var(--sand);
+}
+.matrix-fill[data-level='friendly'], .matrix-swatch[data-level='friendly'] {
+  background: var(--honey-l);
+}
+.matrix-fill[data-level='close'], .matrix-swatch[data-level='close'] { background: var(--honey); }
+.matrix-fill[data-level='strained'], .matrix-swatch[data-level='strained'] {
+  background: var(--rose);
+}
+/* Hatred and strained share the one cold token the sheet has, so the DENSER weave is what tells
+   them apart — a texture, never a second red nobody measured. */
+.matrix-fill[data-level='hatred'], .matrix-swatch[data-level='hatred'] {
+  background:
+    repeating-linear-gradient(45deg, var(--ink) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(-45deg, var(--ink) 0 2px, transparent 2px 5px),
+    var(--rose);
+}
+.matrix-key {
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); margin: 0; padding: 0;
+  list-style: none; font-size: var(--f-1); color: var(--ink);
+}
+.matrix-key li { display: inline-flex; align-items: center; gap: var(--s-3); }
+.matrix-swatch { width: 16px; height: 16px; box-shadow: 0 0 0 1px var(--ink); flex: none; }
 .bonds-views { display: flex; gap: var(--s-2); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
 .legend-halo {
   display: inline-flex; align-items: center; gap: var(--s-2); flex: none;
