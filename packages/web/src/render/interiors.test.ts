@@ -809,6 +809,20 @@ describe('interiorScene builds one room plan per plan change', () => {
     expect(SRC.match(/\bbedCells\(/g) ?? []).toHaveLength(1)
     expect(SRC).toContain('bedSlots(sleeping, bedTiles)')
   })
+
+  // ★ `bedSlots` lays sleepers down in the order it is given them, and it was given the room's
+  // occupant order — which moves with the world's record, so two sleepers swapped beds every
+  // time anything else in the room made it re-lay.
+  it('★ hands the beds out by id, so nobody swaps beds on a relayout', () => {
+    expect(SRC).toMatch(/room2\.occupants[\s\S]{0,120}?\.sort\(\)/)
+    const cells = [
+      { x: 1, y: 1 },
+      { x: 3, y: 1 },
+    ]
+    expect(bedSlots(['nadia', 'amara'].sort(), cells)).toEqual(
+      bedSlots(['amara', 'nadia'].sort(), cells),
+    )
+  })
 })
 
 // ★ Two ways out of one room and neither was wired: the veil took a click and dropped it, and

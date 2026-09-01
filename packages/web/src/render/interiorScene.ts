@@ -680,7 +680,9 @@ export function createInteriorScene(
       laidDown = true
     }
     if (laidDown) {
-      const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
+      // By id, not by occupant order: the room's order moves with the world's own record and
+      // two sleepers swapped beds every time anything else in the room made it re-lay.
+      const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true).sort()
       beds = bedSlots(sleeping, bedTiles)
     }
     let awakeIdx = 0
