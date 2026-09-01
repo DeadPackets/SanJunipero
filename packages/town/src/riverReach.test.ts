@@ -2,17 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
+  createWorldTick,
   fold,
   isPassable,
   naturalPlaces,
+  RngStreams,
+  submitIntent,
   walkDestination,
   type WorldState,
 } from '@sj/engine'
 import { devGenesisState, devTerrain } from './devWorld.js'
 
 // The map rehearsal 5 ran on: ring 1 of the showcase grammar, whose window crops the channel to
-// array rows 8..67 and leaves dry corners north and south of it.
-const config: SimConfig = SimConfigSchema.parse({})
+// array rows 8..67 and leaves dry corners north and south of it. Quiet, and the window never
+// grows: this is a proof about where the water is, not about weather or a wider map.
+const config: SimConfig = SimConfigSchema.parse({
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
+})
 const genesis = devGenesisState(config, devTerrain('showcase', 1), 'showcase', 1) as WorldState
 
 const AGENT = 'p'
@@ -59,6 +67,49 @@ describe('★ the river a ring-1 body can actually get to', () => {
       const bank = to as { x: number; y: number }
       expect(isPassable(state, bank.x, bank.y), `bank for (${x}, ${y})`).toBe(true)
       expect(touchesWater(state, bank), `water at the bank for (${x}, ${y})`).toBe(true)
+    }
+  })
+
+  // ★ The walk and the water verbs have to mean the same thing by "beside": world B refused
+  // `fill` and `drink` 105 times while the mind believed it had walked to the river.
+  it('★ leaves the legs somewhere a body can drink and fill', () => {
+    for (const [x, y] of [
+      [1, 70],
+      [2, 62],
+      [70, 5],
+    ] as const) {
+      const store = new EventStore(openDb(':memory:'))
+      let state = bodyAt(x, y)
+      state = fold(
+        state,
+        store.append(state.tick, 'item_spawned', {
+          id: 'skin',
+          kind: 'waterskin',
+          qty: 1,
+          loc: { t: 'agent', id: AGENT },
+        }),
+        config,
+      )
+      const to = walkDestination(state, config, AGENT, { structureId: 'river' }) as {
+        x: number
+        y: number
+      }
+      const go = submitIntent(state, config, AGENT, 'walk', { structureId: 'river' })
+      expect(go.ok, `walk from (${x}, ${y})`).toBe(true)
+      if (!go.ok) return
+      for (const e of go.events) state = fold(state, store.append(state.tick, e.type, e.payload), config)
+
+      const worldTick = createWorldTick(config, new RngStreams('river-reach'))
+      for (let i = 0; i < 200 && state.agents[AGENT]!.activity !== null; i++) {
+        state = worldTick({ ...state, tick: state.tick + 1 }).state
+      }
+      const body = state.agents[AGENT]!
+      expect({ x: body.x, y: body.y }, `landed, from (${x}, ${y})`).toEqual(to)
+      expect(submitIntent(state, config, AGENT, 'drink', {}).ok, `drink at (${x}, ${y})`).toBe(true)
+      expect(
+        submitIntent(state, config, AGENT, 'fill', { itemId: 'skin' }).ok,
+        `fill at (${x}, ${y})`,
+      ).toBe(true)
     }
   })
 
