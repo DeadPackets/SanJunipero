@@ -24,9 +24,8 @@ import { KeyMap } from './stage/KeyMap.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { kindWords } from './ui/broadcastReady.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
-import { escapeStep } from './ui/interaction.js'
+import { escapeStep, structureTitle } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -67,7 +66,7 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, toggle: toggleDirector } = useAutoCut()
+  const { autoCut, toggle: toggleDirector } = useAutoCut(route.broadcast)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -192,8 +191,8 @@ export function App() {
   const onVerb = (verb: RingVerb): void => {
     if (subject === null) return
     if (subject.kind === 'structure') {
-      if (verb === 'home') enterInterior(insideId === subject.id ? null : subject.id)
-      else openPage('building', verb === 'bonds' ? 'Inside' : 'Provenance')
+      if (verb === 'inside') enterInterior(insideId === subject.id ? null : subject.id)
+      else openPage('building', 'Provenance')
       return
     }
     switch (verb) {
@@ -213,7 +212,7 @@ export function App() {
           (s) => s.owner === subject.id,
         )
         if (home === undefined) return
-        setSubject({ id: home.id, kind: 'structure', name: kindWords(home.kind) })
+        setSubject({ id: home.id, kind: 'structure', name: structureTitle(home) })
         openPage('building', 'Provenance')
         scene?.centerOn(home.x, home.y)
       }
@@ -267,15 +266,32 @@ export function App() {
             if (pick.kind === 'structure') {
               const s = store.getState()?.structures[pick.id]
               if (s === undefined) return
-              setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
+              setSubject({ id: s.id, kind: 'structure', name: structureTitle(s) })
               return
             }
             // A thing on the ground has no ring; the record it came out of is its surface.
             setThing({ kind: pick.kind, id: pick.id })
             openPage('found', 'Things')
           }}
+          onGround={() => {
+            setSubject(null)
+            setThing(null)
+          }}
         />
       </main>
+      {insideId !== null && (
+        <button
+          type="button"
+          className="stage-exit"
+          onClick={() => {
+            enterInterior(null)
+            // the button goes with the room, so the focus it held has to be handed somewhere
+            appRef.current?.querySelector<HTMLElement>('.stage-mount')?.focus()
+          }}
+        >
+          <span aria-hidden="true">← </span>Back to town
+        </button>
+      )}
       <SpeechLive store={store} />
       <Figures
         scene={scene}
@@ -285,7 +301,7 @@ export function App() {
         onOpen={setSubject}
       />
       <Nameplate subject={focus ?? subject} scene={scene} />
-      <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
+      <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <QuietStamp store={store} link={link} />
       <DirectorCue text={cue} />
       {route.broadcast && <LowerThird store={store} />}
@@ -297,7 +313,14 @@ export function App() {
         pinned={following}
         onCue={setCue}
       />
-      <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
+      <Signpost
+        open={sheet?.page ?? null}
+        onOpen={onArm}
+        onHelp={() => {
+          setKeysOpen(true)
+        }}
+        ref={signpostRef}
+      />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}

@@ -11,6 +11,7 @@ import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hit
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import { TextureBook, buildingArt, fadeArtIn, textureUrlFor, type BuildingArt } from './textures.js'
+import { contactShadow } from './interiors.js'
 
 export { BUILDING_PX_PER_TILE } from './textures.js'
 
@@ -46,18 +47,6 @@ export function entersOnClick(
 ): boolean {
   const s = state?.structures[structureId]
   return s?.stage === 'complete' && enterableKind(config, s.kind)
-}
-
-/** The building is named FIRST and the offer follows on a middot: `hoverLabel` already spends an em-dash, so an em-dash here read as three phrases on two identical separators. */
-export const LOOK_INSIDE = 'Look inside'
-export function structureHoverText(
-  config: SimConfig | null,
-  state: WorldState | null,
-  structureId: string,
-): string | null {
-  const name = hoverLabel(state, 'structure', structureId)
-  if (name === null) return null
-  return entersOnClick(config, state, structureId) ? `${name} · ${LOOK_INSIDE}` : name
 }
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
@@ -97,6 +86,8 @@ type Entry = {
   url: string
   pips: Graphics | null
   form: Graphics | null
+  /** the contact shadow under a dropped thing; a body's own is the character layer's */
+  shadow: Graphics | null
   /** the kind and ground plan the hit prism is cut from */
   kind: string
   footprint: { w: number; h: number }
@@ -133,7 +124,10 @@ const syncStates = new WeakMap<Scene, SyncState>()
 function setTexture(book: TextureBook, entry: Entry, url: string): void {
   entry.url = url
   void book.get(url).then((t) => {
-    if (entry.url === url) entry.sprite.texture = t
+    if (entry.url !== url || entry.sprite.destroyed) return
+    entry.sprite.texture = t
+    // A shadow is what marks the entries drawn to a common longest side: the dropped things.
+    if (entry.shadow !== null) fitItem(entry, t)
   })
 }
 
@@ -182,6 +176,25 @@ function applyBuildingArt(
     writeScale(entry, art.scale ?? 1)
     cutHitPrism(entry) // the prism is scaled with the sprite, so a new scale re-cuts it
   })
+}
+
+/** Items are drawn to a common LONGEST side, so a plank stays a plank: a forced 32x32 made
+ *  every dropped thing the same square block. */
+export function itemScaleFor(w: number, h: number): number {
+  return ITEM_PX / Math.max(1, w, h)
+}
+
+function fitItem(entry: Entry, t: Texture): void {
+  const k = itemScaleFor(t.width, t.height)
+  writeScale(entry, k)
+  if (entry.shadow !== null) drawItemShadow(entry.shadow, t.width * k)
+}
+
+function drawItemShadow(g: Graphics, widthPx: number): void {
+  const s = contactShadow(widthPx)
+  g.clear()
+  g.ellipse(0, 0, s.rx, s.ry)
+  g.fill({ color: 0x000000, alpha: s.alpha })
 }
 
 function writeScale(entry: Entry, base: number): void {
@@ -275,13 +288,16 @@ export function syncEntities(
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
-      const text =
-        kind === 'structure'
-          ? structureHoverText(store.getConfig(), store.getState(), id)
-          : hoverLabel(store.getState(), kind, id)
-      // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
-      // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
-      if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
+      const text = hoverLabel(store.getState(), kind, id)
+      // the anchor comes from the sprite's DRAWN size — `getLocalBounds` is the texture BEFORE
+      // the sprite's own scale, so a 1.85× building's tag stranded itself beside the roof
+      if (text !== null) {
+        tags.show(
+          'hover',
+          text,
+          anchorForSprite(sprite, { width: sprite.width, height: sprite.height }),
+        )
+      }
     })
     sprite.on('pointerout', () => {
       tags.hide('hover')
@@ -313,6 +329,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        shadow: null,
         kind: s.kind,
         footprint: { w: s.w, h: s.h },
         hitZoom: sync.hitZoom,
@@ -373,6 +390,10 @@ export function syncEntities(
       sprite.anchor.set(0.5, 1.0)
       const iid = it.id
       nameOnHover(sprite, 'item', iid)
+      // A thing on the ground needs the same contact a body gets, or it reads as floating.
+      const shadow = new Graphics()
+      shadow.eventMode = 'none'
+      scene.layers.shadow.addChild(shadow)
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         sync.onPick?.({ kind: 'item', id: iid, screenX: e.client.x, screenY: e.client.y })
       })
@@ -381,6 +402,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        shadow,
         kind: it.kind,
         footprint: { w: 1, h: 1 },
         hitZoom: 1,
@@ -391,13 +413,10 @@ export function syncEntities(
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
-      void book.get(entry.url).then(() => {
-        entry!.sprite.width = ITEM_PX
-        entry!.sprite.height = ITEM_PX
-      })
     }
     const ground = feetOf(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)
+    entry.shadow?.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
   }
 
@@ -418,6 +437,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        shadow: null,
         kind: c.kind,
         footprint: { w: 1, h: 1 },
         hitZoom: 1,
@@ -439,6 +459,7 @@ export function syncEntities(
   for (const [key, entry] of sync.entries) {
     if (!live.has(key)) {
       entry.sprite.destroy({ children: true })
+      entry.shadow?.destroy()
       sync.entries.delete(key)
       tags.hideAll() // a torn-down sprite never fires pointerout, so its tag would hang
     }
@@ -466,7 +487,9 @@ export function syncEntities(
         const oldUrl = entry.url
         entry.url = url
         void book.swap(oldUrl, url).then((t) => {
-          if (entry.url === url) entry.sprite.texture = t
+          if (entry.url !== url || entry.sprite.destroyed) return
+          entry.sprite.texture = t
+          if (entry.shadow !== null) fitItem(entry, t)
         })
       }
     }

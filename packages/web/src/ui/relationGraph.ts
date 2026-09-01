@@ -16,6 +16,27 @@ import {
 } from './bondModel2.js'
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
 
+/** ★ The key is a legend, not news. It opens the first time somebody looks at the graph —
+ *  thirteen chips and no words is a picture nobody can read — and stays shut once they have
+ *  shut it, for as long as the tab lives. */
+const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
+
+export function keyOpensBy(storage: Pick<Storage, 'getItem'>): boolean {
+  try {
+    return storage.getItem(BONDS_KEY_SHUT) === null
+  } catch {
+    return true // storage throws in a sandboxed frame; an unrememberable viewer gets the legend
+  }
+}
+
+export function rememberKey(storage: Pick<Storage, 'setItem'>, open: boolean): void {
+  try {
+    if (!open) storage.setItem(BONDS_KEY_SHUT, '1')
+  } catch {
+    /* nothing to do: they get it again, which is the safe half of the bargain */
+  }
+}
+
 // Four channels, one meaning each: EVERY LIVING PERSON IS A NODE, so strangers are visible; edge
 // length is LEVEL, edge mark is TYPE, edge colour is the ARC — colour is never the only signal.
 

@@ -13,7 +13,9 @@ import {
   LEVEL_DISTANCE,
   NO_LINK_LEVEL,
   TYPE_STROKE,
+  keyOpensBy,
   relationLegend,
+  rememberKey,
   toRelationGraph,
 } from './relationGraph.js'
 import type { PeopleIndex } from './bondModel2.js'
@@ -335,5 +337,54 @@ describe('★ a bond that decays while its panel is open', () => {
   it('is the branch the graph takes when the lookup finds nothing', () => {
     const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
     expect(source).toContain('<FadedBond onClose={closeDetail} />')
+  })
+})
+
+// ★ Thirteen chips and no words is a picture nobody can read, and the key was shut by default:
+// the one thing that explains the graph had to be found before the graph could be read.
+describe('★ the key opens on the first look and remembers being shut', () => {
+  const store = (): Storage => {
+    const map = new Map<string, string>()
+    return {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => map.set(k, v),
+    } as unknown as Storage
+  }
+
+  it('★ opens for a viewer who has never shut it', () => {
+    expect(keyOpensBy(store())).toBe(true)
+  })
+
+  it('★ stays shut for the rest of the tab once it has been shut', () => {
+    const s = store()
+    rememberKey(s, false)
+    expect(keyOpensBy(s)).toBe(false)
+  })
+
+  it('remembers nothing about opening it again — only the dismissal is a decision', () => {
+    const s = store()
+    rememberKey(s, true)
+    expect(keyOpensBy(s)).toBe(true)
+  })
+
+  it('gives the legend to a viewer whose browser refuses to remember them', () => {
+    const refuses = {
+      getItem: () => {
+        throw new Error('sandboxed')
+      },
+      setItem: () => {
+        throw new Error('sandboxed')
+      },
+    } as unknown as Storage
+    expect(keyOpensBy(refuses)).toBe(true)
+    expect(() => {
+      rememberKey(refuses, false)
+    }).not.toThrow()
+  })
+
+  it('is the default the graph actually opens with', () => {
+    const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('useState(() => keyOpensBy(sessionStorage))')
+    expect(source).toContain('rememberKey(sessionStorage, !keyOpen)')
   })
 })

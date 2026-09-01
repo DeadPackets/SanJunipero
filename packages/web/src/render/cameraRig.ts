@@ -46,6 +46,9 @@ export type CameraRig = {
   setFollow: (target: (() => { x: number; y: number } | null) | null) => void
   onFollowEnd: (cb: () => void) => () => void
   onTilePointer: (cb: (t: { x: number; y: number }) => void) => void
+  /** Whether the gesture that just ended was a pan. ONE answer for the whole app: a copy of it
+   *  read the endpoints only, and a pan that came back to where it started read as a click. */
+  wasDrag: () => boolean
   destroy: () => void
 }
 
@@ -339,6 +342,7 @@ export function createCameraRig(
     onTilePointer: (cb) => {
       tileCbs.push(cb)
     },
+    wasDrag: () => isDrag(drag),
     destroy: () => {
       app.ticker.remove(followTick)
       app.ticker.remove(zoomTick)

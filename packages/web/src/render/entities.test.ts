@@ -95,22 +95,23 @@ import { Container as MockContainer } from 'pixi.js'
 import {
   BUILDING_PX_PER_TILE,
   BUILD_TICKS_FULL,
-  LOOK_INSIDE,
   PIP_COUNT,
   doorTileOf,
   enterableKind,
   entersOnClick,
   entitySpriteOf,
+  ITEM_PX,
   footprintHitPoints,
+  itemScaleFor,
   pipsFilled,
   setEntityScaleMul,
   structureHitPoints,
-  structureHoverText,
   syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 import type { WorldStore } from '../state/worldStore.js'
+import { hoverLabel } from '../ui/interaction.js'
 import { polygonBounds, resolveHit } from './hitShapes.js'
 import { builtFormSpec } from './builtForm.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
@@ -201,24 +202,21 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(entersOnClick(DEFAULT_CONFIG, world([]), 'nobody')).toBe(false)
   })
 
-  it('and the hover tag SAYS which, before the click is made', () => {
+  // ★ The hover is the NAME and nothing else: an offer printed beside it was an instruction
+  // the click already carries, and it pushed the name out of a viewer's eye.
+  it('★ the hover tag names the building, and makes no offer', () => {
     const house = box(4, 4, 2, 2, 'house')
     const well = box(9, 9, 1, 1, 'well')
     const st = world([house, well])
-    expect(structureHoverText(DEFAULT_CONFIG, st, house.id)).toBe(`house · ${LOOK_INSIDE}`)
-    expect(structureHoverText(DEFAULT_CONFIG, st, well.id)).toBe('well')
-    expect(structureHoverText(DEFAULT_CONFIG, st, 'nobody')).toBeNull()
+    expect(hoverLabel(st, 'structure', house.id)).toBe('house')
+    expect(hoverLabel(st, 'structure', well.id)).toBe('well')
+    expect(hoverLabel(st, 'structure', 'nobody')).toBeNull()
+    expect(code).not.toContain('Look inside')
   })
 
-  it('and it spends ONE em-dash, because the name already spent the other', () => {
-    const built: Structure = { ...box(4, 4, 2, 2, 'house'), builtBy: 'omar' }
-    const st = {
-      structures: { [built.id]: built },
-      agents: { omar: { id: 'omar', name: 'Omar' } },
-    } as unknown as WorldState
-    const tag = structureHoverText(DEFAULT_CONFIG, st, built.id)!
-    expect(tag).toBe(`house — built by Omar · ${LOOK_INSIDE}`)
-    expect(tag.split('—')).toHaveLength(2) // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
+  it('hangs the hover tag off the DRAWN size, never the pre-scale local bounds', () => {
+    expect(code).not.toContain('getLocalBounds')
+    expect(code).toMatch(/anchorForSprite\(\s*sprite,\s*\{\s*width: sprite\.width/)
   })
 
   it('the sprite is the one thing wired to the pointer — nothing else in the file is', () => {
@@ -227,6 +225,22 @@ describe('one building, one hitbox, and the building says what a click does', ()
     // the two meanings both hang off the one tap handler
     expect(code).toMatch(/entersOnClick\(store\.getConfig\(\), store\.getState\(\), sid\)/)
     expect(code).toMatch(/sync!?\.onDoor\?\.\(sid\)/)
+  })
+
+  // ★ Every dropped thing was forced to 32x32, so a felled trunk, a plank and an axe were all
+  // the same square block on the ground — and none of them touched it.
+  it('★ a dropped thing is drawn to its LONGEST side, so a plank stays a plank', () => {
+    expect(itemScaleFor(128, 128)).toBe(ITEM_PX / 128)
+    const k = itemScaleFor(128, 32)
+    expect(128 * k).toBe(ITEM_PX)
+    expect(32 * k).toBe(ITEM_PX / 4) // a quarter as tall as it is long, exactly as authored
+    expect(itemScaleFor(0, 0)).toBe(ITEM_PX) // and it never divides by nothing
+    expect(code).not.toContain('sprite.width = ITEM_PX')
+  })
+
+  it('★ and it stands on the same contact shadow a body stands on', () => {
+    expect(code).toContain('scene.layers.shadow.addChild(shadow)')
+    expect(code).toContain('contactShadow(widthPx)')
   })
 
   it('resolveHit: a body beats a building, nothing beats nothing', () => {

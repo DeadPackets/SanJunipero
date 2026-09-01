@@ -129,6 +129,7 @@ export function createInteriorScene(
   scene: Scene,
   store: WorldStore,
   book: TextureBook,
+  onSelect: (agentId: string) => void,
 ): InteriorScene {
   const app = scene.app
 
@@ -143,7 +144,8 @@ export function createInteriorScene(
   const veil = new Graphics()
   veil.eventMode = 'static' // the dimmed town is scenery: a click must not reach through it
   const room = new Container()
-  room.eventMode = 'none' // the room is a view; the chrome bar owns the way out
+  // Passive, not inert: the room takes no click of its own, and the bodies inside it do.
+  room.eventMode = 'passive'
   room.sortableChildren = true
   // A room is a box, and nothing drawn inside it belongs outside it. One mask settles that for
   // every prop, including a hearth glow that is a child of its own sprite.
@@ -154,6 +156,13 @@ export function createInteriorScene(
   room.mask = roomMask
   root.addChild(veil, room)
   app.stage.addChild(root)
+
+  // The dimmed town is also the way back out to it. A pan across it is not a click, and the rig
+  // is asked rather than measured again: a pan that came back to where it started read as one.
+  veil.on('pointertap', () => {
+    if (scene.wasDrag()) return
+    setActive(null)
+  })
 
   // Three planes, behind everything that stands in the room. The walls sort behind the floor
   // because a dimetric camera sees the two far faces of the box and nothing else; the light is
@@ -524,7 +533,11 @@ export function createInteriorScene(
     let sprite = bodies.get(agentId)
     if (sprite !== undefined) return sprite
     sprite = new Sprite()
-    sprite.eventMode = 'none'
+    sprite.eventMode = 'static'
+    sprite.cursor = 'pointer'
+    sprite.on('pointertap', () => {
+      onSelect(agentId)
+    })
     bodies.set(agentId, sprite)
     room.addChild(sprite)
     return sprite
@@ -652,7 +665,9 @@ export function createInteriorScene(
       laidDown = true
     }
     if (laidDown) {
-      const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
+      // By id, not by occupant order: the room's order moves with the world's own record and
+      // two sleepers swapped beds every time anything else in the room made it re-lay.
+      const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true).sort()
       beds = bedSlots(sleeping, bedTiles)
     }
     let awakeIdx = 0

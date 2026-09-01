@@ -142,9 +142,11 @@ export function strideFrameMs(msPerTile: number, strideScale = 1): number {
 /** Where the clock starts before it has seen two batches: the declared default, which is the
  *  only tick rate anything in this repo writes down. It is replaced by the first measurement. */
 export const TICK_PERIOD_SEED_MS = TICK_REAL_MS
-/** A period outside this is a pause, a resume, a scrub or a stall — not the world's cadence. */
+/** A period outside this is a pause, a resume, a scrub or a stall — not the world's cadence.
+ *  The ceiling holds 0.25x idle pacing, which is a legal cadence and not a stall: read as one,
+ *  the legs kept resetting and the town stutter-stepped for its first viewer. */
 const TICK_PERIOD_MIN_MS = 60
-export const TICK_PERIOD_MAX_MS = 6000
+export const TICK_PERIOD_MAX_MS = 9000
 /** Weight on a new sample. Low enough that one late batch does not become the walk's speed,
  *  high enough that a world that changes rate is followed within a second. */
 const TICK_PERIOD_SMOOTHING = 0.25

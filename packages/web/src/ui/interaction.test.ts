@@ -7,6 +7,7 @@ import {
   escapeStep,
   hoverLabel,
   itemCropDetail,
+  structureTitle,
   thingKind,
   type StageUp,
 } from './interaction.js'
@@ -85,12 +86,9 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'agent', 'rahel')).toBe('Rahel')
   })
 
-  it('credits the builder of a structure, and stays quiet when no one is remembered', () => {
-    expect(hoverLabel(state, 'structure', 'h1')).toBe('house — built by Tomas')
+  it('calls a building what the town calls it, and never credits a builder on a hover', () => {
+    expect(hoverLabel(state, 'structure', 'h1')).toBe('house')
     expect(hoverLabel(state, 'structure', 'h2')).toBe('storehouse')
-  })
-
-  it('★ says nothing about a builder who is not a person here — never a raw id', () => {
     expect(hoverLabel(state, 'structure', 'h3')).toBe('shed')
   })
 
@@ -113,6 +111,30 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'item', 'nope')).toBeNull()
     expect(hoverLabel(state, 'crop', 'nope')).toBeNull()
     expect(hoverLabel(null, 'agent', 'rahel')).toBeNull()
+  })
+})
+
+describe('structureTitle — a proper name outranks the kind, wherever a viewer reads one', () => {
+  const named = { ...structure('n1', 'house', null), name: '  Yusuf’s   house ' }
+  const carved = {
+    ...structure('n2', 'house', null),
+    inscription: { text: 'The Long Table', by: 'rahel' },
+  }
+  const blank = { ...structure('n3', 'house', null), inscription: { text: '  ', by: 'rahel' } }
+  it('★ reads the carved name, flattened exactly as speech is', () => {
+    expect(structureTitle(named)).toBe('Yusuf’s house')
+  })
+
+  it('falls back to the inscription, and past an inscription of nothing to the kind', () => {
+    expect(structureTitle(carved)).toBe('The Long Table')
+    expect(structureTitle(blank)).toBe('house')
+    expect(structureTitle(structure('n4', 'fire_pit', null))).toBe('fire pit')
+  })
+
+  it('★ and the hover reads it off the world, saying nothing about a building that is gone', () => {
+    const titled = { structures: { n1: named }, agents: {} } as unknown as WorldState
+    expect(hoverLabel(titled, 'structure', 'n1')).toBe('Yusuf’s house')
+    expect(hoverLabel(titled, 'structure', 'nope')).toBeNull()
   })
 })
 
@@ -152,6 +174,16 @@ describe('escape puts down one thing at a time, topmost first', () => {
     for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx', '../stage/KeyMap.tsx'])
       expect(src(f), f).not.toContain('Escape')
     expect(src('../App.tsx')).toContain('escapeStep(')
+  })
+
+  // ★ The rig published a ground click and NOBODY subscribed, so the only way to put a ring
+  // down was the keyboard. A click on bare ground is the other half of Escape's bottom rung.
+  it('★ a click on bare ground puts the pick down, the way Escape does', () => {
+    const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8')
+    expect(src('../render/StageMount.tsx')).toContain('s.onTilePointer(')
+    expect(src('../App.tsx')).toMatch(
+      /onGround=\{\(\) => \{\s*setSubject\(null\)\s*setThing\(null\)/,
+    )
   })
 })
 

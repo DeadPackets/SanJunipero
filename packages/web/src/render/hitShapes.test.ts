@@ -5,6 +5,7 @@ import {
   HEAD_W,
   HIT_MIN_PX,
   HIT_TIGHTNESS_MAX,
+  LYING_LEN,
   SHOULDER_W,
   STANCE_W,
   TORSO_TOP,
@@ -15,6 +16,7 @@ import {
   inflateToMin,
   legacyFootprintPolygon,
   legacyHitRectPolygon,
+  lyingHitPolygon,
   polygonArea,
   polygonBounds,
 } from './hitShapes.js'
@@ -96,6 +98,40 @@ describe('bodyHitPolygon — the shape of a person, not the box around them', ()
     expect(polygonBounds(tall).h).toBeCloseTo(polygonBounds(world).h, 9)
     const half = screen(bodyHitPolygon(FIGURE_H, SCALE / 2), SCALE / 2)
     expect(polygonBounds(half).h).toBeCloseTo(polygonBounds(world).h / 2, 9)
+  })
+})
+
+// ★ A sleeper outdoors was still wearing the standing capsule: a target 26 px tall and 28 wide
+// over a body lying flat, which missed the body and caught the ground beside it.
+describe('★ lyingHitPolygon — a body that has lain down is not a body standing up', () => {
+  const world = screen(lyingHitPolygon(FIGURE_H, SCALE), SCALE)
+  const box = polygonBounds(world)
+
+  it('★ is longer than it is tall, and as long as the same figure stood', () => {
+    expect(box.w).toBeGreaterThan(box.h)
+    expect(box.w).toBeCloseTo(LYING_LEN * DRAWN_H, 9)
+    expect(box.h).toBeLessThan(polygonBounds(screen(bodyHitPolygon(FIGURE_H, SCALE), SCALE)).h)
+  })
+
+  it('★ covers the ground the body is lying on, where the standing capsule did not', () => {
+    const standing = screen(bodyHitPolygon(FIGURE_H, SCALE), SCALE)
+    // the widest row of the lying capsule: halfway up a body that is only 18 px tall now
+    const far = box.w / 2 - 0.5
+    const mid = -box.h / 2
+    expect(contains(world, far, mid)).toBe(true)
+    expect(contains(world, -far, mid)).toBe(true)
+    expect(contains(standing, far, mid)).toBe(false)
+  })
+
+  it('claims nothing at head height — there is no head up there any more', () => {
+    expect(contains(world, 0, -DRAWN_H + 1)).toBe(false)
+  })
+
+  it('is scale-invariant on screen, by the same law the standing capsule keeps', () => {
+    for (const s of [0.25, 0.5, 1, 2, 4]) {
+      const same = screen(lyingHitPolygon(DRAWN_H / s, s), s)
+      for (const [i, v] of same.entries()) expect(v, `scale ${s}`).toBeCloseTo(world[i]!, 9)
+    }
   })
 })
 
