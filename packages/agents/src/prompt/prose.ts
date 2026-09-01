@@ -276,6 +276,9 @@ export type ProseWorld = {
   // Whether the night now coming is one the cold gets into. Read off the season's own band, so
   // a summer evening is never told to go for wood.
   nightWillBeCold?: () => boolean
+  // Big water past the edge of sight, and null whenever any is already inside it. Terrain is the
+  // one thing perception never projects, and a valley is mostly told by its water.
+  distantWater?: (x: number, y: number) => { x: number; y: number } | null
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -855,6 +858,11 @@ export function perceptionToProse(
     )
   else if (packet.light === 'bright' && packet.time.isNight)
     lines.push('A fire throws a circle of light around you.')
+
+  // What the eyes catch at the far edge of the valley. A direction and nothing else: how far
+  // and what it is worth are the mind's to work out.
+  const glint = world?.distantWater?.(x, y) ?? null
+  if (glint !== null) lines.push(`Water glints to the ${bearing(glint.x - x, glint.y - y)}.`)
 
   // The physics, said plainly. What it is worth building here is not the ground's to say.
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')

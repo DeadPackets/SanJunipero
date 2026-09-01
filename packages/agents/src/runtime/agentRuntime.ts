@@ -1,10 +1,9 @@
 import {
-  BOND_RECENT_ACTS,
+  BOND_VALENCE,
+  decayWarmth,
   MINUTES_PER_DAY,
   sanitizeSpokenText,
   simTimeFromTick,
-  warmthOf,
-  type BondAct,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
@@ -203,6 +202,12 @@ export type RuntimeSnapshot = {
   pendingRecall?: Recalled | null | undefined
   // The same, for the refusal owed to the next turn.
   lastOutcome?: string | null | undefined
+  // The same again, for what a mind last said, where it has been standing and whom it has been
+  // with — a resume that dropped these would have a mind repeat itself into the rut the
+  // stasis line exists to break.
+  spoken?: string[] | undefined
+  still?: Stillness | null | undefined
+  company?: (Company & { id: string })[] | undefined
 }
 
 function freshClock(): MindClock {
@@ -262,10 +267,11 @@ export class AgentRuntime {
   // Where the feet have been standing, and since when. Null while asleep and after any act
   // the world took that was not a walk or a word.
   #still: Stillness | null = null
-  // Who this mind has been with, when it last had them, and the acts it witnessed between
-  // them. The engine keeps no bonds and the gateway folds a log no mind can read, so a mind's
-  // own tie is folded here — out of the one act perception can witness, which is a word.
-  #company = new Map<string, { name: string; lastSeenTick: number; acts: BondAct[] }>()
+  // Who this mind has been with and how warm the tie stood when they last parted. The engine
+  // keeps no bonds and the gateway folds a log no mind can read, so a mind's own tie is folded
+  // here — out of the one act perception can witness, which is a word. Warmth is carried
+  // forward to `lastSeenTick` and no further: a tie does not cool for want of company.
+  #company = new Map<string, Company>()
   // Last tick's utterances. The recent window holds one for as long as it is recent, so only a
   // key that was not there a tick ago is a new word rather than the same word again.
   #heardKeys = new Set<string>()
@@ -317,6 +323,10 @@ export class AgentRuntime {
     this.#pendingDreamMood = null
     this.#pendingRecall = null
     this.#lastOutcome = null
+    this.#spoken = []
+    this.#still = null
+    this.#company = new Map()
+    this.#heardKeys = new Set()
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     this.#started = true
     if (this.#offTick === null) {
@@ -348,6 +358,9 @@ export class AgentRuntime {
       pendingDreamMood: this.#pendingDreamMood,
       pendingRecall: this.#pendingRecall,
       lastOutcome: this.#lastOutcome,
+      spoken: [...this.#spoken],
+      still: this.#still,
+      company: [...this.#company].map(([id, c]) => ({ id, ...c })),
     }
   }
 
@@ -370,6 +383,9 @@ export class AgentRuntime {
     this.#pendingDreamMood = s.pendingDreamMood
     this.#pendingRecall = s.pendingRecall ?? null
     this.#lastOutcome = s.lastOutcome ?? null
+    this.#spoken = [...(s.spoken ?? [])]
+    this.#still = s.still ?? null
+    this.#company = new Map((s.company ?? []).map(({ id, ...c }) => [id, { ...c }]))
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -405,10 +421,13 @@ export class AgentRuntime {
   #onTick(tick: number): void {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
-    // A night in bed is not an afternoon spent standing.
-    this.#still = packet.self.asleep
-      ? null
-      : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
+    // A night in bed is not an afternoon spent standing, and neither is a house going up: a
+    // pair of hands still on a job is not a pair of hands with nothing to do.
+    const working = packet.self.activity !== null && packet.self.activity !== 'walk'
+    this.#still =
+      packet.self.asleep || working
+        ? null
+        : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     this.#noteCompany(packet, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
@@ -479,48 +498,41 @@ export class AgentRuntime {
   }
 
   #noteCompany(packet: PerceptionPacket, tick: number): void {
-    const met = (id: string, name: string): { lastSeenTick: number; acts: BondAct[] } => {
+    const met = (id: string, name: string): Company => {
       const was = this.#company.get(id)
-      if (was !== undefined) return was
-      const fresh = { name, lastSeenTick: tick, acts: [] as BondAct[] }
+      if (was !== undefined) {
+        was.warmth = decayWarmth(was.warmth, was.lastSeenTick, tick)
+        was.lastSeenTick = tick
+        return was
+      }
+      const fresh = { name, lastSeenTick: tick, warmth: 0 }
       this.#company.set(id, fresh)
       return fresh
     }
-    for (const a of packet.visible.agents) {
-      if (a.id !== this.#agentId) met(a.id, a.name).lastSeenTick = tick
-    }
+    for (const a of packet.visible.agents) if (a.id !== this.#agentId) met(a.id, a.name)
     const keys = new Set<string>()
     for (const h of packet.heard) {
       const key = `${h.speakerId}\u0000${h.text}`
       keys.add(key)
       const them = met(h.speakerId, h.name)
-      them.lastSeenTick = tick
-      if (this.#heardKeys.has(key)) continue
-      them.acts.push({ tick, kind: 'friend' })
-      if (them.acts.length > BOND_RECENT_ACTS) them.acts.shift()
+      // The window holds one utterance for as long as it is recent, so only a key that was not
+      // there a tick ago is a new word rather than the same word again.
+      if (!this.#heardKeys.has(key)) them.warmth += BOND_VALENCE.friend
     }
     this.#heardKeys = keys
   }
 
-  // Read at the parting, never at now: a tie that decayed while the two were apart would take
-  // the line away exactly as the absence grew worth saying.
-  #missed(): Company[] {
-    return [...this.#company.values()].map((c) => ({
-      name: c.name,
-      lastSeenTick: c.lastSeenTick,
-      warmth: warmthOf(c.acts, c.lastSeenTick),
-    }))
-  }
-
   // What the WORLD took, not what the model wrote: the words are sanitized the way the verb
-  // sanitizes them, and anything but a walk or a word is something happening, which ends a rut.
-  // A word for standing still never arrives here at all — the registry turns it away.
+  // sanitizes them, and anything but a walk or a word is something happening, which ends a rut
+  // even where it was over too fast for a tick to catch the hands at it. A word for standing
+  // still never arrives here at all — the registry turns it away.
   #noteAccepted(intent: Intent, res: SubmitResult): void {
     if (!res.ok) return
     if (intent.verb === 'speak') {
       const text: unknown = intent.params.text
       if (typeof text === 'string') {
-        this.#spoken = [...this.#spoken, sanitizeSpokenText(text)].slice(-OWN_WORDS_SHOWN)
+        this.#spoken.push(sanitizeSpokenText(text))
+        if (this.#spoken.length > OWN_WORDS_SHOWN) this.#spoken.shift()
       }
       if (this.#still !== null) this.#still = { ...this.#still, spoke: true }
       return
@@ -730,6 +742,7 @@ export class AgentRuntime {
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),
       nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
+      distantWater: (x: number, y: number) => this.#bridge.distantWater(x, y),
     }
     const prose = perceptionToProse(
       packet,
@@ -753,7 +766,7 @@ export class AgentRuntime {
       placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       stasisLine(this.#still, tick),
-      absenceLine(this.#missed(), tick),
+      absenceLine([...this.#company.values()], tick),
     ]
       .filter((p) => p.length > 0)
       .join(' ')

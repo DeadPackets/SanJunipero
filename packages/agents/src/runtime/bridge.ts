@@ -12,7 +12,9 @@ import {
   FUEL_KIND,
   isPassable,
   loneCandidateFor,
+  distantWater,
   makeables,
+  naturalPlaces,
   placeName,
   recipeTileKind,
   submitIntent,
@@ -26,6 +28,9 @@ import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/
 import { isWet, isWoody, type SimConfig, type SimEvent } from '@sj/shared'
 import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
+
+// How far off a body still picks water out of the middle distance.
+const WATER_VISTA_RADIUS = 40
 
 // A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
 // floor is the longest an awake mind can go without a turn; 10% covers the tick it lands on.
@@ -254,15 +259,21 @@ export class EngineBridge {
   }
 
   // Every place this body has ever laid eyes on or been told of, whether or not it can see one
-  // now. The prose drops the ones in sight; the walls are already in front of it.
+  // now, and the landmarks nobody has to be shown: a person knows the valley they live in, and
+  // the walk verb takes their marks on the same terms. The prose drops the roofs in sight.
   knownPlaces(agentId: string): KnownPlace[] {
     const state = this.#loop.state
-    return (state.agents[agentId]?.knownPlaces ?? []).flatMap((id) => {
-      const s = state.structures[id]
-      if (s === undefined) return []
-      const name = placeName(s)
-      return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(name === undefined ? {} : { name }) }]
-    })
+    const a = state.agents[agentId]
+    if (a === undefined) return []
+    return [
+      ...naturalPlaces(state, a.x, a.y),
+      ...(a.knownPlaces ?? []).flatMap((id) => {
+        const s = state.structures[id]
+        if (s === undefined) return []
+        const name = placeName(s)
+        return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(name === undefined ? {} : { name }) }]
+      }),
+    ]
   }
 
   // The other place work can go: free ground moves to a fresh plot the moment somebody plants
@@ -276,6 +287,12 @@ export class EngineBridge {
   // reach test, so what the prose promises is what `drink` and `fill` accept.
   waterAtHand(agentId: string): boolean {
     return waterWithinReach(this.#loop.state, agentId) !== null
+  }
+
+  /** Water this body can see and not reach, in the direction it actually lies. */
+  distantWater(x: number, y: number): { x: number; y: number } | null {
+    const sight = this.#simConfig.movement.sightRadius
+    return distantWater(this.#loop.state, x, y, sight, WATER_VISTA_RADIUS)
   }
 
   // The nearest drink, counting a finished well: the town's own well is usually nearer than

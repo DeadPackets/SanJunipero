@@ -11,12 +11,14 @@ import {
   nutritionOf,
 } from '../food.js'
 import { placesNamedAloud } from '../earshot.js'
+import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
 import { findPath, isPassable, pathCtx, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
   type Affliction,
+  type AgentBody,
   type Item,
   type Structure,
   type TileId,
@@ -210,6 +212,57 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
   })
 }
 
+/** The nearest of these tiles this body can actually reach, nearest first. The one place a
+ *  walk settles on a tile, so a named roof and a named landmark land the same way. */
+function nearestReachable(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  tiles: Point[],
+  rank: (p: Point) => number = () => 0,
+): Point | { refusal: string } {
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const sorted = [...tiles].sort(
+    (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
+  )
+  for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
+  return { refusal: 'no path to that spot' }
+}
+
+// The lake's own middle stands nine tiles from its shore, which is the widest any landmark's
+// centre sits from ground a foot can go on.
+const FEATURE_REACH = 12
+// A bank runs the height of the map, and a search that drains costs thousands of nodes: a body
+// that cannot reach the nearest few tiles of shore cannot reach the hundredth either.
+const FEATURE_TRIES = 8
+
+/** Where a walk to a landmark ends: the nearest ground this body can stand on that touches the
+ *  thing itself — a bank for the river, a shore for the lake, the spit for the ford. */
+function featureDestination(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  at: Point,
+  f: NaturalFeature,
+): Point | { refusal: string } {
+  const ctx = pathCtx(state, config)
+  const touches = (x: number, y: number): boolean => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) if (f.has(state, x + dx, y + dy)) return true
+    }
+    return false
+  }
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const bank: Point[] = []
+  for (let y = at.y - FEATURE_REACH; y <= at.y + FEATURE_REACH; y++) {
+    for (let x = at.x - FEATURE_REACH; x <= at.x + FEATURE_REACH; x++) {
+      if (isPassable(state, x, y, ctx) && touches(x, y)) bank.push({ x, y })
+    }
+  }
+  bank.sort((p, q) => near(p) - near(q))
+  return nearestReachable(state, config, a, bank.slice(0, FEATURE_TRIES))
+}
+
 /** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
  *  it that this body can actually reach; the refusal comes from here too, so the seam that
  *  settles the act and the test that judges it can never disagree. */
@@ -224,25 +277,25 @@ export function walkDestination(
   const named = WalkToPlace.safeParse(params)
   if (!named.success) return { refusal: 'a walk needs a place to end' }
   const a = state.agents[agentId]!
+  // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
+  // knownPlaces row to check — the ground itself is what says whether this valley has one.
+  const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)
+  if (natural !== null) return featureDestination(state, config, a, natural.at, natural.feature)
   const s = state.structures[named.data.structureId]
   // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
   if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
     return { refusal: 'you know no such place' }
   // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
   // measures against are picked off the same tiles in the same order.
-  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
   // A named place is walked to in order to enter it, and `enter` measures from the door. Without
   // the door first, the walk ends at the back wall and the step through the door is refused.
   const door = doorTile(state, s)
   const offDoor = (p: Point): number =>
     door === null || isAdjacentToRect(p.x, p.y, { ...door, w: 1, h: 1 }) ? 0 : 1
   const ctx = pathCtx(state, config)
-  const ring = perimeter(s)
-    .filter((t) => isPassable(state, t.x, t.y, ctx))
-    .sort((p, q) => offDoor(p) - offDoor(q) || near(p) - near(q) || p.y - q.y || p.x - q.x)
+  const ring = perimeter(s).filter((t) => isPassable(state, t.x, t.y, ctx))
   // Nearest first, so the common case is one search and a ring of walls costs none at all.
-  for (const t of ring) if (findPath(state, a, t, config) !== null) return t
-  return { refusal: 'no path to that spot' }
+  return nearestReachable(state, config, a, ring, offDoor)
 }
 
 const walk: VerbDef = makeVerb({

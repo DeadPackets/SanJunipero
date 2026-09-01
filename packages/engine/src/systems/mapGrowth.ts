@@ -5,7 +5,7 @@ import {
   WORLD_MARGIN,
   worldSizeForRings,
 } from '@sj/shared'
-import { genesisTerrainAt } from '../genesis/world.js'
+import { genesisTerrainAt } from '../geography.js'
 import { authoredOrigin, type WorldState } from '../state.js'
 import { townGroundBox } from '../town.js'
 import type { TickCtx } from '../tickCtx.js'

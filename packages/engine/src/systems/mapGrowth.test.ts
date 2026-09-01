@@ -13,7 +13,7 @@ import {
   type SimConfig,
 } from '@sj/shared'
 import { fold } from '../fold.js'
-import { genesisTerrainAt } from '../genesis/world.js'
+import { genesisTerrainAt } from '../geography.js'
 import { findPath } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
