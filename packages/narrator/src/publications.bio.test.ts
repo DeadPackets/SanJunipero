@@ -5,6 +5,7 @@ import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import {
   PUBLIC_EVENT_TYPES,
+  PUBLIC_RECORD_LIMIT,
   collectPublicRecord,
   publicRecordText,
   writeBiography,
@@ -65,6 +66,24 @@ describe('collectPublicRecord', () => {
     expect(record[0]!.text).toContain('The river turns.')
     expect(record[1]!.text).toContain('eat')
     expect(record.some((r) => r.text.includes('secretly'))).toBe(false)
+  })
+
+  it('★ never reads footsteps: a day of walking adds nothing to the record', () => {
+    const world = seedWorld()
+    const ins = world.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)')
+    for (let i = 0; i < 500; i++) ins.run(400 + i, 'agent_moved', JSON.stringify({ id: 'tamar' }))
+    expect(collectPublicRecord(world, 'tamar', 0).length).toBe(2)
+  })
+
+  it('★ caps a long life at the most recent lines', () => {
+    const world = seedWorld()
+    const ins = world.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)')
+    for (let i = 0; i < PUBLIC_RECORD_LIMIT + 50; i++)
+      ins.run(400, 'agent_spoke', JSON.stringify({ agentId: 'tamar', text: `line ${i}` }))
+    const record = collectPublicRecord(world, 'tamar', 0)
+    expect(record.length).toBe(PUBLIC_RECORD_LIMIT)
+    expect(record.at(-1)!.text).toContain(`line ${PUBLIC_RECORD_LIMIT + 49}`)
+    expect(record[0]!.text).toContain('line 50')
   })
 
   it('respects throughDay and unknown agents', () => {
