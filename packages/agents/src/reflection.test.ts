@@ -462,19 +462,31 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     }
   })
 
-  it('a failure that is not budget or malformed output still rejects', async () => {
+  // ★ A 5xx is neither budget, malformed output nor a stall, so it threw past the fallback —
+  // and the caller had already marked the night done, so that day was gone for good.
+  it('★ a provider error nobody listed still leaves the day written down', async () => {
     const { mem, personality } = await makeStores()
-    await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+    const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
     const llm = new ScriptedReflectionLlm(null)
     llm.extractFacts = async () => {
-      throw new Error('the provider is on fire')
+      llm.calls.push('extractFacts')
+      const err = new Error('the provider is on fire')
+      err.name = 'AI_APICallError'
+      throw err
     }
     const sink = alertSink()
 
-    await expect(
-      runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert }),
-    ).rejects.toThrow('the provider is on fire')
-    expect(sink.alerts).toEqual([])
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
+
+    expect(res.fallback).toBe(true)
+    expect(llm.calls).toEqual(['extractFacts'])
+    const days = mem.summaryNodes('day', DAY)
+    expect(days).toHaveLength(1)
+    for (const m of memories) expect(days[0]!.text).toContain(m.text)
+    expect(mem.autobiography()).toEqual([FALLBACK_AUTOBIOGRAPHY])
+    // The kind, so an operator can tell a 5xx from a night that simply had no headroom.
+    expect(sink.alerts.map((a) => a.kind)).toEqual(['reflection_fallback'])
+    expect(sink.alerts[0]!.detail).toContain('AI_APICallError')
   })
 
   it('the mechanical digest is truncated, and the day node survives an empty day', async () => {

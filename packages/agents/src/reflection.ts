@@ -1,6 +1,5 @@
 import { z } from 'zod'
-import { NoObjectGeneratedError } from 'ai'
-import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
+import type { LlmClient, LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { GIST_SYSTEM, gistMemories, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
@@ -48,16 +47,6 @@ function dayDigest(dayMemories: MemoryRow[]): string {
   return full.length <= FALLBACK_DIGEST_CHARS ? full : `${full.slice(0, FALLBACK_DIGEST_CHARS)}…`
 }
 
-// Anything not listed here is a real fault and belongs to the caller's alert path.
-// Matched by name, not by class: an abort wrapped on its way up is the same stall.
-function isDegradable(err: unknown): boolean {
-  return (
-    err instanceof BudgetExceededError ||
-    NoObjectGeneratedError.isInstance(err) ||
-    (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'))
-  )
-}
-
 export async function runSleepReflection(deps: {
   mem: MemoryStore
   personality: PersonalityStore
@@ -78,8 +67,9 @@ export async function runSleepReflection(deps: {
     try {
       return await run()
     } catch (err) {
-      if (!isDegradable(err)) throw err
-      degraded.reason = err instanceof Error ? err.message : String(err)
+      // Every step here is one provider call, and no failure of one may cost the mind its day:
+      // throwing skips the day node below, and the caller has already marked the night done.
+      degraded.reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
       return null
     }
   }
