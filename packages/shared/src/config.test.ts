@@ -32,8 +32,8 @@ const C11_FLAGS = [
 describe('SimConfigSchema', () => {
   it('defaults carry the binding values', () => {
     const c = SimConfigSchema.parse({})
-    expect(c.needs.hungerDecayPerTick).toBe(0.035)
-    expect(c.needs.deathAfterZeroHungerTicks).toBe(1440)
+    expect(c.needs.hungerDecayPerTick).toBe(0.021)
+    expect(c.needs.deathAfterZeroHungerTicks).toBe(2880)
     expect(c.movement.sightRadius).toBe(12)
     expect(c.health.injuryDamage.grave).toBe(60)
     expect(c.skills.tracks).toHaveLength(12)
@@ -205,7 +205,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       illness: 0.08,
       fatigue: 0.04,
     })
-    expect(c.mortality.hungerHpDrainPerTick).toBe(0.1)
+    expect(c.mortality.hungerHpDrainPerTick).toBe(0.04)
+    expect(c.mortality.hungerGraceTicks).toBe(720)
     expect(c.mortality.thirstHpDrainPerTick).toBe(0.15)
     expect(c.mortality.poisonChanceSpoiled).toBe(0.35)
     expect(c.mortality.sleepRegenMultiplier).toBe(3)
@@ -232,7 +233,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   // The spec writes thirst decay as a derivation, so it is exported once.
   it('thirstDecayPerTick is the one derivation of the slower clock', () => {
-    expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.021, 10)
+    expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.0126, 10)
     const fast = SimConfigSchema.parse({
       needs: { hungerDecayPerTick: 0.1 },
       thirst: { decayFactorOfHunger: 0.5 },
@@ -279,7 +280,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   it('warmth and light carry the ratified values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.warmth.comfortBand).toBe(8)
-    expect(c.warmth.exposureDecayPerTick).toBe(0.3)
+    expect(c.warmth.exposureDecayPerTick).toBe(0.15)
+    expect(c.warmth.coldEnergyDrainShare).toBe(0.5)
     expect(c.warmth.heatRadius).toBe(2)
     expect(c.warmth.insulation).toEqual({ garment: 12 })
     expect(c.warmth.ambient).toEqual({

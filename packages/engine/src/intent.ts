@@ -6,6 +6,10 @@ import { VERBS, walkDestination, workPenalty, type PendingEvent } from './verbs/
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
+// The road out of a collapse. World one closed every one of these: Amara died ten feet from a
+// neighbour's door having tried fifteen times to shout, and been refused each time.
+const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
+
 export function submitIntent(
   state: WorldState,
   baseConfig: SimConfig,
@@ -18,9 +22,7 @@ export function submitIntent(
   const a = state.agents[agentId]
   if (!a) return { ok: false, reason: 'no such agent' }
   if (!a.alive) return { ok: false, reason: 'the dead do not act' }
-  // Sleep is allowed while collapsed: energy only regens asleep, so an
-  // energy collapse would otherwise be unrecoverable.
-  if (a.collapsedSinceTick !== null && verb !== 'eat' && verb !== 'sleep')
+  if (a.collapsedSinceTick !== null && !DOWNED_VERBS.has(verb))
     return { ok: false, reason: 'collapsed and unable to act' }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }

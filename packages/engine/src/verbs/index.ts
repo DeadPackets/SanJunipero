@@ -341,6 +341,13 @@ export function walkDestination(
   return nearestReachable(state, config, a, ring, offDoor)
 }
 
+/** A crawl is the walk a downed body is left with: one tile, at the crawl's price in ticks —
+ *  far enough for a body that fell beside a fire to reach it, and no farther. */
+export function isCrawl(state: WorldState, agentId: string): boolean {
+  const a = state.agents[agentId]
+  return a !== undefined && a.collapsedSinceTick !== null
+}
+
 const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
@@ -348,6 +355,9 @@ const walk: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
+    if (isCrawl(state, agentId) && (Math.abs(to.x - a.x) > 1 || Math.abs(to.y - a.y) > 1)) {
+      return 'you can only drag yourself to a tile you could touch'
+    }
     // A memo hit for a named place, which already proved this tile: the two numbers are what
     // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'
@@ -358,7 +368,8 @@ const walk: VerbDef = makeVerb({
     const a = state.agents[agentId]!
     const path = findPath(state, a, p, config)
     if (!path) throw new Error(`walk.duration: no path for ${agentId}`)
-    return walkTicks(path.length, tilesPerTick(state, config, agentId))
+    const ticks = walkTicks(path.length, tilesPerTick(state, config, agentId))
+    return isCrawl(state, agentId) ? ticks * config.movement.crawlTickMultiplier : ticks
   },
   onComplete() {
     return []
@@ -518,6 +529,43 @@ function mealInHand(state: WorldState, agentId: string, itemId: string): Item | 
   return itemWithinReach(state, agentId, item) ? item : undefined
 }
 
+/** What a mouth does to a meal, wherever the meal came from: the poison it may carry, the
+ *  relief a herb gives, the loaf spent and the belly filled. `eat` lifts first and then swallows;
+ *  a hand feeding a body on the ground goes straight here. */
+function swallowEvents(
+  state: WorldState,
+  config: SimConfig,
+  eaterId: string,
+  item: Item,
+  rng: RngStream,
+): PendingEvent[] {
+  // Drawn once, here at emission, and never when the meal is safe: a fresh loaf must not move
+  // the stream, or two worlds that ate differently would diverge for no reason.
+  const risky =
+    config.mortality.enabled &&
+    (item.kind === PALE_MUSHROOM || isSpoiling(state, item, config)) &&
+    rng.next() < config.mortality.poisonChanceSpoiled
+  return [
+    ...(risky
+      ? [
+          {
+            type: 'agent_afflicted',
+            payload: { agentId: eaterId, kind: 'poison', severity: 1, itemId: item.id },
+          },
+        ]
+      : []),
+    ...(item.kind === HERB_KIND ? relieveWorst(state, eaterId, config.mortality.herbRelief) : []),
+    { type: 'item_qty_changed', payload: { id: item.id, delta: -1 } },
+    {
+      type: 'needs_changed',
+      payload: {
+        id: eaterId,
+        changes: [{ need: 'hunger', delta: mealRestore(state, config, eaterId, item.kind) }],
+      },
+    },
+  ]
+}
+
 const eat: VerbDef = makeVerb({
   kind: 'eat',
   validate(state, config, agentId, params) {
@@ -544,32 +592,10 @@ const eat: VerbDef = makeVerb({
     const p = EatParams.parse(params)
     const item = mealInHand(state, agentId, p.itemId)
     if (item === undefined) return []
-    // Drawn once, here at emission, and never when the meal is safe: a fresh loaf must not move
-    // the stream, or two worlds that ate differently would diverge for no reason.
-    const risky =
-      config.mortality.enabled &&
-      (item.kind === PALE_MUSHROOM || isSpoiling(state, item, config)) &&
-      rng.next() < config.mortality.poisonChanceSpoiled
     return [
       // The hand closes before the mouth opens, and it closes exactly as `take` closes it.
       ...liftEvents(state, config, agentId, p.itemId),
-      ...(risky
-        ? [
-            {
-              type: 'agent_afflicted',
-              payload: { agentId, kind: 'poison', severity: 1, itemId: p.itemId },
-            },
-          ]
-        : []),
-      ...(item.kind === HERB_KIND ? relieveWorst(state, agentId, config.mortality.herbRelief) : []),
-      { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
-      {
-        type: 'needs_changed',
-        payload: {
-          id: agentId,
-          changes: [{ need: 'hunger', delta: mealRestore(state, config, agentId, item.kind) }],
-        },
-      },
+      ...swallowEvents(state, config, agentId, item, rng),
     ]
   },
 })
@@ -1719,12 +1745,19 @@ const give: VerbDef = makeVerb({
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
-  onComplete(state, config, agentId, params) {
+  // A meal can carry poison whichever hand it came from, so a give that feeds draws where eat draws.
+  rngStream: 'illness',
+  onComplete(state, config, agentId, params, rng) {
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const target = state.agents[p.targetId]
     if (!target?.alive) return []
+    // A body on the ground cannot close its hand around a loaf. Food held out to one is fed to
+    // it, which is the whole of the rescue: the fold stands it up the moment it has eaten enough.
+    if (target.collapsedSinceTick !== null && isFoodKind(config, item.kind)) {
+      return swallowEvents(state, config, p.targetId, item, rng)
+    }
     // The only voluntary transfer of title the world has.
     return [
       { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } },
@@ -2133,7 +2166,10 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   const done = act.path.findIndex(([x, y]) => x === a.x && y === a.y) + 1
   const tilesLeft = act.path.length - done
   // Spread what is left over the ticks that are left, so the legs land on the last tile exactly
-  // when the clock runs out however the two were nudged apart.
+  // when the clock runs out however the two were nudged apart. More clock than tiles is a body
+  // slower than a tile a tick — a crawl, or a short walk in the dark — and it waits where it is.
+  if (act.ticksRemaining > tilesLeft)
+    return [{ type: 'action_progressed', payload: { agentId, ticks: 1 } }]
   const stride = Math.min(tilesLeft, Math.ceil(tilesLeft / act.ticksRemaining))
   const moves: PendingEvent[] = []
   for (let i = 0; i < stride; i++) {

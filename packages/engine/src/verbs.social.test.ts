@@ -788,7 +788,7 @@ describe('eat rulings (Task 12)', () => {
     expect(submitIntent(s, CFG, 'a1', 'eat', { itemId: 'item_1' }).ok).toBe(true)
   })
 
-  it('a collapsed agent can still eat (rescue flow) but cannot act otherwise', () => {
+  it('a collapsed agent may eat, call out and crawl a tile, but not use its hands', () => {
     let s = makeWorld()
     s = fold(
       s,
@@ -797,8 +797,11 @@ describe('eat rulings (Task 12)', () => {
     )
     s = patchAgent(s, 'a1', { collapsedSinceTick: 5 })
     expect(submitIntent(s, CFG, 'a1', 'eat', { itemId: 'item_1' }).ok).toBe(true)
+    // World one refused this one, and Amara died ten feet from a door for want of it.
+    expect(submitIntent(s, CFG, 'a1', 'speak', { text: 'help' }).ok).toBe(true)
+    expect(submitIntent(s, CFG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a1', 'walk', { x: 2, y: 0 }).ok).toBe(false)
-    expect(submitIntent(s, CFG, 'a1', 'speak', { text: 'help' }).ok).toBe(false)
+    expect(submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' }).ok).toBe(false)
   })
 
   it('eat onComplete re-validates the item is still held (no event if given away)', () => {

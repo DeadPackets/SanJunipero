@@ -8,6 +8,8 @@ import { allowedKinds, rollWeatherKind, weatherTemperature } from './weather.js'
 import { ev } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
+// Any day at or past the ramp, where the sky may roll anything the season allows.
+const SETTLED = CFG.weather.harshFromDay
 
 function tickTo(s: WorldState, tick: number, rng: RngStreams): WorldTickResult {
   const wt = createWorldTick(CFG, rng)
@@ -17,13 +19,26 @@ function tickTo(s: WorldState, tick: number, rng: RngStreams): WorldTickResult {
 describe('allowedKinds', () => {
   it('snow is winter-only; storm and the rest are legal in all seasons', () => {
     for (const season of SEASONS) {
-      const allowed = allowedKinds(CFG, season)
+      const allowed = allowedKinds(CFG, season, SETTLED)
       expect(allowed.includes('snow')).toBe(season === 'winter')
       expect(allowed).toContain('storm')
       expect(allowed).toContain('sunny')
       expect(allowed).toContain('cloudy')
       expect(allowed).toContain('rain')
     }
+  })
+
+  it("holds the harsh kinds back for the world's first week", () => {
+    for (let day = 0; day < CFG.weather.harshFromDay; day++) {
+      for (const season of SEASONS) {
+        const allowed = allowedKinds(CFG, season, day)
+        expect(allowed).not.toContain('storm')
+        expect(allowed).not.toContain('snow')
+        // The mild sky is still a whole sky: a founding week has weather, just no teeth.
+        expect(allowed).toEqual(['sunny', 'cloudy', 'rain'])
+      }
+    }
+    expect(allowedKinds(CFG, 'spring', CFG.weather.harshFromDay)).toContain('storm')
   })
 })
 
@@ -34,7 +49,7 @@ describe('rollWeatherKind: a seeded year of hourly rolls', () => {
     let snowHours = 0
     for (let h = 0; h < 364 * 24; h++) {
       const { season } = simTimeFromTick(h * 60)
-      kind = rollWeatherKind(CFG, rng, season, kind)
+      kind = rollWeatherKind(CFG, rng, season, kind, Math.floor(h / 24))
       expect(CFG.weather.kinds).toContain(kind)
       if (kind === 'snow') {
         expect(season).toBe('winter')

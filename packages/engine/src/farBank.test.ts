@@ -372,7 +372,9 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     const twin = runTown()
     expect(standingRects(twin.loop.state)).toEqual(standingRects(state))
     expect(stateHash(twin.loop.state)).toBe(stateHash(state))
-  }, 120_000)
+    // Two full towns: bodies that no longer starve on day 2 keep acting, so the run is busier
+    // than the budget this was first given.
+  }, 300_000)
 
   // The recipe writes the deck 1x2; the only crossing runs east-west, so buildFootprint turns it
   // and the standing structure is 2x1. w/h on structure_planned is where the engine says so.

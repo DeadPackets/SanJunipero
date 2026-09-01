@@ -292,5 +292,7 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     const twin = runTown()
     expect(standingRects(twin.loop.state)).toEqual(standingRects(state))
     expect(stateHash(twin.loop.state)).toBe(stateHash(state))
-  }, 120_000)
+    // Two full towns: bodies that no longer starve on day 2 keep acting, so the run is busier
+    // than the budget this was first given.
+  }, 300_000)
 })
