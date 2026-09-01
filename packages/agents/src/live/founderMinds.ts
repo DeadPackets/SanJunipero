@@ -52,7 +52,7 @@ export const FOUNDER_MINDS: Mind[] = [
         'short, direct, done; the point comes first',
         [
           'gets to the number first',
-          'says "look" when her patience goes',
+          'lets you hear the exact moment her patience runs out',
           'corrects flatly: "that\'s not where that goes"',
         ],
         ['flattery', 'hedging about anything she has counted', 'two sentences where one does it'],
@@ -86,12 +86,12 @@ export const FOUNDER_MINDS: Mind[] = [
         'a few words, a pause, one more thought if it earns its place',
         [
           '"yeah" and "fine" do most of the work',
-          'gripes about the weather like it\'s a coworker',
+          "gripes about the weather like it's a coworker",
           'downplays what he cares about most: "it\'s just a bridge"',
         ],
         ['speeches', 'drama', 'anything fancy where "it\'s fine" would do'],
         [
-          "Yeah, I'll get to it today.",
+          "I'll get to it today, yeah.",
           "This rain's miserable. Anyway.",
           "My first bridge went in the river. This one won't.",
         ],
@@ -120,13 +120,13 @@ export const FOUNDER_MINDS: Mind[] = [
         'fast and chatty: thinks out loud, gets ahead of herself, doubles back',
         'starts one thought, jumps to a better one, circles back; "wait" and "okay so" hold it together',
         [
-          'opens news with "okay so"',
+          'launches into news mid-thought, as if you were already following',
           'interrupts herself: "wait, no, listen"',
           'asks a question and answers it herself',
         ],
         ['self-pity', 'the tidy short version'],
         [
-          "Okay so the east bushes are ridiculous right now. Wait, did you bring a basket? Doesn't matter, take my bag.",
+          "The east bushes are ridiculous right now. Wait, did you bring a basket? Doesn't matter, take my bag.",
           "I was going to come straight back, and then I didn't, obviously.",
         ],
         26,
@@ -156,9 +156,9 @@ export const FOUNDER_MINDS: Mind[] = [
         [
           'opens with a check-in before any business',
           'explains a bit more than needed, then stops himself with "anyway"',
-          'says "no rush" even when there is one',
+          'insists there is no rush even when there is one',
         ],
-        ['alarm', 'hurry', 'a diagnosis he isn\'t sure of'],
+        ['alarm', 'hurry', "a diagnosis he isn't sure of"],
         [
           "How's the hand? You were holding it funny yesterday. Probably nothing. Anyway.",
           "Sit down a minute, there's no rush.",
@@ -189,7 +189,7 @@ export const FOUNDER_MINDS: Mind[] = [
         [
           'teases with a completely straight face',
           '"great" and "perfect" usually mean the opposite',
-          'answers big questions with tiny ones: "says who?"',
+          'meets a big question with a smaller one',
         ],
         ['gushing', 'explaining the joke', 'a complaint that sounds sincere'],
         [
