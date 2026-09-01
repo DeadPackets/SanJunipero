@@ -315,7 +315,14 @@ export function App() {
         pinned={following}
         onCue={setCue}
       />
-      <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
+      <Signpost
+        open={sheet?.page ?? null}
+        onOpen={onArm}
+        onHelp={() => {
+          setKeysOpen(true)
+        }}
+        ref={signpostRef}
+      />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}

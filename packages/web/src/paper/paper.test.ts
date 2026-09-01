@@ -6,6 +6,7 @@ import { createWorldStore } from '../state/worldStore.js'
 import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
+import { KEY_MAP_KEY } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
   ARMS,
@@ -49,7 +50,7 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
 
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
-    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {} }))
+    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {}, onHelp: () => {} }))
 
   it('hangs four arms, in the order the direction picked', () => {
     expect([...ARMS]).toEqual(['folk', 'chronicle', 'found', 'laws'])
@@ -77,6 +78,17 @@ describe('the signpost', () => {
   it('says whether the sheet is up, so the arms can stand clear of it', () => {
     expect(post(null)).toContain('data-open="no"')
     expect(post('folk')).toContain('data-open="yes"')
+  })
+
+  // ★ The key map answered '?' and nothing on screen said so, so the one sheet that explains
+  // the town could only be found by a viewer who already knew it was there.
+  it('★ hangs a way into the key map off the end of the post', () => {
+    const html = post(null)
+    expect(html).toContain(`aria-label="Keyboard shortcuts"`)
+    expect(html).toContain(`>${KEY_MAP_KEY}<`)
+    // it is not one of the four: it opens no page and presses for none
+    expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])
+    expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(ARMS.length)
   })
 
   it('names itself for a screen reader and puts the post under the arms', () => {

@@ -1,13 +1,17 @@
+import { KEY_MAP_KEY } from '../stage/KeyMap.js'
 import { ARMS, PAGE_TITLE, type Arm, type PageKey } from './pageModel.js'
 
 export function Signpost({
   open,
   onOpen,
+  onHelp,
   ref,
 }: {
   /** the page the paper is showing, so an arm can read as pressed */
   open: PageKey | null
   onOpen: (arm: Arm) => void
+  /** the key map, which until now only a viewer who already knew to press ? could find */
+  onHelp: () => void
   ref?: React.Ref<HTMLElement>
 }) {
   return (
@@ -34,6 +38,14 @@ export function Signpost({
           {PAGE_TITLE[arm]}
         </button>
       ))}
+      <button
+        type="button"
+        className="signpost-arm"
+        aria-label="Keyboard shortcuts"
+        onClick={onHelp}
+      >
+        {KEY_MAP_KEY}
+      </button>
       <span className="signpost-post" aria-hidden="true" />
     </nav>
   )

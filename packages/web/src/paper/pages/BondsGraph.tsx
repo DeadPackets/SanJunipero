@@ -8,7 +8,9 @@ import { LegendChip } from '../../ui/LegendChip.js'
 import { BondDetail, FadedBond } from './BondDetail.js'
 import { EMPTY_LINEAGE, type BondNode, type PeopleIndex } from '../../ui/bondModel2.js'
 import {
+  keyOpensBy,
   relationLegend,
+  rememberKey,
   toRelationGraph,
   type LegendRow,
   type RelationLink,
@@ -86,7 +88,7 @@ export function BondsGraph({
   const traffic = useFeed(trafficRead)
   const wireDown = view === 'ties' ? bonds.failed : traffic.failed
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [keyOpen, setKeyOpen] = useState(false)
+  const [keyOpen, setKeyOpen] = useState(() => keyOpensBy(sessionStorage))
   const [selected, setSelected] = useState<RelationLink | null>(null)
   // The feed refetches every 30s, so the open panel's own tie can leave it mid-read.
   const openBond = useMemo(() => api?.bonds.find((b) => b.id === selected?.id), [api, selected])
@@ -315,7 +317,8 @@ export function BondsGraph({
           aria-expanded={keyOpen}
           aria-controls="bonds-key"
           onClick={() => {
-            setKeyOpen((v) => !v)
+            setKeyOpen(!keyOpen)
+            rememberKey(sessionStorage, !keyOpen)
           }}
         >
           {keyOpen ? 'Hide the key' : 'How to read this'}
