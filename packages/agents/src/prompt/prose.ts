@@ -266,6 +266,10 @@ export type ProseWorld = {
   // never projects, and block 1 now teaches two verbs that need it.
   waterAtHand?: () => boolean
   nearestWater?: (x: number, y: number) => { x: number; y: number } | null
+  // Whether the act the world last turned away wanted water. A mind refused for water and told
+  // nothing about water asks again: 79% of one run B mind's water refusals were the same reason
+  // twice running, and its longest run was twenty-one.
+  waterRefused?: () => boolean
   // Where the food is. The same answer thirst has had since the last batch, for the need that
   // never got one: the run that drank fifteen times ate once (R21).
   nearestFood?: (x: number, y: number) => { x: number; y: number; kind: string } | null
@@ -711,10 +715,12 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
 }
 
-// A vessel in the hands is the same reason to know where the water is that a dry mouth is:
-// `fill` is refused for the water, never for the thirst.
-const wantsWater = (packet: PerceptionPacket, thirst: number): boolean =>
-  thirst < 50 || packet.self.inventory.some((i) => VESSEL_KINDS.has(i.kind))
+// A vessel in the hands, and an act the world just turned away for the water, are the same
+// reason to know where it is that a dry mouth is: `fish` is refused for the water, not the thirst.
+const wantsWater = (packet: PerceptionPacket, thirst: number, world: ProseWorld): boolean =>
+  thirst < 50 ||
+  world.waterRefused?.() === true ||
+  packet.self.inventory.some((i) => VESSEL_KINDS.has(i.kind))
 
 /** Whether these hands are at water, off the same test `drink`, `fill` and `fish` are refused
  *  by. Block 1 teaches all three as "standing beside water" and nothing said whether this body
@@ -723,7 +729,7 @@ function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld)
   if (world?.waterAtHand === undefined) return ''
   if (world.waterAtHand())
     return 'Water lies within reach of your hands. You could drink here, or fill what you carry.'
-  if (!wantsWater(packet, thirst)) return ''
+  if (!wantsWater(packet, thirst, world)) return ''
   const { x, y } = packet.self
   const w = world.nearestWater?.(x, y) ?? null
   if (w === null) return 'No water is within reach of your hands, and you know of none nearby.'

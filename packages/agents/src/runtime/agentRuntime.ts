@@ -738,6 +738,7 @@ export class AgentRuntime {
       isEdible: (kind: string) => this.#bridge.isEdible(kind),
       waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
       nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
+      waterRefused: () => (this.#lastOutcome ?? '').includes('water'),
       nearestFood: (x: number, y: number) => this.#bridge.nearestFood(x, y),
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),

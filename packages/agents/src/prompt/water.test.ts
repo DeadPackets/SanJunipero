@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
-import { fold, genesisState, type TileId } from '@sj/engine'
+import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, T_GRASS, T_WATER } from '@sj/shared'
 import { perceptionToProse, placesKnownLine } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
+import { lastTurnLine } from '../runtime/agentRuntime.js'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
 
 // The ring-1 showcase ground, measured off `showcaseTerrain()`: a 76x76 map whose (0, 0) sits at
@@ -28,7 +29,7 @@ function valley(at: { x: number; y: number }, opts: { bucket?: boolean } = {}): 
     ),
   )
   const store = new EventStore(openDb(':memory:'))
-  let state = { ...genesisState(DEFAULT_CONFIG, terrain), origin: ORIGIN }
+  let state: WorldState = { ...genesisState(DEFAULT_CONFIG, terrain), origin: ORIGIN }
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), DEFAULT_CONFIG)
   }
@@ -45,13 +46,14 @@ function valley(at: { x: number; y: number }, opts: { bucket?: boolean } = {}): 
   }
 }
 
-const proseFor = (bridge: EngineBridge): string =>
+const proseFor = (bridge: EngineBridge, lastOutcome = ''): string =>
   perceptionToProse(bridge.perception(AGENT), undefined, {
     isWalkable: (x, y) => bridge.isWalkable(x, y),
     isEdible: (kind) => bridge.isEdible(kind),
     waterAtHand: () => bridge.waterAtHand(AGENT),
     nearestWater: (x, y) => bridge.nearestWater(x, y),
     distantWater: (x, y) => bridge.distantWater(x, y),
+    waterRefused: () => lastOutcome.includes('water'),
   })
 
 const placesFor = (bridge: EngineBridge): string =>
@@ -128,5 +130,17 @@ describe('the water a body can and cannot reach is said before the turn is spent
       'no water within reach',
     )
     expect(proseFor(t.bridge)).toContain('No water is within reach of your hands')
+  })
+
+  // Omar cast at dry ground 37 times in run B. A cast wants neither a vessel nor a dry throat,
+  // so the reason alone came back turn after turn with no state beside it to answer it.
+  it('a cast at dry ground is answered with the water, not with the reason alone', async () => {
+    const t = valley(BELOW_THE_END)
+    const reason = await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })
+    expect(reason).toBe('no water there')
+    expect(proseFor(t.bridge)).not.toContain('water')
+    const paired = proseFor(t.bridge, lastTurnLine('fish', reason))
+    expect(paired).toContain('No water is within reach of your hands')
+    expect(paired).toContain('The nearest water you know of lies at (13, 67), a way to the east.')
   })
 })
