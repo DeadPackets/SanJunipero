@@ -195,8 +195,8 @@ export function App() {
   const onVerb = (verb: RingVerb): void => {
     if (subject === null) return
     if (subject.kind === 'structure') {
-      if (verb === 'home') enterInterior(insideId === subject.id ? null : subject.id)
-      else openPage('building', verb === 'bonds' ? 'Inside' : 'Provenance')
+      if (verb === 'inside') enterInterior(insideId === subject.id ? null : subject.id)
+      else openPage('building', 'Provenance')
       return
     }
     switch (verb) {
@@ -303,7 +303,7 @@ export function App() {
         onOpen={setSubject}
       />
       <Nameplate subject={focus ?? subject} scene={scene} />
-      <SubjectRing subject={subject} scene={scene} onVerb={onVerb} />
+      <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <QuietStamp store={store} link={link} />
       <DirectorCue text={cue} />
       {route.broadcast && <LowerThird store={store} />}
