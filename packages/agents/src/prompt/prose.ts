@@ -7,7 +7,13 @@ import {
   heardLine,
   type SimTime,
 } from '@sj/shared'
-import { MYSTERIES, type ForageableKind, type MakeableRoad, type Makeables } from '@sj/engine'
+import {
+  MYSTERIES,
+  VESSEL_KINDS,
+  type ForageableKind,
+  type MakeableRoad,
+  type Makeables,
+} from '@sj/engine'
 import { classMembers } from '@sj/shared'
 
 // Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
@@ -705,6 +711,25 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
 }
 
+// A vessel in the hands is the same reason to know where the water is that a dry mouth is:
+// `fill` is refused for the water, never for the thirst.
+const wantsWater = (packet: PerceptionPacket, thirst: number): boolean =>
+  thirst < 50 || packet.self.inventory.some((i) => VESSEL_KINDS.has(i.kind))
+
+/** Whether these hands are at water, off the same test `drink`, `fill` and `fish` are refused
+ *  by. Block 1 teaches all three as "standing beside water" and nothing said whether this body
+ *  was: 105 of run B's 236 refusals were minds reaching for water on dry ground (rehearsal5). */
+function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld): string {
+  if (world?.waterAtHand === undefined) return ''
+  if (world.waterAtHand())
+    return 'Water lies within reach of your hands. You could drink here, or fill what you carry.'
+  if (!wantsWater(packet, thirst)) return ''
+  const { x, y } = packet.self
+  const w = world.nearestWater?.(x, y) ?? null
+  if (w === null) return 'No water is within reach of your hands, and you know of none nearby.'
+  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}).`
+}
+
 /** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
  *  own test. Forty-four of run B's refusals were these facts going unsaid (rehearsal4). */
 function affordanceLines(packet: PerceptionPacket): string[] {
@@ -811,18 +836,8 @@ export function perceptionToProse(
 
   const roads: string[] = []
 
-  // Never a refusal, and opened well before the dryness is felt: thirst decays 1.67x slower
-  // than hunger, so the 30 both once shared left the water road 10 ticks of runway.
-  if (thirst < 50) {
-    if (world?.waterAtHand?.() === true) {
-      roads.push(
-        'Water lies within reach of your hands. You could drink here, or fill what you carry.',
-      )
-    } else {
-      const w = world?.nearestWater?.(x, y) ?? null
-      if (w !== null) roads.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
-    }
-  }
+  const water = waterRoad(packet, thirst, world)
+  if (water.length > 0) roads.push(water)
 
   // The road thirst has had, given to the need that never had one. Hands first, then the
   // nearest thing worth walking to — and never as a refusal.
