@@ -301,4 +301,11 @@ describe('StageMount never leaves React holding a destroyed scene', () => {
   it('types the handback so a caller cannot forget the null', () => {
     expect(src).toMatch(/onScene\?:\s*\(scene: Scene \| null\) => void/)
   })
+
+  // ★ Bubbles stopped for good on the two-hundredth thought: the log is spliced from the head,
+  // so an absolute index into it never moves again.
+  it('★ spawns bubbles off the thought count, never off a ring index', () => {
+    expect(src).toContain('store.thoughtsSeq()')
+    expect(src).not.toMatch(/log\[seenThoughts\]/)
+  })
 })

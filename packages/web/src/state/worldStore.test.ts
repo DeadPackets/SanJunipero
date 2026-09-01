@@ -133,6 +133,16 @@ describe('worldStore', () => {
     expect(store.thoughtsLog()[0]!.text).toBe('t5') // oldest 7 dropped (2 walker + t0..t4)
   })
 
+  // ★ The bubble layer counted an absolute index into a log that is spliced from the head, so
+  // bubbles stopped for good on the two-hundredth thought.
+  it('★ keeps counting thoughts past the cap the log holds', () => {
+    const store = createWorldStore()
+    for (let i = 0; i < 205; i++)
+      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}` })
+    expect(store.thoughtsSeq()).toBe(205)
+    expect(store.thoughtsLog()).toHaveLength(200)
+  })
+
   it('asset frames bump assetsSeq and accumulate records', () => {
     const store = createWorldStore()
     expect(store.assetsSeq()).toBe(0)

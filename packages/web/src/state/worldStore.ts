@@ -35,6 +35,9 @@ export type WorldStore = {
   liveEdge: () => number
   latestThought: (agentId: string) => { tick: number; text: string } | null
   thoughtsLog: () => Thought[]
+  /** Every thought ever heard, the ones the capped log has already dropped included: an index
+   *  into the log is reused the moment it is trimmed, so a reader counts from here. */
+  thoughtsSeq: () => number
   recentEvents: () => SimEvent[]
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
@@ -56,6 +59,7 @@ export function createWorldStore(): WorldStore {
   let paused = false
   let liveEdge = 0
   let assetsSeq = 0
+  let thoughtsSeq = 0
   let logSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
@@ -91,6 +95,7 @@ export function createWorldStore(): WorldStore {
     liveEdge: () => liveEdge,
     latestThought: (agentId) => latest.get(agentId) ?? null,
     thoughtsLog: () => thoughts,
+    thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
@@ -149,6 +154,7 @@ export function createWorldStore(): WorldStore {
           mode = { live: false, tick: msg.tick }
           break
         case 'thought':
+          thoughtsSeq++
           thoughts.push({ agentId: msg.agentId, tick: msg.tick, text: msg.text })
           if (thoughts.length > THOUGHT_LOG_CAP)
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)

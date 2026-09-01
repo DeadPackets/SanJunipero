@@ -170,7 +170,7 @@ export function StageMount({
             }
           }
         })
-        let seenThoughts = store.thoughtsLog().length
+        let seenThoughts = store.thoughtsSeq()
         let lastMs = performance.now()
         tickFn = () => {
           const now = performance.now()
@@ -191,10 +191,13 @@ export function StageMount({
             atmosphere?.update(state)
             weather?.setKind(state.weather.kind)
           }
-          const log = store.thoughtsLog()
-          for (; seenThoughts < log.length; seenThoughts++) {
-            const t = log[seenThoughts]!
-            bubbles?.spawnThought(t.agentId, t.text)
+          // Counted, not indexed: the log is a capped ring, so its indices are reused.
+          const said = store.thoughtsSeq()
+          if (said > seenThoughts) {
+            const log = store.thoughtsLog()
+            for (const t of log.slice(Math.max(0, log.length - (said - seenThoughts))))
+              bubbles?.spawnThought(t.agentId, t.text)
+            seenThoughts = said
           }
         }
         s.app.ticker.add(tickFn)
