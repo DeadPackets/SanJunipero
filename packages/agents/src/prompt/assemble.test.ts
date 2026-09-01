@@ -72,6 +72,20 @@ describe('assemblePrompt stability gradient', () => {
     expect(changed.messages[1]).not.toEqual(before.messages[1])
   })
 
+  // A provider bills the longest byte-identical prefix, and system is the only block stable
+  // enough to hold one all day: an optional block that leaked into it would cost every turn.
+  it.each([
+    ['recalled', { recalled: { query: 'the flood', memories: ['The water rose by dawn.'] } }],
+    ['lastOutcome', { lastOutcome: lastTurnLine('eat', 'the food must be in your hands') }],
+    ['heard', { now: { prose: 'The sun stands high.', heard: 'You hear Bex say: "Rain soon."' } }],
+    ['underway', { underway: { what: 'walk 62 70', step: 2, of: 4 } }],
+  ])('%s rides its own message and never touches the cached system prefix', (_, patch) => {
+    const base = fixtureBlocks()
+    const a = assemblePrompt({ ...base, ...patch })
+    expect(a.system).toBe(assemblePrompt(base).system)
+    expect(a.messages.length).toBeGreaterThan(assemblePrompt(base).messages.length)
+  })
+
   it('changes system when the personality doc changes (sleep-only by contract)', () => {
     const base = fixtureBlocks()
     const before = assemblePrompt(base)
@@ -1084,11 +1098,6 @@ describe('the refusal the next turn is actually told about', () => {
       expect(a.messages.map((m) => m.content)).toEqual(quiet.messages.map((m) => m.content))
       expect(a.estTokens).toBe(quiet.estTokens)
     }
-  })
-
-  it('is volatile: it never touches the cached system prefix', () => {
-    const base = fixtureBlocks()
-    expect(assemblePrompt({ ...base, lastOutcome: line }).system).toBe(assemblePrompt(base).system)
   })
 
   it("names the words the mind used when there was no verb, not a schema's blank", () => {
