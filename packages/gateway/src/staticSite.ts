@@ -130,7 +130,13 @@ export function makeStaticSite(
       // Hashed bundle files never change under their name; index.html always may.
       'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
     })
-    createReadStream(path).pipe(res)
+    // `pipe` forwards no error, and an unlistened one on a Readable throws: the file statted a
+    // moment ago, so what reaches here is fd exhaustion under load.
+    const body = createReadStream(path)
+    body.on('error', () => {
+      res.destroy()
+    })
+    body.pipe(res)
     return true
   }
 
