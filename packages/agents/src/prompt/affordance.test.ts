@@ -96,16 +96,16 @@ describe('the affordance block says what the validators would otherwise refuse',
     expect(proseFor(t.bridge)).toContain('no walk can end where you already stand, at (10, 10)')
   })
 
-  it('`not inside anything` — open sky is said, not left to be inferred', async () => {
+  it('open sky is said, not left to be inferred — and stepping out of it costs nothing', async () => {
     const t = town()
-    expect(await refusal(t, { verb: 'exit', params: {} })).toBe('not inside anything')
+    expect(await refusal(t, { verb: 'exit', params: {} })).toBe('the world allowed it')
     expect(proseFor(t.bridge)).toContain('No walls are around you: there is nothing to step out of')
   })
 
-  it('`already inside` — the roof overhead is said to bar every other one', async () => {
+  it('the roof overhead is said to bar every other one, and entering it again is over at once', async () => {
     const t = town({ indoors: true })
     expect(await refusal(t, { verb: 'enter', params: { structureId: HOUSE } })).toBe(
-      'already inside',
+      'the world allowed it',
     )
     expect(proseFor(t.bridge)).toContain(
       `Four walls are around you: while you are inside the house (${HOUSE}) you can walk nowhere and enter nothing, and the doorway at (${t.door.x}, ${t.door.y}) is the way back out under the sky.`,

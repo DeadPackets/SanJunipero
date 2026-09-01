@@ -48,6 +48,7 @@ import {
   CITY_HEARTH_KIND,
   MINUTES_PER_DAY,
   SPEECH_INPUT_MAX_CHARS,
+  T_FARMLAND,
   T_FOREST,
   T_GRASS,
   T_ROAD,
@@ -132,6 +133,14 @@ export type VerbDef = {
     agentId: string,
     params: Record<string, unknown>,
   ): string | null
+  /** True when the world already holds what this act would bring about. Such an act is over
+   *  before it began, the way a walk to the tile underfoot is: it completes, it is not refused. */
+  settled?(
+    state: WorldState,
+    config: SimConfig,
+    agentId: string,
+    params: Record<string, unknown>,
+  ): boolean
   duration(
     state: WorldState,
     config: SimConfig,
@@ -419,6 +428,7 @@ const sleep: VerbDef = makeVerb({
     }
     return null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.asleep,
   onComplete(state, _config, agentId) {
     // A night lifts the ladder as well as the counter, and lifts it every time — recovery that
     // works once is a body that can only ever wear out.
@@ -455,6 +465,10 @@ const enter: VerbDef = makeVerb({
     }
     return null
   },
+  settled(state, _config, agentId, params) {
+    const p = EnterParams.safeParse(params)
+    return p.success && state.agents[agentId]!.insideId === p.data.structureId
+  },
   onComplete(state, _config, agentId, params) {
     const p = EnterParams.parse(params)
     const s = state.structures[p.structureId]
@@ -472,6 +486,7 @@ const exit: VerbDef = makeVerb({
   validate(state, _config, agentId) {
     return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.insideId === undefined,
   onComplete(state, _config, agentId) {
     const structureId = state.agents[agentId]!.insideId
     return structureId === undefined
@@ -486,6 +501,7 @@ const wake: VerbDef = makeVerb({
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? null : 'not asleep'
   },
+  settled: (state, _config, agentId) => !state.agents[agentId]!.asleep,
   onComplete() {
     return []
   },
@@ -727,6 +743,10 @@ const wear: VerbDef = makeVerb({
       return 'you are already wearing something'
     return null
   },
+  settled(state, _config, agentId, params) {
+    const p = WearParams.safeParse(params)
+    return p.success && state.agents[agentId]!.equipped?.body === p.data.itemId
+  },
   onComplete(state, config, agentId, params) {
     const p = WearParams.parse(params)
     const item = state.items[p.itemId]
@@ -744,6 +764,7 @@ const doff: VerbDef = makeVerb({
       ? 'you are not wearing anything'
       : null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.equipped?.body === undefined,
   onComplete(state, _config, agentId) {
     const itemId = state.agents[agentId]!.equipped?.body
     return itemId === undefined ? [] : [{ type: 'item_unequipped', payload: { agentId, itemId } }]
@@ -773,6 +794,19 @@ export function fuelLeft(item: { fuelTicks?: number }, config: SimConfig): numbe
   return item.fuelTicks ?? config.light.torchBurnTicks
 }
 
+// The thing a light verb names, when this hand is the one holding it: whether it burns is then
+// the whole question, and the answer is the same one both verbs read.
+function heldLight(
+  state: WorldState,
+  agentId: string,
+  params: Record<string, unknown>,
+): { lit: boolean } | null {
+  const p = KindleParams.safeParse(params)
+  const item = p.success ? state.items[p.data.itemId] : undefined
+  if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return null
+  return { lit: item.litUntilTick !== undefined }
+}
+
 const kindle: VerbDef = makeVerb({
   kind: 'kindle',
   validate(state, config, agentId, params) {
@@ -785,6 +819,7 @@ const kindle: VerbDef = makeVerb({
     if (fuelLeft(item, config) <= 0) return 'it is burnt out'
     return null
   },
+  settled: (state, _config, agentId, params) => heldLight(state, agentId, params)?.lit === true,
   onComplete(state, config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
@@ -806,6 +841,7 @@ const snuff: VerbDef = makeVerb({
     if (item.litUntilTick === undefined) return 'it is not lit'
     return null
   },
+  settled: (state, _config, agentId, params) => heldLight(state, agentId, params)?.lit === false,
   onComplete(state, _config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
@@ -900,6 +936,10 @@ const till: VerbDef = makeVerb({
     if (tile !== 0 && tile !== 1) return 'only grass or dirt can be tilled'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to till'
     return null
+  },
+  settled(state, _config, _agentId, params) {
+    const p = TileParams.safeParse(params)
+    return p.success && tileAt(state, p.data.x, p.data.y) === T_FARMLAND
   },
   onComplete(state, _config, agentId, params) {
     const p = TileParams.parse(params)
@@ -1536,6 +1576,10 @@ const pave: VerbDef = makeVerb({
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return shortOf(STONE_KIND)
     return null
   },
+  settled(state, _config, _agentId, params) {
+    const p = TileParams.safeParse(params)
+    return p.success && tileAt(state, p.data.x, p.data.y) === T_ROAD
+  },
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
@@ -1784,6 +1828,11 @@ const take: VerbDef = makeVerb({
       return item.loc.id === agentId ? 'already holding that' : 'someone is holding that'
     return itemWithinReach(state, agentId, item) ? null : 'not close enough to take'
   },
+  settled(state, _config, agentId, params) {
+    const p = TakeParams.safeParse(params)
+    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    return loc?.t === 'agent' && loc.id === agentId
+  },
   onComplete(state, config, agentId, params) {
     return liftEvents(state, config, agentId, TakeParams.parse(params).itemId)
   },
@@ -1801,6 +1850,12 @@ const drop: VerbDef = makeVerb({
     if (item.loc.t !== 'agent') return 'that is already on the ground'
     if (item.loc.id !== agentId) return 'someone is holding that'
     return null
+  },
+  settled(state, _config, agentId, params) {
+    const p = DropParams.safeParse(params)
+    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    const a = state.agents[agentId]!
+    return loc?.t === 'tile' && loc.x === a.x && loc.y === a.y
   },
   onComplete(state, _config, agentId, params) {
     const p = DropParams.parse(params)
@@ -1828,6 +1883,11 @@ const stow: VerbDef = makeVerb({
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h))
       return 'not close enough to put anything down there'
     return null
+  },
+  settled(state, _config, _agentId, params) {
+    const p = StowParams.safeParse(params)
+    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    return loc?.t === 'structure' && loc.id === p.data.structureId
   },
   onComplete(state, _config, agentId, params) {
     const p = StowParams.parse(params)

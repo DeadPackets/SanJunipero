@@ -36,6 +36,18 @@ export function submitIntent(
     if (!('refusal' in to)) p = { ...params, ...to }
   }
   const refusal = def.validate(state, config, agentId, p)
+  // Asked for a thing the world already holds — asleep and told to sleep, inside the roof it is
+  // told to enter. The act is over rather than wrong: it starts and completes in one breath.
+  if (refusal !== null && def.settled?.(state, config, agentId, p) === true) {
+    return {
+      ok: true,
+      events: [
+        ...(a.asleep && verb !== 'sleep' ? [{ type: 'agent_woke', payload: { agentId } }] : []),
+        { type: 'action_started', payload: { agentId, verb, params: p, duration: 0 } },
+        { type: 'action_completed', payload: { agentId, verb } },
+      ],
+    }
+  }
   // The mind chose the verb; where the world holds one thing that verb would take, read it in
   // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
   if (refusal !== null) {

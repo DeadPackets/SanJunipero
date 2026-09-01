@@ -293,17 +293,14 @@ describe('verb: drop', () => {
     expect(tickOnce(s).state.items.item_1!.owner).toBe('a2')
   })
 
-  it('refuses what you are not holding, what is already down, and what is not there', () => {
+  it('refuses what you are not holding and what is not there; what is down is already done', () => {
     let ground = makeWorld()
     ground = fold(
       ground,
       ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'tile', x: 0, y: 0 } }),
       CFG,
     )
-    expect(submitIntent(ground, CFG, 'a1', 'drop', { itemId: 'item_1' })).toEqual({
-      ok: false,
-      reason: 'that is already on the ground',
-    })
+    expect(submitIntent(ground, CFG, 'a1', 'drop', { itemId: 'item_1' }).ok).toBe(true)
     let theirs = makeWorld()
     theirs = fold(
       theirs,

@@ -819,9 +819,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     expect(Object.keys(off.agents.a1!)).not.toContain('equipped')
     expect(stateHash(off)).toBe(stateHash(bare))
 
-    const nothing = submitIntent(bare, CFG, 'a1', 'doff', {})
-    expect(nothing.ok).toBe(false)
-    if (!nothing.ok) expect(nothing.reason).toBe('you are not wearing anything')
+    expect(submitIntent(bare, CFG, 'a1', 'doff', {}).ok).toBe(true)
   })
 
   it('a garment leaving the hands leaves the slot too, however it goes', () => {

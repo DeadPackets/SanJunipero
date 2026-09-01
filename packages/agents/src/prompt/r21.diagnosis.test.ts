@@ -240,10 +240,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(prose).toContain('this is the roof you are under; the way out is at (81, 99).')
     expect(prose).not.toContain('stand there and you can go in')
     // The world's answer to the instruction that used to be given, twice over.
-    expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id })).toEqual({
-      ok: false,
-      reason: 'already inside',
-    })
+    expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id }).ok).toBe(true)
     expect(submitIntent(inside, CFG, 'nadia', 'walk', { x: 68, y: 47 })).toEqual({
       ok: false,
       reason: 'you are indoors; step outside first',

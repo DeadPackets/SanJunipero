@@ -162,11 +162,11 @@ describe('verbs: sleep / wake / eat', () => {
     expect(FOOD_KINDS.has('berries')).toBe(true)
   })
 
-  it('sleep rejects when already asleep; wake rejects when awake', () => {
+  it('sleep while asleep and wake while awake are over, not refused', () => {
     const awake = makeWorld()
-    expect(submitIntent(awake, FAST, 'a1', 'wake', {}).ok).toBe(false)
+    expect(submitIntent(awake, FAST, 'a1', 'wake', {}).ok).toBe(true)
     const asleep = patchAgent(awake, 'a1', { asleep: true })
-    expect(submitIntent(asleep, FAST, 'a1', 'sleep', {}).ok).toBe(false)
+    expect(submitIntent(asleep, FAST, 'a1', 'sleep', {}).ok).toBe(true)
     expect(submitIntent(asleep, FAST, 'a1', 'wake', {}).ok).toBe(true)
   })
 })

@@ -94,9 +94,7 @@ describe('kindle: a torch burns for exactly as long as it has fuel', () => {
     if (!wood.ok) expect(wood.reason).toBe('that will not take a flame')
 
     const lit = apply(holding(bodyAt(0), 'item_1', 'torch'), 'kindle', { itemId: 'item_1' })
-    const twice = submitIntent(lit, CFG, 'a1', 'kindle', { itemId: 'item_1' })
-    expect(twice.ok).toBe(false)
-    if (!twice.ok) expect(twice.reason).toBe('it is already lit')
+    expect(submitIntent(lit, CFG, 'a1', 'kindle', { itemId: 'item_1' }).ok).toBe(true)
 
     const spent = apply({ ...lit, tick: BURN }, 'snuff', { itemId: 'item_1' })
     expect(spent.items.item_1!.fuelTicks).toBe(0)
@@ -104,11 +102,10 @@ describe('kindle: a torch burns for exactly as long as it has fuel', () => {
     expect(dead.ok).toBe(false)
     if (!dead.ok) expect(dead.reason).toBe('it is burnt out')
 
-    const idle = submitIntent(holding(bodyAt(0), 'item_1', 'torch'), CFG, 'a1', 'snuff', {
-      itemId: 'item_1',
-    })
-    expect(idle.ok).toBe(false)
-    if (!idle.ok) expect(idle.reason).toBe('it is not lit')
+    expect(
+      submitIntent(holding(bodyAt(0), 'item_1', 'torch'), CFG, 'a1', 'snuff', { itemId: 'item_1' })
+        .ok,
+    ).toBe(true)
   })
 })
 

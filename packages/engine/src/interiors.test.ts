@@ -134,10 +134,10 @@ describe('enter / exit', () => {
     inside = fold(inside, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(
       submitIntent(inside, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }),
-    ).toMatchObject({ ok: false, reason: 'already inside' })
+    ).toMatchObject({ ok: true })
     expect(
       submitIntent(withAgent(withHouse(world()), 'a1', 3, 4), DEFAULT_CONFIG, 'a1', 'exit', {}),
-    ).toMatchObject({ ok: false, reason: 'not inside anything' })
+    ).toMatchObject({ ok: true })
   })
 
   it('walk is refused while indoors', () => {
