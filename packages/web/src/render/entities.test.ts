@@ -100,7 +100,9 @@ import {
   enterableKind,
   entersOnClick,
   entitySpriteOf,
+  ITEM_PX,
   footprintHitPoints,
+  itemScaleFor,
   pipsFilled,
   setEntityScaleMul,
   structureHitPoints,
@@ -223,6 +225,22 @@ describe('one building, one hitbox, and the building says what a click does', ()
     // the two meanings both hang off the one tap handler
     expect(code).toMatch(/entersOnClick\(store\.getConfig\(\), store\.getState\(\), sid\)/)
     expect(code).toMatch(/sync!?\.onDoor\?\.\(sid\)/)
+  })
+
+  // ★ Every dropped thing was forced to 32x32, so a felled trunk, a plank and an axe were all
+  // the same square block on the ground — and none of them touched it.
+  it('★ a dropped thing is drawn to its LONGEST side, so a plank stays a plank', () => {
+    expect(itemScaleFor(128, 128)).toBe(ITEM_PX / 128)
+    const k = itemScaleFor(128, 32)
+    expect(128 * k).toBe(ITEM_PX)
+    expect(32 * k).toBe(ITEM_PX / 4) // a quarter as tall as it is long, exactly as authored
+    expect(itemScaleFor(0, 0)).toBe(ITEM_PX) // and it never divides by nothing
+    expect(code).not.toContain('sprite.width = ITEM_PX')
+  })
+
+  it('★ and it stands on the same contact shadow a body stands on', () => {
+    expect(code).toContain('scene.layers.shadow.addChild(shadow)')
+    expect(code).toContain('contactShadow(widthPx)')
   })
 
   it('resolveHit: a body beats a building, nothing beats nothing', () => {
