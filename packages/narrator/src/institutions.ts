@@ -1,4 +1,4 @@
-import type { SimEvent } from '@sj/shared'
+import { SOMEONE, type SimEvent, verbPhrase, verbPhrasePast } from '@sj/shared'
 import type { DetectConfig, DetectedInstitution, SceneSegment } from './types.js'
 
 export const DEFAULT_DETECT_CONFIG: DetectConfig = {
@@ -20,81 +20,13 @@ export const ROLE_VERBS: Record<string, string> = {
 
 type Completed = { seq: number; agentId: string; verb: string }
 
-// Both call sites read "has/have <verb>", so this is the past participle, not the simple past.
-const IRREGULAR_PARTICIPLE: Record<string, string> = {
-  bring: 'brought',
-  build: 'built',
-  catch: 'caught',
-  cut: 'cut',
-  dig: 'dug',
-  do: 'done',
-  draw: 'drawn',
-  drink: 'drunk',
-  eat: 'eaten',
-  fall: 'fallen',
-  find: 'found',
-  give: 'given',
-  go: 'gone',
-  hold: 'held',
-  leave: 'left',
-  light: 'lit',
-  make: 'made',
-  put: 'put',
-  read: 'read',
-  run: 'run',
-  say: 'said',
-  see: 'seen',
-  sing: 'sung',
-  sit: 'sat',
-  sleep: 'slept',
-  speak: 'spoken',
-  stand: 'stood',
-  swim: 'swum',
-  take: 'taken',
-  teach: 'taught',
-  think: 'thought',
-  wake: 'woken',
-  wear: 'worn',
-  weave: 'woven',
-  write: 'written',
-}
-
-// One vowel between consonants doubles the last one: chop -> chopped, but craft -> crafted.
-const DOUBLES_FINAL_CONSONANT = /^[^aeiou]*[aeiou][^aeiouwxy]$/
-
-export const pastParticiple = (verb: string): string => {
-  const irregular = IRREGULAR_PARTICIPLE[verb]
-  if (irregular !== undefined) return irregular
-  if (verb.endsWith('e')) return `${verb}d`
-  if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ed`
-  return `${verb}ed`
-}
-
-// A coined verb arrives as a slug — `recipe:plank`, `express:mourn`, `dig_channel`. The
-// namespace and the separators are machine ids, and `recipe:` names the verb "make".
-const verbWords = (verb: string): [string, ...string[]] => {
-  const coined = verb.startsWith('recipe:')
-  const bare = coined ? verb.slice('recipe:'.length) : verb.replace(/^express:/, '')
-  const [head, ...rest] = bare.split(/[_:]/).filter((w) => w !== '')
-  if (head === undefined) return [verb]
-  return coined ? ['make', head, ...rest] : [head, ...rest]
-}
-
-/** "3 people have express:mourned 7 times" -> "3 people have mourned 7 times". */
-export const verbPhrasePast = (verb: string): string => {
-  const [head, ...rest] = verbWords(verb)
-  return [pastParticiple(head), ...rest].join(' ')
-}
-
-/** The same slug in the present, for a name rather than a count. */
-export const verbPhrase = (verb: string): string => verbWords(verb).join(' ')
-
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
 // dropped scene. The caller maps it to a store id and must never persist -1.
 export function detectInstitutions(
   scenes: SceneSegment[],
   events: SimEvent[],
   cfg: DetectConfig = DEFAULT_DETECT_CONFIG,
+  nameOf: (id: string) => string = () => SOMEONE,
 ): DetectedInstitution[] {
   const sceneOf = (seq: number): number => scenes.findIndex((s) => s.eventIds.includes(seq))
 
@@ -125,7 +57,7 @@ export function detectInstitutions(
     out.push({
       kind: 'role',
       name: `the ${label}`,
-      description: `${agentId} has ${pastParticiple(verb)} ${seqs.length} times`,
+      description: `${nameOf(agentId)} has ${verbPhrasePast(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [agentId],
       sourceEventIds: seqs,
@@ -166,12 +98,13 @@ export function detectInstitutions(
     }
     if (members.length < cfg.groupMinMembers) continue
     members.sort()
+    const named = members.map(nameOf)
     const memberSet = new Set(members)
     const foundingIdx = scenes.findIndex((s) => s.cast.filter((a) => memberSet.has(a)).length >= 2)
     out.push({
       kind: 'group',
-      name: members.join(' & '),
-      description: `${members.join(' & ')} are often seen together`,
+      name: named.join(' & '),
+      description: `${named.join(' & ')} are often seen together`,
       foundingSceneIndex: foundingIdx,
       memberIds: members,
       sourceEventIds: foundingIdx === -1 ? [] : scenes[foundingIdx]!.eventIds,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { agentName } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
 /** One line per this, or a screen reader is read a market square all at once. */
@@ -44,7 +45,7 @@ export function SpeechLive({ store }: { store: WorldStore }) {
       for (const ev of evts) {
         if (ev.type !== 'agent_spoke') continue
         const p = ev.payload as { agentId: string; text: string }
-        const name = store.getState()?.agents[p.agentId]?.name ?? p.agentId
+        const name = agentName(store.getState()?.agents, p.agentId)
         queue.current = enqueue(queue.current, { name, text: p.text })
       }
     })

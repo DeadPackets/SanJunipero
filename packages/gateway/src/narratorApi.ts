@@ -4,15 +4,18 @@ import type { IncomingMessage } from 'node:http'
 import Database from 'better-sqlite3'
 import {
   CHRONICLE_TYPES,
+  type ChronicleEntry,
+  type ChronicleLookup,
   MILESTONE_ICON,
   MILESTONE_TYPE,
   MINUTES_PER_DAY,
+  type Moment,
+  agentName,
   chronicleIcon,
   chronicleLine,
   discoveryHeadline,
-  type ChronicleEntry,
-  type ChronicleLookup,
-  type Moment,
+  kindWords,
+  placeWordsAt,
 } from '@sj/shared'
 // Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
 // The contract is declared once, in @sj/shared.
@@ -86,12 +89,20 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   const lookup = (): ChronicleLookup => {
     const state = deps.mirror.state()
     return {
-      agentName: (id) => state.agents[id]?.name ?? id,
-      // A kind is a slug in the engine and PROSE to a viewer. `kindWords` in
-      // web/ui/broadcastReady.ts owns this rule; the gateway cannot import the web bundle.
-      structureKind: (id) => (state.structures[id]?.kind ?? 'building').replace(/_/g, ' '),
+      agentName: (id) => agentName(state.agents, id),
+      structureKind: (id) => kindWords(state.structures[id]?.kind ?? 'building'),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
     }
+  }
+
+  // R4: a scene is stored as the tile it happened on, and a viewer is never shown a pair of
+  // numbers. The nearest thing the town built answers for the tile, or nothing does; a place
+  // already written as words is already an answer.
+  const placeWords = (loc: string | null): string | null => {
+    if (loc === null) return null
+    const m = /^(\d+),(\d+)$/.exec(loc)
+    if (m === null) return loc
+    return placeWordsAt(Object.values(deps.mirror.state().structures), Number(m[1]), Number(m[2]))
   }
 
   // A free key is a cache a stranger can miss on purpose. The clamped pair is also the memo key,
@@ -237,7 +248,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       endTick: r.end_tick,
       title: r.title ?? `Day ${r.day}`,
       cast: JSON.parse(r.cast) as string[],
-      location: r.location,
+      location: placeWords(r.location),
     }))
     sendJson(res, { moments })
   })
@@ -308,9 +319,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
         changes: changeDays(),
         // Its own source, not a sixth MARK_EVENT_TYPE: the events source carries only tick and
         // type, and a discovery mark that cannot name its inventor is a mark not worth aiming at.
-        discoveries: readDiscoveries(
-          deps.db,
-          (id) => deps.mirror.state().agents[id]?.name ?? id,
+        discoveries: readDiscoveries(deps.db, (id) =>
+          agentName(deps.mirror.state().agents, id),
         ).map((d) => ({ tick: d.tick, words: discoveryHeadline(d) })),
         events: selMarkEvents.all(...MARK_EVENT_TYPES) as { tick: number; type: string }[],
       })),

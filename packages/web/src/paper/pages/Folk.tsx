@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState, useSyncExternalStore } from 'react'
-import { tickToMoment } from '@sj/shared'
+import { agentName, personWords, tickToMoment } from '@sj/shared'
 import { actsOf, becomingOf as buildBecoming, type Becoming } from '../../ui/roster/expand.js'
 import { rosterRows2, sortRoster, type RosterSort } from '../../ui/roster/rosterRow.js'
 import { EMPTY_LINEAGE } from '../../ui/bondModel2.js'
@@ -65,7 +65,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   const becomingOf = (agentId: string): Becoming =>
     buildBecoming({
       id: agentId,
-      name: people[agentId] ?? agentId,
+      name: personWords(people[agentId]),
       nowTick: tick,
       skills: state.agents[agentId]?.skills ?? {},
       acts: actsOf(agentId, bonds, events),
@@ -87,7 +87,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
         setOpenId((prev) => (prev === id ? null : id))
       }}
       onOpenFull={(id) => {
-        onSubject({ id, kind: 'agent', name: people[id] ?? id })
+        onSubject({ id, kind: 'agent', name: personWords(people[id]) })
       }}
     />
   )
@@ -96,7 +96,6 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
 function Families({ store }: Pick<PageProps, 'store'>) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
-  const nameOf = (id: string): string => state?.agents[id]?.name ?? id
   const homes = households(lineage)
 
   if (homes.length === 0) return <p className="feed-empty">{EMPTY_COPY.families}</p>
@@ -104,11 +103,14 @@ function Families({ store }: Pick<PageProps, 'store'>) {
     <ul className="families">
       {homes.map((h) => (
         <li key={h.key} className="family">
-          <h3 className="feed-head">{h.parents.map(nameOf).join(' and ')}</h3>
+          <h3 className="feed-head">
+            {h.parents.map((id) => agentName(state?.agents, id)).join(' and ')}
+          </h3>
           <ul className="family-children">
             {h.children.map((c) => (
               <li key={c.id}>
-                <span className="stamp">Day {tickToMoment(c.tick).day}</span> {nameOf(c.id)}
+                <span className="stamp">Day {tickToMoment(c.tick).day}</span>{' '}
+                {agentName(state?.agents, c.id)}
               </li>
             ))}
           </ul>

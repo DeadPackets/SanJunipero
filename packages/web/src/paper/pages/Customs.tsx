@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import {
-  ConstructsResponseSchema,
-  UNNAMED_CONSTRUCT_COPY,
   type ConstructKind,
   type ConstructRecord,
+  ConstructsResponseSchema,
+  UNNAMED_CONSTRUCT_COPY,
+  agentName,
 } from '@sj/shared'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
@@ -36,7 +37,6 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
   const record = useEndpointFor('/api/constructs', customs, CUSTOMS_REFETCH_MS)
   const read = useFeed(record)
   const rows = read.data ?? NO_CUSTOMS
-  const nameOf = (id: string): string => state?.agents[id]?.name ?? id
 
   if (rows.length === 0) {
     if (read.failed) return <OutOfReach onRetry={record.retry} />
@@ -54,11 +54,11 @@ export function CustomsPage({ store }: Pick<PageProps, 'store'>) {
             </li>
             <li>
               <span className="stamp">×{c.gatherings}</span>
-              {c.members.map(nameOf).join(', ')}
+              {c.members.map((id) => agentName(state?.agents, id)).join(', ')}
             </li>
             {c.quote !== null && (
               <li>
-                “{c.quote}” — {nameOf(c.saidBy ?? '')}
+                “{c.quote}” — {agentName(state?.agents, c.saidBy ?? '')}
               </li>
             )}
           </ul>

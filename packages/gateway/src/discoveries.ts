@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
-import { DISCOVERY_EVENT, DiscoveryRecordSchema, type DiscoveryRecord } from '@sj/shared'
+import { DISCOVERY_EVENT, type DiscoveryRecord, DiscoveryRecordSchema, agentName } from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -55,7 +55,9 @@ export function mountDiscoveryApi(router: Router, deps: DiscoveryApiDeps): void 
       res,
       cache.json('discoveries', () => {
         const state = deps.mirror.state()
-        return { discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id) }
+        return {
+          discoveries: readDiscoveries(deps.db, (id) => agentName(state.agents, id)),
+        }
       }),
     )
   })

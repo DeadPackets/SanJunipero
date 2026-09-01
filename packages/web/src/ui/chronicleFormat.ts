@@ -1,12 +1,11 @@
-import { kindWords } from './broadcastReady.js'
-import { chronicleLine, type SimEvent } from '@sj/shared'
+import { SOMEONE, type SimEvent, agentName, chronicleLine, kindWords } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
 // Human-framed one-liners for the viewer-worthy subset; null hides plumbing (spec §5/§8).
 export function describeEvent(ev: SimEvent, state: WorldState | null): string | null {
   const p = ev.payload as Record<string, unknown>
   const name = (agentId: unknown): string =>
-    typeof agentId === 'string' ? (state?.agents[agentId]?.name ?? agentId) : 'Someone'
+    typeof agentId === 'string' ? agentName(state?.agents, agentId) : SOMEONE
   // R4: a kind is a slug in the engine and PROSE to a viewer. The chronicle read "The
   // fire_pit is finished." on screen until this went through kindWords.
   const structureKind = (id: unknown): string =>

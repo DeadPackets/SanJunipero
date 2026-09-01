@@ -1,3 +1,4 @@
+import { agentName } from '@sj/shared'
 import type { BondsResponse } from '@sj/shared'
 import {
   BOND_LEVEL_WORD,
@@ -45,15 +46,18 @@ export function levelMatrix(
   const ids = Object.keys(people).sort((a, b) =>
     (people[a]?.name ?? a).localeCompare(people[b]?.name ?? b),
   )
-  const nameOf = (id: string): string => people[id]?.name ?? id
-  const heads = ids.map((id) => ({ id, name: nameOf(id), short: shortName(nameOf(id)) }))
+  const heads = ids.map((id) => ({
+    id,
+    name: agentName(people, id),
+    short: shortName(agentName(people, id)),
+  }))
   // Built once for the whole grid: the scan it replaces ran inside an n² cell loop.
   const index = bondIndex(bonds)
 
   const rows = ids.map((aId) => ({
     id: aId,
-    name: nameOf(aId),
-    short: shortName(nameOf(aId)),
+    name: agentName(people, aId),
+    short: shortName(agentName(people, aId)),
     cells: ids.map((bId): MatrixCell => {
       if (aId === bId) return { self: true, level: 'strangers', warmth: 0, words: '' }
       const f = pairFacts(aId, bId, index, lineage, bonds, people, nowTick)

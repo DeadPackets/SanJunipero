@@ -1,4 +1,4 @@
-import { tickToMoment, type AssetRecord } from '@sj/shared'
+import { type AssetRecord, agentName, kindWords, tickToMoment } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { interiorOf } from '../render/interiors.js'
 import { resolveAssetId } from '../render/textures.js'
@@ -7,7 +7,7 @@ import { resolveAssetId } from '../render/textures.js'
  * The town's word for a kind IS the kind, with its underscores spent. The hand-maintained map this
  * replaces went stale the day `cabin`, `cottage` and `farmhouse` became rooms, and read "the room".
  */
-export const roomWord = (kind: string): string => kind.replace(/_/g, ' ')
+export const roomWord = kindWords
 
 /** At most this many holdings get a row; the rest are counted honestly. */
 export const ROOM_HOLDS_MAX = 8
@@ -60,12 +60,10 @@ export type RoomCard = {
 
 const ROOM_EMPTY_LINE = 'No one is in just now.'
 
-const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
-
 /** "Raised by Yusuf, Day 3", or the day it was begun while it is still going up. */
 export function builtLine(state: WorldState, p: Provenance | null): string | null {
   if (p === null) return null
-  const who = nameOf(state, p.builderId)
+  const who = agentName(state.agents, p.builderId)
   if (p.completedTick === null)
     return `Begun by ${who}, Day ${tickToMoment(p.plannedTick).day} — still rising`
   return `Raised by ${who}, Day ${tickToMoment(p.completedTick).day}`
@@ -86,11 +84,12 @@ export function roomCard(
   const word = roomWord(room.kind)
   const ownerId = room.structure.owner
   // A typographic apostrophe, because the town's own name for a place is not a code literal.
-  const title = ownerId === undefined ? `the ${word}` : `${nameOf(state, ownerId)}’s ${word}`
+  const title =
+    ownerId === undefined ? `the ${word}` : `${agentName(state.agents, ownerId)}’s ${word}`
 
   const lives: string[] = []
   const claim = (id: string): void => {
-    const n = nameOf(state, id)
+    const n = agentName(state.agents, id)
     if (!lives.includes(n)) lives.push(n)
   }
   if (ownerId !== undefined) claim(ownerId)
@@ -107,7 +106,7 @@ export function roomCard(
       const id = resolveAssetId(records, 'item', `${kind}#icon`)
       return {
         kind,
-        words: kind.replace(/_/g, ' '),
+        words: kindWords(kind),
         qty,
         iconUrl: id === null ? null : `/assets/${id}.png`,
       }

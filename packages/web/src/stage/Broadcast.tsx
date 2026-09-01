@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChronicleEntry } from '@sj/shared'
+import { agentName, type ChronicleEntry } from '@sj/shared'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import {
@@ -32,7 +32,7 @@ export function LowerThird({ store }: { store: WorldStore }) {
       for (const ev of evts) {
         if (ev.type !== 'agent_spoke') continue
         const p = ev.payload as { agentId: string; text: string }
-        const name = store.getState()?.agents[p.agentId]?.name ?? p.agentId
+        const name = agentName(store.getState()?.agents, p.agentId)
         setSpoken({ agentId: p.agentId, name, words: p.text })
         clearTimeout(timer)
         timer = window.setTimeout(() => {

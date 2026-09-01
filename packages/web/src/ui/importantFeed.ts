@@ -1,9 +1,10 @@
-import { kindWords } from './broadcastReady.js'
 import {
   CHRONICLE_FALLBACK_ICON,
-  chronicleLine,
   type ChronicleLookup,
   type SimEvent,
+  agentName,
+  chronicleLine,
+  kindWords,
 } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
@@ -11,7 +12,7 @@ import type { WorldState } from '@sj/engine/state'
 // sentence. Authored mystery prose is engine data the browser bundle does not carry, so it stays quiet.
 export function chronicleLabel(ev: SimEvent, state: WorldState | null): string | null {
   const look: ChronicleLookup = {
-    agentName: (id) => state?.agents[id]?.name ?? id,
+    agentName: (id) => agentName(state?.agents, id),
     // R4: prose to a viewer, never the engine's slug
     structureKind: (id) => kindWords(state?.structures[id]?.kind ?? 'building'),
     mysteryProse: () => null,

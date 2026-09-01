@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
+import { SOMEONE, agentName, bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
@@ -161,7 +161,7 @@ export function PersonLedgerView({
   tick,
   carrying,
   ledger,
-  nameOf = (id) => id,
+  nameOf = () => SOMEONE,
 }: {
   agent: LedgerAgent
   tick: number
@@ -289,7 +289,7 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           tick={tick}
           carrying={carrying}
           ledger={ledger.data}
-          nameOf={(id) => state?.agents[id]?.name ?? id}
+          nameOf={(id) => agentName(state?.agents, id)}
         />
       ) : (
         <PersonStoryView
@@ -310,7 +310,6 @@ function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] 
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   if (api === null) return <Skeleton />
 
-  const nameOf = (id: string): string => state?.agents[id]?.name ?? id
   const mine = api.bonds.filter((b) => b.aId === agentId || b.bId === agentId)
   if (mine.length === 0) return <p className="feed-empty">{EMPTY_COPY.ties}</p>
 
@@ -322,7 +321,7 @@ function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] 
           bondTypeOf(agentId, otherId, lineage, api),
           bondLevel(bondWarmth(b, tick)),
           bondArc(b, tick),
-          [nameOf(agentId), nameOf(otherId)],
+          [agentName(state?.agents, agentId), agentName(state?.agents, otherId)],
         )
         return (
           <li key={b.id} className="edge">

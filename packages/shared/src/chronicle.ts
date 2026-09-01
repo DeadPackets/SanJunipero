@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { kindWords } from './places.js'
+import { verbPhrase } from './verbs.js'
 import type { SimEvent } from './events.js'
 
 // What the town would remember. The weight is editorial, not a score the town can win:
@@ -197,7 +199,8 @@ function tileChangedLine(p: Record<string, unknown>, look: ChronicleLookup): str
 export const FAR_BANK_PHRASE = 'across the river'
 
 export function faunaSightingLine(kind: string, farBank: boolean): string {
-  return farBank ? `a ${kind} ${FAR_BANK_PHRASE}` : `a ${kind}`
+  const beast = kindWords(kind)
+  return farBank ? `a ${beast} ${FAR_BANK_PHRASE}` : `a ${beast}`
 }
 
 // What a viewer reads where a name would be. The town has not named the thing, and saying so
@@ -261,13 +264,16 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       return 'The world is wider than it was.'
     case 'fauna_killed': {
       const who = typeof p.byId === 'string' ? look.agentName(p.byId) : null
-      const beast = str(p.kind) === '' ? 'an animal' : `a ${str(p.kind)}`
-      return who === null ? `A ${str(p.kind)} was found dead.` : `${who} brought down ${beast}.`
+      const beast = str(p.kind) === '' ? 'an animal' : `a ${kindWords(str(p.kind))}`
+      return who === null
+        ? `A ${kindWords(str(p.kind))} was found dead.`
+        : `${who} brought down ${beast}.`
     }
     case 'agent_expressed': {
       const who = look.agentName(str(p.agentId))
-      // The coined word, kept whole: no tense can be guessed for a verb the town invented.
-      const verb = str(p.verb)
+      // The coined word said as words: `recipe:` is the town's "make", and the namespace and the
+      // separators under it are ours, never theirs.
+      const verb = str(p.verb) === '' ? '' : verbPhrase(str(p.verb))
       const witness = p.sense === 'sound' ? 'was heard' : 'was seen'
       const forWhom = typeof p.targetId === 'string' ? ` for ${look.agentName(p.targetId)}` : ''
       return verb === '' ? null : `${who} ${witness} to ${verb}${forWhom}.`

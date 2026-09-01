@@ -58,16 +58,16 @@ const milestones: Milestone[] = [
 ]
 
 describe('renderNewspaper', () => {
-  const paper = renderNewspaper(1, chapter, heats, milestones, scenes)
+  const nameOf = (id: string): string => id[0]!.toUpperCase() + id.slice(1)
+  const paper = renderNewspaper(1, chapter, heats, milestones, scenes, nameOf)
 
   it('composes headline, body, and citations from the day chapter', () => {
     expect(paper.headline).toBe('The Argument by the Storehouse')
     expect(paper.body).toContain('Omar and Yusuf came to blows.')
     expect(paper.body).toContain('the first word spoken')
     expect(paper.body).not.toContain('the first trade') // day 2 milestone excluded
-    expect(paper.body).toContain('omar')
-    expect(paper.body).toContain('yusuf')
-    expect(paper.body).not.toContain('nadia') // only the top-heat scene's cast
+    expect(paper.body).toContain('Seen in the thick of it: Omar, Yusuf.')
+    expect(paper.body).not.toContain('Nadia') // only the top-heat scene's cast
     expect(paper.citations).toEqual([1, 3])
   })
 

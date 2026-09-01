@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import type { SimEvent } from '@sj/shared'
+import { pastParticiple, type SimEvent, verbPhrase, verbPhrasePast } from '@sj/shared'
 import type { SceneSegment } from './types.js'
-import {
-  DEFAULT_DETECT_CONFIG,
-  detectInstitutions,
-  pastParticiple,
-  verbPhrase,
-  verbPhrasePast,
-} from './institutions.js'
+import { DEFAULT_DETECT_CONFIG, detectInstitutions } from './institutions.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
@@ -57,7 +51,8 @@ const events: SimEvent[] = [
 ]
 
 describe('detectInstitutions', () => {
-  const out = detectInstitutions(scenes, events)
+  const nameOf = (id: string): string => id[0]!.toUpperCase() + id.slice(1)
+  const out = detectInstitutions(scenes, events, DEFAULT_DETECT_CONFIG, nameOf)
 
   it('emits the caretaker role for omar with the 3 tend seqs', () => {
     const role = out.find((i) => i.kind === 'role' && i.name === 'the caretaker')
@@ -71,7 +66,7 @@ describe('detectInstitutions', () => {
     const group = out.find((i) => i.kind === 'group')
     expect(group).toBeDefined()
     expect(group!.memberIds).toEqual(['omar', 'yusuf']) // sorted
-    expect(group!.name).toBe('omar & yusuf')
+    expect(group!.name).toBe('Omar & Yusuf')
     expect(group!.foundingSceneIndex).toBe(0) // earliest shared scene
     expect(group!.sourceEventIds).toEqual([1, 2]) // founding scene's eventIds
   })
@@ -111,11 +106,13 @@ describe('detectInstitutions', () => {
       act(9, 8, 'nadia', 'forage'),
     ]
     const tbScenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8, 9], ['omar', 'yusuf', 'nadia'])]
-    const roles = detectInstitutions(tbScenes, teachBuild).filter((i) => i.kind === 'role')
+    const roles = detectInstitutions(tbScenes, teachBuild, DEFAULT_DETECT_CONFIG, nameOf).filter(
+      (i) => i.kind === 'role',
+    )
     const descs = roles.map((r) => r.description)
-    expect(descs).toContain('omar has taught 3 times')
-    expect(descs).toContain('yusuf has built 3 times')
-    expect(descs).toContain('nadia has foraged 3 times')
+    expect(descs).toContain('Omar has taught 3 times')
+    expect(descs).toContain('Yusuf has built 3 times')
+    expect(descs).toContain('Nadia has foraged 3 times')
     expect(descs.join(' ')).not.toMatch(/teached|builded|foragee?ed/)
   })
 

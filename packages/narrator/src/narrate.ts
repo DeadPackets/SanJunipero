@@ -1,5 +1,11 @@
 import type Database from 'better-sqlite3'
-import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  type SimConfig,
+  type SimEvent,
+  personWords,
+  placeWordsAt,
+} from '@sj/shared'
 import type { WorldState } from '@sj/engine'
 import { publishClean, renderChapter, renderEra } from './chronicle.js'
 import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
@@ -11,6 +17,7 @@ import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
 import type { NarratorStore } from './store.js'
 import type {
+  CastMember,
   ChapterRow,
   DetectConfig,
   EraRow,
@@ -43,6 +50,8 @@ export async function narrateDay(deps: {
   events: SimEvent[]
   rulebookCount: number
   privateCounts: { thoughts: number; journals: number }
+  /** The name index. Absent, nobody is named — and a viewer is still never shown an id. */
+  cast?: readonly { id: string; name: string }[]
   segmentCfg?: SegmentConfig
   detectCfg?: DetectConfig
   alert?: (d: string) => void
@@ -60,6 +69,21 @@ export async function narrateDay(deps: {
 }> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
+  const names = new Map((deps.cast ?? []).map((c) => [c.id, c.name]))
+  const nameOf = (id: string): string => personWords(names.get(id))
+  // A scene is stored as the tile it happened on. The prompt is given the place instead, so no
+  // chapter can echo a coordinate the model was never shown.
+  // Living AND dead: the chronicle may name a grave, and may name nothing else.
+  const known = Object.values(deps.world?.state?.agents ?? {})
+  const roll: CastMember[] =
+    known.length > 0
+      ? known.map((a) => ({ name: a.name, alive: a.alive }))
+      : (deps.cast ?? []).map((c) => ({ name: c.name, alive: true }))
+  const standing = Object.values(deps.world?.state?.structures ?? {})
+  const placeOf = (location: string): string | null => {
+    const m = /^(\d+),(\d+)$/.exec(location)
+    return m === null ? location : placeWordsAt(standing, Number(m[1]), Number(m[2]))
+  }
   const day = Math.floor(events[0]!.tick / MINUTES_PER_DAY)
 
   const existing = store.chaptersForDay(day)
@@ -133,6 +157,8 @@ export async function narrateDay(deps: {
       day,
       scenes,
       typeCounts,
+      look: { nameOf, placeOf },
+      cast: roll,
       alert: deps.alert,
     })
     chapter.sceneIds.forEach((sceneId, i) => {
@@ -157,7 +183,7 @@ export async function narrateDay(deps: {
   const rendered = chapter!
 
   if (day % 7 === 0) {
-    for (const inst of detectInstitutions(scenes, events, deps.detectCfg)) {
+    for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
       const { foundingSceneIndex, ...rest } = inst
       const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
       if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
@@ -226,6 +252,7 @@ export async function closeDay(deps: {
     events: deps.events,
     rulebookCount: deps.rulebookCount,
     privateCounts: deps.privateCounts,
+    cast,
     ...(deps.world === undefined ? {} : { world: deps.world }),
     ...(deps.semantic === undefined ? {} : { semantic: deps.semantic }),
     ...(deps.alert === undefined ? {} : { alert: deps.alert }),
@@ -236,7 +263,9 @@ export async function closeDay(deps: {
     published.some((p) => p.kind === kind && p.day === day)
 
   if (!alreadyOn('newspaper')) {
-    const paper = renderNewspaper(day, chapter, heat, milestones, store.scenesForDay(day))
+    const paper = renderNewspaper(day, chapter, heat, milestones, store.scenesForDay(day), (id) =>
+      personWords(cast.find((c) => c.id === id)?.name),
+    )
     store.insertPublication({
       day,
       kind: 'newspaper',

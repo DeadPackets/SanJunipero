@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import type { LlmClient } from '@sj/llm'
 import { NARRATOR_CANON } from '../canon.js'
-import { FOOTNOTE_RULE, NARRATOR_VOCABULARY_NOTES } from '../chronicle.js'
+import { FOOTNOTE_RULE, NARRATOR_VOCABULARY_NOTES, castLaw } from '../chronicle.js'
 import { NARRATOR_VOICE, NARRATOR_VOICES, type NarratorVoice } from '../voice.js'
 import type {
+  CastMember,
   ChapterDigest,
   ChapterSummary,
   EraSummary,
@@ -48,11 +49,18 @@ export function makeNarratorLlm(
 ): NarratorLlm {
   const speak = NARRATOR_VOICES[voice]
   return {
-    async summarizeChapter(scenes: SceneDigest[]): Promise<ChapterSummary> {
+    async summarizeChapter(
+      scenes: SceneDigest[],
+      cast: readonly CastMember[] = [],
+    ): Promise<ChapterSummary> {
       const { value } = await client.object({
         system: NARRATOR_CANON,
         messages: user(
           `${NARRATOR_VOCABULARY_NOTES}\n` +
+            `${castLaw(
+              cast,
+              scenes.some((s) => s.cast.length > 0),
+            )}\n` +
             "Write this day's chapter of the chronicle from the scene digests below, and give it a title.\n" +
             `${speak.chapter}\n` +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +
@@ -90,11 +98,11 @@ export function makeNarratorLlm(
       })
       return value
     },
-    async biography(agentId: string, name: string, record: PublicRecord[]) {
+    async biography(_agentId: string, name: string, record: PublicRecord[]) {
       const { value } = await client.object({
         system: NARRATOR_CANON,
         messages: user(
-          `Write the life of ${name} (known in the ledger as ${agentId}) from what the town saw, below. ` +
+          `Write the life of ${name} from what the town saw, below. ` +
             'Only what was seen and heard in public is known; write nothing of their private mind.\n' +
             `${speak.biography}\n${FOOTNOTE_RULE}\n` +
             JSON.stringify(record),

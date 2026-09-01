@@ -1,4 +1,4 @@
-import { bondNote, tickToMoment, type Bond } from '@sj/shared'
+import { type Bond, agentName, bondNote, tickToMoment } from '@sj/shared'
 import {
   BOND_LEVEL_WORD,
   BOND_TYPE_WORD,
@@ -53,7 +53,6 @@ export function BondDetail({
 }) {
   const newestFirst = [...bond.recent].reverse()
   const evidence = type === 'partner' ? partnerEvidence(bond) : null
-  const nameOf = (id: string): string => people[id]?.name ?? id
   const earlier = bond.strength - bond.recent.length
 
   return (
@@ -62,7 +61,7 @@ export function BondDetail({
         <span className="bond-level">{BOND_LEVEL_WORD[level]}</span>
         {type !== 'none' && <span className="bond-type">{BOND_TYPE_WORD[type]}</span>}
         <h3 className="bond-title">
-          {nameOf(bond.aId)} &amp; {nameOf(bond.bId)}
+          {agentName(people, bond.aId)} &amp; {agentName(people, bond.bId)}
         </h3>
         <button type="button" className="bond-close" onClick={onClose} aria-label="Close this bond">
           ×

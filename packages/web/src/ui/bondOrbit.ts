@@ -1,3 +1,4 @@
+import { agentName } from '@sj/shared'
 import type { BondsResponse } from '@sj/shared'
 import {
   LEVEL_RANK,
@@ -108,7 +109,7 @@ export function orbitOf(
     .filter((id) => id !== centreId)
     .map((id) => {
       const f = pairFacts(centreId, id, index, lineage, bonds, people, nowTick)
-      return { id, name: people[id]?.name ?? id, ...f }
+      return { id, name: agentName(people, id), ...f }
     })
     // Warmest first, then by name: the same person is in the same place on every visit.
     .sort((a, b) => rankOf(b.level) - rankOf(a.level) || a.name.localeCompare(b.name))

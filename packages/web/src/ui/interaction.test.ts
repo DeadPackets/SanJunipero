@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { DEFAULT_CONFIG, structureTitle } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { readFileSync } from 'node:fs'
 import { PLATE_MAX_ROWS } from './plateModel.js'
@@ -9,7 +9,6 @@ import {
   escapeStep,
   hoverPlate,
   itemCropDetail,
-  structureTitle,
   thingKind,
   type StageUp,
 } from './interaction.js'

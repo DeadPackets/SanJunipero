@@ -1,4 +1,4 @@
-import { tickToMoment, type BondsResponse, type SimEvent } from '@sj/shared'
+import { type BondsResponse, type SimEvent, personWords, tickToMoment } from '@sj/shared'
 import type { ChangeEntry } from '../becoming.js'
 import {
   BOND_LEVEL_WORD,
@@ -218,7 +218,7 @@ export function becomingOf(input: BecomingInput): Becoming {
   for (const b of input.bonds?.bonds ?? []) {
     if (b.aId !== input.id && b.bId !== input.id) continue
     const otherId = b.aId === input.id ? b.bId : b.aId
-    const name = input.people[otherId] ?? otherId
+    const name = personWords(input.people[otherId])
     const level = bondLevel(bondWarmth(b, input.nowTick))
     const type = bondTypeOf(input.id, otherId, input.lineage, input.bonds!)
     const arc = bondArc(b, input.nowTick)

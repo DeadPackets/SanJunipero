@@ -1,6 +1,5 @@
-import { sanitizeSpokenText } from '@sj/shared'
-import type { Structure, WorldState } from '@sj/engine/state'
-import { kindWords } from './broadcastReady.js'
+import { agentName, kindWords, structureTitle } from '@sj/shared'
+import type { WorldState } from '@sj/engine/state'
 import { plateRows, type PlateRow } from './plateModel.js'
 import { stateWord } from './status.js'
 
@@ -25,21 +24,6 @@ export const CROP_STAGES = 4
 
 // Typographic apostrophe — the chrome sets prose, not code.
 const OWNS = '’s'
-
-function agentName(state: WorldState, id: string): string {
-  return state.agents[id]?.name ?? id
-}
-
-/** What the town calls a building, everywhere a viewer reads its name: the name a hand carved
- *  into it, then the words of the inscription, and only then the kind it is. It takes the
- *  building, not an id, so no caller has a not-there case to invent an answer for. */
-export function structureTitle(s: Structure): string {
-  // A carved word is one mind's text landing in another's eye, so it goes through the same
-  // sanitizer `placeName` names a place with. R4: a hover used to read "fire_pit".
-  const written = s.name ?? s.inscription?.text
-  const carved = written === undefined ? '' : sanitizeSpokenText(written)
-  return carved === '' ? kindWords(s.kind) : carved
-}
 
 /** A viewer is never shown an id: genesis signs its own work with a runner who is nobody, so an
  *  owner outside the town is left unsaid rather than printed. */
@@ -128,7 +112,7 @@ export function itemCropDetail(
     const it = state.items[thing.id]
     if (it === undefined) return null
     const owner =
-      it.owner === undefined ? 'claimed by no one' : `owned by ${agentName(state, it.owner)}`
+      it.owner === undefined ? 'claimed by no one' : `owned by ${agentName(state.agents, it.owner)}`
     return `${kindWords(it.kind)} ×${it.qty}, ${owner}`
   }
   const c = state.crops[thing.id]
