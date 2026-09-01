@@ -38,8 +38,9 @@ export const MOTION_EXEMPT: readonly MotionExemption[] = [
     what: 'walk',
     ms: TICK_PERIOD_MAX_MS * (1 + WALK_LEAD_TICKS),
     because:
-      'the world’s own clock — a body crosses a tile in a tick of the simulation, and ' +
-      'the alternative to spending it is teleporting the body 2.5 times a second',
+      'the world’s own clock — a tick of the simulation is shared out among the tiles it ' +
+      'carried a body over, and the alternative to spending it is teleporting the body ' +
+      '2.5 times a second',
   },
 ]
 

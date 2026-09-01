@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
-import { ticksPerTileFor } from '@sj/engine/verbs'
+import { tilesPerTickFor } from '@sj/engine/verbs'
 import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
 import {
   BOB_PX,
@@ -850,21 +850,21 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
     // and the leg duration — the thing that moves the body — has no gait term at all
     const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'characters.ts'), 'utf8')
     const leg = /e\.legMs = [^\n]*/.exec(src)?.[0] ?? ''
-    expect(leg).toContain('clock.periodMs * perTile')
+    expect(leg).toContain('clock.periodMs / perTick')
     expect(leg).not.toMatch(/gait|stride|phase/)
   })
 })
 
 describe('★ gait follows what a person is DOING, from state that already existed', () => {
-  it('★ the engine already walks a debuffed body at half speed — this is that rule, restated', () => {
+  it('★ the engine already walks a debuffed body slower — this is that rule, restated', () => {
     const well = { hunger: 90, energy: 90, warmth: 90, social: 90 }
     const hungry = { hunger: 5, energy: 90, warmth: 90, social: 90 }
-    const cfg = { debuffThreshold: 30, base: 1, debuff: 2 }
-    expect(ticksPerTileFor(well, cfg)).toBe(1)
-    expect(ticksPerTileFor(hungry, cfg)).toBe(2)
-    // so a hurrying body's legs cycle twice as fast as an ailing one's, on the same clock
-    expect(strideFrameMs(400 * ticksPerTileFor(well, cfg))).toBeLessThan(
-      strideFrameMs(400 * ticksPerTileFor(hungry, cfg)),
+    const cfg = { debuffThreshold: 30, base: 3, debuff: 2 }
+    expect(tilesPerTickFor(well, cfg)).toBe(3)
+    expect(tilesPerTickFor(hungry, cfg)).toBe(2)
+    // so a hurrying body's legs cycle faster than an ailing one's, on the same clock
+    expect(strideFrameMs(TICK_REAL_MS / tilesPerTickFor(well, cfg))).toBeLessThan(
+      strideFrameMs(TICK_REAL_MS / tilesPerTickFor(hungry, cfg)),
     )
   })
 
@@ -873,10 +873,10 @@ describe('★ gait follows what a person is DOING, from state that already exist
       `debuffThreshold: z.number().default(${MOVEMENT_FALLBACK.debuffThreshold})`,
     )
     expect(SHARED_CONFIG_SRC).toContain(
-      `baseTicksPerTile: z.number().default(${MOVEMENT_FALLBACK.base})`,
+      `baseTilesPerTick: z.number().default(${MOVEMENT_FALLBACK.base})`,
     )
     expect(SHARED_CONFIG_SRC).toContain(
-      `debuffTicksPerTile: z.number().default(${MOVEMENT_FALLBACK.debuff})`,
+      `debuffTilesPerTick: z.number().default(${MOVEMENT_FALLBACK.debuff})`,
     )
   })
 })
@@ -931,7 +931,7 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
       ).toBe(true)
     }
     // the schedule is not one of them: nothing that decides WHERE a body is asks the flag
-    for (const call of ['scheduleLeg(', 'interpolatePos(', 'prunePath(', 'ticksPerTileFor(']) {
+    for (const call of ['scheduleLeg(', 'interpolatePos(', 'prunePath(', 'tilesPerTickFor(']) {
       for (const l of src.split('\n')) {
         if (l.includes(call)) expect(l).not.toContain('wantsMotion')
       }

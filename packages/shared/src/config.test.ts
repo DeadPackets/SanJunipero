@@ -56,7 +56,7 @@ describe('SimConfigSchema', () => {
     const c = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 1 } })
     expect(c.needs.hungerDecayPerTick).toBe(1)
     expect(c.needs.eatRestoreHunger).toBe(60)
-    expect(c.movement.baseTicksPerTile).toBe(1)
+    expect(c.movement.baseTilesPerTick).toBe(3)
   })
 })
 

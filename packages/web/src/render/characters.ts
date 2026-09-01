@@ -1,6 +1,6 @@
 import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
-import { ticksPerTileFor } from '@sj/engine/verbs'
+import { tilesPerTickFor } from '@sj/engine/verbs'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { bodyDepthBox } from './depth.js'
@@ -54,7 +54,7 @@ const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
 /** The movement law's defaults, restated for a world whose snapshot has not arrived; `charAnim.test.ts` asserts these are what `shared/src/config.ts` defaults to. */
-export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 1, debuff: 2 } as const
+export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 3, debuff: 2 } as const
 
 type CharArt = ReturnType<typeof characterArt>
 type Sheet = { art: CharArt; texture: Texture | null }
@@ -353,8 +353,8 @@ export function createCharacterLayer(
     const conf = store.getConfig()
     const cfg = {
       debuffThreshold: conf?.needs.debuffThreshold ?? MOVEMENT_FALLBACK.debuffThreshold,
-      base: conf?.movement.baseTicksPerTile ?? MOVEMENT_FALLBACK.base,
-      debuff: conf?.movement.debuffTicksPerTile ?? MOVEMENT_FALLBACK.debuff,
+      base: conf?.movement.baseTilesPerTick ?? MOVEMENT_FALLBACK.base,
+      debuff: conf?.movement.debuffTilesPerTick ?? MOVEMENT_FALLBACK.debuff,
     }
     for (const ev of evts) {
       if (ev.type !== 'agent_moved') continue
@@ -365,10 +365,10 @@ export function createCharacterLayer(
       const dx = p.x - last.x
       const dy = p.y - last.y
       e.facing = facingFrom(dx, dy) ?? e.facing // a body that has not moved keeps its facing
-      // The leg's length comes from the record: `ticksPerTileFor` is the engine's own rule, where
-      // a body under the debuff threshold takes twice as many ticks per tile.
-      const perTile = ticksPerTileFor(state.agents[p.id]?.needs ?? {}, cfg)
-      e.legMs = clock.periodMs * perTile
+      // The leg's length comes from the record: `tilesPerTickFor` is the engine's own rule, and
+      // a tick that carried three tiles is three legs of a third of it each.
+      const perTick = tilesPerTickFor(state.agents[p.id]?.needs ?? {}, cfg)
+      e.legMs = clock.periodMs / perTick
       e.path = scheduleLeg(e.path, p.x, p.y, {
         nowMs: now,
         legMs: e.legMs,

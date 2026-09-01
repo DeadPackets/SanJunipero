@@ -111,20 +111,20 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
   const at = (x: number, y: number, energy: number): WorldState =>
     putAt(spend(base, 'omar', energy), 'omar', x, y)
 
-  it('costs a walk out of the world’s own numbers — path × tiles-per-tick × decay', () => {
+  it('costs a walk out of the world’s own numbers — path ÷ tiles-per-tick × decay', () => {
     const s = at(door.x + 10, door.y, 50)
     const cost = walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)!
     const path = findPath(s, s.agents.omar!, door, SHOWCASE_CONFIG)!
-    const tired = Math.max(
-      SHOWCASE_CONFIG.movement.baseTicksPerTile,
-      SHOWCASE_CONFIG.movement.debuffTicksPerTile,
+    const tired = Math.min(
+      SHOWCASE_CONFIG.movement.baseTilesPerTick,
+      SHOWCASE_CONFIG.movement.debuffTilesPerTick,
     )
     expect(cost).toBeCloseTo(
-      path.length * tired * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick,
+      Math.ceil(path.length / tired) * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick,
       10,
     )
     // Priced at the TIRED rate: quoting today's speed under-prices the long late journeys.
-    expect(tired).toBeGreaterThan(SHOWCASE_CONFIG.movement.baseTicksPerTile)
+    expect(tired).toBeLessThan(SHOWCASE_CONFIG.movement.baseTilesPerTick)
     expect(walkEnergyCost(at(door.x, door.y, 50), SHOWCASE_CONFIG, 'omar', door)).toBe(0)
   })
 
@@ -239,10 +239,15 @@ describe('makeFoundersOnTick interiors switch', () => {
       })
       return out
     }
-    // Rested, the same leg is simply a walk — so it is the affordability that decides, not the
-    // distance and not the threshold (24 is above the policy's own PATROL_SLEEP_BELOW of 20).
+    // Rested, the same leg is simply a walk. At three tiles a tick the crossing costs a third of
+    // what it did, so the energy it can no longer be paid for out of sits UNDER the patrol's own
+    // sleep line — the gate is asked directly, because the policy can no longer be asked alone.
     expect(started(100)).toEqual(['walk'])
-    expect(started(24)).toEqual(['sleep'])
+    const at = (energy: number): WorldState =>
+      putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
+    expect(arrivesStanding(at(24), SHOWCASE_CONFIG, 'omar', YONDER)).toBe(true)
+    expect(arrivesStanding(at(10), SHOWCASE_CONFIG, 'omar', YONDER)).toBe(false)
+    expect(started(10)).toEqual(['sleep'])
   })
 })
 

@@ -208,7 +208,7 @@ const SLEEP: Intent = { verb: 'sleep', params: {} }
  *  `arrivesStanding`. */
 const PATROL_SLEEP_BELOW = 20
 
-/** Priced at the TIRED rate always: `ticksPerTile` doubles once a need drops under
+/** Priced at the TIRED rate always: `tilesPerTick` drops once a need falls under
  *  `debuffThreshold`, which would under-price the journeys that matter, the long ones taken late. */
 export function walkEnergyCost(
   state: WorldState,
@@ -222,8 +222,8 @@ export function walkEnergyCost(
   if (at.x === to.x && at.y === to.y) return 0
   const path = findPath(state, at, to, config)
   if (path === null) return null
-  const tired = Math.max(config.movement.baseTicksPerTile, config.movement.debuffTicksPerTile)
-  return path.length * tired * awakeEnergyDecay(config, a)
+  const tired = Math.min(config.movement.baseTilesPerTick, config.movement.debuffTilesPerTick)
+  return Math.ceil(path.length / tired) * awakeEnergyDecay(config, a)
 }
 
 /** The reserve is the collapse floor itself — arriving at exactly the floor is arriving face-down. */

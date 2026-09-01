@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, TICK_REAL_MS, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -35,7 +35,7 @@ function applyAll(s: WorldState, events: { type: string; payload: unknown }[]): 
 }
 
 describe('submitIntent', () => {
-  it('accepts a valid walk: action_started with duration = pathLen × ticksPerTile', () => {
+  it('accepts a valid walk: action_started with duration = ceil(pathLen ÷ tilesPerTick)', () => {
     const s = makeWorld()
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(r).toEqual({
@@ -43,18 +43,18 @@ describe('submitIntent', () => {
       events: [
         {
           type: 'action_started',
-          payload: { agentId: 'a1', verb: 'walk', params: { x: 3, y: 0 }, duration: 3 },
+          payload: { agentId: 'a1', verb: 'walk', params: { x: 3, y: 0 }, duration: 1 },
         },
       ],
     })
   })
 
-  it('debuffed duration is 2× when hunger is 20', () => {
+  it('debuffed duration is longer when hunger is 20', () => {
     let s = makeWorld()
     s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(r.ok).toBe(true)
-    if (r.ok) expect((r.events[0]!.payload as { duration: number }).duration).toBe(6)
+    if (r.ok) expect((r.events[0]!.payload as { duration: number }).duration).toBe(2)
   })
 
   it('rejects unknown, dead, collapsed, and busy agents', () => {
@@ -178,35 +178,55 @@ describe('walk progression (stepWalk)', () => {
     return { s, ticks }
   }
 
-  it('completes in exactly pathLen ticks at full health', () => {
+  it('completes in exactly ceil(pathLen ÷ 3) ticks at full health', () => {
     let s = makeWorld()
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 2 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const done = walkUntilDone(s)
-    expect(done.ticks).toBe(7) // pathLen = 5 + 2
+    expect(done.ticks).toBe(3) // pathLen = 5 + 2, three tiles a tick
     expect([done.s.agents.a1!.x, done.s.agents.a1!.y]).toEqual([5, 2])
   })
 
-  it('takes 2× ticks when hunger is 20, still arriving', () => {
-    let s = makeWorld()
-    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
-    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 4, y: 0 })
+  it('★ thirty tiles of straight road is ten ticks — twenty seconds at the world’s own rate', () => {
+    let s = makeWorld(Array.from({ length: 4 }, () => '.'.repeat(31)))
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 30, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const done = walkUntilDone(s)
-    expect(done.ticks).toBe(8)
-    expect([done.s.agents.a1!.x, done.s.agents.a1!.y]).toEqual([4, 0])
+    expect(done.ticks).toBe(10)
+    expect(done.ticks * TICK_REAL_MS).toBe(20_000)
+    expect([done.s.agents.a1!.x, done.s.agents.a1!.y]).toEqual([30, 0])
   })
 
-  it('emits agent_moved one tile per move, along the stored path', () => {
+  it('takes the debuffed body longer, still arriving', () => {
     let s = makeWorld()
-    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 2, y: 0 })
+    s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 2 })
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(s, r.events)
+    const done = walkUntilDone(s)
+    expect(done.ticks).toBe(4) // pathLen 7 at two tiles a tick, against three
+    expect([done.s.agents.a1!.x, done.s.agents.a1!.y]).toEqual([5, 2])
+  })
+
+  it('emits agent_moved once per tile crossed, in order, along the stored path', () => {
+    let s = makeWorld()
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const first = stepWalk(s, 'a1')
-    expect(first.map((e) => e.type)).toEqual(['action_progressed', 'agent_moved'])
-    expect(first[1]!.payload).toEqual({ id: 'a1', x: 1, y: 0 })
+    expect(first.map((e) => e.type)).toEqual([
+      'action_progressed',
+      'agent_moved',
+      'agent_moved',
+      'agent_moved',
+    ])
+    expect(first.slice(1).map((e) => e.payload)).toEqual([
+      { id: 'a1', x: 1, y: 0 },
+      { id: 'a1', x: 2, y: 0 },
+      { id: 'a1', x: 3, y: 0 },
+    ])
   })
 
   it('interrupts with reason blocked when the next tile becomes impassable', () => {
@@ -214,13 +234,13 @@ describe('walk progression (stepWalk)', () => {
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 4, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    s = applyAll(s, stepWalk(s, 'a1')) // a1 now at (1,0)
+    s = applyAll(s, stepWalk(s, 'a1')) // a1 now at (2,0): two tiles this tick
     s = fold(
       s,
       ev(seq++, 'structure_planned', {
         id: 'structure_1',
         kind: 'house',
-        x: 2,
+        x: 3,
         y: 0,
         w: 1,
         h: 1,
@@ -235,7 +255,36 @@ describe('walk progression (stepWalk)', () => {
     ])
     s = applyAll(s, blocked)
     expect(s.agents.a1!.activity).toBeNull()
-    expect([s.agents.a1!.x, s.agents.a1!.y]).toEqual([1, 0])
+    expect([s.agents.a1!.x, s.agents.a1!.y]).toEqual([2, 0])
+  })
+
+  it('★ stops AT a wall that appears mid-stride — three tiles a tick never clips through one', () => {
+    let s = makeWorld()
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 6, y: 0 })
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(s, r.events)
+    // The wall lands on the SECOND tile of a three-tile stride, after the path was already stored.
+    s = fold(
+      s,
+      ev(seq++, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 0,
+        w: 1,
+        h: 1,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+    )
+    const step = stepWalk(s, 'a1')
+    expect(step.map((e) => e.type)).toEqual(['action_progressed', 'agent_moved'])
+    s = applyAll(s, step)
+    expect([s.agents.a1!.x, s.agents.a1!.y]).toEqual([1, 0]) // beside the wall, not past it
+    expect(stepWalk(s, 'a1')).toEqual([
+      { type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } },
+    ])
   })
 })
 

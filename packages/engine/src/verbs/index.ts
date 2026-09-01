@@ -194,7 +194,7 @@ function adjacentLivingTarget(
 }
 
 /** The walk's whole rule, free of world state so the viewer can animate on it too. */
-export function ticksPerTileFor(
+export function tilesPerTickFor(
   needs: Readonly<Record<string, number>>,
   cfg: { debuffThreshold: number; base: number; debuff: number },
 ): number {
@@ -202,11 +202,11 @@ export function ticksPerTileFor(
   return debuffed ? cfg.debuff : cfg.base
 }
 
-export function ticksPerTile(state: WorldState, config: SimConfig, agentId: string): number {
-  return ticksPerTileFor(state.agents[agentId]!.needs, {
+export function tilesPerTick(state: WorldState, config: SimConfig, agentId: string): number {
+  return tilesPerTickFor(state.agents[agentId]!.needs, {
     debuffThreshold: config.needs.debuffThreshold,
-    base: config.movement.baseTicksPerTile,
-    debuff: config.movement.debuffTicksPerTile,
+    base: config.movement.baseTilesPerTick,
+    debuff: config.movement.debuffTilesPerTick,
   })
 }
 
@@ -263,7 +263,7 @@ const walk: VerbDef = makeVerb({
     const a = state.agents[agentId]!
     const path = findPath(state, a, p, config)
     if (!path) throw new Error(`walk.duration: no path for ${agentId}`)
-    return path.length * ticksPerTile(state, config, agentId)
+    return Math.ceil(path.length / tilesPerTick(state, config, agentId))
   },
   onComplete() {
     return []
@@ -2029,7 +2029,7 @@ export function stepBuild(state: WorldState, config: SimConfig, agentId: string)
   return events
 }
 
-// One tick of an in-progress walk: action_progressed, agent_moved on tile boundaries, or a lone action_interrupted {blocked}.
+// One tick of an in-progress walk: action_progressed, one agent_moved per tile crossed, or a lone action_interrupted {blocked}.
 export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
@@ -2037,18 +2037,21 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
     throw new Error(`stepWalk: agent ${agentId} has no walk in progress`)
   const done = act.path.findIndex(([x, y]) => x === a.x && y === a.y) + 1
   const tilesLeft = act.path.length - done
-  const perTile = Math.ceil(act.ticksRemaining / tilesLeft)
-  if ((act.ticksRemaining - 1) % perTile !== 0) {
-    return [{ type: 'action_progressed', payload: { agentId, ticks: 1 } }]
+  // Spread what is left over the ticks that are left, so the legs land on the last tile exactly
+  // when the clock runs out however the two were nudged apart.
+  const stride = Math.min(tilesLeft, Math.ceil(tilesLeft / act.ticksRemaining))
+  const moves: PendingEvent[] = []
+  // Every tile of the stride is judged the way a lone step is: speed can never carry a body
+  // through a wall, and the first refusal ends the tick where a single step would have stopped.
+  for (let i = 0; i < stride; i++) {
+    const [nx, ny] = act.path[done + i]!
+    if (!isPassable(state, nx, ny)) break
+    moves.push({ type: 'agent_moved', payload: { id: agentId, x: nx, y: ny } })
   }
-  const [nx, ny] = act.path[done]!
-  if (!isPassable(state, nx, ny)) {
+  if (moves.length === 0) {
     return [{ type: 'action_interrupted', payload: { agentId, reason: 'blocked' } }]
   }
-  return [
-    { type: 'action_progressed', payload: { agentId, ticks: 1 } },
-    { type: 'agent_moved', payload: { id: agentId, x: nx, y: ny } },
-  ]
+  return [{ type: 'action_progressed', payload: { agentId, ticks: 1 } }, ...moves]
 }
 
 // Their surface stays part of `verbs`.
