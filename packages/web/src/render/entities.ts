@@ -124,7 +124,10 @@ const syncStates = new WeakMap<Scene, SyncState>()
 function setTexture(book: TextureBook, entry: Entry, url: string): void {
   entry.url = url
   void book.get(url).then((t) => {
-    if (entry.url === url) entry.sprite.texture = t
+    if (entry.url !== url || entry.sprite.destroyed) return
+    entry.sprite.texture = t
+    // A shadow is what marks the entries drawn to a common longest side: the dropped things.
+    if (entry.shadow !== null) fitItem(entry, t)
   })
 }
 
@@ -409,11 +412,7 @@ export function syncEntities(
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
-      const fitting = entry
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
-      void book.get(entry.url).then((t) => {
-        if (!fitting.sprite.destroyed) fitItem(fitting, t)
-      })
     }
     const ground = feetOf(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)

@@ -32,7 +32,7 @@ export function armFor(key: string, count: number): number | null {
   switch (key) {
     case 'ArrowUp':
     case 'Home':
-      return at(0)
+      return 0
     case 'ArrowRight':
       return at(1)
     case 'ArrowDown':
@@ -40,7 +40,7 @@ export function armFor(key: string, count: number): number | null {
     case 'ArrowLeft':
       return at(3)
     case 'End':
-      return count > 0 ? count - 1 : null
+      return count - 1
     default:
       return null
   }
@@ -52,7 +52,7 @@ const RING_REACH: Reach = { x: 100, y: 110 }
 
 /** Whether THIS subject has a way in. A person never does; the building answers for itself. */
 function wayIn(store: WorldStore, subject: Subject | null): boolean {
-  if (subject === null || subject.kind !== 'structure') return false
+  if (subject?.kind !== 'structure') return false
   return entersOnClick(store.getConfig(), store.getState(), subject.id)
 }
 
@@ -94,6 +94,8 @@ export function SubjectRing({
 
   if (subject === null) return null
   const verbs = ringVerbsFor(subject.kind, enterable)
+  // A ring that shrinks under the focus must still have ONE tab stop, or Tab cannot reach it.
+  const on = Math.min(at, verbs.length - 1)
   return (
     <div ref={ref} className="stage-ring">
       <div className="stage-ring-arms" role="menu" aria-label={subject.name}>
@@ -105,7 +107,7 @@ export function SubjectRing({
             }}
             type="button"
             role="menuitem"
-            tabIndex={i === at ? 0 : -1}
+            tabIndex={i === on ? 0 : -1}
             onClick={() => {
               onVerb(verb)
             }}

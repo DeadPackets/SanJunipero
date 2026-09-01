@@ -67,7 +67,7 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   const settled = prov.loaded && (prov.data === null || journal.loaded)
   return (
     <section className="provenance">
-      <h3 className="feed-head">{structureTitle(state, id)}</h3>
+      <h3 className="feed-head">{structureTitle(structure)}</h3>
       {settled ? (
         <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (

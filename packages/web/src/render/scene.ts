@@ -116,6 +116,8 @@ export type Scene = {
   /** A click that landed on the GROUND, as a tile. A click that landed on a person, a
    *  building, an item or a crop is not a tile pick and does not fire this — see the handler. */
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
+  /** Whether the gesture that just ended was a pan rather than a click. */
+  wasDrag(): boolean
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
   /** Where a subject stands, in the space `tileToScreen` returns: a body's own sprite anchor
@@ -324,6 +326,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setFollow: rig.setFollow,
     onFollowEnd: rig.onFollowEnd,
     onTilePointer: rig.onTilePointer,
+    wasDrag: rig.wasDrag,
     destroy: () => {
       clock.close()
       offSub()

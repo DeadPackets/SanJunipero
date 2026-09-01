@@ -1,4 +1,5 @@
-import { placeName, type WorldState } from '@sj/engine/state'
+import { sanitizeSpokenText } from '@sj/shared'
+import type { Structure, WorldState } from '@sj/engine/state'
 import { kindWords } from './broadcastReady.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
@@ -28,15 +29,14 @@ function agentName(state: WorldState, id: string): string {
 }
 
 /** What the town calls a building, everywhere a viewer reads its name: the name a hand carved
- *  into it, then the words of the inscription, and only then the kind it is. */
-export function structureTitle(state: WorldState | null, id: string): string | null {
-  const s = state?.structures[id]
-  if (s === undefined) return null
+ *  into it, then the words of the inscription, and only then the kind it is. It takes the
+ *  building, not an id, so no caller has a not-there case to invent an answer for. */
+export function structureTitle(s: Structure): string {
   // A carved word is one mind's text landing in another's eye, so it goes through the same
-  // sanitizer the world names a place with. R4: a hover used to read "fire_pit".
-  const cut = s.inscription
-  const carved = placeName(s) ?? placeName(cut === undefined ? {} : { name: cut.text })
-  return carved === undefined || carved === '' ? kindWords(s.kind) : carved
+  // sanitizer `placeName` names a place with. R4: a hover used to read "fire_pit".
+  const written = s.name ?? s.inscription?.text
+  const carved = written === undefined ? '' : sanitizeSpokenText(written)
+  return carved === '' ? kindWords(s.kind) : carved
 }
 
 // One line for the pointer: what this is, whose it is, how far along it is. Named
@@ -48,8 +48,10 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
       const a = state.agents[id]
       return a === undefined ? null : a.name
     }
-    case 'structure':
-      return structureTitle(state, id)
+    case 'structure': {
+      const s = state.structures[id]
+      return s === undefined ? null : structureTitle(s)
+    }
     case 'item': {
       const it = state.items[id]
       if (it === undefined) return null

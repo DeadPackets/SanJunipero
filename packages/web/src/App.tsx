@@ -184,10 +184,6 @@ export function App() {
     openPage(next.kind === 'agent' ? 'person' : 'building')
   }
 
-  // What the town calls a building, from the one helper every surface reads it through.
-  const nameOf = (structureId: string): string =>
-    structureTitle(store.getState(), structureId) ?? structureId
-
   const enterInterior = (structureId: string | null): void => {
     scene?.interior?.setActive(structureId)
   }
@@ -216,7 +212,7 @@ export function App() {
           (s) => s.owner === subject.id,
         )
         if (home === undefined) return
-        setSubject({ id: home.id, kind: 'structure', name: nameOf(home.id) })
+        setSubject({ id: home.id, kind: 'structure', name: structureTitle(home) })
         openPage('building', 'Provenance')
         scene?.centerOn(home.x, home.y)
       }
@@ -270,7 +266,7 @@ export function App() {
             if (pick.kind === 'structure') {
               const s = store.getState()?.structures[pick.id]
               if (s === undefined) return
-              setSubject({ id: s.id, kind: 'structure', name: nameOf(s.id) })
+              setSubject({ id: s.id, kind: 'structure', name: structureTitle(s) })
               return
             }
             // A thing on the ground has no ring; the record it came out of is its surface.
@@ -289,9 +285,11 @@ export function App() {
           className="stage-exit"
           onClick={() => {
             enterInterior(null)
+            // the button goes with the room, so the focus it held has to be handed somewhere
+            appRef.current?.querySelector<HTMLElement>('.stage-mount')?.focus()
           }}
         >
-          ← Back to town
+          <span aria-hidden="true">← </span>Back to town
         </button>
       )}
       <SpeechLive store={store} />

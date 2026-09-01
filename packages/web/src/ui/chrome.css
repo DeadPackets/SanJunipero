@@ -925,12 +925,12 @@ body {
    duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
   .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
-  .roster-row, .key-summary, .discovery-leaf {
+  .roster-row, .key-summary, .discovery-leaf, .stage-exit {
     transition-duration: 0s;
   }
   .feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
   .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
-  .discovery-leaf:hover {
+  .discovery-leaf:hover, .stage-exit:hover {
     transition-duration: var(--t-fast);
   }
 }

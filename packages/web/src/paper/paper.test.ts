@@ -84,7 +84,8 @@ describe('the signpost', () => {
   // the town could only be found by a viewer who already knew it was there.
   it('★ hangs a way into the key map off the end of the post', () => {
     const html = post(null)
-    expect(html).toContain(`aria-label="Keyboard shortcuts"`)
+    // named for the sheet it opens, so a screen reader hears one name for one thing
+    expect(html).toContain(`aria-label="What the town answers to"`)
     expect(html).toContain(`>${KEY_MAP_KEY}<`)
     // it is not one of the four: it opens no page and presses for none
     expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])

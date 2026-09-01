@@ -19,20 +19,26 @@ export const HIT_MIN_PX = 24
  *  gate asserts. */
 export const HIT_TIGHTNESS_MAX = 1.35
 
-/** The capsule in LOCAL sprite space — feet at (0,0), the body rising to negative y. Points are
- *  pre-divided by `scale` because Pixi scales `hitArea` with the sprite. */
+/** One half-profile up the right side, mirrored down the left — a closed capsule about x = 0.
+ *  Points are pre-divided by `scale` because Pixi scales `hitArea` with the sprite. */
+function mirrored(right: readonly [number, number][], k: number): number[] {
+  const left = [...right].reverse().map(([x, y]): [number, number] => [-x, y])
+  return [...right, ...left].flatMap(([x, y]) => [x / k, y / k])
+}
+
+/** The capsule in LOCAL sprite space — feet at (0,0), the body rising to negative y. */
 export function bodyHitPolygon(figureH: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale
   const drawnH = figureH * k
-  const right: [number, number][] = [
-    [STANCE_W / 2, 0],
-    [SHOULDER_W / 2, -FOOT_H],
-    [SHOULDER_W / 2, -TORSO_TOP * drawnH],
-    [HEAD_W / 2, -HEAD_TOP * drawnH],
-  ]
-  // up the right side, across the head, down the left side — eight points, closed
-  const left = [...right].reverse().map(([x, y]): [number, number] => [-x, y])
-  return [...right, ...left].flatMap(([x, y]) => [x / k, y / k])
+  return mirrored(
+    [
+      [STANCE_W / 2, 0],
+      [SHOULDER_W / 2, -FOOT_H],
+      [SHOULDER_W / 2, -TORSO_TOP * drawnH],
+      [HEAD_W / 2, -HEAD_TOP * drawnH],
+    ],
+    k,
+  )
 }
 
 /** A body that has lain down is as long as it stood tall and rises about a third of that off
@@ -43,19 +49,20 @@ const LYING_TOP = 0.34
 const LYING_END = 0.85
 
 /** The capsule of a sleeper or a collapsed body, in LOCAL sprite space — the ground point at
- *  (0,0), the body lying across it. Pre-divided by `scale` because Pixi scales `hitArea`. */
+ *  (0,0), the body lying across it. */
 export function lyingHitPolygon(figureH: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale
   const drawnH = figureH * k
   const halfL = (LYING_LEN * drawnH) / 2
   const top = LYING_TOP * drawnH
-  const right: [number, number][] = [
-    [halfL * LYING_END, 0],
-    [halfL, -top / 2],
-    [halfL * LYING_END, -top],
-  ]
-  const left = [...right].reverse().map(([x, y]): [number, number] => [-x, y])
-  return [...right, ...left].flatMap(([x, y]) => [x / k, y / k])
+  return mirrored(
+    [
+      [halfL * LYING_END, 0],
+      [halfL, -top / 2],
+      [halfL * LYING_END, -top],
+    ],
+    k,
+  )
 }
 
 /** Shoelace area of a flat point list. */

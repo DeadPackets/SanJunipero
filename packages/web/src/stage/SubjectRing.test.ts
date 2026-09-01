@@ -132,6 +132,17 @@ describe('★ a building is asked what a building can answer', () => {
     expect(markup(WELL, storeOf(place('w1', 'well')))).not.toContain(`>${RING_LABEL.inside}<`)
   })
 
+  // ★ A ring that shrinks under the focus — a house that burns down while it is ringed — kept
+  // its tab stop on an arm that is no longer drawn, and Tab could not reach the ring at all.
+  it('★ keeps its one tab stop however few arms it has', () => {
+    for (const html of [
+      markup(HOUSE, storeOf(place('h1', 'house'))),
+      markup(WELL, storeOf(place('w1', 'well'))),
+    ]) {
+      expect((html.match(/tabindex="0"/g) ?? []).length).toBe(1)
+    }
+  })
+
   it('★ takes the way in off a shell that is still going up — there is no room in it yet', () => {
     const shell = markup(HOUSE, storeOf(place('h1', 'house', 'construction')))
     expect((shell.match(/role="menuitem"/g) ?? []).length).toBe(1)

@@ -41,7 +41,7 @@ export function Signpost({
       <button
         type="button"
         className="signpost-arm"
-        aria-label="Keyboard shortcuts"
+        aria-label="What the town answers to"
         onClick={onHelp}
       >
         {KEY_MAP_KEY}

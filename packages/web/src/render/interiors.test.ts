@@ -834,8 +834,9 @@ describe('★ inside a room, the pointer has somewhere to land', () => {
   it('★ a click on the dimmed town leaves the room, and a pan across it does not', () => {
     expect(SRC).toContain("veil.on('pointertap'")
     expect(SRC).toContain('setActive(null)')
-    // the same slop the camera's own tile pick uses, so a drag is never a click
-    expect(SRC).toContain('TAP_SLOP_PX')
+    // asked of the rig, which owns the one answer: a copy of it read only the endpoints, so a
+    // pan that came back to where it started read as a click and threw the viewer out
+    expect(SRC).toContain('scene.wasDrag()')
     // and it still swallows the town behind it
     expect(SRC).toContain("veil.eventMode = 'static'")
   })

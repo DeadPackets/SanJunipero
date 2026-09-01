@@ -118,7 +118,7 @@ function Places({ store, onSubject }: PageProps) {
   return (
     <ul className="places">
       {standing.map((s) => {
-        const words = structureTitle(state, s.id) ?? kindWords(s.kind)
+        const words = structureTitle(s)
         const builder = s.builtBy === null ? null : (state?.agents[s.builtBy]?.name ?? s.builtBy)
         return (
           <li key={s.id}>

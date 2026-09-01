@@ -121,23 +121,20 @@ describe('structureTitle — a proper name outranks the kind, wherever a viewer 
     inscription: { text: 'The Long Table', by: 'rahel' },
   }
   const blank = { ...structure('n3', 'house', null), inscription: { text: '  ', by: 'rahel' } }
-  const titled = {
-    structures: { n1: named, n2: carved, n3: blank },
-    agents: {},
-  } as unknown as WorldState
-
   it('★ reads the carved name, flattened exactly as speech is', () => {
-    expect(structureTitle(titled, 'n1')).toBe('Yusuf’s house')
+    expect(structureTitle(named)).toBe('Yusuf’s house')
   })
 
   it('falls back to the inscription, and past an inscription of nothing to the kind', () => {
-    expect(structureTitle(titled, 'n2')).toBe('The Long Table')
-    expect(structureTitle(titled, 'n3')).toBe('house')
+    expect(structureTitle(carved)).toBe('The Long Table')
+    expect(structureTitle(blank)).toBe('house')
+    expect(structureTitle(structure('n4', 'fire_pit', null))).toBe('fire pit')
   })
 
-  it('answers null for a building the town does not have', () => {
-    expect(structureTitle(titled, 'nope')).toBeNull()
-    expect(structureTitle(null, 'n1')).toBeNull()
+  it('★ and the hover reads it off the world, saying nothing about a building that is gone', () => {
+    const titled = { structures: { n1: named }, agents: {} } as unknown as WorldState
+    expect(hoverLabel(titled, 'structure', 'n1')).toBe('Yusuf’s house')
+    expect(hoverLabel(titled, 'structure', 'nope')).toBeNull()
   })
 })
 

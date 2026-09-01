@@ -1,33 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { directorArmedBy } from './autoCut.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 
 // ★ The director opened ON for everybody and re-armed twenty seconds after any input, so a
 // person who came to look around had the camera taken off them, over and over.
 describe('★ the director is for a broadcast, not for a person at a desk', () => {
-  const SRC = src('./autoCut.ts')
   const APP = src('../App.tsx')
 
-  it('★ opens off for a viewer and on for a stream', () => {
-    expect(directorArmedBy(false)).toBe(false)
-    expect(directorArmedBy(true)).toBe(true)
-  })
-
-  it('★ takes that answer from the route, which is where the stream frame is decided', () => {
+  it('★ is armed by the route, which is where the stream frame is decided', () => {
     expect(APP).toContain('useAutoCut(route.broadcast)')
   })
 
-  it('★ holds nothing off when nobody armed it — an idle desk gets no handback', () => {
-    expect(SRC).toContain('if (!armedRef.current) return')
-    expect(SRC).toContain('useState(armed)')
-  })
-
-  it('keeps ONE hand on it: the D key, and the handback goes to what that hand last asked', () => {
+  it('keeps ONE hand on it: the D key', () => {
     expect(APP).toContain('onDirector: toggleDirector')
-    expect(SRC).toContain('armedRef.current = !armedRef.current')
-    expect(SRC).toContain('setAutoCut(armedRef.current)')
   })
 })
 

@@ -47,6 +47,7 @@ import {
   scheduleLeg,
   strideFrameMs,
   type Gait,
+  type SheetRow,
   type TickClock,
   type Waypoint,
 } from './charAnim.js'
@@ -166,6 +167,8 @@ export type CharacterCell = {
   scale: number
   /** the sheet's own figure height, so a caller sizing anything off the art has one source */
   figureH: number
+  /** the row the sheet actually had, which is not always the row that was asked for */
+  row: SheetRow
 }
 
 // One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint. The map
@@ -182,6 +185,7 @@ export function characterCell(
       anchor: { x: 0.5, y: FEET_Y / CELL },
       scale: CHAR_TARGET_PX / 64,
       figureH: 64,
+      row,
     }
   }
   // A missing cell degrades inside its own facing — never across one, and never by leaving the
@@ -195,6 +199,7 @@ export function characterCell(
       anchor: { x: cell.feetX / cell.w, y: cell.feetY / cell.h },
       scale: CHAR_TARGET_PX / art.manifest.figureH,
       figureH: art.manifest.figureH,
+      row: r,
     }
   }
   return null
@@ -463,7 +468,8 @@ export function createCharacterLayer(
           e.sprite.texture = cell.texture
           e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
           e.sprite.scale.set(cell.scale) // smooth downscale to world footprint
-          setHitScale(e, cell.scale, cell.figureH, e.ranked, pose.row === 'sleep')
+          // the row the SHEET had: a sheet with no sleep row draws a standing body
+          setHitScale(e, cell.scale, cell.figureH, e.ranked, cell.row === 'sleep')
         }
       }
       standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })

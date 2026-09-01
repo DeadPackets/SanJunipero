@@ -1,11 +1,4 @@
-import {
-  Container,
-  Graphics,
-  Rectangle,
-  Sprite,
-  Texture,
-  type FederatedPointerEvent,
-} from 'pixi.js'
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import { CITY_INTERIOR_SLOTS, type AssetRecord, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -13,7 +6,6 @@ import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
-import { TAP_SLOP_PX } from './fling.js'
 import {
   advanceInterior,
   bedCells,
@@ -165,17 +157,10 @@ export function createInteriorScene(
   root.addChild(veil, room)
   app.stage.addChild(root)
 
-  // The dimmed town is also the way back out to it. A pan started on the veil is not a click:
-  // the same slop the camera's own tile pick uses, measured from where the finger went down.
-  let veilDown: { x: number; y: number } | null = null
-  veil.on('pointerdown', (e: FederatedPointerEvent) => {
-    veilDown = { x: e.global.x, y: e.global.y }
-  })
-  veil.on('pointertap', (e: FederatedPointerEvent) => {
-    const down = veilDown
-    veilDown = null
-    if (down === null) return
-    if (Math.abs(e.global.x - down.x) + Math.abs(e.global.y - down.y) > TAP_SLOP_PX) return
+  // The dimmed town is also the way back out to it. A pan across it is not a click, and the rig
+  // is asked rather than measured again: a pan that came back to where it started read as one.
+  veil.on('pointertap', () => {
+    if (scene.wasDrag()) return
     setActive(null)
   })
 
