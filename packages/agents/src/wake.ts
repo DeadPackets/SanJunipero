@@ -21,7 +21,9 @@ export type MindConfig = {
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
-  conversationGapTicks: 2,
+  // Five ticks is ten seconds at 1x: a reply lands in the pause a person leaves, not on top
+  // of the words it answers.
+  conversationGapTicks: 5,
   conversationWindowTicks: 60,
   idleGapTicks: 20,
   boredomTicks: 60,
