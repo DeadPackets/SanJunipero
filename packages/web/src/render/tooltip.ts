@@ -1,21 +1,7 @@
-import { Container, Graphics } from 'pixi.js'
-import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import type { LayerSet } from './layers.js'
-import { createWorldLabel } from './worldLabel.js'
-// the tag's material is the SPEECH material, taken from its owner rather than through
-// bubbles.ts — bubbles.ts now needs `placeTag` from here, and an alias is not worth a cycle
-import {
-  SPEECH_FILL as BUBBLE_FILL,
-  SPEECH_INK as BUBBLE_INK,
-  faceFor,
-  worldTextScale,
-} from './textFaces.js'
-
-export const TAG_FONT_PX = faceFor('label').size
-export const TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, TAG_FONT_PX + 2)
-export const TAG_PAD_X = 5
-export const TAG_PAD_Y = 3
-const TAG_MAX_CHARS = 48
+import { createPlate, type Plate } from './plate.js'
+import type { PlateRow } from '../ui/plateModel.js'
+import { worldTextScale } from './textFaces.js'
 
 /** Gap between the thing and its label; keep-out from the viewport edge; and how far a label
  *  moves to get clear of something already occupying its place. */
@@ -24,8 +10,16 @@ export const TAG_GAP_PX = 6,
   STACK_STEP_PX = 4
 export const MAX_STACK_STEPS = 3
 
-/** Where a label points. `sy` is the anchor's BASE and `topY` the top of what is DRAWN. */
-export type Anchor = { sx: number; sy: number; halfW: number; topY: number }
+/** Where a label points. `sy` is the anchor's BASE and `topY` the top of what is DRAWN.
+ *  `prefer` is which side is tried FIRST: a footprint plate is welded to the ground point, so
+ *  it asks for `below` and only leaves the footprint when the view has no room for it. */
+export type Anchor = {
+  sx: number
+  sy: number
+  halfW: number
+  topY: number
+  prefer?: 'above' | 'below'
+}
 export type Rect = { x: number; y: number; w: number; h: number }
 export type Placed = { sx: number; sy: number; side: 'above' | 'below' | 'left' | 'right' }
 
@@ -64,6 +58,8 @@ export function placeTag(
       rect: { x: a.sx - a.halfW - TAG_GAP_PX - size.w, y: a.sy - size.h / 2, w: size.w, h: size.h },
     },
   ]
+  // The preferred side goes first; the rest keep their order, so the fallback ladder is one rule.
+  if (a.prefer === 'below') candidates.unshift(candidates.splice(1, 1)[0]!)
   const chosen = candidates.find((c) => fits(c.rect)) ?? candidates[0]!
   const rect = { ...chosen.rect }
 
@@ -105,7 +101,7 @@ type TagOwner = 'hover' | 'door' | 'selection'
 type LabelOwner = 'bubbles' | 'plate' | 'toponyms' | 'acts'
 
 export type TooltipLayer = {
-  show(owner: TagOwner, text: string, a: Anchor): void
+  show(owner: TagOwner, rows: readonly PlateRow[], a: Anchor): void
   hide(owner: TagOwner): void
   hideAll(): void
   /** ONE occupancy, keyed by who owns the boxes. Everybody writes theirs; everybody reads
@@ -118,29 +114,7 @@ export type TooltipLayer = {
   destroy(): void
 }
 
-type Tag = {
-  node: Container
-  slab: Graphics
-  label: ReturnType<typeof createWorldLabel>
-  box: Rect | null
-}
-
-function makeTag(parent: Container): Tag {
-  const node = new Container()
-  node.visible = false
-  node.eventMode = 'none' // a label must never eat the click on the thing it names
-  const slab = new Graphics()
-  const label = createWorldLabel('', {
-    fontFamily: faceFor('label').family,
-    fontSize: TAG_FONT_PX,
-    fill: BUBBLE_INK,
-    lineHeight: TAG_LINE_H,
-  })
-  label.anchor.set(0.5, 0)
-  node.addChild(slab, label)
-  parent.addChild(node)
-  return { node, slab, label, box: null }
-}
+type Tag = { plate: Plate; box: Rect | null }
 
 export function createTooltipLayer(
   layers: LayerSet,
@@ -155,42 +129,26 @@ export function createTooltipLayer(
   const tagFor = (owner: TagOwner): Tag => {
     let t = tags.get(owner)
     if (t === undefined) {
-      t = makeTag(layers.worldText)
+      t = { plate: createPlate(layers.worldText), box: null }
       tags.set(owner, t)
     }
     return t
   }
 
   return {
-    show(owner, text, a) {
+    show(owner, rows, a) {
       const t = tagFor(owner)
-      if (text.length === 0) {
-        t.node.visible = false
+      if (rows.length === 0) {
+        t.plate.node.visible = false
         t.box = null
         return
       }
-      const next = text.length > TAG_MAX_CHARS ? `${text.slice(0, TAG_MAX_CHARS - 1)}…` : text
-      if (t.label.text !== next) {
-        t.label.text = next
-        t.slab.clear()
-        t.slab.roundRect(
-          -t.label.width / 2 - TAG_PAD_X,
-          -TAG_PAD_Y,
-          t.label.width + TAG_PAD_X * 2,
-          t.label.height + TAG_PAD_Y * 2,
-          2,
-        )
-        t.slab.fill(BUBBLE_FILL)
-        t.slab.stroke({ width: 1, color: BUBBLE_INK })
-      }
-      // A tag is the reader's size at every stop; the camera only changes its world footprint,
+      t.plate.setRows(rows)
+      // A plate is the reader's size at every stop; the camera only changes its world footprint,
       // which is the number the de-confliction below has to reason about.
       const inv = worldTextScale(zoom())
-      t.node.scale.set(inv)
-      const size = {
-        w: (t.label.width + TAG_PAD_X * 2) * inv,
-        h: (t.label.height + TAG_PAD_Y * 2) * inv,
-      }
+      t.plate.node.scale.set(inv)
+      const size = { w: t.plate.w * inv, h: t.plate.h * inv }
       // every OTHER live tag is something this one must not land on
       const taken = [
         ...occupiedBoxes(),
@@ -199,20 +157,20 @@ export function createTooltipLayer(
           .map(([, x]) => x.box)
           .filter((b): b is Rect => b !== null),
       ]
-      const at = placeTag(a, size, view(), taken)
-      t.node.position.set(Math.round(at.sx), Math.round(at.sy + TAG_PAD_Y * inv))
-      t.node.visible = true
+      const at = placeTag({ ...a, prefer: 'below' }, size, view(), taken)
+      t.plate.node.position.set(Math.round(at.sx - size.w / 2), Math.round(at.sy))
+      t.plate.node.visible = true
       t.box = { x: at.sx - size.w / 2, y: at.sy, w: size.w, h: size.h }
     },
     hide(owner) {
       const t = tags.get(owner)
       if (t === undefined) return
-      t.node.visible = false
+      t.plate.node.visible = false
       t.box = null
     },
     hideAll() {
       for (const t of tags.values()) {
-        t.node.visible = false
+        t.plate.node.visible = false
         t.box = null
       }
     },
@@ -223,7 +181,7 @@ export function createTooltipLayer(
     boxes: () =>
       [...tags].filter(([, t]) => t.box !== null).map(([owner, t]) => ({ owner, rect: t.box! })),
     destroy() {
-      for (const t of tags.values()) t.node.destroy({ children: true })
+      for (const t of tags.values()) t.plate.destroy()
       tags.clear()
     },
   }

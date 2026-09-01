@@ -80,6 +80,16 @@ overlay sixty times a second.
 | `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
 
+**The hover is a footprint plate.** `render/plate.ts` draws it and `ui/plateModel.ts` decides
+its words: a cream pixel slab welded to the thing's own ground point — `placeTag` is asked for
+`below` and only leaves the footprint when the view has no room there. Three rows at most, 22
+characters each: `kind` in Silkscreen capitals, `name` in the face that has lowercase, and
+`quiet` on a **parchment band** — de-emphasis is a different paper, because `--ink-quiet`
+measures 3.57:1 on cream under the deep-night multiply where the ink on parchment holds 4.67:1.
+A building answers what it is, whose it is (`structure.owner`, never `builtBy`) and who is
+inside; a person answers their name and the one word for what they are doing. A row with nothing
+to say is not drawn.
+
 Speech itself is drawn **in the canvas**, not the DOM: `render/bubbles.ts` draws a 2px ink box on
 a 4px radius with a three-step stair tail, washed toward the speaker's own colour at 15%. Two
 lines then `…`; the nearest three speakers get a box and everyone else a `…` pill; at zoom 0.25
@@ -190,9 +200,13 @@ once.
   the label is `--deep` ink painted on the wood with a 1px `--honey-l` cut edge under it, no halo.
   Sampled off the render at 375–2560 and DPR 2: **7.66:1 idle, 10.19:1 hovered, 5.46:1 on the
   pressed plank**, worst grain pixel under a glyph 5.46:1 (`~/handoff/cleanup/stage8/fix-signpost.md`).
-  **It does NOT hold for canvas world text** — see the open defect in
-  `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the ink it
-  asks for, measured at 1.1:1 over its own slab.
+  Canvas world text held it only after the atlas was split: Pixi bakes a `dynamicFill` atlas
+  white and applies the fill as a per-glyph tint, and that tint was dropped below the call site
+  — every world glyph rendered white, **1.1:1 over its own slab**
+  (`~/handoff/cleanup/stage7/i7-report.md`, D4). `render/textFaces.ts` now installs **one atlas
+  per ink** (`WORLD_INKS`, three of them) with `dynamicFill: false`, so the ink is baked and
+  there is no tint step to lose; `createWorldLabel` resolves the family from the style's fill,
+  and a fill with no atlas falls back to a canvas glyph, which draws its own colour.
 - **A page never prints an empty state over a broken wire.** `Read<T>` carries `failed`, and
   the seven branches that would otherwise say "the town has not done this yet" say
   `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news

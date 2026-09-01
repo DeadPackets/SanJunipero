@@ -25,7 +25,7 @@ export const FACE_INSTALL_PX = 16
  *  a WHOLE multiple keeps one texel on one pixel. Applied through `Scene.textScale`. */
 export const BROADCAST_TEXT_SCALE = 2
 
-export const FACE_ROLES = ['name', 'speech', 'thought', 'label'] as const
+export const FACE_ROLES = ['name', 'speech', 'thought', 'label', 'plate'] as const
 export type FaceRole = (typeof FACE_ROLES)[number]
 
 const ROLE_FACE: Readonly<Record<FaceRole, { family: string; size: number }>> = {
@@ -33,6 +33,8 @@ const ROLE_FACE: Readonly<Record<FaceRole, { family: string; size: number }>> = 
   label: { family: FACE_PX, size: FACE_INSTALL_PX },
   speech: { family: FACE_BODY, size: FACE_INSTALL_PX },
   thought: { family: FACE_BODY, size: FACE_INSTALL_PX },
+  // A plate carries a person's name and a place's, and Silkscreen has no lowercase to set it in.
+  plate: { family: FACE_BODY, size: FACE_INSTALL_PX },
 }
 
 export function faceFor(role: FaceRole): { family: string; size: number } {
@@ -80,19 +82,21 @@ export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
     )
     await doc.fonts.ready
     for (const [name, source] of Object.entries(FACE_SOURCE)) {
-      BitmapFont.install({
-        name,
-        // white + no stroke, so ONE atlas serves every ink the world writes in (dynamicFill)
-        style: { fontFamily: source, fontSize: FACE_INSTALL_PX, fill: 0xffffff },
-        chars: CHARS,
-        // Press Start 2P has `fi`/`fl` ligatures, so Pixi derives a −16 kern and stacks the `i`
-        // on the `f`. Both faces are monospace, so skipping kerning loses nothing.
-        skipKerning: true,
-        resolution: 1,
-        padding: 2,
-        dynamicFill: true,
-        textureStyle: { scaleMode: 'nearest' },
-      })
+      for (const ink of WORLD_INKS) {
+        BitmapFont.install({
+          name: inkedFace(name, ink),
+          style: { fontFamily: source, fontSize: FACE_INSTALL_PX, fill: ink },
+          chars: CHARS,
+          // Press Start 2P has `fi`/`fl` ligatures, so Pixi derives a −16 kern and stacks the `i`
+          // on the `f`. Both faces are monospace, so skipping kerning loses nothing.
+          skipKerning: true,
+          resolution: 1,
+          padding: 2,
+          // FALSE, and it is the whole fix: see WORLD_INKS.
+          dynamicFill: false,
+          textureStyle: { scaleMode: 'nearest' },
+        })
+      }
     }
     installed = true
   } catch {
@@ -177,6 +181,23 @@ export const SPEECH_INK = 0x241f2b // --deep
 export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
+/** --ink, the character name tag's own ink */
+export const NAME_INK = 0x43394a
+/** --cream, the ink a carved name is cut in — the landmark pair turned over */
+export const CARVED_INK = 0xfff6e9
+
+/** ★ THE INK IS BAKED INTO THE ATLAS, NEVER APPLIED AS A TINT. Pixi bakes a `dynamicFill`
+ *  atlas white and tints each glyph from `style.fill`; that tint is dropped somewhere below the
+ *  call site and every world glyph rendered white — measured at 1.1:1 over its own cream slab,
+ *  which made the town's speech unreadable. One atlas per ink has no tint step to lose. A fill
+ *  that is not on this list falls back to a canvas glyph, which draws its own colour correctly. */
+export const WORLD_INKS: readonly number[] = [SPEECH_INK, NAME_INK, CARVED_INK]
+
+/** The installed family for one ink. `createWorldLabel` resolves it from the style's fill, so
+ *  no call site has to know the atlas was split. */
+export function inkedFace(family: string, ink: number): string {
+  return `${family}#${(ink >>> 0).toString(16).padStart(6, '0')}`
+}
 
 export const GLYPH_W = 15
 export const GLYPH_H = 9

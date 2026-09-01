@@ -2,7 +2,7 @@ import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from '
 import { isRoofedKind, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { hoverLabel, type HoverKind } from '../ui/interaction.js'
+import { hoverPlate, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox } from './depth.js'
 import { depthKey, feetOf } from './iso.js'
@@ -288,16 +288,13 @@ export function syncEntities(
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
-      const text = hoverLabel(store.getState(), kind, id)
       // the anchor comes from the sprite's DRAWN size — `getLocalBounds` is the texture BEFORE
-      // the sprite's own scale, so a 1.85× building's tag stranded itself beside the roof
-      if (text !== null) {
-        tags.show(
-          'hover',
-          text,
-          anchorForSprite(sprite, { width: sprite.width, height: sprite.height }),
-        )
-      }
+      // the sprite's own scale, so a 1.85× building's plate stranded itself beside the roof
+      tags.show(
+        'hover',
+        hoverPlate(store.getState(), kind, id),
+        anchorForSprite(sprite, { width: sprite.width, height: sprite.height }),
+      )
     })
     sprite.on('pointerout', () => {
       tags.hide('hover')

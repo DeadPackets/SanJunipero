@@ -67,6 +67,12 @@ vi.mock('pixi.js', () => {
       this.lastRoundRect = args
       return this
     }
+    rect(): this {
+      return this
+    }
+    stroke(): this {
+      return this
+    }
   }
   class BitmapText extends Container {
     text: string
@@ -200,6 +206,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     getZoom: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
+    tags: { occupied: () => [] },
     addDepthSource: (fn: () => { box: { id: string }; node: unknown }[]) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -261,20 +268,20 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5]) // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
   })
 
-  it('places a hovered name tag above the figure and inside the view (U10)', () => {
+  it('places a hovered plate at the figure and inside the view (U10)', () => {
     layer.tick(1000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const nameTag = l.worldText!.children[1] as unknown as {
+    const plate = l.worldText!.children[1] as unknown as {
       visible: boolean
       position: { x: number; y: number }
     }
-    nameTag.visible = true
+    plate.visible = true
     layer.tick(1016)
     const view = { x: -400, y: -300, w: 800, h: 600 }
-    expect(nameTag.position.x).toBeGreaterThanOrEqual(view.x)
-    expect(nameTag.position.x).toBeLessThanOrEqual(view.x + view.w)
-    expect(nameTag.position.y).toBeGreaterThanOrEqual(view.y)
-    expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
+    expect(plate.position.x).toBeGreaterThanOrEqual(view.x)
+    expect(plate.position.x).toBeLessThanOrEqual(view.x + view.w)
+    expect(plate.position.y).toBeGreaterThanOrEqual(view.y)
+    expect(plate.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
   // The multiplier is re-applied by this layer, so tick order stops being load-bearing.
@@ -338,31 +345,21 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     const shadow = l.shadow!.children[0] as unknown as { eventMode: string }
     const sprite = l.entities!.children[0] as unknown as { eventMode: string }
-    const [emote, nameTag] = l.worldText!.children as unknown as { eventMode: string }[]
+    const [emote, plate] = l.worldText!.children as unknown as { eventMode: string }[]
     expect(shadow.eventMode).toBe('none')
     expect(emote!.eventMode).toBe('none')
-    expect(nameTag!.eventMode).toBe('none')
+    expect(plate!.eventMode).toBe('none')
     expect(sprite.eventMode).toBe('static')
   })
 
-  it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
+  it('wears the footprint plate: their name over the one word for what they are doing', () => {
     layer.tick(1000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const nameTag = l.worldText!.children[1]! // per-agent add order into worldText: emote, nameTag
-    const [bg, label] = nameTag.children as unknown as [
-      { lastRoundRect: number[] | null },
-      { anchor: { x: number; y: number }; width: number; height: number },
-    ]
-    expect(label.anchor.x).toBe(0.5)
-    expect(label.anchor.y).toBe(1)
-    // anchored (0.5,1) the text spans x∈[-w/2, w/2], y∈[-h, 0]; slab must pad 4px on all sides
-    expect(bg.lastRoundRect).toEqual([
-      -label.width / 2 - 4,
-      -label.height - 4,
-      label.width + 8,
-      label.height + 8,
-      2,
-    ])
+    const plate = l.worldText!.children[1]! // per-agent add order into worldText: emote, plate
+    plate.visible = true
+    layer.tick(1016)
+    const labels = plate.children.slice(1) as unknown as { text: string }[]
+    expect(labels.map((t) => t.text)).toEqual(['nadia', 'Between things'])
   })
 
   it('removing an agent destroys its 4 objects and drops the entry', () => {

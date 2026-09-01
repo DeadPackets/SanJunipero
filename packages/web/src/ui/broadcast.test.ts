@@ -158,7 +158,7 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
   // measurement, not an assumption. Either would be 4.00px if it were.
   it('accounts for the world labels it did not enlarge', () => {
     expect(landmarkAlpha(DIRECTOR_ZOOM)).toBe(0) // place names are gone by 1x
-    expect(src('../render/characters.ts')).toMatch(/pointerover.*nameTag\.visible = true/s)
+    expect(src('../render/characters.ts')).toMatch(/pointerover.*plate\.node\.visible = true/s)
     expect(captionAtScale(FACE_INSTALL_PX)).toBe(4)
   })
 

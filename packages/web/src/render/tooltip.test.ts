@@ -35,6 +35,9 @@ vi.mock('pixi.js', () => {
     roundRect(): this {
       return this
     }
+    rect(): this {
+      return this
+    }
     fill(): this {
       return this
     }
@@ -64,6 +67,10 @@ vi.mock('pixi.js', () => {
 })
 
 import type { Anchor, Rect } from './tooltip.js'
+import type { PlateRow } from '../ui/plateModel.js'
+
+/** The plate's rows, from the one-line shorthand these placement tests are written in. */
+const rows = (text: string): PlateRow[] => (text === '' ? [] : [{ text, tone: 'name' }])
 
 const {
   EDGE_PAD_PX,
@@ -72,6 +79,7 @@ const {
   TAG_GAP_PX,
   anchorForSprite,
   createTooltipLayer,
+  overlaps,
   placeTag,
 } = await import('./tooltip.js')
 
@@ -197,8 +205,8 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
 
   it('keeps two owners’ boxes disjoint', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', 'the storehouse', anchor(400, 300))
-    l.show('door', 'Look inside — the storehouse', anchor(400, 300))
+    l.show('hover', rows('the storehouse'), anchor(400, 300))
+    l.show('door', rows('Look inside — the storehouse'), anchor(400, 300))
     // the second tag must not land on the first
     const boxes = l.boxes().map((b) => b.rect)
     expect(boxes).toHaveLength(2)
@@ -210,14 +218,14 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
 
   it('never shows a tag for an empty string', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', '', anchor(400, 300))
+    l.show('hover', rows(''), anchor(400, 300))
     expect(l.boxes()).toHaveLength(0)
   })
 
   it('hideAll clears every owner — the interior transition calls this', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', 'a house', anchor(100, 100))
-    l.show('door', 'Look inside', anchor(300, 300))
+    l.show('hover', rows('a house'), anchor(100, 100))
+    l.show('door', rows('Look inside'), anchor(300, 300))
     expect(l.boxes()).toHaveLength(2)
     l.hideAll()
     expect(l.boxes()).toHaveLength(0)
@@ -225,19 +233,23 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
 
   it('hide clears exactly one owner', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', 'a house', anchor(100, 100))
-    l.show('door', 'Look inside', anchor(300, 300))
+    l.show('hover', rows('a house'), anchor(100, 100))
+    l.show('door', rows('Look inside'), anchor(300, 300))
     l.hide('hover')
     expect(l.boxes()).toHaveLength(1)
   })
 
-  it('keeps a tag off a speech bubble that has registered its box', () => {
+  it('keeps a plate off a speech bubble that has registered its box', () => {
     const l = createTooltipLayer(layers() as never, view)
-    const bare = placeTag(anchor(400, 300), { w: 14 * 7 + 10, h: 18 }, VIEW)
-    l.setOccupied('bubbles', [{ x: bare.sx - 60, y: bare.sy - 4, w: 120, h: 26 }])
-    l.show('hover', 'the storehouse', anchor(400, 300))
+    const a = anchor(400, 300)
+    const bare = placeTag({ ...a, prefer: 'below' }, { w: 14 * 7 + 10, h: 18 }, VIEW)
+    const bubble = { x: bare.sx - 60, y: bare.sy - 4, w: 120, h: 60 }
+    l.setOccupied('bubbles', [bubble])
+    l.show('hover', rows('the storehouse'), a)
     const [box] = l.boxes().map((b) => b.rect)
-    expect(box!.y + box!.h).toBeLessThanOrEqual(bare.sy - 4)
+    expect(overlaps(box!, bubble)).toBe(false)
+    // ...and it was pushed DOWN, away from the footprint it is welded to, not up over the roof
+    expect(box!.y).toBeGreaterThan(bare.sy)
   })
 
   // ★ The nameplate is DOM over the canvas: nothing drawn IN the canvas can see it, so a

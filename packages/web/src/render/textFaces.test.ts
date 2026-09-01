@@ -30,7 +30,9 @@ import {
   TAIL_STEP_PX,
   THOUGHT_FILL,
   THOUGHT_INK,
+  WORLD_INKS,
   faceFor,
+  inkedFace,
   installFaces,
   rimDots,
   stairTail,
@@ -38,7 +40,7 @@ import {
   wrapCharsFor,
 } from './textFaces.js'
 import { ZOOM_STOPS } from './camera.js'
-import { bandRatios } from './legibility.js'
+import { WORLD_TEXT_PAIRS, bandRatios } from './legibility.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -56,9 +58,10 @@ const contrast = (a: number, b: number): number => {
 }
 
 describe('U18 — the town speaks in its own typeface', () => {
-  // A font cannot be installed in node, so the call sites are checked at the source. Today
-  // bubbles.ts, characters.ts, tooltip.ts and landmarks.ts all ask for `monospace`.
-  const CALL_SITES = ['./bubbles.ts', './characters.ts', './tooltip.ts', './landmarks.ts']
+  // A font cannot be installed in node, so the call sites are checked at the source. Every
+  // module that builds a world label is here; `tooltip.ts` and `characters.ts` place plates
+  // rather than set type, so they are on the scale list below instead.
+  const CALL_SITES = ['./bubbles.ts', './plate.ts', './landmarks.ts', './acts.ts', './toponyms.ts']
 
   // The call sites route through WORLD_FONT_FAMILY, so scanning only them measures nothing —
   // worldLabel.ts is where the word would actually be.
@@ -89,14 +92,14 @@ describe('the two faces, and which one is allowed to say a sentence', () => {
     expect(LOWERCASE_FACES).not.toContain(FACE_PX)
   })
 
-  it('never lets a face without lowercase carry a spoken sentence', () => {
-    for (const role of ['speech', 'thought'] as const) {
+  it('never lets a face without lowercase carry a sentence or a name', () => {
+    for (const role of ['speech', 'thought', 'plate'] as const) {
       expect(LOWERCASE_FACES, role).toContain(faceFor(role).family)
     }
   })
 
-  it('is total over its four roles', () => {
-    expect([...FACE_ROLES].sort()).toEqual(['label', 'name', 'speech', 'thought'])
+  it('is total over its five roles', () => {
+    expect([...FACE_ROLES].sort()).toEqual(['label', 'name', 'plate', 'speech', 'thought'])
     for (const role of FACE_ROLES) {
       const f = faceFor(role)
       expect([FACE_PX, FACE_BODY], role).toContain(f.family)
@@ -283,16 +286,38 @@ describe('the letter after an f survives — no derived kerning on a ligature fa
     await installFaces({
       fonts: { load: async () => [], ready: Promise.resolve() } as unknown as FontFaceSet,
     })
-    expect(installs.length).toBe(2)
+    expect(installs.length).toBe(2 * WORLD_INKS.length)
     for (const o of installs) expect(o.skipKerning, String(o.name)).toBe(true)
   })
 
-  it('keeps the atlas one texel per screen pixel and tintable, so one atlas serves every ink', () => {
+  it('keeps the atlas one texel per screen pixel', () => {
     for (const o of installs) {
       expect(o.resolution, String(o.name)).toBe(1)
-      expect(o.dynamicFill, String(o.name)).toBe(true)
       expect((o.textureStyle as { scaleMode: string }).scaleMode).toBe('nearest')
     }
+  })
+
+  // The i7 defect: a white atlas plus a per-glyph tint measured 1.1:1 over its own cream slab.
+  it('bakes each ink into its own atlas rather than tinting one white one', () => {
+    for (const o of installs) {
+      expect(o.dynamicFill, String(o.name)).toBe(false)
+      const fill = (o.style as { fill: number }).fill
+      expect(WORLD_INKS, String(o.name)).toContain(fill)
+      expect(o.name).toBe(inkedFace(String(o.name).split('#')[0] ?? '', fill))
+    }
+  })
+
+  it('installs one atlas per face per ink, and every ink the world writes in has one', () => {
+    const names = new Set(installs.map((o) => String(o.name)))
+    for (const family of [FACE_PX, FACE_BODY]) {
+      for (const ink of WORLD_INKS) expect(names).toContain(inkedFace(family, ink))
+    }
+  })
+
+  // legibility.ts is the law list of every surface the world writes words on; an ink on it with
+  // no atlas falls back to a canvas glyph and loses the pixel face.
+  it('covers every ink WORLD_TEXT_PAIRS names', () => {
+    for (const p of WORLD_TEXT_PAIRS) expect(WORLD_INKS, p.what).toContain(p.ink)
   })
 })
 

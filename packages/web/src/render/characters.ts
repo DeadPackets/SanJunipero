@@ -1,8 +1,7 @@
-import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
+import { Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import { tilesPerTickFor } from '@sj/engine/verbs'
 import type { WorldStore } from '../state/worldStore.js'
-import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { bodyDepthBox } from './depth.js'
 import { facingFrom, feetOf, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
@@ -14,10 +13,11 @@ import {
   inflateToMin,
   lyingHitPolygon,
 } from './hitShapes.js'
-import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
+import { anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
-import { createWorldLabel, type WorldLabel } from './worldLabel.js'
-import { faceFor, worldTextScale } from './textFaces.js'
+import { createPlate, type Plate } from './plate.js'
+import { hoverPlate } from '../ui/interaction.js'
+import { worldTextScale } from './textFaces.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -41,7 +41,6 @@ import {
   initialTickClock,
   interpolatePos,
   legFacing,
-  nameTagText,
   observeTick,
   prunePath,
   scheduleLeg,
@@ -54,9 +53,6 @@ import {
 
 const EMOTE_MS = 2000
 const EMOTE_ABOVE_HEAD_PX = 12
-// The name tag is set at the face's own size, which is above the 12px floor, not at it.
-export const CHAR_TAG_FONT_PX = faceFor('name').size
-export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
@@ -70,9 +66,7 @@ type CharEntry = {
   sprite: Sprite
   shadow: Sprite
   emote: Sprite
-  nameTag: Container
-  nameTagBg: Graphics
-  nameTagLabel: WorldLabel
+  plate: Plate
   hit: Polygon
   /** the sheet's own figure height, so the capsule follows the art rather than a second table */
   figureH: number
@@ -310,37 +304,26 @@ export function createCharacterLayer(
     emote.anchor.set(0.5, 1)
     emote.visible = false
     emote.eventMode = 'none'
-    const nameTag = new Container()
-    nameTag.visible = false
-    nameTag.eventMode = 'none'
-    const nameTagBg = new Graphics()
-    const nameTagLabel = createWorldLabel('', {
-      fontFamily: faceFor('name').family,
-      fontSize: CHAR_TAG_FONT_PX,
-      fill: 0x43394a,
-      lineHeight: CHAR_TAG_LINE_H,
-    })
-    nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
-    nameTag.addChild(nameTagBg, nameTagLabel)
-    sprite.on('pointerover', () => {
-      nameTag.visible = true
-    })
-    sprite.on('pointerout', () => {
-      nameTag.visible = false
-    })
     // each companion to the layer it belongs in: a contact shadow under every body, the
-    // emote and the tag over every body. None of them competes with the depth sort any more.
+    // emote and the plate over every body. None of them competes with the depth sort any more.
     scene.layers.shadow.addChild(shadow)
     scene.layers.entities.addChild(sprite)
-    scene.layers.worldText.addChild(emote, nameTag)
+    scene.layers.worldText.addChild(emote)
+    // ★ ONE PLATE, the same object a building wears: a person's is their name and the one word
+    // for what they are doing.
+    const plate = createPlate(scene.layers.worldText)
+    sprite.on('pointerover', () => {
+      plate.node.visible = true
+    })
+    sprite.on('pointerout', () => {
+      plate.node.visible = false
+    })
     const now = performance.now()
     e = {
       sprite,
       shadow,
       emote,
-      nameTag,
-      nameTagBg,
-      nameTagLabel,
+      plate,
       hit,
       figureH: 0,
       hitScale: 0,
@@ -509,37 +492,26 @@ export function createCharacterLayer(
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
-      const tag = nameTagText(a.name)
-      if (e.nameTagLabel.text !== tag) {
-        e.nameTagLabel.text = tag
-        e.nameTagBg.clear()
-        e.nameTagBg.roundRect(
-          -e.nameTagLabel.width / 2 - 4,
-          -e.nameTagLabel.height - 4,
-          e.nameTagLabel.width + 8,
-          e.nameTagLabel.height + 8,
-          2,
-        )
-        e.nameTagBg.fill(0xfff6e9)
-      }
-      // ONE placement rule for every label in the product: above the DRAWN figure,
-      // flipped or slid to stay on screen instead of being drawn off the edge of it.
-      if (e.nameTag.visible) {
-        // The tag holds its size for the reader, so its world FOOTPRINT is what the camera
+      // ONE placement rule for every label in the product, and the plate asks for the FOOTPRINT:
+      // welded to the feet, and only leaving them when the view has no room down there.
+      if (e.plate.node.visible) {
+        e.plate.setRows(hoverPlate(state, 'agent', a.id))
+        // The plate holds its size for the reader, so its world FOOTPRINT is what the camera
         // changes — that is the number placeTag de-conflicts against, not the drawn one.
         const inv = worldTextScale(scene.getZoom())
-        e.nameTag.scale.set(inv)
-        const size = {
-          w: (e.nameTagLabel.width + TAG_PAD_X * 2) * inv,
-          h: (e.nameTagLabel.height + TAG_PAD_Y * 2) * inv,
-        }
+        e.plate.node.scale.set(inv)
+        const size = { w: e.plate.w * inv, h: e.plate.h * inv }
         const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
         const at = placeTag(
-          anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
+          {
+            ...anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
+            prefer: 'below',
+          },
           size,
           scene.viewRect(),
+          scene.tags.occupied(),
         )
-        e.nameTag.position.set(Math.round(at.sx), Math.round(at.sy + size.h))
+        e.plate.node.position.set(Math.round(at.sx - size.w / 2), Math.round(at.sy))
       }
     }
     for (const [agentId, e] of entries) {
@@ -547,7 +519,7 @@ export function createCharacterLayer(
         e.sprite.destroy()
         e.shadow.destroy()
         e.emote.destroy()
-        e.nameTag.destroy({ children: true })
+        e.plate.destroy()
         entries.delete(agentId)
         sheets.delete(agentId)
       }
@@ -574,7 +546,7 @@ export function createCharacterLayer(
         e.sprite.destroy()
         e.shadow.destroy()
         e.emote.destroy()
-        e.nameTag.destroy({ children: true })
+        e.plate.destroy()
       }
       entries.clear()
       shadowTexture.destroy(true)
