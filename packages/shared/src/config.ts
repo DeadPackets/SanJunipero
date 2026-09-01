@@ -2,7 +2,9 @@ import { z } from 'zod'
 
 const NeedsSchema = z
   .object({
-    hungerDecayPerTick: z.number().default(0.035),
+    // World one: nobody ate after tick 455 and 100/0.035 put the first body on the ground at
+    // tick 2715, day 2. At 0.021 an empty stomach takes 4524 ticks to fall — past day 3.
+    hungerDecayPerTick: z.number().default(0.021),
     energyDecayAwakePerTick: z.number().default(0.093),
     energyRegenAsleepPerTick: z.number().default(0.25),
     // Only ever a bonus, and what it shortens is the SHORT sleep: a full night fills the bar from
@@ -14,7 +16,7 @@ const NeedsSchema = z
     warmthEqualizeFactorPerTick: z.number().default(0.05),
     debuffThreshold: z.number().default(30),
     collapseThreshold: z.number().default(5),
-    deathAfterZeroHungerTicks: z.number().default(1440),
+    deathAfterZeroHungerTicks: z.number().default(2880),
     eatRestoreHunger: z.number().default(60),
   })
   .strict()
@@ -23,6 +25,8 @@ const MovementSchema = z
   .object({
     baseTilesPerTick: z.number().positive().default(3),
     debuffTilesPerTick: z.number().positive().default(2),
+    // What a body on the ground pays, in ticks, for the one tile it can still reach.
+    crawlTickMultiplier: z.number().positive().default(8),
     sightRadius: z.number().default(12),
     earshotRadius: z.number().default(8),
   })
@@ -43,6 +47,10 @@ const HealthSchema = z
     recoveryHpPerDay: z.number().default(5),
     tendedRecoveryHpPerDay: z.number().default(15),
     collapseHp: z.number().default(15),
+    // Warm, fed and left alone is the whole of the cure, and it is measured against the fatigue
+    // the fall itself put on the body: it outruns the first rung and the second, and the third
+    // outruns it. Resting off one fall is a road out; resting off a habit of falling is not.
+    downedRecoveryHpPerTick: z.number().default(0.1),
     deathHp: z.number().default(0),
   })
   .strict()
@@ -97,6 +105,8 @@ const WeatherSchema = z
     nightTempDelta: z.number().default(-6),
     rainTempDelta: z.number().default(-4),
     snowOnlyIn: z.string().default('winter'),
+    // A founding week has no roofs, no woodpile and no habits yet; the sky waits for them.
+    harshFromDay: z.number().int().default(7),
     // Rare drama: at 0.02 three storm days burned 27 of 42 houses.
     stormLightningFireChance: z.number().default(0.001),
   })
@@ -430,7 +440,9 @@ const MortalitySchema = z
       })
       .strict()
       .prefault({}),
-    hungerHpDrainPerTick: z.number().default(0.1),
+    hungerHpDrainPerTick: z.number().default(0.04),
+    // An empty stomach is not a wound yet. Half a day passes before it starts costing hp.
+    hungerGraceTicks: z.number().default(720),
     thirstHpDrainPerTick: z.number().default(0.15),
     poisonChanceSpoiled: z.number().default(0.35),
     sleepRegenMultiplier: z.number().default(3),
@@ -531,7 +543,9 @@ const WarmthSchema = z
   .object({
     enabled: z.boolean().default(true),
     comfortBand: z.number().default(8),
-    exposureDecayPerTick: z.number().default(0.3),
+    exposureDecayPerTick: z.number().default(0.15),
+    // The cold's share of the awake energy decay, billed ON TOP of it — not a factor on it.
+    coldEnergyDrainShare: z.number().default(0.5),
     heatRadius: z.number().default(2),
     // Twelve is the gap at the mildest winter hour (comfortBand 8 over ambient -4): the least that
     // reaches winter, and no hour past its mildest.

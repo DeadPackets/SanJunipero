@@ -11,7 +11,7 @@ import { awakeEnergyDecay, warmthTargetFromAir } from './needs.js'
 import { needAfterQueued, queueNeed } from './needsBatch.js'
 
 // Cold is not a new way to die: it takes the warmth out of a body, and a body with no warmth
-// left spends energy twice as fast, which walks it down the collapse ladder and nowhere else.
+// left spends extra energy, which walks it down the collapse ladder and nowhere else.
 
 // A kind that holds a fire says so once, in structures.recipes[kind].hearth — the same shape roofed took.
 export function isHeatSource(config: SimConfig, kind: string): boolean {
@@ -102,6 +102,12 @@ export function warmthSystem(ctx: TickCtx): void {
     // exactly that tick — it is what the fold counts, and what names the death that follows.
     if (needAfterQueued(ctx, a, 'warmth') > 0 || a.asleep) continue
     if (needAfterQueued(ctx, a, 'energy') <= 0) continue
-    queueNeed(ctx, id, 'energy', -awakeEnergyDecay(ctx.config, a), 'exposure')
+    queueNeed(
+      ctx,
+      id,
+      'energy',
+      -awakeEnergyDecay(ctx.config, a) * cfg.coldEnergyDrainShare,
+      'exposure',
+    )
   }
 }

@@ -20,6 +20,7 @@ const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, warmth: { enabled: false } })
 const DECAY = CFG.warmth.exposureDecayPerTick
 const AWAKE = CFG.needs.energyDecayAwakePerTick
+const COLD_SHARE = CFG.warmth.coldEnergyDrainShare
 
 const map = (): TileId[][] => grid(12)
 
@@ -219,18 +220,23 @@ describe('exposure: what the cold takes, and who it cannot reach', () => {
   })
 })
 
-describe('a body with no warmth left burns twice the energy', () => {
+describe('a body with no warmth left burns extra energy', () => {
   const frozen = (energy: number, warmth = 0): WorldState =>
     bodyAt(WINTER_NIGHT, CFG, { needs: { hunger: 100, energy, warmth, social: 100 } })
 
-  it('doubles the awake drain at warmth zero, and only there', () => {
-    expect(needs(tickOnce(frozen(80)), 'energy').map((e) => e.delta)).toEqual([-AWAKE, -AWAKE])
+  it("adds the cold's share of the awake drain at warmth zero, and only there", () => {
+    expect(needs(tickOnce(frozen(80)), 'energy').map((e) => e.delta)).toEqual([
+      -AWAKE,
+      -AWAKE * COLD_SHARE,
+    ])
     expect(needs(tickOnce(frozen(80, 50)), 'energy').map((e) => e.delta)).toEqual([-AWAKE])
   })
 
-  it('marks the second half as the cold, and the fold counts it on the body', () => {
+  it("marks the cold's share as the cold, and the fold counts it on the body", () => {
     const r = tickOnce(frozen(80))
-    expect(chills(r)).toEqual([{ id: 'a1', need: 'energy', delta: -AWAKE, reason: 'exposure' }])
+    expect(chills(r)).toEqual([
+      { id: 'a1', need: 'energy', delta: -AWAKE * COLD_SHARE, reason: 'exposure' },
+    ])
     expect(r.state.agents.a1!.coldTicksSinceRecovery).toBe(1)
     expect(tickOnce(r.state).state.agents.a1!.coldTicksSinceRecovery).toBe(2)
   })
@@ -242,10 +248,10 @@ describe('a body with no warmth left burns twice the energy', () => {
     expect(Object.keys(slept.agents.a1!)).not.toContain('coldTicksSinceRecovery')
   })
 
-  it('the doubling is what puts the body on the ground on the tick it falls', () => {
-    // 5.1 energy: one drain leaves it standing at 5.007, two put it under the threshold.
+  it("the cold's share is what puts the body on the ground on the tick it falls", () => {
+    // 5.1 energy: the ordinary drain alone leaves it standing; the cold's share takes it under.
     expect(5.1 - AWAKE).toBeGreaterThan(CFG.needs.collapseThreshold)
-    expect(5.1 - 2 * AWAKE).toBeLessThan(CFG.needs.collapseThreshold)
+    expect(5.1 - (1 + COLD_SHARE) * AWAKE).toBeLessThan(CFG.needs.collapseThreshold)
     const cold = tickOnce(frozen(5.1, DECAY))
     expect(cold.events.some((e) => e.type === 'agent_collapsed')).toBe(true)
     const warm = tickOnce(
@@ -264,10 +270,12 @@ describe('a body with no warmth left burns twice the energy', () => {
 })
 
 describe('the cold names the death it drove, and nothing else', () => {
+  // Hunger under the fed line, which is the only way the third rung of this ladder is ever
+  // reached: the counter resets on a meal, so a body three falls deep has not eaten.
   const failing = (tick: number, warmth: number) => {
     const s = bodyAt(tick, CFG, {
       hp: 0.1,
-      needs: { hunger: 100, energy: 60, warmth, social: 100 },
+      needs: { hunger: 30, energy: 60, warmth, social: 100 },
     })
     return fold(
       s,

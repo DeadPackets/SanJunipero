@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { EventEnvelope, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  EventEnvelope,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
@@ -28,6 +34,10 @@ function house(id: string, x: number, y: number, flammable = true): SimEvent[] {
 }
 
 // Row of touching houses 1-2-3, house 4 far away, non-flammable structure 5 touching house 1.
+// A storm needs a world old enough for the sky to roll one; minute 59 puts the tick under
+// test on the hour.
+const STORM_HOUR = MINUTES_PER_DAY * SimConfigSchema.parse({}).weather.harshFromDay + 59
+
 function rowWorld(config = CFG): WorldState {
   let s = genesisState(config)
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
@@ -94,7 +104,7 @@ describe('fire: lightning ignition', () => {
     const sure = SimConfigSchema.parse({
       weather: { hourlyChangeChance: 0, stormLightningFireChance: 1 },
     })
-    const r = tickOnce(withWeather(atTick(rowWorld(sure), 59), 'storm'), sure)
+    const r = tickOnce(withWeather(atTick(rowWorld(sure), STORM_HOUR), 'storm'), sure)
     for (const id of ['structure_1', 'structure_2', 'structure_3', 'structure_4']) {
       expect(r.events).toContainEqual({
         type: 'fire_ignited',
@@ -116,12 +126,12 @@ describe('fire: lightning ignition', () => {
     })
     const offHour = tickOnce(withWeather(atTick(rowWorld(sure), 30), 'storm'), sure)
     expect(offHour.events.map((e) => e.type)).not.toContain('fire_ignited')
-    const sunny = tickOnce(atTick(rowWorld(sure), 59), sure)
+    const sunny = tickOnce(atTick(rowWorld(sure), STORM_HOUR), sure)
     expect(sunny.events.map((e) => e.type)).not.toContain('fire_ignited')
     const never = SimConfigSchema.parse({
       weather: { hourlyChangeChance: 0, stormLightningFireChance: 0 },
     })
-    const zero = tickOnce(withWeather(atTick(rowWorld(never), 59), 'storm'), never)
+    const zero = tickOnce(withWeather(atTick(rowWorld(never), STORM_HOUR), 'storm'), never)
     expect(zero.events.map((e) => e.type)).not.toContain('fire_ignited')
   })
 })

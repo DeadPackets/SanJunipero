@@ -161,7 +161,10 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
       ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }),
       CFG,
     )
-    expect(hpDeltas(tickOnce(starving))).toEqual([-0.1])
+    // An empty belly is not a wound yet: the grace has to run out before hp moves at all.
+    expect(hpDeltas(tickOnce(starving))).toEqual([])
+    const graced = { ...starving, tick: CFG.mortality.hungerGraceTicks }
+    expect(hpDeltas(tickOnce(graced))).toEqual([-CFG.mortality.hungerHpDrainPerTick])
   })
 
   it('says nothing about a body with nothing wrong with it', () => {
@@ -194,8 +197,11 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
 
 const hurt = (s: WorldState, amount: number) =>
   fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
-const starve = (s: WorldState) =>
-  fold(s, ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }), CFG)
+// Empty, and empty long enough to count: hunger costs no hp until the grace has run out.
+const starve = (s: WorldState) => ({
+  ...fold(s, ev('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -100 }] }), CFG),
+  tick: CFG.mortality.hungerGraceTicks,
+})
 const died = (r: { events: { type: string; payload: unknown }[] }) =>
   r.events.find((e) => e.type === 'agent_died')?.payload
 const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
@@ -247,7 +253,8 @@ describe('death has a cause', () => {
 
   it('an empty belly kills as hunger, both by the drain and by the long-starvation clock', () => {
     expect(died(tickOnce(nearlyDead(starve(body()))))).toEqual({ agentId: 'a1', cause: 'hunger' })
-    const long = { ...starve(body()), tick: 2000 }
+    // Derived, not a literal: the clock is a dial, and a body has to be past it to die by it.
+    const long = { ...starve(body()), tick: CFG.needs.deathAfterZeroHungerTicks + 1 }
     expect(
       died(tickOnce({ ...long, agents: { a1: { ...long.agents.a1!, zeroHungerSinceTick: 0 } } })),
     ).toEqual({ agentId: 'a1', cause: 'hunger' })

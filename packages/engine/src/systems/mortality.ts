@@ -50,11 +50,18 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
       ...(slain ? { byId: x.sourceId } : {}),
     })
   }
-  if (a.needs.hunger <= 0) {
+  // An empty stomach is not a wound yet: the grace is what a body has to find a meal in before
+  // hunger starts spending hp.
+  const emptySince = a.zeroHungerSinceTick
+  if (
+    a.needs.hunger <= 0 &&
+    emptySince !== null &&
+    state.tick - emptySince >= mortality.hungerGraceTicks
+  ) {
     out.push({
       cause: 'hunger',
       amount: mortality.hungerHpDrainPerTick,
-      sinceTick: a.zeroHungerSinceTick ?? state.tick,
+      sinceTick: emptySince,
     })
   }
   if (thirstOf(a) <= 0) {
@@ -83,6 +90,16 @@ export function deathAttribution(
   }
   if (best === undefined) return { cause: 'injury' }
   return { cause: best.cause, ...(best.byId === undefined ? {} : { byId: best.byId }) }
+}
+
+// Everything draining this body except the fall it took. A wound, a fever, a poison or a dry
+// throat outruns any amount of lying still; only tiredness can be rested off.
+export function ailmentDrainPerTick(state: WorldState, config: SimConfig, agentId: string): number {
+  let total = 0
+  for (const d of drains(state, config, agentId)) {
+    if (d.cause !== 'fatigue' && d.cause !== 'exposure') total += d.amount
+  }
+  return total
 }
 
 export function dominantDrain(state: WorldState, config: SimConfig, agentId: string): DeathCause {
