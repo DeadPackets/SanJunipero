@@ -872,8 +872,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
-        // The cast, not the founders: a town that has borne children thinks for all of them.
-        const castSize = booted?.cast.size ?? cast.length
+        // The living cast, not the founders: a town that has borne children thinks for all of
+        // them, and a dead one is a denominator that hides the rate of everybody left.
+        const castSize = Math.max(1, booted?.alive() ?? cast.length)
         const now = Date.now()
         const cutoff = now - rateWindow * 60_000
         while (tickHistory.length > 1 && tickHistory[1]!.ms <= cutoff) tickHistory.shift()

@@ -231,6 +231,9 @@ async function town(
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
+    bury: (id: string) => {
+      pending.push({ type: 'agent_died', payload: { agentId: id, cause: 'hunger' } })
+    },
     bear: (id = CHILD, name = 'Mira') => {
       pending.push({
         type: 'agent_born',
@@ -357,6 +360,20 @@ describe('★ a born mind survives a restart', () => {
     expect(t.booted.runtimes.has('agent_3')).toBe(true)
     expect(t.booted.runtimes.has('agent_4')).toBe(false)
     expect(birthAlerts(t.opsDb).map((a) => a.kind)).toEqual(['birth_over_max_minds'])
+    t.stop()
+  })
+
+  // The dead stay in `cast` — a newborn reads its parents from it — but a town that has buried
+  // someone is not a full town, and counting corpses closes the ceiling for good.
+  it('★ a death frees a slot the ceiling was holding for it', async () => {
+    const t = await town({ maxMinds: 2 })
+    t.bury(FATHER)
+    await t.settle(() => t.booted.alive() === 1)
+    t.bear()
+    await t.settle(() => t.booted.runtimes.has(CHILD))
+
+    expect(t.booted.runtimes.has(CHILD)).toBe(true)
+    expect(birthAlerts(t.opsDb)).toEqual([])
     t.stop()
   })
 
