@@ -159,10 +159,8 @@ describe('verb: give', () => {
       ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
       CFG,
     )
-    expect(submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' })).toMatchObject({
-      ok: false,
-      reason: expect.stringMatching(/^not adjacent to give — they are at \(/) as string,
-    })
+    // Five tiles is a walk, not a refusal: the legs go, and the giving rides on their end.
+    expect(submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' }).ok).toBe(true)
     expect(
       submitIntent(makeWorld(), CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a1' }),
     ).toEqual({ ok: false, reason: 'cannot give to yourself' })
@@ -224,17 +222,14 @@ describe('verb: take', () => {
     expect(res.state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
   })
 
-  it('rejects distant tiles and items held by agents', () => {
+  it('walks to a distant thing, and rejects one held by somebody else', () => {
     let s = makeWorld()
     s = fold(
       s,
       ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'tile', x: 9, y: 9 } }),
       CFG,
     )
-    expect(submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })).toEqual({
-      ok: false,
-      reason: 'not close enough to take',
-    })
+    expect(submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' }).ok).toBe(true)
     let held = makeWorld()
     held = fold(
       held,
@@ -452,12 +447,9 @@ describe('verb: teach', () => {
       'a1',
       { skills: { farming: 100 } },
     )
-    expect(
-      submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' }),
-    ).toMatchObject({
-      ok: false,
-      reason: expect.stringMatching(/^not adjacent to teach — they are at \(/) as string,
-    })
+    expect(submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' }).ok).toBe(
+      true,
+    )
     const busy = applyAll(s, [
       {
         type: 'action_started',
@@ -600,10 +592,7 @@ describe('verb: attack', () => {
       { id: 'a1', x: 0, y: 0 },
       { id: 'a2', x: 5, y: 5 },
     ])
-    expect(submitIntent(far, CFG, 'a1', 'attack', { targetId: 'a2' })).toMatchObject({
-      ok: false,
-      reason: expect.stringMatching(/^not adjacent to attack — they are at \(/) as string,
-    })
+    expect(submitIntent(far, CFG, 'a1', 'attack', { targetId: 'a2' }).ok).toBe(true)
   })
 
   // A blow is three events and one subtraction: agent_harmed takes the hp and names the hand,

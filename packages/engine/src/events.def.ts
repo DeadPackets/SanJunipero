@@ -177,6 +177,9 @@ export const ActionStarted = z
     verb: z.string(),
     params: z.record(z.string(), z.unknown()),
     duration: z.number(),
+    then: z
+      .object({ verb: z.string(), params: z.record(z.string(), z.unknown()) })
+      .optional(),
   })
   .strict()
 export const ActionProgressed = z.object({ agentId: z.string(), ticks: z.number() }).strict()

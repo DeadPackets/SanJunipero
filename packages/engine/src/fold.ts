@@ -535,6 +535,7 @@ export function fold(
         ticksRemaining: p.duration,
         params: p.params,
         ...(path ? { path } : {}),
+        ...(p.then ? { then: p.then } : {}),
       }
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
     }

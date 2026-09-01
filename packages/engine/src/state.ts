@@ -94,6 +94,9 @@ export type AgentBody = {
     ticksRemaining: number
     params: Record<string, unknown>
     path?: [number, number][]
+    // The act these legs were set going for, run the moment they arrive. Absent unless the
+    // world composed the walk itself, so a town that never composed one hashes as it always did.
+    then?: { verb: string; params: Record<string, unknown> }
   }
   collapsedSinceTick: number | null
   zeroHungerSinceTick: number | null

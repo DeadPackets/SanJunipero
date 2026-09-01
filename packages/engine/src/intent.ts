@@ -2,9 +2,43 @@ import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { VERBS, walkDestination, workPenalty, type PendingEvent } from './verbs/index.js'
+import {
+  approachFor,
+  VERBS,
+  walkDestination,
+  workPenalty,
+  type PendingEvent,
+} from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
+
+/** An act refused for nothing but the distance to it becomes the walk that closes the distance,
+ *  with the act itself hung on the end of the legs. What the world holds against the act rather
+ *  than the ground is refused as it always was, and so is a mark no road reaches. */
+function walkFirst(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+  refusal: string,
+): IntentResult {
+  const to = approachFor(state, config, agentId, verb, params)
+  if (to === null) return { ok: false, reason: refusal }
+  const go = submitIntent(state, config, agentId, 'walk', to)
+  if (!go.ok) return { ok: false, reason: refusal }
+  return {
+    ok: true,
+    events: go.events.map((e) =>
+      e.type === 'action_started'
+        ? {
+            ...e,
+            payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } },
+          }
+        : e,
+    ),
+  }
+}
 
 export function submitIntent(
   state: WorldState,
@@ -56,7 +90,7 @@ export function submitIntent(
     const filled =
       markUnderAnotherKey(state, config, agentId, verb, p) ??
       loneCandidateFor(state, config, agentId, verb, p)
-    if (filled === null) return { ok: false, reason: refusal }
+    if (filled === null) return walkFirst(state, config, agentId, verb, p, refusal)
     p = filled
   }
   const events: PendingEvent[] = []

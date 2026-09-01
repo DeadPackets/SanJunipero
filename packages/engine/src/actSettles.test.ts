@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
+import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
+import { createWorldTick } from './worldTick.js'
 
 const CFG = DEFAULT_CONFIG
 const CHAR: Record<string, TileId> = { '.': 0, '~': 2, f: 6, r: 7 }
@@ -139,5 +141,61 @@ describe('★ an act whose end the world already holds is over, not refused', ()
     expect(refuses(world(), 'enter', { structureId: 'structure_9' })).toBe(
       'there is nothing there to enter',
     )
+  })
+})
+
+describe('★ an act refused only for the distance is a walk with the act on its end', () => {
+  // ★ A mind that names a thing it can see is not asking for a lecture on how far away it is.
+  it('★ walk-then-take crosses the clearing and lifts the thing', () => {
+    const start = put(world(), 'item_spawned', {
+      id: 'item_1',
+      kind: 'wood',
+      qty: 1,
+      loc: { t: 'tile', x: 5, y: 3 },
+    })
+    const go = submitIntent(start, CFG, 'a1', 'take', { itemId: 'item_1' })
+    expect(go.ok).toBe(true)
+    if (!go.ok) return
+    expect(go.events[0]!.payload).toMatchObject({
+      verb: 'walk',
+      then: { verb: 'take', params: { itemId: 'item_1' } },
+    })
+
+    let state = go.events.reduce((s, e) => fold(s, ev(e.type, e.payload), CFG), start)
+    const worldTick = createWorldTick(CFG, new RngStreams('walk-then-take'))
+    const types: string[] = []
+    for (let i = 0; i < 40 && state.items.item_1!.loc.t !== 'agent'; i++) {
+      const out = worldTick({ ...state, tick: state.tick + 1 })
+      state = out.state
+      types.push(...out.events.map((e) => e.type))
+    }
+    // The legs are seen to go, and the taking is its own act on the ledger after them.
+    expect(state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
+    expect(types).toContain('agent_moved')
+    expect(types.filter((t) => t === 'action_started')).toHaveLength(1)
+    expect(types.filter((t) => t === 'action_completed')).toHaveLength(2)
+    expect(state.agents.a1!.activity).toBe(null)
+  })
+
+  it('★ a thing across water with no crossing is still too far to take', () => {
+    const split = put(world(['..~..', '..~..', '..~..'], { x: 0, y: 1 }), 'item_spawned', {
+      id: 'item_1',
+      kind: 'wood',
+      qty: 1,
+      loc: { t: 'tile', x: 4, y: 1 },
+    })
+    expect(refuses(split, 'take', { itemId: 'item_1' })).toBe('not close enough to take')
+  })
+
+  // What the world holds against the act itself is not a distance, and no walk answers it.
+  it('a thing in another pair of hands is refused wherever the feet are', () => {
+    let two = put(world(), 'agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 3, ageDays: 7300 })
+    two = put(two, 'item_spawned', {
+      id: 'item_1',
+      kind: 'wood',
+      qty: 1,
+      loc: { t: 'agent', id: 'a2' },
+    })
+    expect(refuses(two, 'take', { itemId: 'item_1' })).toBe('someone is holding that')
   })
 })

@@ -350,6 +350,115 @@ export function walkDestination(
   return nearestReachable(state, config, a, ring, offDoor)
 }
 
+// How far a body will walk to water nobody made it name: across the town square to the bank,
+// and no further.
+const WATER_REACH = 16
+
+/** The nearest water this body could stand beside — open water or a finished well — nearest
+ *  first, ties north then west, so two runs of the same world pick the same bank. */
+export function nearestWater(
+  state: WorldState,
+  agentId: string,
+  reach = WATER_REACH,
+): Point | null {
+  const a = state.agents[agentId]!
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const found: Point[] = []
+  for (let y = Math.max(0, a.y - reach); y <= a.y + reach; y++) {
+    for (let x = Math.max(0, a.x - reach); x <= a.x + reach; x++) {
+      const t = state.terrain[y]?.[x]
+      if (t !== undefined && isWet(t)) found.push({ x, y })
+    }
+  }
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.kind === WELL_KIND && s.stage === 'complete' && near(s) <= reach) {
+      found.push({ x: s.x, y: s.y })
+    }
+  }
+  found.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  return found[0] ?? null
+}
+
+/** Every point a set of params can be aimed at, in one fixed order. Nothing here knows what any
+ *  verb measures: the order is the same every replay, and validate is what judges the spots. */
+function marksOf(state: WorldState, params: Record<string, unknown>): Point[] {
+  const out: Point[] = []
+  const { x, y, itemId, targetId } = params
+  if (typeof x === 'number' && typeof y === 'number') out.push({ x, y })
+  const item = typeof itemId === 'string' ? state.items[itemId] : undefined
+  if (item?.loc.t === 'tile') out.push({ x: item.loc.x, y: item.loc.y })
+  const holder = item?.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+  if (holder !== undefined) out.push({ x: holder.x, y: holder.y })
+  const target = typeof targetId === 'string' ? state.agents[targetId] : undefined
+  if (target !== undefined) out.push({ x: target.x, y: target.y })
+  return out
+}
+
+/** Ground beside a mark that this body can get to. */
+function standingSpotFor(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  at: Point,
+): Point | null {
+  const ctx = pathCtx(state, config)
+  const ring: Point[] = []
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (isPassable(state, at.x + dx, at.y + dy, ctx)) ring.push({ x: at.x + dx, y: at.y + dy })
+    }
+  }
+  const to = nearestReachable(state, config, a, ring)
+  return 'refusal' in to ? null : to
+}
+
+const bodyAt = (state: WorldState, agentId: string, at: Point): WorldState => ({
+  ...state,
+  agents: { ...state.agents, [agentId]: { ...state.agents[agentId]!, x: at.x, y: at.y } },
+})
+
+/** Where this body would have to stand for an act it is only too far off to do — and null when
+ *  distance is not the whole of what is wrong. The verb's own validate, asked from the spot, is
+ *  the judge, so nothing here has to know what any verb measures or how far its arms reach. */
+export function approachFor(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): Point | null {
+  const def = VERBS[verb]
+  const a = state.agents[agentId]
+  // Indoors the legs are barred, and a walk cannot be composed out of a walk.
+  if (def === undefined || a === undefined || verb === 'walk' || a.insideId !== undefined) {
+    return null
+  }
+  const spots: Point[] = []
+  const structureId = params.structureId
+  if (typeof structureId === 'string') {
+    // A named roof settles to the ring the door is on, which is the tile `enter` measures from.
+    const to = walkDestination(state, config, agentId, { structureId })
+    if (!('refusal' in to)) spots.push(to)
+  }
+  for (const at of marksOf(state, params)) {
+    const spot = standingSpotFor(state, config, a, at)
+    if (spot !== null) spots.push(spot)
+  }
+  // Water is the one mark a body is never asked to name: a thirst refused for want of a bank
+  // has no other spot to try.
+  if (spots.length === 0) {
+    const wet = nearestWater(state, agentId)
+    const spot = wet === null ? null : standingSpotFor(state, config, a, wet)
+    if (spot !== null) spots.push(spot)
+  }
+  for (const to of spots) {
+    if (to.x === a.x && to.y === a.y) continue
+    if (def.validate(bodyAt(state, agentId, to), config, agentId, params) === null) return to
+  }
+  return null
+}
+
 const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
@@ -1886,7 +1995,8 @@ const stow: VerbDef = makeVerb({
   },
   settled(state, _config, _agentId, params) {
     const p = StowParams.safeParse(params)
-    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    if (!p.success) return false
+    const loc = state.items[p.data.itemId]?.loc
     return loc?.t === 'structure' && loc.id === p.data.structureId
   },
   onComplete(state, _config, agentId, params) {
