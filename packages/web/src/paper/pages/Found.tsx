@@ -2,7 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import { kindWords } from '../../ui/broadcastReady.js'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discoveryModel.js'
-import { itemCropDetail, thingKind } from '../../ui/interaction.js'
+import { itemCropDetail, structureTitle, thingKind } from '../../ui/interaction.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
@@ -118,7 +118,7 @@ function Places({ store, onSubject }: PageProps) {
   return (
     <ul className="places">
       {standing.map((s) => {
-        const words = kindWords(s.kind)
+        const words = structureTitle(state, s.id) ?? kindWords(s.kind)
         const builder = s.builtBy === null ? null : (state?.agents[s.builtBy]?.name ?? s.builtBy)
         return (
           <li key={s.id}>

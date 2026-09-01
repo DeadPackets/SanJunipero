@@ -7,6 +7,7 @@ import {
   escapeStep,
   hoverLabel,
   itemCropDetail,
+  structureTitle,
   thingKind,
   type StageUp,
 } from './interaction.js'
@@ -85,12 +86,9 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'agent', 'rahel')).toBe('Rahel')
   })
 
-  it('credits the builder of a structure, and stays quiet when no one is remembered', () => {
-    expect(hoverLabel(state, 'structure', 'h1')).toBe('house — built by Tomas')
+  it('calls a building what the town calls it, and never credits a builder on a hover', () => {
+    expect(hoverLabel(state, 'structure', 'h1')).toBe('house')
     expect(hoverLabel(state, 'structure', 'h2')).toBe('storehouse')
-  })
-
-  it('★ says nothing about a builder who is not a person here — never a raw id', () => {
     expect(hoverLabel(state, 'structure', 'h3')).toBe('shed')
   })
 
@@ -113,6 +111,33 @@ describe('hoverLabel', () => {
     expect(hoverLabel(state, 'item', 'nope')).toBeNull()
     expect(hoverLabel(state, 'crop', 'nope')).toBeNull()
     expect(hoverLabel(null, 'agent', 'rahel')).toBeNull()
+  })
+})
+
+describe('structureTitle — a proper name outranks the kind, wherever a viewer reads one', () => {
+  const named = { ...structure('n1', 'house', null), name: '  Yusuf’s   house ' }
+  const carved = {
+    ...structure('n2', 'house', null),
+    inscription: { text: 'The Long Table', by: 'rahel' },
+  }
+  const blank = { ...structure('n3', 'house', null), inscription: { text: '  ', by: 'rahel' } }
+  const named_state = {
+    structures: { n1: named, n2: carved, n3: blank },
+    agents: {},
+  } as unknown as WorldState
+
+  it('★ reads the carved name, flattened exactly as speech is', () => {
+    expect(structureTitle(named_state, 'n1')).toBe('Yusuf’s house')
+  })
+
+  it('falls back to the inscription, and past an inscription of nothing to the kind', () => {
+    expect(structureTitle(named_state, 'n2')).toBe('The Long Table')
+    expect(structureTitle(named_state, 'n3')).toBe('house')
+  })
+
+  it('answers null for a building the town does not have', () => {
+    expect(structureTitle(named_state, 'nope')).toBeNull()
+    expect(structureTitle(null, 'n1')).toBeNull()
   })
 })
 

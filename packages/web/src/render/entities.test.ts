@@ -95,7 +95,6 @@ import { Container as MockContainer } from 'pixi.js'
 import {
   BUILDING_PX_PER_TILE,
   BUILD_TICKS_FULL,
-  LOOK_INSIDE,
   PIP_COUNT,
   doorTileOf,
   enterableKind,
@@ -105,12 +104,12 @@ import {
   pipsFilled,
   setEntityScaleMul,
   structureHitPoints,
-  structureHoverText,
   syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 import type { WorldStore } from '../state/worldStore.js'
+import { hoverLabel } from '../ui/interaction.js'
 import { polygonBounds, resolveHit } from './hitShapes.js'
 import { builtFormSpec } from './builtForm.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
@@ -201,24 +200,16 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(entersOnClick(DEFAULT_CONFIG, world([]), 'nobody')).toBe(false)
   })
 
-  it('and the hover tag SAYS which, before the click is made', () => {
+  // ★ The hover is the NAME and nothing else: an offer printed beside it was an instruction
+  // the click already carries, and it pushed the name out of a viewer's eye.
+  it('★ the hover tag names the building, and makes no offer', () => {
     const house = box(4, 4, 2, 2, 'house')
     const well = box(9, 9, 1, 1, 'well')
     const st = world([house, well])
-    expect(structureHoverText(DEFAULT_CONFIG, st, house.id)).toBe(`house · ${LOOK_INSIDE}`)
-    expect(structureHoverText(DEFAULT_CONFIG, st, well.id)).toBe('well')
-    expect(structureHoverText(DEFAULT_CONFIG, st, 'nobody')).toBeNull()
-  })
-
-  it('and it spends ONE em-dash, because the name already spent the other', () => {
-    const built: Structure = { ...box(4, 4, 2, 2, 'house'), builtBy: 'omar' }
-    const st = {
-      structures: { [built.id]: built },
-      agents: { omar: { id: 'omar', name: 'Omar' } },
-    } as unknown as WorldState
-    const tag = structureHoverText(DEFAULT_CONFIG, st, built.id)!
-    expect(tag).toBe(`house — built by Omar · ${LOOK_INSIDE}`)
-    expect(tag.split('—')).toHaveLength(2) // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
+    expect(hoverLabel(st, 'structure', house.id)).toBe('house')
+    expect(hoverLabel(st, 'structure', well.id)).toBe('well')
+    expect(hoverLabel(st, 'structure', 'nobody')).toBeNull()
+    expect(code).not.toContain('Look inside')
   })
 
   it('hangs the hover tag off the DRAWN size, never the pre-scale local bounds', () => {

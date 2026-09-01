@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { WorldState } from '@sj/engine/state'
-import { kindWords } from '../../ui/broadcastReady.js'
+import { structureTitle } from '../../ui/interaction.js'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'
@@ -67,7 +67,7 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   const settled = prov.loaded && (prov.data === null || journal.loaded)
   return (
     <section className="provenance">
-      <h3 className="feed-head">{kindWords(structure.kind)}</h3>
+      <h3 className="feed-head">{structureTitle(state, id)}</h3>
       {settled ? (
         <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (

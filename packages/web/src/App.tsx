@@ -24,9 +24,8 @@ import { KeyMap } from './stage/KeyMap.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { kindWords } from './ui/broadcastReady.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
-import { escapeStep } from './ui/interaction.js'
+import { escapeStep, structureTitle } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -185,6 +184,10 @@ export function App() {
     openPage(next.kind === 'agent' ? 'person' : 'building')
   }
 
+  // What the town calls a building, from the one helper every surface reads it through.
+  const nameOf = (structureId: string): string =>
+    structureTitle(store.getState(), structureId) ?? structureId
+
   const enterInterior = (structureId: string | null): void => {
     scene?.interior?.setActive(structureId)
   }
@@ -213,7 +216,7 @@ export function App() {
           (s) => s.owner === subject.id,
         )
         if (home === undefined) return
-        setSubject({ id: home.id, kind: 'structure', name: kindWords(home.kind) })
+        setSubject({ id: home.id, kind: 'structure', name: nameOf(home.id) })
         openPage('building', 'Provenance')
         scene?.centerOn(home.x, home.y)
       }
@@ -267,7 +270,7 @@ export function App() {
             if (pick.kind === 'structure') {
               const s = store.getState()?.structures[pick.id]
               if (s === undefined) return
-              setSubject({ id: s.id, kind: 'structure', name: kindWords(s.kind) })
+              setSubject({ id: s.id, kind: 'structure', name: nameOf(s.id) })
               return
             }
             // A thing on the ground has no ring; the record it came out of is its surface.

@@ -48,18 +48,6 @@ export function entersOnClick(
   return s?.stage === 'complete' && enterableKind(config, s.kind)
 }
 
-/** The building is named FIRST and the offer follows on a middot: `hoverLabel` already spends an em-dash, so an em-dash here read as three phrases on two identical separators. */
-export const LOOK_INSIDE = 'Look inside'
-export function structureHoverText(
-  config: SimConfig | null,
-  state: WorldState | null,
-  structureId: string,
-): string | null {
-  const name = hoverLabel(state, 'structure', structureId)
-  if (name === null) return null
-  return entersOnClick(config, state, structureId) ? `${name} · ${LOOK_INSIDE}` : name
-}
-
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
 }
@@ -275,10 +263,7 @@ export function syncEntities(
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
-      const text =
-        kind === 'structure'
-          ? structureHoverText(store.getConfig(), store.getState(), id)
-          : hoverLabel(store.getState(), kind, id)
+      const text = hoverLabel(store.getState(), kind, id)
       // the anchor comes from the sprite's DRAWN size — `getLocalBounds` is the texture BEFORE
       // the sprite's own scale, so a 1.85× building's tag stranded itself beside the roof
       if (text !== null) {

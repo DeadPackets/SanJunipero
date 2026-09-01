@@ -1,4 +1,4 @@
-import type { WorldState } from '@sj/engine/state'
+import { placeName, type WorldState } from '@sj/engine/state'
 import { kindWords } from './broadcastReady.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
@@ -27,6 +27,18 @@ function agentName(state: WorldState, id: string): string {
   return state.agents[id]?.name ?? id
 }
 
+/** What the town calls a building, everywhere a viewer reads its name: the name a hand carved
+ *  into it, then the words of the inscription, and only then the kind it is. */
+export function structureTitle(state: WorldState | null, id: string): string | null {
+  const s = state?.structures[id]
+  if (s === undefined) return null
+  // A carved word is one mind's text landing in another's eye, so it goes through the same
+  // sanitizer the world names a place with. R4: a hover used to read "fire_pit".
+  const cut = s.inscription
+  const carved = placeName(s) ?? placeName(cut === undefined ? {} : { name: cut.text })
+  return carved === undefined || carved === '' ? kindWords(s.kind) : carved
+}
+
 // One line for the pointer: what this is, whose it is, how far along it is. Named
 // hoverLabel because charAnim already owns nameTagText(name) for the sprite tag itself.
 export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string): string | null {
@@ -36,16 +48,8 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
       const a = state.agents[id]
       return a === undefined ? null : a.name
     }
-    case 'structure': {
-      const s = state.structures[id]
-      if (s === undefined) return null
-      // R4: prose to a viewer — a hover used to read "fire_pit"
-      const words = kindWords(s.kind)
-      // Genesis signs its own work with a builder who is nobody in the town. Naming it told a
-      // viewer the scripted runner laid the first stone.
-      const by = s.builtBy === null ? undefined : state.agents[s.builtBy]
-      return by === undefined ? words : `${words} — built by ${by.name}`
-    }
+    case 'structure':
+      return structureTitle(state, id)
     case 'item': {
       const it = state.items[id]
       if (it === undefined) return null
