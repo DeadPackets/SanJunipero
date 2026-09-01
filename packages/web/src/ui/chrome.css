@@ -90,9 +90,13 @@
   --mark-inset: clamp(16px, 3vmin, 40px);
 
   /* The sun arc owns the top edge. Its width and its height are named here because the quiet
-     stamp has to sit UNDER it and cannot measure a sibling. */
-  --sky-w: 480px;
-  --sky-h: 30px;
+     stamp has to sit UNDER it and cannot measure a sibling — so the arc is DRAWN at `--sky-h`
+     rather than at a second number, or the two drift and the stamp lands on the road. */
+  --sky-w: 600px;
+  --sky-h: 34px;
+  /* Both flanks reserve one width, so the arc is centred on the viewport and stays there when
+     the weather word changes length. */
+  --sky-chip-w: 9rem;
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
@@ -187,7 +191,7 @@ body {
 .thought-line { font-style: italic; color: var(--ink-quiet); margin: 0; }
 
 .need-row { display: flex; align-items: center; gap: var(--s-4); margin: var(--s-2) 0; }
-.need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 500; }
+.need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 600; }
 .need-track {
   flex: 1; height: 10px; background: var(--cream);
   border-radius: 3px; box-shadow: 0 0 0 1.5px var(--ink);
@@ -1079,7 +1083,7 @@ body {
 }
 .stage-ring-arms button {
   position: absolute; translate: -50% -50%;
-  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   min-height: 44px; padding: 0 var(--s-5);
   color: var(--cream); background: var(--deep);
   border: 0; border-radius: 20px;
@@ -1117,19 +1121,23 @@ body {
   pointer-events: none;
 }
 .sky-chip {
-  display: flex; align-items: center; gap: var(--s-3); margin: 0;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  display: flex; align-items: center; gap: var(--s-3); margin: 0; min-width: var(--sky-chip-w);
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cream);
   /* Cream on the daylight tile is 1.40:1, so the four-way halo is load-bearing, not decoration. */
   text-shadow: var(--halo-deep);
 }
 .sky-glyph { display: block; flex: none; image-rendering: pixelated; }
-.sky-arc { position: relative; height: 34px; }
+/* The weather chip is the right flank; its words end at the bar's edge, not against the road. */
+.sky-bar > .sky-chip:last-child { justify-content: flex-end; }
+.sky-arc { position: relative; height: var(--sky-h); }
 .sky-arc-line { display: block; width: 100%; height: 100%; }
-/* The road brings its own ground with it, the way every mark over the town does. */
+/* The road brings its own ground with it, the way every mark over the town does. Whole pixels:
+   `preserveAspectRatio: none` scales the stroke unevenly, and a fractional width lands the road
+   between two rows of a surface where every other edge is on one. */
 .sky-arc-ground { fill: none; stroke: var(--deep); stroke-width: 5; }
-.sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2.4; stroke-dasharray: 1 3; }
+.sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2; stroke-dasharray: 1 3; }
 .sky-token { position: absolute; translate: -50% -50%; color: var(--cream); }
 .sky-token[data-kind='sun'] { color: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
@@ -1141,17 +1149,22 @@ body {
 @media (max-width: 900px) {
   .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
   .sky-arc { display: none; }
+  /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
+  .sky-chip { min-width: 0; }
+  .sky-bar > .sky-chip:last-child { justify-content: flex-start; }
+  :root { --sky-h: 18px; }
 }
 /* The stream frame has its own clock in the stamp, and the bar would sit under the overlay. */
 [data-broadcast='on'] .sky-bar { display: none; }
 
 .stage-stamp {
   position: absolute; z-index: 21;
-  /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news. */
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h));
+  /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news.
+     A clear step, so the two never sit on one line at any width. */
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4));
   right: max(var(--mark-inset), env(safe-area-inset-right));
   pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1165,7 +1178,7 @@ body {
   max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1809,7 +1822,7 @@ body {
   align-self: flex-start; padding: 4px 10px;
 }
 [data-broadcast='on'] .lower-third-words {
-  font-family: var(--font-body); font-size: 32px; font-weight: 500; line-height: 1.25;
+  font-family: var(--font-body); font-size: 32px; font-weight: 600; line-height: 1.25;
   color: var(--ink);
 }
 
