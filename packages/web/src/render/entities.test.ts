@@ -221,6 +221,11 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(tag.split('—')).toHaveLength(2) // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
   })
 
+  it('hangs the hover tag off the DRAWN size, never the pre-scale local bounds', () => {
+    expect(code).not.toContain('getLocalBounds')
+    expect(code).toMatch(/anchorForSprite\(\s*sprite,\s*\{\s*width: sprite\.width/)
+  })
+
   it('the sprite is the one thing wired to the pointer — nothing else in the file is', () => {
     expect(code).toContain("sprite.eventMode = 'static'")
     expect(code).not.toMatch(/door\.eventMode/)

@@ -279,9 +279,15 @@ export function syncEntities(
         kind === 'structure'
           ? structureHoverText(store.getConfig(), store.getState(), id)
           : hoverLabel(store.getState(), kind, id)
-      // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
-      // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
-      if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
+      // the anchor comes from the sprite's DRAWN size — `getLocalBounds` is the texture BEFORE
+      // the sprite's own scale, so a 1.85× building's tag stranded itself beside the roof
+      if (text !== null) {
+        tags.show(
+          'hover',
+          text,
+          anchorForSprite(sprite, { width: sprite.width, height: sprite.height }),
+        )
+      }
     })
     sprite.on('pointerout', () => {
       tags.hide('hover')
