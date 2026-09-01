@@ -57,9 +57,16 @@ describe('worldStore', () => {
       ...makeSnapshot(),
       config: { ...clone(DEFAULT_CONFIG), mystery: 1 },
     }
-    expect(() => {
-      store.applyServer(bad)
-    }).toThrow()
+    expect(store.applyServer(bad)).toBe('reload')
+  })
+
+  // ★ A tab left open across a config change used to throw out of the message handler and hang
+  // forever on "Looking for the town…".
+  it('★ asks for a reload on a config this bundle cannot read, instead of throwing', () => {
+    const store = createWorldStore()
+    const bad = { ...makeSnapshot(), config: { ...clone(DEFAULT_CONFIG), mystery: 1 } }
+    expect(() => store.applyServer(bad)).not.toThrow()
+    expect(store.getState(), 'a config it cannot fold with is not a town').toBeNull()
   })
 
   it('tick messages fold with the adopted config, bit-identical to the engine fold', () => {

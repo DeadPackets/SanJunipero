@@ -19,6 +19,9 @@ type Thought = { agentId: string; tick: number; text: string }
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
 
+/** What a frame the view could not take asks of whoever delivered it. `null`: it was taken. */
+export type Trouble = 'reload' | null
+
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
 export type WorldStore = {
@@ -40,7 +43,7 @@ export type WorldStore = {
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
   lawHistory: () => LawChange[]
-  applyServer: (msg: ServerMsg) => void
+  applyServer: (msg: ServerMsg) => Trouble
   subscribe: (fn: () => void) => () => void
   onEvents: (fn: (evts: SimEvent[]) => void) => () => void
 }
@@ -97,14 +100,19 @@ export function createWorldStore(): WorldStore {
 
     applyServer(msg) {
       switch (msg.t) {
-        case 'snapshot':
+        case 'snapshot': {
+          // strict: the live view must fold with the engine's exact config, and a tab left open
+          // across a config change cannot — only a reload fetches a bundle that can.
+          const carried = SimConfigSchema.safeParse(msg.config)
+          if (!carried.success) return 'reload'
           logSeq = msg.seq
-          config = SimConfigSchema.parse(msg.config) // strict: live view must fold with the engine's exact config
+          config = carried.data
           state = msg.state as WorldState
           laws = msg.laws
           paused = msg.paused ?? false
           mode = { live: true }
           break
+        }
         case 'paused':
           paused = msg.paused
           break
@@ -145,6 +153,7 @@ export function createWorldStore(): WorldStore {
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)
       notify()
+      return null
     },
 
     subscribe(fn) {

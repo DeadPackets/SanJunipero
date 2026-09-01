@@ -109,6 +109,26 @@ describe('connectObservatory link status', () => {
     warn.mockRestore()
   })
 
+  /** The store cannot reload the page; the socket already knows how, for the same reason. */
+  it('★ reloads on a snapshot this bundle cannot read', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    FakeWebSocket.instances[0]!.open()
+    const snapshot = {
+      t: 'snapshot',
+      tick: 0,
+      seq: 1,
+      state: {},
+      config: { mystery: 1 },
+      laws: {},
+      live: true,
+    }
+    FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(snapshot) })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
   it('a deliberate close() never reports reconnecting', () => {
     const statuses: string[] = []
     const handle = connectObservatory({
