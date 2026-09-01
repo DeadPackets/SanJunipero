@@ -149,7 +149,7 @@ function Today({ store, gapTicks, onJump }: PageProps) {
       )}
 
       {/* THE FRONT PAGE: the day's own paper is the lead story and the live feed is the column
-          beside it. Below the sheet's own 44rem the two stack, which is what a narrow broadsheet
+          beside it. Below the sheet's own 40rem the two stack, which is what a narrow broadsheet
           has always done. */}
       <div className="bs-front">
         <section className="block bs-lead">

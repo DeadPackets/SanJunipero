@@ -97,16 +97,13 @@
      rather than at a second number, or the two drift and the stamp lands on the road. */
   --sky-w: 600px;
   --sky-h: 34px;
-  /* Both flanks reserve one width, so the arc is centred on the viewport and stays there when
-     the weather word changes length. */
-  --sky-chip-w: 9rem;
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
 
-  /* The reading line. A 760px sheet runs 80 characters of Manrope at --f-3, which is a third
-     wider than a line the eye can return from without losing its place. */
-  --measure: 68ch;
+  /* The reading line. `ch` is the advance of `0`, about a third wider than the average letter,
+     so this is nearer 78 characters than 62 — and a 760px sheet runs past 100 uncapped. */
+  --measure: 62ch;
 
   color-scheme: light;
   accent-color: var(--honey);
@@ -160,7 +157,7 @@ body {
   width: 52px; height: 52px;
   image-rendering: pixelated; /* the portrait IS world art */
   background: var(--cream);
-  box-shadow: var(--frame-tight), 3px 3px 0 0 var(--deep);
+  box-shadow: var(--frame-tight), var(--ledge);
 }
 .portrait.silhouette {
   background:
@@ -246,7 +243,14 @@ body {
   font-variant-numeric: tabular-nums; font-family: var(--font-data);
 }
 
-.feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
+/* A 6.2rem stamp beside the words leaves them nineteen characters in a sidebar column. The row
+   measures itself, so the stamp steps onto its own line wherever a feed is narrow. */
+.feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; container-type: inline-size; }
+@container (max-width: 26rem) {
+  :is(.feed-line, .feed-jump) { flex-wrap: wrap; row-gap: var(--s-1); }
+  :is(.feed-line, .feed-jump) > .stamp { width: auto; }
+  .feed-text { flex: 1 0 100%; }
+}
 .feed-line {
   display: flex; gap: var(--s-4); align-items: baseline;
   padding: var(--s-2) var(--s-3); margin: 0 calc(-1 * var(--s-3));
@@ -505,10 +509,8 @@ body {
 }
 .legend-mark { flex: none; }
 .legend-word { line-height: 1; }
-/* three axes, each labelled, so a two-channel encoding does not become a manual.
-   The key had NO layout rule of its own: the axes ran inline and wrapped through each other, so
-   an axis whose chips spilled onto a second row left that row starting 86px left of the first
-   and under no label at all. One band per axis, and the label sits over its own chips. */
+/* One band per axis, the label over its own chips: with no layout rule the axes ran inline and
+   a spilled row started 86px left of the row above it, under no label at all. */
 .bonds-legend { display: grid; gap: var(--s-5); margin-top: var(--s-4); }
 .legend-axis {
   display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
@@ -977,9 +979,7 @@ body {
 .paper-title, .thumb-title, .paper-sheet article h4 { text-wrap: balance; }
 .room-who { text-wrap: pretty; }
 
-/* Running prose stops at the reading line. The sheet is as wide as the sheet needs to be; a
-   paragraph is as wide as a paragraph can be read at. */
-.edition-body, .edition-caption, .chapter-text, .biography-body, .law-says, .sheet-note,
+.edition-body, .edition-caption, .chapter-text, .biography-body, .law-says,
 .provenance-line, .era-text, .feed-text, .rx-empty, .feed-empty, .bond-line, .bond-evidence,
 .discovery-credit, .discovery-makes, .room-built, .ops-answer-says {
   max-width: var(--measure);
@@ -1137,12 +1137,13 @@ body {
      900px rule below names, arriving from the other end. */
   left: 50%; translate: -50% 0;
   width: min(var(--sky-w), calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left))));
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Equal flanks, so the arc is centred whatever the day number or the weather word runs to. */
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
   align-items: center; gap: var(--s-5);
   pointer-events: none;
 }
 .sky-chip {
-  display: flex; align-items: center; gap: var(--s-3); margin: 0; min-width: var(--sky-chip-w);
+  display: flex; align-items: center; gap: var(--s-3); margin: 0; min-width: 0;
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cream);
@@ -1171,9 +1172,8 @@ body {
   .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
   .sky-arc { display: none; }
   /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
-  .sky-chip { min-width: 0; }
-  .sky-bar > .sky-chip:last-child { justify-content: flex-start; }
-  :root { --sky-h: 18px; }
+  /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */
+  .stage-stamp { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7)); }
 }
 /* The stream frame has its own clock in the stamp, and the bar would sit under the overlay. */
 [data-broadcast='on'] .sky-bar { display: none; }
@@ -1311,10 +1311,9 @@ body {
     grid-template-columns: repeat(2, auto); padding-bottom: 0;
   }
   .signpost[data-open='yes'] .signpost-post { display: none; }
-  /* The arms take the top edge here, and the sky bar and the stamp were still under them: three
-     marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline carries
-     the day, the season and the clock while it is up, so nothing is lost by standing them down. */
-  .app:has(.signpost[data-open='yes']) :is(.sky-bar, .stage-stamp) { display: none; }
+  /* Three marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline
+     carries the day, the season and the clock while it is up. */
+  .app[data-paper='on'] :is(.sky-bar, .stage-stamp) { display: none; }
 }
 @media (min-width: 641px) and (max-height: 620px) {
   .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
@@ -1371,7 +1370,6 @@ body {
     height: calc(100dvh - 64px); border-top-width: 12px;
   }
   .paper-head { padding-block: var(--s-2) 0; }
-  .paper-title { font-size: var(--f-5); }
 }
 /* short AND narrow: the arms are two rows there, so the sheet leaves two rows of room */
 @media (max-width: 640px) and (max-height: 620px) {
@@ -1402,34 +1400,31 @@ body {
 }
 /* Two rules of different weights is what a dateline IS — heavy over the sections, hairline
    under them. */
-/* Two equal flanks: the tabs sit on the sheet's own centre line, under the masthead, at every
-   width — with `auto` sides the strip hung 21px left of the title it belongs to. */
 .paper-dateline {
-  /* Three tracks, and each one's floor is its own words. `1fr` sides balance so the strip is
-     centred on the masthead; `max-content` in the middle because a wrapping flex row's
-     min-content is ONE tab, and a plain `auto` track collapsed the section line to a column. */
+  /* `1fr` sides balance, so the strip centres on the masthead; `max-content` in the middle
+     because a wrapping flex row's min-content is ONE tab and `auto` collapsed the line. */
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
-  align-items: center; column-gap: var(--s-5);
+  align-items: center; column-gap: var(--s-4);
   border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink);
   /* The tabs' own underline landed 1px off the hairline and the two read as one thick smear. */
   padding-bottom: var(--s-2);
   margin-bottom: var(--s-2);
 }
 .paper-marginalia {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5); min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); min-width: 0;
 }
-/* Both flanks are flexible tracks now, and neither may break its own line: "close · Esc" wrapped
-   to "close ·" over "Esc" the moment the track was narrower than the words. */
-.paper-date, .paper-close { white-space: nowrap; }
+/* The date already had this; the close word did not, and "close · Esc" broke to two lines the
+   moment its flank became a flexible track. */
+.paper-close { white-space: nowrap; }
 .paper-date, .paper-clock {
   margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.paper-tabs { display: flex; gap: var(--s-1); justify-self: center; flex-wrap: wrap; }
+.paper-tabs { display: flex; gap: var(--s-1); }
 /* Manrope, not the pixel face: Silkscreen at 13px reads as a smear, and these are words. */
 .paper-tab {
-  min-height: 44px; padding: 0 var(--s-4);
+  min-height: 44px; padding: 0 var(--s-3);
   font: inherit; font-size: var(--f-2); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--ink-quiet);
@@ -1442,7 +1437,7 @@ body {
    whole strip sideways on every change. */
 .paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .paper-close {
-  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-5);
+  min-height: 44px; padding: 0 var(--s-2) 0 var(--s-3);
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
   color: var(--ink-quiet); background: none; cursor: pointer;
   /* A divider and a rem of clear, or the close word reads as a fifth tab at every width. */
@@ -1453,10 +1448,8 @@ body {
 /* ── the front page: the lead story, and the live feed as the column beside it ── */
 .bs-front { display: grid; gap: var(--s-6); }
 .bs-column { display: grid; align-content: start; gap: var(--s-5); }
-/* Two columns need width or they are two gutters. The sheet measures itself, never the window:
-   at 40rem the lead runs about 45 characters, which is a newspaper column and not a ribbon.
-   40, not 44: a 760px sheet is 42.5rem of container, so at 44 the front page had no width it
-   could ever reach between 641px and 1920px — the two columns were unreachable on a laptop. */
+/* The sheet measures itself, never the window. 40, not 44: a 760px sheet is 42.5rem, so at 44
+   the split could not fire at any width between 641px and 1920px. */
 @container (min-width: 40rem) {
   .bs-front {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -1467,11 +1460,6 @@ body {
     padding-left: var(--s-7); margin-left: calc(var(--s-7) * -1);
     border-left: 1px solid var(--ink-quiet);
   }
-  /* The rail is a newspaper sidebar, not a second page: a 6.2rem stamp column beside the words
-     leaves them 19 characters. The stamp takes the line above its own entry instead. */
-  .bs-column .feed-jump { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-1); }
-  .bs-column .feed-jump .stamp { width: auto; }
-  .bs-column .feed-text { grid-column: 1 / -1; }
 }
 .bs-front .block { margin: 0; }
 /* The lead story is set as one: no slab, no frame, just the headline and the measure. */
@@ -1496,7 +1484,6 @@ body {
    close word. A 78% sheet only reaches that around a 970px window, so below the 1000px the
    signpost already breaks at, the tabs take the second row to themselves and scroll along it. */
 @media (max-width: 1000px) {
-  .paper-title { font-size: var(--f-6); }
   .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
     grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
@@ -1505,6 +1492,14 @@ body {
   }
   .paper-tab { flex: none; scroll-snap-align: start; }
   .paper-marginalia { grid-row: 1; grid-column: 2; }
+}
+/* Both AFTER the base rule: a media block that precedes it loses on source order at equal
+   specificity, which is why the short window's smaller masthead never once took. */
+@media (max-width: 480px) {
+  .paper-title { font-size: var(--f-6); }
+}
+@media (max-height: 620px) {
+  .paper-title { font-size: var(--f-5); }
 }
 .paper-sheet > :first-child { margin-top: 0; }
 
