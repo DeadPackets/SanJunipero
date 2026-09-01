@@ -198,6 +198,40 @@ describe('perceptionToProse', () => {
     expect(a.messages[3]!.content.split('\n')).toHaveLength(1)
   })
 
+  // ★ A mind never perceives itself: `perceiveHeard` skips the speaker and the day log dedups
+  // a still scene, so its own words came back to it nowhere at all.
+  it('★ its own last words come back to it, most recent last', () => {
+    const a = assemblePrompt(
+      fixtureBlocks({
+        now: { prose: 'The sun stands high.', said: ['We should mend the weir.', 'Nobody came.'] },
+      }),
+    )
+    const block = a.messages.at(-1)!.content
+    expect(block.split('\n')).toEqual([
+      'You said: "We should mend the weir."',
+      'You just said: "Nobody came."',
+    ])
+  })
+
+  it('★ two lines at most, and one is said just once', () => {
+    const said = ['first', 'second', 'third', 'fourth']
+    const a = assemblePrompt(fixtureBlocks({ now: { prose: 'The sun stands high.', said } }))
+    const block = a.messages.at(-1)!.content
+    expect(block.split('\n')).toHaveLength(2)
+    expect(block).not.toContain('second')
+    expect(block).toBe('You said: "third"\nYou just said: "fourth"')
+
+    const one = assemblePrompt(
+      fixtureBlocks({ now: { prose: 'The sun stands high.', said: ['only'] } }),
+    )
+    expect(one.messages.at(-1)!.content).toBe('You just said: "only"')
+  })
+
+  it('★ and nothing said adds no message at all', () => {
+    const a = assemblePrompt(fixtureBlocks({ now: { prose: 'The sun stands high.', said: [] } }))
+    expect(a.messages).toHaveLength(3)
+  })
+
   it('★ and nothing heard adds no message at all', () => {
     const a = assemblePrompt(fixtureBlocks({ now: { prose: 'The sun stands high.', heard: '' } }))
     expect(a.messages).toHaveLength(3)

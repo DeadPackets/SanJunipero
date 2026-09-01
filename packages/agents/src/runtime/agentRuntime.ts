@@ -1,4 +1,4 @@
-import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { MINUTES_PER_DAY, sanitizeSpokenText, simTimeFromTick } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
@@ -9,7 +9,13 @@ import type {
   Recalled,
   Underway,
 } from '../prompt/assemble.js'
-import { appendMoment, assemblePrompt, compactDayLog, JOURNAL_LINES } from '../prompt/assemble.js'
+import {
+  appendMoment,
+  assemblePrompt,
+  compactDayLog,
+  JOURNAL_LINES,
+  OWN_WORDS_SHOWN,
+} from '../prompt/assemble.js'
 import {
   heardProse,
   makeablesLine,
@@ -238,6 +244,9 @@ export class AgentRuntime {
   #pendingDreamMood: string | null = null
   #pendingRecall: Recalled | null = null
   #lastOutcome: string | null = null
+  // The mind's own last words, oldest first. Perception skips self and the day log dedups a
+  // still scene, so without this a mind cannot hear what it has been saying.
+  #spoken: string[] = []
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -442,6 +451,15 @@ export class AgentRuntime {
     }
   }
 
+  // What the WORLD took, not what the model wrote: sanitized the way the verb sanitizes it, and
+  // only once the submit came back accepted.
+  #noteAccepted(intent: Intent, res: SubmitResult): void {
+    if (!res.ok || intent.verb !== 'speak') return
+    const text: unknown = intent.params.text
+    if (typeof text !== 'string') return
+    this.#spoken = [...this.#spoken, sanitizeSpokenText(text)].slice(-OWN_WORDS_SHOWN)
+  }
+
   #clearPlanQueue(): void {
     this.#plan.queue = []
     this.#plan.size = 0
@@ -470,6 +488,7 @@ export class AgentRuntime {
     return this.#bridge
       .submit(this.#agentId, intent, (res) => {
         this.#pendingInFlight = false
+        this.#noteAccepted(intent, res)
         if (this.#pendingIntent !== intent) return
         if (res.ok) {
           this.#pendingIntent = null
@@ -563,6 +582,7 @@ export class AgentRuntime {
   }
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
+    this.#noteAccepted(head, res)
     if (res.ok) return
     // A word for standing still is a step spent, not a plan refused: the body was already doing
     // it, so the queue carries on from the next step instead of dying at this one.
@@ -701,7 +721,7 @@ export class AgentRuntime {
       dayLog: this.#dayLog,
       recalled: this.#pendingRecall,
       lastOutcome: this.#lastOutcome,
-      now: { prose: nowProse, heard },
+      now: { prose: nowProse, heard, said: this.#spoken },
       underway: this.#underway(),
     }
     let assembled = assemblePrompt(blocks)
@@ -847,7 +867,8 @@ export class AgentRuntime {
     }
 
     if (turn.speech) {
-      await this.#bridge.submit(this.#agentId, { verb: 'speak', params: { text: turn.speech } })
+      const said: Intent = { verb: 'speak', params: { text: turn.speech } }
+      this.#noteAccepted(said, await this.#bridge.submit(this.#agentId, said))
     }
 
     if (turn.action) {

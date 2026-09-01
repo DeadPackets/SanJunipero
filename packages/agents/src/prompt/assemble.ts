@@ -1,4 +1,5 @@
 // Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
+import { sanitizeSpokenText } from '@sj/shared'
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
@@ -40,8 +41,9 @@ export type PromptBlocks = {
   // built before it existed reads exactly as it always did.
   lastOutcome?: string | null
   // block 6 — every turn. `heard` is another mouth's bytes and rides its own message, so no
-  // utterance can ever read as a sentence the narrator wrote.
-  now: { prose: string; heard?: string }
+  // utterance can ever read as a sentence the narrator wrote. `said` is this mind's own last
+  // words, oldest first: perception skips self, so nothing else in the prompt holds them.
+  now: { prose: string; heard?: string; said?: string[] }
   // Last of all, and only while something is already running: a mind holding an intention is
   // asked whether to carry on or break off, never asked afresh whether to act at all.
   underway: Underway | null
@@ -61,6 +63,10 @@ const DAYLOG_COMPACTION_TOKENS = 6000
 
 export const JOURNAL_LINES = 5
 const JOURNAL_MAX_CHARS = 1200
+
+/** Two, because one line back cannot show a rut and a page of them is the mind talking to
+ *  itself instead of to the town. */
+export const OWN_WORDS_SHOWN = 2
 
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard
@@ -127,6 +133,18 @@ function renderUnderway(u: Underway): string {
   )
 }
 
+// Sanitized here as well as at the verb, for the same reason `heardLine` is: a quote in a
+// prompt is a fence, and model output is where one comes from.
+function renderSaid(said: readonly string[]): string {
+  const lines = said.slice(-OWN_WORDS_SHOWN)
+  return lines
+    .map(
+      (text, i) =>
+        `${i === lines.length - 1 ? 'You just said' : 'You said'}: "${sanitizeSpokenText(text)}"`,
+    )
+    .join('\n')
+}
+
 function renderScene(scene: PromptBlocks['scene']): string {
   const parts: string[] = []
   if (scene.ledgers.length > 0) {
@@ -163,10 +181,11 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const lastOutcome = blocks.lastOutcome ?? ''
   const now = blocks.now.prose
   const heard = blocks.now.heard ?? ''
+  const said = renderSaid(blocks.now.said ?? [])
   // Stable before volatile — the book changes only when the mind writes in it, dayLog is
   // append-only, the scene changes every turn — so the byte prefix stays cacheable.
   const underway = blocks.underway == null ? '' : renderUnderway(blocks.underway)
-  const ordered = [journal, dayLog, scene, recalled, lastOutcome, now, heard, underway]
+  const ordered = [journal, dayLog, scene, recalled, lastOutcome, now, heard, said, underway]
   const messages = ordered
     .filter((content) => content.length > 0)
     .map((content) => ({ role: 'user' as const, content }))
