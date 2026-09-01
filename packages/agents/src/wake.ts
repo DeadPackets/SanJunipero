@@ -25,7 +25,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   // of the words it answers.
   conversationGapTicks: 5,
   conversationWindowTicks: 60,
-  idleGapTicks: 20,
+  idleGapTicks: 30,
   boredomTicks: 60,
   // Thirst empties as hunger does and kills faster, so it rings on the same rung. Any named
   // affliction rings at its first severity: poison and illness both begin there.
@@ -36,7 +36,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   wakeRetryTicks: 25,
   napTicks: 120,
   dreamChance: 0.35,
-  ambientK: 8,
+  ambientK: 6,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }
