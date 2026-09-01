@@ -1,4 +1,5 @@
 import { Assets, Container, Graphics, Texture } from 'pixi.js'
+import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { createWorldLabel } from './worldLabel.js'
 import {
@@ -34,21 +35,26 @@ import { characterCell } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 
+/** The world's own ceiling, not a second one: `sanitizeSpokenText` has already bounded every
+ *  utterance that reaches a viewer, so this layer never cuts a sentence a second time. */
+export { SPEECH_MAX_CHARS } from '@sj/shared'
+
 export const SPEECH_MS_BASE = 3500
+/** A longer line is held longer, all the way to the ceiling: 240 characters is about forty
+ *  words, and forty words at a comfortable reading pace is the 13s this adds up to. */
 export const SPEECH_MS_PER_CHAR = 40
-export const SPEECH_MAX_CHARS = 140
 const THOUGHT_DRIFT_PX = 2
 
-/** How wide a bubble may grow in world pixels before it wraps. */
-export const BUBBLE_MAX_PX = 280
+/** ★ NOTHING IS CUT. The box wrapped at 210 world px — thirteen characters a line in Press
+ *  Start 2P at 16px — and stopped at two lines, so a spoken line arrived as "Sit down, Sa…" and
+ *  the other sixty-six characters were never seen by anyone. Double the width, no line ceiling,
+ *  and the SANITIZER's own bound is the only one left: an utterance reaches this layer already
+ *  cut to `SPEECH_MAX_CHARS`, and the box grows to whatever came. */
+export const BUBBLE_MAX_PX = 420
 export const BUBBLE_FONT_PX = faceFor('speech').size
 export const BUBBLE_LINE_H = Math.max(WORLD_TEXT_LINE_H, BUBBLE_FONT_PX + 4)
 /** DERIVED, not the hardcoded 24 it was: the wide face wraps sooner than the narrow one. */
 export const WRAP_CHARS = wrapCharsFor(faceFor('speech').family, BUBBLE_FONT_PX, BUBBLE_MAX_PX)
-
-/** Four lines of the wider box holds a whole spoken line; past that is a paper's job. */
-export const BUBBLE_MAX_LINES = 4
-export const ELLIPSIS = '…'
 
 /** At the widest stop a person is eight pixels tall and a bubble is the whole street. */
 export const GLYPH_ZOOM: number = ZOOM_STOPS[0]
@@ -84,9 +90,7 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
     }
   }
   if (line.length > 0) lines.push(line)
-  if (lines.length <= BUBBLE_MAX_LINES) return lines
-  const last = lines[BUBBLE_MAX_LINES - 1]!.slice(0, Math.max(1, maxChars - 1)).trimEnd()
-  return [...lines.slice(0, BUBBLE_MAX_LINES - 1), last + ELLIPSIS]
+  return lines
 }
 
 const TINT_BUCKET_BITS = 3

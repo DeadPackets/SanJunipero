@@ -170,7 +170,7 @@ the town serving, and two only speak.
 | Guard | Set at | What it does |
 |---|---|---|
 | Daily budget | `SJ_SPEND_DAILY_USD`, $3.00 per rolling 24 h | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | `SJ_SPEND_CAP_USD`, $50 over the town's life | Kills the process. The town on disk is intact. |
+| Anomaly stop | `SJ_SPEND_CAP_USD`, $50 over the town's life; 0 turns it off | Kills the process. The town on disk is intact. |
 | Rate tripwire | 8 calls/mind/sim-hour over 15 min | A runaway, never a price. Stops every mind; the town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | Prints and files an alert. Stops nothing. |
 | Provider mix | >70% of mind calls off the pinned provider | Prints and files an alert. Never stops. |

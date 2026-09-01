@@ -6,7 +6,8 @@ import { createWorldStore } from '../state/worldStore.js'
 import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
-import { KEY_MAP_KEY } from '../stage/KeyMap.js'
+import { HelpButton } from '../stage/HelpButton.js'
+import { KEY_MAP_ID, KEY_MAP_KEY } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
   ARMS,
@@ -20,6 +21,8 @@ import {
   tabFromKey,
   type PageKey,
 } from './pageModel.js'
+
+import { dateline } from './stamp.js'
 
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const PAGES = Object.keys(PAGE_TABS) as PageKey[]
@@ -50,7 +53,7 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
 
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
-    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {}, onHelp: () => {} }))
+    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {} }))
 
   it('hangs four arms, in the order the direction picked', () => {
     expect([...ARMS]).toEqual(['folk', 'chronicle', 'found', 'laws'])
@@ -80,16 +83,53 @@ describe('the signpost', () => {
     expect(post('folk')).toContain('data-open="yes"')
   })
 
-  // ★ The key map answered '?' and nothing on screen said so, so the one sheet that explains
-  // the town could only be found by a viewer who already knew it was there.
-  it('★ hangs a way into the key map off the end of the post', () => {
+  // ★ 6E supersedes the fifth arm: the way into the key map is the corner button, so the post
+  // carries the four sections and nothing else.
+  it('★ hangs four arms and no fifth — help is the corner button now', () => {
     const html = post(null)
-    // named for the sheet it opens, so a screen reader hears one name for one thing
-    expect(html).toContain(`aria-label="What the town answers to"`)
-    expect(html).toContain(`>${KEY_MAP_KEY}<`)
-    // it is not one of the four: it opens no page and presses for none
+    expect(html.match(/<button/g)).toHaveLength(ARMS.length)
+    expect(html).not.toContain(`>${KEY_MAP_KEY}<`)
     expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])
     expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(ARMS.length)
+  })
+
+  it('★ names the corner button for the sheet it opens, at 44px in a corner of its own', () => {
+    const html = renderToStaticMarkup(
+      createElement(HelpButton, { open: false, onToggle: () => {} }),
+    )
+    expect(html).toContain('aria-label="What the town answers to"')
+    expect(html).toContain(`>${KEY_MAP_KEY}<`)
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('aria-expanded="false"')
+    expect(
+      renderToStaticMarkup(createElement(HelpButton, { open: true, onToggle: () => {} })),
+    ).toContain('aria-expanded="true"')
+
+    const css = src('../ui/chrome.css')
+    const body = /\.help-button \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(body).toContain('width: 44px')
+    expect(body).toContain('height: 44px')
+    expect(body).toMatch(/left: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    expect(body).toMatch(/bottom: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+  })
+
+  // The button toggles, so the click-away that shuts the sheet must not count it as away — and
+  // it asks the DOM through the disclosure, so the key map imports no opener back.
+  it('★ leaves whatever opened the key map out of its own click-away', () => {
+    const keyMap = src('../stage/KeyMap.tsx')
+    expect(keyMap).toContain("[aria-controls='${KEY_MAP_ID}']")
+    expect(keyMap).not.toContain('HelpButton')
+    expect(src('../stage/HelpButton.tsx')).toContain('aria-controls={KEY_MAP_ID}')
+    // ...and the id it names is the one the sheet actually carries
+    expect(keyMap).toContain(`id={KEY_MAP_ID}`)
+    expect(KEY_MAP_ID).toBe('key-map-sheet')
+  })
+
+  it('★ is what the app mounts, with the arm’s wiring kept', () => {
+    const app = src('../App.tsx')
+    expect(app).toMatch(/<HelpButton\s+open=\{keysOpen\}/)
+    expect(app).toContain('setKeysOpen((v) => !v)')
+    expect(app).not.toContain('onHelp')
   })
 
   it('names itself for a screen reader and puts the post under the arms', () => {
@@ -190,6 +230,46 @@ describe('the paper', () => {
     // a phone is not told to press a key it does not have (@media (hover: none))
     expect(html).toContain('class="paper-close-key"> · Esc<')
     expect(html).toContain('class="paper-grip"')
+  })
+
+  // ★ 4A — the sheet is a dated front page, so the head is a masthead over a dateline rule and
+  // the tabs run along it as the section line.
+  it('★ prints a masthead, and dates it off the town’s own clock', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    expect(html).toContain('class="paper-dateline"')
+    expect(html).toMatch(/class="paper-title" id="paper-title">Chronicle</)
+    const { day, time } = dateline(0)
+    expect(html).toContain(`class="paper-date">${day}<`)
+    expect(html).toContain(`class="paper-clock">${time}<`)
+  })
+
+  it('★ runs the section line INSIDE the dateline, with the keyboard path untouched', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    const line = html.slice(html.indexOf('paper-dateline'), html.indexOf('</header>'))
+    expect(line).toContain('role="tablist"')
+    expect(line).toContain('aria-describedby="paper-tabs-keys"')
+    expect(line.match(/tabindex="0"/g)).toHaveLength(1)
+    expect(line).toContain('class="paper-close"')
+  })
+
+  it('★ every arm wears the same chrome, not the Chronicle alone', () => {
+    for (const page of ARMS) {
+      const html = paper({ page, tab: firstTab(page) })
+      expect(html, page).toContain('class="paper-dateline"')
+      expect(html, page).toContain('class="paper-date">')
+    }
+  })
+
+  // The lead story and the live feed, one beside the other — and the lead keeps a real heading
+  // for a reader who cannot see that the headline is one.
+  it('★ lays the Chronicle out as a front page: a lead story and a column beside it', () => {
+    const html = paper({ page: 'chronicle', tab: 'Today' })
+    expect(html).toContain('class="bs-front"')
+    expect(html).toContain('class="block bs-lead"')
+    expect(html).toContain('class="bs-column"')
+    expect(html).toMatch(/class="stage-sr">The day’s paper</)
+    expect(html).toContain('What mattered')
+    expect(html).toContain('Since you arrived')
   })
 
   it('hangs the dim over the town as a sibling, opening with the sheet', () => {

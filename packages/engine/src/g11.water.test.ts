@@ -7,7 +7,7 @@ import { submitIntent } from './intent.js'
 import { findPath, stepCostAt, terrainCostFor, BRIDGE_KIND } from './path.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
-import { BUCKET_KIND, STONE_KIND, type PendingEvent } from './verbs/index.js'
+import { BUCKET_KIND, STONE_KIND, WALK_NO_ROAD, type PendingEvent } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 
@@ -233,10 +233,11 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
   it('before the deck, no route exists and the legs stop at the water', () => {
     const s = banks()
     expect(findPath(s, { x: 9, y: 5 }, { x: 13, y: 5 }, CFG)).toBeNull()
-    // Walking to the far bank is refused for what it is: there is no way across yet.
+    // Walking to the far bank is refused for what it is: there is no way across yet. The builder
+    // already stands on the near bank, so there is no ground toward it left to walk.
     expect(submitIntent(s, CFG, 'builder', 'walk', { x: 13, y: 5 })).toEqual({
       ok: false,
-      reason: 'no path to that spot',
+      reason: WALK_NO_ROAD,
     })
     // The near bank is still reachable, so it is the river and not the pathfinder.
     expect(findPath(s, { x: 9, y: 5 }, { x: 9, y: 12 }, CFG)).not.toBeNull()

@@ -16,6 +16,9 @@ DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 48}")
 export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$
 export SJ_ADMIN_PORT=${SJ_ADMIN_PORT:-8799}
+# Nobody watches a rehearsal, and unwatched is exactly when pacing drops the clock to 0.25x
+# after 300 s. Round 2's first launch lost 380 ticks of world B to it before anyone looked.
+export SJ_IDLE_PACING=0
 # One rotation deep, before SJ_FRESH wipes anything: the run before this one is still readable,
 # the one before that is not.
 PREV=$ROOT/rehearsals-prev

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { readFileSync } from 'node:fs'
+import { PLATE_MAX_ROWS } from './plateModel.js'
+import { stateWord } from './status.js'
 import {
   CROP_STAGES,
   escapeStep,
-  hoverLabel,
+  hoverPlate,
   itemCropDetail,
   structureTitle,
   thingKind,
@@ -21,7 +23,8 @@ function fixture(): WorldState {
       builder: { ...blankAgent('builder', 'Tomas') },
     },
     structures: {
-      h1: structure('h1', 'house', 'builder'),
+      // built by one hand, owned by another — the plate reads `owner`, never `builtBy`.
+      h1: { ...structure('h1', 'house', 'builder'), owner: 'rahel' },
       h2: { ...structure('h2', 'storehouse', null) },
       h3: { ...structure('h3', 'shed', 'ghost') }, // builder id no longer in the roster
     },
@@ -79,38 +82,78 @@ function structure(
   }
 }
 
-describe('hoverLabel', () => {
+const words = (rows: { text: string }[]): string => rows.map((r) => r.text).join(' / ')
+
+describe('hoverPlate — three lines at most, and none of them an id', () => {
   const state = fixture()
 
-  it('names a townsperson and nothing else', () => {
-    expect(hoverLabel(state, 'agent', 'rahel')).toBe('Rahel')
+  it('gives a person their name and the one word for what they are doing', () => {
+    const rows = hoverPlate(state, 'agent', 'rahel')
+    expect(rows.map((r) => r.tone)).toEqual(['name', 'quiet'])
+    expect(rows[0]?.text).toBe('Rahel')
+    expect(rows[1]?.text).toBe(stateWord(state.agents.rahel!, state.tick))
   })
 
-  it('calls a building what the town calls it, and never credits a builder on a hover', () => {
-    expect(hoverLabel(state, 'structure', 'h1')).toBe('house')
-    expect(hoverLabel(state, 'structure', 'h2')).toBe('storehouse')
-    expect(hoverLabel(state, 'structure', 'h3')).toBe('shed')
+  it('leads a building with its kind and never credits a builder', () => {
+    expect(hoverPlate(state, 'structure', 'h1')[0]).toEqual({ text: 'house', tone: 'kind' })
+    expect(words(hoverPlate(state, 'structure', 'h2'))).toBe('storehouse')
+    expect(words(hoverPlate(state, 'structure', 'h3'))).toBe('shed')
   })
 
-  it('counts an item and marks it when someone owns it', () => {
-    expect(hoverLabel(state, 'item', 'i1')).toBe('bread ×3')
-    expect(hoverLabel(state, 'item', 'i2')).toBe('bread ×3 · Rahel’s')
+  it("takes the owner line from the structure's owner, never from who built it", () => {
+    // `builtBy` is 'script' at genesis, which is nobody in the town; `owner` is the person.
+    expect(state.structures.h1?.builtBy).toBe('builder')
+    expect(words(hoverPlate(state, 'structure', 'h1'))).toBe('house / Rahel’s')
+    // ...and a builder who is nobody leaves the plate rather than being printed
+    expect(words(hoverPlate(state, 'structure', 'h3'))).toBe('shed')
   })
 
-  it('names an unknown owner by id rather than dropping the claim', () => {
-    expect(hoverLabel(state, 'item', 'i3')).toBe('axe ×1 · nobody’s')
+  it('says who is under the roof, and counts them once there are too many to name', () => {
+    const two = { ...state, agents: { ...state.agents } }
+    two.agents.rahel = { ...two.agents.rahel!, insideId: 'h1' }
+    two.agents.builder = { ...two.agents.builder!, insideId: 'h1' }
+    expect(words(hoverPlate(two, 'structure', 'h1'))).toBe('house / Rahel’s / Rahel & Tomas inside')
+
+    const crowd = { ...two, agents: { ...two.agents } }
+    for (const n of ['x', 'y', 'z']) {
+      crowd.agents[n] = { ...blankAgent(n, n.toUpperCase()), insideId: 'h1' }
+    }
+    expect(hoverPlate(crowd, 'structure', 'h1')[2]?.text).toBe('5 inside')
+  })
+
+  it('gives a carved name the name line and moves the owner down to the quiet one', () => {
+    const named = { ...state, structures: { ...state.structures } }
+    named.structures.h1 = { ...named.structures.h1!, name: 'The Long House' }
+    expect(words(hoverPlate(named, 'structure', 'h1'))).toBe('house / The Long House / Rahel’s')
+  })
+
+  it('never draws more lines than the plate has', () => {
+    for (const kind of ['agent', 'structure', 'item', 'crop'] as const) {
+      const id = { agent: 'rahel', structure: 'h1', item: 'i2', crop: 'c1' }[kind]
+      expect(hoverPlate(state, kind, id).length, kind).toBeLessThanOrEqual(PLATE_MAX_ROWS)
+    }
+  })
+
+  it('counts an item and marks it when someone in the town owns it', () => {
+    expect(words(hoverPlate(state, 'item', 'i1'))).toBe('bread / ×3')
+    expect(words(hoverPlate(state, 'item', 'i2'))).toBe('bread / ×3 · Rahel’s')
+  })
+
+  // The invariant, applied to a thing as well as to a building: genesis signs its own work with
+  // a runner who is nobody, and an owner outside the town is left unsaid rather than printed.
+  it('leaves an owner the town does not have unsaid, rather than printing their id', () => {
+    expect(words(hoverPlate(state, 'item', 'i3'))).toBe('axe / ×1')
   })
 
   it('shows how far a crop has come', () => {
-    expect(hoverLabel(state, 'crop', 'c1')).toBe(`wheat (stage 3/${CROP_STAGES})`)
+    expect(words(hoverPlate(state, 'crop', 'c1'))).toBe(`wheat / stage 3 of ${CROP_STAGES}`)
   })
 
-  it('returns null for anything the town does not have', () => {
-    expect(hoverLabel(state, 'agent', 'nope')).toBeNull()
-    expect(hoverLabel(state, 'structure', 'nope')).toBeNull()
-    expect(hoverLabel(state, 'item', 'nope')).toBeNull()
-    expect(hoverLabel(state, 'crop', 'nope')).toBeNull()
-    expect(hoverLabel(null, 'agent', 'rahel')).toBeNull()
+  it('draws nothing at all for anything the town does not have', () => {
+    for (const kind of ['agent', 'structure', 'item', 'crop'] as const) {
+      expect(hoverPlate(state, kind, 'nope'), kind).toEqual([])
+    }
+    expect(hoverPlate(null, 'agent', 'rahel')).toEqual([])
   })
 })
 
@@ -133,8 +176,11 @@ describe('structureTitle — a proper name outranks the kind, wherever a viewer 
 
   it('★ and the hover reads it off the world, saying nothing about a building that is gone', () => {
     const titled = { structures: { n1: named }, agents: {} } as unknown as WorldState
-    expect(hoverLabel(titled, 'structure', 'n1')).toBe('Yusuf’s house')
-    expect(hoverLabel(titled, 'structure', 'nope')).toBeNull()
+    expect(hoverPlate(titled, 'structure', 'n1').map((r) => r.text)).toEqual([
+      'house',
+      'Yusuf’s house',
+    ])
+    expect(hoverPlate(titled, 'structure', 'nope')).toEqual([])
   })
 })
 

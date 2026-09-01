@@ -1,5 +1,5 @@
 import { BitmapText, Cache, Container, Text } from 'pixi.js'
-import { FACE_PX } from './textFaces.js'
+import { FACE_PX, inkedFace } from './textFaces.js'
 
 // `new BitmapText(...)` for an uninstalled font throws inside the render pass and blanks the
 // whole canvas, so the glyph class is picked from the font cache before the renderer sees it.
@@ -46,9 +46,11 @@ class VoidLabel extends Container {
 }
 
 export function createWorldLabel(text: string, style: WorldLabelStyle): WorldLabel {
-  if (bitmapFontInstalled(style.fontFamily)) {
+  // The atlas is baked per ink, so the family a label asks for is the family PLUS its fill.
+  const fontFamily = inkedFace(style.fontFamily, style.fill)
+  if (bitmapFontInstalled(fontFamily)) {
     try {
-      return new BitmapText({ text, style })
+      return new BitmapText({ text, style: { ...style, fontFamily } })
     } catch {
       /* the font said it was there and was not — fall through to a canvas glyph */
     }

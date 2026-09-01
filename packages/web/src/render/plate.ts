@@ -1,0 +1,99 @@
+import { Container, Graphics } from 'pixi.js'
+import { WORLD_TEXT_LINE_H } from '../textFloor.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { BUBBLE_EDGE, SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, faceFor } from './textFaces.js'
+import { plateRowText, type PlateRow, type PlateTone } from '../ui/plateModel.js'
+
+const TONE_FACE: Readonly<Record<PlateTone, 'label' | 'plate'>> = {
+  kind: 'label',
+  name: 'plate',
+  quiet: 'plate',
+}
+
+// ★ THE FOOTPRINT PLATE — the smallest surface that answers what this is, whose it is and what
+// is happening, welded to the thing's own ground point. One builder, so a person's plate and a
+// building's are the same object drawn from different rows.
+
+const PLATE_PAD_X = 5
+const PLATE_PAD_Y = 3
+export const PLATE_FONT_PX = faceFor('plate').size
+export const PLATE_ROW_H = Math.max(WORLD_TEXT_LINE_H, PLATE_FONT_PX + 2)
+/** Square, not rounded: the plate is the sheet's own pixel slab — a 2px ink ring on a ledge. */
+const PLATE_STROKE = 2
+const PLATE_LEDGE = 2
+
+export type Plate = {
+  node: Container
+  /** the drawn size in world pixels — what the placer de-conflicts against, times the zoom */
+  w: number
+  h: number
+  setRows(rows: readonly PlateRow[]): void
+  destroy(): void
+}
+
+export function createPlate(parent: Container): Plate {
+  const node = new Container()
+  node.visible = false
+  node.eventMode = 'none' // a plate must never eat the click on the thing it names
+  const paper = new Graphics()
+  node.addChild(paper)
+  parent.addChild(node)
+
+  const labels: WorldLabel[] = []
+  let drawnTones: PlateTone[] = []
+  let drawnTexts: string[] = []
+  const plate: Plate = {
+    node,
+    w: 0,
+    h: 0,
+    setRows(rows) {
+      // Three short rows, compared where they are: a signature string would allocate on a path
+      // that runs while a pointer rests on a body.
+      const same =
+        rows.length === drawnTexts.length &&
+        rows.every((r, i) => r.tone === drawnTones[i] && r.text === drawnTexts[i])
+      if (same) return
+      drawnTones = rows.map((r) => r.tone)
+      drawnTexts = rows.map((r) => r.text)
+      for (const l of labels) l.destroy()
+      labels.length = 0
+
+      for (const row of rows) {
+        const face = faceFor(TONE_FACE[row.tone])
+        const label = createWorldLabel(plateRowText(row), {
+          fontFamily: face.family,
+          fontSize: face.size,
+          fill: SPEECH_INK,
+          lineHeight: PLATE_ROW_H,
+          align: 'left',
+        })
+        label.anchor.set(0, 0)
+        label.position.set(PLATE_PAD_X, PLATE_PAD_Y + labels.length * PLATE_ROW_H)
+        labels.push(label)
+      }
+      const w = Math.ceil(
+        Math.max(0, ...labels.map((l) => l.width)) + PLATE_PAD_X * 2 + PLATE_STROKE,
+      )
+      const h = Math.ceil(rows.length * PLATE_ROW_H + PLATE_PAD_Y * 2)
+      plate.w = w
+      plate.h = h
+
+      // The band, not a lighter ink: every quiet row shares one shaded strip at the foot.
+      const bandFrom = rows.findIndex((r) => r.tone === 'quiet')
+      paper.clear()
+      paper.rect(PLATE_LEDGE, PLATE_LEDGE, w, h).fill(BUBBLE_EDGE)
+      paper.rect(0, 0, w, h).fill(SPEECH_FILL)
+      if (bandFrom >= 0) {
+        const top = PLATE_PAD_Y + bandFrom * PLATE_ROW_H - 1
+        paper.rect(PLATE_STROKE, top, w - PLATE_STROKE * 2, h - top - PLATE_STROKE)
+        paper.fill(THOUGHT_FILL)
+      }
+      paper.rect(0, 0, w, h).stroke({ width: PLATE_STROKE, color: BUBBLE_EDGE, alignment: 1 })
+      node.addChild(...labels)
+    },
+    destroy() {
+      node.destroy({ children: true })
+    },
+  }
+  return plate
+}

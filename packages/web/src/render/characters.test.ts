@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
@@ -65,6 +66,12 @@ vi.mock('pixi.js', () => {
     }
     roundRect(...args: number[]): this {
       this.lastRoundRect = args
+      return this
+    }
+    rect(): this {
+      return this
+    }
+    stroke(): this {
       return this
     }
   }
@@ -150,7 +157,21 @@ type MutableAgents = Record<
 >
 
 function makeAgent(id: string, x: number, y: number): MutableAgents[string] {
-  return { id, name: id, x, y, alive: true, asleep: false, collapsedSinceTick: null }
+  // The overhead slot reads a whole body — the condition table is half of its priority order.
+  return {
+    id,
+    name: id,
+    x,
+    y,
+    alive: true,
+    asleep: false,
+    collapsedSinceTick: null,
+    activity: null,
+    needs: NEEDS_WELL,
+    injuries: [],
+    ill: false,
+    hp: 100,
+  } as MutableAgents[string]
 }
 
 function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: SimEvent[]) => void } {
@@ -200,6 +221,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     getZoom: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
+    tags: { occupied: () => [], show: () => {}, hide: () => {} },
     addDepthSource: (fn: () => { box: { id: string }; node: unknown }[]) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -239,10 +261,12 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     layer = createCharacterLayer(scene, made.book, store, () => {})
   })
 
-  it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
+  it('two ticks add exactly 3 display objects per agent, not 3 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+    // ★ THREE, not four: the hover plate is ONE for the whole stage now, owned by the tooltip
+    // layer, so a body carries a sprite, a shadow and its overhead slot and nothing else.
+    expect(placed(scene)).toHaveLength(2 * 3)
   })
 
   it('puts each companion in the layer that owns it, never in the depth sort', () => {
@@ -250,7 +274,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     expect(l.shadow!.children).toHaveLength(2) // one contact shadow per body
     expect(l.entities!.children).toHaveLength(2) // ONLY the bodies are depth-sorted
-    expect(l.worldText!.children).toHaveLength(4) // emote + name tag per body
+    expect(l.worldText!.children).toHaveLength(2) // one overhead slot per body
   })
 
   it('publishes one depth box per living body, at its INTERPOLATED tile', () => {
@@ -261,20 +285,20 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5]) // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
   })
 
-  it('places a hovered name tag above the figure and inside the view (U10)', () => {
+  it('places a hovered plate at the figure and inside the view (U10)', () => {
     layer.tick(1000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const nameTag = l.worldText!.children[1] as unknown as {
+    const plate = l.worldText!.children[1] as unknown as {
       visible: boolean
       position: { x: number; y: number }
     }
-    nameTag.visible = true
+    plate.visible = true
     layer.tick(1016)
     const view = { x: -400, y: -300, w: 800, h: 600 }
-    expect(nameTag.position.x).toBeGreaterThanOrEqual(view.x)
-    expect(nameTag.position.x).toBeLessThanOrEqual(view.x + view.w)
-    expect(nameTag.position.y).toBeGreaterThanOrEqual(view.y)
-    expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
+    expect(plate.position.x).toBeGreaterThanOrEqual(view.x)
+    expect(plate.position.x).toBeLessThanOrEqual(view.x + view.w)
+    expect(plate.position.y).toBeGreaterThanOrEqual(view.y)
+    expect(plate.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
   // The multiplier is re-applied by this layer, so tick order stops being load-bearing.
@@ -338,40 +362,31 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     const shadow = l.shadow!.children[0] as unknown as { eventMode: string }
     const sprite = l.entities!.children[0] as unknown as { eventMode: string }
-    const [emote, nameTag] = l.worldText!.children as unknown as { eventMode: string }[]
+    const [emote, plate] = l.worldText!.children as unknown as { eventMode: string }[]
     expect(shadow.eventMode).toBe('none')
     expect(emote!.eventMode).toBe('none')
-    expect(nameTag!.eventMode).toBe('none')
+    expect(plate!.eventMode).toBe('none')
     expect(sprite.eventMode).toBe('static')
   })
 
-  it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
-    layer.tick(1000)
-    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const nameTag = l.worldText!.children[1]! // per-agent add order into worldText: emote, nameTag
-    const [bg, label] = nameTag.children as unknown as [
-      { lastRoundRect: number[] | null },
-      { anchor: { x: number; y: number }; width: number; height: number },
-    ]
-    expect(label.anchor.x).toBe(0.5)
-    expect(label.anchor.y).toBe(1)
-    // anchored (0.5,1) the text spans x∈[-w/2, w/2], y∈[-h, 0]; slab must pad 4px on all sides
-    expect(bg.lastRoundRect).toEqual([
-      -label.width / 2 - 4,
-      -label.height - 4,
-      label.width + 8,
-      label.height + 8,
-      2,
-    ])
+  // ★ ONE OCCUPANCY. A person's plate goes through the same owner a building's does, so it is
+  // placed by one rule and published where every other label can read it.
+  it('asks the label layer for the hover plate, rather than keeping one per body', () => {
+    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    expect(src).toContain("scene.tags.show(\n          'hover',")
+    expect(src).toContain("hoverPlate(state, 'agent', a.id)")
+    expect(src).not.toContain('createPlate')
+    // ...and the head box it may flip above measures what is actually drawn up there
+    expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
   })
 
-  it('removing an agent destroys its 4 objects and drops the entry', () => {
+  it('removing an agent destroys its 3 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(4)
+    expect(placed(scene)).toHaveLength(3)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })
@@ -653,7 +668,7 @@ describe('★ four people on one tile, through the real layer', () => {
     }
   })
 
-  it('the shadow and the emote move with the body', () => {
+  it('the shadow and the overhead slot move with the body', () => {
     layer.tick(1000)
     layer.tick(2000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
@@ -663,7 +678,7 @@ describe('★ four people on one tile, through the real layer', () => {
       // non-vacuous: this body is NOT where the record put it, and its companions came along
       expect(sprite.position.x).not.toBe(sx)
       expect(l.shadow!.children[i]!.position.x).toBe(sprite.position.x)
-      expect(l.worldText!.children[i * 2]!.position.x).toBe(sprite.position.x)
+      expect(l.worldText!.children[i]!.position.x).toBe(sprite.position.x)
     }
   })
 

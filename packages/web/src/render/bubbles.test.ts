@@ -4,9 +4,7 @@ import {
   bubbleAlpha,
   onLeash,
   BUBBLE_FONT_PX,
-  BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
-  ELLIPSIS,
   GLYPH_ZOOM,
   SPEAKER_TINT,
   SPEECH_MAX_CHARS,
@@ -65,15 +63,15 @@ describe('wrapBubble', () => {
   })
 })
 
-describe('a bubble stops at four lines and says so', () => {
+describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
   const SPEECH =
     'the fish are biting well this morning by the river and the light is good on the water and nobody has come down to see any of it with me'
 
-  it('caps at BUBBLE_MAX_LINES and ends the last one in an ellipsis', () => {
+  it('★ keeps every character, however many lines that takes', () => {
     const lines = wrapBubble(SPEECH, 24)
-    expect(lines).toHaveLength(BUBBLE_MAX_LINES)
-    expect(lines[BUBBLE_MAX_LINES - 1]!.endsWith(ELLIPSIS)).toBe(true)
-    expect(lines[0]).toBe('the fish are biting well')
+    expect(lines.length).toBeGreaterThan(4)
+    expect(lines.join(' ')).toBe(SPEECH)
+    expect(lines.some((l) => l.endsWith('…'))).toBe(false)
   })
 
   // ★ Two lines cut a spoken line in half and the town read as a place of half-sentences.
@@ -83,7 +81,32 @@ describe('a bubble stops at four lines and says so', () => {
     expect(wrapBubble(said, 24).join(' ')).toBe(said)
   })
 
-  it('never lets the ellipsis push a line past the wrap width', () => {
+  // The one the deck measured: 78 characters, cut to "Sit down, Sa…" at the old width.
+  it('★ sets the recorded line in four lines or fewer at the width it is allowed', () => {
+    const said = 'Sit down, Salma. Let me look at it before it decides to be more than a scratch.'
+    const lines = wrapBubble(said)
+    expect(lines.join(' ')).toBe(said)
+    expect(lines.length).toBeLessThanOrEqual(4)
+  })
+
+  it('★ holds the whole sanitized ceiling without dropping a character', () => {
+    const long = 'word '.repeat(60).slice(0, SPEECH_MAX_CHARS).trim()
+    expect(wrapBubble(long).join(' ')).toBe(long)
+  })
+
+  it("holds a longer line longer, up to the sanitizer's own ceiling", () => {
+    expect(bubbleLife('x'.repeat(200))).toBeGreaterThan(bubbleLife('x'.repeat(40)))
+    expect(bubbleLife('x'.repeat(SPEECH_MAX_CHARS + 100))).toBe(
+      SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS,
+    )
+  })
+
+  it('is about twice the width the box used to wrap at', () => {
+    expect(BUBBLE_MAX_PX).toBeGreaterThanOrEqual(2 * 210)
+    expect(WRAP_CHARS).toBeGreaterThanOrEqual(2 * 13)
+  })
+
+  it('never lets a line push past the wrap width', () => {
     const long = 'aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll'
     for (const width of [10, 16, 24, WRAP_CHARS]) {
       for (const l of wrapBubble(long, width))
@@ -91,7 +114,7 @@ describe('a bubble stops at four lines and says so', () => {
     }
   })
 
-  it('leaves a short line alone — no ellipsis on text that fits', () => {
+  it('leaves a short line alone', () => {
     expect(wrapBubble('the iron sings today', 24)).toEqual(['the iron sings today'])
   })
 })

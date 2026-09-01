@@ -13,7 +13,7 @@ import {
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable, pathCtx, type Point } from '../path.js'
+import { findPath, isPassable, pathCtx, searchToward, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -235,6 +235,27 @@ function nearestReachable(
   return { refusal: 'no path to that spot' }
 }
 
+// What the world says when the legs cannot start at all. Said in the place where it is true:
+// the body that has already walked to the limit is the only one the sentence teaches.
+export const WALK_OFF_MAP = 'the world ends that way'
+export const WALK_NO_ROAD = 'there is no way through from here'
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+
+/** As far toward a mark as the ground allows. A want that points past the edge of the world, or
+ *  across water with no crossing, is a journey worth starting rather than a turn worth spending:
+ *  the refusal is kept for the body already standing at that limit, where it teaches something. */
+function settleToward(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  want: Point,
+  refusal: string,
+): Point | { refusal: string } {
+  const last = searchToward(state, a, want, config)?.path.at(-1)
+  return last === undefined ? { refusal } : { x: last[0], y: last[1] }
+}
+
 // The lake's own middle stands nine tiles from its shore, which is the widest any landmark's
 // centre sits from ground a foot can go on.
 const FEATURE_REACH = 12
@@ -266,7 +287,8 @@ function featureDestination(
     }
   }
   bank.sort((p, q) => near(p) - near(q))
-  return nearestReachable(state, config, a, bank.slice(0, FEATURE_TRIES))
+  const to = nearestReachable(state, config, a, bank.slice(0, FEATURE_TRIES))
+  return 'refusal' in to ? { refusal: `there is no way to ${f.name} from this side` } : to
 }
 
 /** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
@@ -278,11 +300,26 @@ export function walkDestination(
   agentId: string,
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
+  const a = state.agents[agentId]!
   const tile = WalkParams.safeParse(params)
-  if (tile.success) return tile.data
+  if (tile.success) {
+    const want = tile.data
+    // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
+    // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
+    // ground the world does not have makes A* exhaust its whole budget before it answers.
+    const to = {
+      x: clamp(want.x, 0, state.terrain[0]!.length - 1),
+      y: clamp(want.y, 0, state.terrain.length - 1),
+    }
+    const offMap = to.x !== want.x || to.y !== want.y
+    if (offMap && to.x === a.x && to.y === a.y) return { refusal: WALK_OFF_MAP }
+    // A mark with no footing under it is a mark named wrong, and the affordance block says so.
+    if (!offMap && !isPassable(state, to.x, to.y)) return { refusal: 'no path to that spot' }
+    if (findPath(state, a, to, config) !== null) return to
+    return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
+  }
   const named = WalkToPlace.safeParse(params)
   if (!named.success) return { refusal: 'a walk needs a place to end' }
-  const a = state.agents[agentId]!
   // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
   // knownPlaces row to check — the ground itself is what says whether this valley has one.
   const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)
@@ -311,7 +348,6 @@ const walk: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
-    if (a.x === to.x && a.y === to.y) return 'already at that spot'
     // A memo hit for a named place, which already proved this tile: the two numbers are what
     // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'

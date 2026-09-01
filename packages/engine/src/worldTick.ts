@@ -45,11 +45,14 @@ function actionsSystem(ctx: TickCtx): void {
       const tilesLeft = path
         ? path.length - (path.findIndex(([x, y]) => x === a.x && y === a.y) + 1)
         : 0
-      if (tilesLeft <= 0) {
+      if (tilesLeft > 0) {
+        for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
+      } else if (a.activity.ticksRemaining > 0) {
         ctx.emit('action_interrupted', { agentId: id, reason: 'blocked' })
         continue
       }
-      for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
+      // No tiles and no clock left is a body that set off already standing at its destination:
+      // that walk is done, not stopped, and it completes below like any other.
     } else if (a.activity.verb === 'build') {
       for (const e of stepBuild(ctx.state(), ctx.config, id)) ctx.emit(e.type, e.payload)
     } else {

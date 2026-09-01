@@ -74,16 +74,60 @@ overlay sixty times a second.
 | Mark | What it is | Where |
 |---|---|---|
 | `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws, each plank cut to its word | bottom-right, `--mark-inset` |
+| `HelpButton` | one 44px `?` on a honey slab, opening the key map | bottom-left, `--mark-inset` |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
 | `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
 | `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
+| `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
+
+**The sun arc is the one permanent mark.** `ui/skyModel.ts` puts one traveller on one curve —
+the sun from 05:00 to 21:00, then the moon over the same road — and the boundary is
+`dayPhaseFromTick`'s own, so the arc and the light on the town cannot disagree about when it got
+dark. The token's position says the hour before the words beside it are read; the words are the
+day, the season, the weather kind and the temperature, in `WEATHER_GLYPH`'s 8×8 pixels rather
+than an emoji. It eases its position on the world's tick and runs no loop at all. Below 900px the
+arc flattens and the position stops meaning anything, so the road goes and the two chips close
+up. The quiet stamp sits 30px under it, still owning the wire's own word.
+
+**The hover is a footprint plate.** `render/plate.ts` draws it, `ui/interaction.ts` decides its
+words and `ui/plateModel.ts` shapes its rows. There is ONE for the whole stage — the tooltip
+layer's `hover` owner — so a person's plate and a building's are placed by one rule and published
+where every other label reads them: a cream pixel slab welded to the thing's own ground point — `placeTag` is asked for
+`below` and only leaves the footprint when the view has no room there. Three rows at most, 22
+characters each: `kind` in Silkscreen capitals, `name` in the face that has lowercase, and
+`quiet` on a **parchment band** — de-emphasis is a different paper, because `--ink-quiet`
+measures 3.57:1 on cream under the deep-night multiply where the ink on parchment holds 4.67:1.
+A building answers what it is, whose it is (`structure.owner`, never `builtBy`) and who is
+inside; a person answers their name and the one word for what they are doing. A row with nothing
+to say is not drawn.
 
 Speech itself is drawn **in the canvas**, not the DOM: `render/bubbles.ts` draws a 2px ink box on
-a 4px radius with a three-step stair tail, washed toward the speaker's own colour at 15%. Two
-lines then `…`; the nearest three speakers get a box and everyone else a `…` pill; at zoom 0.25
-everything collapses to the pill.
+a 4px radius with a three-step stair tail, washed toward the speaker's own colour at 15%.
+**The box grows to the sentence and nothing is cut** — it wrapped at 210 world px and stopped at
+two lines, so a spoken line arrived as "Sit down, Sa…" and the other 66 characters were seen by
+nobody. `BUBBLE_MAX_PX` is 420 and there is no line ceiling at all; the only bound left is
+`sanitizeSpokenText`'s own 240 characters, and a longer line is held longer (3.5s + 40ms a
+character). Everybody the camera can see gets a box; at zoom 0.25 everything collapses to a `…`
+pill. Wider boxes collide far more often, so `MAX_STACK_STEPS` is 6 rather than 3 — past that
+`onLeash` hides a bubble rather than let two composite.
+
+**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary. At rest it is
+7A: one 20px plate eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY`
+picks first-match-wins — a condition outranks a state, because a person who is hurt is the news;
+the plate turns ember for the three that are. "Between things" wears nothing, and neither does a
+walker. The moment an act starts, **the track wraps that same slot**: seven blocks on a 120°
+arch at r=26, solid for done and hollow for what is left, so progress is a count and a position
+before it is ever a hue. It goes when the act does. The arch spans OVER the glyph — every block
+clears the plate by 3.7px and the arc runs 20.3px each side, twice the plate's own width — and
+because the slot is world art the ratio holds at every zoom stop the indicators show at. Whoever
+the chip is willing to name is whoever the track may wrap: `fractionOf` reads the act layer's own
+`atWork` set, so the word and the arc cannot disagree about what is running.
+`working` has no glyph: while the job runs the track IS the mark, which is how "hurt while
+chopping" says both at once. The act chip keeps its word at the feet and has lost its fill and
+the Graphics **mask** that drew it — a mask per chip is a render target per working person, and
+the viewport rule puts a chip on every one of them.
 
 **One occupancy.** `render/tooltip.ts` is the label layer and owns the only table of taken screen
 space, keyed by who owns the boxes (`bubbles`, `plate`). Everybody writes theirs and reads
@@ -106,6 +150,34 @@ publishes its box in view coordinates — otherwise a bubble pushed below a figu
 `paper/pageModel.ts` is the only place that table exists. Four ways down: the close word, Escape,
 a click on the town, and the grip. Focus enters the tab strip on open, moves with the arm, and
 returns to the opener on close.
+
+**The sheet is a dated front page.** The head is a masthead — Fraunces 700 at `--f-7`, centred,
+the one place the type is the ornament — over a dateline rule: a 2px line above and a hairline
+below, `DAY n · SEASON` at one end and the clock at the other (`paper/stamp.ts:dateline`), with
+**the tabs running along it as the section line**. They are still the same tablist: same roles,
+same one tab stop, same arrow keys, same close word at the end. Every arm wears it, not the
+Chronicle alone.
+
+Chronicle › Today is laid out as the front page it now looks like: the day's edition is the lead
+story and the live feed is the column beside it, split at `44rem` of the sheet's **own**
+container — below that they stack, because two columns of a 760px sheet are two gutters. The
+lead drops its slab and its frame and takes a Fraunces drop cap; its section heading stays in
+the tree as a visually-hidden `h3`, because the edition's own headline is what a sighted reader
+sees.
+
+**Bonds is one vertical sheet**, never two pictures crammed side by side. The whole town's graph
+first — every edge drawn twice, a deep casing then the colour on it, at 3px and 5px rather than
+1.5 and 3, because a hairline over a night ground crossing a slab is not a connection anyone can
+follow; names carry ink on all four sides. Then **one person's orbit**: ego-centric, and the ring
+radii ARE `ui/relationGraph.ts`'s `LEVEL_DISTANCE`, so distance is the number the town graph is
+laid out with rather than a drawing. Each spoke carries three channels at once — the dash is the
+family tie, the colour is which way it is going, the weight is how much of it there is — and a
+stranger gets a node and **no line**, the same rule the town graph follows. Then the **level
+matrix**: a fixed grid where every pair has one address, the level as a fill and the warmth as a
+number beside it so the ladder survives without colour, and an empty cell is two people who have
+never met. Clicking a node in the town graph, or a name down the matrix, moves the orbit; the
+orbit's own head opens that person's page. Names are HTML over the plot, not SVG text — a glyph
+inside the viewBox is 10px on a 300px phone.
 
 **The grip follows the finger.** `pointerdown` captures the pointer and suppresses the sheet's
 transition; every `pointermove` writes `transform: translate(-50%, y)` straight to the DOM — 1:1
@@ -166,7 +238,9 @@ once.
 ## Accessibility floor
 
 - **Every pointer path has a key.** `S` signpost · `Tab` chrome · `Enter` act · `Esc` down ·
-  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` **the key map** ·
+  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` **the key map** — which
+  now has a pointer path of its own, the 44px corner button, because a key nothing on screen
+  names is an affordance only a viewer who already knew could find ·
   `Shift+P` the frame meter. `?` is where a person looks for the list, so the list is what it
   opens; the meter is an instrument and took the chord.
 - **And every key has a pointer path.** Two fingers are the touch screen's wheel
@@ -190,9 +264,13 @@ once.
   the label is `--deep` ink painted on the wood with a 1px `--honey-l` cut edge under it, no halo.
   Sampled off the render at 375–2560 and DPR 2: **7.66:1 idle, 10.19:1 hovered, 5.46:1 on the
   pressed plank**, worst grain pixel under a glyph 5.46:1 (`~/handoff/cleanup/stage8/fix-signpost.md`).
-  **It does NOT hold for canvas world text** — see the open defect in
-  `~/handoff/cleanup/stage7/i7-report.md`: a bitmap glyph renders white rather than the ink it
-  asks for, measured at 1.1:1 over its own slab.
+  Canvas world text held it only after the atlas was split: Pixi bakes a `dynamicFill` atlas
+  white and applies the fill as a per-glyph tint, and that tint was dropped below the call site
+  — every world glyph rendered white, **1.1:1 over its own slab**
+  (`~/handoff/cleanup/stage7/i7-report.md`, D4). `render/textFaces.ts` now installs **one atlas
+  per ink** (`WORLD_INKS`, three of them) with `dynamicFill: false`, so the ink is baked and
+  there is no tint step to lose; `createWorldLabel` resolves the family from the style's fill,
+  and a fill with no atlas falls back to a canvas glyph, which draws its own colour.
 - **A page never prints an empty state over a broken wire.** `Read<T>` carries `failed`, and
   the seven branches that would otherwise say "the town has not done this yet" say
   `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news

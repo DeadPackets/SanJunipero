@@ -30,6 +30,8 @@ export type ReflectionResult = {
   /** The mind declined to change tonight — whether it answered `no_proposal` or proposed a no-op. */
   editSkipped?: true
   gistsWritten: number
+  /** Long rows that wanted a gist tonight; the rest stay eligible tomorrow. */
+  gistsEligible: number
   fallback: boolean
 }
 
@@ -154,11 +156,20 @@ export async function runSleepReflection(deps: {
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
 
-  // 8. Gists — the long rows of the day get a short form tomorrow's turns can carry. Last,
-  //    because it is the one step the night can lose without losing what it learned.
-  const gistsWritten = (await step(() => gistMemories(mem, llm, dayMemories))) ?? 0
+  // 8. Gists — the day's long rows plus what a refused night left behind. Last, because it is
+  //    the one step the night can lose without losing what it learned.
+  const gists = await step(() => gistMemories(mem, llm, dayMemories))
+  if (gists !== null && gists.written === 0 && gists.failed > 0) {
+    alert?.('gist_batch_refused', `${gists.failed} of ${gists.eligible} long rows went ungisted`)
+  }
 
-  const base = { factCount, sceneCount: scenes.length, ledgersUpdated, gistsWritten }
+  const base = {
+    factCount,
+    sceneCount: scenes.length,
+    ledgersUpdated,
+    gistsWritten: gists?.written ?? 0,
+    gistsEligible: gists?.eligible ?? 0,
+  }
   if (degraded.reason !== null) {
     alert?.('reflection_fallback', degraded.reason)
     return { ...base, editApplied: false, fallback: true }

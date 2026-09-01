@@ -32,7 +32,7 @@ import {
 } from './broadcastReady.js'
 import { describeEvent } from './chronicleFormat.js'
 import { chronicleLabel } from './importantFeed.js'
-import { hoverLabel } from './interaction.js'
+import { hoverPlate } from './interaction.js'
 import { placeOf } from './place.js'
 import { LAW_COPY } from './lawCopy.js'
 import { EMPTY_COPY } from './townStats.js'
@@ -149,8 +149,8 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     )
     push('importantFeed', chronicleLabel(ev('structure_completed', { id }), state))
     push('importantFeed', chronicleLabel(ev('fire_ignited', { structureId: id }), state))
-    push('hover', hoverLabel(state, 'structure', id))
-    push('door tag', `Look inside — ${hoverLabel(state, 'structure', id) ?? ''}`)
+    for (const row of hoverPlate(state, 'structure', id)) push('hover', row.text)
+    push('door tag', `Look inside — ${hoverPlate(state, 'structure', id)[0]?.text ?? ''}`)
   }
   push('chronicle', describeEvent(ev('agent_died', { agentId: 'a1', cause: 'hunger' }), state))
   push('chronicle', describeEvent(ev('weather_changed', { kind: 'storm' }), state))
@@ -160,7 +160,7 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     push('roster place', placeOf(state, a.id).words)
     push('roster state', stateWord(a))
     for (const c of conditionsOf(a)) push('roster condition', CONDITION_WORD[c])
-    push('hover', hoverLabel(state, 'agent', a.id))
+    for (const row of hoverPlate(state, 'agent', a.id)) push('hover', row.text)
   }
 
   // the world laws, the empty states and every control label
