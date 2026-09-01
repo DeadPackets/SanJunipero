@@ -23,16 +23,14 @@ import { RngStreams } from '../rng.js'
 import { buildableRecipe, buildTicks, VERBS } from '../verbs/index.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
+import { GENESIS_FORD, GENESIS_FORK_Y, GENESIS_RIVER_X } from '../geography.js'
 import {
   makeGenesisWorld,
   genesisDurability,
-  GENESIS_FORD,
-  GENESIS_FORK_Y,
   GENESIS_BUILDER_ID,
   GENESIS_ROOF_STOOD,
   GENESIS_SOUND_ROOFS,
   roofFell,
-  GENESIS_RIVER_X,
 } from './world.js'
 import { CITY_DWELLING_KINDS } from '@sj/shared'
 

@@ -3,15 +3,10 @@ import {
   FOUNDER_IDS,
   isRoofedKind,
   makeCityTemplate,
-  T_EARTH,
-  T_FOREST,
-  T_GRASS,
-  T_ROCK,
-  T_SAND,
-  T_WATER,
   type CityStructure,
   type SimConfig,
 } from '@sj/shared'
+import { genesisTerrainAt } from '../geography.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
@@ -19,22 +14,8 @@ import { spoilageFor } from '../systems/spoilage.js'
 import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
 
 // The world on the morning of day one, authored from (x, y) arithmetic alone. NO RNG anywhere:
-// two calls with the same config are deep-equal, which is what lets replay start here.
-
-// A straight main channel, because the city template lays its own bank and riverfront path
-// against x 48..50 — a meander here would leave the bank hanging over open water.
-export const GENESIS_RIVER_X = 49
-export const GENESIS_FORK_Y = 20
-export const GENESIS_LAKE = { x: 86, y: 20, rx: 9, ry: 6 } as const
-export const GENESIS_HILL = { x: 22, y: 104, rx: 9, ry: 7 } as const
-export const GENESIS_FOREST_X = 92
-
-// A spit of sand reaches out from the near bank and the channel runs two tiles instead of three:
-// the only place a six-plank deck can span, so the paths converge on it.
-export const GENESIS_FORD = { x: GENESIS_RIVER_X + 1, y0: 50, y1: 53 } as const
-
-const inFord = (x: number, y: number): boolean =>
-  x === GENESIS_FORD.x && y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
+// two calls with the same config are deep-equal, which is what lets replay start here. The
+// valley's own shape is `geography.js`, which the walk verb reads as well.
 
 // Structures the world places and nobody built. The template is the single source of every
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
@@ -53,40 +34,6 @@ export function genesisDurability(config: SimConfig, kind: string): Durability |
   const recipe = config.structures.recipes[kind]
   if (recipe !== undefined) return { maxHp: recipe.maxHp, flammable: recipe.flammable }
   return GENESIS_STRUCTURE_DEFS[kind] ?? null
-}
-
-// Integer ellipse test, so nothing here depends on floating-point rounding.
-function inEllipse(
-  x: number,
-  y: number,
-  e: { x: number; y: number; rx: number; ry: number },
-  grow = 0,
-): boolean {
-  const rx = e.rx + grow,
-    ry = e.ry + grow
-  const dx = x - e.x,
-    dy = y - e.y
-  return dx * dx * ry * ry + dy * dy * rx * rx <= rx * rx * ry * ry
-}
-
-// A ragged forest edge from a cheap deterministic wobble: no RNG, no stored noise field.
-const forestEdgeAt = (y: number): number => GENESIS_FOREST_X + ((y * 7 + (y >> 3)) % 5) - 2
-
-export function genesisTerrainAt(x: number, y: number): TileId {
-  if (inEllipse(x, y, GENESIS_LAKE)) return T_WATER
-  if (inEllipse(x, y, GENESIS_LAKE, 2)) return T_SAND
-  // the branch that leaves the main river for the lake, and the pool where it leaves
-  if (Math.abs(y - GENESIS_FORK_Y) <= 1 && x >= GENESIS_RIVER_X && x <= GENESIS_LAKE.x)
-    return T_WATER
-  if (Math.abs(y - GENESIS_FORK_Y) <= 3 && Math.abs(x - GENESIS_RIVER_X) <= 3) return T_WATER
-  // The spit comes before the channel and after the fork: it narrows the main river and
-  // never the pool the branch leaves from.
-  if (inFord(x, y)) return T_SAND
-  if (Math.abs(x - GENESIS_RIVER_X) <= 1) return T_WATER
-  if (inEllipse(x, y, GENESIS_HILL)) return T_ROCK
-  if (inEllipse(x, y, GENESIS_HILL, 2)) return T_EARTH
-  if (x >= forestEdgeAt(y)) return T_FOREST
-  return T_GRASS
 }
 
 function makeTerrain(config: SimConfig, anchor: { x: number; y: number }): TileId[][] {

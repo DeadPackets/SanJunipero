@@ -71,7 +71,7 @@ describe('decideWake — one case per reason', () => {
       'conversation_beat',
       pkt(),
       clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
-      102,
+      105,
       pln(),
       'conversation_beat',
     ],
@@ -357,9 +357,9 @@ describe('decideWake — conversation cadence and reconsider', () => {
     const base = { lastTurnTick: 100, conversationUntilTick: 130 }
     const packet = pkt()
     const plan = pln()
-    expect(decideWake(cfg, packet, clk(base), 101, plan)).toBe(null)
-    expect(decideWake(cfg, packet, clk(base), 102, plan)).toBe('conversation_beat')
-    expect(decideWake(cfg, packet, clk(base), 104, plan)).toBe('conversation_beat')
+    expect(decideWake(cfg, packet, clk(base), 104, plan)).toBe(null)
+    expect(decideWake(cfg, packet, clk(base), 105, plan)).toBe('conversation_beat')
+    expect(decideWake(cfg, packet, clk(base), 107, plan)).toBe('conversation_beat')
     expect(decideWake(cfg, packet, clk(base), 131, plan)).toBe(null)
   })
 

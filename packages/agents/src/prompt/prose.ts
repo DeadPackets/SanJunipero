@@ -1,4 +1,5 @@
 import {
+  bondLevel,
   dayPhaseFromTick,
   DAYS_PER_SEASON,
   inputName,
@@ -275,6 +276,9 @@ export type ProseWorld = {
   // Whether the night now coming is one the cold gets into. Read off the season's own band, so
   // a summer evening is never told to go for wood.
   nightWillBeCold?: () => boolean
+  // Big water past the edge of sight, and null whenever any is already inside it. Terrain is the
+  // one thing perception never projects, and a valley is mostly told by its water.
+  distantWater?: (x: number, y: number) => { x: number; y: number } | null
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -605,6 +609,56 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
+// Two tiles is the same spot: a step to the water butt and back is not a walk that went
+// anywhere. Sixty ticks is one sim-hour, a hundred and eighty is three.
+const STASIS_RADIUS = 2
+const STASIS_TICKS = 60
+const STASIS_LONG_TICKS = 180
+
+/** Where a body has been standing, since when, and whether it has said anything there. */
+export type Stillness = { x: number; y: number; sinceTick: number; spoke: boolean }
+
+/** The count carries on while the feet stay inside the radius, and starts again the moment
+ *  they leave it. The caller drops it to null when an act the world took changed something. */
+export function stillnessAt(was: Stillness | null, x: number, y: number, tick: number): Stillness {
+  if (was === null || Math.abs(x - was.x) > STASIS_RADIUS || Math.abs(y - was.y) > STASIS_RADIUS) {
+    return { x, y, sinceTick: tick, spoke: false }
+  }
+  return was
+}
+
+/** The hour said as an hour. A fact about where the body has been, with no remedy in it: what
+ *  to do about an afternoon spent standing is the mind's to work out. */
+export function stasisLine(still: Stillness | null, tick: number): string {
+  if (still === null) return ''
+  const held = tick - still.sinceTick
+  if (held < STASIS_TICKS) return ''
+  const how = held >= STASIS_LONG_TICKS ? 'half the morning' : 'an hour'
+  const words = still.spoke ? ', saying much the same things' : ''
+  return `You have been in this same spot for ${how}${words}; nothing has come of it.`
+}
+
+/** Somebody this mind has a tie to, when it last had them in sight or earshot, and how warm
+ *  the tie stood when they parted. Warmth is read at the parting, not now: a tie that decays
+ *  while the two are apart would take the line away exactly as the absence grew long. */
+export type Company = { name: string; lastSeenTick: number; warmth: number }
+
+/** One line, or none. A roll-call of everybody out of sight is a list; the person most missed
+ *  is a pull. Longest gone wins, then warmest, then the name, so two equal absences are stable. */
+export function absenceLine(company: readonly Company[], tick: number): string {
+  const missed = company
+    .filter((c) => bondLevel(c.warmth) !== 'strangers' && tick - c.lastSeenTick >= MINUTES_PER_DAY)
+    .sort(
+      (a, b) =>
+        a.lastSeenTick - b.lastSeenTick || b.warmth - a.warmth || (a.name < b.name ? -1 : 1),
+    )[0]
+  if (missed === undefined) return ''
+  const days = Math.floor((tick - missed.lastSeenTick) / MINUTES_PER_DAY)
+  return days === 1
+    ? `You have not seen ${missed.name} since yesterday.`
+    : `You have not seen ${missed.name} for ${days} days.`
+}
+
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
 export function roadLine(m: Makeables, packet: PerceptionPacket, world?: ProseWorld): string {
   return coldHearthLine(packet, world) || makeableRoadLine(m, packet, world)
@@ -804,6 +858,11 @@ export function perceptionToProse(
     )
   else if (packet.light === 'bright' && packet.time.isNight)
     lines.push('A fire throws a circle of light around you.')
+
+  // What the eyes catch at the far edge of the valley. A direction and nothing else: how far
+  // and what it is worth are the mind's to work out.
+  const glint = world?.distantWater?.(x, y) ?? null
+  if (glint !== null) lines.push(`Water glints to the ${bearing(glint.x - x, glint.y - y)}.`)
 
   // The physics, said plainly. What it is worth building here is not the ground's to say.
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')

@@ -18,7 +18,8 @@ import {
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
-import { makeGenesisWorld, GENESIS_BUILDER_ID, GENESIS_FORD } from './genesis/world.js'
+import { GENESIS_FORD } from './geography.js'
+import { makeGenesisWorld, GENESIS_BUILDER_ID } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import {
