@@ -28,13 +28,23 @@ export function titleFor(route: Route, personName: string | null): string {
   return TOWN_TITLE
 }
 
+/** A truncated share link leaves a half-escape like `%E0` in the path, and `decodeURIComponent`
+ *  throws on it — inside App's first render, which would blank the whole app. */
+function decode(seg: string): string | null {
+  try {
+    return decodeURIComponent(seg)
+  } catch {
+    return null
+  }
+}
+
 export function parseRoute(pathname: string, search: string): Route {
   const params = new URLSearchParams(search)
   const segs = pathname.split('/').filter(Boolean)
 
   // /agent/:id is the address a share card is pasted from; `?agent=` is the older form the
   // canvas wrote, still read so a link copied before this lane keeps working.
-  const linked = segs[0] === 'agent' && segs.length === 2 ? decodeURIComponent(segs[1]!) : null
+  const linked = segs[0] === 'agent' && segs.length === 2 ? decode(segs[1]!) : null
   const agentId = linked ?? params.get('agent')
 
   // /moment/:day/:time is a point in time; /moment/:id is a recorded day. Both are shareable.
@@ -42,8 +52,8 @@ export function parseRoute(pathname: string, search: string): Route {
   let momentId: number | null = null
   if (segs[0] === 'moment' && segs.length === 3) {
     const day = Number(/^(?:day)?(\d+)$/.exec(segs[1]!)?.[1] ?? NaN)
-    const time = decodeURIComponent(segs[2]!)
-    if (!Number.isNaN(momentToTick(day, time))) moment = { day, time }
+    const time = decode(segs[2]!)
+    if (time !== null && !Number.isNaN(momentToTick(day, time))) moment = { day, time }
   } else if (segs[0] === 'moment' && segs.length === 2) {
     const id = Number(segs[1])
     if (Number.isInteger(id) && id > 0) momentId = id
