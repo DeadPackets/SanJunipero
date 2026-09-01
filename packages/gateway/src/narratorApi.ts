@@ -178,14 +178,17 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
-  // Memoised on the world DAY, not `mirror.seq()`: nothing here changes between day boundaries,
-  // and a seq-keyed memo would rescan six tables on every pump.
-  let dispatchedDay = -1
+  // Memoised on the newest publication, not `mirror.seq()` and not the world DAY: nothing here
+  // changes until the narrator writes, and it writes SECONDS into the day a day-keyed memo has
+  // already captured — which showed day N's paper only once day N+2 began.
+  let dispatchedAt = -1
   let dispatched: unknown = null
   router.route('GET', '/api/dispatches', (_req, res) => {
-    const day = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
-    if (day !== dispatchedDay || dispatched === null) {
-      dispatchedDay = day
+    const written =
+      readOrEmpty<{ id: number | null }>(deps.narratorDb, 'SELECT MAX(id) AS id FROM publications')[0]
+        ?.id ?? 0
+    if (written !== dispatchedAt || dispatched === null) {
+      dispatchedAt = written
       const db = deps.narratorDb
       dispatched = {
         papers: readOrEmpty(

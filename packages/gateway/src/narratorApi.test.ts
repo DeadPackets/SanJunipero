@@ -87,6 +87,7 @@ function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Databas
 
 describe('narrator-backed observer apis, with a narrator.db', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-'))
+  const narratorPath = join(dir, 'narrator.db')
   let gw: Gateway
   let base: string
 
@@ -94,7 +95,6 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     const dbPath = join(dir, 'world.db')
     const db = scriptedWorld(dbPath)
 
-    const narratorPath = join(dir, 'narrator.db')
     const ndb = openNarratorFixtureDb(narratorPath)
     ndb
       .prepare(
@@ -282,6 +282,23 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       },
     ])
     expect(body.heat).toEqual([{ day: 0, total: 9 }])
+  })
+
+  /** The narrator writes day N's paper SECONDS into day N, after the first GET of that day has
+   *  already captured a day-keyed memo — which held day N back until day N+2 began. */
+  it('★ a paper written after the panel first asked still reaches it the same day', async () => {
+    await fetch(`${base}/api/dispatches`) // captures the memo
+    const ndb = new Database(narratorPath)
+    ndb
+      .prepare(
+        'INSERT INTO publications (day, kind, title, body, citations, subject_id) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(0, 'newspaper', 'What the Night Left', 'Written while the day ran.', null, null)
+    ndb.close()
+    const body = (await (await fetch(`${base}/api/dispatches`)).json()) as {
+      papers: { title: string }[]
+    }
+    expect(body.papers.map((p) => p.title)).toContain('What the Night Left')
   })
 
   it('reads the firsts ledger to its full width, JSON columns already parsed', async () => {
