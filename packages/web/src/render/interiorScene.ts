@@ -1,4 +1,11 @@
-import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
+import {
+  Container,
+  Graphics,
+  Rectangle,
+  Sprite,
+  Texture,
+  type FederatedPointerEvent,
+} from 'pixi.js'
 import { CITY_INTERIOR_SLOTS, type AssetRecord, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -6,6 +13,7 @@ import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
+import { TAP_SLOP_PX } from './fling.js'
 import {
   advanceInterior,
   bedCells,
@@ -129,6 +137,7 @@ export function createInteriorScene(
   scene: Scene,
   store: WorldStore,
   book: TextureBook,
+  onSelect: (agentId: string) => void,
 ): InteriorScene {
   const app = scene.app
 
@@ -143,7 +152,8 @@ export function createInteriorScene(
   const veil = new Graphics()
   veil.eventMode = 'static' // the dimmed town is scenery: a click must not reach through it
   const room = new Container()
-  room.eventMode = 'none' // the room is a view; the chrome bar owns the way out
+  // Passive, not inert: the room takes no click of its own, and the bodies inside it do.
+  room.eventMode = 'passive'
   room.sortableChildren = true
   // A room is a box, and nothing drawn inside it belongs outside it. One mask settles that for
   // every prop, including a hearth glow that is a child of its own sprite.
@@ -154,6 +164,20 @@ export function createInteriorScene(
   room.mask = roomMask
   root.addChild(veil, room)
   app.stage.addChild(root)
+
+  // The dimmed town is also the way back out to it. A pan started on the veil is not a click:
+  // the same slop the camera's own tile pick uses, measured from where the finger went down.
+  let veilDown: { x: number; y: number } | null = null
+  veil.on('pointerdown', (e: FederatedPointerEvent) => {
+    veilDown = { x: e.global.x, y: e.global.y }
+  })
+  veil.on('pointertap', (e: FederatedPointerEvent) => {
+    const down = veilDown
+    veilDown = null
+    if (down === null) return
+    if (Math.abs(e.global.x - down.x) + Math.abs(e.global.y - down.y) > TAP_SLOP_PX) return
+    setActive(null)
+  })
 
   // Three planes, behind everything that stands in the room. The walls sort behind the floor
   // because a dimetric camera sees the two far faces of the box and nothing else; the light is
@@ -524,7 +548,11 @@ export function createInteriorScene(
     let sprite = bodies.get(agentId)
     if (sprite !== undefined) return sprite
     sprite = new Sprite()
-    sprite.eventMode = 'none'
+    sprite.eventMode = 'static'
+    sprite.cursor = 'pointer'
+    sprite.on('pointertap', () => {
+      onSelect(agentId)
+    })
     bodies.set(agentId, sprite)
     room.addChild(sprite)
     return sprite

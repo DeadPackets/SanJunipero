@@ -1117,6 +1117,22 @@ body {
     0 2px 4px rgba(36, 31, 43, 0.8);
 }
 
+.stage-exit {
+  position: absolute; z-index: 25;
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  top: max(var(--mark-inset), env(safe-area-inset-top));
+  min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
+  color: var(--cream); background: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stage-exit { transition-property: background-color, translate, box-shadow; }
+}
+.stage-exit:hover { background: var(--deep); }
+.stage-exit:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.stage-exit:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+
 /* Once the signpost has a corner, the cue may not reach it. */
 @media (min-width: 700px) {
   .stage-cue { max-width: min(60ch, calc(100% - 320px)); }

@@ -279,6 +279,17 @@ export function App() {
           }}
         />
       </main>
+      {insideId !== null && (
+        <button
+          type="button"
+          className="stage-exit"
+          onClick={() => {
+            enterInterior(null)
+          }}
+        >
+          ← Back to town
+        </button>
+      )}
       <SpeechLive store={store} />
       <Figures
         scene={scene}

@@ -116,12 +116,14 @@ export function StageMount({
           carved.place()
         })
         nameTown()
-        chars = createCharacterLayer(s, book, store, (agentId) => {
-          // click-to-inspect: the G6 check — route change only, React owns the chrome
+        // click-to-inspect: the G6 check — route change only, React owns the chrome. The town
+        // and the room pick a person the same way, so one ring answers for both.
+        const selectAgent = (agentId: string): void => {
           const route = parseRoute(location.pathname, location.search)
           history.pushState(null, '', routeToPath({ ...route, agentId }))
           window.dispatchEvent(new PopStateEvent('popstate'))
-        })
+        }
+        chars = createCharacterLayer(s, book, store, selectAgent)
         bubbles = createBubbleLayer(s, store)
         acts = createActLayer(s, store)
         atmosphere = createAtmosphere(s)
@@ -136,7 +138,7 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
-        interior = createInteriorScene(s, store, book)
+        interior = createInteriorScene(s, store, book, selectAgent)
         s.interior = interior
         interiorRef.current = interior
         offInterior = interior.onChange((id) => {

@@ -810,3 +810,26 @@ describe('interiorScene builds one room plan per plan change', () => {
     expect(SRC).toContain('bedSlots(sleeping, bedTiles)')
   })
 })
+
+// ★ Two ways out of one room and neither was wired: the veil took a click and dropped it, and
+// a body in the room was event-inert, so the only person on screen could not be asked about.
+describe('★ inside a room, the pointer has somewhere to land', () => {
+  const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
+  const bodyFor = /function bodyFor\([\s\S]*?\n  \}/.exec(SRC)![0]
+
+  it('★ a click on the dimmed town leaves the room, and a pan across it does not', () => {
+    expect(SRC).toContain("veil.on('pointertap'")
+    expect(SRC).toContain('setActive(null)')
+    // the same slop the camera's own tile pick uses, so a drag is never a click
+    expect(SRC).toContain('TAP_SLOP_PX')
+    // and it still swallows the town behind it
+    expect(SRC).toContain("veil.eventMode = 'static'")
+  })
+
+  it('★ a body in the room is a pick, through a room that takes no click of its own', () => {
+    expect(SRC).toContain("room.eventMode = 'passive'")
+    expect(bodyFor).toContain("sprite.eventMode = 'static'")
+    expect(bodyFor).toContain("sprite.cursor = 'pointer'")
+    expect(bodyFor).toContain('onSelect(agentId)')
+  })
+})
