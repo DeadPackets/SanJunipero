@@ -152,7 +152,7 @@ const FOODS: LibraryEntry[] = [
   // The anti-spot clause is on BOTH caps — one came back a red toadstool — and the pair may only
   // ever differ by the colour word.
   food(
-    'field_mushroom',
+    'mushroom',
     'a single squat mushroom with a rounded unmarked chestnut cap, no spots and no speckles, and a short cream stalk, drawn from the side',
   ),
   food(
@@ -160,11 +160,11 @@ const FOODS: LibraryEntry[] = [
     'a single squat mushroom with a rounded unmarked ivory cap, no spots and no speckles, and a short cream stalk, drawn from the side',
   ),
   food(
-    'herb_bundle',
+    'herb',
     'a tied bunch of green herbs, sage and pale mint leaves gathered by a strip of dusty-rose cloth',
   ),
   food(
-    'wheat_sheaf',
+    'wheat',
     'a small sheaf of golden wheat stalks with heavy heads, bound in the middle with a twist of straw',
   ),
 ]

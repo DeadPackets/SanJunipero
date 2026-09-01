@@ -1,24 +1,13 @@
-import { type SimConfig } from '@sj/shared'
+import { FOOD_KINDS, type SimConfig } from '@sj/shared'
 
 // The world's one food registry: eat validates against it, forage/fish/harvest spawn from it.
+export { FOOD_KINDS }
 export const FORAGE_KIND = 'berries'
 export const FISH_KIND = 'fish'
 export const PALE_MUSHROOM = 'pale_mushroom'
 export const MUSHROOM_KIND = 'mushroom'
 export const HERB_KIND = 'herb'
 export const STEW_KIND = 'stew'
-export const FOOD_KINDS: ReadonlySet<string> = new Set([
-  FORAGE_KIND,
-  FISH_KIND,
-  'venison',
-  'rabbit_meat',
-  'bread',
-  'wheat',
-  MUSHROOM_KIND,
-  PALE_MUSHROOM,
-  HERB_KIND,
-  STEW_KIND,
-])
 
 // A share of needs.eatRestoreHunger, code and not a dial: SimConfigSchema is closed. An
 // unlisted kind is a full meal.

@@ -1,3 +1,18 @@
+// One name per substance, held here because the engine's eat check and the forge's art catalogue
+// both key on it: world one shipped `herb_bundle` art against an engine that only knew `herb`.
+export const FOOD_KINDS: ReadonlySet<string> = new Set([
+  'berries',
+  'bread',
+  'fish',
+  'herb',
+  'mushroom',
+  'pale_mushroom',
+  'rabbit_meat',
+  'stew',
+  'venison',
+  'wheat',
+])
+
 // A recipe that wants "any meat" names the sentinel and the craft resolves it against what the
 // hands are holding. Canon ids, never world text: CLASS_PROSE is what a refusal may say.
 

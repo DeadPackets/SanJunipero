@@ -127,7 +127,7 @@ export type DevHolding = {
 /** Past the card's eight-row cap on purpose, so the "and N more" line is a thing a viewer can
  *  see. `wood`, NOT `timber` — nothing in the world eats `timber`. */
 const STOREHOUSE_STOCK: readonly (readonly [string, number])[] = [
-  ['wheat_sheaf', 12],
+  ['wheat', 12],
   ['bread', 6],
   ['fish', 4],
   ['berries', 9],
@@ -152,7 +152,7 @@ const SHED_STOCK: readonly (readonly [string, number])[] = [
 const HOUSE_STOCK: readonly (readonly [string, number])[] = [
   ['bread', 2],
   ['waterskin', 1],
-  ['herb_bundle', 3],
+  ['herb', 3],
   ['wood', 10],
 ]
 
@@ -165,7 +165,7 @@ const CABIN_STOCK: readonly (readonly [string, number])[] = [
 const SHARED_STOCK: readonly (readonly [string, number])[] = [
   ['bread', 6],
   ['waterskin', 3],
-  ['herb_bundle', 5],
+  ['herb', 5],
   ['wood', 10],
 ]
 
