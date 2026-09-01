@@ -1,4 +1,5 @@
 import {
+  APICallError,
   generateText,
   NoObjectGeneratedError,
   Output,
@@ -173,6 +174,29 @@ const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 // One retry after the abort, then the call fails loudly. A third attempt only spends the
 // stall again.
 const DEFAULT_MAX_RETRIES = 1
+
+// A rate-limited pair in the live ledger sits 5.5 s apart and both halves fail: an immediate
+// re-ask lands inside the window that just refused it. Jittered over [2 s, 4 s) so a fleet of
+// minds refused together does not re-ask together.
+const RATE_LIMIT_WAIT_MS = 2_000
+
+// OpenRouter reports a saturated back end as a 429, and on a 200-with-error-body only in words.
+function rateLimited(err: unknown): boolean {
+  if (APICallError.isInstance(err) && err.statusCode === 429) return true
+  const text = err instanceof Error ? err.message : String(err)
+  return /\b429\b|rate[ _-]?limit|too many requests/i.test(text)
+}
+
+/** How long to wait before re-asking; nothing at all unless the refusal was a rate limit.
+ *  Public so a test can prove the shape without waiting it out. */
+export function retryBackoffMs(err: unknown): number {
+  if (!rateLimited(err)) return 0
+  return RATE_LIMIT_WAIT_MS + Math.floor(Math.random() * RATE_LIMIT_WAIT_MS)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export class LlmClient {
   private readonly db: Database.Database
@@ -408,7 +432,8 @@ export class LlmClient {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    let attempt = 0
+    for (; attempt <= this.maxRetries; attempt++) {
       const start = performance.now()
       let facts: StepFacts = {}
       const note: Note = (f) => {
@@ -489,11 +514,16 @@ export class LlmClient {
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err
+        if (attempt === this.maxRetries) break
+        const wait = retryBackoffMs(err)
+        // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
+        if (wait > this.requestTimeoutMs) break
+        if (wait > 0) await sleep(wait)
       }
     }
     this.alert(
       'llm_call_failed',
-      `${this.caller}: ${this.maxRetries + 1} attempt(s) failed, the last bounded at ` +
+      `${this.caller}: ${attempt + 1} attempt(s) failed, the last bounded at ` +
         `${(this.requestTimeoutMs / 1000).toFixed(0)}s — ` +
         (lastError instanceof Error ? lastError.message : String(lastError)),
     )
