@@ -24,12 +24,12 @@ const config: SimConfig = SimConfigSchema.parse({
 const genesis = devGenesisState(config, devTerrain('showcase', 1), 'showcase', 1) as WorldState
 
 const AGENT = 'p'
+const store = new EventStore(openDb(':memory:'))
 
 function bodyAt(x: number, y: number): WorldState {
-  const store = new EventStore(openDb(':memory:'))
   return fold(
     genesis,
-    store.append(genesis.tick, 'agent_spawned', { id: AGENT, name: 'P', x, y, ageDays: 7300 }),
+    store.append(genesis.tick, 'agent_spawned', { id: AGENT, name: AGENT, x, y, ageDays: 7300 }),
     config,
   )
 }
@@ -44,8 +44,22 @@ const touchesWater = (state: WorldState, p: { x: number; y: number }): boolean =
   return false
 }
 
+/** Where a walk to the river ends for a body here, refusing to guess if the world refused. */
+function bankFor(state: WorldState, from: string): { x: number; y: number } {
+  const to = walkDestination(state, config, AGENT, { structureId: 'river' })
+  expect(to, from).not.toHaveProperty('refusal')
+  return to as { x: number; y: number }
+}
+
+/** The channel tile this body reads the river off, which is what a bank is a bank of. */
+const channelFor = (state: WorldState, x: number, y: number): { x: number; y: number } => {
+  const river = naturalPlaces(state, x, y).find((p) => p.id === 'river')
+  expect(river, `river named at (${x}, ${y})`).toBeDefined()
+  return river!
+}
+
 // The southwest corner three minds camped in, the last column world A parked Nadia against, and
-// two rows that do hold water, so a fix that only helped the dead zone would still be caught.
+// rows that do hold water, so a fix that only helped the dead zone would still be caught.
 const FROM: readonly (readonly [number, number])[] = [
   [1, 70],
   [0, 75],
@@ -61,12 +75,11 @@ describe('★ the river a ring-1 body can actually get to', () => {
   it('★ lands every body on ground at the water, from the dead corners too', () => {
     for (const [x, y] of FROM) {
       const state = bodyAt(x, y)
-      expect(naturalPlaces(state, x, y).map((p) => p.id)).toContain('river')
-      const to = walkDestination(state, config, AGENT, { structureId: 'river' })
-      expect(to, `from (${x}, ${y})`).not.toHaveProperty('refusal')
-      const bank = to as { x: number; y: number }
-      expect(isPassable(state, bank.x, bank.y), `bank for (${x}, ${y})`).toBe(true)
-      expect(touchesWater(state, bank), `water at the bank for (${x}, ${y})`).toBe(true)
+      const at = `from (${x}, ${y})`
+      channelFor(state, x, y)
+      const bank = bankFor(state, at)
+      expect(isPassable(state, bank.x, bank.y), `footing ${at}`).toBe(true)
+      expect(touchesWater(state, bank), `water at the bank ${at}`).toBe(true)
     }
   })
 
@@ -78,11 +91,10 @@ describe('★ the river a ring-1 body can actually get to', () => {
       [2, 62],
       [70, 5],
     ] as const) {
-      const store = new EventStore(openDb(':memory:'))
-      let state = bodyAt(x, y)
-      state = fold(
-        state,
-        store.append(state.tick, 'item_spawned', {
+      const at = `from (${x}, ${y})`
+      let state = fold(
+        bodyAt(x, y),
+        store.append(genesis.tick, 'item_spawned', {
           id: 'skin',
           kind: 'waterskin',
           qty: 1,
@@ -90,35 +102,30 @@ describe('★ the river a ring-1 body can actually get to', () => {
         }),
         config,
       )
-      const to = walkDestination(state, config, AGENT, { structureId: 'river' }) as {
-        x: number
-        y: number
-      }
+      const bank = bankFor(state, at)
       const go = submitIntent(state, config, AGENT, 'walk', { structureId: 'river' })
-      expect(go.ok, `walk from (${x}, ${y})`).toBe(true)
+      expect(go.ok, `walk ${at}`).toBe(true)
       if (!go.ok) return
-      for (const e of go.events) state = fold(state, store.append(state.tick, e.type, e.payload), config)
+      for (const e of go.events)
+        state = fold(state, store.append(state.tick, e.type, e.payload), config)
 
       const worldTick = createWorldTick(config, new RngStreams('river-reach'))
       for (let i = 0; i < 200 && state.agents[AGENT]!.activity !== null; i++) {
         state = worldTick({ ...state, tick: state.tick + 1 }).state
       }
       const body = state.agents[AGENT]!
-      expect({ x: body.x, y: body.y }, `landed, from (${x}, ${y})`).toEqual(to)
-      expect(submitIntent(state, config, AGENT, 'drink', {}).ok, `drink at (${x}, ${y})`).toBe(true)
-      expect(
-        submitIntent(state, config, AGENT, 'fill', { itemId: 'skin' }).ok,
-        `fill at (${x}, ${y})`,
-      ).toBe(true)
+      expect({ x: body.x, y: body.y }, `landed, ${at}`).toEqual(bank)
+      expect(submitIntent(state, config, AGENT, 'drink', {}).ok, `drink ${at}`).toBe(true)
+      expect(submitIntent(state, config, AGENT, 'fill', { itemId: 'skin' }).ok, `fill ${at}`).toBe(
+        true,
+      )
     }
   })
 
-  it('picks the nearer bank when the body stands on one side of the channel', () => {
+  it('picks the bank on the body’s own side of the channel', () => {
     const west = bodyAt(2, 40)
     const east = bodyAt(75, 40)
-    expect((walkDestination(west, config, AGENT, { structureId: 'river' }) as { x: number }).x)
-      .toBeLessThan(13)
-    expect((walkDestination(east, config, AGENT, { structureId: 'river' }) as { x: number }).x)
-      .toBeGreaterThan(15)
+    expect(bankFor(west, 'west').x).toBeLessThan(channelFor(west, 2, 40).x)
+    expect(bankFor(east, 'east').x).toBeGreaterThan(channelFor(east, 75, 40).x)
   })
 })

@@ -13,7 +13,7 @@ import {
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable, pathCtx, type Point } from '../path.js'
+import { findPath, isPassable, pathCtx, searchToward, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -226,25 +226,19 @@ function nearestReachable(
   a: AgentBody,
   tiles: Point[],
   rank: (p: Point) => number = () => 0,
-  refusal = 'no path to that spot',
 ): Point | { refusal: string } {
   const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
   const sorted = [...tiles].sort(
     (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
   )
   for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
-  return { refusal }
+  return { refusal: 'no path to that spot' }
 }
 
 // What the world says when the legs cannot start at all. Said in the place where it is true:
 // the body that has already walked to the limit is the only one the sentence teaches.
 export const WALK_OFF_MAP = 'the world ends that way'
 export const WALK_NO_ROAD = 'there is no way through from here'
-
-// How far around an unreachable mark the world looks for footing toward it, and how many of
-// those it will search before it takes the refusal. A house or a bank is inside eight.
-const SETTLE_REACH = 8
-const SETTLE_TRIES = 12
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
@@ -258,22 +252,8 @@ function settleToward(
   want: Point,
   refusal: string,
 ): Point | { refusal: string } {
-  const ctx = pathCtx(state, config)
-  const to = {
-    x: clamp(want.x, 0, state.terrain[0]!.length - 1),
-    y: clamp(want.y, 0, state.terrain.length - 1),
-  }
-  const toward = (p: Point): number => Math.abs(p.x - to.x) + Math.abs(p.y - to.y)
-  const near: Point[] = []
-  for (let y = to.y - SETTLE_REACH; y <= to.y + SETTLE_REACH; y++) {
-    for (let x = to.x - SETTLE_REACH; x <= to.x + SETTLE_REACH; x++) {
-      if (isPassable(state, x, y, ctx)) near.push({ x, y })
-    }
-  }
-  near.sort((p, q) => toward(p) - toward(q))
-  const settled = nearestReachable(state, config, a, near.slice(0, SETTLE_TRIES), toward, refusal)
-  if ('refusal' in settled) return settled
-  return settled.x === a.x && settled.y === a.y ? { refusal } : settled
+  const last = searchToward(state, a, want, config)?.path.at(-1)
+  return last === undefined ? { refusal } : { x: last[0], y: last[1] }
 }
 
 // The lake's own middle stands nine tiles from its shore, which is the widest any landmark's
@@ -307,15 +287,8 @@ function featureDestination(
     }
   }
   bank.sort((p, q) => near(p) - near(q))
-  const rank = (): number => 0
-  return nearestReachable(
-    state,
-    config,
-    a,
-    bank.slice(0, FEATURE_TRIES),
-    rank,
-    `there is no way to ${f.name} from this side`,
-  )
+  const to = nearestReachable(state, config, a, bank.slice(0, FEATURE_TRIES))
+  return 'refusal' in to ? { refusal: `there is no way to ${f.name} from this side` } : to
 }
 
 /** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
@@ -332,18 +305,18 @@ export function walkDestination(
   if (tile.success) {
     const want = tile.data
     // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
-    if (
-      want.x < 0 ||
-      want.y < 0 ||
-      want.x >= state.terrain[0]!.length ||
-      want.y >= state.terrain.length
-    )
-      return settleToward(state, config, a, want, WALK_OFF_MAP)
-    // A mark with no footing under it is left to `validate`, which has always named it as one.
-    if (!isPassable(state, want.x, want.y)) return want
-    return findPath(state, a, want, config) === null
-      ? settleToward(state, config, a, want, WALK_NO_ROAD)
-      : want
+    // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
+    // ground the world does not have makes A* exhaust its whole budget before it answers.
+    const to = {
+      x: clamp(want.x, 0, state.terrain[0]!.length - 1),
+      y: clamp(want.y, 0, state.terrain.length - 1),
+    }
+    const offMap = to.x !== want.x || to.y !== want.y
+    if (offMap && to.x === a.x && to.y === a.y) return { refusal: WALK_OFF_MAP }
+    // A mark with no footing under it is a mark named wrong, and the affordance block says so.
+    if (!offMap && !isPassable(state, to.x, to.y)) return { refusal: 'no path to that spot' }
+    if (findPath(state, a, to, config) !== null) return to
+    return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
   }
   const named = WalkToPlace.safeParse(params)
   if (!named.success) return { refusal: 'a walk needs a place to end' }

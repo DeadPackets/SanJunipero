@@ -159,14 +159,29 @@ export function searchPath(
   return found
 }
 
+/** As far toward a mark as the ground goes: the mark itself when a route reaches it, and
+ *  otherwise the reachable tile that comes closest. Answers for a mark off the map or under a
+ *  wall, which `searchPath` will not. Never memoized — a partial answer stored under the key
+ *  `findPath` reads would make every reachability check in the world lie. */
+export function searchToward(
+  state: WorldState,
+  from: Point,
+  to: Point,
+  config: SimConfig = DEFAULT_CONFIG,
+): PathSearch | null {
+  if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
+  return runSearch(state, from, to, config, true)
+}
+
 function runSearch(
   state: WorldState,
   from: Point,
   to: Point,
   config: SimConfig,
+  toward = false,
 ): PathSearch | null {
   const ctx = pathCtx(state, config)
-  if (!isPassable(state, to.x, to.y, ctx)) return null
+  if (!toward && !isPassable(state, to.x, to.y, ctx)) return null
   const width = ctx.width
   // Charging a full grass tile per remaining step over-estimates the moment anything is cheaper
   // than grass — a road is 0.6 — and an over-estimating A* returns a short route, not a cheap one.
@@ -220,7 +235,11 @@ function runSearch(
       return path.length === 0 ? null : { path, capped: true }
     }
   }
-  return null
+  // The open list drained: no route reaches the mark. The frontier is still the nearest the
+  // ground gets to it, which is a walk when the caller asked how far it could go.
+  if (!toward) return null
+  const path = pathTo(frontier)
+  return path.length === 0 ? null : { path, capped: true }
 }
 
 export function findPath(
