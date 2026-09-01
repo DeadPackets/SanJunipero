@@ -156,7 +156,7 @@ describe('verbs: sleep / wake / eat', () => {
       ev('item_spawned', { id: 'item_2', kind: 'berries', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }),
       FAST,
     )
-    expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(false) // not held
+    expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(true) // walks to it
     s = fold(s, ev('item_moved', { id: 'item_2', loc: { t: 'agent', id: 'a1' } }), FAST)
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(true)
     expect(FOOD_KINDS.has('berries')).toBe(true)

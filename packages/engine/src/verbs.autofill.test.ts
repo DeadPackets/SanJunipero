@@ -166,12 +166,12 @@ describe('submitIntent', () => {
     })
   })
 
-  it('still refuses an act the world cannot read one way', () => {
+  it('still refuses an act the world cannot read one way, and names the two readings', () => {
     let s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
     s = holding(s, 'item_fish_2', 'fish')
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', {})).toEqual({
       ok: false,
-      reason: 'eating needs the food named',
+      reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
     })
   })
 })

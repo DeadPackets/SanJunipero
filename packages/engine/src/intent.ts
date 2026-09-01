@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
+import { readAsPerson } from './verbs/autofill.js'
 import {
   approachFor,
   VERBS,
@@ -69,29 +69,27 @@ export function submitIntent(
     const to = walkDestination(state, config, agentId, params)
     if (!('refusal' in to)) p = { ...params, ...to }
   }
-  const refusal = def.validate(state, config, agentId, p)
-  // Asked for a thing the world already holds — asleep and told to sleep, inside the roof it is
-  // told to enter. The act is over rather than wrong: it starts and completes in one breath.
-  if (refusal !== null && def.settled?.(state, config, agentId, p) === true) {
-    return {
-      ok: true,
-      events: [
-        ...(a.asleep && verb !== 'sleep' ? [{ type: 'agent_woke', payload: { agentId } }] : []),
-        { type: 'action_started', payload: { agentId, verb, params: p, duration: 0 } },
-        { type: 'action_completed', payload: { agentId, verb } },
-      ],
+  const first = def.validate(state, config, agentId, p)
+  if (first !== null) {
+    // The mind chose the verb; the mark it wrote is read the way a person would read it (K20),
+    // and two things it fits equally are asked back about rather than picked between.
+    const read = readAsPerson(state, config, agentId, verb, p)
+    if (read !== null && 'refusal' in read) return { ok: false, reason: read.refusal }
+    if (read !== null) p = read.params
+    const refusal = read === null ? first : def.validate(state, config, agentId, p)
+    // Asked for a thing the world already holds — asleep and told to sleep, inside the roof it
+    // is told to enter. The act is over rather than wrong, and ends in the breath it began.
+    if (refusal !== null && def.settled?.(state, config, agentId, p) === true) {
+      return {
+        ok: true,
+        events: [
+          ...(a.asleep && verb !== 'sleep' ? [{ type: 'agent_woke', payload: { agentId } }] : []),
+          { type: 'action_started', payload: { agentId, verb, params: p, duration: 0 } },
+          { type: 'action_completed', payload: { agentId, verb } },
+        ],
+      }
     }
-  }
-  // The mind chose the verb; where the world holds one thing that verb would take, read it in
-  // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
-  if (refusal !== null) {
-    // What the mind named outranks what the world would have guessed: the id it gave is right
-    // 152 times in 154, and only a mark that fits nowhere falls through to the lone candidate.
-    const filled =
-      markUnderAnotherKey(state, config, agentId, verb, p) ??
-      loneCandidateFor(state, config, agentId, verb, p)
-    if (filled === null) return walkFirst(state, config, agentId, verb, p, refusal)
-    p = filled
+    if (refusal !== null) return walkFirst(state, config, agentId, verb, p, refusal)
   }
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })

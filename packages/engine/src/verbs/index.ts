@@ -13,7 +13,14 @@ import {
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable, pathCtx, searchToward, type Point } from '../path.js'
+import {
+  findPath,
+  isPassable,
+  pathCtx,
+  searchToward,
+  type PathCtx,
+  type Point,
+} from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -360,6 +367,7 @@ export function nearestWater(
   state: WorldState,
   agentId: string,
   reach = WATER_REACH,
+  wells = true,
 ): Point | null {
   const a = state.agents[agentId]!
   const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
@@ -370,8 +378,7 @@ export function nearestWater(
       if (t !== undefined && isWet(t)) found.push({ x, y })
     }
   }
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
+  for (const s of wells ? Object.values(state.structures) : []) {
     if (s.kind === WELL_KIND && s.stage === 'complete' && near(s) <= reach) {
       found.push({ x: s.x, y: s.y })
     }
@@ -395,25 +402,36 @@ function marksOf(state: WorldState, params: Record<string, unknown>): Point[] {
   return out
 }
 
-/** Ground beside a mark that this body can get to. */
+// A body that walks up to a thing stands on one of the eight tiles around it, and the nearest
+// two or three are the only ones worth a search: a ring nothing can reach is a mark walled in.
+const APPROACH_TRIES = 3
+
+/** Ground beside a mark that this body can get to and act from. The asking comes before the
+ *  searching: a verb's own answer is cheap, and a path is not. */
 function standingSpotFor(
   state: WorldState,
   config: SimConfig,
   a: AgentBody,
   at: Point,
+  acts: (from: Point) => boolean,
+  ctx: PathCtx,
 ): Point | null {
-  const ctx = pathCtx(state, config)
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
   const ring: Point[] = []
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (isPassable(state, at.x + dx, at.y + dy, ctx)) ring.push({ x: at.x + dx, y: at.y + dy })
     }
   }
-  const to = nearestReachable(state, config, a, ring)
+  ring.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  const worth = ring.filter(acts).slice(0, APPROACH_TRIES)
+  const to = nearestReachable(state, config, a, worth)
   return 'refusal' in to ? null : to
 }
 
-const bodyAt = (state: WorldState, agentId: string, at: Point): WorldState => ({
+/** The same world with this body standing somewhere else: what a verb would say if the feet
+ *  were already there. Nothing folds it — it is a question, not a move. */
+export const bodyAt = (state: WorldState, agentId: string, at: Point): WorldState => ({
   ...state,
   agents: { ...state.agents, [agentId]: { ...state.agents[agentId]!, x: at.x, y: at.y } },
 })
@@ -434,27 +452,25 @@ export function approachFor(
   if (def === undefined || a === undefined || verb === 'walk' || a.insideId !== undefined) {
     return null
   }
-  const spots: Point[] = []
+  const acts = (from: Point): boolean =>
+    (from.x !== a.x || from.y !== a.y) &&
+    def.validate(bodyAt(state, agentId, from), config, agentId, params) === null
+  const ctx = pathCtx(state, config)
+  const marks = marksOf(state, params)
+  for (const at of marks) {
+    const spot = standingSpotFor(state, config, a, at, acts, ctx)
+    if (spot !== null) return spot
+  }
+  // Water is the one mark a body is never asked to name: an act refused with nothing to walk to
+  // has a bank to try, and only then.
+  const wet = marks.length > 0 ? null : nearestWater(state, agentId)
+  const bank = wet === null ? null : standingSpotFor(state, config, a, wet, acts, ctx)
+  if (bank !== null) return bank
   const structureId = params.structureId
   if (typeof structureId === 'string') {
     // A named roof settles to the ring the door is on, which is the tile `enter` measures from.
     const to = walkDestination(state, config, agentId, { structureId })
-    if (!('refusal' in to)) spots.push(to)
-  }
-  for (const at of marksOf(state, params)) {
-    const spot = standingSpotFor(state, config, a, at)
-    if (spot !== null) spots.push(spot)
-  }
-  // Water is the one mark a body is never asked to name: a thirst refused for want of a bank
-  // has no other spot to try.
-  if (spots.length === 0) {
-    const wet = nearestWater(state, agentId)
-    const spot = wet === null ? null : standingSpotFor(state, config, a, wet)
-    if (spot !== null) spots.push(spot)
-  }
-  for (const to of spots) {
-    if (to.x === a.x && to.y === a.y) continue
-    if (def.validate(bodyAt(state, agentId, to), config, agentId, params) === null) return to
+    if (!('refusal' in to) && acts(to)) return to
   }
   return null
 }

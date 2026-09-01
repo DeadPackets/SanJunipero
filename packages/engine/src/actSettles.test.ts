@@ -199,3 +199,56 @@ describe('★ an act refused only for the distance is a walk with the act on its
     expect(refuses(two, 'take', { itemId: 'item_1' })).toBe('someone is holding that')
   })
 })
+
+/** The act the world read out of what the mind wrote. */
+function reads(state: WorldState, verb: string, params: Record<string, unknown>): unknown {
+  const r = submitIntent(state, CFG, 'a1', verb, params)
+  expect(r.ok).toBe(true)
+  if (!r.ok) return null
+  const started = r.events.find((e) => e.type === 'action_started')!.payload as {
+    verb: string
+    params: Record<string, unknown>
+    then?: { verb: string; params: Record<string, unknown> }
+  }
+  return started.then?.params ?? started.params
+}
+
+const wood = (s: WorldState, id: string, x: number, y: number): WorldState =>
+  put(s, 'item_spawned', { id, kind: 'wood', qty: 1, loc: { t: 'tile', x, y } })
+
+describe('★ a mark is read the way a person would read it', () => {
+  // ★ 25 of rehearsal 2's refusals were `no such item` for a mind that wrote what the thing was
+  // instead of which one it was. A kind names a thing: the one in the hands, else the nearest.
+  it('★ a kind word is the nearest one of that kind, and the same one every time', () => {
+    const two = wood(wood(world(), 'item_1', 6, 3), 'item_2', 2, 1)
+    expect(reads(two, 'take', { itemId: 'wood' })).toMatchObject({ itemId: 'item_2' })
+  })
+
+  it('★ and the one already in the hands outranks the one on the ground', () => {
+    const both = wood(held(world(), 'item_1', 'wood'), 'item_2', 1, 0)
+    expect(reads(both, 'drop', { itemId: 'wood' })).toMatchObject({ itemId: 'item_1' })
+  })
+
+  // Two things the act fits equally is a question, not a coin toss.
+  it('★ a mark left blank with two readings names them both and asks', () => {
+    let s = held(world(), 'item_1', 'bread')
+    s = held(s, 'item_2', 'fish')
+    expect(refuses(s, 'eat', {})).toBe('which one — the bread (item_1) or the fish (item_2)?')
+  })
+
+  it('and one reading only is simply read in', () => {
+    expect(reads(held(world(), 'item_1', 'bread'), 'eat', {})).toMatchObject({ itemId: 'item_1' })
+  })
+
+  // ★ ~20 refusals were a cast at water the mind had guessed the coordinates of.
+  it('★ water guessed wrong is the nearest water there is', () => {
+    const river = world(['....~...', '....~...', '....~...', '....~...'], { x: 0, y: 0 })
+    expect(reads(river, 'fish', { x: 1, y: 1 })).toMatchObject({ x: 4, y: 0 })
+  })
+
+  it('a mark written as an empty word is no mark at all', () => {
+    expect(reads(held(world(), 'item_1', 'garment'), 'wear', { itemId: '' })).toMatchObject({
+      itemId: 'item_1',
+    })
+  })
+})

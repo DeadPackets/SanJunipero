@@ -151,7 +151,7 @@ describe('verb: tend', () => {
     expect(submitIntent(trio, CFG, 'a2', 'tend', { targetId: 'a1' }).ok).toBe(false) // a1 is healthy
     const hurt = patchAgent(trio, 'a1', { hp: 50 })
     expect(submitIntent(hurt, CFG, 'a2', 'tend', { targetId: 'a1' }).ok).toBe(true) // diagonal is adjacent
-    expect(submitIntent(hurt, CFG, 'a3', 'tend', { targetId: 'a1' }).ok).toBe(false) // too far
+    expect(submitIntent(hurt, CFG, 'a3', 'tend', { targetId: 'a1' }).ok).toBe(true) // walks over
     const selfHurt = patchAgent(trio, 'a2', { hp: 50 })
     expect(submitIntent(selfHurt, CFG, 'a2', 'tend', { targetId: 'a2' }).ok).toBe(false)
     const illFullHp = patchAgent(trio, 'a1', { ill: true })

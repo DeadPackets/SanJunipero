@@ -130,7 +130,7 @@ describe('verb: till', () => {
     const s = makeWorld(['.~.', '...'])
     expect(submitIntent(s, FAST, 'a1', 'till', {}).ok).toBe(false)
     expect(submitIntent(s, FAST, 'a1', 'till', { x: 1, y: 0 }).ok).toBe(false) // water
-    expect(submitIntent(s, FAST, 'a1', 'till', { x: 2, y: 1 }).ok).toBe(false) // not adjacent
+    expect(submitIntent(s, FAST, 'a1', 'till', { x: 2, y: 1 }).ok).toBe(true) // walks over
     expect(submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 1 }).ok).toBe(true)
     expect(submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 }).ok).toBe(true) // own tile
   })
@@ -161,7 +161,7 @@ describe('verb: plant', () => {
     expect(submitIntent(s, FAST, 'a1', 'plant', { x: 1, y: 0 }).ok).toBe(false) // no kind
     expect(submitIntent(s, FAST, 'a1', 'plant', { x: 0, y: 1, kind: 'wheat' }).ok).toBe(false) // grass
     expect(submitIntent(s, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'kelp' }).ok).toBe(false) // unknown kind
-    expect(submitIntent(s, FAST, 'a1', 'plant', { x: 5, y: 0, kind: 'wheat' }).ok).toBe(false) // not adjacent
+    expect(submitIntent(s, FAST, 'a1', 'plant', { x: 5, y: 0, kind: 'wheat' }).ok).toBe(true) // walks over
     expect(submitIntent(s, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' }).ok).toBe(true)
   })
 

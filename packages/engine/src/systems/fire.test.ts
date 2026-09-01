@@ -339,7 +339,7 @@ describe('verb: douse', () => {
     expect(t.state.items.item_1!.charges).toBe(0)
   })
 
-  it('refuses an empty bucket, no bucket at all, unburnt ground, and a fire two tiles off', () => {
+  it('refuses an empty bucket, no bucket at all, and unburnt ground; two tiles off is a walk', () => {
     const empty = submitIntent(burning(0), CFG, 'a1', 'douse', { x: 2, y: 2 })
     expect(empty.ok).toBe(false)
     if (!empty.ok) expect(empty.reason).toBe('the bucket is empty')
@@ -347,7 +347,7 @@ describe('verb: douse', () => {
     expect(submitIntent(burning(1), CFG, 'a1', 'douse', { x: 4, y: 2 }).ok).toBe(false) // structure_2 is not alight
     const away = burning(1)
     const stepped = { ...away, agents: { a1: { ...away.agents.a1!, x: 0, y: 0 } } }
-    expect(submitIntent(stepped, CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(false)
+    expect(submitIntent(stepped, CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(true)
   })
 
   it('a recorded C9 dousing still folds, and the widened payload survives the envelope', () => {
