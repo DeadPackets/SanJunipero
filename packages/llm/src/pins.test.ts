@@ -194,6 +194,16 @@ it('semantic is left where it was', () => {
   expect(callSettingsFor('semantic').maxOutputTokens).toBe(4000)
 })
 
+// ★ r3: 21 of 46 reflection attempts were Wafer 429s, and every one had a mind call ANSWER within
+// 5 s of it. Only the chain that must land six in a row to write its gists waits a burst out;
+// `dream` is one chance-gated call whose whole product is a mood, and a gist is not on Wafer.
+it('only the night chain that compounds waits a burst out', () => {
+  expect(callSettingsFor('reflection').rateLimitRetries).toBe(3)
+  expect(callSettingsFor('reflection.edit').rateLimitRetries).toBe(3)
+  for (const caller of ['turn', 'preflight', 'arbiter', 'narrator', 'dream', 'reflection.gist'])
+    expect(callSettingsFor(caller).rateLimitRetries, caller).toBeUndefined()
+})
+
 it('an unpinned caller keeps the routing it has always had', () => {
   expect(callSettingsFor('nobody-pinned-this')).toEqual({})
   expect(modelFor('nobody-pinned-this')).toBe(MIND_MODEL)

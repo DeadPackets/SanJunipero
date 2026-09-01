@@ -90,12 +90,20 @@ export type CallSettings = {
   providerOrder?: string[]
   // Raises the derived request bound where the tail is prefill and not decode.
   minTimeoutMs?: number
+  // Re-asks after a BURST LIMIT only, which is refused in milliseconds and bills nothing. A stall
+  // is not patient the same way: re-asking a 295 s bound this often would block for 20 minutes.
+  rateLimitRetries?: number
 }
 
 // Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
 // answers, so a bound derived from the output ceiling alone aborts honest answers and re-bills.
 const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 45_000 }
 const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
+
+// Rehearsal r3: all 21 refused reflection attempts were Wafer 429s, and every one had a mind call
+// ANSWER within 5 s of it — a burst to wait out, not an outage. Six of these must land in a row
+// before the night writes its gists, so two attempts left 1 night in 10 getting that far.
+const WAITS_OUT_A_BURST = { rateLimitRetries: 3 }
 
 // A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone where
 // reasoning is off, the whole output where it stays on. On GLM it can never be off, so each of
@@ -105,9 +113,9 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // the bake-off measured its voice and its 100% named-object act rate at.
   turn: { ...ON_GLM, maxOutputTokens: 600, temperature: 1 },
   // 700 truncated the ledger writes and 1500 cleared the longest of them; +174 for the preamble.
-  reflection: { ...ON_GLM, maxOutputTokens: 1750 },
+  reflection: { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 1750 },
   // Sized around a thinking preamble larger than this model's, so neither of these moves.
-  'reflection.edit': { ...ON_GLM, maxOutputTokens: 13000 },
+  'reflection.edit': { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 13000 },
   // A dream is prose, but it is a mind caller: one allow-list guards everything a mind thinks
   // through, and that one-line law is worth more than a stylist's dreams at 1% of the bill.
   dream: { ...ON_GLM, maxOutputTokens: 2500 },
