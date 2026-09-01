@@ -1,7 +1,6 @@
 import type Database from 'better-sqlite3'
-import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, SOMEONE, type SimEvent, verbPhrase } from '@sj/shared'
 import { applyFootnotes, publishClean } from './chronicle.js'
-import { verbPhrase } from './institutions.js'
 import type { NarratorStore } from './store.js'
 import type {
   ChapterRow,
@@ -21,6 +20,7 @@ export function renderNewspaper(
   heats: HeatScores[],
   milestones: Milestone[],
   scenes?: SceneSegment[],
+  nameOf: (id: string) => string = () => SOMEONE,
 ): { headline: string; body: string; citations: number[] } {
   const parts: string[] = [chapter.text]
 
@@ -35,7 +35,7 @@ export function renderNewspaper(
       if (h.total > (heats[top]?.total ?? 0)) top = i
     })
     const cast = scenes[top]?.cast ?? []
-    if (cast.length > 0) parts.push(`Seen in the thick of it: ${cast.join(', ')}.`)
+    if (cast.length > 0) parts.push(`Seen in the thick of it: ${cast.map(nameOf).join(', ')}.`)
   }
 
   return { headline: chapter.title, body: parts.join('\n\n'), citations: chapter.citations }

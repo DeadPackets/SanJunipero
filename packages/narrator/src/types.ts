@@ -94,11 +94,13 @@ export type SceneDigest = {
 }
 export type ChapterDigest = { day: number; title: string; text: string; citations: number[] }
 
+export type CastMember = { name: string; alive: boolean }
+
 // No tick: this goes to the roster verbatim, and a tick in it comes back as a tick in the prose.
 export type PublicRecord = { eventSeq: number; day: number; text: string }
 
 export type NarratorLlm = {
-  summarizeChapter(scenes: SceneDigest[]): Promise<ChapterSummary>
+  summarizeChapter(scenes: SceneDigest[], cast?: readonly CastMember[]): Promise<ChapterSummary>
   summarizeEra(chapters: ChapterDigest[]): Promise<EraSummary>
   newspaperCopy(
     day: number,
