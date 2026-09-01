@@ -5,6 +5,7 @@ import {
   decideWake,
   disarmBodyAlarm,
   rearmBodyAlarm,
+  rearmConversationWindow,
   DEFAULT_MIND_CONFIG,
   type MindClock,
   type PlanState,
@@ -381,5 +382,91 @@ describe('a mind that has never taken a turn', () => {
   it('waits out the floor again once it HAS taken one', () => {
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 2, pln())).toBe(null)
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 61, pln())).toBe('boredom')
+  })
+})
+
+// ★ Two minds paraphrasing each other held each other in the 5-tick cadence for ever, because
+// any heard word bought another 60 ticks of it. An echo is heard; it is not news.
+describe('only novel speech re-arms the conversation window', () => {
+  const heard = (...texts: string[]): PerceptionPacket =>
+    pkt({
+      heard: texts.map((text) => ({ speakerId: 'nadia', name: 'Nadia', text, distance: 3 })),
+    })
+
+  const asleepHearing = (text: string): PerceptionPacket => ({
+    ...heard(text),
+    self: { ...quietMeadowPacket.self, asleep: true },
+  })
+
+  it('a line the mind has not heard before buys a window', () => {
+    const clock = clk()
+    rearmConversationWindow(cfg, heard('The bridge washed out in the night'), clock, 10)
+    expect(clock.conversationUntilTick).toBe(10 + cfg.conversationWindowTicks)
+  })
+
+  it('a loop of the same line paraphrased buys exactly one', () => {
+    const clock = clk()
+    const loop = [
+      'Good morning, Nadia, the day looks fair',
+      'Good morning, Nadia, the day looks fair to me',
+      'Good morning Nadia — the day looks fair!',
+      'the day looks FAIR, good morning Nadia',
+    ]
+    let tick = 10
+    for (const line of loop) {
+      rearmConversationWindow(cfg, heard(line), clock, tick)
+      tick += 5
+    }
+    expect(clock.conversationUntilTick, 'only the first line was news').toBe(70)
+  })
+
+  it('a genuinely new sentence re-arms exactly as before', () => {
+    const clock = clk()
+    rearmConversationWindow(cfg, heard('Good morning, Nadia'), clock, 10)
+    rearmConversationWindow(cfg, heard('Good morning, Nadia, again'), clock, 15)
+    expect(clock.conversationUntilTick, 'the echo bought nothing').toBe(70)
+    rearmConversationWindow(cfg, heard('The bridge washed out in the night'), clock, 20)
+    expect(clock.conversationUntilTick).toBe(80)
+  })
+
+  it('one novel line among echoes still re-arms', () => {
+    const clock = clk()
+    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 10)
+    rearmConversationWindow(
+      cfg,
+      heard('Are you well, friend, today', 'The goat is loose in the barley'),
+      clock,
+      15,
+    )
+    expect(clock.conversationUntilTick).toBe(75)
+  })
+
+  it('an echo is still heard, and still wakes the mind for it', () => {
+    const clock = clk({ lastTurnTick: 100 })
+    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 100)
+    const echo = heard('Are you well, friend, today')
+    rearmConversationWindow(cfg, echo, clock, 150)
+    expect(clock.conversationUntilTick, 'nobody was made deaf').toBe(160)
+    expect(decideWake(cfg, echo, clock, 150, pln())).toBe('salient_perception')
+  })
+
+  it('forgets what it heard once the window has lapsed', () => {
+    const clock = clk()
+    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 10)
+    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 200)
+    expect(clock.conversationUntilTick, 'the same words a window later are news again').toBe(260)
+  })
+
+  it('a sleeper wakes with nothing to have heard before', () => {
+    const clock = clk()
+    rearmConversationWindow(cfg, heard('Wake up, the roof is burning'), clock, 10)
+    rearmConversationWindow(cfg, asleepHearing('Wake up, the roof is burning'), clock, 20)
+    expect(clock.conversationUntilTick).toBe(80)
+  })
+
+  it('leaves the window expiry itself alone', () => {
+    const clock = clk({ lastTurnTick: 200, conversationUntilTick: 210 })
+    expect(decideWake(cfg, pkt(), clock, 209, pln())).toBe('conversation_beat')
+    expect(decideWake(cfg, pkt(), clock, 211, pln())).toBe(null)
   })
 })

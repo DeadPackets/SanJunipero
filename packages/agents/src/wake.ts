@@ -143,6 +143,59 @@ export function decideWake(
   return null
 }
 
+// Six lines of earshot is enough to see a two-mind loop close on itself.
+const EARSHOT_MEMORY = 6
+const NEAR_DUPLICATE_OVERLAP = 0.8
+// Under three words a shared opening is coincidence, so the overlap rule judges those alone.
+const PREFIX_MIN_WORDS = 3
+
+// Per-clock and ephemeral, because `MindClock` is serialised into a strict checkpoint schema;
+// a resumed mind with nothing to have heard before is the sane reset.
+const earshot = new WeakMap<MindClock, { tick: number; said: string[][] }>()
+
+function words(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .split(' ')
+    .filter((w) => w.length > 0)
+}
+
+function nearDuplicate(a: string[], b: string[]): boolean {
+  if (a.length === 0 || b.length === 0) return a.length === b.length
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  if (short.length >= PREFIX_MIN_WORDS && short.every((w, i) => long[i] === w)) return true
+  const setA = new Set(a)
+  const setB = new Set(b)
+  let shared = 0
+  for (const w of setA) if (setB.has(w)) shared += 1
+  return shared / (setA.size + setB.size - shared) >= NEAR_DUPLICATE_OVERLAP
+}
+
+/** The conversation window's re-arm, called every tick. Speech the mind has just heard said
+ *  again is an echo, not a beat: it is still heard, it just buys no second window. */
+export function rearmConversationWindow(
+  cfg: MindConfig,
+  packet: PerceptionPacket,
+  clock: MindClock,
+  tick: number,
+): void {
+  if (packet.heard.length === 0) return
+  // A sleeper holds no conversation, so it wakes with nothing to have heard before.
+  if (packet.self.asleep) earshot.delete(clock)
+  const prior = earshot.get(clock)
+  const said =
+    prior === undefined || tick - prior.tick > cfg.conversationWindowTicks ? [] : prior.said
+  let novel = false
+  for (const h of packet.heard) {
+    const line = words(h.text)
+    if (!said.some((seen) => nearDuplicate(line, seen))) novel = true
+    said.push(line)
+  }
+  earshot.set(clock, { tick, said: said.slice(-EARSHOT_MEMORY) })
+  if (novel) clock.conversationUntilTick = tick + cfg.conversationWindowTicks
+}
+
 // Every rung the body is failing on right now, need and affliction alike, as alarm keys.
 function ringing(cfg: MindConfig, body: AlarmBody): string[] {
   const keys: string[] = []

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { NoObjectGeneratedError } from 'ai'
+import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
 import { mockModel } from './testutil/mockModel.js'
 import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
-import { BudgetExceededError, LlmClient, defaultExtraBody, servedProvider } from './client.js'
+import {
+  BudgetExceededError,
+  LlmClient,
+  defaultExtraBody,
+  retryBackoffMs,
+  servedProvider,
+} from './client.js'
 import {
   FALLBACK_MODELS,
   MIND_MODEL,
@@ -1067,5 +1073,89 @@ describe('a stalled request is bounded (T37b)', () => {
     const client = new LlmClient({ model, db, caller: 'test', requestTimeoutMs: 60_000 })
     expect((await client.text({ messages: [{ role: 'user', content: 'u' }] })).text).toBe('quick')
     expect(rows(db)[0]!.ok).toBe(1)
+  })
+})
+
+// ★ 201 rate-limited turn calls and 38 gists in the live ledger came in failure pairs 5.5 s
+// apart: the retry re-asked inside the window that had just refused it, and paid for both.
+describe('a re-ask waits out the window it was refused in', () => {
+  const refused = new APICallError({
+    message: 'Provider returned error',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    requestBodyValues: {},
+    statusCode: 429,
+  })
+
+  const answeringAfter = (fail: Error): MockLanguageModelV4 => {
+    let n = 0
+    return new MockLanguageModelV4({
+      doGenerate: () => {
+        n += 1
+        if (n === 1) return Promise.reject(fail)
+        return Promise.resolve({
+          content: [{ type: 'text' as const, text: 'ok' }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: {
+            inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: undefined },
+            outputTokens: { total: 1, text: 1, reasoning: 0 },
+          },
+          warnings: [],
+        })
+      },
+    })
+  }
+
+  it('waits seconds on a rate limit, however the provider spelled it', () => {
+    for (const err of [refused, new Error('429 Too Many Requests'), new Error('Rate-limit hit')]) {
+      const ms = retryBackoffMs(err)
+      expect(ms, String(err)).toBeGreaterThanOrEqual(2_000)
+      expect(ms, String(err)).toBeLessThan(4_000)
+    }
+  })
+
+  it('waits for nothing else, so an ordinary stall still retries at once', () => {
+    expect(retryBackoffMs(new Error('scripted failure'))).toBe(0)
+  })
+
+  it('jitters, so a fleet of minds refused together does not re-ask together', () => {
+    const draws = new Set(Array.from({ length: 20 }, () => retryBackoffMs(refused)))
+    expect(draws.size).toBeGreaterThan(1)
+  })
+
+  it('sleeps before the retry that follows a 429, and books both attempts', async () => {
+    const db = openDb()
+    const model = answeringAfter(refused)
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 1 })
+    const started = Date.now()
+    expect((await client.text({ messages: [{ role: 'user', content: 'u' }] })).text).toBe('ok')
+    expect(
+      Date.now() - started,
+      'the retry re-asked inside the same window',
+    ).toBeGreaterThanOrEqual(2_000)
+    expect(rows(db)).toHaveLength(2)
+  })
+
+  it('does not sleep before the retry that follows an ordinary failure', async () => {
+    const db = openDb()
+    const model = answeringAfter(new Error('scripted failure'))
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 1 })
+    const started = Date.now()
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(Date.now() - started, 'a dead back end is not a busy one').toBeLessThan(100)
+    expect(rows(db)).toHaveLength(2)
+  })
+
+  // No pinned caller goes under the 30 s floor, so this guards the caller that overrides it.
+  it('fails fast rather than sleep past a bound the caller cut below the wait', async () => {
+    const db = openDb()
+    const model = answeringAfter(refused)
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 1, requestTimeoutMs: 50 })
+    const started = Date.now()
+    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow(
+      'Provider returned error',
+    )
+    expect(Date.now() - started, 'no wait it could not afford').toBeLessThan(1_000)
+    expect(rows(db), 'the retry it had no time for was never made').toHaveLength(1)
+    expect(alertsOf(db, 'llm_call_failed')[0]).toContain('test: 1 attempt(s) failed')
   })
 })

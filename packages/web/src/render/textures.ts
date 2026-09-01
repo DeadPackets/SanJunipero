@@ -147,20 +147,11 @@ export class TextureBook {
     return p
   }
 
+  /** NOT `Assets.unload`: that destroys the texture, and the artless kinds all share one
+   *  placeholder url — every sibling still on it would then render a null source. */
   async swap(oldUrl: string, newUrl: string): Promise<Texture> {
-    const next = await this.get(newUrl) // load the replacement FIRST — no blank frame
-    if (oldUrl !== newUrl) {
-      const oldP = this.#cache.get(oldUrl)
-      if (oldP !== undefined) {
-        // claim the entry synchronously: concurrent swaps off a shared url (all
-        // structures leave the placeholder at once) must unload exactly once
-        this.#cache.delete(oldUrl)
-        this.#ready.delete(oldUrl) // a peek must never hand out a texture that was unloaded
-        const old = await oldP
-        old.source.unload() // texture GC gotcha — spec §15
-        await Assets.unload(oldUrl)
-      }
-    }
+    const next = await this.get(newUrl) // free the old source only once the new one is in hand
+    if (oldUrl !== newUrl) this.#ready.get(oldUrl)?.source.unload()
     return next
   }
 }

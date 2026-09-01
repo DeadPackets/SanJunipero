@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
 
 // The book calls into Pixi's loader; nothing else in this file does. A tiny stand-in keeps the
@@ -27,6 +27,7 @@ const land = async (url: string): Promise<void> => {
   await Promise.resolve()
 }
 
+import { Assets } from 'pixi.js'
 import {
   TextureBook,
   buildingArt,
@@ -35,6 +36,8 @@ import {
   resolveAssetId,
   textureUrlFor,
 } from './textures.js'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
   id: 'asset_x',
@@ -228,26 +231,48 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     expect(viaThen).toBe(viaPeek)
   })
 
-  it('a swapped-out url stops peeking, so nothing hands out an unloaded texture', async () => {
+  it('★ a swap frees the old art on the GPU and NEVER destroys it', async () => {
+    // The crash this states: every artless kind shares `/assets/placeholder/item.png`, so the
+    // one entity whose art lands would destroy the texture all its siblings are still drawing.
+    // `Assets.unload` runs `texture.destroy(true)`, which nulls `texture.source`, and the
+    // batcher reads `source.alphaMode` unguarded — the whole stage goes down on the next frame.
+    const shared = '/assets/placeholder/item.png'
     const book = new TextureBook()
-    void book.get('/assets/old.png')
-    await land('/assets/old.png')
-    expect(book.peek('/assets/old.png')).not.toBeNull()
+    void book.get(shared)
+    await land(shared)
+    const old = loads.get(shared)!.texture as { source: { unload: Mock } }
 
-    const p = book.swap('/assets/old.png', '/assets/new.png')
+    const p = book.swap(shared, '/assets/new.png')
     await land('/assets/new.png')
     await p
-    expect(book.peek('/assets/old.png')).toBeNull()
+
+    expect(old.source.unload).toHaveBeenCalledTimes(1) // GPU copy freed; re-uploads on demand
+    expect(Assets.unload).not.toHaveBeenCalled()
+    expect(book.peek(shared)).toBe(old) // the siblings still hold a live texture
     expect(book.peek('/assets/new.png')).not.toBeNull()
+  })
+
+  it('★ and no file under web/src may destroy a texture the book still hands out', () => {
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? sources(join(dir, e.name))
+          : /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)
+            ? [join(dir, e.name)]
+            : [],
+      )
+    const files = sources(join(HERE, '..'))
+    expect(files.length).toBeGreaterThan(40) // a mis-rooted scan must not pass vacuously
+    const offenders = files.filter((f) =>
+      /\bAssets\.unload\(/.test(readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')),
+    )
+    expect(offenders).toEqual([])
   })
 
   it('★ and the room reads it — the furniture path peeks BEFORE it awaits', () => {
     // A behavioural test would need a Pixi stage; what regresses is the composition — the
     // branch tidied back into a bare `get(...).then(...)`, and the empty first frame returns.
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'interiorScene.ts'),
-      'utf8',
-    )
+    const src = readFileSync(join(HERE, 'interiorScene.ts'), 'utf8')
     const add = src.slice(src.indexOf('function addPiece('), src.indexOf('function bodyFor('))
     expect(add).toMatch(/const inHand = book\.peek\(url\)/)
     expect(add.indexOf('book.peek(url)')).toBeLessThan(add.indexOf('book.get(url)'))
