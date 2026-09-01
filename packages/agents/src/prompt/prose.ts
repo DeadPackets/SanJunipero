@@ -260,6 +260,10 @@ export type ProseWorld = {
   // never projects, and block 1 now teaches two verbs that need it.
   waterAtHand?: () => boolean
   nearestWater?: (x: number, y: number) => { x: number; y: number } | null
+  // Whether the act the world last turned away wanted water. A mind refused for water and told
+  // nothing about water asks again: 79% of one run B mind's water refusals were the same reason
+  // twice running, and its longest run was twenty-one.
+  waterRefused?: () => boolean
   // Where the food is. The same answer thirst has had since the last batch, for the need that
   // never got one: the run that drank fifteen times ate once (R21).
   nearestFood?: (x: number, y: number) => { x: number; y: number; kind: string } | null
@@ -591,6 +595,10 @@ function bearing(dx: number, dy: number): string {
 const howFar = (d: number): string =>
   d <= 10 ? 'close to the' : d <= 25 ? 'a way to the' : 'far to the'
 
+// Which way and how far, in one phrase: the places block and the water road say a distance the
+// same way, or a mind is given two vocabularies for one valley.
+const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))} ${bearing(dx, dy)}`
+
 // A whole town read back every turn is a page of standing facts. The nearest dozen is what a
 // person holds in their head anyway.
 const PLACES_SHOWN = 12
@@ -605,7 +613,7 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
     .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
     .sort((a, b) => a.d - b.d || (a.p.id < b.p.id ? -1 : 1))
     .slice(0, PLACES_SHOWN)
-    .map(({ p, d }) => `${placeSaid(p)} (${p.id}), ${howFar(d)} ${bearing(p.x - x, p.y - y)}`)
+    .map(({ p }) => `${placeSaid(p)} (${p.id}), ${wayTo(p.x - x, p.y - y)}`)
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
@@ -705,8 +713,24 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
 }
 
-/** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
- *  own test. Forty-four of run B's refusals were these facts going unsaid (rehearsal4). */
+/** Whether these hands are at water, off the same test `drink`, `fill` and `fish` are refused
+ *  by. Block 1 teaches all three as "standing beside water" and nothing said whether this body
+ *  was: 105 of run B's 236 refusals were minds reaching for water on dry ground (rehearsal5). */
+function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld): string {
+  if (world?.waterAtHand === undefined) return ''
+  if (world.waterAtHand())
+    return 'Water lies within reach of your hands. You could drink here, or fill what you carry.'
+  // Opened before the dryness is felt — thirst decays 1.67x slower than hunger, so the 30 both
+  // once shared left the road 10 ticks of runway — and again the turn after the water is refused.
+  if (thirst >= 50 && world.waterRefused?.() !== true) return ''
+  const { x, y } = packet.self
+  const w = world.nearestWater?.(x, y) ?? null
+  if (w === null) return 'No water is within reach of your hands, and you know of none nearby.'
+  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}), ${wayTo(w.x - x, w.y - y)}.`
+}
+
+/** Two sentences said before the turn is spent, each clause a fact the verbs decide by. Forty-four
+ *  of run B's refusals were these facts going unsaid (rehearsal4). */
 function affordanceLines(packet: PerceptionPacket): string[] {
   const { x, y } = packet.self
   const inside = packet.self.inside
@@ -719,7 +743,7 @@ function affordanceLines(packet: PerceptionPacket): string[] {
         ? ''
         : ` Wall or water covers ${barred.map((p) => `(${p.x}, ${p.y})`).join(', ')}; no walk of yours can end there.`
     lines.push(
-      `No walls are around you: there is nothing to step out of, and no walk can end where you already stand, at (${x}, ${y}).${walls}`,
+      `No walls are around you: there is nothing to step out of, and a walk to (${x}, ${y}) goes nowhere: you already stand there.${walls}`,
     )
   } else {
     const door = packet.visible.structures.find((s) => s.id === inside.id)?.door
@@ -811,18 +835,8 @@ export function perceptionToProse(
 
   const roads: string[] = []
 
-  // Never a refusal, and opened well before the dryness is felt: thirst decays 1.67x slower
-  // than hunger, so the 30 both once shared left the water road 10 ticks of runway.
-  if (thirst < 50) {
-    if (world?.waterAtHand?.() === true) {
-      roads.push(
-        'Water lies within reach of your hands. You could drink here, or fill what you carry.',
-      )
-    } else {
-      const w = world?.nearestWater?.(x, y) ?? null
-      if (w !== null) roads.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
-    }
-  }
+  const water = waterRoad(packet, thirst, world)
+  if (water.length > 0) roads.push(water)
 
   // The road thirst has had, given to the need that never had one. Hands first, then the
   // nearest thing worth walking to — and never as a refusal.
@@ -879,8 +893,10 @@ export function perceptionToProse(
     // ailing is a body nobody tends, and the live run tended nobody at all.
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
     const where = `(${a.x}, ${a.y})${dressed}${ails}`
-    if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
-    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at ${where}.`)
+    // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
+    // while sleeping is flagged both, and asleep-first told the town it was only resting.
+    if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at ${where}.`)
+    else if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
     else lines.push(`${a.name} (${a.id}) stands at ${where}.`)
   }
 
