@@ -16,6 +16,7 @@ import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@s
 import {
   LIVE_ALLOW_PROVIDER_FALLBACKS,
   LIVE_OPS_DB,
+  RATE_STOP_ALERT_KIND,
   amnesiaRefusal,
   capReachedRefusal,
   createLiveCast,
@@ -468,6 +469,28 @@ describe('★ the money, inside the served world', () => {
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+
+  // A rate stop that lives only in the process is no stop at all: `restart: unless-stopped`
+  // brings the container back, and the runaway pays a pre-flight and reruns for another window.
+  it('★ a rate stop outlives the process and refuses the next boot', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    await run(world, 4)
+    callsTo(opsDb, 'turn', 400)
+    await run(world, 130)
+    expect(stops).toHaveLength(1)
+    expect(alertsOf(opsDb, RATE_STOP_ALERT_KIND)).toHaveLength(1)
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    await expect(liveWorld({ dir, spendCapUsd: 5 })).rejects.toThrow(/calling far too often/)
+    await expect(liveWorld({ dir, spendCapUsd: 5 })).rejects.toThrow(/SJ_FRESH=1/)
+  }, 60_000)
 
   // ★ Run C died at $0.5656/sim-day against a $0.50 ceiling on 203 mind calls — 4.7 a mind a
   // sim-hour, an ordinary town. The dollars had moved because the ROUTING had.
