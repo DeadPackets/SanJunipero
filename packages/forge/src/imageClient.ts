@@ -9,6 +9,8 @@ export const IMAGE_MODEL_FALLBACKS = [
 export const GEN_SIZE = 512
 export const EST_COST_PER_IMAGE = 0.045
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
+/** Art is drawn one commission at a time: a hung provider must not hold up every later one. */
+const REQUEST_TIMEOUT_MS = 90_000
 
 export type Candidate = { png: Buffer; model: string; costUsd: number }
 export type ImageClient = {
@@ -37,6 +39,7 @@ export function makeImageClient(opts: {
     opts.budget?.spend(EST_COST_PER_IMAGE)
     const res = await doFetch(ENDPOINT, {
       method: 'POST',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,

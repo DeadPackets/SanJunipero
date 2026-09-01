@@ -13,10 +13,14 @@ const PNG_B64 = Buffer.from('fake-png-bytes').toString('base64')
 function fakeFetch(
   handler: (model: string, body: Record<string, unknown>) => { status: number; json: unknown },
 ) {
-  const calls: { model: string; body: Record<string, unknown> }[] = []
+  const calls: {
+    model: string
+    body: Record<string, unknown>
+    signal: AbortSignal | null | undefined
+  }[] = []
   const fn = (async (_url: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(init!.body as string) as Record<string, unknown>
-    calls.push({ model: body.model as string, body })
+    calls.push({ model: body.model as string, body, signal: init!.signal })
     const r = handler(body.model as string, body)
     return new Response(JSON.stringify(r.json), { status: r.status })
   }) as typeof fetch
@@ -62,6 +66,11 @@ describe('makeImageClient', () => {
     expect(out).toHaveLength(1)
     expect(out[0]!.model).toBe(IMAGE_MODEL_FALLBACKS[0])
     expect(calls.map((c) => c.model)).toEqual([IMAGE_MODEL_PRIMARY, IMAGE_MODEL_FALLBACKS[0]])
+  })
+  it('★ every request carries a deadline, so a hung provider cannot stall the queue', async () => {
+    const { fn, calls } = fakeFetch(() => ok)
+    await makeImageClient({ apiKey: 'k', fetchFn: fn }).generateCandidates('p', [], 1)
+    expect(calls[0]!.signal).toBeInstanceOf(AbortSignal)
   })
   it('throws ImageGenError only when all slots fail', async () => {
     const { fn } = fakeFetch(() => ({ status: 500, json: { error: 'down' } }))
