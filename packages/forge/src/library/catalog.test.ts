@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { INTERIOR_KINDS, resolveFurnishingKind, type LibraryCategory } from '@sj/shared'
+import { FOOD_KINDS, INTERIOR_KINDS, resolveFurnishingKind, type LibraryCategory } from '@sj/shared'
 import {
   LIBRARY,
   LibraryEntrySchema,
@@ -87,9 +87,14 @@ describe('the library catalog', () => {
     for (const b of beds) expect(b.interior!.interiorKinds).toEqual(['house'])
   })
 
+  // Salma starved holding three `herb_bundle` against an engine that only ate `herb`.
+  it('the food category is exactly the food registry, both directions', () => {
+    expect(new Set(byCategory('food').map((e) => e.kind))).toEqual(FOOD_KINDS)
+  })
+
   // The art never labels the danger. Knowledge is the town's, not the picture's.
   it('the two mushrooms differ by exactly one word', () => {
-    const a = libraryEntry('field_mushroom')!.desc.split(/\s+/)
+    const a = libraryEntry('mushroom')!.desc.split(/\s+/)
     const b = libraryEntry('pale_mushroom')!.desc.split(/\s+/)
     expect(a).toHaveLength(b.length)
     const sa = new Set(a),

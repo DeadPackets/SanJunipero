@@ -1,6 +1,6 @@
 {
   "version": "v1-library-item",
-  "kind": "wheat_sheaf",
+  "kind": "herb",
   "category": "food",
   "spritePx": 128,
   "iconPx": 64

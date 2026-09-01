@@ -24,6 +24,8 @@ export type DevStructure = {
    *  face puts founders through a side wall once buildings turn to suit their plot. */
   facing: 'sw' | 'se'
   flammable: boolean
+  /** The template's own name. Dropped, no mouth can say the place and hearsay never fires. */
+  name?: string
 }
 
 export type DevTown = {
@@ -77,6 +79,7 @@ export function devTown(
       owner: s.owner,
       facing: s.facing,
       flammable: s.kind !== 'standing_stone' && s.kind !== 'well',
+      ...(s.name === undefined ? {} : { name: s.name }),
     }
   })
   return { terrain: terrain as TileId[][], structures, anchor: { x: anchor.x, y: anchor.y } }

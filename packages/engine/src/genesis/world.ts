@@ -112,6 +112,16 @@ function plannedPayload(
   }
 }
 
+/** They founded this village, so they know where its roofs are without walking past them.
+ *  Emit AFTER the founders are spawned: `places_seen` folds onto an agent that has to exist. */
+export function foundersKnowTheVillage(
+  founderIds: readonly string[],
+  structureIds: readonly string[],
+): PendingEvent[] {
+  if (structureIds.length === 0) return []
+  return founderIds.map((agentId) => ({ type: 'places_seen', payload: { agentId, structureIds } }))
+}
+
 export function makeGenesisWorld(
   config: SimConfig,
   opts: { anchor?: { x: number; y: number } } = {},
