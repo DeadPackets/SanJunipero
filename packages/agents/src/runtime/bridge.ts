@@ -230,6 +230,11 @@ export class EngineBridge {
     )
   }
 
+  // `agent_died` leaves the body in world state for good, so absence is not the question.
+  isAlive(agentId: string): boolean {
+    return this.#loop.state.agents[agentId]?.alive === true
+  }
+
   // World answers for perception prose: open ground and food kinds, straight
   // from the engine's own path and verb semantics.
   isWalkable(x: number, y: number): boolean {
