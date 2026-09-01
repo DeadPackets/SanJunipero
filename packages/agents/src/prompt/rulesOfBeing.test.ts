@@ -21,10 +21,22 @@ describe('SPEECH_RULES', () => {
   it('carries the distilled humanizer rules, diegetically', () => {
     expect(SPEECH_RULES).toContain('single word')
     expect(SPEECH_RULES).toContain('fragment')
-    expect(SPEECH_RULES).toContain('unfinished')
-    expect(SPEECH_RULES).toMatch(/just said/)
     expect(SPEECH_RULES).toMatch(/plain/)
-    expect(SPEECH_RULES).toMatch(/three|threes/)
+  })
+
+  // The two deleted sentences are the ones the live transcript obeyed into an 81% talk rate
+  // and a forty-line plank loop; silence and the decay ladder are what replaced them.
+  it('makes silence the default and gives a repeat somewhere to go', () => {
+    expect(SPEECH_RULES).toMatch(/Most moments you say nothing/)
+    expect(SPEECH_RULES).toMatch(/shorter and wearier/)
+    expect(SPEECH_RULES).not.toMatch(/never wasted|words spent on/i)
+    expect(SPEECH_RULES).not.toContain('in the words they said it')
+  })
+
+  it('aims a line at one person, lets it end, and keeps the counting out of it', () => {
+    expect(SPEECH_RULES).toMatch(/one person, by name/)
+    expect(SPEECH_RULES).toMatch(/the talk is allowed to end/)
+    expect(SPEECH_RULES).toMatch(/Numbers are for the tally book/)
   })
 
   // The em dash ran at 35-54% of lines in a corpus produced with the old block already in the
