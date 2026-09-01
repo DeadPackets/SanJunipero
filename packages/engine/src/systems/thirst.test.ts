@@ -173,10 +173,8 @@ describe('drink: four ways to answer it', () => {
     if (!empty.ok) expect(empty.reason).toBe('the skin is empty')
   })
 
-  it('refuses two tiles from the water, and refuses a body with nothing to drink from', () => {
-    const far = submitIntent(parch(body(CFG, 2, 4), 10), CFG, 'a1', 'drink', {})
-    expect(far.ok).toBe(false)
-    if (!far.ok) expect(far.reason).toBe('no water within reach')
+  it('walks the two tiles to the water, and refuses a body with nothing to drink from', () => {
+    expect(submitIntent(parch(body(CFG, 2, 4), 10), CFG, 'a1', 'drink', {}).ok).toBe(true)
     const notAVessel = fold(
       parch(body(CFG, 1, 1), 10),
       ev('item_spawned', {

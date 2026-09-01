@@ -513,7 +513,7 @@ describe('verb: pave', () => {
     expect(stepCostAt(s, 1, 0, CFG)).toBe(0.6)
   })
 
-  it('refuses water, an empty pack, ground out of reach, and a world with no roads in it', () => {
+  it('refuses water, an empty pack, and a world with no roads in it; out of reach is a walk', () => {
     const wet = submitIntent(quarried(['.~', '..']), CFG, 'a1', 'pave', { x: 1, y: 0 })
     expect(wet.ok).toBe(false)
     if (!wet.ok) expect(wet.reason).toBe('nothing to pave here')
@@ -521,7 +521,7 @@ describe('verb: pave', () => {
     expect(broke.ok).toBe(false)
     if (!broke.ok) expect(broke.reason).toMatch(/^not enough stone — /)
     expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(
-      false,
+      true,
     )
     expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(
       false,
@@ -819,9 +819,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     expect(Object.keys(off.agents.a1!)).not.toContain('equipped')
     expect(stateHash(off)).toBe(stateHash(bare))
 
-    const nothing = submitIntent(bare, CFG, 'a1', 'doff', {})
-    expect(nothing.ok).toBe(false)
-    if (!nothing.ok) expect(nothing.reason).toBe('you are not wearing anything')
+    expect(submitIntent(bare, CFG, 'a1', 'doff', {}).ok).toBe(true)
   })
 
   it('a garment leaving the hands leaves the slot too, however it goes', () => {

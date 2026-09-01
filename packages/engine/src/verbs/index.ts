@@ -13,7 +13,14 @@ import {
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
-import { findPath, isPassable, pathCtx, searchToward, type Point } from '../path.js'
+import {
+  findPath,
+  isPassable,
+  pathCtx,
+  searchToward,
+  type PathCtx,
+  type Point,
+} from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -48,6 +55,7 @@ import {
   CITY_HEARTH_KIND,
   MINUTES_PER_DAY,
   SPEECH_INPUT_MAX_CHARS,
+  T_FARMLAND,
   T_FOREST,
   T_GRASS,
   T_ROAD,
@@ -132,6 +140,14 @@ export type VerbDef = {
     agentId: string,
     params: Record<string, unknown>,
   ): string | null
+  /** True when the world already holds what this act would bring about. Such an act is over
+   *  before it began, the way a walk to the tile underfoot is: it completes, it is not refused. */
+  settled?(
+    state: WorldState,
+    config: SimConfig,
+    agentId: string,
+    params: Record<string, unknown>,
+  ): boolean
   duration(
     state: WorldState,
     config: SimConfig,
@@ -348,6 +364,150 @@ export function isCrawl(state: WorldState, agentId: string): boolean {
   return a !== undefined && a.collapsedSinceTick !== null
 }
 
+// How far a body will walk to water nobody made it name: across the town square to the bank,
+// and no further.
+const WATER_REACH = 16
+
+/** The nearest water this body could stand beside — open water or a finished well — nearest
+ *  first, ties north then west, so two runs of the same world pick the same bank. */
+export function nearestWater(
+  state: WorldState,
+  agentId: string,
+  reach = WATER_REACH,
+  wells = true,
+): Point | null {
+  const a = state.agents[agentId]!
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const found: Point[] = []
+  for (let y = Math.max(0, a.y - reach); y <= a.y + reach; y++) {
+    for (let x = Math.max(0, a.x - reach); x <= a.x + reach; x++) {
+      const t = state.terrain[y]?.[x]
+      if (t !== undefined && isWet(t)) found.push({ x, y })
+    }
+  }
+  for (const s of wells ? Object.values(state.structures) : []) {
+    if (s.kind === WELL_KIND && s.stage === 'complete' && near(s) <= reach) {
+      found.push({ x: s.x, y: s.y })
+    }
+  }
+  found.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  return found[0] ?? null
+}
+
+/** Every point a set of params can be aimed at, in one fixed order. Nothing here knows what any
+ *  verb measures: the order is the same every replay, and validate is what judges the spots. */
+function marksOf(state: WorldState, params: Record<string, unknown>): Point[] {
+  const out: Point[] = []
+  const { x, y, itemId, targetId } = params
+  if (typeof x === 'number' && typeof y === 'number') out.push({ x, y })
+  const item = typeof itemId === 'string' ? state.items[itemId] : undefined
+  if (item?.loc.t === 'tile') out.push({ x: item.loc.x, y: item.loc.y })
+  const holder = item?.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+  if (holder !== undefined) out.push({ x: holder.x, y: holder.y })
+  const target = typeof targetId === 'string' ? state.agents[targetId] : undefined
+  if (target !== undefined) out.push({ x: target.x, y: target.y })
+  return out
+}
+
+// A body that walks up to a thing stands on one of the eight tiles around it, and the nearest
+// two or three are the only ones worth a search: a ring nothing can reach is a mark walled in.
+const APPROACH_TRIES = 3
+
+/** Ground beside a mark that this body can get to and act from. The asking comes before the
+ *  searching: a verb's own answer is cheap, and a path is not. */
+function standingSpotFor(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  at: Point,
+  acts: (from: Point) => boolean,
+  ctx: PathCtx,
+): Point | null {
+  const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+  const ring: Point[] = []
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (isPassable(state, at.x + dx, at.y + dy, ctx)) ring.push({ x: at.x + dx, y: at.y + dy })
+    }
+  }
+  ring.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+  const worth = ring.filter(acts).slice(0, APPROACH_TRIES)
+  const to = nearestReachable(state, config, a, worth)
+  return 'refusal' in to ? null : to
+}
+
+/** The same world with this body standing somewhere else: what a verb would say if the feet
+ *  were already there. Nothing folds it — it is a question, not a move. */
+export const bodyAt = (state: WorldState, agentId: string, at: Point): WorldState => ({
+  ...state,
+  agents: { ...state.agents, [agentId]: { ...state.agents[agentId]!, x: at.x, y: at.y } },
+})
+
+/** Where this body would have to stand for an act it is only too far off to do — and null when
+ *  distance is not the whole of what is wrong. The verb's own validate, asked from the spot, is
+ *  the judge, so nothing here has to know what any verb measures or how far its arms reach. */
+/** True when four walls are the only thing between this body and the act it named: from its own
+ *  doorway it would be doing that act, or walking to it. */
+export function steppingOutWouldHelp(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): boolean {
+  const a = state.agents[agentId]
+  const def = VERBS[verb]
+  if (def === undefined || a?.insideId === undefined) return false
+  const s = state.structures[a.insideId]
+  const door = s === undefined ? null : doorTile(state, s)
+  if (door === null) return false
+  const { insideId: _under, ...body } = a
+  const outside: WorldState = {
+    ...state,
+    agents: { ...state.agents, [agentId]: { ...body, x: door.x, y: door.y } },
+  }
+  return (
+    def.validate(outside, config, agentId, params) === null ||
+    approachFor(outside, config, agentId, verb, params) !== null
+  )
+}
+
+export function approachFor(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): Point | null {
+  const def = VERBS[verb]
+  const a = state.agents[agentId]
+  // Indoors the legs are barred, and a walk cannot be composed out of a walk.
+  if (def === undefined || a === undefined || verb === 'walk' || a.insideId !== undefined) {
+    return null
+  }
+  const acts = (from: Point): boolean =>
+    (from.x !== a.x || from.y !== a.y) &&
+    def.validate(bodyAt(state, agentId, from), config, agentId, params) === null
+  const ctx = pathCtx(state, config)
+  const marks = marksOf(state, params)
+  for (const at of marks) {
+    const spot = standingSpotFor(state, config, a, at, acts, ctx)
+    if (spot !== null) return spot
+  }
+  // Water is the one mark a body is never asked to name: an act refused with nothing to walk to
+  // has a bank to try, and only then.
+  const wet = marks.length > 0 ? null : nearestWater(state, agentId)
+  const bank = wet === null ? null : standingSpotFor(state, config, a, wet, acts, ctx)
+  if (bank !== null) return bank
+  const structureId = params.structureId
+  if (typeof structureId === 'string') {
+    // A named roof settles to the ring the door is on, which is the tile `enter` measures from.
+    const to = walkDestination(state, config, agentId, { structureId })
+    if (!('refusal' in to) && acts(to)) return to
+  }
+  return null
+}
+
 const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, config, agentId, params) {
@@ -430,6 +590,7 @@ const sleep: VerbDef = makeVerb({
     }
     return null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.asleep,
   onComplete(state, _config, agentId) {
     // A night lifts the ladder as well as the counter, and lifts it every time — recovery that
     // works once is a body that can only ever wear out.
@@ -466,6 +627,10 @@ const enter: VerbDef = makeVerb({
     }
     return null
   },
+  settled(state, _config, agentId, params) {
+    const p = EnterParams.safeParse(params)
+    return p.success && state.agents[agentId]!.insideId === p.data.structureId
+  },
   onComplete(state, _config, agentId, params) {
     const p = EnterParams.parse(params)
     const s = state.structures[p.structureId]
@@ -483,6 +648,7 @@ const exit: VerbDef = makeVerb({
   validate(state, _config, agentId) {
     return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.insideId === undefined,
   onComplete(state, _config, agentId) {
     const structureId = state.agents[agentId]!.insideId
     return structureId === undefined
@@ -497,6 +663,7 @@ const wake: VerbDef = makeVerb({
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? null : 'not asleep'
   },
+  settled: (state, _config, agentId) => !state.agents[agentId]!.asleep,
   onComplete() {
     return []
   },
@@ -753,6 +920,10 @@ const wear: VerbDef = makeVerb({
       return 'you are already wearing something'
     return null
   },
+  settled(state, _config, agentId, params) {
+    const p = WearParams.safeParse(params)
+    return p.success && state.agents[agentId]!.equipped?.body === p.data.itemId
+  },
   onComplete(state, config, agentId, params) {
     const p = WearParams.parse(params)
     const item = state.items[p.itemId]
@@ -770,6 +941,7 @@ const doff: VerbDef = makeVerb({
       ? 'you are not wearing anything'
       : null
   },
+  settled: (state, _config, agentId) => state.agents[agentId]!.equipped?.body === undefined,
   onComplete(state, _config, agentId) {
     const itemId = state.agents[agentId]!.equipped?.body
     return itemId === undefined ? [] : [{ type: 'item_unequipped', payload: { agentId, itemId } }]
@@ -799,6 +971,19 @@ export function fuelLeft(item: { fuelTicks?: number }, config: SimConfig): numbe
   return item.fuelTicks ?? config.light.torchBurnTicks
 }
 
+// The thing a light verb names, when this hand is the one holding it: whether it burns is then
+// the whole question, and the answer is the same one both verbs read.
+function heldLight(
+  state: WorldState,
+  agentId: string,
+  params: Record<string, unknown>,
+): { lit: boolean } | null {
+  const p = KindleParams.safeParse(params)
+  const item = p.success ? state.items[p.data.itemId] : undefined
+  if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return null
+  return { lit: item.litUntilTick !== undefined }
+}
+
 const kindle: VerbDef = makeVerb({
   kind: 'kindle',
   validate(state, config, agentId, params) {
@@ -811,6 +996,7 @@ const kindle: VerbDef = makeVerb({
     if (fuelLeft(item, config) <= 0) return 'it is burnt out'
     return null
   },
+  settled: (state, _config, agentId, params) => heldLight(state, agentId, params)?.lit === true,
   onComplete(state, config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
@@ -832,6 +1018,7 @@ const snuff: VerbDef = makeVerb({
     if (item.litUntilTick === undefined) return 'it is not lit'
     return null
   },
+  settled: (state, _config, agentId, params) => heldLight(state, agentId, params)?.lit === false,
   onComplete(state, _config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
@@ -926,6 +1113,10 @@ const till: VerbDef = makeVerb({
     if (tile !== 0 && tile !== 1) return 'only grass or dirt can be tilled'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to till'
     return null
+  },
+  settled(state, _config, _agentId, params) {
+    const p = TileParams.safeParse(params)
+    return p.success && tileAt(state, p.data.x, p.data.y) === T_FARMLAND
   },
   onComplete(state, _config, agentId, params) {
     const p = TileParams.parse(params)
@@ -1562,6 +1753,10 @@ const pave: VerbDef = makeVerb({
     if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return shortOf(STONE_KIND)
     return null
   },
+  settled(state, _config, _agentId, params) {
+    const p = TileParams.safeParse(params)
+    return p.success && tileAt(state, p.data.x, p.data.y) === T_ROAD
+  },
   onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
     const tile = tileAt(state, p.x, p.y)
@@ -1817,6 +2012,11 @@ const take: VerbDef = makeVerb({
       return item.loc.id === agentId ? 'already holding that' : 'someone is holding that'
     return itemWithinReach(state, agentId, item) ? null : 'not close enough to take'
   },
+  settled(state, _config, agentId, params) {
+    const p = TakeParams.safeParse(params)
+    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    return loc?.t === 'agent' && loc.id === agentId
+  },
   onComplete(state, config, agentId, params) {
     return liftEvents(state, config, agentId, TakeParams.parse(params).itemId)
   },
@@ -1834,6 +2034,12 @@ const drop: VerbDef = makeVerb({
     if (item.loc.t !== 'agent') return 'that is already on the ground'
     if (item.loc.id !== agentId) return 'someone is holding that'
     return null
+  },
+  settled(state, _config, agentId, params) {
+    const p = DropParams.safeParse(params)
+    const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
+    const a = state.agents[agentId]!
+    return loc?.t === 'tile' && loc.x === a.x && loc.y === a.y
   },
   onComplete(state, _config, agentId, params) {
     const p = DropParams.parse(params)
@@ -1861,6 +2067,12 @@ const stow: VerbDef = makeVerb({
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h))
       return 'not close enough to put anything down there'
     return null
+  },
+  settled(state, _config, _agentId, params) {
+    const p = StowParams.safeParse(params)
+    if (!p.success) return false
+    const loc = state.items[p.data.itemId]?.loc
+    return loc?.t === 'structure' && loc.id === p.data.structureId
   },
   onComplete(state, _config, agentId, params) {
     const p = StowParams.parse(params)

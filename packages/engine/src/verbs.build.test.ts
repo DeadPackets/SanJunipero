@@ -58,8 +58,8 @@ describe('verb: build', () => {
       false,
     )
     expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'house', x: 10, y: 10 }).ok).toBe(
-      false,
-    ) // out of reach
+      true,
+    ) // out of reach: the legs close it
     expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'house', x: 0, y: 0 }).ok).toBe(
       false,
     ) // builder in the footprint
@@ -253,10 +253,11 @@ describe('verb: build reads structures.recipes', () => {
 })
 
 describe('verb: fill', () => {
-  // A pond at (1,0); the agent stands beside it at (0,0).
-  function withVessel(kind: string, charges = 0, x = 0): WorldState {
+  // A pond at (1,0); the agent stands beside it at (0,0). Dry is a valley with no water in it
+  // at all, which is the only place a fill has nowhere to walk to.
+  function withVessel(kind: string, charges = 0, x = 0, wet = true): WorldState {
     const terrain = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
-    terrain[0]![1] = 2
+    if (wet) terrain[0]![1] = 2
     let s = genesisState(CFG, terrain)
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: 7300 }), CFG)
     return fold(
@@ -290,7 +291,7 @@ describe('verb: fill', () => {
   })
 
   it('fills at a finished well too, and refuses away from any water at all', () => {
-    let s = withVessel('waterskin', 0, 5)
+    let s = withVessel('waterskin', 0, 5, false)
     s = fold(
       s,
       ev('structure_planned', {
@@ -313,7 +314,9 @@ describe('verb: fill', () => {
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), CFG)
     expect(filled(s).state.items.item_1!.charges).toBe(CFG.thirst.waterskinCharges)
 
-    const dry = submitIntent(withVessel('waterskin', 0, 4), CFG, 'a1', 'fill', { itemId: 'item_1' })
+    const dry = submitIntent(withVessel('waterskin', 0, 4, false), CFG, 'a1', 'fill', {
+      itemId: 'item_1',
+    })
     expect(dry.ok).toBe(false)
     if (!dry.ok) expect(dry.reason).toBe('no water within reach')
   })

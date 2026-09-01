@@ -127,8 +127,21 @@ describe('the water a body can and cannot reach is said before the turn is spent
     expect(said).not.toContain('Water')
   })
 
-  it('the refusal and where the body actually stands reach the mind together', async () => {
+  // Since the settle policy, a fill named within a walk of the bank is the walk and the fill,
+  // not a refusal to explain: the body ends the episode standing at the water.
+  it('a fill named below the end walks the body to the bank and fills there', async () => {
     const t = valley(BELOW_THE_END, { bucket: true })
+    expect(await refusal(t, { verb: 'fill', params: { itemId: BUCKET } })).toBe(
+      'the world allowed it',
+    )
+    expect(t.loop.state.agents[AGENT]!.activity).toMatchObject({ then: { verb: 'fill' } })
+    for (let i = 0; i < 200 && t.loop.state.agents[AGENT]!.activity !== null; i++) t.step()
+    expect(t.bridge.waterAtHand(AGENT)).toBe(true)
+    expect(proseFor(t)).toContain('Water lies within reach of your hands')
+  })
+
+  it('water past all reach is still refused, with the state beside the reason', async () => {
+    const t = valley({ x: 40, y: 40 }, { bucket: true })
     const reason = await refusal(t, { verb: 'fill', params: { itemId: BUCKET } })
     expect(reason).toBe('no water within reach')
     expect(proseFor(t, lastTurnLine('fill', reason))).toContain(
@@ -138,13 +151,13 @@ describe('the water a body can and cannot reach is said before the turn is spent
 
   // Omar cast at dry ground 37 times in run B. A cast wants neither a vessel nor a dry throat,
   // so the reason alone came back turn after turn with no state beside it to answer it.
-  it('a cast at dry ground is answered with the water, not with the reason alone', async () => {
+  it('a cast at dry ground walks to the water instead of coming back a reason', async () => {
     const t = valley(BELOW_THE_END)
-    const reason = await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })
-    expect(reason).toBe('no water there')
     expect(proseFor(t)).not.toContain('water')
-    const paired = proseFor(t, lastTurnLine('fish', reason))
-    expect(paired).toContain('No water is within reach of your hands')
-    expect(paired).toContain('The nearest water you know of lies at (13, 67), a way to the east.')
+    expect(await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })).toBe(
+      'the world allowed it',
+    )
+    for (let i = 0; i < 200 && t.loop.state.agents[AGENT]!.activity !== null; i++) t.step()
+    expect(t.bridge.waterAtHand(AGENT)).toBe(true)
   })
 })

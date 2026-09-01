@@ -156,17 +156,17 @@ describe('verbs: sleep / wake / eat', () => {
       ev('item_spawned', { id: 'item_2', kind: 'berries', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }),
       FAST,
     )
-    expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(false) // not held
+    expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(true) // walks to it
     s = fold(s, ev('item_moved', { id: 'item_2', loc: { t: 'agent', id: 'a1' } }), FAST)
     expect(submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_2' }).ok).toBe(true)
     expect(FOOD_KINDS.has('berries')).toBe(true)
   })
 
-  it('sleep rejects when already asleep; wake rejects when awake', () => {
+  it('sleep while asleep and wake while awake are over, not refused', () => {
     const awake = makeWorld()
-    expect(submitIntent(awake, FAST, 'a1', 'wake', {}).ok).toBe(false)
+    expect(submitIntent(awake, FAST, 'a1', 'wake', {}).ok).toBe(true)
     const asleep = patchAgent(awake, 'a1', { asleep: true })
-    expect(submitIntent(asleep, FAST, 'a1', 'sleep', {}).ok).toBe(false)
+    expect(submitIntent(asleep, FAST, 'a1', 'sleep', {}).ok).toBe(true)
     expect(submitIntent(asleep, FAST, 'a1', 'wake', {}).ok).toBe(true)
   })
 })

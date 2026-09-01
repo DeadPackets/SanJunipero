@@ -1,14 +1,63 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { VERBS, walkDestination, workPenalty, type PendingEvent } from './verbs/index.js'
+import { readAsPerson } from './verbs/autofill.js'
+import {
+  approachFor,
+  steppingOutWouldHelp,
+  VERBS,
+  walkDestination,
+  workPenalty,
+  type PendingEvent,
+} from './verbs/index.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
 // The road out of a collapse. World one closed every one of these: Amara died ten feet from a
 // neighbour's door having tried fifteen times to shout, and been refused each time.
 const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
+
+// The same act, hung on the end of the one that makes it possible.
+const carrying = (
+  go: IntentResult,
+  verb: string,
+  params: Record<string, unknown>,
+): IntentResult =>
+  !go.ok
+    ? go
+    : {
+        ok: true,
+        events: go.events.map((e) =>
+          e.type === 'action_started'
+            ? { ...e, payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } } }
+            : e,
+        ),
+      }
+
+/** An act refused for nothing but the way to it becomes the act that opens the way — the door
+ *  out, or the walk over — with the act itself hung on the end of that one. What the world holds
+ *  against the act rather than the ground is refused as it always was, and so is a mark no road
+ *  reaches. */
+function walkFirst(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+  refusal: string,
+): IntentResult {
+  if (state.agents[agentId]!.insideId !== undefined) {
+    if (!steppingOutWouldHelp(state, config, agentId, verb, params)) {
+      return { ok: false, reason: refusal }
+    }
+    const out = carrying(submitIntent(state, config, agentId, 'exit', {}), verb, params)
+    return out.ok ? out : { ok: false, reason: refusal }
+  }
+  const to = approachFor(state, config, agentId, verb, params)
+  if (to === null) return { ok: false, reason: refusal }
+  const go = carrying(submitIntent(state, config, agentId, 'walk', to), verb, params)
+  return go.ok ? go : { ok: false, reason: refusal }
+}
 
 export function submitIntent(
   state: WorldState,
@@ -37,17 +86,27 @@ export function submitIntent(
     const to = walkDestination(state, config, agentId, params)
     if (!('refusal' in to)) p = { ...params, ...to }
   }
-  const refusal = def.validate(state, config, agentId, p)
-  // The mind chose the verb; where the world holds one thing that verb would take, read it in
-  // rather than refuse (K20). The filled act rides the rest of this function as if it were named.
-  if (refusal !== null) {
-    // What the mind named outranks what the world would have guessed: the id it gave is right
-    // 152 times in 154, and only a mark that fits nowhere falls through to the lone candidate.
-    const filled =
-      markUnderAnotherKey(state, config, agentId, verb, p) ??
-      loneCandidateFor(state, config, agentId, verb, p)
-    if (filled === null) return { ok: false, reason: refusal }
-    p = filled
+  const first = def.validate(state, config, agentId, p)
+  if (first !== null) {
+    // The mind chose the verb; the mark it wrote is read the way a person would read it (K20),
+    // and two things it fits equally are asked back about rather than picked between.
+    const read = readAsPerson(state, config, agentId, verb, p)
+    if (read !== null && 'refusal' in read) return { ok: false, reason: read.refusal }
+    if (read !== null) p = read.params
+    const refusal = read === null ? first : def.validate(state, config, agentId, p)
+    // Asked for a thing the world already holds — asleep and told to sleep, inside the roof it
+    // is told to enter. The act is over rather than wrong, and ends in the breath it began.
+    if (refusal !== null && def.settled?.(state, config, agentId, p) === true) {
+      return {
+        ok: true,
+        events: [
+          ...(a.asleep && verb !== 'sleep' ? [{ type: 'agent_woke', payload: { agentId } }] : []),
+          { type: 'action_started', payload: { agentId, verb, params: p, duration: 0 } },
+          { type: 'action_completed', payload: { agentId, verb } },
+        ],
+      }
+    }
+    if (refusal !== null) return walkFirst(state, config, agentId, verb, p, refusal)
   }
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })

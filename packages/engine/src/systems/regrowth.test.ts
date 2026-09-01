@@ -185,10 +185,8 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
     const r = submitIntent(s, CFG, 'a1', 'chop', { x: 3, y: 0 })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toBe('there is nothing standing there to cut')
-    // The tree two tiles off is a legal target and still out of arm's reach.
-    const far = submitIntent(s, CFG, 'a1', 'chop', { x: 2, y: 2 })
-    expect(far.ok).toBe(false)
-    if (!far.ok) expect(far.reason).toBe('not close enough to cut')
+    // The tree two tiles off is a legal target out of arm's reach, so the arm walks to it.
+    expect(submitIntent(s, CFG, 'a1', 'chop', { x: 2, y: 2 }).ok).toBe(true)
   })
 
   it('clearing a sapling takes its stamp with it, so the ground forgets it was ever planted', () => {

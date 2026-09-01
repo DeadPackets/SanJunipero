@@ -134,20 +134,20 @@ describe('enter / exit', () => {
     inside = fold(inside, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(
       submitIntent(inside, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }),
-    ).toMatchObject({ ok: false, reason: 'already inside' })
+    ).toMatchObject({ ok: true })
     expect(
       submitIntent(withAgent(withHouse(world()), 'a1', 3, 4), DEFAULT_CONFIG, 'a1', 'exit', {}),
-    ).toMatchObject({ ok: false, reason: 'not inside anything' })
+    ).toMatchObject({ ok: true })
   })
 
-  it('walk is refused while indoors', () => {
+  it('a walk from indoors goes out of the door first', () => {
     let s = withAgent(withHouse(world()), 'a1', 2, 3)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 5 }).ok).toBe(true)
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
-    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 5 })).toMatchObject({
-      ok: false,
-      reason: 'you are indoors; step outside first',
-    })
+    const out = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 5 })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.events[0]!.payload).toMatchObject({ verb: 'exit', then: { verb: 'walk' } })
   })
 })
 

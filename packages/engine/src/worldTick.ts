@@ -4,6 +4,7 @@ import { fold } from './fold.js'
 import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import type { System, TickCtx } from './tickCtx.js'
+import { submitIntent } from './intent.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
 import { needsSystem } from './systems/needs.js'
 import { flushNeedsSystem } from './systems/needsBatch.js'
@@ -74,6 +75,12 @@ function actionsSystem(ctx: TickCtx): void {
       ctx.emit(e.type, e.payload)
     if (def.skill)
       ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })
+    // The act these legs were set going for. The walk is over, so it can begin; a world that
+    // moved on while they walked simply leaves the body standing there, free to choose again.
+    if (act.then) {
+      const next = submitIntent(ctx.state(), ctx.config, id, act.then.verb, act.then.params)
+      if (next.ok) for (const e of next.events) ctx.emit(e.type, e.payload)
+    }
   }
 }
 

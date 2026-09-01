@@ -65,12 +65,16 @@ describe('verb: fish', () => {
     expect(FOOD_KINDS.has('wheat')).toBe(true)
   })
 
-  it('requires an adjacent water tile', () => {
+  it('casts at the water, however the water was named — and needs there to be some', () => {
     const s = makeWorld(['.~.~', '....'])
-    expect(submitIntent(s, CFG, 'a1', 'fish', {}).ok).toBe(false)
-    expect(submitIntent(s, CFG, 'a1', 'fish', { x: 0, y: 1 }).ok).toBe(false) // land
-    expect(submitIntent(s, CFG, 'a1', 'fish', { x: 3, y: 0 }).ok).toBe(false) // water, too far
     expect(submitIntent(s, CFG, 'a1', 'fish', { x: 1, y: 0 }).ok).toBe(true)
+    // Unnamed, named as dry land, or named two tiles off: all of them are that same water.
+    expect(submitIntent(s, CFG, 'a1', 'fish', {}).ok).toBe(true)
+    expect(submitIntent(s, CFG, 'a1', 'fish', { x: 0, y: 1 }).ok).toBe(true)
+    expect(submitIntent(s, CFG, 'a1', 'fish', { x: 3, y: 0 }).ok).toBe(true)
+    const dry = submitIntent(makeWorld(['....', '....']), CFG, 'a1', 'fish', { x: 1, y: 0 })
+    expect(dry.ok).toBe(false)
+    if (!dry.ok) expect(dry.reason).toBe('no water there')
   })
 
   it('catch on seed w1: decrements the stock and lands one fish', () => {
