@@ -4,6 +4,7 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
+import { walkDestination, WALK_NO_ROAD, WALK_OFF_MAP } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 
 const CHAR: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
@@ -58,6 +59,46 @@ describe('★ a walk that has nowhere to go', () => {
     expect(body.activity).toBe(null)
     expect(types).toContain('action_completed')
     expect(types).not.toContain('action_interrupted')
+  })
+
+  // ★ World A's Nadia ended on array column 75, the last one the map has, and spent 36 of her
+  // 41 refusals re-issuing a walk east into open space. The legs go as far as there is ground,
+  // and only the body standing at the edge is told where the edge is.
+  it('★ walks to the edge of the world, then says the world ends that way', () => {
+    const start = world(OPEN, { x: 4, y: 2 })
+    const near = walkDestination(start, DEFAULT_CONFIG, AGENT, { x: 40, y: 2 })
+    expect(near).toEqual({ x: 7, y: 2 })
+
+    const atEdge = world(OPEN, { x: 7, y: 2 })
+    expect(walkDestination(atEdge, DEFAULT_CONFIG, AGENT, { x: 40, y: 2 })).toEqual({
+      refusal: WALK_OFF_MAP,
+    })
+    const said = submitIntent(atEdge, DEFAULT_CONFIG, AGENT, 'walk', { x: 40, y: 2 })
+    expect(said.ok).toBe(false)
+    if (!said.ok) expect(said.reason).toBe(WALK_OFF_MAP)
+  })
+
+  // A far bank with no crossing: the legs reach the near one, and the second ask — made from
+  // the bank, where it is finally true — is what says the water cannot be got past.
+  it('★ walks to the near bank, then says there is no way through', () => {
+    const SPLIT = ['..~..', '..~..', '..~..']
+    const start = world(SPLIT, { x: 0, y: 1 })
+    const bank = walkDestination(start, DEFAULT_CONFIG, AGENT, { x: 4, y: 1 })
+    expect(bank).toEqual({ x: 1, y: 1 })
+
+    const onBank = world(SPLIT, { x: 1, y: 1 })
+    expect(walkDestination(onBank, DEFAULT_CONFIG, AGENT, { x: 4, y: 1 })).toEqual({
+      refusal: WALK_NO_ROAD,
+    })
+  })
+
+  // A mark with no footing under it is still a mark named wrong, and the affordance block
+  // already tells a mind that wall and water take no walk of theirs.
+  it('still names a wall as no footing rather than walking around it', () => {
+    const start = world(['..~..', '..~..', '..~..'], { x: 0, y: 1 })
+    const r = submitIntent(start, DEFAULT_CONFIG, AGENT, 'walk', { x: 2, y: 1 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('no path to that spot')
   })
 
   it('still stops a body the world moved a wall in front of', () => {

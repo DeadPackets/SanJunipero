@@ -226,13 +226,54 @@ function nearestReachable(
   a: AgentBody,
   tiles: Point[],
   rank: (p: Point) => number = () => 0,
+  refusal = 'no path to that spot',
 ): Point | { refusal: string } {
   const near = (p: Point): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
   const sorted = [...tiles].sort(
     (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
   )
   for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
-  return { refusal: 'no path to that spot' }
+  return { refusal }
+}
+
+// What the world says when the legs cannot start at all. Said in the place where it is true:
+// the body that has already walked to the limit is the only one the sentence teaches.
+export const WALK_OFF_MAP = 'the world ends that way'
+export const WALK_NO_ROAD = 'there is no way through from here'
+
+// How far around an unreachable mark the world looks for footing toward it, and how many of
+// those it will search before it takes the refusal. A house or a bank is inside eight.
+const SETTLE_REACH = 8
+const SETTLE_TRIES = 12
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+
+/** As far toward a mark as the ground allows. A want that points past the edge of the world, or
+ *  across water with no crossing, is a journey worth starting rather than a turn worth spending:
+ *  the refusal is kept for the body already standing at that limit, where it teaches something. */
+function settleToward(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  want: Point,
+  refusal: string,
+): Point | { refusal: string } {
+  const ctx = pathCtx(state, config)
+  const to = {
+    x: clamp(want.x, 0, state.terrain[0]!.length - 1),
+    y: clamp(want.y, 0, state.terrain.length - 1),
+  }
+  const toward = (p: Point): number => Math.abs(p.x - to.x) + Math.abs(p.y - to.y)
+  const near: Point[] = []
+  for (let y = to.y - SETTLE_REACH; y <= to.y + SETTLE_REACH; y++) {
+    for (let x = to.x - SETTLE_REACH; x <= to.x + SETTLE_REACH; x++) {
+      if (isPassable(state, x, y, ctx)) near.push({ x, y })
+    }
+  }
+  near.sort((p, q) => toward(p) - toward(q))
+  const settled = nearestReachable(state, config, a, near.slice(0, SETTLE_TRIES), toward, refusal)
+  if ('refusal' in settled) return settled
+  return settled.x === a.x && settled.y === a.y ? { refusal } : settled
 }
 
 // The lake's own middle stands nine tiles from its shore, which is the widest any landmark's
@@ -266,7 +307,15 @@ function featureDestination(
     }
   }
   bank.sort((p, q) => near(p) - near(q))
-  return nearestReachable(state, config, a, bank.slice(0, FEATURE_TRIES))
+  const rank = (): number => 0
+  return nearestReachable(
+    state,
+    config,
+    a,
+    bank.slice(0, FEATURE_TRIES),
+    rank,
+    `there is no way to ${f.name} from this side`,
+  )
 }
 
 /** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
@@ -278,11 +327,26 @@ export function walkDestination(
   agentId: string,
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
+  const a = state.agents[agentId]!
   const tile = WalkParams.safeParse(params)
-  if (tile.success) return tile.data
+  if (tile.success) {
+    const want = tile.data
+    // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
+    if (
+      want.x < 0 ||
+      want.y < 0 ||
+      want.x >= state.terrain[0]!.length ||
+      want.y >= state.terrain.length
+    )
+      return settleToward(state, config, a, want, WALK_OFF_MAP)
+    // A mark with no footing under it is left to `validate`, which has always named it as one.
+    if (!isPassable(state, want.x, want.y)) return want
+    return findPath(state, a, want, config) === null
+      ? settleToward(state, config, a, want, WALK_NO_ROAD)
+      : want
+  }
   const named = WalkToPlace.safeParse(params)
   if (!named.success) return { refusal: 'a walk needs a place to end' }
-  const a = state.agents[agentId]!
   // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
   // knownPlaces row to check — the ground itself is what says whether this valley has one.
   const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)

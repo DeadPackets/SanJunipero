@@ -4,7 +4,7 @@ import { DEFAULT_CONFIG, TICK_REAL_MS, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { stepWalk, VERBS } from './verbs/index.js'
+import { stepWalk, VERBS, WALK_NO_ROAD } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
@@ -81,9 +81,15 @@ describe('submitIntent', () => {
     const noVerb = submitIntent(s, DEFAULT_CONFIG, 'a1', 'dance', {})
     expect(noVerb.ok).toBe(false)
     if (!noVerb.ok) expect(noVerb.reason).toMatch(/verb/i)
-    const noPath = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
+    // Ground on the far side of the river: the legs start, and stop on the near bank at (1, 0).
+    const far = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
+    expect(far.ok).toBe(true)
+    if (far.ok) expect(far.events[0]!.payload).toMatchObject({ params: { x: 1, y: 0 } })
+    // Asked again from the bank, where the water is the whole answer, it is refused.
+    const onBank = patchAgent(s, 'a1', { x: 1, y: 0 })
+    const noPath = submitIntent(onBank, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(noPath.ok).toBe(false)
-    if (!noPath.ok) expect(noPath.reason).toMatch(/path/i)
+    if (!noPath.ok) expect(noPath.reason).toBe(WALK_NO_ROAD)
     // Standing where you were sent is not a thing to be refused for.
     const there = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 0, y: 0 })
     expect(there.ok).toBe(true)
