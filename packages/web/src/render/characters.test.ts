@@ -156,7 +156,21 @@ type MutableAgents = Record<
 >
 
 function makeAgent(id: string, x: number, y: number): MutableAgents[string] {
-  return { id, name: id, x, y, alive: true, asleep: false, collapsedSinceTick: null }
+  // The overhead slot reads a whole body — the condition table is half of its priority order.
+  return {
+    id,
+    name: id,
+    x,
+    y,
+    alive: true,
+    asleep: false,
+    collapsedSinceTick: null,
+    activity: null,
+    needs: NEEDS_WELL,
+    injuries: [],
+    ill: false,
+    hp: 100,
+  } as MutableAgents[string]
 }
 
 function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: SimEvent[]) => void } {

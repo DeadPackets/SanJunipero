@@ -1,6 +1,7 @@
 import { Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import { tilesPerTickFor } from '@sj/engine/verbs'
+import type { AgentBody } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { bodyDepthBox } from './depth.js'
 import { facingFrom, feetOf, type Facing } from './iso.js'
@@ -16,6 +17,13 @@ import {
 import { anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { createPlate, type Plate } from './plate.js'
+import {
+  SLOT_ABOVE_HEAD_PX,
+  SLOT_PX,
+  createOverhead,
+  overheadRow,
+  type Overhead,
+} from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
 import { worldTextScale } from './textFaces.js'
 import {
@@ -36,7 +44,6 @@ import {
   WALK_LEAD_TICKS,
   cellRowLadder,
   charPose,
-  emoteFor,
   gaitOf,
   initialTickClock,
   interpolatePos,
@@ -45,13 +52,13 @@ import {
   prunePath,
   scheduleLeg,
   strideFrameMs,
+  type EmoteKind,
   type Gait,
   type SheetRow,
   type TickClock,
   type Waypoint,
 } from './charAnim.js'
 
-const EMOTE_MS = 2000
 const EMOTE_ABOVE_HEAD_PX = 12
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
@@ -65,7 +72,9 @@ type Sheet = { art: CharArt; texture: Texture | null }
 type CharEntry = {
   sprite: Sprite
   shadow: Sprite
-  emote: Sprite
+  overhead: Overhead
+  /** the kind the slot is drawing, so the atlas is cut once and not once a frame */
+  glyphKind: EmoteKind | null
   plate: Plate
   hit: Polygon
   /** the sheet's own figure height, so the capsule follows the art rather than a second table */
@@ -75,7 +84,6 @@ type CharEntry = {
   ranked: boolean
   /** asleep or collapsed: the same body, lying across its ground point rather than standing on it */
   lying: boolean
-  emoteUntil: number
   facing: Facing
   path: Waypoint[]
   /** this body's own phase and stride, derived once from its id and never again */
@@ -215,6 +223,8 @@ export function createCharacterLayer(
   let clock: TickClock = initialTickClock()
   void book.get('/assets/emotes.png').then((t) => {
     emoteAtlas = t
+    // The sheets land after the first frames, so every slot already showing a row re-cuts.
+    for (const e of entries.values()) e.glyphKind = null
   })
 
   const loadSheet = (agentId: string, swapFrom: string | null): void => {
@@ -283,6 +293,23 @@ export function createCharacterLayer(
     }
   }
 
+  /** The atlas cell for the row the slot is showing. Cut once per kind per person: a new
+   *  Texture every frame is a new texture every frame. */
+  const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
+    if (e.glyphKind === kind) return
+    e.glyphKind = kind
+    if (kind === null || emoteAtlas === null) {
+      e.overhead.glyph.texture = Texture.EMPTY
+      return
+    }
+    e.overhead.glyph.texture = new Texture({
+      source: emoteAtlas.source,
+      frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+    })
+    e.overhead.glyph.width = EMOTE_PX
+    e.overhead.glyph.height = EMOTE_PX
+  }
+
   const ensure = (agentId: string, x: number, y: number): CharEntry => {
     let e = entries.get(agentId)
     if (e !== undefined) return e
@@ -300,15 +327,12 @@ export function createCharacterLayer(
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
     shadow.eventMode = 'none'
-    const emote = new Sprite()
-    emote.anchor.set(0.5, 1)
-    emote.visible = false
-    emote.eventMode = 'none'
     // each companion to the layer it belongs in: a contact shadow under every body, the
-    // emote and the plate over every body. None of them competes with the depth sort any more.
+    // overhead slot and the plate over every body. None competes with the depth sort any more.
     scene.layers.shadow.addChild(shadow)
     scene.layers.entities.addChild(sprite)
-    scene.layers.worldText.addChild(emote)
+    // ★ ONE SLOT over the head, and the track wraps it exactly while a job runs.
+    const overhead = createOverhead(scene.layers.worldText)
     // ★ ONE PLATE, the same object a building wears: a person's is their name and the one word
     // for what they are doing.
     const plate = createPlate(scene.layers.worldText)
@@ -322,14 +346,14 @@ export function createCharacterLayer(
     e = {
       sprite,
       shadow,
-      emote,
+      overhead,
+      glyphKind: null,
       plate,
       hit,
       figureH: 0,
       hitScale: 0,
       ranked: false,
       lying: false,
-      emoteUntil: 0,
       facing: 'sw',
       gait: gaitOf(agentId),
       legMs: clock.periodMs / MOVEMENT_FALLBACK.base,
@@ -380,19 +404,6 @@ export function createCharacterLayer(
         leadMs: clock.periodMs * WALK_LEAD_TICKS,
       })
     }
-    // emote triggers ride the same delta batches (one batch per tick)
-    for (const [agentId, e] of entries) {
-      const a = state.agents[agentId]
-      if (a === undefined) continue
-      const kind = emoteFor(a, evts)
-      if (kind !== null && emoteAtlas !== null) {
-        e.emote.texture = new Texture({
-          source: emoteAtlas.source,
-          frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
-        })
-        e.emoteUntil = now + EMOTE_MS
-      }
-    }
   })
 
   const tick = (nowMs: number): void => {
@@ -409,12 +420,13 @@ export function createCharacterLayer(
         if (prev?.art.url !== next.url) loadSheet(agentId, prev?.art.url ?? null)
       }
     }
+    const nowTick = store.getTick()
     const live = new Set<string>()
     // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
     // who else is there and every position must settle before any of them is drawn.
     const standing: { id: string; x: number; y: number; settled: boolean }[] = []
     const drawing: {
-      a: { id: string; name: string }
+      a: AgentBody
       e: CharEntry
       pos: { x: number; y: number }
       bobY: number
@@ -490,8 +502,17 @@ export function createCharacterLayer(
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
-      e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
-      e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
+      // ★ 7A AT REST, 7M-B WHILE A JOB RUNS. The slot holds the one glyph the priority table
+      // picks; the track wraps that same slot exactly while there is an act to report and goes
+      // when it does. `actFraction` is last frame's — the act layer places its chips against
+      // these very sprites, so it cannot run before them, and a world tick is two seconds.
+      const row = emotesHidden ? null : overheadRow(a, nowTick)
+      e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
+      setGlyph(e, row?.glyph ?? null)
+      e.overhead.setRow(row)
+      const running = emotesHidden ? null : (scene.actFraction?.(a.id) ?? null)
+      e.overhead.setTrack(running)
+      e.overhead.node.visible = row !== null || running !== null
       // ONE placement rule for every label in the product, and the plate asks for the FOOTPRINT:
       // welded to the feet, and only leaving them when the view has no room down there.
       if (e.plate.node.visible) {
@@ -518,7 +539,7 @@ export function createCharacterLayer(
       if (!live.has(agentId)) {
         e.sprite.destroy()
         e.shadow.destroy()
-        e.emote.destroy()
+        e.overhead.destroy()
         e.plate.destroy()
         entries.delete(agentId)
         sheets.delete(agentId)
@@ -545,7 +566,7 @@ export function createCharacterLayer(
       for (const e of entries.values()) {
         e.sprite.destroy()
         e.shadow.destroy()
-        e.emote.destroy()
+        e.overhead.destroy()
         e.plate.destroy()
       }
       entries.clear()

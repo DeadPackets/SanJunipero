@@ -111,6 +111,20 @@ character). Everybody the camera can see gets a box; at zoom 0.25 everything col
 pill. Wider boxes collide far more often, so `MAX_STACK_STEPS` is 6 rather than 3 — past that
 `onLeash` hides a bubble rather than let two composite.
 
+**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary. At rest it is
+7A: one 20px plate eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY`
+picks first-match-wins — a condition outranks a state, because a person who is hurt is the news;
+the plate turns ember for the three that are. "Between things" wears nothing, and neither does a
+walker. The moment an act starts, **the track wraps that same slot**: seven blocks on a 120°
+arch at r=26, solid for done and hollow for what is left, so progress is a count and a position
+before it is ever a hue. It goes when the act does. The arch spans OVER the glyph — every block
+clears the plate by 3.7px and the arc runs 20.3px each side, twice the plate's own width — and
+because the slot is world art the ratio holds at every zoom stop the indicators show at.
+`working` has no glyph: while the job runs the track IS the mark, which is how "hurt while
+chopping" says both at once. The act chip keeps its word at the feet and has lost its fill and
+the Graphics **mask** that drew it — a mask per chip is a render target per working person, and
+the viewport rule puts a chip on every one of them.
+
 **One occupancy.** `render/tooltip.ts` is the label layer and owns the only table of taken screen
 space, keyed by who owns the boxes (`bubbles`, `plate`). Everybody writes theirs and reads
 everybody else's, so no two labels can composite. The plate is DOM over the canvas, so it

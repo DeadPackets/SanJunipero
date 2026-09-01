@@ -2,9 +2,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import type { AgentBody } from '@sj/engine/state'
 import { tilesPerTickFor } from '@sj/engine/verbs'
-import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
+import { TICK_REAL_MS } from '@sj/shared'
 import {
   BOB_PX,
   EMOTE_KINDS,
@@ -23,7 +22,6 @@ import {
   WALK_LOOP,
   cellRowLadder,
   charPose,
-  emoteFor,
   gaitOf,
   hash32,
   hitRect,
@@ -51,32 +49,6 @@ describe('charPose v4 cadence', () => {
 })
 
 const base = { asleep: false, collapsed: false, walking: false, facing: 'se' as const, nowMs: 0 }
-
-const agent = (over: Partial<AgentBody> = {}): AgentBody => ({
-  id: 'farmer',
-  name: 'Farmer',
-  x: 3,
-  y: 4,
-  alive: true,
-  asleep: false,
-  needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
-  hp: 10,
-  injuries: [],
-  ill: false,
-  ageDays: 7300,
-  skills: {},
-  activity: null,
-  collapsedSinceTick: null,
-  zeroHungerSinceTick: null,
-  ...over,
-})
-
-const ev = (type: string, payload: unknown, tick = 10): SimEvent => ({
-  seq: 1,
-  tick,
-  type,
-  payload,
-})
 
 describe('charPose', () => {
   it('asleep beats walking and never bobs', () => {
@@ -325,7 +297,9 @@ describe('cellRowLadder — what a body draws when its cell is not in the sheet'
   })
 })
 
-describe('emoteFor', () => {
+// `emoteFor` is gone with the two-second flash it drove: the slot over a head is a permanent
+// address now, and `render/overhead.ts` owns which one glyph is in it.
+describe('the emote atlas', () => {
   it('mirrors the emote atlas order', () => {
     expect(EMOTE_KINDS).toEqual([
       'exclaim',
@@ -341,26 +315,6 @@ describe('emoteFor', () => {
       'idea',
       'anger',
     ])
-  })
-  it('injury beats hunger', () => {
-    const a = agent({ needs: { hunger: 10, energy: 80, warmth: 80, social: 80 } })
-    expect(emoteFor(a, [ev('agent_injured', { agentId: 'farmer', kind: 'minor' })])).toBe('hurt')
-  })
-  it('talk fires on own agent_spoke in the window, not on others', () => {
-    expect(emoteFor(agent(), [ev('agent_spoke', { agentId: 'farmer', text: 'hello' })])).toBe(
-      'talk',
-    )
-    expect(emoteFor(agent(), [ev('agent_spoke', { agentId: 'fisher', text: 'hello' })])).toBeNull()
-  })
-  it('dead agents emote nothing at all', () => {
-    expect(
-      emoteFor(agent({ alive: false }), [
-        ev('agent_injured', { agentId: 'farmer', kind: 'grave' }),
-      ]),
-    ).toBeNull()
-  })
-  it('is null when calm', () => {
-    expect(emoteFor(agent(), [])).toBeNull()
   })
 })
 
