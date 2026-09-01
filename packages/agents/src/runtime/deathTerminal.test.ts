@@ -20,9 +20,6 @@ import { PersonalityStore } from '../personality.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { MindConfig } from '../wake.js'
 
-// World one billed 768 turns — 40.5% of the run, $1.18 — to five corpses trying to drag
-// themselves off their own graves. `intent.ts` refused every one of those acts; the mind read
-// the refusal back as "did not take", woke on `plan_blocked`, and asked again.
 const AGENT = 'tamar'
 
 const ZERO_USAGE = {
@@ -94,7 +91,6 @@ async function setup() {
         content: [
           {
             type: 'text' as const,
-            // The world-one shape: a body on the floor reaching for something out of reach.
             text: JSON.stringify({
               thought: 'Just the arm.',
               importance: 1,
@@ -141,38 +137,28 @@ async function setup() {
 }
 
 describe('★ death is terminal', () => {
-  it('a died agent takes no further turn and calls no further model', async () => {
-    const { loop, runtime, step, kill, calls } = await setup()
+  it('takes no turn, calls no model and writes no memory after the death tick', async () => {
+    const { loop, runtime, db, step, kill, calls } = await setup()
+    const memories = (): number =>
+      (db.prepare('SELECT count(*) AS n FROM memories').get() as { n: number }).n
     await step(20)
-    expect(runtime.stats().turns, 'a living mind must be thinking, or this proves nothing').toBeGreaterThan(0)
+    const living = runtime.stats().turns
+    expect(living, 'a living mind must be thinking, or this proves nothing').toBeGreaterThan(0)
 
     kill()
     await step(2)
     expect(loop.state.agents[AGENT]?.alive).toBe(false)
+    const atDeath = { turns: runtime.stats().turns, calls: calls(), memories: memories() }
 
-    const turnsAtDeath = runtime.stats().turns
-    const callsAtDeath = calls()
     await step(200)
-
-    expect(runtime.stats().turns).toBe(turnsAtDeath)
-    expect(calls()).toBe(callsAtDeath)
-  })
-
-  it('unwinds where it fell: no plan, and the record it wrote stays on disk, closed to writes', async () => {
-    const { db, runtime, step, kill } = await setup()
-    const memories = (): number =>
-      (db.prepare('SELECT count(*) AS n FROM memories').get() as { n: number }).n
-    await step(20)
-    kill()
-    await step(20)
-    const written = memories()
-
-    await step(100)
+    expect(runtime.stats().turns).toBe(atDeath.turns)
+    // The counter the billing actually follows, kept separate from the runtime's own tally.
+    expect(calls()).toBe(atDeath.calls)
+    expect(memories()).toBe(atDeath.memories)
     expect(runtime.snapshot().plan.queue).toEqual([])
-    // A life stops being written the moment it ends — and the db is kept, not deleted: the
-    // gateway and the narrator read a dead mind's memories for as long as the town stands.
-    expect(memories()).toBe(written)
+    // Kept, not deleted: the gateway and the narrator read a dead mind for as long as the
+    // town stands, and how somebody died is the part worth keeping.
     expect(db.open).toBe(true)
-    expect(written).toBeGreaterThan(0)
+    expect(atDeath.memories).toBeGreaterThan(0)
   })
 })

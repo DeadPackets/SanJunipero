@@ -3,12 +3,10 @@ import { EventStore, openDb } from '@sj/engine/store'
 import {
   RngStreams,
   TickLoop,
-  createWorldTick,
   fold,
   foundersKnowTheVillage,
   genesisState,
   makeGenesisWorld,
-  type TickHandler,
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { placesKnownLine } from '../prompt/prose.js'
@@ -26,7 +24,6 @@ function village(): { bridge: EngineBridge; storehouseId: string } {
   })
   const genesis = makeGenesisWorld(config)
   const store = new EventStore(openDb(':memory:'))
-  const rng = new RngStreams('village-seam')
   let state = genesisState(config, genesis.terrain)
   const emit = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
@@ -41,24 +38,18 @@ function village(): { bridge: EngineBridge; storehouseId: string } {
     emit('agent_spawned', { id, name: id, x: far.x, y: far.y, ageDays: 7300 })
   for (const e of foundersKnowTheVillage([FOUNDER], Object.keys(state.structures)))
     emit(e.type, e.payload)
+  // Noon: the sight horizon shrinks with the light, and none of this is about eyesight.
   state = { ...state, tick: 720 }
 
-  const worldTick = createWorldTick(config, rng)
-  let handler: TickHandler = () => {}
+  // Nothing steps this loop: the bridge is the only thing under test, and it reads state.
   const loop = new TickLoop({
     store,
     state,
-    rng,
+    rng: new RngStreams('village-seam'),
     config,
-    onTick: (ctx) => {
-      handler(ctx)
-    },
+    onTick: () => {},
   })
-  const bridge = new EngineBridge({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(({ emit: e }) => {
-    for (const ev of worldTick(loop.state).events) e(ev.type, ev.payload)
-  })
-  return { bridge, storehouseId: storehouse.id }
+  return { bridge: new EngineBridge({ loop, store, simConfig: config }), storehouseId: storehouse.id }
 }
 
 describe('★ the village a founder is born knowing', () => {

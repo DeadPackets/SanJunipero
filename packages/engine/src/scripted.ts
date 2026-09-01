@@ -365,9 +365,7 @@ export function makeScriptedOnTick(
         emit('needs_changed', { id: BUILDER, changes: [{ need: 'energy', delta: 70 }] })
       const holdsFood = Object.values(getState().items).some(
         (i) =>
-          i.loc.t === 'agent' &&
-          i.loc.id === BUILDER &&
-          (FOOD_KINDS.has(i.kind) || Object.prototype.hasOwnProperty.call(config.crops, i.kind)),
+          i.loc.t === 'agent' && i.loc.id === BUILDER && isFoodKind(config, i.kind),
       )
       if (builder.needs.hunger < 60 && holdsFood)
         emit('action_interrupted', { agentId: BUILDER, reason: 'rest' })

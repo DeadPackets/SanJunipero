@@ -112,20 +112,14 @@ function plannedPayload(
   }
 }
 
-/** They founded this village, so they know where its roofs are without walking past them —
- *  the same standing that lets a body name the valley it lives in. Emit AFTER the founders are
- *  spawned: `places_seen` folds onto an agent that has to exist. Sight and hearsay still own
- *  every building raised after today, and every mind born or arriving into it. */
+/** They founded this village, so they know where its roofs are without walking past them.
+ *  Emit AFTER the founders are spawned: `places_seen` folds onto an agent that has to exist. */
 export function foundersKnowTheVillage(
   founderIds: readonly string[],
   structureIds: readonly string[],
 ): PendingEvent[] {
-  const founded = [...new Set(structureIds)].sort()
-  if (founded.length === 0) return []
-  return founderIds.map((agentId) => ({
-    type: 'places_seen',
-    payload: { agentId, structureIds: founded },
-  }))
+  if (structureIds.length === 0) return []
+  return founderIds.map((agentId) => ({ type: 'places_seen', payload: { agentId, structureIds } }))
 }
 
 export function makeGenesisWorld(

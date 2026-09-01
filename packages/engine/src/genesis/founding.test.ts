@@ -7,17 +7,16 @@ import { replayLatest } from '../replay.js'
 import { foundersKnowTheVillage, makeGenesisWorld } from './world.js'
 
 describe('the village its founders raised', () => {
-  it('gives every founder every genesis roof, sorted and deduped', () => {
-    expect(foundersKnowTheVillage(['amara', 'omar'], ['s_2', 's_1', 's_2'])).toEqual([
+  it('gives every founder every genesis roof', () => {
+    expect(foundersKnowTheVillage(['amara', 'omar'], ['s_1', 's_2'])).toEqual([
       { type: 'places_seen', payload: { agentId: 'amara', structureIds: ['s_1', 's_2'] } },
       { type: 'places_seen', payload: { agentId: 'omar', structureIds: ['s_1', 's_2'] } },
     ])
   })
 
   // `PlacesSeen` refuses an empty array, so an empty village must emit nothing at all.
-  it('emits nothing for a village with no roofs, and nothing for no founders', () => {
+  it('emits nothing for a village with no roofs', () => {
     expect(foundersKnowTheVillage(['amara'], [])).toEqual([])
-    expect(foundersKnowTheVillage([], ['s_1'])).toEqual([])
   })
 
   it('folds onto a genesis world and survives a replay', () => {

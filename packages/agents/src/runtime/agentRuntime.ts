@@ -421,9 +421,8 @@ export class AgentRuntime {
 
   #onTick(tick: number): void {
     if (!this.#started) return
-    // Death is terminal. `intent.ts` already refuses the dead every verb, so a corpse that
-    // still woke spent a turn on a refusal, read it back as "did not take" and woke again on
-    // `plan_blocked` — 768 billed turns in world one. The db stays open: the record is its own.
+    // `intent.ts` refuses the dead every verb, so a corpse that still woke spent its turn on a
+    // refusal, read that back as a blocked plan, and woke again: 768 billed turns in world one.
     if (!this.#bridge.isAlive(this.#agentId)) {
       this.stop()
       return
