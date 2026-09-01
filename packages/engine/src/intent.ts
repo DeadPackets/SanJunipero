@@ -4,6 +4,7 @@ import type { WorldState } from './state.js'
 import { readAsPerson } from './verbs/autofill.js'
 import {
   approachFor,
+  steppingOutWouldHelp,
   VERBS,
   walkDestination,
   workPenalty,
@@ -12,9 +13,27 @@ import {
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
-/** An act refused for nothing but the distance to it becomes the walk that closes the distance,
- *  with the act itself hung on the end of the legs. What the world holds against the act rather
- *  than the ground is refused as it always was, and so is a mark no road reaches. */
+// The same act, hung on the end of the one that makes it possible.
+const carrying = (
+  go: IntentResult,
+  verb: string,
+  params: Record<string, unknown>,
+): IntentResult =>
+  !go.ok
+    ? go
+    : {
+        ok: true,
+        events: go.events.map((e) =>
+          e.type === 'action_started'
+            ? { ...e, payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } } }
+            : e,
+        ),
+      }
+
+/** An act refused for nothing but the way to it becomes the act that opens the way — the door
+ *  out, or the walk over — with the act itself hung on the end of that one. What the world holds
+ *  against the act rather than the ground is refused as it always was, and so is a mark no road
+ *  reaches. */
 function walkFirst(
   state: WorldState,
   config: SimConfig,
@@ -23,21 +42,17 @@ function walkFirst(
   params: Record<string, unknown>,
   refusal: string,
 ): IntentResult {
+  if (state.agents[agentId]!.insideId !== undefined) {
+    if (!steppingOutWouldHelp(state, config, agentId, verb, params)) {
+      return { ok: false, reason: refusal }
+    }
+    const out = carrying(submitIntent(state, config, agentId, 'exit', {}), verb, params)
+    return out.ok ? out : { ok: false, reason: refusal }
+  }
   const to = approachFor(state, config, agentId, verb, params)
   if (to === null) return { ok: false, reason: refusal }
-  const go = submitIntent(state, config, agentId, 'walk', to)
-  if (!go.ok) return { ok: false, reason: refusal }
-  return {
-    ok: true,
-    events: go.events.map((e) =>
-      e.type === 'action_started'
-        ? {
-            ...e,
-            payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } },
-          }
-        : e,
-    ),
-  }
+  const go = carrying(submitIntent(state, config, agentId, 'walk', to), verb, params)
+  return go.ok ? go : { ok: false, reason: refusal }
 }
 
 export function submitIntent(

@@ -439,6 +439,32 @@ export const bodyAt = (state: WorldState, agentId: string, at: Point): WorldStat
 /** Where this body would have to stand for an act it is only too far off to do — and null when
  *  distance is not the whole of what is wrong. The verb's own validate, asked from the spot, is
  *  the judge, so nothing here has to know what any verb measures or how far its arms reach. */
+/** True when four walls are the only thing between this body and the act it named: from its own
+ *  doorway it would be doing that act, or walking to it. */
+export function steppingOutWouldHelp(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): boolean {
+  const a = state.agents[agentId]
+  const def = VERBS[verb]
+  if (def === undefined || a?.insideId === undefined) return false
+  const s = state.structures[a.insideId]
+  const door = s === undefined ? null : doorTile(state, s)
+  if (door === null) return false
+  const { insideId: _under, ...body } = a
+  const outside: WorldState = {
+    ...state,
+    agents: { ...state.agents, [agentId]: { ...body, x: door.x, y: door.y } },
+  }
+  return (
+    def.validate(outside, config, agentId, params) === null ||
+    approachFor(outside, config, agentId, verb, params) !== null
+  )
+}
+
 export function approachFor(
   state: WorldState,
   config: SimConfig,

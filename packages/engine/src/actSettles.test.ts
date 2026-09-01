@@ -252,3 +252,40 @@ describe('★ a mark is read the way a person would read it', () => {
     })
   })
 })
+
+describe('★ four walls are the first thing in the way, and the door answers that one', () => {
+  // ★ Seven of rehearsal 2's refusals were a mind under a roof told to step outside first, which
+  // it had no turn left to do. The way out is an act, and the act it was for rides on its end.
+  it('★ a thing outside is fetched by a body indoors: out, over, and lifted', () => {
+    let start = withHouse(world(OPEN, { x: 2, y: 3 }))
+    start = put(start, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' })
+    start = put(start, 'item_spawned', {
+      id: 'item_1',
+      kind: 'wood',
+      qty: 1,
+      loc: { t: 'tile', x: 6, y: 5 },
+    })
+    const go = submitIntent(start, CFG, 'a1', 'take', { itemId: 'item_1' })
+    expect(go.ok).toBe(true)
+    if (!go.ok) return
+    expect(go.events[0]!.payload).toMatchObject({
+      verb: 'exit',
+      then: { verb: 'take', params: { itemId: 'item_1' } },
+    })
+
+    let state = go.events.reduce((s, e) => fold(s, ev(e.type, e.payload), CFG), start)
+    const worldTick = createWorldTick(CFG, new RngStreams('out-over-lifted'))
+    const verbs: string[] = []
+    for (let i = 0; i < 40 && state.items.item_1!.loc.t !== 'agent'; i++) {
+      const out = worldTick({ ...state, tick: state.tick + 1 })
+      state = out.state
+      for (const e of out.events) {
+        if (e.type === 'action_started') verbs.push((e.payload as { verb: string }).verb)
+      }
+    }
+    // One ask, three acts, each of them its own on the ledger.
+    expect(verbs).toEqual(['walk', 'take'])
+    expect(state.agents.a1!.insideId).toBeUndefined()
+    expect(state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
+  })
+})
