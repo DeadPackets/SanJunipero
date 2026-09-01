@@ -13,7 +13,8 @@ import {
 
 const GLYPH_PX = 8
 /** The token is drawn on the same eight-pixel grid the weather glyphs are. */
-const SUN = [
+/** No fill: the sun and the moon take `currentColor` off `.sky-token`. */
+const SUN: readonly (readonly [number, number])[] = [
   [3, 1],
   [4, 1],
   [2, 2],
@@ -30,8 +31,8 @@ const SUN = [
   [7, 2],
   [0, 3],
   [7, 3],
-] as const
-const MOON = [
+]
+const MOON: readonly (readonly [number, number])[] = [
   [3, 0],
   [4, 0],
   [2, 1],
@@ -44,13 +45,14 @@ const MOON = [
   [5, 4],
   [3, 5],
   [4, 5],
-] as const
+]
 
 function PixelGlyph({
   pixels,
   className,
 }: {
-  pixels: readonly (readonly [number, number, string])[]
+  /** a fill of `null` takes the element's own colour, which is where the token lives */
+  pixels: readonly (readonly [number, number, string?])[]
   className: string
 }) {
   return (
@@ -64,7 +66,7 @@ function PixelGlyph({
       focusable="false"
     >
       {pixels.map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
+        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill ?? 'currentColor'} />
       ))}
     </svg>
   )
@@ -111,12 +113,9 @@ export function SkyArc({ store }: { store: WorldStore }) {
           data-kind={token.kind}
           style={{ left: `${at.left}%`, top: `${at.top}%` }}
         >
-          <PixelGlyph
-            className="sky-glyph"
-            pixels={(token.kind === 'sun' ? SUN : MOON).map(
-              ([x, y]) => [x, y, token.kind === 'sun' ? '#F2C879' : '#FFF6E9'] as const,
-            )}
-          />
+          {/* `currentColor`, so the token's honey and cream stay in `:root` with every other
+              colour the product uses rather than being retyped here. */}
+          <PixelGlyph className="sky-glyph" pixels={token.kind === 'sun' ? SUN : MOON} />
         </span>
       </div>
       <p className="sky-chip">{sky}</p>

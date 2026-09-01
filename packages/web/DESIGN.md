@@ -91,8 +91,10 @@ than an emoji. It eases its position on the world's tick and runs no loop at all
 arc flattens and the position stops meaning anything, so the road goes and the two chips close
 up. The quiet stamp sits 30px under it, still owning the wire's own word.
 
-**The hover is a footprint plate.** `render/plate.ts` draws it and `ui/plateModel.ts` decides
-its words: a cream pixel slab welded to the thing's own ground point — `placeTag` is asked for
+**The hover is a footprint plate.** `render/plate.ts` draws it, `ui/interaction.ts` decides its
+words and `ui/plateModel.ts` shapes its rows. There is ONE for the whole stage — the tooltip
+layer's `hover` owner — so a person's plate and a building's are placed by one rule and published
+where every other label reads them: a cream pixel slab welded to the thing's own ground point — `placeTag` is asked for
 `below` and only leaves the footprint when the view has no room there. Three rows at most, 22
 characters each: `kind` in Silkscreen capitals, `name` in the face that has lowercase, and
 `quiet` on a **parchment band** — de-emphasis is a different paper, because `--ink-quiet`
@@ -119,7 +121,9 @@ walker. The moment an act starts, **the track wraps that same slot**: seven bloc
 arch at r=26, solid for done and hollow for what is left, so progress is a count and a position
 before it is ever a hue. It goes when the act does. The arch spans OVER the glyph — every block
 clears the plate by 3.7px and the arc runs 20.3px each side, twice the plate's own width — and
-because the slot is world art the ratio holds at every zoom stop the indicators show at.
+because the slot is world art the ratio holds at every zoom stop the indicators show at. Whoever
+the chip is willing to name is whoever the track may wrap: `fractionOf` reads the act layer's own
+`atWork` set, so the word and the arc cannot disagree about what is running.
 `working` has no glyph: while the job runs the track IS the mark, which is how "hurt while
 chopping" says both at once. The act chip keeps its word at the feet and has lost its fill and
 the Graphics **mask** that drew it — a mask per chip is a render target per working person, and

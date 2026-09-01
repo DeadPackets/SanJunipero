@@ -1,10 +1,10 @@
 import { BOND_LEVEL_WORD } from '../../ui/bondModel2.js'
-import { ORBIT_R, ORBIT_RINGS, type Orbit, type OrbitTie } from '../../ui/bondOrbit.js'
+import { type Orbit, type OrbitTie } from '../../ui/bondOrbit.js'
 
 /** A doubled stroke is the second family channel; the pair is offset by its own width. */
 const DOUBLE_GAP = 1.6
 /** Orbit units to a percentage of the box, so a node lands on the end of its own spoke. */
-const pct = (v: number): string => `${((v + ORBIT_R) / (ORBIT_R * 2)) * 100}%`
+const pct = (v: number, box: number): string => `${((v + box) / (box * 2)) * 100}%`
 
 function Tie({ tie }: { tie: OrbitTie }) {
   if (!tie.drawn) return null
@@ -38,7 +38,7 @@ function Tie({ tie }: { tie: OrbitTie }) {
  *  The rings and the spokes scale with the box; the NAMES do not. A glyph inside the viewBox
  *  would be 10px on a 300px phone, and nothing in this product renders below twelve. */
 export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: string) => void }) {
-  const box = ORBIT_R
+  const box = orbit.box
   return (
     <div className="orbit">
       <div
@@ -51,7 +51,7 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
           viewBox={`${-box} ${-box} ${box * 2} ${box * 2}`}
           aria-hidden="true"
         >
-          {ORBIT_RINGS.map((ring) => (
+          {orbit.rings.map((ring) => (
             <circle key={ring.level} className="orbit-ring" r={ring.r} />
           ))}
           {orbit.ties.map((tie) => (
@@ -61,8 +61,10 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
         {orbit.ties.map((tie) => (
           <span
             key={tie.id}
-            className="orbit-mark"
-            style={{ left: pct(tie.x), top: pct(tie.y) }}
+            // The name goes on the OUTER side of the node: below on the lower half, above on
+            // the upper, or a close tie's name lands on the person in the middle.
+            className={tie.y < 0 ? 'orbit-mark above' : 'orbit-mark'}
+            style={{ left: pct(tie.x, box), top: pct(tie.y, box) }}
             aria-hidden="true"
           >
             <i className="orbit-node" />
@@ -96,9 +98,9 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
       </ul>
       <p className="orbit-key">
         <b>Nearer means closer.</b>{' '}
-        {ORBIT_RINGS.map((r) => `${BOND_LEVEL_WORD[r.level].toLowerCase()} ${String(r.r)}`).join(
-          ' · ',
-        )}
+        {orbit.rings
+          .map((r) => `${BOND_LEVEL_WORD[r.level].toLowerCase()} ${String(r.r)}`)
+          .join(' · ')}
         . No line means they have never met.
       </p>
     </div>

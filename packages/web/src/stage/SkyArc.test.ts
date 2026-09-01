@@ -141,20 +141,25 @@ describe('★ the bar the viewer actually gets', () => {
 })
 
 describe('the bar is quiet chrome, and does not fight the town', () => {
-  it('takes the signpost’s own inset on all three edges', () => {
+  // ★ ONE GROUP, bounded and centred. Spread edge to edge on a 1440px window the arc stretches
+  // to a 556px smear 26px tall and its position stops meaning anything — the 900px failure,
+  // arriving from the other end.
+  it('takes the signpost’s inset at the top and stays a bounded, centred group', () => {
     const body = /\.sky-bar \{([^}]*)\}/.exec(CSS)?.[1] ?? ''
-    for (const edge of ['top', 'left', 'right']) {
-      expect(body, edge).toMatch(
-        new RegExp(`${edge}: max\\(var\\(--mark-inset\\), env\\(safe-area-inset-`),
-      )
-    }
+    expect(body).toMatch(/top: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    expect(body).toContain('left: 50%')
+    expect(body).toContain('translate: -50% 0')
+    expect(body).toMatch(/width: min\(var\(--sky-w\)/)
+    expect(body).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-left\)\)/)
     expect(body).toContain('pointer-events: none')
   })
 
-  it('carries its own ground: a four-way halo on the words, a deep stroke under the road', () => {
-    const chip = /\.sky-chip \{([^}]*)\}/.exec(CSS)?.[1] ?? ''
+  it('carries its own ground: the sheet’s one halo on the words, a deep stroke under the road', () => {
+    expect(/\.sky-chip \{([^}]*)\}/.exec(CSS)?.[1]).toContain('text-shadow: var(--halo-deep)')
+    // ...and the halo itself is ink on every side, stated once in `:root`
+    const halo = /--halo-deep:([^;]*);/.exec(CSS)?.[1] ?? ''
     for (const offset of ['1px 0 0 var(--deep)', '-1px 0 0 var(--deep)', '0 1px 0 var(--deep)']) {
-      expect(chip, offset).toContain(offset)
+      expect(halo, offset).toContain(offset)
     }
     expect(/\.sky-arc-ground \{([^}]*)\}/.exec(CSS)?.[1]).toContain('stroke: var(--deep)')
   })

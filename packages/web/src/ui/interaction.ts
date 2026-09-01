@@ -83,14 +83,16 @@ export function hoverPlate(state: WorldState | null, kind: HoverKind, id: string
       if (s === undefined) return []
       const kindWord = kindWords(s.kind)
       const title = structureTitle(s)
-      const owner = ownedBy(state, s.owner)
-      // The title is the carved name when there is one; when there is not, `structureTitle`
-      // gives back the kind, which line one already said — so the owner takes the line.
-      const named = title === kindWord ? null : title
+      // ONE RULE, said once: line one is what it is, and what identifies it after that is the
+      // carved name and then the owner, whichever of them the world has. `structureTitle` gives
+      // the kind back when nothing is carved, and line one already said that.
+      const identity = [title === kindWord ? null : title, ownedBy(state, s.owner)].filter(
+        (v): v is string => v !== null,
+      )
       return plateRows([
         { text: kindWord, tone: 'kind' },
-        { text: named ?? owner ?? '', tone: 'name' },
-        { text: whoIsInside(state, s.id) ?? (named === null ? '' : (owner ?? '')), tone: 'quiet' },
+        { text: identity[0] ?? '', tone: 'name' },
+        { text: whoIsInside(state, s.id) ?? identity[1] ?? '', tone: 'quiet' },
       ])
     }
     case 'item': {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ZOOM_STOPS } from './camera.js'
 import { GLYPH_ZOOM } from './bubbles.js'
 import { EMOTE_KINDS } from './charAnim.js'
-import { STATE_WORD, type AgentView } from '../ui/status.js'
+import { CONDITIONS, STATES, STATE_WORD, type AgentView } from '../ui/status.js'
 import {
   BLOCK_PX,
   GLYPH_PX,
@@ -14,6 +14,7 @@ import {
   TRACK_R,
   TRACK_SPAN_DEG,
   blockCentres,
+  NO_OVERHEAD,
   overheadRow,
   trackFilled,
 } from './overhead.js'
@@ -79,6 +80,21 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
 
   it('asks the atlas for a glyph it actually has, on every row', () => {
     for (const row of OVERHEAD_PRIORITY) expect(EMOTE_KINDS, row.id).toContain(row.glyph)
+  })
+
+  // ★ A transcription drifts; this makes every future word declare itself. Add a condition to
+  // `status.ts` and it reaches the roster and the plate — this is what stops it reaching the
+  // head by accident, or silently not reaching it at all.
+  it('★ accounts for every word status.ts can produce — a row, or a named omission', () => {
+    const spoken = new Set(OVERHEAD_PRIORITY.map((r) => r.id))
+    for (const word of [...STATES, ...CONDITIONS]) {
+      expect(
+        spoken.has(word) || NO_OVERHEAD.includes(word),
+        `${word} is neither a row nor a named omission`,
+      ).toBe(true)
+    }
+    // ...and nothing is on both lists
+    for (const word of NO_OVERHEAD) expect(spoken.has(word), word).toBe(false)
   })
 
   it('marks exactly the rows that are news as urgent', () => {

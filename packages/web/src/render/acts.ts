@@ -98,6 +98,9 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
   const chips = new Map<string, Chip>()
   const runs = new Map<string, ActRun>()
   const starts = new Map<string, { verb: string; duration: number }>()
+  /** ONE gate for one act: whoever the chip is willing to name is whoever the track may wrap.
+   *  Read apart, a sleeper with a live `activity` wore a track and no word for it. */
+  let atWork = new Set<string>()
 
   const build = (word: string): Chip => {
     const node = new Container()
@@ -142,7 +145,7 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
 
     fractionOf: (agentId) => {
       const run = runs.get(agentId)
-      if (run === undefined || !actTrackShown(run)) return null
+      if (run === undefined || !atWork.has(agentId) || !actTrackShown(run)) return null
       return actFraction(run)
     },
 
@@ -173,6 +176,7 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
         runs.set(a.id, run)
         if (actShown(a, run, nowTick)) live.add(a.id)
       }
+      atWork = live
       for (const id of [...chips.keys()]) if (!live.has(id)) drop(id)
       if (live.size === 0) {
         scene.tags.setOccupied('acts', [])

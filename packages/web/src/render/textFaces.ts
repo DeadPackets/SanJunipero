@@ -182,9 +182,9 @@ export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
 export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
 /** --ink, the character name tag's own ink */
-export const NAME_INK = 0x43394a
+const NAME_INK = 0x43394a
 /** --cream, the ink a carved name is cut in — the landmark pair turned over */
-export const CARVED_INK = 0xfff6e9
+const CARVED_INK = 0xfff6e9
 
 /** ★ THE INK IS BAKED INTO THE ATLAS, NEVER APPLIED AS A TINT. Pixi bakes a `dynamicFill`
  *  atlas white and tints each glyph from `style.fill`; that tint is dropped somewhere below the

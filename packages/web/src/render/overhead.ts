@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
-import { conditionsOf, statusOf, type AgentView, type Condition, type State } from '../ui/status.js'
+import { hasCondition, statusOf, type AgentView, type Condition, type State } from '../ui/status.js'
 import type { EmoteKind } from './charAnim.js'
 import { SPEECH_FILL, SPEECH_INK } from './textFaces.js'
 
@@ -31,13 +31,31 @@ export const OVERHEAD_PRIORITY: readonly OverheadRow[] = [
   { id: 'eating', glyph: 'hunger', urgent: false },
 ]
 
-/** The one glyph this person wears, or none at all. Death is the renderer's tone, never a mark. */
+/**
+ * The words that deliberately wear NOTHING, so a future one cannot slip through unclassified.
+ * `working` needs no glyph — while a job runs the track IS the mark. `walking` and `idle` are
+ * legible from the body itself, and "Between things" is not news. `gone` is the renderer's tone.
+ * `thirsty` and `spent` are real conditions a viewer reads on the roster and the plate, but they
+ * are the slowest news a person carries and would sit over a head for hours.
+ */
+export const NO_OVERHEAD: readonly (State | Condition)[] = [
+  'gone',
+  'working',
+  'walking',
+  'idle',
+  'thirsty',
+  'spent',
+]
+
+/** The one glyph this person wears, or none at all. Death is the renderer's tone, never a mark.
+ *  Allocation-free: this runs for every visible person every frame, and `conditionsOf` would
+ *  build an array and a Set to answer eight membership questions. */
 export function overheadRow(a: AgentView, nowTick?: number): OverheadRow | null {
   if (!a.alive) return null
   const state = statusOf(a, nowTick)
-  const conditions = new Set<string>(conditionsOf(a))
   for (const row of OVERHEAD_PRIORITY) {
-    if (row.id === state || conditions.has(row.id)) return row
+    if (row.id === state) return row
+    if (hasCondition(a, row.id)) return row
   }
   return null
 }
@@ -71,7 +89,8 @@ export function trackFilled(fraction: number): number {
   return Math.min(TRACK_BLOCKS - 1, Math.floor(f * TRACK_BLOCKS))
 }
 
-/** The seven block centres, in world pixels around the slot's own centre. */
+/** The seven block centres, in world pixels around the slot's own centre. A pure function of
+ *  the two constants above, so it is called once for the whole product. */
 export function blockCentres(): { x: number; y: number }[] {
   const from = 180 + (180 - TRACK_SPAN_DEG) / 2
   const step = TRACK_SPAN_DEG / TRACK_BLOCKS
@@ -82,6 +101,8 @@ export function blockCentres(): { x: number; y: number }[] {
   }
   return out
 }
+
+const TRACK_CENTRES = blockCentres()
 
 const PLATE_INK = SPEECH_INK
 const PLATE_PAPER = SPEECH_FILL
@@ -116,8 +137,6 @@ export function createOverhead(parent: Container): Overhead {
   let drawnUrgent: boolean | null = null
   let drawnFilled = -1
 
-  const centres = blockCentres()
-
   return {
     node,
     glyph,
@@ -140,8 +159,9 @@ export function createOverhead(parent: Container): Overhead {
     },
     setTrack(fraction) {
       if (fraction === null) {
+        // The drawn blocks survive the toggle, so nothing is reset: a job stopping and starting
+        // again at the same count must not repaint what is already there.
         track.visible = false
-        drawnFilled = -1
         return
       }
       track.visible = true
@@ -152,7 +172,7 @@ export function createOverhead(parent: Container): Overhead {
       // viewport is a render target per person.
       track.clear()
       const half = BLOCK_PX / 2
-      centres.forEach((c, i) => {
+      TRACK_CENTRES.forEach((c, i) => {
         track.rect(c.x - half - 1, c.y - half - 1, BLOCK_PX + 2, BLOCK_PX + 2).fill(PLATE_INK)
         if (i < filled) {
           track.rect(c.x - half, c.y - half, BLOCK_PX, BLOCK_PX).fill(BLOCK_DONE)

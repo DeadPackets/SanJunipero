@@ -14,9 +14,8 @@ import {
   inflateToMin,
   lyingHitPolygon,
 } from './hitShapes.js'
-import { anchorForSprite, placeTag } from './tooltip.js'
+import { anchorForSprite } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
-import { createPlate, type Plate } from './plate.js'
 import {
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
@@ -25,7 +24,6 @@ import {
   type Overhead,
 } from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
-import { worldTextScale } from './textFaces.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -38,7 +36,6 @@ import {
   CHAR_TARGET_PX,
   EMOTE_KINDS,
   FEET_Y,
-  NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS,
   SHEET_ROWS,
   WALK_LEAD_TICKS,
@@ -59,7 +56,6 @@ import {
   type Waypoint,
 } from './charAnim.js'
 
-const EMOTE_ABOVE_HEAD_PX = 12
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
@@ -75,7 +71,8 @@ type CharEntry = {
   overhead: Overhead
   /** the kind the slot is drawing, so the atlas is cut once and not once a frame */
   glyphKind: EmoteKind | null
-  plate: Plate
+  /** the pointer is on this body, so the ONE hover plate is theirs this frame */
+  hovered: boolean
   hit: Polygon
   /** the sheet's own figure height, so the capsule follows the art rather than a second table */
   figureH: number
@@ -333,22 +330,22 @@ export function createCharacterLayer(
     scene.layers.entities.addChild(sprite)
     // ★ ONE SLOT over the head, and the track wraps it exactly while a job runs.
     const overhead = createOverhead(scene.layers.worldText)
-    // ★ ONE PLATE, the same object a building wears: a person's is their name and the one word
-    // for what they are doing.
-    const plate = createPlate(scene.layers.worldText)
+    // ★ ONE PLATE FOR THE WHOLE STAGE, the same one a building wears. The layer owns it, so a
+    // person's plate is placed and de-conflicted by the rule every other label goes through.
     sprite.on('pointerover', () => {
-      plate.node.visible = true
+      e2.hovered = true
     })
     sprite.on('pointerout', () => {
-      plate.node.visible = false
+      e2.hovered = false
+      scene.tags.hide('hover')
     })
     const now = performance.now()
-    e = {
+    const e2: CharEntry = {
       sprite,
       shadow,
       overhead,
       glyphKind: null,
-      plate,
+      hovered: false,
       hit,
       figureH: 0,
       hitScale: 0,
@@ -365,6 +362,7 @@ export function createCharacterLayer(
       crowdSinceMs: now,
       mulY: 1,
     }
+    e = e2
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
     loadSheet(agentId, null)
@@ -513,26 +511,18 @@ export function createCharacterLayer(
       const running = emotesHidden ? null : (scene.actFraction?.(a.id) ?? null)
       e.overhead.setTrack(running)
       e.overhead.node.visible = row !== null || running !== null
-      // ONE placement rule for every label in the product, and the plate asks for the FOOTPRINT:
-      // welded to the feet, and only leaving them when the view has no room down there.
-      if (e.plate.node.visible) {
-        e.plate.setRows(hoverPlate(state, 'agent', a.id))
-        // The plate holds its size for the reader, so its world FOOTPRINT is what the camera
-        // changes — that is the number placeTag de-conflicts against, not the drawn one.
-        const inv = worldTextScale(scene.getZoom())
-        e.plate.node.scale.set(inv)
-        const size = { w: e.plate.w * inv, h: e.plate.h * inv }
-        const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
-        const at = placeTag(
-          {
-            ...anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
-            prefer: 'below',
-          },
-          size,
-          scene.viewRect(),
-          scene.tags.occupied(),
+      // ONE placement rule for every label in the product, and the layer applies it: the plate
+      // is welded to the feet and only leaves them when the view has no room down there. Said
+      // every frame, because the body it names walks.
+      if (e.hovered) {
+        // The head box is what the plate flips ABOVE into, so it measures what is drawn there:
+        // the slot, at its own offset, and nothing that used to be.
+        const head = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX
+        scene.tags.show(
+          'hover',
+          hoverPlate(state, 'agent', a.id),
+          anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
         )
-        e.plate.node.position.set(Math.round(at.sx - size.w / 2), Math.round(at.sy))
       }
     }
     for (const [agentId, e] of entries) {
@@ -540,7 +530,6 @@ export function createCharacterLayer(
         e.sprite.destroy()
         e.shadow.destroy()
         e.overhead.destroy()
-        e.plate.destroy()
         entries.delete(agentId)
         sheets.delete(agentId)
       }
@@ -567,7 +556,6 @@ export function createCharacterLayer(
         e.sprite.destroy()
         e.shadow.destroy()
         e.overhead.destroy()
-        e.plate.destroy()
       }
       entries.clear()
       shadowTexture.destroy(true)

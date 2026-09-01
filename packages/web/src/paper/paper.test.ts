@@ -7,7 +7,7 @@ import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
 import { HelpButton } from '../stage/HelpButton.js'
-import { KEY_MAP_KEY } from '../stage/KeyMap.js'
+import { KEY_MAP_ID, KEY_MAP_KEY } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
   ARMS,
@@ -113,9 +113,16 @@ describe('the signpost', () => {
     expect(body).toMatch(/bottom: max\(var\(--mark-inset\), env\(safe-area-inset-/)
   })
 
-  // The button toggles, so the click-away that shuts the sheet must not count it as away.
-  it('★ leaves the corner button out of the key map’s own click-away', () => {
-    expect(src('../stage/KeyMap.tsx')).toContain('HELP_BUTTON_CLASS')
+  // The button toggles, so the click-away that shuts the sheet must not count it as away — and
+  // it asks the DOM through the disclosure, so the key map imports no opener back.
+  it('★ leaves whatever opened the key map out of its own click-away', () => {
+    const keyMap = src('../stage/KeyMap.tsx')
+    expect(keyMap).toContain("[aria-controls='${KEY_MAP_ID}']")
+    expect(keyMap).not.toContain('HelpButton')
+    expect(src('../stage/HelpButton.tsx')).toContain('aria-controls={KEY_MAP_ID}')
+    // ...and the id it names is the one the sheet actually carries
+    expect(keyMap).toContain(`id={KEY_MAP_ID}`)
+    expect(KEY_MAP_ID).toBe('key-map-sheet')
   })
 
   it('★ is what the app mounts, with the arm’s wiring kept', () => {

@@ -1,11 +1,9 @@
 import type { BondsResponse } from '@sj/shared'
 import {
   BOND_LEVEL_WORD,
-  bondArc,
-  bondLevel,
-  bondTypeOf,
-  bondWarmth,
-  relationLine,
+  LEVEL_RANK,
+  bondIndex,
+  pairFacts,
   type BondLevel,
   type LineageLike,
   type PeopleIndex,
@@ -20,7 +18,7 @@ export function shortName(name: string): string {
   return name.slice(0, 2)
 }
 
-export type MatrixCell = {
+type MatrixCell = {
   /** the diagonal: nobody has an address with themselves */
   self: boolean
   level: BondLevel
@@ -30,7 +28,7 @@ export type MatrixCell = {
   words: string
 }
 
-export type MatrixRow = { id: string; name: string; short: string; cells: MatrixCell[] }
+type MatrixRow = { id: string; name: string; short: string; cells: MatrixCell[] }
 
 export type LevelMatrix = {
   heads: { id: string; name: string; short: string }[]
@@ -49,6 +47,8 @@ export function levelMatrix(
   )
   const nameOf = (id: string): string => people[id]?.name ?? id
   const heads = ids.map((id) => ({ id, name: nameOf(id), short: shortName(nameOf(id)) }))
+  // Built once for the whole grid: the scan it replaces ran inside an n² cell loop.
+  const index = bondIndex(bonds)
 
   const rows = ids.map((aId) => ({
     id: aId,
@@ -56,36 +56,15 @@ export function levelMatrix(
     short: shortName(nameOf(aId)),
     cells: ids.map((bId): MatrixCell => {
       if (aId === bId) return { self: true, level: 'strangers', warmth: 0, words: '' }
-      const bond =
-        bonds.bonds.find(
-          (b) => (b.aId === aId && b.bId === bId) || (b.aId === bId && b.bId === aId),
-        ) ?? null
-      const warmth = bond === null ? 0 : bondWarmth(bond, nowTick)
-      const level = bondLevel(warmth)
-      const type = bondTypeOf(aId, bId, lineage, bonds)
-      const arc =
-        bond === null
-          ? ({ from: level, to: level, direction: 'steady', sinceDay: 0 } as const)
-          : bondArc(bond, nowTick)
-      return {
-        self: false,
-        level,
-        warmth: Math.round(warmth),
-        words: relationLine(type, level, arc, [nameOf(aId), nameOf(bId)]),
-      }
+      const f = pairFacts(aId, bId, index, lineage, bonds, people, nowTick)
+      return { self: false, level: f.level, warmth: Math.round(f.warmth), words: f.words }
     }),
   }))
   return { heads, rows }
 }
 
-/** The key under the grid, coldest to warmest, so the ladder reads as a ladder. */
-export const MATRIX_LEVELS: readonly BondLevel[] = [
-  'hatred',
-  'strained',
-  'strangers',
-  'acquaintances',
-  'friendly',
-  'close',
-]
+/** The key under the grid. `LEVEL_RANK` is already coldest-to-warmest, which is exactly the
+ *  order a ladder reads in — a second copy could only drift from it. */
+export const MATRIX_LEVELS: readonly BondLevel[] = LEVEL_RANK
 
 export const MATRIX_LEVEL_WORD = BOND_LEVEL_WORD

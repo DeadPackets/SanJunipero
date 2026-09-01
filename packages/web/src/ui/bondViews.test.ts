@@ -6,13 +6,12 @@ import type { Bond, BondsResponse } from '@sj/shared'
 import { EMPTY_LINEAGE, type PeopleIndex } from './bondModel2.js'
 import { LEVEL_DISTANCE, NO_LINK_LEVEL } from './relationGraph.js'
 import {
-  ORBIT_R,
-  ORBIT_RINGS,
   STRENGTH_FULL,
   STROKE_MAX,
   STROKE_MIN,
   busiestPerson,
   orbitOf,
+  orbitRings,
   orbitStroke,
 } from './bondOrbit.js'
 import { MATRIX_LEVELS, levelMatrix, shortName } from './bondMatrix.js'
@@ -50,14 +49,40 @@ describe('★ the orbit stands people at their real distance', () => {
   const orbit = orbitOf('amara', API, EMPTY_LINEAGE, PEOPLE, 0)!
 
   it('★ takes its rings straight off the graph’s own LEVEL_DISTANCE table', () => {
-    expect(ORBIT_RINGS.map((r) => r.r)).toEqual(
-      [...ORBIT_RINGS].map((r) => LEVEL_DISTANCE[r.level]),
-    )
+    for (const ring of orbit.rings) expect(ring.r, ring.level).toBe(LEVEL_DISTANCE[ring.level])
     // ascending, so the picture reads outward as it cools
-    expect([...ORBIT_RINGS].map((r) => r.r)).toEqual(
-      [...ORBIT_RINGS].map((r) => r.r).sort((a, b) => a - b),
-    )
-    expect(ORBIT_R).toBeGreaterThan(Math.max(...Object.values(LEVEL_DISTANCE)))
+    const radii = orbit.rings.map((r) => r.r)
+    expect(radii).toEqual([...radii].sort((a, b) => a - b))
+    expect(orbit.box).toBeGreaterThan(Math.max(...radii))
+  })
+
+  // ★ Hatred is 240 and strangers 150, so a town with no cold pair spent 38% of every orbit on
+  // two empty bands and crammed the four that matter into the middle.
+  it('★ cuts the ladder to the coldest tie the TOWN has, not to the one the ladder could hold', () => {
+    expect(orbit.rings.map((r) => r.level)).toEqual([
+      'close',
+      'friendly',
+      'acquaintances',
+      'strangers',
+    ])
+    expect(orbit.box).toBe(LEVEL_DISTANCE.strangers + 26)
+
+    // ...and a town with a cold pair in it draws down to that pair's own ring
+    const cold = { asOfTick: 0, bonds: [...API.bonds, bond('omar', 'yusuf', -20)] }
+    const wider = orbitOf('amara', cold, EMPTY_LINEAGE, PEOPLE, 0)!
+    expect(wider.rings.map((r) => r.level)).toContain('hatred')
+    expect(wider.box).toBeGreaterThan(orbit.box)
+  })
+
+  // One ladder for the whole town, so two people's orbits are still comparable.
+  it('★ draws every orbit in one town to the same ladder', () => {
+    const other = orbitOf('salma', API, EMPTY_LINEAGE, PEOPLE, 0)!
+    expect(other.box).toBe(orbit.box)
+    expect(other.rings).toEqual(orbit.rings)
+  })
+
+  it('always leaves a stranger somewhere to stand, however warm the town is', () => {
+    expect(orbitRings(0).map((r) => r.level)).toContain('strangers')
   })
 
   it('puts everybody else on the ring their level names, and nobody anywhere else', () => {
@@ -172,11 +197,12 @@ describe('★ the two views a reader gets', () => {
     }),
   )
 
-  it('draws a ring for every level and a spoke only where there is a tie', () => {
-    expect(plot.match(/class="orbit-ring"/g)).toHaveLength(ORBIT_RINGS.length)
+  it('draws a ring for every level in use and a spoke only where there is a tie', () => {
+    expect(plot.match(/class="orbit-ring"/g)).toHaveLength(orbit.rings.length)
     // three alters, two of them met: Salma gets a node and no line
     expect(plot.match(/<line /g)).toHaveLength(2)
-    expect(plot.match(/class="orbit-mark"/g)).toHaveLength(3)
+    // the ties, not the person in the middle
+    expect(plot.match(/class="orbit-mark(?: above)?"/g)).toHaveLength(3)
   })
 
   it('★ names the picture for a reader who cannot see it, and gives them a way through it', () => {
@@ -190,7 +216,7 @@ describe('★ the two views a reader gets', () => {
   // Nothing in this product renders below twelve, and an SVG glyph would be 10px on a phone.
   it('★ sets the orbit names in HTML at the sheet’s own scale, never inside the viewBox', () => {
     expect(plot).not.toMatch(/<text/)
-    expect(/\.orbit-name \{([^}]*)\}/.exec(CSS)?.[1]).toContain('font-size: var(--f-2)')
+    expect(/\n\.orbit-name \{([^}]*)\}/.exec(CSS)?.[1]).toContain('font-size: var(--f-2)')
   })
 
   it('★ is a real table, with a row a keyboard can choose a person from', () => {
@@ -211,6 +237,12 @@ describe('★ the two views a reader gets', () => {
   it('scrolls a wide grid inside its own box rather than the sheet', () => {
     expect(grid).toContain('class="matrix-scroll"')
     expect(/\.matrix-scroll \{([^}]*)\}/.exec(CSS)?.[1]).toContain('overflow-x: auto')
+  })
+
+  // A close tie sits above the middle; its name must not land on the person in it.
+  it('★ puts a name on the OUTER side of its node', () => {
+    expect(plot).toContain('class="orbit-mark above"')
+    expect(/\.orbit-mark\.above \.orbit-name[^{]*\{([^}]*)\}/.exec(CSS)?.[1]).toContain('order: -1')
   })
 
   it('draws a key for every level, so a fill is never asked to speak alone', () => {
@@ -236,9 +268,18 @@ describe('★ the tab is one vertical sheet, and the town graph is legible', () 
     expect(src).toContain('LINK_CASING_COLOR')
   })
 
-  it('★ puts ink on all four sides of a name, not one corner of it', () => {
-    expect(src).toContain('HALO_OFFSETS')
+  it('★ puts ink on every side of a name, not one corner of it', () => {
+    expect(src).toContain('ctx.strokeText(n.name')
+    expect(src).toContain("ctx.lineJoin = 'round'")
     expect(src).toMatch(/const NAME_PX = TEXT_MIN_PX \+ 1/)
+  })
+
+  // These run once per link and per node per FRAME; a fresh array each time is tens of
+  // thousands a second for a value that never changes.
+  it('allocates no dash array inside the draw loops', () => {
+    expect(src).not.toMatch(/setLineDash\(\[\]/)
+    expect(src).not.toMatch(/\[\.\.\.(l|ring)\.dash\]/)
+    expect(src).toContain('const NO_DASH')
   })
 
   it('★ hands a clicked node to the orbit rather than opening a page', () => {

@@ -10,7 +10,6 @@ import {
   GAIT_STRIDE_SPREAD,
   HIT_AREA_H,
   HIT_AREA_W,
-  NAME_TAG_MAX_CHARS,
   STRIDE_TILES,
   TICK_PERIOD_MAX_MS,
   TICK_PERIOD_SEED_MS,
@@ -28,7 +27,6 @@ import {
   initialTickClock,
   interpolatePos,
   legFacing,
-  nameTagText,
   observeTick,
   prunePath,
   scheduleLeg,
@@ -318,7 +316,7 @@ describe('the emote atlas', () => {
   })
 })
 
-describe('character hit area + name tag', () => {
+describe('character hit area', () => {
   it('pins the generous hit rect constants', () => {
     expect(HIT_AREA_W).toBe(52)
     expect(HIT_AREA_H).toBe(72)
@@ -338,12 +336,6 @@ describe('character hit area + name tag', () => {
       expect(r.x * s).toBeCloseTo(-HIT_AREA_W / 2, 9)
       expect(r.y * s).toBeCloseTo(-HIT_AREA_H, 9)
     }
-  })
-  it('name-tag text is the agent name, truncated to the slab', () => {
-    expect(nameTagText('Omar')).toBe('Omar')
-    const long = nameTagText('A very long founder name beyond the slab')
-    expect(long).toHaveLength(NAME_TAG_MAX_CHARS)
-    expect(long.endsWith('…')).toBe(true)
   })
 })
 

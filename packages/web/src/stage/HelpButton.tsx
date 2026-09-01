@@ -1,8 +1,4 @@
-import { KEY_MAP_KEY } from './KeyMap.js'
-
-/** The class the key map's own click-away handler must not count as "outside": without it the
- *  pointerdown closes the sheet and the click that follows opens it again. */
-export const HELP_BUTTON_CLASS = 'help-button'
+import { KEY_MAP_ID, KEY_MAP_KEY } from './KeyMap.js'
 
 /** ★ One 44px target with the glyph everyone already knows. `?` opened the key map and nothing
  *  said so, which is an affordance only a viewer who already knew could find. */
@@ -10,8 +6,11 @@ export function HelpButton({ open, onToggle }: { open: boolean; onToggle: () => 
   return (
     <button
       type="button"
-      className={HELP_BUTTON_CLASS}
+      className="help-button"
       aria-haspopup="dialog"
+      // A disclosure names what it opens, which is also how the key map's own click-away knows
+      // this button is not "outside" it.
+      aria-controls={KEY_MAP_ID}
       aria-expanded={open}
       aria-label="What the town answers to"
       onClick={onToggle}

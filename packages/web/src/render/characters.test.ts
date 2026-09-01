@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
@@ -220,7 +221,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     getZoom: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
-    tags: { occupied: () => [] },
+    tags: { occupied: () => [], show: () => {}, hide: () => {} },
     addDepthSource: (fn: () => { box: { id: string }; node: unknown }[]) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -260,10 +261,12 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     layer = createCharacterLayer(scene, made.book, store, () => {})
   })
 
-  it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
+  it('two ticks add exactly 3 display objects per agent, not 3 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+    // ★ THREE, not four: the hover plate is ONE for the whole stage now, owned by the tooltip
+    // layer, so a body carries a sprite, a shadow and its overhead slot and nothing else.
+    expect(placed(scene)).toHaveLength(2 * 3)
   })
 
   it('puts each companion in the layer that owns it, never in the depth sort', () => {
@@ -271,7 +274,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     expect(l.shadow!.children).toHaveLength(2) // one contact shadow per body
     expect(l.entities!.children).toHaveLength(2) // ONLY the bodies are depth-sorted
-    expect(l.worldText!.children).toHaveLength(4) // emote + name tag per body
+    expect(l.worldText!.children).toHaveLength(2) // one overhead slot per body
   })
 
   it('publishes one depth box per living body, at its INTERPOLATED tile', () => {
@@ -366,23 +369,24 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(sprite.eventMode).toBe('static')
   })
 
-  it('wears the footprint plate: their name over the one word for what they are doing', () => {
-    layer.tick(1000)
-    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
-    const plate = l.worldText!.children[1]! // per-agent add order into worldText: emote, plate
-    plate.visible = true
-    layer.tick(1016)
-    const labels = plate.children.slice(1) as unknown as { text: string }[]
-    expect(labels.map((t) => t.text)).toEqual(['nadia', 'Between things'])
+  // ★ ONE OCCUPANCY. A person's plate goes through the same owner a building's does, so it is
+  // placed by one rule and published where every other label can read it.
+  it('asks the label layer for the hover plate, rather than keeping one per body', () => {
+    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    expect(src).toContain("scene.tags.show(\n          'hover',")
+    expect(src).toContain("hoverPlate(state, 'agent', a.id)")
+    expect(src).not.toContain('createPlate')
+    // ...and the head box it may flip above measures what is actually drawn up there
+    expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
   })
 
-  it('removing an agent destroys its 4 objects and drops the entry', () => {
+  it('removing an agent destroys its 3 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(4)
+    expect(placed(scene)).toHaveLength(3)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })
@@ -664,7 +668,7 @@ describe('★ four people on one tile, through the real layer', () => {
     }
   })
 
-  it('the shadow and the emote move with the body', () => {
+  it('the shadow and the overhead slot move with the body', () => {
     layer.tick(1000)
     layer.tick(2000)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
@@ -674,7 +678,7 @@ describe('★ four people on one tile, through the real layer', () => {
       // non-vacuous: this body is NOT where the record put it, and its companions came along
       expect(sprite.position.x).not.toBe(sx)
       expect(l.shadow!.children[i]!.position.x).toBe(sprite.position.x)
-      expect(l.worldText!.children[i * 2]!.position.x).toBe(sprite.position.x)
+      expect(l.worldText!.children[i]!.position.x).toBe(sprite.position.x)
     }
   })
 

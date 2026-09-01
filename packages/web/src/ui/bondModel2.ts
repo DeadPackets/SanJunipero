@@ -63,6 +63,57 @@ const bondBetween = (aId: string, bId: string, bonds: BondsResponse): Bond | nul
   bonds.bonds.find((b) => (b.aId === aId && b.bId === bId) || (b.aId === bId && b.bId === aId)) ??
   null
 
+/** Every pair the world has a bond for, keyed both ways round. Built ONCE by a caller that is
+ *  about to ask about many pairs: the linear scan above is n² × m inside a matrix. */
+export type BondIndex = ReadonlyMap<string, Bond>
+const pairKey = (aId: string, bId: string): string =>
+  aId < bId ? `${aId}\t${bId}` : `${bId}\t${aId}`
+
+export function bondIndex(bonds: BondsResponse): BondIndex {
+  const out = new Map<string, Bond>()
+  for (const b of bonds.bonds) out.set(pairKey(b.aId, b.bId), b)
+  return out
+}
+
+/** Where one pair stands, in every channel the two pictures draw. The `arc` of a pair the world
+ *  has never written is steady at their level, which is strangers — not a gap. */
+export type PairFacts = {
+  bond: Bond | null
+  warmth: number
+  level: BondLevel
+  type: BondType
+  arc: BondArc
+  words: string
+}
+
+export function pairFacts(
+  aId: string,
+  bId: string,
+  index: BondIndex,
+  lineage: LineageLike,
+  bonds: BondsResponse,
+  people: PeopleIndex,
+  nowTick: number,
+): PairFacts {
+  const bond = index.get(pairKey(aId, bId)) ?? null
+  const warmth = bond === null ? 0 : bondWarmth(bond, nowTick)
+  const level = bondLevel(warmth)
+  const type = bondTypeOf(aId, bId, lineage, bonds)
+  const arc: BondArc =
+    bond === null
+      ? { from: level, to: level, direction: 'steady', sinceDay: 0 }
+      : bondArc(bond, nowTick)
+  const nameOf = (id: string): string => people[id]?.name ?? id
+  return {
+    bond,
+    warmth,
+    level,
+    type,
+    arc,
+    words: relationLine(type, level, arc, [nameOf(aId), nameOf(bId)]),
+  }
+}
+
 /**
  * Directional, because "parent" and "child" are the same edge read from two ends. KIN OUTRANKS
  * PARTNER: a birth is a fact the world wrote down, a partnership is inferred from who slept where.

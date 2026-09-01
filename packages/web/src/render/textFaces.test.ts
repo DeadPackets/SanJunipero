@@ -272,7 +272,7 @@ describe('a world label is the same size to the viewer at every zoom stop', () =
   })
 
   it('is applied by every layer that puts a label in the world, not just by landmarks', () => {
-    for (const f of ['./bubbles.ts', './characters.ts', './tooltip.ts', './landmarks.ts']) {
+    for (const f of ['./bubbles.ts', './acts.ts', './tooltip.ts', './landmarks.ts']) {
       expect(src(f), `${f} draws world text at the camera's scale`).toMatch(/worldTextScale\(/)
     }
   })

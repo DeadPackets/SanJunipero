@@ -58,6 +58,30 @@ const LINK_WIDTH: Readonly<Record<1 | 2, number>> = { 1: 3, 2: 5 }
 /** The deep casing every edge is drawn on, so the colour is never read against the ground. */
 const LINK_CASING = 1.5
 const LINK_CASING_COLOR = '#241F2B'
+/** Shared, because these run once per link per node per FRAME and a fresh array each time is
+ *  tens of thousands a second for a value that never changes. */
+const NO_DASH: number[] = []
+const DASH_SCALE = 2
+const DOUBLED_DASH = new WeakMap<readonly number[], number[]>()
+/** A ring's dash is drawn at its own size, so it gets its own cache rather than the doubled one. */
+const RING_DASH = new WeakMap<readonly number[], number[]>()
+const drawnRingDash = (dash: readonly number[]): number[] => {
+  let out = RING_DASH.get(dash)
+  if (out === undefined) {
+    out = [...dash]
+    RING_DASH.set(dash, out)
+  }
+  return out
+}
+const drawnDash = (dash: readonly number[] | null): number[] => {
+  if (dash === null) return NO_DASH
+  let out = DOUBLED_DASH.get(dash)
+  if (out === undefined) {
+    out = dash.map((d) => d * DASH_SCALE)
+    DOUBLED_DASH.set(dash, out)
+  }
+  return out
+}
 const NO_HALO: Halo = { kinds: [], names: [] }
 
 type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
@@ -74,14 +98,8 @@ type PositionedNode = BondNode & { x?: number; y?: number }
 
 const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.size) * 5))
 
-/** A name over the graph, one step up from the 12px floor, with ink on all four sides of it. */
+/** A name over the graph, one step up from the 12px floor, drawn on a ground of its own. */
 const NAME_PX = TEXT_MIN_PX + 1
-const HALO_OFFSETS: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-]
 
 export function BondsGraph({
   store,
@@ -231,11 +249,11 @@ export function BondsGraph({
     const width = LINK_WIDTH[l.strokeCount]
     ctx.save()
     ctx.lineCap = 'butt'
-    for (const pass of [0, 1]) {
+    for (let pass = 0; pass < 2; pass++) {
       ctx.beginPath()
       ctx.moveTo(a.x, a.y)
       ctx.lineTo(b.x, b.y)
-      ctx.setLineDash(pass === 0 || l.dash === null ? [] : [...l.dash].map((d) => d * 2))
+      ctx.setLineDash(pass === 0 ? NO_DASH : drawnDash(l.dash))
       ctx.lineWidth = pass === 0 ? width + LINK_CASING * 2 : width
       ctx.strokeStyle = pass === 0 ? LINK_CASING_COLOR : l.color
       ctx.stroke()
@@ -300,7 +318,7 @@ export function BondsGraph({
       if (!n.alive) {
         ctx.strokeStyle = GONE_RING
         ctx.lineWidth = 2
-        ctx.setLineDash([])
+        ctx.setLineDash(NO_DASH)
         ctx.strokeRect(x - HALO_STEP, y - HALO_STEP, side + HALO_STEP * 2, side + HALO_STEP * 2)
       }
       const halo = halos.get(n.id) ?? NO_HALO
@@ -309,10 +327,10 @@ export function BondsGraph({
         const ring = INSTITUTION_RING[kind]
         ctx.strokeStyle = ring.color
         ctx.lineWidth = 2
-        ctx.setLineDash(ring.dash === null ? [] : [...ring.dash])
+        ctx.setLineDash(ring.dash === null ? NO_DASH : drawnRingDash(ring.dash))
         ctx.strokeRect(x - out, y - out, side + out * 2, side + out * 2)
       })
-      ctx.setLineDash([])
+      ctx.setLineDash(NO_DASH)
     },
     [halos],
   )
@@ -324,18 +342,20 @@ export function BondsGraph({
       ctx.font = `${fontSize}px Silkscreen, monospace`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      const halo = Math.max(1, fontSize / 6)
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = Math.max(2, fontSize / 3)
+      ctx.strokeStyle = '#241F2B'
+      ctx.fillStyle = '#FFF6E9'
       const nodes: PositionedNode[] = graphData.nodes
       for (const n of nodes) {
         if (n.x === undefined || n.y === undefined) continue
         const side = slabSide(n)
         const lx = Math.round(n.x)
         const ly = Math.round(n.y) - Math.round(side / 2) + side + 4
-        // A FOUR-WAY halo, not one offset: a name over a graph carries its own ground on every
-        // side, or the edge it crosses eats a stroke of it.
-        ctx.fillStyle = '#241F2B'
-        for (const [dx, dy] of HALO_OFFSETS) ctx.fillText(n.name, lx + dx * halo, ly + dy * halo)
-        ctx.fillStyle = '#FFF6E9'
+        // Ink on EVERY side, not one corner, or the edge a name crosses eats a stroke of it —
+        // and drawn as one round stroke rather than four offset fills, because this runs per
+        // node per frame.
+        ctx.strokeText(n.name, lx, ly)
         ctx.fillText(n.name, lx, ly)
       }
     },

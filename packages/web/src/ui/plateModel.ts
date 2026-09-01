@@ -4,7 +4,7 @@
 /** Three short lines is the ceiling; a fourth answer has nowhere to go. */
 export const PLATE_MAX_ROWS = 3
 /** Per row. Press Start 2P sets one em per character, so 22 is already 352 world pixels. */
-export const PLATE_MAX_CHARS = 22
+const PLATE_MAX_CHARS = 22
 
 /** What a row is FOR, which is also how it is set.
  *  `kind` the pixel face in capitals · `name` the face with lowercase · `quiet` the same face on

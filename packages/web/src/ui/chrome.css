@@ -59,6 +59,13 @@
   --f-6: 22px;
   --f-7: 28px;
 
+  /* Text over art carries its own ground: ink on all four sides, then a drop so the mark
+     survives a tile as light as daylight grass. Cream on that tile is 1.40:1 — load-bearing,
+     not decoration. */
+  --halo-deep:
+    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
+    0 2px 4px rgba(36, 31, 43, 0.8);
+
   /* signature: the pixel slab — 2px ink ring with a stepped deep-shadow ledge */
   --frame: 0 0 0 2px var(--ink), 4px 4px 0 0 var(--deep);
   --frame-tight: 0 0 0 2px var(--ink);
@@ -81,6 +88,11 @@
   /* The stage marks hang off percentages, which is 15.6px on a landscape phone and 57.6px at
      2560. One inset, and it clears the notch on the phones that have one. */
   --mark-inset: clamp(16px, 3vmin, 40px);
+
+  /* The sun arc owns the top edge. Its width and its height are named here because the quiet
+     stamp has to sit UNDER it and cannot measure a sibling. */
+  --sky-w: 480px;
+  --sky-h: 30px;
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
@@ -1095,8 +1107,11 @@ body {
 .sky-bar {
   position: absolute; z-index: 21;
   top: max(var(--mark-inset), env(safe-area-inset-top));
-  left: max(var(--mark-inset), env(safe-area-inset-left));
-  right: max(var(--mark-inset), env(safe-area-inset-right));
+  /* ONE GROUP, centred and bounded. Spread across a 1440px window the arc stretches to a
+     556px-wide 26px-tall smear and its position stops meaning anything — the same failure the
+     900px rule below names, arriving from the other end. */
+  left: 50%; translate: -50% 0;
+  width: min(var(--sky-w), calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left))));
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center; gap: var(--s-5);
   pointer-events: none;
@@ -1107,9 +1122,7 @@ body {
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cream);
   /* Cream on the daylight tile is 1.40:1, so the four-way halo is load-bearing, not decoration. */
-  text-shadow:
-    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
-    0 2px 4px rgba(36, 31, 43, 0.8);
+  text-shadow: var(--halo-deep);
 }
 .sky-glyph { display: block; flex: none; image-rendering: pixelated; }
 .sky-arc { position: relative; height: 34px; }
@@ -1117,7 +1130,8 @@ body {
 /* The road brings its own ground with it, the way every mark over the town does. */
 .sky-arc-ground { fill: none; stroke: var(--deep); stroke-width: 5; }
 .sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2.4; stroke-dasharray: 1 3; }
-.sky-token { position: absolute; translate: -50% -50%; }
+.sky-token { position: absolute; translate: -50% -50%; color: var(--cream); }
+.sky-token[data-kind='sun'] { color: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
   /* The one easing on the bar, and it is a position, not an effect. */
   .sky-token { transition: left var(--t-slow) var(--ease-move), top var(--t-slow) var(--ease-move); }
@@ -1125,7 +1139,7 @@ body {
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
 @media (max-width: 900px) {
-  .sky-bar { grid-template-columns: auto auto; justify-content: start; gap: var(--s-5); }
+  .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
   .sky-arc { display: none; }
 }
 /* The stream frame has its own clock in the stamp, and the bar would sit under the overlay. */
@@ -1134,15 +1148,13 @@ body {
 .stage-stamp {
   position: absolute; z-index: 21;
   /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news. */
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + 30px);
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h));
   right: max(var(--mark-inset), env(safe-area-inset-right));
   pointer-events: none;
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
   color: var(--cream);
-  text-shadow:
-    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
-    0 2px 4px rgba(36, 31, 43, 0.8);
+  text-shadow: var(--halo-deep);
   opacity: 0;
 }
 .stage-stamp.shown { opacity: 1; }
@@ -1156,9 +1168,7 @@ body {
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
-  text-shadow:
-    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep),
-    0 2px 4px rgba(36, 31, 43, 0.8);
+  text-shadow: var(--halo-deep);
 }
 
 .stage-exit {
@@ -1557,6 +1567,9 @@ body {
   position: absolute; translate: -50% -50%;
   display: grid; justify-items: center; gap: var(--s-1);
 }
+/* The name takes the outer side of its node, so a close tie's does not land on the middle. */
+.orbit-mark.above, .orbit-mark.orbit-me { grid-auto-flow: row dense; }
+.orbit-mark.above .orbit-name, .orbit-mark.orbit-me .orbit-name { order: -1; }
 .orbit-node {
   width: 13px; height: 13px; background: var(--sage);
   box-shadow: 0 0 0 2px var(--ink); flex: none;
@@ -1565,8 +1578,7 @@ body {
 .orbit-name {
   font-family: var(--font-body); font-weight: 600; font-size: var(--f-2);
   line-height: 1; white-space: nowrap; color: var(--cream);
-  text-shadow:
-    1px 0 0 var(--deep), -1px 0 0 var(--deep), 0 1px 0 var(--deep), 0 -1px 0 var(--deep);
+  text-shadow: var(--halo-deep);
 }
 .orbit-me .orbit-name { color: var(--honey-l); }
 .orbit-key { margin: 0; font-size: var(--f-1); color: var(--ink-quiet); text-wrap: pretty; }
@@ -1600,25 +1612,25 @@ body {
   font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.matrix-fill[data-level='self'] {
+.matrix [data-level='self'] {
   background: repeating-linear-gradient(45deg, var(--ink) 0 1px, transparent 1px 5px);
 }
-.matrix-fill[data-level='strangers'], .matrix-swatch[data-level='strangers'] {
+.matrix [data-level='strangers'] {
   background: repeating-linear-gradient(45deg, var(--sand) 0 2px, var(--parchment) 2px 4px);
 }
-.matrix-fill[data-level='acquaintances'], .matrix-swatch[data-level='acquaintances'] {
+.matrix [data-level='acquaintances'] {
   background: var(--sand);
 }
-.matrix-fill[data-level='friendly'], .matrix-swatch[data-level='friendly'] {
+.matrix [data-level='friendly'] {
   background: var(--honey-l);
 }
-.matrix-fill[data-level='close'], .matrix-swatch[data-level='close'] { background: var(--honey); }
-.matrix-fill[data-level='strained'], .matrix-swatch[data-level='strained'] {
+.matrix [data-level='close'] { background: var(--honey); }
+.matrix [data-level='strained'] {
   background: var(--rose);
 }
 /* Hatred and strained share the one cold token the sheet has, so the DENSER weave is what tells
    them apart — a texture, never a second red nobody measured. */
-.matrix-fill[data-level='hatred'], .matrix-swatch[data-level='hatred'] {
+.matrix [data-level='hatred'] {
   background:
     repeating-linear-gradient(45deg, var(--ink) 0 2px, transparent 2px 5px),
     repeating-linear-gradient(-45deg, var(--ink) 0 2px, transparent 2px 5px),
@@ -1816,3 +1828,4 @@ body {
   letter-spacing: 0.04em;
   color: var(--cream);
 }
+

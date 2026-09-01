@@ -32,12 +32,8 @@ export function hitRect(scale: number): { x: number; y: number; w: number; h: nu
     h: HIT_AREA_H / scale,
   }
 }
-export const NAME_TAG_ABOVE_HEAD_PX = 8
-export const NAME_TAG_MAX_CHARS = 16
-// Hover name tag: the agent's name, truncated to fit the pixel slab.
-export function nameTagText(name: string): string {
-  return name.length <= NAME_TAG_MAX_CHARS ? name : `${name.slice(0, NAME_TAG_MAX_CHARS - 1)}…`
-}
+// The name tag and its own truncation are gone with the sprite slab that carried them: a hover
+// is the footprint plate now, and `ui/plateModel.ts` owns how a row is clipped.
 
 // Gait variance is derived from a stable hash of the agent's id, never from `Math.random()`:
 // two people watching the same replay must see the same town.

@@ -1,10 +1,13 @@
 import { Fragment, useEffect, useRef } from 'react'
-import { HELP_BUTTON_CLASS } from './HelpButton.js'
 import { stageKeyAllowed } from './useStageKeys.js'
 
 /** The key that opens it — where a person looks for exactly this, which is why the frame meter
  *  had to move off it (`ui/FpsOverlay.tsx`). */
 export const KEY_MAP_KEY = '?'
+
+/** The sheet's id, so a control that opens it can SAY it does — the disclosure pattern the
+ *  signpost's arms already use, and the reason nothing here has to import the opener back. */
+export const KEY_MAP_ID = 'key-map-sheet'
 
 /** Every key the town answers to, in the order a hand finds them. Read off the bindings, not off
  *  a document: `useStageKeys` owns S/F/D/Esc, `render/cameraNav.ts` owns the camera. */
@@ -53,9 +56,10 @@ export function KeyMap({
     if (!open) return
     const onDown = (e: PointerEvent): void => {
       const t = e.target as HTMLElement | null
-      // The corner button is not "outside": closing here and reopening on its own click would
-      // leave a control that cannot put down what it puts up.
-      if (t?.closest(`.${HELP_BUTTON_CLASS}`) != null) return
+      // Whatever opened this is not "outside": closing here and reopening on its own click
+      // would leave a control that cannot put down what it puts up. Asked of the DOM through
+      // the disclosure it declares, so no opener has to be named in this file.
+      if (t?.closest(`[aria-controls='${KEY_MAP_ID}']`) != null) return
       if (!(sheet.current?.contains(t) ?? false)) onOpenChange(false)
     }
     window.addEventListener('pointerdown', onDown)
@@ -80,6 +84,7 @@ export function KeyMap({
     <div className="key-map">
       <div
         className="key-map-sheet"
+        id={KEY_MAP_ID}
         ref={sheet}
         role="dialog"
         aria-label="What the town answers to"
