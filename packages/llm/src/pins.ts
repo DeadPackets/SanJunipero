@@ -11,10 +11,13 @@ export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
 export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
-// Never add Together, Reka, DeepInfra, AkashML, Ambient or Mancer: on the nullable-act probe each
-// returned 100% well-formed Turns, `action: null` on 75-99%; only pre-flight's act bar catches it.
+// No act-emitting caller may route to Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each
+// returned `action: null` on 75-99% of otherwise well-formed Turns; only pre-flight's bar sees it.
 // The fallback IS the pinned model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
+// A gist emits no act and no schema, so the ban above does not reach it: on three live rows
+// DeepInfra kept 4/4 marks with none invented, at 0.08/0.18 against Inceptron's 0.13/0.28.
+export const GIST_PROVIDER_ORDER: string[] = ['DeepInfra']
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
@@ -112,7 +115,12 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   preflight: { ...ON_GLM, maxOutputTokens: 2500 },
   // One long memory set down short at the night boundary. The ask is two or three sentences;
   // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
-  'reflection.gist': { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 200 },
+  'reflection.gist': {
+    ...ON_DEEPSEEK,
+    providerOrder: GIST_PROVIDER_ORDER,
+    reasoning: { enabled: false },
+    maxOutputTokens: 200,
+  },
   // The court writes permanent law, so it gets the mind model: a ruling's params carry the same
   // binding GLM fills 100% and DeepSeek blanked. Its mandatory reasoning bills inside the 4,000.
   arbiter: { ...ON_GLM, maxOutputTokens: 4000 },

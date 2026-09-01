@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 import {
   CEILING_PRICE_PER_M,
   FALLBACK_MODELS,
+  GIST_PROVIDER_ORDER,
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
   PRICE_PER_M,
@@ -18,6 +19,7 @@ import {
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
   expect(PROVIDER_ORDER).toEqual(['Wafer'])
+  expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
@@ -90,6 +92,8 @@ it('★ the fleet: which model and which back end answers for each caller', () =
     voice: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     semantic: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     constructs: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    // No act and no schema, so the act-null ban frees it for the cheaper back end.
+    'reflection.gist': [PROSE_MODEL, GIST_PROVIDER_ORDER],
   }
   for (const [caller, [model, order]] of Object.entries(fleet)) {
     expect(modelFor(caller), caller).toBe(model)
