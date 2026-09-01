@@ -90,7 +90,16 @@ describe('the water a body can and cannot reach is said before the turn is spent
   it('on dry ground a mind with a vessel is told the water is not here, and where it is', () => {
     const said = proseFor(valley(DRY, { bucket: true }).bridge)
     expect(said).toContain('No water is within reach of your hands')
-    expect(said).toContain('The nearest water you know of lies at (13, 40)')
+    expect(said).toContain('The nearest water you know of lies at (13, 40), a way to the east.')
+  })
+
+  // Omar, run B: "The glint's a step west, at (0,64)." The river is at x 13..15 — east of him.
+  // 84 of world B's 105 water refusals were fired from 11 to 13 tiles out, where the glint is
+  // suppressed for being inside the sight box and the coordinate was gated behind thirst.
+  it('the direction is the true one, from the corner where the minds guessed it wrong', () => {
+    const said = proseFor(valley(BELOW_THE_END, { bucket: true }).bridge)
+    expect(said).toContain('(13, 67), a way to the east.')
+    expect(said).not.toContain('west')
   })
 
   // Below the channel's southern end `naturalPlaces` finds no river abreast of the body, so the

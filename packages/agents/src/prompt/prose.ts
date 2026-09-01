@@ -727,7 +727,10 @@ function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld)
   const { x, y } = packet.self
   const w = world.nearestWater?.(x, y) ?? null
   if (w === null) return 'No water is within reach of your hands, and you know of none nearby.'
-  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}).`
+  // Which way and how far, in the words the places block uses. A bare coordinate left the
+  // valley's three southern minds sure the river lay west of them; it lies east (rehearsal5).
+  const said = `${howFar(Math.hypot(w.x - x, w.y - y))} ${bearing(w.x - x, w.y - y)}`
+  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}), ${said}.`
 }
 
 /** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
