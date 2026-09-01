@@ -1,10 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  ACT_FILL,
-  ACT_FILL_MAX_TICKS,
+  ACT_TRACK_MAX_TICKS,
   ACT_MIN_TICKS,
   actChipShown,
-  actFillShown,
+  actTrackShown,
   actFraction,
   actShown,
   trackRun,
@@ -30,20 +30,21 @@ const person = (over: Partial<AgentView> = {}): AgentView => ({
 
 const run = (over: Partial<ActRun> = {}): ActRun => ({ verb: 'chop', total: 30, left: 30, ...over })
 
-// ★ THE WASH IS PAPER A READER STILL HAS TO READ THROUGH. Measured, not asserted, in the same
-// two light bands every other paper in the town is measured in.
-describe('the worked part of the chip is still legible', () => {
-  it('clears AA under the ink, in day and in the deep-night multiply', () => {
-    const r = bandRatios(SPEECH_INK, ACT_FILL)
-    const offenders = (['day', 'night'] as const)
-      .filter((band) => r[band] < AA_RATIO)
-      .map((band) => `${band} — ${r[band].toFixed(2)}:1`)
-    expect(offenders).toEqual([])
+// ★ 7M-B: the fill under the word is gone. Progress is seven blocks over the head — a count and
+// a position before it is ever a hue — so the chip is one flat slab and the reader is never
+// asked to read a word through a wash.
+describe('the chip carries the word and nothing else', () => {
+  it('draws no wash, no waterline and no mask of its own', () => {
+    const src = readFileSync(new URL('./acts.ts', import.meta.url), 'utf8')
+    expect(src).not.toContain('drawWash')
+    expect(src).not.toContain('.mask =')
+    expect(src).not.toContain('ACT_FILL')
   })
 
-  it('is a wash and not a second colour: darker than the paper, lighter than the ink', () => {
-    expect(ACT_FILL).toBeLessThan(SPEECH_FILL)
-    expect(ACT_FILL).toBeGreaterThan(SPEECH_INK)
+  it('keeps the paper and the ink it always had', () => {
+    const r = bandRatios(SPEECH_INK, SPEECH_FILL)
+    expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
+    expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
   })
 })
 
@@ -141,14 +142,14 @@ describe('whose act is worth a word', () => {
   it('keeps the word for the longest act in the game', () => {
     const house = run({ verb: 'build', total: 2880 })
     expect(actShown(person({ activity: { verb: 'build' } }), house)).toBe(true)
-    expect(actFillShown(house)).toBe(false)
+    expect(actTrackShown(house)).toBe(false)
   })
 
   it('fills only while a fill can promise you will see it finish', () => {
-    expect(actFillShown(run({ total: ACT_FILL_MAX_TICKS }))).toBe(true)
-    expect(actFillShown(run({ total: ACT_FILL_MAX_TICKS + 1 }))).toBe(false)
-    expect(actFillShown(run({ total: 30 })), 'felling a tree').toBe(true)
-    expect(actFillShown(run({ total: 3 })), 'tending a patch').toBe(true)
+    expect(actTrackShown(run({ total: ACT_TRACK_MAX_TICKS }))).toBe(true)
+    expect(actTrackShown(run({ total: ACT_TRACK_MAX_TICKS + 1 }))).toBe(false)
+    expect(actTrackShown(run({ total: 30 })), 'felling a tree').toBe(true)
+    expect(actTrackShown(run({ total: 3 })), 'tending a patch').toBe(true)
   })
 })
 

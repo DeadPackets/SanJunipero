@@ -1,5 +1,4 @@
-import type { AgentBody } from '@sj/engine/state'
-import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
+import { TICK_REAL_MS } from '@sj/shared'
 import { FACINGS, facingFrom, type Facing } from './iso.js'
 
 // Character standard v2 sheet layout (forge style bible) — the atlas is the runtime truth.
@@ -33,12 +32,8 @@ export function hitRect(scale: number): { x: number; y: number; w: number; h: nu
     h: HIT_AREA_H / scale,
   }
 }
-export const NAME_TAG_ABOVE_HEAD_PX = 8
-export const NAME_TAG_MAX_CHARS = 16
-// Hover name tag: the agent's name, truncated to fit the pixel slab.
-export function nameTagText(name: string): string {
-  return name.length <= NAME_TAG_MAX_CHARS ? name : `${name.slice(0, NAME_TAG_MAX_CHARS - 1)}…`
-}
+// The name tag and its own truncation are gone with the sprite slab that carried them: a hover
+// is the footprint plate now, and `ui/plateModel.ts` owns how a row is clipped.
 
 // Gait variance is derived from a stable hash of the agent's id, never from `Math.random()`:
 // two people watching the same replay must see the same town.
@@ -253,26 +248,3 @@ export const EMOTE_KINDS = [
   'anger',
 ] as const // mirrors /assets/emotes.json order
 export type EmoteKind = (typeof EMOTE_KINDS)[number]
-
-const NEED_EMOTE_BELOW = 30
-
-export function emoteFor(a: AgentBody, recent: SimEvent[]): EmoteKind | null {
-  if (!a.alive) return null // the renderer's tone handling owns death
-  const mine = (type: string): boolean =>
-    recent.some((ev) => ev.type === type && (ev.payload as { agentId?: string }).agentId === a.id)
-  if (mine('agent_injured')) return 'hurt'
-  if (a.collapsedSinceTick !== null) return 'exclaim'
-  if (a.asleep) return 'sleep'
-  if (a.needs.hunger < NEED_EMOTE_BELOW) return 'hunger'
-  if (a.needs.warmth < NEED_EMOTE_BELOW) return 'cold'
-  if (mine('agent_spoke')) return 'talk'
-  if (
-    recent.some(
-      (ev) =>
-        ev.type === 'weather_changed' &&
-        ['rain', 'storm'].includes((ev.payload as { kind: string }).kind),
-    )
-  )
-    return 'rain'
-  return null
-}

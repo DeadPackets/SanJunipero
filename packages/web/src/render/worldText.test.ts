@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BODY_MIN_PX, TEXT_MIN_PX, WORLD_TEXT_LINE_H } from '../textFloor.js'
-import { CHAR_TAG_FONT_PX, CHAR_TAG_LINE_H } from './characters.js'
-import { TAG_FONT_PX, TAG_LINE_H } from './tooltip.js'
+import { PLATE_FONT_PX, PLATE_ROW_H } from './plate.js'
 import { BUBBLE_FONT_PX, BUBBLE_LINE_H } from './bubbles.js'
 
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
@@ -10,6 +9,7 @@ const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url),
 // Every glyph the product draws onto a canvas is set in one of these four modules.
 const CANVAS_TEXT_FILES = [
   './characters.ts',
+  './plate.ts',
   './tooltip.ts',
   './bubbles.ts',
   '../paper/pages/BondsGraph.tsx',
@@ -29,10 +29,10 @@ describe('the legibility floors themselves', () => {
 
 describe('B2 — world text, readable at ZOOM_MIN where a world px is a CSS px', () => {
   it('sets every canvas glyph at or above the floor', () => {
-    for (const px of [CHAR_TAG_FONT_PX, TAG_FONT_PX, BUBBLE_FONT_PX]) {
+    for (const px of [PLATE_FONT_PX, BUBBLE_FONT_PX]) {
       expect(px).toBeGreaterThanOrEqual(TEXT_MIN_PX)
     }
-    for (const lh of [CHAR_TAG_LINE_H, TAG_LINE_H, BUBBLE_LINE_H]) {
+    for (const lh of [PLATE_ROW_H, BUBBLE_LINE_H]) {
       expect(lh).toBeGreaterThanOrEqual(TEXT_MIN_PX)
     }
   })

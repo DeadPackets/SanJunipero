@@ -10,7 +10,6 @@ import {
   faceFor,
   worldTextScale,
 } from './textFaces.js'
-import { over } from './legibility.js'
 import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles } from './bubbles.js'
 import { tileToScreen } from './iso.js'
 import { fadeArtIn } from './textures.js'
@@ -26,10 +25,11 @@ import type { Scene } from './scene.js'
 /** One tick is 2.5s of flicker, not a caption: an act has to last to be worth a word. */
 export const ACT_MIN_TICKS = 2
 
-/** ★ THE CEILING IS ON THE FILL, NOT ON THE CHIP. `chop` is 30 ticks but a house is
- *  `houseTicks: 2880`: a fill creeping 0.03% a tick reads as broken while telling the truth,
- *  and the word is worth having at any length — a long act keeps its word, loses its fill. */
-export const ACT_FILL_MAX_TICKS = 60
+/** ★ THE CEILING IS ON THE TRACK, NOT ON THE CHIP. `chop` is 30 ticks but a house is
+ *  `houseTicks: 2880`: seven blocks creeping one block every 411 ticks reads as broken while
+ *  telling the truth, and the word is worth having at any length — a long act keeps its word
+ *  and loses its track. */
+export const ACT_TRACK_MAX_TICKS = 60
 
 /** ★ A chip has its own reason to be on screen, and it is not "a bubble would be": the two
  *  used to share `bubbleShown`, so changing who speaks silently changed who works. The stop is
@@ -37,10 +37,6 @@ export const ACT_FILL_MAX_TICKS = 60
 export function actChipShown(zoom: number, inView: boolean): boolean {
   return inView && zoom > GLYPH_ZOOM
 }
-/** MEASURED, not chosen: cream clears the night multiply at 5.19:1, a 0.14 wash fell to 4.17:1
- *  after dark, and 0.08 holds 4.58:1. `acts.test.ts` fails the build if it is pushed back up. */
-const ACT_WASH = 0.08
-export const ACT_FILL: number = over(SPEECH_INK, SPEECH_FILL, ACT_WASH)
 /** Clear of the feet, and clear of the contact shadow under them. */
 const ACT_DROP_PX = 10
 
@@ -75,32 +71,36 @@ export function actShown(a: AgentView, run: ActRun | null, nowTick?: number): bo
   return statusOf(a, nowTick) === 'working'
 }
 
-/** Whether the work is short enough that a fill can promise you will see it finish. */
-export function actFillShown(run: ActRun): boolean {
-  return run.total <= ACT_FILL_MAX_TICKS
+/** Whether the work is short enough that seven blocks can promise you will see it finish. */
+export function actTrackShown(run: ActRun): boolean {
+  return run.total <= ACT_TRACK_MAX_TICKS
 }
 
 export type ActLayer = {
   /** the exact duration, from `action_started`; everything else is read off the world state */
   noteStart(agentId: string, verb: string, duration: number): void
+  /** ★ How far into their job this person is, for the TRACK that wraps their overhead slot —
+   *  0..1 while a short act runs, and null the moment it stops. The chip's own fill is gone:
+   *  progress is seven blocks over the head now, a count and a position before it is a hue. */
+  fractionOf(agentId: string): number | null
   tick(): void
   destroy(): void
 }
 
 type Chip = {
   node: Container
-  wash: Graphics
   w: number
   h: number
   word: string
-  /** the filled width last drawn, so the paper is redrawn only when the work has moved */
-  drawnPx: number
 }
 
 export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
   const chips = new Map<string, Chip>()
   const runs = new Map<string, ActRun>()
   const starts = new Map<string, { verb: string; duration: number }>()
+  /** ONE gate for one act: whoever the chip is willing to name is whoever the track may wrap.
+   *  Read apart, a sleeper with a live `activity` wore a track and no word for it. */
+  let atWork = new Set<string>()
 
   const build = (word: string): Chip => {
     const node = new Container()
@@ -115,42 +115,20 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
     const w = Math.ceil(label.width) + 2 * BUBBLE_PAD
     const h = Math.ceil(label.height) + 2 * BUBBLE_PAD
 
+    // ★ NO MASK, and no wash under the word. The fill was a Graphics mask PER CHIP, which is a
+    // render target per working person — and with the viewport rule that is every working person
+    // on screen. Progress is the overhead track now; the chip is one flat slab with a word on it.
     const paper = new Graphics()
     paper.roundRect(0, 0, w, h, BUBBLE_RADIUS)
     paper.fill(SPEECH_FILL)
     paper.stroke({ width: BUBBLE_STROKE, color: BUBBLE_EDGE, alignment: 1 })
 
-    // THE FILL IS THE PAPER TAKING UP INK, not a bar laid on top of one. It is masked by the
-    // chip's own rounded shape, so the wash cannot square off the corners it runs into.
-    const wash = new Graphics()
-    const shape = new Graphics()
-    shape.roundRect(0, 0, w, h, BUBBLE_RADIUS)
-    shape.fill(0xffffff)
-    wash.mask = shape
-
     const box = new Container()
-    box.addChild(paper, wash, shape, label)
+    box.addChild(paper, label)
     label.position.set(BUBBLE_PAD, BUBBLE_PAD)
     box.position.set(-Math.round(w / 2), 0)
     node.addChild(box)
-    return { node, wash, w, h, word, drawnPx: -1 }
-  }
-
-  const drawWash = (chip: Chip, frac: number): void => {
-    // Whole pixels, stepping as the work does: a smooth crawl interpolated between ticks would
-    // be the one thing on this chip that is not a fact.
-    const px = Math.round(chip.w * frac)
-    if (px === chip.drawnPx) return
-    chip.drawnPx = px
-    chip.wash.clear()
-    if (px <= 0) return
-    chip.wash.rect(0, 0, px, chip.h)
-    chip.wash.fill(ACT_FILL)
-    // THE WATERLINE. A wash light enough to keep the word legible is too light to see at a
-    // glance, so what a viewer actually reads is this 1px ink edge, not the fill behind it.
-    if (px >= chip.w) return
-    chip.wash.rect(px - 1, 0, 1, chip.h)
-    chip.wash.fill(BUBBLE_EDGE)
+    return { node, w, h, word }
   }
 
   const drop = (agentId: string): void => {
@@ -163,6 +141,12 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
   return {
     noteStart: (agentId, verb, duration) => {
       starts.set(agentId, { verb, duration })
+    },
+
+    fractionOf: (agentId) => {
+      const run = runs.get(agentId)
+      if (run === undefined || !atWork.has(agentId) || !actTrackShown(run)) return null
+      return actFraction(run)
     },
 
     tick: () => {
@@ -192,6 +176,7 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
         runs.set(a.id, run)
         if (actShown(a, run, nowTick)) live.add(a.id)
       }
+      atWork = live
       for (const id of [...chips.keys()]) if (!live.has(id)) drop(id)
       if (live.size === 0) {
         scene.tags.setOccupied('acts', [])
@@ -227,8 +212,6 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
           if (scene.wantsMotion()) fadeArtIn(chip.node)
           chips.set(p.id, chip)
         }
-        const run = runs.get(p.id)!
-        drawWash(chip, actFillShown(run) ? actFraction(run) : 0)
         want.push({ ...p, size: { w: chip.w * inv, h: chip.h * inv } })
       }
 

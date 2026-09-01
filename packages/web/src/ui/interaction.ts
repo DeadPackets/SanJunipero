@@ -1,6 +1,8 @@
 import { sanitizeSpokenText } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { kindWords } from './broadcastReady.js'
+import { plateRows, type PlateRow } from './plateModel.js'
+import { stateWord } from './status.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
 
@@ -39,28 +41,79 @@ export function structureTitle(s: Structure): string {
   return carved === '' ? kindWords(s.kind) : carved
 }
 
-// One line for the pointer: what this is, whose it is, how far along it is. Named
-// hoverLabel because charAnim already owns nameTagText(name) for the sprite tag itself.
-export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string): string | null {
-  if (state === null) return null
+/** A viewer is never shown an id: genesis signs its own work with a runner who is nobody, so an
+ *  owner outside the town is left unsaid rather than printed. */
+function ownedBy(state: WorldState, ownerId: string | undefined): string | null {
+  if (ownerId === undefined) return null
+  const owner = state.agents[ownerId]
+  return owner === undefined ? null : `${owner.name}${OWNS}`
+}
+
+/** Who is under this roof, in the town's own words. Two names read as names; a crowd is a count,
+ *  because the plate has one line for it either way. */
+function whoIsInside(state: WorldState, structureId: string): string | null {
+  const names: string[] = []
+  for (const a of Object.values(state.agents)) {
+    if (a.alive && a.insideId === structureId) names.push(a.name)
+  }
+  if (names.length === 0) return null
+  names.sort()
+  if (names.length > 2) return `${names.length} inside`
+  return `${names.join(' & ')} inside`
+}
+
+// ★ THE FOOTPRINT PLATE'S WORDS — what this is, whose it is, and what is happening. Three lines
+// at most, and a line with nothing to say is not drawn at all. Named apart from
+// charAnim's nameTagText(name), which is the sprite tag itself.
+export function hoverPlate(state: WorldState | null, kind: HoverKind, id: string): PlateRow[] {
+  if (state === null) return []
   switch (kind) {
     case 'agent': {
       const a = state.agents[id]
-      return a === undefined ? null : a.name
+      // A person's plate is their name and the one word for what they are doing.
+      return a === undefined
+        ? []
+        : plateRows([
+            { text: a.name, tone: 'name' },
+            { text: stateWord(a, state.tick), tone: 'quiet' },
+          ])
     }
     case 'structure': {
       const s = state.structures[id]
-      return s === undefined ? null : structureTitle(s)
+      if (s === undefined) return []
+      const kindWord = kindWords(s.kind)
+      const title = structureTitle(s)
+      // ONE RULE, said once: line one is what it is, and what identifies it after that is the
+      // carved name and then the owner, whichever of them the world has. `structureTitle` gives
+      // the kind back when nothing is carved, and line one already said that.
+      const identity = [title === kindWord ? null : title, ownedBy(state, s.owner)].filter(
+        (v): v is string => v !== null,
+      )
+      return plateRows([
+        { text: kindWord, tone: 'kind' },
+        { text: identity[0] ?? '', tone: 'name' },
+        { text: whoIsInside(state, s.id) ?? identity[1] ?? '', tone: 'quiet' },
+      ])
     }
     case 'item': {
       const it = state.items[id]
-      if (it === undefined) return null
-      const base = `${it.kind} ×${it.qty}`
-      return it.owner === undefined ? base : `${base} · ${agentName(state, it.owner)}${OWNS}`
+      if (it === undefined) return []
+      const owner = ownedBy(state, it.owner)
+      return plateRows([
+        { text: kindWords(it.kind), tone: 'kind' },
+        { text: `×${it.qty}${owner === null ? '' : ` · ${owner}`}`, tone: 'quiet' },
+      ])
     }
     case 'crop': {
       const c = state.crops[id]
-      return c === undefined ? null : `${c.kind} (stage ${c.stage}/${CROP_STAGES})`
+      if (c === undefined) return []
+      return plateRows([
+        { text: kindWords(c.kind), tone: 'kind' },
+        {
+          text: c.withered ? 'withered' : `stage ${c.stage} of ${CROP_STAGES}`,
+          tone: 'quiet',
+        },
+      ])
     }
   }
 }

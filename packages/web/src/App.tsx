@@ -15,11 +15,13 @@ import {
   SpeechLive,
   SubjectRing,
   QuietStamp,
+  SkyArc,
   toggleFullscreen,
   useStageKeys,
   type RingVerb,
   type Subject,
 } from './stage/index.js'
+import { HelpButton } from './stage/HelpButton.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -302,6 +304,7 @@ export function App() {
       />
       <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
+      <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
       <DirectorCue text={cue} />
       {route.broadcast && <LowerThird store={store} />}
@@ -313,13 +316,12 @@ export function App() {
         pinned={following}
         onCue={setCue}
       />
-      <Signpost
-        open={sheet?.page ?? null}
-        onOpen={onArm}
-        onHelp={() => {
-          setKeysOpen(true)
+      <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
+      <HelpButton
+        open={keysOpen}
+        onToggle={() => {
+          setKeysOpen((v) => !v)
         }}
-        ref={signpostRef}
       />
       <Paper
         page={sheet?.page ?? null}

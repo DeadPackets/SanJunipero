@@ -105,6 +105,12 @@ const CONDITION_TEST: Readonly<Record<Condition, (a: AgentView) => boolean>> = {
   spent: (a) => a.needs.energy < NEED_LOW,
 }
 
+/** One question, no array: a per-frame caller asking about a single condition should not have
+ *  to build the whole list to find out. */
+export function hasCondition(a: AgentView, c: Condition | State): boolean {
+  return c in CONDITION_TEST && CONDITION_TEST[c as Condition](a)
+}
+
 export function conditionsOf(a: AgentView): Condition[] {
   return CONDITIONS.filter((c) => CONDITION_TEST[c](a))
 }

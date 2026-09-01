@@ -111,7 +111,7 @@ import {
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 import type { WorldStore } from '../state/worldStore.js'
-import { hoverLabel } from '../ui/interaction.js'
+import { hoverPlate } from '../ui/interaction.js'
 import { polygonBounds, resolveHit } from './hitShapes.js'
 import { builtFormSpec } from './builtForm.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
@@ -172,7 +172,10 @@ describe('one building, one hitbox, and the building says what a click does', ()
     .join('\n')
 
   const world = (structures: Structure[]): WorldState =>
-    ({ structures: Object.fromEntries(structures.map((s) => [s.id, s])) }) as unknown as WorldState
+    ({
+      structures: Object.fromEntries(structures.map((s) => [s.id, s])),
+      agents: {},
+    }) as unknown as WorldState
 
   it('has no door node, no door graphics and no rectangle hit area left', () => {
     for (const gone of [
@@ -208,9 +211,9 @@ describe('one building, one hitbox, and the building says what a click does', ()
     const house = box(4, 4, 2, 2, 'house')
     const well = box(9, 9, 1, 1, 'well')
     const st = world([house, well])
-    expect(hoverLabel(st, 'structure', house.id)).toBe('house')
-    expect(hoverLabel(st, 'structure', well.id)).toBe('well')
-    expect(hoverLabel(st, 'structure', 'nobody')).toBeNull()
+    expect(hoverPlate(st, 'structure', house.id)[0]?.text).toBe('house')
+    expect(hoverPlate(st, 'structure', well.id)[0]?.text).toBe('well')
+    expect(hoverPlate(st, 'structure', 'nobody')).toEqual([])
     expect(code).not.toContain('Look inside')
   })
 

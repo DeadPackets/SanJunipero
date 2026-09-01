@@ -146,6 +146,10 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
+        // The track over a head is the act layer's number, drawn by the character layer that
+        // owns the slot it wraps. Same shape as `anchorOf`, and for the same reason.
+        const actLayer = acts
+        s.actFraction = (agentId) => actLayer.fractionOf(agentId)
         interior = createInteriorScene(s, store, book, selectAgent)
         s.interior = interior
         interiorRef.current = interior
