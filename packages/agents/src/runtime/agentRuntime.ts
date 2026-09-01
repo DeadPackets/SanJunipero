@@ -24,6 +24,9 @@ import {
   placesKnownLine,
   type ProseWorld,
   standingWallsLine,
+  stasisLine,
+  stillnessAt,
+  type Stillness,
   worldDay,
   type PerceptionPacket,
 } from '../prompt/prose.js'
@@ -247,6 +250,9 @@ export class AgentRuntime {
   // The mind's own last words, oldest first. Perception skips self and the day log dedups a
   // still scene, so without this a mind cannot hear what it has been saying.
   #spoken: string[] = []
+  // Where the feet have been standing, and since when. Null while asleep and after any act
+  // the world took that was not a walk or a word.
+  #still: Stillness | null = null
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -383,6 +389,10 @@ export class AgentRuntime {
   #onTick(tick: number): void {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
+    // A night in bed is not an afternoon spent standing.
+    this.#still = packet.self.asleep
+      ? null
+      : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
@@ -451,13 +461,20 @@ export class AgentRuntime {
     }
   }
 
-  // What the WORLD took, not what the model wrote: sanitized the way the verb sanitizes it, and
-  // only once the submit came back accepted.
+  // What the WORLD took, not what the model wrote: the words are sanitized the way the verb
+  // sanitizes them, and anything but a walk or a word is something happening, which ends a rut.
+  // A word for standing still never arrives here at all — the registry turns it away.
   #noteAccepted(intent: Intent, res: SubmitResult): void {
-    if (!res.ok || intent.verb !== 'speak') return
-    const text: unknown = intent.params.text
-    if (typeof text !== 'string') return
-    this.#spoken = [...this.#spoken, sanitizeSpokenText(text)].slice(-OWN_WORDS_SHOWN)
+    if (!res.ok) return
+    if (intent.verb === 'speak') {
+      const text: unknown = intent.params.text
+      if (typeof text === 'string') {
+        this.#spoken = [...this.#spoken, sanitizeSpokenText(text)].slice(-OWN_WORDS_SHOWN)
+      }
+      if (this.#still !== null) this.#still = { ...this.#still, spoke: true }
+      return
+    }
+    if (intent.verb !== 'walk') this.#still = null
   }
 
   #clearPlanQueue(): void {
@@ -684,6 +701,7 @@ export class AgentRuntime {
       roadLine(canMake, packet, world),
       placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
+      stasisLine(this.#still, tick),
     ]
       .filter((p) => p.length > 0)
       .join(' ')

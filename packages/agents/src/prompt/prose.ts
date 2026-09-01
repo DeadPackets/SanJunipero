@@ -605,6 +605,44 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
+// Two tiles is the same spot: a step to the water butt and back is not a walk that went
+// anywhere. Sixty ticks is one sim-hour, a hundred and eighty is three.
+const STASIS_RADIUS = 2
+const STASIS_TICKS = 60
+const STASIS_LONG_TICKS = 180
+
+/** Where a body has been standing, since when, and whether it has said anything there. */
+export type Stillness = { x: number; y: number; sinceTick: number; spoke: boolean }
+
+/** The count carries on while the feet stay inside the radius, and starts again the moment
+ *  they leave it. The caller drops it to null when an act the world took changed something. */
+export function stillnessAt(
+  was: Stillness | null,
+  x: number,
+  y: number,
+  tick: number,
+): Stillness {
+  if (
+    was === null ||
+    Math.abs(x - was.x) > STASIS_RADIUS ||
+    Math.abs(y - was.y) > STASIS_RADIUS
+  ) {
+    return { x, y, sinceTick: tick, spoke: false }
+  }
+  return was
+}
+
+/** The hour said as an hour. A fact about where the body has been, with no remedy in it: what
+ *  to do about an afternoon spent standing is the mind's to work out. */
+export function stasisLine(still: Stillness | null, tick: number): string {
+  if (still === null) return ''
+  const held = tick - still.sinceTick
+  if (held < STASIS_TICKS) return ''
+  const how = held >= STASIS_LONG_TICKS ? 'half the morning' : 'an hour'
+  const words = still.spoke ? ', saying much the same things' : ''
+  return `You have been in this same spot for ${how}${words}; nothing has come of it.`
+}
+
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
 export function roadLine(m: Makeables, packet: PerceptionPacket, world?: ProseWorld): string {
   return coldHearthLine(packet, world) || makeableRoadLine(m, packet, world)
