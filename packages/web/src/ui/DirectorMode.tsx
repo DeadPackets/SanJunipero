@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
-import type { HeatWindow } from '@sj/shared'
+import { agentName, type HeatWindow } from '@sj/shared'
 import { CUT_MIN_MS, subjectFor } from './directorCut.js'
 import { useEndpointFor, useFeed } from './useEndpoint.js'
 
@@ -93,7 +93,7 @@ export function DirectorMode({
     }
   }, [scene, store, followed, awake])
 
-  const name = followed === null ? null : (state?.agents[followed]?.name ?? followed)
+  const name = followed === null ? null : agentName(state?.agents, followed)
   useEffect(() => {
     onCue?.(name === null ? null : `${pinned === null ? 'DIRECTOR' : 'FOLLOWING'} · ${name}`)
   }, [name, pinned, onCue])

@@ -1,14 +1,15 @@
 import {
   BOND_ACT_OF_KIND,
+  type Bond,
+  type BondLevel,
+  type BondsResponse,
   LEVEL_RANK,
+  agentName,
   bondActCount,
   bondLevel,
   bondRollup,
   bondWarmth,
   tickToMoment,
-  type Bond,
-  type BondLevel,
-  type BondsResponse,
 } from '@sj/shared'
 
 // Warmth, the level thresholds and the valence table live in `@sj/shared`: the reader is handed
@@ -103,14 +104,13 @@ export function pairFacts(
     bond === null
       ? { from: level, to: level, direction: 'steady', sinceDay: 0 }
       : bondArc(bond, nowTick)
-  const nameOf = (id: string): string => people[id]?.name ?? id
   return {
     bond,
     warmth,
     level,
     type,
     arc,
-    words: relationLine(type, level, arc, [nameOf(aId), nameOf(bId)]),
+    words: relationLine(type, level, arc, [agentName(people, aId), agentName(people, bId)]),
   }
 }
 

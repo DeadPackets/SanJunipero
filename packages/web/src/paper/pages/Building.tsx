@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { WorldState } from '@sj/engine/state'
-import { structureTitle } from '../../ui/interaction.js'
+import { structureTitle } from '@sj/shared'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { usePolled } from '../../ui/useEndpoint.js'

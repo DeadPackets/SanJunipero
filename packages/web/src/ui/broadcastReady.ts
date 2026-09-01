@@ -57,12 +57,6 @@ export function machineWordOffenders(sites: readonly StringSite[]): string[] {
   return out
 }
 
-/** A kind is a slug in the engine and PROSE to a viewer. One owner for the conversion, so a
- *  fourth call site cannot forget it the way three already did. */
-export function kindWords(kind: string): string {
-  return kind.replace(/_/g, ' ')
-}
-
 // ── R2 · a caption legible on a phone ─────────────────────────────────────────────────────
 
 /** "1080p" is 1920 x 1080 and the mobile player is 480 CSS px WIDE, so the scale is 480/1920 =

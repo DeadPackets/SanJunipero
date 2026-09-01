@@ -39,8 +39,8 @@ describe('thumbLabel', () => {
     expect(thumbLabel(moment({ cast: [] }), people).cast).toBe('the town')
   })
 
-  it('falls back to the id rather than to nobody', () => {
-    expect(thumbLabel(moment({ cast: ['ghost'] }), people).cast).toBe('ghost')
+  it('says someone for a mind the snapshot has dropped, never its id', () => {
+    expect(thumbLabel(moment({ cast: ['ghost'] }), people).cast).toBe('someone')
   })
 
   it('carries a day with no place as no place', () => {

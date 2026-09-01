@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   CHRONICLE_FALLBACK_ICON,
   CHRONICLE_ICONS,
+  DEFAULT_CONFIG,
   MILESTONE_ICON,
-  chronicleIcon,
   type SimEvent,
+  chronicleIcon,
 } from '@sj/shared'
-import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { CHRONICLE_GLYPH, GLYPH_PALETTE, chronicleGlyph, chronicleLabel } from './importantFeed.js'
 
@@ -99,9 +99,9 @@ describe('chronicleLabel', () => {
     expect(chronicleLabel(ev('mystery_event', { kind: 'far_bell' }), state)).toBeNull()
   })
 
-  it('falls back to raw ids rather than inventing a person before the first snapshot', () => {
+  it('says someone before the first snapshot, never the raw id', () => {
     expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), null)).toBe(
-      'a1 froze.',
+      'someone froze.',
     )
   })
 })

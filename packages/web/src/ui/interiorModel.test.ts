@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, INTERIOR_KINDS, type AssetRecord } from '@sj/shared'
+import { type AssetRecord, DEFAULT_CONFIG, INTERIOR_KINDS } from '@sj/shared'
 import { genesisState, type Item, type WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
@@ -152,9 +152,9 @@ describe('roomCard — who built it', () => {
     expect(c.built).not.toBe('unknown')
   })
 
-  it('names a builder the world has forgotten by the only name it has', () => {
+  it('says someone for a builder the world has forgotten, never its id', () => {
     const c = roomCard(world(), 'house1', RECORDS, { ...PROV, builderId: 'ghost' })!
-    expect(c.built).toBe('Raised by ghost, Day 3')
+    expect(c.built).toBe('Raised by someone, Day 3')
   })
 
   it('says the day it was begun when it is still rising', () => {

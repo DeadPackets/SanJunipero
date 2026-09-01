@@ -1,3 +1,4 @@
+import { agentName } from '@sj/shared'
 import type { BondsResponse } from '@sj/shared'
 import {
   BOND_LEVELS,
@@ -94,8 +95,6 @@ export const ARC_COLOR: Readonly<Record<BondArc['direction'], string>> = {
  *  than asserted (`--night`). */
 export const LENS_BACKGROUND = '#322B38'
 
-const nameOf = (people: PeopleIndex, id: string): string => people[id]?.name ?? id
-
 /**
  * Every living person is a node; only pairs that are more than strangers get a line. A kin edge is
  * oriented PARENT → CHILD however the endpoint stored it, so one family fact draws one mark.
@@ -134,7 +133,7 @@ export function toRelationGraph(
       dash: stroke.dash,
       strokeCount: stroke.strokeCount,
       color: ARC_COLOR[arc.direction],
-      words: relationLine(type, level, arc, [nameOf(people, source), nameOf(people, target)]),
+      words: relationLine(type, level, arc, [agentName(people, source), agentName(people, target)]),
     })
     degree.set(source, (degree.get(source) ?? 0) + 1)
     degree.set(target, (degree.get(target) ?? 0) + 1)
@@ -142,7 +141,7 @@ export function toRelationGraph(
 
   const nodes: BondNode[] = ids.map((id) => ({
     id,
-    name: nameOf(people, id),
+    name: agentName(people, id),
     size: 6 + 2 * (degree.get(id) ?? 0),
     color: people[id]?.alive === false ? NODE_DEAD : NODE_ALIVE,
     alive: people[id]?.alive !== false,

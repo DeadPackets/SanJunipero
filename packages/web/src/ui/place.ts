@@ -1,3 +1,4 @@
+import { agentName, kindWords } from '@sj/shared'
 import type { Structure, TileId, WorldState } from '@sj/engine/state'
 
 // A deliberate viewer-side reimplementation: `nearestStructureKind` lives in `@sj/agents`, which P1
@@ -35,13 +36,13 @@ export const TERRAIN_WORDS: Readonly<Record<TileId, string | null>> = {
 const WATER: TileId = 2
 const DIRT: TileId = 1
 
-const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
-
 /** "Amara’s house" | "the well". A kind is a slug in the engine and prose here — the underscore
  *  never reaches a viewer. */
 export function structureWords(state: WorldState, s: Structure): string {
-  const words = s.kind.replace(/_/g, ' ')
-  return s.owner === undefined ? `the ${words}` : `${nameOf(state, s.owner)}${OWNS} ${words}`
+  const words = kindWords(s.kind)
+  return s.owner === undefined
+    ? `the ${words}`
+    : `${agentName(state.agents, s.owner)}${OWNS} ${words}`
 }
 
 const tileAt = (state: WorldState, x: number, y: number): TileId | null =>

@@ -1,3 +1,4 @@
+import { agentName } from '@sj/shared'
 import type { Moment } from '@sj/shared'
 import type { PeopleIndex } from './bondModel2.js'
 
@@ -8,7 +9,7 @@ export type ThumbLabel = { day: number; cast: string; location: string | null }
 // A postcard, not a screenshot: a real capture of the scene would need a second headless renderer.
 // The deep link and the playback are the substance; this is the affordance.
 export function thumbLabel(m: Moment, people: PeopleIndex): ThumbLabel {
-  const named = m.cast.slice(0, THUMB_CAST_MAX).map((id) => people[id]?.name ?? id)
+  const named = m.cast.slice(0, THUMB_CAST_MAX).map((id) => agentName(people, id))
   const rest = m.cast.length - named.length
   const cast = named.length === 0 ? 'the town' : named.join(', ') + (rest > 0 ? ` +${rest}` : '')
   return { day: m.day, cast, location: m.location }

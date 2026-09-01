@@ -1,3 +1,4 @@
+import { agentName } from '@sj/shared'
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
 import type { LegendRow } from './relationGraph.js'
 
@@ -69,7 +70,6 @@ export function trafficGraph(
   api: SocietyResponse,
   people: PeopleIndex,
 ): { nodes: BondNode[]; links: TrafficLink[] } {
-  const nameOf = (id: string): string => people[id]?.name ?? id
   const kept = api.links.filter((l) => isKind(l.kind) && l.weight > 0)
   const heaviest = kept.reduce((m, l) => Math.max(m, l.weight), 1)
   const degree = new Map<string, number>()
@@ -89,7 +89,7 @@ export function trafficGraph(
       dash: stroke.dash,
       strokeCount: stroke.strokeCount,
       color: stroke.color,
-      words: `${nameOf(l.source)} ${TRAFFIC_WORD[kind].toLowerCase()} ${nameOf(l.target)} — ${times(l.weight)}`,
+      words: `${agentName(people, l.source)} ${TRAFFIC_WORD[kind].toLowerCase()} ${agentName(people, l.target)} — ${times(l.weight)}`,
     }
   })
 
@@ -97,7 +97,7 @@ export function trafficGraph(
     .sort()
     .map((id) => ({
       id,
-      name: nameOf(id),
+      name: agentName(people, id),
       size: 6 + 2 * (degree.get(id) ?? 0),
       color: people[id]?.alive === false ? NODE_DEAD : NODE_ALIVE,
       alive: people[id]?.alive !== false,

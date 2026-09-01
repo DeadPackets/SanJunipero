@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import {
+  type ChronicleLookup,
   MILESTONE_ICON,
+  type SimEvent,
   chronicleIcon,
   chronicleLine,
-  type ChronicleLookup,
-  type SimEvent,
+  kindWords,
 } from '@sj/shared'
 import { chronicleGlyph } from './importantFeed.js'
 import { MARK_GLYPH, marksFrom } from './timelineMarks.js'
@@ -22,7 +23,6 @@ import {
   captionReads,
   captionShortfall,
   figuresAreLive,
-  kindWords,
   TWITCH_FRAME_H,
   machineWordOffenders,
   readinessReport,
