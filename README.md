@@ -19,8 +19,7 @@ key, no network — and become live LLM minds when you ask (`SJ_LIVE=1`). The de
 **physics, never outcomes**: the engine defines what wood, rain, hunger and walls *do*, and
 never what anybody should do about them. The minds noticed the cold and started building
 houses anyway. Watch it run at
-**[sanjunipero.deadpackets.pw](https://sanjunipero.deadpackets.pw)** (when the owner has the
-town up).
+**[sanjunipero.deadpackets.pw](https://sanjunipero.deadpackets.pw)**.
 
 ## The town
 
@@ -52,8 +51,9 @@ action on every call.
 
 **The money.** Every call is booked to a ledger (`_ops.db`) at the rate the account is
 actually charged — reconciled against the provider's bill, not read off a price list — and
-the ledger resumes with the town, so a restart never resets a budget. Measured cost of the
-live cast: **$0.0369 per sim-day** for five minds. A sim-day is 1440 ticks and passes every
+the ledger resumes with the town, so a restart never resets a budget. Across the launch
+rehearsals the live cast measured **$0.12–$0.66 per sim-day** for all five minds, the
+spread being how talkative the day got. A sim-day is 1440 ticks and passes every
 48 real minutes. The scripted default costs $0.00, ever.
 
 **The record.** The world is an event log folded into state. Two viewers folding the same
@@ -76,8 +76,8 @@ database readonly, so nothing an operator does is ever folded back into the town
 
 ## The town's own history
 
-These happened. They were observed in live rehearsal runs, not authored — the quotes are
-verbatim from the minds' own journals and speech logs.
+All of this happened in live rehearsal runs, unauthored. The quotes are verbatim from the
+minds' own journals and speech logs.
 
 **The first house a mind ever built.** Nobody told Yusuf to build — building is a verb, not
 a goal. On day 1 of a live run he set out at dawn in the rain with nine wood and two planks

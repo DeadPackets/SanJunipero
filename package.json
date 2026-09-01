@@ -1,34 +1,35 @@
 {
-  "name": "san-junipero",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
-  "scripts": {
-    "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/town serve",
-    "test": "vitest run",
-    "typecheck": "tsc -b packages/shared packages/engine packages/llm packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator packages/live packages/town && for p in agents arbiter forge narrator town; do tsc -p packages/$p/tsconfig.scripts.json || exit 1; done && tsc -p packages/live/tsconfig.test.json",
-    "lint": "for p in packages/*; do node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js $p || exit 1; done && node node_modules/eslint/bin/eslint.js *.js *.ts",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "knip": "knip",
-    "rehearse": "scripts/rehearse.sh",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm knip && pnpm test"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.5.10",
-    "@sj/agents": "workspace:*",
-    "@sj/llm": "workspace:*",
-    "@sj/shared": "workspace:*",
-    "better-sqlite3": "^13.0.0",
-    "@types/node": "^24.0.0",
-    "eslint": "10.9.1",
-    "eslint-plugin-react-hooks": "7.1.1",
-    "knip": "6.32.3",
-    "tsx": "^4.23.12",
-    "typescript": "^5.9.0",
-    "typescript-eslint": "8.68.0",
-    "vitest": "^3.2.0"
-  }
+ "name": "san-junipero",
+ "packageManager": "pnpm@11.7.0",
+ "private": true,
+ "type": "module",
+ "engines": {
+  "node": ">=24"
+ },
+ "scripts": {
+  "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/town serve",
+  "test": "vitest run",
+  "typecheck": "tsc -b packages/shared packages/engine packages/llm packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator packages/live packages/town && for p in agents arbiter forge narrator town; do tsc -p packages/$p/tsconfig.scripts.json || exit 1; done && tsc -p packages/live/tsconfig.test.json",
+  "lint": "for p in packages/*; do node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js $p || exit 1; done && node node_modules/eslint/bin/eslint.js *.js *.ts",
+  "format": "biome format --write .",
+  "format:check": "biome format .",
+  "knip": "knip",
+  "rehearse": "scripts/rehearse.sh",
+  "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm knip && pnpm test"
+ },
+ "devDependencies": {
+  "@biomejs/biome": "2.5.10",
+  "@sj/agents": "workspace:*",
+  "@sj/llm": "workspace:*",
+  "@sj/shared": "workspace:*",
+  "better-sqlite3": "^13.0.0",
+  "@types/node": "^24.0.0",
+  "eslint": "10.9.1",
+  "eslint-plugin-react-hooks": "7.1.1",
+  "knip": "6.32.3",
+  "tsx": "^4.23.12",
+  "typescript": "^5.9.0",
+  "typescript-eslint": "8.68.0",
+  "vitest": "^3.2.0"
+ }
 }
