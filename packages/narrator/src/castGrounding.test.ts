@@ -68,6 +68,22 @@ describe('the chronicle may name nobody the world has not got', () => {
     expect(namesOutsideRoll(GROUNDED, ROLL)).toEqual([])
   })
 
+  // Both verbatim from run r3: cast_leak dropped real sentences over "Nadias" and "The".
+  it("a possessive of a cast name is that name, not a stranger ending in s", () => {
+    expect(
+      namesOutsideRoll("The rain fell on Nadia\u2019s roof, and spared Yusuf's beside it.", ROLL),
+    ).toEqual([])
+  })
+
+  it('a capital handed out by a quote, colon, or dash is grammar, not a name', () => {
+    expect(
+      namesOutsideRoll(
+        'Salma said, \u201cThe rain is close.\u201d Overhead: nothing. Then \u2014 By morning it had passed \u2014 Roof after roof held.',
+        ROLL,
+      ),
+    ).toEqual([])
+  })
+
   it('a chapter for a day of weather and deer names no one off the roll', async () => {
     const chapter = await renderChapter({
       store: watched().store,

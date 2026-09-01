@@ -55,9 +55,12 @@ export function castLaw(cast: readonly CastMember[], anyoneActed: boolean): stri
 export function namesOutsideRoll(text: string, cast: readonly CastMember[]): string[] {
   const known = new Set(cast.map((c) => c.name))
   const found = new Set<string>()
-  for (const sentence of text.split(/(?<=[.!?])\s+/u)) {
+  // Colons, semicolons, dashes, and quote marks hand the next word its capital the way a full
+  // stop does, and a possessive of a known name is that name, not a stranger ending in s.
+  for (const sentence of text.split(/(?<=[.!?:;\u2014\u2013]["'\u201d\u2019]?)\s+/u)) {
     for (const raw of sentence.trim().split(/\s+/u).slice(1)) {
-      const word = raw.replace(/[^\p{L}]/gu, '')
+      if (/^[\p{Pi}\p{Ps}"'\u2014\u2013-]/u.test(raw)) continue
+      const word = raw.replace(/['\u2019]s(?=\P{L}|$)/u, '').replace(/[^\p{L}]/gu, '')
       if (/^\p{Lu}\p{Ll}+$/u.test(word) && !known.has(word) && !PLACE_WORDS.has(word))
         found.add(word)
     }
