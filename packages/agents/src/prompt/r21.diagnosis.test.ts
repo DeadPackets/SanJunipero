@@ -108,9 +108,9 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
       return Math.min(...d)
     })
     expect(nearest).toEqual([34, 25, 13, 27, 20])
-    expect(CFG.movement.baseTicksPerTile).toBe(1)
+    expect(CFG.movement.baseTilesPerTick).toBe(3)
     // The worst round trip is under a tenth of a sixteen-hour waking day, so distance is not it.
-    expect(Math.max(...nearest) * 2 * CFG.movement.baseTicksPerTile).toBeLessThan(0.1 * 16 * 60)
+    expect((Math.max(...nearest) * 2) / CFG.movement.baseTilesPerTick).toBeLessThan(0.1 * 16 * 60)
   })
 
   it('R14: the town keeps its own meadow, and the far bank is still a bridge away', () => {

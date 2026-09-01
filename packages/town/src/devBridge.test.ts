@@ -254,8 +254,8 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
     )
     // Reachability is the deck's; ORDER is the claim's — the town still had east plots ahead of
     // it in the register, and the two are separated below by taking the deck away again.
-    expect(run.deckTick).toBe(766)
-    expect(run.crossedTick).toBe(1088)
+    expect(run.deckTick).toBe(736)
+    expect(run.crossedTick).toBe(999)
   })
 
   it('★ AND IT IS THE DECK AND NOTHING CACHED: take it away and the claim goes back east', () => {

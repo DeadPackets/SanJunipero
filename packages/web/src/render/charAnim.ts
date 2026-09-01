@@ -120,17 +120,17 @@ export function charPose(
 // ── THE STRIDE FOLLOWS THE GROUND ─────────────────────────────────────────────────────────
 // A walk cycle at a fixed frame time has no relationship to the ground and reads as skating.
 
-/** How far one four-frame cycle carries a body, in tiles: the v4 cadence's 720 ms cycle at the dev world's 400 ms a tile, so the shipped look is reproduced exactly. */
+/** How far one four-frame cycle carries a body, in tiles: the v4 cadence's 720 ms cycle against the 400 ms a tile it was drawn at, so the shipped look is reproduced exactly. */
 export const STRIDE_TILES = 1.8
 
-/** Outside this band the legs slide on purpose: a body crossing a tile in 2 s would otherwise cycle its legs once every 3.6 s, which reads as a freeze rather than an amble.
+/** Outside this band the legs slide on purpose: a body crossing a tile in 2 s would otherwise cycle its legs once every 3.6 s, which reads as a freeze rather than an amble. A body under the debuff walks 1 s a tile and a hale one 667 ms, so the shipped rates sit inside it and only a fast-forward world slides.
  *  The band bounds the world's NOMINAL cadence, not a body's own — see `strideFrameMs`. */
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
 
 /** The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed. Scales the
- *  CLAMPED cadence, not the ideal — inside the clamp all five founders came out at exactly
- *  360 ms at the product's real 2000 ms a tile (5 of 5 distinct only at the dev world's 400 ms). */
+ *  CLAMPED cadence, not the ideal, so a rate outside the band cannot flatten five founders onto
+ *  one cadence — which is what the shipped 667 ms a tile used to do at 2000. */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
   const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length
   return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal)) * strideScale

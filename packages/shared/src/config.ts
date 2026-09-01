@@ -21,8 +21,8 @@ const NeedsSchema = z
 
 const MovementSchema = z
   .object({
-    baseTicksPerTile: z.number().default(1),
-    debuffTicksPerTile: z.number().default(2),
+    baseTilesPerTick: z.number().positive().default(3),
+    debuffTilesPerTick: z.number().positive().default(2),
     sightRadius: z.number().default(12),
     earshotRadius: z.number().default(8),
   })

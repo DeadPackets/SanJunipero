@@ -421,7 +421,7 @@ function drawnTile(scene: Scene, id: string): { x: number; y: number } {
 describe("★ the layer walks each body at the record's pace, not a stopwatch's", () => {
   const config = {
     needs: { debuffThreshold: 30 },
-    movement: { baseTicksPerTile: 1, debuffTicksPerTile: 2 },
+    movement: { baseTilesPerTick: 3, debuffTilesPerTick: 2 },
   }
 
   // The layer reads the wall clock in `onEvents` and the frame's own clock in `tick`; StageMount

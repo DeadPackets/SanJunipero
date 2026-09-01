@@ -158,7 +158,7 @@ describe('the exemptions from the motion band', () => {
 
   it('★ the walk is one of them, and it was over the ceiling before anyone wrote it down', () => {
     const walk = MOTION_EXEMPT.find((e) => e.what === 'walk')
-    expect(walk, 'a body spends a whole sim tick crossing a tile, with no row here').toBeDefined()
+    expect(walk, 'a body spends a whole sim tick crossing ground, with no row here').toBeDefined()
     // the exempted number is the world's, not ours: the widest cadence the renderer's clock
     // will believe, plus the one tick of interpolation buffer that rides on it
     expect(walk!.ms).toBe(TICK_PERIOD_MAX_MS * (1 + WALK_LEAD_TICKS))
