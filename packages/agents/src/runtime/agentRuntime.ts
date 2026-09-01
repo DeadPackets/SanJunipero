@@ -55,6 +55,7 @@ import {
   decideWake,
   disarmBodyAlarm,
   rearmBodyAlarm,
+  rearmConversationWindow,
   DEFAULT_MIND_CONFIG,
   type MindClock,
   type MindConfig,
@@ -433,9 +434,7 @@ export class AgentRuntime {
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
     this.#answerWakeOwed(packet)
-    if (packet.heard.length > 0) {
-      this.#clock.conversationUntilTick = tick + this.#config.conversationWindowTicks
-    }
+    rearmConversationWindow(this.#config, packet, this.#clock, tick)
     this.#handleNight(tick, packet)
     // Morning is consumed by an actual rise, not by the reason firing: a body
     // seen awake in daylight has had its morning.
