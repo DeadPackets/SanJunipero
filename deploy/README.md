@@ -20,8 +20,11 @@ Skip Caddy. The `caddy` service sits behind `--profile edge` and never starts on
 1. `.env` sets `PORT=8090` (any free loopback port) — the town publishes on `127.0.0.1:$PORT` only.
 2. One vhost on the box's nginx forwards the hostname to it; here `add-site
    sanjunipero.deadpackets.pw 8090 --cloudflare-only` wrote it (WebSocket upgrade included).
-3. Cloudflare's proxied record terminates TLS; the origin speaks plain HTTP on :80 and only
-   accepts Cloudflare's ranges. Nothing in this repo needs a certificate.
+3. Cloudflare's proxied record terminates TLS; the origin speaks plain HTTP on :80 and drops
+   any peer that is not a Cloudflare edge. Because the vhost rewrites `$remote_addr` from
+   `CF-Connecting-IP`, an `allow`/`deny` list would reject every real visitor: the lock is a
+   `geo` map on `$realip_remote_addr` (`/etc/nginx/conf.d/cloudflare-edge.conf`) and
+   `if ($cf_edge = 0) { return 444; }` in the vhost. Nothing in this repo needs a certificate.
 4. `docker compose up -d --build` — town only. `docker compose logs -f town` as below.
 
 ## The runbook
@@ -230,7 +233,7 @@ Two kill the process, one stops the minds and leaves the town serving, and two o
 |---|---|---|---|
 | Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $1.77 | Kills the process; a restart refuses until the window rolls. |
 | Anomaly stop | $50 total | ~675 real hours, so 28 days | Kills the process. The town on disk is intact. |
-| Rate tripwire | **8 calls/mind/sim-hour** over 15 min | 1.7x rehearsal 4's measured 4.7 — a runaway, never a price | Stops every mind. The town keeps serving. |
+| Rate tripwire | **14 calls/mind/sim-hour** over 15 min | 1.7x rehearsal 4's measured 4.7 — a runaway, never a price | Stops every mind. The town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | 21x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
 | Provider mix | >70% of mind calls off `PROVIDER_ORDER[0]` | only when the pin is shut out — 52/48 is the measured normal | Prints and files an alert. **Never stops.** |
 

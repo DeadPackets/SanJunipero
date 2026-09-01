@@ -76,7 +76,8 @@ services:
       retries: 3
     # Sized around `assetsHttp`'s `encoded` Map, which never shrinks, so the floor rises with the
     # population. Raise it, never remove it: no limit means the OOM killer takes the whole box.
-    mem_limit: 1g
+    mem_limit: 1.5g
+    memswap_limit: 1.5g
 
   # Behind a profile: a box that already runs its own reverse proxy (nginx in front of Cloudflare)
   # points it at 127.0.0.1:${PORT} and never starts this. `--profile edge` for a bare box.

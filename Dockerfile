@@ -33,7 +33,8 @@ RUN rm -rf node_modules/.pnpm/onnxruntime-node@*/node_modules/onnxruntime-node/b
   node_modules/.pnpm/onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v6/darwin
 
 FROM node:24-slim AS runtime
-RUN corepack enable
+# Prepared here so a boot never reaches the npm registry for the package manager.
+RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 WORKDIR /app
 ENV NODE_ENV=production
 # Copied whole rather than re-installed --prod: better-sqlite3 has no prebuild for this
