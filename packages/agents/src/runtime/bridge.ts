@@ -158,6 +158,8 @@ export class EngineBridge {
     this.#store = opts.store
     this.#simConfig = opts.simConfig
     this.#recentWindowTicks = opts.recentWindowTicks ?? DEFAULT_RECENT_WINDOW_TICKS
+    // Resume at the window's edge: a restart must not read the whole log to throw it away.
+    this.#lastSeq = opts.store.lastSeqThroughTick(opts.loop.tick - this.#recentWindowTicks)
   }
 
   // Drain announcements, then queued intents in arrival order, then run the world systems,
