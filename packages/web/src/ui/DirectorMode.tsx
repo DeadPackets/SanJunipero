@@ -61,12 +61,7 @@ export function DirectorMode({
       .sort()
     const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
     const now = performance.now()
-    const first = followedRef.current === null
-    if (
-      next !== null &&
-      next !== followedRef.current &&
-      (first || now - lastCutRef.current >= CUT_MIN_MS)
-    ) {
+    if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
       followedRef.current = next
       lastCutRef.current = now
       setCut(next)
