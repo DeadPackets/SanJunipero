@@ -2,16 +2,16 @@
 // OpenRouter publishes no dated snapshot for this model, so the bare id is the only id there
 // is; see the pins test for the dated-pin exception.
 export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
-// Single-homed by necessity, not by the load-balancing law: probed on the nullable-act schema,
-// 19 of 20 endpoints returned a Turn with no action on 75-100% of calls; Wafer cleared 36/36 acts.
-export const PROVIDER_ORDER: string[] = ['Wafer']
+// Two homes since the 2026-09-01 bake-off: DeepInfra cleared 60/60 acts under 8-way concurrency
+// with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
+export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
 export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
-// No act-emitting caller may route to Together, Reka, DeepInfra, AkashML, Ambient or Mancer: each
+// No act-emitting caller may route to Together, Reka, AkashML, Ambient or Mancer: each
 // returned `action: null` on 75-99% of otherwise well-formed Turns; only pre-flight's bar sees it.
 // The fallback IS the pinned model; no alias ever answers for it.
 export const FALLBACK_MODELS: string[] = []
@@ -32,7 +32,7 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   // Tripled overnight 2026-08-31 (was 0.04494/0.08988/0.008988); confirmed against a real bill.
   Baidu: { input: 0.14, output: 0.28, cacheRead: 0.028 },
   StreamLake: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
-  DeepInfra: { input: 0.08, output: 0.18, cacheRead: 0.016 },
+  DeepInfra: { input: 0.075, output: 0.25, cacheRead: 0.016 },
 }
 
 // The per-component maximum over every endpoint the ledger has ever routed to, peak legs

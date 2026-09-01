@@ -696,8 +696,8 @@ describe('★ the money, inside the served world', () => {
     expect(stops, 'town work was charged to the cast').toHaveLength(0)
   }, 40_000)
 
-  // ★ One name is pinned with `allow_fallbacks:false`, so one call served by anyone else is a
-  // leak past the pin — and it is still only ever a line on the ops surface.
+  // ★ The allow-list is pinned with `allow_fallbacks:false`, so one call served by anyone else
+  // is a leak past the pin — and it is still only ever a line on the ops surface.
   it('★ names a back end that got past the allow-list, and never stops the town for it', async () => {
     const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
@@ -720,7 +720,7 @@ describe('★ the money, inside the served world', () => {
     const mix = alertsOf(opsDb, 'llm_provider_off_allow_list')
     expect(mix.length, 'the routing left the pin and nobody was told').toBeGreaterThan(0)
     expect(mix[0]).toContain('Baidu 1')
-    expect(mix[0]).toContain('[Wafer]')
+    expect(mix[0]).toContain('[Wafer, DeepInfra]')
     expect(mix[0]).toContain('$0.0100')
     expect(stops, 'a leaked back end must never stop a town').toHaveLength(0)
   }, 40_000)

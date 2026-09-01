@@ -799,26 +799,26 @@ describe('default OpenRouter path extraBody', () => {
       const b = new LlmClient({ db, caller }).requestBody()
       return { models: b.models, order: b.provider.order }
     }
-    expect(body('turn')).toEqual({ models: [MIND_MODEL], order: ['Wafer'] })
+    expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
     expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: ['Inceptron'] })
     // The court rides the mind's pair: a ruling's params carry the same binding a turn's do.
     expect(body('arbiter')).toEqual(body('turn'))
   })
 
-  // One name: `provider.order` load-balances, so a second took 56% of run D at 3x the price and
-  // split the KV cache with the first. A refusal is retried onto the same name.
-  it('★ the request body carries exactly one allowed provider', () => {
-    expect(PROVIDER_ORDER).toEqual(['Wafer'])
+  // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
+  // the other home. Run D's dear second name is gone; DeepInfra costs half of Wafer.
+  it('★ the request body carries exactly the pinned allow-list', () => {
+    expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: ['Wafer'],
+      order: PROVIDER_ORDER,
       allow_fallbacks: false,
     })
   })
 
   // ★ Single-homed, the retry is the whole safety net, so it has to cover a back end that
   // refused as well as one that stalled — and it must not widen the allow-list to do it.
-  it('★ a provider refusal is retried once, onto the same one name', async () => {
+  it('★ a provider refusal is retried once, inside the same allow-list', async () => {
     const db = openDb()
     const model = mockModel([
       { fail: true },
@@ -836,7 +836,7 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: ['Wafer'], allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the

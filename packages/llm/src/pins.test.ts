@@ -18,7 +18,7 @@ import {
 
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
-  expect(PROVIDER_ORDER).toEqual(['Wafer'])
+  expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
   expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
