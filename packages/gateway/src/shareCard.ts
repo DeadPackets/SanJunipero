@@ -248,19 +248,22 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
   router.route('GET', '/card/moment/:day/:time', (_req, res, params) => {
     const asked = splitExt(params.time ?? '')
     const day = Number(/^(?:day)?(\d+)$/.exec(params.day ?? '')?.[1] ?? NaN)
-    if (asked === null || Number.isNaN(momentToTick(day, asked.name))) {
+    const live = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
+    // A day the town has not lived is not a card, and every day beyond it is 43 ms of sharp a
+    // stranger can ask for. The minute is checked and then dropped: one card per day, so the
+    // 1440 minutes of a day share one raster instead of filling the memo with near-copies.
+    if (asked === null || Number.isNaN(momentToTick(day, asked.name)) || day > live) {
       failCard(res, 404, 'not found')
       return
     }
     const read = readDay(deps, day)
-    const live = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
     sendCard(
       res,
       asked.png,
       renderShareCard({
         day: read.day,
         title: read.title,
-        subtitle: `${asked.name} · ${read.subtitle}`,
+        subtitle: read.subtitle,
         heat: readHeat(deps, day),
       }),
       day < live ? CACHE_CLOSED : CACHE_LIVE,

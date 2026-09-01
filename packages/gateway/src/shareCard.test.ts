@@ -44,7 +44,9 @@ function scriptedWorld(dbPath: string): Database.Database {
         emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
     },
   })
-  for (let i = 0; i < 40; i++) loop.step()
+  // Into day 2: a card is refused for a day the town has not lived, so the fixture must live
+  // past every day its links name.
+  for (let i = 0; i < 2 * MINUTES_PER_DAY + 40; i++) loop.step()
   return db
 }
 
@@ -198,13 +200,13 @@ describe('the card route and the tags the app is served with', () => {
     const svg = await res.text()
     expect(svg.startsWith('<svg')).toBe(true)
     expect(svg).toContain('What the Fire Took')
-    expect(svg).toContain('19:31 · the night the roof went')
+    expect(svg).toContain('the night the roof went')
     expect(svg).toContain('Day 1')
   })
 
   it('names a day the narrator has not written by its number, rather than failing', async () => {
-    const svg = await (await fetch(`${base}/card/moment/9/06:00.svg`)).text()
-    expect(svg).toContain('Day 9')
+    const svg = await (await fetch(`${base}/card/moment/2/06:00.svg`)).text()
+    expect(svg).toContain('Day 2')
     expect(svg).toContain(TOWN_NAME)
   })
 
@@ -212,6 +214,16 @@ describe('the card route and the tags the app is served with', () => {
     expect((await fetch(`${base}/card/moment/1/99:99.svg`)).status).toBe(404)
     expect((await fetch(`${base}/card/moment/1/99:99.png`)).status).toBe(404)
     expect((await fetch(`${base}/card/moment/1/19:31.gif`)).status).toBe(404)
+  })
+
+  /** Every (day, minute) pair used to be its own SVG and its own 43 ms sharp job, over a day
+   *  with no ceiling — unbounded CPU from a stranger with a URL. */
+  it('★ draws only days the town has lived, and one card for all 1440 minutes of one', async () => {
+    expect((await fetch(`${base}/card/moment/9/06:00.png`)).status).toBe(404)
+    expect((await fetch(`${base}/card/moment/999999/06:00.svg`)).status).toBe(404)
+    const noon = await (await fetch(`${base}/card/moment/1/12:00.svg`)).text()
+    const night = await (await fetch(`${base}/card/moment/1/23:59.svg`)).text()
+    expect(noon).toBe(night)
   })
 
   // Twitter, Slack, Discord, Facebook, LinkedIn and iMessage all refuse an SVG for `og:image`.
@@ -284,7 +296,7 @@ describe('the card route and the tags the app is served with', () => {
   })
 
   it('keeps the living day’s card on a short lease — it is rewritten as the day is lived', async () => {
-    const live = await fetch(`${base}/card/moment/0/06:00.svg`)
+    const live = await fetch(`${base}/card/moment/2/06:00.svg`)
     expect(live.headers.get('cache-control')).toBe('public, max-age=300')
   })
 })
