@@ -2,8 +2,12 @@ import {
   BOND_VALENCE,
   decayWarmth,
   MINUTES_PER_DAY,
+  nightStartTick,
+  REFLECTION_SETTLE_MS,
   sanitizeSpokenText,
   simTimeFromTick,
+  stateHash,
+  TICK_REAL_MS,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
@@ -80,6 +84,17 @@ const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 const DAWN_MINUTES = 6 * 60
 export function nightOf(tick: number): number {
   return Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY)
+}
+
+// Every mind asleep at dusk asked for its reflection in the same second, and one back end refused
+// most of them. The whole spread stays inside REFLECTION_SETTLE_MS, so a town closing during it
+// still waits out the last mind's ask rather than losing that night.
+const REFLECTION_STAGGER_TICKS = Math.ceil(REFLECTION_SETTLE_MS / TICK_REAL_MS)
+
+/** Which tick of the night this mind may begin reflecting on. Deterministic, so a mind that
+ *  restarts mid-night keeps its place in the spread instead of drawing a new one. */
+export function reflectionOffsetTicks(agentId: string): number {
+  return Number.parseInt(stateHash(agentId).slice(0, 8), 16) % REFLECTION_STAGGER_TICKS
 }
 
 function messageOf(err: unknown): string {
@@ -713,7 +728,11 @@ export class AgentRuntime {
       this.#dayLog = []
       this.#prevMomentSentences = new Set()
     }
-    if (isNight && packet.self.asleep) {
+    if (
+      isNight &&
+      packet.self.asleep &&
+      tick - nightStartTick(tick) >= reflectionOffsetTicks(this.#agentId)
+    ) {
       const night = nightOf(tick)
       if (night >= 0 && this.#reflectedNight !== night) void this.#runNight(night)
     }

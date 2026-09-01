@@ -4,7 +4,13 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { ARBITER_DB_FILE, DISCOVERY_EVENT, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import {
+  ARBITER_DB_FILE,
+  DISCOVERY_EVENT,
+  MINUTES_PER_DAY,
+  REFLECTION_SETTLE_MS,
+  type SimEvent,
+} from '@sj/shared'
 import type { TickHandler } from '@sj/engine'
 import {
   EngineBridge,
@@ -82,9 +88,6 @@ const RECOGNIZER_EVENTS = ['agent_moved', 'agent_spoke', 'agent_expressed', 'ite
 /** How many of a day's words the tier-2.5 pass is shown. A very loud day must not build an
  *  unbounded prompt; the most recent words are the ones a first is most likely to be in. */
 const SEMANTIC_RECORD_CAP = 300
-/** A container gives about ten seconds before SIGKILL; losing a night's reflection is survivable
- *  and hanging the shutdown is not. */
-const REFLECTION_SETTLE_MS = 5_000
 /** `dozeTicks` is the one `MIND_CONFIG` dial denominated in real seconds — it is an HTTP retry
  *  backoff — so it is the only one this world's 2 500 ms tick may rescale. */
 const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }

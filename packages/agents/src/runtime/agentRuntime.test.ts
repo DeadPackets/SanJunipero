@@ -17,8 +17,10 @@ import {
 } from '@sj/engine'
 import {
   MINUTES_PER_DAY,
+  REFLECTION_SETTLE_MS,
   SimConfigSchema,
   stateHash,
+  TICK_REAL_MS,
   type DiscoveryCredit,
   type SimConfig,
 } from '@sj/shared'
@@ -29,6 +31,7 @@ import {
   OPAQUE_REFUSAL,
   REFUSAL_MEMORY_TICKS,
   REPEATED_REFUSAL,
+  reflectionOffsetTicks,
   refusalMemoryText,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
@@ -1920,5 +1923,29 @@ describe("a beat spent on one's own past", () => {
     expect(prompts[1]!.find((m) => m.role === 'user')!.text).toBe(
       'You turn back the pages of your own book:\nDay 1: The roof held.',
     )
+  })
+})
+
+// ★ r3: five minds asleep at dusk asked for their reflections in the same second, and 44-46% of
+// those attempts were refused at the door by the one back end serving all of them.
+describe('the night boundary is staggered', () => {
+  const CAST = ['tamar', 'omar', 'nadia', 'yusuf', 'leila']
+
+  // Pinned, not recomputed: a mind restarting mid-night must keep the place in the spread it
+  // had before, and a new hash would silently hand it someone else's.
+  it('gives one mind the same offset across restarts and releases', () => {
+    expect(CAST.map(reflectionOffsetTicks)).toEqual([2, 2, 2, 1, 0])
+  })
+
+  it('does not put the whole cast in the same instant', () => {
+    expect(new Set(CAST.map(reflectionOffsetTicks)).size).toBeGreaterThan(1)
+  })
+
+  // The spread must fit inside the grace a closing town gives a reflection, or a shutdown lands
+  // in it and the night is lost rather than merely delayed.
+  it('stays inside the settle a closing town waits out', () => {
+    for (const id of CAST) {
+      expect(reflectionOffsetTicks(id) * TICK_REAL_MS, id).toBeLessThan(REFLECTION_SETTLE_MS)
+    }
   })
 })

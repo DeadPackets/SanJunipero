@@ -8,6 +8,8 @@ export type Season = (typeof SEASONS)[number]
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 
 export const DAWN_HOUR = 5
+// The hour `SimTime.isNight` turns over on, which is the hour every sleeping mind's night begins.
+const NIGHT_HOUR = 20
 
 // The only phase derivation in the codebase. `SimTime.isNight` is the older two-way
 // clock and every landed caller keeps it — the two disagree at dusk on purpose.
@@ -19,10 +21,24 @@ export function dayPhaseFromTick(tick: number): DayPhase {
   return 'day'
 }
 
+const tickOfHour = (tick: number, hour: number): number =>
+  Math.floor(tick / MINUTES_PER_DAY) * MINUTES_PER_DAY + hour * 60
+
 export function nextDawnTick(tick: number): number {
-  const dawn = Math.floor(tick / MINUTES_PER_DAY) * MINUTES_PER_DAY + DAWN_HOUR * 60
+  const dawn = tickOfHour(tick, DAWN_HOUR)
   return tick < dawn ? dawn : dawn + MINUTES_PER_DAY
 }
+
+/** The most recent turn of `isNight` at or before this tick — the instant the whole fleet
+ *  crosses into night together, and the only shared origin an anti-herd offset can measure from. */
+export function nightStartTick(tick: number): number {
+  const dusk = tickOfHour(tick, NIGHT_HOUR)
+  return tick >= dusk ? dusk : dusk - MINUTES_PER_DAY
+}
+
+/** A container gives about ten seconds before SIGKILL; losing a night's reflection is survivable
+ *  and hanging the shutdown is not, so a closing town waits this long for one and no longer. */
+export const REFLECTION_SETTLE_MS = 5_000
 
 export type SimTime = {
   tick: number
@@ -44,6 +60,6 @@ export function simTimeFromTick(tick: number): SimTime {
   const dayOfSeason = (dayOfYear % DAYS_PER_SEASON) + 1
   const hour = Math.floor(minuteOfDay / 60)
   const minute = minuteOfDay % 60
-  const isNight = hour >= 20 || hour < 6
+  const isNight = hour >= NIGHT_HOUR || hour < 6
   return { tick, year, season, dayOfSeason, dayOfYear, hour, minute, isNight }
 }
