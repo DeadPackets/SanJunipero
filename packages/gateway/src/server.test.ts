@@ -272,4 +272,16 @@ describe('what a stranger cannot do to the town', () => {
     await wait(300)
     expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
   }, 20000)
+
+  it('★ answers one `live` per scrub window, not one full snapshot per 40-byte frame', async () => {
+    const gw = await gateway()
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    for (let i = 0; i < 20; i++) sock.send(JSON.stringify({ t: 'live' }))
+    await wait(200)
+    expect(frames.filter((f) => f.includes('"t":"snapshot"'))).toHaveLength(1)
+  }, 20000)
 })

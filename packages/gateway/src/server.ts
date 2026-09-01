@@ -12,7 +12,7 @@ import {
 import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
-import { OPEN, SocketHub } from './hub.js'
+import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
@@ -280,11 +280,14 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (!greeted) sock.close(CLOSE_BAD_HELLO)
     }, HELLO_DEADLINE_MS)
     let scrubAt = 0 // last answered scrub, for coalescing
+    let liveAt = 0 // last answered `live`, on its own clock: a drag ends with one of them
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
+      // A ~120 KB reply to a viewer already a megabyte behind is memory nobody will ever read.
+      if (sock.bufferedAmount > MAX_BUFFERED) return
       if (!takeScrubBudget()) {
         sock.send(busyScrubJson(req.reqId))
         return
@@ -351,6 +354,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           if (next !== null && sock.readyState === OPEN) answerScrub(next)
         }, SCRUB_MIN_MS - since)
       } else if (msg.t === 'live') {
+        // A full snapshot per 40-byte frame, otherwise: the same floor a scrub gets, on its own
+        // clock so ending a drag is never the ask that gets dropped.
+        const now = Date.now()
+        if (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
+        liveAt = now
         sock.send(snapshotJson())
       }
     })
