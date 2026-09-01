@@ -18,7 +18,7 @@ import {
   type SimEvent,
 } from '@sj/shared'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
-import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge } from './bridge.js'
+import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge, ROLLED_BACK } from './bridge.js'
 
 const AGENT = 'tamar'
 
@@ -393,7 +393,7 @@ describe('nearestSource: where the missing material stands', () => {
 
 // A bare world with no systems running, so the only thing in the log is what the bridge put
 // there. Same `let handler` wiring the harnesses above use — TickLoop takes onTick once.
-function announceHarness(): {
+function announceHarness(world: TickHandler = () => {}): {
   store: EventStore
   loop: TickLoop
   bridge: EngineBridge
@@ -428,7 +428,7 @@ function announceHarness(): {
     },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(() => {})
+  handler = bridge.wrapTickHandler(world)
   return { store, loop, bridge, config, terrain }
 }
 const typesOf = (store: EventStore): string[] => store.readFrom(0).map((e: SimEvent) => e.type)
@@ -445,6 +445,34 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
       makes: ['waterskin'],
     })
     expect(typesOf(store)).not.toContain(DISCOVERY_EVENT) // nothing before the tick
+    loop.step()
+    expect(typesOf(store)).toContain(DISCOVERY_EVENT)
+  })
+
+  // ★ The tick rolls back on a throw, but a resolved promise cannot: the mind went on
+  // believing it had walked, and the discovery it had announced was gone from the log for good.
+  it('★ a tick that comes apart tells the minds so, and keeps the announcement', async () => {
+    let falling = true
+    const { store, loop, bridge } = announceHarness(() => {
+      if (falling) throw new Error('the world systems fell over')
+    })
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:waterskin',
+      name: 'stitch a waterskin',
+      kind: 'craft',
+      byId: 'a1',
+      intent: 'carry water in a hide',
+      makes: ['waterskin'],
+    })
+    const p = bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
+
+    expect(() => {
+      loop.step()
+    }).toThrow('fell over')
+    expect(await p).toEqual({ ok: false, reason: ROLLED_BACK })
+    expect(typesOf(store)).not.toContain(DISCOVERY_EVENT)
+
+    falling = false
     loop.step()
     expect(typesOf(store)).toContain(DISCOVERY_EVENT)
   })
