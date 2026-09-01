@@ -17,6 +17,7 @@ import {
   genesisState,
   GENESIS_FORD,
   isPassable,
+  foundersKnowTheVillage,
   makeGenesisWorld,
   replayFromGenesis,
   replayLatest,
@@ -673,6 +674,11 @@ async function main(): Promise<void> {
         ageDays: m.ageDays,
       })
     }
+    for (const e of foundersKnowTheVillage(
+      MINDS.map((m) => m.id),
+      Object.keys(state.structures),
+    ))
+      emit(e.type, e.payload)
     // The staged affliction: one founder wakes on day zero with a fever nobody has been told
     // about. Recovery or death both pass the criterion; silence does not.
     emit('agent_afflicted', { agentId: SICK_ONE, kind: 'illness', severity: 1 })

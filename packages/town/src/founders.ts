@@ -13,6 +13,7 @@ import {
   type LawQueue,
   doorTile,
   findPath,
+  foundersKnowTheVillage,
   isAdjacentToRect,
   isPassable,
   isRoofedFire,
@@ -610,9 +611,15 @@ export function makeFoundersOnTick(
           // Absent is `sw`, so the frozen fixture — all six of whose buildings face sw — folds
           // the payload it always folded.
           ...(s.facing === 'sw' ? {} : { facing: s.facing }),
+          ...(s.name === undefined ? {} : { name: s.name }),
         })
         emit('structure_completed', { id: s.id })
       }
+      for (const e of foundersKnowTheVillage(
+        cast.map((f) => f.id),
+        structures.map((s) => s.id),
+      ))
+        emit(e.type, e.payload)
       if (opts.holdings === true) {
         for (const h of devHoldings(structures)) {
           emit('item_spawned', {
