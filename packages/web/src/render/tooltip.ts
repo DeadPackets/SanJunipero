@@ -8,7 +8,10 @@ import { worldTextScale } from './textFaces.js'
 export const TAG_GAP_PX = 6,
   EDGE_PAD_PX = 8,
   STACK_STEP_PX = 4
-export const MAX_STACK_STEPS = 3
+/** Six, not three: a bubble grown to the whole sentence is 420 world px wide, so far more of
+ *  them collide than when a box stopped at 210. A plate pushed past the sixth is off its own
+ *  speaker anyway and `onLeash` hides it, which beats compositing two of them. */
+export const MAX_STACK_STEPS = 6
 
 /** Where a label points. `sy` is the anchor's BASE and `topY` the top of what is DRAWN.
  *  `prefer` is which side is tried FIRST: a footprint plate is welded to the ground point, so

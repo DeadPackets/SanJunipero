@@ -145,7 +145,7 @@ describe('placeTag — one rule for every label in the product', () => {
     expect(taken.y - (moved.y + moved.h)).toBe(STACK_STEP_PX)
   })
 
-  it('clears up to three occupied boxes and never loops for ever', () => {
+  it('clears up to MAX_STACK_STEPS occupied boxes and never loops for ever', () => {
     const a = anchor(400, 400)
     const stack: Rect[] = []
     for (let i = 0; i < MAX_STACK_STEPS; i++) {

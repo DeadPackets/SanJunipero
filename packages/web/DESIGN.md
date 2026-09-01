@@ -91,9 +91,14 @@ inside; a person answers their name and the one word for what they are doing. A 
 to say is not drawn.
 
 Speech itself is drawn **in the canvas**, not the DOM: `render/bubbles.ts` draws a 2px ink box on
-a 4px radius with a three-step stair tail, washed toward the speaker's own colour at 15%. Two
-lines then `…`; the nearest three speakers get a box and everyone else a `…` pill; at zoom 0.25
-everything collapses to the pill.
+a 4px radius with a three-step stair tail, washed toward the speaker's own colour at 15%.
+**The box grows to the sentence and nothing is cut** — it wrapped at 210 world px and stopped at
+two lines, so a spoken line arrived as "Sit down, Sa…" and the other 66 characters were seen by
+nobody. `BUBBLE_MAX_PX` is 420 and there is no line ceiling at all; the only bound left is
+`sanitizeSpokenText`'s own 240 characters, and a longer line is held longer (3.5s + 40ms a
+character). Everybody the camera can see gets a box; at zoom 0.25 everything collapses to a `…`
+pill. Wider boxes collide far more often, so `MAX_STACK_STEPS` is 6 rather than 3 — past that
+`onLeash` hides a bubble rather than let two composite.
 
 **One occupancy.** `render/tooltip.ts` is the label layer and owns the only table of taken screen
 space, keyed by who owns the boxes (`bubbles`, `plate`). Everybody writes theirs and reads
