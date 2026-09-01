@@ -6,6 +6,7 @@ import { createWorldStore } from '../state/worldStore.js'
 import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
+import { HelpButton } from '../stage/HelpButton.js'
 import { KEY_MAP_KEY } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
@@ -52,7 +53,7 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
 
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
-    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {}, onHelp: () => {} }))
+    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {} }))
 
   it('hangs four arms, in the order the direction picked', () => {
     expect([...ARMS]).toEqual(['folk', 'chronicle', 'found', 'laws'])
@@ -82,16 +83,46 @@ describe('the signpost', () => {
     expect(post('folk')).toContain('data-open="yes"')
   })
 
-  // ★ The key map answered '?' and nothing on screen said so, so the one sheet that explains
-  // the town could only be found by a viewer who already knew it was there.
-  it('★ hangs a way into the key map off the end of the post', () => {
+  // ★ 6E supersedes the fifth arm: the way into the key map is the corner button, so the post
+  // carries the four sections and nothing else.
+  it('★ hangs four arms and no fifth — help is the corner button now', () => {
     const html = post(null)
-    // named for the sheet it opens, so a screen reader hears one name for one thing
-    expect(html).toContain(`aria-label="What the town answers to"`)
-    expect(html).toContain(`>${KEY_MAP_KEY}<`)
-    // it is not one of the four: it opens no page and presses for none
+    expect(html.match(/<button/g)).toHaveLength(ARMS.length)
+    expect(html).not.toContain(`>${KEY_MAP_KEY}<`)
     expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])
     expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(ARMS.length)
+  })
+
+  it('★ names the corner button for the sheet it opens, at 44px in a corner of its own', () => {
+    const html = renderToStaticMarkup(
+      createElement(HelpButton, { open: false, onToggle: () => {} }),
+    )
+    expect(html).toContain('aria-label="What the town answers to"')
+    expect(html).toContain(`>${KEY_MAP_KEY}<`)
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('aria-expanded="false"')
+    expect(
+      renderToStaticMarkup(createElement(HelpButton, { open: true, onToggle: () => {} })),
+    ).toContain('aria-expanded="true"')
+
+    const css = src('../ui/chrome.css')
+    const body = /\.help-button \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(body).toContain('width: 44px')
+    expect(body).toContain('height: 44px')
+    expect(body).toMatch(/left: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    expect(body).toMatch(/bottom: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+  })
+
+  // The button toggles, so the click-away that shuts the sheet must not count it as away.
+  it('★ leaves the corner button out of the key map’s own click-away', () => {
+    expect(src('../stage/KeyMap.tsx')).toContain('HELP_BUTTON_CLASS')
+  })
+
+  it('★ is what the app mounts, with the arm’s wiring kept', () => {
+    const app = src('../App.tsx')
+    expect(app).toMatch(/<HelpButton\s+open=\{keysOpen\}/)
+    expect(app).toContain('setKeysOpen((v) => !v)')
+    expect(app).not.toContain('onHelp')
   })
 
   it('names itself for a screen reader and puts the post under the arms', () => {

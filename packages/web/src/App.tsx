@@ -21,6 +21,7 @@ import {
   type RingVerb,
   type Subject,
 } from './stage/index.js'
+import { HelpButton } from './stage/HelpButton.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -315,13 +316,12 @@ export function App() {
         pinned={following}
         onCue={setCue}
       />
-      <Signpost
-        open={sheet?.page ?? null}
-        onOpen={onArm}
-        onHelp={() => {
-          setKeysOpen(true)
+      <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
+      <HelpButton
+        open={keysOpen}
+        onToggle={() => {
+          setKeysOpen((v) => !v)
         }}
-        ref={signpostRef}
       />
       <Paper
         page={sheet?.page ?? null}

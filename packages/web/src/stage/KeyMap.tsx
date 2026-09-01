@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react'
+import { HELP_BUTTON_CLASS } from './HelpButton.js'
 import { stageKeyAllowed } from './useStageKeys.js'
 
 /** The key that opens it — where a person looks for exactly this, which is why the frame meter
@@ -51,7 +52,11 @@ export function KeyMap({
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
-      if (!(sheet.current?.contains(e.target as Node) ?? false)) onOpenChange(false)
+      const t = e.target as HTMLElement | null
+      // The corner button is not "outside": closing here and reopening on its own click would
+      // leave a control that cannot put down what it puts up.
+      if (t?.closest(`.${HELP_BUTTON_CLASS}`) != null) return
+      if (!(sheet.current?.contains(t) ?? false)) onOpenChange(false)
     }
     window.addEventListener('pointerdown', onDown)
     return () => {
