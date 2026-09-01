@@ -5,7 +5,8 @@ import { decodePng, encodePng, type RawImage } from './post/raw.js'
 import { makePlaceholder } from './placeholder.js'
 import { assetPromptParts, targetSize } from './styleBible.js'
 import { loadForgeConfig, type ForgeConfig } from './forgeConfig.js'
-import { SpendLedger } from './spendLedger.js'
+import { AnomalyStopError, SpendLedger } from './spendLedger.js'
+import { BudgetExceededError } from './budget.js'
 import { runVisionGate } from './visionQa/gate.js'
 import { CRITERIA, totalScore } from './visionQa/verdict.js'
 import type { VisionJudgeFn } from './visionQa/visionJudge.js'
@@ -85,7 +86,8 @@ export function createForge(deps: {
       throw new Error(`${assetId}: no generation survived the chain in ${DRAW_TRIES} tries`)
     }
 
-    // contract: commission never rejects on generation failure — every path registers an asset
+    // contract: commission never rejects on generation failure — every path registers an asset.
+    // A spend stop is not a generation failure: it is the alarm, and it leaves by the caller.
     const res = await runVisionGate({
       assetId,
       klass,
@@ -96,7 +98,10 @@ export function createForge(deps: {
       config,
       footprint,
       regenerate: draw,
-    }).catch(() => null)
+    }).catch((err: unknown) => {
+      if (err instanceof AnomalyStopError || err instanceof BudgetExceededError) throw err
+      return null
+    })
 
     const last = res?.verdicts.at(-1)
     const png =
