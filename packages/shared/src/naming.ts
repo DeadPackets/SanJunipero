@@ -21,3 +21,16 @@ export function assertQuotedName(name: string, sources: readonly NameSource[]): 
   }
   return null
 }
+
+// R4: a viewer is never shown an id. Where the world has no name for somebody — a mind the
+// snapshot has dropped, or the genesis runner, who is nobody — the town says so instead.
+export const SOMEONE = 'someone'
+
+export const personWords = (name: string | undefined): string => name ?? SOMEONE
+
+export type NameIndex = Readonly<Record<string, { name: string } | undefined>>
+
+/** The one way to turn an agent id into words. An id goes in and prose comes out, so no caller
+ *  is left holding the id — which is how `?? id` stopped being a thing anyone could type. */
+export const agentName = (index: NameIndex | null | undefined, id: string): string =>
+  personWords(index?.[id]?.name)
