@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
-import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
+import { fold, genesisState, type TickLoop, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, T_GRASS, T_WATER } from '@sj/shared'
 import { perceptionToProse, placesKnownLine } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
-import { lastTurnLine } from '../runtime/agentRuntime.js'
+import { lastTurnLine, wantedWater } from '../runtime/agentRuntime.js'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
 
 // The ring-1 showcase ground, measured off `showcaseTerrain()`: a 76x76 map whose (0, 0) sits at
@@ -20,12 +20,16 @@ const BELOW_THE_END = { x: 2, y: 70 }
 const AGENT = 'tamar'
 const BUCKET = 'item_bucket'
 
-type Town = { bridge: EngineBridge; step: () => void }
+type Town = { bridge: EngineBridge; loop: TickLoop; step: () => void }
 
 function valley(at: { x: number; y: number }, opts: { bucket?: boolean } = {}): Town {
   const terrain: TileId[][] = Array.from({ length: SPAN }, (_, y) =>
-    Array.from({ length: SPAN }, (_, x): TileId =>
-      x >= CHANNEL.x0 && x <= CHANNEL.x1 && y >= CHANNEL.y0 && y <= CHANNEL.y1 ? T_WATER : T_GRASS,
+    Array.from(
+      { length: SPAN },
+      (_, x): TileId =>
+        x >= CHANNEL.x0 && x <= CHANNEL.x1 && y >= CHANNEL.y0 && y <= CHANNEL.y1
+          ? T_WATER
+          : T_GRASS,
     ),
   )
   const store = new EventStore(openDb(':memory:'))
@@ -40,24 +44,30 @@ function valley(at: { x: number; y: number }, opts: { bucket?: boolean } = {}): 
   const { bridge, loop } = wireTown({ state, store, seed: 'water', startTick: 720 })
   return {
     bridge,
+    loop,
     step: () => {
       loop.step()
     },
   }
 }
 
-const proseFor = (bridge: EngineBridge, lastOutcome = ''): string =>
-  perceptionToProse(bridge.perception(AGENT), undefined, {
-    isWalkable: (x, y) => bridge.isWalkable(x, y),
-    isEdible: (kind) => bridge.isEdible(kind),
-    waterAtHand: () => bridge.waterAtHand(AGENT),
-    nearestWater: (x, y) => bridge.nearestWater(x, y),
-    distantWater: (x, y) => bridge.distantWater(x, y),
-    waterRefused: () => lastOutcome.includes('water'),
+const thirsty = (t: Town): Town => {
+  t.loop.state.agents[AGENT]!.thirst = 10
+  return t
+}
+
+const proseFor = (t: Town, lastOutcome = ''): string =>
+  perceptionToProse(t.bridge.perception(AGENT), undefined, {
+    isWalkable: (x, y) => t.bridge.isWalkable(x, y),
+    isEdible: (kind) => t.bridge.isEdible(kind),
+    waterAtHand: () => t.bridge.waterAtHand(AGENT),
+    nearestWater: (x, y) => t.bridge.nearestWater(x, y),
+    distantWater: (x, y) => t.bridge.distantWater(x, y),
+    waterRefused: () => wantedWater(lastOutcome),
   })
 
-const placesFor = (bridge: EngineBridge): string =>
-  placesKnownLine(bridge.knownPlaces(AGENT), bridge.perception(AGENT))
+const placesFor = (t: Town): string =>
+  placesKnownLine(t.bridge.knownPlaces(AGENT), t.bridge.perception(AGENT))
 
 async function refusal(
   t: Town,
@@ -73,63 +83,58 @@ describe('the water a body can and cannot reach is said before the turn is spent
   it('at the bank the hands are told they are at water, whatever the throat says', () => {
     const t = valley(BANK)
     expect(t.bridge.waterAtHand(AGENT)).toBe(true)
-    const said = proseFor(t.bridge)
+    const said = proseFor(t)
     expect(said).toContain('Water lies within reach of your hands')
     expect(said).not.toContain('No water is within reach')
   })
 
-  // The Places block reads the river as somewhere to go while the body stands on its bank, and
+  // The places block reads the river as somewhere to go while the body stands on its bank, and
   // `walk {river}` lands on the tile under the feet. The in-reach line is what tells them apart.
   it('at the bank the walk the places block invites is the one the world refuses', async () => {
     const t = valley(BANK)
-    expect(placesFor(t.bridge)).toContain('the river (river)')
+    expect(placesFor(t)).toContain('the river (river)')
     expect(await refusal(t, { verb: 'walk', params: { structureId: 'river' } })).toBe(
       'already at that spot',
     )
-    expect(proseFor(t.bridge)).toContain('Water lies within reach of your hands')
+    expect(proseFor(t)).toContain('Water lies within reach of your hands')
   })
 
-  it('on dry ground a mind with a vessel is told the water is not here, and where it is', () => {
-    const said = proseFor(valley(DRY, { bucket: true }).bridge)
+  it('on dry ground a dry throat is told the water is not here, and which way it is', () => {
+    const said = proseFor(thirsty(valley(DRY)))
     expect(said).toContain('No water is within reach of your hands')
     expect(said).toContain('The nearest water you know of lies at (13, 40), a way to the east.')
   })
 
-  // Omar, run B: "The glint's a step west, at (0,64)." The river is at x 13..15 — east of him.
-  // 84 of world B's 105 water refusals were fired from 11 to 13 tiles out, where the glint is
-  // suppressed for being inside the sight box and the coordinate was gated behind thirst.
-  it('the direction is the true one, from the corner where the minds guessed it wrong', () => {
-    const said = proseFor(valley(BELOW_THE_END, { bucket: true }).bridge)
-    expect(said).toContain('(13, 67), a way to the east.')
-    expect(said).not.toContain('west')
-  })
-
   // Below the channel's southern end `naturalPlaces` finds no river abreast of the body, so the
-  // places block is empty and `walk {river}` is "you know no such place". The prose said nothing
-  // about water at all: three minds spent run B here, and 105 refusals came of it (rehearsal5).
+  // places block is empty and `walk {river}` is "you know no such place". Omar, run B, from this
+  // corner: "The glint's a step west, at (0,64)." The water is east; 84 of world B's 105 water
+  // refusals were fired from 11 to 13 tiles out, where the glint is suppressed for being inside
+  // the sight box and the coordinate was gated behind thirst (rehearsal5).
   it('below the end of the river the mind is no longer told the valley has none', async () => {
-    const t = valley(BELOW_THE_END, { bucket: true })
-    expect(placesFor(t.bridge)).toBe('')
+    const t = valley(BELOW_THE_END)
+    expect(placesFor(t)).toBe('')
     expect(await refusal(t, { verb: 'walk', params: { structureId: 'river' } })).toBe(
       'you know no such place',
     )
-    const said = proseFor(t.bridge)
+    const said = proseFor(thirsty(t))
     expect(said).toContain('No water is within reach of your hands')
-    expect(said).toContain('The nearest water you know of lies at (13, 67)')
+    expect(said).toContain('The nearest water you know of lies at (13, 67), a way to the east.')
+    expect(said).not.toContain('west')
   })
 
-  it('empty hands and a wet throat say nothing about water on dry ground', () => {
-    const said = proseFor(valley(DRY).bridge)
+  it('a wet throat and nothing refused says nothing about water on dry ground', () => {
+    const said = proseFor(valley(DRY))
     expect(said).not.toContain('water')
     expect(said).not.toContain('Water')
   })
 
   it('the refusal and where the body actually stands reach the mind together', async () => {
     const t = valley(BELOW_THE_END, { bucket: true })
-    expect(await refusal(t, { verb: 'fill', params: { itemId: BUCKET } })).toBe(
-      'no water within reach',
+    const reason = await refusal(t, { verb: 'fill', params: { itemId: BUCKET } })
+    expect(reason).toBe('no water within reach')
+    expect(proseFor(t, lastTurnLine('fill', reason))).toContain(
+      'No water is within reach of your hands',
     )
-    expect(proseFor(t.bridge)).toContain('No water is within reach of your hands')
   })
 
   // Omar cast at dry ground 37 times in run B. A cast wants neither a vessel nor a dry throat,
@@ -138,8 +143,8 @@ describe('the water a body can and cannot reach is said before the turn is spent
     const t = valley(BELOW_THE_END)
     const reason = await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })
     expect(reason).toBe('no water there')
-    expect(proseFor(t.bridge)).not.toContain('water')
-    const paired = proseFor(t.bridge, lastTurnLine('fish', reason))
+    expect(proseFor(t)).not.toContain('water')
+    const paired = proseFor(t, lastTurnLine('fish', reason))
     expect(paired).toContain('No water is within reach of your hands')
     expect(paired).toContain('The nearest water you know of lies at (13, 67), a way to the east.')
   })

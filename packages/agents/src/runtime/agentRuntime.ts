@@ -140,6 +140,11 @@ export function lastTurnLine(what: string, reason: string): string {
   return `Last turn: ${what} did not take — ${sayable(reason)}.`
 }
 
+// The reasons `drink`, `fill` and `fish` are turned away by all name the water. Read off the
+// rendered line, which is the one place a refusal survives into the next turn.
+export const wantedWater = (lastOutcome: string | null): boolean =>
+  (lastOutcome ?? '').includes('water')
+
 // A freeform intent has no verb to name, only the words the mind used.
 export const TRIED_FREEFORM = 'what you tried'
 
@@ -738,7 +743,7 @@ export class AgentRuntime {
       isEdible: (kind: string) => this.#bridge.isEdible(kind),
       waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
       nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
-      waterRefused: () => (this.#lastOutcome ?? '').includes('water'),
+      waterRefused: () => wantedWater(this.#lastOutcome),
       nearestFood: (x: number, y: number) => this.#bridge.nearestFood(x, y),
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),

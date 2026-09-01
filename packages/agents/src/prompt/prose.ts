@@ -7,13 +7,7 @@ import {
   heardLine,
   type SimTime,
 } from '@sj/shared'
-import {
-  MYSTERIES,
-  VESSEL_KINDS,
-  type ForageableKind,
-  type MakeableRoad,
-  type Makeables,
-} from '@sj/engine'
+import { MYSTERIES, type ForageableKind, type MakeableRoad, type Makeables } from '@sj/engine'
 import { classMembers } from '@sj/shared'
 
 // Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
@@ -601,6 +595,10 @@ function bearing(dx: number, dy: number): string {
 const howFar = (d: number): string =>
   d <= 10 ? 'close to the' : d <= 25 ? 'a way to the' : 'far to the'
 
+// Which way and how far, in one phrase: the places block and the water road say a distance the
+// same way, or a mind is given two vocabularies for one valley.
+const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))} ${bearing(dx, dy)}`
+
 // A whole town read back every turn is a page of standing facts. The nearest dozen is what a
 // person holds in their head anyway.
 const PLACES_SHOWN = 12
@@ -615,7 +613,7 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
     .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
     .sort((a, b) => a.d - b.d || (a.p.id < b.p.id ? -1 : 1))
     .slice(0, PLACES_SHOWN)
-    .map(({ p, d }) => `${placeSaid(p)} (${p.id}), ${howFar(d)} ${bearing(p.x - x, p.y - y)}`)
+    .map(({ p }) => `${placeSaid(p)} (${p.id}), ${wayTo(p.x - x, p.y - y)}`)
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
@@ -715,13 +713,6 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
 }
 
-// A vessel in the hands, and an act the world just turned away for the water, are the same
-// reason to know where it is that a dry mouth is: `fish` is refused for the water, not the thirst.
-const wantsWater = (packet: PerceptionPacket, thirst: number, world: ProseWorld): boolean =>
-  thirst < 50 ||
-  world.waterRefused?.() === true ||
-  packet.self.inventory.some((i) => VESSEL_KINDS.has(i.kind))
-
 /** Whether these hands are at water, off the same test `drink`, `fill` and `fish` are refused
  *  by. Block 1 teaches all three as "standing beside water" and nothing said whether this body
  *  was: 105 of run B's 236 refusals were minds reaching for water on dry ground (rehearsal5). */
@@ -729,14 +720,13 @@ function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld)
   if (world?.waterAtHand === undefined) return ''
   if (world.waterAtHand())
     return 'Water lies within reach of your hands. You could drink here, or fill what you carry.'
-  if (!wantsWater(packet, thirst, world)) return ''
+  // Opened before the dryness is felt — thirst decays 1.67x slower than hunger, so the 30 both
+  // once shared left the road 10 ticks of runway — and again the turn after the water is refused.
+  if (thirst >= 50 && world.waterRefused?.() !== true) return ''
   const { x, y } = packet.self
   const w = world.nearestWater?.(x, y) ?? null
   if (w === null) return 'No water is within reach of your hands, and you know of none nearby.'
-  // Which way and how far, in the words the places block uses. A bare coordinate left the
-  // valley's three southern minds sure the river lay west of them; it lies east (rehearsal5).
-  const said = `${howFar(Math.hypot(w.x - x, w.y - y))} ${bearing(w.x - x, w.y - y)}`
-  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}), ${said}.`
+  return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}), ${wayTo(w.x - x, w.y - y)}.`
 }
 
 /** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
