@@ -209,7 +209,8 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
   // on the first and 1.34:1 on the second: the rule was a smudge on both.
   it('paints the section rule in a token that clears 3:1 on both grounds it is laid on', () => {
     const body = ruleBody(CSS, '.block h3::after')
-    const colour = /repeating-linear-gradient\([^)]*var\(--([\w-]+)\)/.exec(body)?.[1]
+    // Solid or a gradient — what the test guards is the token, not how the rule is painted.
+    const colour = /background:[^;]*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(colour, 'the rule paints no palette token').toBeDefined()
     for (const paper of ['parchment', 'cream'] as const) {
       expect(

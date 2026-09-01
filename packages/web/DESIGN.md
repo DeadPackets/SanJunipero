@@ -30,8 +30,11 @@ All in `:root` at the top of `ui/chrome.css`.
 
 De-emphasis is **a colour, never `opacity`** — a transparency's ratio is unknowable at the call
 site. The signature shape is the pixel slab: `--frame` = a 2px ink ring over a 4px stepped
-`--ledge` in `--deep`. Under `forced-colors: active` the browser drops every `box-shadow`, so the
-sheet rebuilds those edges as `2px solid CanvasText`.
+`--ledge` in `--deep`. There are exactly three steps and nothing between them: `--ledge` at
+rest, `--ledge-hi` (4px 6px) under a pointer that lifts the slab 2px, and `--ledge-in` pressed.
+The x never changes — a hover that also pulled the ledge in 2px slid the shadow sideways.
+Under `forced-colors: active` the browser drops every `box-shadow`, so the sheet rebuilds those
+edges as `2px solid CanvasText`.
 
 **Two ladders, and nothing off them.** Spacing is `--s-1: 2px` through `--s-8: 40px` on a 2px base
 (4px cannot spell the hairline pads the chips are built from). Type is `--f-1: 12px` through
@@ -53,6 +56,9 @@ was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 | Manrope | `--font-body` | paper body, ring arms, roster names, place names, and the two letter-spaced marks — the stamp (0.14em) and the cue (0.18em, uppercase) |
 | Fraunces | `--font-title` | paper headings |
 | system mono | `--font-data` | law paths, stamps, every column of figures |
+
+Only **400 and 600** of Manrope are loaded. Six marks asked for 500 and were served 400 by the
+browser's own font matching; every mark that stands over the town takes 600, a weight that exists.
 
 Silkscreen at 13px had an 8px cap on the arms and read as a smear over the wood; Press Start 2P
 at an integer multiple of its grid is the one place the sheet uses it (`render/textFaces.ts` also
@@ -89,7 +95,10 @@ dark. The token's position says the hour before the words beside it are read; th
 day, the season, the weather kind and the temperature, in `WEATHER_GLYPH`'s 8×8 pixels rather
 than an emoji. It eases its position on the world's tick and runs no loop at all. Below 900px the
 arc flattens and the position stops meaning anything, so the road goes and the two chips close
-up. The quiet stamp sits 30px under it, still owning the wire's own word.
+up. The arc is DRAWN at `--sky-h` rather than at a second number — the token said 30px while the
+bar drew 34, and the quiet stamp that positions off it sat 4px inside the road. The stamp now
+steps `--sky-h` plus `--s-4` clear. Both flanking chips reserve `--sky-chip-w`, so the arc is
+centred on the viewport and stays there when the weather word changes length.
 
 **The hover is a footprint plate.** `render/plate.ts` draws it, `ui/interaction.ts` decides its
 words and `ui/plateModel.ts` shapes its rows. There is ONE for the whole stage — the tooltip
@@ -159,8 +168,12 @@ same one tab stop, same arrow keys, same close word at the end. Every arm wears 
 Chronicle alone.
 
 Chronicle › Today is laid out as the front page it now looks like: the day's edition is the lead
-story and the live feed is the column beside it, split at `44rem` of the sheet's **own**
-container — below that they stack, because two columns of a 760px sheet are two gutters. The
+story and the live feed is the column beside it, split at `40rem` of the sheet's **own**
+container — below that they stack, because two columns of a 760px sheet are two gutters. 40 and
+not 44: a 760px sheet is 42.5rem of container, so at 44 the split could not fire at any width
+between 641px and 1920px and the front page was one 80-character ribbon on every laptop.
+Running prose stops at `--measure` (68ch); the sheet is as wide as it needs to be, a paragraph
+is as wide as it can be read at. The
 lead drops its slab and its frame and takes a Fraunces drop cap; its section heading stays in
 the tree as a visually-hidden `h3`, because the edition's own headline is what a sighted reader
 sees.
@@ -195,7 +208,7 @@ out of**. Several now, and the sheet's own lists read the sheet rather than the 
 | Query | What it is for |
 |---|---|
 | `max-width: 640px` | the sheet takes 96% × 80%; the arms move to the top edge as a 2×2 block |
-| `max-width: 480px` | the head becomes a grid — title and close on one row, tabs scrolling along the next |
+| `max-width: 1000px` | the head becomes a grid — date and marginalia on one row, tabs scrolling along the next. The one-row section line needs ~677px of head, which a 78% sheet only reaches near a 970px window |
 | `641–1000px` | with the sheet open the arms take the top-left corner, 2×2: the sheet at the left edge leaves 146px beside it at 768 and the longest arm is 192px |
 | `641–1400px` | the sheet steps left far enough to clear the arms, statically, so nothing moves when it opens |
 | `max-height: 620px` | the sheet takes `100dvh - 64px` and 96% of the width; the post is hidden; the arms lie in a row above it |

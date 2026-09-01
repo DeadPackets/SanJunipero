@@ -221,10 +221,14 @@ export function Paper({
             <p className="stage-sr" id="paper-tabs-keys">
               Left and right arrow keys move between pages
             </p>
-            <p className="paper-clock">{date.time}</p>
-            <button type="button" className="paper-close" onClick={onClose}>
-              close<span className="paper-close-key"> · Esc</span>
-            </button>
+            {/* One cell, so the dateline's two flanks balance and the tabs are centred on the
+                masthead rather than on whatever the clock and the close word leave. */}
+            <div className="paper-marginalia">
+              <p className="paper-clock">{date.time}</p>
+              <button type="button" className="paper-close" onClick={onClose}>
+                close<span className="paper-close-key"> · Esc</span>
+              </button>
+            </div>
           </div>
         </header>
         <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>

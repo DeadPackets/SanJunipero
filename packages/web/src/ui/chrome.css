@@ -70,6 +70,9 @@
   --frame: 0 0 0 2px var(--ink), 4px 4px 0 0 var(--deep);
   --frame-tight: 0 0 0 2px var(--ink);
   --ledge: 4px 4px 0 0 var(--deep);
+  /* Lifted 2px, so the ledge grows 2px DOWN and not sideways: hover was written five ways, and
+     three of them pulled the shadow's right edge in while the slab rose. */
+  --ledge-hi: 4px 6px 0 0 var(--deep);
   --ledge-in: 1px 1px 0 0 var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
@@ -90,12 +93,17 @@
   --mark-inset: clamp(16px, 3vmin, 40px);
 
   /* The sun arc owns the top edge. Its width and its height are named here because the quiet
-     stamp has to sit UNDER it and cannot measure a sibling. */
-  --sky-w: 480px;
-  --sky-h: 30px;
+     stamp has to sit UNDER it and cannot measure a sibling — so the arc is DRAWN at `--sky-h`
+     rather than at a second number, or the two drift and the stamp lands on the road. */
+  --sky-w: 600px;
+  --sky-h: 34px;
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
+
+  /* The reading line. `ch` is the advance of `0`, about a third wider than the average letter,
+     so this is nearer 78 characters than 62 — and a 760px sheet runs past 100 uncapped. */
+  --measure: 62ch;
 
   color-scheme: light;
   accent-color: var(--honey);
@@ -148,9 +156,8 @@ body {
 .portrait {
   width: 52px; height: 52px;
   image-rendering: pixelated; /* the portrait IS world art */
-  border-radius: 4px;
   background: var(--cream);
-  box-shadow: var(--frame-tight), 3px 3px 0 0 var(--deep);
+  box-shadow: var(--frame-tight), var(--ledge);
 }
 .portrait.silhouette {
   background:
@@ -176,10 +183,12 @@ body {
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--ink-quiet);
 }
+/* A solid rule on the spacing ladder, not a 35px dash: at that length the broken line read as a
+   rendering fault under every section head on the sheet rather than as a mark.
+   --sand is 1.19:1 on parchment and 1.34:1 on cream; --ink-quiet is 5.83 and 6.57. */
 .block h3::after, .feed-head::after {
-  content: ''; display: block; margin-top: var(--s-2); height: 2px; width: 2.2rem;
-  /* --sand is 1.19:1 on parchment and 1.34:1 on cream; --ink-quiet is 5.83 and 6.57. */
-  background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 7px);
+  content: ''; display: block; margin-top: var(--s-3); height: 2px; width: var(--s-8);
+  background: var(--ink-quiet);
 }
 .block ul { margin: 0; padding-left: var(--s-6); }
 .block p { margin: var(--s-2) 0; text-wrap: pretty; }
@@ -187,14 +196,14 @@ body {
 .thought-line { font-style: italic; color: var(--ink-quiet); margin: 0; }
 
 .need-row { display: flex; align-items: center; gap: var(--s-4); margin: var(--s-2) 0; }
-.need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 500; }
+.need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 600; }
 .need-track {
   flex: 1; height: 10px; background: var(--cream);
-  border-radius: 3px; box-shadow: 0 0 0 1.5px var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
   overflow: hidden;
 }
 .need-fill {
-  height: 100%; background-color: var(--sage); border-radius: 2px;
+  height: 100%; background-color: var(--sage);
   background-image: repeating-linear-gradient(90deg, transparent 0 6px, rgba(255, 246, 233, 0.25) 6px 8px);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -210,7 +219,7 @@ body {
 
 .diff {
   font-family: var(--font-data); font-size: var(--f-1);
-  background: var(--cream); border-radius: 4px; box-shadow: var(--frame-tight);
+  background: var(--cream); box-shadow: var(--frame-tight);
   padding: var(--s-4); overflow-x: auto; margin: var(--s-3) 0 0;
 }
 .diff-line { padding: 0 var(--s-2); }
@@ -234,10 +243,17 @@ body {
   font-variant-numeric: tabular-nums; font-family: var(--font-data);
 }
 
-.feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
+/* A 6.2rem stamp beside the words leaves them nineteen characters in a sidebar column. The row
+   measures itself, so the stamp steps onto its own line wherever a feed is narrow. */
+.feed { list-style: none; margin: var(--s-4) 0 0; padding: 0; container-type: inline-size; }
+@container (max-width: 26rem) {
+  :is(.feed-line, .feed-jump) { flex-wrap: wrap; row-gap: var(--s-1); }
+  :is(.feed-line, .feed-jump) > .stamp { width: auto; }
+  .feed-text { flex: 1 0 100%; }
+}
 .feed-line {
   display: flex; gap: var(--s-4); align-items: baseline;
-  padding: var(--s-2) var(--s-3); margin: 0 calc(-1 * var(--s-3)); border-radius: 4px;
+  padding: var(--s-2) var(--s-3); margin: 0 calc(-1 * var(--s-3));
 }
 .feed-line:nth-child(odd) { background: var(--parchment-zebra); }
 .feed-line .stamp {
@@ -270,7 +286,7 @@ body {
   display: flex; align-items: center; gap: var(--s-4);
   width: 100%; min-height: 44px; padding: var(--s-2) var(--s-3);
   font: inherit; color: inherit; text-align: left; cursor: pointer;
-  background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 4px;
+  background: transparent; border: 0; border-left: 3px solid transparent;
 }
 .feed-jump:hover { background: var(--cream); border-left-color: var(--honey); }
 /* the entry you are standing in — a rail as well as a colour, never colour alone */
@@ -358,7 +374,7 @@ body {
   overflow: hidden; text-overflow: ellipsis;
   font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--ink); background: var(--cream);
-  border: 2px solid var(--ink); box-shadow: 2px 2px 0 0 var(--deep);
+  border: 2px solid var(--ink); box-shadow: var(--ledge);
   padding: var(--s-2) var(--s-3); pointer-events: none;
 }
 /* WHAT THE BROWSER CAUGHT: centred on the first mark, the tip ran off the left of the
@@ -368,7 +384,7 @@ body {
 .mark:hover .mark-tip, .mark:focus .mark-tip { display: block; }
 .playhead {
   position: absolute; top: -3px; bottom: -3px; width: 3px; translate: -50%;
-  background: var(--ember); border-radius: 1px; box-shadow: 0 0 0 1px var(--ink);
+  background: var(--ember); box-shadow: 0 0 0 2px var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .playhead { transition: left var(--t-fast) var(--ease-enter); }
@@ -377,10 +393,10 @@ body {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em; text-transform: uppercase;
   padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
-  box-shadow: 2px 2px 0 0 var(--deep);
+  box-shadow: var(--ledge);
   transition-property: background-color, translate, box-shadow;
 }
-.live-pill:hover { translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
+.live-pill:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
 .live-pill:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .live-pill.live { background: var(--honey); }
 
@@ -461,7 +477,7 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .key-summary { transition-property: background-color, translate, box-shadow; }
 }
-.key-summary:hover { translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep); }
+.key-summary:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
 .key-summary:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 
 /* struck-out chips keep filtering while the key is shut — say so where the key is */
@@ -476,9 +492,10 @@ body {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase;
   padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
-  transition-property: color, background-color, translate;
+  box-shadow: var(--ledge);
+  transition-property: color, background-color, translate, box-shadow;
 }
-.legend-chip:hover { translate: 0 -2px; }
+.legend-chip:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
 .legend-chip:active { translate: 0 1px; }
 /* The off state is a MARK, not a dimming: a struck-through chip says "filtered out", a faded one
    says "less important". */
@@ -492,13 +509,15 @@ body {
 }
 .legend-mark { flex: none; }
 .legend-word { line-height: 1; }
-/* three axes, each labelled, so a two-channel encoding does not become a manual */
+/* One band per axis, the label over its own chips: with no layout rule the axes ran inline and
+   a spilled row started 86px left of the row above it, under no label at all. */
+.bonds-legend { display: grid; gap: var(--s-5); margin-top: var(--s-4); }
 .legend-axis {
-  display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
-  padding-right: var(--s-4);
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
 }
-.legend-axis + .legend-axis { border-left: 2px solid var(--sand); padding-left: var(--s-4); }
+.legend-axis + .legend-axis { border-top: 1px solid var(--ink-quiet); padding-top: var(--s-5); }
 .legend-axis-name {
+  flex: 0 0 100%;
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-quiet);
 }
@@ -554,7 +573,7 @@ body {
 .bond-history { list-style: none; margin: var(--s-5) 0 0; padding: 0; }
 .bond-history li {
   display: flex; gap: var(--s-4); align-items: baseline;
-  padding: var(--s-2) 0; border-top: 1px solid var(--sand);
+  padding: var(--s-2) 0; border-top: 1px solid var(--ink-quiet);
 }
 .bond-history .stamp {
   flex: none; width: 6.2rem; font-size: var(--f-1); color: var(--ink-quiet);
@@ -650,7 +669,7 @@ body {
 
 /* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
 
-.roster-sorts { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--s-2); }
+.roster-sorts { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--s-3); }
 .roster-sort {
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
   min-height: 44px; padding: var(--s-1) var(--s-3); cursor: pointer;
@@ -675,7 +694,7 @@ body {
   padding: var(--s-4);
   background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0;
-  box-shadow: 3px 3px 0 0 var(--deep);
+  box-shadow: var(--ledge);
 }
 @media (prefers-reduced-motion: no-preference) {
   .roster-row {
@@ -683,9 +702,9 @@ body {
     transition-timing-function: var(--ease-enter);
   }
 }
-.roster-row:hover { translate: 0 -2px; box-shadow: 3px 5px 0 0 var(--deep); background-color: var(--honey); }
+.roster-row:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); background-color: var(--honey); }
 .roster-row:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-.roster-row.open { background-color: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), 3px 3px 0 0 var(--deep); }
+.roster-row.open { background-color: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), var(--ledge); }
 /* substance drives DENSITY, never a printed number: a person the run has made something of
    gets a row with more room to say it in. */
 .roster-row[data-lived='some'] { padding-block: var(--s-4); }
@@ -746,7 +765,7 @@ body {
   margin: 0 0 0 var(--s-4); padding: var(--s-4) var(--s-5);
   background: var(--parchment) var(--grain);
   border: 2px solid var(--ink); border-top: 0; border-radius: 0;
-  box-shadow: 3px 3px 0 0 var(--deep);
+  box-shadow: var(--ledge);
 }
 @media (prefers-reduced-motion: no-preference) {
   .roster-expanded { animation: panel-in var(--t-fast) var(--ease-enter); }
@@ -775,7 +794,7 @@ body {
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
   padding: var(--s-2) var(--s-4); color: var(--ink);
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
-  box-shadow: 2px 2px 0 0 var(--deep);
+  box-shadow: var(--ledge);
 }
 .rx-full:hover { background: var(--honey); }
 .rx-full:active { translate: 0 1px; box-shadow: var(--ledge-in); }
@@ -791,7 +810,7 @@ body {
 .law-row, .law-edit {
   display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: baseline; gap: var(--s-4);
-  padding: var(--s-3) 0; border-bottom: 2px dotted var(--sand);
+  padding: var(--s-3) 0; border-bottom: 1px dotted var(--ink-quiet);
 }
 .law-row { grid-template-columns: minmax(0, 1fr) auto; }
 .law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: var(--s-3); }
@@ -837,7 +856,7 @@ body {
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
 .law-edit select:disabled, .law-edit input:disabled { color: var(--ink-quiet); cursor: not-allowed; }
-.ops-block { margin-top: var(--s-6); padding-top: var(--s-4); border-top: 2px dotted var(--sand); }
+.ops-block { margin-top: var(--s-6); padding-top: var(--s-4); border-top: 1px dotted var(--ink-quiet); }
 
 .ops-reading { display: flex; align-items: baseline; gap: var(--s-4); margin: var(--s-2) 0 var(--s-4); }
 .ops-word {
@@ -884,7 +903,7 @@ body {
 .ops-ledger { margin: 0; }
 .ops-line {
   display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4);
-  padding: var(--s-2) 0; border-bottom: 2px dotted var(--sand);
+  padding: var(--s-2) 0; border-bottom: 1px dotted var(--ink-quiet);
 }
 .ops-line dt { min-width: 0; overflow-wrap: anywhere; }
 .ops-line dd {
@@ -894,7 +913,7 @@ body {
 
 .ops-ruling {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3);
-  padding: var(--s-2) 0; border-bottom: 2px dotted var(--sand);
+  padding: var(--s-2) 0; border-bottom: 1px dotted var(--ink-quiet);
 }
 .ops-ruling .law-path { flex: 1 1 8rem; }
 .ops-reason { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-3); }
@@ -960,6 +979,12 @@ body {
 .paper-title, .thumb-title, .paper-sheet article h4 { text-wrap: balance; }
 .room-who { text-wrap: pretty; }
 
+.edition-body, .edition-caption, .chapter-text, .biography-body, .law-says,
+.provenance-line, .era-text, .feed-text, .rx-empty, .feed-empty, .bond-line, .bond-evidence,
+.discovery-credit, .discovery-makes, .room-built, .ops-answer-says {
+  max-width: var(--measure);
+}
+
 /* 12 · the scrollbars are the town's, and they are ALWAYS THERE on a scrollable region — an
    overlay bar that only appears on hover hides the fact that there is more to read. */
 .paper-sheet, .bond-detail {
@@ -992,7 +1017,7 @@ body {
   transition-timing-function: var(--ease-tap);
 }
 .discovery-leaf:hover, .discovery-leaf:focus-visible {
-  background-color: var(--honey-l); translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep);
+  background-color: var(--honey-l); translate: 0 -2px; box-shadow: var(--ledge-hi);
 }
 .discovery-leaf:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the leaf you are standing in — an ember rail as well as a ring, never colour alone */
@@ -1057,7 +1082,7 @@ body {
 /* Sized and placed by the stage loop: only it knows how big a body is drawn at this zoom. */
 .stage-figure {
   position: absolute; left: 0; top: 0; padding: 0;
-  background: none; border: 0; border-radius: 2px;
+  background: none; border: 0;
   pointer-events: none;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
 }
@@ -1079,7 +1104,7 @@ body {
 }
 .stage-ring-arms button {
   position: absolute; translate: -50% -50%;
-  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   min-height: 44px; padding: 0 var(--s-5);
   color: var(--cream); background: var(--deep);
   border: 0; border-radius: 20px;
@@ -1112,24 +1137,29 @@ body {
      900px rule below names, arriving from the other end. */
   left: 50%; translate: -50% 0;
   width: min(var(--sky-w), calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left))));
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Equal flanks, so the arc is centred whatever the day number or the weather word runs to. */
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
   align-items: center; gap: var(--s-5);
   pointer-events: none;
 }
 .sky-chip {
-  display: flex; align-items: center; gap: var(--s-3); margin: 0;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  display: flex; align-items: center; gap: var(--s-3); margin: 0; min-width: 0;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cream);
   /* Cream on the daylight tile is 1.40:1, so the four-way halo is load-bearing, not decoration. */
   text-shadow: var(--halo-deep);
 }
 .sky-glyph { display: block; flex: none; image-rendering: pixelated; }
-.sky-arc { position: relative; height: 34px; }
+/* The weather chip is the right flank; its words end at the bar's edge, not against the road. */
+.sky-bar > .sky-chip:last-child { justify-content: flex-end; }
+.sky-arc { position: relative; height: var(--sky-h); }
 .sky-arc-line { display: block; width: 100%; height: 100%; }
-/* The road brings its own ground with it, the way every mark over the town does. */
+/* The road brings its own ground with it, the way every mark over the town does. Whole pixels:
+   `preserveAspectRatio: none` scales the stroke unevenly, and a fractional width lands the road
+   between two rows of a surface where every other edge is on one. */
 .sky-arc-ground { fill: none; stroke: var(--deep); stroke-width: 5; }
-.sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2.4; stroke-dasharray: 1 3; }
+.sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2; stroke-dasharray: 1 3; }
 .sky-token { position: absolute; translate: -50% -50%; color: var(--cream); }
 .sky-token[data-kind='sun'] { color: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
@@ -1141,17 +1171,21 @@ body {
 @media (max-width: 900px) {
   .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
   .sky-arc { display: none; }
+  /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
+  /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */
+  .stage-stamp { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7)); }
 }
 /* The stream frame has its own clock in the stamp, and the bar would sit under the overlay. */
 [data-broadcast='on'] .sky-bar { display: none; }
 
 .stage-stamp {
   position: absolute; z-index: 21;
-  /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news. */
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h));
+  /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news.
+     A clear step, so the two never sit on one line at any width. */
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4));
   right: max(var(--mark-inset), env(safe-area-inset-right));
   pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1165,7 +1199,7 @@ body {
   max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1277,6 +1311,9 @@ body {
     grid-template-columns: repeat(2, auto); padding-bottom: 0;
   }
   .signpost[data-open='yes'] .signpost-post { display: none; }
+  /* Three marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline
+     carries the day, the season and the clock while it is up. */
+  .app[data-paper='on'] :is(.sky-bar, .stage-stamp) { display: none; }
 }
 @media (min-width: 641px) and (max-height: 620px) {
   .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
@@ -1333,7 +1370,6 @@ body {
     height: calc(100dvh - 64px); border-top-width: 12px;
   }
   .paper-head { padding-block: var(--s-2) 0; }
-  .paper-title { font-size: var(--f-5); }
 }
 /* short AND narrow: the arms are two rows there, so the sheet leaves two rows of room */
 @media (max-width: 640px) and (max-height: 620px) {
@@ -1365,19 +1401,30 @@ body {
 /* Two rules of different weights is what a dateline IS — heavy over the sections, hairline
    under them. */
 .paper-dateline {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center; column-gap: var(--s-5);
+  /* `1fr` sides balance, so the strip centres on the masthead; `max-content` in the middle
+     because a wrapping flex row's min-content is ONE tab and `auto` collapsed the line. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+  align-items: center; column-gap: var(--s-4);
   border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink);
+  /* The tabs' own underline landed 1px off the hairline and the two read as one thick smear. */
+  padding-bottom: var(--s-2);
   margin-bottom: var(--s-2);
 }
+.paper-marginalia {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); min-width: 0;
+}
+/* The date already had this; the close word did not, and "close · Esc" broke to two lines the
+   moment its flank became a flexible track. */
+.paper-close { white-space: nowrap; }
 .paper-date, .paper-clock {
   margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.paper-tabs { display: flex; gap: var(--s-1); justify-self: center; flex-wrap: wrap; }
+.paper-tabs { display: flex; gap: var(--s-1); }
 /* Manrope, not the pixel face: Silkscreen at 13px reads as a smear, and these are words. */
 .paper-tab {
-  min-height: 44px; padding: 0 var(--s-4);
+  min-height: 44px; padding: 0 var(--s-3);
   font: inherit; font-size: var(--f-2); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--ink-quiet);
@@ -1390,20 +1437,20 @@ body {
    whole strip sideways on every change. */
 .paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .paper-close {
-  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-5);
+  min-height: 44px; padding: 0 var(--s-2) 0 var(--s-3);
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
   color: var(--ink-quiet); background: none; cursor: pointer;
   /* A divider and a rem of clear, or the close word reads as a fifth tab at every width. */
-  border: 0; border-left: 2px solid var(--sand);
+  border: 0; border-left: 2px solid var(--ink-quiet);
 }
 .paper-close:hover { color: var(--ink); }
 
 /* ── the front page: the lead story, and the live feed as the column beside it ── */
 .bs-front { display: grid; gap: var(--s-6); }
 .bs-column { display: grid; align-content: start; gap: var(--s-5); }
-/* Two columns need width or they are two gutters. The sheet measures itself, never the window:
-   at 44rem the lead runs about 46 characters, which is a newspaper column and not a ribbon. */
-@container (min-width: 44rem) {
+/* The sheet measures itself, never the window. 40, not 44: a 760px sheet is 42.5rem, so at 44
+   the split could not fire at any width between 641px and 1920px. */
+@container (min-width: 40rem) {
   .bs-front {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     /* the column rule IS the page's spine, so it is drawn on the gap and not on a card */
@@ -1411,7 +1458,7 @@ body {
   }
   .bs-column {
     padding-left: var(--s-7); margin-left: calc(var(--s-7) * -1);
-    border-left: 1px solid var(--sand);
+    border-left: 1px solid var(--ink-quiet);
   }
 }
 .bs-front .block { margin: 0; }
@@ -1433,19 +1480,26 @@ body {
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* Under 480px the head wrapped onto three rows and took a third of the sheet: the tabs get the
-   second row to themselves and scroll along it. */
-@media (max-width: 480px) {
-  .paper-title { font-size: var(--f-6); }
-  .paper-dateline { grid-template-columns: auto minmax(0, 1fr) auto; }
+/* The one-row section line needs about 677px of head: five tabs, the date, the clock and the
+   close word. A 78% sheet only reaches that around a 970px window, so below the 1000px the
+   signpost already breaks at, the tabs take the second row to themselves and scroll along it. */
+@media (max-width: 1000px) {
+  .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
     grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
     overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
-    border-top: 1px solid var(--sand);
+    border-top: 1px solid var(--ink-quiet);
   }
   .paper-tab { flex: none; scroll-snap-align: start; }
-  .paper-clock { grid-row: 1; grid-column: 2; justify-self: end; }
-  .paper-close { grid-row: 1; grid-column: 3; }
+  .paper-marginalia { grid-row: 1; grid-column: 2; }
+}
+/* Both AFTER the base rule: a media block that precedes it loses on source order at equal
+   specificity, which is why the short window's smaller masthead never once took. */
+@media (max-width: 480px) {
+  .paper-title { font-size: var(--f-6); }
+}
+@media (max-height: 620px) {
+  .paper-title { font-size: var(--f-5); }
 }
 .paper-sheet > :first-child { margin-top: 0; }
 
@@ -1484,7 +1538,7 @@ body {
   transition-property: translate, box-shadow, background-color;
   transition-timing-function: var(--ease-enter);
 }
-.place-row:hover { translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep); background-color: var(--honey); }
+.place-row:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); background-color: var(--honey); }
 .place-row:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 .place-name { font-family: var(--font-body); font-weight: 600; font-size: var(--f-3); }
 .place-by { font-size: var(--f-1); color: var(--ink-quiet); }
@@ -1561,7 +1615,7 @@ body {
 .orbit-lines { display: block; width: 100%; height: 100%; overflow: visible; }
 /* 8.28:1 on the deep ground the plot is drawn on. The rings are the scale, not decoration, so
    every level is drawn on every orbit and an empty one is as much of an answer as a full one. */
-.orbit-ring { fill: none; stroke: var(--cream-quiet); stroke-width: 1.5; stroke-dasharray: 2 6; }
+.orbit-ring { fill: none; stroke: var(--cream-quiet); stroke-width: 2; stroke-dasharray: 2 6; }
 /* The marks are HTML, not SVG text: a glyph inside the viewBox is 10px on a 300px phone. */
 .orbit-mark {
   position: absolute; translate: -50% -50%;
@@ -1642,7 +1696,7 @@ body {
 }
 .matrix-key li { display: inline-flex; align-items: center; gap: var(--s-3); }
 .matrix-swatch { width: 16px; height: 16px; box-shadow: 0 0 0 1px var(--ink); flex: none; }
-.bonds-views { display: flex; gap: var(--s-2); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
+.bonds-views { display: flex; gap: var(--s-3); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
 .legend-halo {
   display: inline-flex; align-items: center; gap: var(--s-2); flex: none;
   font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase; color: var(--ink);
@@ -1722,7 +1776,8 @@ body {
 
 .key-map {
   position: fixed; inset: 0; z-index: 45;
-  display: grid; place-items: center; padding: 5vmin;
+  /* the one inset every other mark over the town hangs off, not a second percentage */
+  display: grid; place-items: center; padding: var(--mark-inset);
   /* the town keeps living, and a click that misses the sheet still reaches it */
   pointer-events: none;
 }
@@ -1735,6 +1790,9 @@ body {
 }
 /* Focused only so a screen reader announces it; the first Tab lands on `close`, which rings. */
 .key-map-sheet:focus-visible { outline: none; }
+/* The close word's divider separates it from the TAB STRIP. There is no strip here, so the rule
+   was a stray stroke hanging in the head. */
+.key-map-head .paper-close { border-left: 0; padding-left: var(--s-3); }
 .key-map-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-6);
   margin: 0 0 var(--s-5); padding-bottom: var(--s-5);
@@ -1809,7 +1867,7 @@ body {
   align-self: flex-start; padding: 4px 10px;
 }
 [data-broadcast='on'] .lower-third-words {
-  font-family: var(--font-body); font-size: 32px; font-weight: 500; line-height: 1.25;
+  font-family: var(--font-body); font-size: 32px; font-weight: 600; line-height: 1.25;
   color: var(--ink);
 }
 

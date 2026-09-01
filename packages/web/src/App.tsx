@@ -254,7 +254,12 @@ export function App() {
   })
 
   return (
-    <div className="app" ref={appRef} data-broadcast={route.broadcast ? 'on' : undefined}>
+    <div
+      className="app"
+      ref={appRef}
+      data-broadcast={route.broadcast ? 'on' : undefined}
+      data-paper={sheet === null ? undefined : 'on'}
+    >
       <h1 className="stage-sr">San Junipero</h1>
       <a className="skip" href="#signpost">
         Skip to the signpost
