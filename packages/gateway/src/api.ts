@@ -163,6 +163,12 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
       foldOne(toEvent(r))
       foldCursor = r.seq
     }
+    // Only the last sim-day is ever served, and nothing else drops a window: unpruned this is
+    // ~1k keys per sim-day, kept for the life of the process.
+    const floorW = Math.floor((deps.mirror.state().tick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
+    for (const key of heat.keys()) {
+      if (Number(key.slice(0, key.indexOf('\n'))) < floorW) heat.delete(key)
+    }
   }
   // On a resumed town this is the whole log, and it runs on the boot thread rather than on the
   // first stranger's GET — which would be the thread that ticks the town.
@@ -280,23 +286,13 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
-  /** The running map stays whole — a viewer-picked window must be exact however far back it
-   *  reaches — but what is SENT is the last sim-day, bounded by population, not the town's age. */
+  /** The last sim-day, bounded by population and not by the town's age — `readFold` has already
+   *  dropped every window older than that, so the map IS the answer's own horizon. */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()
     sendPrebuilt(
       res,
-      cache.json('heat', () => {
-        const nowTick = deps.mirror.state().tick
-        // The windows `heatSince` would keep, picked out before they are built and sorted: it keeps
-        // `60w + 59 >= nowTick − HORIZON`, which is exactly `w >= floor((nowTick − HORIZON) / 60)`.
-        const floorW = Math.floor((nowTick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
-        const recent: HeatScores = new Map()
-        for (const [key, score] of heat) {
-          if (Number(key.slice(0, key.indexOf('\n'))) >= floorW) recent.set(key, score)
-        }
-        return heatSince(heatFromScores(recent), nowTick)
-      }),
+      cache.json('heat', () => heatSince(heatFromScores(heat), deps.mirror.state().tick)),
     )
   })
 
