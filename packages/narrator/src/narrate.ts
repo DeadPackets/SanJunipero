@@ -9,7 +9,7 @@ import {
 import type { WorldState } from '@sj/engine'
 import { publishClean, renderChapter, renderEra } from './chronicle.js'
 import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
-import { detectFirsts } from './firsts.js'
+import { detectFirsts, populationDelta } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
 import { detectSemanticFirsts, type SemanticDeps } from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
@@ -101,10 +101,20 @@ export async function narrateDay(deps: {
   // The world in reach answers what the day's own events cannot: `structure_completed` carries
   // no kind, and the day that finishes a house never saw the day that planned it.
   const structures = deps.world?.state?.structures
+  // The state is the world as the day ENDS, and the detector counts the day onto what it is
+  // given: the day is run backwards off the living to reach the count it began with.
   const tier1 = detectFirsts(events, {
     seenKinds,
     rulebookCount: deps.rulebookCount,
     ...(structures === undefined ? {} : { structureKind: (id: string) => structures[id]?.kind }),
+    ...(deps.world?.state === undefined
+      ? {}
+      : {
+          population: events.reduce(
+            (n, e) => n - populationDelta(e),
+            known.filter((a) => a.alive).length,
+          ),
+        }),
   })
   const tier2 =
     deps.world === undefined

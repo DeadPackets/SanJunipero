@@ -8,6 +8,12 @@ export const FIRST_DEFS = TIER1_DEFS
 
 const p = (ev: SimEvent): Record<string, unknown> => (ev.payload ?? {}) as Record<string, unknown>
 
+/** What one event does to the count of souls. A caller rewinding a day runs it backwards. */
+export function populationDelta(ev: SimEvent): number {
+  if (ev.type === 'agent_spawned' || ev.type === 'agent_born') return 1
+  return ev.type === 'agent_died' ? -1 : 0
+}
+
 export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
   const seen = new Set(ctx.seenKinds)
   const out: Milestone[] = []
@@ -25,8 +31,7 @@ export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
   let population = ctx.population ?? 0
 
   for (const ev of events) {
-    if (ev.type === 'agent_spawned' || ev.type === 'agent_born') population += 1
-    if (ev.type === 'agent_died') population -= 1
+    population += populationDelta(ev)
     const running: FirstCtx = { ...ctx, structureKind, population }
     for (const def of FIRST_DEFS) {
       if (seen.has(def.kind) || !def.match(ev, running)) continue
