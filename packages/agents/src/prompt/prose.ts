@@ -893,8 +893,10 @@ export function perceptionToProse(
     // ailing is a body nobody tends, and the live run tended nobody at all.
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
     const where = `(${a.x}, ${a.y})${dressed}${ails}`
-    if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
-    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at ${where}.`)
+    // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
+    // while sleeping is flagged both, and asleep-first told the town it was only resting.
+    if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at ${where}.`)
+    else if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
     else lines.push(`${a.name} (${a.id}) stands at ${where}.`)
   }
 
