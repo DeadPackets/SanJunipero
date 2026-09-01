@@ -19,7 +19,7 @@ import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondMo
 /** ★ The key is a legend, not news. It opens the first time somebody looks at the graph —
  *  thirteen chips and no words is a picture nobody can read — and stays shut once they have
  *  shut it, for as long as the tab lives. */
-export const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
+const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
 
 export function keyOpensBy(storage: Pick<Storage, 'getItem'>): boolean {
   try {
