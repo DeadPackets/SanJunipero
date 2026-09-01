@@ -132,7 +132,8 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
    *  asset set changes — a manifest is parsed once, not once a sim tick */
   const points = new Map<string, { kind: string; points: BuildingPoints | null }>()
   let synced: WorldState | null = null
-  let syncedRecords: unknown = null
+  // The codex array is mutated in place, so its identity never changes — the seq is the signal.
+  let syncedAssets = -1
   const still = !scene.wantsMotion()
   let t = 0
   let drawn = 0
@@ -156,8 +157,8 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
 
   const sync = (state: WorldState): void => {
     const records = store.assetRecords()
-    if (records !== syncedRecords) points.clear()
-    syncedRecords = records
+    if (store.assetsSeq() !== syncedAssets) points.clear()
+    syncedAssets = store.assetsSeq()
     for (const s of Object.values(state.structures)) {
       if (points.get(s.id)?.kind !== s.kind)
         points.set(s.id, {
@@ -202,7 +203,7 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
       const state = store.getState()
       if (state === null) return
       if (!still) t += dtMs
-      if (state !== synced || store.assetRecords() !== syncedRecords) {
+      if (state !== synced || store.assetsSeq() !== syncedAssets) {
         synced = state
         sync(state)
       }
