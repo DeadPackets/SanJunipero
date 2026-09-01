@@ -11,7 +11,7 @@ import {
   worldTextScale,
 } from './textFaces.js'
 import { over } from './legibility.js'
-import { bubbleShown, nearestSpeakers, onLeash, placeBubbles } from './bubbles.js'
+import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles } from './bubbles.js'
 import { tileToScreen } from './iso.js'
 import { fadeArtIn } from './textures.js'
 import { stateWord, statusOf, type AgentView } from '../ui/status.js'
@@ -31,8 +31,12 @@ export const ACT_MIN_TICKS = 2
  *  and the word is worth having at any length — a long act keeps its word, loses its fill. */
 export const ACT_FILL_MAX_TICKS = 60
 
-/** The same three the bubbles keep, measured the same way, so one rule covers the stage. */
-export const ACT_NEAREST = 3
+/** ★ A chip has its own reason to be on screen, and it is not "a bubble would be": the two
+ *  used to share `bubbleShown`, so changing who speaks silently changed who works. The stop is
+ *  the same one — a person eight pixels tall cannot wear a word either. */
+export function actChipShown(zoom: number, inView: boolean): boolean {
+  return inView && zoom > GLYPH_ZOOM
+}
 /** MEASURED, not chosen: cream clears the night multiply at 5.19:1, a 0.14 wash fell to 4.17:1
  *  after dark, and 0.08 holds 4.58:1. `acts.test.ts` fails the build if it is pushed back up. */
 const ACT_WASH = 0.08
@@ -202,16 +206,11 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
         return { id, sx, sy: sy + ACT_DROP_PX }
       })
       const view = scene.viewRect()
-      const near = nearestSpeakers(
-        at,
-        { x: view.x + view.w / 2, y: view.y + view.h / 2 },
-        ACT_NEAREST,
-      )
+      const seen = inViewSpeakers(at, view)
 
       const want: { id: string; sx: number; sy: number; size: { w: number; h: number } }[] = []
       for (const p of at) {
-        // A person eight pixels tall cannot wear a word, and the bubbles already know it.
-        if (!bubbleShown(zoom, near.has(p.id))) {
+        if (!actChipShown(zoom, seen.has(p.id))) {
           drop(p.id)
           continue
         }

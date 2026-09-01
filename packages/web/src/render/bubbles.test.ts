@@ -6,7 +6,6 @@ import {
   BUBBLE_FONT_PX,
   BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
-  BUBBLE_NEAREST,
   ELLIPSIS,
   GLYPH_ZOOM,
   SPEAKER_TINT,
@@ -17,7 +16,7 @@ import {
   bubbleLife,
   bubbleShown,
   dominantColor,
-  nearestSpeakers,
+  inViewSpeakers,
   placeBubbles,
   speakerWash,
   wrapBubble,
@@ -66,12 +65,22 @@ describe('wrapBubble', () => {
   })
 })
 
-describe('a bubble stops at two lines and says so', () => {
+describe('a bubble stops at four lines and says so', () => {
+  const SPEECH =
+    'the fish are biting well this morning by the river and the light is good on the water and nobody has come down to see any of it with me'
+
   it('caps at BUBBLE_MAX_LINES and ends the last one in an ellipsis', () => {
-    const lines = wrapBubble('the fish are biting well this morning by the river', 24)
+    const lines = wrapBubble(SPEECH, 24)
     expect(lines).toHaveLength(BUBBLE_MAX_LINES)
     expect(lines[BUBBLE_MAX_LINES - 1]!.endsWith(ELLIPSIS)).toBe(true)
     expect(lines[0]).toBe('the fish are biting well')
+  })
+
+  // ★ Two lines cut a spoken line in half and the town read as a place of half-sentences.
+  it('★ lets a whole spoken line through, where two lines would have cut it', () => {
+    const said = 'the fish are biting well this morning by the river'
+    expect(wrapBubble(said, 24)).toHaveLength(3)
+    expect(wrapBubble(said, 24).join(' ')).toBe(said)
   })
 
   it('never lets the ellipsis push a line past the wrap width', () => {
@@ -167,27 +176,31 @@ describe('the dominant colour of a sheet is the cloth, not the outline', () => {
   })
 })
 
-describe('only the nearest three speak out loud', () => {
+// ★ Three speakers in a town of thirty read as a town where only three people ever talk. The
+// picture is the rule now: if the camera can see them, they get their word.
+describe('★ everybody the camera can see speaks out loud', () => {
   const at = (id: string, sx: number, sy: number) => ({ id, sx, sy })
+  const VIEW = { x: 0, y: 0, w: 400, h: 300 }
 
-  it('keeps BUBBLE_NEAREST, measured from the camera centre', () => {
-    const near = nearestSpeakers(
-      [at('far', 500, 0), at('a', 10, 0), at('b', 0, 20), at('c', 30, 0), at('mid', 200, 0)],
-      { x: 0, y: 0 },
+  it('★ keeps every speaker inside the picture, however many that is', () => {
+    const seen = inViewSpeakers(
+      [at('a', 10, 10), at('b', 200, 150), at('c', 399, 299), at('d', 40, 90), at('e', 5, 5)],
+      VIEW,
     )
-    expect(near.size).toBe(BUBBLE_NEAREST)
-    expect([...near].sort()).toEqual(['a', 'b', 'c'])
+    expect(seen.size).toBe(5)
   })
 
-  it('takes everybody when there are fewer than three', () => {
-    expect(nearestSpeakers([at('a', 0, 0)], { x: 0, y: 0 }).size).toBe(1)
+  it('★ drops the ones the camera cannot see, and keeps the ones on its edge', () => {
+    const seen = inViewSpeakers(
+      [at('far', 5000, 0), at('above', 200, -1), at('edge', 400, 300), at('in', 1, 1)],
+      VIEW,
+    )
+    expect([...seen].sort()).toEqual(['edge', 'in'])
   })
 
-  it('breaks a tie by arrival order, so the same frame chooses the same three twice', () => {
-    const want = [at('a', 10, 0), at('b', 10, 0), at('c', 10, 0), at('d', 10, 0)]
-    const first = [...nearestSpeakers(want, { x: 0, y: 0 })]
-    expect(first).toEqual(['a', 'b', 'c'])
-    expect([...nearestSpeakers(want, { x: 0, y: 0 })]).toEqual(first)
+  it('takes nobody out of an empty frame, and everybody out of a full one', () => {
+    expect(inViewSpeakers([], VIEW).size).toBe(0)
+    expect(inViewSpeakers([at('a', 0, 0)], VIEW).size).toBe(1)
   })
 
   it('collapses the whole town to a glyph at the widest stop', () => {
@@ -195,7 +208,7 @@ describe('only the nearest three speak out loud', () => {
     expect(bubbleShown(GLYPH_ZOOM, true)).toBe(false)
     for (const zoom of ZOOM_STOPS.filter((z) => z > GLYPH_ZOOM)) {
       expect(bubbleShown(zoom, true), `${zoom}x`).toBe(true)
-      expect(bubbleShown(zoom, false), `${zoom}x not nearest`).toBe(false)
+      expect(bubbleShown(zoom, false), `${zoom}x off screen`).toBe(false)
     }
   })
 })

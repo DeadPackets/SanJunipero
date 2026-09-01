@@ -3,7 +3,7 @@ import {
   ACT_FILL,
   ACT_FILL_MAX_TICKS,
   ACT_MIN_TICKS,
-  ACT_NEAREST,
+  actChipShown,
   actFillShown,
   actFraction,
   actShown,
@@ -11,7 +11,8 @@ import {
   type ActRun,
 } from './acts.js'
 import { AA_RATIO, bandRatios } from './legibility.js'
-import { BUBBLE_NEAREST, nearestSpeakers } from './bubbles.js'
+import { GLYPH_ZOOM } from './bubbles.js'
+import { ZOOM_STOPS } from './camera.js'
 import { SPEECH_FILL, SPEECH_INK } from './textFaces.js'
 import type { AgentView } from '../ui/status.js'
 
@@ -151,20 +152,14 @@ describe('whose act is worth a word', () => {
   })
 })
 
-describe('the chip keeps the same crowd rule the bubbles keep', () => {
-  it('counts to the same three, through the same function', () => {
-    expect(ACT_NEAREST).toBe(BUBBLE_NEAREST)
-  })
-
-  it('keeps the three nearest the middle of the picture', () => {
-    const at = [
-      { id: 'far', sx: 900, sy: 0 },
-      { id: 'a', sx: 10, sy: 0 },
-      { id: 'b', sx: 20, sy: 0 },
-      { id: 'c', sx: 30, sy: 0 },
-    ]
-    const near = nearestSpeakers(at, { x: 0, y: 0 }, ACT_NEAREST)
-    expect(near.size).toBe(3)
-    expect(near.has('far')).toBe(false)
+// ★ The chip used to ask `bubbleShown`, so a change to who SPEAKS silently changed who is seen
+// working. It keeps the same zoom stop and asks it in its own name.
+describe('★ the chip has its own reason to be on screen', () => {
+  it('★ wears no word where a person is eight pixels tall', () => {
+    expect(actChipShown(GLYPH_ZOOM, true)).toBe(false)
+    for (const zoom of ZOOM_STOPS.filter((z) => z > GLYPH_ZOOM)) {
+      expect(actChipShown(zoom, true), `${zoom}x`).toBe(true)
+      expect(actChipShown(zoom, false), `${zoom}x off screen`).toBe(false)
+    }
   })
 })

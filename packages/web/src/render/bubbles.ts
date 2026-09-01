@@ -24,6 +24,7 @@ import {
 } from './textFaces.js'
 import { over } from './legibility.js'
 import { overlaps, placeTag, type Rect } from './tooltip.js'
+import { rectInView } from './cull.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
@@ -33,25 +34,22 @@ import { characterCell } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 
-export const SPEECH_MS_BASE = 2500
+export const SPEECH_MS_BASE = 3500
 export const SPEECH_MS_PER_CHAR = 40
 export const SPEECH_MAX_CHARS = 140
 const THOUGHT_DRIFT_PX = 2
 
 /** How wide a bubble may grow in world pixels before it wraps. */
-export const BUBBLE_MAX_PX = 210
+export const BUBBLE_MAX_PX = 280
 export const BUBBLE_FONT_PX = faceFor('speech').size
 export const BUBBLE_LINE_H = Math.max(WORLD_TEXT_LINE_H, BUBBLE_FONT_PX + 4)
 /** DERIVED, not the hardcoded 24 it was: the wide face wraps sooner than the narrow one. */
 export const WRAP_CHARS = wrapCharsFor(faceFor('speech').family, BUBBLE_FONT_PX, BUBBLE_MAX_PX)
 
-/** Two lines is what a reader takes in over a moving town; the rest is a paper's job. */
-export const BUBBLE_MAX_LINES = 2
+/** Four lines of the wider box holds a whole spoken line; past that is a paper's job. */
+export const BUBBLE_MAX_LINES = 4
 export const ELLIPSIS = '…'
 
-/** Only the three nearest the camera's centre are worth reading. The camera centre IS the
- *  followed subject while the director is cutting, so one rule covers both. */
-export const BUBBLE_NEAREST = 3
 /** At the widest stop a person is eight pixels tall and a bubble is the whole street. */
 export const GLYPH_ZOOM: number = ZOOM_STOPS[0]
 export const SPEAKER_TINT = 0.15
@@ -137,24 +135,20 @@ export function speakerWash(rgb: number): number {
   return over(0xffffff, (lift(r) << 16) | (lift(g) << 8) | lift(b), SPEAKER_WASH)
 }
 
-/** The three nearest the centre keep their bubble; input order breaks a tie, and `sort` is
- *  stable, so the same frame always chooses the same three. */
-export function nearestSpeakers(
+/** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
+ *  of speech and it read as a town where only three people ever talk; the placer already drops
+ *  what it cannot fit. One pass, no sort — this ran per frame. */
+export function inViewSpeakers(
   want: readonly { id: string; sx: number; sy: number }[],
-  centre: { x: number; y: number },
-  limit = BUBBLE_NEAREST,
+  view: Rect,
 ): Set<string> {
-  return new Set(
-    want
-      .map((b) => ({ id: b.id, d: (b.sx - centre.x) ** 2 + (b.sy - centre.y) ** 2 }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, limit)
-      .map((b) => b.id),
-  )
+  const out = new Set<string>()
+  for (const b of want) if (rectInView(b.sx, b.sy, b.sx, b.sy, view, 0)) out.add(b.id)
+  return out
 }
 
-export function bubbleShown(zoom: number, isNearest: boolean): boolean {
-  return isNearest && zoom > GLYPH_ZOOM
+export function bubbleShown(zoom: number, inView: boolean): boolean {
+  return inView && zoom > GLYPH_ZOOM
 }
 
 /** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
@@ -389,10 +383,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         return { id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift }
       })
       const view = scene.viewRect()
-      const near = nearestSpeakers(at, { x: view.x + view.w / 2, y: view.y + view.h / 2 })
+      const seen = inViewSpeakers(at, view)
       const want = at.map((p, i) => {
         const b = bubbles[i]!
-        const shown = bubbleShown(zoom, near.has(p.id))
+        const shown = bubbleShown(zoom, seen.has(p.id))
         b.box.visible = shown
         b.glyph.visible = !shown
         return {

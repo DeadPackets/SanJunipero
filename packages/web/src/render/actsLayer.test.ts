@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { Container } from 'pixi.js'
 import { createActLayer } from './acts.js'
+import { tileToScreen } from './iso.js'
 import type { Rect } from './tooltip.js'
 import type { Scene } from './scene.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -65,7 +66,9 @@ const body = (id: string, activity: Act, over: Record<string, unknown> = {}): un
   ...over,
 })
 
-function harness(): {
+const WHOLE_WORLD = { x: -1e4, y: -1e4, w: 2e4, h: 2e4 }
+
+function harness(view: Rect = WHOLE_WORLD): {
   layer: ReturnType<typeof createActLayer>
   set: (...bodies: unknown[]) => void
   chips: () => Container[]
@@ -80,8 +83,8 @@ function harness(): {
     textScale: 1,
     getZoom: () => 1,
     wantsMotion: () => false,
-    viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
-    anchorOf: () => ({ x: 0, y: 0 }),
+    viewRect: () => view,
+    anchorOf: () => null, // the layer falls back to the record's tile, which is where a body IS
     tags: {
       occupied: () => [],
       setOccupied: (_owner: string, b: readonly Rect[]) => {
@@ -186,15 +189,27 @@ describe('the chip tells the rest of the stage where it is', () => {
     expect(boxes[0]!.h).toBeGreaterThan(0)
   })
 
-  it('keeps only three when the whole town is at work', () => {
+  // ★ Three chips in a town of thirty read as a town where three people work. The picture is
+  // the rule now: whoever the camera can see is seen working.
+  it('★ chips everybody the camera can see, however many that is', () => {
     const h = harness()
-    const crew = ['a', 'b', 'c', 'd', 'e'].map((id) =>
-      body(id, { verb: 'chop', ticksRemaining: 30 }),
-    )
-    h.set(...crew)
-    for (const id of ['a', 'b', 'c', 'd', 'e']) h.noteStart(id, 'chop', 30)
+    const crew = ['a', 'b', 'c', 'd', 'e']
+    h.set(...crew.map((id) => body(id, { verb: 'chop', ticksRemaining: 30 })))
+    for (const id of crew) h.noteStart(id, 'chop', 30)
     h.layer.tick()
-    expect(h.chips()).toHaveLength(3)
+    expect(h.chips()).toHaveLength(crew.length)
+  })
+
+  it('★ and nobody it cannot — a body off the edge wears no word', () => {
+    const near = tileToScreen(4, 4)
+    const h = harness({ x: near.sx - 60, y: near.sy - 60, w: 120, h: 120 })
+    h.set(
+      body('here', { verb: 'chop', ticksRemaining: 30 }),
+      body('away', { verb: 'chop', ticksRemaining: 30 }, { x: 400, y: 400 }),
+    )
+    for (const id of ['here', 'away']) h.noteStart(id, 'chop', 30)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(1)
   })
 })
 
