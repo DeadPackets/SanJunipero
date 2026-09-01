@@ -220,7 +220,7 @@ describe('what a stranger cannot do to the town', () => {
   const open: (WebSocket | Gateway)[] = []
   let made = 0
 
-  const gateway = async (maxViewers?: number): Promise<Gateway> => {
+  const gateway = async (maxViewers = 500): Promise<Gateway> => {
     const dbPath = join(dir, `world-${made++}.db`)
     const { db, loop } = makeWorld(dbPath)
     for (let i = 0; i < 6; i++) loop.step()
