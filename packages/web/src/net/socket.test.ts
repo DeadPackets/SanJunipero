@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CLOSE_BAD_HELLO } from '@sj/shared'
+import { CLOSE_BAD_HELLO, DEFAULT_CONFIG } from '@sj/shared'
 import { connectObservatory } from './socket.js'
 import { createWorldStore } from '../state/worldStore.js'
 
@@ -127,6 +127,27 @@ describe('connectObservatory link status', () => {
     }
     FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(snapshot) })
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  /** A delta that will not fold leaves a half-folded town; only the server's own state is one. */
+  it('★ asks to go live again when the store cannot take a delta', () => {
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    const ghost = { seq: 1, tick: 1, type: 'agent_moved', payload: { id: 'ghost', x: 1, y: 1 } }
+    const snapshot = {
+      t: 'snapshot',
+      tick: 0,
+      seq: 0,
+      state: { tick: 0, agents: {}, structures: {}, items: {} },
+      config: DEFAULT_CONFIG,
+      laws: {},
+      live: true,
+    }
+    sock.onmessage?.({ data: JSON.stringify(snapshot) })
+    sock.onmessage?.({ data: JSON.stringify({ t: 'tick', tick: 1, seq: 1, events: [ghost] }) })
+    expect(sock.sent.at(-1)).toBe('{"t":"live"}')
   })
 
   it('a deliberate close() never reports reconnecting', () => {

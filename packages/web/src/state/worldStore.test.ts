@@ -87,6 +87,29 @@ describe('worldStore', () => {
     expect(store.getTick()).toBe(2)
   })
 
+  // ★ A viewer that fell behind is resynced with a snapshot built AFTER the deltas that follow
+  // it, so the same events arrive twice. Refolding them threw and the live view froze.
+  it('★ ignores a delta the snapshot it just took already holds', () => {
+    const store = createWorldStore()
+    const snap = { ...makeSnapshot(), seq: 9 }
+    store.applyServer(snap)
+    const again: SimEvent = { seq: 9, tick: 1, type: 'agent_spawned', payload: spawn.payload }
+    expect(store.applyServer({ t: 'tick', tick: 1, seq: 9, events: [again] })).toBeNull()
+    expect(stateHash(store.getState())).toBe(stateHash(snap.state))
+  })
+
+  it('★ asks for a fresh snapshot when a delta will not fold, instead of freezing', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    const ghost: SimEvent = {
+      seq: 5,
+      tick: 2,
+      type: 'agent_moved',
+      payload: { id: 'ghost', x: 1, y: 1 },
+    }
+    expect(store.applyServer({ t: 'tick', tick: 2, seq: 5, events: [ghost] })).toBe('resnapshot')
+  })
+
   it('scrubbed pauses at the past moment; a live snapshot resumes', () => {
     const store = createWorldStore()
     const snap = makeSnapshot()

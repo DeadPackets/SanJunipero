@@ -19,8 +19,9 @@ type Thought = { agentId: string; tick: number; text: string }
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
 
-/** What a frame the view could not take asks of whoever delivered it. `null`: it was taken. */
-export type Trouble = 'reload' | null
+/** What a frame the view could not take asks of whoever delivered it: a fresh snapshot, or a
+ *  bundle that can read this town at all. `null`: it was taken. */
+export type Trouble = 'reload' | 'resnapshot' | null
 
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
@@ -117,10 +118,17 @@ export function createWorldStore(): WorldStore {
           paused = msg.paused
           break
         case 'tick':
+          // The hub resyncs a drained viewer with a snapshot taken AFTER the deltas it then
+          // sends: refolding an event this state already has throws, and the town stops.
+          if (msg.seq <= logSeq) return null
           logSeq = msg.seq
           // deltas only advance the live view; while scrubbed the past moment stays still
           if (mode.live && state !== null && config !== null) {
-            for (const ev of msg.events) state = fold(state, ev, config)
+            try {
+              for (const ev of msg.events) state = fold(state, ev, config)
+            } catch {
+              return 'resnapshot' // half-folded: only the server's own state is a town again
+            }
             for (const ev of msg.events) {
               if (ev.type !== 'config_changed') continue
               const p = ev.payload as { path?: unknown; value?: unknown }

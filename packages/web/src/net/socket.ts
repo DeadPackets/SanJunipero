@@ -70,8 +70,10 @@ export function connectObservatory(opts: {
         const last = readLastSeen()
         if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
       }
-      if (opts.store.applyServer(msg) === 'reload') {
-        location.reload()
+      const trouble = opts.store.applyServer(msg)
+      if (trouble !== null) {
+        if (trouble === 'reload') location.reload()
+        else send({ t: 'live' })
         return
       }
       if (msg.t === 'snapshot' || msg.t === 'tick') writeLastSeen(msg.tick)
