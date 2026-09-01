@@ -84,8 +84,9 @@ describe('submitIntent', () => {
     const noPath = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(noPath.ok).toBe(false)
     if (!noPath.ok) expect(noPath.reason).toMatch(/path/i)
+    // Standing where you were sent is not a thing to be refused for.
     const there = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 0, y: 0 })
-    expect(there.ok).toBe(false)
+    expect(there.ok).toBe(true)
   })
 
   it('prepends agent_woke when the agent is asleep', () => {

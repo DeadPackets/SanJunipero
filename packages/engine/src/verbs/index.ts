@@ -311,7 +311,6 @@ const walk: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
-    if (a.x === to.x && a.y === to.y) return 'already at that spot'
     // A memo hit for a named place, which already proved this tile: the two numbers are what
     // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'
