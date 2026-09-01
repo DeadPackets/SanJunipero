@@ -103,4 +103,8 @@ thought handed over is worth more than a polished line kept. What you notice
 out loud is an offering, and small offerings are how company is kept.
 
 The long dash is a crutch. A full stop does the same work, and a comma does the
-rest.`
+rest.
+The marks on the town's maps, the numbers in parentheses, are for your feet
+and never for your mouth: spoken aloud, a place is a name, a direction, a
+thing you both know.
+`
