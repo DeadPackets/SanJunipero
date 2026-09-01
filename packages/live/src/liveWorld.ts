@@ -630,6 +630,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // Dispatched OFF this handler: awaiting two provider calls here would stall the socket
       // for as long as they take. The day just ended is the one being written.
       let narratedThroughSeq = store.lastSeq()
+      const recognizerEvents: SimEvent[] = []
+      let recognizedThroughSeq = 0
       const rulebookCount = (): number =>
         arbiterDb === null
           ? 0
@@ -714,10 +716,15 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (recognizing) return
         recognizing = true
         setImmediate(() => {
+          // A site is recognized by recurring, so the pass still needs every day it has seen —
+          // but it is extended, never re-read: parsing the whole log again grows without bound.
+          const fresh = RECOGNIZER_EVENTS.flatMap((t) =>
+            store.readTypeFrom(recognizedThroughSeq, t),
+          ).sort((a, b) => a.seq - b.seq)
+          recognizedThroughSeq = store.lastSeq()
+          recognizerEvents.push(...fresh)
           void runConstructPass({
-            events: RECOGNIZER_EVENTS.flatMap((t) => store.readTypeFrom(0, t)).sort(
-              (a, b) => a.seq - b.seq,
-            ),
+            events: recognizerEvents,
             baseConfig: config,
             store: new ConstructStore(arb),
             llm: makeClient('constructs', 'town'),

@@ -4,13 +4,14 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
+import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
@@ -1251,6 +1252,24 @@ describe('★ the chronicle, written on the day boundary', () => {
     // and the semantic pass ran rather than falling over: no unreadable-verdict alert
     expect(alertsOf(opsDb, 'semantic_firsts_unreadable')).toEqual([])
   }, 120_000)
+
+  // The recognizer's cost must not grow with the town's age: `agent_moved` alone is a row per
+  // tile crossed, and re-parsing every one of them each sim-day blocks the loop for longer daily.
+  it('★ the recognizer reads what is new, not the whole log again', async () => {
+    const dir = tmp()
+    const readTypeFrom = vi.spyOn(EventStore.prototype, 'readTypeFrom')
+    const moved = (): number[] =>
+      readTypeFrom.mock.calls.filter(([, type]) => type === 'agent_moved').map(([from]) => from)
+    const { world } = await liveWorld({ dir, turn: SILENT_TURN })
+    await sprint(world, MINUTES_PER_DAY + 1)
+    expect(await settle(() => moved().length === 0, 10_000)).toBe(true)
+
+    readTypeFrom.mockClear()
+    await sprint(world, MINUTES_PER_DAY)
+    expect(await settle(() => moved().length === 0, 10_000)).toBe(true)
+    expect(moved().every((from) => from > 0)).toBe(true)
+    readTypeFrom.mockRestore()
+  }, 180_000)
 
   it('leaves the day unwritten when the daily budget is already spent', async () => {
     const dir = tmp()
