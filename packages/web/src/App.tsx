@@ -277,6 +277,10 @@ export function App() {
             setThing({ kind: pick.kind, id: pick.id })
             openPage('found', 'Things')
           }}
+          onGround={() => {
+            setSubject(null)
+            setThing(null)
+          }}
         />
       </main>
       {insideId !== null && (

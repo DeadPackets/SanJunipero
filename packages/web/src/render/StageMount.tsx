@@ -26,6 +26,7 @@ export function StageMount({
   onScene,
   onInterior,
   onPick,
+  onGround,
 }: {
   store: WorldStore
   /** The live scene, and `null` the moment it is torn down — React must never be left
@@ -35,6 +36,8 @@ export function StageMount({
   onInterior?: (structureId: string | null) => void
   /** what the pointer landed on — App draws the popover, the canvas draws nothing of the kind */
   onPick?: (pick: WorldPick) => void
+  /** a click that landed on the bare ground, which is how a viewer puts a pick back down */
+  onGround?: () => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<Scene | null>(null)
@@ -44,6 +47,8 @@ export function StageMount({
   onInteriorRef.current = onInterior
   const onPickRef = useRef(onPick)
   onPickRef.current = onPick
+  const onGroundRef = useRef(onGround)
+  onGroundRef.current = onGround
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
     const s = sceneRef.current
@@ -105,6 +110,9 @@ export function StageMount({
           carved.place()
         }
         const pick = (p: WorldPick): void => onPickRef.current?.(p)
+        // The rig already refuses a drag and anything that landed on a body or a building, so
+        // what reaches here is bare ground — and bare ground is how a pick is put back down.
+        s.onTilePointer(() => onGroundRef.current?.())
         offSync = store.subscribe(() => {
           syncEntities(s, book, store, openDoor, pick)
           nameTown()

@@ -121,22 +121,22 @@ describe('structureTitle — a proper name outranks the kind, wherever a viewer 
     inscription: { text: 'The Long Table', by: 'rahel' },
   }
   const blank = { ...structure('n3', 'house', null), inscription: { text: '  ', by: 'rahel' } }
-  const named_state = {
+  const titled = {
     structures: { n1: named, n2: carved, n3: blank },
     agents: {},
   } as unknown as WorldState
 
   it('★ reads the carved name, flattened exactly as speech is', () => {
-    expect(structureTitle(named_state, 'n1')).toBe('Yusuf’s house')
+    expect(structureTitle(titled, 'n1')).toBe('Yusuf’s house')
   })
 
   it('falls back to the inscription, and past an inscription of nothing to the kind', () => {
-    expect(structureTitle(named_state, 'n2')).toBe('The Long Table')
-    expect(structureTitle(named_state, 'n3')).toBe('house')
+    expect(structureTitle(titled, 'n2')).toBe('The Long Table')
+    expect(structureTitle(titled, 'n3')).toBe('house')
   })
 
   it('answers null for a building the town does not have', () => {
-    expect(structureTitle(named_state, 'nope')).toBeNull()
+    expect(structureTitle(titled, 'nope')).toBeNull()
     expect(structureTitle(null, 'n1')).toBeNull()
   })
 })
@@ -177,6 +177,16 @@ describe('escape puts down one thing at a time, topmost first', () => {
     for (const f of ['../paper/Paper.tsx', '../stage/SubjectRing.tsx', '../stage/KeyMap.tsx'])
       expect(src(f), f).not.toContain('Escape')
     expect(src('../App.tsx')).toContain('escapeStep(')
+  })
+
+  // ★ The rig published a ground click and NOBODY subscribed, so the only way to put a ring
+  // down was the keyboard. A click on bare ground is the other half of Escape's bottom rung.
+  it('★ a click on bare ground puts the pick down, the way Escape does', () => {
+    const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8')
+    expect(src('../render/StageMount.tsx')).toContain('s.onTilePointer(')
+    expect(src('../App.tsx')).toMatch(
+      /onGround=\{\(\) => \{\s*setSubject\(null\)\s*setThing\(null\)/,
+    )
   })
 })
 
