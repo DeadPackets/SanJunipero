@@ -285,9 +285,11 @@ describe('★ the sheet answers the device, not only the window width', () => {
     )
   })
 
+  // 1000, not 480: one row of section line needs ~677px of head, and a 78% sheet only reaches
+  // that near a 970px window. Between the two the strip was overflowing its own row.
   it('makes the tab strip a scroller before it wraps onto a third row', () => {
     expect(BARE).toMatch(
-      /@media \(max-width: 480px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
+      /@media \(max-width: 1000px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
     )
   })
 })
