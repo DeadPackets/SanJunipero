@@ -35,7 +35,7 @@ async function exported(): Promise<{ files: Map<string, Buffer>; manifest: RunMa
   const sink = new PassThrough()
   const chunks: Buffer[] = []
   sink.on('data', (c: Buffer) => chunks.push(c))
-  const manifest = writeRunTar(sink, {
+  const manifest = await writeRunTar(sink, {
     worldDbPath: WORLD,
     mindsDir: MINDS,
     config: { seed: 'g6' },
@@ -93,6 +93,27 @@ describe('the replication export', () => {
     // The manifest is written last and still names itself correctly to a reader.
     const onDisk = JSON.parse(files.get('run/manifest.json')!.toString()) as RunManifest
     expect(onDisk.files).toEqual(manifest.files)
+  })
+
+  /** Every db used to be `serialize()`d into a Buffer and pushed at the writer whatever it said,
+   *  so peak memory was the export's own size on the thread that ticks the town. */
+  it('★ waits for the reader instead of pushing the whole run at it', async () => {
+    const sink = new PassThrough({ highWaterMark: 512 })
+    let finished = false
+    const run = writeRunTar(sink, {
+      worldDbPath: WORLD,
+      mindsDir: MINDS,
+      config: { seed: 'g6' },
+    }).then(() => {
+      finished = true
+    })
+    await new Promise((r) => setTimeout(r, 100))
+    expect(finished, 'a reader that has read nothing cannot have been handed the whole tar').toBe(
+      false,
+    )
+    expect(sink.readableLength).toBeLessThan(200_000)
+    sink.resume()
+    await run
   })
 
   it('names the code that folded the events when the image was stamped', async () => {

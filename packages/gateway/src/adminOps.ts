@@ -3,6 +3,7 @@ import { MINUTES_PER_DAY, TICK_REAL_MS } from '@sj/shared'
 import { readBody, type AdminRoute } from './adminLaws.js'
 import { writeRunTar, type ExportOpts } from './exportRun.js'
 import { sendJson } from './http.js'
+import { reportOnce } from './degraded.js'
 import type { LiveOps } from './liveCast.js'
 
 /** `TickLoop` satisfies this. */
@@ -303,8 +304,19 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
           'content-type': 'application/x-tar',
           'content-disposition': `attachment; filename="san-junipero-tick-${deps.clock.tick}.tar"`,
         })
-        writeRunTar(res, deps)
-        res.end()
+        // Streamed from disk at the reader's pace, so the answer outlives this handler.
+        void writeRunTar(res, deps).then(
+          () => {
+            res.end()
+          },
+          (e: unknown) => {
+            reportOnce(
+              'admin.export',
+              () => `the run export failed — ${e instanceof Error ? e.message : String(e)}`,
+            )
+            res.destroy()
+          },
+        )
       },
     },
   ]

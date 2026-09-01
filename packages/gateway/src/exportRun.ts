@@ -1,6 +1,10 @@
-import { readdirSync } from 'node:fs'
+import { createReadStream, readdirSync, statSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { once } from 'node:events'
 import type { Writable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import Database from 'better-sqlite3'
 import { MINUTES_PER_DAY } from '@sj/shared'
 
@@ -50,27 +54,53 @@ function tarHeader(name: string, bytes: number, mtimeMs: number): Buffer {
   return head
 }
 
-function writeEntry(out: Writable, name: string, body: Buffer, mtimeMs: number): void {
-  out.write(tarHeader(name, body.length, mtimeMs))
-  out.write(body)
-  const pad = (BLOCK - (body.length % BLOCK)) % BLOCK
-  if (pad > 0) out.write(Buffer.alloc(pad))
+/** `write()` returning false is the only backpressure a socket gives, and an export the reader
+ *  is not keeping up with is otherwise held whole in the serving process's memory. */
+async function put(out: Writable, buf: Buffer): Promise<void> {
+  if (!out.write(buf)) await once(out, 'drain')
 }
 
-/** A consistent copy of a database that is being written to. `serialize()` reads it under one
- *  transaction; copying the file bytes would tear against the WAL. */
-function snapshotDb(path: string): Buffer {
+const padding = (bytes: number): number => (BLOCK - (bytes % BLOCK)) % BLOCK
+
+async function writeEntry(
+  out: Writable,
+  name: string,
+  body: Buffer,
+  mtimeMs: number,
+): Promise<void> {
+  await put(out, tarHeader(name, body.length, mtimeMs))
+  await put(out, body)
+  const pad = padding(body.length)
+  if (pad > 0) await put(out, Buffer.alloc(pad))
+}
+
+async function writeFileEntry(
+  out: Writable,
+  name: string,
+  file: string,
+  mtimeMs: number,
+): Promise<number> {
+  const bytes = statSync(file).size
+  await put(out, tarHeader(name, bytes, mtimeMs))
+  await pipeline(createReadStream(file), out, { end: false })
+  const pad = padding(bytes)
+  if (pad > 0) await put(out, Buffer.alloc(pad))
+  return bytes
+}
+
+/** A consistent copy of a database that is being written to, taken to disk rather than to a
+ *  Buffer: `serialize()` is the whole file in memory, on the thread that ticks the town. */
+async function snapshotDb(path: string, into: string): Promise<string> {
   const db = new Database(path, { readonly: true, fileMustExist: true })
   try {
-    return db.serialize()
+    await db.backup(into)
+    return into
   } finally {
     db.close()
   }
 }
 
-function readWorld(
-  path: string,
-): Pick<RunManifest, 'world' | 'tick' | 'events'> & { bytes: Buffer } {
+function readWorld(path: string): Pick<RunManifest, 'world' | 'tick' | 'events'> {
   const db = new Database(path, { readonly: true, fileMustExist: true })
   try {
     // `seq` is an autoincrementing primary key and no row is ever deleted, so its max IS the count.
@@ -85,42 +115,55 @@ function readWorld(
     } catch {
       /* no such table: an older world, or one this process never platted */
     }
-    return { world, ...head, bytes: db.serialize() }
+    return { world, ...head }
   } finally {
     db.close()
   }
 }
 
 /** Ordering inside a tar carries no meaning, so the manifest is written last, sizes and all. */
-export function writeRunTar(out: Writable, opts: ExportOpts): RunManifest {
+export async function writeRunTar(out: Writable, opts: ExportOpts): Promise<RunManifest> {
   const now = Date.now()
   const files: RunManifest['files'] = []
-  const put = (path: string, body: Buffer): void => {
-    files.push({ path, bytes: body.length })
-    writeEntry(out, ROOT + path, body, now)
-  }
-
-  const { bytes, ...world } = readWorld(opts.worldDbPath)
-  put('world.db', bytes)
-  let minds: string[] = []
+  const world = readWorld(opts.worldDbPath)
+  const scratch = await mkdtemp(join(tmpdir(), 'sj-run-'))
   try {
-    minds = readdirSync(opts.mindsDir)
-      .filter((n) => n.endsWith('.db'))
-      .sort()
-  } catch {
-    /* a scripted stream has no minds directory */
-  }
-  for (const name of minds) put(`minds/${name}`, snapshotDb(join(opts.mindsDir, name)))
-  put('config.json', Buffer.from(JSON.stringify(opts.config, null, 2)))
+    const putDb = async (path: string, source: string): Promise<void> => {
+      const snap = await snapshotDb(source, join(scratch, `${files.length}.db`))
+      files.push({ path, bytes: await writeFileEntry(out, ROOT + path, snap, now) })
+    }
 
-  const manifest: RunManifest = {
-    gitSha: process.env.SJ_GIT_SHA ?? null,
-    ...world,
-    day: Math.floor(world.tick / MINUTES_PER_DAY),
-    takenAt: new Date(now).toISOString(),
-    files,
+    await putDb('world.db', opts.worldDbPath)
+    let minds: string[] = []
+    try {
+      minds = readdirSync(opts.mindsDir)
+        .filter((n) => n.endsWith('.db'))
+        .sort()
+    } catch {
+      /* a scripted stream has no minds directory */
+    }
+    for (const name of minds) await putDb(`minds/${name}`, join(opts.mindsDir, name))
+
+    const config = Buffer.from(JSON.stringify(opts.config, null, 2))
+    files.push({ path: 'config.json', bytes: config.length })
+    await writeEntry(out, `${ROOT}config.json`, config, now)
+
+    const manifest: RunManifest = {
+      gitSha: process.env.SJ_GIT_SHA ?? null,
+      ...world,
+      day: Math.floor(world.tick / MINUTES_PER_DAY),
+      takenAt: new Date(now).toISOString(),
+      files,
+    }
+    await writeEntry(
+      out,
+      `${ROOT}manifest.json`,
+      Buffer.from(JSON.stringify(manifest, null, 2)),
+      now,
+    )
+    await put(out, Buffer.alloc(BLOCK * 2)) // two zero blocks end a tar
+    return manifest
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
   }
-  writeEntry(out, `${ROOT}manifest.json`, Buffer.from(JSON.stringify(manifest, null, 2)), now)
-  out.write(Buffer.alloc(BLOCK * 2)) // two zero blocks end a tar
-  return manifest
 }
