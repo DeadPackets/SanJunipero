@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
@@ -20,6 +20,7 @@ import {
   PROVIDER_ORDER,
   callSettingsFor,
   modelFor,
+  requestTimeoutMsFor,
 } from './pins.js'
 
 type CallRow = {
@@ -1120,6 +1121,75 @@ describe('a re-ask waits out the window it was refused in', () => {
   it('jitters, so a fleet of minds refused together does not re-ask together', () => {
     const draws = new Set(Array.from({ length: 20 }, () => retryBackoffMs(refused)))
     expect(draws.size).toBeGreaterThan(1)
+  })
+
+  // ★ r3: the first attempt was refused 35% of the time and the second 75% — one 2 s-wide
+  // window is not spread enough for five minds refused in the same instant.
+  it('widens the window each time it is refused again', () => {
+    for (const [attempt, low] of [
+      [0, 2_000],
+      [1, 4_000],
+      [2, 8_000],
+    ] as const) {
+      const draws = Array.from({ length: 40 }, () => retryBackoffMs(refused, attempt))
+      expect(Math.min(...draws), `attempt ${attempt}`).toBeGreaterThanOrEqual(low)
+      expect(Math.max(...draws), `attempt ${attempt}`).toBeLessThan(low * 2)
+    }
+  })
+
+  // The last wait a re-asking caller can draw must still fit inside its own bound, or the guard
+  // below turns every re-ask into an immediate hard failure.
+  it('never waits longer than the bound a re-asking caller runs on', () => {
+    const last = Math.max(...Array.from({ length: 200 }, () => retryBackoffMs(refused, 2)))
+    expect(last).toBeLessThan(requestTimeoutMsFor('reflection'))
+  })
+
+  // ★ Six reflection calls must land in a row before the night writes its gists; at two attempts
+  // each, r3 got 1 night in 10 that far. A 429 bills nothing, so the re-asks are free.
+  const refusing = (n: number): MockLanguageModelV4 => {
+    let sent = 0
+    return new MockLanguageModelV4({
+      doGenerate: () => {
+        sent += 1
+        if (sent > n) throw new Error(`re-asked ${sent} times, more than the ${n} it was pinned for`)
+        return Promise.reject(refused)
+      },
+    })
+  }
+
+  it.each([
+    ['reflection', 4],
+    ['turn', 2],
+  ])('re-asks %s past a burst as many times as it is pinned for', async (caller, attempts) => {
+    // The widening waits are the point elsewhere; here only the count is, so the clock is driven
+    // rather than waited out. Each attempt is refused before any timer of its own can fire.
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      const model = refusing(attempts)
+      const call = new LlmClient({ model, db, caller })
+        .text({ messages: [{ role: 'user', content: 'u' }] })
+        .catch((err: unknown) => err)
+      for (let i = 0; i < attempts; i++) await vi.advanceTimersByTimeAsync(20_000)
+      expect(await call).toBeInstanceOf(APICallError)
+      expect(model.doGenerateCalls).toHaveLength(attempts)
+      expect(alertsOf(db, 'llm_call_failed')[0]).toContain(`${caller}: ${attempts} attempt(s)`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // ★ reflection.edit's bound is 295 s. Spending the burst budget on a stall instead would sit
+  // that out four times over, and unlike a 429 every one of them is billed.
+  it('spends the burst budget on a burst only, never on a stall', async () => {
+    const db = openDb()
+    const model = mockModel([{ fail: true }, { fail: true }])
+    await expect(
+      new LlmClient({ model, db, caller: 'reflection.edit' }).text({
+        messages: [{ role: 'user', content: 'u' }],
+      }),
+    ).rejects.toThrow('scripted failure')
+    expect(model.doGenerateCalls).toHaveLength(2)
   })
 
   it('sleeps before the retry that follows a 429, and books both attempts', async () => {

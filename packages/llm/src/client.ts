@@ -176,8 +176,8 @@ const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 const DEFAULT_MAX_RETRIES = 1
 
 // A rate-limited pair in the live ledger sits 5.5 s apart and both halves fail: an immediate
-// re-ask lands inside the window that just refused it. Jittered over [2 s, 4 s) so a fleet of
-// minds refused together does not re-ask together.
+// re-ask lands inside the window that just refused it. The first window, doubled on each further
+// refusal and jittered, so a fleet of minds refused together does not re-ask together.
 const RATE_LIMIT_WAIT_MS = 2_000
 
 // OpenRouter reports a saturated back end as a 429, and on a 200-with-error-body only in words.
@@ -189,9 +189,12 @@ function rateLimited(err: unknown): boolean {
 
 /** How long to wait before re-asking; nothing at all unless the refusal was a rate limit.
  *  Public so a test can prove the shape without waiting it out. */
-export function retryBackoffMs(err: unknown): number {
+export function retryBackoffMs(err: unknown, attempt = 0): number {
   if (!rateLimited(err)) return 0
-  return RATE_LIMIT_WAIT_MS + Math.floor(Math.random() * RATE_LIMIT_WAIT_MS)
+  // Doubling: at r3 the first attempt was refused 35% of the time and the second 75%, because one
+  // 2 s-wide window is not spread enough for five minds refused in the same instant.
+  const window = RATE_LIMIT_WAIT_MS * 2 ** attempt
+  return window + Math.floor(Math.random() * window)
 }
 
 function sleep(ms: number): Promise<void> {
@@ -207,6 +210,7 @@ export class LlmClient {
   private readonly allowProviderFallbacks: boolean
   private readonly reasoning: ReasoningSetting | null
   private readonly maxRetries: number
+  private readonly rateLimitRetries: number
   private readonly requestTimeoutMs: number
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
@@ -229,6 +233,8 @@ export class LlmClient {
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? false
     this.reasoning = opts.reasoning === undefined ? (pinned.reasoning ?? null) : opts.reasoning
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
+    // An explicit count is the caller saying exactly how many; only the default defers to the pin.
+    this.rateLimitRetries = opts.maxRetries ?? pinned.rateLimitRetries ?? this.maxRetries
     this.requestTimeoutMs = opts.requestTimeoutMs ?? requestTimeoutMsFor(opts.caller)
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
@@ -433,7 +439,9 @@ export class LlmClient {
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
     let attempt = 0
-    for (; attempt <= this.maxRetries; attempt++) {
+    // The outer bound is whichever budget is larger; which one this failure may spend is decided
+    // against the error itself, below.
+    for (; attempt <= Math.max(this.maxRetries, this.rateLimitRetries); attempt++) {
       const start = performance.now()
       let facts: StepFacts = {}
       const note: Note = (f) => {
@@ -514,8 +522,10 @@ export class LlmClient {
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err
-        if (attempt === this.maxRetries) break
-        const wait = retryBackoffMs(err)
+        // Only a burst limit earns the pinned patience: it is refused in milliseconds and bills
+        // nothing, where re-asking a stall this often would sit out the whole bound each time.
+        if (attempt === (rateLimited(err) ? this.rateLimitRetries : this.maxRetries)) break
+        const wait = retryBackoffMs(err, attempt)
         // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
         if (wait > this.requestTimeoutMs) break
         if (wait > 0) await sleep(wait)
