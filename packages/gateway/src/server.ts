@@ -264,6 +264,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
+    // Before the capacity check: a socket refused at capacity is still read from while it closes,
+    // and an oversize frame on it emits an 'error' that throws out of the socket server unlistened.
+    sock.on('error', () => {
+      sock.terminate()
+    })
     // `wss.clients` already holds the arriving socket, hence `>`. Counted here rather than off
     // the hub, which a socket joins only after a valid hello.
     if (wss.clients.size > maxViewers) {
@@ -355,10 +360,6 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       removers.get(sock)?.()
       removers.delete(sock)
       opts.onViewers?.(hub.size())
-    })
-    // A viewer's connection dying mid-frame must not throw out of the socket server.
-    sock.on('error', () => {
-      sock.terminate()
     })
   })
 

@@ -257,4 +257,19 @@ describe('what a stranger cannot do to the town', () => {
     expect(await reply).toContain('400')
     expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
   }, 20000)
+
+  // Pre-fix this leaves an unhandled 'error' — the run fails on that, not on an expectation.
+  it('★ survives an oversize frame on a socket it turned away at capacity', async () => {
+    const gw = await gateway(1)
+    open.push(await connect(gw.port)) // the one viewer this town seats
+    // Sent from inside 'open': a beat later the refusal has landed and the frame never goes.
+    const refused = new WebSocket(`ws://127.0.0.1:${gw.port}/ws`)
+    open.push(refused)
+    refused.on('error', () => undefined)
+    refused.on('open', () => {
+      refused.send('x'.repeat(8192)) // twice the 4 KB frame cap
+    })
+    await wait(300)
+    expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
+  }, 20000)
 })
