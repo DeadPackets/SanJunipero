@@ -101,6 +101,10 @@
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
 
+  /* The reading line. A 760px sheet runs 80 characters of Manrope at --f-3, which is a third
+     wider than a line the eye can return from without losing its place. */
+  --measure: 68ch;
+
   color-scheme: light;
   accent-color: var(--honey);
   -webkit-tap-highlight-color: transparent;
@@ -180,10 +184,12 @@ body {
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--ink-quiet);
 }
+/* A solid rule on the spacing ladder, not a 35px dash: at that length the broken line read as a
+   rendering fault under every section head on the sheet rather than as a mark.
+   --sand is 1.19:1 on parchment and 1.34:1 on cream; --ink-quiet is 5.83 and 6.57. */
 .block h3::after, .feed-head::after {
-  content: ''; display: block; margin-top: var(--s-2); height: 2px; width: 2.2rem;
-  /* --sand is 1.19:1 on parchment and 1.34:1 on cream; --ink-quiet is 5.83 and 6.57. */
-  background: repeating-linear-gradient(90deg, var(--ink-quiet) 0 4px, transparent 4px 7px);
+  content: ''; display: block; margin-top: var(--s-3); height: 2px; width: var(--s-8);
+  background: var(--ink-quiet);
 }
 .block ul { margin: 0; padding-left: var(--s-6); }
 .block p { margin: var(--s-2) 0; text-wrap: pretty; }
@@ -964,6 +970,14 @@ body {
 .paper-title, .thumb-title, .paper-sheet article h4 { text-wrap: balance; }
 .room-who { text-wrap: pretty; }
 
+/* Running prose stops at the reading line. The sheet is as wide as the sheet needs to be; a
+   paragraph is as wide as a paragraph can be read at. */
+.edition-body, .edition-caption, .chapter-text, .biography-body, .law-says, .sheet-note,
+.provenance-line, .era-text, .feed-text, .rx-empty, .feed-empty, .bond-line, .bond-evidence,
+.discovery-credit, .discovery-makes, .room-built, .ops-answer-says {
+  max-width: var(--measure);
+}
+
 /* 12 · the scrollbars are the town's, and they are ALWAYS THERE on a scrollable region — an
    overlay bar that only appears on hover hides the fact that there is more to read. */
 .paper-sheet, .bond-detail {
@@ -1377,11 +1391,18 @@ body {
 }
 /* Two rules of different weights is what a dateline IS — heavy over the sections, hairline
    under them. */
+/* Two equal flanks: the tabs sit on the sheet's own centre line, under the masthead, at every
+   width — with `auto` sides the strip hung 21px left of the title it belongs to. */
 .paper-dateline {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center; column-gap: var(--s-5);
   border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink);
+  /* The tabs' own underline landed 1px off the hairline and the two read as one thick smear. */
+  padding-bottom: var(--s-2);
   margin-bottom: var(--s-2);
+}
+.paper-marginalia {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5); min-width: 0;
 }
 .paper-date, .paper-clock {
   margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
@@ -1415,8 +1436,10 @@ body {
 .bs-front { display: grid; gap: var(--s-6); }
 .bs-column { display: grid; align-content: start; gap: var(--s-5); }
 /* Two columns need width or they are two gutters. The sheet measures itself, never the window:
-   at 44rem the lead runs about 46 characters, which is a newspaper column and not a ribbon. */
-@container (min-width: 44rem) {
+   at 40rem the lead runs about 45 characters, which is a newspaper column and not a ribbon.
+   40, not 44: a 760px sheet is 42.5rem of container, so at 44 the front page had no width it
+   could ever reach between 641px and 1920px — the two columns were unreachable on a laptop. */
+@container (min-width: 40rem) {
   .bs-front {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     /* the column rule IS the page's spine, so it is drawn on the gap and not on a card */
@@ -1450,15 +1473,14 @@ body {
    second row to themselves and scroll along it. */
 @media (max-width: 480px) {
   .paper-title { font-size: var(--f-6); }
-  .paper-dateline { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
     grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
     overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
     border-top: 1px solid var(--sand);
   }
   .paper-tab { flex: none; scroll-snap-align: start; }
-  .paper-clock { grid-row: 1; grid-column: 2; justify-self: end; }
-  .paper-close { grid-row: 1; grid-column: 3; }
+  .paper-marginalia { grid-row: 1; grid-column: 2; }
 }
 .paper-sheet > :first-child { margin-top: 0; }
 
