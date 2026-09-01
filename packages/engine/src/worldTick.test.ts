@@ -300,7 +300,8 @@ describe('worldTick: collapse recovery through sleep', () => {
     })
     let t = tickOnce(s) // energy 4−4 = 0 < 5: collapses
     expect(t.events.map((e) => e.type)).toContain('agent_collapsed')
-    expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
+    // A tile it could touch is a crawl and is allowed; anything past that is not.
+    expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 3, y: 3 }).ok).toBe(false)
     const r = submitIntent(t.state, FAST, 'a1', 'sleep', {})
     expect(r.ok).toBe(true)
     if (!r.ok) throw new Error(r.reason)

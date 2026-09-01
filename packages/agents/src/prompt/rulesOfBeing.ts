@@ -28,7 +28,7 @@ fill: name it fill standing beside water; give itemId, the empty skin or bucket 
 wear: name it wear; give itemId, the garment you hold
 doff: name it doff to take off what you are wearing; nothing more is needed
 take: name it take; give itemId, the mark of the thing within reach
-give: name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side, never a building
+give: name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side, never a building. Food given to someone lying collapsed is eaten from your hand, and it is what puts them back on their feet
 speak: name it speak; give text, the words you say aloud
 drop: name it drop; give itemId, the mark of the thing you hold, and it rests on the ground at your feet
 stow: name it stow; give itemId, the mark of the thing you hold, and structureId, the building you leave it in

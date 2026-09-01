@@ -134,28 +134,35 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(wheat!.withered).toBe(false)
     expect(wheat!.stage).not.toBe(G2_CONFIG.crops.wheat!.stages - 1)
 
-    // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies. A fish is
+    // Rescue flow: the collapsed Idler is FED where it lies, recovers, then dies. A fish is
     // worth less than the flat eatRestoreHunger, and nutritionOf is the one place that says so.
+    const firstFish = G2_CONFIG.needs.eatRestoreHunger * nutritionOf(G2_CONFIG, 'fish')
+    expect(firstFish).toBeLessThan(G2_CONFIG.needs.eatRestoreHunger)
     const giveEv = evs.find(
       (e) =>
-        e.type === 'item_moved' &&
-        (e.payload as Payload).loc !== undefined &&
-        ((e.payload as Payload).loc as Payload).t === 'agent' &&
-        ((e.payload as Payload).loc as Payload).id === IDLER,
+        e.type === 'action_completed' &&
+        (e.payload as Payload).agentId === FISHER &&
+        (e.payload as Payload).verb === 'give',
     )
     expect(giveEv).toBeDefined()
     expect(collapseEv!.tick).toBeLessThan(giveEv!.tick)
-    // First meal of the run, so the variety bonus is nothing: the flat restore times the
-    // fish's own worth, and no longer the flat restore.
-    const firstFish = G2_CONFIG.needs.eatRestoreHunger * nutritionOf(G2_CONFIG, 'fish')
-    expect(firstFish).toBeLessThan(G2_CONFIG.needs.eatRestoreHunger)
     const eatEv = evs.find(
       (e) =>
         (e.payload as Payload).id === IDLER &&
         changesOf(e).some((c) => c.need === 'hunger' && c.delta === firstFish),
     )
     expect(eatEv).toBeDefined()
-    expect(giveEv!.tick).toBeLessThan(eatEv!.tick)
+    // The giving IS the feeding: a body on the ground cannot close its hand around a fish, so
+    // the belly fills on the same tick and nothing is ever transferred into the Idler's hands.
+    expect(eatEv!.tick).toBe(giveEv!.tick)
+    expect(
+      evs.some(
+        (e) =>
+          e.type === 'item_moved' &&
+          ((e.payload as Payload).loc as Payload | undefined)?.t === 'agent' &&
+          ((e.payload as Payload).loc as Payload | undefined)?.id === IDLER,
+      ),
+    ).toBe(false)
     // After eating, the Idler can act again (walk) -> collapse cleared.
     const actEv = evs.find(
       (e) =>

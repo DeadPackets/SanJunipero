@@ -66,12 +66,11 @@ describe('submitIntent', () => {
         y: 0,
       }).ok,
     ).toBe(false)
-    expect(
-      submitIntent(patchAgent(s, 'a1', { collapsedSinceTick: 5 }), DEFAULT_CONFIG, 'a1', 'walk', {
-        x: 1,
-        y: 0,
-      }).ok,
-    ).toBe(false)
+    // A body on the ground may drag itself to a tile it could touch, and no further.
+    const down = patchAgent(s, 'a1', { collapsedSinceTick: 5 })
+    expect(submitIntent(down, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 3 }).ok).toBe(false)
+    expect(submitIntent(down, DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(true)
+    expect(submitIntent(down, DEFAULT_CONFIG, 'a1', 'build', {}).ok).toBe(false)
     s = patchAgent(s, 'a1', { activity: { verb: 'walk', ticksRemaining: 2, params: {} } })
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
   })

@@ -426,7 +426,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(packet)).toContain('Your stomach gnaws at you.')
+    expect(perceptionToProse(packet)).toContain('Hunger is all you can think about.')
   })
 
   it('renders the shared calendar — the day, the part of it, and the season', () => {
@@ -516,7 +516,7 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('collapsed')
-    expect(prose).toContain('aches with hunger')
+    expect(prose).toContain('Hunger is all you can think about.')
   })
 
   it('never mentions the sun at night', () => {

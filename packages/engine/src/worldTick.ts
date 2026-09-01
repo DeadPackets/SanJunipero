@@ -88,6 +88,10 @@ function collapseDeathSystem(ctx: TickCtx): void {
     const fell = down && a.collapsedSinceTick === null
     if (fell) {
       if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'collapsed' })
+      // Falling wakes you. World one lost Nadia to the other answer: her hunger crossed the line
+      // in her sleep, and a body that is asleep AND down has no road out at all — it cannot eat,
+      // call for help or crawl. Lying down again while down is still its own choice.
+      if (a.asleep) ctx.emit('agent_woke', { agentId: id })
       ctx.emit('agent_collapsed', { agentId: id })
     }
     const b = ctx.state().agents[id]!

@@ -767,7 +767,10 @@ export function perceptionToProse(
   )
   lines.push(...affordanceLines(packet))
 
-  if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
+  if (packet.self.collapsed)
+    lines.push(
+      'You have collapsed and cannot stand. You can still eat what is already in your hands, sleep, and drag yourself to one neighbouring tile — a fire or a roof within a single tile is worth the crawl. Food, warmth and rest bring you back to your feet.',
+    )
 
   // What the body is already doing. A mind told it is standing still sets out again, and
   // again: one founder said she was leaving for the berries in forty-four turns (R21).
@@ -776,21 +779,28 @@ export function perceptionToProse(
     lines.push(
       toward === undefined
         ? `Your hands are already busy; you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
-        : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`,
+        : packet.self.collapsed
+          ? `You are already dragging yourself toward (${toward.x}, ${toward.y}); you will get there if you keep at it.`
+          : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`,
     )
   }
 
+  // World one told five founders their stomachs ached on the exact tick they hit the floor: a
+  // need fells at 5, so hunger and energy warn far above it. Thirst fells nobody and is left be.
   const { hunger, energy, warmth, social } = packet.self.body.needs
-  if (hunger < 5) lines.push('Your stomach aches with hunger.')
-  else if (hunger < 30) lines.push('Your stomach gnaws at you.')
+  if (hunger < 25)
+    lines.push(
+      'Hunger is all you can think about. Eat today, wherever the food is and whoever it belongs to, or you will be on the ground before tomorrow.',
+    )
+  else if (hunger < 50) lines.push('Your stomach gnaws at you. You should eat before long.')
   // The same ladder hunger uses. A packet from before thirst existed reads as a full body.
   const thirst = packet.self.body.thirst ?? 100
   if (thirst < 5) lines.push('Your throat burns with thirst.')
   else if (thirst < 30) lines.push('Your mouth is dry.')
   if (energy < 10) lines.push('You are about to collapse; sleep is taking you where you stand.')
-  else if (energy < 25)
+  else if (energy < 30)
     lines.push('Your legs tremble. You can barely stand, and your eyes keep closing.')
-  else if (energy < 30) lines.push('Weariness drags at your limbs.')
+  else if (energy < 45) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
   // Where the cold is, and what stands between: the pair is the whole of what there is to learn.
   if (packet.cold !== undefined) {
@@ -880,7 +890,10 @@ export function perceptionToProse(
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
     const where = `(${a.x}, ${a.y})${dressed}${ails}`
     if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
-    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at ${where}.`)
+    else if (a.collapsed)
+      lines.push(
+        `${a.name} (${a.id}) lies collapsed at ${where} — hold food out to them and they will eat it from your hand.`,
+      )
     else lines.push(`${a.name} (${a.id}) stands at ${where}.`)
   }
 

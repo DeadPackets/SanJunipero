@@ -258,9 +258,15 @@ function scriptedTimeline(
       qty: 3,
       loc: { t: 'structure', id: STOREHOUSE.id },
     })
-    // Idler starts food-insecure: hunger 100 -> 4, collapses this tick.
+    // Idler starts food-insecure: hunger 100 -> 4, collapses this tick. The body is already
+    // worn to 60 hp by getting that hungry, which is what keeps one rescue and one starvation
+    // inside three days now that hunger empties a body in three rather than two.
     emit('needs_changed', { id: IDLER, changes: [{ need: 'hunger', delta: -96 }] })
+    emit('hp_changed', { agentId: IDLER, delta: -40 })
   }
+  // The Fisher takes his poison at 3812 either way; a slower hunger clock walked him onto the
+  // spoiled fish a meal later, so the fixture wears him first to keep the end inside the run.
+  if (tick === 3300) emit('hp_changed', { agentId: FISHER, delta: -50 })
   // Day 2 (tick 1440 is the first tick of day index 1): ignite the storehouse, let it
   // spread to the adjacent shed, then scripted rain douses both.
   if (tick === 1441) emit('fire_ignited', { structureId: STOREHOUSE.id, cause: 'scripted' })

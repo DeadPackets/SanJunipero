@@ -298,7 +298,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(prose).toContain('The nearest water you know of lies at (50, 62)')
     // R21-B. The stomach used to get a sensation and no road; it now gets the road thirst
     // has had, and only when the hands are empty.
-    expect(prose).toContain('Your stomach gnaws at you')
+    expect(prose).toContain('Hunger is all you can think about.')
     expect(prose).toContain('The nearest food you know of is bread at (68, 60).')
 
     // A hand already holding a loaf is told about the loaf, not sent across town for one.
