@@ -30,6 +30,16 @@ class FakeWebSocket {
   }
 }
 
+const SNAPSHOT = {
+  t: 'snapshot',
+  tick: 0,
+  seq: 0,
+  state: { tick: 0, agents: {}, structures: {}, items: {} },
+  config: DEFAULT_CONFIG,
+  laws: {},
+  live: true,
+}
+
 describe('connectObservatory link status', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -136,18 +146,25 @@ describe('connectObservatory link status', () => {
     const sock = FakeWebSocket.instances[0]!
     sock.open()
     const ghost = { seq: 1, tick: 1, type: 'agent_moved', payload: { id: 'ghost', x: 1, y: 1 } }
-    const snapshot = {
-      t: 'snapshot',
-      tick: 0,
-      seq: 0,
-      state: { tick: 0, agents: {}, structures: {}, items: {} },
-      config: DEFAULT_CONFIG,
-      laws: {},
-      live: true,
-    }
-    sock.onmessage?.({ data: JSON.stringify(snapshot) })
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
     sock.onmessage?.({ data: JSON.stringify({ t: 'tick', tick: 1, seq: 1, events: [ghost] }) })
     expect(sock.sent.at(-1)).toBe('{"t":"live"}')
+  })
+
+  /** The server defers a scrub asked inside its coalescing window; press Live in that window
+   *  and the answer lands after the snapshot. */
+  it('★ drops a scrub answered after the viewer went back to the live edge', () => {
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    handle.scrub(5)
+    handle.goLive()
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'scrubbed', reqId: 1, tick: 5, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: true })
   })
 
   it('a deliberate close() never reports reconnecting', () => {

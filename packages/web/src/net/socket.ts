@@ -66,6 +66,9 @@ export function connectObservatory(opts: {
         }
         return
       }
+      // A scrub inside the server's coalescing window is answered late — after the `live` the
+      // viewer asked for next — and would put the view back on a minute they have left.
+      if (msg.t === 'scrubbed' && msg.reqId !== reqId) return
       if (msg.t === 'snapshot') {
         const last = readLastSeen()
         if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
@@ -102,6 +105,7 @@ export function connectObservatory(opts: {
       send({ t: 'scrub', tick, reqId: ++reqId })
     },
     goLive() {
+      reqId++ // no scrub still in flight can answer for the live edge
       send({ t: 'live' })
     },
     close() {
