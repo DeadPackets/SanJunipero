@@ -383,6 +383,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       snapJson = null
       hub.broadcast(JSON.stringify({ t: 'paused', paused: wasPaused }))
     }
+    hub.resyncDrained() // before the poll folds: a snapshot must predate the deltas after it
     const groups = mirror.poll()
     if (groups.length > 0) {
       snapJson = null
