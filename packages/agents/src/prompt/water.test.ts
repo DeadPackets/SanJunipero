@@ -89,13 +89,15 @@ describe('the water a body can and cannot reach is said before the turn is spent
   })
 
   // The places block reads the river as somewhere to go while the body stands on its bank, and
-  // `walk {river}` lands on the tile under the feet. The in-reach line is what tells them apart.
-  it('at the bank the walk the places block invites is the one the world refuses', async () => {
+  // the walk lands on the tile under the feet. The in-reach line is the one thing that tells a
+  // mind it has already arrived.
+  it('at the bank the walk the places block invites changes nothing', async () => {
     const t = valley(BANK)
     expect(placesFor(t)).toContain('the river (river)')
     expect(await refusal(t, { verb: 'walk', params: { structureId: 'river' } })).toBe(
-      'already at that spot',
+      'the world allowed it',
     )
+    expect(t.loop.state.agents[AGENT]).toMatchObject(BANK)
     expect(proseFor(t)).toContain('Water lies within reach of your hands')
   })
 
@@ -105,17 +107,14 @@ describe('the water a body can and cannot reach is said before the turn is spent
     expect(said).toContain('The nearest water you know of lies at (13, 40), a way to the east.')
   })
 
-  // Below the channel's southern end `naturalPlaces` finds no river abreast of the body, so the
-  // places block is empty and `walk {river}` is "you know no such place". Omar, run B, from this
-  // corner: "The glint's a step west, at (0,64)." The water is east; 84 of world B's 105 water
-  // refusals were fired from 11 to 13 tiles out, where the glint is suppressed for being inside
-  // the sight box and the coordinate was gated behind thirst (rehearsal5).
-  it('below the end of the river the mind is no longer told the valley has none', async () => {
+  // Below the channel's southern end the river is offered off its nearest end, so the places
+  // block names it — but a name is not a reach, and `fill` and `fish` are refused for the reach.
+  // Omar, run B, from this corner: "The glint's a step west, at (0,64)." The water is east; 84 of
+  // world B's 105 water refusals were fired from 11 to 13 tiles out, where the glint is
+  // suppressed for being inside the sight box and the coordinate was gated behind thirst.
+  it('below the end of the river the water is given a coordinate, not only a name', () => {
     const t = valley(BELOW_THE_END)
-    expect(placesFor(t)).toBe('')
-    expect(await refusal(t, { verb: 'walk', params: { structureId: 'river' } })).toBe(
-      'you know no such place',
-    )
+    expect(placesFor(t)).toContain('the river (river)')
     const said = proseFor(thirsty(t))
     expect(said).toContain('No water is within reach of your hands')
     expect(said).toContain('The nearest water you know of lies at (13, 67), a way to the east.')

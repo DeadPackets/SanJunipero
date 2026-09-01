@@ -729,8 +729,8 @@ function waterRoad(packet: PerceptionPacket, thirst: number, world?: ProseWorld)
   return `No water is within reach of your hands. The nearest water you know of lies at (${w.x}, ${w.y}), ${wayTo(w.x - x, w.y - y)}.`
 }
 
-/** Two sentences said before the turn is spent, each clause the packet's copy of a validator's
- *  own test. Forty-four of run B's refusals were these facts going unsaid (rehearsal4). */
+/** Two sentences said before the turn is spent, each clause a fact the verbs decide by. Forty-four
+ *  of run B's refusals were these facts going unsaid (rehearsal4). */
 function affordanceLines(packet: PerceptionPacket): string[] {
   const { x, y } = packet.self
   const inside = packet.self.inside
@@ -743,7 +743,7 @@ function affordanceLines(packet: PerceptionPacket): string[] {
         ? ''
         : ` Wall or water covers ${barred.map((p) => `(${p.x}, ${p.y})`).join(', ')}; no walk of yours can end there.`
     lines.push(
-      `No walls are around you: there is nothing to step out of, and no walk can end where you already stand, at (${x}, ${y}).${walls}`,
+      `No walls are around you: there is nothing to step out of, and a walk to (${x}, ${y}) goes nowhere: you already stand there.${walls}`,
     )
   } else {
     const door = packet.visible.structures.find((s) => s.id === inside.id)?.door

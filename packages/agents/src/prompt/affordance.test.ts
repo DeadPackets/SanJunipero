@@ -93,7 +93,7 @@ describe('the affordance block says what the validators would otherwise refuse',
     expect(await refusal(t, { verb: 'walk', params: { x: 10, y: 10 } })).toBe(
       'the world allowed it',
     )
-    expect(proseFor(t.bridge)).toContain('no walk can end where you already stand, at (10, 10)')
+    expect(proseFor(t.bridge)).toContain('a walk to (10, 10) goes nowhere: you already stand there')
   })
 
   it('`not inside anything` — open sky is said, not left to be inferred', async () => {
