@@ -18,18 +18,17 @@ export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; r
 const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
 
 // The same act, hung on the end of the one that makes it possible.
-const carrying = (
-  go: IntentResult,
-  verb: string,
-  params: Record<string, unknown>,
-): IntentResult =>
+const carrying = (go: IntentResult, verb: string, params: Record<string, unknown>): IntentResult =>
   !go.ok
     ? go
     : {
         ok: true,
         events: go.events.map((e) =>
           e.type === 'action_started'
-            ? { ...e, payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } } }
+            ? {
+                ...e,
+                payload: { ...(e.payload as Record<string, unknown>), then: { verb, params } },
+              }
             : e,
         ),
       }

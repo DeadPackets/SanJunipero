@@ -55,9 +55,9 @@ describe('★ the stage says what just happened', () => {
   })
 
   it('★ says a law in its own words, and says who broke one', () => {
-    expect(cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)?.text).toBe(
-      'The town made it law — No fire after dark',
-    )
+    expect(
+      cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)?.text,
+    ).toBe('The town made it law — No fire after dark')
     expect(cueFor(ev('law_ratified', { lawId: 'l1' }), state)?.text).toBe('The town made it law.')
     const broken = cueFor(ev('law_broken', { lawId: 'l1', agentId: 'yusuf', verb: 'take' }), state)
     expect(broken?.text).toBe("Yusuf broke the town's own law.")

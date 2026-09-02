@@ -138,12 +138,7 @@ const add = (scores: HeatScores, tick: number, agentId: string, n: number): void
 
 /** Pays `SCENE_BONUS` to both voices the first time this window carries two of them within
  *  earshot. Allocation-light: one array and one set, both emptied at the window seam. */
-function scoreScene(
-  scores: HeatScores,
-  ev: SimEvent,
-  agentId: string,
-  ctx: HeatContext,
-): void {
+function scoreScene(scores: HeatScores, ev: SimEvent, agentId: string, ctx: HeatContext): void {
   const p = ev.payload as { x?: number; y?: number }
   if (typeof p.x !== 'number' || typeof p.y !== 'number') return
   const window = Math.floor(ev.tick / HEAT_WINDOW_TICKS)

@@ -8,7 +8,10 @@ import { createRequire } from 'node:module'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { openAgentDb } from '/home/ubuntu/workspace/SanJunipero/packages/agents/src/memory/schema.ts'
-import { LlmClient, migrateLlmTables } from '/home/ubuntu/workspace/SanJunipero/packages/llm/src/index.ts'
+import {
+  LlmClient,
+  migrateLlmTables,
+} from '/home/ubuntu/workspace/SanJunipero/packages/llm/src/index.ts'
 import { createOpenRouter } from '/home/ubuntu/workspace/SanJunipero/packages/llm/node_modules/@openrouter/ai-sdk-provider/dist/index.js'
 import { simTimeFromTick } from '/home/ubuntu/workspace/SanJunipero/packages/shared/src/index.ts'
 import {
@@ -22,7 +25,10 @@ import {
   standingWallsLine,
   type PerceptionPacket,
 } from '/home/ubuntu/workspace/SanJunipero/packages/agents/src/prompt/prose.ts'
-import { assemblePrompt, type AssembledPrompt } from '/home/ubuntu/workspace/SanJunipero/packages/agents/src/prompt/assemble.ts'
+import {
+  assemblePrompt,
+  type AssembledPrompt,
+} from '/home/ubuntu/workspace/SanJunipero/packages/agents/src/prompt/assemble.ts'
 import {
   TurnSchemaActionRequired,
   turnSpeaks,
@@ -67,7 +73,13 @@ const GLM = 'z-ai/glm-5.3-flash'
 const GEM = 'google/gemini-3.7-flash'
 const DSP = 'deepseek/deepseek-v4-pro-0813'
 const LUNA = 'openai/gpt-5.6-luna'
-const glm = (slug: string, provider: string, quant: string, priceIn = 0.15, priceOut = 0.5): Candidate => ({
+const glm = (
+  slug: string,
+  provider: string,
+  quant: string,
+  priceIn = 0.15,
+  priceOut = 0.5,
+): Candidate => ({
   id: `glm@${slug}`,
   model: GLM,
   slug,
@@ -87,8 +99,18 @@ const CANDIDATES: Candidate[] = [
   glm('together', 'Together', 'unknown'),
   glm('cloudflare', 'Cloudflare', 'unknown'),
   // No structured_outputs on these two: the client's other transport, tools with auto choice.
-  { ...glm('z-ai', 'Z.AI', 'fp8', 0.075, 0.25), id: 'glm@z-ai(tool)', transport: 'tool', toolChoice: 'auto' },
-  { ...glm('gmicloud', 'GMICloud', 'fp8', 0.075, 0.25), id: 'glm@gmicloud(tool)', transport: 'tool', toolChoice: 'auto' },
+  {
+    ...glm('z-ai', 'Z.AI', 'fp8', 0.075, 0.25),
+    id: 'glm@z-ai(tool)',
+    transport: 'tool',
+    toolChoice: 'auto',
+  },
+  {
+    ...glm('gmicloud', 'GMICloud', 'fp8', 0.075, 0.25),
+    id: 'glm@gmicloud(tool)',
+    transport: 'tool',
+    toolChoice: 'auto',
+  },
   {
     id: 'gemini@google-ai-studio',
     model: GEM,
@@ -240,7 +262,9 @@ const StrictTurn = z
     reconsider_at: z
       .union([
         z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-        z.object({ day: z.number().int().positive(), phase: z.enum(['day', 'dusk', 'night']) }).strict(),
+        z
+          .object({ day: z.number().int().positive(), phase: z.enum(['day', 'dusk', 'night']) })
+          .strict(),
       ])
       .nullable(),
   })
@@ -256,7 +280,11 @@ function fromStrict(v: unknown): unknown {
       params: Object.fromEntries(Object.entries(o.params).filter(([, x]) => x !== null)),
     }
   }
-  return { ...(t as object), action: clean(t.action), plan: t.plan == null ? t.plan : t.plan.map(clean) }
+  return {
+    ...(t as object),
+    action: clean(t.action),
+    plan: t.plan == null ? t.plan : t.plan.map(clean),
+  }
 }
 
 // ------------------------------------------------------------------ scenes
@@ -277,7 +305,9 @@ const WORLD = {
   nearestFood: () => null,
 }
 const TAMAR = 'tamar'
-const base = (over: Partial<PerceptionPacket> & { self?: Partial<PerceptionPacket['self']> }): PerceptionPacket => ({
+const base = (
+  over: Partial<PerceptionPacket> & { self?: Partial<PerceptionPacket['self']> },
+): PerceptionPacket => ({
   ...quietMeadowPacket,
   ...over,
   self: { ...quietMeadowPacket.self, ...(over.self ?? {}) },
@@ -286,7 +316,8 @@ const base = (over: Partial<PerceptionPacket> & { self?: Partial<PerceptionPacke
 const speechText = (turn: Turn): string => {
   if (turn.speech) return turn.speech
   const a = turn.action
-  if (a && !('freeform' in a) && a.verb === 'speak' && typeof a.params.text === 'string') return a.params.text
+  if (a && !('freeform' in a) && a.verb === 'speak' && typeof a.params.text === 'string')
+    return a.params.text
   return ''
 }
 const ID_KEYS = ['itemId', 'structureId', 'targetId', 'cropId', 'nodeId', 'faunaId'] as const
@@ -310,7 +341,12 @@ const b = (x: boolean): 0 | 1 => (x ? 1 : 0)
 function scene1(): Scene {
   const packet = base({
     self: {
-      body: { needs: { hunger: 20, energy: 78, warmth: 71, social: 55 }, hp: 100, injuries: [], ill: false },
+      body: {
+        needs: { hunger: 20, energy: 78, warmth: 71, social: 55 },
+        hp: 100,
+        injuries: [],
+        ill: false,
+      },
       inventory: [{ id: 'item_bread_7', kind: 'bread', qty: 1, loc: { t: 'agent', id: TAMAR } }],
     },
   })
@@ -336,7 +372,17 @@ function scene2(): Scene {
   const packet = base({
     time: simTimeFromTick(14 * 60),
     visible: {
-      agents: [{ id: 'nadia', name: 'Nadia', x: 13, y: 9, activityVerb: null, collapsed: false, asleep: false }],
+      agents: [
+        {
+          id: 'nadia',
+          name: 'Nadia',
+          x: 13,
+          y: 9,
+          activityVerb: null,
+          collapsed: false,
+          asleep: false,
+        },
+      ],
       structures: [],
       items: [],
       crops: [],
@@ -345,7 +391,7 @@ function scene2(): Scene {
       {
         speakerId: 'nadia',
         name: 'Nadia',
-        text: 'Tamar, did your roof hold in last night\'s wind, or do you need a hand with it?',
+        text: "Tamar, did your roof hold in last night's wind, or do you need a hand with it?",
         distance: 1,
       },
     ],
@@ -406,7 +452,9 @@ function scene3(): Scene {
       const a = act(t)
       const verbOk = a?.verb === 'give' || a?.verb === 'tend'
       const paramOk =
-        (a?.verb === 'give' && a.params.targetId === 'nadia' && a.params.itemId === 'item_bread_7') ||
+        (a?.verb === 'give' &&
+          a.params.targetId === 'nadia' &&
+          a.params.itemId === 'item_bread_7') ||
         (a?.verb === 'tend' && a.params.targetId === 'nadia')
       return { verb: b(verbOk), param: b(!!paramOk), speech: 1, ids: idsOk(t, known) }
     },
@@ -418,7 +466,12 @@ function scene4(): Scene {
     self: {
       x: 12,
       y: 9,
-      body: { needs: { hunger: 60, energy: 50, warmth: 25, social: 55 }, hp: 100, injuries: [], ill: false },
+      body: {
+        needs: { hunger: 60, energy: 50, warmth: 25, social: 55 },
+        hp: 100,
+        injuries: [],
+        ill: false,
+      },
     },
     weather: { kind: 'clear', temperatureC: 2 },
     cold: { biting: true },
@@ -434,7 +487,9 @@ function scene4(): Scene {
     name: 'night, cold, far from home, home known -> walk house_tamar',
     prompt: assemblePrompt(
       fixtureBlocks({
-        dayLog: ['You left your house (house_tamar) at first light and walked out to the far meadow.'],
+        dayLog: [
+          'You left your house (house_tamar) at first light and walked out to the far meadow.',
+        ],
         now: { prose },
       }),
     ),
@@ -466,7 +521,17 @@ function scene5(): Scene {
     visible: {
       agents: [],
       structures: [
-        { id: 'shed_tamar_1', kind: 'shed', x: 12, y: 8, w: 2, h: 2, burning: false, stage: 'construction', raised: { done: 2, needs: 5 } },
+        {
+          id: 'shed_tamar_1',
+          kind: 'shed',
+          x: 12,
+          y: 8,
+          w: 2,
+          h: 2,
+          burning: false,
+          stage: 'construction',
+          raised: { done: 2, needs: 5 },
+        },
       ],
       items: [],
       crops: [],
@@ -490,7 +555,10 @@ function scene5(): Scene {
       const a = act(t)
       return {
         verb: b(a?.verb === 'build'),
-        param: b(a?.verb === 'build' && (a.params.kind === 'shed' || a.params.structureId === 'shed_tamar_1')),
+        param: b(
+          a?.verb === 'build' &&
+            (a.params.kind === 'shed' || a.params.structureId === 'shed_tamar_1'),
+        ),
         speech: b(!turnSpeaks(t)),
         ids: idsOk(t, known),
       }
@@ -575,10 +643,12 @@ type Summary = {
 function classify(err: unknown): { errorKind: CallRow['errorKind']; error: string } {
   const e = err as { statusCode?: number; name?: string; message?: string; responseBody?: string }
   const status = typeof e.statusCode === 'number' ? e.statusCode : null
-  const text = `${e.name ?? ''}: ${e.message ?? String(err)} ${typeof e.responseBody === 'string' ? e.responseBody : ''}`
-    .replace(/\s+/g, ' ')
-    .slice(0, 400)
-  if (status === 429 || /\b429\b|rate[ _-]?limit|too many requests/i.test(text)) return { errorKind: '429', error: text }
+  const text =
+    `${e.name ?? ''}: ${e.message ?? String(err)} ${typeof e.responseBody === 'string' ? e.responseBody : ''}`
+      .replace(/\s+/g, ' ')
+      .slice(0, 400)
+  if (status === 429 || /\b429\b|rate[ _-]?limit|too many requests/i.test(text))
+    return { errorKind: '429', error: text }
   if (e.name === 'AI_NoObjectGeneratedError') return { errorKind: 'decode', error: text }
   if (/tool transport:/.test(text)) return { errorKind: 'decode', error: text }
   if (/abort|timeout|timed out/i.test(text)) return { errorKind: 'timeout', error: text }
@@ -594,7 +664,14 @@ const q = (xs: number[], p: number): number => {
 const db = openAgentDb(DB_PATH)
 migrateLlmTables(db)
 const spent = (): number =>
-  Number(db.prepare('SELECT COALESCE(SUM(COALESCE(reported_cost_usd, estimated_cost_usd)),0) FROM llm_calls').pluck().get())
+  Number(
+    db
+      .prepare(
+        'SELECT COALESCE(SUM(COALESCE(reported_cost_usd, estimated_cost_usd)),0) FROM llm_calls',
+      )
+      .pluck()
+      .get(),
+  )
 let stop = false
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY ?? '' })
@@ -648,9 +725,15 @@ async function runCandidate(c: Candidate, scenes: Scene[]): Promise<Summary> {
         }
         const before = Number(db.prepare('SELECT COALESCE(MAX(id),0) FROM llm_calls').pluck().get())
         try {
-          const { value } = await llm.object({ system: s.prompt.system, messages: s.prompt.messages, schema })
+          const { value } = await llm.object({
+            system: s.prompt.system,
+            messages: s.prompt.messages,
+            schema,
+          })
           row.ok = true
-          const live = TurnSchemaActionRequired.safeParse(c.schema === 'strict' ? fromStrict(value) : value)
+          const live = TurnSchemaActionRequired.safeParse(
+            c.schema === 'strict' ? fromStrict(value) : value,
+          )
           if (!live.success) {
             row.errorKind = 'decode'
             row.error = `off live schema: ${z.prettifyError(live.error).slice(0, 200)}`
@@ -659,11 +742,17 @@ async function runCandidate(c: Candidate, scenes: Scene[]): Promise<Summary> {
             const turn = live.data
             const a = act(turn)
             row.acted = a !== null
-            row.verb = turn.action && 'freeform' in turn.action ? 'freeform' : (turn.action?.verb ?? null)
+            row.verb =
+              turn.action && 'freeform' in turn.action ? 'freeform' : (turn.action?.verb ?? null)
             row.paramKeys = a === null ? 0 : Object.keys(a.params).length
             row.axis = s.judge(turn)
             row.score = (row.axis.verb + row.axis.param + row.axis.speech + row.axis.ids) / 4
-            if (i === 0) row.sample = { thought: turn.thought.slice(0, 200), speech: turn.speech, action: turn.action }
+            if (i === 0)
+              row.sample = {
+                thought: turn.thought.slice(0, 200),
+                speech: turn.speech,
+                action: turn.action,
+              }
           }
         } catch (err) {
           Object.assign(row, classify(err))
@@ -704,7 +793,12 @@ async function runCandidate(c: Candidate, scenes: Scene[]): Promise<Summary> {
     console.log(
       `[${c.id}] scene ${s.n}: valid ${sc.filter((r) => r.valid).length}/${sc.length} mean ${(
         sc.reduce((a, r) => a + r.score, 0) / sc.length
-      ).toFixed(2)} 429=${sc.filter((r) => r.errorKind === '429').length} p50=${Math.round(q(sc.map((r) => r.latencyMs), 0.5))}ms spent=$${spent().toFixed(3)}`,
+      ).toFixed(2)} 429=${sc.filter((r) => r.errorKind === '429').length} p50=${Math.round(
+        q(
+          sc.map((r) => r.latencyMs),
+          0.5,
+        ),
+      )}ms spent=$${spent().toFixed(3)}`,
     )
     if (spent() > CAP_USD) {
       stop = true
@@ -716,7 +810,9 @@ async function runCandidate(c: Candidate, scenes: Scene[]): Promise<Summary> {
       const mean = rows.reduce((a, r) => a + r.score, 0) / rows.length
       if (validRate < 0.5 || mean < 0.3) {
         dropped = true
-        console.log(`[${c.id}] DROPPED after 2 scenes: valid ${(validRate * 100).toFixed(0)}% mean ${mean.toFixed(2)}`)
+        console.log(
+          `[${c.id}] DROPPED after 2 scenes: valid ${(validRate * 100).toFixed(0)}% mean ${mean.toFixed(2)}`,
+        )
         break
       }
     }
@@ -732,7 +828,11 @@ function summarize(c: Candidate, rows: CallRow[], dropped: boolean): Summary {
   const perScene: Summary['perScene'] = {}
   for (const n of new Set(rows.map((r) => r.scene))) {
     const sc = rows.filter((r) => r.scene === n)
-    perScene[n] = { calls: sc.length, valid: sc.filter((r) => r.valid).length, mean: sc.reduce((a, r) => a + r.score, 0) / sc.length }
+    perScene[n] = {
+      calls: sc.length,
+      valid: sc.filter((r) => r.valid).length,
+      mean: sc.reduce((a, r) => a + r.score, 0) / sc.length,
+    }
   }
   const verbs: Record<string, number> = {}
   for (const r of rows) if (r.verb) verbs[r.verb] = (verbs[r.verb] ?? 0) + 1
@@ -743,7 +843,10 @@ function summarize(c: Candidate, rows: CallRow[], dropped: boolean): Summary {
     id: c.id,
     model: c.model,
     provider: c.provider,
-    transport: c.transport + (c.toolChoice ? `/${c.toolChoice}` : '') + (c.schema === 'strict' ? '/strict' : ''),
+    transport:
+      c.transport +
+      (c.toolChoice ? `/${c.toolChoice}` : '') +
+      (c.schema === 'strict' ? '/strict' : ''),
     quant: c.quant,
     calls: rows.length,
     scenesRun: Object.keys(perScene).length,
@@ -752,19 +855,40 @@ function summarize(c: Candidate, rows: CallRow[], dropped: boolean): Summary {
     actRequiredCalls: need.length,
     actRequiredActed: need.filter((r) => r.acted).length,
     meanScore: rows.length === 0 ? 0 : rows.reduce((a, r) => a + r.score, 0) / rows.length,
-    meanParamKeys: scored.filter((r) => r.acted).length === 0 ? 0 : scored.filter((r) => r.acted).reduce((a, r) => a + r.paramKeys, 0) / scored.filter((r) => r.acted).length,
-    axisMeans: { verb: mean((a) => a.verb), param: mean((a) => a.param), speech: mean((a) => a.speech), ids: mean((a) => a.ids) } as Summary['axisMeans'],
+    meanParamKeys:
+      scored.filter((r) => r.acted).length === 0
+        ? 0
+        : scored.filter((r) => r.acted).reduce((a, r) => a + r.paramKeys, 0) /
+          scored.filter((r) => r.acted).length,
+    axisMeans: {
+      verb: mean((a) => a.verb),
+      param: mean((a) => a.param),
+      speech: mean((a) => a.speech),
+      ids: mean((a) => a.ids),
+    } as Summary['axisMeans'],
     perScene,
     http429: rows.filter((r) => r.errorKind === '429').length,
     timeouts: rows.filter((r) => r.errorKind === 'timeout').length,
     decodeFails: rows.filter((r) => r.errorKind === 'decode').length,
     otherErrors: rows.filter((r) => r.errorKind === 'http' || r.errorKind === 'other').length,
-    p50Ms: Math.round(q(answered.map((r) => r.latencyMs), 0.5)),
-    p95Ms: Math.round(q(answered.map((r) => r.latencyMs), 0.95)),
+    p50Ms: Math.round(
+      q(
+        answered.map((r) => r.latencyMs),
+        0.5,
+      ),
+    ),
+    p95Ms: Math.round(
+      q(
+        answered.map((r) => r.latencyMs),
+        0.95,
+      ),
+    ),
     costUsd: cost,
     costPerCallUsd: billed === 0 ? 0 : cost / billed,
     costPer1kTurnsUsd: billed === 0 ? 0 : (cost / billed) * 1000,
-    servedProviders: [...new Set(rows.map((r) => r.servedProvider).filter((p): p is string => !!p))],
+    servedProviders: [
+      ...new Set(rows.map((r) => r.servedProvider).filter((p): p is string => !!p)),
+    ],
     errors: [...new Set(rows.map((r) => r.error).filter((e): e is string => !!e))].slice(0, 3),
     verbs,
     samples: rows.filter((r) => r.sample).map((r) => ({ scene: r.scene, sample: r.sample })),
@@ -781,12 +905,17 @@ async function main(): Promise<void> {
   const sceneNs = list('scenes').map(Number)
   const scenes = sceneNs.length === 0 ? ALL_SCENES : ALL_SCENES.filter((s) => sceneNs.includes(s.n))
   const picked = CANDIDATES.filter(
-    (c) => (models.length === 0 || models.includes(c.model)) && (providers.length === 0 || providers.includes(c.slug) || providers.includes(c.id)),
+    (c) =>
+      (models.length === 0 || models.includes(c.model)) &&
+      (providers.length === 0 || providers.includes(c.slug) || providers.includes(c.id)),
   )
-  console.log(`[bakeoff2] ${picked.length} candidates x ${scenes.length} scenes x ${N} calls, ${WAVES} candidates at a time, cap $${CAP_USD}`)
+  console.log(
+    `[bakeoff2] ${picked.length} candidates x ${scenes.length} scenes x ${N} calls, ${WAVES} candidates at a time, cap $${CAP_USD}`,
+  )
   for (const s of scenes) console.log(`  scene ${s.n}: ${s.name} (~${s.prompt.estTokens} tok)`)
   if (args.has('dry')) {
-    for (const s of scenes) console.log(`\n=== S${s.n}\n${s.prompt.messages.map((m) => m.content).join('\n---\n')}`)
+    for (const s of scenes)
+      console.log(`\n=== S${s.n}\n${s.prompt.messages.map((m) => m.content).join('\n---\n')}`)
     process.exit(0)
   }
   const summaries: Summary[] = []
@@ -802,12 +931,27 @@ async function main(): Promise<void> {
   )
   void samples
   const total = spent()
-  writeFileSync(OUT_PATH, JSON.stringify({ generatedAt: new Date().toISOString(), n: N, totalCostUsd: total, summaries }, null, 2))
-  summaries.sort((a, b) => b.meanScore - a.meanScore || b.valid / b.calls - a.valid / a.calls || a.p50Ms - b.p50Ms)
-  console.log('\n| candidate | transport | quant | scenes | mean score | verb | param | speech | ids | keys/act | valid | act (where required) | 429 | timeout | decode | p50 ms | p95 ms | $/call | $/1k turns | served |')
-  console.log('|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|')
+  writeFileSync(
+    OUT_PATH,
+    JSON.stringify(
+      { generatedAt: new Date().toISOString(), n: N, totalCostUsd: total, summaries },
+      null,
+      2,
+    ),
+  )
+  summaries.sort(
+    (a, b) =>
+      b.meanScore - a.meanScore || b.valid / b.calls - a.valid / a.calls || a.p50Ms - b.p50Ms,
+  )
+  console.log(
+    '\n| candidate | transport | quant | scenes | mean score | verb | param | speech | ids | keys/act | valid | act (where required) | 429 | timeout | decode | p50 ms | p95 ms | $/call | $/1k turns | served |',
+  )
+  console.log(
+    '|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+  )
   for (const s of summaries) {
-    const pc = (n: number, d: number): string => (d === 0 ? 'n/a' : `${((100 * n) / d).toFixed(0)}%`)
+    const pc = (n: number, d: number): string =>
+      d === 0 ? 'n/a' : `${((100 * n) / d).toFixed(0)}%`
     console.log(
       `| ${s.id}${s.dropped ? ' (dropped)' : ''} | ${s.transport} | ${s.quant} | ${s.scenesRun} | ${s.meanScore.toFixed(2)} | ${s.axisMeans.verb.toFixed(2)} | ${s.axisMeans.param.toFixed(2)} | ${s.axisMeans.speech.toFixed(2)} | ${s.axisMeans.ids.toFixed(2)} | ${s.meanParamKeys.toFixed(2)} | ${pc(s.valid, s.calls)} | ${pc(s.actRequiredActed, s.actRequiredCalls)} | ${pc(s.http429, s.calls)} | ${s.timeouts} | ${s.decodeFails} | ${s.p50Ms} | ${s.p95Ms} | ${s.costPerCallUsd.toFixed(5)} | ${s.costPer1kTurnsUsd.toFixed(2)} | ${s.servedProviders.join(',') || '-'} |`,
     )
@@ -821,8 +965,11 @@ async function main(): Promise<void> {
           .join('  ') +
         `  verbs ${JSON.stringify(s.verbs)}`,
     )
-  for (const s of summaries) for (const e of s.errors) console.log(`  ${s.id} err: ${e.slice(0, 300)}`)
-  console.log(`\nTOTAL this run $${total.toFixed(4)} (OpenRouter-reported usage.cost; failed calls at ceiling estimate). Written to ${OUT_PATH}`)
+  for (const s of summaries)
+    for (const e of s.errors) console.log(`  ${s.id} err: ${e.slice(0, 300)}`)
+  console.log(
+    `\nTOTAL this run $${total.toFixed(4)} (OpenRouter-reported usage.cost; failed calls at ceiling estimate). Written to ${OUT_PATH}`,
+  )
   db.close()
 }
 

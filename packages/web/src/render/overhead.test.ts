@@ -92,10 +92,7 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
   // town wears the wrong glyph — the same failure, arriving quietly. Read off the forge's source
   // rather than imported: `@sj/forge` reaches sharp and better-sqlite3, and the viewer must not.
   it('★ cuts from the same roster the atlas is drawn from', () => {
-    const forge = readFileSync(
-      new URL('../../../forge/src/emotes.ts', import.meta.url),
-      'utf8',
-    )
+    const forge = readFileSync(new URL('../../../forge/src/emotes.ts', import.meta.url), 'utf8')
     const roster = /export const EMOTE_KINDS = \[([\s\S]*?)\] as const/.exec(forge)?.[1] ?? ''
     expect(roster, "the forge's roster must be findable").not.toBe('')
     expect([...roster.matchAll(/'([a-z]+)'/g)].map((m) => m[1])).toEqual([...EMOTE_KINDS])
