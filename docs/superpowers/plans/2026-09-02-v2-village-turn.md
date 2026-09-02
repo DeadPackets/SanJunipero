@@ -2,7 +2,7 @@
 
 Spec: the reconciliation report (artifact "The Village Turn", 2026-09-02) and its sources under the session scratchpad `docs/superpowers/specs/v2/` (architecture-gap.md §4 carries the data models this plan adopts; research-sota.md the literature; evidence.md the baseline; scene-proto/transcripts.md the prototype). The owner approved every decision D1-D9 on 2026-09-02 and ruled: "disregard v1 as a failed survival village; go for v2 as the true vision."
 
-Branch: `v2` (cut from `519b8f27`). Every task runs in its own worktree on a branch `v2/<slug>` cut from the current `v2` tip; the controller merges. `main` fast-forwards at phase gates only.
+Branch: `v2` (cut from `519b8f27`). Every task runs in its own worktree on a branch `v2-<slug>` (a slash is impossible while branch `v2` exists) cut from the current `v2` tip; the controller merges. `main` fast-forwards at phase gates only.
 
 ## Global Constraints (binding on every task)
 
