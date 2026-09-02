@@ -65,7 +65,7 @@ export const REPLY_WINDOW_MS = 12_000
  *  transcribed, so it cannot go stale the way a written 8 would. */
 export const EARSHOT_TILES: number = DEFAULT_CONFIG.movement.earshotRadius
 
-type Voice = { agentId: string; x: number; y: number; atMs: number }
+export type Voice = { agentId: string; x: number; y: number; atMs: number }
 
 /** Who holds the floor of a scene: the last of `ids` to have said anything. The floor PASSES,
  *  it never lapses — a silence in a scene is still that speaker's turn, not nobody's. */
