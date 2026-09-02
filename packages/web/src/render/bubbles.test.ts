@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   BUBBLE_FADE_MS,
@@ -22,6 +23,8 @@ import {
 import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
+import { fateOfPriorLine, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
 
 describe('bubbleLife', () => {
@@ -30,6 +33,48 @@ describe('bubbleLife', () => {
   })
   it('clamps at SPEECH_MAX_CHARS', () => {
     expect(bubbleLife('x'.repeat(500))).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS)
+  })
+
+  it('★ always outlasts its own typing, so no line dies half-said', () => {
+    for (const len of [1, 13, 40, 120, SPEECH_MAX_CHARS]) {
+      expect(bubbleLife('x'.repeat(len)), `${len} chars`).toBeGreaterThan(typingMs(len))
+    }
+  })
+})
+
+// ★ Holding the partner's line so the pair reads as one exchange also held the SPEAKER's own
+// previous line, and two full-alpha slabs from one mouth stacked until the first timed out.
+describe('★ what a new line does to the lines already in the air', () => {
+  const line = (agentId: string, dimmed = false) => ({ agentId, isThought: false, dimmed })
+
+  it('★ ends the speaker’s OWN last line — they have said something new', () => {
+    expect(fateOfPriorLine(line('amara'), 'amara')).toBe('end')
+    expect(fateOfPriorLine(line('amara', true), 'amara')).toBe('end')
+  })
+
+  it('★ dims and holds the other speaker’s, so the pair is on screen together', () => {
+    expect(fateOfPriorLine(line('amara'), 'yusuf')).toBe('dim')
+  })
+
+  it('lets a dimmed line go the moment a third one lands', () => {
+    expect(fateOfPriorLine(line('amara', true), 'omar')).toBe('end')
+  })
+
+  it('leaves a thought alone: it is not part of anybody’s exchange', () => {
+    for (const speaker of ['amara', 'yusuf']) {
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: false }, speaker)).toBe(
+        'keep',
+      )
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: true }, speaker)).toBe(
+        'keep',
+      )
+    }
+  })
+
+  it('★ the layer applies it to every live bubble on every spoken line', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)')
+    expect(SRC).toContain("if (fate === 'end') b.dieMs = now")
   })
 })
 
@@ -233,6 +278,40 @@ describe('★ everybody the camera can see speaks out loud', () => {
       expect(bubbleShown(zoom, true), `${zoom}x`).toBe(true)
       expect(bubbleShown(zoom, false), `${zoom}x off screen`).toBe(false)
     }
+  })
+
+  /** ★ THE "…" ON A SPEAKER STANDING IN THE PICTURE. The cull was asked about the BUBBLE's own
+   *  anchor — 70 world px over the speaker's feet — as a bare point with no margin, so anybody
+   *  whose feet were inside the top 70 px of the view was ruled off screen and collapsed to a
+   *  glyph. At the director's 3x stop the view is 300 world px tall: the whole top quarter. */
+  describe('★ the cull is asked about the SPEAKER, not about where their words float', () => {
+    const VIEW = { x: 0, y: 0, w: 1440, h: 900 }
+    const feet = (id: string, sx: number, sy: number) => ({ id, sx, sy })
+
+    it('★ keeps a speaker whose whole body is in the picture, however near the top edge', () => {
+      for (const feetY of [0, 1, 20, 51, 52, 70, 450, 899]) {
+        expect(inViewSpeakers([feet('a', 700, feetY)], VIEW).has('a'), `feet at ${feetY}`).toBe(true)
+      }
+    })
+
+    it('★ still drops a speaker the camera genuinely cannot see', () => {
+      // feet one pixel above the top edge, so even the heels are out of frame
+      expect(inViewSpeakers([feet('above', 700, -1)], VIEW).has('above')).toBe(false)
+      // ...and one whose head has just cleared the bottom edge
+      expect(inViewSpeakers([feet('below', 700, 900 + CHAR_TARGET_PX + 1)], VIEW).has('below')).toBe(
+        false,
+      )
+      expect(inViewSpeakers([feet('crown', 700, 900 + CHAR_TARGET_PX)], VIEW).has('crown')).toBe(
+        true,
+      )
+      expect(inViewSpeakers([feet('far', 5000, 400)], VIEW).has('far')).toBe(false)
+    })
+
+    it('★ the layer hands it the feet, and lifts the box off the head only to place it', () => {
+      const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+      expect(SRC).toContain('const seen = inViewSpeakers(at, view)')
+      expect(SRC).toContain('sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift')
+    })
   })
 })
 

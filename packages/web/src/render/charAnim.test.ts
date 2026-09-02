@@ -8,6 +8,7 @@ import {
   BOB_PX,
   EMOTE_KINDS,
   GAIT_STRIDE_SPREAD,
+  IDLE_BREATH_MS,
   HIT_AREA_H,
   HIT_AREA_W,
   STRIDE_TILES,
@@ -70,6 +71,50 @@ describe('charPose', () => {
 
   it('idles at rest', () => {
     expect(charPose(base)).toEqual({ row: 'idle', facing: 'se', bobY: 0 })
+  })
+})
+
+// ★ `idle` returned one frame and `bobY: 0`, so the only life on a person who was not walking
+// was a squash on four work verbs. Everybody else was a statue.
+describe('★ a standing body breathes', () => {
+  const stand = (nowMs: number, phase?: number) =>
+    charPose({ ...base, nowMs }, WALK_FRAME_MS_V4, phase === undefined ? {} : { phase })
+
+  it('★ is two steps a whole pixel apart, each held IDLE_BREATH_MS', () => {
+    expect(IDLE_BREATH_MS).toBe(450)
+    const held = [0, 1, 449, 450, 899, 900].map((t) => stand(t).bobY)
+    expect(held).toEqual([0, 0, 0, BOB_PX, BOB_PX, 0])
+    for (const t of [0, 137, 449, 450, 900, 4321]) expect([0, BOB_PX]).toContain(stand(t).bobY)
+  })
+
+  it('★ two standing bodies do not breathe in unison', () => {
+    const FOUNDERS = ['omar', 'amara', 'yusuf', 'nadia', 'salma']
+    const trace = (id: string): string =>
+      Array.from({ length: 40 }, (_, i) => stand(i * 50, gaitOf(id).phase).bobY).join('')
+    const traces = FOUNDERS.map(trace)
+    expect(new Set(traces).size, 'five founders, five breaths').toBeGreaterThan(1)
+    for (const t of traces) expect(new Set(t).size, 'every one of them moves').toBe(2)
+  })
+
+  it('★ leaves a walking body exactly as it was: the hop belongs to the passing frames', () => {
+    const walk = { ...base, walking: true }
+    for (let t = 0; t < WALK_FRAME_MS_V4 * WALK_LOOP.length * 3; t += 7) {
+      const pose = charPose({ ...walk, nowMs: t }, WALK_FRAME_MS_V4, { phase: 0.37 })
+      const passing = pose.row === 'passing-a' || pose.row === 'passing-b'
+      expect(pose.bobY, `${t}ms on ${pose.row}`).toBe(passing ? BOB_PX : 0)
+    }
+  })
+
+  it('holds still under reduced motion, and for a body that is not standing', () => {
+    for (const t of [0, 450, 900, 1350]) {
+      expect(charPose({ ...base, nowMs: t }, WALK_FRAME_MS_V4, { bob: false }).bobY).toBe(0)
+      expect(charPose({ ...base, asleep: true, nowMs: t }).bobY).toBe(0)
+      expect(charPose({ ...base, collapsed: true, nowMs: t }).bobY).toBe(0)
+    }
+  })
+
+  it('names a step whichever way the clock ran', () => {
+    for (const t of [-1, -450, -12345.6]) expect([0, BOB_PX]).toContain(stand(t, 0.7).bobY)
   })
 })
 

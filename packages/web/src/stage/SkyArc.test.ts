@@ -182,6 +182,20 @@ describe('the bar is quiet chrome, and does not fight the town', () => {
     )
   })
 
+  // ★ THE PHONE COLLISION: `width: auto` on an absolutely positioned box whose only offset is
+  // `left: 50%` shrinks to fit inside HALF the viewport — 195px on a 390px phone. Two nowrap
+  // chips overran it and the second started before the first had finished: `DAY 0 · SPRINGLOUDY 8°`.
+  it('★ keeps the two chips apart on a phone, rather than printing them into each other', () => {
+    const narrow = /@media \(max-width: 900px\) \{(.*?)\n\}/s.exec(CSS)?.[1] ?? ''
+    const bar = /\.sky-bar \{([^}]*)\}/.exec(narrow)?.[1] ?? ''
+    expect(bar, 'the narrow bar must be restated').not.toBe('')
+    expect(bar, 'half a viewport is not a width').not.toMatch(/width: auto/)
+    expect(bar).toContain('justify-content: space-between')
+    expect(bar).toContain('gap: var(--s-5)')
+    // ...and it still takes the whole width the inset leaves it, so space-between has a span
+    expect(bar).toMatch(/width: calc\(100% - 2 \* max\(var\(--mark-inset\)/)
+  })
+
   it('leaves the stamp its corner by sitting above it, and stands down in the stream frame', () => {
     expect(/\.stage-stamp \{([^}]*)\}/.exec(CSS)?.[1]).toMatch(
       /top: calc\(max\(var\(--mark-inset\)/,

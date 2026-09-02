@@ -85,7 +85,7 @@ overlay sixty times a second.
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
 | `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
-| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
+| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
 | `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
 
@@ -123,21 +123,38 @@ character). Everybody the camera can see gets a box; at zoom 0.25 everything col
 pill. Wider boxes collide far more often, so `MAX_STACK_STEPS` is 6 rather than 3 — past that
 `onLeash` hides a bubble rather than let two composite.
 
-**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary. At rest it is
-7A: one 20px plate eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY`
-picks first-match-wins — a condition outranks a state, because a person who is hurt is the news;
-the plate turns ember for the three that are. "Between things" wears nothing, and neither does a
-walker. The moment an act starts, **the track wraps that same slot**: seven blocks on a 120°
-arch at r=26, solid for done and hollow for what is left, so progress is a count and a position
-before it is ever a hue. It goes when the act does. The arch spans OVER the glyph — every block
-clears the plate by 3.7px and the arc runs 20.3px each side, twice the plate's own width — and
-because the slot is world art the ratio holds at every zoom stop the indicators show at. Whoever
-the chip is willing to name is whoever the track may wrap: `fractionOf` reads the act layer's own
-`atWork` set, so the word and the arc cannot disagree about what is running.
-`working` has no glyph: while the job runs the track IS the mark, which is how "hurt while
-chopping" says both at once. The act chip keeps its word at the feet and has lost its fill and
-the Graphics **mask** that drew it — a mask per chip is a render target per working person, and
-the viewport rule puts a chip on every one of them.
+**The cull is asked about the SPEAKER, head to heel** — not about the anchor the box floats from,
+seventy world pixels higher, which is what made a person standing in the top of the frame wear a
+"…" over their own words; at the director's 3× stop that band is a whole quarter of the picture.
+**A conversation looks like one** (`render/converse.ts`): the box is cut to the whole sentence
+and the words arrive inside it at 28 characters a second, so the paper never moves under the
+reader; a body that is `talking` turns toward the last other voice within earshot in the twelve
+seconds behind it; and once a line stops being the newest it dims to `PRIOR_ALPHA` (0.6) and is
+held `PRIOR_HOLD_MS` (6s), letting go the moment a third line lands. That single write is the one
+alpha allowed on a bubble node, and `textFaces.test.ts` fails on a second.
+
+**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary: one 20px plate
+eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY` picks
+first-match-wins — a condition outranks a state, because a person who is hurt is the news; the
+plate turns ember for the three that are. "Between things" wears nothing, and neither does a
+walker. A cell the atlas has no glyph for draws **nothing**: `indexOf` answering −1 cut a frame
+off the left of the sheet, and the forge's checkerboard stood over the head of somebody who was
+only speaking.
+
+**The seven progress blocks are gone.** An arch over the head told the truth and read as broken
+on any job past a minute, and it crowded the one address the slot was built to be. Progress is a
+1px honey bar under the act chip, beneath the word it is about (`render/acts.ts`), still gated by
+`ACT_TRACK_MAX_TICKS` so a 2880-tick house keeps its word and shows no bar. `working` has no
+glyph: the chip IS the mark, which is how "hurt while chopping" says both at once. The chip has
+lost its fill and the Graphics **mask** that drew it — a mask per chip is a render target per
+working person, and the viewport rule puts a chip on every one of them.
+
+**A pixel rises off a head when something happens to the person under it**
+(`render/momentEmotes.ts`): a heart for a bond gained, the crack for one lost, the lit bulb for a
+discovery or a law, the ember mark for a ruling undone. Ten world pixels on an ease-out over
+1.2s, a fade over the last 0.6s, gone at 1.8s, drawn clear of the slot's own top edge so the two
+marks can never composite. The same moment prints in the cue slot for six seconds and bounces
+both bodies on the finished-structure curve.
 
 **One occupancy.** `render/tooltip.ts` is the label layer and owns the only table of taken screen
 space, keyed by who owns the boxes (`bubbles`, `plate`). Everybody writes theirs and reads
@@ -315,7 +332,12 @@ once.
 - **Rendering law untouched**: 2:1 dimetric `sx=(dx-dy)*16`, `sy=(dx+dy)*8`; the fixed zoom stops
   `0.25 0.5 1 2 3 4`; NEAREST everywhere.
 - **Determinism untouched.** Nothing in the chrome moves the world.
-- The first viewport is the town at zoom 1, centred, with the director cutting from there.
+- The first viewport is the town at zoom 1, centred, with the director cutting from there. **The
+  director is armed for every viewer**, desk and stream alike; any input hands the camera back for
+  20s. It opens to 2× at 1280px and wider, where two speakers two tiles apart fit in one shot.
+- **A carved name is not permanent chrome.** Toponyms come in at the 2× stop and answer on hover
+  below it, and the one the viewer has picked stands down for its own nameplate — a picked
+  building used to wear three labels at once.
 - **Two `<img alt="">` are deliberate.** A person's portrait sits beside their name, and the
   discovery art is ornament on a card whose `aria-label` already carries the whole record.
 - **The town-dim is a pointer-only dismissal**, `aria-hidden` with no role. Escape is the keyboard

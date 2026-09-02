@@ -93,6 +93,25 @@ describe('hoverPlate — three lines at most, and none of them an id', () => {
     expect(rows[1]?.text).toBe(stateWord(state.agents.rahel!, state.tick))
   })
 
+  // ★ A picked building wore three labels at once — its carved name, the nameplate under it and
+  // this plate — and the plate's own first line repeated what the nameplate had just said.
+  it('★ drops the kind line for the thing the viewer has already picked', () => {
+    const named = { ...state, structures: { ...state.structures } }
+    named.structures.h1 = { ...named.structures.h1!, name: 'The Long House' }
+    expect(words(hoverPlate(named, 'structure', 'h1'))).toBe('house / The Long House / Rahel’s')
+    expect(words(hoverPlate(named, 'structure', 'h1', true))).toBe('The Long House / Rahel’s')
+    expect(hoverPlate(named, 'structure', 'h1', true).map((r) => r.tone)).not.toContain('kind')
+  })
+
+  it('★ keeps the kind line where no name is left to lead with', () => {
+    // Nothing is carved into h2, so the kind IS its name and dropping it would empty the plate;
+    // a heap of bread with its kind taken off is a quantity of nothing.
+    expect(words(hoverPlate(state, 'structure', 'h2', true))).toBe('storehouse')
+    expect(words(hoverPlate(state, 'item', 'i1', true))).toBe('bread / ×3')
+    // A person's plate never led with a kind, so a pick leaves it exactly as it was.
+    expect(hoverPlate(state, 'agent', 'rahel', true)).toEqual(hoverPlate(state, 'agent', 'rahel'))
+  })
+
   it('leads a building with its kind and never credits a builder', () => {
     expect(hoverPlate(state, 'structure', 'h1')[0]).toEqual({ text: 'house', tone: 'kind' })
     expect(words(hoverPlate(state, 'structure', 'h2'))).toBe('storehouse')

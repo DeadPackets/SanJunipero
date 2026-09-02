@@ -1169,7 +1169,12 @@ body {
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
 @media (max-width: 900px) {
-  .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
+  /* NOT `width: auto`: on an abspos box offset only by `left: 50%` that shrinks to fit HALF the
+     viewport, and two nowrap chips overran it as `DAY 0 · SPRINGLOUDY 8°`. */
+  .sky-bar {
+    width: calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left)));
+    grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
+  }
   .sky-arc { display: none; }
   /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
   /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */
@@ -1203,7 +1208,15 @@ body {
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow: var(--halo-deep);
+  opacity: 1;
 }
+/* Its own case, not the caption's capitals: a law is a sentence the town wrote, and setting it
+   in caps is the machine shouting it back. */
+.stage-cue[data-moment='on'] {
+  display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+  letter-spacing: 0.04em; text-transform: none;
+}
+.stage-cue-glyph { display: block; flex: none; image-rendering: pixelated; }
 
 .stage-exit {
   position: absolute; z-index: 25;
@@ -1230,6 +1243,15 @@ body {
   /* Slow out, fast in: a mark that answers a mouse-move may not lag it by 300ms. */
   .stage-stamp { transition: opacity var(--t-slow) var(--ease-enter); }
   .stage-stamp.shown { transition-duration: var(--t-fast); }
+  /* A moment arrives and goes on the sheet's own reveal — it is news, not an answer to a hand. */
+  .stage-cue {
+    transition: opacity var(--t-fast) var(--ease-enter);
+    animation: cue-in var(--t-fast) var(--ease-enter) backwards;
+  }
+  @keyframes cue-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-plate { opacity: 1; animation: none; }
