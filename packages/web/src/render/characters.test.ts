@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
+import type { TownScene, WorldStore } from '../state/worldStore.js'
 
 vi.mock('pixi.js', () => {
   class Point {
@@ -139,7 +139,7 @@ import { ZOOM_STOPS } from './camera.js'
 import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
 import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
-import { feetOf, tileToScreen } from './iso.js'
+import { FACINGS, feetOf, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 
@@ -174,8 +174,13 @@ function makeAgent(id: string, x: number, y: number): MutableAgents[string] {
   } as MutableAgents[string]
 }
 
-function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: SimEvent[]) => void } {
+function makeStore(agents: MutableAgents): {
+  store: WorldStore
+  emit: (evts: SimEvent[]) => void
+  setScene: (s: TownScene | null) => void
+} {
   const handlers = new Set<(evts: SimEvent[]) => void>()
+  let scene: TownScene | null = null
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
     getMode: () => ({ live: true as const }),
@@ -183,6 +188,7 @@ function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: Sim
     latestThought: () => null,
     thoughtsLog: () => [],
     recentEvents: () => [],
+    getScene: () => scene,
     assetsSeq: () => 0,
     assetRecords: () => [],
     applyServer: () => {},
@@ -194,6 +200,9 @@ function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: Sim
   } as unknown as WorldStore
   return {
     store,
+    setScene: (s) => {
+      scene = s
+    },
     emit: (evts) => {
       for (const fn of handlers) fn(evts)
     },
@@ -261,12 +270,12 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     layer = createCharacterLayer(scene, made.book, store, () => {})
   })
 
-  it('two ticks add exactly 3 display objects per agent, not 3 per agent per tick', () => {
+  it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    // ★ THREE, not four: the hover plate is ONE for the whole stage now, owned by the tooltip
-    // layer, so a body carries a sprite, a shadow and its overhead slot and nothing else.
-    expect(placed(scene)).toHaveLength(2 * 3)
+    // ★ The hover plate is ONE for the whole stage, owned by the tooltip layer, so a body
+    // carries a sprite, a shadow, its overhead slot and its floor ring — and nothing else.
+    expect(placed(scene)).toHaveLength(2 * 4)
   })
 
   it('puts each companion in the layer that owns it, never in the depth sort', () => {
@@ -380,13 +389,13 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
   })
 
-  it('removing an agent destroys its 3 objects and drops the entry', () => {
+  it('removing an agent destroys its 4 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(3)
+    expect(placed(scene)).toHaveLength(4)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })
@@ -960,5 +969,130 @@ describe('★ five people on one tile are five separate hit targets', () => {
     }
     expect(checked, 'the capsules never overlapped — this test proved nothing').toBeGreaterThan(500)
     layer.destroy()
+  })
+})
+
+// ★ A scene's turn-taking is on the BODIES, not only in the boxes over them: the ring says who
+// is holding the floor and the shoulders say the two of them are talking to each other.
+describe('★ the floor ring and the facing, through the real layer', () => {
+  const FADE_MS = 200 // longer than the reveal band, so the fade has finished
+
+  let clockMs = 0
+  beforeEach(() => {
+    clockMs = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clockMs)
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const spoke = (agentId: string, x: number, y: number): SimEvent =>
+    ({ type: 'agent_spoke', tick: 1, payload: { agentId, x, y, text: 'a line' } }) as SimEvent
+
+  const openScene = (participants: string[]): TownScene => ({
+    id: 'sc_1',
+    kind: 'talk',
+    participants,
+    topic: 'the well',
+    stakes: 4,
+    open: true,
+  })
+
+  /** The floor rings in the ground layer, in the order the bodies were made: amara, then salma. */
+  const rings = (scene: Scene): { alpha: number; visible: boolean }[] =>
+    (
+      scene.layers as unknown as Record<
+        string,
+        { children: { alpha: number; visible: boolean }[] }
+      >
+    ).groundDecal!.children
+
+  const facingOf = (layer: ReturnType<typeof createCharacterLayer>, id: string): string | null => {
+    const s = layer.getSprite(id) as unknown as { texture: { frame?: { x: number } } } | null
+    const x = s?.texture.frame?.x
+    return x === undefined ? null : (FACINGS[x / CELL] ?? null)
+  }
+
+  async function rig(): Promise<{
+    scene: Scene
+    layer: ReturnType<typeof createCharacterLayer>
+    setScene: (s: TownScene | null) => void
+    say: (who: string, x: number, atMs: number) => void
+  }> {
+    // Two tiles apart on one row, so their facings are opposite and unambiguous.
+    const agents: MutableAgents = {
+      amara: makeBodyAgent('amara', 0, 0),
+      salma: makeBodyAgent('salma', 2, 0),
+    }
+    const scene = makeScene()
+    const { store, emit, setScene } = makeStore(agents)
+    ;(store as unknown as { getConfig: () => unknown }).getConfig = () => null
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    layer.tick(0)
+    await Promise.resolve()
+    await Promise.resolve()
+    layer.tick(0)
+    return {
+      scene,
+      layer,
+      setScene,
+      say: (who, x, atMs) => {
+        clockMs = atMs
+        emit([spoke(who, x, 0)])
+        layer.tick(atMs)
+        layer.tick(atMs + FADE_MS)
+      },
+    }
+  }
+
+  it('★ rings nobody until a scene is open, whoever is talking', async () => {
+    const { scene, say } = await rig()
+    say('amara', 0, 1000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+    expect(rings(scene).every((r) => !r.visible)).toBe(true)
+  })
+
+  it('★ moves the ring from body to body as the exchange alternates', async () => {
+    const { scene, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+
+    say('amara', 0, 1000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([1, 0])
+
+    say('salma', 2, 2000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 1])
+
+    say('amara', 0, 3000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([1, 0])
+  })
+
+  it('★ turns the two of them toward each other while the scene runs', async () => {
+    const { layer, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    // amara at (0,0) and salma at (2,0): each faces the other across the screen's x
+    say('amara', 0, 1000)
+    expect(facingOf(layer, 'salma')).toBe('nw')
+    say('salma', 2, 2000)
+    expect(facingOf(layer, 'amara')).toBe('se')
+    expect(facingOf(layer, 'salma')).toBe('nw')
+  })
+
+  it('★ takes the ring back when the scene closes', async () => {
+    const { scene, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    say('amara', 0, 1000)
+    expect(rings(scene)[0]!.alpha).toBe(1)
+
+    setScene({ ...openScene(['amara', 'salma']), open: false, summary: 'They agreed.' })
+    say('amara', 0, 2000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+  })
+
+  it('rings nobody in a scene where nobody has spoken yet', async () => {
+    const { scene, layer, setScene } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    layer.tick(1000)
+    layer.tick(1000 + FADE_MS)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
   })
 })
