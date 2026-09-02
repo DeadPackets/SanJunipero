@@ -17,6 +17,7 @@ import {
   insertLlmCall,
   insertTurnOutcome,
   makeBudgetGuard,
+  mergeBlockTokens,
   sumCostUsd,
   type BudgetGuard,
   type LlmCallInsert,
@@ -43,6 +44,13 @@ export type LlmUsage = {
 }
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
+
+/** Why this call was made and what it sent, carried onto the row whichever way the call ends —
+ *  a call that came back with nothing is the one this most needs to explain. */
+export type CallBill = {
+  wakeReason?: string | null
+  blockTokens?: Record<string, number> | null
+}
 
 /** What one attempt is known to have done, recorded the moment the provider answers and BEFORE
  *  the value is read: a generation that answered but produced no output still billed its
@@ -220,6 +228,7 @@ export class LlmClient {
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
   private model: LanguageModel | undefined
+  private lastCallId: number | null = null
 
   constructor(opts: LlmClientOpts) {
     this.opts = { ...opts }
@@ -256,11 +265,13 @@ export class LlmClient {
     messages: LlmMessage[]
     schema: z.ZodType<T>
     repairOnce?: boolean
+    bill?: CallBill
   }): Promise<{ value: T; usage: LlmUsage }> {
     const system = this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
+    const bill = opts.bill ?? {}
     try {
-      return await this.generateObject(system, messages, opts.schema)
+      return await this.generateObject(system, messages, opts.schema, bill)
     } catch (err) {
       const bad = opts.repairOnce === true ? malformedObjectText(err) : undefined
       if (bad === undefined) throw err
@@ -276,6 +287,7 @@ export class LlmClient {
           },
         ],
         opts.schema,
+        bill,
       )
     }
   }
@@ -284,6 +296,7 @@ export class LlmClient {
     system: string,
     messages: LlmMessage[],
     schema: z.ZodType<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     return this.invoke(async (model, note) => {
       if (this.transport === 'tool') {
@@ -335,7 +348,7 @@ export class LlmClient {
         })
         return repaired.value
       }
-    })
+    }, bill)
   }
 
   async text(opts: {
@@ -372,6 +385,13 @@ export class LlmClient {
 
   alert(kind: string, detail: string): void {
     insertAlert(this.db, { agentId: this.agentId, kind, detail })
+  }
+
+  /** Adds to the block JSON of the row this client wrote last — what the answer turned out to
+   *  be worth, which is only known once it has parsed. */
+  noteCallBill(patch: Record<string, number>): void {
+    if (this.lastCallId === null) return
+    mergeBlockTokens(this.db, this.lastCallId, patch)
   }
 
   /** Books what the last answer produced against the back end that served it. A well-formed
@@ -414,6 +434,7 @@ export class LlmClient {
 
   private async invoke<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill = {},
   ): Promise<{ value: T; usage: LlmUsage }> {
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
@@ -429,7 +450,7 @@ export class LlmClient {
       )
     }
     try {
-      return await this.invokeReserved(exec)
+      return await this.invokeReserved(exec, bill)
     } finally {
       this.guard.release(reservation)
     }
@@ -437,6 +458,7 @@ export class LlmClient {
 
   private async invokeReserved<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
@@ -450,7 +472,7 @@ export class LlmClient {
     for (; attempt <= Math.max(this.maxRetries, this.rateLimitRetries); attempt++) {
       try {
         return await this.limiter.run(
-          () => this.attemptOnce(model, modelName, exec),
+          () => this.attemptOnce(model, modelName, exec, bill),
           Math.max(0, queueUntil - Date.now()),
         )
       } catch (err) {
@@ -487,6 +509,7 @@ export class LlmClient {
     model: LanguageModel,
     modelName: string,
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const start = performance.now()
     let facts: StepFacts = {}
@@ -508,7 +531,7 @@ export class LlmClient {
         served,
         provider,
       })
-      insertLlmCall(
+      this.lastCallId = insertLlmCall(
         this.db,
         this.llmCallRow({
           model: served,
@@ -521,6 +544,7 @@ export class LlmClient {
           latencyMs: performance.now() - start,
           finishReason: facts.finishReason ?? null,
           error: null,
+          ...bill,
         }),
       )
       this.warnIfTruncated(facts.finishReason)
@@ -542,7 +566,7 @@ export class LlmClient {
         served,
         provider,
       ).costUsd
-      insertLlmCall(
+      this.lastCallId = insertLlmCall(
         this.db,
         this.llmCallRow({
           model: served,
@@ -555,6 +579,7 @@ export class LlmClient {
           latencyMs: performance.now() - start,
           finishReason,
           error: err instanceof Error ? err.message : String(err),
+          ...bill,
         }),
       )
       this.warnIfTruncated(finishReason)

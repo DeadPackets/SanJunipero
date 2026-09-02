@@ -38,6 +38,7 @@ export {
   BudgetExceededError,
   defaultExtraBody,
   servedProvider,
+  type CallBill,
   type LlmUsage,
   type LlmMessage,
   type LlmClientOpts,

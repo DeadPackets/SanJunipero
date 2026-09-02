@@ -48,7 +48,7 @@ import { tamarIdentity } from '../testutil/fixtures.js'
 import type { ReflectionLlm } from '../reflection.js'
 import type { DreamLlm } from '../dream.js'
 
-import type { MindConfig } from '../wake.js'
+import type { MindConfig, WakeReason } from '../wake.js'
 
 const AGENT = 'tamar'
 const BREAD_ID = 'item_1'
@@ -1993,5 +1993,84 @@ describe('the night boundary is staggered', () => {
     for (const id of CAST) {
       expect(reflectionOffsetTicks(id) * TICK_REAL_MS, id).toBeLessThan(REFLECTION_SETTLE_MS)
     }
+  })
+})
+
+// 521 paid turns and nobody could say which of the eight reasons bought them, because the row
+// never carried one. Instrumentation only: what a mind decides is untouched.
+describe('every turn row says what bought it', () => {
+  const REASONS: WakeReason[] = [
+    'body_alarm',
+    'salient_perception',
+    'plan_blocked',
+    'plan_done',
+    'conversation_beat',
+    'reconsider',
+    'boredom',
+    'morning',
+  ]
+
+  function bills(
+    db: Database.Database,
+  ): { reason: string | null; blocks: Record<string, number> }[] {
+    return (
+      db
+        .prepare(
+          "SELECT wake_reason, block_tokens FROM llm_calls WHERE caller = 'turn' ORDER BY id",
+        )
+        .all() as { wake_reason: string | null; block_tokens: string | null }[]
+    ).map((r) => ({
+      reason: r.wake_reason,
+      blocks: r.block_tokens === null ? {} : (JSON.parse(r.block_tokens) as Record<string, number>),
+    }))
+  }
+
+  it('carries the wake reason, the block sizes, and what the plan was worth', async () => {
+    const { loop, agentDb, world } = await setup({
+      model: turnModel([
+        {
+          thought: 'I should fetch and eat some bread.',
+          plan: [
+            { verb: 'walk', params: { x: 5, y: 6 } },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+            { verb: 'eat', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 100)
+
+    const first = bills(agentDb)[0]!
+    expect(REASONS).toContain(first.reason)
+    expect(first.blocks.shared).toBeGreaterThan(0)
+    expect(first.blocks.identity).toBeGreaterThan(0)
+    expect(first.blocks._planSize).toBe(3)
+    expect(first.blocks._priorStepsLeft).toBe(0)
+  })
+
+  // The waste this whole exercise is chasing: a paid call that lands on a plan still running.
+  it('counts the steps still queued when a call arrived on top of them', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'The long way round.',
+          plan: [
+            { verb: 'walk', params: { x: 22, y: 22 } },
+            { verb: 'walk', params: { x: 3, y: 22 } },
+            { verb: 'walk', params: { x: 22, y: 3 } },
+          ],
+          reconsider_at: '00:10',
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => bills(agentDb).length >= 2, 60)
+
+    const left = bills(agentDb).map((b) => b.blocks._priorStepsLeft ?? 0)
+    expect(left[0]).toBe(0)
+    expect(left[1]).toBeGreaterThan(0)
   })
 })

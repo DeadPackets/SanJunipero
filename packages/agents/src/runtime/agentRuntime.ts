@@ -13,7 +13,7 @@ import {
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
-import type { LlmClient } from '@sj/llm'
+import type { CallBill, LlmClient } from '@sj/llm'
 import type {
   IdentityCore,
   AssembledPrompt,
@@ -68,6 +68,7 @@ import {
   type MindClock,
   type MindConfig,
   type PlanState,
+  type WakeReason,
 } from '../wake.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
@@ -493,7 +494,7 @@ export class AgentRuntime {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
       }
-      void this.#startTurn()
+      void this.#startTurn(reason)
     }
   }
 
@@ -757,12 +758,12 @@ export class AgentRuntime {
     this.#wasNight = isNight
   }
 
-  async #startTurn(): Promise<void> {
+  async #startTurn(wakeReason: WakeReason): Promise<void> {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
     const tick = this.#bridge.currentTick()
     try {
-      await this.#runTurnBody()
+      await this.#runTurnBody(wakeReason)
     } catch (err) {
       this.#llm.alert('turn_crash', messageOf(err))
       this.#clock.lastTurnTick = tick + this.#config.dozeTicks
@@ -772,7 +773,7 @@ export class AgentRuntime {
     }
   }
 
-  async #runTurnBody(): Promise<void> {
+  async #runTurnBody(wakeReason: WakeReason): Promise<void> {
     this.#reframedThisTurn = false
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
@@ -862,6 +863,9 @@ export class AgentRuntime {
       underway: this.#underway(),
     }
     let assembled = assemblePrompt(blocks)
+    // Steps still queued from the plan this call may be about to replace: what a paid call
+    // throws away is only visible against what was already running.
+    const priorStepsLeft = this.#plan.queue.length
 
     let turn: Turn
     try {
@@ -873,10 +877,14 @@ export class AgentRuntime {
         this.#dayLog = compactDayLog(this.#dayLog, summary.text)
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
-      let answer = await this.#ask(assembled)
+      const bill: CallBill = {
+        wakeReason,
+        blockTokens: { ...assembled.blockTokens, _priorStepsLeft: priorStepsLeft },
+      }
+      let answer = await this.#ask(assembled, bill)
       // A blank answer is not a wrong answer. There is nothing to correct, so the honest
       // retry is the same request again — byte-identical, and so still a cached prefix.
-      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
+      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled, bill)
       if (isBlankAnswer(answer.raw)) {
         // Twice nothing leaves the turn UNSPENT: no invented thought, no turn counted. The
         // doze is the back-pressure, so a silent back end is not hammered.
@@ -890,7 +898,7 @@ export class AgentRuntime {
         // A shape the schema refused comes back as the provider's own bytes; an act with
         // nothing in it parsed cleanly, so the answer itself is what goes back.
         (issues) =>
-          this.#repair(assembled, badText.length > 0 ? badText : JSON.stringify(raw), issues),
+          this.#repair(assembled, badText.length > 0 ? badText : JSON.stringify(raw), issues, bill),
         (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
@@ -902,6 +910,7 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
+    this.#llm.noteCallBill({ _planSize: turn.plan?.length ?? 0 })
     // What the answer produced, booked before the world sees it: a wait arrives here as act:null
     // and leaves no refusal, no event and no alert of its own (K26) — the shape run G read as
     // silence when a plan was already carrying the body.
@@ -931,12 +940,16 @@ export class AgentRuntime {
 
   // One ask, and what came back of it: the parsed answer, plus the raw text when the answer
   // did not fit the shape, which is what a repair needs to quote back.
-  async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
+  async #ask(
+    assembled: AssembledPrompt,
+    bill: CallBill,
+  ): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
         schema: StrictTurnSchema,
         system: assembled.system,
         messages: assembled.messages,
+        bill,
       })
       return { raw: value, badText: '' }
     } catch (err) {
@@ -948,7 +961,12 @@ export class AgentRuntime {
 
   // The bad output goes back as the assistant's own words, the correction as
   // a user message — never a correction spoken in the assistant's voice.
-  async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
+  async #repair(
+    assembled: AssembledPrompt,
+    badText: string,
+    issues: string,
+    bill: CallBill,
+  ): Promise<unknown> {
     try {
       const { value } = await this.#llm.object({
         schema: StrictTurnSchema,
@@ -958,6 +976,7 @@ export class AgentRuntime {
           { role: 'assistant', content: badText.length > 0 ? badText : '…' },
           { role: 'user', content: `Your answer was rejected. Fix it:\n${issues}` },
         ],
+        bill,
       })
       return value
     } catch (err) {

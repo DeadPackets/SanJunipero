@@ -57,6 +57,9 @@ export type AssembledPrompt = {
   messages: { role: 'user'; content: string }[] // stable→volatile; an empty block sends no message
   estTokens: number // ceil(totalChars/4)
   needsCompaction: boolean // est(dayLog) > 6000 tokens
+  // What each rendered block cost, and no entry for one it skipped. Same estimator as
+  // `estTokens`, so the entries sum to it bar the delimiters and per-block rounding.
+  blockTokens: Record<string, number>
 }
 
 // Byte-stable, so blocks 1-3 form an unbroken cache prefix until sleep rewrites block 3.
@@ -159,18 +162,10 @@ function renderScene(scene: PromptBlocks['scene']): string {
   if (parts.length === 0) return 'Nothing in particular comes back to you.'
   return parts.join('\n\n')
 }
-function renderSystem(blocks: PromptBlocks): string {
-  // Rules of being + capabilities are static and identical for every agent;
-  // identity and personality complete the byte-stable system prefix.
-  const roster = renderRoster(blocks.roster ?? [])
-  return [
-    blocks.rulesOfBeing,
-    CAPABILITIES,
-    SPEECH_RULES,
-    ...(roster.length === 0 ? [] : [roster]),
-    renderIdentity(blocks.identity),
-    renderPersonality(blocks.personality),
-  ].join(BLOCK_DELIM)
+// Rules of being + capabilities are static and identical for every agent, and the cache keeps
+// them as one unit: nothing per-mind may ever go in front of this.
+function renderShared(rulesOfBeing: string): string {
+  return [rulesOfBeing, CAPABILITIES, SPEECH_RULES].join(BLOCK_DELIM)
 }
 
 function estTokens(text: string): number {
@@ -178,7 +173,13 @@ function estTokens(text: string): number {
 }
 
 export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
-  const system = renderSystem(blocks)
+  const shared = renderShared(blocks.rulesOfBeing)
+  const roster = renderRoster(blocks.roster ?? [])
+  const identity = renderIdentity(blocks.identity)
+  const personality = renderPersonality(blocks.personality)
+  const system = [shared, ...(roster.length === 0 ? [] : [roster]), identity, personality].join(
+    BLOCK_DELIM,
+  )
   const journal = renderJournal(blocks.journal)
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
@@ -195,11 +196,29 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     .filter((content) => content.length > 0)
     .map((content) => ({ role: 'user' as const, content }))
   const serialized = system + ordered.join('')
+  const named: [string, string][] = [
+    ['shared', shared],
+    ['roster', roster],
+    ['identity', identity],
+    ['personality', personality],
+    ['journal', journal],
+    ['dayLog', dayLog],
+    ['scene', scene],
+    ['recalled', recalled],
+    ['lastOutcome', lastOutcome],
+    ['now', now],
+    ['heard', heard],
+    ['said', said],
+    ['underway', underway],
+  ]
+  const blockTokens: Record<string, number> = {}
+  for (const [name, text] of named) if (text.length > 0) blockTokens[name] = estTokens(text)
   return {
     system,
     messages,
     estTokens: estTokens(serialized),
     needsCompaction: estTokens(dayLog) > DAYLOG_COMPACTION_TOKENS,
+    blockTokens,
   }
 }
 

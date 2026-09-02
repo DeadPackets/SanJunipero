@@ -4,7 +4,13 @@ import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
 import { mockModel } from './testutil/mockModel.js'
-import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
+import {
+  insertLlmCall,
+  makeBudgetGuard,
+  mergeBlockTokens,
+  migrateLlmTables,
+  sumReserved,
+} from './callLog.js'
 import {
   BudgetExceededError,
   LlmClient,
@@ -70,6 +76,110 @@ describe('migrateLlmTables', () => {
     expect(() => {
       migrateLlmTables(db)
     }).not.toThrow()
+  })
+
+  it('adds the two bill columns to a table that predates them, leaving its rows alone', () => {
+    const db = new Database(':memory:')
+    db.exec(`
+      CREATE TABLE llm_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, agent_id TEXT,
+        caller TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL, cache_read_tokens INTEGER NOT NULL,
+        reasoning_tokens INTEGER NOT NULL, cost_usd REAL NOT NULL, estimated_cost_usd REAL,
+        reported_cost_usd REAL, latency_ms INTEGER NOT NULL, ok INTEGER NOT NULL, error TEXT,
+        provider TEXT, finish_reason TEXT, generation_id TEXT);
+      INSERT INTO llm_calls VALUES
+        (1, 7, 'tamar', 'turn', 'm', 10, 2, 0, 0, 0.5, 0.5, NULL, 90, 1, NULL, 'Wafer', 'stop', NULL);
+    `)
+    migrateLlmTables(db)
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = 1').get() as Record<string, unknown>
+    expect(row.caller).toBe('turn')
+    expect(row.cost_usd).toBe(0.5)
+    expect(row.wake_reason).toBeNull()
+    expect(row.block_tokens).toBeNull()
+  })
+})
+
+// Why a turn was bought and what its prompt weighed. Null for every caller with no wake —
+// reflection, arbiter, pre-flight — and for every row written before the columns existed.
+describe('the wake reason and the block bill', () => {
+  const call = {
+    agentId: 'tamar',
+    caller: 'turn',
+    model: MIND_MODEL,
+    provider: 'Wafer',
+    inputTokens: 8000,
+    outputTokens: 300,
+    cacheReadTokens: 2048,
+    reasoningTokens: 0,
+    costUsd: 0.001,
+    estimatedCostUsd: 0.001,
+    reportedCostUsd: null,
+    latencyMs: 900,
+    finishReason: 'stop',
+    ok: true,
+    error: null,
+  }
+
+  it('round-trips a wake reason and the block JSON', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, {
+      ...call,
+      wakeReason: 'conversation_beat',
+      blockTokens: { shared: 2067, dayLog: 4200, _priorStepsLeft: 3 },
+    })
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
+      wake_reason: string | null
+      block_tokens: string | null
+    }
+    expect(row.wake_reason).toBe('conversation_beat')
+    expect(JSON.parse(row.block_tokens!)).toEqual({
+      shared: 2067,
+      dayLog: 4200,
+      _priorStepsLeft: 3,
+    })
+  })
+
+  it('reads back a row written without either, as a caller with no wake writes one', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, { ...call, caller: 'reflection' })
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
+      caller: string
+      wake_reason: string | null
+      block_tokens: string | null
+    }
+    expect(row.caller).toBe('reflection')
+    expect(row.wake_reason).toBeNull()
+    expect(row.block_tokens).toBeNull()
+  })
+
+  it('merges what the answer turned out to be worth into the row already written', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, {
+      ...call,
+      wakeReason: 'boredom',
+      blockTokens: { shared: 2067, _priorStepsLeft: 0 },
+    })
+    mergeBlockTokens(db, id, { _planSize: 4 })
+
+    const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as {
+      json: string
+    }
+    expect(JSON.parse(row.json)).toEqual({ shared: 2067, _priorStepsLeft: 0, _planSize: 4 })
+  })
+
+  it('starts the block JSON from nothing when the row carried none', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, call)
+    mergeBlockTokens(db, id, { _planSize: 0 })
+
+    const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as {
+      json: string
+    }
+    expect(JSON.parse(row.json)).toEqual({ _planSize: 0 })
   })
 })
 
