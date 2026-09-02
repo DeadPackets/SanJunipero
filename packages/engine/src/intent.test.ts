@@ -4,7 +4,7 @@ import { ADULT_AGE_DAYS, DEFAULT_CONFIG, TICK_REAL_MS, type SimEvent } from '@sj
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { stepWalk, VERBS, WALK_NO_ROAD } from './verbs/index.js'
+import { ACT_SET_DOWN, stepWalk, VERBS, WALK_NO_ROAD } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
@@ -295,8 +295,8 @@ describe('verb registry', () => {
   })
 })
 
-// One policy over the whole registry: interruption is something the world does to a body, never
-// something a mind can ask for. VerbDef used to declare it and nothing read it.
+// One policy over the whole registry: no act elbows another out of a pair of busy hands. What
+// changed in task 30 is that a body may take its OWN hands off the work, by the one verb for it.
 describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
   const CFG = DEFAULT_CONFIG
   const busyWith = (verb: string): WorldState =>
@@ -305,12 +305,13 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     ])
 
   // The policy is about the HANDS. `speak` declares `atOnce`, because a body with an axe in its
-  // hands can still answer when it is spoken to. Widening this set is a visible edit.
-  it('★ the mouth is the only thing that does not wait for the hands', () => {
+  // hands can still answer when it is spoken to; `stop` is what puts the axe down. Widening this
+  // set is a visible edit.
+  it('★ the mouth and the setting-down are the only things that do not wait for the hands', () => {
     const exempt = Object.keys(VERBS)
       .filter((k) => VERBS[k]!.atOnce !== undefined)
       .sort()
-    expect(exempt).toEqual(['speak'])
+    expect(exempt).toEqual(['speak', 'stop'])
     const r = submitIntent(busyWith('build'), CFG, 'a1', 'speak', { text: 'over here' })
     expect(r.ok).toBe(true)
     expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(
@@ -333,19 +334,18 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     ])
   })
 
-  it('★ and the only thing that ends an activity early is the world, not another intent', () => {
-    // Every `action_interrupted` the engine emits, and who emits it. A mind is on none of
-    // these lists: `submitIntent` has no path that produces one.
+  it('★ and an act ends early only through the event the fold reads, never a mutation beside it', () => {
     const s = busyWith('sleep')
     expect(s.agents.a1!.activity).not.toBeNull()
-    const byIntent = submitIntent(s, CFG, 'a1', 'eat', {})
-    expect(byIntent.ok).toBe(false)
+    // Still true of every act but the one: eat does not get to shove sleep aside.
+    expect(submitIntent(s, CFG, 'a1', 'eat', {}).ok).toBe(false)
+    // `intent.ts` names no interruption of its own: the verb emits it, and every one of them —
+    // the world's four reasons and the mind's — is a payload the fold applies.
     const src = readFileSync(new URL('./intent.ts', import.meta.url), 'utf8')
-    expect(src, 'submitIntent learned to interrupt without a ruling').not.toContain(
+    expect(src, 'submitIntent learned to interrupt behind the registry').not.toContain(
       'action_interrupted',
     )
-    // and the world's own four reasons still clear it
-    for (const reason of ['blocked', 'gone', 'collapsed', 'rest']) {
+    for (const reason of ['blocked', 'gone', 'collapsed', 'rest', ACT_SET_DOWN]) {
       const cleared = applyAll(s, [
         { type: 'action_interrupted', payload: { agentId: 'a1', reason } },
       ])

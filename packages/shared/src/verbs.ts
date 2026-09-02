@@ -66,3 +66,15 @@ export const verbPhrasePast = (verb: string): string => {
   const [head, ...rest] = verbWords(verb)
   return [pastParticiple(head), ...rest].join(' ')
 }
+
+const presentParticiple = (verb: string): string => {
+  if (verb.endsWith('e') && !verb.endsWith('ee')) return `${verb.slice(0, -1)}ing`
+  if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ing`
+  return `${verb}ing`
+}
+
+/** "you broke off fishing" — the act named while it was still going on. */
+export const verbPhraseGerund = (verb: string): string => {
+  const [head, ...rest] = verbWords(verb)
+  return [presentParticiple(head), ...rest].join(' ')
+}

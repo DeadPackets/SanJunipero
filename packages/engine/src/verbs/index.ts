@@ -81,6 +81,7 @@ export type VerbKind =
   | 'walk'
   | 'sleep'
   | 'wake'
+  | 'stop'
   | 'enter'
   | 'exit'
   | 'eat'
@@ -739,6 +740,24 @@ const exit: VerbDef = makeVerb({
       ? []
       : [{ type: 'agent_exited', payload: { agentId, structureId } }]
   },
+})
+
+/** What the log records when an act is set down before its time. Who took the hands off it is
+ *  the mind's own business, and it is told that in words of its own. */
+export const ACT_SET_DOWN = 'you set it down'
+
+// The one verb that reaches into an act already running, and it uses no hands. It yields
+// nothing: what the act had already put into the world it keeps, and half a cast is no fish.
+const stop: VerbDef = makeVerb({
+  kind: 'stop',
+  takes: 'moment',
+  validate: () => null,
+  atOnce(state, _config, agentId) {
+    return state.agents[agentId]?.activity
+      ? [{ type: 'action_interrupted', payload: { agentId, reason: ACT_SET_DOWN } }]
+      : []
+  },
+  onComplete: () => [],
 })
 
 // submitIntent already prepends agent_woke for any intent from a sleeper.
@@ -2377,6 +2396,7 @@ export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
   wake,
+  stop,
   enter,
   exit,
   eat,

@@ -75,7 +75,7 @@ export function submitIntent(
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
   // A verb that declares `atOnce` does not use the hands: it never takes the activity slot and is
-  // never refused for busy-ness. Nothing here can end a running activity early.
+  // never refused for busy-ness. `stop` is the one that reaches into an act already running.
   const usesHands = def.atOnce === undefined
   if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
   // A named place settles to its tile before anybody judges the act, so validate, duration and

@@ -124,7 +124,7 @@ export const FALLBACK_TURN: Turn = {
 
 // The acts that ask for nothing of their own. A verb minted at runtime is one too: the arbiter
 // only ever hands those over with nothing in them.
-const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'exit', 'doff', 'drink', 'forage'])
+const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'stop', 'exit', 'doff', 'drink', 'forage'])
 
 // A try at something new carries no verb of its own, so neither reader below can speak for it.
 const namedAct = (turn: Turn): z.infer<typeof IntentSchema> | null => {

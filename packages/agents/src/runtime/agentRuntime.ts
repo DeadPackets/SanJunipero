@@ -10,6 +10,7 @@ import {
   simTimeFromTick,
   stateHash,
   TICK_REAL_MS,
+  verbPhraseGerund,
   verbPhrasePast,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
@@ -202,6 +203,19 @@ export function actImportance(verb: string): number {
 export function lastTurnLine(what: string, reason: string): string {
   return `Last turn: ${what} did not take — ${sayable(reason)}.`
 }
+
+/** The other thing a turn can open with: not an act refused, but an act the body set down
+ *  half-finished. A mind that woke standing empty-handed would otherwise never learn why. */
+export function brokeOffLine(verb: string, why: string): string {
+  return `Last turn: you broke off ${verbPhraseGerund(verb)} — ${sayable(why)}.`
+}
+
+/** The verb that takes a body's hands off what they are doing. */
+const STOP = 'stop'
+
+// What a body says to itself when it stops before it meant to. It never asked; the hands came
+// off the work because the body was failing under it.
+export const BODY_WOULD_NOT_GO_ON = 'your body would not carry it any further'
 
 // The reasons `drink`, `fill` and `fish` are turned away by all name the water. Read off the
 // rendered line, which is the one place a refusal survives into the next turn. An empty vessel
@@ -561,6 +575,9 @@ export class AgentRuntime {
       void this.#takeFloor(tick)
       return
     }
+    // The body's own reflex, and it costs the mind nothing. The legs are left out of it: a walk
+    // is how a hungry body reaches food, so breaking one off takes the road away too.
+    if (reason === 'body_alarm' && working) this.#breakOff(packet.self.activity!)
     if (reason !== null) {
       if (packet.self.asleep) {
         this.#wakeOwed = true
@@ -568,6 +585,13 @@ export class AgentRuntime {
       }
       void this.#startTurn(wake)
     }
+  }
+
+  // The hands come off the work now; the turn that follows is the alarm's, and opens by saying
+  // what happened, so the mind is never left to guess why it is standing with nothing in hand.
+  #breakOff(verb: string): void {
+    this.#lastOutcome = brokeOffLine(verb, BODY_WOULD_NOT_GO_ON)
+    void this.#bridge.submit(this.#agentId, { verb: STOP, params: {} })
   }
 
   // A scene line, under the same in-flight guard an ordinary turn runs under, so a mind never
@@ -621,7 +645,7 @@ export class AgentRuntime {
         return
       }
     }
-    if (activity === null) {
+    if (activity === null || this.#plan.queue[0]?.verb === STOP) {
       this.#planHeadInFlight = true
       const head = this.#plan.queue[0]!
       void this.#bridge.submit(this.#agentId, head, (res) => {
@@ -697,7 +721,9 @@ export class AgentRuntime {
 
   #submitPendingIfIdle(activity: string | null): Promise<void> {
     if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
-    if (activity !== null) return Promise.resolve()
+    // `stop` is the one act aimed AT the hands rather than done with them: holding it until they
+    // come free is holding it until the very thing it means to end is over.
+    if (activity !== null && this.#pendingIntent.verb !== STOP) return Promise.resolve()
     const intent = this.#pendingIntent
     this.#pendingInFlight = true
     return this.#bridge

@@ -421,7 +421,7 @@ describe('an act with nothing named in it', () => {
   })
 
   it('is not raised for an act that asks for nothing, nor for one that is filled', () => {
-    for (const verb of ['sleep', 'wake', 'exit', 'doff', 'drink', 'forage']) {
+    for (const verb of ['sleep', 'wake', 'stop', 'exit', 'doff', 'drink', 'forage']) {
       expect(actWithoutItsDetail(turn({ verb, params: {} })), verb).toBeNull()
     }
     expect(
