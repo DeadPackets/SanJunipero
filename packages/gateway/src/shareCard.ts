@@ -102,8 +102,9 @@ export function shareRouteAgent(pathname: string): string | null {
 }
 
 export function shareRouteDay(pathname: string, liveTick: number): number | null {
+  const live = Math.floor(liveTick / MINUTES_PER_DAY)
   const segs = pathname.split('/').filter(Boolean)
-  if (segs.length === 0) return Math.floor(liveTick / MINUTES_PER_DAY)
+  if (segs.length === 0) return live
   if (segs[0] !== 'moment') return null
   if (segs.length === 2) return null // `/moment/:id` names a scene, and a scene names its own day
   if (segs.length !== 3) return null
@@ -114,7 +115,8 @@ export function shareRouteDay(pathname: string, liveTick: number): number | null
   } catch {
     return null
   }
-  return Number.isNaN(momentToTick(day, time)) ? null : day
+  // A day the town has not lived is no page, and its tags would point at a card that 404s.
+  return Number.isNaN(momentToTick(day, time)) || day > live ? null : day
 }
 
 export function shareRouteScene(pathname: string): number | null {

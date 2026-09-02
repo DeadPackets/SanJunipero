@@ -53,8 +53,9 @@ function scriptedWorld(dbPath: string): Database.Database {
 describe('shareRouteDay — which pages a link is ever pasted from', () => {
   it('names the live day for the root, and the linked day for a minute', () => {
     expect(shareRouteDay('/', 3 * MINUTES_PER_DAY + 30)).toBe(3)
-    expect(shareRouteDay('/moment/4/19:31', 0)).toBe(4)
-    expect(shareRouteDay('/moment/day4/19:31', 0)).toBe(4)
+    expect(shareRouteDay('/moment/4/19:31', 9 * MINUTES_PER_DAY)).toBe(4)
+    expect(shareRouteDay('/moment/day4/19:31', 9 * MINUTES_PER_DAY)).toBe(4)
+    expect(shareRouteDay('/moment/4/19:31', 0), 'a day the town has not lived').toBeNull()
   })
 
   it('names the person a `/agent/:id` link is pasted from, and nobody else', () => {
@@ -268,9 +269,9 @@ describe('the card route and the tags the app is served with', () => {
   })
 
   it('★ never says the town’s name twice in one sentence', async () => {
-    const html = await (await fetch(`${base}/moment/9/06:00`)).text()
-    expect(html).not.toContain('Day 9 in San Junipero. San Junipero')
-    expect(html).toContain('Day 9 in San Junipero. A town of minds')
+    const html = await (await fetch(`${base}/moment/2/06:00`)).text()
+    expect(html).not.toContain('Day 2 in San Junipero. San Junipero')
+    expect(html).toContain('Day 2 in San Junipero. A town of minds')
   })
 
   it('★ 404s a path that is not a page, rather than indexing every typo as the town', async () => {
