@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
-import { perceptionToProse } from './prose.js'
+import { doorstepLine, perceptionToProse } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 
@@ -15,7 +15,14 @@ const STORE = 'structure_store'
 const OTHER = 'structure_other'
 
 // `into` names the shelf a thing stands on; without one it is in the hands.
-type Placed = { id: string; kind: string; qty: number; into?: string; owner?: string }
+type Placed = {
+  id: string
+  kind: string
+  qty: number
+  into?: string
+  at?: { x: number; y: number }
+  owner?: string
+}
 
 function town(placed: Placed[] = []): EngineBridge {
   const config = DEFAULT_CONFIG
@@ -52,7 +59,12 @@ function town(placed: Placed[] = []): EngineBridge {
       id: p.id,
       kind: p.kind,
       qty: p.qty,
-      loc: p.into === undefined ? { t: 'agent', id: AGENT } : { t: 'structure', id: p.into },
+      loc:
+        p.into !== undefined
+          ? { t: 'structure', id: p.into }
+          : p.at !== undefined
+            ? { t: 'tile', x: p.at.x, y: p.at.y }
+            : { t: 'agent', id: AGENT },
       owner: p.owner ?? AGENT,
     })
   }
@@ -65,6 +77,33 @@ const proseFor = (bridge: EngineBridge): string =>
     isWalkable: (x, y) => bridge.isWalkable(x, y),
     isEdible: (kind) => bridge.isEdible(kind),
   })
+
+describe('the heap on your own doorstep', () => {
+  // The house stands at (2, 2), two tiles by two, and the body is over at (16, 16): what is
+  // piled against your own wall is a thing you know, not a thing you are looking at.
+  const byTheDoor = (n: number): Placed[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `item_${i}`,
+      kind: 'plank',
+      qty: 1,
+      at: { x: 4, y: 4 },
+    }))
+
+  it('is said at three things and not at two', () => {
+    expect(doorstepLine(town(byTheDoor(2)).perception(AGENT), null)).toBe('')
+    expect(doorstepLine(town(byTheDoor(3)).perception(AGENT), null)).toBe(
+      'On the ground by your door: plank ×3.',
+    )
+  })
+
+  it('is said once an hour, however long the heap stands there', () => {
+    const packet = town(byTheDoor(3)).perception(AGENT)
+    const said = packet.time.tick
+    expect(doorstepLine(packet, said)).toBe('')
+    expect(doorstepLine(packet, said - 59)).toBe('')
+    expect(doorstepLine(packet, said - 60)).toContain('On the ground by your door')
+  })
+})
 
 describe('the satchel is read out once, grouped by kind', () => {
   const notes = (n: number): Placed[] =>

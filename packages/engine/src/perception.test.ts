@@ -1356,6 +1356,7 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          }
         ]
        },
+       "stores": [],
        "heard": [
         {
          "speakerId": "b",

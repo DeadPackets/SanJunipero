@@ -42,6 +42,16 @@ function structure(
   return put(planned, ev('structure_completed', { id }))
 }
 
+const dropped = (
+  s: WorldState,
+  id: string,
+  kind: string,
+  qty: number,
+  at: { x: number; y: number },
+  owner = 'a1',
+): WorldState =>
+  put(s, ev('item_spawned', { id, kind, qty, loc: { t: 'tile', x: at.x, y: at.y }, owner }))
+
 const shelved = (s: WorldState, id: string, kind: string, qty: number, into: string): WorldState =>
   put(s, ev('item_spawned', { id, kind, qty, loc: { t: 'structure', id: into }, owner: 'a1' }))
 
@@ -92,5 +102,34 @@ describe('the stores a mind may put things in', () => {
     expect(p.stores).toEqual([
       { structureId: 'store_1', kind: 'storehouse', name: 'the long barn', items: [] },
     ])
+  })
+})
+
+// house_1 stands at (2, 2) and is two tiles by two, so its doorstep runs out to (5, 5).
+describe('what is piling up on your own doorstep', () => {
+  it('counts three of your own things by your own wall, and not two', () => {
+    let s = dropped(town(), 'item_1', 'plank', 1, { x: 4, y: 4 })
+    s = dropped(s, 'item_2', 'plank', 1, { x: 5, y: 4 })
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', []).self.doorstep).toBeUndefined()
+    s = dropped(s, 'item_3', 'plank', 1, { x: 5, y: 5 })
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', []).self.doorstep).toEqual([
+      { kind: 'plank', qty: 3 },
+    ])
+  })
+
+  it('counts what is in a stack, and never what lies out past the doorstep', () => {
+    const s = dropped(town(), 'item_1', 'plank', 4, { x: 4, y: 4 })
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', []).self.doorstep).toEqual([
+      { kind: 'plank', qty: 4 },
+    ])
+    const far = dropped(town(), 'item_1', 'plank', 4, { x: 6, y: 6 })
+    expect(composePerception(far, DEFAULT_CONFIG, 'a1', []).self.doorstep).toBeUndefined()
+  })
+
+  it("counts nothing of another's, and nothing by another's wall", () => {
+    const theirs = dropped(town(), 'item_1', 'plank', 4, { x: 4, y: 4 }, 'a2')
+    expect(composePerception(theirs, DEFAULT_CONFIG, 'a1', []).self.doorstep).toBeUndefined()
+    const elsewhere = dropped(town(), 'item_2', 'plank', 4, { x: 28, y: 4 })
+    expect(composePerception(elsewhere, DEFAULT_CONFIG, 'a1', []).self.doorstep).toBeUndefined()
   })
 })

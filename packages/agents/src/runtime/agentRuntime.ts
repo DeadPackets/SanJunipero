@@ -31,6 +31,7 @@ import {
   heardProse,
   makeablesLine,
   roadLine,
+  doorstepLine,
   perceptionToProse,
   placesKnownLine,
   valleyExtentLine,
@@ -290,6 +291,8 @@ export class AgentRuntime {
   // Where the feet have been standing, and since when. Null while asleep and after any act
   // the world took that was not a walk or a word.
   #still: Stillness | null = null
+  // When the heap on this mind's own doorstep was last named. Null until it ever is.
+  #doorstepSaidTick: number | null = null
   // Who this mind has been with and how warm the tie stood when they last parted. The engine
   // keeps no bonds and the gateway folds a log no mind can read, so a mind's own tie is folded
   // here — out of the one act perception can witness, which is a word. Warmth is carried
@@ -792,6 +795,8 @@ export class AgentRuntime {
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
     const canMake = this.#bridge.makeables()
+    const doorstep = doorstepLine(packet, this.#doorstepSaidTick)
+    if (doorstep.length > 0) this.#doorstepSaidTick = tick
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
@@ -799,6 +804,7 @@ export class AgentRuntime {
       valleyExtentLine(world),
       placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
+      doorstep,
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
     ]

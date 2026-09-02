@@ -100,6 +100,7 @@ function reconcile(
       activity: raw.self.activity,
       ...(raw.self.activityToward === undefined ? {} : { activityToward: raw.self.activityToward }),
       ...(raw.self.inside === undefined ? {} : { inside: raw.self.inside }),
+      ...(raw.self.doorstep === undefined ? {} : { doorstep: raw.self.doorstep }),
       inventory: raw.self.inventory.map((i) => ({
         id: i.id,
         kind: i.kind,

@@ -220,6 +220,9 @@ export type PerceptionPacket = {
     activityToward?: { x: number; y: number }
     inside?: PerceivedInterior
     inventory: InventoryItem[]
+    // Your own things heaped on the ground by your own wall, grouped by kind. Absent below the
+    // few it takes to be a heap, so a tidy doorstep reads exactly as it always did.
+    doorstep?: { kind: string; qty: number }[]
   }
   weather: { kind: string; temperatureC: number }
   visible: {
@@ -553,6 +556,42 @@ function perceiveInventory(lens: Lens): InventoryItem[] {
     .map((i) => ({ ...i, ...itemMarks(lens, i) }))
 }
 
+// Two tiles out from the wall is the ground a thing is set down on rather than carried in, and
+// three of them is a heap rather than a thing you put down for a moment.
+const DOORSTEP_REACH = 2
+const DOORSTEP_HEAP = 3
+
+const withinOfRect = (
+  x: number,
+  y: number,
+  r: { x: number; y: number; w: number; h: number },
+  reach: number,
+): boolean =>
+  x >= r.x - reach && x <= r.x + r.w - 1 + reach && y >= r.y - reach && y <= r.y + r.h - 1 + reach
+
+/** What this mind has left lying on the ground by its own walls. Owner, 2026-09-02: "agents
+ *  just end up leaving things in front of their houses". Absent until it is a heap. */
+function perceiveDoorstep(lens: Lens): { kind: string; qty: number }[] | undefined {
+  const { state, self } = lens
+  const mine = Object.values(state.structures).filter(
+    (s) => s.owner === self.id && s.stage === 'complete',
+  )
+  if (mine.length === 0) return undefined
+  const kinds = new Map<string, number>()
+  let heaped = 0
+  for (const id of Object.keys(state.items).sort()) {
+    const i = state.items[id]!
+    if (!isTileItem(i) || i.owner !== self.id) continue
+    if (!mine.some((s) => withinOfRect(i.loc.x, i.loc.y, s, DOORSTEP_REACH))) continue
+    kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
+    heaped += i.qty
+  }
+  if (heaped < DOORSTEP_HEAP) return undefined
+  return [...kinds]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .map(([kind, qty]) => ({ kind, qty }))
+}
+
 /** The shelves this mind may use — the roofs it owns, and the town's own store, which is the
  *  one public building that keeps what is left in it — and what each holds, most of it first. */
 function perceiveStores(lens: Lens): PerceivedStore[] {
@@ -730,6 +769,8 @@ export function composePerception(
       ? { x: walkTo.x, y: walkTo.y }
       : undefined
 
+  const doorstep = perceiveDoorstep(lens)
+
   const visible = {
     agents: perceiveAgents(lens),
     structures: perceiveStructures(lens),
@@ -756,6 +797,7 @@ export function composePerception(
       ...(toward === undefined ? {} : { activityToward: toward }),
       ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
       inventory: perceiveInventory(lens),
+      ...(doorstep === undefined ? {} : { doorstep }),
     },
     weather: { ...state.weather },
     ...(ground === undefined ? {} : { ground }),

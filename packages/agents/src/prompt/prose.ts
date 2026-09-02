@@ -124,6 +124,8 @@ export type PerceptionPacket = {
     // The roof overhead. Absent under open sky, so an outdoor packet reads as it always did.
     inside?: { id: string; kind: string }
     inventory: PerceptionItem[]
+    // Your own things heaped on the ground by your own wall. Absent on a tidy doorstep.
+    doorstep?: { kind: string; qty: number }[]
   }
   weather: { kind: string; temperatureC: number }
   // Absent on plain earth; present when road or worn path runs under or beside the feet.
@@ -825,6 +827,19 @@ function affordanceLines(packet: PerceptionPacket): string[] {
 // Roughly a token per 3.3 characters. A store is a standing fact said every turn, so a full
 // storehouse is capped at a phrase rather than a page.
 const STORE_MAX_CHARS = Math.floor(40 * 3.3)
+
+// Sixty ticks is one sim-hour. A heap on the doorstep is a standing fact, and a standing fact
+// said every turn is a fact a mind stops reading.
+const DOORSTEP_QUIET_TICKS = 60
+
+/** Your own things heaped against your own wall, said at most once an hour. `saidAtTick` is when
+ *  this line last stood; null when it never has. */
+export function doorstepLine(packet: PerceptionPacket, saidAtTick: number | null): string {
+  const heap = packet.self.doorstep ?? []
+  if (heap.length === 0) return ''
+  if (saidAtTick !== null && packet.time.tick - saidAtTick < DOORSTEP_QUIET_TICKS) return ''
+  return `On the ground by your door: ${heap.map(tally).join(', ')}.`
+}
 
 /** What one shelf holds, capped. The tail of a long one is a count of kinds: a mind deciding
  *  where to put a plank needs to know the barn is full, not to read the barn. */
