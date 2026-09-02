@@ -4,18 +4,20 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
+import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
   LIVE_ALLOW_PROVIDER_FALLBACKS,
   LIVE_OPS_DB,
+  RATE_STOP_ALERT_KIND,
   amnesiaRefusal,
   capReachedRefusal,
   createLiveCast,
@@ -468,6 +470,28 @@ describe('★ the money, inside the served world', () => {
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+
+  // A rate stop that lives only in the process is no stop at all: `restart: unless-stopped`
+  // brings the container back, and the runaway pays a pre-flight and reruns for another window.
+  it('★ a rate stop outlives the process and refuses the next boot', async () => {
+    const stops: { spent: number; cap: number }[] = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    await run(world, 4)
+    callsTo(opsDb, 'turn', 400)
+    await run(world, 130)
+    expect(stops).toHaveLength(1)
+    expect(alertsOf(opsDb, RATE_STOP_ALERT_KIND)).toHaveLength(1)
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    await expect(liveWorld({ dir, spendCapUsd: 5 })).rejects.toThrow(/calling far too often/)
+    await expect(liveWorld({ dir, spendCapUsd: 5 })).rejects.toThrow(/SJ_FRESH=1/)
+  }, 60_000)
 
   // ★ Run C died at $0.5656/sim-day against a $0.50 ceiling on 203 mind calls — 4.7 a mind a
   // sim-hour, an ordinary town. The dollars had moved because the ROUTING had.
@@ -1228,6 +1252,24 @@ describe('★ the chronicle, written on the day boundary', () => {
     // and the semantic pass ran rather than falling over: no unreadable-verdict alert
     expect(alertsOf(opsDb, 'semantic_firsts_unreadable')).toEqual([])
   }, 120_000)
+
+  // The recognizer's cost must not grow with the town's age: `agent_moved` alone is a row per
+  // tile crossed, and re-parsing every one of them each sim-day blocks the loop for longer daily.
+  it('★ the recognizer reads what is new, not the whole log again', async () => {
+    const dir = tmp()
+    const readTypeFrom = vi.spyOn(EventStore.prototype, 'readTypeFrom')
+    const moved = (): number[] =>
+      readTypeFrom.mock.calls.filter(([, type]) => type === 'agent_moved').map(([from]) => from)
+    const { world } = await liveWorld({ dir, turn: SILENT_TURN })
+    await sprint(world, MINUTES_PER_DAY + 1)
+    expect(await settle(() => moved().length === 0, 10_000)).toBe(true)
+
+    readTypeFrom.mockClear()
+    await sprint(world, MINUTES_PER_DAY)
+    expect(await settle(() => moved().length === 0, 10_000)).toBe(true)
+    expect(moved().every((from) => from > 0)).toBe(true)
+    readTypeFrom.mockRestore()
+  }, 180_000)
 
   it('leaves the day unwritten when the daily budget is already spent', async () => {
     const dir = tmp()

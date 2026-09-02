@@ -18,7 +18,7 @@ import {
   type SimEvent,
 } from '@sj/shared'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
-import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge } from './bridge.js'
+import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge, ROLLED_BACK } from './bridge.js'
 
 const AGENT = 'tamar'
 
@@ -66,6 +66,9 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
 // A second town where things are owned, so the bridge's ownership mapping is observable.
 function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
   bridge: EngineBridge
+  config: SimConfig
+  loop: TickLoop
+  store: EventStore
   step: () => void
 } {
   const config = SimConfigSchema.parse({
@@ -128,6 +131,9 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
   })
   return {
     bridge,
+    config,
+    loop,
+    store,
     step: () => {
       loop.step()
     },
@@ -193,6 +199,32 @@ describe('the default perception window outlasts the gap between turns (D-28-6)'
     step()
     for (let i = 0; i < 60; i++) step()
     expect(bridge.perception(AGENT).seen).toEqual([])
+  })
+
+  it('a bridge built over an old log starts at the window edge, not at seq 0', () => {
+    const { config, loop, store, step } = ownedWorld()
+    for (let i = 0; i < 400; i++) step()
+    const read: { from: number; rows: SimEvent[] }[] = []
+    const inner = store.readFrom.bind(store)
+    store.readFrom = (from: number) => {
+      const rows = inner(from)
+      read.push({ from, rows })
+      return rows
+    }
+    new EngineBridge({ loop, store, simConfig: config }).perception(AGENT)
+    const cutoff = loop.tick - DEFAULT_RECENT_WINDOW_TICKS
+    expect(read[0]!.from).toBeGreaterThan(0)
+    expect(read[0]!.rows.every((ev) => ev.tick > cutoff)).toBe(true)
+  })
+
+  it('a bridge built moments after the event still carries it', () => {
+    const { config, loop, store, step } = ownedWorld()
+    step() // Cass lifts Bex's plank at tick 1, in Tamar's sight
+    for (let i = 0; i < 60; i++) step()
+    const restarted = new EngineBridge({ loop, store, simConfig: config })
+    expect(restarted.perception(AGENT).seen).toEqual([
+      { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
+    ])
   })
 })
 
@@ -361,7 +393,7 @@ describe('nearestSource: where the missing material stands', () => {
 
 // A bare world with no systems running, so the only thing in the log is what the bridge put
 // there. Same `let handler` wiring the harnesses above use — TickLoop takes onTick once.
-function announceHarness(): {
+function announceHarness(world: TickHandler = () => {}): {
   store: EventStore
   loop: TickLoop
   bridge: EngineBridge
@@ -396,7 +428,7 @@ function announceHarness(): {
     },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(() => {})
+  handler = bridge.wrapTickHandler(world)
   return { store, loop, bridge, config, terrain }
 }
 const typesOf = (store: EventStore): string[] => store.readFrom(0).map((e: SimEvent) => e.type)
@@ -413,6 +445,34 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
       makes: ['waterskin'],
     })
     expect(typesOf(store)).not.toContain(DISCOVERY_EVENT) // nothing before the tick
+    loop.step()
+    expect(typesOf(store)).toContain(DISCOVERY_EVENT)
+  })
+
+  // ★ The tick rolls back on a throw, but a resolved promise cannot: the mind went on
+  // believing it had walked, and the discovery it had announced was gone from the log for good.
+  it('★ a tick that comes apart tells the minds so, and keeps the announcement', async () => {
+    let falling = true
+    const { store, loop, bridge } = announceHarness(() => {
+      if (falling) throw new Error('the world systems fell over')
+    })
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:waterskin',
+      name: 'stitch a waterskin',
+      kind: 'craft',
+      byId: 'a1',
+      intent: 'carry water in a hide',
+      makes: ['waterskin'],
+    })
+    const p = bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
+
+    expect(() => {
+      loop.step()
+    }).toThrow('fell over')
+    expect(await p).toEqual({ ok: false, reason: ROLLED_BACK })
+    expect(typesOf(store)).not.toContain(DISCOVERY_EVENT)
+
+    falling = false
     loop.step()
     expect(typesOf(store)).toContain(DISCOVERY_EVENT)
   })

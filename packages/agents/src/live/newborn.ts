@@ -33,7 +33,7 @@ export function wireBirths(opts: BirthsOpts): () => void {
   const booting = new Set<string>()
 
   const spawn = (born: AgentBornPayload, birth: { seq: number; tick: number }): void => {
-    if (opts.booted.cast.size + booting.size >= opts.maxMinds) {
+    if (opts.booted.alive() + booting.size >= opts.maxMinds) {
       insertAlert(opts.opsDb, {
         agentId: born.id,
         kind: 'birth_over_max_minds',

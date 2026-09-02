@@ -40,6 +40,8 @@ export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredom
 export type Intent = { verb: string; params: Record<string, unknown> }
 export type SubmitResult = { ok: true } | { ok: false; reason: string }
 
+export const ROLLED_BACK = 'the moment came apart'
+
 type QueuedSubmit = {
   agentId: string
   intent: Intent
@@ -158,6 +160,8 @@ export class EngineBridge {
     this.#store = opts.store
     this.#simConfig = opts.simConfig
     this.#recentWindowTicks = opts.recentWindowTicks ?? DEFAULT_RECENT_WINDOW_TICKS
+    // Resume at the window's edge: a restart must not read the whole log to throw it away.
+    this.#lastSeq = opts.store.lastSeqThroughTick(opts.loop.tick - this.#recentWindowTicks)
   }
 
   // Drain announcements, then queued intents in arrival order, then run the world systems,
@@ -172,26 +176,35 @@ export class EngineBridge {
 
       const queue = this.#queue
       this.#queue = []
-      for (const item of queue) {
-        const result = submitIntent(
-          this.#loop.state,
-          this.#simConfig,
-          item.agentId,
-          item.intent.verb,
-          item.intent.params,
-        )
-        if (result.ok) {
-          for (const event of result.events) ctx.emit(event.type, event.payload)
-          item.onResult?.({ ok: true })
-          item.resolve({ ok: true })
-        } else {
-          item.onResult?.({ ok: false, reason: result.reason })
-          item.resolve({ ok: false, reason: result.reason })
+      // A promise cannot be un-resolved, and the tick rolls back on a throw — so nothing is
+      // settled until the transaction that made it true has committed.
+      const settled: [QueuedSubmit, SubmitResult][] = []
+      try {
+        for (const item of queue) {
+          const result = submitIntent(
+            this.#loop.state,
+            this.#simConfig,
+            item.agentId,
+            item.intent.verb,
+            item.intent.params,
+          )
+          if (result.ok) for (const event of result.events) ctx.emit(event.type, event.payload)
+          settled.push([item, result.ok ? { ok: true } : { ok: false, reason: result.reason }])
         }
+        world(ctx)
+      } catch (err) {
+        this.#announcements.unshift(...announced)
+        for (const item of queue) this.#tell(item, { ok: false, reason: ROLLED_BACK })
+        throw err
       }
-      world(ctx)
+      for (const [item, result] of settled) this.#tell(item, result)
       for (const cb of this.#tickCallbacks) cb(ctx.tick)
     }
+  }
+
+  #tell(item: QueuedSubmit, result: SubmitResult): void {
+    item.onResult?.(result)
+    item.resolve(result)
   }
 
   // A fact that is already true and has no verb to ride in on. Not a promise: nothing waits on
@@ -215,10 +228,7 @@ export class EngineBridge {
   drain(reason = 'the moment passes'): number {
     const queue = this.#queue
     this.#queue = []
-    for (const item of queue) {
-      item.onResult?.({ ok: false, reason })
-      item.resolve({ ok: false, reason })
-    }
+    for (const item of queue) this.#tell(item, { ok: false, reason })
     return queue.length
   }
 

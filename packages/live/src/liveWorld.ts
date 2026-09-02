@@ -267,6 +267,27 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
   ].join('\n')
 }
 
+export const RATE_STOP_ALERT_KIND = 'rate_stop'
+
+export function rateStopRefusal(detail: string, agentDbDir: string): string {
+  return [
+    'stream: could not start — this town was stopped for calling far too often.',
+    ...detail.split('\n'),
+    '        A rate stop outlives the process, or a restart would pay a pre-flight and rerun the',
+    '        runaway. Nothing was spent to tell you this.',
+    '        `pnpm stream` (no SJ_LIVE) resumes this same town scripted, for $0.00/hour.',
+    `        DELETE FROM alerts WHERE kind = '${RATE_STOP_ALERT_KIND}' clears it;` +
+      ` SJ_FRESH=1 throws away ${agentDbDir}.`,
+  ].join('\n')
+}
+
+function rateStopOnRecord(db: Database.Database): string | null {
+  const row = db
+    .prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id DESC LIMIT 1')
+    .get(RATE_STOP_ALERT_KIND) as { detail: string } | undefined
+  return row?.detail ?? null
+}
+
 /** Not `sumCostUsd`, which is per-caller where the cap is not: five minds on two callers each
  *  would clear one ten times over. */
 export function ledgerTotalUsd(db: Database.Database, sinceMs = 0): number {
@@ -340,6 +361,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
   // Before the pre-flight, because the pre-flight spends and a town that is already over either
   // line must not spend another cent to be told so.
+  const priorRateStop = rateStopOnRecord(opsDb)
+  if (priorRateStop !== null) {
+    opsDb.close()
+    throw new Error(rateStopRefusal(priorRateStop, opts.agentDbDir))
+  }
   const alreadySpent = ledgerTotalUsd(opsDb)
   if (cap > 0 && alreadySpent >= cap) {
     opsDb.close()
@@ -607,6 +633,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // Dispatched OFF this handler: awaiting two provider calls here would stall the socket
       // for as long as they take. The day just ended is the one being written.
       let narratedThroughSeq = store.lastSeq()
+      const recognizerEvents: SimEvent[] = []
+      let recognizedThroughSeq = 0
       const rulebookCount = (): number =>
         arbiterDb === null
           ? 0
@@ -691,10 +719,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (recognizing) return
         recognizing = true
         setImmediate(() => {
+          // A site is recognized by recurring, so the pass still needs every day it has seen —
+          // but it is extended, never re-read: parsing the whole log again grows without bound.
+          const fresh = RECOGNIZER_EVENTS.flatMap((t) =>
+            store.readTypeFrom(recognizedThroughSeq, t),
+          ).sort((a, b) => a.seq - b.seq)
+          recognizedThroughSeq = store.lastSeq()
+          // One at a time: the first pass on a resumed town is the whole log, and a spread
+          // that wide overflows the argument stack.
+          for (const ev of fresh) recognizerEvents.push(ev)
           void runConstructPass({
-            events: RECOGNIZER_EVENTS.flatMap((t) => store.readTypeFrom(0, t)).sort(
-              (a, b) => a.seq - b.seq,
-            ),
+            events: recognizerEvents,
             baseConfig: config,
             store: new ConstructStore(arb),
             llm: makeClient('constructs', 'town'),
@@ -842,8 +877,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
-        // The cast, not the founders: a town that has borne children thinks for all of them.
-        const castSize = booted?.cast.size ?? cast.length
+        // The living cast, not the founders: a town that has borne children thinks for all of
+        // them, and a dead one is a denominator that hides the rate of everybody left.
+        const castSize = Math.max(1, booted?.alive() ?? cast.length)
         const now = Date.now()
         const cutoff = now - rateWindow * 60_000
         while (tickHistory.length > 1 && tickHistory[1]!.ms <= cutoff) tickHistory.shift()
@@ -858,14 +894,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         })
         const rate = projected.callsPerMindSimHour
         if (rate <= LIVE_CALL_CEILING_PER_MIND_SIM_HOUR) return
-        console.error(
-          rateStopMessage(
-            rate,
-            LIVE_CALL_CEILING_PER_MIND_SIM_HOUR,
-            castSize,
-            projected.sampledCalls,
-          ),
+        const msg = rateStopMessage(
+          rate,
+          LIVE_CALL_CEILING_PER_MIND_SIM_HOUR,
+          castSize,
+          projected.sampledCalls,
         )
+        console.error(msg)
+        insertAlert(opsDb, { agentId: null, kind: RATE_STOP_ALERT_KIND, detail: msg })
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })

@@ -8,6 +8,7 @@ export class EventStore {
   private selRange
   private selTypeFrom
   private selLast
+  private selLastThroughTick
   private insertSnap
   private selSnap
   private upsertRng
@@ -24,6 +25,9 @@ export class EventStore {
       'SELECT seq, tick, type, payload FROM events WHERE seq > ? AND type = ? ORDER BY seq',
     )
     this.selLast = db.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM events')
+    this.selLastThroughTick = db.prepare(
+      'SELECT COALESCE(MAX(seq), 0) AS m FROM events WHERE tick <= ?',
+    )
     this.insertSnap = db.prepare(
       'INSERT INTO snapshots (tick, seq, state, rng) VALUES (?, ?, ?, ?)',
     )
@@ -66,6 +70,10 @@ export class EventStore {
   }
   lastSeq(): number {
     return (this.selLast.get() as { m: number }).m
+  }
+  /** Where a tick-window tail resumes: the last seq at or before `tick`, parsing nothing. */
+  lastSeqThroughTick(tick: number): number {
+    return (this.selLastThroughTick.get(tick) as { m: number }).m
   }
 
   saveSnapshot(tick: number, seq: number, state: unknown, rng: Record<string, RngState>): void {

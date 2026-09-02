@@ -375,4 +375,26 @@ describe('hybrid retrieval', () => {
     expect(results).toHaveLength(1)
     expect(results.every((r) => r.agentId === 'bob')).toBe(true)
   })
+
+  it('caps the tag pool, so a long-tagged history does not grow the candidate set', async () => {
+    const { store } = await makeStore()
+    const now = 400
+    for (let i = 0; i < 300; i += 1) {
+      await store.insertMemory({
+        tick: i,
+        kind: 'perception',
+        text: `errand number ${i}`,
+        importance: 5,
+        tags: { people: ['yusuf'], place: null, objects: [], topics: [] },
+      })
+    }
+    const inner = store.getMemories.bind(store)
+    let candidateCount = 0
+    store.getMemories = (ids: number[]) => {
+      candidateCount = ids.length
+      return inner(ids)
+    }
+    await retrieveAmbient(store, { people: ['yusuf'], place: null, topics: [] }, now)
+    expect(candidateCount).toBeLessThanOrEqual(150)
+  })
 })

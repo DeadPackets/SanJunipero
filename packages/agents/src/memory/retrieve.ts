@@ -42,6 +42,7 @@ export const MISS_MIN_RESULTS = 3
 
 const FTS_POOL = 50
 const VEC_POOL = 50
+const TAG_POOL = 50
 const MAX_TAG_MATCH = 3
 
 const STOPWORDS = new Set<string>([
@@ -177,9 +178,11 @@ async function retrieve(
         `SELECT DISTINCT t.memory_id AS id
          FROM memory_tags t
          JOIN memories m ON m.id = t.memory_id
-         WHERE t.tag IN (${placeholders}) AND m.agent_id = ? AND m.tick <= ?`,
+         WHERE t.tag IN (${placeholders}) AND m.agent_id = ? AND m.tick <= ?
+         ORDER BY m.tick DESC
+         LIMIT ?`,
       )
-      .all(...[...qTags], agentId, nowTick) as { id: number }[]
+      .all(...[...qTags], agentId, nowTick, TAG_POOL) as { id: number }[]
     for (const r of rows) candidates.add(r.id)
   }
 
