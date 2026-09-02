@@ -197,6 +197,17 @@ export type PerceivedReach = {
   noFooting: { x: number; y: number }[]
 }
 
+// A shelf this mind may use and what stands on it, grouped by kind. Carried whether or not the
+// body is anywhere near the walls: where your own things are is a thing you know, not a thing
+// you see. `yours` is absent on the town's own store, which belongs to nobody.
+export type PerceivedStore = {
+  structureId: string
+  kind: string
+  name?: string
+  yours?: true
+  items: { kind: string; qty: number }[]
+}
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -220,6 +231,7 @@ export type PerceptionPacket = {
     forageables: PerceivedForageable[]
   }
   reach: PerceivedReach
+  stores: PerceivedStore[]
   ground?: PerceivedGround
   light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
@@ -541,6 +553,37 @@ function perceiveInventory(lens: Lens): InventoryItem[] {
     .map((i) => ({ ...i, ...itemMarks(lens, i) }))
 }
 
+/** The shelves this mind may use — the roofs it owns, and the town's own store, which is the
+ *  one public building that keeps what is left in it — and what each holds, most of it first. */
+function perceiveStores(lens: Lens): PerceivedStore[] {
+  const { state, config, self } = lens
+  const inside = new Map<string, Map<string, number>>()
+  for (const id of Object.keys(state.items).sort()) {
+    const i = state.items[id]!
+    if (!isStructureItem(i)) continue
+    const kinds = inside.get(i.loc.id) ?? new Map<string, number>()
+    kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
+    inside.set(i.loc.id, kinds)
+  }
+  const stores: PerceivedStore[] = []
+  for (const s of Object.values(state.structures).sort(byId)) {
+    const yours = s.owner === self.id
+    const townsOwn = s.owner === undefined && config.spoilage.preservingKinds.includes(s.kind)
+    if (s.stage !== 'complete' || (!yours && !townsOwn)) continue
+    stores.push({
+      structureId: s.id,
+      kind: s.kind,
+      ...named(s),
+      ...(yours ? { yours: true as const } : {}),
+      items: [...(inside.get(s.id) ?? new Map<string, number>())]
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+        .map(([kind, qty]) => ({ kind, qty })),
+    })
+  }
+  // Your own roofs first: the shelf a mind reaches for is the one it owns.
+  return stores.sort((a, b) => Number(b.yours ?? false) - Number(a.yours ?? false))
+}
+
 function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
   const { state, config, self } = lens
   const heard: HeardSpeech[] = []
@@ -722,6 +765,7 @@ export function composePerception(
     ...(isMapRim(state, self.x, self.y) ? { atRim: true as const } : {}),
     visible,
     reach: perceiveReach(lens, visible),
+    stores: perceiveStores(lens),
     heard: perceiveHeard(lens, recentEvents),
     seen: perceiveSeen(lens, recentEvents),
     feltEvents,

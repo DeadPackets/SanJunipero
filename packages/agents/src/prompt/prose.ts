@@ -79,6 +79,15 @@ type PerceptionStructure = {
   bed?: true
 }
 
+// A shelf this mind may use and what stands on it. `yours` is absent on the town's own store.
+type PerceptionStore = {
+  structureId: string
+  kind: string
+  name?: string
+  yours?: true
+  items: { kind: string; qty: number }[]
+}
+
 type PerceptionCrop = {
   id: string
   kind: string
@@ -143,6 +152,9 @@ export type PerceptionPacket = {
   // What the hands can touch and which named spots no foot can take, both read off the verbs'
   // own tests. Absent on a packet from before it was composed, which reads as it always did.
   reach?: { atHand: string[]; noFooting: { x: number; y: number }[] }
+  // The shelves this mind may use, wherever its feet are. Absent on a packet from before the
+  // town had anywhere to put things, which reads as it always did.
+  stores?: PerceptionStore[]
   heard: { speakerId: string; name: string; text: string; distance: number }[]
   seen: PerceptionSeen[]
   feltEvents: string[]
@@ -788,6 +800,27 @@ function affordanceLines(packet: PerceptionPacket): string[] {
   return lines
 }
 
+// A tally of a kind and how many, which is how a shelf reads and how a satchel reads.
+const tally = (t: { kind: string; qty: number }): string => `${t.kind} ×${t.qty}`
+
+// Roughly a token per 3.3 characters. A store is a standing fact said every turn, so a full
+// storehouse is capped at a phrase rather than a page.
+const STORE_MAX_CHARS = Math.floor(40 * 3.3)
+
+/** What one shelf holds, capped. The tail of a long one is a count of kinds: a mind deciding
+ *  where to put a plank needs to know the barn is full, not to read the barn. */
+function storeLine(s: PerceptionStore): string {
+  const said = s.name ?? `${s.yours === true ? 'your' : 'the'} ${words(s.kind)}`
+  const say = (n: number): string => {
+    const left = s.items.length - n
+    const tail = left === 0 ? '' : `, and ${left} other ${left === 1 ? 'kind' : 'kinds'}`
+    return `${opening(said)} holds ${s.items.slice(0, n).map(tally).join(', ')}${tail}.`
+  }
+  let shown = 1
+  while (shown < s.items.length && say(shown + 1).length <= STORE_MAX_CHARS) shown++
+  return say(shown)
+}
+
 export function perceptionToProse(
   packet: PerceptionPacket,
   alert?: (detail: string) => void,
@@ -992,6 +1025,8 @@ export function perceptionToProse(
   for (const it of packet.self.inventory) {
     lines.push(`You are carrying ${itemPhrase(it)}${claimPhrase(it)}.`)
   }
+
+  for (const s of packet.stores ?? []) if (s.items.length > 0) lines.push(storeLine(s))
 
   for (const s of packet.seen) {
     if (s.kind === 'item_taken')

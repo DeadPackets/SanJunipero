@@ -133,6 +133,7 @@ function reconcile(
       forageables: raw.visible.forageables,
     },
     reach: raw.reach,
+    stores: raw.stores,
     heard: raw.heard,
     seen: raw.seen,
     feltEvents: raw.feltEvents,
