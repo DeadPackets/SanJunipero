@@ -146,11 +146,14 @@ export const waitIsRest = (turn: Turn): Turn => {
   return { ...rested, plan: kept.length > 0 ? kept : null }
 }
 
-/** The verb this turn began with nothing named, or null when the act carries its detail. */
+/** The verb this turn began with nothing named, or null when the act carries its detail. A
+ *  field of the turn named as a verb is dropped as the no-op it is, so asking again for a
+ *  detail it never had would buy a call for an act that cannot reach the world. */
 export function actWithoutItsDetail(turn: Turn): string | null {
   const action = namedAct(turn)
   if (action === null) return null
-  if (ACTS_ASKING_NOTHING.has(action.verb) || action.verb.includes(':')) return null
+  if (ACTS_ASKING_NOTHING.has(action.verb) || TURN_FIELDS.has(action.verb)) return null
+  if (action.verb.includes(':')) return null
   return Object.values(action.params).every(isBlankAnswer) ? action.verb : null
 }
 

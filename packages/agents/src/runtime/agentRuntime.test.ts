@@ -1730,6 +1730,17 @@ describe('arbiter seam (T19)', () => {
     expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not a recognized routine'])
   })
 
+  it('★ and buys no second call for one that named nothing either', async () => {
+    const bare = { thought: 'I plan.', action: { verb: 'plan', params: {} }, importance: 3 }
+    const { model, prompts } = capturingModel([bare, bare])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).not.toContain('empty_act_detail')
+    expect(refusalMemories(agentDb)).toEqual([])
+  })
+
   it('★ takes the field names off the schema, so a new field cannot leave the guard stale', () => {
     expect([...TURN_FIELDS].sort()).toEqual(Object.keys(StrictTurnSchema.shape).sort())
     expect(TURN_FIELDS.has('plan')).toBe(true)
