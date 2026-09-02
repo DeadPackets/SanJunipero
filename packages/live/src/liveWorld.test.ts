@@ -22,6 +22,8 @@ import {
   capReachedRefusal,
   createLiveCast,
   dailyReachedRefusal,
+  DEFAULT_IDLE_GAP_TICKS,
+  idleGapTicks,
   ledgerTotalUsd,
   preflightCostUsd,
   restorableSnapshot,
@@ -1358,4 +1360,19 @@ describe('★ the chronicle, written on the day boundary', () => {
     expect(narratorRows(dir, 'SELECT day FROM chapters')).toEqual([])
     expect(narratorRows(dir, 'SELECT day FROM publications')).toEqual([])
   }, 120_000)
+})
+
+describe('★ the liveliness dial', () => {
+  it('defaults to acting four times an hour, not twice', () => {
+    expect(idleGapTicks({})).toBe(DEFAULT_IDLE_GAP_TICKS)
+    expect(DEFAULT_IDLE_GAP_TICKS).toBe(15)
+  })
+
+  it('takes SJ_IDLE_GAP, and ignores what cannot be a gap', () => {
+    expect(idleGapTicks({ SJ_IDLE_GAP: '45' })).toBe(45)
+    expect(idleGapTicks({ SJ_IDLE_GAP: '7.9' })).toBe(7)
+    for (const bad of ['0', '-5', 'lively', '']) {
+      expect(idleGapTicks({ SJ_IDLE_GAP: bad }), bad).toBe(DEFAULT_IDLE_GAP_TICKS)
+    }
+  })
 })

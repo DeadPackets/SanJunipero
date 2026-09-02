@@ -93,6 +93,16 @@ const SEMANTIC_RECORD_CAP = 300
 /** `dozeTicks` is the one `MIND_CONFIG` dial denominated in real seconds — it is an HTTP retry
  *  backoff — so it is the only one this world's 2 500 ms tick may rescale. */
 const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
+
+/** Sim-minutes a mind waits between turns when nothing is happening to it: the one dial that
+ *  trades money for a town worth watching. At the old 30 a mind acted twice an hour, which
+ *  measured as 15.9 idle hours of a 17.3-hour waking day. Every call the town makes scales
+ *  roughly inversely with it. */
+export const DEFAULT_IDLE_GAP_TICKS = 15
+export function idleGapTicks(env: Record<string, string | undefined> = process.env): number {
+  const raw = Number(env.SJ_IDLE_GAP)
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_IDLE_GAP_TICKS
+}
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
@@ -572,7 +582,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
         dreamLlm: (id) => makeClient('dream', id),
-        mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
+        mindConfig: { ...STREAM_MIND_CONFIG, idleGapTicks: idleGapTicks(), ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
         ...(arbiter === undefined ? {} : { arbiter }),
