@@ -65,7 +65,10 @@ export type LawPredicate =
   | { kind: 'none' }
 export type Law = { id: string; text: string; predicate: LawPredicate; proposedBy: string; ratifiedTick: number;
   votes: { for: string[]; against: string[] }; repealedTick: number | null; why: string }
-// events: law_proposed, law_ratified, law_broken { lawId, agentId, verb, witnesses: string[] }, law_repealed
+// events (payload shapes the viewer's cue and emote layers already read, Task 1):
+//   law_proposed { lawId, agentId, text }   law_ratified { lawId, agentId, text, why }
+//   law_broken { lawId, agentId, verb, witnesses: string[] }   law_repealed { lawId, agentId, text }
+//   custom_noted { agentIds: string[], text }  (Task 14, a witness event folded to nothing)
 // state.socialLaws: Record<id, Law>. forbid never blocks: the act goes through and law_broken is emitted.
 
 // packages/agents/src/scene/scene.ts  (runtime coordinator, one per world)
