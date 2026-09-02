@@ -10,6 +10,7 @@ import {
   simTimeFromTick,
   stateHash,
   TICK_REAL_MS,
+  verbPhrasePast,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
@@ -156,6 +157,43 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${said}${hint}`
 }
 
+/** The other half of the same sentence: what the hands did do. All 402 action memories the
+ *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. */
+function actionMemoryText(verb: string): string {
+  return `You have ${verbPhrasePast(verb)}.`
+}
+
+// What a finished act is worth on the mind's own one to ten. A refusal is 3, so most doing
+// outranks most failing to; a wall raised is not a bucket filled, and neither is a walk.
+const ACT_IMPORTANCE: Record<string, number> = {
+  walk: 1,
+  drop: 1,
+  stow: 1,
+  fill: 1,
+  exit: 1,
+  enter: 1,
+  wake: 1,
+  take: 2,
+  drink: 2,
+  stoke: 2,
+  sleep: 2,
+  read: 2,
+  wear: 2,
+  craft: 6,
+  give: 6,
+  tend: 6,
+  inscribe: 6,
+  build: 7,
+  teach: 7,
+}
+const ORDINARY_ACT = 3
+const REFUSAL_IMPORTANCE = 3
+
+export function actImportance(verb: string): number {
+  // A minted making is a making: `recipe:plank` is what `craft` was before the town had a word.
+  return ACT_IMPORTANCE[verb] ?? (verb.startsWith('recipe:') ? ACT_IMPORTANCE.craft! : ORDINARY_ACT)
+}
+
 /** The same refusal, said to the next turn instead of only to the memory store. A reason that
  *  reached a memory row had to win retrieval to be seen, and mostly did not (rehearsal4 K20). */
 export function lastTurnLine(what: string, reason: string): string {
@@ -289,8 +327,11 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, when, and why. Read before the god is asked again.
+  // What this mind has already been refused, when, and why. Read before the god is asked again,
+  // and again before a sentence it already carries is written into the day a second time.
   #refusedIntents = new Map<string, { tick: number; reason: string }>()
+  // How far down the world's log this mind has read its own finished acts.
+  #lastActSeq = 0
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
@@ -368,6 +409,8 @@ export class AgentRuntime {
     this.#company = new Map()
     this.#heardKeys = new Set()
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
+    // From here forward only: a mind that resumes must not remember a day it was not there for.
+    this.#lastActSeq = this.#bridge.lastSeq()
     this.#started = true
     if (this.#offTick === null) {
       this.#offTick = (tick) => {
@@ -476,6 +519,7 @@ export class AgentRuntime {
         ? null
         : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     this.#noteCompany(packet, tick)
+    this.#noteFinishedActs()
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet)
@@ -706,12 +750,38 @@ export class AgentRuntime {
   }
 
   #rememberRefusal(description: string, reason: string): void {
-    const key = sameIntent(description)
+    this.#remember(sameIntent(description), reason)
+  }
+
+  #remember(key: string, reason: string): void {
     this.#refusedIntents.delete(key)
     this.#refusedIntents.set(key, { tick: this.#bridge.currentTick(), reason })
     // Insertion-ordered, so the first key is the oldest.
     while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
       this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
+    }
+  }
+
+  /** Whether this mind already carries this sentence from inside the refusal window. kamal
+   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval.
+   *  The NUL keeps these keys apart from the intents the arbiter's precedent is looked up by. */
+  #alreadyHeld(text: string): boolean {
+    const key = `\u0000${sameIntent(text)}`
+    const held = this.#refusedIntents.get(key)
+    if (held !== undefined && this.#bridge.currentTick() - held.tick < REFUSAL_MEMORY_TICKS)
+      return true
+    this.#remember(key, text)
+    return false
+  }
+
+  // Every act the world finished for this body since the last look. The refusals were always
+  // written; this is the other half, so a mind holds a trace of what worked.
+  #noteFinishedActs(): void {
+    for (const done of this.#bridge.completedSince(this.#agentId, this.#lastActSeq)) {
+      this.#lastActSeq = done.seq
+      void this.#writeActionMemory(actionMemoryText(done.verb), actImportance(done.verb)).catch(
+        this.#sink('memory_write_failed'),
+      )
     }
   }
 
@@ -1130,12 +1200,15 @@ export class AgentRuntime {
     return out
   }
 
-  #writeActionMemory(text: string): Promise<number> {
+  // A sentence the mind is already carrying is not written again: nine texts in eighty-seven
+  // rows is eight-odd copies competing in retrieval for one thing that happened.
+  #writeActionMemory(text: string, importance = REFUSAL_IMPORTANCE): Promise<number | null> {
+    if (this.#alreadyHeld(text)) return Promise.resolve(null)
     return this.#mem!.insertMemory({
       tick: this.#bridge.currentTick(),
       kind: 'action',
       text,
-      importance: 3,
+      importance,
       tags: EMPTY_TAGS,
     })
   }

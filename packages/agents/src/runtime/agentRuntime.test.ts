@@ -33,6 +33,7 @@ import {
   OPAQUE_REFUSAL,
   REFUSAL_MEMORY_TICKS,
   TRIED_FREEFORM,
+  actImportance,
   reflectionOffsetTicks,
   refusalMemoryText,
 } from './agentRuntime.js'
@@ -469,6 +470,14 @@ function memoriesOfKind(
       'SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id',
     )
     .all(AGENT, kind) as { tick: number; text: string; importance: number }[]
+}
+
+// The half of the action memories that are refusals. Successes share the row and the kind,
+// so a row asking "was anything refused" has to say which half it means.
+function refusalMemories(db: Database.Database): string[] {
+  return memoriesOfKind(db, 'action')
+    .map((m) => m.text)
+    .filter((t) => t.startsWith('You realize you cannot'))
 }
 
 function journalRows(db: Database.Database): { tick: number; text: string }[] {
@@ -990,8 +999,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(startedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(loop.state.agents[AGENT]!.asleep).toBe(true)
-    // One 'already busy' rejection must not have discarded the intent.
-    expect(memoriesOfKind(agentDb, 'action')).toHaveLength(0)
+    // One 'already busy' rejection must not have discarded the intent, and must leave no
+    // refusal behind it. The two acts that landed are remembered as acts.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have slept.',
+    ])
   })
 
   it('does not reflect on a merely attempted sleep that the engine rejected', async () => {
@@ -1173,6 +1187,55 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(alertKinds(agentDb)).toContain('act_detail_filled_in')
   })
 
+  // All 402 action memories the phase 1 gate wrote were refusals: no mind held a trace of a
+  // wall raised or a fish caught. Both call sites of the write were refusal paths.
+  it('★ remembers what worked, and not at the weight of what did not', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walls first, then rest.',
+          plan: [
+            { verb: 'walk', params: { x: 4, y: 3 } },
+            { verb: 'sleep', params: {} },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 200)
+    const acts = memoriesOfKind(agentDb, 'action')
+    expect(acts.map((m) => m.text)).toEqual(['You have walked.', 'You have slept.'])
+    // Not one flat constant: a walk is worth less than the refusal a walk earns.
+    expect(acts.map((m) => m.importance)).toEqual([actImportance('walk'), actImportance('sleep')])
+    expect(actImportance('walk')).toBeLessThan(actImportance('build'))
+    expect(actImportance('recipe:plank')).toBe(actImportance('craft'))
+  })
+
+  // kamal wrote 87 action memories with 9 texts between them; leyla 69 with 11. Every copy
+  // competed in retrieval and could reach the prompt.
+  it('★ writes the same refusal once inside the window, and again outside it', async () => {
+    const refused = {
+      thought: 'The bread.',
+      action: { verb: 'eat', params: { itemId: 'nope' } },
+      importance: 3,
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([refused], refused),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    // Far more turns than texts: the window is what holds the count down, not the asking.
+    await stepUntil(loop, () => loop.tick >= REFUSAL_MEMORY_TICKS - 1, REFUSAL_MEMORY_TICKS)
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not holding that'])
+    await stepUntil(loop, () => refusalMemories(agentDb).length >= 2, REFUSAL_MEMORY_TICKS + 10)
+    expect(refusalMemories(agentDb)).toEqual([
+      'You realize you cannot: not holding that',
+      'You realize you cannot: not holding that',
+    ])
+  })
+
   it('does not execute the next plan item when the head is rejected', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([
@@ -1218,7 +1281,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 150)
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
-    expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
+    // Nothing was refused, and each of the three acts left the mind a trace of itself.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have taken.',
+      'You have eaten.',
+    ])
   })
 
   it('retrieves ambient memories before inserting the current perception (finding 9)', async () => {
