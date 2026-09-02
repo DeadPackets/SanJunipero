@@ -304,6 +304,13 @@ describe('StageMount never leaves React holding a destroyed scene', () => {
 
   // ★ Bubbles stopped for good on the two-hundredth thought: the log is spliced from the head,
   // so an absolute index into it never moves again.
+  // ★ `app.init` rejects with no WebGL and no WebGPU, into a chain that had no catch.
+  it('★ says why the town will not be drawn, and drops the half-built scene', () => {
+    const caught = src.slice(src.indexOf('.catch('))
+    expect(caught).toContain('firstFrameStuck(FIRST_FRAME_COPY.blind)')
+    expect(caught).toContain('scene?.destroy()')
+  })
+
   it('★ spawns bubbles off the thought count, never off a ring index', () => {
     expect(src).toContain('store.thoughtsSeq()')
     expect(src).not.toMatch(/log\[seenThoughts\]/)

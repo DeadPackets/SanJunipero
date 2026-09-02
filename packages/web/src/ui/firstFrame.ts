@@ -3,6 +3,7 @@ import { MOTION } from './motion.js'
 export const FIRST_FRAME_COPY = {
   looking: 'Looking for the town…',
   lost: 'The town is out of reach. Reconnecting.',
+  blind: 'This browser cannot draw the town.',
 }
 
 let card: HTMLElement | null = null
@@ -19,6 +20,13 @@ export function detachFirstFrame(): void {
 export function firstFrameNote(text: string): void {
   const note = done ? null : card?.querySelector('#first-frame-note')
   if (note != null && note.textContent !== text) note.textContent = text
+}
+
+/** The town will never arrive: say why, and let nothing write over it — "Looking for the town…"
+ *  is a lie once the canvas has failed, and there is no town underneath to uncover. */
+export function firstFrameStuck(text: string): void {
+  firstFrameNote(text)
+  done = true
 }
 
 /** The town is here. One way only: a socket that drops later is the stamp's news, not the card's. */

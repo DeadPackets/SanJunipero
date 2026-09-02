@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { parseRoute, routeToPath } from '../ui/route.js'
+import { FIRST_FRAME_COPY, firstFrameStuck } from '../ui/firstFrame.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { installFaces } from './textFaces.js'
@@ -203,6 +204,14 @@ export function StageMount({
         s.app.ticker.add(tickFn)
         published = true
         onScene?.(s)
+      })
+      .catch(() => {
+        // No WebGL, no WebGPU, a context lost mid-build: without this the card sits on
+        // "Looking for the town…" forever and never says why.
+        if (disposed) return
+        firstFrameStuck(FIRST_FRAME_COPY.blind)
+        scene?.destroy()
+        scene = null
       })
     return () => {
       disposed = true
