@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -51,7 +51,7 @@ function withHouse(
 }
 
 function withAgent(s: WorldState, id: string, x: number, y: number): WorldState {
-  return fold(s, ev(10, 'agent_spawned', { id, name: id, x, y, ageDays: 7300 }))
+  return fold(s, ev(10, 'agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }))
 }
 
 describe('doorTile', () => {

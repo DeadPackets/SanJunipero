@@ -374,7 +374,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   it('asks the label layer for the hover plate, rather than keeping one per body', () => {
     const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
     expect(src).toContain("scene.tags.show(\n          'hover',")
-    expect(src).toContain("hoverPlate(state, 'agent', a.id)")
+    expect(src).toContain("hoverPlate(state, 'agent', a.id,")
     expect(src).not.toContain('createPlate')
     // ...and the head box it may flip above measures what is actually drawn up there
     expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')

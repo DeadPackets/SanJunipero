@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { stepCostAt, isPassable } from '../path.js'
@@ -145,7 +151,7 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
     let s = { ...genesisState(config, t), tick: 720 }
     s = fold(
       s,
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 0, ageDays: 7300 }, 720),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 0, ageDays: ADULT_AGE_DAYS }, 720),
       config,
     )
     return s
@@ -208,7 +214,7 @@ describe('the wood loop: felling is the consumer the regrowth cycle was missing'
     const s = { ...genesisState(config, t), tick: 720 }
     return fold(
       s,
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 1, ageDays: 7300 }, 720),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 1, ageDays: ADULT_AGE_DAYS }, 720),
       config,
     )
   }

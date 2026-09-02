@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { composePerception } from './perception.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -41,7 +41,7 @@ function world(kind = 'house', stage: 'construction' | 'complete' = 'complete'):
 // Noon: the witness radius scales with the light on the thing looked at, and ten paces at
 // midnight is past it.
 const withCarver = (s: WorldState, x: number, y: number): WorldState => ({
-  ...fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x, y, ageDays: 7300 })),
+  ...fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x, y, ageDays: ADULT_AGE_DAYS })),
   tick: 720,
 })
 

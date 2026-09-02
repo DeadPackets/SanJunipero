@@ -32,6 +32,9 @@ import {
   type WorldState,
 } from '@sj/engine'
 import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_SEASON,
+  DAYS_PER_YEAR,
   chronicleLine,
   DEFAULT_CONFIG,
   DISCOVERY_EVENT,
@@ -278,7 +281,7 @@ const MINDS: Mind[] = [
   {
     id: 'amara',
     sex: 'f',
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     identity: {
       name: 'Amara',
       age: 34,
@@ -312,7 +315,7 @@ const MINDS: Mind[] = [
   {
     id: 'yusuf',
     sex: 'm',
-    ageDays: 41 * 364,
+    ageDays: 41 * DAYS_PER_YEAR,
     identity: {
       name: 'Yusuf',
       age: 41,
@@ -343,7 +346,7 @@ const MINDS: Mind[] = [
   {
     id: 'nadia',
     sex: 'f',
-    ageDays: 29 * 364,
+    ageDays: 29 * DAYS_PER_YEAR,
     identity: {
       name: 'Nadia',
       age: 29,
@@ -374,7 +377,7 @@ const MINDS: Mind[] = [
   {
     id: 'omar',
     sex: 'm',
-    ageDays: 46 * 364,
+    ageDays: 46 * DAYS_PER_YEAR,
     identity: {
       name: 'Omar',
       age: 46,
@@ -408,7 +411,7 @@ const MINDS: Mind[] = [
   {
     id: 'salma',
     sex: 'f',
-    ageDays: 26 * 364,
+    ageDays: 26 * DAYS_PER_YEAR,
     identity: {
       name: 'Salma',
       age: 26,
@@ -1244,7 +1247,7 @@ async function main(): Promise<void> {
       const put = (type: string, payload: unknown): void => {
         s = fold(s, { seq: -1, tick: s.tick, type, payload }, config)
       }
-      put('agent_spawned', { id: PROBE, name: 'probe', x: at.x, y: at.y, ageDays: 7300 })
+      put('agent_spawned', { id: PROBE, name: 'probe', x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS })
       for (const [type, payload] of extra) put(type, payload)
       return s
     }
@@ -1302,7 +1305,7 @@ async function main(): Promise<void> {
     })()
 
     const clothedSurvive = (() => {
-      const NIGHT = 3 * 91 * MINUTES_PER_DAY + 22 * 60
+      const NIGHT = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 22 * 60
       const home = Object.values(finalState.structures).find((x) => x.kind === 'house')
       const fire = Object.values(finalState.structures).find((x) => x.kind === 'fire_pit')
       if (home === undefined || fire === undefined) return false
@@ -1317,21 +1320,21 @@ async function main(): Promise<void> {
         name: 'probe_bare',
         x: door.x + 3,
         y: door.y + 3,
-        ageDays: 7300,
+        ageDays: ADULT_AGE_DAYS,
       })
       put('agent_spawned', {
         id: 'probe_inside',
         name: 'probe_inside',
         x: door.x,
         y: door.y,
-        ageDays: 7300,
+        ageDays: ADULT_AGE_DAYS,
       })
       put('agent_spawned', {
         id: 'probe_hearth',
         name: 'probe_hearth',
         x: fire.x + 1,
         y: fire.y,
-        ageDays: 7300,
+        ageDays: ADULT_AGE_DAYS,
       })
       put('agent_entered', { agentId: 'probe_inside', structureId: home.id })
       put('structure_fueled', { structureId: fire.id, burnsUntilTick: NIGHT + 8 * 60 + 1 })

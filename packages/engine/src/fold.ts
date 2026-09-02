@@ -705,7 +705,7 @@ export function fold(
             alive: true,
             asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
-            // Twelve years on this world's calendar, which is 364 days long — not 365.
+            // Twelve years on this world's calendar, whose year is four weeks long.
             hp: config.health.maxHp,
             injuries: [],
             ill: false,

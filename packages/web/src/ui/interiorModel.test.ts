@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type AssetRecord, DEFAULT_CONFIG, INTERIOR_KINDS } from '@sj/shared'
+import { ADULT_AGE_DAYS, type AssetRecord, DEFAULT_CONFIG, INTERIOR_KINDS } from '@sj/shared'
 import { genesisState, type Item, type WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
@@ -28,7 +28,7 @@ function agent(id: string, name: string, over: Partial<WorldState['agents'][stri
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,

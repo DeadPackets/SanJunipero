@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -19,7 +19,11 @@ const NOON = 720
 
 function makeWorld(config = CFG, wood = 10): WorldState {
   let s = genesisState(config)
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
   if (wood > 0)
     s = fold(
       s,
@@ -173,7 +177,11 @@ describe('verb: build', () => {
 describe('verb: build reads structures.recipes', () => {
   function withStone(qty: number): WorldState {
     let s = genesisState(CFG)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = fold(
       s,
       ev('item_spawned', { id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' } }),
@@ -259,7 +267,11 @@ describe('verb: fill', () => {
     const terrain = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
     if (wet) terrain[0]![1] = 2
     let s = genesisState(CFG, terrain)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     return fold(
       s,
       ev('item_spawned', {

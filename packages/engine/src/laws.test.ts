@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -29,7 +30,11 @@ const MAP = (): TileId[][] => grid(16)
 
 function world(): WorldState {
   const s = genesisState(CFG, MAP())
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }), CFG)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
+    CFG,
+  )
 }
 
 describe('effectiveConfig', () => {
@@ -171,7 +176,11 @@ describe('fold: config_changed', () => {
   it('the fold itself reads the law it just set — replay cannot drift from the live run', () => {
     // partnerWindowDays is read inside the co_slept fold; widen it and the same gap stops breaking the pair.
     let s = world()
-    s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 3, y: 2, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 3, y: 2, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 0 }), CFG)
     const narrow = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 20 }), CFG)
     expect(narrow.pairNights!['a1|a2']!.nights).toBe(1) // the gap broke the run
@@ -243,7 +252,8 @@ describe('laws survive the wire: replay and snapshots', () => {
       config: CFG,
       snapshotEveryTicks: 10,
       onTick: ({ tick, emit }) => {
-        if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 })
+        if (tick === 1)
+          emit('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS })
         if (tick === 12) {
           applyLaw(queue, 'spoilage.enabled', false)
           applyLaw(queue, 'mystery.chancePerDay', 1)

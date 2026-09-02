@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CITY_FURNISHING_KINDS,
   DEFAULT_CONFIG,
   INTERIOR_KINDS,
@@ -71,7 +72,7 @@ function agent(
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,

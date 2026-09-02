@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
   createWorldTick,
@@ -29,7 +29,13 @@ const store = new EventStore(openDb(':memory:'))
 function bodyAt(x: number, y: number): WorldState {
   return fold(
     genesis,
-    store.append(genesis.tick, 'agent_spawned', { id: AGENT, name: AGENT, x, y, ageDays: 7300 }),
+    store.append(genesis.tick, 'agent_spawned', {
+      id: AGENT,
+      name: AGENT,
+      x,
+      y,
+      ageDays: ADULT_AGE_DAYS,
+    }),
     config,
   )
 }

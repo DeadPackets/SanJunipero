@@ -37,6 +37,6 @@ describe('the built client, served from the world’s own origin', () => {
     await fetch(`${base}/locked.txt`)
       .then((r) => r.text())
       .catch(() => null)
-    expect((await (await fetch(`${base}/`)).text())).toContain('the town')
+    expect(await (await fetch(`${base}/`)).text()).toContain('the town')
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, type TileId } from '@sj/engine'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { perceptionToProse } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import { FLAT_WORLD } from '../testutil/fixtures.js'
@@ -19,8 +19,8 @@ function pair(): { prose: () => string; state: () => ReturnType<typeof genesisSt
   const put = (type: string, payload: unknown): void => {
     seed = fold(seed, store.append(seed.tick, type, payload), DEFAULT_CONFIG)
   }
-  put('agent_spawned', { id: WATCHER, name: 'Tamar', x: 8, y: 8, ageDays: 7300 })
-  put('agent_spawned', { id: OTHER, name: 'Amara', x: 9, y: 8, ageDays: 7300 })
+  put('agent_spawned', { id: WATCHER, name: 'Tamar', x: 8, y: 8, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: OTHER, name: 'Amara', x: 9, y: 8, ageDays: ADULT_AGE_DAYS })
   // Noon, so the other body is inside the sight horizon.
   const { bridge, loop } = wireTown({ state: seed, store, seed: 'downed', startTick: 720 })
   return {

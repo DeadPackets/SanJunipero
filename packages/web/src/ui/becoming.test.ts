@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { diffLines } from './diffLines.js'
 import { PersonLedgerView, PersonStoryView } from '../paper/pages/Person.js'
+import { DAYS_PER_YEAR } from '@sj/shared'
 import {
   AUTHORED_IDENTITY_FIELDS,
   CHANGE_EMPTY,
@@ -251,7 +252,7 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
   const a = {
     id: 'amara',
     name: 'Amara',
-    ageDays: 35 * 364,
+    ageDays: 35 * DAYS_PER_YEAR,
     alive: true,
     asleep: false,
     ill: false,

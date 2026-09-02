@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  stateHash,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 
@@ -10,12 +16,15 @@ const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => 
   payload,
 })
 const spawn = (id: string, x = 0, y = 0) =>
-  ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: 7300 })
+  ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS })
 
 describe('fold', () => {
   it('spawns, moves, and changes needs', () => {
     let s = genesisState(DEFAULT_CONFIG)
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
     s = fold(s, ev(2, 'agent_moved', { id: 'a1', x: 4, y: 3 }))
     s = fold(s, ev(3, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -30 }] }))
     expect(s.agents.a1).toMatchObject({ x: 4, y: 3, needs: { hunger: 70 } })
@@ -72,7 +81,7 @@ describe('fold', () => {
     let s = genesisState(DEFAULT_CONFIG)
     const branches: SimEvent[] = [
       ev(1, 'tick_advanced', {}, 5),
-      ev(2, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev(2, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       ev(3, 'agent_moved', { id: 'a1', x: 2, y: 2 }),
       ev(4, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -3 }] }),
     ]
@@ -193,7 +202,10 @@ describe('what a minted verb can do to the world folds to a golden', () => {
   function town(): WorldState {
     let s = genesisState(DEFAULT_CONFIG)
     s = fold(s, spawn('a1', 3, 3), DEFAULT_CONFIG)
-    s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 3, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
     s = fold(
       s,
       ev(3, 'structure_planned', {
@@ -244,7 +256,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     ).toThrow(/unknown item/)
     golden(
       ev(5, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' }),
-      '13efc4bd7b60c16182170b4ccffc5c6944e34507b7edfcb9157ca9f29b921f89',
+      'fc6cd5caa3b4c961e2125a9b6cb7d62a2475d3c1ef6506b9f41a9b1c3c3cb212',
     )
   })
 
@@ -260,7 +272,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     })
     const before = town()
     expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
-    golden(event, '7863941783f39a6fbb448271dbaada58ede23d471bd0ae6e39237ca87a94f2ee')
+    golden(event, 'b3e8ff6d1b3b92d0b6ee8d7af55e1bdfd56658f055932dba9b7f7ea9f4eb0f5f')
   })
 
   it('name_place: the building takes the name', () => {
@@ -272,14 +284,14 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     expect(fold(town(), event, DEFAULT_CONFIG).structures.structure_1!.name).toBe(
       "the Widow's Well",
     )
-    golden(event, 'ec1b8d35aec12c287984fee71b3426de97ff4f3a6fbf01a64815e8eccb5a948c')
+    golden(event, '015a9f67e3c7f73710596594f4627517975f9a8c410447aa63495ff4d904fefe')
   })
 
   it('transfer: title passes to the target, the thing stays where it is', () => {
     const event = ev(5, 'item_owner_changed', { id: 'item_1', owner: 'a2' })
     const after = fold(town(), event, DEFAULT_CONFIG)
     expect(after.items.item_1).toMatchObject({ owner: 'a2', loc: { t: 'agent', id: 'a1' } })
-    golden(event, '8ea6fffc5c9d476356f8e023b7bf84ee3e75eac9917261ee1789b1cf27f1a1f1')
+    golden(event, 'a5cad29096166ab7c9495b2a0fabac80c29c8d72a99a8b79683f225737e258c1')
   })
 
   it('need_delta: one need moves by the charter’s number', () => {
@@ -293,6 +305,6 @@ describe('what a minted verb can do to the world folds to a golden', () => {
         event,
       ).agents.a1!.needs.social,
     ).toBe(60)
-    golden(event, '0ca7050daf491c60ed545e2aac1542641587818c85b373aaa2e01c44acdaa5a0')
+    golden(event, '8021c2cb539e47d3ca2026d694b2b0ecdd6bd9d5747f93277400dff041cba31d')
   })
 })

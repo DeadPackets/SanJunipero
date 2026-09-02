@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import {
@@ -70,7 +70,7 @@ describe('asset http routes', () => {
       onTick: ({ tick, emit }) => {
         if (tick !== 1) return
         CAST.forEach((id, i) => {
-          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 })
+          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: ADULT_AGE_DAYS })
         })
       },
     })

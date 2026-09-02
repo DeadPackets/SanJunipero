@@ -61,6 +61,10 @@ export type Scene = {
   /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
    *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
   textScale: number
+  /** What the viewer has picked, so a label layer can stand down for the one thing that already
+   *  wears a nameplate. Written onto the handle rather than passed as a prop, the way
+   *  `textScale` is: the layers live in a Pixi closure React never re-renders. */
+  pickedId: string | null
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
@@ -121,9 +125,6 @@ export type Scene = {
   wasDrag(): boolean
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
-  /** How far into their current job this person is, 0..1, or null when there is none. Set by
-   *  the act layer, read by the overhead slot the track wraps. */
-  actFraction?: (agentId: string) => number | null
   /** Where a subject stands, in the space `tileToScreen` returns: a body's own sprite anchor
    *  (the interpolated step, not the record's tile) and a building's site. */
   pointOf(kind: 'agent' | 'structure', id: string): { sx: number; sy: number } | null
@@ -290,6 +291,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     app,
     setTicking: clock.set,
     textScale: 1,
+    pickedId: null,
     world,
     layers,
     graded,

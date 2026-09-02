@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   isBeddedKind,
   isHearthKind,
   lightBandAt,
@@ -42,7 +43,11 @@ function houseAndBody(tick = WINTER_NIGHT, weatherC = -10): WorldState {
   let s = genesisState(CFG, map())
   s = fold(s, ev('tick_advanced', {}, tick), CFG)
   s = fold(s, ev('weather_changed', { kind: 'sunny', temperatureC: weatherC }, tick), CFG)
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick), CFG)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS }, tick),
+    CFG,
+  )
   s = fold(
     s,
     ev(
@@ -299,7 +304,11 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
     s = fold(s, ev('tick_advanced', {}, WINTER_NIGHT), CFG)
     s = fold(
       s,
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, WINTER_NIGHT),
+      ev(
+        'agent_spawned',
+        { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS },
+        WINTER_NIGHT,
+      ),
       CFG,
     )
     s = fold(
@@ -344,7 +353,7 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
     let outside = genesisState(CFG, map())
     outside = fold(
       outside,
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }, 0),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }, 0),
       CFG,
     )
     expect(sleepRegenPerTick(outside, CFG, 'a1')).toBe(REGEN)

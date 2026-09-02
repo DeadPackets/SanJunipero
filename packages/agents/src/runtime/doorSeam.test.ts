@@ -9,7 +9,7 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema } from '@sj/shared'
 import { perceptionToProse } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
@@ -32,7 +32,7 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: HOUSE,
     kind: 'house',

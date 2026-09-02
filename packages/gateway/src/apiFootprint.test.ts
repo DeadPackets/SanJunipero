@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS } from './heat.js'
@@ -72,7 +72,7 @@ describe('★ the read path holds answers, not the log', () => {
               name: `A${i}`,
               x: (i * 5) % 60,
               y: (i * 7) % 60,
-              ageDays: 7300,
+              ageDays: ADULT_AGE_DAYS,
             })
           }
         for (let k = 0; k < 4; k++) {

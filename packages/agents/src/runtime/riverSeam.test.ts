@@ -14,7 +14,7 @@ import {
   type TileId,
   type WorldState,
 } from '@sj/engine'
-import { isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { perceptionToProse, placesKnownLine } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
@@ -47,7 +47,7 @@ function valley(
       name: 'Tamar',
       x: at.x,
       y: at.y,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
     }),
     config,
   )

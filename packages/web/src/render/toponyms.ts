@@ -27,10 +27,12 @@ export function toponymsOf(state: WorldState | null): Toponym[] {
   return out.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-/** Whole from the 0.5 stop in, gone at the overview: the layer is 1 or 0 at every resting
- *  `ZOOM_STOP` and never between — the same rule the place names are held to. */
-const TOPONYM_FULL_SCALE = 0.5
-const TOPONYM_GONE_SCALE = 0.25
+/** ★ Whole from the 2× stop in, gone below it. Eleven of these were drawn at full alpha from
+ *  0.5 in — that is, always — in caps on ink plates, and the loudest text in the product named
+ *  the furniture. Below 2× a place answers when it is asked: the hover plate has its name. The
+ *  layer is still 1 or 0 at every resting `ZOOM_STOP` and only crosses during a transit. */
+export const TOPONYM_FULL_SCALE = 2
+const TOPONYM_GONE_SCALE = 1
 
 export function toponymAlpha(scale: number): number {
   const out = (scale - TOPONYM_GONE_SCALE) / (TOPONYM_FULL_SCALE - TOPONYM_GONE_SCALE)
@@ -149,6 +151,12 @@ export function createToponymLayer(scene: Scene, store: WorldStore): ToponymLaye
     for (const b of built) {
       const cut = cuts.get(b.id)
       if (cut === undefined) continue
+      // The nameplate under a picked place is the label the viewer asked for; its carved name
+      // over the roof would be the same word a second time.
+      if (b.id === scene.pickedId) {
+        cut.node.visible = false
+        continue
+      }
       cut.node.scale.set(inv)
       const size = { w: b.w * inv, h: b.h * inv }
       const on =

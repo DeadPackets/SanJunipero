@@ -12,6 +12,7 @@ import {
   type WorldState,
 } from '@sj/engine'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
   NO_PARAMS,
@@ -98,7 +99,11 @@ function twoBodies(): WorldState {
     ['ada', 'Ada'],
     ['bex', 'Bex'],
   ]) {
-    s = fold(s, ev(0, 'agent_spawned', { id, name, x: 20, y: 20, ageDays: 7300 }), DEFAULT_CONFIG)
+    s = fold(
+      s,
+      ev(0, 'agent_spawned', { id, name, x: 20, y: 20, ageDays: ADULT_AGE_DAYS }),
+      DEFAULT_CONFIG,
+    )
   }
   return { ...s, tick: 720 }
 }

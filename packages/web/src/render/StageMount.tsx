@@ -10,11 +10,13 @@ import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
+import { createMomentEmotes, type MomentEmoteLayer } from './momentEmotes.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
 import { createSmoke, type SmokeLayer } from './smoke.js'
+import { createClouds, type CloudLayer } from './clouds.js'
 import { createVignette, type Vignette } from './vignette.js'
 import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
@@ -75,11 +77,13 @@ export function StageMount({
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
     let acts: ActLayer | null = null
+    let moments: MomentEmoteLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let lightPools: LightPools | null = null
     let smoke: SmokeLayer | null = null
+    let clouds: CloudLayer | null = null
     let vignette: Vignette | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
@@ -139,11 +143,13 @@ export function StageMount({
         bubbles = createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
+        moments = createMomentEmotes(s, store, book)
         atmosphere = createAtmosphere(s)
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
         smoke = createSmoke(s, store)
+        clouds = createClouds(s, store)
         vignette = createVignette(s.app) // last onto app.stage: over the weather
         sceneRef.current = s
         const charLayer = chars
@@ -151,10 +157,6 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
-        // The track over a head is the act layer's number, drawn by the character layer that
-        // owns the slot it wraps. Same shape as `anchorOf`, and for the same reason.
-        const actLayer = acts
-        s.actFraction = (agentId) => actLayer.fractionOf(agentId)
         interior = createInteriorScene(s, store, book, selectAgent)
         s.interior = interior
         interiorRef.current = interior
@@ -186,10 +188,12 @@ export function StageMount({
           s.sortDepth() // one painter's order for the whole frame, after every box is published
           bubbles?.tick(now)
           acts?.tick()
+          moments?.tick(now)
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
           smoke?.tick(dt)
+          clouds?.tick(dt)
           vignette?.tick()
           const state = store.getState()
           if (state !== null) {
@@ -232,9 +236,11 @@ export function StageMount({
       chars?.destroy()
       bubbles?.destroy()
       acts?.destroy()
+      moments?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
       smoke?.destroy()
+      clouds?.destroy()
       vignette?.destroy()
       weather?.destroy()
       atmosphere?.destroy()
