@@ -362,37 +362,52 @@ export function walkDestination(
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
   const a = state.agents[agentId]!
-  const tile = WalkParams.safeParse(params)
-  if (tile.success) {
-    const want = tile.data
-    // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
-    // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
-    // ground the world does not have makes A* exhaust its whole budget before it answers.
-    const to = {
-      x: clamp(want.x, 0, state.terrain[0]!.length - 1),
-      y: clamp(want.y, 0, state.terrain.length - 1),
-    }
-    const offMap = to.x !== want.x || to.y !== want.y
-    // A mark with no footing under it is a mark named wrong, and the affordance block says so —
-    // except at the rim, where the last ground the legs can hold is the whole of the answer:
-    // there is nothing further out to name instead, so a refusal there teaches nothing. A
-    // clamped mark is always on the rim, which is why `offMap` has nothing to add here.
-    if (!isMapRim(state, to.x, to.y) && !isPassable(state, to.x, to.y))
-      return { refusal: 'no path to that spot' }
-    if (findPath(state, a, to, config) !== null) return to
-    return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
-  }
-  const person = WalkToPerson.safeParse(params)
+  // ★ A MARK BEATS A GUESS. Two thirds of the walks that named somebody also carried the two
+  // numbers the mind had estimated for them, and the coordinate branch read first — so the guess
+  // decided where the legs went and the name was never used. A mark the mind chose wins, and so
+  // does its refusal: it asked for the river, and "there is no river" is the true answer.
+  // Each schema is strict, so a mark handed over WITH the mind's guessed numbers parsed as none
+  // of them and fell to the coordinates. The mark is read off on its own.
+  const person = WalkToPerson.safeParse({ targetId: params.targetId })
   if (person.success) return personDestination(state, config, agentId, person.data.targetId)
-  const thing = WalkToThing.safeParse(params)
+  const thing = WalkToThing.safeParse({ itemId: params.itemId })
   if (thing.success) return thingDestination(state, config, agentId, thing.data.itemId)
-  const named = WalkToPlace.safeParse(params)
-  if (!named.success) return { refusal: 'a walk needs a place to end' }
+  const named = WalkToPlace.safeParse({ structureId: params.structureId })
+  if (named.success) return placeDestination(state, config, a, agentId, named.data.structureId)
+
+  const tile = WalkParams.safeParse(params)
+  if (!tile.success) return { refusal: 'a walk needs a place to end' }
+  const want = tile.data
+  // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
+  // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
+  // ground the world does not have makes A* exhaust its whole budget before it answers.
+  const to = {
+    x: clamp(want.x, 0, state.terrain[0]!.length - 1),
+    y: clamp(want.y, 0, state.terrain.length - 1),
+  }
+  const offMap = to.x !== want.x || to.y !== want.y
+  // A mark with no footing under it is a mark named wrong, and the affordance block says so —
+  // except at the rim, where the last ground the legs can hold is the whole of the answer:
+  // there is nothing further out to name instead, so a refusal there teaches nothing. A
+  // clamped mark is always on the rim, which is why `offMap` has nothing to add here.
+  if (!isMapRim(state, to.x, to.y) && !isPassable(state, to.x, to.y))
+    return { refusal: 'no path to that spot' }
+  if (findPath(state, a, to, config) !== null) return to
+  return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
+}
+
+function placeDestination(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  agentId: string,
+  structureId: string,
+): { x: number; y: number } | { refusal: string } {
   // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
   // knownPlaces row to check — the ground itself is what says whether this valley has one.
-  const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)
+  const natural = naturalFeatureAt(state, structureId, a.x, a.y)
   if (natural !== null) return featureDestination(state, config, a, natural.at, natural.feature)
-  const s = state.structures[named.data.structureId]
+  const s = state.structures[structureId]
   // Known, not merely standing: a mark a mind was never shown is a place it cannot name — save
   // for a roof of its own, which nobody has to be shown the way home to.
   if (s === undefined || !((a.knownPlaces ?? []).includes(s.id) || isYourRoof(state, agentId, s)))

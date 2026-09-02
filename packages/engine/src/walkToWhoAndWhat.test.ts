@@ -176,3 +176,35 @@ describe('★ a walk that names a thing on the ground', () => {
     })
   })
 })
+
+// ★ 21 of the 32 walks that named a mark also carried the mind's own guess at its coordinates,
+// and the coordinate branch read first — so the guess decided and the name was never used.
+describe('★ a mark the mind named beats the numbers it guessed', () => {
+  it('walks to the person, not to the tile the mind estimated for them', () => {
+    const s = world({ x: 4, y: 4 }, { x: 12, y: 4 })
+    const both = walkDestination(s, CFG, ME, { targetId: YOU, x: 20, y: 20 })
+    const alone = walkDestination(s, CFG, ME, { targetId: YOU })
+    expect(both).toEqual(alone)
+    expect(both).not.toMatchObject({ x: 20, y: 20 })
+  })
+
+  it('walks to the thing, not to the tile the mind estimated for it', () => {
+    const s = withItem(world({ x: 4, y: 4 }), { x: 10, y: 6 })
+    expect(walkDestination(s, CFG, ME, { itemId: 'i1', x: 20, y: 20 })).toEqual(
+      walkDestination(s, CFG, ME, { itemId: 'i1' }),
+    )
+  })
+
+  it('★ keeps the mark’s refusal too — it asked for a place, and there is none', () => {
+    const s = world({ x: 4, y: 4 })
+    // Good numbers beside a name this valley has never heard of: the name is the answer.
+    expect(walkDestination(s, CFG, ME, { structureId: 'no_such_place', x: 6, y: 6 })).toEqual({
+      refusal: 'you know no such place',
+    })
+  })
+
+  it('still walks by number when that is all the mind gave', () => {
+    const s = world({ x: 4, y: 4 })
+    expect(walkDestination(s, CFG, ME, { x: 6, y: 6 })).toMatchObject({ x: 6, y: 6 })
+  })
+})
