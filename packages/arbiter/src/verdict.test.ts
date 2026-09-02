@@ -25,7 +25,7 @@ const validRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -166,10 +166,34 @@ describe('RecipeSchema', () => {
 })
 
 describe('OutcomeEffectSchema', () => {
-  it('rejects spawn_item missing the to field', () => {
+  it('takes spawn_item with only what the contract names, and refuses the old to field', () => {
     expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1 }).success).toBe(
-      false,
+      true,
     )
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' })
+        .success,
+    ).toBe(false)
+  })
+
+  it('takes the contract’s five grounding ops, each with its closed fields', () => {
+    for (const effect of [
+      { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+      { op: 'witness', label: 'raises a cup to the room', sense: 'sight' },
+      { op: 'witness', label: 'calls the row', sense: 'sound', radius: 6 },
+      { op: 'name_place', text: "the Widow's Well" },
+      { op: 'transfer', to: 'target' },
+      { op: 'need_delta', need: 'social', delta: 10 },
+    ]) {
+      expect(OutcomeEffectSchema.safeParse(effect).success, JSON.stringify(effect)).toBe(true)
+    }
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'mark', on: 'town', key: 'k', value: 'v' }).success,
+    ).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'transfer', to: 'self' }).success).toBe(false)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'need_delta', need: 'hunger', delta: 10 }).success,
+    ).toBe(false)
   })
 
   it('rejects an unknown op — the whitelist is closed', () => {
@@ -179,20 +203,17 @@ describe('OutcomeEffectSchema', () => {
 
 describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', () => {
   it('caps spawn_item qty at 20', () => {
-    expect(
-      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20, to: 'agent' })
-        .success,
-    ).toBe(true)
-    expect(
-      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21, to: 'agent' })
-        .success,
-    ).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20 }).success).toBe(
+      true,
+    )
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21 }).success).toBe(
+      false,
+    )
     expect(
       OutcomeEffectSchema.safeParse({
         op: 'spawn_item',
         kind: 'salt',
         qty: 1_000_000_000,
-        to: 'agent',
       }).success,
     ).toBe(false)
   })

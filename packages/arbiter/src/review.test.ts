@@ -21,7 +21,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,

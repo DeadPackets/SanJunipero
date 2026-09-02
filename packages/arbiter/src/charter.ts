@@ -1,4 +1,4 @@
-import type { ClosedKey, DiscoveryCredit } from '@sj/shared'
+import { CLOSED_KEYS, type ClosedKey, type DiscoveryCredit } from '@sj/shared'
 import type { OutcomeRow, Recipe, RecipeRequirement } from './verdict.js'
 
 // What a minted verb is, for the world and for the town: the physics the engine runs, the
@@ -36,13 +36,31 @@ export function capGloss(text: string): string {
   return flat.slice(0, cut > 0 ? cut : GLOSS_MAX_CHARS)
 }
 
+/** The keys a verb's effects point at, and so the keys an act of it must name. */
+export function readsOf(outcomes: OutcomeRow[]): ClosedKey[] {
+  const keys = new Set<ClosedKey>()
+  for (const row of outcomes) {
+    for (const e of row.effects) {
+      if (e.op === 'mark' && e.on === 'target') keys.add('targetId')
+      if (e.op === 'mark' && e.on === 'item') keys.add('itemId')
+      if (e.op === 'mark' && e.on === 'structure') keys.add('structureId')
+      if (e.op === 'name_place') keys.add('structureId')
+      if (e.op === 'transfer') {
+        keys.add('itemId')
+        keys.add('targetId')
+      }
+    }
+  }
+  return CLOSED_KEYS.filter((k) => keys.has(k))
+}
+
 export function charterFromAttempt(attempt: AttemptVerdict, credit: DiscoveryCredit): VerbCharter {
   const r = attempt.recipe
   return {
     id: r.id,
     name: r.name,
     gloss: capGloss(attempt.summary),
-    reads: [],
+    reads: readsOf(r.outcomeTable),
     durationTicks: r.durationTicks,
     energyCost: 0,
     requires: r.requires,

@@ -184,7 +184,7 @@ const SMOKE_RECIPE = {
       weight: 1,
       success: true,
       label: 'The fish darkens and firms in the smoke.',
-      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1 }],
     },
   ],
   rngStream: 'recipe:smoke_fish',

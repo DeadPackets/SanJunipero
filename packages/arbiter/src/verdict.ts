@@ -9,7 +9,6 @@ export const OutcomeEffectSchema = z.discriminatedUnion('op', [
       op: z.literal('spawn_item'),
       kind: z.string().min(1),
       qty: z.number().int().positive().max(20),
-      to: z.literal('agent'),
       durability: z.number().int().positive().max(200).optional(),
     })
     .strict(),
@@ -21,6 +20,33 @@ export const OutcomeEffectSchema = z.discriminatedUnion('op', [
     })
     .strict(),
   z.object({ op: z.literal('hp_delta'), delta: z.number().int().min(-50).max(50) }).strict(), // negative = damage, positive = heal
+  // A tag the town can read off a person, a building or a thing: "marked: debt two planks".
+  z
+    .object({
+      op: z.literal('mark'),
+      on: z.enum(['self', 'target', 'structure', 'item']),
+      key: z.string().min(1).max(24),
+      value: z.string().min(1).max(60),
+    })
+    .strict(),
+  // What the others see or hear, in the third person, as far as a dance or a song carries.
+  z
+    .object({
+      op: z.literal('witness'),
+      label: z.string().min(1).max(120),
+      sense: z.enum(['sight', 'sound']),
+      radius: z.number().int().positive().max(30).optional(),
+    })
+    .strict(),
+  z.object({ op: z.literal('name_place'), text: z.string().min(1).max(40) }).strict(),
+  z.object({ op: z.literal('transfer'), to: z.literal('target') }).strict(),
+  z
+    .object({
+      op: z.literal('need_delta'),
+      need: z.enum(['energy', 'social', 'warmth']),
+      delta: z.number().int().min(-50).max(50),
+    })
+    .strict(),
   z.object({ op: z.literal('none') }).strict(),
 ])
 export type OutcomeEffect = z.infer<typeof OutcomeEffectSchema>

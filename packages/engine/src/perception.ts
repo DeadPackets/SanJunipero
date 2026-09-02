@@ -4,6 +4,7 @@ import {
   isRoofedKind,
   isTravelled,
   lightBandAt,
+  sanitizeSpokenText,
   simTimeFromTick,
   visionRadiusAt,
   type SimConfig,
@@ -64,7 +65,10 @@ export type PerceivedAgent = {
   // Absent on a well body, so a healthy town reads exactly as it always did — and never a number.
   // The packet carries the phrase, because the phrase is what a pair of eyes actually gets.
   condition?: string
-}
+} & Markings
+
+// Tags a minted verb left, readable by anyone who can see the thing. Absent when unmarked.
+export type Markings = { marks?: Record<string, string> }
 
 // How a worn thing reads to whoever is looking. The forageable-prose precedent: the packet
 // carries the phrase, because the phrase is what a pair of eyes actually gets.
@@ -135,7 +139,7 @@ export type PerceivedStructure = {
   // A body has to tell a room it will sleep WELL in from a room with a floor BEFORE it walks
   // there; being told at the door is a turn already spent. Absent on a kind with no bed.
   bed?: true
-}
+} & Markings
 
 // Whose it is, and whose hands made it — the two things prose needs to say
 // "Rahel's basket" or "a chair bearing Yusuf's mark". Absent when unclaimed.
@@ -151,7 +155,8 @@ export type PerceivedItem = {
   x: number
   y: number
 } & OwnerNames &
-  Turning
+  Turning &
+  Markings
 
 export type InventoryItem = Item & OwnerNames & Turning
 
@@ -177,7 +182,14 @@ export type HeardSpeech = { speakerId: string; name: string; text: string; dista
 export type SeenEvent =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
-  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
+  | {
+      kind: 'expression'
+      actorName: string
+      verb: string
+      sense: 'sight' | 'sound'
+      // What a minted act looks or sounds like, in the words its charter gave it.
+      label?: string
+    }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
@@ -317,15 +329,19 @@ type Lens = {
   nameOf(id: string): string
 }
 
-function itemMarks(lens: Lens, i: Item): OwnerNames & Turning {
-  const out: OwnerNames & Turning = {}
+function itemMarks(lens: Lens, i: Item): OwnerNames & Turning & Markings {
+  const out: OwnerNames & Turning & Markings = {}
   if (lens.config.ownership.enabled) {
     if (i.owner !== undefined) out.ownerName = lens.nameOf(i.owner)
     if (i.crafterMark !== undefined) out.crafterMarkName = lens.nameOf(i.crafterMark)
   }
   if (isSpoiling(lens.state, i, lens.config)) out.spoiling = true
+  if (i.marks !== undefined) out.marks = i.marks
   return out
 }
+
+const marked = (thing: { marks?: Record<string, string> }): Markings =>
+  thing.marks === undefined ? {} : { marks: thing.marks }
 
 function perceiveAgents(lens: Lens): PerceivedAgent[] {
   const { state, config, self } = lens
@@ -346,6 +362,7 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
         ageBand: ageBand(config, a.ageDays),
         ...(worn === undefined ? {} : { worn }),
         ...(condition === undefined ? {} : { condition }),
+        ...marked(a),
       }
     })
 }
@@ -425,6 +442,7 @@ function perceiveStructures(lens: Lens): PerceivedStructure[] {
     ...howFarUp(lens, s),
     ...theHearth(lens, s),
     ...theBed(lens, s),
+    ...marked(s),
   }))
 }
 
@@ -606,17 +624,28 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
       x?: unknown
       y?: unknown
       sense?: unknown
+      label?: unknown
+      radius?: unknown
     }
     if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
     if (p.agentId === self.id) continue
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
+    // A minted act may name its own reach; the room still walls it in.
     const reaches =
-      sense === 'sound'
-        ? hears(state, config, ev.payload, self.id)
-        : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
+      typeof p.radius === 'number'
+        ? lens.sameRoom(p.agentId) && dist(self.x, self.y, p.x, p.y) <= p.radius
+        : sense === 'sound'
+          ? hears(state, config, ev.payload, self.id)
+          : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
     if (!reaches) continue
-    seen.push({ kind: 'expression', actorName: lens.nameOf(p.agentId), verb: p.verb, sense })
+    seen.push({
+      kind: 'expression',
+      actorName: lens.nameOf(p.agentId),
+      verb: p.verb,
+      sense,
+      ...(typeof p.label === 'string' ? { label: sanitizeSpokenText(p.label) } : {}),
+    })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a

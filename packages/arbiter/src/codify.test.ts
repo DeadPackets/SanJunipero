@@ -37,7 +37,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -278,12 +278,71 @@ describe('codify', () => {
       expect(emitOutcomeEffects(agentState(), 'a1', [{ op: 'none' }])).toEqual([])
     })
 
+    // The five grounding ops, each to the one engine event that folds it.
+    it('grounds mark, witness, name_place, transfer and need_delta in engine events', () => {
+      const params = { targetId: 'a2', itemId: 'item_1', structureId: 's1' }
+      const state = burningFireAdjacent()
+      expect(
+        emitOutcomeEffects(
+          state,
+          'a1',
+          [
+            { op: 'mark', on: 'self', key: 'oath', value: 'sworn' },
+            { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+            { op: 'mark', on: 'item', key: 'promised', value: 'to a2' },
+            { op: 'mark', on: 'structure', key: 'keeper', value: 'a1' },
+            { op: 'witness', label: 'raises a cup to the room', sense: 'sight', radius: 6 },
+            { op: 'name_place', text: 'the Old Hearth' },
+            { op: 'transfer', to: 'target' },
+            { op: 'need_delta', need: 'social', delta: 10 },
+          ],
+          { params, verb: 'recipe:toast' },
+        ),
+      ).toEqual([
+        { type: 'marked', payload: { on: 'agent', id: 'a1', key: 'oath', value: 'sworn' } },
+        { type: 'marked', payload: { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' } },
+        { type: 'marked', payload: { on: 'item', id: 'item_1', key: 'promised', value: 'to a2' } },
+        { type: 'marked', payload: { on: 'structure', id: 's1', key: 'keeper', value: 'a1' } },
+        {
+          type: 'agent_expressed',
+          payload: {
+            agentId: 'a1',
+            verb: 'recipe:toast',
+            x: 5,
+            y: 5,
+            sense: 'sight',
+            label: 'raises a cup to the room',
+            radius: 6,
+          },
+        },
+        {
+          type: 'place_named',
+          payload: { structureId: 's1', name: 'the Old Hearth', byId: 'a1' },
+        },
+        { type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a2' } },
+        {
+          type: 'needs_changed',
+          payload: { id: 'a1', changes: [{ need: 'social', delta: 10 }] },
+        },
+      ])
+    })
+
+    it('skips an effect whose mark the act never named, rather than inventing one', () => {
+      expect(
+        emitOutcomeEffects(agentState(), 'a1', [
+          { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+          { op: 'transfer', to: 'target' },
+          { op: 'name_place', text: 'x' },
+        ]),
+      ).toEqual([])
+    })
+
     it('emits distinct ids for an outcome row with multiple spawn_item effects', () => {
       const state = agentState()
       const nextId = state.counters.nextEntityId
       const events = emitOutcomeEffects(state, 'a1', [
-        { op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' },
-        { op: 'spawn_item', kind: 'clay', qty: 2, to: 'agent' },
+        { op: 'spawn_item', kind: 'salt', qty: 1 },
+        { op: 'spawn_item', kind: 'clay', qty: 2 },
       ])
       expect(events).toEqual([
         {
@@ -299,6 +358,65 @@ describe('codify', () => {
             loc: { t: 'agent', id: 'a1' },
           },
         },
+      ])
+    })
+  })
+
+  // A verb whose effects point at a person, a thing or a place reads that key, and the act is
+  // refused in the tier-1 verbs' own words until the key names something that fits.
+  describe('a charter that reads keys', () => {
+    const wager: Recipe = {
+      ...boilSaltRecipe,
+      id: 'recipe:wager',
+      name: 'Wager a Thing',
+      skillCheck: undefined,
+      requires: [],
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'The stake changes hands.',
+          effects: [
+            { op: 'transfer', to: 'target' },
+            { op: 'mark', on: 'target', key: 'owed', value: 'a wager' },
+          ],
+        },
+      ],
+    }
+    const def = asVerb(wager)
+    function twoBodies(): WorldState {
+      let s = twoWoodStacks()
+      s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 6, y: 5, ageDays: 7300 }), CFG)
+      s = fold(s, ev('agent_spawned', { id: 'far', name: 'far', x: 20, y: 20, ageDays: 7300 }), CFG)
+      return s
+    }
+
+    it('reads itemId and targetId, in the grammar’s order', () => {
+      expect(charterFromAttempt({ recipe: wager, summary: 'x' }, CREDIT_FIXTURE).reads).toEqual([
+        'itemId',
+        'targetId',
+      ])
+    })
+
+    it('refuses until both are named and fit', () => {
+      const s = twoBodies()
+      expect(def.validate(s, CFG, 'a1', {})).toBe('name itemId, the thing it is for')
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_9', targetId: 'a2' })).toBe(
+        'not in your hands',
+      )
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'far' })).toBe('too far away')
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a1' })).toBe(
+        'that is yourself',
+      )
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a2' })).toBeNull()
+    })
+
+    it('and hands the keys it read to the effects', () => {
+      const params = { itemId: 'item_1', targetId: 'a2' }
+      const events = def.onComplete(twoBodies(), CFG, 'a1', params, { next: () => 0 } as never)
+      expect(events).toEqual([
+        { type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a2' } },
+        { type: 'marked', payload: { on: 'agent', id: 'a2', key: 'owed', value: 'a wager' } },
       ])
     })
   })
@@ -366,7 +484,7 @@ describe('codify', () => {
           weight: 1,
           success: true,
           label: 'A fish.',
-          effects: [{ op: 'spawn_item', kind: 'fish', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'fish', qty: 1 }],
         },
       ],
     }
@@ -396,7 +514,7 @@ describe('codify', () => {
       const nextId = state.counters.nextEntityId
       expect(
         emitOutcomeEffects(state, 'a1', [
-          { op: 'spawn_item', kind: 'rod', qty: 1, to: 'agent', durability: 40 },
+          { op: 'spawn_item', kind: 'rod', qty: 1, durability: 40 },
         ]),
       ).toEqual([
         {
@@ -579,7 +697,6 @@ describe('productsOf — what a recipe unlocked', () => {
           op: 'spawn_item' as const,
           kind,
           qty: 1,
-          to: 'agent' as const,
         })),
       },
       { weight: 3, success: false, label: 'it leaks', effects: [{ op: 'none' as const }] },

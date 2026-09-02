@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
-import { genesisState } from './state.js'
+import { genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 
 const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => ({
@@ -184,5 +184,115 @@ describe('discovery_made — the record, and nothing in the state', () => {
     expect(() =>
       fold(base, { ...evt, payload: { ...payload, kind: 'vibe' } }, DEFAULT_CONFIG),
     ).toThrow()
+  })
+})
+
+// The five grounding effects a minted verb may have, each folded to one pinned hash: a charter
+// that changes the world changes it the same way on every replay.
+describe('what a minted verb can do to the world folds to a golden', () => {
+  function town(): WorldState {
+    let s = genesisState(DEFAULT_CONFIG)
+    s = fold(s, spawn('a1', 3, 3), DEFAULT_CONFIG)
+    s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 3, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev(3, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'well',
+        x: 5,
+        y: 3,
+        w: 1,
+        h: 1,
+        maxHp: 10,
+        flammable: false,
+        builderId: 'a1',
+      }),
+    )
+    s = fold(
+      s,
+      ev(4, 'item_spawned', { id: 'item_1', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' } }),
+    )
+    return s
+  }
+  const golden = (event: SimEvent, hash: string): void => {
+    const once = fold(town(), event, DEFAULT_CONFIG)
+    expect(stateHash(once)).toBe(stateHash(fold(town(), event, DEFAULT_CONFIG)))
+    expect(stateHash(once)).toBe(hash)
+  }
+
+  it('mark: a tag on a person, a building or a thing', () => {
+    const s = fold(
+      town(),
+      ev(5, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' }),
+      DEFAULT_CONFIG,
+    )
+    expect(s.agents.a2!.marks).toEqual({ debt: 'two planks' })
+    expect(
+      fold(s, ev(6, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'paid' })).agents.a2!
+        .marks,
+    ).toEqual({ debt: 'paid' })
+    expect(
+      fold(s, ev(6, 'marked', { on: 'structure', id: 'structure_1', key: 'keeper', value: 'a1' }))
+        .structures.structure_1!.marks,
+    ).toEqual({ keeper: 'a1' })
+    expect(
+      fold(s, ev(6, 'marked', { on: 'item', id: 'item_1', key: 'promised', value: 'to a2' })).items
+        .item_1!.marks,
+    ).toEqual({ promised: 'to a2' })
+    expect(() =>
+      fold(s, ev(7, 'marked', { on: 'item', id: 'nope', key: 'k', value: 'v' })),
+    ).toThrow(/unknown item/)
+    golden(
+      ev(5, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' }),
+      '13efc4bd7b60c16182170b4ccffc5c6944e34507b7edfcb9157ca9f29b921f89',
+    )
+  })
+
+  it('witness: a labelled expression folds to nothing', () => {
+    const event = ev(5, 'agent_expressed', {
+      agentId: 'a1',
+      verb: 'act:toast',
+      x: 3,
+      y: 3,
+      sense: 'sight',
+      label: 'raises a cup to the room',
+      radius: 6,
+    })
+    const before = town()
+    expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
+    golden(event, '7863941783f39a6fbb448271dbaada58ede23d471bd0ae6e39237ca87a94f2ee')
+  })
+
+  it('name_place: the building takes the name', () => {
+    const event = ev(5, 'place_named', {
+      structureId: 'structure_1',
+      name: "the Widow's Well",
+      byId: 'a1',
+    })
+    expect(fold(town(), event, DEFAULT_CONFIG).structures.structure_1!.name).toBe(
+      "the Widow's Well",
+    )
+    golden(event, 'ec1b8d35aec12c287984fee71b3426de97ff4f3a6fbf01a64815e8eccb5a948c')
+  })
+
+  it('transfer: title passes to the target, the thing stays where it is', () => {
+    const event = ev(5, 'item_owner_changed', { id: 'item_1', owner: 'a2' })
+    const after = fold(town(), event, DEFAULT_CONFIG)
+    expect(after.items.item_1).toMatchObject({ owner: 'a2', loc: { t: 'agent', id: 'a1' } })
+    golden(event, '8ea6fffc5c9d476356f8e023b7bf84ee3e75eac9917261ee1789b1cf27f1a1f1')
+  })
+
+  it('need_delta: one need moves by the charter’s number', () => {
+    const event = ev(5, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -10 }] })
+    expect(
+      fold(
+        fold(
+          town(),
+          ev(4, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -30 }] }),
+        ),
+        event,
+      ).agents.a1!.needs.social,
+    ).toBe(60)
+    golden(event, '0ca7050daf491c60ed545e2aac1542641587818c85b373aaa2e01c44acdaa5a0')
   })
 })
