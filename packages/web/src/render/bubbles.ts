@@ -140,15 +140,26 @@ export function speakerWash(rgb: number): number {
   return over(0xffffff, (lift(r) << 16) | (lift(g) << 8) | lift(b), SPEAKER_WASH)
 }
 
+/** How far a box floats over the head it belongs to. */
+export const BUBBLE_LIFT_PX = 18
+
 /** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
  *  of speech and it read as a town where only three people ever talk; the placer already drops
- *  what it cannot fit. One pass, no sort — this ran per frame. */
+ *  what it cannot fit. One pass, no sort — this ran per frame.
+ *
+ *  ★ It is handed each SPEAKER's own feet and tests the body they draw, head to heel. It used to
+ *  be handed the anchor a box hangs from, 70 world px higher, as a bare point: a person standing
+ *  in the top of the frame was ruled off screen and wore a "…" instead of their own words —
+ *  and at the director's 3× stop, where the view is 300 world px tall, that is a whole quarter
+ *  of the picture. */
 export function inViewSpeakers(
   want: readonly { id: string; sx: number; sy: number }[],
   view: Rect,
 ): Set<string> {
   const out = new Set<string>()
-  for (const b of want) if (rectInView(b.sx, b.sy, b.sx, b.sy, view, 0)) out.add(b.id)
+  for (const b of want) {
+    if (rectInView(b.sx, b.sy - CHAR_TARGET_PX, b.sx, b.sy, view, 0)) out.add(b.id)
+  }
   return out
 }
 
@@ -397,9 +408,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const drift = b.isThought
           ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs)
           : 0
-        return { id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift }
+        return { id: String(i), sx, sy, drift }
       })
       const view = scene.viewRect()
+      // The SPEAKER, not the box that floats over them: the lift belongs to the placement below.
       const seen = inViewSpeakers(at, view)
       const want = at.map((p, i) => {
         const b = bubbles[i]!
@@ -407,7 +419,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         b.box.visible = shown
         b.glyph.visible = !shown
         return {
-          ...p,
+          id: p.id,
+          sx: p.sx,
+          sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift,
           size: shown ? { w: b.w * inv, h: b.h * inv } : { w: GLYPH_W * inv, h: GLYPH_H * inv },
         }
       })

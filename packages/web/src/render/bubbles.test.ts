@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   BUBBLE_FADE_MS,
@@ -22,6 +23,7 @@ import {
 import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
 import type { Rect } from './tooltip.js'
 
 describe('bubbleLife', () => {
@@ -233,6 +235,40 @@ describe('★ everybody the camera can see speaks out loud', () => {
       expect(bubbleShown(zoom, true), `${zoom}x`).toBe(true)
       expect(bubbleShown(zoom, false), `${zoom}x off screen`).toBe(false)
     }
+  })
+
+  /** ★ THE "…" ON A SPEAKER STANDING IN THE PICTURE. The cull was asked about the BUBBLE's own
+   *  anchor — 70 world px over the speaker's feet — as a bare point with no margin, so anybody
+   *  whose feet were inside the top 70 px of the view was ruled off screen and collapsed to a
+   *  glyph. At the director's 3x stop the view is 300 world px tall: the whole top quarter. */
+  describe('★ the cull is asked about the SPEAKER, not about where their words float', () => {
+    const VIEW = { x: 0, y: 0, w: 1440, h: 900 }
+    const feet = (id: string, sx: number, sy: number) => ({ id, sx, sy })
+
+    it('★ keeps a speaker whose whole body is in the picture, however near the top edge', () => {
+      for (const feetY of [0, 1, 20, 51, 52, 70, 450, 899]) {
+        expect(inViewSpeakers([feet('a', 700, feetY)], VIEW).has('a'), `feet at ${feetY}`).toBe(true)
+      }
+    })
+
+    it('★ still drops a speaker the camera genuinely cannot see', () => {
+      // feet one pixel above the top edge, so even the heels are out of frame
+      expect(inViewSpeakers([feet('above', 700, -1)], VIEW).has('above')).toBe(false)
+      // ...and one whose head has just cleared the bottom edge
+      expect(inViewSpeakers([feet('below', 700, 900 + CHAR_TARGET_PX + 1)], VIEW).has('below')).toBe(
+        false,
+      )
+      expect(inViewSpeakers([feet('crown', 700, 900 + CHAR_TARGET_PX)], VIEW).has('crown')).toBe(
+        true,
+      )
+      expect(inViewSpeakers([feet('far', 5000, 400)], VIEW).has('far')).toBe(false)
+    })
+
+    it('★ the layer hands it the feet, and lifts the box off the head only to place it', () => {
+      const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+      expect(SRC).toContain('const seen = inViewSpeakers(at, view)')
+      expect(SRC).toContain('sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift')
+    })
   })
 })
 

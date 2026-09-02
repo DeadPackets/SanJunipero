@@ -1169,7 +1169,14 @@ body {
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
 @media (max-width: 900px) {
-  .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
+  /* `width: auto` on an absolutely positioned box whose only offset is `left: 50%` shrinks to
+     fit inside HALF the viewport — 195px on a 390px phone. Two nowrap chips overran it and the
+     second started before the first had ended: `DAY 0 · SPRINGLOUDY 8°`. The bar takes the whole
+     width the inset leaves it and the chips go to its two ends, a gap apart at the narrowest. */
+  .sky-bar {
+    width: calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left)));
+    grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
+  }
   .sky-arc { display: none; }
   /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
   /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */

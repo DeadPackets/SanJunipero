@@ -82,6 +82,33 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
     for (const row of OVERHEAD_PRIORITY) expect(EMOTE_KINDS, row.id).toContain(row.glyph)
   })
 
+  // ★ A checkerboard stood over a talker's head in the shipped watch. The cut took
+  // `EMOTE_KINDS.indexOf(kind)` at face value, and -1 for a kind the sheet has no cell for cut a
+  // frame off the left of the atlas — art the viewer reads as "the picture is missing", drawn
+  // over a person who was only speaking.
+  it('★ a cell the atlas does not have draws NOTHING, never a placeholder', () => {
+    const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    const cut = /const setGlyph = [\s\S]*?\n  \}/.exec(SRC)?.[0] ?? ''
+    expect(cut, 'setGlyph must be findable').not.toBe('')
+    expect(cut).toContain('Texture.EMPTY')
+    // the index is CHECKED before it becomes a frame, rather than handed straight to Rectangle
+    expect(cut).toMatch(/cell < 0/)
+    expect(cut).not.toMatch(/frame: new Rectangle\(EMOTE_KINDS\.indexOf/)
+  })
+
+  // The web and the forge each keep the roster; drift shifts every cell by one and the whole
+  // town wears the wrong glyph — the same failure, arriving quietly. Read off the forge's source
+  // rather than imported: `@sj/forge` reaches sharp and better-sqlite3, and the viewer must not.
+  it('★ cuts from the same roster the atlas is drawn from', () => {
+    const forge = readFileSync(
+      new URL('../../../forge/src/emotes.ts', import.meta.url),
+      'utf8',
+    )
+    const roster = /export const EMOTE_KINDS = \[([\s\S]*?)\] as const/.exec(forge)?.[1] ?? ''
+    expect(roster, "the forge's roster must be findable").not.toBe('')
+    expect([...roster.matchAll(/'([a-z]+)'/g)].map((m) => m[1])).toEqual([...EMOTE_KINDS])
+  })
+
   // ★ A transcription drifts; this makes every future word declare itself. Add a condition to
   // `status.ts` and it reaches the roster and the plate — this is what stops it reaching the
   // head by accident, or silently not reaching it at all.

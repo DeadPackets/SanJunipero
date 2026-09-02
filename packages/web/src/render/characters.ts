@@ -295,13 +295,17 @@ export function createCharacterLayer(
   const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
     if (e.glyphKind === kind) return
     e.glyphKind = kind
-    if (kind === null || emoteAtlas === null) {
+    // ★ A CELL THE ATLAS DOES NOT HAVE DRAWS NOTHING. `indexOf` answered -1 for a kind the sheet
+    // has no glyph for and the frame was cut off the left of the atlas, which is how a
+    // checkerboard came to stand over the head of somebody who was only speaking.
+    const cell = kind === null ? -1 : EMOTE_KINDS.indexOf(kind)
+    if (cell < 0 || emoteAtlas === null) {
       e.overhead.glyph.texture = Texture.EMPTY
       return
     }
     e.overhead.glyph.texture = new Texture({
       source: emoteAtlas.source,
-      frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+      frame: new Rectangle(cell * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
     })
     e.overhead.glyph.width = EMOTE_PX
     e.overhead.glyph.height = EMOTE_PX
