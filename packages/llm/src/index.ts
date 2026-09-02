@@ -4,7 +4,6 @@ export {
   insertAlert,
   insertLlmCall,
   insertTurnOutcome,
-  mergeBlockTokens,
   sumCostUsd,
 } from './callLog.js'
 export { backfillUnattributed } from './backfill.js'
