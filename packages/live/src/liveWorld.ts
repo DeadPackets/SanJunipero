@@ -271,7 +271,7 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
 
 export const RATE_STOP_ALERT_KIND = 'rate_stop'
 
-export function rateStopRefusal(detail: string, agentDbDir: string): string {
+function rateStopRefusal(detail: string, agentDbDir: string): string {
   return [
     'stream: could not start — this town was stopped for calling far too often.',
     ...detail.split('\n'),

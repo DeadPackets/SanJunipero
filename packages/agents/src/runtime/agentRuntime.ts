@@ -190,8 +190,8 @@ function sameIntent(text: string): string {
 
 // The spoken reason behind a discovery is the mind's own words for the attempt, reported as
 // "he said he would <saying>": first person stripped, flattened as speech is, and short.
-export const SAYING_MAX_CHARS = 120
-export function spokenReason(intent: string): string {
+const SAYING_MAX_CHARS = 120
+function spokenReason(intent: string): string {
   const said = sanitizeSpokenText(intent)
     .replace(/^i (?:try|want|attempt|mean|am going) to /i, '')
     .replace(/^i (?:will |shall )?/i, '')
