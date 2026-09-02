@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, structureTitle } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, structureTitle } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { readFileSync } from 'node:fs'
 import { PLATE_MAX_ROWS } from './plateModel.js'
@@ -50,7 +50,7 @@ function blankAgent(id: string, name: string): WorldState['agents'][string] {
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,

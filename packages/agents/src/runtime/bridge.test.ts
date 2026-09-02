@@ -11,6 +11,7 @@ import {
   type TileId,
 } from '@sj/engine'
 import {
+  ADULT_AGE_DAYS,
   DISCOVERY_EVENT,
   SimConfigSchema,
   stateHash,
@@ -84,9 +85,9 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
   const put = (type: string, payload: unknown) => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 })
-  put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: 7300 })
-  put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: ADULT_AGE_DAYS })
   put('item_spawned', {
     id: 'item_1',
     kind: 'bread',
@@ -311,7 +312,7 @@ function larder(plant?: (terrain: TileId[][]) => void): EngineBridge {
   const put = (type: string, payload: unknown) => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: 'shed_1',
     kind: 'storehouse',
@@ -419,7 +420,7 @@ function announceHarness(world: TickHandler = () => {}): {
       name: 'Tamar',
       x: 3,
       y: 3,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
     }),
     config,
   )

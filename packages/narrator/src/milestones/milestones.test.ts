@@ -9,7 +9,13 @@ import {
   type TileId,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  type SimEvent,
+} from '@sj/shared'
 import { detectFirsts } from '../firsts.js'
 import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '@sj/shared'
 import { migrateNarratorTables } from '../schema.js'
@@ -201,7 +207,13 @@ describe('tier 1 — the engine firsts', () => {
 
   it('counts the town up to each round number, once', () => {
     const born = Array.from({ length: 12 }, (_, i) =>
-      ev(i + 1, 'agent_spawned', { id: `a${i}`, name: `A${i}`, x: 0, y: 0, ageDays: 7300 }),
+      ev(i + 1, 'agent_spawned', {
+        id: `a${i}`,
+        name: `A${i}`,
+        x: 0,
+        y: 0,
+        ageDays: ADULT_AGE_DAYS,
+      }),
     )
     const fired = detectFirsts([...born, ...born], ctx()).filter((m) => m.kind.endsWith('_souls'))
     expect(fired.map((m) => m.kind)).toEqual(['first_ten_souls'])
@@ -209,7 +221,7 @@ describe('tier 1 — the engine firsts', () => {
 
   it('marks the turn of the year and the winter come through, once each', () => {
     const spring = [
-      ev(day(364) + 60, 'agent_spoke', { agentId: 'a', text: 'warm again', x: 0, y: 0 }),
+      ev(day(DAYS_PER_YEAR) + 60, 'agent_spoke', { agentId: 'a', text: 'warm again', x: 0, y: 0 }),
     ]
     const kinds = detectFirsts(spring, ctx()).map((m) => m.kind)
     expect(kinds).toContain('first_winter_survived')
@@ -338,7 +350,12 @@ function pairWorld(
   ]) {
     s = fold(
       s,
-      { seq: 0, tick: 0, type: 'agent_spawned', payload: { id, name, x: 4, y: 4, ageDays: 7300 } },
+      {
+        seq: 0,
+        tick: 0,
+        type: 'agent_spawned',
+        payload: { id, name, x: 4, y: 4, ageDays: ADULT_AGE_DAYS },
+      },
       DEFAULT_CONFIG,
     )
   }

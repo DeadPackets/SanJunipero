@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SimConfigSchema } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema } from '@sj/shared'
 import { fold } from '../fold.js'
 import { genesisState } from '../state.js'
 import { EventStore, openDb } from '../store.js'
@@ -28,7 +28,7 @@ describe('the village its founders raised', () => {
       s = fold(s, store.append(s.tick, type, payload), config)
     }
     for (const e of genesis.events) emit(e.type, e.payload)
-    emit('agent_spawned', { id: 'amara', name: 'Amara', x: 2, y: 2, ageDays: 7300 })
+    emit('agent_spawned', { id: 'amara', name: 'Amara', x: 2, y: 2, ageDays: ADULT_AGE_DAYS })
     const storehouse = Object.values(s.structures).find((x) => x.kind === 'storehouse')
     if (storehouse === undefined) throw new Error('genesis: no storehouse')
     for (const e of foundersKnowTheVillage(['amara'], Object.keys(s.structures)))

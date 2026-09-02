@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   FORBIDDEN_FRAMING,
   MINUTES_PER_DAY,
@@ -175,7 +176,11 @@ describe('★ block 1 tells the truth about sleep', () => {
       CFG,
     )
     s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }), CFG)
-    s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     if (opts.indoors) {
       s = fold(s, ev(4, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     }

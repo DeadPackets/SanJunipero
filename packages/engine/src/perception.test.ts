@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
@@ -577,7 +583,7 @@ describe('composePerception: ownership prose', () => {
     ])
     s = fold(
       s,
-      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: ADULT_AGE_DAYS }),
       DEFAULT_CONFIG,
     )
     s = fold(

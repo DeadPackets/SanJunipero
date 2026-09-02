@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
@@ -27,7 +27,11 @@ const SPRING_DAY = at(1, 12)
 function world(tick: number, extra: Partial<AgentBody> = {}, id = 'a1'): WorldState {
   let s = genesisState(CFG, map())
   s = fold(s, ev('tick_advanced', {}, tick - 1), CFG)
-  s = fold(s, ev('agent_spawned', { id, name: id, x: 4, y: 4, ageDays: 7300 }, tick - 1), CFG)
+  s = fold(
+    s,
+    ev('agent_spawned', { id, name: id, x: 4, y: 4, ageDays: ADULT_AGE_DAYS }, tick - 1),
+    CFG,
+  )
   const a = {
     ...s.agents[id]!,
     ...extra,
@@ -177,7 +181,7 @@ describe('a collapse has a road out of it', () => {
     let s = downed()
     s = fold(
       s,
-      ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: 7300 }, s.tick),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: ADULT_AGE_DAYS }, s.tick),
       CFG,
     )
     s = fold(

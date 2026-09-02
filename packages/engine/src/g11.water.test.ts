@@ -1,7 +1,13 @@
 // @slow — GATE G11a, the water and the ground: the bucket line, the channel, the crossing, and
 // the roads feet make. Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
-import { fertilityAt, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  fertilityAt,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { findPath, stepCostAt, terrainCostFor, BRIDGE_KIND } from './path.js'
@@ -23,7 +29,7 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const MAP = (n = 24): TileId[][] => grid(n)
 
 function spawn(s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState {
-  return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
+  return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), config)
 }
 
 function give(

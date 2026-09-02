@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -39,7 +39,10 @@ function world(stage: 'construction' | 'complete' = 'complete', kind = 'storehou
 }
 
 function withHolder(s: WorldState, x: number, y: number, owner = 'a1'): WorldState {
-  const spawned = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }))
+  const spawned = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }),
+  )
   return fold(
     spawned,
     ev('item_spawned', {

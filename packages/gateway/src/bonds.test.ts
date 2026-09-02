@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   BOND_RECENT_ACTS,
   BondsResponseSchema,
   DEFAULT_CONFIG,
@@ -40,11 +41,25 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300, sex: 'f' })
-          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 1, ageDays: 7300, sex: 'm' })
-          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: 7300 })
-          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 20, y: 21, ageDays: 7300 })
-          emit('agent_spawned', { id: 'eve', name: 'Eve', x: 8, y: 8, ageDays: 7300 })
+          emit('agent_spawned', {
+            id: 'alice',
+            name: 'Alice',
+            x: 0,
+            y: 0,
+            ageDays: ADULT_AGE_DAYS,
+            sex: 'f',
+          })
+          emit('agent_spawned', {
+            id: 'bob',
+            name: 'Bob',
+            x: 0,
+            y: 1,
+            ageDays: ADULT_AGE_DAYS,
+            sex: 'm',
+          })
+          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 20, y: 21, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'eve', name: 'Eve', x: 8, y: 8, ageDays: ADULT_AGE_DAYS })
         }
         // a talking pair, in earshot and inside the window → friend
         if (tick === 5)
@@ -221,8 +236,8 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
       snapshotEveryTicks: 1000,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: 7300 })
-          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: 7300 })
+          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
         }
         emit('agent_spoke', { agentId: tick % 2 === 0 ? 'a' : 'b', text: 'w', x: 1, y: 1 })
       },

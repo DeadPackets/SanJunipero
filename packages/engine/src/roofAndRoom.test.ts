@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   isBeddedKind,
   isHearthKind,
@@ -60,7 +61,10 @@ function withBuilding(s: WorldState, kind: string, id = 'structure_1'): WorldSta
 
 function withAgentAtDoor(s: WorldState, id: string): WorldState {
   const door = doorTile(s, s.structures.structure_1!)!
-  return fold(s, ev(10, 'agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: 7300 }))
+  return fold(
+    s,
+    ev(10, 'agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const enter = (s: WorldState, id: string): ReturnType<typeof submitIntent> =>
@@ -127,12 +131,15 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
         builderId: 'g',
       }),
     )
-    site = fold(site, ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 3, y: 3, ageDays: 7300 }))
+    site = fold(
+      site,
+      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 3, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
     expect(enter(site, 'a1')).toMatchObject({ ok: false, reason: 'it is not finished' })
 
     const far = fold(
       withBuilding(world(), 'cottage'),
-      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: 7300 }),
+      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: ADULT_AGE_DAYS }),
     )
     expect(enter(far, 'a1')).toMatchObject({ ok: false, reason: 'not close enough to the door' })
   })
@@ -351,7 +358,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
           name: `b${i}`,
           x: 60 + i,
           y: 90,
-          ageDays: 7300,
+          ageDays: ADULT_AGE_DAYS,
         }),
         CFG,
       )

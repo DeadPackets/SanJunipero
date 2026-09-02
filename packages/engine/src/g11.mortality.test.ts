@@ -2,6 +2,7 @@
 // the one night a fever crosses a room. Scripted actors only: no LLM, no network.
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_YEAR,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -39,7 +40,13 @@ type Spawn = { id: string; x: number; y: number; ageDays?: number }
 function spawn(s: WorldState, config: SimConfig, a: Spawn): WorldState {
   return fold(
     s,
-    ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: a.ageDays ?? 7300 }),
+    ev('agent_spawned', {
+      id: a.id,
+      name: a.id,
+      x: a.x,
+      y: a.y,
+      ageDays: a.ageDays ?? ADULT_AGE_DAYS,
+    }),
     config,
   )
 }

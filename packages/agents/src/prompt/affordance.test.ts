@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { doorTile, fold, genesisState, type TileId } from '@sj/engine'
-import { DEFAULT_CONFIG, scanPromptForGlassLeak } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, scanPromptForGlassLeak } from '@sj/shared'
 import { perceptionToProse } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
@@ -25,7 +25,7 @@ function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: HOUSE,
     kind: 'house',

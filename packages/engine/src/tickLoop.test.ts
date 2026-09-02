@@ -5,7 +5,7 @@ import { genesisState } from './state.js'
 import { RngStreams } from './rng.js'
 import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
-import { DEFAULT_CONFIG, SimConfigSchema, stateHash } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, stateHash } from '@sj/shared'
 
 function loop(
   onTick: ConstructorParameters<typeof TickLoop>[0]['onTick'],
@@ -27,7 +27,8 @@ function loop(
 describe('TickLoop', () => {
   it('step() advances tick and applies handler emissions to state', () => {
     const { loop: l } = loop(({ tick, emit }) => {
-      if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+      if (tick === 1)
+        emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
     })
     l.step()
     expect(l.tick).toBe(1)
@@ -35,7 +36,8 @@ describe('TickLoop', () => {
   })
   it('events land in the store in order', () => {
     const { store, loop: l } = loop(({ tick, emit }) => {
-      if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+      if (tick === 1)
+        emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
     })
     l.step()
     l.step()
@@ -48,7 +50,13 @@ describe('TickLoop', () => {
   it('snapshots every N ticks and replayLatest matches live state', () => {
     const { store, loop: l } = loop(({ tick, emit }) => {
       if (tick % 2 === 1)
-        emit('agent_spawned', { id: `a${tick}`, name: `a${tick}`, x: tick, y: 0, ageDays: 7300 })
+        emit('agent_spawned', {
+          id: `a${tick}`,
+          name: `a${tick}`,
+          x: tick,
+          y: 0,
+          ageDays: ADULT_AGE_DAYS,
+        })
     }, 5)
     for (let i = 0; i < 12; i++) l.step()
     expect(store.latestSnapshot()!.tick).toBe(10)
@@ -57,7 +65,13 @@ describe('TickLoop', () => {
   it('restores tick and state when the transaction throws, and can step again', () => {
     let thrown = false
     const { store, loop: l } = loop(({ tick, emit }) => {
-      emit('agent_spawned', { id: `a${tick}`, name: `a${tick}`, x: tick, y: 0, ageDays: 7300 })
+      emit('agent_spawned', {
+        id: `a${tick}`,
+        name: `a${tick}`,
+        x: tick,
+        y: 0,
+        ageDays: ADULT_AGE_DAYS,
+      })
       if (tick === 3 && !thrown) {
         thrown = true
         throw new Error('boom')
@@ -90,7 +104,13 @@ describe('TickLoop', () => {
       rng,
       onTick: ({ tick, emit }) => {
         draws.push(rng.get('health').next())
-        emit('agent_spawned', { id: `a${tick}`, name: `a${tick}`, x: 0, y: 0, ageDays: 7300 })
+        emit('agent_spawned', {
+          id: `a${tick}`,
+          name: `a${tick}`,
+          x: 0,
+          y: 0,
+          ageDays: ADULT_AGE_DAYS,
+        })
         if (boom) {
           boom = false
           throw new Error('boom')
@@ -173,7 +193,8 @@ describe('TickLoop', () => {
       rng: new RngStreams('cfg'),
       config: custom,
       onTick: ({ tick, emit }) => {
-        if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+        if (tick === 1)
+          emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
       },
     })
     for (let i = 0; i < 10; i++) l.step()
@@ -187,7 +208,8 @@ describe('the operator stops the clock', () => {
     vi.useFakeTimers()
     try {
       const { store, loop: l } = loop(({ tick, emit }) => {
-        if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 })
+        if (tick === 1)
+          emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
       })
       l.start()
       vi.advanceTimersByTime(5000)

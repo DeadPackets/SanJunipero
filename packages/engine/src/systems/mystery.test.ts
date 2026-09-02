@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+} from '@sj/shared'
 import { MYSTERIES, MYSTERY_BY_KIND } from '../data/mysteries.js'
 import { composePerception } from '../perception.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
@@ -20,7 +26,11 @@ function world(config: SimConfig): WorldState {
     config,
     Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
 }
 
 // Run the single tick at `hour` on day 1 and return only what the mystery system said.
@@ -104,7 +114,11 @@ describe('perception: mysteries', () => {
 
   function twoAgents(bAsleep: boolean): WorldState {
     let s = world(CERTAIN)
-    s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: 7300 }), CERTAIN)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: ADULT_AGE_DAYS }),
+      CERTAIN,
+    )
     if (bAsleep) s = fold(s, ev('agent_slept', { agentId: 'a2' }), CERTAIN)
     return s
   }

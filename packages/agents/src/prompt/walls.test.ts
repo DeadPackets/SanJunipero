@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent, scanForDirective } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent, scanForDirective } from '@sj/shared'
 import {
   buildTicks,
   composePerception,
@@ -89,7 +89,10 @@ describe('★ the packet carries how far up the walls are', () => {
     )
     if (progress > 0)
       s = fold(s, ev(2, 'structure_progressed', { id: 'structure_1', ticks: progress }))
-    return fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
+    return fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
   }
 
   const seen = (s: WorldState) =>
@@ -127,7 +130,7 @@ describe('★ the packet carries how far up the walls are', () => {
         name: 'a1',
         x: cottage.x,
         y: cottage.y + cottage.h,
-        ageDays: 7300,
+        ageDays: ADULT_AGE_DAYS,
       }),
       CFG,
     )
@@ -344,7 +347,7 @@ describe('* walls already standing are a place the world can name', () => {
     }
     return fold(
       s,
-      ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
   }

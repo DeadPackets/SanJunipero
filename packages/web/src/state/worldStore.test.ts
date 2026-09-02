@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type AssetRecord, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  stateHash,
+  type AssetRecord,
+  type SimEvent,
+} from '@sj/shared'
 import { fold, genesisState, type TileId } from '@sj/engine'
 import { createWorldStore, onFirstSnapshot } from './worldStore.js'
 
@@ -9,7 +15,7 @@ const spawn: SimEvent = {
   seq: 1,
   tick: 1,
   type: 'agent_spawned',
-  payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: 7300 },
+  payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: ADULT_AGE_DAYS },
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T

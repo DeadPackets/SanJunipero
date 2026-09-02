@@ -8,6 +8,10 @@ export const DAYS_PER_YEAR = 28
 // seasons long is a season the calendar cannot name.
 export const DAYS_PER_SEASON = DAYS_PER_YEAR / SEASONS.length
 
+/** A grown body of no particular age — what a fixture means when it spawns "an adult". Counted,
+ *  never typed: the literal 7 300 that used to say this is an elder on a four-week year. */
+export const ADULT_AGE_DAYS = 30 * DAYS_PER_YEAR
+
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 
 export const DAWN_HOUR = 5

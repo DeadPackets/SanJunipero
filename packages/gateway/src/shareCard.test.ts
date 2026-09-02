@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
 import { AssetCodex, decodePng, encodePng, openForgeDb, type RawImage } from '@sj/forge'
 import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
 import { EventStore, openDb } from '@sj/engine/store'
@@ -41,7 +41,7 @@ function scriptedWorld(dbPath: string): Database.Database {
     snapshotEveryTicks: 25,
     onTick: ({ tick, emit }) => {
       if (tick === 1)
-        emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
     },
   })
   // Into day 2: a card is refused for a day the town has not lived, so the fixture must live
@@ -343,8 +343,8 @@ describe('a person’s own card', () => {
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick !== 1) return
-        emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
-        emit('agent_spawned', { id: 'bob', name: 'Bob', x: 1, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        emit('agent_spawned', { id: 'bob', name: 'Bob', x: 1, y: 0, ageDays: ADULT_AGE_DAYS })
       },
     })
     for (let i = 0; i < 5; i++) loop.step()

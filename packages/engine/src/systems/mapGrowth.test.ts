@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CHUNK_TILES,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -42,7 +43,11 @@ const map = (n = SIZE): TileId[][] => grid(n)
 
 function town(config = CFG, structures = 2, size = SIZE, at = { x: 10, y: 20 }): WorldState {
   let s = genesisState(config, map(size))
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: 7300 }), config)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
   for (let i = 0; i < structures; i++) {
     s = fold(
       s,

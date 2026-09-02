@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { describeEvent, isNarratable } from './chronicleFormat.js'
 
@@ -16,7 +16,7 @@ function fixtureState(): WorldState {
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold, genesisState, submitIntent, unregisterVerb, type WorldState } from '@sj/engine'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
@@ -45,7 +45,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function agentState(): WorldState {
   return fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
 }

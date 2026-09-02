@@ -2,6 +2,7 @@
 // w/h — structure_planned has to carry it, and a renderer holding one structure needs it.
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   SimConfigSchema,
   T_ROAD,
   doorFrontOf,
@@ -30,7 +31,10 @@ function world(): WorldState {
   let s = apply(genesisState(CFG, terrain), events)
   const sq = townSquareOf(s)!
   s = apply(s, [
-    { type: 'agent_spawned', payload: { id: BUILDER, name: 'B', x: sq.x, y: sq.y, ageDays: 7300 } },
+    {
+      type: 'agent_spawned',
+      payload: { id: BUILDER, name: 'B', x: sq.x, y: sq.y, ageDays: ADULT_AGE_DAYS },
+    },
   ])
   return apply(s, [
     {

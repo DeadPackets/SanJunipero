@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CITY_ANCHOR_DEFAULT,
   DEFAULT_CONFIG,
   FOUNDER_IDS,
@@ -337,7 +338,7 @@ describe('the ford: one reach where the channel runs two wide', () => {
         seq: 9000,
         tick: 0,
         type: 'agent_spawned',
-        payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: 7300 },
+        payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: ADULT_AGE_DAYS },
       },
       DEFAULT_CONFIG,
     )
@@ -512,7 +513,13 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
         seq: 9103,
         tick: NIGHT,
         type: 'agent_spawned',
-        payload: { id: 'walker', name: 'Walker', x: starts[0]!.x, y: starts[0]!.y, ageDays: 7300 },
+        payload: {
+          id: 'walker',
+          name: 'Walker',
+          x: starts[0]!.x,
+          y: starts[0]!.y,
+          ageDays: ADULT_AGE_DAYS,
+        },
       },
       CFG,
     )

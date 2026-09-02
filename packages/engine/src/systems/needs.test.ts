@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_SEASON,
+  DAYS_PER_YEAR,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
@@ -23,7 +30,7 @@ function makeWorld(
   for (const a of agents)
     s = fold(
       s,
-      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: ADULT_AGE_DAYS }),
       config,
     )
   return s
@@ -210,7 +217,9 @@ describe('winter scarcity: hunger', () => {
   })
 
   it('leaves every other season at the base rate', () => {
-    for (const tick of [1440, 91 * 1440, 182 * 1440]) {
+    // One day in each of the three seasons that are not winter, counted in seasons.
+    for (const s of [0, 1, 2]) {
+      const tick = (s * DAYS_PER_SEASON + 1) * MINUTES_PER_DAY
       expect(hungerDeltaAt(tick)).toBeCloseTo(-CFG.needs.hungerDecayPerTick, 10)
     }
   })

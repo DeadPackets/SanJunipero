@@ -1,7 +1,13 @@
 // An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import {
   RngStream,
   RngStreams,
@@ -77,7 +83,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function makeWorld(): WorldState {
   let s = fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
   s = fold(

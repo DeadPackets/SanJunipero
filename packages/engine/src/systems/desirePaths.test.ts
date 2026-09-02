@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { stepCostAt, terrainCostFor } from '../path.js'
@@ -33,7 +39,7 @@ function meadow(rows: string[] = ['...', '...', '...'], config = CFG): WorldStat
 function withWalker(s: WorldState, config = CFG): WorldState {
   const spawned = fold(
     s,
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
     config,
   )
   const a1 = spawned.agents.a1!
@@ -68,7 +74,11 @@ describe('traffic: the walk itself is the record', () => {
   it("counts a walker's steps, ignores a body that simply appears, and stays absent when the law is off", () => {
     expect(cross(withWalker(meadow()), 3).traffic).toEqual({ [tileKey(1, 1)]: 3 })
     const teleported = fold(
-      fold(meadow(), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG),
+      fold(
+        meadow(),
+        ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+        CFG,
+      ),
       ev('agent_moved', { id: 'a1', x: 1, y: 1 }),
       CFG,
     )
@@ -85,7 +95,7 @@ describe('traffic: the walk itself is the record', () => {
     expect('traffic' in fresh).toBe(false)
     const spawned = fold(
       fresh,
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
     expect(stateHash(fold(spawned, ev('agent_moved', { id: 'a1', x: 1, y: 1 }), CFG))).toBe(

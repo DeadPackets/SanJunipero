@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, stateHash, thirstDecayPerTick, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  SimConfigSchema,
+  stateHash,
+  thirstDecayPerTick,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { submitIntent } from '../intent.js'
@@ -24,7 +30,7 @@ function map(): TileId[][] {
 function body(config = CFG, x = 3, y = 4): WorldState {
   return fold(
     genesisState(config, map()),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }),
     config,
   )
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, DAYS_PER_YEAR, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
@@ -49,32 +49,43 @@ describe('ageBand', () => {
     expect(CFG.aging.naturalDeathBaseChancePerDay).toBe(0.0005)
     expect(CFG.aging.naturalDeathChancePerYearOver).toBe(0.0002)
   })
+
+  // What that chance MEANS is the thing the shorter year changed, and it changed by 13x. Move
+  // either number and this row says in years what the new pair buys an elder.
+  it('spends the same 2,000 sunrises on an elder, which is 71 years now and was 5.5', () => {
+    const daysAtBaseChance = 1 / CFG.aging.naturalDeathBaseChancePerDay
+    expect(daysAtBaseChance).toBe(2000)
+    expect(daysAtBaseChance / DAYS_PER_YEAR).toBeCloseTo(71.4, 1)
+    // Nobody could have seen this before: on the old year 2 000 days was 5.5 years, the elder
+    // line stood at 60, and so old age was never once reachable as a cause of death.
+    expect(daysAtBaseChance / DAYS_PER_YEAR).toBeGreaterThan(CFG.aging.elderFromYears)
+  })
 })
 
 describe('fold: agent_aged', () => {
   it('increments ageDays by exactly 1', () => {
-    let s = makeWorld(7300)
+    let s = makeWorld(ADULT_AGE_DAYS)
     s = fold(s, ev('agent_aged', { agentId: 'a1' }), CFG)
-    expect(s.agents.a1!.ageDays).toBe(7301)
+    expect(s.agents.a1!.ageDays).toBe(ADULT_AGE_DAYS + 1)
     expect(() => fold(s, ev('agent_aged', { agentId: 'ghost' }), CFG)).toThrow(/unknown agent/i)
   })
 })
 
 describe('worldTick: aging at midnight', () => {
   it('ages exactly at the midnight tick, not before or after', () => {
-    const at = tickTo({ ...makeWorld(7300), tick: MIDNIGHT - 1 }, MIDNIGHT)
+    const at = tickTo({ ...makeWorld(ADULT_AGE_DAYS), tick: MIDNIGHT - 1 }, MIDNIGHT)
     expect(at.events).toContainEqual({ type: 'agent_aged', payload: { agentId: 'a1' } })
-    expect(at.state.agents.a1!.ageDays).toBe(7301)
+    expect(at.state.agents.a1!.ageDays).toBe(ADULT_AGE_DAYS + 1)
 
-    const before = tickTo({ ...makeWorld(7300), tick: MIDNIGHT - 2 }, MIDNIGHT - 1)
+    const before = tickTo({ ...makeWorld(ADULT_AGE_DAYS), tick: MIDNIGHT - 2 }, MIDNIGHT - 1)
     expect(before.events.map((e) => e.type)).not.toContain('agent_aged')
-    const after = tickTo({ ...makeWorld(7300), tick: MIDNIGHT }, MIDNIGHT + 1)
+    const after = tickTo({ ...makeWorld(ADULT_AGE_DAYS), tick: MIDNIGHT }, MIDNIGHT + 1)
     expect(after.events.map((e) => e.type)).not.toContain('agent_aged')
-    expect(after.state.agents.a1!.ageDays).toBe(7300)
+    expect(after.state.agents.a1!.ageDays).toBe(ADULT_AGE_DAYS)
   })
 
   it('dead agents do not age', () => {
-    let s = makeWorld(7300)
+    let s = makeWorld(ADULT_AGE_DAYS)
     s = fold(s, ev('agent_died', { agentId: 'a1', cause: 'health' }), CFG)
     const r = tickTo({ ...s, tick: MIDNIGHT - 1 }, MIDNIGHT)
     expect(r.events.map((e) => e.type)).not.toContain('agent_aged')

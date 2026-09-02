@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'
@@ -28,7 +34,7 @@ const map = (): TileId[][] => grid(16)
 function body(config = CFG): WorldState {
   return fold(
     genesisState(config, map()),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
     config,
   )
 }
@@ -362,7 +368,7 @@ describe('a grave where the life ended', () => {
     wet[3]![2] = 2
     let s = fold(
       genesisState(CFG, wet),
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
     s = fold(
