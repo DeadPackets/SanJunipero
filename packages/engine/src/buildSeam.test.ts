@@ -344,7 +344,7 @@ describe('★ two bodies raise one building — the second pair of hands joins t
 
   it('★ walls already up need no plot: joining them survives a town with nowhere left to lay one', () => {
     const { s } = aWallAndTwoBodies()
-    const short: WorldState = { ...s, terrain: s.terrain.slice(0, 95) }
+    const short: WorldState = { ...s, terrain: s.terrain.map((row) => row.slice(0, 97)) }
     // NON-VACUITY: on this world the town cannot lay a fresh plot at all.
     const claim = claimInWorld(short, { along: 2, deep: 2 })!
     expect(layBlock(short, TOWN_SQUARE, claim.block)).toBe('off the map')
@@ -416,7 +416,7 @@ describe('★ the town grows only where the lattice lets it', () => {
   it('twelve agent builds fill ring 1 and cross into ring 2, with the floor intact', () => {
     const s = raiseThrough(12)
     const rects = standingRects(s)
-    expect(rects).toHaveLength(11 + 12)
+    expect(rects).toHaveLength(13 + 12)
     // Nothing overlaps, and nothing comes closer than the grammar's floor.
     const seen = new Set<string>()
     for (const r of rects)
@@ -433,9 +433,9 @@ describe('★ the town grows only where the lattice lets it', () => {
         closest = Math.min(closest, Math.hypot(p.sx - q.sx, p.sy - q.sy))
       }
     expect(closest).toBeGreaterThanOrEqual(MIN_SEP)
-    // The twelfth is the one that crossed: it stands on a block two rings out.
-    expect(claimInWorld(genesisTown(), { along: 2, deep: 2 })!.rings).toBe(1)
-    expect(claimInWorld(raiseThrough(11), { along: 2, deep: 2 })!.rings).toBe(2)
+    // The tenth is the one that crossed: it stands on a block two rings out.
+    expect(claimInWorld(raiseThrough(8), { along: 2, deep: 2 })!.rings).toBe(1)
+    expect(claimInWorld(raiseThrough(9), { along: 2, deep: 2 })!.rings).toBe(2)
   })
 
   it('replays identically: the same builds in the same order reach the same town', () => {

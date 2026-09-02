@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CITY_HEARTH_KIND,
   DEFAULT_CONFIG,
-  FOUNDER_IDS,
+  CAST_IDS,
   cityStructures,
   parseCharacterAtlasManifest,
   parseLibraryItemManifest,
@@ -163,7 +163,7 @@ describe('★ the committed-art ingest scans the codex once, not once per item',
 
 describe('every founder the town spawns has a committed sheet', () => {
   it('is measuring the cast it thinks it is', () => {
-    expect(requiredCastKinds()).toEqual([...FOUNDER_IDS].map(characterKind).sort())
+    expect(requiredCastKinds()).toEqual([...CAST_IDS].map(characterKind).sort())
   })
 
   it('MISSING: no villager is left to the placeholder', () => {
@@ -185,13 +185,13 @@ describe('every founder the town spawns has a committed sheet', () => {
 
 // Shipping the content ends the live failure, so the shape of the defect is kept as a fixture.
 describe('the pre-recovery tree, as a fixture', () => {
-  it('an empty codex reports all fifty-four items and all five founders', () => {
+  it('an empty codex reports all fifty-four items and the whole cast of sixteen', () => {
     const items = itemArtCoverage([])
     const cast = castArtCoverage([])
     expect(items.missing).toHaveLength(108)
-    expect(cast.missing).toHaveLength(5)
+    expect(cast.missing).toHaveLength(16)
     expect(coverageFailure('items', items)[0]).toMatch(/108 kinds the world asks for/)
-    expect(coverageFailure('cast', cast)[0]).toMatch(/5 kinds the world asks for/)
+    expect(coverageFailure('cast', cast)[0]).toMatch(/16 kinds the world asks for/)
   })
 
   it('half a library is still a failure, and names only the half that is absent', () => {
@@ -346,7 +346,7 @@ describe('the committed cast', () => {
   const cast = listCommittedCast()
 
   it('ships one directory per founder', () => {
-    expect(cast.map((c) => c.id).sort()).toEqual([...FOUNDER_IDS].sort())
+    expect(cast.map((c) => c.id).sort()).toEqual([...CAST_IDS].sort())
   })
 
   it.each(cast.map((c) => [c.id, c] as const))('%s addresses all 24 cells', async (_id, c) => {

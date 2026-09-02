@@ -16,7 +16,7 @@ const base: Recipe = {
       weight: 1,
       success: true,
       label: 'The seams hold water.',
-      effects: [{ op: 'spawn_item', kind: 'waterskin', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'waterskin', qty: 1 }],
     },
   ],
   rngStream: 'recipe:waterskin',
@@ -88,7 +88,7 @@ describe('the codification sanity gate', () => {
           weight: 1,
           success: true,
           label: 'It holds water.',
-          effects: [{ op: 'spawn_item', kind: 'waterskins', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'waterskins', qty: 1 }],
         },
       ],
     }

@@ -177,9 +177,7 @@ export const ActionStarted = z
     verb: z.string(),
     params: z.record(z.string(), z.unknown()),
     duration: z.number(),
-    then: z
-      .object({ verb: z.string(), params: z.record(z.string(), z.unknown()) })
-      .optional(),
+    then: z.object({ verb: z.string(), params: z.record(z.string(), z.unknown()) }).optional(),
   })
   .strict()
 export const ActionProgressed = z.object({ agentId: z.string(), ticks: z.number() }).strict()
@@ -214,7 +212,8 @@ export const AgentSpoke = z
   })
   .strict()
 // A witness record and nothing else. `sense` says which way the act travelled, so a replay knows
-// a song from a dance; `insideId` replays the doorway rule from the event alone.
+// a song from a dance; `insideId` replays the doorway rule from the event alone. A minted verb
+// may say in words what the others see (`label`) and how far it carries (`radius`).
 export const AgentExpressed = z
   .object({
     agentId: z.string(),
@@ -224,10 +223,25 @@ export const AgentExpressed = z
     y: z.number(),
     sense: z.enum(['sight', 'sound']).optional(),
     insideId: z.string().optional(),
+    label: z.string().min(1).optional(),
+    radius: z.number().int().positive().optional(),
   })
   .strict()
-// `byId` is the inventor, `intent` the words they used, `makes` the item kinds the new verb can
-// produce (empty for a coined word). The tick is the envelope's.
+// A tag on a person, a building or a thing, readable by anyone who can see it.
+export const Marked = z
+  .object({
+    on: z.enum(['agent', 'structure', 'item']),
+    id: z.string().min(1),
+    key: z.string().min(1),
+    value: z.string().min(1),
+  })
+  .strict()
+// A name given to a place by a minted verb; `byId` is the mouth it came from.
+export const PlaceNamed = z
+  .object({ structureId: z.string().min(1), name: z.string().min(1), byId: z.string().min(1) })
+  .strict()
+// `byId` is the inventor, `intent` the words they used, `saying` the thought behind the ask,
+// `makes` the item kinds the new verb can produce (empty for a coined word). The tick is the envelope's.
 export const DiscoveryMade = z
   .object({
     recipeId: z.string().min(1),
@@ -235,6 +249,7 @@ export const DiscoveryMade = z
     kind: z.enum(['craft', 'word']),
     byId: z.string().min(1),
     intent: z.string().min(1),
+    saying: z.string().min(1).optional(),
     makes: z.array(z.string().min(1)),
   })
   .strict()

@@ -109,7 +109,6 @@ export type VerbKind =
   | 'inscribe'
   | 'teach'
   | 'attack'
-  | 'experiment'
 
 export type VerbDef = {
   kind: string
@@ -2255,16 +2254,6 @@ const attack: VerbDef = makeVerb({
   rngStream: 'combat',
 })
 
-const experiment: VerbDef = makeVerb({
-  kind: 'experiment',
-  validate() {
-    return 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
-  },
-  onComplete() {
-    return []
-  },
-})
-
 export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
@@ -2303,7 +2292,6 @@ export const VERBS: Record<string, VerbDef> = {
   inscribe,
   teach,
   attack,
-  experiment,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id.

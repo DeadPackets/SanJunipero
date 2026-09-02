@@ -67,6 +67,141 @@ export const CAST_V5: readonly CastMember[] = [
       'Only THREE signature features: the round hair bun, the dusty-rose cardigan, the white apron. ' +
       'No spoon, no ladle, no kerchief, no oven glove, no extra props.',
   },
+  // The seven who joined the founding, from `founderMinds.ts`; costumes derived from trade and
+  // age the same way. Hands EMPTY throughout: a held thing is the thing the gates lose a sheet to.
+  {
+    // 37, f — tailor; the tape measure is the trade, the headscarf sets her apart from Salma's bun.
+    id: 'farida',
+    desc:
+      'a slim, upright woman of about thirty-seven, about 3 heads tall, with dark hair tied back ' +
+      'under a mustard-yellow headscarf knotted at the nape, wearing a plum-purple button-up ' +
+      'cardigan over a cream blouse, charcoal trousers, and a yellow tape measure draped around ' +
+      'her neck with both ends hanging down her front',
+    featureCap:
+      'Only THREE signature features: the mustard-yellow headscarf, the plum-purple cardigan, the ' +
+      'tape measure around the neck. No pins, no scissors, no needles, no glasses, no extra props. ' +
+      'Both hands are EMPTY.',
+  },
+  {
+    // 39, m — fisherman; big, loud, and dressed for the water.
+    id: 'bashir',
+    desc:
+      'a broad, big-bellied man of about thirty-nine, about 3 heads tall, with a short black ' +
+      'beard, wearing a rust-orange knitted beanie, a navy-blue waterproof fishing jacket open ' +
+      'over a cream T-shirt, and tall olive-green rubber boots up to the knee',
+    featureCap:
+      'Only THREE signature features: the rust-orange beanie, the navy-blue fishing jacket, the ' +
+      'tall olive-green rubber boots. No fish, no rod, no net, no bucket, no extra props. Both ' +
+      'hands are EMPTY.',
+  },
+  {
+    // 54, m — smith and mender of the generator; the coverall is the office.
+    id: 'kamal',
+    desc:
+      'a barrel-chested man of about fifty-four, about 3 heads tall, bald on top with a thick ' +
+      'dark moustache, wearing a charcoal-grey work coverall with the sleeves rolled to the ' +
+      'elbow, a coral-red neckerchief knotted at the throat, and heavy dark work boots',
+    featureCap:
+      'Only THREE signature features: the bald head with the dark moustache, the charcoal-grey ' +
+      'coverall, the coral-red neckerchief. No hammer, no spanner, no apron, no goggles, no extra ' +
+      'props. Both hands are EMPTY.',
+  },
+  {
+    // 51, f — brewer; warm and pinned-up, the lavender keeps her off Salma's rose.
+    id: 'leyla',
+    desc:
+      'a plump, smiling woman of about fifty-one, about 3 heads tall, with grey-streaked dark ' +
+      'hair in a braid pinned up around her head, wearing a lavender-purple quilted body-warmer ' +
+      'gilet over a cream long-sleeved dress that reaches mid-calf, and short brown boots',
+    featureCap:
+      'Only THREE signature features: the pinned-up grey-streaked braid, the lavender-purple gilet, ' +
+      'the cream dress. No cup, no jug, no tray, no apron, no extra props. Both hands are EMPTY.',
+  },
+  {
+    // 22, m — the son who will not be a smith; slouch, hood, torn knee.
+    id: 'tariq',
+    desc:
+      'a thin, slouching young man of about twenty-two, about 3 heads tall, with shaggy black ' +
+      'hair falling over his eyes, wearing a charcoal-grey hooded sweatshirt with the hood down, ' +
+      'faded pale-blue jeans with a torn knee, and white canvas sneakers',
+    featureCap:
+      'Only THREE signature features: the shaggy black hair, the charcoal-grey hoodie, the ' +
+      'pale-blue torn jeans. No notebook, no pen, no guitar, no headphones, no extra props. Both ' +
+      'hands are EMPTY.',
+  },
+  {
+    // 67, m — the old schoolmaster; the waistcoat is the last of the classroom.
+    id: 'halim',
+    desc:
+      'a stooped, thin old man of about sixty-seven, about 3 heads tall, with white hair combed ' +
+      'back and a neat short white beard, wearing a moss-green wool waistcoat buttoned over a ' +
+      'white shirt with the collar done up, tan corduroy trousers, and brown leather shoes',
+    featureCap:
+      'Only THREE signature features: the white beard, the moss-green waistcoat, the tan corduroy ' +
+      'trousers. No walking stick, no glasses, no book, no hat, no extra props. Both hands are ' +
+      'EMPTY.',
+  },
+  {
+    // 33, f — hunter and trapper; cropped hair and a waxed jacket, nothing Nadia wears.
+    id: 'dilara',
+    desc:
+      'a lean, wiry woman of about thirty-three, about 3 heads tall, with dark hair cropped ' +
+      'short, wearing a dark olive-green waxed field jacket zipped over a grey T-shirt, khaki ' +
+      'cargo trousers tucked into dark laced boots',
+    featureCap:
+      'Only THREE signature features: the cropped dark hair, the olive-green waxed jacket, the ' +
+      'khaki cargo trousers. No bow, no rope, no knife, no snare, no bag, no extra props. Both ' +
+      'hands are EMPTY.',
+  },
+  // The four travellers, from `travellerMinds.ts`.
+  {
+    // 31, f — pedlar; the pack never comes off, so it is one of her three.
+    id: 'mira',
+    desc:
+      'a small, quick woman of about thirty-one, about 3 heads tall, with curly red-brown hair ' +
+      'held back by a coral-red knitted headband, wearing a mustard-yellow anorak, dark trousers, ' +
+      'and a large tan canvas backpack worn on both shoulders',
+    featureCap:
+      'Only THREE signature features: the coral-red headband, the mustard-yellow anorak, the tan ' +
+      'backpack. No basket, no cart, no goods in hand, no hat, no extra props. Both hands are ' +
+      'EMPTY.',
+  },
+  {
+    // 27, m — surveyor; the vest says the trade without a single tool. Soft orange, not
+    // high-visibility: the neon one measured 32 against a palette ceiling of 25.
+    id: 'emre',
+    desc:
+      'a tall, thin young man of about twenty-seven, about 3 heads tall, with neat short brown ' +
+      'hair and round glasses, wearing a soft peach-orange sleeveless work vest over a pale ' +
+      'sky-blue long-sleeved shirt, grey trousers, and brown hiking boots',
+    featureCap:
+      'Only THREE signature features: the round glasses, the peach-orange work vest, the ' +
+      'pale sky-blue shirt. No notebook, no tripod, no measuring pole, no clipboard, no extra ' +
+      'props. Both hands are EMPTY.',
+  },
+  {
+    // 58, m — shepherd without a flock; a long coat for the pass.
+    id: 'reza',
+    desc:
+      'a weathered, broad man of about fifty-eight, about 3 heads tall, with a grey stubbled ' +
+      'beard, wearing a brown flat cap, a long dark-brown wool overcoat reaching the knee over a ' +
+      'cream jumper, and dark trousers over black boots',
+    featureCap:
+      'Only THREE signature features: the brown flat cap, the long dark-brown overcoat, the grey ' +
+      'stubbled beard. No crook, no staff, no dog, no sheep, no extra props. Both hands are EMPTY.',
+  },
+  {
+    // 24, f — came up the road at night with one bag; the jacket is borrowed and too big.
+    id: 'zeynep',
+    desc:
+      'a slight young woman of about twenty-four, about 3 heads tall, with long straight black ' +
+      'hair worn loose over one shoulder, wearing an oversized sky-blue denim jacket over a white ' +
+      'T-shirt, black leggings, and black ankle boots',
+    featureCap:
+      'Only THREE signature features: the long loose black hair, the oversized sky-blue denim ' +
+      'jacket, the black leggings. No bag, no hood, no scarf, no jewelry, no extra props. Both ' +
+      'hands are EMPTY.',
+  },
 ]
 
 /** Omar first, and not by alphabet: his master sheet is the proportion reference every other

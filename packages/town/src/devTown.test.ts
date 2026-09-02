@@ -28,8 +28,8 @@ const FROZEN_TOWN_STRUCTURES = [
 const town = devTown()
 
 describe('devTown — one town, not two', () => {
-  it('carries all eleven template structures', () => {
-    expect(town.structures).toHaveLength(11)
+  it('carries all thirteen template structures', () => {
+    expect(town.structures).toHaveLength(13)
   })
 
   it('has exactly the template kind multiset', () => {
@@ -39,9 +39,9 @@ describe('devTown — one town, not two', () => {
       return out
     }
     expect(count(town.structures)).toEqual(count(cityStructures()))
-    // Six kinds over eleven roofs; the cottage, the cabin and the farmhouse are unowned.
+    // Six kinds over thirteen roofs; the cottage, the cabin and the farmhouse are unowned.
     expect(count(town.structures)).toEqual({
-      house: 5,
+      house: 7,
       cottage: 1,
       cabin: 1,
       farmhouse: 1,
@@ -51,11 +51,11 @@ describe('devTown — one town, not two', () => {
     })
   })
 
-  it('gives five houses one founder owner each, and leaves every other building public', () => {
+  it('gives seven houses one founder owner each, and leaves every other building public', () => {
     const owned = town.structures.filter((s) => s.owner !== null)
-    expect(owned).toHaveLength(5)
+    expect(owned).toHaveLength(7)
     expect(new Set(owned.map((s) => s.kind))).toEqual(new Set(['house']))
-    expect(new Set(owned.map((s) => s.owner))).toEqual(new Set(FOUNDER_IDS))
+    for (const s of owned) expect(FOUNDER_IDS).toContain(s.owner)
     expect(new Set(owned.map((s) => s.owner)).size).toBe(owned.length) // nobody twice
   })
 

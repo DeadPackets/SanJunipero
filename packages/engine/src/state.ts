@@ -88,6 +88,9 @@ export type AgentBody = {
   // Every place this body has ever had in sight, sorted and only ever growing. Absent until
   // the first one comes into view, so a mind that has seen no building hashes as it always did.
   knownPlaces?: string[]
+  // Tags a minted verb left on this body, readable by anyone who can see it. Absent until the
+  // first one, so a town that has invented nothing hashes as it always did.
+  marks?: Record<string, string>
   skills: Record<string, number> // track → xp
   activity: null | {
     verb: string
@@ -128,6 +131,7 @@ export type Structure = {
   // The tick a fed fire burns down to. Absent until somebody stokes it, so an unlit hearth is
   // a hearth that was never lit — and the same field answers "is it warm" and "is it bright".
   fueledUntilTick?: number
+  marks?: Record<string, string>
 }
 
 export type Item = {
@@ -144,6 +148,7 @@ export type Item = {
   // struck yet — which is a full one.
   litUntilTick?: number
   fuelTicks?: number
+  marks?: Record<string, string>
   loc:
     | { t: 'tile'; x: number; y: number }
     | { t: 'agent'; id: string }

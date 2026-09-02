@@ -54,9 +54,11 @@ import {
   ReviewStore,
   makeArbiter,
   openArbiterDb,
+  RETIRED_REASON,
   runConstructPass,
+  type Arbiter,
+  type AttemptVerdict,
   type Codified,
-  type Recipe,
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import {
@@ -212,9 +214,9 @@ const LIVE_BACKFILL_REAL_SECONDS = 60
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
-/** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
- *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
-const LIVE_MAX_MINDS_PER_FOUNDER = 3
+/** The population ceiling: nothing else in the world stops the town growing, and every mind is
+ *  another live bill. Twelve founders, four travellers, four births. `SJ_MAX_MINDS`. */
+const LIVE_MAX_MINDS = 20
 
 function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
@@ -345,10 +347,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = Math.max(
-    opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER,
-    founders.length,
-  )
+  const maxMinds = Math.max(opts.maxMinds ?? LIVE_MAX_MINDS, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -529,36 +528,39 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       // Not built in `createLiveCast`: `makeArbiter` needs the tick and `onCodified` the bridge.
       // `makeClient` points at `opsDb` — an arbiter on its own db spends outside the anomaly stop.
+      const built =
+        arbiterDb === null || opts.arbiter !== undefined
+          ? null
+          : makeArbiter({
+              db: arbiterDb,
+              llm: makeClient('arbiter'),
+              embedder,
+              tick: () => loop.state.tick,
+              vocabulary: STREAM_VOCABULARY,
+              // A codification is a world fact, so it goes in the world's log. The verb is
+              // already minted by the time this runs, so nothing here can fail it.
+              onCodified: (d: Codified) => {
+                bridge?.announce(DISCOVERY_EVENT, {
+                  recipeId: d.recipeId,
+                  name: d.name,
+                  kind: d.kind,
+                  byId: d.credit.agentId,
+                  intent: d.credit.intent,
+                  ...(d.credit.saying ? { saying: d.credit.saying } : {}),
+                  makes: d.makes,
+                })
+                art.onDiscovery({ name: d.name, makes: d.makes })
+              },
+            })
       const arbiter: SeamArbiter | undefined =
         opts.arbiter ??
-        (arbiterDb === null
+        (built === null
           ? undefined
-          : (() => {
-              const built = makeArbiter({
-                db: arbiterDb,
-                llm: makeClient('arbiter'),
-                embedder,
-                tick: () => loop.state.tick,
-                vocabulary: STREAM_VOCABULARY,
-                // A codification is a world fact, so it goes in the world's log. The verb is
-                // already minted by the time this runs, so nothing here can fail it.
-                onCodified: (d: Codified) => {
-                  bridge?.announce(DISCOVERY_EVENT, {
-                    recipeId: d.recipeId,
-                    name: d.name,
-                    kind: d.kind,
-                    byId: d.credit.agentId,
-                    intent: d.credit.intent,
-                    makes: d.makes,
-                  })
-                  art.onDiscovery({ name: d.name, makes: d.makes })
-                },
-              })
-              return {
-                adjudicate: (...args) => built.adjudicate(...args),
-                codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
-              }
-            })())
+          : {
+              adjudicate: (...args) => built.adjudicate(...args),
+              codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
+              roster: () => built.roster(),
+            })
 
       // A child still owed its household comes up the way a live birth does — household
       // first, then the mind — so `ensureChildren` below is what boots it.
@@ -818,10 +820,23 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       let nextMixCheckAt = Date.now()
       let nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
       let backfilling = false
+      // Minted verbs are used through the world log, which the arbiter cannot read: each day's
+      // acts are handed over, then whatever has gone fourteen days unused is retired.
+      let usedThroughSeq = store.lastSeq()
+      const retireTheDay = (arb: Arbiter, tick: number): void => {
+        for (const ev of store.readTypeFrom(usedThroughSeq, 'action_started')) {
+          const verb = (ev.payload as { verb?: unknown }).verb
+          if (typeof verb === 'string' && verb.includes(':')) arb.noteUsed(verb, ev.tick)
+        }
+        usedThroughSeq = store.lastSeq()
+        const retired = arb.retireUnused(tick)
+        if (retired.length > 0) log(`stream: retired ${retired.join(', ')} — ${RETIRED_REASON}`)
+      }
       bridge.onTick((tick) => {
         tickHistory.push({ ms: Date.now(), tick })
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
+          if (built !== null) retireTheDay(built, tick)
           if (arbiterDb !== null) recognizeTheDay(arbiterDb, narratorStore, tick)
           if (narratorStore !== null) writeTheDay(narratorStore, tick)
         }

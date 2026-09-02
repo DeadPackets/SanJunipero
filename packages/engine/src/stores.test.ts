@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, FOUNDER_IDS, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { composePerception } from './perception.js'
+import { makeGenesisWorld } from './genesis/world.js'
 import { spoilDeadline } from './systems/spoilage.js'
 import { ev, grid } from './testutil/world.js'
 
@@ -144,6 +145,22 @@ describe('the stores a mind may put things in', () => {
     )
     expect(store).toMatchObject({ kind: 'storehouse' })
     expect(store).not.toHaveProperty('yours')
+  })
+
+  // Seven of the twelve founders own no roof: two sleep under a partner's name and three share
+  // the old cottage, which is nobody's. Every one of them still has a shelf.
+  it('leaves no founder of the village without a roof of their own', () => {
+    const g = makeGenesisWorld(DEFAULT_CONFIG)
+    let s = genesisState(DEFAULT_CONFIG, g.terrain)
+    for (const e of g.events) s = put(s, ev(e.type, e.payload))
+    for (const id of FOUNDER_IDS) s = spawn(s, id, 1, 1)
+    for (const id of FOUNDER_IDS) {
+      const mine = composePerception(s, DEFAULT_CONFIG, id, []).stores.filter(
+        (st) => st.yours === true,
+      )
+      expect(mine.length, id).toBe(1)
+      expect(mine[0]!.items.length, id).toBeGreaterThan(0)
+    }
   })
 
   it('carries a name where the walls have one', () => {

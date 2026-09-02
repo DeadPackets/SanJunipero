@@ -13,7 +13,7 @@ OUT=$ROOT/rehearsals
 MINUTES=${1:-65}
 SPEED=${SPEED:-1}
 DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 48}")
-export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
+export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=${SJ_MAX_MINDS:-20} PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$
 export SJ_ADMIN_PORT=${SJ_ADMIN_PORT:-8799}
 # Nobody watches a rehearsal, and unwatched is exactly when pacing drops the clock to 0.25x

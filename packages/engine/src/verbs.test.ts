@@ -105,7 +105,6 @@ const TIER1 = [
   'inscribe',
   'teach',
   'attack',
-  'experiment',
 ]
 
 afterEach(() => {
