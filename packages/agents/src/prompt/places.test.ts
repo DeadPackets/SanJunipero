@@ -4,6 +4,7 @@ import { placeName } from '@sj/engine'
 import {
   perceptionToProse,
   placesKnownLine,
+  valleyExtentLine,
   type KnownPlace,
   type PerceptionPacket,
 } from './prose.js'
@@ -152,6 +153,31 @@ describe('★ a carved name cannot forge a line', () => {
     )
     expect(block.split('\n')).toHaveLength(2)
     expect(block).toContain('the mill Amara (structure_1), close to the north (structure_9)')
+  })
+})
+
+describe('★ how far the ground goes', () => {
+  // ★ World three's Nadia walked to (75, 30), (75, 36) and (75, 42) chasing east bushes that
+  // were never there, and only a refusal ever told her the map stopped at 75.
+  it('names the whole valley in map numbers, once', () => {
+    expect(valleyExtentLine({ extent: () => ({ w: 76, h: 76 }) })).toBe(
+      'The valley runs from (0, 0) to (75, 75); past its edges there is nothing to find.',
+    )
+  })
+
+  it('says nothing at all when no world was wired to answer', () => {
+    expect(valleyExtentLine()).toBe('')
+    expect(valleyExtentLine({})).toBe('')
+  })
+
+  // The other half: the standing fact, said on every turn the feet are there and not once on
+  // arriving — four separate walks is four turns that each have to say it.
+  it('★ says where a body on the last column is standing', () => {
+    const said = (p: PerceptionPacket): string => perceptionToProse(p, undefined, {})
+    expect(said(quietMeadowPacket)).not.toContain("valley's edge")
+    expect(said({ ...quietMeadowPacket, atRim: true })).toContain(
+      "You are standing at the valley's edge; nothing lies beyond.",
+    )
   })
 })
 

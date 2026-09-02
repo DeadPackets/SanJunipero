@@ -31,6 +31,7 @@ import {
   buildTicks,
   isAdjacentToRect,
   itemWithinReach,
+  isMapRim,
   walkIsCapped,
   workPenalty,
 } from './verbs/index.js'
@@ -227,6 +228,8 @@ export type PerceptionPacket = {
   // Present only while the legs are walking a route the search could not follow to its end.
   // A distance, not a failure — and never the word for what the search did.
   wayUnclear?: true
+  // Present only while the feet are on the last row or column the map has.
+  atRim?: true
   heard: HeardSpeech[]
   seen: SeenEvent[]
   feltEvents: string[]
@@ -716,6 +719,7 @@ export function composePerception(
     light: lightBandAt(state, self.x, self.y, state.tick, config),
     ...(fumbling ? { fumbling: true as const } : {}),
     ...(walkIsCapped(state, agentId) ? { wayUnclear: true as const } : {}),
+    ...(isMapRim(state, self.x, self.y) ? { atRim: true as const } : {}),
     visible,
     reach: perceiveReach(lens, visible),
     heard: perceiveHeard(lens, recentEvents),

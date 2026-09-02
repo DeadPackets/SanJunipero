@@ -5,7 +5,8 @@ import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { ev } from './testutil/world.js'
-import { walkDestination, WALK_NO_ROAD, WALK_OFF_MAP } from './verbs/index.js'
+import { composePerception } from './perception.js'
+import { walkDestination, WALK_NO_ROAD } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 
 const CHAR: Record<string, TileId> = { '.': 0, '~': 2 }
@@ -53,20 +54,31 @@ describe('★ a walk that has nowhere to go', () => {
   })
 
   // ★ World A's Nadia ended on array column 75, the last one the map has, and spent 36 of her
-  // 41 refusals re-issuing a walk east into open space. The legs go as far as there is ground,
-  // and only the body standing at the edge is told where the edge is.
-  it('★ walks to the edge of the world, then says the world ends that way', () => {
+  // 41 refusals re-issuing a walk east into open space. World three's Nadia went one worse: her
+  // four walks to that column all TOOK, and standing there told her nothing, so she chased east
+  // bushes until a refusal finally named the rim. The legs go as far as there is ground, and the
+  // body is told, on every turn it stands there, that it is standing on the last of it.
+  it('★ walks to the edge of the world, and the body standing there is told so', () => {
     expect(
       walkDestination(world(OPEN, { x: 4, y: 2 }), DEFAULT_CONFIG, AGENT, { x: 40, y: 2 }),
     ).toEqual({ x: 7, y: 2 })
 
-    const atEdge = world(OPEN, { x: 7, y: 2 })
-    expect(walkDestination(atEdge, DEFAULT_CONFIG, AGENT, { x: 40, y: 2 })).toEqual({
-      refusal: WALK_OFF_MAP,
-    })
-    const said = submitIntent(atEdge, DEFAULT_CONFIG, AGENT, 'walk', { x: 40, y: 2 })
-    expect(said.ok).toBe(false)
-    if (!said.ok) expect(said.reason).toBe(WALK_OFF_MAP)
+    const atEdge = start(world(OPEN, { x: 4, y: 2 }), { x: 40, y: 2 })
+    expect(composePerception(atEdge, DEFAULT_CONFIG, AGENT, []).atRim).toBeUndefined()
+    expect(composePerception(world(OPEN, { x: 7, y: 2 }), DEFAULT_CONFIG, AGENT, []).atRim).toBe(
+      true,
+    )
+  })
+
+  // ★ The rim is where a mark with no footing under it is answered with ground rather than a
+  // refusal: there is nothing further out to name instead, so the last dry tile is the answer.
+  it('★ settles onto the last dry tile when the rim itself is water', () => {
+    expect(
+      walkDestination(world(['....~', '....~', '....~'], { x: 0, y: 1 }), DEFAULT_CONFIG, AGENT, {
+        x: 4,
+        y: 1,
+      }),
+    ).toEqual({ x: 3, y: 1 })
   })
 
   // A far bank with no crossing: the legs reach the near one, and the second ask — made from

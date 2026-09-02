@@ -113,6 +113,7 @@ function reconcile(
     ...(raw.ground === undefined ? {} : { ground: raw.ground }),
     ...(raw.fumbling === undefined ? {} : { fumbling: raw.fumbling }),
     ...(raw.wayUnclear === undefined ? {} : { wayUnclear: raw.wayUnclear }),
+    ...(raw.atRim === undefined ? {} : { atRim: raw.atRim }),
     ...(cold === undefined ? {} : { cold }),
     light: raw.light,
     visible: {
@@ -253,6 +254,13 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // How big the valley is. No packet can say: terrain is the one thing perception never
+  // projects, and a mind with no number for the rim walks at it until the world refuses.
+  extent(): { w: number; h: number } {
+    const t = this.#loop.state.terrain
+    return { w: t[0]!.length, h: t.length }
   }
 
   // Whether an act that named no object has exactly one thing it could mean. Asked before the

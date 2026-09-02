@@ -32,6 +32,7 @@ import {
   roadLine,
   perceptionToProse,
   placesKnownLine,
+  valleyExtentLine,
   absenceLine,
   type Company,
   type ProseWorld,
@@ -773,6 +774,7 @@ export class AgentRuntime {
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),
       nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
       distantWater: (x: number, y: number) => this.#bridge.distantWater(x, y),
+      extent: () => this.#bridge.extent(),
     }
     const prose = perceptionToProse(
       packet,
@@ -793,6 +795,7 @@ export class AgentRuntime {
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
       roadLine(canMake, packet, world),
+      valleyExtentLine(world),
       placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       stasisLine(this.#still, tick),

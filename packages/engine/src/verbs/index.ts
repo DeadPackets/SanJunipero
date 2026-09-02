@@ -258,6 +258,12 @@ export const WALK_NO_ROAD = 'there is no way through from here'
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
+/** Whether this tile is the last the map has in some direction. The one copy: the walk reads it
+ *  to know a mark it must answer with ground, and perception reads it to say where a body is. */
+export function isMapRim(state: WorldState, x: number, y: number): boolean {
+  return x === 0 || y === 0 || x === state.terrain[0]!.length - 1 || y === state.terrain.length - 1
+}
+
 /** As far toward a mark as the ground allows. A want that points past the edge of the world, or
  *  across water with no crossing, is a journey worth starting rather than a turn worth spending:
  *  the refusal is kept for the body already standing at that limit, where it teaches something. */
@@ -328,9 +334,12 @@ export function walkDestination(
       y: clamp(want.y, 0, state.terrain.length - 1),
     }
     const offMap = to.x !== want.x || to.y !== want.y
-    if (offMap && to.x === a.x && to.y === a.y) return { refusal: WALK_OFF_MAP }
-    // A mark with no footing under it is a mark named wrong, and the affordance block says so.
-    if (!offMap && !isPassable(state, to.x, to.y)) return { refusal: 'no path to that spot' }
+    // A mark with no footing under it is a mark named wrong, and the affordance block says so —
+    // except at the rim, where the last ground the legs can hold is the whole of the answer:
+    // there is nothing further out to name instead, so a refusal there teaches nothing. A
+    // clamped mark is always on the rim, which is why `offMap` has nothing to add here.
+    if (!isMapRim(state, to.x, to.y) && !isPassable(state, to.x, to.y))
+      return { refusal: 'no path to that spot' }
     if (findPath(state, a, to, config) !== null) return to
     return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
   }

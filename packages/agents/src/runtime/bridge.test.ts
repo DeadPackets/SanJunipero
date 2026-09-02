@@ -165,6 +165,12 @@ describe('EngineBridge carries ownership through to the mind', () => {
   })
 })
 
+describe('extent: the one fact about the valley no packet carries', () => {
+  it('reads the terrain the world was built on', () => {
+    expect(buildBridge().bridge.extent()).toEqual({ w: 12, h: 12 })
+  })
+})
+
 describe('nearestPerson', () => {
   it('names the nearest other body, and never the one asking', () => {
     const { bridge } = ownedWorld()

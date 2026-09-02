@@ -126,6 +126,8 @@ export type PerceptionPacket = {
   cold?: { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' }
   // Present only while the legs are on a route that stops short of where they were sent.
   wayUnclear?: true
+  // Present only while the feet are on the last row or column the map has.
+  atRim?: true
   // How much light is on the ground underfoot. Absent on a packet from before the dark had
   // a price, which reads as it always did.
   light?: 'bright' | 'dim' | 'dark'
@@ -283,6 +285,8 @@ export type ProseWorld = {
   // Big water past the edge of sight, and null whenever any is already inside it. Terrain is the
   // one thing perception never projects, and a valley is mostly told by its water.
   distantWater?: (x: number, y: number) => { x: number; y: number } | null
+  // How wide and how deep the valley is, in tiles.
+  extent?: () => { w: number; h: number }
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -617,6 +621,15 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 
+/** ★ How far the ground goes, said once a turn above the places block. World three's Nadia walked
+ *  at the east rim four times chasing bushes that were never there, and learned where the valley
+ *  stopped only by being turned away at it. */
+export function valleyExtentLine(world?: ProseWorld): string {
+  const e = world?.extent?.()
+  if (e === undefined) return ''
+  return `The valley runs from (0, 0) to (${e.w - 1}, ${e.h - 1}); past its edges there is nothing to find.`
+}
+
 // Two tiles is the same spot: a step to the water butt and back is not a walk that went
 // anywhere. Sixty ticks is one sim-hour, a hundred and eighty is three.
 const STASIS_RADIUS = 2
@@ -896,6 +909,10 @@ export function perceptionToProse(
 
   // Where the legs are going, and how far of it the body actually knows. Not a refusal.
   if (packet.wayUnclear) lines.push('The way is unclear from here.')
+
+  // ★ Said on every turn the feet are there, not once on arriving: world three's Nadia stood on
+  // column 75 four separate times and learned where the valley stopped only by being refused.
+  if (packet.atRim) lines.push("You are standing at the valley's edge; nothing lies beyond.")
 
   for (const a of packet.visible.agents) {
     const dressed = a.worn === undefined ? '' : `, ${a.worn}`
