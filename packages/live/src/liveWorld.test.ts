@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
+import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { DAYS_PER_YEAR, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -274,6 +274,7 @@ async function liveWorld(opts: {
   useArbiter?: boolean
   /** Where the day's chapter is written. Absent, no day is narrated. */
   narratorDbPath?: string
+  log?: (line: string) => void
 }): Promise<{
   world: DevWorld
   cast: LiveCast
@@ -310,7 +311,7 @@ async function liveWorld(opts: {
         ...(opts.spendAlertRealMinutes === undefined
           ? {}
           : { spendAlertRealMinutes: opts.spendAlertRealMinutes }),
-        log: () => {},
+        log: opts.log ?? (() => {}),
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
@@ -358,6 +359,15 @@ function thoughtTexts(dir: string): string[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
     return thoughtsSince(db, 0).map((t) => t.text)
+  } finally {
+    db.close()
+  }
+}
+
+function thinkers(dir: string): Set<string> {
+  const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
+  try {
+    return new Set(thoughtsSince(db, 0).map((t) => t.agentId))
   } finally {
     db.close()
   }
@@ -964,6 +974,29 @@ describe("★ a mind's memory across a resume", () => {
     expect(msg).toContain('omar (4)')
     expect(msg).toContain('SJ_FRESH=1')
   })
+})
+
+describe('★ the founding of twelve, under a flat cap of twenty', () => {
+  it("boots a mind for every founder, and the ceiling is the town's and not a multiple of the cast", async () => {
+    const dir = tmp()
+    const lines: string[] = []
+    const { world, opsDb } = await liveWorld({
+      dir,
+      minds: [...FOUNDER_MINDS],
+      log: (l) => lines.push(l),
+    })
+    await run(world, 4)
+
+    expect(lines.find((l) => l.startsWith('stream: LIVE'))).toContain('12 of at most 20 minds')
+    expect(alertsOf(opsDb, 'cast_at_max_minds')).toEqual([])
+    expect(
+      eventsOf(dir, 'agent_spawned')
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual([...FOUNDER_IDS].sort())
+    // Every one of the twelve took a turn: a body with no mind behind it stands still for ever.
+    expect([...thinkers(dir)].sort()).toEqual([...FOUNDER_IDS].sort())
+  }, 60_000)
 })
 
 describe('★ what the first live boot broke', () => {

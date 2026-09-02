@@ -24,7 +24,7 @@ import {
 import {
   DEFAULT_CONFIG,
   DWELLING_FOOTPRINTS,
-  FOUNDER_IDS,
+  CAST_IDS,
   ROAD_AUTOTILE_KEYS,
   TERRAIN_TILE_KINDS,
   makeCityTemplate,
@@ -272,13 +272,11 @@ describe('ingestCastArt', () => {
 
     const first = ingestCastArt(db)
     expect(first.map((e) => e.kind).sort()).toEqual(
-      [...FOUNDER_IDS].map((id) => `character:${id}`).sort(),
+      [...CAST_IDS].map((id) => `character:${id}`).sort(),
     )
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(ingestCastArt(db).every((e) => e.action === 'unchanged')).toBe(true)
-    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(
-      FOUNDER_IDS.length,
-    )
+    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(CAST_IDS.length)
     db.close()
   }, 30_000)
 })
@@ -318,6 +316,6 @@ describe('the boot resolves every kind the world will ask for', () => {
 
   it('and an empty codex reports every one of them, so the guard cannot go vacuous', () => {
     expect(itemArtCoverage([]).missing).toHaveLength(LIBRARY.length * 2)
-    expect(castArtCoverage([]).missing).toHaveLength(FOUNDER_IDS.length)
+    expect(castArtCoverage([]).missing).toHaveLength(CAST_IDS.length)
   })
 })

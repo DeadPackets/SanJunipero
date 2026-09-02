@@ -25,6 +25,7 @@ import {
 } from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
 import { trimToFigure } from './hires.js'
+import { MAGENTA_RESIDUE_MAX, WALK_CELLS, magentaResidue, walkRowGate } from './walkGates.js'
 
 const MAX_ART_H = FEET_Y_V2 + 1
 const CALIBRATED_MEDIAN = 0.31
@@ -245,6 +246,55 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
       expect(cellDistance(lhs, rhs), 'cellDistance would not see the shift').toBeGreaterThan(0)
     }
     expect(odd, 'no odd-width bbox in this sheet — the residual is unexercised').toBeGreaterThan(0)
+  })
+})
+
+// Two rows of one walk each shipped past every frame gate: dilara's front contact-b 29 px short
+// of its neighbours, and tariq's front passing frame drawn from behind. A row keeps one height
+// and, facing front, one face.
+describe('every committed walk row keeps one height and, facing front, one face', () => {
+  it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
+    const crop = cropper(c, await atlasOf(c))
+    for (const f of FACINGS) {
+      const row = Object.fromEntries(WALK_CELLS.map((p) => [p, crop(`${p}-${f}`)])) as Record<
+        (typeof WALK_CELLS)[number],
+        RawImage
+      >
+      const failures = walkRowGate(row, f === 'sw' || f === 'se').map(
+        (x) => `${id} ${x.cell}-${f} ${x.gate} ${x.value.toFixed(2)} against ${x.limit}`,
+      )
+      expect(failures).toEqual([])
+    }
+  })
+
+  it.each(cast.map((c) => [c.id, c] as const))(
+    '%s carries no magenta the key missed',
+    async (id, c) => {
+      const crop = cropper(c, await atlasOf(c))
+      for (const name of Object.keys(c.manifest.cells))
+        expect(magentaResidue(crop(name)), `${id} ${name}`).toBeLessThanOrEqual(MAGENTA_RESIDUE_MAX)
+    },
+  )
+
+  it('is not vacuous: a short frame and a faceless frame are both refused', async () => {
+    const c = cast.find((x) => x.id === 'omar')!
+    const crop = cropper(c, await atlasOf(c))
+    const row = Object.fromEntries(WALK_CELLS.map((p) => [p, crop(`${p}-se`)])) as Record<
+      (typeof WALK_CELLS)[number],
+      RawImage
+    >
+    expect(walkRowGate(row, true)).toEqual([])
+    const short = fitForGate(row['contact-b'])
+    const shrunk = downscaleMajority(short, short.width, Math.round(short.height * 0.85))
+    expect(walkRowGate({ ...row, 'contact-b': shrunk }, true).map((x) => x.gate)).toContain(
+      'walk-height',
+    )
+    // The back of his own head where his face should be.
+    const back = crop('passing-a-ne')
+    expect(walkRowGate({ ...row, 'passing-a': back }, true).map((x) => x.gate)).toContain(
+      'head-skin',
+    )
+    expect(walkRowGate({ ...row, 'passing-a': back }, false)).toEqual([])
   })
 })
 

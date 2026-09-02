@@ -120,16 +120,16 @@ describe('★ the packet carries how far up the walls are', () => {
     const g = makeGenesisWorld(CFG)
     let s = genesisState(CFG, g.terrain)
     for (const e of g.events) s = fold(s, ev(1, e.type, e.payload), CFG)
-    // The cottage, not a founder's house: every house stands now (D1), and the two roofs the
-    // village left down are the shared pair.
-    const cottage = Object.values(s.structures).find((x) => x.kind === 'cottage')!
+    // The farmhouse, not a founder's house: every seated roof stands now (D1), and the one the
+    // village left down is the one nobody sleeps in.
+    const farmhouse = Object.values(s.structures).find((x) => x.kind === 'farmhouse')!
     s = fold(
       s,
       ev(2, 'agent_spawned', {
         id: 'a1',
         name: 'a1',
-        x: cottage.x,
-        y: cottage.y + cottage.h,
+        x: farmhouse.x,
+        y: farmhouse.y + farmhouse.h,
         ageDays: ADULT_AGE_DAYS,
       }),
       CFG,

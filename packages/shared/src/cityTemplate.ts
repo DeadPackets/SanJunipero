@@ -113,7 +113,7 @@ export const CityStructureSchema = z
     dy: z.number().int(),
     w: z.number().int().min(1).max(4),
     h: z.number().int().min(1).max(4),
-    // The five houses are owned, one founder each; every public building is null. The field is
+    // The seven houses are owned, one founder each; every public building is null. The field is
     // REQUIRED; only its value may be null.
     owner: z.string().min(1).nullable(),
     // What the town calls it. Every genesis building has one; a roof raised later is nameless
@@ -297,10 +297,49 @@ export const footprintFor = (
 ): { w: number; h: number } =>
   facing === 'sw' ? { w: mass.w, h: mass.h } : { w: mass.h, h: mass.w }
 
-// Assumption A-2: the five locked founders (design spec §10). Template data, not engine truth
-// — genesis binds them, and different id strings are one data edit with no code change.
-export const FOUNDER_IDS = ['amara', 'yusuf', 'nadia', 'omar', 'salma'] as const
+// The twelve who found the village. Template data, not engine truth — genesis binds them, and
+// different id strings are one data edit with no code change.
+export const FOUNDER_IDS = [
+  'amara',
+  'yusuf',
+  'nadia',
+  'omar',
+  'salma',
+  'farida',
+  'bashir',
+  'kamal',
+  'leyla',
+  'tariq',
+  'halim',
+  'dilara',
+] as const
 export type FounderId = (typeof FOUNDER_IDS)[number]
+
+/** The four who may come up the valley road later, in arrival order. Not in the founding, but
+ *  the art gate wants their sheets before the first of them walks in. */
+export const TRAVELLER_IDS = ['mira', 'emre', 'reza', 'zeynep'] as const
+/** Everyone who may ever need a sprite sheet. */
+export const CAST_IDS: readonly string[] = [...FOUNDER_IDS, ...TRAVELLER_IDS]
+
+/** Who sleeps under which roof on the first morning, by the roof's name. A couple's house is
+ *  owned by one of them; the old cottage is nobody's and holds the elder and the two singles. */
+export const FOUNDER_SEATS: Readonly<Record<FounderId, string>> = {
+  amara: "Amara's house",
+  yusuf: "Yusuf's house",
+  nadia: "Nadia's house",
+  omar: "Omar's house",
+  salma: "Salma's house",
+  farida: "Farida's house",
+  bashir: "Farida's house",
+  kamal: "Kamal's house",
+  leyla: "Kamal's house",
+  tariq: 'the old cottage',
+  halim: 'the old cottage',
+  dilara: 'the old cottage',
+}
+
+export const founderSeat = (id: string): string | null =>
+  (FOUNDER_SEATS as Readonly<Record<string, string | undefined>>)[id] ?? null
 
 // The room grid every enterable structure exposes to its furnishings: template vocabulary
 // only, never what a room actually looks like.
@@ -396,6 +435,10 @@ export const GENESIS_WANTED: readonly Wanted[] = [
     owner: null,
     name: 'the old farmhouse',
   },
+  // The two couples' houses come last so the first nine keep the plots every landed gate
+  // measured them on.
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'farida', name: "Farida's house" },
+  { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'kamal', name: "Kamal's house" },
 ]
 
 // A kind whose row says `hearth` is furnished with one, or it is a fire a mind can feed and
@@ -421,7 +464,7 @@ export function cityPlacements(): PlacedStructure[] {
   return claimAll({ ground: CITY_GROUND, wanted: GENESIS_WANTED }).built
 }
 
-// Eleven: nine buildings on nine claimed plots plus the two monuments. The standing stone is
+// Thirteen: eleven buildings on eleven claimed plots plus the two monuments. The standing stone is
 // deliberately absent. Only structures.privateKinds (house) separates a home from a bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
   const monument = (kind: string, at: { dx: number; dy: number }, name: string): CityStructure => ({
@@ -539,7 +582,7 @@ export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   })
 }
 
-/** A fact about the template, not any running world: eleven on day one and eleven on day one
+/** A fact about the template, not any running world: nine on day one and nine on day one
  *  hundred. What is free now is claimTownPlot. */
 export function genesisEmptyPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   const taken = takenPlots(cityPlacements())

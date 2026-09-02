@@ -79,16 +79,16 @@ function genesisTown(config: SimConfig = CFG): {
 // ------------------------------------------------------------------ the 128x128 town
 
 describe('G11a-M1: the genesis town folds, and it is the size the world says it is', () => {
-  it('a hundred and twenty-eight tiles on a side, eleven roofs, a herd and the standing bushes', () => {
+  it('a hundred and twenty-eight tiles on a side, thirteen roofs, a herd and the standing bushes', () => {
     const { state } = genesisTown()
     expect(state.terrain.length).toBe(CFG.world.size.h)
     expect(state.terrain[0]!.length).toBe(CFG.world.size.w)
     expect(state.terrain.every((row) => row.length === CFG.world.size.w)).toBe(true)
 
     const structures = Object.values(state.structures)
-    expect(structures).toHaveLength(11)
-    // Eleven buildings, nine of them roofed: every founder wakes indoors (D1), and the two the
-    // village left as walls are the pair nobody owns, for a pair of hands to finish together.
+    expect(structures).toHaveLength(13)
+    // Thirteen buildings, twelve of them roofed: every founder wakes indoors (D1), the cottage
+    // row included, and the farmhouse nobody sleeps in is left as walls to finish together.
     expect(
       structures
         .filter((s) => s.stage === 'complete')
@@ -96,7 +96,10 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
         .sort(),
     ).toEqual([
       'cabin',
+      'cottage',
       'fire_pit',
+      'house',
+      'house',
       'house',
       'house',
       'house',
@@ -105,7 +108,7 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
       'storehouse',
       'well',
     ])
-    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
+    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(7)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
 
