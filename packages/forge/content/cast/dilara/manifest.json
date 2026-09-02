@@ -1,6 +1,6 @@
 {
   "version": "v4-hires-atlas",
-  "figureH": 223,
+  "figureH": 251,
   "cells": {
     "idle-sw": {
       "x": 0,
@@ -48,7 +48,7 @@
       "w": 256,
       "h": 256,
       "feetX": 128,
-      "feetY": 225
+      "feetY": 223
     },
     "idle-se": {
       "x": 0,
@@ -79,7 +79,7 @@
       "y": 256,
       "w": 256,
       "h": 256,
-      "feetX": 128,
+      "feetX": 127,
       "feetY": 255
     },
     "passing-b-se": {
@@ -96,7 +96,7 @@
       "w": 256,
       "h": 256,
       "feetX": 128,
-      "feetY": 225
+      "feetY": 223
     },
     "idle-ne": {
       "x": 0,
@@ -144,7 +144,7 @@
       "w": 256,
       "h": 256,
       "feetX": 128,
-      "feetY": 225
+      "feetY": 223
     },
     "idle-nw": {
       "x": 0,
@@ -192,7 +192,7 @@
       "w": 256,
       "h": 256,
       "feetX": 128,
-      "feetY": 225
+      "feetY": 223
     }
   }
 }

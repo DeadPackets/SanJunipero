@@ -42,6 +42,7 @@ import { trimToFigure } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
 import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pixelGates.js'
 import { quantize } from '../src/post/quantize.js'
+import { MAGENTA_RESIDUE_MAX, WALK_CELLS, magentaResidue, walkRowGate } from '../src/walkGates.js'
 import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL, PROPORTION_CLAUSE } from './character.js'
@@ -473,6 +474,9 @@ async function runCharacter(m: CastMember): Promise<void> {
     // inside the figure's own column reads as one cluster. Hard reject: another candidate is drawn.
     const sole = soleSilhouetteGate(hi)
     if (!sole.ok) throw new Error(sole.failures.join('; '))
+    const residue = magentaResidue(hi)
+    if (residue > MAGENTA_RESIDUE_MAX)
+      throw new Error(`${residue} magenta pixels the key missed — a shadow disc`)
     const b = opaqueBbox(hi)!
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)
@@ -586,6 +590,8 @@ async function runCharacter(m: CastMember): Promise<void> {
       // caption, and a sleeping villager is where the model likes to draw floating "z"s.
       const sole = soleSilhouetteGate(hi)
       if (!sole.ok) throw new Error(sole.failures.join('; '))
+      const residue = magentaResidue(hi)
+      if (residue > MAGENTA_RESIDUE_MAX) throw new Error(`${residue} magenta pixels the key missed`)
       const failures = sleepCoherenceGateV4(gateView(hi))
       push(
         `${key}: ${failures.length === 0 ? 'PASS' : failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`,
@@ -624,6 +630,23 @@ async function runCharacter(m: CastMember): Promise<void> {
     },
     sleep: sleep.hi,
   })
+  // The row laws, on the derived cells: a frame that passed every pairwise gate can still be
+  // the short one in its row, or the back of a head in a front-facing row.
+  const rows = (['se', 'ne'] as const).flatMap((f) =>
+    walkRowGate(
+      Object.fromEntries(WALK_CELLS.map((p) => [p, cells.get(`${p}-${f}`)!])) as Record<
+        (typeof WALK_CELLS)[number],
+        RawImage
+      >,
+      f === 'se',
+    ).map((x) => `${x.cell}-${f} ${x.gate} ${x.value.toFixed(2)} against ${x.limit}`),
+  )
+  for (const r of rows) push(`row: ${r}`)
+  if (rows.length > 0)
+    throw new Error(
+      `${m.id}: a walk row fails its law — ${rows.join('; ')}. CAST_REJECTED the offending ` +
+        'candidate and draw again. Nothing is written for this character.',
+    )
   for (const [name, img] of cells) writeFileSync(`${DIR}/cells/${name}.png`, await encodePng(img))
   const { image, manifest } = packCharacterAtlas(cells, TARGET_H)
   const atlas = await encodeWebp(image)
