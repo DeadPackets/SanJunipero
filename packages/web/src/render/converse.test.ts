@@ -4,11 +4,14 @@ import { DEFAULT_CONFIG } from '@sj/shared'
 import { facingFrom } from './iso.js'
 import {
   EARSHOT_TILES,
+  MAX_LIVE_THOUGHTS,
   PRIOR_ALPHA,
   PRIOR_HOLD_MS,
   REPLY_WINDOW_MS,
   TYPE_CHARS_PER_S,
   createConversation,
+  fateOfPriorLine,
+  thoughtsToEnd,
   typedChars,
   typingMs,
 } from './converse.js'
@@ -108,5 +111,49 @@ describe('★ the line before this one stays, and dims', () => {
     const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
     expect(SRC).toContain('partnerOf(')
     expect(SRC).toMatch(/facingFrom\(/)
+  })
+})
+
+// ★ Nothing ever ended a thought, so they stacked until each timed out and the desk frame caught
+// two of them overlapping. A mind holds one thought; the street holds two.
+describe('★ one live thought a mind, and two on screen', () => {
+  const think = (agentId: string, bornMs: number) => ({ agentId, bornMs })
+
+  it('★ ends a mind’s own earlier thought the moment it thinks again', () => {
+    expect(thoughtsToEnd([think('amara', 0)], 'amara')).toEqual([0])
+    expect(thoughtsToEnd([think('amara', 0), think('amara', 100)], 'amara')).toEqual([0, 1])
+  })
+
+  it('★ ends the oldest when a third would stand', () => {
+    expect(MAX_LIVE_THOUGHTS).toBe(2)
+    expect(thoughtsToEnd([think('amara', 0), think('yusuf', 100)], 'omar')).toEqual([0])
+    expect(thoughtsToEnd([think('yusuf', 100), think('amara', 0)], 'omar')).toEqual([1])
+  })
+
+  it('leaves one other mind’s thought alone — two on screen is the rule, not one', () => {
+    expect(thoughtsToEnd([think('amara', 0)], 'yusuf')).toEqual([])
+    expect(thoughtsToEnd([], 'yusuf')).toEqual([])
+  })
+
+  it('★ never leaves more than two standing, however many were already up', () => {
+    const live = [think('a', 0), think('b', 10), think('c', 20), think('d', 30)]
+    for (const thinker of ['a', 'b', 'e']) {
+      const left = live.length - thoughtsToEnd(live, thinker).length
+      expect(left + 1, thinker).toBeLessThanOrEqual(MAX_LIVE_THOUGHTS)
+    }
+  })
+
+  it('★ speech still never ends a thought: it is not part of the exchange', () => {
+    for (const speaker of ['amara', 'yusuf']) {
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: false }, speaker)).toBe(
+        'keep',
+      )
+    }
+  })
+
+  it('★ the layer applies it on every thought, and leaves speech on its own rule', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now')
+    expect(SRC).toContain('const live = bubbles.filter((b) => b.isThought)')
   })
 })

@@ -3,7 +3,14 @@ import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
-import { PRIOR_ALPHA, PRIOR_HOLD_MS, fateOfPriorLine, typedChars, typingMs } from './converse.js'
+import {
+  PRIOR_ALPHA,
+  PRIOR_HOLD_MS,
+  fateOfPriorLine,
+  thoughtsToEnd,
+  typedChars,
+  typingMs,
+} from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -390,7 +397,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const state = store.getState()
     if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
-    if (!isThought) {
+    if (isThought) {
+      const live = bubbles.filter((b) => b.isThought)
+      for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now
+    } else {
       for (const b of bubbles) {
         const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)
         if (fate === 'end') b.dieMs = now
