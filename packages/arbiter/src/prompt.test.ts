@@ -120,6 +120,13 @@ describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
     expect(system).toContain('An id that appears on neither line is a format error')
   })
 
+  it('lets the court propose the next rung an attempt opens, and tells it when not to', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('you may add "unlocks"')
+    expect(system).toContain("prerequisiteId copied from the recipe's own canon")
+    expect(system).toContain('Leave "unlocks" out when the attempt opens nothing new')
+  })
+
   it('lives in the byte-stable system prefix, never in the agent-facing block', () => {
     const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
     const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))

@@ -702,6 +702,31 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     expect(new CodexStore(db).withinAdjacency(['smoking_food'])).toBe(true)
   })
 
+  it('★ the ladder grows: a codified attempt earns its rung and the court is shown the next', async () => {
+    const withNext: Verdict = {
+      ...smokedFish,
+      unlocks: { id: 'smoke_house', name: 'A smokehouse', prerequisiteId: 'smoking_food' },
+    }
+    const llm = new ScriptedLlm(() => withNext)
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+    expect(verdict).toEqual(withNext)
+    arbiter.codify(withNext as { recipe: Recipe; summary: string }, CODIFY_CREDIT)
+
+    const codex = new CodexStore(db)
+    expect(codex.known()).toContain('smoking_food')
+    expect(codex.frontier()).toContain('smoke_house')
+    await arbiter.adjudicate('I raise a shed for the smoke', esenCtx)
+    expect(llm.lastSystem).toContain(
+      'The town currently knows: fire, pottery, weaving, fishing, smoking_food',
+    )
+    expect(llm.lastSystem).toMatch(
+      /Within reach, though nobody here has done it yet: [^\n]*smoke_house/,
+    )
+    unregisterVerb('recipe:smoked_fish')
+  })
+
   it('still refuses a rung two steps out, so the frontier widens nothing', async () => {
     const twoStepsOut: Verdict = {
       kind: 'attempt',

@@ -128,6 +128,19 @@ describe('VerdictSchema', () => {
     )
   })
 
+  it('an attempt may propose the next rung, in the closed shape and no other', () => {
+    const unlocks = { id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'fire' }
+    const v = VerdictSchema.parse({ ...validAttempt, unlocks })
+    expect(v.kind === 'attempt' ? v.unlocks : null).toEqual(unlocks)
+    expect(
+      VerdictSchema.safeParse({ ...validAttempt, unlocks: { ...unlocks, id: 'Salt Curing' } })
+        .success,
+    ).toBe(false)
+    expect(
+      VerdictSchema.safeParse({ ...validAttempt, unlocks: { ...unlocks, era: 'works' } }).success,
+    ).toBe(false)
+  })
+
   it('rejects an extra key via strict', () => {
     expect(() =>
       VerdictSchema.parse({ kind: 'map', verb: 'x', params: NO_PARAMS, bogus: 1 }),

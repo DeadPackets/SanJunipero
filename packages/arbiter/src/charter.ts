@@ -22,7 +22,7 @@ export type VerbCharter = {
 export type AttemptVerdict = {
   recipe: Recipe
   summary: string
-  unlocks?: { id: string; name: string; prerequisiteId: string }
+  unlocks?: { id: string; name: string; prerequisiteId: string } | undefined
 }
 
 // The roster line a charter becomes is capped at forty tokens, and the gloss is the part of

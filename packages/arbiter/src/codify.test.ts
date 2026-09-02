@@ -730,6 +730,38 @@ describe('productsOf — what a recipe unlocked', () => {
   })
 })
 
+describe('codify climbs the ladder', () => {
+  it('earns the rung the craft rests on and proposes the next one, unearned', () => {
+    const db = openArbiterDb(':memory:')
+    const codex = new CodexStore(db)
+    codex.insert({ id: 'cooking', era: 'handwork', name: 'Cooking', prerequisiteId: null })
+    codex.insert({
+      id: 'food_preserving',
+      era: 'arrangement',
+      name: 'Keeping food past its week',
+      prerequisiteId: 'cooking',
+      known: false,
+    })
+    expect(codex.frontier()).toEqual(['food_preserving'])
+    codify(
+      {
+        recipe: {
+          ...boilSaltRecipe,
+          id: 'recipe:smoke_fish_ladder',
+          name: 'Smoke Fish Ladder',
+          canon: ['food_preserving'],
+        },
+        summary: 'Hang the catch in smoke so it keeps.',
+        unlocks: { id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'food_preserving' },
+      },
+      CREDIT_FIXTURE,
+      { rulebook: new RulebookStore(db), review: new ReviewStore(db), codex, tick: 1 },
+    )
+    expect(codex.known()).toContain('food_preserving')
+    expect(codex.frontier()).toEqual(['salt_curing'])
+  })
+})
+
 describe('codify reports the mint — once, and only for a new one', () => {
   const CREDIT = { agentId: 'a1', intent: 'carry water in a stitched hide' }
 

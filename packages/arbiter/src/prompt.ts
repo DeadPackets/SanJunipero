@@ -57,6 +57,7 @@ Between attempt and impossible, decide by whether the first step can be taken wi
 The verdict word must agree with the reasoning that reached it: if your own reasoning concludes the action can be begun, the verdict is "attempt" and no other word will do.
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
 Two lines above name ids: what the town currently knows, and what stands within reach. When you rule "attempt", every id you put in the recipe's canon must be copied exactly from those two lines. An id that appears on neither line is a format error, not a craft, and the ruling is thrown away unread.
+An attempt that reaches a craft within reach earns it, and you may add "unlocks": the one craft that step opens next, as a new id of lowercase words joined by underscores, its name in the town's words, and prerequisiteId copied from the recipe's own canon. Leave "unlocks" out when the attempt opens nothing new.
 Three rulings for the measure of it:
 "I cut down a tree by the river for its wood" — map: the town fells trees every day and already has the act.
 "I hang the fish in the old shed over a slow smoke of green wood so it will keep past the week" — attempt: nobody has done it, yet the shed, the wood and the fire are all at hand, so the first step can be taken.

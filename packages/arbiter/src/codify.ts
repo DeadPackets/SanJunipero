@@ -316,6 +316,10 @@ export function codify(
   const unsound = recipeSanityRefusal(recipe)
   if (unsound !== null) throw new Error(`cannot codify ${recipe.id}: ${unsound}`)
   const charter = charterFromAttempt(attempt, credit)
+  // The ladder grows as it is climbed: the rung this craft rests on is earned, and the court's
+  // proposed next rung stands one step out for the next ask.
+  deps.codex.learn(charter.canon)
+  if (charter.unlocks !== undefined) deps.codex.propose(charter.unlocks)
   const existing = deps.rulebook.byId(charter.id)
   if (existing) {
     // Active row is a no-op; a reverted one is reactivated so the review queue's re-open path

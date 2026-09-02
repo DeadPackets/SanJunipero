@@ -116,7 +116,20 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
     .object({ kind: z.literal('map'), verb: z.string().min(1), params: ClosedIntentParams })
     .strict(),
   z
-    .object({ kind: z.literal('attempt'), recipe: RecipeSchema, summary: z.string().min(1) })
+    .object({
+      kind: z.literal('attempt'),
+      recipe: RecipeSchema,
+      summary: z.string().min(1),
+      // The next rung this step opens, proposed by the court so the ladder grows as it is climbed.
+      unlocks: z
+        .object({
+          id: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/),
+          name: z.string().min(1).max(60),
+          prerequisiteId: z.string().min(1),
+        })
+        .strict()
+        .optional(),
+    })
     .strict(),
   z
     .object({
