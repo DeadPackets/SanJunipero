@@ -374,3 +374,17 @@ describe('a mind that has never taken a turn', () => {
 
 // ★ Two minds paraphrasing each other held each other in the 5-tick cadence for ever, because
 // any heard word bought another 60 ticks of it. An echo is heard; it is not news.
+
+describe('★ fire and a blow reach a listener, as they reach a sleeper', () => {
+  const rousing = (e: string) => pkt({ feltEvents: [e] })
+
+  it('rouses a listener who is being attacked or burned', () => {
+    for (const e of ['you_were_attacked', 'fire_nearby']) {
+      expect(decideWake(cfg, rousing(e), clk(), 100, pln(), LISTENS)).toBe('salient_perception')
+    }
+  })
+
+  it('still holds a listener still for anything less than that', () => {
+    expect(decideWake(cfg, rousing('someone_spoke'), clk(), 100, pln(), LISTENS)).toBeNull()
+  })
+})

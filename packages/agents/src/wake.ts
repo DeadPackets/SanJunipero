@@ -100,11 +100,19 @@ export function decideWake(
   // Backoff after a failed turn: even floor-exempt reasons wait it out.
   if (tick < clock.dozeUntilTick) return null
 
+  // Fire and a blow reach a sleeper, so they reach a listener too: talk is a shallower state
+  // than sleep, and it must not hold a mind still through the one thing sleep does not.
+  const rousing = packet.feltEvents.some(
+    (e) => e === 'you_were_attacked' || e.startsWith('fire'),
+  )
+
   // A listener takes no turn at all — that is what makes hearing free.
-  if (floor.inScene && !packet.self.asleep) return floor.holdsFloor ? 'floor' : null
+  if (floor.inScene && !packet.self.asleep && !rousing) {
+    return floor.holdsFloor ? 'floor' : null
+  }
 
   if (packet.self.asleep) {
-    if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
+    if (rousing) {
       return 'salient_perception'
     }
     // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
