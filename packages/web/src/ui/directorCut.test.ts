@@ -84,6 +84,46 @@ describe('the televised town always has somebody in front of the camera', () => 
   })
 })
 
+// ★ Two burst frames read DIRECTOR · KAMAL and held on three closed doors: Kamal was inside his
+// house, and the exterior view draws no interiors.
+describe('★ the director does not cut to a mind the street cannot show', () => {
+  const TOWN = ['amara', 'omar', 'salma', 'yusuf']
+  const hot = [w('amara', 940, 6), w('omar', 940, 20), w('salma', 940, 3)]
+
+  it('★ takes the top OUTDOOR scorer when the hottest mind is indoors', () => {
+    expect(subjectFor(hot, null, 1000, TOWN)).toBe('omar')
+    expect(subjectFor(hot, null, 1000, TOWN, new Set(['omar']))).toBe('amara')
+    expect(subjectFor(hot, null, 1000, TOWN, new Set(['omar', 'amara']))).toBe('salma')
+  })
+
+  it('★ answers null when every candidate is indoors, so the caller holds its shot', () => {
+    expect(subjectFor(hot, null, 1000, TOWN, new Set(TOWN))).toBeNull()
+    // and the quiet round has nobody to turn over either
+    expect(subjectFor([], 'omar', 1000, TOWN, new Set(TOWN))).toBeNull()
+  })
+
+  it('★ does not stay stuck on a subject that has gone inside', () => {
+    expect(subjectFor(hot, 'omar', 1000, TOWN, new Set(['omar']))).toBe('amara')
+  })
+
+  it('turns the quiet round over the people who are actually out', () => {
+    const out = ['omar', 'yusuf']
+    for (const t of [0, 30, 60, 90, 200])
+      expect(out, `tick ${t}`).toContain(subjectFor([], null, t, TOWN, new Set(['amara', 'salma'])))
+  })
+
+  it('leaves a town where nobody is inside exactly as it was', () => {
+    for (const t of [0, 60, 1000])
+      expect(subjectFor(hot, null, t, TOWN, new Set())).toBe(subjectFor(hot, null, t, TOWN))
+  })
+
+  it('★ DirectorMode reads indoors off the layer that draws the street', () => {
+    const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
+    expect(SRC).toContain('rendersOnMap')
+    expect(SRC).toMatch(/subjectFor\([\s\S]*?indoors,?\s*\)/)
+  })
+})
+
 describe('DirectorMode reads the heat window through the one endpoint layer', () => {
   const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
 

@@ -21,6 +21,29 @@ export function fateOfPriorLine(
   return prior.agentId === speakerId || prior.dimmed ? 'end' : 'dim'
 }
 
+/** ★ A THOUGHT IS ENDED BY THINKING, NEVER BY SPEECH. `fateOfPriorLine` keeps every prior
+ *  thought — right, because a thought is not part of the exchange — so nothing ever ended one
+ *  and they stacked until each timed out, two of them overlapping on screen. */
+export const MAX_LIVE_THOUGHTS = 2
+
+/** Which of the live thoughts end when `thinkerId` thinks: that mind's own earlier ones, always,
+ *  and then the oldest of the rest while a third would stand. Indices into `live`. */
+export function thoughtsToEnd(
+  live: readonly { agentId: string; bornMs: number }[],
+  thinkerId: string,
+): number[] {
+  const ending = new Set<number>()
+  live.forEach((t, i) => {
+    if (t.agentId === thinkerId) ending.add(i)
+  })
+  const rest = live
+    .map((t, i) => ({ bornMs: t.bornMs, i }))
+    .filter((e) => !ending.has(e.i))
+    .sort((a, b) => a.bornMs - b.bornMs || a.i - b.i)
+  for (const e of rest.slice(0, Math.max(0, rest.length + 1 - MAX_LIVE_THOUGHTS))) ending.add(e.i)
+  return [...ending].sort((a, b) => a - b)
+}
+
 /** How much of a line of `len` characters has arrived `msSince` after it was spoken. */
 export function typedChars(len: number, msSince: number): number {
   if (!(msSince > 0)) return 0

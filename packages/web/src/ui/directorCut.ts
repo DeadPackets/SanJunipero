@@ -45,14 +45,22 @@ export function quietSubject(people: readonly string[], nowTick: number): string
   return people[Math.floor(tick / QUIET_TURN_TICKS) % people.length]!
 }
 
+/** ★ A MIND INDOORS IS AN EMPTY STREET. The exterior view does not draw interiors, so cutting to
+ *  somebody inside a house holds the camera on three closed doors while they speak. Nobody
+ *  outside is a reason to HOLD the shot, never to cut to nobody. */
+const NOBODY_INSIDE: ReadonlySet<string> = new Set()
+
 /** Who the camera is on: the hottest agent, or — when the town is quiet — one of its people.
- *  Heat is scored for whatever acted, the scripted runner included; only a body can be followed. */
+ *  Heat is scored for whatever acted, the scripted runner included; only a body the exterior
+ *  view actually draws can be followed. */
 export function subjectFor(
   heat: HeatWindow[],
   currentAgent: string | null,
   nowTick: number,
   people: readonly string[],
+  indoors: ReadonlySet<string> = NOBODY_INSIDE,
 ): string | null {
-  const embodied = heat.filter((w) => people.includes(w.agentId))
-  return pickCut(embodied, currentAgent, nowTick) ?? quietSubject(people, nowTick)
+  const outdoors = people.filter((id) => !indoors.has(id))
+  const embodied = heat.filter((w) => outdoors.includes(w.agentId))
+  return pickCut(embodied, currentAgent, nowTick) ?? quietSubject(outdoors, nowTick)
 }
