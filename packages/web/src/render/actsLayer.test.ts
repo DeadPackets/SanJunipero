@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { Container } from 'pixi.js'
-import { createActLayer } from './acts.js'
+import { ACT_BAR_GAP_PX, ACT_BAR_PX, chipHeight, createActLayer } from './acts.js'
 import { tileToScreen } from './iso.js'
 import type { Rect } from './tooltip.js'
 import type { Scene } from './scene.js'
@@ -187,6 +187,21 @@ describe('the chip tells the rest of the stage where it is', () => {
     expect(boxes).toHaveLength(1)
     expect(boxes[0]!.w).toBeGreaterThan(0)
     expect(boxes[0]!.h).toBeGreaterThan(0)
+  })
+
+  // ★ The published box was the slab alone while the bar hangs a row below it, so a neighbouring
+  // label could be placed straight onto the progress bar.
+  it('★ publishes the bar’s row too, not the slab alone', () => {
+    const h = harness()
+    h.set(body('yusuf', { verb: 'chop', ticksRemaining: 30 }))
+    h.noteStart('yusuf', 'chop', 30)
+    h.layer.tick()
+    const chip = h.chips()[0]!
+    // the slab the layer drew, and the box it told the stage about
+    const slabH = (chip.children[0] as unknown as { children: { height: number }[] }).children[0]!
+      .height
+    expect(h.occupied()[0]!.h).toBe(chipHeight(slabH))
+    expect(chipHeight(slabH)).toBe(slabH + ACT_BAR_GAP_PX + ACT_BAR_PX)
   })
 
   // ★ Three chips in a town of thirty read as a town where three people work. The picture is

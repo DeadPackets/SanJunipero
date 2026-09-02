@@ -91,10 +91,8 @@ describe('toponymsOf — the names the town cut for itself', () => {
   })
 })
 
-// ★ Eleven carved names were drawn at full alpha from the 0.5 stop in — that is, always — in
-// caps, on ink plates: the loudest text in the product named the furniture. A place answers
-// when it is asked now, and only says its name unbidden once the camera is close enough that
-// the name is about a place you can see into.
+// ★ Eleven carved names stood at full alpha from the 0.5 stop in — that is, always — in caps on
+// ink plates, so the loudest text in the product named the furniture.
 describe('toponymAlpha — whole or gone, never between', () => {
   it('★ is gone at the overview and whole from the 2× stop in', () => {
     expect(TOPONYM_FULL_SCALE).toBe(2)

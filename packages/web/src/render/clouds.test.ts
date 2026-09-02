@@ -14,8 +14,7 @@ import {
 import { wind } from './wind.js'
 
 // ★ At the overview stop a swaying crown is twelve pixels and a bird is one, so an unattended
-// frame held still for minutes at a time. A cloud shadow is the cheapest thing that changes a
-// whole picture: no art, one multiply, and the widest surface the town has to cross.
+// frame barely changed for minutes at a time.
 
 describe('★ cloud shadows drift with the town’s own wind', () => {
   it('is three to five blobs, wider than they are tall like the ground they lie on', () => {

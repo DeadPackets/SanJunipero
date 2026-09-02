@@ -9,9 +9,7 @@ import { worldTextScale } from './textFaces.js'
 import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 
-// ★ SOMETHING HAPPENED TO THIS PERSON. A pixel rises off the head of everybody a moment belongs
-// to and is gone in under two seconds — the one mark on the stage that says a thing was achieved
-// rather than a thing is being done.
+// The one mark on the stage that says a thing was ACHIEVED, not that a thing is being done.
 
 /** The whole life of one rising mark. */
 export const MOMENT_EMOTE_MS = 1800
@@ -20,8 +18,7 @@ export const MOMENT_EMOTE_RISE_MS = 1200
 export const MOMENT_EMOTE_FADE_MS = 600
 export const MOMENT_EMOTE_RISE_PX = 10
 
-/** Clear of the overhead slot's own top edge, so the rising mark and the slot's one glyph can
- *  never composite. Derived from the slot, not transcribed. */
+/** Derived from the slot, never transcribed: below its top edge the two marks composite. */
 export const MOMENT_EMOTE_ABOVE_PX = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX + 4
 
 /** Which pixel a moment wears. A heart for a bond gained, the crack for one lost, the lit bulb

@@ -299,9 +299,8 @@ export function createCharacterLayer(
   const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
     if (e.glyphKind === kind) return
     e.glyphKind = kind
-    // ★ A CELL THE ATLAS DOES NOT HAVE DRAWS NOTHING. `indexOf` answered -1 for a kind the sheet
-    // has no glyph for and the frame was cut off the left of the atlas, which is how a
-    // checkerboard came to stand over the head of somebody who was only speaking.
+    // Check the index: `indexOf` answers -1 for a kind the sheet lacks, and a frame cut off the
+    // left of the atlas is the forge's checkerboard standing over somebody's head.
     const cell = kind === null ? -1 : EMOTE_KINDS.indexOf(kind)
     if (cell < 0 || emoteAtlas === null) {
       e.overhead.glyph.texture = Texture.EMPTY
@@ -457,8 +456,8 @@ export function createCharacterLayer(
       // idle orientation after arrival
       if (walking) e.facing = legFacing(e.path) ?? e.facing
       else if (statusOf(a, nowTick) === 'talking') {
-        // ★ A body in a conversation turns to whoever it is answering. Two people spoke and both
-        // kept facing wherever they last walked, so nothing said the lines were one exchange.
+        // Turned toward whoever they are answering: two talkers facing where they last walked
+        // read as two people, not as an exchange.
         const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
         const at = partner === null ? undefined : state.agents[partner]
         if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
@@ -520,8 +519,6 @@ export function createCharacterLayer(
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
-      // ★ ONE SLOT, ONE GLYPH. The seven progress blocks that used to wrap it are gone: work is
-      // a word and a one-pixel bar under the feet, where the word already was.
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)

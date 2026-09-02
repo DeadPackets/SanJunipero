@@ -3,7 +3,7 @@ import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
-import { PRIOR_ALPHA, PRIOR_HOLD_MS, typedChars } from './converse.js'
+import { PRIOR_ALPHA, PRIOR_HOLD_MS, fateOfPriorLine, typedChars } from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -148,11 +148,8 @@ export const BUBBLE_LIFT_PX = 18
  *  of speech and it read as a town where only three people ever talk; the placer already drops
  *  what it cannot fit. One pass, no sort — this ran per frame.
  *
- *  ★ It is handed each SPEAKER's own feet and tests the body they draw, head to heel. It used to
- *  be handed the anchor a box hangs from, 70 world px higher, as a bare point: a person standing
- *  in the top of the frame was ruled off screen and wore a "…" instead of their own words —
- *  and at the director's 3× stop, where the view is 300 world px tall, that is a whole quarter
- *  of the picture. */
+ *  ★ Take each SPEAKER's own feet, never the anchor a box floats from: culling on that point
+ *  put a "…" on anybody standing in the top 70 world px of the view. */
 export function inViewSpeakers(
   want: readonly { id: string; sx: number; sy: number }[],
   view: Rect,
@@ -324,8 +321,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       text.slice(0, SPEECH_MAX_CHARS),
       wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX),
     )
-    // ★ THE BOX IS CUT TO THE WHOLE LINE and the words arrive inside it. Measured whole, then
-    // set to what has been typed: a box that grew with its sentence would move under the reader.
+    // Cut to the WHOLE line, then set to what has been typed: a box that grew with its own
+    // sentence would move the paper under the reader.
     const full = lines.join('\n')
     const label = createWorldLabel(full, {
       fontFamily: face.family,
@@ -373,14 +370,14 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const state = store.getState()
     if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
-    // ★ THE LINE BEFORE THIS ONE STAYS, so a viewer reads the two of them as one exchange: it
-    // dims and is held for `PRIOR_HOLD_MS`, and lets go the moment a third line lands.
     if (!isThought) {
-      for (const b of bubbles) if (!b.isThought && b.dimMs !== null) b.dieMs = now
       for (const b of bubbles) {
-        if (b.isThought || b.dimMs !== null || b.agentId === agentId) continue
-        b.dimMs = now
-        b.dieMs = now + PRIOR_HOLD_MS
+        const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)
+        if (fate === 'end') b.dieMs = now
+        else if (fate === 'dim') {
+          b.dimMs = now
+          b.dieMs = now + PRIOR_HOLD_MS
+        }
       }
     }
     const built = build(agentId, text, isThought)
@@ -425,7 +422,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
           bubbles.splice(i, 1)
           continue
         }
-        // ★ THE LINE TYPES IN. Set only when the count moves, which is 28 times a second at most.
+        // Set only when the count moves: 28 texture rebuilds a second, not one a frame.
         if (b.typed < b.full.length) {
           const n = typedChars(b.full.length, nowMs - b.bornMs)
           if (n !== b.typed) {

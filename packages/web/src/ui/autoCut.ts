@@ -13,12 +13,8 @@ export type Director = {
   toggle(): void
 }
 
-/** The director is armed for every viewer, desk and stream alike: a town nobody is steering is
- *  a town the camera has to find the story in. Any input hands it back for `IDLE_HANDBACK_MS`,
- *  which is long enough to look at something and short enough that the show resumes.
- *
- *  A store rather than hook state, and the listeners land on the first subscriber: App holds
- *  the Pixi scene, and a timestamp in the tree would re-render all of it on every keystroke. */
+/** A store rather than hook state, with the listeners on the first subscriber: App holds the
+ *  Pixi scene, and a timestamp in the tree would re-render all of it on every keystroke. */
 export function director(target: EventTarget): Director {
   let armed = true
   let cutting = true

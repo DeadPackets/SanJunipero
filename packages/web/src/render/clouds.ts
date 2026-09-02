@@ -5,10 +5,8 @@ import { phaseOf } from './charAnim.js'
 import { windNow } from './wind.js'
 import type { Scene } from './scene.js'
 
-// ★ A TOWN THAT NOBODY IS MOVING STILL MOVES. At the overview stop a swaying crown is twelve
-// pixels and a bird is one, so an unattended frame held still for minutes at a time. A cloud
-// shadow is the cheapest thing that changes a whole picture: no art, one multiply, and the
-// ground it crosses is the widest surface the town has.
+// At the overview stop a swaying crown is twelve pixels and a bird is one, so an unattended
+// frame barely changed. This is the cheapest thing that moves a whole picture: no art, one blend.
 
 /** Few enough that the ground is still the ground. */
 export const CLOUD_COUNT = 4

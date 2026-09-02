@@ -24,7 +24,7 @@ import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
-import { typingMs } from './converse.js'
+import { fateOfPriorLine, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
 
 describe('bubbleLife', () => {
@@ -39,6 +39,42 @@ describe('bubbleLife', () => {
     for (const len of [1, 13, 40, 120, SPEECH_MAX_CHARS]) {
       expect(bubbleLife('x'.repeat(len)), `${len} chars`).toBeGreaterThan(typingMs(len))
     }
+  })
+})
+
+// ★ Holding the partner's line so the pair reads as one exchange also held the SPEAKER's own
+// previous line, and two full-alpha slabs from one mouth stacked until the first timed out.
+describe('★ what a new line does to the lines already in the air', () => {
+  const line = (agentId: string, dimmed = false) => ({ agentId, isThought: false, dimmed })
+
+  it('★ ends the speaker’s OWN last line — they have said something new', () => {
+    expect(fateOfPriorLine(line('amara'), 'amara')).toBe('end')
+    expect(fateOfPriorLine(line('amara', true), 'amara')).toBe('end')
+  })
+
+  it('★ dims and holds the other speaker’s, so the pair is on screen together', () => {
+    expect(fateOfPriorLine(line('amara'), 'yusuf')).toBe('dim')
+  })
+
+  it('lets a dimmed line go the moment a third one lands', () => {
+    expect(fateOfPriorLine(line('amara', true), 'omar')).toBe('end')
+  })
+
+  it('leaves a thought alone: it is not part of anybody’s exchange', () => {
+    for (const speaker of ['amara', 'yusuf']) {
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: false }, speaker)).toBe(
+        'keep',
+      )
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: true }, speaker)).toBe(
+        'keep',
+      )
+    }
+  })
+
+  it('★ the layer applies it to every live bubble on every spoken line', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)')
+    expect(SRC).toContain("if (fate === 'end') b.dieMs = now")
   })
 })
 

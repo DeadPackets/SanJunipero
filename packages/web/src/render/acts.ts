@@ -31,15 +31,22 @@ export const ACT_MIN_TICKS = 2
  *  and loses its bar. */
 export const ACT_TRACK_MAX_TICKS = 60
 
-/** The bar under the word: one drawn pixel of honey, as wide as the work is done. Under the
- *  slab rather than over the head — progress belongs to the word it is about. */
+/** One DRAWN pixel: the chip is world art, so this thickens with the camera like every edge. */
 export const ACT_BAR_PX = 1
+/** Whole pixels between the slab and its bar: at 0 the honey touches the ink ring and reads as
+ *  part of it. Reserved whether or not a bar is drawn, so no neighbour is placed on that row. */
+export const ACT_BAR_GAP_PX = 1
 const ACT_BAR_FILL = 0xf2c879 // --honey
 
 /** How much of a `w`-wide chip the bar covers. Whole pixels: a fractional edge on a 1px bar is
  *  a grey row, and a bar that reads as grey reads as broken. */
 export function barWidth(w: number, fraction: number): number {
   return Math.round(w * Math.min(1, Math.max(0, fraction)))
+}
+
+/** Everything a chip DRAWS, slab and bar, which is what the placer must be told about. */
+export function chipHeight(slabH: number): number {
+  return slabH + ACT_BAR_GAP_PX + ACT_BAR_PX
 }
 
 /** ★ A chip has its own reason to be on screen, and it is not "a bubble would be": the two
@@ -137,7 +144,7 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
     paper.stroke({ width: BUBBLE_STROKE, color: BUBBLE_EDGE, alignment: 1 })
 
     const bar = new Graphics()
-    bar.position.set(0, h + 1)
+    bar.position.set(0, h + ACT_BAR_GAP_PX)
     const box = new Container()
     box.addChild(paper, label, bar)
     label.position.set(BUBBLE_PAD, BUBBLE_PAD)
@@ -237,7 +244,8 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
         }
         const run = runs.get(p.id)
         setBar(chip, run === undefined || !actTrackShown(run) ? null : actFraction(run))
-        want.push({ ...p, size: { w: chip.w * inv, h: chip.h * inv } })
+        // The declared height carries the bar: the placer keeps every other label off it.
+        want.push({ ...p, size: { w: chip.w * inv, h: chipHeight(chip.h) * inv } })
       }
 
       // ── placed against the bubbles, never over them ─────────────────────────────────────

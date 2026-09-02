@@ -125,9 +125,8 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
   })
 })
 
-// ★ THE SEVEN BLOCKS ARE GONE. An arch of progress over the head told the truth and read as
-// broken on any job longer than a minute, and it crowded the one address the slot was built to
-// be. Progress is a one-pixel bar under the act chip now — see acts.ts and momentEmotes.test.ts.
+// ★ An arch of progress over the head read as broken on any job past a minute, and crowded the
+// one address the slot was built to be. `acts.ts` carries progress now.
 describe('★ the slot is one glyph, and nothing else stands over a head', () => {
   const src = readFileSync(new URL('./overhead.ts', import.meta.url), 'utf8')
 

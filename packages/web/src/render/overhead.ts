@@ -66,10 +66,8 @@ export const SLOT_PX = 20
 export const SLOT_ABOVE_HEAD_PX = 8
 export const GLYPH_PX = 16
 
-// ★ THE SEVEN BLOCKS ARE GONE. An arch of progress over the head told the truth and read as
-// broken on any job longer than a minute, and it crowded the one address this slot was built to
-// be. Progress is a one-pixel bar under the act chip now, beneath the word it is about
-// (`acts.ts`), and the slot is one glyph again.
+// No progress over the head: an arch read as broken on any job past a minute and crowded the one
+// address this slot is. `acts.ts` carries it, under the word it is about.
 
 const PLATE_INK = SPEECH_INK
 const PLATE_PAPER = SPEECH_FILL

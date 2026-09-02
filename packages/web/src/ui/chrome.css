@@ -1169,10 +1169,8 @@ body {
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
 @media (max-width: 900px) {
-  /* `width: auto` on an absolutely positioned box whose only offset is `left: 50%` shrinks to
-     fit inside HALF the viewport — 195px on a 390px phone. Two nowrap chips overran it and the
-     second started before the first had ended: `DAY 0 · SPRINGLOUDY 8°`. The bar takes the whole
-     width the inset leaves it and the chips go to its two ends, a gap apart at the narrowest. */
+  /* NOT `width: auto`: on an abspos box offset only by `left: 50%` that shrinks to fit HALF the
+     viewport, and two nowrap chips overran it as `DAY 0 · SPRINGLOUDY 8°`. */
   .sky-bar {
     width: calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left)));
     grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
@@ -1212,8 +1210,8 @@ body {
   text-shadow: var(--halo-deep);
   opacity: 1;
 }
-/* A MOMENT, not a caption: the glyph sits on the line and the words keep their own case, because
-   a law is a sentence the town wrote and capitals are the machine shouting it back. */
+/* Its own case, not the caption's capitals: a law is a sentence the town wrote, and setting it
+   in caps is the machine shouting it back. */
 .stage-cue[data-moment='on'] {
   display: flex; align-items: center; justify-content: center; gap: var(--s-4);
   letter-spacing: 0.04em; text-transform: none;

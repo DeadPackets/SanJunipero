@@ -1,18 +1,25 @@
 import { DEFAULT_CONFIG } from '@sj/shared'
 
-// ★ A CONVERSATION LOOKS LIKE ONE. Two people spoke and the town showed two paragraph slabs
-// appearing wherever the placer put them, neither of them facing the other, the first gone
-// before the second arrived. Nothing on the stage said the two lines were one exchange.
+// The three rules that make two lines read as one exchange, kept pure and apart from the drawing.
 
-/** Read aloud, this is a natural pace, and a line that lands all at once gives a viewer no way
- *  to tell which of two boxes is the one being said now. */
+/** A reading pace. Faster and a viewer cannot tell which of two boxes is the one being said. */
 export const TYPE_CHARS_PER_S = 28
 
-/** How long a line stays once it has been answered — long enough to read the pair together, and
- *  it goes the moment the exchange moves on to a third line. */
+/** Long enough to read an answered line beside its reply; it goes early on a third line. */
 export const PRIOR_HOLD_MS = 6000
-/** ...at six tenths, so the line being said now is the brighter of the two. */
+/** Six tenths, so the line being said now is the brighter of the two. */
 export const PRIOR_ALPHA = 0.6
+
+/** The speaker's OWN last line ends — two full slabs from one mouth read as one shout — and the
+ *  partner's dims and holds. */
+export type LineFate = 'end' | 'dim' | 'keep'
+export function fateOfPriorLine(
+  prior: { agentId: string; isThought: boolean; dimmed: boolean },
+  speakerId: string,
+): LineFate {
+  if (prior.isThought) return 'keep'
+  return prior.agentId === speakerId || prior.dimmed ? 'end' : 'dim'
+}
 
 /** How much of a line of `len` characters has arrived `msSince` after it was spoken. */
 export function typedChars(len: number, msSince: number): number {

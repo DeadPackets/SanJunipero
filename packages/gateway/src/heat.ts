@@ -1,8 +1,7 @@
 import { DEFAULT_CONFIG, type HeatWindow, type SimEvent } from '@sj/shared'
 
-// Deterministic drama scorer. ★ It used to optimise for catastrophe — a death, a fire and an
-// injury above everything a person could say or make — so a healthy town scored flat and the
-// camera fell back to a carousel. What the town DECIDES and what it SAYS now outrank the weather.
+// Deterministic drama scorer. Weighted so what the town DECIDES and SAYS outranks the weather:
+// scored for catastrophe alone, a healthy town came out flat and the camera fell back to a carousel.
 export const HEAT_WINDOW_TICKS = 60
 export const HEAT_WEIGHTS: Record<string, number> = {
   agent_died: 20,
@@ -21,9 +20,8 @@ export const HEAT_WEIGHTS: Record<string, number> = {
   item_moved: 1,
 }
 
-/** ★ A scene is two voices, not one. Two different people speaking within earshot inside one
- *  window is the thing the director exists to find, so it is worth more than either line — and
- *  the pair together clears any single disaster the weather can raise. */
+/** Two voices in one window are what the director exists to find, so the pair must clear any
+ *  single disaster the weather can raise: 6 + 8 beats `fire_ignited`. */
 export const SCENE_BONUS = 8
 /** Plain distance, not the engine's `hears`: heat is a hint about where to point a camera, and
  *  a wall between two voices does not make them a worse shot. */
