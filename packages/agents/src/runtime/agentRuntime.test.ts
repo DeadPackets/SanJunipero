@@ -36,6 +36,7 @@ import {
   actImportance,
   reflectionOffsetTicks,
   refusalMemoryText,
+  wantedWater,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
@@ -2281,5 +2282,17 @@ describe('every turn row says what bought it', () => {
     const left = bills(agentDb).map((b) => b.blocks._priorStepsLeft ?? 0)
     expect(left[0]).toBe(0)
     expect(left[1]).toBeGreaterThan(0)
+  })
+})
+
+describe('★ an empty vessel is a want for water, though it names none', () => {
+  it('reads the water road off a refusal that names water, and off an empty vessel', () => {
+    expect(wantedWater('Last turn: drinking did not take — no water there.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not take — the skin is empty.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not take — the bucket is empty.')).toBe(true)
+  })
+  it('leaves a refusal about anything else alone', () => {
+    expect(wantedWater('Last turn: stoking did not take — not enough wood.')).toBe(false)
+    expect(wantedWater(null)).toBe(false)
   })
 })

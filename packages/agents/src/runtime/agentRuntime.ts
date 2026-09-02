@@ -204,9 +204,12 @@ export function lastTurnLine(what: string, reason: string): string {
 }
 
 // The reasons `drink`, `fill` and `fish` are turned away by all name the water. Read off the
-// rendered line, which is the one place a refusal survives into the next turn.
-export const wantedWater = (lastOutcome: string | null): boolean =>
-  (lastOutcome ?? '').includes('water')
+// rendered line, which is the one place a refusal survives into the next turn. An empty vessel
+// names no water and is the same want: the road out of it runs to the bank either way.
+export const wantedWater = (lastOutcome: string | null): boolean => {
+  const said = lastOutcome ?? ''
+  return said.includes('water') || /\bis empty\b/.test(said)
+}
 
 // A freeform intent has no verb to name, only the words the mind used.
 export const TRIED_FREEFORM = 'what you tried'
