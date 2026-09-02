@@ -13,6 +13,7 @@ import { SceneCoordinator, type SceneMind } from '../scene/coordinator.js'
 import { makeSceneLlm } from '../scene/sceneLlm.js'
 import { MemoryStore } from '../memory/store.js'
 import { TieStore } from '../memory/ties.js'
+import type { WantBias } from '../memory/wants.js'
 import type { MindConfig } from '../wake.js'
 
 export type Kin = { id: string; relation: 'partner' | 'parent' | 'child' }
@@ -32,6 +33,9 @@ export type MindSpec = {
   /** Declared in the persona so a kin tie can be seeded from it; a body born in the world
    *  gets its kin from the birth instead. */
   kin?: readonly Kin[]
+  /** What this person feels the lack of faster than everybody else, read off the voice card.
+   *  A kind with no entry rises at the common rate, and so does a persona with no table. */
+  wantBias?: WantBias
 }
 
 export type BootedMinds = {
@@ -156,6 +160,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       ...(opts.dreamLlm === undefined ? {} : { dreamLlm: makeDreamLlm(opts.dreamLlm(spec.id)) }),
       ...(opts.onThought === undefined ? {} : { onThought: opts.onThought }),
       ...(scenes === null ? {} : { scenes }),
+      ...(spec.wantBias === undefined ? {} : { wantBias: spec.wantBias }),
+      partners: (spec.kin ?? []).filter((k) => k.relation === 'partner').map((k) => k.id),
     })
     runtime.start(spec.id)
     const was = opts.restoring?.get(spec.id)

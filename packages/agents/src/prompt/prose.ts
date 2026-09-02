@@ -9,6 +9,7 @@ import {
 } from '@sj/shared'
 import { MYSTERIES, type ForageableKind, type MakeableRoad, type Makeables } from '@sj/engine'
 import { classMembers } from '@sj/shared'
+import type { WantKind } from '../memory/wants.js'
 
 // Local mirror of the engine's PerceptionPacket plus the two self-state booleans the bridge
 // reconciles in. Keep the field shapes identical to @sj/engine's so the mapping stays 1:1.
@@ -731,6 +732,12 @@ export function absenceLine(company: readonly Company[], tick: number): string {
   return days === 1
     ? `You have not seen ${missed.name} since yesterday.`
     : `You have not seen ${missed.name} for ${days} days.`
+}
+
+/** What this mind is shortest of, said once at the morning wake and nowhere else. It names a
+ *  want and asks for a person, because a want with no road is worse than no want at all. */
+export function wantLine(want: WantKind | null): string {
+  return want === null ? '' : `Today you most want ${want}; who could give you that?`
 }
 
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */

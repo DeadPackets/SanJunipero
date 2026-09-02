@@ -5,6 +5,8 @@ import { assemblePrompt } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { FOUNDER_IDS, TRAVELLER_IDS, scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
 import { FOUNDER_MINDS } from './founderMinds.js'
+import { WANT_KINDS, WantStore } from '../memory/wants.js'
+import { openAgentDb } from '../memory/schema.js'
 import { TRAVELLER_MINDS } from './travellerMinds.js'
 
 // Travellers are held to every rule a founder is: they take turns in the same town.
@@ -146,6 +148,49 @@ describe('★ the streamed cast and the one-way glass', () => {
       expect(t.arrival.length, `${t.id} has no arrival note`).toBeGreaterThan(20)
       expect(scanPromptForGlassLeak(promptFor(t)), `${t.id} leaks`).toEqual([])
       expect(t.kin ?? []).toEqual([])
+    }
+  })
+})
+
+describe('★ what each founder feels the lack of faster', () => {
+  it('names a want out of the contract, and nobody rises slower than everybody else', () => {
+    for (const mind of CAST) {
+      for (const [kind, factor] of Object.entries(mind.wantBias ?? {})) {
+        expect(WANT_KINDS, `${mind.id} biases ${kind}`).toContain(kind)
+        expect(factor, `${mind.id} biases ${kind}`).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('reads the want off the voice card, and leaves a card that names none alone', () => {
+    const biased = Object.fromEntries(
+      FOUNDER_MINDS.filter((m) => m.wantBias !== undefined).map((m) => [m.id, m.wantBias]),
+    )
+    // Amara "wants to be relied on", Bashir "to be loved by everyone in earshot", Halim "to be
+    // the memory of the place". Nadia, Salma and Farida say no such thing and rise at 1.
+    expect(biased).toEqual({
+      amara: { esteem: 1.5 },
+      yusuf: { esteem: 1.5 },
+      omar: { esteem: 1.5 },
+      bashir: { belonging: 1.5 },
+      kamal: { esteem: 1.5 },
+      leyla: { curiosity: 1.5 },
+      tariq: { legacy: 1.5 },
+      halim: { legacy: 1.5 },
+      dilara: { esteem: 1.5 },
+    })
+    for (const id of ['nadia', 'salma', 'farida']) {
+      expect(FOUNDER_MINDS.find((m) => m.id === id)?.wantBias, id).toBeUndefined()
+    }
+  })
+
+  it('decides what each of them wants on the very first morning', () => {
+    for (const mind of FOUNDER_MINDS) {
+      const wants = new WantStore(openAgentDb(':memory:'), mind.id, mind.wantBias ?? {})
+      wants.begin(0)
+      // Every want starts level, so the only thing that can separate them by dawn is the bias.
+      const named = Object.keys(mind.wantBias ?? {})[0]
+      expect(wants.top(6 * 60), mind.id).toBe(named ?? 'belonging')
     }
   })
 })
