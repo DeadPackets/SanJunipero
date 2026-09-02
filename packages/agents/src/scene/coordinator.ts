@@ -38,6 +38,10 @@ export type SceneCoordinatorOpts = {
 const OPENING_STAKES = 5
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
+// A coordinator with nobody to tell drops what it would have reported.
+const NO_REPORT = (): void => {
+  /* nothing to tell */
+}
 
 /** One per world. It hears every word, decides who holds the floor, and is the only thing that
  *  knows a conversation is a conversation. */
@@ -57,7 +61,7 @@ export class SceneCoordinator {
     this.#bridge = opts.bridge
     this.#mindFor = opts.mindFor
     this.#now = opts.now ?? Date.now
-    this.#onError = opts.onError ?? ((): void => {})
+    this.#onError = opts.onError ?? NO_REPORT
   }
 
   /** Every open scene, for the gateway's frame and for a snapshot. */
@@ -115,7 +119,7 @@ export class SceneCoordinator {
    *  a line is booked to the mouth that said it and to nobody listening. */
   async takeFloor(agentId: string, tick: number): Promise<void> {
     const scene = this.sceneFor(agentId)
-    if (scene === null || scene.floor !== agentId) return
+    if (scene?.floor !== agentId) return
     const mind = this.#mindFor(agentId)
     if (mind === null) return
     const token = ++this.#token
@@ -150,7 +154,8 @@ export class SceneCoordinator {
       return
     }
     scene.passes = 0
-    await this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } })
+    // Not awaited: an intent settles on the next tick, and the floor must not wait a tick to move.
+    void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
     this.#recordLine(scene, agentId, said, turn.thought, turn.move, tick)
     if (scene.thread.length >= LINE_CAP) await this.#close(scene, 'capped', tick)
   }
@@ -239,7 +244,8 @@ export class SceneCoordinator {
     return this.#bridge.expressersAtSquare().length >= GATHERING_MINIMUM
   }
 
-  /** Anyone who has walked out of the last speaker's earshot, died, or fallen asleep has left. */
+  /** Anyone out of the last speaker's earshot, or dead, has left. A sleeper keeps the floor
+   *  until the timeout takes it off them, which is the same thing one beat slower. */
   #dropAbsent(scene: Scene): void {
     const anchor = scene.thread[scene.thread.length - 1]?.agentId ?? scene.participants[0]!
     const within = new Set([anchor, ...this.#bridge.earshot(anchor)])

@@ -225,7 +225,7 @@ export class EngineBridge {
   earshot(agentId: string): string[] {
     const state = this.#loop.state
     const speaker = state.agents[agentId]
-    if (speaker === undefined || !speaker.alive) return []
+    if (speaker?.alive !== true) return []
     const spoken = {
       x: speaker.x,
       y: speaker.y,

@@ -6,7 +6,7 @@ export type Move = 'press' | 'give_way' | 'deflect' | 'tease' | 'none'
 
 // Task 13 compiles a law into the engine's own predicate; until it exists the only shape a
 // proposal can carry is the empty one.
-export type LawPredicate = { kind: 'none' }
+type LawPredicate = { kind: 'none' }
 
 export type SceneLine = {
   agentId: string
@@ -131,7 +131,10 @@ const RE_META = /[.*+?^${}()|[\]\\]/g
 function namedAt(text: string, name: string): number {
   const bare = firstNameOf(name)
   if (bare.length === 0) return -1
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])${bare.replace(RE_META, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu')
+  const re = new RegExp(
+    `(?<![\\p{L}\\p{N}])${bare.replace(RE_META, '\\$&')}(?![\\p{L}\\p{N}])`,
+    'iu',
+  )
   return text.search(re)
 }
 
@@ -166,7 +169,7 @@ const QUARREL_TIE_KINDS: readonly TieKind[] = ['grudge', 'slight']
 
 /** A line names an open grudge or slight when the person that tie is about is named in it.
  *  Ties do not exist until Task 11, so `tiesOf` answers `[]` and this is false everywhere. */
-export function namesAQuarrel(
+function namesAQuarrel(
   scene: Scene,
   text: string,
   tiesOf: (agentId: string) => readonly Tie[],
@@ -213,5 +216,3 @@ export function appendLine(scene: Scene, line: SceneLine): void {
   if (scene.thread.length > LINE_CAP) scene.thread.shift()
   scene.lastLineTick = line.tick
 }
-
-export const isOpen = (scene: Scene): boolean => scene.closedTick === null

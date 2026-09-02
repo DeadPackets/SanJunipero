@@ -89,6 +89,10 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_spawned',
   'agent_spoke',
   'agent_conceived',
+  // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.
+  'scene_opened',
+  'scene_line',
+  'scene_closed',
   // Superseded by the mortality events above, which say the same things better.
   'agent_injured',
   'agent_infected',

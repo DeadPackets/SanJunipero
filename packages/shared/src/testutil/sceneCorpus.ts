@@ -29,23 +29,26 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'nadia',
         thought: 'He looks like a man carrying more than wood.',
-        speech: 'Omar. Planks. I know, I know, the little one. But I\'ve told Salma and I\'ve told Ruth they\'re coming, so I need a day. Today, tomorrow. Out loud, not soon.',
+        speech:
+          "Omar. Planks. I know, I know, the little one. But I've told Salma and I've told Ruth they're coming, so I need a day. Today, tomorrow. Out loud, not soon.",
         move: 'press',
         leave: false,
         importance: 4,
       },
       {
         speaker: 'omar',
-        thought: 'I wanted her to ask first. She didn\'t.',
-        speech: 'You told two people already, Nadia. Before you asked me how she keeps down the broth. That\'s the part I keep chewing on.',
+        thought: "I wanted her to ask first. She didn't.",
+        speech:
+          "You told two people already, Nadia. Before you asked me how she keeps down the broth. That's the part I keep chewing on.",
         move: 'press',
         leave: false,
         importance: 3,
       },
       {
         speaker: 'nadia',
-        thought: 'Caught, and it stings more because he\'s right.',
-        speech: 'I told them because you said yes, Omar. That\'s the chain. You said yes first, I just... passed it on. And I did ask about the broth, I asked first, actually. Look. Sick child, I get it, I\'m not a monster. But Ruth is counting on those planks for her roof and it\'s my name on it now, so give me a day. Today. Tomorrow at the latest. Say it and I\'ll leave you alone, I swear.',
+        thought: "Caught, and it stings more because he's right.",
+        speech:
+          "I told them because you said yes, Omar. That's the chain. You said yes first, I just... passed it on. And I did ask about the broth, I asked first, actually. Look. Sick child, I get it, I'm not a monster. But Ruth is counting on those planks for her roof and it's my name on it now, so give me a day. Today. Tomorrow at the latest. Say it and I'll leave you alone, I swear.",
         move: 'press',
         leave: false,
         importance: 2,
@@ -53,7 +56,8 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'omar',
         thought: 'She did ask. I owed her that.',
-        speech: 'She asked first. Fine, I\'ll give you that. Tomorrow, then. Before noon, and I\'ll carry them myself, so Ruth hears it from my mouth too. But Nadia, the girl ate a whole bowl this morning. You can tell them that part as well.',
+        speech:
+          "She asked first. Fine, I'll give you that. Tomorrow, then. Before noon, and I'll carry them myself, so Ruth hears it from my mouth too. But Nadia, the girl ate a whole bowl this morning. You can tell them that part as well.",
         move: 'give_way',
         leave: false,
         importance: 5,
@@ -61,7 +65,8 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'nadia',
         thought: 'Relief, and a small sting of shame under it.',
-        speech: 'Tomorrow before noon, carried by your own arms, and Ruth hears it from you. That\'s better than I hoped for, honestly. And I\'ll tell them about the bowl. Whole bowl, your mouth, my word on it. Go sit with her.',
+        speech:
+          "Tomorrow before noon, carried by your own arms, and Ruth hears it from you. That's better than I hoped for, honestly. And I'll tell them about the bowl. Whole bowl, your mouth, my word on it. Go sit with her.",
         move: 'give_way',
         leave: true,
         importance: 4,
@@ -82,40 +87,42 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       },
       {
         speaker: 'yusuf',
-        thought: 'She\'s seen it. No use pretending.',
-        speech: 'Until the fire burns down. You got a question, ask it plain or don\'t.',
+        thought: "She's seen it. No use pretending.",
+        speech: "Until the fire burns down. You got a question, ask it plain or don't.",
         move: 'deflect',
         leave: false,
         importance: 6,
       },
       {
         speaker: 'salma',
-        thought: 'He\'ll know why I asked. Good.',
-        speech: 'Plain. Fine. The third beam, the crooked one. That was on purpose, or were your hands cold?',
+        thought: "He'll know why I asked. Good.",
+        speech:
+          'Plain. Fine. The third beam, the crooked one. That was on purpose, or were your hands cold?',
         move: 'tease',
         leave: false,
         importance: 7,
       },
       {
         speaker: 'yusuf',
-        thought: 'Her eyes are kind. That\'s the danger.',
-        speech: 'The third beam sits true. Ask Salma, she\'s slept under it twice.',
+        thought: "Her eyes are kind. That's the danger.",
+        speech: "The third beam sits true. Ask Salma, she's slept under it twice.",
         move: 'deflect',
         leave: false,
         importance: 3,
       },
       {
         speaker: 'salma',
-        thought: 'He\'s guarding the wrong door.',
-        speech: 'He checked the beam for me. Very thorough, Yusuf. You check anything else of mine that close?',
+        thought: "He's guarding the wrong door.",
+        speech:
+          'He checked the beam for me. Very thorough, Yusuf. You check anything else of mine that close?',
         move: 'tease',
         leave: false,
         importance: 4,
       },
       {
         speaker: 'yusuf',
-        thought: 'She hit close. I\'m not ready for this.',
-        speech: 'Your firewood\'s damp. That\'s why it smokes.',
+        thought: "She hit close. I'm not ready for this.",
+        speech: "Your firewood's damp. That's why it smokes.",
         move: 'deflect',
         leave: false,
         importance: 4,
@@ -123,15 +130,16 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'salma',
         thought: 'Come on. Just say her name, Yusuf.',
-        speech: 'Damp wood. That the only thing of mine you\'ve been keeping an eye on?',
+        speech: "Damp wood. That the only thing of mine you've been keeping an eye on?",
         move: 'press',
         leave: false,
         importance: 5,
       },
       {
         speaker: 'yusuf',
-        thought: 'She\'s close. Too close, and I fed her.',
-        speech: 'Amara took the short beams yesterday. Saved me the walk. There\'s your keeping an eye on.',
+        thought: "She's close. Too close, and I fed her.",
+        speech:
+          "Amara took the short beams yesterday. Saved me the walk. There's your keeping an eye on.",
         move: 'deflect',
         leave: false,
         importance: 5,
@@ -146,8 +154,8 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       },
       {
         speaker: 'yusuf',
-        thought: 'Caught. She\'ll pry it out of me by spring.',
-        speech: 'Wood\'s popping. That\'s the damp, not me talking.',
+        thought: "Caught. She'll pry it out of me by spring.",
+        speech: "Wood's popping. That's the damp, not me talking.",
         move: 'deflect',
         leave: false,
         importance: 4,
@@ -160,8 +168,8 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
     lines: [
       {
         speaker: 'amara',
-        thought: 'If she balks, I\'ve already lost the morning.',
-        speech: 'Well\'s dry. I counted the buckets, Salma. Yours first, everyone after, agreed?',
+        thought: "If she balks, I've already lost the morning.",
+        speech: "Well's dry. I counted the buckets, Salma. Yours first, everyone after, agreed?",
         move: 'press',
         leave: false,
         importance: 4,
@@ -176,24 +184,26 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       },
       {
         speaker: 'amara',
-        thought: 'Her laughing won\'t fill the well.',
-        speech: 'I don\'t sleep much. Doesn\'t change the numbers. Yours first, or somebody else decides for you.',
+        thought: "Her laughing won't fill the well.",
+        speech:
+          "I don't sleep much. Doesn't change the numbers. Yours first, or somebody else decides for you.",
         move: 'press',
         leave: false,
         importance: 6,
       },
       {
         speaker: 'salma',
-        thought: 'Being on anybody\'s list is the thing I can\'t stand.',
-        speech: 'Somebody else deciding for me. That\'s new. Didn\'t realize the well came with a landlord. I\'ll carry back double today, every day, and you can cross me off your list for good.',
+        thought: "Being on anybody's list is the thing I can't stand.",
+        speech:
+          "Somebody else deciding for me. That's new. Didn't realize the well came with a landlord. I'll carry back double today, every day, and you can cross me off your list for good.",
         move: 'press',
         leave: false,
         importance: 4,
       },
       {
         speaker: 'amara',
-        thought: 'She\'ll do it. I just need it said.',
-        speech: 'Double\'s fine. But the order stands. Yours first, say it.',
+        thought: "She'll do it. I just need it said.",
+        speech: "Double's fine. But the order stands. Yours first, say it.",
         move: 'press',
         leave: false,
         importance: 5,
@@ -201,7 +211,8 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'salma',
         thought: 'He wants the words, not the water. No.',
-        speech: 'Fine. I\'m standing here, aren\'t I? Rope\'s in my hand. Write that down however you like.',
+        speech:
+          "Fine. I'm standing here, aren't I? Rope's in my hand. Write that down however you like.",
         move: 'give_way',
         leave: true,
         importance: 5,
@@ -247,7 +258,7 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'salma',
         thought: 'He will break before I do.',
-        speech: 'Cold river. Good thing you spent midday staring at Amara\'s porch.',
+        speech: "Cold river. Good thing you spent midday staring at Amara's porch.",
         move: 'tease',
         leave: false,
         importance: 4,
@@ -279,14 +290,14 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'salma',
         thought: 'He is red as a beet.',
-        speech: 'Took three hours staring, Yusuf. Surprised the step didn\'t fix itself.',
+        speech: "Took three hours staring, Yusuf. Surprised the step didn't fix itself.",
         move: 'tease',
         leave: false,
         importance: 4,
       },
       {
         speaker: 'yusuf',
-        thought: 'She won\'t let this bone go.',
+        thought: "She won't let this bone go.",
         speech: 'Cedar burns too fast anyway. Pass me that green pine, Salma.',
         move: 'deflect',
         leave: false,
@@ -309,7 +320,7 @@ export const SCENE_CORPUS: readonly SceneCorpusScene[] = [
       {
         speaker: 'yusuf',
         thought: 'The cold is easier than this question.',
-        speech: 'The fire\'s loud enough. Pass me that split log, Salma.',
+        speech: "The fire's loud enough. Pass me that split log, Salma.",
         move: 'deflect',
         leave: false,
         importance: 3,
