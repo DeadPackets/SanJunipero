@@ -116,10 +116,67 @@ describe('worldStore', () => {
     const snap = makeSnapshot()
     store.applyServer(snap)
     store.applyServer({ t: 'scrubbed', reqId: 1, tick: 1, state: snap.state })
-    expect(store.getMode()).toEqual({ live: false, tick: 1 })
+    expect(store.getMode()).toEqual({ live: false, replaying: false, tick: 1 })
+    expect(store.timeMoving()).toBe(false)
     expect(store.getTick()).toBe(1)
     store.applyServer(makeSnapshot())
     expect(store.getMode()).toEqual({ live: true })
+    expect(store.timeMoving()).toBe(true)
+  })
+
+  // ★ The whole of the bug the owner reported: a scrub was a still frame because every delta was
+  // dropped unless the view was live. A replay is not live, and its time moves.
+  it('★ a replay folds its deltas and walks the clock on; a still scrub takes none', () => {
+    const store = createWorldStore()
+    const snap = { ...makeSnapshot(), seq: 900 } // the live edge, far ahead of the replayed past
+    store.applyServer(snap)
+    const reached: SimEvent = { seq: 900, tick: 5, type: 'tick_advanced', payload: {} }
+    store.applyServer({ t: 'tick', tick: 5, seq: 901, events: [reached] })
+    expect(store.liveEdge()).toBe(5)
+
+    store.applyServer({ t: 'replaying', reqId: 1, tick: 1, seq: 1, state: snap.state })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 1 })
+    expect(store.timeMoving()).toBe(true)
+
+    const adv: SimEvent = { seq: 2, tick: 2, type: 'tick_advanced', payload: {} }
+    const ev: SimEvent = {
+      seq: 3,
+      tick: 2,
+      type: 'agent_moved',
+      payload: { id: 'walker', x: 1, y: 2 },
+    }
+    // ★ the recorded seqs are far BELOW the live head this viewer had; the guard must not eat them
+    store.applyServer({ t: 'tick', tick: 2, seq: 3, events: [adv, ev] })
+    const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
+    expect(stateHash(store.getState())).toBe(stateHash(clone(reference)))
+    expect(store.getTick()).toBe(2)
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 2 })
+
+    // ...and the live watermark stays where the live town left it
+    expect(store.liveEdge()).toBe(5)
+
+    // the same delta on a STILL scrub changes nothing at all
+    const still = createWorldStore()
+    still.applyServer(makeSnapshot())
+    still.applyServer({ t: 'scrubbed', reqId: 1, tick: 1, state: snap.state })
+    still.applyServer({ t: 'tick', tick: 2, seq: 3, events: [adv, ev] })
+    expect(stateHash(still.getState())).toBe(stateHash(snap.state))
+    expect(still.getTick()).toBe(1)
+  })
+
+  // ★ Going live must not leave the viewer deaf: the snapshot carries the live head, so the
+  // frames after it clear the guard the replay had wound back.
+  it('★ a snapshot after a replay takes the live deltas that follow it', () => {
+    const store = createWorldStore()
+    store.applyServer({ ...makeSnapshot(), seq: 900 })
+    store.applyServer({ t: 'replaying', reqId: 1, tick: 1, seq: 1, state: makeSnapshot().state })
+    expect(store.logSeq()).toBe(1)
+
+    store.applyServer({ ...makeSnapshot(), seq: 900 })
+    expect(store.getMode()).toEqual({ live: true })
+    const adv: SimEvent = { seq: 901, tick: 2, type: 'tick_advanced', payload: {} }
+    expect(store.applyServer({ t: 'tick', tick: 2, seq: 901, events: [adv] })).toBeNull()
+    expect(store.getTick()).toBe(2)
   })
 
   it('thoughts feed latestThought and a 200-entry capped log', () => {

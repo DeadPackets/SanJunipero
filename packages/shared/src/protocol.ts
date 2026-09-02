@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 5 // 5: the scene frame — a v4 reducer's union throws on it
+export const PROTOCOL_VERSION = 6 // 6: the replay frames — a v5 viewer folds their deltas into the live edge
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -16,8 +16,18 @@ export const ClientHello = z
 export const ClientScrub = z
   .object({ t: z.literal('scrub'), tick, reqId: z.number().int().nonnegative() })
   .strict()
+// A stretch of time rather than an instant: the town plays forward from `from` at the live
+// cadence until it reaches now. `live` is how a viewer leaves it.
+export const ClientReplay = z
+  .object({ t: z.literal('replay'), from: tick, reqId: z.number().int().nonnegative() })
+  .strict()
 export const ClientLive = z.object({ t: z.literal('live') }).strict()
-export const ClientMsg = z.discriminatedUnion('t', [ClientHello, ClientScrub, ClientLive])
+export const ClientMsg = z.discriminatedUnion('t', [
+  ClientHello,
+  ClientScrub,
+  ClientReplay,
+  ClientLive,
+])
 export type ClientMsg = z.infer<typeof ClientMsg>
 
 export const ServerSnapshot = z
@@ -51,6 +61,17 @@ export const ServerScrubbed = z
     t: z.literal('scrubbed'),
     reqId: z.number().int().nonnegative(),
     tick,
+    state: z.unknown(),
+  })
+  .strict()
+// The ONE fold a replay pays for. `seq` is the log head at `tick`, and the viewer adopts it: the
+// recorded deltas that follow are then ordinary `tick` frames with ordinary rising seqs.
+export const ServerReplaying = z
+  .object({
+    t: z.literal('replaying'),
+    reqId: z.number().int().nonnegative(),
+    tick,
+    seq: z.number().int().nonnegative(),
     state: z.unknown(),
   })
   .strict()
@@ -98,6 +119,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerPaused,
   ServerTick,
   ServerScrubbed,
+  ServerReplaying,
   ServerThought,
   ServerAssets,
   ServerScene,

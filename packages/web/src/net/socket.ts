@@ -6,7 +6,13 @@ const GAP_TICKS = 1440 // more than a missed day → offer the digest
 const BACKOFF_MIN_MS = 1_000
 const BACKOFF_MAX_MS = 30_000
 
-export type ObservatoryHandle = { scrub(tick: number): void; goLive(): void; close(): void }
+export type ObservatoryHandle = {
+  scrub(tick: number): void
+  /** Play the town forward from `from` at the live cadence, until it catches up or `goLive`. */
+  replay(from: number): void
+  goLive(): void
+  close(): void
+}
 export type LinkStatus = 'connecting' | 'online' | 'reconnecting'
 
 export function connectObservatory(opts: {
@@ -68,7 +74,7 @@ export function connectObservatory(opts: {
       }
       // A scrub inside the server's coalescing window is answered late — after the `live` the
       // viewer asked for next — and would put the view back on a minute they have left.
-      if (msg.t === 'scrubbed' && msg.reqId !== reqId) return
+      if ((msg.t === 'scrubbed' || msg.t === 'replaying') && msg.reqId !== reqId) return
       if (msg.t === 'snapshot') {
         const last = readLastSeen()
         if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
@@ -82,7 +88,10 @@ export function connectObservatory(opts: {
         send({ t: 'live' })
         return
       }
-      if (msg.t === 'snapshot' || msg.t === 'tick') writeLastSeen(msg.tick)
+      // A replayed minute is a minute this viewer has already seen: stored, it would make the
+      // next visit offer a digest of the days between then and now.
+      if (msg.t === 'snapshot' || (msg.t === 'tick' && opts.store.getMode().live))
+        writeLastSeen(msg.tick)
     }
     sock.onclose = (e: CloseEvent) => {
       if (closed) return
@@ -106,6 +115,9 @@ export function connectObservatory(opts: {
   return {
     scrub(tick) {
       send({ t: 'scrub', tick, reqId: ++reqId })
+    },
+    replay(from) {
+      send({ t: 'replay', from, reqId: ++reqId })
     },
     goLive() {
       reqId++ // no scrub still in flight can answer for the live edge

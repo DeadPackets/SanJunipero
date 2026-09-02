@@ -956,12 +956,12 @@ body {
    duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
   .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
-  .roster-row, .key-summary, .discovery-leaf, .stage-exit {
+  .roster-row, .key-summary, .discovery-leaf, .stage-exit, .stage-live {
     transition-duration: 0s;
   }
   .feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
   .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
-  .discovery-leaf:hover, .stage-exit:hover {
+  .discovery-leaf:hover, .stage-exit:hover, .stage-live:hover {
     transition-duration: var(--t-fast);
   }
 }
@@ -1259,7 +1259,7 @@ body {
 .stage-scene-stamp[data-stakes='warm'] { color: var(--honey); }
 .stage-scene-stamp[data-stakes='hot'] { color: var(--ember); }
 
-.stage-exit {
+.stage-exit, .stage-live {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
   top: max(var(--mark-inset), env(safe-area-inset-top));
@@ -1268,12 +1268,27 @@ body {
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .stage-exit { transition-property: background-color, translate, box-shadow; }
+/* Under the stamp, in the same corner: the word REPLAY and the way out of it are one thing.
+   One stamp line plus a gap below its own top, so the two never sit on each other. */
+.stage-live {
+  left: auto;
+  right: max(var(--mark-inset), env(safe-area-inset-right));
+  top: calc(
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+  );
 }
-.stage-exit:hover { background: var(--deep); }
-.stage-exit:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-.stage-exit:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+@media (max-width: 900px) {
+  /* The stamp clears one chip row below 900px, and this follows it down. */
+  .stage-live { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stage-exit, .stage-live { transition-property: background-color, translate, box-shadow; }
+}
+.stage-exit:hover, .stage-live:hover { background: var(--deep); }
+.stage-exit:active, .stage-live:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.stage-exit:focus-visible, .stage-live:focus-visible {
+  outline: 2px solid var(--honey); outline-offset: 2px;
+}
 
 /* Once the signpost has a corner, the cue may not reach it. */
 @media (min-width: 700px) {

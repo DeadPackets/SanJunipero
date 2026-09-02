@@ -60,11 +60,22 @@ describe('protocol', () => {
     expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, kind: 'gossip' } })).toThrow()
     expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, stakes: 11 } })).toThrow()
   })
-  it('is at version 5: a v4 union has no scene frame, so it throws on one', () => {
-    expect(PROTOCOL_VERSION).toBe(5)
+  it('is at version 6: a v5 viewer folds a replay stream into the live edge', () => {
+    expect(PROTOCOL_VERSION).toBe(6)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })
+  })
+
+  it('carries a replay: the ask names a minute, the answer names the log head at it', () => {
+    const ask = { t: 'replay', from: 41 * 1440, reqId: 3 }
+    expect(ClientMsg.parse(ask)).toEqual(ask)
+    expect(() => ClientMsg.parse({ ...ask, from: -1 })).toThrow()
+    const opened = { t: 'replaying', reqId: 3, tick: 41 * 1440, seq: 900, state: {} }
+    expect(ServerMsg.parse(opened)).toEqual(opened)
+    // the seq is what the viewer winds its guard back to, so it may not be left off
+    const { seq: _seq, ...noSeq } = opened
+    expect(() => ServerMsg.parse(noSeq)).toThrow()
   })
   it('moment math: day 41 14:30 ↔ tick', () => {
     expect(momentToTick(41, '14:30')).toBe(41 * 1440 + 14 * 60 + 30)

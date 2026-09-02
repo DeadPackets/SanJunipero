@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, structureTitle, tickToMoment } from '@sj/shared'
 import { createWorldStore, onFirstSnapshot } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
@@ -74,6 +74,7 @@ export function App() {
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
   const { autoCut, toggle: toggleDirector } = useAutoCut()
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
   const moment = useStageCue(store)
   // ...and what the town is DOING. One owner for the scene's eight-second hold, so the line and
@@ -92,13 +93,13 @@ export function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(sock)
 
-    // deep link: once the first snapshot lands, scrub to the linked moment
+    // deep link: once the first snapshot lands, play the town on from the linked moment
     const initial = parseRoute(location.pathname, location.search)
     const offMoment =
       initial.moment === null
         ? null
         : onFirstSnapshot(store, () => {
-            sock.scrub(momentToTick(initial.moment!.day, initial.moment!.time))
+            sock.replay(momentToTick(initial.moment!.day, initial.moment!.time))
           })
 
     // A person ringed beside a moment link is not a pasted `/agent/:id`, and an id the town does
@@ -329,6 +330,13 @@ export function App() {
           }}
         >
           <span aria-hidden="true">← </span>Back to town
+        </button>
+      )}
+      {/* The stamp already names the minute and reads REPLAY; this is the one way back out of it.
+          A stream frame has no hands, and its stamp says the same thing on its own. */}
+      {!mode.live && !route.broadcast && (
+        <button type="button" className="stage-live" onClick={onLive}>
+          Return to now<span aria-hidden="true"> →</span>
         </button>
       )}
       <SpeechLive store={store} />

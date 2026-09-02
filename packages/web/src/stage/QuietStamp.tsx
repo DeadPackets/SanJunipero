@@ -78,8 +78,10 @@ export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState
 
   // Not a live region: a clock announcing itself every minute of town time is one nobody can
   // listen past. It stays in the tree to be read on demand.
+  // Off the live edge it stays up: a town replaying the past says so for as long as it is, not
+  // for three seconds after the last thing the pointer did.
   return (
-    <div className={shown ? 'stage-stamp shown' : 'stage-stamp'}>
+    <div className={shown || !live ? 'stage-stamp shown' : 'stage-stamp'}>
       {stampText(tick, stampWord(live, awake, link, paused))}
     </div>
   )
