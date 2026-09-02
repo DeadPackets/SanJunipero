@@ -50,10 +50,10 @@ import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../me
 import { promptText } from '../memory/gist.js'
 import {
   isBlankAnswer,
+  MIND_TURN_WIRE,
   parseTurnWithRepair,
   reconsiderTick,
   turnSpeaks,
-  TurnSchemaActionRequired,
   type Turn,
 } from '../turn.js'
 import {
@@ -913,7 +913,7 @@ export class AgentRuntime {
   async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchemaActionRequired,
+        schema: MIND_TURN_WIRE.schema,
         system: assembled.system,
         messages: assembled.messages,
       })
@@ -930,7 +930,7 @@ export class AgentRuntime {
   async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchemaActionRequired,
+        schema: MIND_TURN_WIRE.schema,
         system: assembled.system,
         messages: [
           ...assembled.messages,
