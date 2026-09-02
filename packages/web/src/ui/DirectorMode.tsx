@@ -8,7 +8,16 @@ import { useEndpointFor, useFeed } from './useEndpoint.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
+/** Two speakers two tiles apart are 156 world px apart, which a 1280-wide frame holds at 2×
+ *  and no frame holds at 3× — and a two-person exchange is what the director exists to find.
+ *  Narrower than that the wider stop spends the whole face to gain nothing beside it. */
+export const DIRECTOR_ZOOM_WIDE = 2 as const
+export const WIDE_VIEWPORT_PX = 1280
 export const OVERVIEW_ZOOM = 1 as const
+
+export function directorZoom(width: number): typeof DIRECTOR_ZOOM | typeof DIRECTOR_ZOOM_WIDE {
+  return width >= WIDE_VIEWPORT_PX ? DIRECTOR_ZOOM_WIDE : DIRECTOR_ZOOM
+}
 
 /** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
  *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
@@ -79,7 +88,7 @@ export function DirectorMode({
       }
       return
     }
-    scene.setZoom(DIRECTOR_ZOOM)
+    scene.setZoom(directorZoom(window.innerWidth))
     scene.setFollow(() => {
       const anchor = scene.anchorOf?.(followed)
       if (anchor !== undefined && anchor !== null) return anchor

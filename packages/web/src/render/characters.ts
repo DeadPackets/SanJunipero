@@ -24,6 +24,8 @@ import {
   type Overhead,
 } from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
+import { statusOf } from '../ui/status.js'
+import { createConversation } from './converse.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -215,6 +217,8 @@ export function createCharacterLayer(
   let lastAssetsSeq = store.assetsSeq()
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
+  /** Who is answering whom, so a talker turns to their partner rather than out to sea. */
+  const talk = createConversation()
   /** ONE clock for the whole town: the world ticks for everybody at once, so a per-body
    *  estimate would be five noisy copies of one number. */
   let clock: TickClock = initialTickClock()
@@ -295,13 +299,16 @@ export function createCharacterLayer(
   const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
     if (e.glyphKind === kind) return
     e.glyphKind = kind
-    if (kind === null || emoteAtlas === null) {
+    // Check the index: `indexOf` answers -1 for a kind the sheet lacks, and a frame cut off the
+    // left of the atlas is the forge's checkerboard standing over somebody's head.
+    const cell = kind === null ? -1 : EMOTE_KINDS.indexOf(kind)
+    if (cell < 0 || emoteAtlas === null) {
       e.overhead.glyph.texture = Texture.EMPTY
       return
     }
     e.overhead.glyph.texture = new Texture({
       source: emoteAtlas.source,
-      frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+      frame: new Rectangle(cell * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
     })
     e.overhead.glyph.width = EMOTE_PX
     e.overhead.glyph.height = EMOTE_PX
@@ -384,6 +391,11 @@ export function createCharacterLayer(
       debuff: conf?.movement.debuffTilesPerTick ?? MOVEMENT_FALLBACK.debuff,
     }
     for (const ev of evts) {
+      if (ev.type === 'agent_spoke') {
+        const s = ev.payload as { agentId: string; x: number; y: number }
+        talk.heard({ agentId: s.agentId, x: s.x, y: s.y, atMs: now })
+        continue
+      }
       if (ev.type !== 'agent_moved') continue
       const p = ev.payload as { id: string; x: number; y: number }
       const e = entries.get(p.id)
@@ -443,6 +455,13 @@ export function createCharacterLayer(
       // while walking, face the current leg; the event-time facing stays as the
       // idle orientation after arrival
       if (walking) e.facing = legFacing(e.path) ?? e.facing
+      else if (statusOf(a, nowTick) === 'talking') {
+        // Turned toward whoever they are answering: two talkers facing where they last walked
+        // read as two people, not as an exchange.
+        const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
+        const at = partner === null ? undefined : state.agents[partner]
+        if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      }
       const sheet = sheets.get(a.id)
       const pose = charPose(
         {
@@ -500,17 +519,11 @@ export function createCharacterLayer(
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
-      // ★ 7A AT REST, 7M-B WHILE A JOB RUNS. The slot holds the one glyph the priority table
-      // picks; the track wraps that same slot exactly while there is an act to report and goes
-      // when it does. `actFraction` is last frame's — the act layer places its chips against
-      // these very sprites, so it cannot run before them, and a world tick is two seconds.
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)
-      const running = emotesHidden ? null : (scene.actFraction?.(a.id) ?? null)
-      e.overhead.setTrack(running)
-      e.overhead.node.visible = row !== null || running !== null
+      e.overhead.node.visible = row !== null
       // ONE placement rule for every label in the product, and the layer applies it: the plate
       // is welded to the feet and only leaves them when the view has no room down there. Said
       // every frame, because the body it names walks.
@@ -520,7 +533,7 @@ export function createCharacterLayer(
         const head = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX
         scene.tags.show(
           'hover',
-          hoverPlate(state, 'agent', a.id),
+          hoverPlate(state, 'agent', a.id, a.id === scene.pickedId),
           anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
         )
       }

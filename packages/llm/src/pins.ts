@@ -111,11 +111,11 @@ const WAITS_OUT_A_BURST = { rateLimitRetries: 3, maxQueueWaitMs: 60_000 }
 // reasoning is off, the whole output where it stays on. On GLM it can never be off, so each of
 // those ceilings carries 2x87 tokens more of mandatory preamble. Truncation is a hard failure.
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
-  // GLM's own turn p99 is 287 output tokens, preamble included. Temperature 1 is the sampling
-  // the bake-off measured its voice and its 100% named-object act rate at.
+  // Not 2x the 287-token p99: a plan step on the wire is now the whole closed grammar, and a
+  // full twelve-step turn measured 1,019 output tokens live, which 600 would have truncated.
   // One call ahead of you drains in Wafer's 14.7 s p95 and an idle turn is 60 s apart, so 20 s of
   // queue covers a wait one deep; past that the mind is standing still and gives the ask up.
-  turn: { ...ON_GLM, maxQueueWaitMs: 20_000, maxOutputTokens: 600, temperature: 1 },
+  turn: { ...ON_GLM, maxQueueWaitMs: 20_000, maxOutputTokens: 1500, temperature: 1 },
   // 700 truncated the ledger writes and 1500 cleared the longest of them; +174 for the preamble.
   reflection: { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 1750 },
   // Sized around a thinking preamble larger than this model's, so neither of these moves.

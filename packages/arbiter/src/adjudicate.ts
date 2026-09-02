@@ -1,8 +1,10 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import { IntentParamsSchema, registerVerb, VERBS } from '@sj/engine'
+import { registerVerb, VERBS } from '@sj/engine'
 import {
+  CLOSED_KEYS,
   FORBIDDEN_FRAMING,
+  NO_PARAMS,
   type DiscoveryCredit,
   type DiscoveryKind,
   scanRulingForGlassLeak,
@@ -59,7 +61,7 @@ export const FALLBACK_IMPOSSIBLE = {
 // The words a turn is made of, spilled into the act slot: the name of an act, the keys it takes,
 // the parts of an answer. An intent made of nothing else is a decode slip, not an attempt.
 const DEBRIS_WORDS: ReadonlySet<string> = new Set([
-  ...Object.keys(IntentParamsSchema.shape).map((k) => k.toLowerCase()),
+  ...CLOSED_KEYS.map((k) => k.toLowerCase()),
   'thought',
   'speech',
   'action',
@@ -286,7 +288,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
       // Stage 1 — deterministic rulebook lookup (exact normalized-name match).
       const hit = rulebook.lookup(intent)
-      if (hit) return { kind: 'map', verb: hit.verb, params: {} }
+      if (hit) return { kind: 'map', verb: hit.verb, params: NO_PARAMS }
 
       // Stages 2 and 3 share one retrieval: similar[0] serves the short-circuit,
       // the full list becomes the LLM's precedent block.
@@ -300,7 +302,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           const row = rulebook.byId(stored.recipe.id)
           if (row === null) return stored
           if (row.revertedAtTick === null)
-            return { kind: 'map', verb: stored.recipe.id, params: {} }
+            return { kind: 'map', verb: stored.recipe.id, params: NO_PARAMS }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
         } else if (stored.kind === 'map') {
           if (stored.verb.startsWith('recipe:')) {
@@ -328,7 +330,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           const verdict: Verdict = {
             kind: 'map',
             verb: codifyExpressive(ruling.data, tick(), { agentId: agentCtx.agentId, intent }),
-            params: {},
+            params: NO_PARAMS,
           }
           await rulings.record(intent, verdict, tick())
           return verdict

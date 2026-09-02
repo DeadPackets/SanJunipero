@@ -25,11 +25,29 @@ import type { Scene } from './scene.js'
 /** One tick is 2.5s of flicker, not a caption: an act has to last to be worth a word. */
 export const ACT_MIN_TICKS = 2
 
-/** ★ THE CEILING IS ON THE TRACK, NOT ON THE CHIP. `chop` is 30 ticks but a house is
- *  `houseTicks: 2880`: seven blocks creeping one block every 411 ticks reads as broken while
+/** ★ THE CEILING IS ON THE BAR, NOT ON THE CHIP. `chop` is 30 ticks but a house is
+ *  `houseTicks: 2880`: a bar creeping a pixel every hour of town time reads as broken while
  *  telling the truth, and the word is worth having at any length — a long act keeps its word
- *  and loses its track. */
+ *  and loses its bar. */
 export const ACT_TRACK_MAX_TICKS = 60
+
+/** One DRAWN pixel: the chip is world art, so this thickens with the camera like every edge. */
+export const ACT_BAR_PX = 1
+/** Whole pixels between the slab and its bar: at 0 the honey touches the ink ring and reads as
+ *  part of it. Reserved whether or not a bar is drawn, so no neighbour is placed on that row. */
+export const ACT_BAR_GAP_PX = 1
+const ACT_BAR_FILL = 0xf2c879 // --honey
+
+/** How much of a `w`-wide chip the bar covers. Whole pixels: a fractional edge on a 1px bar is
+ *  a grey row, and a bar that reads as grey reads as broken. */
+export function barWidth(w: number, fraction: number): number {
+  return Math.round(w * Math.min(1, Math.max(0, fraction)))
+}
+
+/** Everything a chip DRAWS, slab and bar, which is what the placer must be told about. */
+export function chipHeight(slabH: number): number {
+  return slabH + ACT_BAR_GAP_PX + ACT_BAR_PX
+}
 
 /** ★ A chip has its own reason to be on screen, and it is not "a bubble would be": the two
  *  used to share `bubbleShown`, so changing who speaks silently changed who works. The stop is
@@ -71,7 +89,7 @@ export function actShown(a: AgentView, run: ActRun | null, nowTick?: number): bo
   return statusOf(a, nowTick) === 'working'
 }
 
-/** Whether the work is short enough that seven blocks can promise you will see it finish. */
+/** Whether the work is short enough that a bar can promise you will see it finish. */
 export function actTrackShown(run: ActRun): boolean {
   return run.total <= ACT_TRACK_MAX_TICKS
 }
@@ -79,9 +97,8 @@ export function actTrackShown(run: ActRun): boolean {
 export type ActLayer = {
   /** the exact duration, from `action_started`; everything else is read off the world state */
   noteStart(agentId: string, verb: string, duration: number): void
-  /** ★ How far into their job this person is, for the TRACK that wraps their overhead slot —
-   *  0..1 while a short act runs, and null the moment it stops. The chip's own fill is gone:
-   *  progress is seven blocks over the head now, a count and a position before it is a hue. */
+  /** ★ How far into their job this person is — 0..1 while a short act runs, and null the moment
+   *  it stops. The chip's own bar reads it; nothing over the head does any more. */
   fractionOf(agentId: string): number | null
   tick(): void
   destroy(): void
@@ -89,9 +106,12 @@ export type ActLayer = {
 
 type Chip = {
   node: Container
+  bar: Graphics
   w: number
   h: number
   word: string
+  /** the whole pixels the bar was last drawn at, so it is redrawn only when it moves */
+  drawn: number
 }
 
 export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
@@ -117,18 +137,28 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
 
     // ★ NO MASK, and no wash under the word. The fill was a Graphics mask PER CHIP, which is a
     // render target per working person — and with the viewport rule that is every working person
-    // on screen. Progress is the overhead track now; the chip is one flat slab with a word on it.
+    // on screen. The bar under the slab is a rectangle redrawn only when it moves a whole pixel.
     const paper = new Graphics()
     paper.roundRect(0, 0, w, h, BUBBLE_RADIUS)
     paper.fill(SPEECH_FILL)
     paper.stroke({ width: BUBBLE_STROKE, color: BUBBLE_EDGE, alignment: 1 })
 
+    const bar = new Graphics()
+    bar.position.set(0, h + ACT_BAR_GAP_PX)
     const box = new Container()
-    box.addChild(paper, label)
+    box.addChild(paper, label, bar)
     label.position.set(BUBBLE_PAD, BUBBLE_PAD)
     box.position.set(-Math.round(w / 2), 0)
     node.addChild(box)
-    return { node, w, h, word }
+    return { node, bar, w, h, word, drawn: -1 }
+  }
+
+  const setBar = (chip: Chip, fraction: number | null): void => {
+    const px = fraction === null ? 0 : barWidth(chip.w, fraction)
+    if (px === chip.drawn) return
+    chip.drawn = px
+    chip.bar.clear()
+    if (px > 0) chip.bar.rect(0, 0, px, ACT_BAR_PX).fill(ACT_BAR_FILL)
   }
 
   const drop = (agentId: string): void => {
@@ -212,7 +242,10 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
           if (scene.wantsMotion()) fadeArtIn(chip.node)
           chips.set(p.id, chip)
         }
-        want.push({ ...p, size: { w: chip.w * inv, h: chip.h * inv } })
+        const run = runs.get(p.id)
+        setBar(chip, run === undefined || !actTrackShown(run) ? null : actFraction(run))
+        // The declared height carries the bar: the placer keeps every other label off it.
+        want.push({ ...p, size: { w: chip.w * inv, h: chipHeight(chip.h) * inv } })
       }
 
       // ── placed against the bubbles, never over them ─────────────────────────────────────

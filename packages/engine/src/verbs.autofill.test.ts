@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, NO_PARAMS, namedParams, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
+import { VERBS } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1
@@ -166,6 +167,29 @@ describe('submitIntent', () => {
     })
   })
 
+  // The closed grammar answers every key it did not use with null, and a verdict handed straight
+  // to the world arrives that way. A null is no mark, so the readings below are the same ones.
+  it('reads a params object filled with nulls exactly as one that named nothing', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', { ...NO_PARAMS })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      verb: 'eat',
+      params: { itemId: 'item_bread_1' },
+    })
+    // And the one mark it did name is still read off a body of nulls, under the wrong word.
+    const named = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', {
+      ...NO_PARAMS,
+      targetId: 'item_bread_1',
+    })
+    expect(named.ok).toBe(true)
+    if (!named.ok) return
+    expect(named.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      params: { itemId: 'item_bread_1' },
+    })
+  })
+
   it('still refuses an act the world cannot read one way, and names the two readings', () => {
     let s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
     s = holding(s, 'item_fish_2', 'fish')
@@ -173,5 +197,31 @@ describe('submitIntent', () => {
       ok: false,
       reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
     })
+  })
+})
+
+// The seam proved for the whole registry, not for `eat` alone: each verb parses a `.strict()`
+// schema of its own keys, so the thirteen must be stripped before any of them sees them.
+describe('every registered verb across the closed-params seam', () => {
+  const NAMED: Record<string, unknown> = { itemId: 'item_bread_1', x: 1, y: 1, kind: 'bread' }
+
+  it('reads the stripped answer exactly as the sparse one the world has always passed', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(Object.keys(VERBS).length).toBeGreaterThan(30)
+    for (const [verb, def] of Object.entries(VERBS)) {
+      expect(namedParams({ ...NO_PARAMS, ...NAMED }), verb).toEqual(NAMED)
+      expect(
+        def.validate(s, DEFAULT_CONFIG, 'a1', namedParams({ ...NO_PARAMS, ...NAMED })),
+        verb,
+      ).toEqual(def.validate(s, DEFAULT_CONFIG, 'a1', NAMED))
+    }
+  })
+
+  it('is refused by most of them with the nulls left on, so the stripping is load-bearing', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    const refused = Object.values(VERBS).filter(
+      (def) => def.validate(s, DEFAULT_CONFIG, 'a1', { ...NO_PARAMS, ...NAMED }) !== null,
+    )
+    expect(refused.length).toBeGreaterThan(20)
   })
 })

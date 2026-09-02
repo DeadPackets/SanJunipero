@@ -9,7 +9,7 @@ import Database from 'better-sqlite3'
 import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { FOUNDER_IDS, MINUTES_PER_DAY } from '@sj/shared'
+import { FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -143,11 +143,33 @@ const WELLSIDE = foundersFor(townStructuresFor('showcase')).find((f) => f.id ===
 // `VERBS` has no `smoke_fish`, so the world refuses this with `unknown verb:` and the runtime
 // re-offers it to the arbiter as freeform words. That refusal is the only doorway to spec §4.
 const INVENTED_VERB = 'smoke_fish'
-const INVENTING_TURN = {
+// A mind is asked in the closed dialect: every field of the turn present, every param key
+// answered. Written once here so a fixture can go on naming only what it means.
+const closedTurn = (t: {
+  thought: string
+  importance: number
+  speech?: string
+  action?: { verb: string; params?: Partial<typeof NO_PARAMS> }
+}): unknown => ({
+  speech: null,
+  plan: null,
+  journal: null,
+  recall: null,
+  reconsider_at: null,
+  ...t,
+  action:
+    t.action === undefined
+      ? { verb: 'wait', params: NO_PARAMS }
+      : { verb: t.action.verb, params: { ...NO_PARAMS, ...t.action.params } },
+})
+
+// A verb the grammar has no key for takes its detail through `description`, which is the one
+// slot the closed params keep for words (§2.5).
+const INVENTING_TURN = closedTurn({
   thought: THOUGHT,
   importance: 7,
-  action: { verb: INVENTED_VERB, params: { over: 'green wood' } },
-}
+  action: { verb: INVENTED_VERB, params: { description: 'green wood' } },
+})
 
 // `canon: ['food_preserving']` is an UNEARNED rung whose prerequisite (`cooking`) the genesis
 // codex knows, so `withinAdjacency` lets it through. `requires`/`costs` are empty on purpose.
@@ -179,13 +201,13 @@ const REFUSING_VERDICT = {
   reason: 'the smoke will not hold without a knack for it nobody here has shown',
 }
 
-const SPEAKING_TURN = {
+const SPEAKING_TURN = closedTurn({
   thought: THOUGHT,
   importance: 5,
   speech: SPOKEN,
   action: { verb: 'walk', params: { x: WELLSIDE.x, y: WELLSIDE.y } },
-}
-const SILENT_TURN = { thought: THOUGHT, importance: 2 }
+})
+const SILENT_TURN = closedTurn({ thought: THOUGHT, importance: 2 })
 
 // Every mind turns on the tick it is asked to, so a row does not have to step out the 120-tick
 // boredom floor five times over.

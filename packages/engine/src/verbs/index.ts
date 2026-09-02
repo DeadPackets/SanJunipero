@@ -111,27 +111,6 @@ export type VerbKind =
   | 'attack'
   | 'experiment'
 
-// Named rather than an open `z.record`, whose `propertyNames` a grammar-constrained decoder
-// refuses. Loose, so a verb minted at runtime can still be handed a parameter nobody listed.
-// Every named string is non-empty: the world refuses a blank one a beat later, so the decoder
-// is told up front. Probed against the pinned back end; `minLength` survives its grammar.
-const nonEmpty = z.string().min(1).optional()
-export const IntentParamsSchema = z.looseObject({
-  x: z.number().optional(),
-  y: z.number().optional(),
-  itemId: nonEmpty,
-  structureId: nonEmpty,
-  targetId: nonEmpty,
-  cropId: nonEmpty,
-  nodeId: nonEmpty,
-  faunaId: nonEmpty,
-  kind: nonEmpty,
-  recipe: nonEmpty,
-  track: nonEmpty,
-  text: nonEmpty,
-  description: nonEmpty,
-})
-
 export type VerbDef = {
   kind: string
   validate(

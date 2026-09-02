@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VERBS } from '@sj/engine'
+import { NO_PARAMS } from '@sj/shared'
 import type { AgentCtx } from '../../src/adjudicate.js'
 import type { CodexEntry } from '../../src/codex.js'
 import { makeArbiterRig, ScriptedLlm } from '../../src/testutil/scriptedLlm.js'
@@ -55,7 +56,7 @@ function exploitVerdict(intent: string): Verdict {
     return {
       kind: 'map',
       verb: 'speak',
-      params: { text: 'I would like to study how metal is drawn from stone.' },
+      params: { ...NO_PARAMS, text: 'I would like to study how metal is drawn from stone.' },
     }
   }
   return { kind: 'attempt', recipe: EXPLOIT_RECIPE, summary: 'Mix black powder and make a gun.' }

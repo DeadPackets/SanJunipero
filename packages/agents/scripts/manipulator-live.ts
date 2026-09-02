@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs'
 import { openDb } from '@sj/engine/store'
 import { LlmClient, migrateLlmTables } from '@sj/llm'
-import { type Turn, TurnSchema } from '../src/turn.js'
+import { readMindTurn, StrictTurnSchema, type Turn } from '../src/turn.js'
 import { assemblePrompt } from '../src/prompt/assemble.js'
 import { fixtureBlocks } from '../src/testutil/fixtures.js'
 // Relative, like `g11-deepworld.ts`'s cross-package imports: a script is outside the package
@@ -81,7 +81,10 @@ type Row = { id: string; goal: string; spoken: string; arms: Arm[] }
 async function askMind(prose: string): Promise<Turn> {
   const blocks = fixtureBlocks({ now: { prose } })
   const { system, messages } = assemblePrompt(blocks)
-  return (await llm.object({ schema: TurnSchema, system, messages })).value
+  const { value } = await llm.object({ schema: StrictTurnSchema, system, messages })
+  const read = readMindTurn(value)
+  if (!read.success) throw new Error(read.error.message)
+  return read.data
 }
 
 async function runArm(id: string, prose: string, render: Arm['render']): Promise<Arm | null> {

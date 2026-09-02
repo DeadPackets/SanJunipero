@@ -14,7 +14,7 @@ import {
   VERBS,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimEvent } from '@sj/shared'
 import {
   makeArbiter,
   wordTainted,
@@ -134,7 +134,7 @@ describe('the cheap approval', () => {
     const arbiter = await makeRig(llm)
     try {
       const verdict = await arbiter.adjudicate('I dance by the fire', ctx)
-      expect(verdict).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(verdict).toEqual({ kind: 'map', verb: 'express:dance', params: NO_PARAMS })
       expect(llm.objectCalls).toBe(1)
       expect(llm.systems[0]).toContain(EXPRESSIVE_INSTRUCTION)
       expect(llm.systems[0]).not.toContain(ADJUDICATION_INSTRUCTION)
@@ -151,7 +151,7 @@ describe('the cheap approval', () => {
       await arbiter.adjudicate('I dance by the fire', ctx)
       expect(llm.objectCalls).toBe(1)
       const second = await arbiter.adjudicate('dance', ctx2)
-      expect(second).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(second).toEqual({ kind: 'map', verb: 'express:dance', params: NO_PARAMS })
       expect(llm.objectCalls).toBe(1)
     } finally {
       unregisterVerb('express:dance')
@@ -306,7 +306,7 @@ describe('F-C — a coined word is held to the framing law, like a recipe name',
     const { arbiter, db } = await riggedDb(llm)
     try {
       const v = await arbiter.adjudicate('I dance by the fire', ctx)
-      expect(v).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(v).toEqual({ kind: 'map', verb: 'express:dance', params: NO_PARAMS })
       expect(new RulebookStore(db).byId('express:dance')).not.toBeNull()
     } finally {
       unregisterVerb('express:dance')
