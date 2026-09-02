@@ -126,8 +126,9 @@ export const CAST_V5: readonly CastMember[] = [
       'faded pale-blue jeans with a torn knee, and white canvas sneakers',
     featureCap:
       'Only THREE signature features: the shaggy black hair, the charcoal-grey hoodie, the ' +
-      'pale-blue torn jeans. No notebook, no pen, no guitar, no headphones, no extra props. Both ' +
-      'hands are EMPTY.',
+      'pale-blue torn jeans. The hoodie is ONE dark charcoal-grey colour in every frame, worn ' +
+      'open with no zip, no lighter panel and no shirt showing. No notebook, no pen, no guitar, ' +
+      'no headphones, no extra props. Both hands are EMPTY.',
   },
   {
     // 67, m — the old schoolmaster; the waistcoat is the last of the classroom.

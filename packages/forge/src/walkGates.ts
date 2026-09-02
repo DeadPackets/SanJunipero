@@ -62,8 +62,44 @@ export function magentaResidue(img: RawImage): number {
   return n
 }
 
+/** The torso band is the middle third of the figure box: below the head, above the legs. Its
+ *  colours, binned 4 levels a channel and compared as distributions (L1, 0–2), must stay close
+ *  to the row's idle. Front rows on the shipped sixteen measure 0.10–0.64; the hoodie that
+ *  flickered light and zipped measured 0.95. Back rows are exempt: a coat's back and a
+ *  swinging arm put different cloth in the band each stride (reza's measures 1.47, bashir's 1.00). */
+export const TORSO_DRIFT_MAX = 0.8
+
+const BINS = 4
+const bin = (v: number): number => Math.min(BINS - 1, Math.floor((v / 256) * BINS))
+
+export function torsoHistogram(img: RawImage): Float64Array {
+  const h = new Float64Array(BINS * BINS * BINS)
+  const b = opaqueBbox(img)
+  if (b === null) return h
+  const third = Math.round((b.y1 - b.y0 + 1) / 3)
+  let n = 0
+  for (let y = b.y0 + third; y < b.y0 + 2 * third; y++)
+    for (let x = b.x0; x <= b.x1; x++) {
+      const i = (y * img.width + x) * 4
+      if (img.data[i + 3]! === 0) continue
+      h[bin(img.data[i]!) * BINS * BINS + bin(img.data[i + 1]!) * BINS + bin(img.data[i + 2]!)]! +=
+        1
+      n++
+    }
+  if (n > 0) for (let k = 0; k < h.length; k++) h[k]! /= n
+  return h
+}
+
+export function torsoDrift(cell: RawImage, idle: RawImage): number {
+  const a = torsoHistogram(cell),
+    b = torsoHistogram(idle)
+  let d = 0
+  for (let k = 0; k < a.length; k++) d += Math.abs(a[k]! - b[k]!)
+  return d
+}
+
 export type WalkRowFailure = {
-  gate: 'walk-height' | 'head-skin'
+  gate: 'walk-height' | 'head-skin' | 'torso-drift'
   cell: string
   value: number
   limit: number
@@ -91,5 +127,12 @@ export function walkRowGate(
           out.push({ gate: 'head-skin', cell: c, value: share, limit: HEAD_SKIN_SHARE_MIN })
       }
   }
+  if (frontFacing)
+    for (const c of WALK_CELLS) {
+      if (c === 'idle') continue
+      const drift = torsoDrift(cells[c], cells.idle)
+      if (drift > TORSO_DRIFT_MAX)
+        out.push({ gate: 'torso-drift', cell: c, value: drift, limit: TORSO_DRIFT_MAX })
+    }
   return out
 }

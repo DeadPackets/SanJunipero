@@ -295,6 +295,12 @@ describe('every committed walk row keeps one height and, facing front, one face'
       'head-skin',
     )
     expect(walkRowGate({ ...row, 'passing-a': back }, false)).toEqual([])
+    // Another villager's coat where his overalls should be.
+    const farida = cast.find((x) => x.id === 'farida')!
+    const coat = cropper(farida, await atlasOf(farida))('passing-a-se')
+    expect(walkRowGate({ ...row, 'passing-a': coat }, true).map((x) => x.gate)).toContain(
+      'torso-drift',
+    )
   })
 })
 
