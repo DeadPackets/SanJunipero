@@ -157,6 +157,15 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   arbiter: ON_RULING,
   council: ON_RULING,
   'law.compile': ON_RULING,
+  // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
+  // share one warm prefix; bounded under the scene's own 30 s floor, which drops a later answer.
+  scene: {
+    ...ON_GLM,
+    minTimeoutMs: 25_000,
+    maxQueueWaitMs: 10_000,
+    maxOutputTokens: 300,
+    temperature: 1,
+  },
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   // Two sentences and a short list of ties, once per scene. Prose, so it takes the prose pin.
   'scene.close': { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 600 },

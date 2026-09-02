@@ -130,12 +130,20 @@ it('★ a GLM caller is bounded by its provider tail, not only by its output cei
   expect(requestTimeoutMsFor('narrator')).toBe(Math.ceil((22000 / 44) * 1000))
 })
 
-// The turn is the one caller that samples freely: temperature 1 is what the bake-off measured
-// its voice and its 100% named-object act rate at.
-it('★ the turn samples at temperature 1, and no other caller pins one', () => {
+// The two callers that speak in a persona's own voice sample freely: temperature 1 is what the
+// bake-off measured that voice and its 100% named-object act rate at. Nothing else pins one.
+it('★ the turn and the scene sample at temperature 1, and no other caller pins one', () => {
   expect(callSettingsFor('turn').temperature).toBe(1)
+  expect(callSettingsFor('scene').temperature).toBe(1)
   for (const caller of ['reflection', 'narrator', 'arbiter', 'preflight', 'semantic'])
     expect(callSettingsFor(caller).temperature, caller).toBeUndefined()
+})
+
+// A scene line the coordinator has already given up on is a billed answer nobody reads. Its
+// bound is under `FLOOR_TIMEOUT_MS` (30 s in @sj/agents), so the call dies before the floor does.
+it('★ a scene line is bounded under the floor that will take it away', () => {
+  expect(requestTimeoutMsFor('scene')).toBeLessThan(30_000)
+  expect(callSettingsFor('scene').maxOutputTokens).toBe(300)
 })
 
 // Two models on two back ends bill side by side in one ledger, and neither may book at the
@@ -164,6 +172,9 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
     preflight: 1175,
     dream: 1035,
     constructs: 20,
+    // 114 live scene lines, 2026-09-02: p50 80, p95 116, max 148.
+    scene: 135,
+    'scene.close': 193,
   }
   for (const [caller, measured] of Object.entries(p99)) {
     expect(callSettingsFor(caller).maxOutputTokens, caller).toBeGreaterThanOrEqual(measured * 2)
