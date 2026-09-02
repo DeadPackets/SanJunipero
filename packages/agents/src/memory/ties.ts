@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { TieDelta, TieKind } from '../scene/scene.js'
+
+/** How long a tie stands with nothing to feed it. A grudge nobody feeds stops being a grudge;
+ *  that is the whole point of a tie having a clock. One tick is one sim-minute. */
+export const TIE_LET_GO_TICKS = 7 * MINUTES_PER_DAY
 
 export type Tie = {
   id: number
@@ -70,5 +75,38 @@ export class TieStore {
       }
     })
     write(deltas.filter((d) => d.agentId === this.agentId))
+  }
+
+  /** The kin a persona was written with, as ties from the first tick. Kin never settle, so a
+   *  second boot finds them already standing and writes nothing. */
+  seedKin(kin: readonly { id: string; relation: string }[], tick: number): void {
+    const held = new Set(
+      this.all()
+        .filter((t) => t.kind === 'kin')
+        .map((t) => t.personId),
+    )
+    this.apply(
+      kin
+        .filter((k) => k.id !== this.agentId && !held.has(k.id))
+        .map((k) => ({
+          agentId: this.agentId,
+          personId: k.id,
+          kind: 'kin' as const,
+          text: `your ${k.relation}`,
+        })),
+      tick,
+      'kin',
+    )
+  }
+
+  /** Every open tie nothing has touched for seven sim-days, closed and handed back so the mind
+   *  can remember letting it go. Kin have no clock. */
+  letGo(tick: number): Tie[] {
+    const gone = this.open().filter((t) => t.kind !== 'kin' && tick - t.tick >= TIE_LET_GO_TICKS)
+    const settle = this.db.prepare('UPDATE ties SET settled_tick = ? WHERE id = ?')
+    this.db.transaction((rows: readonly Tie[]): void => {
+      for (const t of rows) settle.run(tick, t.id)
+    })(gone)
+    return gone
   }
 }

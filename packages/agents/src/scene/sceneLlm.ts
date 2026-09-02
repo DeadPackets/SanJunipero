@@ -10,6 +10,7 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import type { Tie } from '../memory/ties.js'
 import {
   SceneTurnSchema,
+  TIE_KINDS,
   type Scene,
   type SceneAsk,
   type SceneClose,
@@ -225,17 +226,6 @@ The summary is two sentences at most, plain, naming people by name. It is what e
 Then the ties. A tie is one thing one person now holds about another: a promise made, a debt owed, a slight taken, a grudge kept, an attraction felt, a secret held, an alliance struck, kin claimed. Write one only where the talk itself made it or paid it off. Most conversations make none, and an invented tie is worse than a missing one. Mark a tie settled when the talk squared something that was already owed.
 
 Name nobody who was not in the conversation.`
-
-const TIE_KINDS = [
-  'promise',
-  'debt',
-  'slight',
-  'grudge',
-  'attraction',
-  'secret',
-  'alliance',
-  'kin',
-] as const
 
 const CloseAnswerSchema = z
   .object({

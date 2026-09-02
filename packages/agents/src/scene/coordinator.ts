@@ -377,6 +377,9 @@ export class SceneCoordinator {
         this.#onError('scene_close', err instanceof Error ? err.message : String(err))
       }
     }
+    // A tie is what passed between two people who were in it. Standing near it is not being in
+    // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
+    deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
     const at = this.#bridge.currentTick()
     for (const id of cast) this.#mindFor(id)?.ties.apply(deltas, at)
     this.#bridge.announce('scene_closed', {

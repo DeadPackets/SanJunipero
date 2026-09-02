@@ -51,6 +51,7 @@ import {
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
+import type { TieStore } from '../memory/ties.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
@@ -119,6 +120,12 @@ function jsonOrRaw(text: string): unknown {
 }
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
+
+/** The mind's tie book and the closed roll a night may name. Absent, a mind reflects the way it
+ *  did before there were ties. */
+export type RuntimeTies = { store: TieStore; cast: () => readonly { id: string; name: string }[] }
+
+const LET_GO_IMPORTANCE = 4
 
 // Rendered at prose time and never written back into a stored ruling. Only a skill deficit
 // earns it: a thing nobody can do teaches no one a false path.
@@ -334,6 +341,7 @@ export class AgentRuntime {
   readonly #dreamLlm: DreamLlm | null
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
   readonly #scenes: SceneCoordinator | null
+  readonly #ties: RuntimeTies | null
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
@@ -397,6 +405,7 @@ export class AgentRuntime {
     adjudicator?: Adjudicator | undefined
     /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
     scenes?: SceneCoordinator | undefined
+    ties?: RuntimeTies | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -410,6 +419,7 @@ export class AgentRuntime {
     this.#onThought = deps.onThought ?? null
     this.#adjudicator = deps.adjudicator ?? null
     this.#scenes = deps.scenes ?? null
+    this.#ties = deps.ties ?? null
   }
 
   start(agentId: string): void {
@@ -1228,18 +1238,45 @@ export class AgentRuntime {
     }
   }
 
+  /** A tie nothing has fed for seven sim-days closes, and the mind remembers letting it go. It
+   *  costs no call, so a night with no reflection in it still lets go. */
+  async #letGoOfStaleTies(): Promise<void> {
+    const ties = this.#ties
+    if (ties === null) return
+    const tick = this.#bridge.currentTick()
+    try {
+      for (const t of ties.store.letGo(tick)) {
+        const who = this.#bridge.agentFacts(t.personId)?.name ?? t.personId
+        await this.#mem!.insertMemory({
+          tick,
+          kind: 'reflection',
+          text: `You have let go of what stood between you and ${who}: ${t.text}`,
+          importance: LET_GO_IMPORTANCE,
+          tags: { ...EMPTY_TAGS, people: [who] },
+        })
+      }
+    } catch (err) {
+      this.#llm.alert('tie_let_go_failed', messageOf(err))
+    }
+  }
+
   async #runNight(day: number): Promise<void> {
     if (this.#reflectedNight === day) return
     this.#reflectedNight = day
+    await this.#letGoOfStaleTies()
     if (this.#reflectionLlm === null) return
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
+    const ties = this.#ties
     try {
       await runSleepReflection({
         mem: this.#mem!,
         personality: this.#personality,
         llm: this.#reflectionLlm,
         day,
+        ...(ties === null
+          ? {}
+          : { ties: { store: ties.store, cast: ties.cast(), tick: this.#bridge.currentTick() } }),
         alert: (kind, detail) => {
           this.#llm.alert(kind, detail)
         },

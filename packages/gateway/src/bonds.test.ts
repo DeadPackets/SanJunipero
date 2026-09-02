@@ -206,7 +206,7 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
 
   /** `buildBonds` folds exactly `BOND_TYPES`; every other row falls through its chain, so the
    *  SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log. */
-  it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
+  it('★ answers what the whole log answers, reading only the types a bond is made of', () => {
     const rows = db
       .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
       .all() as EventRow[]
@@ -300,6 +300,46 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
     ask()
     expect(scans, 'the cadence never came round').toBe(2)
     world.close()
+  })
+})
+
+/** The one thing in the graph the minds wrote themselves. It moves how a pair stands without
+ *  claiming the world witnessed an act, so the window and its ceiling are untouched. */
+describe('★ a tie a scene left behind is worth something to the pair', () => {
+  const closed = (seq: number, tick: number, deltas: unknown[]): SimEvent => ({
+    seq,
+    tick,
+    type: 'scene_closed',
+    payload: { id: 's1', summary: 'They counted the planks.', deltas, closeReason: 'ended' },
+  })
+  const delta = (kind: string, settled?: true): unknown => ({
+    agentId: 'a',
+    personId: 'b',
+    kind,
+    text: 'the planks again',
+    ...(settled === undefined ? {} : { settled }),
+  })
+  const warmthOfClose = (deltas: unknown[]): number =>
+    buildBonds([closed(1, 100, deltas)], 5, 100).bonds[0]?.warmth ?? 0
+
+  it('folds a slight as three off, and a promise kept as three on', () => {
+    expect(warmthOfClose([delta('slight')])).toBe(-3)
+    expect(warmthOfClose([delta('promise', true)])).toBe(3)
+    expect(warmthOfClose([delta('attraction')])).toBe(2)
+    expect(warmthOfClose([delta('grudge')]), 'a grudge is a slight that stayed').toBe(-3)
+    const kin = buildBonds([closed(1, 100, [delta('kin')])], 5, 100).bonds
+    expect([kin.length, kin[0]?.warmth], 'kin is a claim, not a warmth').toEqual([1, 0])
+  })
+
+  it('says nothing about a promise merely made, and nothing about a secret', () => {
+    expect(buildBonds([closed(1, 100, [delta('promise')])], 5, 100).bonds).toEqual([])
+    expect(buildBonds([closed(1, 100, [delta('secret')])], 5, 100).bonds).toEqual([])
+  })
+
+  it('leaves the act window empty: a tie is nothing the world witnessed', () => {
+    const b = buildBonds([closed(1, 100, [delta('slight')])], 5, 100).bonds[0]!
+    expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
+    expect(b.id).toBe(bondId('a', 'b'))
   })
 })
 
