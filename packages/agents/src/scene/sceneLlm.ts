@@ -50,7 +50,7 @@ export function sceneWordCap(voice: IdentityCore['voiceCard']): number {
 // one place that has to say so.
 const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
 
-Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.`
+Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.`
 
 const TIE_PHRASE: Record<TieKind, string> = {
   promise: 'a promise',
@@ -95,6 +95,10 @@ function renderThread(
   if (shown.length === 0) return ''
   const rows = shown.flatMap((l) => {
     const who = l.agentId === selfId ? 'You' : nameOf(l.agentId)
+    if (l.presence !== undefined) {
+      const verb = l.presence === 'joined' ? 'join' : 'leave'
+      return [l.agentId === selfId ? `You ${verb}.` : `${who} ${verb}s.`]
+    }
     const said = `${who}: "${sanitizeSpokenText(l.text)}"`
     return l.aside.length === 0 ? [said] : [said, `  (you were thinking: ${l.aside})`]
   })
@@ -131,13 +135,18 @@ function renderLateness(tick: number, energy: number): string {
   return parts.length === 0 ? '' : `${parts.join(' ')} ${SLEEP_WILL_KEEP}`
 }
 
-function renderYourTurn(opts: {
+/** Who is here and whose turn it is, in one block AFTER the thread. It sits last because it is
+ *  the one part a join or a leave rewrites, and every byte above it stays cached. */
+function renderFloor(opts: {
   lastSpeaker: string | null
   others: readonly string[]
+  silent: readonly string[]
+  audience: readonly string[]
   wrapUp: boolean
   words: number
 }): string {
-  const them = opts.others.length === 1 ? (opts.others[0] ?? 'them') : 'them'
+  // Name one mind rather than say "somebody": whoever has not spoken yet, else the only other.
+  const them = opts.silent[0] ?? (opts.others.length === 1 ? opts.others[0]! : 'them')
   const spoke =
     opts.lastSpeaker === null || opts.lastSpeaker === them
       ? `${them} just spoke.`
@@ -145,35 +154,46 @@ function renderYourTurn(opts: {
   const ask = opts.wrapUp
     ? 'This has run on. Say the last thing you have to say, and let it end.'
     : `Answer ${them}, or say nothing at all and let the talk end.`
-  return (
-    `It is your turn. ${spoke} ${ask}\n` +
-    `No more than ${opts.words} words. One breath, then stop, and leave ${them} something to answer.`
-  )
+  return [
+    opts.others.length === 0 ? '' : `Standing with you: ${opts.others.join(', ')}.`,
+    opts.silent.length === 0 ? '' : `Not a word yet from ${opts.silent.join(', ')}.`,
+    opts.audience.length === 0
+      ? ''
+      : `Within earshot and not in the talk: ${opts.audience.join(', ')}.`,
+    `It is your turn. ${spoke} ${ask}`,
+    `No more than ${opts.words} words. One breath, then stop, and leave ${them} something to answer.`,
+  ]
+    .filter((p) => p.length > 0)
+    .join('\n')
 }
 
 /** The one volatile block a scene turn sends, stable parts first so the cached prefix reaches
- *  as far into it as the provider will take it. */
+ *  as far into it as the provider will take it. The thread only ever grows at its end, so the
+ *  roster is the one thing that must stand below it. */
 export function sceneBlock(
   ask: SceneAsk,
   voice: Pick<SceneVoice, 'livingCast' | 'want'> & { words: number },
 ): string {
   const names = new Map<string, string>()
   for (const p of voice.livingCast()) names.set(p.id, p.name)
-  for (const p of ask.cast) names.set(p.id, p.name)
+  for (const p of [...ask.cast, ...ask.audience]) names.set(p.id, p.name)
   const nameOf = (id: string): string => names.get(id) ?? id
-  const others = ask.cast.filter((p) => p.id !== ask.agentId).map((p) => p.name)
+  const spoken = ask.thread.filter((l) => l.presence === undefined)
+  const heard = new Set(spoken.map((l) => l.agentId))
+  const rest = ask.cast.filter((p) => p.id !== ask.agentId)
   const want = voice.want?.() ?? null
   const parts = [
     SCENE_ANSWER,
     castLaw(voice.livingCast()),
-    others.length === 0 ? '' : `Standing with you: ${others.join(', ')}.`,
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
     renderThread(ask.thread, nameOf, ask.agentId),
     renderLateness(ask.tick, ask.energy),
-    renderYourTurn({
-      lastSpeaker: nameOf(ask.thread[ask.thread.length - 1]?.agentId ?? ''),
-      others,
+    renderFloor({
+      lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),
+      others: rest.map((p) => p.name),
+      silent: rest.filter((p) => !heard.has(p.id)).map((p) => p.name),
+      audience: ask.audience.map((p) => p.name),
       wrapUp: ask.wrapUp,
       words: voice.words,
     }),

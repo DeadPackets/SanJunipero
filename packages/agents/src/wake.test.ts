@@ -65,7 +65,7 @@ describe('decideWake — one case per reason', () => {
   ][] = [
     ['body_alarm', withNeeds(14, 78, 71), clk(), 10, pln(), 'body_alarm', ['body_alarm']],
     [
-      'salient_perception (heard speech)',
+      'salient_perception (rain felt, with a voice and a face under it)',
       conversationPacket,
       clk(),
       10,
@@ -231,10 +231,43 @@ describe('decideWake — priority and floor', () => {
         ],
       },
     }
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln())).toBe(
+    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 40, pln())).toBe(
       'salient_perception',
     )
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 10, pln())).toBe(null)
+    expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 40, pln())).toBe(null)
+    expect(
+      decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln()),
+      'a face arriving is noticed, and waits out the idle gap like anything else noticed',
+    ).toBe(null)
+  })
+})
+
+// A word said near a mind is not addressed to it. The scene machine answers speech now: whoever
+// was spoken to becomes a participant and holds the floor, which is gap-exempt. Leaving `heard`
+// above the gate as well made every bystander pay a full turn for every line it overheard.
+describe('hearing is not being spoken to', () => {
+  const overheard: PerceptionPacket = {
+    ...quietMeadowPacket,
+    heard: [{ speakerId: 'nadia', name: 'Nadia', text: 'Six planks, you said.', distance: 2 }],
+  }
+
+  it('buys no turn inside the idle gap, however much is said', () => {
+    expect(wakeReasons(cfg, overheard, clk(), 10, pln())).toEqual([])
+    expect(wakeReasons(cfg, overheard, clk(), 29, pln())).toEqual([])
+  })
+
+  it('costs a listener no more than the silence beside it', () => {
+    const silent = { ...quietMeadowPacket }
+    for (const tick of [5, 10, 20, 29]) {
+      expect(wakeReasons(cfg, overheard, clk(), tick, pln()), `tick ${tick}`).toEqual(
+        wakeReasons(cfg, silent, clk(), tick, pln()),
+      )
+    }
+  })
+
+  it('still reaches a mind that something happened TO, at once', () => {
+    const rained = { ...overheard, feltEvents: ['rain_started'] }
+    expect(wakeReasons(cfg, rained, clk(), 10, pln())).toEqual(['salient_perception'])
   })
 })
 

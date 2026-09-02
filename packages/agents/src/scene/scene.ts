@@ -14,6 +14,9 @@ export type SceneLine = {
   aside: string
   move: Move
   tick: number
+  /** A body arriving or going, carried in the thread so the roster above it never has to be
+   *  rewritten. Empty text: nothing was said. */
+  presence?: 'joined' | 'left'
 }
 
 export type Scene = {
@@ -21,7 +24,13 @@ export type Scene = {
   kind: SceneKind
   openedTick: number
   lastLineTick: number
+  /** The minds that engaged. Everyone else who can hear is `audience`. */
   participants: string[]
+  /** In earshot and not in the talk. They keep taking ordinary turns, pay for nothing, and hear
+   *  the summary when it closes. */
+  audience: string[]
+  /** Whoever opened it. The floor comes back here on a pass, and their own pass ends it. */
+  anchor: string
   floor: string | null
   thread: SceneLine[]
   topic: string | null
@@ -29,6 +38,7 @@ export type Scene = {
   proposal?: { lawText: string; predicate: LawPredicate }
   invitation?: { verb: 'court' | 'propose' | 'lie_with'; from: string; to: string }
   passes: number
+  timeouts: number
   closedTick: number | null
   closeReason?: 'ended' | 'left' | 'night' | 'capped' | 'timeout'
 }
@@ -37,6 +47,9 @@ export const SceneTurnSchema = z
   .object({
     thought: z.string(),
     speech: z.string().nullable(),
+    /** Who the line is for, by name, out of the roster the prompt hands over. Null speaks to
+     *  the room and lets the anchor answer. */
+    to: z.string().nullable(),
     gesture: z.string().nullable(),
     move: z.enum(['press', 'give_way', 'deflect', 'tease', 'none']),
     stance: z.enum(['for', 'against', 'unsure']).nullable(),
@@ -52,9 +65,11 @@ export type SceneAsk = {
   scene: Scene
   agentId: string
   cast: { id: string; name: string }[]
+  /** In earshot, not in the talk. Named to the floor-holder so a line can pull one of them in. */
+  audience: { id: string; name: string }[]
   ties: Tie[]
   thread: SceneLine[]
-  /** The tenth line and after: say the thing you came to say, the scene is ending. */
+  /** Two lines short of the cap and after: say the thing you came to say, the scene is ending. */
   wrapUp: boolean
   /** The tick this line is said on. The mind is told the hour it reads to, because nothing
    *  closes a talk for being late any more. */
@@ -91,14 +106,18 @@ export type SceneLlm = {
   close(ask: SceneCloseAsk): Promise<SceneClose>
 }
 
-// Twelve lines is the cap, so twelve is also every line the thread ever holds; the tenth is
-// where the floor-holder is told to land it.
-export const LINE_CAP = 12
-export const WRAP_CUE_LINE = 10
-export const CLOSING_PASSES = 2
 /** A talk needs somebody to answer. The opener and the tick sweep count to the same number, so
  *  no scene can open under a rule the same tick would close it under. */
 export const TALKERS_NEEDED = 2
+/** How long a talk runs, in lines: twelve for the pair `TALKERS_NEEDED` asks for, four more for
+ *  every mind past that, and forty-eight however big it gets. */
+export function lineCapFor(talkers: number): number {
+  return Math.min(48, Math.max(12, 4 * talkers))
+}
+// Two lines short of the cap is where the floor-holder is told to land it.
+const WRAP_CUE_BEFORE_CAP = 2
+/** Two silent floors close a scene the provider stopped answering for. */
+export const CLOSING_TIMEOUTS = 2
 /** Wall clock, not ticks: a mind that never answers is a provider stall, not a slow hour. */
 export const FLOOR_TIMEOUT_MS = 30_000
 
@@ -111,6 +130,7 @@ export function sceneId(openedTick: number, participants: readonly string[]): st
 export function openScene(opts: {
   openedTick: number
   participants: readonly string[]
+  audience?: readonly string[]
   opener: string
   topic: string | null
   stakes: number
@@ -122,11 +142,14 @@ export function openScene(opts: {
     openedTick: opts.openedTick,
     lastLineTick: opts.openedTick,
     participants,
+    audience: [...new Set(opts.audience ?? [])].filter((id) => !participants.includes(id)).sort(),
+    anchor: opts.opener,
     floor: opts.opener,
     thread: [],
     topic: opts.topic,
     stakes: opts.stakes,
     passes: 0,
+    timeouts: 0,
     closedTick: null,
   }
 }
@@ -135,38 +158,85 @@ const firstNameOf = (name: string): string => name.split(/\s+/)[0] ?? name
 
 const RE_META = /[.*+?^${}()|[\]\\]/g
 
-/** Where a name is spoken in a line, or -1. Whole word, so "Sal" is not "Salma". */
-function namedAt(text: string, name: string): number {
+/** Where a name is spoken AS AN ADDRESS, or -1. The name has to open the line or stand behind a
+ *  comma, and be closed by punctuation: "Yusuf, is that true?" is a question put to him,
+ *  "Yusuf said so" is a remark about him and hands him nothing. */
+function addressedAt(text: string, name: string): number {
   const bare = firstNameOf(name)
   if (bare.length === 0) return -1
   const re = new RegExp(
-    `(?<![\\p{L}\\p{N}])${bare.replace(RE_META, '\\$&')}(?![\\p{L}\\p{N}])`,
+    `(?:^|[,;:—–-])\\s*${bare.replace(RE_META, '\\$&')}\\s*(?:[,;:?!.…—–-]|$)`,
     'iu',
   )
   return text.search(re)
 }
 
-/** After a line the floor goes to whoever it named, else to whoever has said least, ties by
- *  warmth and then by id so two equal claims never decide it differently twice. */
+/** Whether a name is spoken in a line at all, addressed or only talked about. Whole word, so
+ *  "Sal" is not "Salma". What a quarrel is named by; the floor asks the stricter question. */
+function mentions(text: string, name: string): boolean {
+  const bare = firstNameOf(name)
+  if (bare.length === 0) return false
+  const re = new RegExp(
+    `(?<![\\p{L}\\p{N}])${bare.replace(RE_META, '\\$&')}(?![\\p{L}\\p{N}])`,
+    'iu',
+  )
+  return re.test(text)
+}
+
+/** Whoever this line was addressed to, out of these, earliest first. */
+export function addressedIn(
+  text: string,
+  ids: readonly string[],
+  nameOf: (id: string) => string | null,
+): string | null {
+  const hits = ids
+    .map((id) => ({ id, at: addressedAt(text, nameOf(id) ?? '') }))
+    .filter((c) => c.at >= 0)
+    .sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))
+  return hits[0]?.id ?? null
+}
+
+/** The name a mind wrote in `to`, back to an id. It is handed the roster to choose from, so a
+ *  name that is not on it is a miss and the floor falls through to the anchor. */
+function idNamed(
+  to: string,
+  ids: readonly string[],
+  nameOf: (id: string) => string | null,
+): string | null {
+  const wanted = to.trim().toLowerCase()
+  if (wanted.length === 0) return null
+  for (const id of ids) {
+    const name = nameOf(id) ?? ''
+    if (id.toLowerCase() === wanted) return id
+    if (name.toLowerCase() === wanted || firstNameOf(name).toLowerCase() === wanted) return id
+  }
+  return null
+}
+
+/** After a line the floor goes to whoever it was for: the mind named in `to`, else the one the
+ *  words addressed, else back to the anchor. An audience name is a legal answer to both — that
+ *  is how a bystander is drawn into the talk. The last resort is warmth, ties by id, so two
+ *  equal claims never decide it differently twice. */
 export function nextFloor(
   scene: Scene,
   speakerId: string,
   text: string,
+  to: string | null,
   nameOf: (id: string) => string | null,
   warmth: (id: string) => number,
 ): string | null {
+  const candidates = [...scene.participants, ...scene.audience].filter((id) => id !== speakerId)
+  if (candidates.length === 0) return null
+  const asked = to === null ? null : idNamed(to, candidates, nameOf)
+  if (asked !== null) return asked
+  const addressed = addressedIn(text, candidates, nameOf)
+  if (addressed !== null) return addressed
+  if (scene.anchor !== speakerId && scene.participants.includes(scene.anchor)) return scene.anchor
   const others = scene.participants.filter((id) => id !== speakerId)
   if (others.length === 0) return null
-  const named = others
-    .map((id) => ({ id, at: namedAt(text, nameOf(id) ?? '') }))
-    .filter((c) => c.at >= 0)
-    .sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))
-  if (named.length > 0) return named[0]!.id
-  const spoken = (id: string): number => scene.thread.filter((l) => l.agentId === id).length
-  const ranked = others
-    .map((id) => ({ id, said: spoken(id), warm: warmth(id) }))
-    .sort((a, b) => a.said - b.said || b.warm - a.warm || a.id.localeCompare(b.id))
-  return ranked[0]!.id
+  return others
+    .map((id) => ({ id, warm: warmth(id) }))
+    .sort((a, b) => b.warm - a.warm || a.id.localeCompare(b.id))[0]!.id
 }
 
 const PROPOSAL_PATTERNS = [/from now on/i, /call it/i, /we should all/i, /new rule/i]
@@ -188,7 +258,7 @@ function namesAQuarrel(
       if (tie.settledTick !== null) continue
       if (!QUARREL_TIE_KINDS.includes(tie.kind)) continue
       if (!scene.participants.includes(tie.personId)) continue
-      if (namedAt(text, nameOf(tie.personId) ?? '') >= 0) return true
+      if (mentions(text, nameOf(tie.personId) ?? '')) return true
     }
   }
   return false
@@ -217,10 +287,14 @@ export function threadFor(scene: Scene, agentId: string): SceneLine[] {
   return scene.thread.map((l) => (l.agentId === agentId ? l : { ...l, aside: '' }))
 }
 
-export const wrapUpDue = (scene: Scene): boolean => scene.thread.length >= WRAP_CUE_LINE - 1
+/** How long this scene may run, read off the cast it has now. */
+export const lineCapOf = (scene: Scene): number => lineCapFor(scene.participants.length)
+
+export const wrapUpDue = (scene: Scene): boolean =>
+  scene.thread.length + 1 >= lineCapOf(scene) - WRAP_CUE_BEFORE_CAP
 
 export function appendLine(scene: Scene, line: SceneLine): void {
   scene.thread.push(line)
-  if (scene.thread.length > LINE_CAP) scene.thread.shift()
+  if (scene.thread.length > lineCapOf(scene)) scene.thread.shift()
   scene.lastLineTick = line.tick
 }

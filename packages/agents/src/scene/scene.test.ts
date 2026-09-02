@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { SCENE_CORPUS_LINES } from '@sj/shared/testutil'
 import type { Tie } from '../memory/ties.js'
 import {
+  addressedIn,
   appendLine,
+  lineCapFor,
   nextFloor,
   openScene,
   proposesALaw,
@@ -11,18 +13,23 @@ import {
   threadFor,
   upgradedKind,
   wrapUpDue,
-  WRAP_CUE_LINE,
   type Scene,
 } from './scene.js'
 
-const NAMES: Record<string, string> = { nadia: 'Nadia', omar: 'Omar', salma: 'Salma' }
+const NAMES: Record<string, string> = {
+  nadia: 'Nadia',
+  omar: 'Omar',
+  salma: 'Salma',
+  yusuf: 'Yusuf',
+}
 const nameOf = (id: string): string | null => NAMES[id] ?? null
 const noWarmth = (): number => 0
 
-function scene(participants = ['nadia', 'omar', 'salma']): Scene {
+function scene(participants = ['nadia', 'omar', 'salma'], audience: string[] = []): Scene {
   return openScene({
     openedTick: 600,
     participants,
+    audience,
     opener: participants[0]!,
     topic: null,
     stakes: 5,
@@ -34,46 +41,141 @@ const say = (s: Scene, agentId: string, text: string, tick = 601): void => {
 }
 
 describe('the floor', () => {
-  it('goes to whoever the line named, by first name', () => {
+  it('goes to whoever the line addressed, by first name', () => {
     const s = scene()
-    expect(nextFloor(s, 'nadia', 'Salma, you saw it too.', nameOf, noWarmth)).toBe('salma')
+    expect(nextFloor(s, 'nadia', 'Salma, you saw it too.', null, nameOf, noWarmth)).toBe('salma')
   })
 
-  it('reads the first name spoken when a line names two', () => {
+  it('reads the first name addressed when a line addresses two', () => {
     const s = scene()
-    expect(nextFloor(s, 'nadia', 'Omar promised, and Salma heard him.', nameOf, noWarmth)).toBe(
-      'omar',
-    )
+    expect(
+      nextFloor(s, 'nadia', 'Omar, you promised. Salma, you heard him.', null, nameOf, noWarmth),
+    ).toBe('omar')
   })
 
   it('does not hear a name inside another word', () => {
     const s = scene(['nadia', 'omar'])
-    // "Omar" is not in "Omarov"; with nobody named, the least-spoken rule answers instead.
-    expect(nextFloor(s, 'nadia', 'The Omarov place is empty.', nameOf, noWarmth)).toBe('omar')
+    // "Omar" is not in "Omarov", and nobody was addressed, so the anchor answers instead.
+    expect(nextFloor(s, 'omar', 'The Omarov place is empty.', null, nameOf, noWarmth)).toBe('nadia')
   })
 
-  it('falls to whoever has said least when the line names nobody', () => {
+  it('hands a pass and an unaddressed line back to the anchor', () => {
     const s = scene()
     say(s, 'omar', 'Fine.')
-    say(s, 'nadia', 'It is not fine.')
-    say(s, 'omar', 'It is.')
-    expect(nextFloor(s, 'nadia', 'Somebody say something.', nameOf, noWarmth)).toBe('salma')
+    expect(nextFloor(s, 'omar', 'Somebody say something.', null, nameOf, noWarmth)).toBe('nadia')
+    expect(nextFloor(s, 'salma', '', null, nameOf, noWarmth), 'a silence too').toBe('nadia')
   })
 
-  it('breaks a tie on how warm the speaker feels', () => {
+  it('breaks a tie on how warm the speaker feels, once the anchor is the one speaking', () => {
     const s = scene()
     const warmth = (id: string): number => (id === 'salma' ? 3 : 0)
-    expect(nextFloor(s, 'nadia', 'Well?', nameOf, warmth)).toBe('salma')
-    expect(nextFloor(s, 'nadia', 'Well?', nameOf, noWarmth), 'no warmth: lowest id').toBe('omar')
+    expect(nextFloor(s, 'nadia', 'Well?', null, nameOf, warmth)).toBe('salma')
+    expect(nextFloor(s, 'nadia', 'Well?', null, nameOf, noWarmth), 'no warmth: lowest id').toBe(
+      'omar',
+    )
   })
 
   it('never hands the floor back to the mouth that just spoke', () => {
     const s = scene(['nadia', 'omar'])
-    expect(nextFloor(s, 'nadia', 'Nadia is right about this.', nameOf, noWarmth)).toBe('omar')
+    expect(nextFloor(s, 'nadia', 'Nadia is right about this.', null, nameOf, noWarmth)).toBe('omar')
   })
 
   it('is nobody when there is nobody left to hand it to', () => {
-    expect(nextFloor(scene(['nadia']), 'nadia', 'Anyone?', nameOf, noWarmth)).toBeNull()
+    expect(nextFloor(scene(['nadia']), 'nadia', 'Anyone?', null, nameOf, noWarmth)).toBeNull()
+  })
+})
+
+describe('`to` decides the floor before the words do', () => {
+  it('takes the name the mind wrote, by first name, full name or id', () => {
+    const s = scene()
+    for (const to of ['Salma', 'salma', 'SALMA']) {
+      expect(nextFloor(s, 'nadia', 'Anyone at all.', to, nameOf, noWarmth)).toBe('salma')
+    }
+  })
+
+  it('outranks a name the words addressed', () => {
+    const s = scene()
+    expect(nextFloor(s, 'nadia', 'Omar, the planks.', 'Salma', nameOf, noWarmth)).toBe('salma')
+  })
+
+  it('falls through to the anchor when it names nobody who is here', () => {
+    const s = scene()
+    expect(nextFloor(s, 'omar', 'Anyone at all.', 'Kepler', nameOf, noWarmth)).toBe('nadia')
+    expect(nextFloor(s, 'omar', 'Anyone at all.', '  ', nameOf, noWarmth)).toBe('nadia')
+  })
+
+  it('reaches into the audience, which is how a bystander is drawn in', () => {
+    const s = scene(['nadia', 'omar'], ['yusuf'])
+    expect(nextFloor(s, 'nadia', 'Anyone at all.', 'Yusuf', nameOf, noWarmth)).toBe('yusuf')
+    expect(nextFloor(s, 'nadia', 'Yusuf, you were there.', null, nameOf, noWarmth)).toBe('yusuf')
+  })
+
+  it('never picks an audience member the words only mentioned', () => {
+    const s = scene(['nadia', 'omar'], ['yusuf'])
+    expect(nextFloor(s, 'omar', 'Yusuf told me the same thing.', null, nameOf, noWarmth)).toBe(
+      'nadia',
+    )
+  })
+})
+
+// A mention is about somebody; an address is to them. The whole difference is punctuation, and
+// getting it wrong hands the floor to a stranger who has nothing to answer.
+describe('twenty lines, mentions against addresses', () => {
+  const ADDRESSED: readonly string[] = [
+    'Yusuf, is that true?',
+    'Yusuf. Six planks.',
+    'Yusuf?',
+    'Yusuf!',
+    'Is that true, Yusuf?',
+    'No, Yusuf, you did not.',
+    'I counted them twice — Yusuf, twice.',
+    'Then say it: Yusuf, say it.',
+    'Yusuf; the well first.',
+    'That is enough, Yusuf.',
+  ]
+  const MENTIONED: readonly string[] = [
+    'Yusuf said so.',
+    'It was Yusuf who counted.',
+    'I saw Yusuf at the well.',
+    "Yusuf's plank is the short one.",
+    'The Yusufov place is empty.',
+    'Ask Yusuf about it.',
+    'Yusuf and Salma went down together.',
+    'Nobody has seen Yusuf since dawn.',
+    'That is what Yusuf always says.',
+    'She married Yusuf in the spring.',
+  ]
+
+  it.each(ADDRESSED)('gives the floor on %s', (text) => {
+    expect(addressedIn(text, ['yusuf'], nameOf)).toBe('yusuf')
+  })
+
+  it.each(MENTIONED)('gives no floor on %s', (text) => {
+    expect(addressedIn(text, ['yusuf'], nameOf)).toBeNull()
+  })
+})
+
+describe('how long a talk runs', () => {
+  it('is twelve lines for a pair and four more for every mind past that', () => {
+    expect(lineCapFor(2)).toBe(12)
+    expect(lineCapFor(3)).toBe(12)
+    expect(lineCapFor(6)).toBe(24)
+    expect(lineCapFor(12)).toBe(48)
+    expect(lineCapFor(20), 'and never more than forty-eight').toBe(48)
+  })
+
+  it('cues the wrap two lines before the cap, whatever the cast', () => {
+    for (const cast of [
+      ['nadia', 'omar'],
+      ['nadia', 'omar', 'salma', 'yusuf', 'a', 'b'],
+    ]) {
+      const s = scene(cast)
+      const cue = lineCapFor(cast.length) - 2
+      for (let i = 0; i < cue - 2; i++) say(s, cast[i % cast.length]!, `line ${i}`)
+      expect(wrapUpDue(s), `${cast.length} minds: the ask for line ${cue - 1}`).toBe(false)
+      say(s, cast[0]!, 'one more')
+      expect(wrapUpDue(s), `${cast.length} minds: the ask for line ${cue}`).toBe(true)
+    }
   })
 })
 
@@ -91,12 +193,18 @@ describe('the thread', () => {
     ).toEqual(['Six planks.', 'Ask about the boy first.'])
   })
 
-  it('cues the wrap on the tenth line and not the ninth', () => {
+  it('carries an arrival and a going as lines of their own', () => {
     const s = scene(['nadia', 'omar'])
-    for (let i = 0; i < WRAP_CUE_LINE - 2; i++) say(s, i % 2 === 0 ? 'nadia' : 'omar', `line ${i}`)
-    expect(wrapUpDue(s), 'the ask for the ninth line').toBe(false)
-    say(s, 'omar', 'line 8')
-    expect(wrapUpDue(s), 'the ask for the tenth line').toBe(true)
+    say(s, 'nadia', 'Six planks.')
+    appendLine(s, {
+      agentId: 'salma',
+      text: '',
+      aside: '',
+      move: 'none',
+      tick: 602,
+      presence: 'joined',
+    })
+    expect(threadFor(s, 'nadia').map((l) => l.presence)).toEqual([undefined, 'joined'])
   })
 })
 
@@ -171,6 +279,7 @@ describe('the recorded corpus', () => {
       const parsed = SceneTurnSchema.safeParse({
         thought: line.thought,
         speech: line.speech,
+        to: null,
         gesture: null,
         move: line.move,
         stance: null,

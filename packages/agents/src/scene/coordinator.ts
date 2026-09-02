@@ -2,10 +2,11 @@ import { dayPhaseFromTick, sanitizeSpokenText } from '@sj/shared'
 import type { EngineBridge } from '../runtime/bridge.js'
 import type { Tie, TieStore } from '../memory/ties.js'
 import {
+  addressedIn,
   appendLine,
-  CLOSING_PASSES,
+  CLOSING_TIMEOUTS,
   FLOOR_TIMEOUT_MS,
-  LINE_CAP,
+  lineCapOf,
   nextFloor,
   openScene,
   TALKERS_NEEDED,
@@ -26,6 +27,11 @@ export type SceneMind = {
   remember(m: { tick: number; text: string; importance: number }): Promise<void>
   warmth(otherId: string): number
 }
+
+/** A scene as a checkpoint holds it. The three fields a talk gained when it learned to have an
+ *  audience are absent in anything written before that, and a live run has to resume anyway. */
+type StoredScene = Omit<Scene, 'audience' | 'anchor' | 'timeouts'> &
+  Partial<Pick<Scene, 'audience' | 'anchor' | 'timeouts'>>
 
 export type SceneCoordinatorOpts = {
   bridge: EngineBridge
@@ -78,24 +84,40 @@ export class SceneCoordinator {
   }
 
   /** Put a scene back after a restore. Keyed by id, so twelve minds restoring the same scene
-   *  converge on one — the id is derived from the opening tick and the cast, not from a counter. */
-  adopt(scene: Scene | null | undefined): void {
+   *  converge on one — the id is derived from the opening tick and the cast, not from a counter.
+   *  A checkpoint written before a scene had an audience or an anchor still has to come back. */
+  adopt(scene: StoredScene | null | undefined): void {
     if (scene === null || scene === undefined) return
     if (scene.closedTick !== null) return
-    if (!this.#scenes.has(scene.id)) this.#scenes.set(scene.id, structuredClone(scene))
+    if (this.#scenes.has(scene.id)) return
+    const back = structuredClone(scene)
+    this.#scenes.set(back.id, {
+      ...back,
+      audience: back.audience ?? [],
+      anchor: back.anchor ?? back.participants[0] ?? '',
+      timeouts: back.timeouts ?? 0,
+    })
   }
 
-  /** A word said outside any scene. If anyone who could answer heard it, that is a scene. */
+  /** A word said by a mind in no scene. Inside an open scene's earshot it is a line of THAT
+   *  scene and the mouth joins it; otherwise, if anyone who could answer heard it, it opens one
+   *  between the speaker and the mind they spoke to, and everybody else stands and listens. */
   noteSpoken(agentId: string, text: string, tick: number): Scene | null {
     if (this.sceneFor(agentId) !== null) return null
+    const said = sanitizeSpokenText(text)
+    const joined = this.#joinNearby(agentId, said, tick)
+    if (joined !== null) return joined
     const heard = this.#bridge
       .earshot(agentId)
       .filter((id) => this.#mindFor(id) !== null && this.#canTalk(id))
     if (heard.length + 1 < TALKERS_NEEDED) return null
-    const said = sanitizeSpokenText(text)
+    const answering =
+      addressedIn(said, heard, (id) => this.#nameOf(id)) ?? this.#bridge.nearestOf(agentId, heard)
+    if (answering === null) return null
     const scene = openScene({
       openedTick: tick,
-      participants: [agentId, ...heard],
+      participants: [agentId, answering],
+      audience: heard.filter((id) => id !== answering),
       opener: agentId,
       topic: said,
       stakes: OPENING_STAKES,
@@ -110,8 +132,46 @@ export class SceneCoordinator {
       topic: scene.topic,
       stakes: scene.stakes,
     })
-    this.#recordLine(scene, agentId, said, '', 'none', tick)
+    this.#recordLine(scene, agentId, said, '', 'none', null, tick)
     return scene
+  }
+
+  /** One invariant: a say inside an open scene's earshot is a line of that scene. So no second
+   *  scene ever opens over the top of one, and two can share a square only out of each other's
+   *  hearing. Ties by id, because a mouth heard by two scenes has to pick the same one twice. */
+  #joinNearby(agentId: string, said: string, tick: number): Scene | null {
+    if (this.#mindFor(agentId) === null || !this.#canTalk(agentId)) return null
+    const within = new Set(this.#bridge.earshot(agentId))
+    const scene = this.open()
+      .filter((s) => s.participants.some((id) => within.has(id)))
+      .sort((a, b) => a.id.localeCompare(b.id))[0]
+    if (scene === undefined) return null
+    this.#admit(scene, agentId, tick)
+    this.#recordLine(scene, agentId, said, '', 'none', null, tick)
+    return scene
+  }
+
+  /** A mind moves off the audience and into the talk. The arrival is a line rather than a roster
+   *  edit, so every byte the prompt already sent stays where it was. */
+  #admit(scene: Scene, agentId: string, tick: number): void {
+    if (scene.participants.includes(agentId)) return
+    scene.audience = scene.audience.filter((id) => id !== agentId)
+    scene.participants = [...scene.participants, agentId].sort()
+    appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
+  }
+
+  /** One body out of the talk, and the talk goes on without them. The anchor and the floor both
+   *  move off anyone who is no longer in it. */
+  #part(scene: Scene, agentId: string, tick: number): void {
+    if (!scene.participants.includes(agentId)) return
+    scene.participants = scene.participants.filter((id) => id !== agentId)
+    appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'left' })
+    if (!scene.participants.includes(scene.anchor)) {
+      scene.anchor = scene.participants[0] ?? scene.anchor
+    }
+    if (scene.floor === agentId) {
+      scene.floor = scene.participants.length === 0 ? null : scene.anchor
+    }
   }
 
   /** The one turn a scene ever takes. Called by the floor-holder's own runtime, so the cost of
@@ -128,7 +188,8 @@ export class SceneCoordinator {
       turn = await mind.llm.line({
         scene: structuredClone(scene),
         agentId,
-        cast: this.#castOf(scene),
+        cast: this.#named(scene.participants),
+        audience: this.#named(scene.audience),
         ties: this.#tiesBetween(mind.ties, scene, agentId),
         thread: threadFor(scene, agentId),
         wrapUp: wrapUpDue(scene),
@@ -153,22 +214,26 @@ export class SceneCoordinator {
     }
     const said = turn.speech === null ? '' : sanitizeSpokenText(turn.speech)
     if (said.length === 0) {
-      await this.#pass(scene, tick, 'ended')
+      await this.#pass(scene, tick)
       return
     }
     scene.passes = 0
+    scene.timeouts = 0
     // Not awaited: an intent settles on the next tick, and the floor must not wait a tick to move.
     void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
-    this.#recordLine(scene, agentId, said, turn.thought, turn.move, tick)
-    if (scene.thread.length >= LINE_CAP) await this.#close(scene, 'capped', tick)
+    this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick)
+    if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
   }
 
-  /** The body took this mind out of the talk. The floor is a commitment and this is the one
-   *  thing that breaks it from outside; what is left is a scene somebody walked out of. */
+  /** The body took this mind out of the talk. One person's alarm drops that person; the talk
+   *  ends only where too few are left to answer each other. */
   leave(agentId: string, tick: number): void {
     const scene = this.sceneFor(agentId)
     if (scene === null) return
-    void this.#close(scene, 'left', tick).catch(this.#sink)
+    this.#part(scene, agentId, tick)
+    if (scene.participants.length < TALKERS_NEEDED) {
+      void this.#close(scene, 'left', tick).catch(this.#sink)
+    }
   }
 
   /** Every tick, once, whoever calls first: the ones who walked away or went to bed, and the
@@ -177,7 +242,7 @@ export class SceneCoordinator {
     if (tick === this.#lastTick) return
     this.#lastTick = tick
     for (const scene of this.open()) {
-      this.#dropAbsent(scene)
+      this.#dropAbsent(scene, tick)
       if (scene.participants.length < TALKERS_NEEDED) {
         void this.#close(scene, 'left', tick).catch(this.#sink)
         continue
@@ -185,7 +250,7 @@ export class SceneCoordinator {
       const ask = this.#asked.get(scene.id)
       if (ask !== undefined && this.#now() - ask.atMs >= FLOOR_TIMEOUT_MS) {
         this.#asked.delete(scene.id)
-        void this.#pass(scene, tick, 'timeout').catch(this.#sink)
+        void this.#timedOut(scene, tick).catch(this.#sink)
       }
     }
   }
@@ -194,21 +259,27 @@ export class SceneCoordinator {
     this.#onError('scene_close', err instanceof Error ? err.message : String(err))
   }
 
-  /** A silence, whether the mouth chose it or the provider never answered. Two of them end it,
-   *  and the second one's kind names the reason. */
-  async #pass(scene: Scene, tick: number, reason: 'ended' | 'timeout'): Promise<void> {
-    scene.passes += 1
-    if (scene.passes >= CLOSING_PASSES) {
-      await this.#close(scene, reason, tick)
+  /** A silence the mouth chose. It hands the floor back to the anchor, and the anchor's own
+   *  silence is the end of it — there is nobody left for the talk to fall back on. */
+  async #pass(scene: Scene, tick: number): Promise<void> {
+    const quiet = scene.floor ?? scene.anchor
+    if (quiet === scene.anchor) {
+      await this.#close(scene, 'ended', tick)
       return
     }
-    scene.floor = nextFloor(
-      scene,
-      scene.floor ?? scene.thread[scene.thread.length - 1]?.agentId ?? '',
-      '',
-      (id) => this.#nameOf(id),
-      (id) => this.#warmthToward(scene, id),
-    )
+    scene.passes += 1
+    scene.floor = this.#floorAfter(scene, quiet, '', null)
+  }
+
+  /** A provider that never came back. The floor moves on and nobody is asked twice for the same
+   *  line; two silences in a row is a scene nothing is coming back from. */
+  async #timedOut(scene: Scene, tick: number): Promise<void> {
+    scene.timeouts += 1
+    if (scene.timeouts >= CLOSING_TIMEOUTS) {
+      await this.#close(scene, 'timeout', tick)
+      return
+    }
+    scene.floor = this.#floorAfter(scene, scene.floor ?? scene.anchor, '', null)
   }
 
   #recordLine(
@@ -217,6 +288,7 @@ export class SceneCoordinator {
     text: string,
     aside: string,
     move: Scene['thread'][number]['move'],
+    to: string | null,
     tick: number,
   ): void {
     appendLine(scene, { agentId, text, aside, move, tick })
@@ -227,14 +299,22 @@ export class SceneCoordinator {
         scene.proposal = { lawText: text, predicate: { kind: 'none' } }
       }
     }
-    scene.floor = nextFloor(
-      scene,
-      agentId,
-      text,
-      (id) => this.#nameOf(id),
-      (id) => this.#warmthToward(scene, id),
-    )
+    const next = this.#floorAfter(scene, agentId, text, to)
+    if (next !== null) this.#admit(scene, next, tick)
+    scene.floor = next
     this.#bridge.announce('scene_line', { id: scene.id, agentId, text, move })
+  }
+
+  #floorAfter(scene: Scene, speakerId: string, text: string, to: string | null): string | null {
+    const mind = this.#mindFor(speakerId)
+    return nextFloor(
+      scene,
+      speakerId,
+      text,
+      to,
+      (id) => this.#nameOf(id),
+      (id) => mind?.warmth(id) ?? 0,
+    )
   }
 
   #kindAfter(scene: Scene, text: string, tick: number): Scene['kind'] {
@@ -257,17 +337,16 @@ export class SceneCoordinator {
     return this.#bridge.isAlive(agentId) && this.#bridge.isAwake(agentId)
   }
 
-  /** Anyone out of the last speaker's earshot, dead, or gone to bed has left the talk. The
-   *  floor moves off them the tick they lie down, so no scene waits on a sleeper. */
-  #dropAbsent(scene: Scene): void {
-    const anchor = scene.thread[scene.thread.length - 1]?.agentId ?? scene.participants[0]!
-    const within = new Set([anchor, ...this.#bridge.earshot(anchor)])
-    const kept = scene.participants.filter((id) => within.has(id) && this.#canTalk(id))
-    if (kept.length === scene.participants.length) return
-    scene.participants = kept
-    if (scene.floor !== null && !kept.includes(scene.floor)) {
-      scene.floor = kept.length > 0 ? (kept[0] ?? null) : null
-    }
+  /** Anyone out of the last speaker's earshot, dead, or gone to bed has left the talk, and the
+   *  same rule thins the audience. The floor moves off them the tick they lie down, so no scene
+   *  waits on a sleeper. Presence lines are not speech, so they never become the ear. */
+  #dropAbsent(scene: Scene, tick: number): void {
+    const spoke = scene.thread.filter((l) => l.presence === undefined)
+    const ear = spoke[spoke.length - 1]?.agentId ?? scene.anchor
+    const within = new Set([ear, ...this.#bridge.earshot(ear)])
+    const here = (id: string): boolean => within.has(id) && this.#canTalk(id)
+    for (const id of scene.participants.filter((id) => !here(id))) this.#part(scene, id, tick)
+    scene.audience = scene.audience.filter(here)
   }
 
   async #close(
@@ -283,7 +362,9 @@ export class SceneCoordinator {
     this.#scenes.delete(scene.id)
     // Everyone who was ever in it gets the memory, not only whoever was left at the end.
     const cast = [...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)])].sort()
-    const named = cast.map((id) => ({ id, name: this.#nameOf(id) ?? id }))
+    // Standing near it is not being in it: the audience carries the summary away and no tie.
+    const overheard = scene.audience.filter((id) => !cast.includes(id))
+    const named = this.#named(cast)
     const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
     let summary = ''
     let deltas: TieDelta[] = []
@@ -308,15 +389,15 @@ export class SceneCoordinator {
     // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
     // had anything at stake in still happened.
     const importance = Math.min(10, Math.max(1, Math.round(scene.stakes)))
-    for (const id of cast) {
+    for (const id of [...cast, ...overheard]) {
       const mind = this.#mindFor(id)
       if (mind === null) continue
       await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
     }
   }
 
-  #castOf(scene: Scene): { id: string; name: string }[] {
-    return scene.participants.map((id) => ({ id, name: this.#nameOf(id) ?? id }))
+  #named(ids: readonly string[]): { id: string; name: string }[] {
+    return ids.map((id) => ({ id, name: this.#nameOf(id) ?? id }))
   }
 
   #tiesBetween(store: TieStore, scene: Scene, agentId: string): Tie[] {
@@ -326,12 +407,5 @@ export class SceneCoordinator {
 
   #nameOf(agentId: string): string | null {
     return this.#bridge.agentFacts(agentId)?.name ?? null
-  }
-
-  /** How warm the mind who just spoke feels toward a candidate for the floor. */
-  #warmthToward(scene: Scene, candidateId: string): number {
-    const speaker = scene.thread[scene.thread.length - 1]?.agentId
-    if (speaker === undefined) return 0
-    return this.#mindFor(speaker)?.warmth(candidateId) ?? 0
   }
 }

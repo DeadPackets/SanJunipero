@@ -63,6 +63,7 @@ function sceneTurn(i: number): SceneTurn {
   return {
     thought: line.thought,
     speech: line.speech,
+    to: null,
     gesture: null,
     move: line.move,
     stance: null,
@@ -89,7 +90,17 @@ function baseDoc(): PersonalityDoc {
   }
 }
 
-async function twoMinds(opts: { speech: string; mindConfig?: Partial<MindConfig> }) {
+const PAIR: readonly { id: string; name: string; x: number }[] = [
+  { id: NADIA, name: 'Nadia', x: 3 },
+  { id: OMAR, name: 'Omar', x: 4 },
+]
+
+async function twoMinds(opts: {
+  speech: string
+  mindConfig?: Partial<MindConfig>
+  who?: readonly { id: string; name: string; x: number }[]
+}) {
+  const who = opts.who ?? PAIR
   const config = simConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -100,8 +111,7 @@ async function twoMinds(opts: { speech: string; mindConfig?: Partial<MindConfig>
   const seed = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  seed('agent_spawned', { id: NADIA, name: 'Nadia', x: 3, y: 3, ageDays: 30 })
-  seed('agent_spawned', { id: OMAR, name: 'Omar', x: 4, y: 3, ageDays: 30 })
+  for (const w of who) seed('agent_spawned', { ...w, y: 3, ageDays: 30 })
   const loop = new TickLoop({
     store,
     state,
@@ -129,7 +139,7 @@ async function twoMinds(opts: { speech: string; mindConfig?: Partial<MindConfig>
   const runtimes = new Map<string, AgentRuntime>()
   const coordinator = new SceneCoordinator({ bridge, mindFor: (id) => minds.get(id) ?? null })
 
-  for (const id of [NADIA, OMAR]) {
+  for (const { id, name } of who) {
     const db = openAgentDb(':memory:')
     migrateLlmTables(db)
     const personality = new PersonalityStore(db, id)
@@ -160,7 +170,7 @@ async function twoMinds(opts: { speech: string; mindConfig?: Partial<MindConfig>
         maxRetries: 0,
       }),
       embedder,
-      identity: { ...tamarIdentity, name: id === NADIA ? 'Nadia' : 'Omar' },
+      identity: { ...tamarIdentity, name },
       personality,
       bridge,
       config: { ...FAST, ...opts.mindConfig },
@@ -215,6 +225,32 @@ describe('the runtime hands its mind to a scene', () => {
     h.emitNext('needs_changed', { id: holder!, changes: [{ need: 'energy', delta: -96 }] })
     await stepUntil(h.loop, () => h.coordinator.open().length === 0, 10)
     expect(h.coordinator.open(), 'the body took them out of the talk').toHaveLength(0)
+  })
+
+  // An audience member is not a participant, so `sceneFor` gives it nothing and the wake ladder
+  // runs. Every scene line reaches it as heard speech; if hearing bought a turn, ten bystanders
+  // around a twelve-line scene would spend 47x what the conversation itself cost.
+  it('lets a bystander overhear a whole scene for nothing', async () => {
+    const SALMA = 'salma'
+    const FAR = 'tarek'
+    const h = await twoMinds({
+      speech: 'Omar. Six planks, you said.',
+      // The real pacing: an idle gap that a cheap `heard` branch would walk straight past.
+      mindConfig: { idleGapTicks: 30, boredomTicks: 60, napTicks: 500 },
+      who: [...PAIR, { id: SALMA, name: 'Salma', x: 5 }, { id: FAR, name: 'Tarek', x: 22 }],
+    })
+    await stepUntil(h.loop, () => (h.sceneCalls.get(OMAR) ?? 0) > 0)
+    expect(h.coordinator.sceneFor(SALMA), 'in earshot, and still her own mind').toBeNull()
+    for (let i = 0; i < 20; i++) {
+      h.loop.step()
+      await flush()
+      await flush()
+    }
+    const overheard = h.turnCalls.get(SALMA)?.n ?? 0
+    expect(h.sceneCalls.get(OMAR) ?? 0, 'the talk did run').toBeGreaterThan(0)
+    expect(overheard, 'hearing bought her nothing the silence did not').toBe(
+      h.turnCalls.get(FAR)?.n ?? 0,
+    )
   })
 
   it('carries the open scene through a snapshot and puts it back once', async () => {
