@@ -229,34 +229,42 @@ function computeBuildSite(
       refusal,
     }
   }
-  const square = townSquareOf(state)!
   const mine = siteToRaise(state, agentId, params.kind)
+  // Walls already standing need no plot: a full lattice would otherwise refuse a body its own
+  // half-raised site forever, and the ground to walk to is that site's door, not a new claim's.
+  if (mine !== null) {
+    const door = doorTile(state, mine)
+    return {
+      site: {
+        x: mine.x,
+        y: mine.y,
+        w: mine.w,
+        h: mine.h,
+        ...(mine.facing === undefined ? {} : { facing: mine.facing }),
+      },
+      resume: { id: mine.id, progressTicks: mine.progressTicks },
+      lay: [],
+      refusal: nearRect(state, agentId, mine.x, mine.y, mine.w, mine.h)
+        ? null
+        : `walls are already up for a ${words(params.kind)}${door === null ? '' : ` — go and stand at (${door.x}, ${door.y})`}`,
+    }
+  }
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const raising =
-    mine === null
-      ? null
-      : {
-          x: mine.x,
-          y: mine.y,
-          w: mine.w,
-          h: mine.h,
-          ...(mine.facing === undefined ? {} : { facing: mine.facing }),
-        }
   if (claim === null) {
     return {
-      site: raising,
+      site: null,
       resume: null,
       lay: [],
       refusal: `there is nowhere left in the town for a ${words(params.kind)}`,
     }
   }
-  const site = raising ?? {
+  const site = {
     ...claim.site,
     ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }),
   }
   // A refusal rather than a silent skip: a plot withheld for want of a bigger world would look
   // to a mind like no plot at all.
-  const lay = layBlock(state, square, claim.block)
+  const lay = layBlock(state, townSquareOf(state)!, claim.block)
   if (lay === 'off the map') {
     return {
       site,
@@ -265,22 +273,21 @@ function computeBuildSite(
       refusal: `the ground a ${words(params.kind)} needs is past the edge of the known country`,
     }
   }
-  const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
   // The door tile, not the footprint's corner: a road, passable, adjacent to every mass the plot holds.
   const go = `go and stand at (${claim.door.x}, ${claim.door.y})`
   if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
     return {
       site,
-      resume,
+      resume: null,
       lay,
       refusal: `the town keeps ground for a ${words(params.kind)} — ${go}`,
     }
   }
   return {
     site,
-    resume,
+    resume: null,
     lay,
-    refusal: resume !== null ? null : plottedRefusal(state, config, agentId, params.kind, site, go),
+    refusal: plottedRefusal(state, config, agentId, params.kind, site, go),
   }
 }
 

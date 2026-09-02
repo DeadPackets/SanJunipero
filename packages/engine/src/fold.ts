@@ -1119,6 +1119,12 @@ export function fold(
                       : {
                           path: a.activity.path.map(([x, y]): [number, number] => [x + dx, y + dy]),
                         }),
+                    // The act hung on the end of a walk names its tile in the old frame too.
+                    ...(a.activity.then === undefined
+                      ? {}
+                      : {
+                          then: { ...a.activity.then, params: shiftParams(a.activity.then.params) },
+                        }),
                   },
                 }),
           },

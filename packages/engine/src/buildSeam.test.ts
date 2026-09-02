@@ -342,6 +342,18 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     })
   })
 
+  it('★ walls already up need no plot: joining them survives a town with nowhere left to lay one', () => {
+    const { s } = aWallAndTwoBodies()
+    const short: WorldState = { ...s, terrain: s.terrain.slice(0, 95) }
+    // NON-VACUITY: on this world the town cannot lay a fresh plot at all.
+    const claim = claimInWorld(short, { along: 2, deep: 2 })!
+    expect(layBlock(short, TOWN_SQUARE, claim.block)).toBe('off the map')
+    expect(buildSiteOf(short, CFG, 'b', { kind: 'house' }).resume).not.toBeNull()
+    const r = submitIntent(short, CFG, 'b', 'build', { kind: 'house' })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(sitesIn(apply(short, r.ok ? r.events : []))).toHaveLength(1)
+  })
+
   it('other walls are not these walls: a well is not joined to a half-built house', () => {
     const { s } = aWallAndTwoBodies()
     expect(buildSiteOf(s, CFG, 'b', { kind: 'well' }).resume).toBeNull()

@@ -320,7 +320,7 @@ describe('fold: world_grown', () => {
     expect(routeAfter.map(([x, y]) => [x - 4, y])).toEqual(routeBefore)
   })
 
-  it('carries an in-flight walk with the ground it was walking on', () => {
+  it('carries an in-flight walk, and the act hung on its end, with the ground', () => {
     let s = town()
     const path = findPath(s, s.agents.a1!, { x: 25, y: 28 }, CFG)!
     s = fold(
@@ -330,6 +330,7 @@ describe('fold: world_grown', () => {
         verb: 'walk',
         params: { x: 25, y: 28 },
         duration: path.length,
+        then: { verb: 'till', params: { x: 25, y: 28 } },
       }),
       CFG,
     )
@@ -337,9 +338,11 @@ describe('fold: world_grown', () => {
     const act = after.agents.a1!.activity!
     expect(act.params).toEqual({ x: 29, y: 28 })
     expect(act.path).toEqual(path.map(([x, y]) => [x + 4, y]))
+    expect(act.then).toEqual({ verb: 'till', params: { x: 29, y: 28 } })
     // and an east growth leaves it exactly as it was
-    const east = growTo('e', s)
-    expect(east.agents.a1!.activity!.path).toEqual(path)
+    const east = growTo('e', s).agents.a1!.activity!
+    expect(east.path).toEqual(path)
+    expect(east.then).toEqual({ verb: 'till', params: { x: 25, y: 28 } })
   })
 
   it('lays the rolled strip down where the payload says, and nowhere else', () => {

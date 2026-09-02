@@ -2,7 +2,7 @@ import { mintId, thirstOf, type WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
 import type { SimConfig } from '@sj/shared'
 import { perimeter } from '../interiors.js'
-import { isPassable, type Point } from '../path.js'
+import { bridgeAt, isPassable, type Point } from '../path.js'
 
 // Dying is arithmetic here, not a roll: every affliction on a body takes its own toll every tick,
 // and the tick the total reaches the floor is the tick it dies. ZERO RNG in this file.
@@ -109,15 +109,20 @@ export function dominantDrain(state: WorldState, config: SimConfig, agentId: str
 // Where the life ended, or the nearest tile that will take a stone — the same ring walk
 // doorways use, so "nearest" means one thing in this codebase.
 export function graveTile(state: WorldState, x: number, y: number): Point | null {
-  if (isPassable(state, x, y)) return { x, y }
+  if (buriable(state, x, y)) return { x, y }
   const limit = Math.max(state.terrain.length, state.terrain[0]?.length ?? 0)
   for (let r = 1; r <= limit; r++) {
     for (const p of perimeter({ x: x - (r - 1), y: y - (r - 1), w: 2 * r - 1, h: 2 * r - 1 })) {
-      if (isPassable(state, p.x, p.y)) return p
+      if (buriable(state, p.x, p.y)) return p
     }
   }
   return null
 }
+
+// A stone goes IN the ground, and a bridge deck is not ground: `isPassable` says yes to a deck,
+// and `grave_placed` throws on a stone that overlaps the bridge under it.
+const buriable = (state: WorldState, x: number, y: number): boolean =>
+  isPassable(state, x, y) && !bridgeAt(state, x, y)
 
 // Death would otherwise strand held items: drop them on the death tile first.
 export function dropHeldItems(ctx: TickCtx, agentId: string): void {
