@@ -1,18 +1,33 @@
-import type { HeatWindow, SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, type HeatWindow, type SimEvent } from '@sj/shared'
 
-// Deterministic drama scorer.
+// Deterministic drama scorer. ★ It used to optimise for catastrophe — a death, a fire and an
+// injury above everything a person could say or make — so a healthy town scored flat and the
+// camera fell back to a carousel. What the town DECIDES and what it SAYS now outrank the weather.
 export const HEAT_WINDOW_TICKS = 60
 export const HEAT_WEIGHTS: Record<string, number> = {
   agent_died: 20,
+  discovery_made: 12,
   fire_ignited: 12,
+  law_ratified: 12,
   fire_spread: 10,
+  law_broken: 9,
   agent_injured: 8,
+  co_slept: 8,
   structure_completed: 6,
   agent_collapsed: 6,
+  agent_spoke: 6,
+  agent_expressed: 4,
   crop_harvested: 3,
-  agent_spoke: 2,
   item_moved: 1,
 }
+
+/** ★ A scene is two voices, not one. Two different people speaking within earshot inside one
+ *  window is the thing the director exists to find, so it is worth more than either line — and
+ *  the pair together clears any single disaster the weather can raise. */
+export const SCENE_BONUS = 8
+/** Plain distance, not the engine's `hears`: heat is a hint about where to point a camera, and
+ *  a wall between two voices does not make them a worse shot. */
+export const SCENE_EARSHOT_TILES = DEFAULT_CONFIG.movement.earshotRadius
 
 /** One sim-day, not the 120 ticks the only caller reads: `/api/heat` is a public contract and a
  *  legible unit survives a second reader better than a number tuned to the first. */
@@ -40,12 +55,25 @@ export type HeatContext = {
   /** The `seq` of the event before this one, so a caller that reads a FILTERED log still sees
    *  the rows it skipped as what they are: events between the completion and its result. */
   lastSeq: number
+  /** The window the two fields below belong to; crossing into the next empties both, so the
+   *  scene bonus remembers one window's voices and never the whole day's. */
+  sceneWindow: number
+  spoke: { agentId: string; x: number; y: number }[]
+  /** who has already been paid the bonus for this window */
+  paired: Set<string>
 }
 
 /** A context for a log with no plans in it — every structure resolves to nobody. */
 export const heatContext = (
   builderOf: (id: string) => string | null = () => null,
-): HeatContext => ({ builderOf, prevActor: null, lastSeq: 0 })
+): HeatContext => ({
+  builderOf,
+  prevActor: null,
+  lastSeq: 0,
+  sceneWindow: -1,
+  spoke: [],
+  paired: new Set(),
+})
 
 /** Who this event's drama belongs to, or null when the log cannot honestly name anybody. */
 function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
@@ -54,10 +82,18 @@ function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
     structureId?: string
     toId?: string
     id?: string
+    byId?: string
+    aId?: string
     loc?: { t: string; id?: string }
   }
   if (typeof p.agentId === 'string') return p.agentId
   switch (ev.type) {
+    case 'discovery_made':
+      return p.byId ?? null
+    // One night pays one of the pair, the way one fire pays one person: the camera can only be
+    // on one face, and whichever it takes has the other standing in the same shot.
+    case 'co_slept':
+      return p.aId ?? null
     case 'fire_ignited':
       return p.structureId === undefined ? null : ctx.builderOf(p.structureId)
     case 'fire_spread':
@@ -93,8 +129,43 @@ export function scoreEvent(scores: HeatScores, ev: SimEvent, ctx: HeatContext): 
   // long as those results do and no longer.
   if (ev.type !== 'crop_harvested' && ev.type !== 'structure_completed') ctx.prevActor = null
   if (agentId === null) return
-  const key = heatKey(ev.tick, agentId)
-  scores.set(key, (scores.get(key) ?? 0) + weight)
+  add(scores, ev.tick, agentId, weight)
+  if (ev.type === 'agent_spoke') scoreScene(scores, ev, agentId, ctx)
+}
+
+const add = (scores: HeatScores, tick: number, agentId: string, n: number): void => {
+  const key = heatKey(tick, agentId)
+  scores.set(key, (scores.get(key) ?? 0) + n)
+}
+
+/** Pays `SCENE_BONUS` to both voices the first time this window carries two of them within
+ *  earshot. Allocation-light: one array and one set, both emptied at the window seam. */
+function scoreScene(
+  scores: HeatScores,
+  ev: SimEvent,
+  agentId: string,
+  ctx: HeatContext,
+): void {
+  const p = ev.payload as { x?: number; y?: number }
+  if (typeof p.x !== 'number' || typeof p.y !== 'number') return
+  const window = Math.floor(ev.tick / HEAT_WINDOW_TICKS)
+  if (window !== ctx.sceneWindow) {
+    ctx.sceneWindow = window
+    ctx.spoke.length = 0
+    ctx.paired.clear()
+  }
+  const pay = (id: string): void => {
+    if (ctx.paired.has(id)) return
+    ctx.paired.add(id)
+    add(scores, ev.tick, id, SCENE_BONUS)
+  }
+  for (const other of ctx.spoke) {
+    if (other.agentId === agentId) continue
+    if (Math.hypot(other.x - p.x, other.y - p.y) > SCENE_EARSHOT_TILES) continue
+    pay(other.agentId)
+    pay(agentId)
+  }
+  ctx.spoke.push({ agentId, x: p.x, y: p.y })
 }
 
 export function heatFromScores(scores: ReadonlyMap<string, number>): HeatWindow[] {
