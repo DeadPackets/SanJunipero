@@ -14,6 +14,7 @@ import {
   SPEECH_MAX_CHARS,
   SPEECH_MS_BASE,
   WRAP_CHARS,
+  bubbleInked,
   bubbleLife,
   bubbleShown,
   dominantColor,
@@ -26,7 +27,7 @@ import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
-import { fateOfPriorLine, typingMs } from './converse.js'
+import { fateOfPriorLine, typedChars, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
 
 // ★ D3 — 240 characters took 8.6s to type and died 13.1s in, leaving 4.5 seconds to read them:
@@ -422,6 +423,32 @@ describe('two speakers standing together do not composite into one pile', () => 
       { id: 'b', sx: 310, sy: 305, size: { w: 150, h: 40 } },
     ]
     expect(placeBubbles(want, view)).toEqual(placeBubbles(want, view))
+  })
+})
+
+// ★ D1 — `build` draws the paper at its final w × h and then empties the label, so a speech
+// bubble opened as a blank rectangle for the 36ms its first character took to type.
+describe('★ the paper is not there until the first character is', () => {
+  const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+
+  it('★ is blank at the instant of speaking, and inked one character later', () => {
+    expect(bubbleInked(typedChars(40, 0))).toBe(false)
+    expect(bubbleInked(typedChars(40, -100))).toBe(false)
+    expect(bubbleInked(typedChars(40, typingMs(1)))).toBe(true)
+    expect(bubbleInked(typedChars(40, typingMs(40)))).toBe(true)
+  })
+
+  it('★ a thought is not typed, so its paper is there from the first frame', () => {
+    expect(bubbleInked('cold stays outside'.length)).toBe(true)
+  })
+
+  it('★ the layer holds the node back rather than showing an empty box', () => {
+    expect(SRC).toContain('node.visible = bubbleInked(typed)')
+    expect(SRC).toContain(
+      'b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)',
+    )
+    // and the box is still cut to the whole line: reflow would move paper under a reader
+    expect(SRC).toContain('const w = Math.ceil(label.width) + 2 * BUBBLE_PAD')
   })
 })
 

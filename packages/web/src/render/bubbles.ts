@@ -181,6 +181,11 @@ export function bubbleShown(zoom: number, inView: boolean): boolean {
   return inView && zoom > GLYPH_ZOOM
 }
 
+/** ★ NO PAPER BEFORE THE INK. The box is cut to the WHOLE line and the label then emptied, so a
+ *  speech bubble opened as a blank slab and stood there for as long as its first character took
+ *  to arrive. The paper is not there until something is written on it. */
+export const bubbleInked = (typed: number): boolean => typed > 0
+
 /** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
  *  a "…" pinned to the viewport corner with nobody under it. */
 export function onLeash(
@@ -350,6 +355,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     // A thought is not spoken, so it is not typed either.
     const typed = isThought ? full.length : 0
     if (typed !== full.length) label.text = ''
+    node.visible = bubbleInked(typed)
 
     // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Different paper, a dotted rim
     // and no tail at all — shape and paper, not `alpha: 0.55`.
@@ -479,7 +485,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const b = bubbles[i]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
         const p = want[i]!
-        b.node.visible = onLeash(placed.rect, p.sx, p.sy, p.size)
+        b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)
         if (!b.node.visible) continue
         // the last frames fade; the fade-in is a rAF on the node and is left alone once done
         const leaving = bubbleAlpha(b.dieMs - nowMs)
