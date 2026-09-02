@@ -37,9 +37,7 @@ export type OutcomeRow = z.infer<typeof OutcomeRowSchema>
 export const OutcomeTableSchema = z.array(OutcomeRowSchema).min(1)
 export type OutcomeTable = z.infer<typeof OutcomeTableSchema>
 
-// A plain union, not a discriminated one: the strict dialect below reuses it, and a
-// discriminator emits `oneOf`, which the ruling model's decoder refuses outright.
-export const RecipeRequirementSchema = z.union([
+export const RecipeRequirementSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('held_item'),
@@ -58,15 +56,14 @@ export const RecipeRequirementSchema = z.union([
 ])
 export type RecipeRequirement = z.infer<typeof RecipeRequirementSchema>
 
-export const SkillCheckSchema = z
-  .object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) })
-  .strict()
-
 export const RecipeSchema = z
   .object({
     id: z.string().regex(/^recipe:[a-z0-9_]+$/), // deterministic slug
     name: z.string().min(1), // in-world name
-    skillCheck: SkillCheckSchema.optional(),
+    skillCheck: z
+      .object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) })
+      .strict()
+      .optional(),
     durationTicks: z.number().int().positive().max(1440),
     costs: z.array(
       z.object({ kind: z.string().min(1), qty: z.number().int().positive() }).strict(),
@@ -105,80 +102,70 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
 ])
 export type Verdict = z.infer<typeof VerdictSchema>
 
-// The dialect the court is asked in. Measured live 2026-09-02: the pinned ruling model's decoder
-// takes only an object at the root, refuses `oneOf` anywhere, and refuses an optional key — so
-// the verdict rides wrapped, every union is plain, and absence is written null.
-const StrictEffectSchema = z.union([
-  z
-    .object({
-      op: z.literal('spawn_item'),
-      kind: z.string().min(1),
-      qty: z.number().int().positive().max(20),
-      to: z.literal('agent'),
-      durability: z.number().int().positive().max(200).nullable(),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal('gain_skill'),
-      track: z.string().min(1),
-      xp: z.number().int().positive().max(100),
-    })
-    .strict(),
-  z.object({ op: z.literal('hp_delta'), delta: z.number().int().min(-50).max(50) }).strict(),
-  z.object({ op: z.literal('none') }).strict(),
-])
-const StrictRecipeSchema = RecipeSchema.extend({
-  skillCheck: SkillCheckSchema.nullable(),
-  outcomeTable: z
-    .array(OutcomeRowSchema.extend({ effects: z.array(StrictEffectSchema) }))
-    .min(1),
-})
-export const StrictVerdictSchema = z
-  .object({
-    verdict: z.union([
-      z
-        .object({ kind: z.literal('map'), verb: z.string().min(1), params: ClosedIntentParams })
-        .strict(),
-      z
-        .object({
-          kind: z.literal('attempt'),
-          recipe: StrictRecipeSchema,
-          summary: z.string().min(1),
-        })
-        .strict(),
-      z
-        .object({
-          kind: z.literal('impossible'),
-          reason: z.string().min(1),
-          class: ImpossibleClassSchema,
-        })
-        .strict(),
-    ]),
-  })
-  .strict()
+type AnyZod = z.ZodType
+type AnyShape = z.ZodObject<Record<string, AnyZod>>
 
-const withoutNull = (o: Record<string, unknown>, key: string): Record<string, unknown> => {
-  if (o[key] !== null) return o
-  const { [key]: _dropped, ...rest } = o
-  return rest
+// The ruling model's decoder takes only an object at the root, refuses `oneOf`, and refuses an
+// optional key. Derived, so an op or a field added to the verdict is in the dialect that day.
+function strictly(schema: AnyZod): AnyZod {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return strictly((schema as z.ZodOptional<AnyZod>).unwrap()).nullable()
+  if (type === 'array') {
+    const array = schema as z.ZodArray<AnyZod>
+    // Carried over rather than dropped, so `minItems` still reaches the decoder.
+    const checks = (array.def.checks ?? []) as z.core.$ZodCheck<unknown[]>[]
+    return z.array(strictly(array.element)).check(...checks)
+  }
+  // Both union kinds report `union`; rebuilding either as a plain one is what turns oneOf to anyOf.
+  if (type === 'union') return z.union((schema as z.ZodUnion<[AnyZod]>).options.map(strictly))
+  if (type !== 'object') return schema
+  const shape = (schema as AnyShape).shape
+  return z
+    .object(Object.fromEntries(Object.entries(shape).map(([k, v]) => [k, strictly(v)])))
+    .strict()
+}
+
+export const StrictVerdictSchema = z.object({ verdict: strictly(VerdictSchema) }).strict()
+
+/** Null stood in for absence and comes off here — but only where the town's own schema says the
+ *  key may be absent, so a params key answered null stays null. Walks value and schema together. */
+function withoutNulls(value: unknown, schema: AnyZod): unknown {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return withoutNulls(value, (schema as z.ZodOptional<AnyZod>).unwrap())
+  if (type === 'array')
+    return Array.isArray(value)
+      ? value.map((v) => withoutNulls(v, (schema as z.ZodArray<AnyZod>).element))
+      : value
+  if (type === 'union') {
+    for (const option of (schema as z.ZodUnion<[AnyZod]>).options) {
+      const stripped = withoutNulls(value, option)
+      if (option.safeParse(stripped).success) return stripped
+    }
+    return value
+  }
+  if (type !== 'object' || value === null || typeof value !== 'object') return value
+  const shape = (schema as AnyShape).shape
+  const out: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(value)) {
+    const field = shape[key]
+    if (field === undefined) {
+      out[key] = v
+      continue
+    }
+    if (v === null && field.def.type === 'optional') continue
+    out[key] = withoutNulls(v, field)
+  }
+  return out
 }
 
 /** The court's answer in the dialect it was asked for, read as the verdict the town keeps, or
- *  null off the union: the nulls standing in for absence come off here and nowhere else. */
+ *  null off the union. */
 export function readRuling(raw: unknown): Verdict | null {
   const wrapped = StrictVerdictSchema.safeParse(raw)
   if (!wrapped.success) return null
-  const v = wrapped.data.verdict
-  if (v.kind !== 'attempt') return v
-  const recipe = {
-    ...withoutNull(v.recipe, 'skillCheck'),
-    outcomeTable: v.recipe.outcomeTable.map((row) => ({
-      ...row,
-      effects: row.effects.map((e) => withoutNull(e, 'durability')),
-    })),
-  }
-  const read = VerdictSchema.safeParse({ ...v, recipe })
+  const read = VerdictSchema.safeParse(withoutNulls(wrapped.data.verdict, VerdictSchema))
   return read.success ? read.data : null
 }
 

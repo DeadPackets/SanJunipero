@@ -226,6 +226,59 @@ describe('readRuling', () => {
     expect(readRuling({ verdict: { kind: 'nuke' } })).toBeNull()
     expect(readRuling({ kind: 'map', verb: 'walk', params: NO_PARAMS })).toBeNull()
   })
+
+  // A params key answered null is the act naming nothing there, not a key to drop: the closed
+  // grammar requires all thirteen, so the round trip has to keep them.
+  it('★ keeps the nulls the closed grammar requires while dropping the ones that mean absence', () => {
+    const verdict = readRuling({
+      verdict: { kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 3, y: 4 } },
+    })
+    expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 3, y: 4 } })
+  })
+})
+
+// The dialect is derived from `OutcomeEffectSchema`, never restated, so an op added to the town's
+// effects is in it the same day. This test fails on a new op until it is sampled here — and the
+// derivation is what makes the sample pass without a second edit in verdict.ts.
+describe('the strict dialect covers every effect the town can emit', () => {
+  const samples: Record<string, Record<string, unknown>> = {
+    spawn_item: { op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' },
+    gain_skill: { op: 'gain_skill', track: 'cooking', xp: 10 },
+    hp_delta: { op: 'hp_delta', delta: -3 },
+    none: { op: 'none' },
+  }
+  const ops = OutcomeEffectSchema.options.map((o) => (o.shape.op as z.ZodLiteral<string>).value)
+
+  it('★ every op in the union has a sample here', () => {
+    expect([...ops].sort()).toEqual(Object.keys(samples).sort())
+  })
+
+  it.each(ops)('★ %s survives the round trip null-filled', (op) => {
+    const option = OutcomeEffectSchema.options.find(
+      (o) => (o.shape.op as z.ZodLiteral<string>).value === op,
+    )!
+    const sample = samples[op]!
+    // Every key the op has, answered null, then the sample over the top: exactly what the
+    // decoder is handed when the court leaves an optional field out.
+    const nullFilled = {
+      ...Object.fromEntries(Object.keys(option.shape).map((k) => [k, null])),
+      ...sample,
+    }
+    const wire = {
+      verdict: {
+        ...validAttempt,
+        recipe: {
+          ...validRecipe,
+          skillCheck: null,
+          outcomeTable: [{ ...validRecipe.outcomeTable[0]!, effects: [nullFilled] }],
+        },
+      },
+    }
+    expect(StrictVerdictSchema.safeParse(wire).success, op).toBe(true)
+    const verdict = readRuling(wire)
+    if (verdict?.kind !== 'attempt') throw new Error(`${op}: not an attempt`)
+    expect(verdict.recipe.outcomeTable[0]!.effects[0], op).toEqual(sample)
+  })
 })
 
 describe('OutcomeTableSchema', () => {

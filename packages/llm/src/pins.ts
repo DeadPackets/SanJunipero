@@ -11,10 +11,8 @@ export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
 export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
-// The fleet's third model, and the only one it pays a premium for. A ruling is permanent, so the
-// court buys the model that reads one best: over 12 of world two's own rulings, 3 calls each, it
-// agreed with the hand label 32/36 where GLM took 25/33 and DeepSeek v4-pro 26/36, at a quarter
-// of GLM's latency. OpenRouter publishes no dated snapshot of it, as with the mind model.
+// A ruling is permanent, so the court buys the model that reads one best: over 12 of world two's
+// rulings it agreed 32/36, where GLM took 25/33 and DeepSeek v4-pro 26/36. No dated snapshot.
 export const RULING_MODEL = 'openai/gpt-5.6-luna' as const
 // One home, not two: the `openai` tier is the one that was measured, and `openai/fast` bills 2x
 // for the same answer. Its decoder is why `StrictVerdictSchema` exists.
