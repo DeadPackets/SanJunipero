@@ -66,6 +66,7 @@ export {
   type TieDelta,
   type TieKind,
 } from './scene/scene.js'
+export { makeSceneLlm, sceneWordCap, type SceneVoice } from './scene/sceneLlm.js'
 export { TieStore, type Tie } from './memory/ties.js'
 export { FOUNDER_MINDS, type Mind } from './live/founderMinds.js'
 export { TRAVELLER_MINDS, type Traveller } from './live/travellerMinds.js'
