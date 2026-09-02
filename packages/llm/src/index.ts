@@ -4,6 +4,7 @@ export {
   insertAlert,
   insertLlmCall,
   insertTurnOutcome,
+  mergeBlockTokens,
   sumCostUsd,
 } from './callLog.js'
 export { backfillUnattributed } from './backfill.js'
@@ -38,6 +39,7 @@ export {
   BudgetExceededError,
   defaultExtraBody,
   servedProvider,
+  type CallBill,
   type LlmUsage,
   type LlmMessage,
   type LlmClientOpts,

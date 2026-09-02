@@ -25,6 +25,11 @@ export type LlmCallInsert = {
   finishReason: string | null
   ok: boolean
   error: string | null
+  // Which `WakeReason` bought this call. Null for every caller that has no wake.
+  wakeReason?: string | null
+  // One JSON object, not a column per block: the blocks change as the prompt does, and a
+  // schema migration for each is not worth it.
+  blockTokens?: Record<string, number> | null
 }
 
 export function migrateLlmTables(db: Database.Database): void {
@@ -47,7 +52,9 @@ export function migrateLlmTables(db: Database.Database): void {
       error TEXT,
       provider TEXT,
       finish_reason TEXT,
-      generation_id TEXT
+      generation_id TEXT,
+      wake_reason TEXT,
+      block_tokens TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts);
@@ -90,6 +97,12 @@ export function migrateLlmTables(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === 'generation_id')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN generation_id TEXT')
+  }
+  if (!cols.some((c) => c.name === 'wake_reason')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN wake_reason TEXT')
+  }
+  if (!cols.some((c) => c.name === 'block_tokens')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN block_tokens TEXT')
   }
   const outcomeCols = db.prepare('PRAGMA table_info(turn_outcomes)').all() as { name: string }[]
   if (!outcomeCols.some((c) => c.name === 'plan_continued')) {
@@ -160,31 +173,55 @@ export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGu
   }
 }
 
-export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void {
-  db.prepare(
-    `INSERT INTO llm_calls
+/** Returns the row it wrote, so a fact the caller only learns after the answer parses can be
+ *  merged into the same row rather than guessed at from the outside. */
+export function insertLlmCall(db: Database.Database, call: LlmCallInsert): number {
+  const info = db
+    .prepare(
+      `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
-        error, provider, finish_reason, generation_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    Date.now(),
-    call.agentId,
-    call.caller,
-    call.model,
-    call.inputTokens,
-    call.outputTokens,
-    call.cacheReadTokens,
-    call.reasoningTokens,
-    call.costUsd,
-    call.estimatedCostUsd,
-    call.reportedCostUsd,
-    Math.round(call.latencyMs),
-    call.ok ? 1 : 0,
-    call.error,
-    call.provider,
-    call.finishReason,
-    call.generationId ?? null,
+        error, provider, finish_reason, generation_id, wake_reason, block_tokens)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      Date.now(),
+      call.agentId,
+      call.caller,
+      call.model,
+      call.inputTokens,
+      call.outputTokens,
+      call.cacheReadTokens,
+      call.reasoningTokens,
+      call.costUsd,
+      call.estimatedCostUsd,
+      call.reportedCostUsd,
+      Math.round(call.latencyMs),
+      call.ok ? 1 : 0,
+      call.error,
+      call.provider,
+      call.finishReason,
+      call.generationId ?? null,
+      call.wakeReason ?? null,
+      call.blockTokens == null ? null : JSON.stringify(call.blockTokens),
+    )
+  return Number(info.lastInsertRowid)
+}
+
+/** What the answer committed to, which the caller only learns once the plan has parsed. */
+export function mergeBlockTokens(
+  db: Database.Database,
+  id: number,
+  patch: Record<string, number>,
+): void {
+  const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as
+    | { json: string | null }
+    | undefined
+  if (row === undefined) return
+  const base = row.json === null ? {} : (JSON.parse(row.json) as Record<string, number>)
+  db.prepare('UPDATE llm_calls SET block_tokens = ? WHERE id = ?').run(
+    JSON.stringify({ ...base, ...patch }),
+    id,
   )
 }
 
