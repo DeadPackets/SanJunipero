@@ -4,8 +4,6 @@ import { IntentSchema } from './turn.js'
 import type { PerceptionPacket } from './prompt/prose.js'
 
 export type MindConfig = {
-  conversationGapTicks: number
-  conversationWindowTicks: number
   idleGapTicks: number
   boredomTicks: number
   // Four clocks that ring when they run low, and one rung that rings when it rises: a named
@@ -21,10 +19,6 @@ export type MindConfig = {
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
-  // Five ticks is ten seconds at 1x: a reply lands in the pause a person leaves, not on top
-  // of the words it answers.
-  conversationGapTicks: 5,
-  conversationWindowTicks: 60,
   idleGapTicks: 30,
   boredomTicks: 60,
   // Thirst rings with hunger; any named affliction rings at its first severity. Hunger and
@@ -61,7 +55,6 @@ export type MindClock = {
   // so a zero makes a new arrival wait out the whole boredom floor first.
   lastTurnTick: number | null
   reconsiderAtTick: number | null
-  conversationUntilTick: number
   dozeUntilTick: number
   // Keyed by need name and by `affliction:<kind>`. Absent is armed: a rung nobody has spent
   // yet still rings, so a clock added after a mind woke up needs no migration.
@@ -86,10 +79,15 @@ export type WakeReason =
   | 'salient_perception'
   | 'plan_blocked'
   | 'plan_done'
-  | 'conversation_beat'
+  | 'floor'
   | 'reconsider'
   | 'boredom'
   | 'morning'
+
+/** Where this mind stands in an open scene. A scene holds the talk now, so it outranks every
+ *  other reason while it is open: a floor-holder who woke for a plan would never answer. */
+export type FloorState = { inScene: boolean; holdsFloor: boolean }
+const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
 
 export function decideWake(
   cfg: MindConfig,
@@ -97,9 +95,13 @@ export function decideWake(
   clock: MindClock,
   tick: number,
   plan: PlanState,
+  floor: FloorState = NO_SCENE,
 ): WakeReason | null {
   // Backoff after a failed turn: even floor-exempt reasons wait it out.
   if (tick < clock.dozeUntilTick) return null
+
+  // A listener takes no turn at all — that is what makes hearing free.
+  if (floor.inScene && !packet.self.asleep) return floor.holdsFloor ? 'floor' : null
 
   if (packet.self.asleep) {
     if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
@@ -119,81 +121,20 @@ export function decideWake(
   }
 
   const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
-  const inConversation = tick < clock.conversationUntilTick
 
   // Floor-exempt: physical rousing and immediate surprises.
   if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) return 'body_alarm'
   if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
   if (plan.lastResult === 'blocked') return 'plan_blocked'
 
-  // plan_done: subject to the idle floor, but the floor only applies outside
-  // an open conversation window.
-  if (plan.lastResult === 'done' && (inConversation || sinceLast >= cfg.idleGapTicks))
-    return 'plan_done'
+  if (plan.lastResult === 'done' && sinceLast >= cfg.idleGapTicks) return 'plan_done'
 
-  // conversation_beat: inside the window, its own tighter cadence.
-  if (inConversation && sinceLast >= cfg.conversationGapTicks) return 'conversation_beat'
-
-  // The idle floor gates the remaining reasons only outside conversation.
-  if (!inConversation && sinceLast < cfg.idleGapTicks) return null
+  if (sinceLast < cfg.idleGapTicks) return null
 
   if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) return 'reconsider'
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) return 'boredom'
 
   return null
-}
-
-// Six lines of earshot is enough to see a two-mind loop close on itself.
-const EARSHOT_MEMORY = 6
-const NEAR_DUPLICATE_OVERLAP = 0.8
-// Under three words a shared opening is coincidence, so the overlap rule judges those alone.
-const PREFIX_MIN_WORDS = 3
-
-// Per-clock and ephemeral, because `MindClock` is serialised into a strict checkpoint schema;
-// a resumed mind with nothing to have heard before is the sane reset.
-const earshot = new WeakMap<MindClock, { tick: number; said: string[][] }>()
-
-function words(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .split(' ')
-    .filter((w) => w.length > 0)
-}
-
-function nearDuplicate(a: string[], b: string[]): boolean {
-  if (a.length === 0 || b.length === 0) return a.length === b.length
-  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
-  if (short.length >= PREFIX_MIN_WORDS && short.every((w, i) => long[i] === w)) return true
-  const setA = new Set(a)
-  const setB = new Set(b)
-  let shared = 0
-  for (const w of setA) if (setB.has(w)) shared += 1
-  return shared / (setA.size + setB.size - shared) >= NEAR_DUPLICATE_OVERLAP
-}
-
-/** The conversation window's re-arm, called every tick. Speech the mind has just heard said
- *  again is an echo, not a beat: it is still heard, it just buys no second window. */
-export function rearmConversationWindow(
-  cfg: MindConfig,
-  packet: PerceptionPacket,
-  clock: MindClock,
-  tick: number,
-): void {
-  if (packet.heard.length === 0) return
-  // A sleeper holds no conversation, so it wakes with nothing to have heard before.
-  if (packet.self.asleep) earshot.delete(clock)
-  const prior = earshot.get(clock)
-  const said =
-    prior === undefined || tick - prior.tick > cfg.conversationWindowTicks ? [] : prior.said
-  let novel = false
-  for (const h of packet.heard) {
-    const line = words(h.text)
-    if (!said.some((seen) => nearDuplicate(line, seen))) novel = true
-    said.push(line)
-  }
-  earshot.set(clock, { tick, said: said.slice(-EARSHOT_MEMORY) })
-  if (novel) clock.conversationUntilTick = tick + cfg.conversationWindowTicks
 }
 
 // Every rung the body is failing on right now, need and affliction alike, as alarm keys.

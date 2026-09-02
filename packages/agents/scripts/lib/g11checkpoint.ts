@@ -37,7 +37,6 @@ const MindClockZ = z
   .object({
     lastTurnTick: z.number().nullable(),
     reconsiderAtTick: z.number().nullable(),
-    conversationUntilTick: z.number(),
     dozeUntilTick: z.number(),
     // Not a wire schema — nothing sends this to a provider — so `z.record` is safe here.
     // Optional values, because an unspent rung is absent rather than false.

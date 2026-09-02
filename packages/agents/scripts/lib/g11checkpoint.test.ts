@@ -72,7 +72,6 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
           clock: {
             lastTurnTick: tick - 6,
             reconsiderAtTick: tick + 40,
-            conversationUntilTick: 0,
             dozeUntilTick: 0,
             alarmArmed: { hunger: true },
             morningWokeDay: 1,
