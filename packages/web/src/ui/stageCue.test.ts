@@ -267,6 +267,23 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     expect(src('../stage/DirectorCue.tsx')).toContain('stage-sr')
   })
 
+  // Measured in a headless shot at 390px: `balance` shrinks a flex item to equalise its lines,
+  // which left the sentence 117px wide with 100px of slot standing empty on either side of it.
+  it('★ sets the line as a chyron, so a phone gets the whole stage to read on', () => {
+    const CSS = src('./chrome.css').replace(/\s+/g, ' ')
+    const scene = /\.stage-cue\[data-scene='on'\] \{([^}]*)\}/.exec(CSS)?.[1] ?? ''
+    expect(scene, 'a sentence is body text, never a balanced heading').toContain(
+      'text-wrap: pretty',
+    )
+    // a WIDTH: `left: 50%` with no `right` leaves shrink-to-fit only half the stage
+    expect(scene).toMatch(/width: calc\(100% - 2 \* var\(--mark-inset\)\)/)
+    expect(scene, 'the stamp sits on the sentence’s first line').toContain('align-items: baseline')
+    // and the cap that keeps it off the signpost still composes with that width
+    expect(CSS).toMatch(
+      /@media \(min-width: 700px\) \{ \.stage-cue \{ max-width: min\(calc\(60ch \+ var\(--cue-aside\)\), calc\(100% - 320px\)\)/,
+    )
+  })
+
   it('★ the stamp is the sheet’s own slab, and survives forced colours', () => {
     const CSS = src('./chrome.css').replace(/\s+/g, ' ')
     expect(CSS).toMatch(/\.stage-scene-stamp \{[^}]*box-shadow: var\(--frame\)/)

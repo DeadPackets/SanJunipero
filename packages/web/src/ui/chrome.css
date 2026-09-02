@@ -1201,7 +1201,10 @@ body {
 .stage-cue {
   position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
-  max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
+  /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
+     room that thing takes, so the reading width is the same line to line. */
+  --cue-aside: 0px;
+  max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
@@ -1220,12 +1223,23 @@ body {
 
 /* A scene is not news: it stands for as long as the room is talking, so it is a struck stamp
    and a sentence, never a caption shouted in capitals for a minute at a time. */
+/* A stamp and a sentence, set like a chyron: `balance` shrinks a flex item to equalise its
+   lines, which on a phone left the sentence 112px wide with 100px of slot empty each side.
+   The sentence is body text — `pretty`, ranged left, its first line on the stamp's baseline. */
 .stage-cue[data-scene='on'] {
-  display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+  display: flex; align-items: baseline; justify-content: center; gap: var(--s-4);
   letter-spacing: 0.04em; text-transform: none;
+  text-align: start; text-wrap: pretty;
+  /* A WIDTH, not only a cap: `left: 50%` with no `right` leaves shrink-to-fit half the stage to
+     work in, and on a phone that clamped the sentence to 117px. `max-width` still does the
+     capping — the two rules above compose. */
+  width: calc(100% - 2 * var(--mark-inset));
+  /* The stamp's own room, so the sentence keeps its 60ch: inside it, a 51-character topic
+     wrapped onto two lines while there was a third of the slot standing empty. */
+  --cue-aside: calc(3 * var(--s-8));
 }
 .stage-scene-stamp {
-  position: relative; flex: none; align-self: center;
+  position: relative; flex: none;
   /* the extra 2px at the foot is the stakes rule's own room, so the word never sits on it */
   padding: var(--s-2) var(--s-3) calc(var(--s-2) + var(--s-1));
   font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
@@ -1263,7 +1277,7 @@ body {
 
 /* Once the signpost has a corner, the cue may not reach it. */
 @media (min-width: 700px) {
-  .stage-cue { max-width: min(60ch, calc(100% - 320px)); }
+  .stage-cue { max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 320px)); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
