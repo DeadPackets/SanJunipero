@@ -505,13 +505,13 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const llm = new ScriptedLlm(() => {
       call += 1
       return call === 1
-        ? { kind: 'map', verb: 'recipe:ghost_dance', params: {} }
-        : { kind: 'map', verb: 'walk', params: { x: 1, y: 1 } }
+        ? { kind: 'map', verb: 'recipe:ghost_dance', params: NO_PARAMS }
+        : { kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 1, y: 1 } }
     })
     const { db, arbiter } = await makeArbiterRig({ llm })
 
     const verdict = await arbiter.adjudicate('I wander toward the river', TAMAR_CTX)
-    expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { x: 1, y: 1 } })
+    expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 1, y: 1 } })
     expect(llm.objectCalls).toBe(2)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
     expect((JSON.parse(row.verdict_json) as Verdict).kind).toBe('map')

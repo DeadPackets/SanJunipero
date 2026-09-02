@@ -1,0 +1,201 @@
+{
+  "source": "world two, backups/town-data-20260902T0823.tgz, minds/_arbiter.db table `rulings` (62 rows)",
+  "labelledBy": "hand, 2026-09-02, against ADJUDICATION_INSTRUCTION and the genesis codex",
+  "note": "`recorded` is the verdict world two actually stored. Where it differs from `expect`, world two was wrong: every one of its nine impossibles is the beyond_adjacency correction adjudicate.ts writes over the model's own answer, so the corpus holds no physics-impossible intent. The three impossible slots below are the class world two did produce — a mind's own machinery spilled into the act slot, which the court must refuse rather than invent physics for.",
+  "terms": "groups of words the ruling's world-facing text must keep, one word from each group; [] where the right ruling names nothing of the asker's.",
+  "agent": "reconstructed from the ids and coordinates the intent itself names; world two kept no per-ruling snapshot of the asker.",
+  "prompts": [
+    {
+      "ruling": 20,
+      "tick": 6221,
+      "intent": "eat item_120",
+      "expect": "map",
+      "recorded": "map",
+      "why": "eat (itemId) is on the roster and the bread is in hand.",
+      "terms": [["item_120"]],
+      "agent": {
+        "name": "Yusuf",
+        "skills": { "farming": 2, "fishing": 1, "foraging": 3, "carpentry": 1, "cooking": 2 },
+        "inventory": [{ "kind": "bread", "qty": 1 }],
+        "position": { "x": 39, "y": 39 },
+        "visible": { "structures": [{ "kind": "fire_pit", "x": 39, "y": 39 }], "ground": ["grass", "dirt"] }
+      }
+    },
+    {
+      "ruling": 8,
+      "tick": 3573,
+      "intent": "walk to (12,79), aiming south to find where the land gives out",
+      "expect": "map",
+      "recorded": "map",
+      "why": "walk (x, y) with both coordinates in the sentence.",
+      "terms": [["12"], ["79"]],
+      "agent": {
+        "name": "Salma",
+        "skills": { "farming": 1, "fishing": 2, "foraging": 2, "carpentry": 1, "masonry": 1 },
+        "inventory": [{ "kind": "waterskin", "qty": 1 }],
+        "position": { "x": 20, "y": 60 },
+        "visible": { "structures": [], "ground": ["grass", "forest"] }
+      }
+    },
+    {
+      "ruling": 45,
+      "tick": 13471,
+      "intent": "fill (waterskin) at the river edge, then settle in to watch the bank while Amara fishes.",
+      "expect": "map",
+      "recorded": "map",
+      "why": "fill (itemId) is a routine and the waterskin is in hand; the watching is not an act.",
+      "terms": [["item_140", "waterskin"]],
+      "agent": {
+        "name": "Omar",
+        "skills": { "farming": 2, "fishing": 4, "foraging": 2, "carpentry": 3, "machine_repair": 2 },
+        "inventory": [{ "kind": "waterskin", "qty": 1 }],
+        "position": { "x": 18, "y": 34 },
+        "visible": { "structures": [], "ground": ["water", "sand", "grass"] }
+      }
+    },
+    {
+      "ruling": 16,
+      "tick": 3780,
+      "intent": "plan bring all the planks inside structure_house_39_63",
+      "expect": "map",
+      "recorded": "map",
+      "why": "stow (itemId, structureId) with the house id written out.",
+      "terms": [["structure_house_39_63"], ["item_211", "plank"]],
+      "agent": {
+        "name": "Nadia",
+        "skills": { "farming": 1, "fishing": 1, "foraging": 1, "carpentry": 4, "masonry": 2 },
+        "inventory": [{ "kind": "plank", "qty": 5 }],
+        "position": { "x": 39, "y": 62 },
+        "visible": { "structures": [{ "kind": "house", "x": 39, "y": 63 }], "ground": ["dirt", "grass"] }
+      }
+    },
+    {
+      "ruling": 61,
+      "tick": 22551,
+      "intent": "fish: the water within reach, from where I lie or kneel at (16, 65), x=16, y=65",
+      "expect": "map",
+      "recorded": "map",
+      "why": "fish (x, y), both coordinates given twice over.",
+      "terms": [["16"], ["65"]],
+      "agent": {
+        "name": "Amara",
+        "skills": { "farming": 3, "fishing": 3, "foraging": 2, "carpentry": 1, "cooking": 3 },
+        "inventory": [],
+        "position": { "x": 16, "y": 65 },
+        "visible": { "structures": [], "ground": ["water", "sand"] }
+      }
+    },
+    {
+      "ruling": 46,
+      "tick": 13637,
+      "intent": "walk toward Omar and the fire pit route",
+      "expect": "map",
+      "recorded": "attempt",
+      "why": "walk (x, y) is a routine and the asker's own block carries the fire pit's tile; world two minted a recipe for walking.",
+      "terms": [["39"], ["39"]],
+      "agent": {
+        "name": "Amara",
+        "skills": { "farming": 3, "fishing": 3, "foraging": 2, "carpentry": 1, "cooking": 3 },
+        "inventory": [{ "kind": "wood", "qty": 3 }],
+        "position": { "x": 44, "y": 47 },
+        "visible": { "structures": [{ "kind": "fire_pit", "x": 39, "y": 39 }], "ground": ["grass", "dirt"] }
+      }
+    },
+    {
+      "ruling": 50,
+      "tick": 13977,
+      "intent": "sharpen a length of wood with stone and edge into a hunting spike",
+      "expect": "attempt",
+      "recorded": "attempt",
+      "why": "no routine shapes wood into a point, and the wood and the stone are both at hand.",
+      "terms": [["wood"], ["spike", "point", "sharp", "hunt"]],
+      "agent": {
+        "name": "Amara",
+        "skills": { "farming": 3, "fishing": 3, "foraging": 2, "carpentry": 2, "cooking": 3 },
+        "inventory": [{ "kind": "wood", "qty": 3 }, { "kind": "stone", "qty": 1 }],
+        "position": { "x": 44, "y": 47 },
+        "visible": { "structures": [], "ground": ["grass", "rock"] }
+      }
+    },
+    {
+      "ruling": 11,
+      "tick": 3650,
+      "intent": "Search the riverbank for a stout piece of driftwood or a heavy branch to use as a club",
+      "expect": "attempt",
+      "recorded": "map",
+      "why": "forage asks for a nodeId and the block carries none, so the routine cannot be filled; picking driftwood off a bank needs nothing the town lacks.",
+      "terms": [["driftwood", "branch", "wood"], ["club"]],
+      "agent": {
+        "name": "Salma",
+        "skills": { "farming": 1, "fishing": 2, "foraging": 2, "carpentry": 1, "masonry": 1 },
+        "inventory": [],
+        "position": { "x": 17, "y": 63 },
+        "visible": { "structures": [], "ground": ["water", "sand"] }
+      }
+    },
+    {
+      "ruling": 29,
+      "tick": 7611,
+      "intent": "sit down quietly beside Amara, saying nothing, and let her read",
+      "expect": "attempt",
+      "recorded": "attempt",
+      "why": "the town has no word for companionable silence, and sitting down costs it nothing.",
+      "terms": [["sit"], ["quiet", "silence", "silent", "saying nothing", "still", "beside"]],
+      "agent": {
+        "name": "Omar",
+        "skills": { "farming": 2, "fishing": 4, "foraging": 2, "carpentry": 3, "machine_repair": 2 },
+        "inventory": [],
+        "position": { "x": 44, "y": 20 },
+        "visible": { "structures": [{ "kind": "house", "x": 44, "y": 20 }], "ground": ["dirt"] }
+      }
+    },
+    {
+      "ruling": 4,
+      "tick": 2049,
+      "intent": "{thought: Skin's dry still. Fill it, then the notes., importance: 4, action: {name: fill, input: {itemId: item_structure_house_44_20_waterskin}}}",
+      "expect": "impossible",
+      "recorded": "impossible",
+      "why": "a whole turn's machinery shed into the act slot: there is no sentence here a person could act on.",
+      "terms": [],
+      "agent": {
+        "name": "Nadia",
+        "skills": { "farming": 1, "fishing": 1, "foraging": 1, "carpentry": 4, "masonry": 2 },
+        "inventory": [{ "kind": "waterskin", "qty": 1 }],
+        "position": { "x": 44, "y": 20 },
+        "visible": { "structures": [{ "kind": "house", "x": 44, "y": 20 }], "ground": ["dirt"] }
+      }
+    },
+    {
+      "ruling": 53,
+      "tick": 17989,
+      "intent": "recall The bread puzzle keeps. Day 9, her kitchen, saying the page reads better fed. It's kept long enough. After the fire catches I go north and eat like it's medicine, because it is.",
+      "expect": "impossible",
+      "recorded": "impossible",
+      "why": "a memory the mind meant to look up, not an act begun now; the court has nothing to rule on.",
+      "terms": [],
+      "agent": {
+        "name": "Yusuf",
+        "skills": { "farming": 2, "fishing": 1, "foraging": 3, "carpentry": 1, "cooking": 2 },
+        "inventory": [],
+        "position": { "x": 48, "y": 4 },
+        "visible": { "structures": [], "ground": ["grass"] }
+      }
+    },
+    {
+      "ruling": 59,
+      "tick": 22353,
+      "intent": "Wait, no — the action must be the named act.",
+      "expect": "impossible",
+      "recorded": "map",
+      "why": "the mind talking to itself about the format; world two mapped it to an act anyway.",
+      "terms": [],
+      "agent": {
+        "name": "Amara",
+        "skills": { "farming": 3, "fishing": 3, "foraging": 2, "carpentry": 1, "cooking": 3 },
+        "inventory": [],
+        "position": { "x": 16, "y": 65 },
+        "visible": { "structures": [], "ground": ["water", "sand"] }
+      }
+    }
+  ]
+}
