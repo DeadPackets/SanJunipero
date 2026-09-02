@@ -2459,7 +2459,9 @@ export function chaseStep(
   const act = a?.activity
   if (!a || act?.verb !== 'walk') return null
   const targetId = act.params.targetId
-  if (typeof targetId !== 'string') return null
+  // A body that cannot stand cannot follow anybody: a crawl keeps the one tile and the price in
+  // ticks it always had, and the ordinary step below is what charges it.
+  if (typeof targetId !== 'string' || isCrawl(state, agentId)) return null
   const target = state.agents[targetId]
   const lost: PendingEvent[] = [
     { type: 'action_interrupted', payload: { agentId, reason: WALK_LOST_THEM } },

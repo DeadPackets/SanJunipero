@@ -6,7 +6,7 @@ import { RngStreams } from './rng.js'
 import { composePerception } from './perception.js'
 import { genesisState, type WorldState } from './state.js'
 import { ev, grid } from './testutil/world.js'
-import { VERBS, WALK_LOST_THEM, walkDestination } from './verbs/index.js'
+import { chaseStep, VERBS, WALK_LOST_THEM, walkDestination } from './verbs/index.js'
 import { createWorldTick } from './worldTick.js'
 
 // ★ 63 of 165 coordinate walks in the rehearsal landed on or beside another mind, and not one
@@ -78,7 +78,7 @@ describe('★ a walk that names a person', () => {
     const { state, types } = run(
       start(world({ x: 2, y: 2 }, { x: 8, y: 2 }), { targetId: YOU }),
       40,
-      (s, i) => (i < 4 ? { x: 8, y: Math.min(2 + i + 1, 12) } : null),
+      (_s, i) => (i < 4 ? { x: 8, y: Math.min(2 + i + 1, 12) } : null),
     )
     expect(types).toContain('walk_reaimed')
     expect(gap(state)).toBeLessThanOrEqual(1)
@@ -117,6 +117,22 @@ describe('★ a walk that names a person', () => {
     const felt = composePerception(world({ x: 2, y: 2 }), CFG, ME, [ev(cut.type, cut.payload)])
     expect(felt.feltEvents).toEqual(['you_lost_them'])
     expect(WALK_LOST_THEM).not.toMatch(/blocked|target|path|invalid/i)
+  })
+
+  // A crawl is one tile at eight ticks a tile. Naming a person rather than a tile must not be
+  // the way a body on the ground gets there for nothing.
+  it('is no chase at all for a body that cannot stand', () => {
+    // Two tiles off, so the one tile a crawl is allowed is the whole of the journey.
+    const s0 = world({ x: 2, y: 2 }, { x: 4, y: 2 })
+    const a = s0.agents[ME]!
+    const down: WorldState = {
+      ...s0,
+      agents: { ...s0.agents, [ME]: { ...a, collapsedSinceTick: 1 } },
+    }
+    const begun = start(down, { targetId: YOU })
+    expect(begun.agents[ME]!.activity!.ticksRemaining).toBe(CFG.movement.crawlTickMultiplier)
+    // Asked of the step itself: the collapse system stands a well-fed body back up on the tick.
+    expect(chaseStep(begun, CFG, ME)).toBe(null)
   })
 
   it('refuses a person this body cannot see, and itself', () => {
