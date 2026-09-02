@@ -36,6 +36,29 @@ function holding(s: WorldState, id: string, kind: string, charges?: number): Wor
   )
 }
 
+function onGround(s: WorldState, id: string, kind: string, x: number, y: number): WorldState {
+  return fold(s, ev('item_spawned', { id, kind, qty: 1, loc: { t: 'tile', x, y } }))
+}
+
+// A finished fire pit on one tile: stokeable, and warm on whichever side you stand.
+function withFire(s: WorldState, id: string, x: number, y: number): WorldState {
+  const planned = fold(
+    s,
+    ev('structure_planned', {
+      id,
+      kind: 'fire_pit',
+      x,
+      y,
+      w: 1,
+      h: 1,
+      maxHp: 50,
+      flammable: true,
+      builderId: 'a1',
+    }),
+  )
+  return fold(planned, ev('structure_completed', { id }))
+}
+
 // A complete 2x2 house whose door lands one row south of its footprint.
 function withHouse(s: WorldState, id: string, x: number): WorldState {
   const planned = fold(
@@ -82,6 +105,65 @@ describe('loneCandidateFor', () => {
     expect(fill(one, 'enter')).toEqual({ structureId: 'structure_1' })
     const two = withHouse(withHouse(withAgent(world(), 3, 3), 'structure_1', 2), 'structure_2', 4)
     expect(fill(two, 'enter')).toBeNull()
+  })
+
+  it('fills take from the one thing in reach, and not from a second on the ground', () => {
+    const one = onGround(withAgent(world(), 2, 2), 'item_wood_1', 'wood', 2, 3)
+    expect(fill(one, 'take')).toEqual({ itemId: 'item_wood_1' })
+    expect(fill(onGround(one, 'item_stone_2', 'stone', 1, 2), 'take')).toBeNull()
+    // Seen across the meadow is not close enough to close a hand around.
+    expect(fill(onGround(withAgent(world(), 2, 2), 'item_wood_1', 'wood', 6, 5), 'take')).toBeNull()
+  })
+
+  it('fills drop and read from the one thing held that each of them takes', () => {
+    const wood = holding(withAgent(world(), 1, 1), 'item_wood_1', 'wood')
+    expect(fill(wood, 'drop')).toEqual({ itemId: 'item_wood_1' })
+    expect(fill(holding(wood, 'item_axe_2', 'axe'), 'drop')).toBeNull()
+    // A note is the only thing there is to read, however full the hands are otherwise.
+    const note = fold(
+      wood,
+      ev('item_spawned', {
+        id: 'item_note_1',
+        kind: 'note',
+        qty: 1,
+        text: 'the well is dry',
+        loc: { t: 'agent', id: 'a1' },
+      }),
+    )
+    expect(fill(note, 'read')).toEqual({ itemId: 'item_note_1' })
+    expect(fill(wood, 'read')).toBeNull()
+  })
+
+  it('fills fill from the one vessel held while there is water to kneel at', () => {
+    const wet = ['..~.....', '........', '........', '........', '........', '........']
+    const one = holding(withAgent(world(wet), 2, 1), 'item_skin_1', 'waterskin')
+    expect(fill(one, 'fill')).toEqual({ itemId: 'item_skin_1' })
+    expect(fill(holding(one, 'item_bucket_2', 'bucket'), 'fill')).toBeNull()
+    expect(fill(holding(withAgent(world(wet), 2, 1), 'item_wood_1', 'wood'), 'fill')).toBeNull()
+  })
+
+  // 98 of the phase 1 gate's 402 refusals were `stoke` with its fire left null — the largest
+  // bucket, and the one reading the table did not have.
+  it('fills stoke from the one fire beside the body, lit or cold', () => {
+    const cold = withFire(withAgent(world(), 2, 2), 'structure_fire_1', 2, 3)
+    expect(fill(cold, 'stoke')).toBeNull() // nothing to feed it with
+    const fuelled = holding(cold, 'item_wood_1', 'wood')
+    expect(fill(fuelled, 'stoke')).toEqual({ structureId: 'structure_fire_1' })
+    // Two fires equally in reach: the mind must say which, and the refusal is right.
+    expect(fill(withFire(fuelled, 'structure_fire_2', 1, 2), 'stoke')).toBeNull()
+    // One four paces off is no reading at all — `stoke.validate` asks arm's reach itself.
+    const far = holding(withFire(withAgent(world(), 2, 2), 'structure_fire_1', 6, 5), 'i_w', 'wood')
+    expect(fill(far, 'stoke')).toBeNull()
+  })
+
+  // Guessing which person someone meant reads as a bug in the story, and inventing words for a
+  // mind is worse. Neither is in the table, and a row here says so out loud.
+  it('never reads in a person or a word: give, teach and speak stay refused', () => {
+    let s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 1, ageDays: ADULT_AGE_DAYS }))
+    for (const verb of ['give', 'teach', 'speak']) {
+      expect([verb, fill(s, verb)]).toEqual([verb, null])
+    }
   })
 })
 

@@ -1130,9 +1130,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(stateHash(replayed)).toBe(liveHash)
   })
 
-  // 98 of the gate's 402 refusals were this act, named with its fire left null. The world has
-  // no reading of its own for `stoke`, so a started act is proof the seam filled the mark.
-  it('fills the fire an act left null before the world is asked', async () => {
+  // 98 of the gate's 402 refusals were this act, named with its fire left null — the largest
+  // bucket. The world reads it in; these three rows are that reading seen from the mind's side.
+  it('starts the act on the fire the mind left null, because only one was in reach', async () => {
     const { world, loop } = await setup({
       model: turnModel([
         {
@@ -1168,14 +1168,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       hearths: 2,
     })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
-    // The one candidate is what buys the mind out of the retry; two do not, and no fire is
-    // guessed at either — the act simply never reaches the world.
+    // `actHasOneReading` is what buys a mind out of the retry, and two readings do not buy it.
+    // No fire is guessed at either: the act never reaches the world.
     expect(prompts.length).toBe(2)
     expect(alertKinds(agentDb)).toContain('empty_act_detail')
     expect(startedVerbs(world.engineDb)).not.toContain('stoke')
   })
 
-  it('spends no second call on the one fire it could only have meant', async () => {
+  // The gate's escape hatch reads the same table the world binds from, so closing the bucket
+  // and closing the repair call it bought are one change.
+  it('★ spends no second call on the one fire it could only have meant', async () => {
     const blank = {
       thought: 'The fire wants feeding.',
       action: { verb: 'stoke', params: { structureId: null } },
