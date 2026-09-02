@@ -1,4 +1,4 @@
-// LIVE — the fifty-item library, COMMITTED. Cap $LIB_CAP.
+// LIVE — the fifty-four-item library, COMMITTED. Cap $LIB_CAP.
 // The icon is a WHOLE-number downscale of the paid generation (1024/128, 1024/64); a
 // fractional divide is what made the round-3 items mush.
 // Controls: BATCH (required, or `all`), ITEMS=<comma list> for reruns, LIB_DRY=1,

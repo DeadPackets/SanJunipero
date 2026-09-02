@@ -1,7 +1,7 @@
 // The coverage law, extended from structures to items and to the cast. It reads the CODEX, not
 // the renderer: `makePlaceholder` answers every class, so "did something draw?" passes forever.
-import { FOUNDER_IDS } from '@sj/shared'
-import { LIBRARY } from './library/catalog.js'
+import { FOOD_KINDS, FOUNDER_IDS, expandItemKinds, type SimConfig } from '@sj/shared'
+import { LIBRARY, libraryEntry } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
 import { characterKind } from './castArt.js'
 
@@ -25,10 +25,36 @@ function compare(required: readonly string[], registered: readonly string[]): Co
 
 // ── items ───────────────────────────────────────────────────────────────────────────────────
 
-/** Every codex kind the fifty-item library must answer to; an item is TWO records, the world
+/** Every codex kind the fifty-four-item library must answer to; an item is TWO records, the world
  *  sprite and the inventory icon, and they go missing separately. */
 export function requiredItemKinds(): string[] {
   return LIBRARY.flatMap((e) => [e.kind, `${e.kind}${ICON_SUFFIX}`]).sort()
+}
+
+/** Every item kind a config can put in a hand: both sides of every craft, what a build consumes,
+ *  what spoils, what a field grows, what a body wears. What the sim seeds on top of it — the
+ *  founder kit, the storehouse, the ground's and the animals' yield — is `extra`, because the
+ *  forge may not read a consumer lane. */
+export function configItemKinds(config: SimConfig, extra: readonly string[] = []): string[] {
+  const kinds = [...extra, ...FOOD_KINDS]
+  for (const r of Object.values(config.crafting.recipes))
+    kinds.push(...Object.keys(r.inputs), r.output.kind)
+  for (const s of Object.values(config.structures.recipes)) kinds.push(...Object.keys(s.inputs))
+  for (const table of [
+    config.construction.houseMaterials,
+    config.spoilage.days,
+    config.crops,
+    config.warmth.insulation,
+  ])
+    kinds.push(...Object.keys(table))
+  return expandItemKinds(kinds)
+}
+
+/** The kinds the world can put in a hand that the catalog does not carry. The catalog is
+ *  hand-listed, so this is the one gate that reads what the world can actually hold: every kind
+ *  it names draws the placeholder wherever it is held. */
+export function catalogGap(worldKinds: readonly string[]): string[] {
+  return worldKinds.filter((k) => libraryEntry(k) === null)
 }
 
 /** `registered` is the codex `kind` column of every ready class-`item` record. */

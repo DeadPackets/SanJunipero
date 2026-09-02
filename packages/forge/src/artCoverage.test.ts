@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CITY_HEARTH_KIND,
+  DEFAULT_CONFIG,
   FOUNDER_IDS,
   cityStructures,
   parseCharacterAtlasManifest,
@@ -40,6 +41,8 @@ import {
 } from './castArt.js'
 import {
   castArtCoverage,
+  catalogGap,
+  configItemKinds,
   coverageFailure,
   itemArtCoverage,
   requiredCastKinds,
@@ -84,9 +87,29 @@ describe('every item the catalog specifies has committed art, sprite and icon', 
         LIBRARY.filter((e) => e.category === category),
         category,
       ).toHaveLength(n)
-    // 50 items is 100 codex records: the world sprite and the inventory icon are separate
+    // 54 items is 108 codex records: the world sprite and the inventory icon are separate
     // rows and go missing separately.
     expect(requiredItemKinds()).toHaveLength(LIBRARY.length * 2)
+  })
+
+  // ★ Every gate below reads the hand-listed LIBRARY, so a kind only the CONFIG names slipped
+  // past all of them: `plank` and `garment` drew the checkerboard in the live town.
+  it('★ MISSING: no kind the config can put in a hand is absent from the catalog', () => {
+    const world = configItemKinds(DEFAULT_CONFIG)
+    // anti-vacuity: `plank` is named by a recipe and by nothing else the forge can see
+    expect(world, 'the config walk found nothing — the gate would be vacuous').toContain('plank')
+    const absent = catalogGap(world)
+    expect(
+      absent,
+      `${absent.length} kind${absent.length === 1 ? '' : 's'} the config can put in a hand with no ` +
+        `catalog entry — each one draws the placeholder —\n    ${absent.join('\n    ')}`,
+    ).toEqual([])
+  })
+
+  it('and the class sentinels are expanded, never asked for as art', () => {
+    const world = configItemKinds(DEFAULT_CONFIG, ['any_meat'])
+    expect(world).not.toContain('any_meat')
+    for (const k of ['fish', 'rabbit_meat', 'venison']) expect(world).toContain(k)
   })
 
   it('MISSING: no library kind is left to the placeholder', () => {
@@ -162,12 +185,12 @@ describe('every founder the town spawns has a committed sheet', () => {
 
 // Shipping the content ends the live failure, so the shape of the defect is kept as a fixture.
 describe('the pre-recovery tree, as a fixture', () => {
-  it('an empty codex reports all fifty items and all five founders', () => {
+  it('an empty codex reports all fifty-four items and all five founders', () => {
     const items = itemArtCoverage([])
     const cast = castArtCoverage([])
-    expect(items.missing).toHaveLength(100)
+    expect(items.missing).toHaveLength(108)
     expect(cast.missing).toHaveLength(5)
-    expect(coverageFailure('items', items)[0]).toMatch(/100 kinds the world asks for/)
+    expect(coverageFailure('items', items)[0]).toMatch(/108 kinds the world asks for/)
     expect(coverageFailure('cast', cast)[0]).toMatch(/5 kinds the world asks for/)
   })
 

@@ -35,3 +35,15 @@ export function classMembers(kind: string): readonly string[] | undefined {
 export function inputName(kind: string): string {
   return CLASS_PROSE[kind] ?? kind
 }
+
+/** A kind list with every class sentinel replaced by the kinds it stands for, sorted and deduped.
+ *  The art gates count kinds, and `any_meat` is not a thing anybody can hold. */
+export function expandItemKinds(kinds: Iterable<string>): string[] {
+  const out = new Set<string>()
+  for (const k of kinds) {
+    const members = classMembers(k)
+    if (members === undefined) out.add(k)
+    else for (const m of members) out.add(m)
+  }
+  return [...out].sort()
+}

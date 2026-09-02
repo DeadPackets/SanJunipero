@@ -13,13 +13,13 @@ import { GEN_SIZE } from '../imageClient.js'
 const byCategory = (c: LibraryCategory) => LIBRARY.filter((e) => e.category === c)
 
 describe('the library catalog', () => {
-  it('is exactly 50 entries with unique kinds', () => {
-    expect(LIBRARY).toHaveLength(50)
-    expect(new Set(LIBRARY.map((e) => e.kind)).size).toBe(50)
+  it('is exactly 54 entries with unique kinds', () => {
+    expect(LIBRARY).toHaveLength(54)
+    expect(new Set(LIBRARY.map((e) => e.kind)).size).toBe(54)
   })
 
-  it('splits 10 / 10 / 9 / 6 / 15 across the five categories', () => {
-    expect(LIBRARY_COUNTS).toEqual({ tool: 10, food: 10, material: 9, ritual: 6, furniture: 15 })
+  it('splits 12 / 10 / 11 / 6 / 15 across the five categories', () => {
+    expect(LIBRARY_COUNTS).toEqual({ tool: 12, food: 10, material: 11, ritual: 6, furniture: 15 })
     for (const [c, n] of Object.entries(LIBRARY_COUNTS))
       expect(byCategory(c as LibraryCategory), c).toHaveLength(n)
   })
