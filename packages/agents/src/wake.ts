@@ -102,9 +102,7 @@ export function decideWake(
 
   // Fire and a blow reach a sleeper, so they reach a listener too: talk is a shallower state
   // than sleep, and it must not hold a mind still through the one thing sleep does not.
-  const rousing = packet.feltEvents.some(
-    (e) => e === 'you_were_attacked' || e.startsWith('fire'),
-  )
+  const rousing = packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))
 
   // A listener takes no turn at all — that is what makes hearing free.
   if (floor.inScene && !packet.self.asleep && !rousing) {

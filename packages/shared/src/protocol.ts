@@ -65,7 +65,14 @@ export const ServerAssets = z
 // The one frame the world sends while its clock is stopped, so a viewer is never told a time
 // the town is not keeping.
 export const ServerPaused = z.object({ t: z.literal('paused'), paused: z.boolean() }).strict()
-export const SceneKind = z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation'])
+export const SceneKind = z.enum([
+  'talk',
+  'quarrel',
+  'council',
+  'gathering',
+  'telling',
+  'invitation',
+])
 export type SceneKind = z.infer<typeof SceneKind>
 // Scene STATE, not its lines: the lines already reach a viewer as speech. `summary` arrives on
 // the closing frame only.
