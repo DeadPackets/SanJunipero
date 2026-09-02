@@ -25,8 +25,12 @@ import {
   mealRestore,
   nutritionOf,
   workPenalty,
+  VERBS,
   type PendingEvent,
 } from './verbs/index.js'
+
+/** What the dark charges for is the verb's own business now, so a test reads it off the verb. */
+const lit = (verb: string): boolean => VERBS[verb]?.needsLight === true
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 
@@ -527,13 +531,13 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     expect(carried.refusal).toBeNull()
     expect(blind.duration).toBe(Math.ceil(CFG.roads.paveDurationTicks * CFG.light.nightWorkPenalty))
     expect(carried.duration).toBe(CFG.roads.paveDurationTicks)
-    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(
+    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', lit('pave'))).toBe(
       CFG.light.nightWorkPenalty,
     )
-    expect(workPenalty({ ...nightWork(true), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(1)
+    expect(workPenalty({ ...nightWork(true), tick: NIGHT }, CFG, 'wright', lit('pave'))).toBe(1)
     // Speech and walking cost the same at midnight as at noon: the night is a price change,
     // not a curfew.
-    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'speak')).toBe(1)
+    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', lit('speak'))).toBe(1)
   })
 
   it('a torch burns for exactly its fuel and then it is ash', () => {

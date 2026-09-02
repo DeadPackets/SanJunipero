@@ -31,7 +31,11 @@ import {
   isPlottedKind,
   stepBuild,
   workPenalty,
+  VERBS,
 } from './verbs/index.js'
+
+/** What the dark charges for is the verb's own business now, so a test reads it off the verb. */
+const lit = (verb: string): boolean => VERBS[verb]?.needsLight === true
 import {
   claimInWorld,
   layBlock,
@@ -799,7 +803,7 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     it('a house raised blind still takes half again as long', () => {
       const { s, ids } = crewOf(1, NIGHT)
       expect(dayPhaseFromTick(NIGHT)).toBe('night')
-      expect(workPenalty(s, FAST, 'h0', 'build')).toBe(FAST.light.nightWorkPenalty)
+      expect(workPenalty(s, FAST, 'h0', lit('build'))).toBe(FAST.light.nightWorkPenalty)
       expect(raise(s, ids).ticks).toBe(Math.ceil(HOUSE_TICKS * FAST.light.nightWorkPenalty))
     })
 

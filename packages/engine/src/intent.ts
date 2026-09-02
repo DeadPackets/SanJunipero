@@ -119,7 +119,7 @@ export function submitIntent(
   }
   // The one place a duration is settled, so the dark can charge for work without every verb
   // having to remember that it is night.
-  const penalty = workPenalty(state, config, agentId, verb)
+  const penalty = workPenalty(state, config, agentId, def.needsLight === true)
   const base = def.duration(state, config, agentId, p)
   const duration = penalty === 1 ? base : Math.ceil(base * penalty)
   events.push({ type: 'action_started', payload: { agentId, verb, params: p, duration } })

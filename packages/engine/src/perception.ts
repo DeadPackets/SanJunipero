@@ -34,6 +34,7 @@ import {
   isAdjacentToRect,
   itemWithinReach,
   isMapRim,
+  VERBS,
   WALK_LOST_THEM,
   walkIsCapped,
   workPenalty,
@@ -840,7 +841,8 @@ export function composePerception(
 
   const ground = groundUnderfoot(state, config, self.x, self.y)
   const fumbling =
-    self.activity !== null && workPenalty(state, config, agentId, self.activity.verb) !== 1
+    self.activity !== null &&
+    workPenalty(state, config, agentId, VERBS[self.activity.verb]?.needsLight === true) !== 1
 
   const roof = indoors === null ? undefined : state.structures[indoors]
   const walkTo = self.activity?.verb === 'walk' ? self.activity.params : undefined

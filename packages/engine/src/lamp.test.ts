@@ -24,9 +24,15 @@ import {
   isKindleable,
   isPlottedKind,
   isStokeable,
+  registerVerb,
+  unregisterVerb,
   workPenalty,
+  VERBS,
   type PendingEvent,
 } from './verbs/index.js'
+
+/** What the dark charges for is the verb's own business now, so a test reads it off the verb. */
+const lit = (verb: string): boolean => VERBS[verb]?.needsLight === true
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 
@@ -226,11 +232,29 @@ describe('★ the lamp answers the dark, and the dark it answers is the one that
     const id = (
       raised.events.find((e) => e.type === 'structure_planned')!.payload as { id: string }
     ).id
-    expect(workPenalty(raised.state, CFG, 'wright', 'pave')).toBe(CFG.light.nightWorkPenalty)
+    expect(workPenalty(raised.state, CFG, 'wright', lit('pave'))).toBe(CFG.light.nightWorkPenalty)
     const fed = doVerb(raised.state, raised.state.tick, 'wright', 'stoke', { structureId: id })
-    expect(workPenalty(fed.state, CFG, 'wright', 'pave')).toBe(1)
+    expect(workPenalty(fed.state, CFG, 'wright', lit('pave'))).toBe(1)
     // And a mind standing in it is told so, in the words that were already there.
     expect(lightBandAt(fed.state, 4, 4, fed.state.tick, CFG)).toBe('bright')
+  })
+
+  it('★ charges the dark by what a verb says it needs, not by a list of names', () => {
+    const dark = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 }).state
+    // The same answers the set of five gave, now read off the verbs themselves.
+    for (const v of ['build', 'craft', 'till', 'pave', 'dig_channel'])
+      expect([v, lit(v)]).toEqual([v, true])
+    for (const v of ['speak', 'walk', 'sleep', 'eat', 'take'])
+      expect([v, lit(v)]).toEqual([v, false])
+    // ★ And the part the set could not do: a word the engine has never heard of pays the price
+    // for saying it needs light, with nothing edited anywhere else. Every minted craft was free.
+    registerVerb({ ...VERBS.pave!, kind: 'thatch', needsLight: true })
+    try {
+      expect(workPenalty(dark, CFG, 'wright', lit('thatch'))).toBe(CFG.light.nightWorkPenalty)
+    } finally {
+      unregisterVerb('thatch')
+    }
+    expect(lit('thatch')).toBe(false)
   })
 
   it('burns till dawn, goes out when its fuel does, and takes another armful', () => {

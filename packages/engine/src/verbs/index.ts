@@ -169,6 +169,10 @@ export type VerbDef = {
     params: Record<string, unknown>,
   ): Record<string, unknown>
   skill?: { track: string; xp: number }
+  /** Work done with the eyes on a thing outside the body, so an unlit night lengthens its clock.
+   *  Every other property of an act lives on the act; this one used to live in a set of five
+   *  names, which no verb the town invented could ever join. */
+  needsLight?: boolean
   /** The closed keys a minted verb's charter reads, carried so registration can bind its object
    *  the way the built-in rows do. Built-ins leave it absent: their rows are hand-tuned. */
   reads?: readonly ClosedKey[]
@@ -1221,6 +1225,7 @@ export function skillLevel(
 
 const till: VerbDef = makeVerb({
   kind: 'till',
+  needsLight: true,
   takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
@@ -1257,6 +1262,7 @@ const till: VerbDef = makeVerb({
 // or from what has already been cut, which is why irrigation is a project and not a wish.
 const digChannel: VerbDef = makeVerb({
   kind: 'dig_channel',
+  needsLight: true,
   // Slower than scratching a furrow: a spade's worth of effort against the till beside it.
   takes: 'hour',
   validate(state, _config, agentId, params) {
@@ -1637,6 +1643,7 @@ export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
 const build: VerbDef = makeVerb({
   kind: 'build',
+  needsLight: true,
   validate(state, config, agentId, params) {
     const kind = (params as { kind?: unknown }).kind
     if (typeof kind !== 'string') return BUILD_NEEDS_A_THING_AND_A_PLACE
@@ -1796,6 +1803,7 @@ function chosenRoute(
 
 const craft: VerbDef = makeVerb({
   kind: 'craft',
+  needsLight: true,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
@@ -1865,6 +1873,7 @@ export const STONE_KIND = 'stone'
 // A road is not something the map has; it is something somebody carried stone for.
 const pave: VerbDef = makeVerb({
   kind: 'pave',
+  needsLight: true,
   duration: (_state, config) => config.roads.paveDurationTicks,
   validate(state, config, agentId, params) {
     if (!config.roads.enabled) return 'your hands find no way to lay a road here'
