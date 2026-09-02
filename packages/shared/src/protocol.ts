@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 4 // 4: needs_changed batches every need — a v3 reducer throws on it
+export const PROTOCOL_VERSION = 5 // 5: the scene frame — a v4 reducer's union throws on it
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -65,6 +65,27 @@ export const ServerAssets = z
 // The one frame the world sends while its clock is stopped, so a viewer is never told a time
 // the town is not keeping.
 export const ServerPaused = z.object({ t: z.literal('paused'), paused: z.boolean() }).strict()
+export const SceneKind = z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation'])
+export type SceneKind = z.infer<typeof SceneKind>
+// Scene STATE, not its lines: the lines already reach a viewer as speech. `summary` arrives on
+// the closing frame only.
+export const ServerScene = z
+  .object({
+    t: z.literal('scene'),
+    scene: z
+      .object({
+        id: z.string().min(1),
+        kind: SceneKind,
+        participants: z.array(z.string().min(1)),
+        topic: z.string().nullable(),
+        stakes: z.number().int().min(0).max(10),
+        open: z.boolean(),
+        summary: z.string().optional(),
+      })
+      .strict(),
+  })
+  .strict()
+export type ServerScene = z.infer<typeof ServerScene>
 export const ServerMsg = z.discriminatedUnion('t', [
   ServerSnapshot,
   ServerPaused,
@@ -72,6 +93,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerScrubbed,
   ServerThought,
   ServerAssets,
+  ServerScene,
 ])
 export type ServerMsg = z.infer<typeof ServerMsg>
 

@@ -42,8 +42,26 @@ describe('protocol', () => {
     ).toThrow()
     expect(() => ServerMsg.parse({ t: 'mutate_world' })).toThrow()
   })
-  it('is at version 4: needs_changed batches every need, so a v3 reducer cannot fold a tick', () => {
-    expect(PROTOCOL_VERSION).toBe(4)
+  it('carries a scene as state, and closes one with a summary', () => {
+    const open = {
+      t: 'scene',
+      scene: {
+        id: 's1',
+        kind: 'quarrel',
+        participants: ['kamal', 'leyla'],
+        topic: 'the fire pit',
+        stakes: 7,
+        open: true,
+      },
+    }
+    expect(ServerMsg.parse(open)).toEqual(open)
+    const closed = { ...open, scene: { ...open.scene, open: false, summary: 'They settled it.' } }
+    expect(ServerMsg.parse(closed)).toEqual(closed)
+    expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, kind: 'gossip' } })).toThrow()
+    expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, stakes: 11 } })).toThrow()
+  })
+  it('is at version 5: a v4 union has no scene frame, so it throws on one', () => {
+    expect(PROTOCOL_VERSION).toBe(5)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })
