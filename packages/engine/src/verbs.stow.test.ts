@@ -3,8 +3,9 @@ import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { RngStream } from './rng.js'
+import { RngStream, RngStreams } from './rng.js'
 import { VERBS } from './verbs/index.js'
+import { createWorldTick } from './worldTick.js'
 
 // `stow` is the inverse of `take`: it closes the "no way yet to shelve what you hold" gap.
 
@@ -15,7 +16,11 @@ const ev = (type: string, payload: unknown): SimEvent => ({ seq: seq++, tick: 0,
 const OPEN = ['........', '........', '........', '........', '........', '........']
 
 // A 2x2 storehouse at (2,1); its door is the tile south of centre, (2,3).
-function world(stage: 'construction' | 'complete' = 'complete', kind = 'storehouse'): WorldState {
+function world(
+  stage: 'construction' | 'complete' = 'complete',
+  kind = 'storehouse',
+  owner?: string,
+): WorldState {
   let s = genesisState(
     DEFAULT_CONFIG,
     OPEN.map((row) => Array.from(row).map((): TileId => 0)),
@@ -32,6 +37,7 @@ function world(stage: 'construction' | 'complete' = 'complete', kind = 'storehou
       maxHp: 20,
       flammable: true,
       builderId: 'a1',
+      ...(owner === undefined ? {} : { owner }),
     }),
   )
   if (stage === 'complete') s = fold(s, ev('structure_completed', { id: 'structure_1' }))
@@ -192,5 +198,37 @@ describe('verb: stow', () => {
 
   it('is a registered Tier-1 verb', () => {
     expect(VERBS.stow).toBeDefined()
+  })
+})
+
+// A shelf across the square is a walk away, not a refusal — the settle policy `fill` and `fish`
+// already ride. The store a mind names is the store its legs are sent to.
+describe('verb: stow, from across the square', () => {
+  const worldTickFor = (seed: string) => createWorldTick(DEFAULT_CONFIG, new RngStreams(seed))
+
+  function walkAndStow(s: WorldState, structureId = 'structure_1'): WorldState {
+    const params = { itemId: 'item_1', structureId }
+    const go = submitIntent(s, DEFAULT_CONFIG, 'a1', 'stow', params)
+    expect(go.ok).toBe(true)
+    if (!go.ok) return s
+    expect(go.events[0]!.payload).toMatchObject({ verb: 'walk', then: { verb: 'stow', params } })
+    let state = go.events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), DEFAULT_CONFIG), s)
+    const tick = worldTickFor('stow-walk')
+    for (let i = 0; i < 60 && state.items.item_1!.loc.t === 'agent'; i++) {
+      state = tick({ ...state, tick: state.tick + 1 }).state
+    }
+    return state
+  }
+
+  it('walks to a store it has been shown and shelves the thing there', () => {
+    let s = withHolder(world(), 6, 5)
+    s = fold(s, ev('places_seen', { agentId: 'a1', structureIds: ['structure_1'] }))
+    expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
+  })
+
+  it('walks to its own roof named by id, shown to it or not', () => {
+    const s = withHolder(world('complete', 'house', 'a1'), 6, 5)
+    expect(s.agents.a1!.knownPlaces ?? []).toEqual([])
+    expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
   })
 })

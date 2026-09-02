@@ -329,8 +329,9 @@ export function walkDestination(
   const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)
   if (natural !== null) return featureDestination(state, config, a, natural.at, natural.feature)
   const s = state.structures[named.data.structureId]
-  // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
-  if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
+  // Known, not merely standing: a mark a mind was never shown is a place it cannot name — save
+  // for a roof of its own, which nobody has to be shown the way to.
+  if (s === undefined || !((a.knownPlaces ?? []).includes(s.id) || s.owner === agentId))
     return { refusal: 'you know no such place' }
   // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
   // measures against are picked off the same tiles in the same order.
