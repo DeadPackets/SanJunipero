@@ -10,7 +10,14 @@ import type { DepthEntry } from './layers.js'
 import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
-import { TextureBook, buildingArt, fadeArtIn, textureUrlFor, type BuildingArt } from './textures.js'
+import {
+  TextureBook,
+  artOptional,
+  buildingArt,
+  fadeArtIn,
+  textureUrlFor,
+  type BuildingArt,
+} from './textures.js'
 import { contactShadow } from './interiors.js'
 
 export { BUILDING_PX_PER_TILE } from './textures.js'
@@ -128,7 +135,7 @@ function setTexture(book: TextureBook, entry: Entry, url: string): void {
     entry.sprite.texture = t
     // A shadow is what marks the entries drawn to a common longest side: the dropped things.
     if (entry.shadow !== null) fitItem(entry, t)
-  })
+  }, artOptional)
 }
 
 // v4 hi-res buildings anchor at the manifest feet point and downscale smoothly to the
@@ -175,7 +182,7 @@ function applyBuildingArt(
     else entry.sprite.anchor.set(0.5, 1.0)
     writeScale(entry, art.scale ?? 1)
     cutHitPrism(entry) // the prism is scaled with the sprite, so a new scale re-cuts it
-  })
+  }, artOptional)
 }
 
 /** Items are drawn to a common LONGEST side, so a plank stays a plank: a forced 32x32 made
@@ -487,7 +494,7 @@ export function syncEntities(
           if (entry.url !== url || entry.sprite.destroyed) return
           entry.sprite.texture = t
           if (entry.shadow !== null) fitItem(entry, t)
-        })
+        }, artOptional)
       }
     }
   }

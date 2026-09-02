@@ -289,6 +289,6 @@ describe('★ the tab is one vertical sheet, and the town graph is legible', () 
 
   // The legend opening itself the first time is already the law; the stack must not lose it.
   it('keeps the key open on a first visit', () => {
-    expect(src).toContain('useState(() => keyOpensBy(sessionStorage))')
+    expect(src).toContain('useState(() => keyOpensBy(sessionStore()))')
   })
 })

@@ -6,14 +6,17 @@ import type { AssetRecord } from '@sj/shared'
 
 // The book calls into Pixi's loader; nothing else in this file does. A tiny stand-in keeps the
 // pure resolvers under test exactly as they were and lets `peek` be asserted at all.
-const loads = new Map<string, { resolve: (t: unknown) => void; texture: unknown }>()
+const loads = new Map<
+  string,
+  { resolve: (t: unknown) => void; reject: (e: unknown) => void; texture: unknown }
+>()
 vi.mock('pixi.js', () => ({
   Assets: {
     add: vi.fn(),
     load: vi.fn(
       (url: string) =>
-        new Promise((resolve) => {
-          loads.set(url, { resolve, texture: { url, source: { unload: vi.fn() } } })
+        new Promise((resolve, reject) => {
+          loads.set(url, { resolve, reject, texture: { url, source: { unload: vi.fn() } } })
         }),
     ),
     unload: vi.fn(async () => {}),
@@ -30,6 +33,7 @@ const land = async (url: string): Promise<void> => {
 import { Assets } from 'pixi.js'
 import {
   TextureBook,
+  artOptional,
   buildingArt,
   characterArt,
   facingCellKind,
@@ -267,6 +271,21 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
       /\bAssets\.unload\(/.test(readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')),
     )
     expect(offenders).toEqual([])
+  })
+
+  // ★ A gateway restarting under a live socket fails whatever was asked for in the gap. The
+  // rejected promise stayed in the cache, so those sprites were artless until a reload.
+  it('★ forgets a load that failed, so the next ask fetches again', async () => {
+    const book = new TextureBook()
+    const url = '/assets/gap.png'
+    void book.get(url).catch(artOptional)
+    loads.get(url)!.reject(new Error('gateway restarting'))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    void book.get(url).catch(artOptional)
+    await land(url)
+    expect(book.peek(url)).not.toBeNull()
   })
 
   it('★ and the room reads it — the furniture path peeks BEFORE it awaits', () => {

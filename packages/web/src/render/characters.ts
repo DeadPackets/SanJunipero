@@ -15,7 +15,7 @@ import {
   lyingHitPolygon,
 } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
-import { characterArt, type TextureBook } from './textures.js'
+import { artOptional, characterArt, type TextureBook } from './textures.js'
 import {
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
@@ -222,7 +222,7 @@ export function createCharacterLayer(
     emoteAtlas = t
     // The sheets land after the first frames, so every slot already showing a row re-cuts.
     for (const e of entries.values()) e.glyphKind = null
-  })
+  }, artOptional)
 
   const loadSheet = (agentId: string, swapFrom: string | null): void => {
     const art = characterArt(store.assetRecords(), agentId)
@@ -233,7 +233,7 @@ export function createCharacterLayer(
     void p.then((t) => {
       if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
       sheet.texture = t
-    })
+    }, artOptional)
   }
 
   // Publish where every body is standing. The frame's one owner sorts these against the

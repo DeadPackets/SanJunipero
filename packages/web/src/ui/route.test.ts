@@ -114,6 +114,12 @@ describe('route', () => {
       expect(parseRoute(pathname, search), full).toEqual(r)
     }
   })
+
+  // A truncated share link reaches the app shell, and the first render parses it.
+  it('★ reads a mangled escape as no address rather than blanking the app', () => {
+    expect(parseRoute('/agent/%E0', '').agentId).toBeNull()
+    expect(parseRoute('/moment/4/%E0', '').moment).toBeNull()
+  })
 })
 
 describe('the tab’s own name for where the viewer is', () => {

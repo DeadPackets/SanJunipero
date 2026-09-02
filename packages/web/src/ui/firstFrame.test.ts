@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { FIRST_FRAME_COPY } from './firstFrame.js'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  FIRST_FRAME_COPY,
+  detachFirstFrame,
+  firstFrameNote,
+  firstFrameStuck,
+} from './firstFrame.js'
 import { MOTION } from './motion.js'
 
 // The card is static HTML so it can paint on the first byte, which puts three of its facts
@@ -31,5 +36,21 @@ describe('the first frame', () => {
     for (const face of ['Fraunces', 'Manrope', 'Silkscreen', 'Press Start'])
       expect(card, face).not.toContain(face)
     expect(card).toContain('Georgia')
+  })
+
+  // ★ The scene chain had no catch, so a browser that cannot draw sat on "Looking for the
+  // town…" forever. The reason has to outlast every later write to the card.
+  it('★ latches the reason the town will never arrive', () => {
+    const note = { textContent: '' }
+    vi.stubGlobal('document', {
+      getElementById: () => ({ querySelector: () => note }),
+      body: { append: () => undefined },
+    })
+    detachFirstFrame()
+    firstFrameStuck(FIRST_FRAME_COPY.blind)
+    expect(note.textContent).toBe(FIRST_FRAME_COPY.blind)
+    firstFrameNote(FIRST_FRAME_COPY.looking)
+    expect(note.textContent, 'nothing writes over it').toBe(FIRST_FRAME_COPY.blind)
+    vi.unstubAllGlobals()
   })
 })

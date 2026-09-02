@@ -384,7 +384,7 @@ describe('★ the key opens on the first look and remembers being shut', () => {
 
   it('is the default the graph actually opens with', () => {
     const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('useState(() => keyOpensBy(sessionStorage))')
-    expect(source).toContain('rememberKey(sessionStorage, !keyOpen)')
+    expect(source).toContain('useState(() => keyOpensBy(sessionStore()))')
+    expect(source).toContain('rememberKey(sessionStore(), !keyOpen)')
   })
 })

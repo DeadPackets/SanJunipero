@@ -22,17 +22,17 @@ import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondMo
  *  shut it, for as long as the tab lives. */
 const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
 
-export function keyOpensBy(storage: Pick<Storage, 'getItem'>): boolean {
+export function keyOpensBy(storage: Pick<Storage, 'getItem'> | null): boolean {
   try {
-    return storage.getItem(BONDS_KEY_SHUT) === null
+    return storage?.getItem(BONDS_KEY_SHUT) == null
   } catch {
     return true // storage throws in a sandboxed frame; an unrememberable viewer gets the legend
   }
 }
 
-export function rememberKey(storage: Pick<Storage, 'setItem'>, open: boolean): void {
+export function rememberKey(storage: Pick<Storage, 'setItem'> | null, open: boolean): void {
   try {
-    if (!open) storage.setItem(BONDS_KEY_SHUT, '1')
+    if (!open) storage?.setItem(BONDS_KEY_SHUT, '1')
   } catch {
     /* nothing to do: they get it again, which is the safe half of the bargain */
   }

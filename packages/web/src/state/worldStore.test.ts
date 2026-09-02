@@ -57,9 +57,11 @@ describe('worldStore', () => {
       ...makeSnapshot(),
       config: { ...clone(DEFAULT_CONFIG), mystery: 1 },
     }
-    expect(() => {
-      store.applyServer(bad)
-    }).toThrow()
+    // ★ It used to throw out of the message handler, hanging on "Looking for the town…".
+    expect(store.applyServer(bad)).toBe('reload')
+    expect(stateHash(store.getState()), 'a config it cannot fold with is not a town').toBe(
+      stateHash(snap.state),
+    )
   })
 
   it('tick messages fold with the adopted config, bit-identical to the engine fold', () => {
@@ -78,6 +80,29 @@ describe('worldStore', () => {
     const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
     expect(stateHash(store.getState())).toBe(stateHash(clone(reference)))
     expect(store.getTick()).toBe(2)
+  })
+
+  // ★ A viewer that fell behind is resynced with a snapshot built AFTER the deltas that follow
+  // it, so the same events arrive twice. Refolding them threw and the live view froze.
+  it('★ ignores a delta the snapshot it just took already holds', () => {
+    const store = createWorldStore()
+    const snap = { ...makeSnapshot(), seq: 9 }
+    store.applyServer(snap)
+    const again: SimEvent = { seq: 9, tick: 1, type: 'agent_spawned', payload: spawn.payload }
+    expect(store.applyServer({ t: 'tick', tick: 1, seq: 9, events: [again] })).toBeNull()
+    expect(stateHash(store.getState())).toBe(stateHash(snap.state))
+  })
+
+  it('★ asks for a fresh snapshot when a delta will not fold, instead of freezing', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    const ghost: SimEvent = {
+      seq: 5,
+      tick: 2,
+      type: 'agent_moved',
+      payload: { id: 'ghost', x: 1, y: 1 },
+    }
+    expect(store.applyServer({ t: 'tick', tick: 2, seq: 5, events: [ghost] })).toBe('resnapshot')
   })
 
   it('scrubbed pauses at the past moment; a live snapshot resumes', () => {
@@ -101,6 +126,16 @@ describe('worldStore', () => {
       store.applyServer({ t: 'thought', agentId: 'other', tick: 5 + i, text: `t${i}` })
     expect(store.thoughtsLog()).toHaveLength(200)
     expect(store.thoughtsLog()[0]!.text).toBe('t5') // oldest 7 dropped (2 walker + t0..t4)
+  })
+
+  // ★ The bubble layer counted an absolute index into a log that is spliced from the head, so
+  // bubbles stopped for good on the two-hundredth thought.
+  it('★ keeps counting thoughts past the cap the log holds', () => {
+    const store = createWorldStore()
+    for (let i = 0; i < 205; i++)
+      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}` })
+    expect(store.thoughtsSeq()).toBe(205)
+    expect(store.thoughtsLog()).toHaveLength(200)
   })
 
   it('asset frames bump assetsSeq and accumulate records', () => {

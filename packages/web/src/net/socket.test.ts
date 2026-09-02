@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CLOSE_BAD_HELLO } from '@sj/shared'
+import { CLOSE_BAD_HELLO, DEFAULT_CONFIG } from '@sj/shared'
 import { connectObservatory } from './socket.js'
 import { createWorldStore } from '../state/worldStore.js'
 
@@ -28,6 +28,16 @@ class FakeWebSocket {
     this.readyState = 3
     this.onclose?.({ code })
   }
+}
+
+const SNAPSHOT = {
+  t: 'snapshot',
+  tick: 0,
+  seq: 0,
+  state: { tick: 0, agents: {}, structures: {}, items: {} },
+  config: DEFAULT_CONFIG,
+  laws: {},
+  live: true,
 }
 
 describe('connectObservatory link status', () => {
@@ -107,6 +117,46 @@ describe('connectObservatory link status', () => {
     expect(store.getState()).toBeNull()
     expect(warn, 'a bad frame per tick is a console nobody can read').toHaveBeenCalledTimes(1)
     warn.mockRestore()
+  })
+
+  /** The store cannot reload the page; the socket already knows how, for the same reason. */
+  it('★ reloads on a snapshot this bundle cannot read', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    FakeWebSocket.instances[0]!.open()
+    const snapshot = { ...SNAPSHOT, config: { mystery: 1 } }
+    FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(snapshot) })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  /** A delta that will not fold leaves a half-folded town; only the server's own state is one. */
+  it('★ asks to go live again when the store cannot take a delta', () => {
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    const ghost = { seq: 1, tick: 1, type: 'agent_moved', payload: { id: 'ghost', x: 1, y: 1 } }
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    sock.onmessage?.({ data: JSON.stringify({ t: 'tick', tick: 1, seq: 1, events: [ghost] }) })
+    expect(sock.sent.at(-1)).toBe('{"t":"live"}')
+  })
+
+  /** The server defers a scrub asked inside its coalescing window; press Live in that window
+   *  and the answer lands after the snapshot. */
+  it('★ drops a scrub answered after the viewer went back to the live edge', () => {
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    handle.scrub(5)
+    handle.goLive()
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'scrubbed', reqId: 1, tick: 5, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: true })
   })
 
   it('a deliberate close() never reports reconnecting', () => {

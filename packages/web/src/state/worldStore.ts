@@ -19,6 +19,10 @@ type Thought = { agentId: string; tick: number; text: string }
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
 
+/** What a frame the view could not take asks of whoever delivered it: a fresh snapshot, or a
+ *  bundle that can read this town at all. */
+type Trouble = 'reload' | 'resnapshot'
+
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
 export type WorldStore = {
@@ -31,6 +35,9 @@ export type WorldStore = {
   liveEdge: () => number
   latestThought: (agentId: string) => { tick: number; text: string } | null
   thoughtsLog: () => Thought[]
+  /** Every thought ever heard, the ones the capped log has already dropped included: an index
+   *  into the log is reused the moment it is trimmed, so a reader counts from here. */
+  thoughtsSeq: () => number
   recentEvents: () => SimEvent[]
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
@@ -40,7 +47,7 @@ export type WorldStore = {
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
   lawHistory: () => LawChange[]
-  applyServer: (msg: ServerMsg) => void
+  applyServer: (msg: ServerMsg) => Trouble | null
   subscribe: (fn: () => void) => () => void
   onEvents: (fn: (evts: SimEvent[]) => void) => () => void
 }
@@ -52,6 +59,7 @@ export function createWorldStore(): WorldStore {
   let paused = false
   let liveEdge = 0
   let assetsSeq = 0
+  let thoughtsSeq = 0
   let logSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
@@ -87,6 +95,7 @@ export function createWorldStore(): WorldStore {
     liveEdge: () => liveEdge,
     latestThought: (agentId) => latest.get(agentId) ?? null,
     thoughtsLog: () => thoughts,
+    thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
@@ -97,22 +106,37 @@ export function createWorldStore(): WorldStore {
 
     applyServer(msg) {
       switch (msg.t) {
-        case 'snapshot':
+        case 'snapshot': {
+          // strict: the live view must fold with the engine's exact config, and a tab left open
+          // across a config change cannot — only a reload fetches a bundle that can.
+          const carried = SimConfigSchema.safeParse(msg.config)
+          if (!carried.success) return 'reload'
           logSeq = msg.seq
-          config = SimConfigSchema.parse(msg.config) // strict: live view must fold with the engine's exact config
+          config = carried.data
           state = msg.state as WorldState
           laws = msg.laws
           paused = msg.paused ?? false
           mode = { live: true }
           break
+        }
         case 'paused':
           paused = msg.paused
           break
         case 'tick':
+          // The hub resyncs a drained viewer with a snapshot taken AFTER the deltas it then
+          // sends: refolding an event this state already has throws, and the town stops.
+          if (msg.seq <= logSeq) return null
           logSeq = msg.seq
           // deltas only advance the live view; while scrubbed the past moment stays still
           if (mode.live && state !== null && config !== null) {
-            for (const ev of msg.events) state = fold(state, ev, config)
+            // Folded aside first: a throw halfway through must not leave half a town on screen.
+            let next = state
+            try {
+              for (const ev of msg.events) next = fold(next, ev, config)
+            } catch {
+              return 'resnapshot'
+            }
+            state = next
             for (const ev of msg.events) {
               if (ev.type !== 'config_changed') continue
               const p = ev.payload as { path?: unknown; value?: unknown }
@@ -133,6 +157,7 @@ export function createWorldStore(): WorldStore {
           mode = { live: false, tick: msg.tick }
           break
         case 'thought':
+          thoughtsSeq++
           thoughts.push({ agentId: msg.agentId, tick: msg.tick, text: msg.text })
           if (thoughts.length > THOUGHT_LOG_CAP)
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
@@ -145,6 +170,7 @@ export function createWorldStore(): WorldStore {
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)
       notify()
+      return null
     },
 
     subscribe(fn) {

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { parseRoute, routeToPath } from '../ui/route.js'
+import { FIRST_FRAME_COPY, firstFrameStuck } from '../ui/firstFrame.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { installFaces } from './textFaces.js'
@@ -44,10 +45,13 @@ export function StageMount({
   const interiorRef = useRef<InteriorScene | null>(null)
   // read in the Pixi callbacks, never subscribed to — a follow change must not remount Pixi
   const onInteriorRef = useRef(onInterior)
+  // eslint-disable-next-line react-hooks/refs -- Pixi holds this across renders it does not join; an effect would hand it a prop one frame stale.
   onInteriorRef.current = onInterior
   const onPickRef = useRef(onPick)
+  // eslint-disable-next-line react-hooks/refs -- as above
   onPickRef.current = onPick
   const onGroundRef = useRef(onGround)
+  // eslint-disable-next-line react-hooks/refs -- as above
   onGroundRef.current = onGround
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -170,7 +174,7 @@ export function StageMount({
             }
           }
         })
-        let seenThoughts = store.thoughtsLog().length
+        let seenThoughts = store.thoughtsSeq()
         let lastMs = performance.now()
         tickFn = () => {
           const now = performance.now()
@@ -191,15 +195,24 @@ export function StageMount({
             atmosphere?.update(state)
             weather?.setKind(state.weather.kind)
           }
-          const log = store.thoughtsLog()
-          for (; seenThoughts < log.length; seenThoughts++) {
-            const t = log[seenThoughts]!
-            bubbles?.spawnThought(t.agentId, t.text)
+          // Counted, not indexed: the log is a capped ring, so its indices are reused.
+          const said = store.thoughtsSeq()
+          if (said > seenThoughts) {
+            for (const t of store.thoughtsLog().slice(seenThoughts - said))
+              bubbles?.spawnThought(t.agentId, t.text)
+            seenThoughts = said
           }
         }
         s.app.ticker.add(tickFn)
         published = true
         onScene?.(s)
+      })
+      .catch(() => {
+        // No WebGL, no WebGPU, or a context lost mid-build.
+        if (disposed) return
+        firstFrameStuck(FIRST_FRAME_COPY.blind)
+        scene?.destroy()
+        scene = null
       })
     return () => {
       disposed = true

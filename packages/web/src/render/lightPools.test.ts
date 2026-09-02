@@ -48,7 +48,14 @@ vi.mock('pixi.js', () => {
   return { Container, Graphics, Point, Sprite, Texture }
 })
 vi.mock('./entities.js', () => ({ entitySpriteOf: () => null }))
-import { DEFAULT_CONFIG, flamesAt, isDark, type LitWorld, type SimConfig } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  flamesAt,
+  isDark,
+  type AssetRecord,
+  type LitWorld,
+  type SimConfig,
+} from '@sj/shared'
 import { CLOCK_STOPS, skyLevel } from './tints.js'
 import { TILE_H, TILE_W, feetOf } from './iso.js'
 import { phaseOf } from './charAnim.js'
@@ -318,6 +325,7 @@ describe('the pool is priced by the world the store describes, not by the defaul
       getTick: () => MIDNIGHT,
       getConfig: () => config,
       assetRecords: () => [],
+      assetsSeq: () => 0,
     } as unknown as WorldStore
     createLightPools(scene, store).tick(16)
     return children[0]!.children[0]!
@@ -343,5 +351,74 @@ describe('the pool is priced by the world the store describes, not by the defaul
 
   it('tints the white radial with the warm token', () => {
     expect(painted(null).tint).toBe(POOL_COLOR)
+  })
+})
+
+// ★ `assetRecords()` hands back ONE array it mutates in place, so its identity never changes:
+// a building whose art landed after the first sync kept points read off a codex without it.
+describe('★ art that lands after the first frame', () => {
+  const LAMP_ART: AssetRecord = {
+    id: 'asset_lamp',
+    seq: 1,
+    class: 'building',
+    desc: 'lamp post',
+    kind: 'lamp_post',
+    footprint: { w: 1, h: 1 },
+    widthPx: 64,
+    heightPx: 64,
+    status: 'ready',
+    score: null,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '2026-09-01 00:00:00',
+    meta: JSON.stringify({
+      version: 'v4-hires-building',
+      kind: 'lamp_post',
+      footprint: { w: 1, h: 1 },
+      cell: { w: 64, h: 64, feetX: 32, feetY: 60 },
+      points: { flame: { x: 32, y: 10 } },
+    }),
+  }
+
+  it('★ re-reads the manifest points when the codex grows', () => {
+    const children: { children: unknown[] }[] = []
+    const scene = {
+      app: { renderer: { generateTexture: () => ({ source: {} }) } },
+      screen: { lights: { addChild: (c: (typeof children)[0]) => children.push(c) } },
+      viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+      wantsMotion: () => true,
+    } as unknown as Scene
+    const state = {
+      agents: {},
+      items: {},
+      structures: {
+        lamp_1: {
+          id: 'lamp_1',
+          kind: 'lamp_post',
+          x: 10,
+          y: 10,
+          w: 1,
+          h: 1,
+          stage: 'complete',
+          fueledUntilTick: MIDNIGHT + 500,
+        },
+      },
+    }
+    const records: AssetRecord[] = []
+    const store = {
+      getState: () => state,
+      getTick: () => MIDNIGHT,
+      getConfig: () => DEFAULT_CONFIG,
+      assetRecords: () => records,
+      assetsSeq: () => records.length,
+    } as unknown as WorldStore
+
+    const pools = createLightPools(scene, store)
+    pools.tick(16)
+    expect(children[0]!.children, 'the pool alone: no art, so no painted flame').toHaveLength(1)
+
+    records.push(LAMP_ART)
+    pools.tick(16)
+    expect(children[0]!.children, 'the flame the manifest points at').toHaveLength(2)
   })
 })

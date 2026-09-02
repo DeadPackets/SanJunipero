@@ -124,6 +124,10 @@ export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: s
   return id !== null ? `/assets/${id}.png` : `/assets/placeholder/${klass}.png`
 }
 
+/** Art is optional: a load that failed leaves the placeholder standing, and the book will ask
+ *  again the next time somebody wants it. */
+export const artOptional = (): undefined => undefined
+
 export class TextureBook {
   #cache = new Map<string, Promise<Texture>>()
   #ready = new Map<string, Texture>()
@@ -138,10 +142,18 @@ export class TextureBook {
     let p = this.#cache.get(url)
     if (p === undefined) {
       Assets.add({ alias: url, src: url })
-      p = Assets.load<Texture>(url).then((t) => {
-        this.#ready.set(url, t)
-        return t
-      })
+      p = Assets.load<Texture>(url).then(
+        (t) => {
+          this.#ready.set(url, t)
+          return t
+        },
+        (err: unknown) => {
+          // A fetch that failed once — a gateway restarting under a live socket — must not be
+          // this url's answer for the rest of the session.
+          this.#cache.delete(url)
+          throw err
+        },
+      )
       this.#cache.set(url, p)
     }
     return p

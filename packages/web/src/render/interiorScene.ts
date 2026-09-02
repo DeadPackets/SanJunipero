@@ -4,7 +4,7 @@ import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
-import { characterArt, type TextureBook } from './textures.js'
+import { artOptional, characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior,
@@ -277,7 +277,7 @@ export function createInteriorScene(
         floorStone.poly(floorRegionPoly(r))
         floorStone.fill({ texture: t, matrix: materialMatrix('interior-flagstone', 1) })
       }
-    })
+    }, artOptional)
   }
 
   function paintFloor(m: RoomMap, records: AssetRecord[]): void {
@@ -295,7 +295,7 @@ export function createInteriorScene(
         floorArt.poly(floorPolyOf(roomTiles))
         floorArt.fill({ texture: t, matrix: materialMatrix('interior-floor', 0) })
         floorArt.visible = true
-      })
+      }, artOptional)
     }
     floor.clear()
     drawFloorBase(floor, roomTiles, url === null ? ROOM_SHELL_PAINT.floor : null)
@@ -350,7 +350,7 @@ export function createInteriorScene(
       }
       const inHand = book.peek(url)
       if (inHand !== null) apply(inHand)
-      else void book.get(url).then(apply)
+      else void book.get(url).then(apply, artOptional)
     }
   }
 
@@ -514,7 +514,7 @@ export function createInteriorScene(
     else {
       void book.get(url).then((t) => {
         if (!sprite.destroyed) applyHalf(sprite, t, half)
-      })
+      }, artOptional)
     }
     furniture.set(key, sprite)
     room.addChild(sprite)
@@ -553,7 +553,7 @@ export function createInteriorScene(
       void book.get(art.url).then((t) => {
         if (sheets.get(agentId) !== claimed) return
         claimed.texture = t
-      })
+      }, artOptional)
     }
     return sheet
   }
