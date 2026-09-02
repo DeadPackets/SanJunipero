@@ -213,6 +213,21 @@ Packages: `llm`, plus a scratch script. Depends on Task 2. Bake off three candid
 
 Report the score table.
 
+### Task 20: Putting things away
+
+Packages: `engine`, `agents`, `shared`. Phase 1, starts after Task 3 merges; runs beside Task 5 (Task 5 owns the discovery line in perception, the roster block and the capabilities closing line; you own item listing, stores and spoilage). Owner, 2026-09-02: "characters don't have any mechanism for storage. There are no chests or boxes, and agents just end up leaving things in front of their houses (they don't even take them inside)."
+
+What exists: `stow` (engine/src/verbs/index.ts, `StowParams { itemId, structureId }`) moves an item into any complete structure the body stands beside or inside; `spoilDeadline` applies `storehouseMultiplier` only inside `preservingKinds`; item locations are tile, agent or structure; structures carry `owner`. The prompt lists the inventory twice per turn (36% of the volatile prose in world two) and says only "or stow it in a building you stand beside".
+
+1. Knowing what is where: the perception packet gains `stores: { structureId, kind, name?, items: { kind, qty }[] }[]` for every structure the mind owns plus every public structure of a preserving kind (the storehouse), whether or not the mind is inside; prose renders one line per store, grouped by kind with counts: "Your house holds planks ×3, bread ×2. The storehouse holds wood ×60, …". Cap 40 tokens per store; more kinds fold into "and 4 other kinds".
+2. Inventory once: the "hands hold" and "you are carrying" sentences become one line grouped by kind with counts and one id per kind ("notes ×12 (item_131…)"); the verb catalogue keeps its ids. Measure the token delta on a 12-note inventory and report it.
+3. The doorstep: when three or more items owned by the mind lie on tiles within 2 of a structure it owns, the prose adds "On the ground by your door: planks ×4." Once per sim-hour at most.
+4. Ground pressure: `config.spoilage.groundMultiplier` (default 0.5) applies to spoiling items on a tile outdoors; the rule line in `rulesOfBeing.ts` line 65 becomes "What lies on the ground is anyone's and spoils fast; your house and the storehouse keep things." Nothing else changes about taking.
+5. `stow` composes a walk when the store is out of reach, the same way `fill` and `fish` compose one (see the settle policy in verbs/index.ts and prompt/water.test.ts); the intent's `structureId` may name the mind's own house by id.
+6. Tests: stores in the packet for owner and storehouse, absent for a stranger's house; the grouped inventory line and its token delta; the doorstep line fires at three items and not two, once per hour; ground spoilage halves the deadline outdoors and not indoors; stow from across the square composes a walk and settles into the house. Golden folds unchanged except where spoilage deadlines move; list them.
+
+Not in scope, note in the report: chests and crates as craftable furniture (art exists in the forge for chest, crate, barrel, shelf) are a phase 3 candidate once wants and ownership matter.
+
 ### Task 7: Phase 1 gate
 
 Controller task. Merge Tasks 1-6 into `v2`. Dispatch a lint lane to clear the pre-existing red (3 eslint errors in `engine/src/genesis/founding.test.ts:39`, `engine/src/survival.test.ts:234,293`; `format:check` on 11 files; knip `rateStopRefusal` in `live/src/liveWorld.ts:272`) so `pnpm check` is green. Run one short rehearsal on port 8099: `SPEED=2 SJ_MAX_MINDS=20 pnpm rehearse 25` (about one sim-day) and record: 12 minds boot, every sprite loads (no placeholder route hits in the log), no death, cost per sim-day, invention attempts per mind-day, roster block present in a sampled prompt. Fast-forward `main` when green.
