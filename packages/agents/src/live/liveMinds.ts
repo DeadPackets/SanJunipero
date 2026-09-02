@@ -122,6 +122,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     const personality = new PersonalityStore(db, spec.id)
     if (!hasPersonality(db, spec.id))
       personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
+    const ties = new TieStore(db, spec.id)
+    ties.seedKin(spec.kin ?? [], opts.bridge.currentTick())
     if (sceneClient !== undefined) {
       const mem = new MemoryStore(db, spec.id, opts.embedder)
       minds.set(spec.id, {
@@ -134,7 +136,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
           ...(roster === undefined ? {} : { roster }),
           livingCast,
         }),
-        ties: new TieStore(db, spec.id),
+        ties,
         remember: async (m) => {
           await mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS })
         },
@@ -156,6 +158,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       ...(opts.dreamLlm === undefined ? {} : { dreamLlm: makeDreamLlm(opts.dreamLlm(spec.id)) }),
       ...(opts.onThought === undefined ? {} : { onThought: opts.onThought }),
       ...(scenes === null ? {} : { scenes }),
+      ties: { store: ties, cast: livingCast },
     })
     runtime.start(spec.id)
     const was = opts.restoring?.get(spec.id)

@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
+import { TieStore } from './memory/ties.js'
 import Sqlite from 'better-sqlite3'
 import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } from '@sj/llm'
 import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
@@ -16,6 +17,7 @@ import {
   summarizeScenesPrompt,
   summarizeDayPrompt,
   updateLedgerPrompt,
+  listTiesPrompt,
   autobiographyPrompt,
   proposeEditPrompt,
   ProposeEditSchema,
@@ -29,6 +31,11 @@ import { FORBIDDEN_FRAMING, scanForLayoutLeak, scanPromptForGlassLeak } from '@s
 const AGENT = 'tamar'
 const DAY = 3
 const TICKS_PER_DAY = 1440
+const CAST = [
+  { id: AGENT, name: 'Tamar' },
+  { id: 'nadia', name: 'Nadia' },
+  { id: 'omar', name: 'Omar' },
+]
 
 const TAGS: MemoryTags = { people: [], place: 'storehouse', objects: [], topics: [] }
 
@@ -83,6 +90,23 @@ async function seedDay(
   }
   return mem.memoriesOfDay(day)
 }
+
+/** One the day opened and one it paid off, plus a neighbour who was never in the valley. */
+const LISTED_TIES: Awaited<ReturnType<ReflectionLlm['listTies']>> = [
+  {
+    about: 'Nadia',
+    kind: 'promise',
+    text: 'She mends the storehouse door with me.',
+    settled: false,
+  },
+  { about: 'Omar', kind: 'debt', text: 'Three firewood, and he brought them.', settled: true },
+  {
+    about: 'Kestrel',
+    kind: 'grudge',
+    text: 'Nobody of that name has ever lived here.',
+    settled: false,
+  },
+]
 
 class ScriptedReflectionLlm implements ReflectionLlm {
   calls: string[] = []
@@ -139,6 +163,11 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   async updateLedger(personName: string, _existing: string | null, relevant: MemoryRow[]) {
     this.calls.push('updateLedger')
     return `Ledger for ${personName} (${relevant.length} memories).`
+  }
+
+  async listTies() {
+    this.calls.push('listTies')
+    return LISTED_TIES
   }
 
   async autobiographyParagraph(_daySummary: string, doc: PersonalityDoc) {
@@ -232,6 +261,40 @@ describe('runSleepReflection pipeline', () => {
     expect(mem.getLedger('Nadia')!.doc).toBe('Ledger for Nadia (1 memories).')
     expect(mem.getLedger('Omar')!.doc).toBe('Ledger for Omar (1 memories).')
     expect(mem.getLedger('SomeoneElse')).toBeNull()
+  })
+
+  it('writes the day’s ties, settled and open, and invents no neighbour', async () => {
+    const { db, mem, personality } = await makeStores()
+    await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const store = new TieStore(db, AGENT)
+    store.apply(
+      [{ agentId: AGENT, personId: 'omar', kind: 'debt', text: 'Three firewood by tomorrow.' }],
+      0,
+    )
+    const llm = new ScriptedReflectionLlm(null)
+    const res = await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: DAY,
+      ties: { store, cast: CAST, tick: DAY * TICKS_PER_DAY },
+    })
+
+    expect(res.tiesWritten, 'Kestrel is nobody, so two of the three land').toBe(2)
+    expect(store.open().map((t) => [t.personId, t.kind, t.source])).toEqual([
+      ['nadia', 'promise', 'reflection'],
+    ])
+    const debt = store.all().find((t) => t.kind === 'debt')!
+    expect(debt.settledTick, 'the day squared what was already owed').toBe(DAY * TICKS_PER_DAY)
+  })
+
+  it('reflects without a tie book the way it did before there were ties', async () => {
+    const { mem, personality } = await makeStores()
+    await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm(null)
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
+    expect(llm.calls).not.toContain('listTies')
+    expect(res.tiesWritten).toBe(0)
   })
 
   it('applies a valid proposed edit -> editApplied true and personality v2', async () => {
@@ -604,11 +667,12 @@ describe('makeReflectionLlm prompts', () => {
     await llm.summarizeScenes(memories)
     await llm.summarizeDay([{ title: 'Trade', text: 'The day was full of deals.' }])
     await llm.updateLedger('Nadia', null, memories)
+    await llm.listTies(memories, ['Nadia'])
     await llm.autobiographyParagraph('The day was full of deals.', doc)
     await llm.proposeEdit('The day was full of deals.', doc, memories)
     await llm.gist('A very long moment that the night sets down in short.')
 
-    expect(calls).toHaveLength(7)
+    expect(calls).toHaveLength(8)
     for (const c of calls) {
       expect(c.system).toMatch(/\byou\b/i)
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
@@ -620,7 +684,7 @@ describe('makeReflectionLlm prompts', () => {
       )
     }
   })
-  // Seven authored surfaces every mind reads every night, which neither the card scan nor
+  // Eight authored surfaces every mind reads every night, which neither the card scan nor
   // `assemblePrompt` reaches. A shorter prompt must not turn a question into an instruction.
   it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
     const authored = [
@@ -628,6 +692,7 @@ describe('makeReflectionLlm prompts', () => {
       authoredText(summarizeScenesPrompt(memories)),
       summarizeDayPrompt([{ title: 'Trade', text: 'The day was full of deals.' }]).system,
       updateLedgerPrompt('Nadia', null, memories).system,
+      authoredText(listTiesPrompt(memories, ['Nadia'])),
       autobiographyPrompt('The day was full of deals.', doc).system,
       proposeEditPrompt('The day was full of deals.', doc, memories).system,
       gistPrompt('A very long moment that the night sets down in short.').system,

@@ -121,6 +121,29 @@ export const BOND_VALENCE: Readonly<Record<BondKind, number>> = {
   rival: -8,
 }
 
+/** What a tie the minds themselves wrote is worth to a pair. Apart from `BOND_VALENCE` because a
+ *  tie is not one of the six acts the panel names: it moves warmth and joins no act window. */
+export const TIE_ACTS = ['slight', 'promise_kept', 'promise_broken', 'attraction', 'kin'] as const
+export type TieAct = (typeof TIE_ACTS)[number]
+
+export const TIE_VALENCE: Readonly<Record<TieAct, number>> = {
+  slight: -3,
+  promise_kept: 3,
+  promise_broken: -6,
+  attraction: 2,
+  kin: 0,
+}
+
+/** Which of those a scene's tie delta is, or null where it says nothing about warmth: a promise
+ *  newly made is neither kept nor broken, and a grudge is a slight that stayed. */
+export function tieActOf(kind: string, settled: boolean): TieAct | null {
+  if (kind === 'promise') return settled ? 'promise_kept' : null
+  if (settled) return null
+  if (kind === 'slight' || kind === 'grudge') return 'slight'
+  if (kind === 'attraction' || kind === 'kin') return kind
+  return null
+}
+
 /** Silence costs warmth, which is what lets a level fall without anybody doing anything wrong.
  *  A tick is a sim-minute and MINUTES_PER_DAY is 1440, so this is two sim-days. */
 export const WARMTH_HALF_LIFE_TICKS = 2880
@@ -186,6 +209,9 @@ export function bondRollup(bond: Bond, kind: BondKind): BondRollup | null {
 export type BondFold = {
   /** Ticks must not go backwards — the caller reads the log in `seq` order, which is tick order. */
   add(kind: BondKind, tick: number): void
+  /** A tie the minds wrote, weighed into warmth alone. It counts toward no act and names no
+   *  bond kind, so the served window and its ceiling are what they were. */
+  addTie(act: TieAct, tick: number): void
   acts(): number
   bond(): Bond
 }
@@ -221,25 +247,28 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     openTick = -1
   }
 
+  const weigh = (w: number, tick: number): void => {
+    if (first) {
+      formedTick = tick
+      levelChangedTick = tick
+      first = false
+    }
+    if (tick !== openTick) closeTick()
+
+    warmth = decayWarmth(warmth, lastTick, tick) + w
+    lastTick = tick
+    openTick = tick
+
+    if (tick <= priorAt) {
+      prior = decayWarmth(prior, priorFrom, tick) + w
+      priorFrom = tick
+    }
+  }
+
   return {
     add(k, tick) {
-      if (first) {
-        kind = k
-        formedTick = tick
-        levelChangedTick = tick
-        first = false
-      } else kind = strongerBondKind(kind, k)
-
-      if (tick !== openTick) closeTick()
-
-      warmth = decayWarmth(warmth, lastTick, tick) + BOND_VALENCE[k]
-      lastTick = tick
-      openTick = tick
-
-      if (tick <= priorAt) {
-        prior = decayWarmth(prior, priorFrom, tick) + BOND_VALENCE[k]
-        priorFrom = tick
-      }
+      kind = first ? k : strongerBondKind(kind, k)
+      weigh(BOND_VALENCE[k], tick)
 
       const roll = rolls.get(k)
       if (roll === undefined) rolls.set(k, { count: 1, firstTick: tick, lastTick: tick })
@@ -251,6 +280,9 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
       recent.push({ tick, kind: k })
       if (recent.length > BOND_RECENT_ACTS) recent.shift()
       count += 1
+    },
+    addTie(act, tick) {
+      weigh(TIE_VALENCE[act], tick)
     },
     acts: () => count,
     bond() {

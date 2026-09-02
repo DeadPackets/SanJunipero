@@ -3,11 +3,17 @@ import {
   BOND_KINDS,
   BOND_KIND_PRECEDENCE,
   BOND_RECENT_ACTS,
+  BOND_VALENCE,
   BondSchema,
   BondsResponseSchema,
+  TIE_ACTS,
+  TIE_VALENCE,
   bondFrom,
   bondId,
+  decayWarmth,
+  foldBond,
   strongerBondKind,
+  tieActOf,
   type Bond,
   type BondAct,
 } from './bonds.js'
@@ -78,6 +84,45 @@ describe('BondsResponseSchema', () => {
   it('refuses a stray field', () => {
     expect(BondsResponseSchema.safeParse({ bonds: [], asOfTick: 0, extra: true }).success).toBe(
       false,
+    )
+  })
+})
+
+describe('what a tie is worth', () => {
+  it('prices the five the minds can write, and leaves the act window alone', () => {
+    expect(TIE_VALENCE).toEqual({
+      slight: -3,
+      promise_kept: 3,
+      promise_broken: -6,
+      attraction: 2,
+      kin: 0,
+    })
+    expect(Object.keys(TIE_VALENCE).sort()).toEqual([...TIE_ACTS].sort())
+  })
+
+  it('reads a delta: a promise kept, a grudge that is a slight, a promise merely made', () => {
+    expect(tieActOf('promise', true)).toBe('promise_kept')
+    expect(tieActOf('promise', false)).toBeNull()
+    expect(tieActOf('slight', false)).toBe('slight')
+    expect(tieActOf('grudge', false)).toBe('slight')
+    expect(tieActOf('attraction', false)).toBe('attraction')
+    expect(tieActOf('kin', false)).toBe('kin')
+    expect(tieActOf('secret', false)).toBeNull()
+    expect(tieActOf('slight', true), 'a slight squared is not a slight taken').toBeNull()
+  })
+
+  it('moves warmth without becoming an act, so the served window is what it was', () => {
+    const fold = foldBond('alice', 'bob', 120)
+    fold.add('friend', 30)
+    fold.addTie('slight', 60)
+    const b = fold.bond()
+    expect(b.strength, 'one act, not two').toBe(1)
+    expect(b.recent).toEqual([{ tick: 30, kind: 'friend' }])
+    expect(b.acts).toEqual([{ kind: 'friend', count: 1, firstTick: 30, lastTick: 30 }])
+    expect(b.lastUpdatedTick, 'warmth is evaluated where the tie left it').toBe(60)
+    expect(b.warmth, 'a friendly word decayed, then three off it').toBeCloseTo(
+      decayWarmth(BOND_VALENCE.friend, 30, 60) + TIE_VALENCE.slight,
+      10,
     )
   })
 })

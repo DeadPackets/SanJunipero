@@ -502,6 +502,39 @@ describe('what a close leaves behind', () => {
     ).toEqual(['debt'])
   })
 
+  it('writes no tie for a body that only overheard it, and announces none either', async () => {
+    const eavesdropper: TieDelta = {
+      agentId: SALMA,
+      personId: NADIA,
+      kind: 'slight',
+      text: 'They talked over her.',
+    }
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: SALMA, name: 'Salma', x: 6 },
+      ],
+      script: () => () => fromCorpus(0, { speech: null }),
+      closer: () => ({ ...CLOSE, deltas: [...CLOSE.deltas, eavesdropper] }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(h.coordinator.open()[0]!.audience, 'Salma is in earshot and not in it').toContain(SALMA)
+    await play(h, NOON)
+    h.loop.step()
+
+    expect(h.minds.get(SALMA)!.ties.all(), 'she owes nothing for standing there').toEqual([])
+    expect(
+      h.remembered.map((r) => r.agentId),
+      'she still carries the summary',
+    ).toContain(SALMA)
+    const announced = sceneEvents(h.engineDb).find((e) => e.type === 'scene_closed')
+    expect((announced!.payload as { deltas: TieDelta[] }).deltas.map((d) => d.agentId)).toEqual([
+      NADIA,
+      OMAR,
+    ])
+  })
+
   it('asks for one close and no more, however the scene ended', async () => {
     const h = harness({ script: () => () => fromCorpus(0, { speech: null }), closer: () => CLOSE })
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
@@ -611,6 +644,21 @@ describe('a quarrel needs a tie', () => {
   it('is a quarrel once the grudge is in the book', () => {
     const h = harness({ ties: { [NADIA]: GRUDGE } })
     expect(h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)?.kind).toBe('quarrel')
+  })
+
+  it('is named by talking ABOUT the person, which the floor would not have counted', () => {
+    const slight: TieDelta[] = [
+      { agentId: OMAR, personId: NADIA, kind: 'slight', text: 'She counted his work aloud.' },
+    ]
+    const h = harness({ ties: { [OMAR]: slight } })
+    const scene = h.coordinator.noteSpoken(OMAR, 'Nadia said it would be six.', NOON)
+    expect(scene?.kind).toBe('quarrel')
+    expect(scene?.floor, 'a remark about her is not a question put to her').toBe(NADIA)
+  })
+
+  it('stays a talk on the same line once the slight is squared', () => {
+    const h = harness({ ties: {} })
+    expect(h.coordinator.noteSpoken(OMAR, 'Nadia said it would be six.', NOON)?.kind).toBe('talk')
   })
 
   it('carries the proposal a council opened on', () => {

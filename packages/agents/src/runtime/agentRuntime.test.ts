@@ -350,6 +350,10 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     this.calls.push('updateLedger')
     return 'A person.'
   }
+  async listTies() {
+    this.calls.push('listTies')
+    return []
+  }
   async autobiographyParagraph(): Promise<string> {
     this.calls.push('autobiographyParagraph')
     return 'I lived a day.'

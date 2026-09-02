@@ -78,15 +78,17 @@ export type SceneAsk = {
   energy: number
 }
 
-export type TieKind =
-  | 'promise'
-  | 'debt'
-  | 'slight'
-  | 'grudge'
-  | 'attraction'
-  | 'secret'
-  | 'alliance'
-  | 'kin'
+export const TIE_KINDS = [
+  'promise',
+  'debt',
+  'slight',
+  'grudge',
+  'attraction',
+  'secret',
+  'alliance',
+  'kin',
+] as const
+export type TieKind = (typeof TIE_KINDS)[number]
 
 export type TieDelta = {
   agentId: string
@@ -245,8 +247,8 @@ export const proposesALaw = (text: string): boolean => PROPOSAL_PATTERNS.some((p
 
 const QUARREL_TIE_KINDS: readonly TieKind[] = ['grudge', 'slight']
 
-/** A line names an open grudge or slight when the person that tie is about is named in it.
- *  Ties do not exist until Task 11, so `tiesOf` answers `[]` and this is false everywhere. */
+/** A line names an open grudge or slight when the person that tie is about is named in it. The
+ *  loose match, not `addressedAt`: a quarrel is named by talking ABOUT somebody. */
 function namesAQuarrel(
   scene: Scene,
   text: string,

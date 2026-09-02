@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import {
   bondId,
   foldBond,
+  tieActOf,
   type Bond,
   type BondFold,
   type BondKind,
@@ -22,6 +23,9 @@ const VERB_BONDS: Readonly<Record<string, BondKind>> = {
   attack: 'rival',
 }
 
+/** What a close writes about one pair. The minds' own reading, not an act the world witnessed. */
+type SceneTieDelta = { agentId: string; personId: string; kind: string; settled?: true }
+
 /** The whole of what `buildBonds` folds; every other type falls through its chain untouched. */
 export const BOND_TYPES: readonly string[] = [
   'agent_spoke',
@@ -29,6 +33,7 @@ export const BOND_TYPES: readonly string[] = [
   'action_completed',
   'co_slept',
   'agent_born',
+  'scene_closed',
 ]
 
 /** The graph folds the WHOLE bond history — 4.2 ms over 1,605 rows at tick 5,000, linear in the
@@ -50,15 +55,19 @@ export function buildBonds(
 ): BondsResponse {
   const drafts = new Map<string, BondFold>()
 
-  const tie = (a: string, b: string, kind: BondKind, tick: number): void => {
-    if (a === b) return
+  const between = (a: string, b: string): BondFold | null => {
+    if (a === b) return null
     const id = bondId(a, b)
     let fold = drafts.get(id)
     if (fold === undefined) {
       fold = foldBond(a, b, asOfTick)
       drafts.set(id, fold)
     }
-    fold.add(kind, tick)
+    return fold
+  }
+
+  const tie = (a: string, b: string, kind: BondKind, tick: number): void => {
+    between(a, b)?.add(kind, tick)
   }
 
   // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than the
@@ -93,6 +102,12 @@ export function buildBonds(
     } else if (ev.type === 'agent_born') {
       const p = ev.payload as { id: string; motherId: string; fatherId: string }
       for (const parent of [p.motherId, p.fatherId]) tie(parent, p.id, 'kin', ev.tick)
+    } else if (ev.type === 'scene_closed') {
+      const p = ev.payload as { deltas: readonly SceneTieDelta[] }
+      for (const d of p.deltas) {
+        const act = tieActOf(d.kind, d.settled === true)
+        if (act !== null) between(d.agentId, d.personId)?.addTie(act, ev.tick)
+      }
     }
   }
 

@@ -22,13 +22,16 @@ import type { PersonalityDoc } from '../personality.js'
 import {
   autobiographyPrompt,
   extractFactsPrompt,
+  listTiesPrompt,
   proposeEditPrompt,
   summarizeDayPrompt,
   summarizeScenesPrompt,
   updateLedgerPrompt,
 } from '../reflection.js'
 import { EngineBridge } from '../runtime/bridge.js'
+import { TieStore } from '../memory/ties.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
+import { FOUNDER_MINDS } from './founderMinds.js'
 import { bootMinds, type MindSpec } from './liveMinds.js'
 
 const AGENT = 'tamar'
@@ -63,6 +66,8 @@ const CANNED: { key: string; answer: unknown }[] = [
   { key: instruction(summarizeScenesPrompt([])), answer: { scenes: [] } },
   { key: summarizeDayPrompt([]).system, answer: { title: 'A day', text: 'It passed.' } },
   { key: updateLedgerPrompt('someone', null, []).system, answer: { doc: 'A person.' } },
+  // Its last line names the roll, which the living cast decides, so the key is its opening line.
+  { key: instruction(listTiesPrompt([], [])).split('\n')[0]!, answer: { ties: [] } },
   { key: autobiographyPrompt('', doc).system, answer: { paragraph: 'I lived a day.' } },
   { key: proposeEditPrompt('', doc, []).system, answer: { verdict: 'no_proposal' } },
   { key: DREAM_PROMPT, answer: { text: DREAM_TEXT, mood: 'unsettled' } },
@@ -97,7 +102,7 @@ function scriptedModel(): MockLanguageModelV4 {
 // reflects over, so the night these rows are about would never come.
 const DUSK_DAY_0 = 1200
 
-function buildWorld() {
+function buildWorld(startTick = DUSK_DAY_0) {
   const config = SimConfigSchema.parse({
     needs: { hungerDecayPerTick: 0.5 },
     structures: { sleepIndoorsOnly: false },
@@ -126,7 +131,7 @@ function buildWorld() {
     state,
     rng,
     config,
-    startTick: DUSK_DAY_0,
+    startTick,
     onTick: (ctx) => {
       handler(ctx)
     },
@@ -146,8 +151,10 @@ const SPEC: MindSpec = {
   sex: 'f',
 }
 
-async function bootOne(opts: { dreamBudgetUsd?: number } = {}) {
-  const { loop, bridge } = buildWorld()
+async function bootOne(
+  opts: { dreamBudgetUsd?: number; startTick?: number; minds?: readonly MindSpec[] } = {},
+) {
+  const { loop, bridge } = buildWorld(opts.startTick)
   const opsDb = openAgentDb(':memory:')
   migrateLlmTables(opsDb)
   const mindDb = openAgentDb(':memory:')
@@ -164,7 +171,7 @@ async function bootOne(opts: { dreamBudgetUsd?: number } = {}) {
         : {}),
     })
   const booted = bootMinds({
-    minds: [SPEC],
+    minds: opts.minds ?? [SPEC],
     bridge,
     embedder: await FakeEmbedder.create(),
     dbFor: () => mindDb,
@@ -223,5 +230,72 @@ describe('★ a booted mind dreams, and the town pays for it through the one led
     expect(daySummaries(mindDb).length).toBe(1)
     expect(dreamRows(mindDb)).toEqual([])
     expect(callersIn(opsDb)).not.toContain('dream')
+  })
+})
+
+const tieRows = (db: Database.Database, agentId: string): { person_id: string; kind: string }[] =>
+  db
+    .prepare('SELECT person_id, kind FROM ties WHERE agent_id = ? ORDER BY person_id')
+    .all(agentId) as { person_id: string; kind: string }[]
+
+describe('★ kin are ties from the first tick', () => {
+  it('every founder written with kin boots holding them, and nobody else holds any', async () => {
+    const kinned = FOUNDER_MINDS.filter((m) => m.kin !== undefined && m.kin.length > 0)
+    expect(kinned.length, 'Task 4 wrote kin into the founding cast').toBeGreaterThan(0)
+    const { booted, mindDb } = await bootOne({ minds: FOUNDER_MINDS })
+    booted.stop()
+
+    for (const mind of kinned) {
+      expect(tieRows(mindDb, mind.id), `${mind.id} boots without their kin`).toEqual(
+        [...mind.kin!]
+          .map((k) => ({ person_id: k.id, kind: 'kin' }))
+          .sort((a, b) => a.person_id.localeCompare(b.person_id)),
+      )
+    }
+    for (const mind of FOUNDER_MINDS.filter((m) => !kinned.includes(m))) {
+      expect(tieRows(mindDb, mind.id), `${mind.id} was given kin nobody wrote`).toEqual([])
+    }
+  })
+})
+
+// Dusk of day 7: the first night a tie opened on the founding tick is older than its clock.
+const DUSK_DAY_7 = 7 * 1440 + 1200
+
+describe('★ a tie nobody has touched for seven sim-days is let go', () => {
+  const letGoRows = (db: Database.Database): { text: string }[] =>
+    db.prepare("SELECT text FROM memories WHERE text LIKE 'You have let go%'").all() as {
+      text: string
+    }[]
+
+  it('closes on the night it ages out, and the mind remembers letting it go', async () => {
+    const { loop, booted, mindDb } = await bootOne({ startTick: DUSK_DAY_7 })
+    const ties = new TieStore(mindDb, AGENT)
+    ties.apply(
+      [
+        { agentId: AGENT, personId: 'nadia', kind: 'grudge', text: 'She took the last loaf.' },
+        { agentId: AGENT, personId: 'omar', kind: 'promise', text: 'A day on the well gate.' },
+      ],
+      0,
+    )
+    ties.apply(
+      [{ agentId: AGENT, personId: 'omar', kind: 'debt', text: 'Two planks.' }],
+      DUSK_DAY_7,
+    )
+    await stepUntil(loop, () => letGoRows(mindDb).length >= 2, 600)
+    booted.stop()
+
+    // Only Tamar has a body in this world, so the other two are named by the id the tie carries.
+    expect(
+      letGoRows(mindDb)
+        .map((r) => r.text)
+        .sort(),
+    ).toEqual([
+      'You have let go of what stood between you and nadia: She took the last loaf.',
+      'You have let go of what stood between you and omar: A day on the well gate.',
+    ])
+    expect(
+      ties.open().map((t) => t.kind),
+      'today’s debt is not stale',
+    ).toEqual(['debt'])
   })
 })

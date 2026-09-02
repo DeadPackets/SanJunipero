@@ -4,6 +4,8 @@ import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { GIST_SYSTEM, gistMemories, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
+import { TIE_KINDS, type TieDelta } from './scene/scene.js'
+import type { TieStore } from './memory/ties.js'
 
 export type ReflectionLlm = GistLlm & {
   extractFacts(
@@ -16,6 +18,10 @@ export type ReflectionLlm = GistLlm & {
     scenes: { title: string; text: string }[],
   ): Promise<{ title: string; text: string; standing: string[] }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
+  listTies(
+    dayMemories: MemoryRow[],
+    people: readonly string[],
+  ): Promise<{ about: string; kind: TieDelta['kind']; text: string; settled: boolean }[]>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
   proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown>
 }
@@ -31,7 +37,44 @@ export type ReflectionResult = {
   gistsWritten: number
   /** Long rows that wanted a gist tonight; the rest stay eligible tomorrow. */
   gistsEligible: number
+  /** Ties the night opened or settled. A scene is not the only place a mind incurs something. */
+  tiesWritten: number
   fallback: boolean
+}
+
+/** Whose book the night writes into, and the roll it may name. Absent, a mind reflects the way
+ *  it did before there were ties. */
+export type ReflectionTies = {
+  store: TieStore
+  cast: readonly { id: string; name: string }[]
+  tick: number
+}
+
+/** Names back to ids off the closed roll, dropping the mind itself and anyone it invented. */
+function tiesFrom(
+  answer: readonly { about: string; kind: TieDelta['kind']; text: string; settled: boolean }[],
+  ties: ReflectionTies,
+): TieDelta[] {
+  const agentId = ties.store.agentId
+  const idOf = new Map<string, string>()
+  for (const p of ties.cast) {
+    idOf.set(p.name.toLowerCase(), p.id)
+    idOf.set(p.id.toLowerCase(), p.id)
+  }
+  const out: TieDelta[] = []
+  for (const t of answer) {
+    const personId = idOf.get(t.about.trim().toLowerCase())
+    if (personId === undefined || personId === agentId) continue
+    if (t.text.trim().length === 0) continue
+    out.push({
+      agentId,
+      personId,
+      kind: t.kind,
+      text: t.text.trim(),
+      ...(t.settled ? { settled: true as const } : {}),
+    })
+  }
+  return out
 }
 
 export const FALLBACK_DAY_TITLE = 'A long day'
@@ -52,9 +95,10 @@ export async function runSleepReflection(deps: {
   personality: PersonalityStore
   llm: ReflectionLlm
   day: number
+  ties?: ReflectionTies
   alert?: (kind: string, detail: string) => void
 }): Promise<ReflectionResult> {
-  const { mem, personality, llm, day, alert } = deps
+  const { mem, personality, llm, day, ties, alert } = deps
 
   // 1. Load the day's memories.
   const dayMemories = mem.memoriesOfDay(day)
@@ -138,6 +182,21 @@ export async function runSleepReflection(deps: {
     ledgersUpdated.push(person)
   }
 
+  // 5b. What the day left standing between this mind and the people in it. The note above is
+  //     prose the mind reads; these are rows the scene block and the quarrel upgrade read.
+  let tiesWritten = 0
+  if (ties !== undefined) {
+    const listed = await step(() =>
+      llm.listTies(
+        dayMemories,
+        ties.cast.map((p) => p.name),
+      ),
+    )
+    const deltas = listed === null ? [] : tiesFrom(listed, ties)
+    ties.store.apply(deltas, ties.tick, 'reflection')
+    tiesWritten = deltas.length
+  }
+
   // 6. Autobiography paragraph.
   const personalityDoc = personality.current().doc
   const paragraph = await step(() => llm.autobiographyParagraph(daySummaryText, personalityDoc))
@@ -159,6 +218,7 @@ export async function runSleepReflection(deps: {
     ledgersUpdated,
     gistsWritten: gists?.written ?? 0,
     gistsEligible: gists?.eligible ?? 0,
+    tiesWritten,
   }
   if (degraded.reason !== null) {
     alert?.('reflection_fallback', degraded.reason)
@@ -283,6 +343,19 @@ export function updateLedgerPrompt(
   }
 }
 
+export function listTiesPrompt(dayMemories: MemoryRow[], people: readonly string[]): LlmPrompt {
+  return nightPrompt(dayMemories, [
+    'Before sleep, you count what the day left standing between you and other people.',
+    'A tie is one thing YOU now hold about one of them: a promise you made or they made you, a',
+    'debt, a slight taken, a grudge kept, an attraction felt, a secret held, an alliance struck.',
+    'Write one only where today actually made it or paid it off, and mark it settled when the day',
+    'squared something that was already owed. Most days leave one or two, and many leave none.',
+    people.length === 0
+      ? 'Name nobody: you were alone today.'
+      : `Name only these people: ${people.join(', ')}.`,
+  ])
+}
+
 export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): LlmPrompt {
   return {
     system: [
@@ -365,6 +438,24 @@ const DAY_SUMMARY_SCHEMA = z
   })
   .strict()
 const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
+// Six is what a whole scene may name; a day is longer, and eight is the runaway stop rather
+// than the ask, which the prose above puts at one or two.
+const TIES_SCHEMA = z
+  .object({
+    ties: z
+      .array(
+        z
+          .object({
+            about: z.string().min(1),
+            kind: z.enum(TIE_KINDS),
+            text: z.string().min(1),
+            settled: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(8),
+  })
+  .strict()
 const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
 export const ProposeEditSchema = z.discriminatedUnion('verdict', [
   z.object({ verdict: z.literal('no_proposal') }).strict(),
@@ -417,6 +508,15 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
         schema: LEDGER_SCHEMA,
       })
       return value.doc
+    },
+    async listTies(dayMemories, people) {
+      const p = listTiesPrompt(dayMemories, people)
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: TIES_SCHEMA,
+      })
+      return value.ties
     },
     async autobiographyParagraph(daySummary, doc) {
       const p = autobiographyPrompt(daySummary, doc)
