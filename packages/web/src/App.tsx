@@ -23,13 +23,15 @@ import {
 } from './stage/index.js'
 import { HelpButton } from './stage/HelpButton.js'
 import { KeyMap } from './stage/KeyMap.js'
+import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
-import { sessionStore } from './ui/storage.js'
+import { localStore, sessionStore } from './ui/storage.js'
+import { rememberThoughts, thoughtsSetting } from './ui/thoughts.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
 import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
@@ -64,6 +66,7 @@ export function App() {
   )
   const [cue, setCue] = useState<string | null>(null)
   const [keysOpen, setKeysOpen] = useState(false)
+  const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
@@ -230,6 +233,18 @@ export function App() {
     scene.textScale = route.broadcast ? BROADCAST_TEXT_SCALE : 1
   }, [scene, route.broadcast])
 
+  // The same reach for the same reason: the bubble layer lives in a Pixi closure React never
+  // re-renders, so the setting is written onto the scene handle rather than passed as a prop.
+  useEffect(() => {
+    scene?.bubbles?.setThoughts(thoughts)
+  }, [scene, thoughts])
+
+  const toggleThoughts = useCallback(() => {
+    const next = thoughts === 'hidden' ? 'shown' : 'hidden'
+    setThoughts(next)
+    rememberThoughts(localStore(), next)
+  }, [thoughts])
+
   useStageKeys({
     onSignpost: () => {
       signpostRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
@@ -252,6 +267,7 @@ export function App() {
       toggleFullscreen(appRef.current)
     },
     onDirector: toggleDirector,
+    onThoughts: toggleThoughts,
   })
 
   return (
@@ -329,6 +345,7 @@ export function App() {
           setKeysOpen((v) => !v)
         }}
       />
+      <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}

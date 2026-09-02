@@ -22,7 +22,7 @@ describe('the key map — heuristic 10 used to score zero', () => {
 
   it('★ every key it claims is a key something actually binds', () => {
     const stage = KEY_MAP.filter((r) => r.keys.length === 1 && /^[A-Z]$/.test(r.keys[0] ?? ''))
-    expect(stage.map((r) => r.keys[0])).toEqual(['S', 'F', 'D'])
+    expect(stage.map((r) => r.keys[0])).toEqual(['S', 'F', 'D', 'T'])
     for (const r of stage) expect(stageKeyFor(r.keys[0]!), r.keys[0]).not.toBeNull()
     for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '-', 'Home'])
       expect(cameraActionFor(key), key).not.toBeNull()

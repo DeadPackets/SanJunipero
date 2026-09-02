@@ -4,13 +4,15 @@ import { cameraActionFor } from '../render/cameraNav.js'
 import { KEY_MAP_KEY } from './KeyMap.js'
 import { stageKeyAllowed, stageKeyFor } from './useStageKeys.js'
 
-describe('the four keys the stage itself owns', () => {
-  it('maps S, Esc, F and D, in either case', () => {
+describe('the five keys the stage itself owns', () => {
+  it('maps S, Esc, F, D and T, in either case', () => {
     expect(stageKeyFor('s')).toBe('signpost')
     expect(stageKeyFor('S')).toBe('signpost')
     expect(stageKeyFor('Escape')).toBe('escape')
     expect(stageKeyFor('f')).toBe('fullscreen')
     expect(stageKeyFor('D')).toBe('director')
+    expect(stageKeyFor('t')).toBe('thoughts')
+    expect(stageKeyFor('T')).toBe('thoughts')
   })
 
   // StageMount already binds these to the camera. A second binding pans twice per press.
@@ -32,7 +34,7 @@ describe('the four keys the stage itself owns', () => {
   })
 
   it('claims no key the camera claims', () => {
-    for (const key of ['s', 'S', 'f', 'F', 'd', 'D', 'Escape']) {
+    for (const key of ['s', 'S', 'f', 'F', 'd', 'D', 't', 'T', 'Escape']) {
       expect(cameraActionFor(key), key).toBeNull()
     }
   })

@@ -137,6 +137,7 @@ export function StageMount({
         }
         chars = createCharacterLayer(s, book, store, selectAgent)
         bubbles = createBubbleLayer(s, store)
+        s.bubbles = bubbles
         acts = createActLayer(s, store)
         atmosphere = createAtmosphere(s)
         weather = createWeatherLayer(s, store)

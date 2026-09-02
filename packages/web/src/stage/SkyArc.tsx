@@ -10,8 +10,8 @@ import {
   skyToken,
   skyWord,
 } from '../ui/skyModel.js'
+import { PixelGlyph } from './PixelGlyph.js'
 
-const GLYPH_PX = 8
 /** The token is drawn on the same eight-pixel grid the weather glyphs are. */
 /** No fill: the sun and the moon take `currentColor` off `.sky-token`. */
 const SUN: readonly (readonly [number, number])[] = [
@@ -46,31 +46,6 @@ const MOON: readonly (readonly [number, number])[] = [
   [3, 5],
   [4, 5],
 ]
-
-function PixelGlyph({
-  pixels,
-  className,
-}: {
-  /** a fill of `null` takes the element's own colour, which is where the token lives */
-  pixels: readonly (readonly [number, number, string?])[]
-  className: string
-}) {
-  return (
-    <svg
-      className={className}
-      viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
-      width={GLYPH_PX * 2}
-      height={GLYPH_PX * 2}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {pixels.map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill ?? 'currentColor'} />
-      ))}
-    </svg>
-  )
-}
 
 /** ★ THE SUN ARC — the one permanent mark over the town. Where the token sits on the curve says
  *  what hour it is before the words beside it are read at all; the words are the day, the season,

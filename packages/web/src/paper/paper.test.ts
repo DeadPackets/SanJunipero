@@ -106,7 +106,9 @@ describe('the signpost', () => {
     ).toContain('aria-expanded="true"')
 
     const css = src('../ui/chrome.css')
-    const body = /\.help-button \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    // The corner cluster is one block now: the thoughts switch stands on the same slab.
+    // Anchored: the same pair heads the `forced-colors` list, indented, further up the sheet.
+    const body = /^\.help-button, \.thoughts-button \{([^}]*)\}/m.exec(css)?.[1] ?? ''
     expect(body).toContain('width: 44px')
     expect(body).toContain('height: 44px')
     expect(body).toMatch(/left: max\(var\(--mark-inset\), env\(safe-area-inset-/)

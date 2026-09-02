@@ -1,6 +1,7 @@
 import { Assets, Container, Graphics, Texture } from 'pixi.js'
 import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
+import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { createWorldLabel } from './worldLabel.js'
 import {
   BUBBLE_EDGE,
@@ -196,7 +197,11 @@ export function placeBubbles(
 export type BubbleLayer = {
   spawnSpeech(agentId: string, text: string): void
   spawnThought(agentId: string, text: string): void
+  /** the town's tone, set by the ambient director */
   setSuppressed(v: boolean): void
+  /** the viewer's own switch, set by the chrome. Independent of the tone: leaving a grave hour
+   *  must not hand back wisps somebody turned off. */
+  setThoughts(v: ThoughtsSetting): void
   tick(nowMs: number): void
   destroy(): void
 }
@@ -220,7 +225,18 @@ type Bubble = {
 
 export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer {
   const bubbles: Bubble[] = []
-  let suppressed = false
+  let graveTone = false
+  let viewer: ThoughtsSetting = 'shown'
+  // Whatever shut them, the ones already in the air go with it.
+  const gate = (): void => {
+    if (!thoughtsHidden(graveTone, viewer)) return
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      if (bubbles[i]!.isThought) {
+        bubbles[i]!.node.destroy({ children: true })
+        bubbles.splice(i, 1)
+      }
+    }
+  }
 
   // One readback per person, from the idle cell the character layer already loaded. Until it
   // lands the bubble is plain cream, which is the material it leans away from anyway.
@@ -325,7 +341,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
-    if (isThought && suppressed) return // thought wisps stop under grave tone; speech is world fact
+    if (isThought && thoughtsHidden(graveTone, viewer)) return // speech is world fact and passes
     const state = store.getState()
     if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
@@ -350,15 +366,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       spawn(agentId, text, true)
     },
     setSuppressed: (v) => {
-      suppressed = v
-      if (v) {
-        for (let i = bubbles.length - 1; i >= 0; i--) {
-          if (bubbles[i]!.isThought) {
-            bubbles[i]!.node.destroy({ children: true })
-            bubbles.splice(i, 1)
-          }
-        }
-      }
+      graveTone = v
+      gate()
+    },
+    setThoughts: (v) => {
+      viewer = v
+      gate()
     },
     tick: (nowMs) => {
       const state = store.getState()

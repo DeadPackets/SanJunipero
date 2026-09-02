@@ -81,6 +81,7 @@ overlay sixty times a second.
 |---|---|---|
 | `Signpost` | four arms on a post: Folk · Chronicle · Found · Laws, each plank cut to its word | bottom-right, `--mark-inset` |
 | `HelpButton` | one 44px `?` on a honey slab, opening the key map | bottom-left, `--mark-inset` |
+| `ThoughtsButton` | one 44px pixel wisp, shown or hidden; a switch, so `aria-pressed`, and off empties the silhouette the way `.legend-chip.off` strikes a chip — never a darker ground, which is what a pressed arm means | bottom-left, stacked over the help button |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
 | `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
@@ -251,8 +252,9 @@ once.
 ## Accessibility floor
 
 - **Every pointer path has a key.** `S` signpost · `Tab` chrome · `Enter` act · `Esc` down ·
-  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `?` **the key map** — which
-  now has a pointer path of its own, the 44px corner button, because a key nothing on screen
+  `F` fullscreen · arrows/`+`/`-`/`Home` camera · `D` director · `T` thought bubbles ·
+  `?` **the key map** — which
+  now has a pointer path of its own, a 44px corner button, because a key nothing on screen
   names is an affordance only a viewer who already knew could find ·
   `Shift+P` the frame meter. `?` is where a person looks for the list, so the list is what it
   opens; the meter is an instrument and took the chord.

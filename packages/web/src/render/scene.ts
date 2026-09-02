@@ -15,6 +15,7 @@ import { createCameraRig } from './cameraRig.js'
 import { createGroundBaker } from './groundBake.js'
 import { feetOf } from './iso.js'
 import { groundArtSignature } from './groundField.js'
+import type { BubbleLayer } from './bubbles.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
   applyDepthOrder,
@@ -128,6 +129,10 @@ export type Scene = {
   pointOf(kind: 'agent' | 'structure', id: string): { sx: number; sy: number } | null
   /** the interior sub-scene; wired by StageMount once the character layer exists */
   interior?: InteriorScene
+  /** The viewer's own switch on the wisps; wired by StageMount, so the chrome can reach a live
+   *  setting into a Pixi handle React never re-renders. Narrowed to the one method: the rest of
+   *  the layer is the ambient director's. */
+  bubbles?: Pick<BubbleLayer, 'setThoughts'>
   destroy(): void
 }
 

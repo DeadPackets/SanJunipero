@@ -21,6 +21,7 @@ export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
   { keys: ['Home'], says: 'back to the middle' },
   { keys: ['F'], says: 'fullscreen' },
   { keys: ['D'], says: 'the director' },
+  { keys: ['T'], says: 'thought bubbles' },
   { keys: ['?'], says: 'this sheet' },
   { keys: ['⇧', 'P'], says: 'the frame meter' },
 ]

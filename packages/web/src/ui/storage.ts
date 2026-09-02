@@ -7,3 +7,13 @@ export function sessionStore(): Storage | null {
     return null
   }
 }
+
+/** The same guard for a preference that outlives the tab: how this browser likes the town shown
+ *  is not news about one session. */
+export function localStore(): Storage | null {
+  try {
+    return localStorage
+  } catch {
+    return null
+  }
+}
