@@ -330,7 +330,7 @@ export class EngineBridge {
     const a = state.agents[agentId]
     if (a === undefined) return []
     return [
-      ...naturalPlaces(state, a.x, a.y),
+      ...naturalPlaces(state, a.x, a.y).map((p) => ({ ...p, natural: true })),
       ...(a.knownPlaces ?? []).flatMap((id) => {
         const s = state.structures[id]
         if (s === undefined) return []

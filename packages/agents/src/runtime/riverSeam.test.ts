@@ -117,6 +117,21 @@ describe('★ the valley a mind is born knowing', () => {
       refusal: 'you know no such place',
     })
   })
+
+  // ★ The block tells a mind to walk to any landmark it is shown, so every word the block prints
+  // has to be a word the legs answer to. Nothing here checks the bank; only that the mark is read
+  // as a place at all, which is the one way the prompt and the engine can drift apart.
+  it('walks to every landmark the block prints, from anywhere in the valley', () => {
+    for (const at of [EAST_BANK, { x: 4, y: 4 }, { x: 70, y: 8 }, { x: 20, y: 100 }]) {
+      const { bridge, loop, config } = valley(at)
+      const known = bridge.knownPlaces(AGENT).filter((p) => p.natural === true)
+      expect(known.length, `landmarks at ${at.x},${at.y}`).toBeGreaterThan(0)
+      for (const p of known) {
+        const to = walkDestination(loop.state, config, AGENT, { structureId: p.id })
+        expect(to, `${p.id} from ${at.x},${at.y}`).not.toEqual({ refusal: 'you know no such place' })
+      }
+    }
+  })
 })
 
 describe('★ water at the far edge of the valley', () => {

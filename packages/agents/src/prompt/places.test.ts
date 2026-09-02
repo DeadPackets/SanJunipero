@@ -94,9 +94,29 @@ describe('★ the places a mind knows but cannot see', () => {
       place({ id: `structure_${String(i).padStart(2, '0')}`, x: AT.x + 60 - i }),
     )
     const lines = linesOf(many)
-    expect(lines).toHaveLength(13) // the heading and twelve places
+    expect(lines).toHaveLength(17) // the heading and sixteen places
     expect(lines[1]).toContain('structure_29')
-    expect(lines.at(-1)).toContain('structure_18')
+    expect(lines.at(-1)).toContain('structure_14')
+  })
+
+  // ★ Genesis plants twelve roofs at x 67..98 and the channel runs at x 49: every one of them
+  // is nearer than the river, and a cap read off distance alone hides the valley from the town.
+  it('keeps the landmarks a mind was born knowing, however many roofs stand nearer', () => {
+    const roofs = Array.from({ length: 30 }, (_, i) =>
+      place({ id: `structure_${String(i).padStart(2, '0')}`, x: AT.x + 1 + i }),
+    )
+    const river = place({
+      id: 'river',
+      kind: 'river',
+      name: 'the river',
+      x: AT.x + 60,
+      natural: true,
+    })
+    const lines = linesOf([...roofs, river])
+    expect(lines).toHaveLength(17)
+    expect(lines[1]).toBe('the river (river), far to the east')
+    // The roofs keep their own order behind it, and the cap still holds.
+    expect(lines[2]).toContain('structure_00')
   })
 
   it('is a fact and nothing more: no machinery, no counsel', () => {
@@ -186,7 +206,18 @@ describe('★ block 1 tells the truth about walking to a place', () => {
 
   it('offers both ways of naming where a walk ends', () => {
     expect(walkLine).toContain('give x and y as two numbers')
-    expect(walkLine).toMatch(/structureId, the mark of a place you know/)
+    expect(walkLine).toMatch(/structureId, the mark of any place you know/)
+  })
+
+  // ★ 94% of the rehearsal's walks named a raw tile and 88% of them were followed by another
+  // walk. The affordance was never missing; the coordinate form was simply offered first.
+  it('leads with the named place and leaves the two numbers as the fallback', () => {
+    expect(walkLine.indexOf('structureId')).toBeLessThan(walkLine.indexOf('x and y'))
+  })
+
+  it('says a mark reaches a landmark and not only a roof, and that the legs close the distance', () => {
+    expect(walkLine).toContain('a roof or a landmark alike')
+    expect(walkLine).toContain('set you down beside it, however far off it lies')
   })
 
   it('says a place stays known once seen or heard of, which the marks paragraph used to deny', () => {
