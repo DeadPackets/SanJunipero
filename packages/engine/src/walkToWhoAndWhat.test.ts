@@ -52,13 +52,14 @@ function run(
   moveYou?: (s: WorldState, i: number) => { x: number; y: number } | null,
 ): { state: WorldState; types: string[] } {
   const worldTick = createWorldTick(CFG, new RngStreams('walk-to'))
+  const walking = (w: WorldState): boolean => w.agents[ME]?.activity != null
   const types: string[] = []
   let s = state
-  for (let i = 0; i < ticks && s.agents[ME]!.activity !== null; i++) {
+  for (let i = 0; i < ticks && walking(s); i++) {
     const out = worldTick({ ...s, tick: s.tick + 1 })
     s = out.state
     types.push(...out.events.map((e) => e.type))
-    if (s.agents[ME]!.activity === null) break
+    if (!walking(s)) break
     const to = moveYou?.(s, i) ?? null
     if (to !== null) s = fold(s, ev('agent_moved', { id: YOU, ...to }), CFG)
   }
