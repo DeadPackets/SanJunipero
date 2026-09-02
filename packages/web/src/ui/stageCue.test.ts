@@ -2,8 +2,24 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import type { TownScene } from '../state/worldStore.js'
 import { CHRONICLE_GLYPH } from './importantFeed.js'
-import { CUE_HOLD_MS, CUE_ICON_PX, CUE_TYPES, bodiesOf, cueFor } from './stageCue.js'
+import { contrast, tokens } from './contrast.test.js'
+import {
+  CUE_HOLD_MS,
+  CUE_ICON_PX,
+  CUE_TYPES,
+  SCENE_SUMMARY_MS,
+  STAKES_HOT,
+  STAKES_MAX,
+  STAKES_WARM,
+  bodiesOf,
+  cueFor,
+  sceneCueFor,
+  sceneNames,
+  sceneStageOf,
+  stakesBand,
+} from './stageCue.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 
@@ -55,9 +71,9 @@ describe('★ the stage says what just happened', () => {
   })
 
   it('★ says a law in its own words, and says who broke one', () => {
-    expect(cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)?.text).toBe(
-      'The town made it law — No fire after dark',
-    )
+    expect(
+      cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)?.text,
+    ).toBe('The town made it law — No fire after dark')
     expect(cueFor(ev('law_ratified', { lawId: 'l1' }), state)?.text).toBe('The town made it law.')
     const broken = cueFor(ev('law_broken', { lawId: 'l1', agentId: 'yusuf', verb: 'take' }), state)
     expect(broken?.text).toBe("Yusuf broke the town's own law.")
@@ -127,5 +143,140 @@ describe('★ the moment stands for six seconds, then the slot goes back to nami
     const guarded =
       /@media \(prefers-reduced-motion: no-preference\) \{(?:(?!@media)[\s\S])*?\.stage-cue \{ transition: opacity/
     expect(CSS, 'every motion in the sheet lives inside the no-preference guard').toMatch(guarded)
+  })
+})
+
+// ★ THE SLOT SAYS WHAT THE TOWN IS DOING. A moment is news and is gone in six seconds; a scene
+// is the thing itself and stands for as long as the room talks.
+const NAMES = {
+  amara: { name: 'Amara' },
+  salma: { name: 'Salma' },
+  nadir: { name: 'Nadir' },
+  yusuf: { name: 'Yusuf' },
+}
+
+const scene = (over: Partial<TownScene> = {}): TownScene => ({
+  id: 'sc_1',
+  kind: 'talk',
+  participants: ['amara', 'salma'],
+  topic: 'At the well',
+  stakes: 2,
+  open: true,
+  ...over,
+})
+
+describe('★ the lower third says what is happening', () => {
+  it('★ names the topic and the people, in the town’s own words', () => {
+    const cue = sceneCueFor(sceneStageOf(scene(), null), NAMES)
+    expect(cue?.text).toBe('At the well · Amara & Salma')
+    expect(cue?.kind).toBe('talk')
+  })
+
+  it('joins a room of three, and counts one bigger than that', () => {
+    expect(sceneNames(['amara'], NAMES)).toBe('Amara')
+    expect(sceneNames(['amara', 'salma'], NAMES)).toBe('Amara & Salma')
+    expect(sceneNames(['amara', 'salma', 'nadir'], NAMES)).toBe('Amara, Salma & Nadir')
+    expect(sceneNames(['amara', 'salma', 'nadir', 'yusuf'], NAMES)).toBe('Amara & 3 others')
+  })
+
+  it('says who without a topic, rather than an empty separator', () => {
+    expect(sceneCueFor(sceneStageOf(scene({ topic: null }), null), NAMES)?.text).toBe(
+      'Amara & Salma',
+    )
+    expect(sceneCueFor(sceneStageOf(scene({ topic: '  ' }), null), NAMES)?.text).toBe(
+      'Amara & Salma',
+    )
+  })
+
+  it('★ hands the slot to the summary when the scene closes', () => {
+    const closed = scene({ open: false, summary: '  They agreed to dig deeper.  ' })
+    const cue = sceneCueFor(sceneStageOf(closed, null), NAMES)
+    expect(cue?.text).toBe('They agreed to dig deeper.')
+  })
+
+  it('★ clears eight seconds after the close, and not before', () => {
+    expect(SCENE_SUMMARY_MS).toBe(8000)
+    const closed = scene({ open: false, summary: 'They agreed.' })
+    expect(sceneStageOf(closed, null)?.phase).toBe('summary')
+    // the hold has run out on THIS scene, named by its own id
+    expect(sceneStageOf(closed, 'sc_1')).toBe(null)
+    expect(sceneStageOf(closed, 'sc_other')?.phase).toBe('summary')
+  })
+
+  it('an open scene is never cleared by a hold that ran out on its own id', () => {
+    expect(sceneStageOf(scene(), 'sc_1')?.phase).toBe('open')
+  })
+
+  it('clears at once on a close with nothing to say — an empty line is not a summary', () => {
+    expect(sceneStageOf(scene({ open: false }), null)).toBe(null)
+    expect(sceneStageOf(scene({ open: false, summary: '   ' }), null)).toBe(null)
+  })
+
+  it('has nothing to print with no scene, and nothing to print about nobody', () => {
+    expect(sceneStageOf(null, null)).toBe(null)
+    expect(sceneCueFor(null, NAMES)).toBe(null)
+    expect(sceneCueFor(sceneStageOf(scene({ topic: null, participants: [] }), null), NAMES)).toBe(
+      null,
+    )
+  })
+
+  it('names nobody it was not told about — an id never reaches the slot', () => {
+    expect(sceneNames(['stranger'], NAMES)).toBe('someone')
+  })
+})
+
+describe('★ a quarrel at nine does not look like a talk at two', () => {
+  it('reads the stakes as three bands, not as a number', () => {
+    expect([0, 1, 3].map(stakesBand)).toEqual(['quiet', 'quiet', 'quiet'])
+    expect([STAKES_WARM, 5, 7].map(stakesBand)).toEqual(['warm', 'warm', 'warm'])
+    expect([STAKES_HOT, 9, STAKES_MAX].map(stakesBand)).toEqual(['hot', 'hot', 'hot'])
+  })
+
+  it('★ carries the kind and the band, so the two scenes cannot draw the same', () => {
+    const talk = sceneCueFor(sceneStageOf(scene(), null), NAMES)
+    const quarrel = sceneCueFor(sceneStageOf(scene({ kind: 'quarrel', stakes: 9 }), null), NAMES)
+    expect([talk?.kind, talk?.band, talk?.stakes]).toEqual(['talk', 'quiet', 2])
+    expect([quarrel?.kind, quarrel?.band, quarrel?.stakes]).toEqual(['quarrel', 'hot', 9])
+  })
+
+  it('★ drops the stakes on the close: a live pressure, never a verdict', () => {
+    const cue = sceneCueFor(
+      sceneStageOf(scene({ kind: 'quarrel', stakes: 9, open: false, summary: 'Settled.' }), null),
+      NAMES,
+    )
+    expect(cue?.stakes).toBe(null)
+    expect(cue?.band).toBe('quiet')
+  })
+
+  it('★ every band clears AA on the stamp’s own ground', () => {
+    const T = tokens(src('./chrome.css'))
+    for (const ink of ['cream-quiet', 'honey', 'ember']) {
+      expect(contrast(T[ink]!, T.deep!), `--${ink} on --deep`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('★ says the stakes in a second channel, because colour is never the only one', () => {
+    const CSS = src('./chrome.css').replace(/\s+/g, ' ')
+    // a rule along the stamp's foot, as long a fraction of it as the scene is worth
+    expect(CSS).toMatch(
+      /\.stage-scene-stamp::after \{[^}]*width: calc\(var\(--stakes, 0\) \* 100%\)/,
+    )
+    expect(CSS).toMatch(/\.stage-scene-stamp\[data-stakes='hot'\] \{ color: var\(--ember\)/)
+    // ...and a third for anyone who cannot see either
+    expect(src('../stage/DirectorCue.tsx')).toContain('at stake')
+    expect(src('../stage/DirectorCue.tsx')).toContain('stage-sr')
+  })
+
+  it('★ the stamp is the sheet’s own slab, and survives forced colours', () => {
+    const CSS = src('./chrome.css').replace(/\s+/g, ' ')
+    expect(CSS).toMatch(/\.stage-scene-stamp \{[^}]*box-shadow: var\(--frame\)/)
+    expect(CSS).toMatch(/@media \(forced-colors: active\)[\s\S]*?\.stage-scene-stamp/)
+  })
+
+  it('★ the App feeds the slot from the one hold the camera also reads', () => {
+    const APP = src('../App.tsx')
+    expect(APP).toContain('useSceneStage(store)')
+    expect(APP).toContain('sceneCueFor(stage,')
+    expect(APP).toContain('stage={stage}')
   })
 })

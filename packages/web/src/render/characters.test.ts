@@ -1000,12 +1000,8 @@ describe('★ the floor ring and the facing, through the real layer', () => {
 
   /** The floor rings in the ground layer, in the order the bodies were made: amara, then salma. */
   const rings = (scene: Scene): { alpha: number; visible: boolean }[] =>
-    (
-      scene.layers as unknown as Record<
-        string,
-        { children: { alpha: number; visible: boolean }[] }
-      >
-    ).groundDecal!.children
+    (scene.layers as unknown as Record<string, { children: { alpha: number; visible: boolean }[] }>)
+      .groundDecal!.children
 
   const facingOf = (layer: ReturnType<typeof createCharacterLayer>, id: string): string | null => {
     const s = layer.getSprite(id) as unknown as { texture: { frame?: { x: number } } } | null

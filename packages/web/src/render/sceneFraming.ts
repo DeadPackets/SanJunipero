@@ -44,9 +44,6 @@ export function sceneShot(
 
 /** Whose bodies the camera can actually frame: the participants the exterior view draws. A
  *  scene held entirely indoors has nothing on the map to point at. */
-export function sceneCast(
-  participants: readonly string[],
-  indoors: ReadonlySet<string>,
-): string[] {
+export function sceneCast(participants: readonly string[], indoors: ReadonlySet<string>): string[] {
   return participants.filter((id) => !indoors.has(id))
 }
