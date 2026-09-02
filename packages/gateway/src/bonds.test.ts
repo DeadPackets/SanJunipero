@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   ADULT_AGE_DAYS,
   BOND_RECENT_ACTS,
@@ -333,19 +333,21 @@ describe('★ the talk window is a window, not the whole log', () => {
   })
 
   it('is linear in the log, not quadratic — 8× the speech is not 64× the work', () => {
-    const run = (n: number): number => {
+    // Every pair the fold weighs reaches exactly one distance check, so counting those counts the
+    // work itself; a wall clock would be counting whatever else the box is doing.
+    const distanceChecks = (n: number): number => {
       const events = Array.from({ length: n }, (_, i) => spoke(i + 1, i, `a${i % 8}`, 0))
-      const t0 = process.hrtime.bigint()
-      buildBonds(events, 5, n)
-      return Number(process.hrtime.bigint() - t0) / 1e6
+      const hypot = vi.spyOn(Math, 'hypot')
+      try {
+        buildBonds(events, 5, n)
+        return hypot.mock.calls.length
+      } finally {
+        hypot.mockRestore()
+      }
     }
-    run(4_000) // warm the jit so the ratio is the algorithm
-    const small = Math.max(run(8_000), 1)
-    const large = run(64_000)
+    const small = distanceChecks(1_000)
+    const large = distanceChecks(8_000)
     // quadratic would be ~64×; the bound makes it ~8×. Ten is the honest line between them.
-    expect(
-      large / small,
-      `8k took ${small.toFixed(1)} ms, 64k took ${large.toFixed(1)} ms`,
-    ).toBeLessThan(10)
+    expect(large / small, `1k weighed ${small} pairs, 8k weighed ${large}`).toBeLessThan(10)
   })
 })
