@@ -44,6 +44,13 @@ type PerceptionSeen =
       // What a minted act looks or sounds like, in the words its charter gave it.
       label?: string
     }
+  | {
+      kind: 'discovery'
+      inventorName: string
+      pronoun: 'he' | 'she'
+      name: string
+      saying?: string
+    }
 
 type PerceptionAgent = {
   id: string
@@ -1023,6 +1030,9 @@ export function perceptionToProse(
           ? `You hear ${s.actorName} ${doing}.`
           : `You watch ${s.actorName} ${doing}.`,
       )
+    } else if (s.kind === 'discovery') {
+      const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.saying}`
+      lines.push(`${s.inventorName} has worked out ${s.name}${why}.`)
     } else lines.push(s.prose)
   }
 

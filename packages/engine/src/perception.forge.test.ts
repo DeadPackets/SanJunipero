@@ -63,6 +63,45 @@ describe('marks a minted verb left', () => {
   })
 })
 
+describe('a discovery is told within earshot', () => {
+  const worked = (saying?: string): SimEvent =>
+    ev('discovery_made', {
+      recipeId: 'recipe:smoke_fish',
+      name: 'smoking fish over green wood',
+      kind: 'craft',
+      byId: 'b',
+      intent: 'hang the fish over green wood',
+      ...(saying === undefined ? {} : { saying }),
+      makes: ['smoked fish'],
+    })
+
+  it('reaches a neighbour, with the inventor’s own why', () => {
+    const packet = composePerception(town(), DEFAULT_CONFIG, 'a', [
+      worked('The catch will not keep past the week.'),
+    ])
+    expect(packet.seen).toEqual([
+      {
+        kind: 'discovery',
+        inventorName: 'Omar',
+        pronoun: 'he',
+        name: 'smoking fish over green wood',
+        saying: 'The catch will not keep past the week.',
+      },
+    ])
+  })
+
+  it('does not reach a mind across the map, nor the inventor', () => {
+    expect(composePerception(town(), DEFAULT_CONFIG, 'far', [worked('x')]).seen).toEqual([])
+    expect(composePerception(town(), DEFAULT_CONFIG, 'b', [worked('x')]).seen).toEqual([])
+  })
+
+  it('is still told when the mind had no thought behind the ask', () => {
+    expect(composePerception(town(), DEFAULT_CONFIG, 'a', [worked()]).seen[0]).not.toHaveProperty(
+      'saying',
+    )
+  })
+})
+
 describe('a witnessed act', () => {
   const toast = (radius?: number): SimEvent =>
     ev('agent_expressed', {

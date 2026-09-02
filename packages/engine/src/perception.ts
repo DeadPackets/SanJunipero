@@ -27,6 +27,7 @@ import {
   type WorldState,
 } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
+import { sexOf } from './systems/reproduction.js'
 import { isSpoiling } from './systems/spoilage.js'
 import {
   buildTicks,
@@ -189,6 +190,15 @@ export type SeenEvent =
       sense: 'sight' | 'sound'
       // What a minted act looks or sounds like, in the words its charter gave it.
       label?: string
+    }
+  // Somebody within earshot worked something out, and said why. `saying` is absent when the
+  // mind had no thought behind the ask.
+  | {
+      kind: 'discovery'
+      inventorName: string
+      pronoun: 'he' | 'she'
+      name: string
+      saying?: string
     }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
@@ -645,6 +655,25 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
       verb: p.verb,
       sense,
       ...(typeof p.label === 'string' ? { label: sanitizeSpokenText(p.label) } : {}),
+    })
+  }
+
+  // A discovery is told, not seen: it carries as far as the inventor's voice does, from where
+  // the inventor stands now.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'discovery_made') continue
+    const p = ev.payload as { byId?: unknown; name?: unknown; saying?: unknown }
+    if (typeof p.byId !== 'string' || typeof p.name !== 'string' || p.byId === self.id) continue
+    const inventor = state.agents[p.byId]
+    if (inventor === undefined) continue
+    const mouth = { x: inventor.x, y: inventor.y, insideId: inventor.insideId }
+    if (!hears(state, config, mouth, self.id)) continue
+    seen.push({
+      kind: 'discovery',
+      inventorName: inventor.name,
+      pronoun: sexOf(inventor) === 'm' ? 'he' : 'she',
+      name: p.name,
+      ...(typeof p.saying === 'string' ? { saying: sanitizeSpokenText(p.saying) } : {}),
     })
   }
 

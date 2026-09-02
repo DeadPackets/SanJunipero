@@ -59,6 +59,28 @@ describe('marks a minted verb left', () => {
   })
 })
 
+describe('a discovery a neighbour made', () => {
+  it('is told with the name and the why, and without the why when there was none', () => {
+    const told = (saying?: string): string =>
+      perceptionToProse({
+        ...quietMeadowPacket,
+        seen: [
+          {
+            kind: 'discovery',
+            inventorName: 'Omar',
+            pronoun: 'he',
+            name: 'smoking fish over green wood',
+            ...(saying === undefined ? {} : { saying }),
+          },
+        ],
+      })
+    expect(told('the catch would not keep past the week')).toContain(
+      'Omar has worked out smoking fish over green wood: he said the catch would not keep past the week.',
+    )
+    expect(told()).toContain('Omar has worked out smoking fish over green wood.')
+  })
+})
+
 describe('a witnessed act', () => {
   it('is told in the words its charter gave it, seen or heard', () => {
     const seen = (sense: 'sight' | 'sound'): string =>
