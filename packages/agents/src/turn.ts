@@ -89,6 +89,11 @@ export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
   plan: z.array(ClosedIntentSchema).max(PLAN_MAX_STEPS).nullable().describe(A_PLAN),
 })
 
+/** The turn's own field names. A mind reaches for these as verbs — four of the phase 1 gate's
+ *  seven paid rulings were `plan` named as an act — and the runtime turns them away as the
+ *  no-op they are. Read off the schema, so a field added there cannot leave this stale. */
+export const TURN_FIELDS: ReadonlySet<string> = new Set(Object.keys(StrictTurnSchema.shape))
+
 const askedFor = (step: unknown): unknown => {
   if (step === null || typeof step !== 'object') return step
   const { params, ...rest } = step as { params?: unknown }

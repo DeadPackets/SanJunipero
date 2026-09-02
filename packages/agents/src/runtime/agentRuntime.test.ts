@@ -38,6 +38,7 @@ import {
   refusalMemoryText,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
+import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -1701,6 +1702,39 @@ describe('arbiter seam (T19)', () => {
     expect(
       memoriesOfKind(agentDb, 'action').filter((m) => m.text.includes(OPAQUE_REFUSAL)),
     ).toEqual([])
+  })
+
+  // ★ Four of the gate's seven paid rulings were `plan` named as the action verb, each ruled
+  // "not a recognized routine" for a fee. The turn's field list is three clauses from the
+  // action's own instruction, and minds read the two as one vocabulary.
+  it('★ a field of the turn named as a verb is a quiet beat, not a ruling', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'not a recognized routine', class: 'nonsense' }
+    }
+    const asVerbs = [...TURN_FIELDS].map((field) => ({
+      thought: `I mean to ${field}.`,
+      action: { verb: field, params: { x: 1, y: 2 } },
+      importance: 3,
+    }))
+    const { loop, agentDb } = await setup({
+      model: turnModel([...asVerbs, freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => seen.length >= 1, 400)
+
+    // Only the real try reaches the god; not one field name does, and none is remembered.
+    expect(seen).toEqual(['weave reeds into a basket'])
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not a recognized routine'])
+  })
+
+  it('★ takes the field names off the schema, so a new field cannot leave the guard stale', () => {
+    expect([...TURN_FIELDS].sort()).toEqual(Object.keys(StrictTurnSchema.shape).sort())
+    expect(TURN_FIELDS.has('plan')).toBe(true)
+    // A word the world does answer to is never one of them.
+    expect(TURN_FIELDS.has('walk')).toBe(false)
   })
 
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {

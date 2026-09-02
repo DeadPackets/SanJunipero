@@ -58,6 +58,7 @@ import {
   StrictTurnSchema,
   reconsiderTick,
   turnSpeaks,
+  TURN_FIELDS,
   type Turn,
 } from '../turn.js'
 import {
@@ -141,8 +142,10 @@ const BODY_NOOPS = new Set([
   'stay',
 ])
 
+// A word for standing still, or one of the turn's own field names read off the list it was
+// asked in: `plan` is a thing a mind writes, never a thing a body does.
 function isBodyNoOp(reason: string, verb: string): boolean {
-  return reason.startsWith('unknown verb:') && BODY_NOOPS.has(verb)
+  return reason.startsWith('unknown verb:') && (BODY_NOOPS.has(verb) || TURN_FIELDS.has(verb))
 }
 
 export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
