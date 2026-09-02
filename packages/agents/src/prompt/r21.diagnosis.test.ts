@@ -214,11 +214,11 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     // band, and nothing about the body under it. It now gets the ailment too, in words.
     expect(salma!.condition).toBe('flushed with fever')
     expect(proseFor(sick, 'omar')).toContain(
-      'salma (salma) stands at (74, 113), flushed with fever.',
+      'salma (salma) stands close to the east, flushed with fever.',
     )
 
     // And a town with nothing wrong with it reads exactly as it always did.
-    expect(proseFor(s, 'omar')).toContain('salma (salma) stands at (74, 113).')
+    expect(proseFor(s, 'omar')).toContain('salma (salma) stands close to the east.')
   })
 })
 
@@ -245,8 +245,12 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // R21-A. No line said she was under a roof, and the roof line sent her to its own doorway.
     expect(prose).toContain(`You stand inside the house (${house.id}) at (79, 99).`)
     expect(prose).toContain('Four walls are around you')
-    expect(prose).toContain('this is the roof you are under; the way out is at (81, 99).')
-    expect(prose).not.toContain('stand there and you can go in')
+    // ★ THE ONE DOOR TILE THAT STAYS. Walking is refused indoors and `exit` takes no mark, so no
+    // walk can be aimed at this pair: it says where the body comes out, and the roof line, which
+    // used to repeat it, now only says which roof it is.
+    expect(prose).toContain('the doorway at (81, 99) is the way back out under the sky')
+    expect(prose).toContain('this is the roof you are under.')
+    expect(prose).not.toContain('walk to it and you can go in')
     // The world's answer to the instruction that used to be given: both acts now stand, the
     // first because she is already under that roof, the second by way of its door.
     expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id }).ok).toBe(true)
@@ -399,7 +403,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // The id is READ from the world, not retyped: a template edit renumbers the mints. A named
     // place is called by its name now, so the sentence opens with what the town calls it.
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
-    expect(everyProse).toContain(`The well (${well.id}) stands at`)
+    expect(everyProse).toContain(`The well (${well.id}) stands `)
     for (const noun of ['house', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
       expect(everyProse).not.toMatch(
         new RegExp(`(build|craft|raise|shape|make)[^.]{0,40}${noun}`, 'i'),

@@ -116,7 +116,7 @@ describe('the affordance block says what the validators would otherwise refuse',
     const t = town()
     expect(await refusal(t, { verb: 'walk', params: { x: 5, y: 5 } })).toBe('no path to that spot')
     const said = proseFor(t.bridge)
-    expect(said).toContain(`A house (${HOUSE}) stands at (5, 5)`)
+    expect(said).toContain(`A house (${HOUSE}) stands close to the north-west`)
     expect(said).toContain('Wall or water covers (5, 5); no walk of yours can end there.')
   })
 

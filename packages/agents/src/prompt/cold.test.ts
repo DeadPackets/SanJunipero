@@ -274,8 +274,10 @@ describe('the road to a fed fire, opened before the light goes', () => {
     nightWillBeCold: () => true,
     nearestSource: (kind) => (kind === 'wood' ? { x: 31, y: 44, from: 'tree' } : null),
   }
+  // The fire is named, not placed: `walk` and `stoke` both take the mark, and the tile the line
+  // used to carry was the one thing in it a mind could copy into a coordinate walk.
   const NEEDS_WOOD =
-    'The night will be cold; the hearth in the fire pit at (12, 11) is cold and wants wood.'
+    'The night will be cold; the hearth in a fire pit (structure_fire_pit_12_11) is cold and wants wood.'
   const cold = (packet: PerceptionPacket, world = coldNight): string =>
     roadLine(makeables(CFG), packet, world)
 

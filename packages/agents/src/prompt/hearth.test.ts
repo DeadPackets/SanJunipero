@@ -216,7 +216,7 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
   it('★ VACUOUS GUARD: and the finished building does not say it', () => {
     const done = site('complete')
     expect(done).not.toContain('There is no inside to it yet.')
-    expect(done).toContain('stand there and you can go in')
+    expect(done).toContain('it has a doorway; walk to it and you can go in')
   })
 
   it('names no remedy: it is a fact about now and promises nothing later', () => {

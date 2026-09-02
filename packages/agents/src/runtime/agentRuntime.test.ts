@@ -1470,14 +1470,12 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(alertKinds(agentDb)).toContain('empty_act_detail')
   })
 
-  it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
+  it('perception prose says a visible structure can be walked into (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
-    // A storehouse is a thing you can walk into, so the prose names the doorway `enter`
-    // measures against rather than the nearest open ground beside the wall.
-    expect(runtime.dayLogSnapshot()[0]).toContain(
-      'its doorway is at (5, 6); stand there and you can go in',
-    )
+    // A storehouse is a thing you can walk into, so the prose says it has a doorway rather than
+    // offering ground beside the wall — and names neither as a tile.
+    expect(runtime.dayLogSnapshot()[0]).toContain('it has a doorway; walk to it and you can go in')
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {

@@ -31,21 +31,21 @@ function pair(): { prose: () => string; state: () => ReturnType<typeof genesisSt
 
 describe('a body that has gone down is seen to have gone down', () => {
   it('on its feet it stands', () => {
-    expect(pair().prose()).toContain('Amara (amara) stands at (9, 8)')
+    expect(pair().prose()).toContain('Amara (amara) stands close to the east')
   })
 
   it('merely asleep it sleeps', () => {
     const t = pair()
     t.state().agents[OTHER]!.asleep = true
     const said = t.prose()
-    expect(said).toContain('Amara (amara) sleeps at (9, 8)')
+    expect(said).toContain('Amara (amara) sleeps close to the east')
     expect(said).not.toContain('lies collapsed')
   })
 
   it('collapsed while awake it lies collapsed', () => {
     const t = pair()
     t.state().agents[OTHER]!.collapsedSinceTick = 700
-    expect(t.prose()).toContain('Amara (amara) lies collapsed at (9, 8)')
+    expect(t.prose()).toContain('Amara (amara) lies collapsed close to the east')
   })
 
   // Hunger keeps falling through the night, so `collapseDeathSystem` fires on a sleeping body and
@@ -56,7 +56,7 @@ describe('a body that has gone down is seen to have gone down', () => {
     t.state().agents[OTHER]!.asleep = true
     t.state().agents[OTHER]!.collapsedSinceTick = 700
     const said = t.prose()
-    expect(said).toContain('Amara (amara) lies collapsed at (9, 8)')
-    expect(said).not.toContain('sleeps at')
+    expect(said).toContain('Amara (amara) lies collapsed close to the east')
+    expect(said).not.toContain('sleeps close to')
   })
 })
