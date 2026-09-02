@@ -1,5 +1,8 @@
 packages:
   - packages/*
+overrides:
+  adm-zip: ^0.6.0
+  sharp: ^0.35.0
 allowBuilds:
   better-sqlite3: true
   esbuild: true
