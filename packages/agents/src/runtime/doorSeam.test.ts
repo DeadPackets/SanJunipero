@@ -13,8 +13,9 @@ import { ADULT_AGE_DAYS, SimConfigSchema } from '@sj/shared'
 import { perceptionToProse } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
-// Walked end to end: prose names a doorway, the mind reads the tile out of the words, walks
-// there, and `enter` lets it in. Nothing here knows the tile except the sentence the mind read.
+// Walked end to end: prose names a doorway and the roof it belongs to, the mind reads the MARK
+// out of the words, walks by it, and `enter` lets it in. No tile is read from the prose at all —
+// there is none in it to read.
 const AGENT = 'tamar'
 const HOUSE = 'structure_1'
 
@@ -80,20 +81,20 @@ const proseFor = (bridge: EngineBridge): string =>
   })
 
 describe('the door seam — prose, intent, verb, interior', () => {
-  it('a mind reads the doorway out of its own prose, walks there and goes in', async () => {
+  it('a mind reads the mark out of its own prose, walks by it and goes in', async () => {
     const { bridge, step, loop } = town()
+    // A place is known once the eyes have reached it, and sight lands at the end of a tick.
+    step()
 
     const said = proseFor(bridge)
-    const door = /doorway is at \((\d+), (\d+)\)/.exec(said)
-    expect(door).not.toBeNull()
-    const x = Number(door![1])
-    const y = Number(door![2])
+    const mark = /\((structure_\d+)\) stands/.exec(said)
+    expect(mark).not.toBeNull()
+    const structureId = mark![1]!
 
-    const walking = bridge.submit(AGENT, { verb: 'walk', params: { x, y } })
+    const walking = bridge.submit(AGENT, { verb: 'walk', params: { structureId } })
     step()
     expect(await walking).toEqual({ ok: true })
     for (let i = 0; i < 200 && loop.state.agents[AGENT]!.activity !== null; i++) step()
-    expect({ x: loop.state.agents[AGENT]!.x, y: loop.state.agents[AGENT]!.y }).toEqual({ x, y })
 
     const entering = bridge.submit(AGENT, { verb: 'enter', params: { structureId: HOUSE } })
     step()
@@ -102,10 +103,11 @@ describe('the door seam — prose, intent, verb, interior', () => {
     expect(loop.state.agents[AGENT]!.insideId).toBe(HOUSE)
   })
 
-  it('never offers a tile beside the wall for a building it could walk into', () => {
+  it('names the doorway for a building it could walk into, and no tile for either', () => {
     const { bridge } = town()
     const said = proseFor(bridge)
-    expect(said).toContain('stand there and you can go in')
-    expect(said).not.toContain('you could stand beside it at')
+    expect(said).toContain('it has a doorway; walk to it and you can go in')
+    expect(said).not.toContain('no open ground lies beside it')
+    expect(said).not.toMatch(new RegExp(`${HOUSE}[^.]*\\(\\d+, ?\\d+\\)`))
   })
 })

@@ -324,27 +324,19 @@ export type ProseWorld = {
   extent?: () => { w: number; h: number }
 }
 
-// Nearest open tile ringing a structure's footprint (Manhattan to self);
-// row-major scan keeps ties deterministic (lower y, then lower x).
-function besideTile(
+// Whether any tile ringing a structure's footprint can hold a body. A walk that names the place
+// picks the tile itself, so all the sentence needs is whether there is one at all.
+function openGroundBeside(
   s: { x: number; y: number; w: number; h: number },
-  self: { x: number; y: number },
   isWalkable: (x: number, y: number) => boolean,
-): { x: number; y: number } | null {
-  let best: { x: number; y: number } | null = null
-  let bestDist = Infinity
+): boolean {
   for (let y = s.y - 1; y <= s.y + s.h; y++) {
     for (let x = s.x - 1; x <= s.x + s.w; x++) {
       const inside = x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h
-      if (inside || !isWalkable(x, y)) continue
-      const d = Math.abs(x - self.x) + Math.abs(y - self.y)
-      if (d < bestDist) {
-        bestDist = d
-        best = { x, y }
-      }
+      if (!inside && isWalkable(x, y)) return true
     }
   }
-  return best
+  return false
 }
 
 // Whose it is and whose hands made it, in the order prose wants them. Empty for
@@ -534,9 +526,7 @@ function sourcePhrase(from: SourceKind, kind: string): string {
 function placeOf(want: Want, packet: PerceptionPacket, world: ProseWorld): string {
   if (want.cond === 'fire') {
     const fire = nearestHearth(packet, 'lit')
-    return fire === null
-      ? ''
-      : `; the hearth in the ${words(fire.kind)} at (${fire.x}, ${fire.y}) is lit`
+    return fire === null ? '' : `; the hearth in ${placeSaid(fire)} (${fire.id}) is lit`
   }
   if (want.cond === 'water') {
     const w = world.nearestWater?.(packet.self.x, packet.self.y) ?? null
@@ -605,7 +595,7 @@ function coldRoadHearth(packet: PerceptionPacket, world?: ProseWorld): Perceptio
 function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
   const near = coldRoadHearth(packet, world)
   if (near === null) return ''
-  const line = `The night will be cold; the hearth in the ${words(near.kind)} at (${near.x}, ${near.y}) is cold and wants wood.`
+  const line = `The night will be cold; the hearth in ${placeSaid(near)} (${near.id}) is cold and wants wood.`
   // Hands that already hold the wood need no road to a tree, only the fire it is wanted at.
   if (packet.self.inventory.some((i) => i.kind === FUEL_ITEM)) return line
   const at = world?.nearestSource?.(FUEL_ITEM, packet.self.x, packet.self.y) ?? null
@@ -654,6 +644,11 @@ const howFar = (d: number): string =>
 // Which way and how far, in one phrase: the places block and the water road say a distance the
 // same way, or a mind is given two vocabularies for one valley.
 const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))} ${bearing(dx, dy)}`
+
+// Where a thing in sight lies, said the way the places block says it. A named mark is what the
+// walk verb takes, so the tile it used to be given here was only ever the easier thing to copy.
+const inSight = (self: { x: number; y: number }, at: { x: number; y: number }): string =>
+  at.x === self.x && at.y === self.y ? 'where you stand' : wayTo(at.x - self.x, at.y - self.y)
 
 // A whole town read back every turn is a page of standing facts. Genesis raises twelve roofs and
 // the valley has three landmarks, so a founder's whole world fits with a slot to spare.
@@ -1029,15 +1024,15 @@ export function perceptionToProse(
     // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
     // ailing is a body nobody tends, and the live run tended nobody at all.
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
-    const where = `(${a.x}, ${a.y})${dressed}${ails}${markedPhrase(a.marks)}`
+    const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
     if (a.collapsed)
       lines.push(
-        `${a.name} (${a.id}) lies collapsed at ${where} — hold food out to them and they will eat it from your hand.`,
+        `${a.name} (${a.id}) lies collapsed ${where} — hold food out to them and they will eat it from your hand.`,
       )
-    else if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at ${where}.`)
-    else lines.push(`${a.name} (${a.id}) stands at ${where}.`)
+    else if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps ${where}.`)
+    else lines.push(`${a.name} (${a.id}) stands ${where}.`)
   }
 
   for (const s of packet.visible.structures) {
@@ -1046,40 +1041,33 @@ export function perceptionToProse(
       : s.stage === 'construction'
         ? `, and ${howFarUp(s.raised)}`
         : ''
-    // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
-    // against, so a mind told to stand there is a mind the world lets in.
-    let approach = 'walk to a tile beside it.'
-    if (s.id === inside?.id) {
-      approach =
-        s.door === undefined
-          ? 'this is the roof you are under.'
-          : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
-    } else if (s.door !== undefined) {
+    // ★ A DOORWAY IS A FACT, NOT A TILE. `enter` takes any ground within one of the door and a
+    // walk that names the place is scored to land on exactly that ground, so the pair the line
+    // used to carry bought nothing the name does not — and it was the easier thing to copy.
+    let approach = 'walk to it and your legs will set you down beside it.'
+    if (s.id === inside?.id) approach = 'this is the roof you are under.'
+    else if (s.door !== undefined) {
       // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
       // room that is full now from a wall with no way through it ever — and can come back.
       approach =
         s.full === true
-          ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
-          : `its doorway is at (${s.door.x}, ${s.door.y}); stand there and you can go in.`
-    } else if (world?.isWalkable) {
-      const t = besideTile(s, packet.self, world.isWalkable)
-      approach =
-        t === null
-          ? 'no open ground lies beside it.'
-          : `you could stand beside it at (${t.x}, ${t.y}).`
+          ? 'it has a doorway, and there is no floor left in it.'
+          : 'it has a doorway; walk to it and you can go in.'
+    } else if (world?.isWalkable && !openGroundBeside(s, world.isWalkable)) {
+      approach = 'no open ground lies beside it.'
     }
     // Said at the wall instead of at the refusal: how far up the walls are never said that
     // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
     lines.push(
-      `${opening(placeSaid(s))} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
+      `${opening(placeSaid(s))} (${s.id}) stands ${inSight(packet.self, s)}, ${footprintPhrase(s.w, s.h)}${state}; ${
         approach
       }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}${markedPhrase(s.marks)}`,
     )
   }
 
   for (const i of packet.visible.items) {
-    const pos = i.loc.t === 'tile' ? ` at (${i.loc.x}, ${i.loc.y})` : ''
+    const pos = i.loc.t === 'tile' ? ` ${inSight(packet.self, i.loc)}` : ''
     lines.push(`You can see ${itemPhrase(i)}${pos}${claimPhrase(i)}.`)
   }
 

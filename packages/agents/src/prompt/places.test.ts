@@ -154,11 +154,19 @@ describe('★ a place in sight is called by its name too', () => {
     })
 
   it('names it where it stands, opening the sentence with what the town calls it', () => {
-    expect(standingAt({ name: 'the well' })).toContain('The well (structure_10) stands at (14, 9)')
+    expect(standingAt({ name: 'the well' })).toContain(
+      'The well (structure_10) stands close to the east',
+    )
   })
 
   it('and points at an unnamed one exactly as it always did', () => {
-    expect(standingAt({})).toContain('A well (structure_10) stands at (14, 9)')
+    expect(standingAt({})).toContain('A well (structure_10) stands close to the east')
+  })
+
+  // The same law the places block keeps, kept in front of the eyes too: a roof a mind can see is
+  // a roof it can name, and the tile beside the name is the thing it copies instead.
+  it('carries no tile at all, for a place in sight any more than for one over the hill', () => {
+    expect(standingAt({ name: 'the well' })).not.toMatch(/well \(structure_10\)[^.]*\(\d+, ?\d+\)/)
   })
 })
 

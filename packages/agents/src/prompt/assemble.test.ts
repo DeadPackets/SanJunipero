@@ -391,7 +391,7 @@ describe('perceptionToProse', () => {
         ],
       },
     })
-    expect(prose).toContain("basket (item_3) at (12, 10); Rahel's, marked by Yusuf")
+    expect(prose).toContain("basket (item_3) close to the south; Rahel's, marked by Yusuf")
     expect(prose).toContain("hold plank ×1 (item_9; Bex's)")
   })
 
@@ -403,7 +403,7 @@ describe('perceptionToProse', () => {
         items: [{ id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 } }],
       },
     })
-    expect(prose).toContain('You can see 1 basket (item_3) at (12, 10).')
+    expect(prose).toContain('You can see 1 basket (item_3) close to the south.')
     expect(prose).not.toContain('—')
   })
 
@@ -543,7 +543,7 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('clear')
   })
 
-  it('renders self position and visible coordinates with marks', () => {
+  it('renders self position, and the things it can see by mark and bearing', () => {
     const packet = {
       ...quietMeadowPacket,
       visible: {
@@ -566,8 +566,9 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('You stand at (12, 9)')
-    expect(prose).toContain('storehouse (structure_1) stands at (14, 9)')
-    expect(prose).toContain('20 bread (item_1) at (13, 9)')
+    expect(prose).toContain('storehouse (structure_1) stands close to the east')
+    expect(prose).toContain('20 bread (item_1) close to the east')
+    // A crop is not nameable to a walk, so the ground it grows on is still the whole of the road.
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
 
@@ -647,12 +648,12 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('storehouse (structure_1) stands at (10, 10)')
+    expect(prose).toContain('storehouse (structure_1) stands close to the south-west')
     expect(prose).toContain('2 tiles wide and 1 tile tall')
-    expect(prose).toContain('walk to a tile beside it')
+    expect(prose).toContain('walk to it and your legs will set you down beside it')
   })
 
-  it('offers the nearest open tile beside a structure when the world can be asked', () => {
+  it('says when nothing beside a structure can hold a body, and offers no tile either way', () => {
     const packet = {
       ...quietMeadowPacket,
       visible: {
@@ -673,16 +674,16 @@ describe('perceptionToProse', () => {
         crops: [],
       },
     }
-    // Self is at (12, 9): with all neighbors open, (11, 9) is nearest.
+    // Which tile is the walk's to pick, so the sentence turns only on whether one exists at all.
     const open = perceptionToProse(packet, undefined, { isWalkable: () => true })
-    expect(open).toContain('you could stand beside it at (11, 9)')
-    expect(open).not.toContain('walk to a tile beside it')
+    expect(open).toContain('walk to it and your legs will set you down beside it')
+    expect(open).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
 
-    // Only (10, 11) is open ground; the offer must skip blocked tiles.
+    // One tile of open ground is ground enough, and it is still never named.
     const oneGap = perceptionToProse(packet, undefined, {
       isWalkable: (x, y) => x === 10 && y === 11,
     })
-    expect(oneGap).toContain('you could stand beside it at (10, 11)')
+    expect(oneGap).toContain('walk to it and your legs will set you down beside it')
 
     // No open ground at all: say so instead of pointing at a wall.
     const walled = perceptionToProse(packet, undefined, { isWalkable: () => false })
@@ -748,8 +749,8 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('Nadia (nadia) lies collapsed at (16, 10)')
-    expect(prose).toContain('Edda (edda) sleeps at (15, 11)')
+    expect(prose).toContain('Nadia (nadia) lies collapsed close to the east')
+    expect(prose).toContain('Edda (edda) sleeps close to the south-east')
   })
 
   it('renders self stance by asleep/collapsed state', () => {

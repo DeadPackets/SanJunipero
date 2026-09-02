@@ -214,10 +214,13 @@ describe('★ and the prose says it where the mind will read it', () => {
     expect(nearly).not.toEqual(barely)
   })
 
-  it('still tells the mind where to stand, which is the half that lets it join', () => {
-    expect(say({ done: 1440, needs: 2880 })).toMatch(
-      /its walls are half up; you could stand beside it at \(\d+, \d+\)\./,
+  it('still tells the mind it can get to the walls, which is the half that lets it join', () => {
+    const said = say({ done: 1440, needs: 2880 })
+    expect(said).toContain(
+      'its walls are half up; walk to it and your legs will set you down beside it.',
     )
+    // The site is named, and a walk that names it lands on the ring: no tile is offered to copy.
+    expect(said).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
   })
 
   it('falls back to the landed sentence when the packet carries no progress', () => {
@@ -287,10 +290,8 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
     )
 
   it('names the doorway either way — a full room is not a wall', () => {
-    expect(seeing({})).toContain('its doorway is at (2, 3); stand there and you can go in.')
-    expect(seeing({ full: true })).toContain(
-      'its doorway is at (2, 3), and there is no floor left in it.',
-    )
+    expect(seeing({})).toContain('it has a doorway; walk to it and you can go in.')
+    expect(seeing({ full: true })).toContain('it has a doorway, and there is no floor left in it.')
   })
 
   // The distinction the whole of R2 turns on: a mind that cannot tell "full now" from "no way
@@ -299,7 +300,7 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
     const full = seeing({ full: true })
     const solid = seeing({ door: undefined })
     expect(full).not.toEqual(solid)
-    expect(full).toContain('(2, 3)')
+    expect(full).toContain('doorway')
     expect(solid).not.toContain('doorway')
   })
 
