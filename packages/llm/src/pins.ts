@@ -11,6 +11,18 @@ export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
 // 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
 export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
+// The fleet's third model, and the only one it pays a premium for. A ruling is permanent, so the
+// court buys the model that reads one best: over 12 of world two's own rulings, 3 calls each, it
+// agreed with the hand label 32/36 where GLM took 25/33 and DeepSeek v4-pro 26/36, at a quarter
+// of GLM's latency. OpenRouter publishes no dated snapshot of it, as with the mind model.
+export const RULING_MODEL = 'openai/gpt-5.6-luna' as const
+// One home, not two: the `openai` tier is the one that was measured, and `openai/fast` bills 2x
+// for the same answer. Its decoder is why `StrictVerdictSchema` exists.
+export const RULING_PROVIDER_ORDER: string[] = ['OpenAI']
+// Everything the town cannot take back: the court's physics, the council's law, and the compiler
+// that turns a law into a rule. Nothing per-tick or per-turn is on this list.
+export const RULING_CALLERS: readonly string[] = ['arbiter', 'council', 'law.compile']
+
 // No act-emitting caller may route to Together, Reka, AkashML, Ambient or Mancer: each
 // returned `action: null` on 75-99% of otherwise well-formed Turns; only pre-flight's bar sees it.
 // The fallback IS the pinned model; no alias ever answers for it.
@@ -42,10 +54,11 @@ export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cac
 // The pinned route's real price. Kept as the name the rest of the tree imports.
 export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
 
-// For the case where a fallback MODEL answered rather than a different back end. An unlisted
-// model is a different product, so it books at the ceiling and not at the pinned rate.
+// Keyed by the model where the model, not the back end, is what sets the price: a fallback that
+// answered, and the single-homed ruling model. An unlisted model books at the ceiling.
 const PRICE_PER_M_BY_MODEL: Record<string, ModelPrices> = {
   [MIND_MODEL]: PRICE_PER_M,
+  [RULING_MODEL]: { input: 0.2, output: 1.2, cacheRead: 0.02 },
 }
 
 // Either fleet model prices by WHO served it; anything else is a different product.
@@ -101,6 +114,14 @@ export type CallSettings = {
 // answers, so a bound derived from the output ceiling alone aborts honest answers and re-bills.
 const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 45_000 }
 const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
+// Measured at this effort and no other: at 'low' it answered in 4.4 s p50 with every ruling on
+// the schema. The ceiling is 2x the longest recipe the bake-off saw, reasoning included.
+const ON_RULING: CallSettings = {
+  model: RULING_MODEL,
+  providerOrder: RULING_PROVIDER_ORDER,
+  reasoning: { effort: 'low' },
+  maxOutputTokens: 4000,
+}
 
 // Rehearsal r3: all 21 refused reflection attempts were Wafer 429s, and every one had a mind call
 // ANSWER within 5 s of it — a burst to wait out, not an outage. Six of these must land in a row
@@ -133,9 +154,11 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
     reasoning: { enabled: false },
     maxOutputTokens: 200,
   },
-  // The court writes permanent law, so it gets the mind model: a ruling's params carry the same
-  // binding GLM fills 100% and DeepSeek blanked. Its mandatory reasoning bills inside the 4,000.
-  arbiter: { ...ON_GLM, maxOutputTokens: 4000 },
+  // The court writes what the town can never take back, so it is the one place the fleet pays
+  // for a stronger reader. Thinking is what buys the judgement; 4,000 covers it and the ruling.
+  arbiter: ON_RULING,
+  council: ON_RULING,
+  'law.compile': ON_RULING,
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000 },
   naming: ON_DEEPSEEK,

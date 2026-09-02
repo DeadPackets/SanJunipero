@@ -7,7 +7,9 @@ import {
   OutcomeEffectSchema,
   OutcomeTableSchema,
   RecipeSchema,
+  StrictVerdictSchema,
   VerdictSchema,
+  readRuling,
   rollOutcomeTable,
   skillFactor,
   type OutcomeRow,
@@ -136,6 +138,93 @@ describe('VerdictSchema', () => {
 
   it('rejects an unknown kind (closed union)', () => {
     expect(VerdictSchema.safeParse({ kind: 'nuke' }).success).toBe(false)
+  })
+})
+
+// Measured live 2026-09-02 against the pinned ruling model: it refuses a schema whose root is
+// not an object ('got type: "None"') and refuses `oneOf` anywhere ("'oneOf' is not permitted"),
+// on top of the optional-key rule `strictModeFaults` already knows.
+describe('StrictVerdictSchema', () => {
+  it('★ is the dialect a strict decoder takes: object at the root, no oneOf, no optional key', () => {
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(StrictVerdictSchema, { io }) as { type?: string }
+      expect(emitted.type, io).toBe('object')
+      expect(JSON.stringify(emitted), io).not.toContain('oneOf')
+      expect(strictModeFaults(emitted), io).toEqual([])
+    }
+  })
+
+  it('★ carries the two fields the live recipe leaves out, required and nullable', () => {
+    const wire = {
+      verdict: {
+        ...validAttempt,
+        recipe: {
+          ...validRecipe,
+          skillCheck: null,
+          outcomeTable: validRecipe.outcomeTable.map((r) => ({
+            ...r,
+            effects: r.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
+          })),
+        },
+      },
+    }
+    expect(StrictVerdictSchema.safeParse(wire).success).toBe(true)
+    // Leaving either one out is what the decoder cannot do, so the schema must not accept it.
+    const noSkillCheck = { verdict: { ...validAttempt, recipe: { ...validRecipe } } }
+    expect(StrictVerdictSchema.safeParse(noSkillCheck).success).toBe(false)
+  })
+})
+
+describe('readRuling', () => {
+  it('★ reads the strict dialect back as the verdict the town keeps: null is absent', () => {
+    const verdict = readRuling({
+      verdict: {
+        ...validAttempt,
+        recipe: {
+          ...validRecipe,
+          skillCheck: null,
+          outcomeTable: validRecipe.outcomeTable.map((r) => ({
+            ...r,
+            effects: r.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
+          })),
+        },
+      },
+    })
+    if (verdict?.kind !== 'attempt') throw new Error('not an attempt')
+    expect('skillCheck' in verdict.recipe).toBe(false)
+    expect('durability' in verdict.recipe.outcomeTable[0]!.effects[0]!).toBe(false)
+  })
+
+  it('★ keeps a skill check and a durability the court did name', () => {
+    const verdict = readRuling({
+      verdict: {
+        ...validAttempt,
+        recipe: {
+          ...validRecipe,
+          skillCheck: { track: 'cooking', difficulty: 4 },
+          outcomeTable: [
+            {
+              ...validRecipe.outcomeTable[0]!,
+              effects: [{ op: 'spawn_item', kind: 'knife', qty: 1, to: 'agent', durability: 30 }],
+            },
+          ],
+        },
+      },
+    })
+    if (verdict?.kind !== 'attempt') throw new Error('not an attempt')
+    expect(verdict.recipe.skillCheck).toEqual({ track: 'cooking', difficulty: 4 })
+    expect(verdict.recipe.outcomeTable[0]!.effects[0]).toEqual({
+      op: 'spawn_item',
+      kind: 'knife',
+      qty: 1,
+      to: 'agent',
+      durability: 30,
+    })
+  })
+
+  it('★ refuses an answer off the union, wrapped or bare', () => {
+    expect(readRuling({ verdict: { kind: 'nuke' } })).toBeNull()
+    expect(readRuling({ kind: 'map', verb: 'walk', params: NO_PARAMS })).toBeNull()
   })
 })
 

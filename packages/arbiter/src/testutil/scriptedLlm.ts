@@ -4,12 +4,34 @@ import { FakeEmbedder } from '@sj/llm/testutil'
 import { makeArbiter, type AgentCtx, type Arbiter } from '../adjudicate.js'
 import { CodexStore, type CodexEntry } from '../codex.js'
 import { openArbiterDb } from '../schema.js'
+import { StrictVerdictSchema } from '../verdict.js'
 
 function emptyUsage(): LlmUsage {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
 }
 
 export type ScriptedCall = { intent: string; system: string; user: string }
+
+// A script writes the verdict the town keeps; the court is asked in the strict dialect, where
+// absence is written null. The inverse of `readRuling`, so a script never spells the nulls out.
+function strictDialect(value: unknown): unknown {
+  const v = value as { kind?: string; recipe?: Record<string, unknown> }
+  if (v.kind !== 'attempt' || v.recipe === undefined) return value
+  const rows = v.recipe.outcomeTable as { effects: Record<string, unknown>[] }[]
+  return {
+    ...v,
+    recipe: {
+      ...v.recipe,
+      skillCheck: v.recipe.skillCheck ?? null,
+      outcomeTable: rows.map((row) => ({
+        ...row,
+        effects: row.effects.map((e) =>
+          e.op === 'spawn_item' ? { ...e, durability: e.durability ?? null } : e,
+        ),
+      })),
+    },
+  }
+}
 
 // Never talks to a provider: answers from a script, counts the calls, and keeps every prompt
 // it was handed so a glass scan can run over all of the suite's traffic.
@@ -37,10 +59,9 @@ export class ScriptedLlm {
         .split('\n')
         .at(-1)
         ?.replace(/^Intent: /, '') ?? ''
-    return Promise.resolve({
-      value: this.respond({ intent, system: opts.system, user }),
-      usage: emptyUsage(),
-    })
+    const value = this.respond({ intent, system: opts.system, user })
+    const wire = opts.schema === StrictVerdictSchema ? { verdict: strictDialect(value) } : value
+    return Promise.resolve({ value: wire, usage: emptyUsage() })
   }
 
   text(): Promise<{ text: string; usage: LlmUsage }> {

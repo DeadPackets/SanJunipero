@@ -19,6 +19,8 @@ import {
   MIN_REQUEST_TIMEOUT_MS,
   PROSE_MODEL,
   PROVIDER_ORDER,
+  RULING_MODEL,
+  RULING_PROVIDER_ORDER,
   callSettingsFor,
   modelFor,
   requestTimeoutMsFor,
@@ -807,8 +809,8 @@ describe('default OpenRouter path extraBody', () => {
     expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
     expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: ['Inceptron'] })
-    // The court rides the mind's pair: a ruling's params carry the same binding a turn's do.
-    expect(body('arbiter')).toEqual(body('turn'))
+    // The court is the one caller off the fleet's two models: what it writes is permanent.
+    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], order: RULING_PROVIDER_ORDER })
   })
 
   // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on

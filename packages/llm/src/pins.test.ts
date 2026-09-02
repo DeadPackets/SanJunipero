@@ -11,6 +11,9 @@ import {
   PROSE_MODEL,
   PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
+  RULING_CALLERS,
+  RULING_MODEL,
+  RULING_PROVIDER_ORDER,
   callSettingsFor,
   modelFor,
   pricesFor,
@@ -68,10 +71,13 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
 // GLM refuses `enabled:false` on every endpoint and answers worse under `effort:'minimal'`, so
 // no caller routed to it may name the field at all. DeepSeek's callers keep their pins.
 it('★ no caller on the GLM half asks for a reasoning setting — that model refuses all of them', () => {
-  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight', 'arbiter'])
+  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight'])
     expect(callSettingsFor(caller).reasoning, caller).toBeUndefined()
   for (const caller of ['semantic', 'constructs'])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ enabled: false })
+  // The court is off that half of the fleet and its model takes the dial.
+  for (const caller of RULING_CALLERS)
+    expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'low' })
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   expect(callSettingsFor('narrator').reasoning).toBeUndefined()
 })
@@ -85,8 +91,10 @@ it('★ the fleet: which model and which back end answers for each caller', () =
     'reflection.edit': [MIND_MODEL, PROVIDER_ORDER],
     dream: [MIND_MODEL, PROVIDER_ORDER],
     preflight: [MIND_MODEL, PROVIDER_ORDER],
-    // The court writes permanent law: its map verdicts bind params the way a turn does.
-    arbiter: [MIND_MODEL, PROVIDER_ORDER],
+    // The court writes permanent law, so it is the one place the fleet buys a stronger model.
+    arbiter: [RULING_MODEL, RULING_PROVIDER_ORDER],
+    council: [RULING_MODEL, RULING_PROVIDER_ORDER],
+    'law.compile': [RULING_MODEL, RULING_PROVIDER_ORDER],
     narrator: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     naming: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     // The voice-comparison script must render the voice that ships, not the mind's model.
@@ -176,15 +184,43 @@ it('★ the turn ceiling clears a full twelve-step plan in the closed grammar', 
   )
 })
 
-// The court's rulings are permanent physics and its map verdicts bind object params — the two
-// things the mind model measurably does best. Its mandatory preamble bills inside the 4,000.
-it('★ the arbiter judges on the mind model, under a 4,000-token ceiling', () => {
-  expect(callSettingsFor('arbiter')).toEqual({
-    model: MIND_MODEL,
-    providerOrder: PROVIDER_ORDER,
-    minTimeoutMs: 45_000,
+// A ruling is permanent, so the court buys the model that reads one best rather than the
+// cheapest. Bake-off 2026-09-02 over 12 of world two's own rulings, 3 calls each, hand-labelled:
+// this model agreed 32/36 where GLM took 25/33 and DeepSeek v4-pro 26/36, at a quarter of GLM's
+// latency and 6x under DeepSeek's price.
+it('★ the three callers that write something permanent share one pin', () => {
+  const court = callSettingsFor('arbiter')
+  expect(court).toEqual({
+    model: RULING_MODEL,
+    providerOrder: RULING_PROVIDER_ORDER,
+    reasoning: { effort: 'low' },
     maxOutputTokens: 4000,
   })
+  for (const caller of RULING_CALLERS) {
+    expect(callSettingsFor(caller), caller).toEqual(court)
+    expect(modelFor(caller), caller).toBe(RULING_MODEL)
+  }
+  expect([...RULING_CALLERS]).toEqual(['arbiter', 'council', 'law.compile'])
+})
+
+// The turn and the scene are 99% of the calls and stay where the fleet's own bake-off put them:
+// a strong pin on either would multiply the bill by the whole fleet, for no permanent record.
+it('★ the strong pin reaches the permanent record and nothing else', () => {
+  for (const caller of ['turn', 'scene']) {
+    expect(modelFor(caller), caller).toBe(MIND_MODEL)
+    expect(callSettingsFor(caller).providerOrder ?? PROVIDER_ORDER, caller).toEqual(PROVIDER_ORDER)
+  }
+})
+
+// Its own row, keyed by the model: this one is not two-homed, and pricing it by the back end
+// would book it at whatever the fleet's GLM costs there.
+it('★ the ruling model prices at its own rate, never the fleet"s', () => {
+  expect(pricesFor(RULING_MODEL, 'OpenAI')).toEqual({
+    prices: { input: 0.2, output: 1.2, cacheRead: 0.02 },
+    source: 'model',
+  })
+  expect(pricesFor(RULING_MODEL, null).source).toBe('model')
+  expect(CEILING_PRICE_PER_M.output).toBeGreaterThanOrEqual(1.2)
 })
 
 // The night's one reasoning-on call has its own ceiling and its own ledger line. 13,000 was
