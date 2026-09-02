@@ -239,6 +239,14 @@ export function App() {
     scene?.bubbles?.setThoughts(thoughts)
   }, [scene, thoughts])
 
+  // ONE label over the thing a viewer picked: the nameplate. The canvas layers read the pick
+  // off the handle and stand down for it.
+  useEffect(() => {
+    if (scene === null) return
+    // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
+    scene.pickedId = subject?.id ?? null
+  }, [scene, subject])
+
   const toggleThoughts = useCallback(() => {
     const next = thoughts === 'hidden' ? 'shown' : 'hidden'
     setThoughts(next)

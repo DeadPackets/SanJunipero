@@ -520,7 +520,7 @@ export function createCharacterLayer(
         const head = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX
         scene.tags.show(
           'hover',
-          hoverPlate(state, 'agent', a.id),
+          hoverPlate(state, 'agent', a.id, a.id === scene.pickedId),
           anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
         )
       }

@@ -299,7 +299,7 @@ export function syncEntities(
       // the sprite's own scale, so a 1.85× building's plate stranded itself beside the roof
       tags.show(
         'hover',
-        hoverPlate(store.getState(), kind, id),
+        hoverPlate(store.getState(), kind, id, id === scene.pickedId),
         anchorForSprite(sprite, { width: sprite.width, height: sprite.height }),
       )
     })

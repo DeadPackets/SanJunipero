@@ -5,7 +5,7 @@ import { genesisState, type WorldState } from '@sj/engine/state'
 import { ZOOM_STOPS } from './camera.js'
 import { AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, bandRatios } from './legibility.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
-import { TOPONYM_LABEL_PX, toponymAlpha, toponymsOf } from './toponyms.js'
+import { TOPONYM_FULL_SCALE, TOPONYM_LABEL_PX, toponymAlpha, toponymsOf } from './toponyms.js'
 
 function carved(
   id: string,
@@ -91,14 +91,35 @@ describe('toponymsOf — the names the town cut for itself', () => {
   })
 })
 
+// ★ Eleven carved names were drawn at full alpha from the 0.5 stop in — that is, always — in
+// caps, on ink plates: the loudest text in the product named the furniture. A place answers
+// when it is asked now, and only says its name unbidden once the camera is close enough that
+// the name is about a place you can see into.
 describe('toponymAlpha — whole or gone, never between', () => {
-  it('is gone at the overview and whole from half-size in', () => {
+  it('★ is gone at the overview and whole from the 2× stop in', () => {
+    expect(TOPONYM_FULL_SCALE).toBe(2)
     expect(toponymAlpha(0.25)).toBe(0)
-    expect(toponymAlpha(0.5)).toBe(1)
+    expect(toponymAlpha(0.5)).toBe(0)
+    expect(toponymAlpha(1)).toBe(0)
+    expect(toponymAlpha(2)).toBe(1)
+    expect(toponymAlpha(4)).toBe(1)
   })
 
   it('★ is 0 or 1 at every resting stop — a name at 0.5 alpha has no contrast ratio', () => {
     for (const stop of ZOOM_STOPS) expect([0, 1], `stop ${stop}`).toContain(toponymAlpha(stop))
+  })
+
+  it('fades over the transit rather than snapping on, so a zoom does not flash the names', () => {
+    expect(toponymAlpha(1.5)).toBeCloseTo(0.5)
+  })
+})
+
+// ★ A picked building wore three labels at once: its carved name, the nameplate under it and
+// the hover plate. The nameplate is the one the viewer asked for, so it is the one that stands.
+describe('★ one label for the thing that is picked', () => {
+  it('★ hides its own carved name for whatever the viewer picked', () => {
+    const SRC = readFileSync(new URL('./toponyms.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('scene.pickedId')
   })
 })
 
