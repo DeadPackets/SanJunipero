@@ -85,10 +85,10 @@ beforeEach(() => {
   resetDepthFallbacks()
 })
 
-describe('the walk-around, on the eleven buildings of the real town', () => {
-  it('is the real town — eleven buildings, five of them owned', () => {
-    expect(town.structures).toHaveLength(11)
-    expect(town.structures.filter((s) => s.owner !== null)).toHaveLength(5)
+describe('the walk-around, on the thirteen buildings of the real town', () => {
+  it('is the real town — thirteen buildings, seven of them owned', () => {
+    expect(town.structures).toHaveLength(13)
+    expect(town.structures.filter((s) => s.owner !== null)).toHaveLength(7)
     expect([...new Set(town.structures.map((s) => s.kind))].sort()).toEqual([
       'cabin',
       'cottage',
@@ -104,7 +104,7 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
     const { decided, disagreements } = sweep((_b, i, tile) =>
       landedInFront(town.structures[i]!, tile),
     )
-    expect(decided).toBe(432)
+    expect(decided).toBe(512)
     // One tie per frontage face: the tiles where the landed rule drew a body at a door behind
     // the building it stood in front of.
     expect(
@@ -122,15 +122,17 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
       'structure_farmhouse_55_33 (55,37) oracle=true got=false',
       'structure_farmhouse_55_33 (57,33) oracle=true got=false',
       'structure_farmhouse_55_33 (57,34) oracle=true got=false',
+      'structure_house_55_40 (55,42) oracle=true got=false',
+      'structure_house_43_45 (43,47) oracle=true got=false',
     ])
-    expect(disagreements).toHaveLength(12)
+    expect(disagreements).toHaveLength(14)
   })
 
   it('the new sort disagrees with the geometry on NO tile', () => {
     const { decided, disagreements } = sweep((box, _i, tile) =>
       before(depthOrder([box, bodyDepthBox('body', tile.x, tile.y)]), box.id, 'body'),
     )
-    expect(decided).toBe(432)
+    expect(decided).toBe(512)
     expect(
       disagreements.map((d) => `${d.structure} at ${d.tile}: oracle ${d.oracle}, got ${d.got}`),
     ).toEqual([])

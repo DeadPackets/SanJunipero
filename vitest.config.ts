@@ -4,8 +4,8 @@ export default defineConfig({
     include: ['packages/*/src/**/*.test.ts', 'packages/*/scripts/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
-    // bonds.test.ts asserts a RATIO of two measured durations: half a 4-vCPU box left idle is
-    // what keeps it measuring the code. Raise the timeouts before lowering this — never --retry.
+    // g11.test.ts holds the engine to a per-tick millisecond budget: half a 4-vCPU box left idle
+    // is what keeps it measuring the code. Raise the timeouts before lowering this — never --retry.
     maxWorkers: 2,
   },
 })
