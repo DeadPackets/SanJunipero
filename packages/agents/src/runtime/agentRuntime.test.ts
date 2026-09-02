@@ -2212,15 +2212,20 @@ describe('every turn row says what bought it', () => {
 
   function bills(
     db: Database.Database,
-  ): { reason: string | null; blocks: Record<string, number> }[] {
+  ): { reason: string | null; every: string[]; blocks: Record<string, number> }[] {
     return (
       db
         .prepare(
-          "SELECT wake_reason, block_tokens FROM llm_calls WHERE caller = 'turn' ORDER BY id",
+          "SELECT wake_reason, wake_reasons, block_tokens FROM llm_calls WHERE caller = 'turn' ORDER BY id",
         )
-        .all() as { wake_reason: string | null; block_tokens: string | null }[]
+        .all() as {
+        wake_reason: string | null
+        wake_reasons: string | null
+        block_tokens: string | null
+      }[]
     ).map((r) => ({
       reason: r.wake_reason,
+      every: r.wake_reasons === null ? [] : (JSON.parse(r.wake_reasons) as string[]),
       blocks: r.block_tokens === null ? {} : (JSON.parse(r.block_tokens) as Record<string, number>),
     }))
   }
@@ -2244,6 +2249,10 @@ describe('every turn row says what bought it', () => {
 
     const first = bills(agentDb)[0]!
     expect(REASONS).toContain(first.reason)
+    // The winner and everything else that was true, deciding one first: the histogram of winners
+    // alone could not say how much of salient_perception was a finished plan underneath it.
+    expect(first.every[0]).toBe(first.reason)
+    for (const r of first.every) expect(REASONS).toContain(r)
     expect(first.blocks.shared).toBeGreaterThan(0)
     expect(first.blocks.identity).toBeGreaterThan(0)
     expect(first.blocks._planSize).toBe(3)

@@ -68,7 +68,8 @@ def main(minds_dir):
                 # A ledger written before the bill columns existed has neither: read NULL for
                 # whichever it is missing rather than refusing the whole run.
                 cols = {r[1] for r in c.execute('PRAGMA table_info(llm_calls)')}
-                bill = ', '.join(n if n in cols else 'NULL' for n in ('wake_reason', 'block_tokens'))
+                bill = ', '.join(n if n in cols else 'NULL'
+                                 for n in ('wake_reason', 'wake_reasons', 'block_tokens'))
                 turns += c.execute(
                     'SELECT ts, input_tokens, output_tokens, cache_read_tokens, provider,'
                     f'      {bill}, ok'
@@ -91,7 +92,7 @@ def main(minds_dir):
     n = len(turns)
     fresh_of = lambda r: max(0, r[1] - r[3])
     cost_of = lambda r: cost(fresh_of(r), r[3], r[2], r[4])
-    print(f'{n} turn calls in {minds_dir}, {sum(1 for r in turns if not r[7])} of them came back with nothing')
+    print(f'{n} turn calls in {minds_dir}, {sum(1 for r in turns if not r[8])} of them came back with nothing')
     print(f'priced from pins.ts: ${sum(cost_of(r) for r in turns):.4f}\n')
 
     print('1. WHICH WAKE REASON BOUGHT THE CALL')
@@ -103,14 +104,32 @@ def main(minds_dir):
         print(f'{reason:20s} {len(rows):6d} {pct(len(rows), n):6.1f}% '
               f'{mean([cost_of(x) for x in rows]):9.5f} {mean([fresh_of(x) for x in rows]):10.0f}')
 
+    # The deciding reason is only the first one that matched, so the column above hides every
+    # overlap: a call salient_perception won was often a finished plan as well.
+    any_true = collections.Counter()
+    scored = 0
+    for r in turns:
+        if r[6] is None:
+            continue
+        scored += 1
+        for name in json.loads(r[6]):
+            any_true[name] += 1
+    if scored == 0:
+        print(f'\n   and which reasons were true at all: no row carries the set — all {n} predate it')
+    else:
+        print(f'\n   AND WHICH REASONS WERE TRUE AT ALL, over {scored} rows that carry the set')
+        print(f'{"reason":20s} {"deciding":>9s} {"any":>6s} {"share":>7s}')
+        for reason, hits in any_true.most_common():
+            print(f'{reason:20s} {len(by_reason.get(reason, [])):9d} {hits:6d} {pct(hits, scored):6.1f}%')
+
     print('\n2. WHICH BLOCK BOUGHT THE TOKENS')
     blocks = collections.defaultdict(list)
     billed = 0
     for r in turns:
-        if r[6] is None:
+        if r[7] is None:
             continue
         billed += 1
-        for k, v in json.loads(r[6]).items():
+        for k, v in json.loads(r[7]).items():
             if not k.startswith('_'):
                 blocks[k].append(v)
     if billed == 0:
@@ -156,8 +175,8 @@ def main(minds_dir):
               f'{mean([fresh_of(x) for x in rows]):11.0f} {mean([x[3] for x in rows]):12.0f}')
 
     print('\n5. WHAT THE CALLS WERE WORTH')
-    sizes = [json.loads(r[6]).get('_planSize') for r in turns if r[6]]
-    left = [json.loads(r[6]).get('_priorStepsLeft') for r in turns if r[6]]
+    sizes = [json.loads(r[7]).get('_planSize') for r in turns if r[7]]
+    left = [json.loads(r[7]).get('_priorStepsLeft') for r in turns if r[7]]
     sizes = [x for x in sizes if x is not None]
     left = [x for x in left if x is not None]
     named = outcomes[1]

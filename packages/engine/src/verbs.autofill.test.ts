@@ -59,6 +59,25 @@ function withFire(s: WorldState, id: string, x: number, y: number): WorldState {
   return fold(planned, ev('structure_completed', { id }))
 }
 
+// A finished well: a building the fire verbs want nothing to do with.
+function withWell(s: WorldState, id: string, x: number, y: number): WorldState {
+  const planned = fold(
+    s,
+    ev('structure_planned', {
+      id,
+      kind: 'well',
+      x,
+      y,
+      w: 1,
+      h: 1,
+      maxHp: 30,
+      flammable: false,
+      builderId: 'a1',
+    }),
+  )
+  return fold(planned, ev('structure_completed', { id }))
+}
+
 // A complete 2x2 house whose door lands one row south of its footprint.
 function withHouse(s: WorldState, id: string, x: number): WorldState {
   const planned = fold(
@@ -163,6 +182,59 @@ describe('loneCandidateFor', () => {
     s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 1, ageDays: ADULT_AGE_DAYS }))
     for (const verb of ['give', 'teach', 'speak']) {
       expect([verb, fill(s, verb)]).toEqual([verb, null])
+    }
+  })
+})
+
+// 83 of 139 refusal episodes in the phase 1 gate were an act the table could have bound, turned
+// away with "name it" while the real obstacle stood somewhere else entirely.
+describe('the refusal names what is actually in the way', () => {
+  const refuse = (s: WorldState, verb: string, params: Record<string, unknown> = {}) => {
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', verb, params)
+    return r.ok ? null : r.reason
+  }
+
+  it('says there is no water rather than asking which vessel, holding one', () => {
+    const dry = holding(withAgent(world(), 1, 1), 'item_skin_1', 'waterskin')
+    expect(refuse(dry, 'fill')).toBe('no water within reach')
+    // A null under the key is no key at all, and reads the same way.
+    expect(refuse(dry, 'fill', { itemId: null })).toBe('no water within reach')
+  })
+
+  it('says the fire wants wood rather than asking which fire, standing at one', () => {
+    const cold = withFire(withAgent(world(), 2, 2), 'structure_fire_1', 2, 3)
+    expect(refuse(cold, 'stoke')).toBe('not enough wood — wood comes from felling a tree')
+    // A well answers what a name the world does not hold answers, so it is no candidate at all
+    // and the one fire still speaks alone: a town full of buildings does not mute this.
+    expect(refuse(withWell(cold, 'structure_well_1', 5, 5), 'stoke')).toBe(
+      'not enough wood — wood comes from felling a tree',
+    )
+  })
+
+  it('leaves the honest refusal when the things in hand disagree about why', () => {
+    let s = holding(withAgent(world(), 1, 1), 'item_skin_1', 'waterskin')
+    s = holding(s, 'item_axe_2', 'axe')
+    // One is dry, the other holds no water at all: two obstacles, and no one sentence for them.
+    expect(refuse(s, 'fill')).toBe('filling needs the vessel named')
+  })
+
+  it('leaves an act the world can read alone, and one nothing at all is in the way of', () => {
+    const wet = ['..~.....', '........', '........', '........', '........', '........']
+    const one = holding(withAgent(world(wet), 2, 1), 'item_skin_1', 'waterskin')
+    expect(refuse(one, 'fill')).toBeNull()
+    const two = holding(one, 'item_bucket_2', 'bucket')
+    expect(refuse(two, 'fill')).toBe(
+      'which one — the bucket (item_bucket_2) or the waterskin (item_skin_1)?',
+    )
+  })
+
+  // Machinery words never reach a mind: `MACHINE_REASON` blanks a reason spelled in braces or a
+  // registry name, and the sentences above are the town's own.
+  it('surfaces nothing a mind could not be told', () => {
+    const cold = withFire(withAgent(world(), 2, 2), 'structure_fire_1', 2, 3)
+    const dry = holding(withAgent(world(), 1, 1), 'item_skin_1', 'waterskin')
+    for (const said of [refuse(cold, 'stoke'), refuse(dry, 'fill')]) {
+      expect([said, /[{}]/.test(said ?? '')]).toEqual([said, false])
     }
   })
 })

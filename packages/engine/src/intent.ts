@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { readAsPerson } from './verbs/autofill.js'
+import { readAsPerson, soleObstacle } from './verbs/autofill.js'
 import {
   approachFor,
   steppingOutWouldHelp,
@@ -105,7 +105,11 @@ export function submitIntent(
         ],
       }
     }
-    if (refusal !== null) return walkFirst(state, config, agentId, verb, p, refusal)
+    // Said in the truest words the verb has for it: the walk is still tried first either way.
+    if (refusal !== null) {
+      const cause = soleObstacle(state, config, agentId, verb, p) ?? refusal
+      return walkFirst(state, config, agentId, verb, p, cause)
+    }
   }
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })

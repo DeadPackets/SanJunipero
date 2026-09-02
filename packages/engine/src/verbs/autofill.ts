@@ -95,6 +95,41 @@ function readingsOf(
     .filter((id) => def.validate(state, config, agentId, { ...params, [spec.key]: id }) === null)
 }
 
+// A name the world does not hold. Whatever a verb answers to it is that verb's words for "that
+// is not the sort of thing I take", and a real mark answered the same way is no reading either.
+const NO_SUCH_MARK = 'no_such_mark'
+
+/** What is actually in the way, when the act left its object blank and nothing fit. "Name the
+ *  thing" is true and useless — 83 of 139 refusal episodes were a mind sent looking for a word
+ *  when the obstacle was no water, or no wood. Every candidate the table offers is put to the
+ *  verb, and where the ones that could be meant agree on why they were turned away, that is the
+ *  sentence to send back instead. Several answers means several obstacles, and the mind is told
+ *  to name one after all. */
+export function soleObstacle(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): string | null {
+  const spec = OBJECT_PARAM[verb]
+  const def = VERBS[verb]
+  if (spec === undefined || def === undefined) return null
+  if (state.agents[agentId] === undefined || !isBlank(params[spec.key])) return null
+  const unnamed = def.validate(state, config, agentId, params)
+  const unknown = def.validate(state, config, agentId, { ...params, [spec.key]: NO_SUCH_MARK })
+  // Naming anything at all left the same answer: this refusal was never about the missing name.
+  if (unnamed === null || unnamed === unknown) return null
+  const standing = new Set<string>()
+  for (const id of spec.candidates(state, agentId)) {
+    const why = def.validate(state, config, agentId, { ...params, [spec.key]: id })
+    // Something fits: this act has a reading, and the readings above answer it, not this.
+    if (why === null) return null
+    if (why !== unnamed && why !== unknown) standing.add(why)
+  }
+  return standing.size === 1 ? [...standing][0]! : null
+}
+
 const nameOf = (state: WorldState, id: string): string => {
   const kind = state.items[id]?.kind ?? state.structures[id]?.kind
   return kind === undefined ? id : `the ${words(kind)} (${id})`
