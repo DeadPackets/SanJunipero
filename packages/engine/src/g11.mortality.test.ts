@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   ADULT_AGE_DAYS,
   DAYS_PER_YEAR,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   thirstDecayPerTick,
@@ -129,7 +130,7 @@ const apply = (
   tick: number,
 ): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload, tick), config), s)
 
-// Submit an intent and let the world finish it. One-tick verbs are done in one pass.
+// Submit an intent and let the world finish it, however many minutes the act runs for.
 function act(
   s: WorldState,
   config: SimConfig,
@@ -141,9 +142,15 @@ function act(
 ): { state: WorldState; events: PendingEvent[]; refusal: string | null } {
   const started = submitIntent(s, config, agentId, verb, params)
   if (!started.ok) return { state: s, events: [], refusal: started.reason }
-  const withIntent = apply(s, config, started.events, tick)
-  const out = pass(withIntent, config, tick + 1, seed)
-  return { state: out.state, events: out.events, refusal: null }
+  let state = apply(s, config, started.events, tick)
+  const events: PendingEvent[] = []
+  for (let i = 1; i <= DURATION_TICKS.day; i++) {
+    const out = pass(state, config, tick + i, seed)
+    state = out.state
+    events.push(...out.events)
+    if (!state.agents[agentId]?.activity) break
+  }
+  return { state, events, refusal: null }
 }
 
 // ------------------------------------------------------------------ thirst, the second clock
@@ -289,34 +296,50 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
     return { ...s, tick: START - 1 }
   }
 
-  // The poison roll is drawn from the `illness` stream at emission; a seed whose first draw
-  // falls under the dial is the forced roll, and its opposite is the forced miss.
-  const seedWhoseFirstIllnessDrawIsBelow = (dial: number, want: boolean): string => {
+  // The roll is drawn from the `illness` stream when the meal is swallowed, half an hour in, and
+  // the stream has been drawn from over those minutes. So a seed is forced by eating the
+  // mushroom and looking at the body, not by arithmetic on the stream's first draw.
+  const seedThatPoisons = (want: boolean): string => {
     for (let i = 0; i < 500; i++) {
       const seed = `poison-${i}`
-      if (new RngStreams(seed).get('illness').next() < dial === want) return seed
+      const out = act(eater(), CFG, START, 'eater', 'eat', { itemId: 'item_cap' }, seed)
+      if ((out.state.agents.eater!.afflictions?.length ?? 0) > 0 === want) return seed
     }
     throw new Error('no seed found')
   }
 
   it('a forced roll poisons the eater; the opposite roll leaves a clean body', () => {
-    const hit = seedWhoseFirstIllnessDrawIsBelow(CFG.mortality.poisonChanceSpoiled, true)
-    const out = act(eater(), CFG, START, 'eater', 'eat', { itemId: 'item_cap' }, hit)
+    const out = act(
+      eater(),
+      CFG,
+      START,
+      'eater',
+      'eat',
+      { itemId: 'item_cap' },
+      seedThatPoisons(true),
+    )
     expect(out.state.agents.eater!.afflictions).toEqual([
-      { kind: 'poison', severity: 1, sinceTick: START + 1 },
+      { kind: 'poison', severity: 1, sinceTick: START + DURATION_TICKS.half_hour },
     ])
 
-    const miss = seedWhoseFirstIllnessDrawIsBelow(CFG.mortality.poisonChanceSpoiled, false)
-    const clean = act(eater(), CFG, START, 'eater', 'eat', { itemId: 'item_cap' }, miss)
+    const clean = act(
+      eater(),
+      CFG,
+      START,
+      'eater',
+      'eat',
+      { itemId: 'item_cap' },
+      seedThatPoisons(false),
+    )
     expect(clean.state.agents.eater!.afflictions).toBeUndefined()
   })
 
   it('tend with a herb lifts it, and the patient is stamped as tended', () => {
-    const hit = seedWhoseFirstIllnessDrawIsBelow(CFG.mortality.poisonChanceSpoiled, true)
+    const hit = seedThatPoisons(true)
     const poisoned = act(eater(), CFG, START, 'eater', 'eat', { itemId: 'item_cap' }, hit).state
     expect(poisoned.agents.eater!.afflictions).toHaveLength(1)
 
-    // `tend` takes three ticks, so the intent is submitted and the world runs it out.
+    // `tend` is an hour of hands, so the intent is submitted and the world runs it out.
     const started = submitIntent(poisoned, CFG, 'healer', 'tend', {
       targetId: 'eater',
       itemId: 'item_herb',
@@ -326,13 +349,13 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
       poisoned,
       CFG,
       (started as { events: PendingEvent[] }).events,
-      START + 2,
+      START + DURATION_TICKS.half_hour + 1,
     )
     const { state } = runUntil(
       withIntent,
       CFG,
-      START + 3,
-      8,
+      START + DURATION_TICKS.half_hour + 2,
+      DURATION_TICKS.hour + 2,
       (st) => st.agents.healer!.activity === null,
     )
     expect(state.agents.eater!.afflictions).toBeUndefined()
@@ -341,10 +364,16 @@ describe('G11a-M2: a pale mushroom, an affliction, and the two hands that lift i
   })
 
   it('untreated, the same poison finishes the body and the death says so', () => {
-    const hit = seedWhoseFirstIllnessDrawIsBelow(CFG.mortality.poisonChanceSpoiled, true)
+    const hit = seedThatPoisons(true)
     const poisoned = act(eater(), CFG, START, 'eater', 'eat', { itemId: 'item_cap' }, hit).state
     // Nothing else is wrong with this body: it is the poison and the ladder the poison drives.
-    const { log } = runUntil(poisoned, CFG, START + 2, 4000, (st) => !st.agents.eater!.alive)
+    const { log } = runUntil(
+      poisoned,
+      CFG,
+      START + DURATION_TICKS.half_hour + 1,
+      4000,
+      (st) => !st.agents.eater!.alive,
+    )
     const death = died(log, 'eater')
     expect(death).toBeDefined()
     noteCause(death!.payload)

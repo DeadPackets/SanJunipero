@@ -7,6 +7,7 @@ import {
   chunkOf,
   chunksTouched,
   DAYS_PER_YEAR,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   stateHash,
@@ -621,7 +622,10 @@ describe('G11a-D1: a competent body comes through three days on the default worl
       (eaten as { events: PendingEvent[] }).events,
       awake.tick + 1,
     )
-    cured = pass(cured, CFG, awake.tick + 2, 'ratchet').state
+    // The herb is a meal, and a meal is half a sim-hour of chewing.
+    for (let i = 2; i <= DURATION_TICKS.half_hour + 1; i++) {
+      cured = pass(cured, CFG, awake.tick + i, 'ratchet').state
+    }
     expect(cured.agents.ada!.afflictions).toBeUndefined()
   })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, DURATION_TICKS, type SimEvent } from '@sj/shared'
 import { composePerception } from './perception.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -58,9 +58,11 @@ const apply = (s: WorldState, params: Record<string, unknown>): WorldState =>
   )
 
 describe('verb: inscribe', () => {
-  it('is a registered verb that takes three ticks — a deliberate act', () => {
+  it('is a registered verb that takes half an hour — a deliberate act', () => {
     expect(VERBS.inscribe).toBeDefined()
-    expect(VERBS.inscribe!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(3)
+    expect(VERBS.inscribe!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(
+      DURATION_TICKS.half_hour,
+    )
   })
 
   it('carves a house wall from just outside it', () => {

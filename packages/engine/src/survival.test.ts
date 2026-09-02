@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DURATION_TICKS,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
@@ -276,7 +282,7 @@ describe('a collapse has a road out of it', () => {
     const r = submitIntent(s, CFG, 'a1', 'sleep', {})
     expect(r.ok).toBe(true)
     for (const e of r.ok ? r.events : []) s = fold(s, ev(e.type, e.payload, s.tick), CFG)
-    s = run(s, 1)
+    s = run(s, DURATION_TICKS.moment)
     expect(s.agents.a1!.asleep).toBe(true)
     expect(s.agents.a1!.collapsedSinceTick).not.toBeNull()
 

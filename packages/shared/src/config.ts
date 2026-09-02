@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DURATION_TICKS } from './duration.js'
 
 const NeedsSchema = z
   .object({
@@ -493,7 +494,7 @@ const RoadsSchema = z
   .object({
     enabled: z.boolean().default(true),
     stonePerTile: z.number().int().positive().default(1),
-    paveDurationTicks: z.number().int().positive().default(6),
+    paveDurationTicks: z.number().int().positive().default(DURATION_TICKS.minutes),
   })
   .strict()
 

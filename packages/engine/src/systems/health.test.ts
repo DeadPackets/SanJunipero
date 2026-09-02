@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, DURATION_TICKS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
@@ -195,17 +195,19 @@ describe('worldTick: recovery and tend', () => {
     ])
     s = patchAgent(s, 'a1', { hp: 50 })
     s = patchAgent(s, 'a2', { hp: 50 })
-    s = atTick(s, DAWN - 6)
+    const care = DURATION_TICKS.hour
+    s = atTick(s, DAWN - care - 1)
     const r = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     let last: WorldTickResult | null = null
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < care + 1; i++) {
       last = tickOnce(s)
       s = last.state
     }
-    // The hour of care lands three ticks in, and dawn pays it at the tended rate x tendMultiplier.
-    expect(s.agents.a1!.tendedTick).toBe(DAWN - 3)
+    // The hour of care lands on the last tick before dawn, and dawn pays it at the tended rate
+    // x tendMultiplier.
+    expect(s.agents.a1!.tendedTick).toBe(DAWN - 1)
     expect(last!.events).toContainEqual({
       type: 'hp_changed',
       payload: {

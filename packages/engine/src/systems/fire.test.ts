@@ -13,7 +13,7 @@ import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { fireSystem } from './fire.js'
-import { ev } from '../testutil/world.js'
+import { ev, runAct } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
@@ -306,7 +306,7 @@ describe('verb: extinguish', () => {
     if (!r.ok) throw new Error(r.reason)
     let w = s
     for (const e of r.events) w = fold(w, ev(e.type, e.payload, w.tick), CFG)
-    const t1 = tickOnce(w, CFG)
+    const t1 = runAct(w, CFG)
     expect(t1.events).toContainEqual({
       type: 'fire_extinguished',
       payload: { structureId: 'structure_1', cause: 'doused' },
@@ -345,7 +345,7 @@ describe('verb: douse', () => {
     const r = submitIntent(s, CFG, 'a1', 'douse', { x: 2, y: 2 })
     if (!r.ok) throw new Error(r.reason)
     for (const e of r.events) s = fold(s, ev(e.type, e.payload, s.tick), CFG)
-    const t = tickOnce(s, CFG)
+    const t = runAct(s, CFG)
     expect(t.events).toContainEqual({
       type: 'fire_extinguished',
       payload: { structureId: 'structure_1', cause: 'doused', x: 2, y: 2, agentId: 'a1' },

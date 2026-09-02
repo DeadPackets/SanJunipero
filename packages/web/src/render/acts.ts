@@ -1,4 +1,5 @@
 import { Container, Graphics } from 'pixi.js'
+import { DURATION_TICKS } from '@sj/shared'
 import { createWorldLabel } from './worldLabel.js'
 import {
   BUBBLE_EDGE,
@@ -25,11 +26,11 @@ import type { Scene } from './scene.js'
 /** One tick is 2.5s of flicker, not a caption: an act has to last to be worth a word. */
 export const ACT_MIN_TICKS = 2
 
-/** ★ THE CEILING IS ON THE BAR, NOT ON THE CHIP. `chop` is 30 ticks but a house is
- *  `houseTicks: 2880`: a bar creeping a pixel every hour of town time reads as broken while
- *  telling the truth, and the word is worth having at any length — a long act keeps its word
- *  and loses its bar. */
-export const ACT_TRACK_MAX_TICKS = 60
+/** ★ THE CEILING IS ON THE BAR, NOT ON THE CHIP, and it is the longest an ACT may run: a house
+ *  is `houseTicks: 2880`, and a bar creeping a pixel every hour of town time reads as broken
+ *  while telling the truth. Everything the duration vocabulary can produce keeps its bar; a
+ *  build, which is a thing worked on across sessions, keeps its word and loses it. */
+export const ACT_TRACK_MAX_TICKS = DURATION_TICKS.day
 
 /** One DRAWN pixel: the chip is world art, so this thickens with the camera like every edge. */
 export const ACT_BAR_PX = 1

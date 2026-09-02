@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { FORBIDDEN_FRAMING, type RosterEntry } from '@sj/shared'
+import { DURATION_TICKS, DURATION_WORDS, FORBIDDEN_FRAMING, type RosterEntry } from '@sj/shared'
 import { VERBS } from '@sj/engine'
-import { assembleAdjudicationPrompt, type AdjudicationBlocks } from './prompt.js'
+import {
+  assembleAdjudicationPrompt,
+  DURATION_CALIBRATION,
+  DURATION_EXEMPLARS,
+  type AdjudicationBlocks,
+} from './prompt.js'
 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
   return {
@@ -167,6 +172,32 @@ describe('the roster of routines a map may name', () => {
     const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I forage for twigs.' }))
     expect(a.system).toBe(b.system)
     expect(a.messages[0]!.content).not.toContain('walk (x, y)')
+  })
+})
+
+// A minted act's clock used to be set blind: the recipe prompt never mentioned a duration at
+// all, and the one real invention a rehearsal produced came back one minute long.
+describe('how long an act takes, as the court is asked for it', () => {
+  it('asks for a word off the closed set, and shows the whole set', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('takes')
+    for (const word of DURATION_WORDS) {
+      expect(system, word).toContain(`${word} (${DURATION_TICKS[word]} minutes)`)
+    }
+  })
+
+  it('every act the calibration names is at the length the registry gives it', () => {
+    for (const row of DURATION_EXEMPLARS) {
+      for (const verb of row.verbs) {
+        expect(VERBS[verb]?.takes, `${verb} in the ${row.word} row`).toBe(row.word)
+      }
+    }
+  })
+
+  it('the calibration is on the cache-stable prefix, not the asker block', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I plait a rope.' }))
+    expect(a.system).toContain(DURATION_CALIBRATION)
+    expect(a.messages[0]!.content).not.toContain(DURATION_CALIBRATION)
   })
 })
 

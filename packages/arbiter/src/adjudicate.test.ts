@@ -29,7 +29,7 @@ const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
   skillCheck: { track: 'cooking', difficulty: 2 },
-  durationTicks: 5,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
@@ -59,7 +59,7 @@ const boilSaltVerdict: Verdict = {
 const basketRecipe: Recipe = {
   id: 'recipe:basket',
   name: 'Weave Reed Basket',
-  durationTicks: 4,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'held_item', kind: 'reeds', qty: 3 }],
   outcomeTable: [
@@ -83,7 +83,7 @@ const basketVerdict: Verdict = {
 const ropeRecipe: Recipe = {
   id: 'recipe:rope',
   name: 'Twist Reeds to Rope',
-  durationTicks: 4,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'held_item', kind: 'reeds', qty: 2 }],
   outcomeTable: [
@@ -492,9 +492,9 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     const verdict = await arbiter.adjudicate('I dance the ghost dance', TAMAR_CTX)
     expect(verdict.kind).toBe('impossible')
-    // Three: a dance is tried on the cheap expressive path first, and this script has no
+    // Four: a dance is tried on the cheap expressive path first, twice, and this script has no
     // ruling to give it, so it falls through to the two verdict attempts.
-    expect(llm.objectCalls).toBe(3)
+    expect(llm.objectCalls).toBe(4)
     // Never recorded — a hallucinated verb must not become immutable precedent.
     const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
     expect(n).toBe(0)
@@ -584,7 +584,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     id: 'recipe:smoked_fish',
     name: 'Smoke Fish Over the Hearth',
     skillCheck: { track: 'cooking', difficulty: 2 },
-    durationTicks: 30,
+    takes: 'half_hour',
     costs: [{ kind: 'fish', qty: 2 }],
     requires: [{ type: 'adjacent_fire' }],
     outcomeTable: [
@@ -808,8 +808,8 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
       expect(FORBIDDEN_FRAMING.test(verdict.reason)).toBe(false)
       expect(verdict.class).toBe('physically_impossible')
     }
-    // Two: a whistle reaches the cheap expressive path first and gets no ruling from it.
-    expect(llm.objectCalls).toBe(2)
+    // Three: a whistle reaches the cheap expressive path first, twice, and gets no ruling from it.
+    expect(llm.objectCalls).toBe(3)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
     expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
   })
@@ -955,7 +955,7 @@ describe('the roster the town is told', () => {
     const llm = new ScriptedLlm(() => ({
       word: 'toast',
       sense: 'sound',
-      durationTicks: 2,
+      takes: 'moment',
       energyCost: 1,
       targeted: true,
       emote: 'raises a cup to someone',

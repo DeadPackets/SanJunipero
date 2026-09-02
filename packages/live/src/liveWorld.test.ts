@@ -186,7 +186,7 @@ const INVENTING_TURN = closedTurn({
 const SMOKE_RECIPE = {
   id: 'recipe:smoke_fish',
   name: 'Smoke Fish Over Green Wood',
-  durationTicks: 2,
+  takes: 'moment',
   costs: [],
   requires: [],
   outcomeTable: [

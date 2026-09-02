@@ -14,7 +14,16 @@ import {
   VERBS,
   type WorldState,
 } from '@sj/engine'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  DEFAULT_DURATION_WORD,
+  DURATION_TICKS,
+  DURATION_WORDS,
+  NO_PARAMS,
+  stateHash,
+  type SimEvent,
+} from '@sj/shared'
 import {
   makeArbiter,
   wordTainted,
@@ -48,7 +57,7 @@ const ctx2: AgentCtx = { ...ctx, agentId: 'a2', name: 'Yusuf' }
 const DANCE: ExpressiveRuling = {
   word: 'dance',
   sense: 'sight',
-  durationTicks: 10,
+  takes: 'minutes',
   energyCost: 2,
   targeted: false,
   emote: 'turns in slow circles, arms wide',
@@ -56,7 +65,7 @@ const DANCE: ExpressiveRuling = {
 const SONG: ExpressiveRuling = {
   word: 'sing',
   sense: 'sound',
-  durationTicks: 8,
+  takes: 'minutes',
   energyCost: 1,
   targeted: false,
   emote: 'lifts a long, wavering note',
@@ -170,11 +179,57 @@ describe('the cheap approval', () => {
 
   it('shows the model every word it is asked to answer with', () => {
     for (const word of ['sight', 'sound']) expect(EXPRESSIVE_INSTRUCTION).toContain(word)
+    for (const word of DURATION_WORDS) expect(EXPRESSIVE_INSTRUCTION).toContain(word)
     expect(ExpressiveRulingSchema.safeParse({ ...DANCE, sense: 'smell' }).success).toBe(false)
     expect(ExpressiveRulingSchema.safeParse({ ...DANCE, extra: 1 }).success).toBe(false)
     expect(ExpressiveRulingSchema.safeParse({ ...DANCE, word: 'Dance The Long One' }).success).toBe(
       false,
     )
+  })
+})
+
+describe('how long the court says an act runs', () => {
+  const OFF_THE_SET = { ...DANCE, takes: 'a while' }
+
+  it('refuses a word off the set, asks again, and takes the second answer', async () => {
+    const answers = [OFF_THE_SET, DANCE]
+    const llm = new ScriptedLlm(() => answers.shift() ?? DANCE)
+    const arbiter = await makeRig(llm)
+    try {
+      expect(await arbiter.adjudicate('I dance by the fire', ctx)).toEqual({
+        kind: 'map',
+        verb: 'express:dance',
+        params: NO_PARAMS,
+      })
+      expect(llm.objectCalls).toBe(2)
+      expect(VERBS['express:dance']!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(
+        DURATION_TICKS.minutes,
+      )
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('and once the retry is spent, half an hour stands in for the word it would not give', async () => {
+    const llm = new ScriptedLlm(() => OFF_THE_SET)
+    const arbiter = await makeRig(llm)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(llm.objectCalls).toBe(2)
+      expect(VERBS['express:dance']!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(
+        DURATION_TICKS[DEFAULT_DURATION_WORD],
+      )
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('the engine expands the word; the ruling never carries a number', () => {
+    for (const word of DURATION_WORDS) {
+      const def = expressiveVerbFromRuling('vigil', { ...DANCE, takes: word })
+      expect(def.takes).toBe(word)
+      expect(def.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(DURATION_TICKS[word])
+    }
   })
 })
 

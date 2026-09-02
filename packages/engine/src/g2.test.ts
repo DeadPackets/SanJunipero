@@ -3,7 +3,13 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { dayPhaseFromTick, SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
+import {
+  dayPhaseFromTick,
+  DURATION_TICKS,
+  SimConfigSchema,
+  stateHash,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type WorldState } from './state.js'
 import { openDb } from './db.js'
 import { fold } from './fold.js'
@@ -297,7 +303,8 @@ describe('GATE G2: 3-day scripted world run', () => {
       return { taken, watched: composePerception(state, G2_CONFIG, KEEPER, taken.slice(-1)).seen }
     }
 
-    const night = seen(NIGHT_THEFT_TICK + 1)
+    // A taking is a moment, so the hand closes the tick after that.
+    const night = seen(NIGHT_THEFT_TICK + DURATION_TICKS.moment)
     expect(night.taken).toHaveLength(1)
     expect(night.taken[0]!.payload).toMatchObject({
       itemId: STOLEN_ITEM,
@@ -307,7 +314,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(dayPhaseFromTick(night.taken[0]!.tick)).toBe('night')
     expect(night.watched).toEqual([])
 
-    const noon = seen(NOON_THEFT_TICK + 1)
+    const noon = seen(NOON_THEFT_TICK + DURATION_TICKS.moment)
     expect(noon.taken).toHaveLength(2)
     expect(dayPhaseFromTick(noon.taken[1]!.tick)).toBe('day')
     expect(noon.watched).toContainEqual({

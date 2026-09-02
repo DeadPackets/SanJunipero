@@ -6,7 +6,7 @@ import { submitIntent } from '../intent.js'
 import { FOOD_KINDS, VERBS } from '../verbs/index.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev } from '../testutil/world.js'
+import { ev, runAct } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DAWN = 360 // hour 6, minute 0
@@ -47,7 +47,7 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
 function castLine(s: WorldState, seed: string, config = CFG): WorldTickResult {
   const r = submitIntent(s, config, 'a1', 'fish', { x: 1, y: 0 })
   if (!r.ok) throw new Error(r.reason)
-  return tickOnce(applyAll(s, r.events, config), config, new RngStreams(seed))
+  return runAct(applyAll(s, r.events, config), config, 'a1', new RngStreams(seed))
 }
 
 describe('fold: wildlife_changed', () => {
@@ -154,7 +154,7 @@ describe('verb: forage', () => {
     const s = makeWorld(['.f', '..'])
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events).toContainEqual({
       type: 'item_spawned',
       payload: {
@@ -176,7 +176,7 @@ describe('verb: forage', () => {
     const s = atTick(makeWorld(['.f', '..']), WINTER + 5)
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events.map((e) => e.type)).not.toContain('item_spawned')
     expect(Object.keys(t.state.items)).toHaveLength(0)
   })

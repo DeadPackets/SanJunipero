@@ -1,4 +1,4 @@
-import { CLOSED_KEYS, type ClosedKey, type DiscoveryCredit } from '@sj/shared'
+import { CLOSED_KEYS, type ClosedKey, type DiscoveryCredit, type DurationWord } from '@sj/shared'
 import type { OutcomeRow, Recipe, RecipeRequirement } from './verdict.js'
 
 // What a minted verb is, for the world and for the town: the physics the engine runs, the
@@ -8,7 +8,7 @@ export type VerbCharter = {
   name: string
   gloss: string
   reads: ClosedKey[]
-  durationTicks: number
+  takes: DurationWord
   requires: RecipeRequirement[]
   costs: { kind: string; qty: number }[]
   outcomes: OutcomeRow[]
@@ -60,7 +60,7 @@ export function charterFromAttempt(attempt: AttemptVerdict, credit: DiscoveryCre
     name: r.name,
     gloss: capGloss(attempt.summary),
     reads: readsOf(r.outcomeTable),
-    durationTicks: r.durationTicks,
+    takes: r.takes,
     requires: r.requires,
     costs: r.costs,
     outcomes: r.outcomeTable,

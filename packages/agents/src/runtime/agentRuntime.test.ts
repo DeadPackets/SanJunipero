@@ -752,9 +752,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const second = prompts[1]!.map((m) => m.text).join('\n')
     // Nothing was underway on the first turn, so the open framing stands.
     expect(first).not.toContain('You are in the middle of:')
-    // Three tiles a tick carries the five-tile walk and the take inside one turn, so what the
-    // second prompt finds underway is the last step of the same plan.
-    expect(second).toContain('You are in the middle of: eat item_1 (step 3 of 3).')
+    // Three tiles a tick carries the five-tile walk inside one turn, so what the second prompt
+    // finds underway is the next step of the same plan, still running.
+    expect(second).toContain('You are in the middle of: take item_1 (step 2 of 3).')
     expect(second).toContain('Answer wait and it goes on.')
   })
 
