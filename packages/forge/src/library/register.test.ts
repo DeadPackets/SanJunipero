@@ -97,21 +97,21 @@ describe('deriveIcon', () => {
 })
 
 describe('libraryIndexJson', () => {
-  it('lists all 50 entries with both asset ids and parses as JSON', () => {
+  it('lists all 54 entries with both asset ids and parses as JSON', () => {
     const c = codex()
     const records: AssetRecord[] = []
     for (const e of LIBRARY) {
       const r = registerLibraryEntry(c, e, args)
       records.push(r.spriteRecord, r.iconRecord)
     }
-    expect(records).toHaveLength(100)
+    expect(records).toHaveLength(108)
 
     const index = JSON.parse(libraryIndexJson(records)) as {
       version: string
       entries: { kind: string; spriteId: string; iconId: string; category: string }[]
     }
     expect(index.version).toBe(LIBRARY_INDEX_VERSION)
-    expect(index.entries).toHaveLength(50)
+    expect(index.entries).toHaveLength(54)
     expect(index.entries.map((e) => e.kind)).toEqual(LIBRARY.map((e) => e.kind))
     for (const e of index.entries) {
       expect(e.spriteId, e.kind).toMatch(/^asset_/)

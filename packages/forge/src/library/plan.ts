@@ -5,7 +5,7 @@ import { STYLE_PROMPT } from '../styleBible.js'
 import { MASTER_PALETTE } from '../palette.js'
 import { LIBRARY, type LibraryEntry } from './catalog.js'
 
-// One batch per eyeball: the runner refuses to make all 50 in a single unwatched go.
+// One batch per eyeball: the runner refuses to make all 54 in a single unwatched go.
 export const LIBRARY_BATCHES = ['tools', 'foods', 'materials', 'ritual', 'furniture'] as const
 export type LibraryBatch = (typeof LIBRARY_BATCHES)[number]
 

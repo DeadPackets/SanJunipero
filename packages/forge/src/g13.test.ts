@@ -277,7 +277,7 @@ describe('G13a.4 — the alignment pixel half', () => {
 // ---------------------------------------------------------------- 5. library codex
 
 describe('G13a.5 — the library in the codex', () => {
-  it('registers all fifty entries as two parseable rows each', () => {
+  it('registers all fifty-four entries as two parseable rows each', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const png = Buffer.from('png')
     let n = 0
@@ -300,7 +300,7 @@ describe('G13a.5 — the library in the codex', () => {
       expect(iconRecord.kind).toBe(`${e.kind}${ICON_SUFFIX}`)
       expect(iconRecord.widthPx).toBe(e.iconPx)
     }
-    expect(n).toBe(100)
+    expect(n).toBe(108)
   })
 
   it('resolves the six C10 FurnishingKind originals', () => {

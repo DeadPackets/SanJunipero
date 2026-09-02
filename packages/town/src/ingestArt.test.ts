@@ -13,6 +13,8 @@ import {
   listCommittedItems,
   openForgeDb,
   castArtCoverage,
+  catalogGap,
+  configItemKinds,
   itemArtCoverage,
   coverageFailure,
   registerCommittedBuildings,
@@ -36,6 +38,7 @@ import {
   parseLibraryItemManifest,
   resolveFurnishingKind,
 } from '@sj/shared'
+import { seededItemKinds } from '@sj/engine'
 import {
   ingestCastArt,
   ingestLibraryArt,
@@ -215,7 +218,7 @@ describe('ingestTerrainArt', () => {
 })
 
 describe('ingestLibraryArt', () => {
-  it('registers a sprite AND an icon for every one of the fifty, idempotently', async () => {
+  it('registers a sprite AND an icon for every one of the fifty-four, idempotently', async () => {
     const db = openForgeDb(join(dir, 'lib.db'))
     const codex = new AssetCodex(db)
 
@@ -229,7 +232,7 @@ describe('ingestLibraryArt', () => {
     expect(first.every((e) => e.action === 'registered')).toBe(true)
 
     const items = codex.listSince(0).filter((r) => r.class === 'item')
-    expect(items, 'fifty sprites and fifty icons').toHaveLength(LIBRARY.length * 2)
+    expect(items, 'fifty-four sprites and fifty-four icons').toHaveLength(LIBRARY.length * 2)
     const tileset = codex.listSince(0).filter((r) => r.kind?.startsWith('interior:') === true)
     expect(tileset, 'five wall elevations').toHaveLength(5)
     const bed = items.find((r) => r.kind === 'bed')!
@@ -299,6 +302,19 @@ describe('the boot resolves every kind the world will ask for', () => {
     expect(cast.orphans, coverageFailure('cast', cast).join('\n')).toEqual([])
     db.close()
   }, 30_000)
+
+  // ★ Only this lane sees both the sim and the catalogue, so only here can the whole question be
+  // asked: `seed_pouch` sat in every founder's kit and `torch` in a recipe, neither ever drawn.
+  it('★ every kind the sim seeds or crafts is a kind the catalog carries', () => {
+    const world = configItemKinds(DEFAULT_CONFIG, seededItemKinds())
+    for (const k of ['seed_pouch', 'torch', 'plank'])
+      expect(world, `the walk lost ${k} — the gate would be vacuous`).toContain(k)
+    const absent = catalogGap(world)
+    expect(
+      absent,
+      `${absent.length} kind(s) the world puts in a hand draw the placeholder — ${absent.join(', ')}`,
+    ).toEqual([])
+  })
 
   it('and an empty codex reports every one of them, so the guard cannot go vacuous', () => {
     expect(itemArtCoverage([]).missing).toHaveLength(LIBRARY.length * 2)

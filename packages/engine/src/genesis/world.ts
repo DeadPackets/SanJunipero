@@ -1,17 +1,18 @@
 import {
   CITY_ANCHOR_DEFAULT,
   FOUNDER_IDS,
+  expandItemKinds,
   isRoofedKind,
   makeCityTemplate,
   type CityStructure,
   type SimConfig,
 } from '@sj/shared'
 import { genesisTerrainAt } from '../geography.js'
-import { GENESIS_FAUNA } from '../data/faunaDefs.js'
-import { GENESIS_FORAGEABLES } from '../data/forageables.js'
+import { FAUNA_YIELD, GENESIS_FAUNA } from '../data/faunaDefs.js'
+import { FORAGEABLE_YIELD, GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
-import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
+import { SEED_RECIPES, buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
 
 // The world on the morning of day one, authored from (x, y) arithmetic alone. NO RNG anywhere:
 // two calls with the same config are deep-equal, which is what lets replay start here. The
@@ -87,6 +88,18 @@ const STOREHOUSE_STOCK: readonly { kind: string; qty: number }[] = [
   { kind: 'rope', qty: 4 },
   { kind: 'cloth', qty: 4 },
 ]
+
+/** The item kinds this world puts in a hand that no config row names: the kit, the stock, what
+ *  the ground and the animals yield, and both sides of the recipes that live in code. The art
+ *  gates add it to `configItemKinds`, so a kind nobody drew is a red test and not a checkerboard. */
+export function seededItemKinds(): string[] {
+  const kinds: string[] = []
+  for (const i of [...FOUNDER_KIT, ...STOREHOUSE_STOCK]) kinds.push(i.kind)
+  kinds.push(...Object.values(FORAGEABLE_YIELD))
+  for (const drops of Object.values(FAUNA_YIELD)) for (const d of drops) kinds.push(d.kind)
+  for (const r of Object.values(SEED_RECIPES)) kinds.push(...Object.keys(r.inputs), r.output.kind)
+  return expandItemKinds(kinds)
+}
 
 function plannedPayload(
   config: SimConfig,

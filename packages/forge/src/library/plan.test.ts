@@ -26,9 +26,9 @@ describe('planBatch', () => {
     }
   })
 
-  it('plans the materials batch at nine items and one candidate each', () => {
+  it('plans the materials batch at eleven items and one candidate each', () => {
     const items = planBatch('materials')
-    expect(items).toHaveLength(9)
+    expect(items).toHaveLength(11)
     for (const i of items) {
       expect(i.entry.iconPx).toBe(DEFAULT_FORGE_CONFIG.library.iconSizePx)
       expect(i.candidates).toBe(1)
@@ -73,7 +73,7 @@ describe('planBatch', () => {
   it('the batch estimate is candidates of image plus two of vision, per item', () => {
     const items = planBatch('tools')
     expect(estimateBatchCost(items)).toBeCloseTo(
-      10 * 1 * EST_COST_PER_IMAGE + 10 * 2 * EST_COST_PER_VISION_CALL,
+      12 * 1 * EST_COST_PER_IMAGE + 12 * 2 * EST_COST_PER_VISION_CALL,
       10,
     )
     expect(estimateBatchCost(planBatch('furniture', { candidates: 3 }))).toBeCloseTo(

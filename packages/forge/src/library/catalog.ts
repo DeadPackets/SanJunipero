@@ -17,9 +17,9 @@ export const LibraryEntrySchema = z
 export type LibraryEntry = z.infer<typeof LibraryEntrySchema>
 
 export const LIBRARY_COUNTS: Record<LibraryCategory, number> = {
-  tool: 10,
+  tool: 12,
   food: 10,
-  material: 9,
+  material: 11,
   ritual: 6,
   furniture: 15,
 }
@@ -120,6 +120,14 @@ const TOOLS: LibraryEntry[] = [
     'saw',
     'a hand saw with a honey-wood grip and a wide warm-grey blade with even teeth along its lower edge',
   ),
+  tool(
+    'torch',
+    'a short honey-wood stave wrapped at its head with straw-coloured fibre charred dark, one honey-gold flame standing off the wrapped end',
+  ),
+  tool(
+    'seed_pouch',
+    'a small drawstring bag of tanned hide, plump and rounded, cinched at the neck with a leather cord and a carved wooden toggle',
+  ),
 ]
 
 const FOODS: LibraryEntry[] = [
@@ -207,6 +215,17 @@ const MATERIALS: LibraryEntry[] = [
     'a small pile of charred black wood chunks with a faint warm-grey ash dusting them',
   ),
   material('gravel', 'a low heap of small warm-grey pebbles, sizes mixed, packed close together'),
+  // `wood` is already a stack of three, so the sawn board is ONE board or the two read alike.
+  material(
+    'plank',
+    'one single sawn board of pale honey-wood lying flat and angled across the frame, thin in ' +
+      'section, straight grain running its whole length, clean square-cut ends and a paler cut face along its top',
+  ),
+  material(
+    'garment',
+    'a warm hooded tunic folded once and set down, soft cream wool with a dusty-rose band across ' +
+      'its hem, the hood and one loose sleeve lying clear of the fold so the shape of the clothing reads',
+  ),
 ]
 
 const RITUAL: LibraryEntry[] = [
