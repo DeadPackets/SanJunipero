@@ -1110,3 +1110,110 @@ describe('the refusal the next turn is actually told about', () => {
     expect(FORBIDDEN_FRAMING.test(line)).toBe(false)
   })
 })
+
+// The prompt's bill, itemised: which block bought which tokens, and which of them the cache
+// can keep. Measurement only — nothing here changes a byte a mind reads.
+describe('blockTokens', () => {
+  function commonPrefixLength(a: string, b: string): number {
+    let i = 0
+    while (i < a.length && i < b.length && a[i] === b[i]) i += 1
+    return i
+  }
+
+  const NAMED = [
+    'shared',
+    'roster',
+    'identity',
+    'personality',
+    'journal',
+    'dayLog',
+    'scene',
+    'recalled',
+    'lastOutcome',
+    'now',
+    'heard',
+    'said',
+    'underway',
+  ]
+
+  it('carries an entry for every block it rendered and none for one it skipped', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    expect(Object.keys(a.blockTokens).sort()).toEqual(
+      ['shared', 'identity', 'personality', 'dayLog', 'scene', 'now'].sort(),
+    )
+
+    const full = assemblePrompt(
+      fixtureBlocks({
+        roster: [
+          {
+            id: 'recipe:smoke_fish',
+            name: 'Smoke Fish Over Green Wood',
+            gloss: 'Hang the catch in green-wood smoke so it keeps',
+            reads: [],
+          },
+        ],
+        journal: [{ day: 2, text: 'The weir held.' }],
+        recalled: { query: 'my mother', memories: ['She kept bees.'] },
+        lastOutcome: lastTurnLine('eat', 'the food must be in your hands'),
+        now: { prose: 'The sun is high.', heard: 'You hear Nadia say: "Bread?"', said: ['Aye.'] },
+        underway: { what: 'walk 62 70', step: 2, of: 4 },
+      }),
+    )
+    expect(Object.keys(full.blockTokens).sort()).toEqual([...NAMED].sort())
+    for (const n of NAMED) expect(full.blockTokens[n]).toBeGreaterThan(0)
+  })
+
+  it('sums to within 1% of estTokens, so no block escapes the bill', () => {
+    for (const blocks of [
+      fixtureBlocks(),
+      fixtureBlocks({
+        journal: [{ day: 2, text: 'The weir held.' }],
+        underway: { what: 'walk 62 70', step: 2, of: 4 },
+      }),
+    ]) {
+      const a = assemblePrompt(blocks)
+      const summed = Object.values(a.blockTokens).reduce((t, n) => t + n, 0)
+      expect(Math.abs(summed - a.estTokens) / a.estTokens).toBeLessThan(0.01)
+    }
+  })
+
+  // The whole cache rests on this: `shared` is the only stretch that is byte-identical for all
+  // twelve minds, so anything per-mind put in front of it costs every mind its warm prefix.
+  it('measures the same shared prefix for two minds with nothing else in common', () => {
+    const other = assemblePrompt(
+      fixtureBlocks({
+        identity: {
+          name: 'Halim',
+          age: 61,
+          backstory: 'I dug the second well and buried two of the men who helped.',
+          temperament: 'dry and watchful',
+          voiceCard: {
+            register: 'clipped',
+            rhythm: 'one clause, then silence',
+            tics: ['counts on his fingers'],
+            neverSays: ['perhaps'],
+            exampleLines: ['It holds or it does not.'],
+          },
+        },
+        personality: {
+          doc: {
+            temperament: 'dry and watchful',
+            values: ['water', 'a straight answer'],
+            beliefs: ['the valley remembers'],
+            current: { mood: 'wary', worries: ['the second well'], goals: ['sink a third'] },
+          },
+          autobiography: ['I have not left this valley since the year of the flood.'],
+        },
+      }),
+    )
+    const tamar = assemblePrompt(fixtureBlocks())
+
+    expect(other.blockTokens.shared).toBe(tamar.blockTokens.shared)
+    expect(other.blockTokens.identity).not.toBe(tamar.blockTokens.identity)
+    // Byte-identical, and first: the two systems agree for at least as far as `shared` reaches.
+    expect(commonPrefixLength(tamar.system, other.system)).toBeGreaterThanOrEqual(
+      4 * tamar.blockTokens.shared! - 3,
+    )
+    expect(tamar.system.startsWith(RULES_OF_BEING)).toBe(true)
+  })
+})

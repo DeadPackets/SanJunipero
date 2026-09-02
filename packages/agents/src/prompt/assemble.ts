@@ -177,12 +177,9 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const roster = renderRoster(blocks.roster ?? [])
   const identity = renderIdentity(blocks.identity)
   const personality = renderPersonality(blocks.personality)
-  const system = [
-    shared,
-    ...(roster.length === 0 ? [] : [roster]),
-    identity,
-    personality,
-  ].join(BLOCK_DELIM)
+  const system = [shared, ...(roster.length === 0 ? [] : [roster]), identity, personality].join(
+    BLOCK_DELIM,
+  )
   const journal = renderJournal(blocks.journal)
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
