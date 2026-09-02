@@ -110,6 +110,20 @@ export function migrateAgentTables(db: Database.Database): void {
       result_count INTEGER NOT NULL
     );
 
+    -- What one mind holds about another. A scene's close writes here; so does reflection.
+    CREATE TABLE IF NOT EXISTS ties (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id TEXT NOT NULL,
+      person_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN
+        ('promise','debt','slight','grudge','attraction','secret','alliance','kin')),
+      text TEXT NOT NULL,
+      tick INTEGER NOT NULL,
+      settled_tick INTEGER,
+      source TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ties_agent_person ON ties(agent_id, person_id);
+
     CREATE TABLE IF NOT EXISTS personality_versions (
       agent_id TEXT NOT NULL,
       version INTEGER NOT NULL,
