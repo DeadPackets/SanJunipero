@@ -167,27 +167,6 @@ export const wantedWater = (lastOutcome: string | null): boolean =>
 // A freeform intent has no verb to name, only the words the mind used.
 export const TRIED_FREEFORM = 'what you tried'
 
-// The second ask inside the window is answered from the mind's own history, not from the god.
-// It names the repetition and nothing else: a mind's own past is not a hint.
-export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
-
-// Sim minutes: long enough to cover a loop, short enough that a changed town gets asked again.
-export const REFUSAL_MEMORY_TICKS = 240
-
-// How many refused intents a mind carries. Bounded because it is per-mind state held for the
-// life of the process, not because 16 is special.
-const REFUSAL_MEMORY_SIZE = 16
-
-// Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
-// true copy, but importing @sj/arbiter back here is a package cycle.
-function sameIntent(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/[.,!?;:]+$/, '')
-}
-
 function nearestStructureKind(packet: PerceptionPacket): string | null {
   const { x, y } = packet.self
   let best: string | null = null
@@ -276,8 +255,6 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, and when. Read before the god is asked again.
-  #refusedIntents = new Map<string, number>()
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
@@ -639,12 +616,6 @@ export class AgentRuntime {
   async #adjudicateFreeform(description: string): Promise<void> {
     const fallback = (): Promise<void> =>
       this.#holdIntent({ verb: 'experiment', params: { description } })
-    // The same idea inside the window, answered from this mind's own history at no call. The
-    // memory it leaves differs from the first refusal, or the mind learns nothing.
-    if (this.#alreadyRefused(description)) {
-      await this.#writeActionMemory(REPEATED_REFUSAL)
-      return
-    }
     let verdict
     try {
       verdict = await this.#adjudicator!(
@@ -658,7 +629,6 @@ export class AgentRuntime {
     if (verdict.kind === 'map')
       return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
     if (verdict.kind === 'impossible') {
-      this.#rememberRefusal(description)
       this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
@@ -678,21 +648,6 @@ export class AgentRuntime {
       return fallback()
     }
     return this.#holdIntent({ verb, params: {} })
-  }
-
-  #alreadyRefused(description: string): boolean {
-    const at = this.#refusedIntents.get(sameIntent(description))
-    return at !== undefined && this.#bridge.currentTick() - at < REFUSAL_MEMORY_TICKS
-  }
-
-  #rememberRefusal(description: string): void {
-    const key = sameIntent(description)
-    this.#refusedIntents.delete(key)
-    this.#refusedIntents.set(key, this.#bridge.currentTick())
-    // Insertion-ordered, so the first key is the oldest.
-    while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
-      this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
-    }
   }
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {

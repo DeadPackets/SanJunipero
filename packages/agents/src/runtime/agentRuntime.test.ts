@@ -16,7 +16,6 @@ import {
   type TileId,
 } from '@sj/engine'
 import {
-  MINUTES_PER_DAY,
   NO_PARAMS,
   REFLECTION_SETTLE_MS,
   SimConfigSchema,
@@ -31,8 +30,6 @@ import {
   AgentRuntime,
   CRAFT_HINT,
   OPAQUE_REFUSAL,
-  REFUSAL_MEMORY_TICKS,
-  REPEATED_REFUSAL,
   reflectionOffsetTicks,
   refusalMemoryText,
 } from './agentRuntime.js'
@@ -1460,8 +1457,9 @@ describe('arbiter seam (T19)', () => {
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
   })
 
-  // A refusal a mind cannot act on is a refusal it repeats, at a full arbiter call each time.
-  it("★ asks the god ONCE for one idea: the same intent again is answered from the mind's own past", async () => {
+  // The court, not the mind's own past, answers a repeated ask: its precedent path already
+  // returns a stored ruling at no call, and a refusal is one memory, never a repeated line.
+  it('asks the god every time, and each refusal is one memory of importance 3', async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {
       calls += 1
@@ -1472,32 +1470,22 @@ describe('arbiter seam (T19)', () => {
       }
     }
     const { loop, agentDb } = await setup({
-      // The same idea, three turns running — and said differently the third time, because a
-      // mind rephrases. `sameIntent` normalizes case, spacing and trailing punctuation.
-      model: turnModel([
-        freeformTurn,
-        freeformTurn,
-        { ...freeformTurn, action: { freeform: 'Weave reeds into a basket.' } },
-      ]),
+      model: turnModel([freeformTurn, freeformTurn]),
       mindConfig: FAST_MIND,
       adjudicator,
     })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 3, 400)
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
 
-    // One call for three asks. The other two cost nothing at all.
-    expect(calls).toBe(1)
-    const texts = memoriesOfKind(agentDb, 'action').map((m) => m.text)
-    expect(texts[0]).toBe('You realize you cannot: the reeds will not hold that shape')
-    // ★ AND THE SECOND MEMORY IS DIFFERENT FROM THE FIRST. Handing a mind the identical
-    // sentence a third time is the defect, not the call count.
-    expect(texts[1]).toBe(REPEATED_REFUSAL)
-    expect(texts[2]).toBe(REPEATED_REFUSAL)
-    expect(REPEATED_REFUSAL).not.toBe(texts[0])
+    expect(calls).toBe(2)
+    const memories = memoriesOfKind(agentDb, 'action')
+    expect(memories.map((m) => m.text)).toEqual([
+      'You realize you cannot: the reeds will not hold that shape',
+      'You realize you cannot: the reeds will not hold that shape',
+    ])
+    expect(memories.map((m) => m.importance)).toEqual([3, 3])
   })
 
   it('★ ANTI-VACUITY: a DIFFERENT idea still reaches the god, and so does the same one later', async () => {
-    // A breaker that silences the second ask of anything would be worse than the loop: it
-    // would cap a mind at one novel act per lifetime.
     const seen: string[] = []
     const adjudicator: Adjudicator = async (intent) => {
       seen.push(intent)
@@ -1518,9 +1506,6 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
 
     expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
-    // The window is a window: it is measured in ticks and it expires.
-    expect(REFUSAL_MEMORY_TICKS).toBeGreaterThan(0)
-    expect(REFUSAL_MEMORY_TICKS).toBeLessThan(MINUTES_PER_DAY)
   })
 
   // ★ Run D spent 3 of its 9 rulings on `stand`, `think` and `none player`, ~11 ticks of
@@ -1560,11 +1545,8 @@ describe('arbiter seam (T19)', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
-    )
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'Perhaps someone in the town knows how.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
   })
 
@@ -1579,8 +1561,8 @@ describe('arbiter seam (T19)', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
   })
@@ -1622,8 +1604,8 @@ describe('arbiter seam (T19)', () => {
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
   })
 
@@ -1812,8 +1794,8 @@ describe('arbiter wiring expansion (T20)', () => {
       adjudicator,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
   })
 })

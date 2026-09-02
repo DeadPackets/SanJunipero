@@ -1140,10 +1140,10 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // The failure was recorded where an operator looks...
     const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
     expect(alerts.length).toBeGreaterThan(0)
-    // ...and the intent still reached the world as `experiment`, which never starts an activity
-    // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
+    // ...and the intent still reached the world as `experiment`, a verb the world does not
+    // have, so the perceivable outcome is the opaque refusal in memory, not an event.
     expect(
-      memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')),
+      memoriesOf(dir, 'amara').some((t) => t.includes('it does not take, and you cannot say why')),
     ).toBe(true)
     // A god that fell over must not have minted law on the way down.
     expect(rulebookOf(dir)).toHaveLength(0)

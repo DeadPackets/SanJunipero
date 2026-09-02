@@ -749,22 +749,6 @@ describe('verb: attack', () => {
   })
 })
 
-describe('verb: experiment (stub)', () => {
-  it('always returns the stub rejection, and it leaves a door open (T18)', () => {
-    const expected =
-      'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
-    expect(
-      submitIntent(makeWorld(), CFG, 'a1', 'experiment', {
-        description: 'boil river water for salt',
-      }),
-    ).toEqual({ ok: false, reason: expected })
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'experiment', {})).toEqual({
-      ok: false,
-      reason: expected,
-    })
-  })
-})
-
 describe('eat rulings (Task 12)', () => {
   it('accepts config-crop kinds in addition to FOOD_KINDS', () => {
     let s = makeWorld()
@@ -814,16 +798,7 @@ describe('eat rulings (Task 12)', () => {
 
 describe('verb registry (Task 12)', () => {
   it('registers the new verbs', () => {
-    for (const k of [
-      'speak',
-      'give',
-      'take',
-      'write',
-      'read',
-      'teach',
-      'attack',
-      'experiment',
-    ] as const) {
+    for (const k of ['speak', 'give', 'take', 'write', 'read', 'teach', 'attack'] as const) {
       expect(VERBS[k]!.kind).toBe(k)
     }
   })

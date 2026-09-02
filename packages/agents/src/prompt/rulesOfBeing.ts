@@ -84,7 +84,7 @@ the whole moment so that you do nothing else with it and what comes back
 reaches you a moment later; reconsider_at, a clock time such as 08:30 when you
 mean to return to your thoughts.
 
-What you cannot do yet, the world will show you, and you will learn.`
+Anything you can name, you may try; the world answers with what it took.`
 
 // What the town has minted since the static rules were written, one line a verb. Empty text
 // when nothing is minted, so a town that has invented nothing pays no bytes for the block.
