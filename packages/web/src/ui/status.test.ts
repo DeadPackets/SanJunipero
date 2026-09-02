@@ -21,6 +21,7 @@ import {
   TALK_RECENT_TICKS,
   conditionsOf,
   drivesOf,
+  stateLine,
   stateWord,
   statusLiteralOffenders,
   statusOf,
@@ -156,6 +157,21 @@ describe('STATES — one state per person, and the array IS the priority', () =>
   it('sleep outranks the conversation, and death outranks everything', () => {
     expect(statusOf(body({ asleep: true, lastSpokeTick: 500 }), 501)).toBe('asleep')
     expect(statusOf(body({ alive: false, lastSpokeTick: 500 }), 501)).toBe('gone')
+  })
+
+  // A body is still for half an hour at a stretch now. The word alone reads as a stuck body,
+  // so anywhere with room for a sentence says how long there is left of it.
+  it('the line says the act and how far there is to go, and drops the number when there is none', () => {
+    expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 40 } }))).toBe(
+      'Fishing — 40 min to go',
+    )
+    expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 0 } }))).toBe('Fishing')
+    expect(stateLine(body({ activity: { verb: 'fish' } }))).toBe('Fishing')
+    expect(stateLine(body())).toBe('Between things')
+    // The state still rules the word: a sleeper is asleep however long the clock says.
+    expect(stateLine(body({ asleep: true, activity: { verb: 'fish', ticksRemaining: 9 } }))).toBe(
+      'Asleep — 9 min to go',
+    )
   })
 
   it('the working word is the verb’s own gerund, and the others keep theirs', () => {

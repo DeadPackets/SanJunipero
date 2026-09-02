@@ -3,6 +3,7 @@ import {
   ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   DEFAULT_CONFIG,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   type SimConfig,
@@ -401,8 +402,8 @@ describe("tend: an hour of another body's hands", () => {
   const complete = (s: WorldState, params: Record<string, unknown>) =>
     VERBS.tend!.onComplete(s, CFG, 'a2', params, new RngStreams('t').get('actions'))
 
-  it('takes three ticks, names the tender, and reads as a C9 log when it has to', () => {
-    expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(3)
+  it('takes an hour, names the tender, and reads as a C9 log when it has to', () => {
+    expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(DURATION_TICKS.hour)
     expect(complete(pair(), { targetId: 'a1' })).toEqual([
       { type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } },
     ])
@@ -507,10 +508,10 @@ describe('verb: pave', () => {
   const laid = (s: WorldState, x: number, y: number, config = CFG) =>
     VERBS.pave!.onComplete(s, config, 'a1', { x, y }, new RngStreams('t').get('actions'))
 
-  it('turns grass to road for one stone and six ticks of work', () => {
+  it('turns grass to road for one stone and minutes of work', () => {
     const s = quarried()
     expect(VERBS.pave!.duration(s, CFG, 'a1', { x: 1, y: 0 })).toBe(CFG.roads.paveDurationTicks)
-    expect(CFG.roads.paveDurationTicks).toBe(6)
+    expect(CFG.roads.paveDurationTicks).toBe(DURATION_TICKS.minutes)
     expect(laid(s, 1, 0)).toEqual([
       { type: 'item_qty_changed', payload: { id: 'item_1', delta: -CFG.roads.stonePerTile } },
       {
@@ -795,7 +796,12 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     if (r.ok)
       expect(r.events[0]).toEqual({
         type: 'action_started',
-        payload: { agentId: 'a1', verb: 'wear', params: { itemId: 'item_1' }, duration: 1 },
+        payload: {
+          agentId: 'a1',
+          verb: 'wear',
+          params: { itemId: 'item_1' },
+          duration: DURATION_TICKS.minutes,
+        },
       })
     expect(
       VERBS.wear!.onComplete(

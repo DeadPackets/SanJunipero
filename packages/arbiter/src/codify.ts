@@ -1,6 +1,6 @@
 import { crafterStamp, RECIPE_TILE_IDS, registerVerb, shortOf, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
-import type { DiscoveryCredit, SimConfig } from '@sj/shared'
+import { ticksFor, type DiscoveryCredit, type SimConfig } from '@sj/shared'
 import { charterFromAttempt, type AttemptVerdict, type VerbCharter } from './charter.js'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
@@ -239,8 +239,9 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
       }
       return null
     },
+    takes: charter.takes,
     duration() {
-      return charter.durationTicks
+      return ticksFor(charter.takes)
     },
     onStart(state, _config, agentId) {
       // Mirrors the engine craft verb: re-check sufficiency at consumption time

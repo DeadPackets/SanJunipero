@@ -5,8 +5,8 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { VERBS } from './verbs/index.js'
 import { RngStreams } from './rng.js'
-import { createWorldTick, type WorldTickResult } from './worldTick.js'
-import { ev } from './testutil/world.js'
+import type { WorldTickResult } from './worldTick.js'
+import { ev, runAct } from './testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
@@ -45,10 +45,8 @@ function applyAll(
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), config)
   return s
 }
-function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): WorldTickResult {
-  const wt = createWorldTick(config, rng)
-  return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
-}
+// Every act in this file is run to its end: nothing here is about a single tick.
+const runsAct = (s: WorldState, config = CFG): WorldTickResult => runAct(s, config)
 
 describe('verb: speak', () => {
   // ★ THE MOUTH IS NOT THE HANDS. A word lands the moment it is said: no `action_started`, no
@@ -145,7 +143,7 @@ describe('verb: give', () => {
     const r = submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a2' })
   })
 
@@ -184,7 +182,7 @@ describe('verb: take', () => {
     const r = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
   })
 
@@ -218,7 +216,7 @@ describe('verb: take', () => {
     const r = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
   })
 
@@ -263,7 +261,7 @@ describe('verb: drop', () => {
     const r = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.items.item_1!.loc).toEqual({ t: 'tile', x: 0, y: 0 })
   })
 
@@ -271,10 +269,10 @@ describe('verb: drop', () => {
     let s = holding()
     const rd = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
     if (!rd.ok) throw new Error(rd.reason)
-    s = tickOnce(applyAll(s, rd.events)).state
+    s = runsAct(applyAll(s, rd.events)).state
     const rt = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
     if (!rt.ok) throw new Error(rt.reason)
-    expect(tickOnce(applyAll(s, rt.events)).state.items.item_1!.loc).toEqual({
+    expect(runsAct(applyAll(s, rt.events)).state.items.item_1!.loc).toEqual({
       t: 'agent',
       id: 'a1',
     })
@@ -285,7 +283,7 @@ describe('verb: drop', () => {
     const r = submitIntent(s, CFG, 'a1', 'drop', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    expect(tickOnce(s).state.items.item_1!.owner).toBe('a2')
+    expect(runsAct(s).state.items.item_1!.owner).toBe('a2')
   })
 
   it('refuses what you are not holding and what is not there; what is down is already done', () => {
@@ -325,7 +323,7 @@ describe('verbs: write + read', () => {
     const rw = submitIntent(s, CFG, 'a1', 'write', { text: 'the password is swordfish' })
     if (!rw.ok) throw new Error(rw.reason)
     s = applyAll(s, rw.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     const note = Object.values(res.state.items).find((i) => i.kind === 'note')!
     expect(note.text).toBe('the password is swordfish')
     expect(note.loc).toEqual({ t: 'agent', id: 'a1' })
@@ -333,7 +331,7 @@ describe('verbs: write + read', () => {
     const rr = submitIntent(res.state, CFG, 'a1', 'read', { itemId: note.id })
     if (!rr.ok) throw new Error(rr.reason)
     const s2 = applyAll(res.state, rr.events)
-    const res2 = tickOnce(s2)
+    const res2 = runsAct(s2)
     const completed = res2.events.find((e) => e.type === 'action_completed')
     expect((completed?.payload as { results?: unknown } | undefined)?.results).toEqual({
       text: 'the password is swordfish',
@@ -356,7 +354,7 @@ describe('verbs: write + read', () => {
     const r = submitIntent(s, CFG, 'a1', 'write', { itemId: 'item_1', text: 'new text' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.items.item_1!.text).toBe('new text')
     expect(Object.values(res.state.items)).toHaveLength(1)
   })
@@ -406,7 +404,7 @@ describe('verb: teach', () => {
     const r = submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
+    const res = runsAct(s)
     expect(res.state.agents.a2!.skills.farming).toBe(30)
     expect(res.state.agents.a1!.skills.scholarship).toBe(1)
   })

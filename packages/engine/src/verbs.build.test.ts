@@ -6,7 +6,7 @@ import { submitIntent } from './intent.js'
 import { VERBS } from './verbs/index.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
-import { ev } from './testutil/world.js'
+import { ev, runAct } from './testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 const FAST: SimConfig = SimConfigSchema.parse({
@@ -287,7 +287,7 @@ describe('verb: fill', () => {
   const filled = (s: WorldState) => {
     const r = submitIntent(s, CFG, 'a1', 'fill', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
-    return tickOnce(applyAll(s, r.events))
+    return runAct(applyAll(s, r.events), CFG)
   }
 
   it('fills a waterskin to its config charge count and a bucket to exactly one', () => {
@@ -365,7 +365,7 @@ describe('verb: craft', () => {
     const s = makeWorld(CFG, 1)
     const r = submitIntent(s, CFG, 'a1', 'craft', { recipe: 'plank' })
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events).toContainEqual({
       type: 'item_qty_changed',
       payload: { id: 'item_1', delta: -1 },

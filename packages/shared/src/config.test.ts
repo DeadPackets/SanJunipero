@@ -9,6 +9,7 @@ import {
   thirstDecayPerTick,
 } from './config.js'
 import { CITY_BED_KIND, CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
+import { DURATION_TICKS } from './duration.js'
 import { MINUTES_PER_DAY } from './time.js'
 
 // Every section flag, in the order they will be unpinned.
@@ -244,7 +245,11 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   it('ground, water and road dials carry their exact values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.fertility).toEqual({ enabled: true, radius: 3, waterBonus: 0.5, maxMultiplier: 1.5 })
-    expect(c.roads).toEqual({ enabled: true, stonePerTile: 1, paveDurationTicks: 6 })
+    expect(c.roads).toEqual({
+      enabled: true,
+      stonePerTile: 1,
+      paveDurationTicks: DURATION_TICKS.minutes,
+    })
     expect(c.desirePaths).toEqual({
       enabled: true,
       wearThreshold: 120,

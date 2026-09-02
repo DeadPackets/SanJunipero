@@ -15,7 +15,7 @@ const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
 const EXPLOIT_RECIPE: Recipe = {
   id: 'recipe:gunpowder',
   name: 'Craft Black Powder and a Gun',
-  durationTicks: 1,
+  takes: 'moment',
   costs: [],
   requires: [],
   outcomeTable: [
@@ -35,7 +35,7 @@ const EARNED_RECIPE: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
   skillCheck: { track: 'cooking', difficulty: 2 },
-  durationTicks: 5,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [

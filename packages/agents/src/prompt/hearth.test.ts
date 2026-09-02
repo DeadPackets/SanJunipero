@@ -14,6 +14,7 @@ import {
   ADULT_AGE_DAYS,
   DAYS_PER_YEAR,
   DEFAULT_CONFIG,
+  DURATION_TICKS,
   type SimEvent,
   scanForDirective,
   scanForLayoutLeak,
@@ -82,8 +83,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     expect(proseFor(bridge)).toContain('The hearth here is cold.')
 
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     const lit = proseFor(bridge)
     expect(lit).toContain('A fire is burning in the hearth here.')
     expect(lit).not.toContain('The hearth here is cold.')
@@ -97,8 +97,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const before = warmthTargetFor(loop.state, CFG, 'amara')
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     // A spring night, so nothing here is shivering either way — the point is that the number
     // MOVES, which it never did: walls answered the cold and the fire answered nothing.
     expect(warmthTargetFor(loop.state, CFG, 'amara')).toBe(before + 2 * CFG.warmth.fireWarmth)
@@ -143,8 +142,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const cold = proseFor(bridge).toLowerCase()
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
       expect(scanForDirective(said), said).toEqual([])

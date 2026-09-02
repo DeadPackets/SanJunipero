@@ -1,7 +1,7 @@
 import { agentName, kindWords, structureTitle } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { plateRows, type PlateRow } from './plateModel.js'
-import { stateWord } from './status.js'
+import { stateLine } from './status.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
 
@@ -69,12 +69,12 @@ function plateFor(state: WorldState | null, kind: HoverKind, id: string): PlateR
   switch (kind) {
     case 'agent': {
       const a = state.agents[id]
-      // A person's plate is their name and the one word for what they are doing.
+      // A person's plate is their name and what they are doing, with the minutes left in it.
       return a === undefined
         ? []
         : plateRows([
             { text: a.name, tone: 'name' },
-            { text: stateWord(a, state.tick), tone: 'quiet' },
+            { text: stateLine(a, state.tick), tone: 'quiet' },
           ])
     }
     case 'structure': {

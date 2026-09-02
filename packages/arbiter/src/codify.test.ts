@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DURATION_TICKS,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import {
   RngStream,
   VERBS,
@@ -29,7 +35,7 @@ const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
   skillCheck: { track: 'cooking', difficulty: 2 },
-  durationTicks: 5,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
@@ -112,7 +118,7 @@ describe('the charter a ruling becomes', () => {
       name: 'Boil River Water for Salt',
       gloss: SUMMARY,
       reads: [],
-      durationTicks: 5,
+      takes: 'minutes',
       requires: boilSaltRecipe.requires,
       costs: [],
       outcomes: boilSaltRecipe.outcomeTable,
@@ -166,7 +172,7 @@ describe('codify', () => {
       expect(def.kind).toBe('recipe:boil_salt')
       expect(def.skill).toEqual({ track: 'cooking', xp: 10 })
       expect(def.rngStream).toBe('recipe:boil_salt')
-      expect(def.duration(agentState(), CFG, 'a1', {})).toBe(5)
+      expect(def.duration(agentState(), CFG, 'a1', {})).toBe(DURATION_TICKS.minutes)
     })
 
     it('validate rejects a position with no adjacent fire', () => {
@@ -635,7 +641,7 @@ describe('codify', () => {
       expect(rulebook.byId('recipe:salt_revive')!.revertedAtTick).toBe(250)
 
       const revived = codify(
-        { recipe: { ...recipe, durationTicks: 7 }, summary: SUMMARY },
+        { recipe: { ...recipe, takes: 'hour' as const }, summary: SUMMARY },
         CREDIT_FIXTURE,
         {
           rulebook,
@@ -650,7 +656,7 @@ describe('codify', () => {
       expect(row.revertedAtTick).toBeNull()
       expect(row.revertedReason).toBeNull()
       expect(row.tick).toBe(300)
-      expect((JSON.parse(row.recipeJson) as Recipe).durationTicks).toBe(7)
+      expect((JSON.parse(row.recipeJson) as Recipe).takes).toBe('hour')
 
       expect(
         submitIntent(burningFireAdjacent(), CFG, 'a1', 'recipe:salt_revive', {}),

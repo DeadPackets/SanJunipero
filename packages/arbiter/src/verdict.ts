@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ClosedIntentParams } from '@sj/shared'
+import { ClosedIntentParams, DEFAULT_DURATION_WORD, DurationWordSchema } from '@sj/shared'
 
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
@@ -90,7 +90,7 @@ export const RecipeSchema = z
       .object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) })
       .strict()
       .optional(),
-    durationTicks: z.number().int().positive().max(1440),
+    takes: DurationWordSchema,
     costs: z.array(
       z.object({ kind: z.string().min(1), qty: z.number().int().positive() }).strict(),
     ),
@@ -197,6 +197,16 @@ function withoutNulls(value: unknown, schema: AnyZod): unknown {
     out[key] = withoutNulls(v, field)
   }
   return out
+}
+
+/** The same answer with the one word it may get wrong replaced. A duration off the closed set is
+ *  a schema failure like any other; this is what the last attempt falls back to rather than
+ *  throwing away a sound recipe over its clock. */
+export function withDefaultTakes(raw: unknown): unknown {
+  const verdict = (raw as { verdict?: Record<string, unknown> } | null)?.verdict
+  const recipe = verdict?.recipe
+  if (verdict === undefined || recipe === null || typeof recipe !== 'object') return raw
+  return { verdict: { ...verdict, recipe: { ...recipe, takes: DEFAULT_DURATION_WORD } } }
 }
 
 /** The court's answer in the dialect it was asked for, read as the verdict the town keeps, or

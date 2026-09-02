@@ -1,5 +1,5 @@
 import type { LlmMessage } from '@sj/llm'
-import type { RosterEntry } from '@sj/shared'
+import { DURATION_VOCABULARY, type DurationWord, type RosterEntry } from '@sj/shared'
 
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
@@ -46,6 +46,46 @@ wear (itemId) — doff (nothing) — kindle (itemId) — snuff (itemId) — stok
 till (x, y) — plant (x, y, kind) — harvest (cropId) — fish (x, y) — forage (nodeId, or nothing where trees stand) — hunt (faunaId)
 chop (x, y) — pave (x, y) — dig_channel (x, y) — douse (x, y) — build (kind, and x, y only for a thing smaller than a building) — craft (recipe)`
 
+// The town's own acts at the length they take, so a minted one lands on the same ladder.
+// Authored rather than read off the registry, for the same reason the roster above is: a table
+// that moved when a verb was minted would cost the prefix cache; `prompt.test.ts` holds the two
+// together. The top two rows name no built-in — nothing the town does in one go runs that long,
+// and a build, which does, carries its progress across sessions instead of running as one act.
+export const DURATION_EXEMPLARS: readonly {
+  word: DurationWord
+  verbs: readonly string[]
+  says: string
+}[] = [
+  {
+    word: 'moment',
+    verbs: ['take', 'drop', 'drink', 'speak'],
+    says: 'lifting a thing off the ground, setting one down, a sip of water, a spoken line',
+  },
+  {
+    word: 'minutes',
+    verbs: ['stoke', 'wear', 'read'],
+    says: 'feeding a fire an armful, pulling on a coat, reading a note',
+  },
+  {
+    word: 'half_hour',
+    verbs: ['eat', 'plant', 'inscribe', 'teach'],
+    says: 'eating a meal, sowing a plot, carving words into a wall, teaching a craft',
+  },
+  {
+    word: 'hour',
+    verbs: ['tend', 'dig_channel', 'fish', 'forage'],
+    says: 'tending a sick body, cutting a channel for water, an hour at the water with a line, felling a tree',
+  },
+  { word: 'morning', verbs: [], says: 'a watch or a vigil kept from first light until noon' },
+  { word: 'day', verbs: [], says: 'work that fills the whole of the daylight' },
+]
+
+export const DURATION_CALIBRATION = [
+  `How long an act takes is a word, never a number: exactly one of ${DURATION_VOCABULARY}. Nothing one body does in one go runs longer than a day.`,
+  "The town's own acts, for the measure of it:",
+  ...DURATION_EXEMPLARS.map((e) => `  ${e.word} — ${e.says}`),
+].join('\n')
+
 // Operator-facing instruction appended after the canon block. Canon + instruction is
 // byte-stable across every adjudication, so the provider's prefix cache stays warm.
 export const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
@@ -58,6 +98,8 @@ The verdict word must agree with the reasoning that reached it: if your own reas
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
 Two lines above name ids: what the town currently knows, and what stands within reach. When you rule "attempt", every id you put in the recipe's canon must be copied exactly from those two lines. An id that appears on neither line is a format error, not a craft, and the ruling is thrown away unread.
 An attempt that reaches a craft within reach earns it, and you may add "unlocks": the one craft that step opens next, as a new id of lowercase words joined by underscores, its name in the town's words, and prerequisiteId copied from the recipe's own canon. Leave "unlocks" out when the attempt opens nothing new.
+Every recipe says how long one go at it takes, as "takes".
+${DURATION_CALIBRATION}
 Three rulings for the measure of it:
 "I cut down a tree by the river for its wood" — map: the town fells trees every day and already has the act.
 "I hang the fish in the old shed over a slow smoke of green wood so it will keep past the week" — attempt: nobody has done it, yet the shed, the wood and the fire are all at hand, so the first step can be taken.

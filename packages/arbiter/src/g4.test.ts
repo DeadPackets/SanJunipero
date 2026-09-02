@@ -6,6 +6,7 @@ import {
   DEFAULT_CONFIG,
   NO_PARAMS,
   stateHash,
+  ticksFor,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -35,7 +36,7 @@ const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
   skillCheck: { track: 'cooking', difficulty: 2 },
-  durationTicks: 5,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
@@ -139,7 +140,7 @@ function runTier1(state: WorldState): {
     events.push(e)
   }
 
-  for (let i = 0; i < boilSaltRecipe.durationTicks; i++) {
+  for (let i = 0; i < ticksFor(boilSaltRecipe.takes); i++) {
     const tick = state.tick + 1
     state = fold(state, ev('tick_advanced', {}, tick), CFG)
     const wt = createWorldTick(CFG, rng)(state)

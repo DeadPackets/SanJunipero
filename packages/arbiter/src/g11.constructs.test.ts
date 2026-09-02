@@ -55,7 +55,7 @@ const ALL_PROMPTS: string[] = []
 const DANCE: ExpressiveRuling = {
   word: 'dance',
   sense: 'sight',
-  durationTicks: 10,
+  takes: 'minutes',
   energyCost: 2,
   targeted: false,
   emote: 'turns in slow circles, arms wide',

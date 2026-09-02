@@ -71,7 +71,9 @@ import {
   sanitizeSpokenText,
   simTimeFromTick,
   structureGlowRadius,
+  ticksFor,
   visionRadiusAt,
+  type DurationWord,
   type SimConfig,
 } from '@sj/shared'
 
@@ -133,6 +135,9 @@ export type VerbDef = {
     agentId: string,
     params: Record<string, unknown>,
   ): number
+  /** The word this act's length was chosen as, when it was chosen as a word at all. The few
+   *  verbs whose clock is worked out from the world — walk, build, pave, chop — leave it absent. */
+  takes?: DurationWord
   onStart?(
     state: WorldState,
     config: SimConfig,
@@ -164,9 +169,17 @@ export type VerbDef = {
   rngStream?: string
 }
 
-// Fills the one default nearly every verb repeats: a one-tick duration.
-function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'duration'>>): VerbDef {
-  return { duration: () => 1, ...spec }
+// Every act says how long it takes, and says it in one of six words or works it out from the
+// world. There is no default: an act with no answer to this is what left a mind idle 94% of its
+// waking life, so it is now a type error rather than a minute.
+type VerbSpec =
+  | (Omit<VerbDef, 'duration' | 'takes'> & { takes: DurationWord })
+  | (Omit<VerbDef, 'takes'> & { takes?: never })
+
+function makeVerb(spec: VerbSpec): VerbDef {
+  if (spec.takes === undefined) return spec
+  const { takes } = spec
+  return { ...spec, takes, duration: () => ticksFor(takes) }
 }
 
 // Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).
@@ -648,6 +661,7 @@ function mayLieDownRough(state: WorldState, config: SimConfig, agentId: string):
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
+  takes: 'moment',
   validate(state, config, agentId) {
     const a = state.agents[agentId]!
     if (a.asleep) return 'already asleep'
@@ -674,6 +688,7 @@ export const EnterParams = z.object({ structureId: z.string() }).strict()
 
 const enter: VerbDef = makeVerb({
   kind: 'enter',
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = EnterParams.safeParse(params)
     if (!p.success) return 'going inside needs the building you mean'
@@ -713,6 +728,7 @@ const enter: VerbDef = makeVerb({
 
 const exit: VerbDef = makeVerb({
   kind: 'exit',
+  takes: 'moment',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
   },
@@ -728,6 +744,7 @@ const exit: VerbDef = makeVerb({
 // submitIntent already prepends agent_woke for any intent from a sleeper.
 const wake: VerbDef = makeVerb({
   kind: 'wake',
+  takes: 'moment',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? null : 'not asleep'
   },
@@ -803,6 +820,7 @@ function swallowEvents(
 
 const eat: VerbDef = makeVerb({
   kind: 'eat',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
     if (!p.success) return 'eating needs the food named'
@@ -837,12 +855,10 @@ const eat: VerbDef = makeVerb({
 
 export const TendParams = z.object({ targetId: z.string(), itemId: z.string().optional() }).strict()
 
-// An hour, not a scribble: three ticks, the carving precedent.
-const TEND_TICKS = 3
-
 const tend: VerbDef = makeVerb({
   kind: 'tend',
-  duration: () => TEND_TICKS,
+  // An hour, not a scribble — which is what the three ticks here always meant to say.
+  takes: 'hour',
   validate(state, config, agentId, params) {
     const p = TendParams.safeParse(params)
     if (!p.success) return 'tending needs someone to tend'
@@ -916,6 +932,7 @@ export const DrinkParams = z.object({ itemId: z.string().optional() }).strict()
 
 const drink: VerbDef = makeVerb({
   kind: 'drink',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DrinkParams.safeParse(params)
     if (!p.success) return 'drinking takes water at your side, or the vessel you name'
@@ -949,6 +966,7 @@ export const FillParams = z.object({ itemId: z.string() }).strict()
 
 const fill: VerbDef = makeVerb({
   kind: 'fill',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = FillParams.safeParse(params)
     if (!p.success) return 'filling needs the vessel named'
@@ -978,6 +996,7 @@ export function isWearable(config: SimConfig, kind: string): boolean {
 
 const wear: VerbDef = makeVerb({
   kind: 'wear',
+  takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = WearParams.safeParse(params)
     if (!p.success) return 'wearing needs the garment named'
@@ -1004,6 +1023,7 @@ const wear: VerbDef = makeVerb({
 
 const doff: VerbDef = makeVerb({
   kind: 'doff',
+  takes: 'minutes',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.equipped?.body === undefined
       ? 'you are not wearing anything'
@@ -1054,6 +1074,7 @@ function heldLight(
 
 const kindle: VerbDef = makeVerb({
   kind: 'kindle',
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'kindling needs the torch or lamp named'
@@ -1078,6 +1099,7 @@ const kindle: VerbDef = makeVerb({
 
 const snuff: VerbDef = makeVerb({
   kind: 'snuff',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'snuffing needs the lit thing named'
@@ -1117,6 +1139,7 @@ export function isRoofedFire(config: SimConfig, kind: string): boolean {
 
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
+  takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
     if (!p.success) return 'stoking needs the fire named'
@@ -1174,6 +1197,7 @@ export function skillLevel(
 
 const till: VerbDef = makeVerb({
   kind: 'till',
+  takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'tilling needs a patch of ground to break'
@@ -1205,14 +1229,12 @@ const till: VerbDef = makeVerb({
   skill: { track: 'farming', xp: 1 },
 })
 
-// Digging is slower than scratching a furrow: four ticks with a spade's worth of effort.
-const DIG_CHANNEL_TICKS = 4
-
 // Water only runs downhill from water. A channel spreads one tile at a time from the river
 // or from what has already been cut, which is why irrigation is a project and not a wish.
 const digChannel: VerbDef = makeVerb({
   kind: 'dig_channel',
-  duration: () => DIG_CHANNEL_TICKS,
+  // Slower than scratching a furrow: a spade's worth of effort against the till beside it.
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'a channel needs a patch of ground to cut'
@@ -1252,6 +1274,7 @@ const digChannel: VerbDef = makeVerb({
 
 const plant: VerbDef = makeVerb({
   kind: 'plant',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = PlantParams.safeParse(params)
     if (!p.success) return 'planting needs ground and a seed to sow'
@@ -1278,6 +1301,7 @@ const plant: VerbDef = makeVerb({
 
 const harvest: VerbDef = makeVerb({
   kind: 'harvest',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = HarvestParams.safeParse(params)
     if (!p.success) return 'harvesting needs the ripe plant named'
@@ -1353,6 +1377,7 @@ export function fishCatchChance(
 
 const fish: VerbDef = makeVerb({
   kind: 'fish',
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'fishing needs the water to cast into'
@@ -1427,6 +1452,9 @@ export function huntChance(
 
 const hunt: VerbDef = makeVerb({
   kind: 'hunt',
+  // The strike, not the stalk: this verb asks the animal to be at your side already, and fauna
+  // flee every fauna.movePeriodTicks. Anything longer is a hunt no body could ever land.
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = HuntParams.safeParse(params)
     if (!p.success) return 'a hunt needs the animal named'
@@ -1482,6 +1510,7 @@ export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
 
 const forage: VerbDef = makeVerb({
   kind: 'forage',
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = ForageParams.safeParse(params)
     if (!p.success) return 'foraging takes the patch you mean, or nothing at all'
@@ -1743,6 +1772,7 @@ function chosenRoute(
 
 const craft: VerbDef = makeVerb({
   kind: 'craft',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'crafting needs the thing to shape named'
@@ -1789,6 +1819,7 @@ const craft: VerbDef = makeVerb({
 
 const extinguish: VerbDef = makeVerb({
   kind: 'extinguish',
+  takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ExtinguishParams.safeParse(params)
     if (!p.success) return 'putting a fire out needs the burning thing named'
@@ -1843,8 +1874,8 @@ const pave: VerbDef = makeVerb({
 
 // A sapling is not timber yet: clearing one costs the swing and yields nothing. Either way the
 // ground goes back to grass, which is what makes the regrowth cycle a cycle and not an ornament.
-export const CLEAR_TICKS = 4
-export const FELL_TICKS = 30
+export const CLEAR_TICKS = ticksFor('minutes')
+export const FELL_TICKS = ticksFor('hour')
 export const TIMBER_PER_TREE = 2
 
 const chop: VerbDef = makeVerb({
@@ -1906,6 +1937,7 @@ function heldBuckets(state: WorldState, agentId: string) {
 // bucket line is a thing the town has to organise for itself.
 const douse: VerbDef = makeVerb({
   kind: 'douse',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DouseParams.safeParse(params)
     if (!p.success) return 'dousing needs the burning ground named'
@@ -1976,6 +2008,7 @@ const spoken = (
 
 const speak: VerbDef = makeVerb({
   kind: 'speak',
+  takes: 'moment',
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
     // Length is refused in the town's own words: the refusal becomes a memory the mind reads
@@ -1995,6 +2028,7 @@ const speak: VerbDef = makeVerb({
 
 const give: VerbDef = makeVerb({
   kind: 'give',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = GiveParams.safeParse(params)
     if (!p.success) return 'giving needs the thing and the person to hand it to'
@@ -2071,6 +2105,7 @@ function liftEvents(
 
 const take: VerbDef = makeVerb({
   kind: 'take',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
     if (!p.success) return 'taking needs the thing to lift'
@@ -2094,6 +2129,7 @@ const take: VerbDef = makeVerb({
 // untouched — setting a thing down is not parting with it.
 const drop: VerbDef = makeVerb({
   kind: 'drop',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DropParams.safeParse(params)
     if (!p.success) return 'setting a thing down needs the thing named'
@@ -2122,6 +2158,7 @@ export const StowParams = z.object({ itemId: z.string(), structureId: z.string()
 
 const stow: VerbDef = makeVerb({
   kind: 'stow',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = StowParams.safeParse(params)
     if (!p.success) return 'stowing needs the thing and the store to leave it in'
@@ -2161,9 +2198,10 @@ export const InscribeParams = z
   })
   .strict()
 
-// Writing on something nobody can pocket. Three ticks, because carving is not scribbling.
+// Writing on something nobody can pocket, and carving is not scribbling.
 const inscribe: VerbDef = makeVerb({
   kind: 'inscribe',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     if (!config.inscription.enabled) return 'your hands find no way to mark this'
     const p = InscribeParams.safeParse(params)
@@ -2176,9 +2214,6 @@ const inscribe: VerbDef = makeVerb({
     if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to mark it'
     return null
-  },
-  duration() {
-    return 3
   },
   onComplete(state, _config, agentId, params) {
     const p = InscribeParams.parse(params)
@@ -2194,6 +2229,7 @@ const inscribe: VerbDef = makeVerb({
 
 const write: VerbDef = makeVerb({
   kind: 'write',
+  takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = WriteParams.safeParse(params)
     if (!p.success) return 'writing needs words to set down'
@@ -2230,6 +2266,7 @@ const write: VerbDef = makeVerb({
 
 const read: VerbDef = makeVerb({
   kind: 'read',
+  takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ReadParams.safeParse(params)
     if (!p.success) return 'reading needs the writing named'
@@ -2250,6 +2287,7 @@ const read: VerbDef = makeVerb({
 
 const teach: VerbDef = makeVerb({
   kind: 'teach',
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = TeachParams.safeParse(params)
     if (!p.success) return 'teaching needs someone to teach and a craft to pass on'
@@ -2285,6 +2323,7 @@ const INJURY_SEVERITY: Readonly<Record<'minor' | 'serious' | 'grave', number>> =
 
 const attack: VerbDef = makeVerb({
   kind: 'attack',
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = AttackParams.safeParse(params)
     if (!p.success) return 'a blow needs someone to strike'

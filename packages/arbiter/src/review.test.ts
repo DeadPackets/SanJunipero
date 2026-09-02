@@ -13,7 +13,7 @@ const CFG: SimConfig = SimConfigSchema.parse({})
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
-  durationTicks: 6,
+  takes: 'minutes',
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [

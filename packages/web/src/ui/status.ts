@@ -6,7 +6,7 @@
 export type AgentView = {
   alive: boolean
   asleep: boolean
-  activity: { verb: string } | null
+  activity: { verb: string; ticksRemaining?: number } | null
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number
   ill: boolean
@@ -80,6 +80,14 @@ export function stateWord(a: AgentView, nowTick?: number): string {
   const s = statusOf(a, nowTick)
   if (s === 'working' && a.activity !== null) return sentenceCase(gerund(a.activity.verb))
   return STATE_WORD[s]
+}
+
+/** The word plus how far there is to go. An act is minutes long now, so a surface with room for
+ *  a sentence says the minutes: a still body with no number on it reads as a stuck one. */
+export function stateLine(a: AgentView, nowTick?: number): string {
+  const left = a.activity?.ticksRemaining ?? 0
+  const word = stateWord(a, nowTick)
+  return left > 0 ? `${word} — ${left} min to go` : word
 }
 
 /** CONDITION: zero or more, from a DISJOINT vocabulary. A condition is never a state, so it

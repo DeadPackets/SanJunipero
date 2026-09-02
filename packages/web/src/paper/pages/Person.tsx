@@ -5,7 +5,13 @@ import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
-import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from '../../ui/status.js'
+import {
+  CONDITION_WORD,
+  conditionsOf,
+  stateLine,
+  stateWord,
+  type AgentView,
+} from '../../ui/status.js'
 import {
   CHANGE_EMPTY,
   SKILLS_EMPTY,
@@ -183,9 +189,7 @@ export function PersonLedgerView({
         )}
         {/* The page header already prints the state, so this line carries only what the
             header cannot: how long there is left to go. */}
-        {agent.activity !== null && (
-          <p>{`${stateWord(agent, tick)} — ${agent.activity.ticksRemaining} min to go`}</p>
-        )}
+        {agent.activity !== null && <p>{stateLine(agent, tick)}</p>}
       </section>
 
       <section className="block">

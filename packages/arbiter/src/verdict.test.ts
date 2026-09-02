@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { CLOSED_KEYS, NO_PARAMS } from '@sj/shared'
+import { CLOSED_KEYS, DEFAULT_DURATION_WORD, DURATION_WORDS, NO_PARAMS } from '@sj/shared'
 import { strictModeFaults } from '@sj/shared/testutil'
 import { strictDialect } from './testutil/scriptedLlm.js'
 import { ExpressiveParams } from './expressive.js'
@@ -13,6 +13,7 @@ import {
   readRuling,
   rollOutcomeTable,
   skillFactor,
+  withDefaultTakes,
   type OutcomeRow,
   type Recipe,
 } from './verdict.js'
@@ -20,7 +21,7 @@ import {
 const validRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil Salt',
-  durationTicks: 6,
+  takes: 'minutes',
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
@@ -355,9 +356,23 @@ describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', 
     expect(OutcomeEffectSchema.safeParse({ op: 'hp_delta', delta: 51 }).success).toBe(false)
   })
 
-  it('caps durationTicks at 1440 so a verdict cannot wedge an agent', () => {
-    expect(RecipeSchema.safeParse({ ...validRecipe, durationTicks: 1440 }).success).toBe(true)
-    expect(RecipeSchema.safeParse({ ...validRecipe, durationTicks: 1441 }).success).toBe(false)
+  it('takes a word off the closed set and nothing else, so no verdict can wedge an agent', () => {
+    for (const word of DURATION_WORDS) {
+      expect(RecipeSchema.safeParse({ ...validRecipe, takes: word }).success).toBe(true)
+    }
+    for (const off of ['week', 'fortnight', 'a moment', 30, null]) {
+      expect(RecipeSchema.safeParse({ ...validRecipe, takes: off }).success).toBe(false)
+    }
+  })
+
+  it('the last attempt keeps a sound recipe whose only fault is its clock', () => {
+    const sound = strictDialect(validAttempt) as { recipe: Record<string, unknown> }
+    const wire = { verdict: { ...sound, recipe: { ...sound.recipe, takes: 'week' } } }
+    expect(readRuling(wire)).toBeNull()
+    expect(readRuling(withDefaultTakes(wire))).toEqual({
+      ...validAttempt,
+      recipe: { ...validRecipe, takes: DEFAULT_DURATION_WORD },
+    })
   })
 
   it('caps outcome row weight at 1000', () => {

@@ -8,7 +8,7 @@ import type { Recipe } from './verdict.js'
 const base: Recipe = {
   id: 'recipe:waterskin',
   name: 'Sew a Waterskin',
-  durationTicks: 20,
+  takes: 'half_hour',
   costs: [{ kind: 'hide', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'hide', qty: 1 }],
   outcomeTable: [

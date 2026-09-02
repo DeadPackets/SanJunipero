@@ -24,6 +24,7 @@ import {
   expressiveVerbFromRuling,
   isExpressive,
   isExpressiveRow,
+  readExpressiveRuling,
   type ExpressiveRuling,
 } from './expressive.js'
 import { assembleAdjudicationPrompt } from './prompt.js'
@@ -31,7 +32,13 @@ import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
-import { StrictVerdictSchema, readRuling, type Recipe, type Verdict } from './verdict.js'
+import {
+  StrictVerdictSchema,
+  readRuling,
+  withDefaultTakes,
+  type Recipe,
+  type Verdict,
+} from './verdict.js'
 
 // At or above this cosine the stored ruling is returned verbatim, so a rephrasing of an
 // already-ruled intent resolves to identical physics with zero LLM calls. The same bar decides
@@ -378,12 +385,13 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       // one small call names it, and a ruling nobody can parse falls through to the full path.
       if (isExpressive(intent)) {
         const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
-        const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
-        const ruling = ExpressiveRulingSchema.safeParse(r.value)
-        if (ruling.success && !wordTainted(ruling.data.word)) {
+        for (let i = 0; i < MAX_LLM_ATTEMPTS; i++) {
+          const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
+          const ruling = readExpressiveRuling(r.value, i === MAX_LLM_ATTEMPTS - 1)
+          if (ruling === null || wordTainted(ruling.word)) continue
           const verdict: Verdict = {
             kind: 'map',
-            verb: codifyExpressive(ruling.data, tick(), { agentId: agentCtx.agentId, intent }),
+            verb: codifyExpressive(ruling, tick(), { agentId: agentCtx.agentId, intent }),
             params: NO_PARAMS,
           }
           await rulings.record(intent, verdict, tick())
@@ -426,8 +434,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
         const answer = await deps.llm.object({ schema: StrictVerdictSchema, system, messages })
         contradicted = false
-        // The court answers in the strict dialect; anything off it is not a ruling — retry.
-        const ruling = readRuling(answer.value)
+        // The court answers in the strict dialect; anything off it is not a ruling — retry. Once
+        // the retry is spent, a duration off the closed set is the one slip a sound recipe is
+        // not thrown away for: the word defaults and everything else must still read.
+        const spent = i === MAX_LLM_ATTEMPTS - 1
+        const ruling =
+          readRuling(answer.value) ?? (spent ? readRuling(withDefaultTakes(answer.value)) : null)
         if (ruling === null) continue
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
