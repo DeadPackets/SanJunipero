@@ -15,6 +15,10 @@ import sys
 import tempfile
 
 DAY = 1440
+WATCHED_DAY = 30
+COST_TARGET = 'under $0.30'
+COST_NOTE = (f'A watched day is one real day at 1x = {WATCHED_DAY} sim-days, so the plan\'s '
+             f'"$9 per watched day for 12 minds" is {COST_TARGET} per sim-day for 12 minds.')
 EARSHOT = 8
 REPLY_TICKS = 30
 CHAIN_TICKS = 60
@@ -307,6 +311,7 @@ def report(src, tmp):
     print('\n## 2. Accepted acts per mind-day by class\n')
     arb = opendb(os.path.join(minds_dir, '_arbiter.db'))
     rulings = one(arb, 'select count(*) from rulings')
+    attempts = one(arb, "select count(*) from rulings where json_extract(verdict_json,'$.kind')='attempt'")
     verbs = collections.Counter(p.get('verb', '') for _, ty, p in ev if ty == 'action_started')
 
     def klass(v):
@@ -329,7 +334,7 @@ def report(src, tmp):
         acts[klass(v)] += c
     minted_acts = acts['invention']
     discoveries = types.get('discovery_made', 0)
-    acts['invention'] += discoveries + rulings
+    acts['invention'] += discoveries + attempts
     tot_acts = sum(acts.values())
     act_targets = {'survival': ('25%', '15%'), 'move+carry': ('35%', '25%'), 'making': ('10%', '20%'),
                    'notes': ('10%', '5%'), 'social': ('15%', '25%'), 'invention': ('5%', '10%')}
@@ -341,7 +346,8 @@ def report(src, tmp):
     rows.append(['**all**', tot_acts, num(tot_acts, mind_days), '100%', '', ''])
     print(table(rows, ['class', 'n', 'per mind-day', 'share', 'target p2', 'target p4']))
     print(f'\ninvention = {minted_acts} recipe:/act: verbs + {discoveries} discovery_made + ' +
-          f'{rulings} arbiter rulings.')
+          f'{attempts} arbiter rulings that wrote a recipe (verdict "attempt"); ' +
+          f'the other {rulings - attempts} rulings were map or impossible.')
 
     print('\n## 3. Speech\n')
     lines = [(t, p.get('agentId'), p.get('text', ''), (p.get('x', 0), p.get('y', 0)), p.get('insideId'))
@@ -398,11 +404,11 @@ def report(src, tmp):
     srows, scls = split_rows([l[2] for l in lines], name_re)
     people_wonder = scls.get('people', 0) + scls.get('wonder', 0)
     srows.append(['**people+wonder**', people_wonder, pct(people_wonder, n)])
-    print('\nkeyword classes (heuristic, not an LLM pass):\n')
+    print('\nkeyword classes (heuristic; the LLM pass is the number to quote):\n')
     print(table(srows, ['class', 'lines', 'share']))
     print('\nper mind: ' + (', '.join(f'{a}:{c}' for a, c in per_agent.most_common()) or 'none'))
 
-    print('\n## 4. Thoughts (same heuristic)\n')
+    print('\n## 4. Thoughts (same heuristic; the LLM pass is the number to quote)\n')
     thoughts = q(world, 'select agent_id,text from observer_thoughts order by id') \
         if has_table(world, 'observer_thoughts') else []
     tn = len(thoughts)
@@ -433,7 +439,9 @@ def report(src, tmp):
          sum(c for ty, c in types.items() if ty.startswith('partnership_')), '-', '-', '-'],
         ['arrivals (stranger_arrived)', types.get('stranger_arrived', 0), '-', '-', '-'],
         ['deaths (agent_died)', types.get('agent_died', 0), '-', '-', '-'],
-        ['arbiter rulings', rulings, rate(rulings, mind_days, '/mind-day'), '-', '-'],
+        ['arbiter rulings (all verdicts)', rulings, rate(rulings, mind_days, '/mind-day'), '-', '-'],
+        ['…of which wrote a recipe (verdict "attempt")', attempts,
+         rate(attempts, mind_days, '/mind-day'), '-', '-'],
     ]
     print(table(rows, ['signal', 'n', 'rate', 'target p2', 'target p4']))
 
@@ -461,9 +469,15 @@ def report(src, tmp):
         rows.append(['**all**', '', calls, f'${total:.3f}', f'${total / days:.3f}' if days else 'n/a'])
         print(table(rows, ['ledger', 'caller', 'calls', 'cost', 'cost/sim-day']))
     per12 = total / mind_days * 12 if mind_days else 0
+    watched = per12 * WATCHED_DAY
     print(f'\ncost per mind-day: ' + (f'${total / mind_days:.4f}' if mind_days else 'n/a') + '\n')
-    print(table([['cost per sim-day scaled to 12 minds', f'${per12:.2f}' if mind_days else 'n/a',
-                  'under $9', 'under $9']], ['metric', 'measured', 'target p2', 'target p4']))
+    print(table([
+        ['cost per sim-day, scaled to 12 minds', f'${per12:.2f}' if mind_days else 'n/a',
+         COST_TARGET, COST_TARGET],
+        [f'…the same run per watched day ({WATCHED_DAY} sim-days at 1x)',
+         f'${watched:.2f}' if mind_days else 'n/a', 'under $9', 'under $9'],
+    ], ['metric', 'measured', 'target p2', 'target p4']))
+    print(f'\n{COST_NOTE}')
 
     print('\n## 7. Targets\n')
     nar = opendb(os.path.join(minds_dir, '_narrator.db'))
@@ -494,8 +508,8 @@ def report(src, tmp):
     rows = [
         ['idle hours per mind-day', f'{idle_h:.1f}' if mind_ticks else 'n/a', 'under 8',
          mark(mind_ticks, idle_h < 8), 'under 6', mark(mind_ticks, idle_h < 6)],
-        ['speech about people or wonder (heuristic)', f'{pw:.0f}%' if n else 'n/a', 'over 55%',
-         mark(n, pw > 55), 'over 60%', mark(n, pw > 60)],
+        ['speech about people or wonder (heuristic; the LLM pass is the number to quote)',
+         f'{pw:.0f}%' if n else 'n/a', 'over 55%', mark(n, pw > 55), 'over 60%', mark(n, pw > 60)],
         ['exchanges with a run of 4+ per sim-day', f'{runs_day:.1f}' if days else 'n/a', '3',
          mark(days, runs_day >= 3), '5', mark(days, runs_day >= 5)],
         ['invention attempts per mind-day', f'{inv_md:.2f}' if mind_days else 'n/a', '0.5',
@@ -504,8 +518,10 @@ def report(src, tmp):
          '1 or more', mark(weeks, laws_week >= 1)],
         ['moments in the director top five', f'{hit5} of {len(top5)}' if top5 else 'n/a', 'n/a', '-',
          '3 of 5', mark(top5, hit5 >= 3)],
-        ['cost per sim-day, scaled to 12 minds', f'${per12:.2f}' if mind_days else 'n/a', 'under $9',
-         mark(mind_days and total, per12 < 9), 'under $9', mark(mind_days and total, per12 < 9)],
+        ['cost per sim-day, scaled to 12 minds',
+         f'${per12:.2f} (${watched:.2f} per watched day)' if mind_days else 'n/a',
+         COST_TARGET, mark(mind_days and total, per12 < 0.30),
+         COST_TARGET, mark(mind_days and total, per12 < 0.30)],
         ['cast hallucinations per 100 scene lines', f'{halluc_100:.1f}' if scene_lines else 'n/a', '0',
          mark(scene_lines, halluc == 0), '0', mark(scene_lines, halluc == 0)],
     ]
