@@ -33,10 +33,12 @@ import {
   OPAQUE_REFUSAL,
   REFUSAL_MEMORY_TICKS,
   TRIED_FREEFORM,
+  actImportance,
   reflectionOffsetTicks,
   refusalMemoryText,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
+import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -100,7 +102,16 @@ function baseDoc(): PersonalityDoc {
 const FAR_PLACE_ID = 'structure_2'
 const FAR_PLACE_NAME = 'the old farmhouse'
 
-function buildWorld(simConfig?: SimConfig, knownAfar = false) {
+// Cold fire pits either side of the body, and an armful of wood in its hands: everything
+// `stoke` wants except the mark, which is the whole point of the rows that ask for it.
+const FIRE_IDS = ['structure_fire_1', 'structure_fire_2']
+const FIRE_AT = [
+  { x: 3, y: 4 },
+  { x: 2, y: 3 },
+]
+const WOOD_ID = 'item_wood'
+
+function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -148,6 +159,22 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false) {
     })
     emit('structure_completed', { id: FAR_PLACE_ID })
     emit('places_seen', { agentId: AGENT, structureIds: [FAR_PLACE_ID] })
+  }
+  for (let i = 0; i < hearths; i++) {
+    emit('structure_planned', {
+      id: FIRE_IDS[i]!,
+      kind: 'fire_pit',
+      ...FIRE_AT[i]!,
+      w: 1,
+      h: 1,
+      maxHp: 50,
+      flammable: true,
+      builderId: AGENT,
+    })
+    emit('structure_completed', { id: FIRE_IDS[i]! })
+  }
+  if (hearths > 0) {
+    emit('item_spawned', { id: WOOD_ID, kind: 'wood', qty: 3, loc: { t: 'agent', id: AGENT } })
   }
   return { config, terrain, engineDb, store, rng, state }
 }
@@ -349,8 +376,9 @@ async function setup(opts: {
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
+  hearths?: number
 }) {
-  const world = buildWorld(opts.simConfig, opts.knownAfar)
+  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -443,6 +471,14 @@ function memoriesOfKind(
       'SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id',
     )
     .all(AGENT, kind) as { tick: number; text: string; importance: number }[]
+}
+
+// The half of the action memories that are refusals. Successes share the row and the kind,
+// so a row asking "was anything refused" has to say which half it means.
+function refusalMemories(db: Database.Database): string[] {
+  return memoriesOfKind(db, 'action')
+    .map((m) => m.text)
+    .filter((t) => t.startsWith('You realize you cannot'))
 }
 
 function journalRows(db: Database.Database): { tick: number; text: string }[] {
@@ -964,8 +1000,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(startedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(loop.state.agents[AGENT]!.asleep).toBe(true)
-    // One 'already busy' rejection must not have discarded the intent.
-    expect(memoriesOfKind(agentDb, 'action')).toHaveLength(0)
+    // One 'already busy' rejection must not have discarded the intent, and must leave no
+    // refusal behind it. The two acts that landed are remembered as acts.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have slept.',
+    ])
   })
 
   it('does not reflect on a merely attempted sleep that the engine rejected', async () => {
@@ -1089,6 +1130,115 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(stateHash(replayed)).toBe(liveHash)
   })
 
+  // 98 of the gate's 402 refusals were this act, named with its fire left null — the largest
+  // bucket. The world reads it in; these three rows are that reading seen from the mind's side.
+  it('starts the act on the fire the mind left null, because only one was in reach', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'The fire wants feeding.',
+          action: { verb: 'stoke', params: { structureId: null } },
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      hearths: 1,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('stoke'), 100)
+    const started = world.engineDb
+      .prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq")
+      .all() as { payload: string }[]
+    const stoked = started
+      .map((r) => JSON.parse(r.payload) as { verb: string; params: { structureId?: string } })
+      .find((p) => p.verb === 'stoke')
+    expect(stoked?.params.structureId).toBe(FIRE_IDS[0])
+  })
+
+  it('leaves the fire null when two are within reach, so the mind is asked which', async () => {
+    const blank = {
+      thought: 'A fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { world, loop, runtime, agentDb } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      // A second pit on the body's other side: two readings, and no act may pick between them.
+      hearths: 2,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    // `actHasOneReading` is what buys a mind out of the retry, and two readings do not buy it.
+    // No fire is guessed at either: the act never reaches the world.
+    expect(prompts.length).toBe(2)
+    expect(alertKinds(agentDb)).toContain('empty_act_detail')
+    expect(startedVerbs(world.engineDb)).not.toContain('stoke')
+  })
+
+  // The gate's escape hatch reads the same table the world binds from, so closing the bucket
+  // and closing the repair call it bought are one change.
+  it('★ spends no second call on the one fire it could only have meant', async () => {
+    const blank = {
+      thought: 'The fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND, hearths: 1 })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).toContain('act_detail_filled_in')
+  })
+
+  // All 402 action memories the phase 1 gate wrote were refusals: no mind held a trace of a
+  // wall raised or a fish caught. Both call sites of the write were refusal paths.
+  it('★ remembers what worked, and not at the weight of what did not', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walls first, then rest.',
+          plan: [
+            { verb: 'walk', params: { x: 4, y: 3 } },
+            { verb: 'sleep', params: {} },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 200)
+    const acts = memoriesOfKind(agentDb, 'action')
+    expect(acts.map((m) => m.text)).toEqual(['You have walked.', 'You have slept.'])
+    // Not one flat constant: a walk is worth less than the refusal a walk earns.
+    expect(acts.map((m) => m.importance)).toEqual([actImportance('walk'), actImportance('sleep')])
+    expect(actImportance('walk')).toBeLessThan(actImportance('build'))
+    expect(actImportance('recipe:plank')).toBe(actImportance('craft'))
+  })
+
+  // kamal wrote 87 action memories with 9 texts between them; leyla 69 with 11. Every copy
+  // competed in retrieval and could reach the prompt.
+  it('★ writes the same refusal once inside the window, and again outside it', async () => {
+    const refused = {
+      thought: 'The bread.',
+      action: { verb: 'eat', params: { itemId: 'nope' } },
+      importance: 3,
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([refused], refused),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    // Far more turns than texts: the window is what holds the count down, not the asking.
+    await stepUntil(loop, () => loop.tick >= REFUSAL_MEMORY_TICKS - 1, REFUSAL_MEMORY_TICKS)
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not holding that'])
+    await stepUntil(loop, () => refusalMemories(agentDb).length >= 2, REFUSAL_MEMORY_TICKS + 10)
+    expect(refusalMemories(agentDb)).toEqual([
+      'You realize you cannot: not holding that',
+      'You realize you cannot: not holding that',
+    ])
+  })
+
   it('does not execute the next plan item when the head is rejected', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([
@@ -1134,7 +1284,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 150)
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
-    expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
+    // Nothing was refused, and each of the three acts left the mind a trace of itself.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have taken.',
+      'You have eaten.',
+    ])
   })
 
   it('retrieves ambient memories before inserting the current perception (finding 9)', async () => {
@@ -1548,6 +1704,50 @@ describe('arbiter seam (T19)', () => {
     expect(
       memoriesOfKind(agentDb, 'action').filter((m) => m.text.includes(OPAQUE_REFUSAL)),
     ).toEqual([])
+  })
+
+  // ★ Four of the gate's seven paid rulings were `plan` named as the action verb, each ruled
+  // "not a recognized routine" for a fee. The turn's field list is three clauses from the
+  // action's own instruction, and minds read the two as one vocabulary.
+  it('★ a field of the turn named as a verb is a quiet beat, not a ruling', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'not a recognized routine', class: 'nonsense' }
+    }
+    const asVerbs = [...TURN_FIELDS].map((field) => ({
+      thought: `I mean to ${field}.`,
+      action: { verb: field, params: { x: 1, y: 2 } },
+      importance: 3,
+    }))
+    const { loop, agentDb } = await setup({
+      model: turnModel([...asVerbs, freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => seen.length >= 1, 400)
+
+    // Only the real try reaches the god; not one field name does, and none is remembered.
+    expect(seen).toEqual(['weave reeds into a basket'])
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not a recognized routine'])
+  })
+
+  it('★ and buys no second call for one that named nothing either', async () => {
+    const bare = { thought: 'I plan.', action: { verb: 'plan', params: {} }, importance: 3 }
+    const { model, prompts } = capturingModel([bare, bare])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).not.toContain('empty_act_detail')
+    expect(refusalMemories(agentDb)).toEqual([])
+  })
+
+  it('★ takes the field names off the schema, so a new field cannot leave the guard stale', () => {
+    expect([...TURN_FIELDS].sort()).toEqual(Object.keys(StrictTurnSchema.shape).sort())
+    expect(TURN_FIELDS.has('plan')).toBe(true)
+    // A word the world does answer to is never one of them.
+    expect(TURN_FIELDS.has('walk')).toBe(false)
   })
 
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {

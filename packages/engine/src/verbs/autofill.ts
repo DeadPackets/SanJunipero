@@ -26,6 +26,9 @@ const OBJECT_PARAM: Record<string, { key: string; candidates: CandidateSource }>
   stow: { key: 'itemId', candidates: heldItemIds },
   take: { key: 'itemId', candidates: (state) => Object.keys(state.items).sort() },
   enter: { key: 'structureId', candidates: (state) => Object.keys(state.structures) },
+  // 98 of the phase 1 gate's 402 refusals were this act with its fire left null, the largest
+  // bucket by far. `stoke.validate` already asks stokeable, complete, in reach and fuel in hand.
+  stoke: { key: 'structureId', candidates: (state) => Object.keys(state.structures) },
 }
 
 function isBlank(raw: unknown): boolean {

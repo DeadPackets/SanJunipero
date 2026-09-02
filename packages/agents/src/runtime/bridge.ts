@@ -525,6 +525,25 @@ export class EngineBridge {
     return this.#loop.tick
   }
 
+  /** The seq the log stands at, for a caller that means to read forward from here and not over
+   *  a day it was not there for. */
+  lastSeq(): number {
+    return this.#store.lastSeq()
+  }
+
+  /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same
+   *  window perception is composed from, so nothing reaches a mind before it could have felt it. */
+  completedSince(agentId: string, afterSeq: number): { seq: number; verb: string }[] {
+    const done: { seq: number; verb: string }[] = []
+    for (const ev of this.#window) {
+      if (ev.seq <= afterSeq || ev.type !== 'action_completed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown }
+      if (p.agentId !== agentId || typeof p.verb !== 'string') continue
+      done.push({ seq: ev.seq, verb: p.verb })
+    }
+    return done
+  }
+
   #recentEvents(): SimEvent[] {
     const cutoff = this.#loop.tick - this.#recentWindowTicks
     const fresh = this.#store.readFrom(this.#lastSeq)
