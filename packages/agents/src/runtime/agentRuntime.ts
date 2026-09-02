@@ -1033,17 +1033,21 @@ export class AgentRuntime {
     }
 
     this.#clock.lastTurnTick = tick
-    this.#llm.noteCallBill({ _planSize: turn.plan?.length ?? 0 })
     // What the answer produced, booked before the world sees it: a wait arrives here as act:null
     // and leaves no refusal, no event and no alert of its own (K26) — the shape run G read as
     // silence when a plan was already carrying the body.
     const acted = (turn.action ?? null) !== null
     const spoke = turnSpeaks(turn)
-    this.#llm.noteTurnOutcome({
-      acted,
-      spoke,
-      planContinued:
-        !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
+    // The ledger must never cost the world a turn it has already paid for: a busy database here
+    // would throw the mind's answer away between the model and the act.
+    this.#book(() => {
+      this.#llm.noteCallBill({ _planSize: turn.plan?.length ?? 0 })
+      this.#llm.noteTurnOutcome({
+        acted,
+        spoke,
+        planContinued:
+          !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
+      })
     })
     // Read once: a cast back that has been answered is not answered again next turn, and a
     // refusal the mind has now been told about is not told twice.
@@ -1243,6 +1247,16 @@ export class AgentRuntime {
 
   // A sentence the mind is already carrying is not written again: nine texts in eighty-seven
   // rows is eight-odd copies competing in retrieval for one thing that happened.
+  /** Bookkeeping around a turn the town has already been billed for. A method the client never
+   *  grew is a type error now, so what is left here is a database too busy to write. */
+  #book(write: () => void): void {
+    try {
+      write()
+    } catch (err) {
+      this.#llm.alert('ledger_write_failed', messageOf(err))
+    }
+  }
+
   #writeActionMemory(text: string, importance = REFUSAL_IMPORTANCE): Promise<number | null> {
     if (this.#alreadyHeld(text)) return Promise.resolve(null)
     return this.#mem!.insertMemory({

@@ -2294,3 +2294,25 @@ describe('★ an empty vessel is a want for water, though it names none', () => 
     expect(wantedWater(null)).toBe(false)
   })
 })
+
+// ★ Both ledger writes sat between the parsed turn and the act, outside the try that guards the
+// call. A database too busy to take a row would have thrown away an answer already paid for.
+describe('★ a ledger that cannot write does not cost the town a paid turn', () => {
+  it('still acts on the answer, and says the ledger failed', async () => {
+    const { world, loop, agentDb, runtime } = await setup({
+      model: turnModel([
+        { thought: 'I should fetch some bread.', importance: 5, speech: 'Bread, then.' },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    agentDb.exec('DROP TABLE turn_outcomes')
+    await stepUntil(loop, () => runtime.stats().turns > 0, 200)
+    const kinds = agentDb
+      .prepare('SELECT kind FROM alerts')
+      .all()
+      .map((r) => (r as { kind: string }).kind)
+    expect(kinds).toContain('ledger_write_failed')
+    expect(runtime.stats().turns).toBeGreaterThan(0)
+    world.store.close?.()
+  })
+})
