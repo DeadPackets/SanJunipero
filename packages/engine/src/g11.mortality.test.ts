@@ -181,7 +181,7 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
 
   it('a body denied water dies on that tick, and the death is named for the thirst', () => {
     const expected = scheduledDeathTick(CFG, START)
-    const { log } = runUntil(parched(), CFG, START, 1200, (st) => !st.agents.dry!.alive)
+    const { log } = runUntil(parched(), CFG, START, expected - START + 60, (st) => !st.agents.dry!.alive)
     const death = died(log, 'dry')
     expect(death).toBeDefined()
     noteCause(death!.payload)

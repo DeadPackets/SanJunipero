@@ -207,7 +207,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     })
     expect(c.mortality.hungerHpDrainPerTick).toBe(0.04)
     expect(c.mortality.hungerGraceTicks).toBe(720)
-    expect(c.mortality.thirstHpDrainPerTick).toBe(0.15)
+    expect(c.mortality.thirstHpDrainPerTick).toBe(0.04)
     expect(c.mortality.poisonChanceSpoiled).toBe(0.35)
     expect(c.mortality.sleepRegenMultiplier).toBe(3)
     expect(c.mortality.fedThreshold).toBe(40)

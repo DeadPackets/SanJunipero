@@ -443,7 +443,7 @@ const MortalitySchema = z
     hungerHpDrainPerTick: z.number().default(0.04),
     // An empty stomach is not a wound yet. Half a day passes before it starts costing hp.
     hungerGraceTicks: z.number().default(720),
-    thirstHpDrainPerTick: z.number().default(0.15),
+    thirstHpDrainPerTick: z.number().default(0.04),
     poisonChanceSpoiled: z.number().default(0.35),
     sleepRegenMultiplier: z.number().default(3),
     fedThreshold: z.number().default(40),

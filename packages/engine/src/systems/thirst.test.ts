@@ -74,7 +74,7 @@ describe('thirst: absent means full', () => {
     })
     const nearly = fold(
       parch(body(), 0),
-      ev('agent_harmed', { agentId: 'a1', amount: 99.9, source: 'accident' }),
+      ev('agent_harmed', { agentId: 'a1', amount: 99.99, source: 'accident' }),
       CFG,
     )
     expect(tickOnce(nearly).events.find((e) => e.type === 'agent_died')?.payload).toEqual({
