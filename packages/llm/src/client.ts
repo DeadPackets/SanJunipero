@@ -49,6 +49,7 @@ export type LlmMessage = { role: 'user' | 'assistant'; content: string }
  *  a call that came back with nothing is the one this most needs to explain. */
 export type CallBill = {
   wakeReason?: string | null
+  wakeReasons?: readonly string[] | null
   blockTokens?: Record<string, number> | null
 }
 

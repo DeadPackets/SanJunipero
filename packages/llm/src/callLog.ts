@@ -27,6 +27,9 @@ export type LlmCallInsert = {
   error: string | null
   // Which `WakeReason` bought this call. Null for every caller that has no wake.
   wakeReason?: string | null
+  // Every reason that was true at that tick, deciding one first, as a JSON array. The winner
+  // alone hides the overlap: the reason below it would have bought the call anyway.
+  wakeReasons?: readonly string[] | null
   // One JSON object, not a column per block: the blocks change as the prompt does, and a
   // schema migration for each is not worth it.
   blockTokens?: Record<string, number> | null
@@ -54,6 +57,7 @@ export function migrateLlmTables(db: Database.Database): void {
       finish_reason TEXT,
       generation_id TEXT,
       wake_reason TEXT,
+      wake_reasons TEXT,
       block_tokens TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
@@ -100,6 +104,9 @@ export function migrateLlmTables(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === 'wake_reason')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN wake_reason TEXT')
+  }
+  if (!cols.some((c) => c.name === 'wake_reasons')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN wake_reasons TEXT')
   }
   if (!cols.some((c) => c.name === 'block_tokens')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN block_tokens TEXT')
@@ -181,8 +188,8 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): numbe
       `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
-        error, provider, finish_reason, generation_id, wake_reason, block_tokens)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        error, provider, finish_reason, generation_id, wake_reason, wake_reasons, block_tokens)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       Date.now(),
@@ -203,6 +210,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): numbe
       call.finishReason,
       call.generationId ?? null,
       call.wakeReason ?? null,
+      call.wakeReasons == null ? null : JSON.stringify(call.wakeReasons),
       call.blockTokens == null ? null : JSON.stringify(call.blockTokens),
     )
   return Number(info.lastInsertRowid)

@@ -62,7 +62,7 @@ import {
   type Turn,
 } from '../turn.js'
 import {
-  decideWake,
+  wakeReasons,
   disarmBodyAlarm,
   rearmBodyAlarm,
   DEFAULT_MIND_CONFIG,
@@ -551,7 +551,8 @@ export class AgentRuntime {
     if (this.#turnInFlight) return
     const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
     const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
-    const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan, floor)
+    const wake = wakeReasons(this.#config, packet, this.#clock, tick, this.#plan, floor)
+    const reason = wake[0] ?? null
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
     if (reason === 'floor') {
       void this.#takeFloor(tick)
@@ -562,7 +563,7 @@ export class AgentRuntime {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
       }
-      void this.#startTurn(reason)
+      void this.#startTurn(wake)
     }
   }
 
@@ -876,12 +877,12 @@ export class AgentRuntime {
     this.#wasNight = isNight
   }
 
-  async #startTurn(wakeReason: WakeReason): Promise<void> {
+  async #startTurn(wake: readonly WakeReason[]): Promise<void> {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
     const tick = this.#bridge.currentTick()
     try {
-      await this.#runTurnBody(wakeReason)
+      await this.#runTurnBody(wake)
     } catch (err) {
       this.#llm.alert('turn_crash', messageOf(err))
       this.#clock.lastTurnTick = tick + this.#config.dozeTicks
@@ -891,7 +892,7 @@ export class AgentRuntime {
     }
   }
 
-  async #runTurnBody(wakeReason: WakeReason): Promise<void> {
+  async #runTurnBody(wake: readonly WakeReason[]): Promise<void> {
     this.#reframedThisTurn = false
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
@@ -996,7 +997,8 @@ export class AgentRuntime {
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
       const bill: CallBill = {
-        wakeReason,
+        wakeReason: wake[0] ?? null,
+        wakeReasons: wake,
         blockTokens: { ...assembled.blockTokens, _priorStepsLeft: priorStepsLeft },
       }
       let answer = await this.#ask(assembled, bill)

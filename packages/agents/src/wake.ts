@@ -89,6 +89,8 @@ export type WakeReason =
 export type FloorState = { inScene: boolean; holdsFloor: boolean }
 const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
 
+/** The one reason that decides the turn: the head of the list below, and the same answer this
+ *  function has always given. */
 export function decideWake(
   cfg: MindConfig,
   packet: PerceptionPacket,
@@ -97,8 +99,25 @@ export function decideWake(
   plan: PlanState,
   floor: FloorState = NO_SCENE,
 ): WakeReason | null {
+  return wakeReasons(cfg, packet, clock, tick, plan, floor)[0] ?? null
+}
+
+/** Every reason true at this tick, the deciding one first. What follows the head bought nothing
+ *  — it is what a histogram of winners alone cannot see, and `salient_perception` at 82% of the
+ *  gate's calls was mostly a mind with nothing left to do that someone also walked past.
+ *
+ *  A reason gated behind a `return` still ends the list: the backoff, the retry rung and the idle
+ *  floor each stop the ladder, and what they stop was never going to be returned either. */
+export function wakeReasons(
+  cfg: MindConfig,
+  packet: PerceptionPacket,
+  clock: MindClock,
+  tick: number,
+  plan: PlanState,
+  floor: FloorState = NO_SCENE,
+): WakeReason[] {
   // Backoff after a failed turn: even floor-exempt reasons wait it out.
-  if (tick < clock.dozeUntilTick) return null
+  if (tick < clock.dozeUntilTick) return []
 
   // Fire and a blow reach a sleeper, so they reach a listener too: talk is a shallower state
   // than sleep, and it must not hold a mind still through the one thing sleep does not.
@@ -106,41 +125,38 @@ export function decideWake(
 
   // A listener takes no turn at all — that is what makes hearing free.
   if (floor.inScene && !packet.self.asleep && !rousing) {
-    return floor.holdsFloor ? 'floor' : null
+    return floor.holdsFloor ? ['floor'] : []
   }
 
+  const reasons: WakeReason[] = []
   if (packet.self.asleep) {
-    if (rousing) {
-      return 'salient_perception'
-    }
+    if (rousing) reasons.push('salient_perception')
     // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
     // the re-arm point, so the alarm has to ring again until the body rises.
-    if (tick < clock.wakeRetryAtTick) return null
-    if (bodyAlarmBelow(cfg, packet.self.body)) return 'body_alarm'
-    if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
-      return 'morning'
-    }
+    if (tick < clock.wakeRetryAtTick) return reasons
+    if (bodyAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
     // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
     const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
-    if (!packet.time.isNight && napped >= cfg.napTicks) return 'morning'
-    return null
+    const dawn = clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)
+    if (!packet.time.isNight && (dawn || napped >= cfg.napTicks)) reasons.push('morning')
+    return reasons
   }
 
   const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
 
   // Floor-exempt: physical rousing and immediate surprises.
-  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) return 'body_alarm'
-  if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
-  if (plan.lastResult === 'blocked') return 'plan_blocked'
+  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
+  if (salientPerception(packet, clock.prevVisibleIds)) reasons.push('salient_perception')
+  if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
 
-  if (plan.lastResult === 'done' && sinceLast >= cfg.idleGapTicks) return 'plan_done'
+  if (plan.lastResult === 'done' && sinceLast >= cfg.idleGapTicks) reasons.push('plan_done')
 
-  if (sinceLast < cfg.idleGapTicks) return null
+  if (sinceLast < cfg.idleGapTicks) return reasons
 
-  if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) return 'reconsider'
-  if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) return 'boredom'
+  if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) reasons.push('reconsider')
+  if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) reasons.push('boredom')
 
-  return null
+  return reasons
 }
 
 // Every rung the body is failing on right now, need and affliction alike, as alarm keys.

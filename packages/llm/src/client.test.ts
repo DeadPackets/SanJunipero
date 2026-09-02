@@ -97,6 +97,7 @@ describe('migrateLlmTables', () => {
     expect(row.caller).toBe('turn')
     expect(row.cost_usd).toBe(0.5)
     expect(row.wake_reason).toBeNull()
+    expect(row.wake_reasons).toBeNull()
     expect(row.block_tokens).toBeNull()
   })
 })
@@ -122,19 +123,22 @@ describe('the wake reason and the block bill', () => {
     error: null,
   }
 
-  it('round-trips a wake reason and the block JSON', () => {
+  it('round-trips a wake reason, everything else that was true, and the block JSON', () => {
     const db = openDb()
     const id = insertLlmCall(db, {
       ...call,
-      wakeReason: 'conversation_beat',
+      wakeReason: 'salient_perception',
+      wakeReasons: ['salient_perception', 'plan_done'],
       blockTokens: { shared: 2067, dayLog: 4200, _priorStepsLeft: 3 },
     })
 
     const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
       wake_reason: string | null
+      wake_reasons: string | null
       block_tokens: string | null
     }
-    expect(row.wake_reason).toBe('conversation_beat')
+    expect(row.wake_reason).toBe('salient_perception')
+    expect(JSON.parse(row.wake_reasons!)).toEqual(['salient_perception', 'plan_done'])
     expect(JSON.parse(row.block_tokens!)).toEqual({
       shared: 2067,
       dayLog: 4200,
@@ -149,10 +153,12 @@ describe('the wake reason and the block bill', () => {
     const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
       caller: string
       wake_reason: string | null
+      wake_reasons: string | null
       block_tokens: string | null
     }
     expect(row.caller).toBe('reflection')
     expect(row.wake_reason).toBeNull()
+    expect(row.wake_reasons).toBeNull()
     expect(row.block_tokens).toBeNull()
   })
 

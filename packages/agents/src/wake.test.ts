@@ -5,6 +5,7 @@ import {
   decideWake,
   disarmBodyAlarm,
   rearmBodyAlarm,
+  wakeReasons,
   DEFAULT_MIND_CONFIG,
   type FloorState,
   type MindClock,
@@ -50,6 +51,8 @@ const HOLDS_FLOOR: FloorState = { inScene: true, holdsFloor: true }
 const LISTENS: FloorState = { inScene: true, holdsFloor: false }
 
 describe('decideWake — one case per reason', () => {
+  // The sixth column is the reason that decides and always has; the seventh is every reason that
+  // was true, deciding one first. Nothing reads the seventh but the ledger.
   const cases: [
     string,
     PerceptionPacket,
@@ -57,9 +60,10 @@ describe('decideWake — one case per reason', () => {
     number,
     PlanState,
     WakeReason | null,
+    WakeReason[],
     FloorState?,
   ][] = [
-    ['body_alarm', withNeeds(14, 78, 71), clk(), 10, pln(), 'body_alarm'],
+    ['body_alarm', withNeeds(14, 78, 71), clk(), 10, pln(), 'body_alarm', ['body_alarm']],
     [
       'salient_perception (heard speech)',
       conversationPacket,
@@ -67,6 +71,7 @@ describe('decideWake — one case per reason', () => {
       10,
       pln(),
       'salient_perception',
+      ['salient_perception'],
     ],
     [
       'salient_perception (felt event only)',
@@ -75,15 +80,74 @@ describe('decideWake — one case per reason', () => {
       10,
       pln(),
       'salient_perception',
+      ['salient_perception'],
     ],
-    ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
-    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
-    ['floor', pkt(), clk({ lastTurnTick: 100 }), 105, pln(), 'floor', HOLDS_FLOOR],
-    ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
-    ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
+    [
+      'plan_blocked',
+      pkt(),
+      clk(),
+      10,
+      pln({ lastResult: 'blocked' }),
+      'plan_blocked',
+      ['plan_blocked'],
+    ],
+    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done', ['plan_done']],
+    ['floor', pkt(), clk({ lastTurnTick: 100 }), 105, pln(), 'floor', ['floor'], HOLDS_FLOOR],
+    [
+      'reconsider',
+      pkt(),
+      clk({ reconsiderAtTick: 100 }),
+      100,
+      pln(),
+      'reconsider',
+      ['reconsider', 'boredom'],
+    ],
+    ['boredom', pkt(), clk(), 130, pln(), 'boredom', ['boredom']],
   ]
-  it.each(cases)('%s', (_name, packet, clock, tick, plan, expected, floor) => {
+  it.each(cases)('%s', (_name, packet, clock, tick, plan, expected, every, floor) => {
     expect(decideWake(cfg, packet, clock, tick, plan, floor)).toBe(expected)
+    expect(wakeReasons(cfg, packet, clock, tick, plan, floor)).toEqual(every)
+  })
+})
+
+// 82.4% of the gate's 510 calls were charged to salient_perception, and the number was inflated:
+// an act lasts one sim-minute, so the plan was finished on nearly every one of those ticks too,
+// three lines below where the answer was already given.
+describe('wakeReasons — what else was true when the winner was recorded', () => {
+  const asleepHungry: PerceptionPacket = {
+    ...withNeeds(5, 78, 71),
+    self: { ...withNeeds(5, 78, 71).self, asleep: true },
+  }
+
+  it('sees the finished plan under the passer-by that bought the call', () => {
+    const clock = clk()
+    const plan = pln({ lastResult: 'done' })
+    expect(decideWake(cfg, conversationPacket, clock, 30, plan)).toBe('salient_perception')
+    expect(wakeReasons(cfg, conversationPacket, clock, 30, plan)).toEqual([
+      'salient_perception',
+      'plan_done',
+    ])
+  })
+
+  it('a sleeper woken by its body is often owed a morning as well', () => {
+    expect(wakeReasons(cfg, asleepHungry, clk(), 600, pln())).toEqual(['body_alarm', 'morning'])
+  })
+
+  it('ends the list where the ladder ends: a gate stops what it was always going to stop', () => {
+    // The doze answers nothing at all, the retry rung silences a body that is still failing, and
+    // the idle floor never let reconsider be reached. None of these is "true but outranked".
+    expect(wakeReasons(cfg, conversationPacket, clk({ dozeUntilTick: 50 }), 49, pln())).toEqual([])
+    expect(wakeReasons(cfg, asleepHungry, clk({ wakeRetryAtTick: 910 }), 900, pln())).toEqual([])
+    expect(wakeReasons(cfg, conversationPacket, clk({ reconsiderAtTick: 0 }), 10, pln())).toEqual([
+      'salient_perception',
+    ])
+  })
+
+  it('a scene reaches one reason and a listener none, whatever else the body is doing', () => {
+    const starving = withNeeds(5, 78, 71)
+    const plan = pln({ lastResult: 'blocked' })
+    expect(wakeReasons(cfg, starving, clk(), 10, plan, HOLDS_FLOOR)).toEqual(['floor'])
+    expect(wakeReasons(cfg, starving, clk(), 10, plan, LISTENS)).toEqual([])
   })
 })
 
