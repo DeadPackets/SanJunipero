@@ -204,20 +204,30 @@ describe('★ how far the ground goes', () => {
 describe('★ block 1 tells the truth about walking to a place', () => {
   const walkLine = CAPABILITIES.split('\n').find((l) => l.startsWith('walk: '))!
 
-  it('offers both ways of naming where a walk ends', () => {
+  it('offers every way of naming where a walk ends', () => {
     expect(walkLine).toContain('give x and y as two numbers')
-    expect(walkLine).toMatch(/structureId, the mark of any place you know/)
+    expect(walkLine).toMatch(/structureId for any place you know/)
+    expect(walkLine).toMatch(/targetId for a person you can see/)
+    expect(walkLine).toMatch(/itemId for a thing you can see/)
   })
 
   // ★ 94% of the rehearsal's walks named a raw tile and 88% of them were followed by another
   // walk. The affordance was never missing; the coordinate form was simply offered first.
-  it('leads with the named place and leaves the two numbers as the fallback', () => {
-    expect(walkLine.indexOf('structureId')).toBeLessThan(walkLine.indexOf('x and y'))
+  it('leads with the named marks and leaves the two numbers as the fallback', () => {
+    for (const key of ['structureId', 'targetId', 'itemId']) {
+      expect(walkLine.indexOf(key), key).toBeLessThan(walkLine.indexOf('x and y'))
+    }
   })
 
   it('says a mark reaches a landmark and not only a roof, and that the legs close the distance', () => {
     expect(walkLine).toContain('a roof or a landmark alike')
     expect(walkLine).toContain('set you down beside it, however far off it lies')
+  })
+
+  // ★ 38% of the rehearsal's coordinate walks aimed at a person, who had moved by the next turn.
+  it('says the legs follow a person while they move, and that they can be lost', () => {
+    expect(walkLine).toContain('follow them while they move')
+    expect(walkLine).toContain('until you are beside them or they are lost')
   })
 
   it('says a place stays known once seen or heard of, which the marks paragraph used to deny', () => {

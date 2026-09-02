@@ -34,6 +34,7 @@ import {
   isAdjacentToRect,
   itemWithinReach,
   isMapRim,
+  WALK_LOST_THEM,
   walkIsCapped,
   workPenalty,
 } from './verbs/index.js'
@@ -316,11 +317,16 @@ const SELF_EVENT_TAG: Record<string, string> = {
   agent_tended: 'you_were_tended',
 }
 
+// The one interruption a mind is told about in words. Every other act cut short is read off the
+// body next turn — standing still, holding nothing — and needs no sentence of its own.
+const INTERRUPT_TAG: Record<string, string> = { [WALK_LOST_THEM]: 'you_lost_them' }
+
 // Every tag `feltTagFor` can produce, so the prose map can be proven complete
 // rather than sampled. Mystery tags come from MYSTERIES.
 export const FELT_TAGS: readonly string[] = [
   ...Object.keys(PRECIPITATION).map((kind) => `${kind}_started`),
   ...Object.values(SELF_EVENT_TAG),
+  ...Object.values(INTERRUPT_TAG),
 ]
 
 // A felt event is something that happens *to* this agent (or ambient weather). Anything about
@@ -333,6 +339,10 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
+  if (ev.type === 'action_interrupted') {
+    const reason = (ev.payload as { reason?: unknown }).reason
+    return typeof reason === 'string' ? (INTERRUPT_TAG[reason] ?? null) : null
+  }
   return SELF_EVENT_TAG[ev.type] ?? null
 }
 

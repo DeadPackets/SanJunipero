@@ -159,17 +159,33 @@ export const FireExtinguished = z
   })
   .strict()
 
-// `structureId` is the place the mind actually named, kept beside the tile it settled on: the
-// legs read the two numbers, and the log still knows she set out for the mill.
+// The mark the mind actually named, kept beside the tile it settled on: the legs read the two
+// numbers, and the log still knows she set out for the mill, for Omar, or for the axe.
 export const WalkParams = z
   .object({
     x: z.number().int(),
     y: z.number().int(),
     structureId: z.string().min(1).optional(),
+    targetId: z.string().min(1).optional(),
+    itemId: z.string().min(1).optional(),
   })
   .strict()
-// The other way to say it, before the tile is found. Settled once, at the intent seam.
+// The other three ways to say it, before the tile is found. Settled once, at the intent seam.
 export const WalkToPlace = z.object({ structureId: z.string().min(1) }).strict()
+export const WalkToPerson = z.object({ targetId: z.string().min(1) }).strict()
+export const WalkToThing = z.object({ itemId: z.string().min(1) }).strict()
+
+// A chase re-aimed at where the person is now. The path is not carried: the fold finds it the
+// same way `action_started` does, so one walk and its hundredth re-aim are laid the same way.
+export const WalkReaimed = z
+  .object({
+    agentId: z.string(),
+    x: z.number().int(),
+    y: z.number().int(),
+    ticks: z.number().int().nonnegative(),
+    chase: z.object({ ticks: z.number(), grew: z.number(), gap: z.number() }).strict(),
+  })
+  .strict()
 
 export const ActionStarted = z
   .object({

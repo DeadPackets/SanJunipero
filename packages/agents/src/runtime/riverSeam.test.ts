@@ -128,7 +128,9 @@ describe('★ the valley a mind is born knowing', () => {
       expect(known.length, `landmarks at ${at.x},${at.y}`).toBeGreaterThan(0)
       for (const p of known) {
         const to = walkDestination(loop.state, config, AGENT, { structureId: p.id })
-        expect(to, `${p.id} from ${at.x},${at.y}`).not.toEqual({ refusal: 'you know no such place' })
+        expect(to, `${p.id} from ${at.x},${at.y}`).not.toEqual({
+          refusal: 'you know no such place',
+        })
       }
     }
   })

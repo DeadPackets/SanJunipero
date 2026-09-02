@@ -197,6 +197,7 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
     'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
   you_recovered: 'The sickness lifts. Your head clears and your strength begins to come back.',
   you_were_tended: 'Someone has cared for your hurts; the pain eases under their hands.',
+  you_lost_them: 'You were following someone and lost them; your legs have stopped.',
   fire_ignited: 'Smoke stings your nose. Something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
