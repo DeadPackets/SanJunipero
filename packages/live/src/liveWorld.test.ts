@@ -190,15 +190,29 @@ const SMOKE_RECIPE = {
   rngStream: 'recipe:smoke_fish',
   canon: ['food_preserving'],
 }
+// The court is asked in the strict dialect: the verdict rides wrapped and every absent key is
+// written null, which `readRuling` takes back out before anything downstream sees one.
 const SMOKE_VERDICT = {
-  kind: 'attempt',
-  recipe: SMOKE_RECIPE,
-  summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
+  verdict: {
+    kind: 'attempt',
+    recipe: {
+      ...SMOKE_RECIPE,
+      skillCheck: null,
+      outcomeTable: SMOKE_RECIPE.outcomeTable.map((row) => ({
+        ...row,
+        effects: row.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
+      })),
+    },
+    summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
+    unlocks: null,
+  },
 }
 const REFUSING_VERDICT = {
-  kind: 'impossible',
-  class: 'insufficient_skill',
-  reason: 'the smoke will not hold without a knack for it nobody here has shown',
+  verdict: {
+    kind: 'impossible',
+    class: 'insufficient_skill',
+    reason: 'the smoke will not hold without a knack for it nobody here has shown',
+  },
 }
 
 const SPEAKING_TURN = closedTurn({
