@@ -945,7 +945,7 @@ describe('★ why the provider stopped is on every ledger row', () => {
     })
     // The caller and its ceiling, so the row says which number in `pins.ts` to move.
     expect(alertsOf(db, 'llm_output_truncated')).toEqual([
-      'turn: the answer stopped at the 600 output token ceiling — raise it or the answer is a fragment',
+      `turn: the answer stopped at the ${callSettingsFor('turn').maxOutputTokens} output token ceiling — raise it or the answer is a fragment`,
     ])
   })
 

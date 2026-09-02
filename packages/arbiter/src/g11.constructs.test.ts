@@ -14,6 +14,7 @@ import {
 import {
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
+  NO_PARAMS,
   SimConfigSchema,
   type SimEvent,
   scanPromptForGlassLeak,
@@ -108,14 +109,14 @@ describe('G11a-X1: a word the town buys once and then owns', () => {
     const arbiter = await rig(llm)
     try {
       const first = await arbiter.adjudicate('I dance by the fire', ADA)
-      expect(first).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(first).toEqual({ kind: 'map', verb: 'express:dance', params: NO_PARAMS })
       expect(llm.objectCalls).toBe(1)
       expect(llm.systems[0]).toContain(EXPRESSIVE_INSTRUCTION)
       expect(llm.systems[0]).not.toContain(ADJUDICATION_INSTRUCTION)
 
       const before = llm.objectCalls
       const second = await arbiter.adjudicate('dance', BEX)
-      expect(second).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(second).toEqual({ kind: 'map', verb: 'express:dance', params: NO_PARAMS })
       expect(llm.objectCalls - before).toBe(0)
 
       // And the second body can really do it: the verb is in the registry the engine reads.

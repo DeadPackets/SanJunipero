@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
-import { EMBEDDING_DIM, FORBIDDEN_FRAMING } from '@sj/shared'
+import { EMBEDDING_DIM, FORBIDDEN_FRAMING, NO_PARAMS } from '@sj/shared'
 import {
   FALLBACK_IMPOSSIBLE,
   isDecodeDebris,
@@ -202,7 +202,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('I try to boil river water for salt', TAMAR_CTX)
-    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
+    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: NO_PARAMS })
     expect(llm.objectCalls).toBe(0)
   })
 
@@ -419,7 +419,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     arbiter.codify(basketRecipe, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('basket weave reeds', TAMAR_CTX)
-    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: {} })
+    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: NO_PARAMS })
     expect(llm.objectCalls).toBe(0)
   })
 
@@ -518,7 +518,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   it('stage-2 short-circuit returns a stored map verdict whose verb is a live engine verb', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
-    const stored: Verdict = { kind: 'map', verb: 'walk', params: {} }
+    const stored: Verdict = { kind: 'map', verb: 'walk', params: NO_PARAMS }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
 
@@ -530,7 +530,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   it('stage-2 short-circuit re-checks stored map verdicts pointing at reverted recipe verbs', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
-    const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: {} }
+    const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: NO_PARAMS }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
     arbiter.codify(ropeRecipe, CODIFY_CREDIT)

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+import { CLOSED_KEYS, PLAN_MAX_STEPS } from '@sj/shared'
 import {
   CEILING_PRICE_PER_M,
   FALLBACK_MODELS,
@@ -109,7 +110,7 @@ it("★ pre-flight runs the turn's own model on the turn's own back end", () => 
 })
 
 // Wafer's tail is prefill, not decode: 14.7 s p95 and 41.0 s max on 300-token answers. A bound
-// derived from a 600-token ceiling alone is 13.6 s, floored at 30 s — and still aborts them.
+// derived from the 1,500-token ceiling alone is 34.1 s — under the max, so the floor still rules.
 it('★ a GLM caller is bounded by its provider tail, not only by its output ceiling', () => {
   expect(requestTimeoutMsFor('turn')).toBe(45_000)
   expect(requestTimeoutMsFor('reflection')).toBe(45_000)
@@ -157,6 +158,22 @@ it('every measured caller has an output ceiling above 2x its p99', () => {
   for (const [caller, measured] of Object.entries(p99)) {
     expect(callSettingsFor(caller).maxOutputTokens, caller).toBeGreaterThanOrEqual(measured * 2)
   }
+})
+
+// 2x the p99 no longer bounds the turn: under the closed grammar a plan step carries all
+// thirteen keys, so the schema's own maximum is what the ceiling has to clear, not the average.
+it('★ the turn ceiling clears a full twelve-step plan in the closed grammar', () => {
+  const step = JSON.stringify({
+    verb: 'stow',
+    params: Object.fromEntries(CLOSED_KEYS.map((k) => [k, k === 'x' || k === 'y' ? 62 : null])),
+  })
+  // Measured live against the pinned model 2026-09-02: a rendered turn ran 3.3 chars per token,
+  // and everything outside the plan — thought, speech, journal, recall, act, scalars — 721 chars.
+  const worstTokens = Math.ceil((step.length * PLAN_MAX_STEPS + 721) / 3.3)
+  expect(worstTokens).toBeGreaterThan(900)
+  expect(callSettingsFor('turn').maxOutputTokens).toBeGreaterThanOrEqual(
+    Math.ceil(worstTokens * 1.3),
+  )
 })
 
 // The court's rulings are permanent physics and its map verdicts bind object params — the two
