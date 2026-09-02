@@ -33,7 +33,14 @@ import {
   type BubbleSide,
 } from './textFaces.js'
 import { over } from './legibility.js'
-import { overlaps, placeTag, type Rect } from './tooltip.js'
+import {
+  EDGE_PAD_PX,
+  MAX_STACK_STEPS,
+  STACK_STEP_PX,
+  overlaps,
+  placeTag,
+  type Rect,
+} from './tooltip.js'
 import { rectInView } from './cull.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
@@ -209,6 +216,30 @@ export function bubbleAlpha(msLeft: number): number {
   return 1 - progress('reveal', 0, BUBBLE_FADE_MS - msLeft)
 }
 
+const pin = (v: number, lo: number, hi: number): number =>
+  lo > hi ? lo : Math.min(Math.max(v, lo), hi)
+
+/** ★ THE WHOLE BOX STAYS IN THE PICTURE. `placeTag` clamps and THEN steps clear, and its step is
+ *  away from the anchor — so a tall box pinned at the top edge was pushed up, clamped back to the
+ *  same place, and left composited over the box below it. This runs after that step, and a box
+ *  the view moved is walked DOWN past whatever it landed on. */
+export function clampBubble(rect: Rect, view: Rect, taken: readonly Rect[]): Rect {
+  const fit = (r: Rect): Rect => ({
+    ...r,
+    x: pin(r.x, view.x + EDGE_PAD_PX, view.x + view.w - EDGE_PAD_PX - r.w),
+    y: pin(r.y, view.y + EDGE_PAD_PX, view.y + view.h - EDGE_PAD_PX - r.h),
+  })
+  let out = fit(rect)
+  for (let step = 0; step < MAX_STACK_STEPS; step++) {
+    const hit = taken.filter((o) => overlaps(out, o))
+    if (hit.length === 0) break
+    const next = fit({ ...out, y: Math.max(...hit.map((o) => o.y + o.h)) + STACK_STEP_PX })
+    if (next.y <= out.y) break // the view has no room left below: nowhere better to put it
+    out = next
+  }
+  return out
+}
+
 /** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
 export function placeBubbles(
   want: readonly { id: string; sx: number; sy: number; size: { w: number; h: number } }[],
@@ -224,9 +255,13 @@ export function placeBubbles(
       view,
       taken,
     )
-    const rect = { x: at.sx - b.size.w / 2, y: at.sy, w: b.size.w, h: b.size.h }
+    const rect = clampBubble(
+      { x: at.sx - b.size.w / 2, y: at.sy, w: b.size.w, h: b.size.h },
+      view,
+      taken,
+    )
     taken.push(rect)
-    out.push({ id: b.id, sx: at.sx, sy: at.sy, side: at.side, rect })
+    out.push({ id: b.id, sx: rect.x + rect.w / 2, sy: rect.y, side: at.side, rect })
   }
   return out
 }

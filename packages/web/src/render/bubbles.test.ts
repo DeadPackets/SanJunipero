@@ -17,6 +17,7 @@ import {
   bubbleInked,
   bubbleLife,
   bubbleShown,
+  clampBubble,
   dominantColor,
   inViewSpeakers,
   placeBubbles,
@@ -423,6 +424,52 @@ describe('two speakers standing together do not composite into one pile', () => 
       { id: 'b', sx: 310, sy: 305, size: { w: 150, h: 40 } },
     ]
     expect(placeBubbles(want, view)).toEqual(placeBubbles(want, view))
+  })
+
+  // ★ D5 — the burst frame caught a box pinned at the very top of the viewport with a line of
+  // the box under it composited away. `placeTag` steps AWAY from the anchor and clamps as it
+  // goes, so once the view pinned the box the step had nowhere left to move it.
+  describe('★ the whole box stays inside the picture, clear of the boxes already there', () => {
+    // the director's own frame at 1440x900 and the 2x stop, in world coordinates; a box is the
+    // widest a bubble goes and three lines tall
+    const VIEW = { x: 0, y: 0, w: 720, h: 450 }
+    const BOX = { w: 213, h: 35 }
+    // the place name over the same head, tall enough that stepping up runs out of viewport
+    const NAME = { x: 0, y: 0, w: 720, h: 260 }
+    const inside = (r: Rect): boolean =>
+      r.x >= VIEW.x && r.y >= VIEW.y && r.x + r.w <= VIEW.x + VIEW.w && r.y + r.h <= VIEW.y + VIEW.h
+
+    it('★ steps a box the view pinned at its top edge clear of what is already there', () => {
+      const want = [0, 1].map((i) => ({ id: `b${i}`, sx: 360, sy: 320, size: BOX }))
+      const placed = placeBubbles(want, VIEW, [NAME])
+      for (const p of placed) {
+        expect(overlaps(p.rect, NAME), p.id).toBe(false)
+        expect(inside(p.rect), p.id).toBe(true)
+      }
+    })
+
+    it('★ keeps four boxes asking for one head inside the frame and off each other', () => {
+      const placed = placeBubbles(
+        [0, 1, 2, 3].map((i) => ({ id: `b${i}`, sx: 360, sy: 320, size: BOX })),
+        VIEW,
+        [NAME],
+      )
+      for (const p of placed) expect(inside(p.rect), p.id).toBe(true)
+      for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++)
+          expect(overlaps(placed[i]!.rect, placed[j]!.rect), `${i} vs ${j}`).toBe(false)
+      }
+    })
+
+    it('★ the node is hung off the CLAMPED box, not off where the box wanted to be', () => {
+      const [p] = placeBubbles([{ id: 'a', sx: 360, sy: 40, size: BOX }], VIEW)
+      expect(p!.sy).toBe(p!.rect.y)
+      expect(p!.sx).toBe(p!.rect.x + p!.rect.w / 2)
+    })
+
+    it('leaves a box that already fits exactly where the placer put it', () => {
+      expect(clampBubble({ x: 200, y: 200, ...BOX }, VIEW, [])).toEqual({ x: 200, y: 200, ...BOX })
+    })
   })
 })
 
