@@ -26,7 +26,7 @@ import { mountShareCard, shareMeta } from './shareCard.js'
 import { mountCrawlerRoutes } from './crawler.js'
 import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
-import { frameText, notFound, sendJson } from './http.js'
+import { frameText, notFound, parseTarget, sendJson } from './http.js'
 import type { RouteHandler, Router } from './router.js'
 
 export type GatewayOpts = {
@@ -139,12 +139,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   )
 
   const httpServer = createServer((req, res) => {
-    // `//x:99999/` is a target llhttp accepts and `URL` refuses, and unguarded that throw is an
-    // uncaughtException on the thread that ticks the town.
-    let url: URL
-    try {
-      url = new URL(req.url ?? '/', 'http://localhost')
-    } catch {
+    const url = parseTarget(req.url)
+    if (url === null) {
       sendJson(res, { error: 'bad request' }, 400)
       return
     }
