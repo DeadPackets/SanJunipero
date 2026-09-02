@@ -41,9 +41,7 @@ describe('★ bubbleLife buys a read window out of what is SHOWN', () => {
 
   it('★ a thought is not typed, so it pays for reading only', () => {
     const thought = 'cold stays outside where it belongs'
-    expect(bubbleLife(thought, true)).toBe(
-      SPEECH_MS_BASE + READ_MS_PER_CHAR * thought.length,
-    )
+    expect(bubbleLife(thought, true)).toBe(SPEECH_MS_BASE + READ_MS_PER_CHAR * thought.length)
     expect(bubbleLife(thought, true)).toBeLessThan(bubbleLife(thought))
   })
 
