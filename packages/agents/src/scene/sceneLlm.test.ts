@@ -14,6 +14,11 @@ const ZERO_USAGE = {
   outputTokens: { total: 0, text: 0, reasoning: 0 },
 }
 
+const MORNING = 10 * 60
+const PAST_MIDNIGHT = 24 * 60 + 60
+const SMALL_HOURS = 24 * 60 + 4 * 60
+const JUST_DARK = 21 * 60
+
 const LIVING = [
   { id: 'tamar', name: 'Tamar' },
   { id: 'yusuf', name: 'Yusuf' },
@@ -61,6 +66,8 @@ function ask(overrides: Partial<SceneAsk> = {}): SceneAsk {
     ties: [],
     thread: [line('yusuf', 'Four days of bread, you said.')],
     wrapUp: false,
+    tick: MORNING,
+    energy: 80,
     ...overrides,
   }
 }
@@ -204,6 +211,43 @@ describe('the scene block', () => {
 
   it('tells the mind this moment is not an act', () => {
     expect(block()).toContain('This moment is not an act')
+  })
+})
+
+describe('the hour, and the body that has to sit through it', () => {
+  it('says nothing at all by day to a body with something left in it', () => {
+    const text = block()
+    expect(text).not.toContain('Sleep will keep')
+    expect(text).not.toContain('midnight')
+    expect(text).not.toContain('Weariness')
+  })
+
+  it('tells the hour after dark, in the words somebody outdoors would use', () => {
+    expect(block(ask({ tick: JUST_DARK }))).toContain('It is late, and the town has gone quiet')
+    expect(block(ask({ tick: PAST_MIDNIGHT }))).toContain('It is past midnight.')
+    expect(block(ask({ tick: SMALL_HOURS }))).toContain('The night is nearly out.')
+  })
+
+  it('says the tiredness as weariness and never as a number', () => {
+    expect(block(ask({ energy: 40 }))).toContain('Weariness drags at your limbs.')
+    expect(block(ask({ energy: 20 }))).toContain('Your eyes keep closing.')
+    expect(block(ask({ energy: 20 }))).not.toContain('20')
+  })
+
+  it('leaves both doors open, and sends nobody to bed', () => {
+    const text = block(ask({ tick: PAST_MIDNIGHT, energy: 20 }))
+    expect(text).toContain('Sleep will keep. Stay while the talk is worth it')
+    expect(text).toContain('say that you leave when it is not')
+    // Nothing in it tells a mind to go: a night owl reads the same sentence and stays.
+    expect(text).not.toMatch(/go to bed|you should sleep|time to sleep/i)
+  })
+
+  it('costs a daylight line nothing, and a midnight line one short paragraph', () => {
+    const est = (t: string): number => Math.ceil(t.length / 4)
+    const day = est(block())
+    const worst = est(block(ask({ tick: PAST_MIDNIGHT, energy: 20 })))
+    expect(worst - day, 'the whole of what a late line adds').toBeLessThanOrEqual(40)
+    expect(est(block(ask({ tick: PAST_MIDNIGHT, energy: 80 }))) - day).toBeLessThanOrEqual(30)
   })
 })
 

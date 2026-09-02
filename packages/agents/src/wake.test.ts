@@ -144,10 +144,37 @@ describe('wakeReasons — what else was true when the winner was recorded', () =
   })
 
   it('a scene reaches one reason and a listener none, whatever else the body is doing', () => {
-    const starving = withNeeds(5, 78, 71)
+    const weary = withNeeds(60, 40, 71)
     const plan = pln({ lastResult: 'blocked' })
-    expect(wakeReasons(cfg, starving, clk(), 10, plan, HOLDS_FLOOR)).toEqual(['floor'])
-    expect(wakeReasons(cfg, starving, clk(), 10, plan, LISTENS)).toEqual([])
+    expect(wakeReasons(cfg, weary, clk(), 10, plan, HOLDS_FLOOR)).toEqual(['floor'])
+    expect(wakeReasons(cfg, weary, clk(), 10, plan, LISTENS)).toEqual([])
+  })
+})
+
+// Nothing closes a talk for being late any more, so the body alarm is the only thing left that
+// can reach a mouth running down mid-sentence.
+describe('the body reaches a mind holding the floor', () => {
+  it('leaves a merely tired floor-holder talking', () => {
+    const tired = withNeeds(60, 40, 71)
+    expect(decideWake(cfg, tired, clk(), 10, pln(), HOLDS_FLOOR)).toBe('floor')
+  })
+
+  it('takes a failing one off the floor', () => {
+    const failing = withNeeds(60, 5, 71)
+    expect(decideWake(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toBe('body_alarm')
+    expect(wakeReasons(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toContain('body_alarm')
+  })
+
+  it('rings once and then gives the floor back, because a spent alarm is disarmed', () => {
+    const failing = withNeeds(60, 5, 71)
+    const clock = clk()
+    disarmBodyAlarm(cfg, failing.self.body, clock)
+    expect(decideWake(cfg, failing, clock, 10, pln(), HOLDS_FLOOR)).toBe('floor')
+  })
+
+  it('keeps hearing free: a listener with the same body takes no turn', () => {
+    const failing = withNeeds(60, 5, 71)
+    expect(wakeReasons(cfg, failing, clk(), 10, pln(), LISTENS)).toEqual([])
   })
 })
 
@@ -177,12 +204,13 @@ describe('decideWake — priority and floor', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
   })
 
-  it('a scene outranks every other reason, and a listener takes no turn at all', () => {
+  it('a scene outranks every reason but a failing body, and a listener takes no turn at all', () => {
+    const blocked = pln({ lastResult: 'blocked' })
+    const well = withNeeds(60, 78, 71)
     const starving = withNeeds(5, 78, 71)
-    expect(decideWake(cfg, starving, clk(), 10, pln({ lastResult: 'blocked' }), HOLDS_FLOOR)).toBe(
-      'floor',
-    )
-    expect(decideWake(cfg, starving, clk(), 10, pln({ lastResult: 'blocked' }), LISTENS)).toBe(null)
+    expect(decideWake(cfg, well, clk(), 10, blocked, HOLDS_FLOOR)).toBe('floor')
+    expect(decideWake(cfg, starving, clk(), 10, blocked, HOLDS_FLOOR)).toBe('body_alarm')
+    expect(decideWake(cfg, starving, clk(), 10, blocked, LISTENS)).toBe(null)
   })
 
   it('salient_perception fires when the visible-agent set changes', () => {

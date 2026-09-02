@@ -2,7 +2,7 @@
 // account of the whole thing. The system prefix is the ordinary turn's, byte for byte, so a
 // scene line lands on the cache the mind's own turns keep warm.
 import { z } from 'zod'
-import { sanitizeSpokenText, type RosterEntry } from '@sj/shared'
+import { dayPhaseFromTick, sanitizeSpokenText, simTimeFromTick, type RosterEntry } from '@sj/shared'
 import type { CallBill, LlmClient } from '@sj/llm'
 import type { PersonalityDoc } from '../personality.js'
 import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
@@ -101,6 +101,36 @@ function renderThread(
   return ['What has been said, oldest first:', ...rows].join('\n')
 }
 
+// Both doors, said in one breath. Nothing here sends a mind to bed: the last one to leave a
+// room is a person, and the mind already has `leave` for the other answer.
+const SLEEP_WILL_KEEP =
+  'Sleep will keep. Stay while the talk is worth it, and say that you leave when it is not.'
+
+// The town's own words for a body running down, from the ordinary turn's ladder.
+const TIREDNESS: readonly [number, string][] = [
+  [30, 'Your eyes keep closing.'],
+  [45, 'Weariness drags at your limbs.'],
+]
+
+/** The hour, in the register somebody outdoors would tell it. Only after dark, and only through
+ *  the one phase derivation the codebase has. */
+function hourSaid(tick: number): string {
+  if (dayPhaseFromTick(tick) !== 'night') return ''
+  const { hour } = simTimeFromTick(tick)
+  if (hour >= 21) return 'It is late, and the town has gone quiet around you.'
+  return hour < 3 ? 'It is past midnight.' : 'The night is nearly out.'
+}
+
+/** What a person knows at midnight without being told: the hour and their own weariness. The
+ *  hour no longer ends a talk, so it is said to the mind instead and the mind answers it.
+ *  Empty in daylight on a body with something left in it, which is most lines. */
+function renderLateness(tick: number, energy: number): string {
+  const parts = [hourSaid(tick), TIREDNESS.find(([at]) => energy < at)?.[1] ?? ''].filter(
+    (p) => p.length > 0,
+  )
+  return parts.length === 0 ? '' : `${parts.join(' ')} ${SLEEP_WILL_KEEP}`
+}
+
 function renderYourTurn(opts: {
   lastSpeaker: string | null
   others: readonly string[]
@@ -140,6 +170,7 @@ export function sceneBlock(
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
     renderThread(ask.thread, nameOf, ask.agentId),
+    renderLateness(ask.tick, ask.energy),
     renderYourTurn({
       lastSpeaker: nameOf(ask.thread[ask.thread.length - 1]?.agentId ?? ''),
       others,

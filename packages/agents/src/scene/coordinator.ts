@@ -1,4 +1,4 @@
-import { dayPhaseFromTick, sanitizeSpokenText, simTimeFromTick } from '@sj/shared'
+import { dayPhaseFromTick, sanitizeSpokenText } from '@sj/shared'
 import type { EngineBridge } from '../runtime/bridge.js'
 import type { Tie, TieStore } from '../memory/ties.js'
 import {
@@ -8,6 +8,7 @@ import {
   LINE_CAP,
   nextFloor,
   openScene,
+  TALKERS_NEEDED,
   threadFor,
   upgradedKind,
   wrapUpDue,
@@ -84,11 +85,13 @@ export class SceneCoordinator {
     if (!this.#scenes.has(scene.id)) this.#scenes.set(scene.id, structuredClone(scene))
   }
 
-  /** A word said outside any scene. If anyone heard it, that is a scene. */
+  /** A word said outside any scene. If anyone who could answer heard it, that is a scene. */
   noteSpoken(agentId: string, text: string, tick: number): Scene | null {
     if (this.sceneFor(agentId) !== null) return null
-    const heard = this.#bridge.earshot(agentId).filter((id) => this.#mindFor(id) !== null)
-    if (heard.length === 0) return null
+    const heard = this.#bridge
+      .earshot(agentId)
+      .filter((id) => this.#mindFor(id) !== null && this.#canTalk(id))
+    if (heard.length + 1 < TALKERS_NEEDED) return null
     const said = sanitizeSpokenText(text)
     const scene = openScene({
       openedTick: tick,
@@ -129,6 +132,8 @@ export class SceneCoordinator {
         ties: this.#tiesBetween(mind.ties, scene, agentId),
         thread: threadFor(scene, agentId),
         wrapUp: wrapUpDue(scene),
+        tick,
+        energy: this.#bridge.energyOf(agentId),
       })
     } catch (err) {
       this.#onError('scene_line', err instanceof Error ? err.message : String(err))
@@ -138,7 +143,9 @@ export class SceneCoordinator {
     // The floor moved while the provider was thinking: a timeout already counted this as a pass.
     if (this.#asked.get(scene.id)?.token !== token) return
     this.#asked.delete(scene.id)
-    if (scene.closedTick !== null) return
+    // Or the mouth left the talk while the provider was thinking: went to bed, or walked out of
+    // earshot. Saying the line now would wake a sleeper with its own words.
+    if (scene.closedTick !== null || !scene.participants.includes(agentId)) return
 
     if (turn.leave) {
       await this.#close(scene, 'left', tick)
@@ -156,19 +163,22 @@ export class SceneCoordinator {
     if (scene.thread.length >= LINE_CAP) await this.#close(scene, 'capped', tick)
   }
 
-  /** Every tick, once, whoever calls first: night, the ones who walked away, and the ones who
-   *  never answered. */
+  /** The body took this mind out of the talk. The floor is a commitment and this is the one
+   *  thing that breaks it from outside; what is left is a scene somebody walked out of. */
+  leave(agentId: string, tick: number): void {
+    const scene = this.sceneFor(agentId)
+    if (scene === null) return
+    void this.#close(scene, 'left', tick).catch(this.#sink)
+  }
+
+  /** Every tick, once, whoever calls first: the ones who walked away or went to bed, and the
+   *  ones who never answered. */
   onTick(tick: number): void {
     if (tick === this.#lastTick) return
     this.#lastTick = tick
-    const night = simTimeFromTick(tick).isNight
     for (const scene of this.open()) {
-      if (night) {
-        void this.#close(scene, 'night', tick).catch(this.#sink)
-        continue
-      }
       this.#dropAbsent(scene)
-      if (scene.participants.length <= 1) {
+      if (scene.participants.length < TALKERS_NEEDED) {
         void this.#close(scene, 'left', tick).catch(this.#sink)
         continue
       }
@@ -240,12 +250,19 @@ export class SceneCoordinator {
     return this.#bridge.expressersAtSquare().length >= GATHERING_MINIMUM
   }
 
-  /** Anyone out of the last speaker's earshot, or dead, has left. A sleeper keeps the floor
-   *  until the timeout takes it off them, which is the same thing one beat slower. */
+  /** Whether this body can hold up its end of a talk: alive, and not in bed. The one rule the
+   *  opener and the tick sweep both read, so nothing opens a scene the same tick would close.
+   *  The hour is not in it — a talk that runs past midnight is a late night, not a fault. */
+  #canTalk(agentId: string): boolean {
+    return this.#bridge.isAlive(agentId) && this.#bridge.isAwake(agentId)
+  }
+
+  /** Anyone out of the last speaker's earshot, dead, or gone to bed has left the talk. The
+   *  floor moves off them the tick they lie down, so no scene waits on a sleeper. */
   #dropAbsent(scene: Scene): void {
     const anchor = scene.thread[scene.thread.length - 1]?.agentId ?? scene.participants[0]!
     const within = new Set([anchor, ...this.#bridge.earshot(anchor)])
-    const kept = scene.participants.filter((id) => within.has(id) && this.#bridge.isAlive(id))
+    const kept = scene.participants.filter((id) => within.has(id) && this.#canTalk(id))
     if (kept.length === scene.participants.length) return
     scene.participants = kept
     if (scene.floor !== null && !kept.includes(scene.floor)) {

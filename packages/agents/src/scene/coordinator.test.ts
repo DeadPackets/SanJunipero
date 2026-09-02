@@ -275,13 +275,24 @@ describe('every way a scene ends', () => {
     expect(closeReasonOf(h)).toBe('left')
   })
 
-  it('night ends it', async () => {
+  it('somebody going to bed ends it', async () => {
     const h = harness({})
-    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
-    h.coordinator.onTick(NIGHT)
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    h.emitNext('agent_slept', { agentId: OMAR })
+    h.loop.step()
+    h.coordinator.onTick(NIGHT + 1)
     await flush()
     expect(h.coordinator.open()).toHaveLength(0)
-    expect(closeReasonOf(h)).toBe('night')
+    expect(closeReasonOf(h)).toBe('left')
+  })
+
+  it('the body walking a mind out of the talk ends it', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    h.coordinator.leave(OMAR, NIGHT + 1)
+    await flush()
+    expect(h.coordinator.open()).toHaveLength(0)
+    expect(closeReasonOf(h)).toBe('left')
   })
 
   it('twelve lines cap it, and the tenth is told to wrap up', async () => {
@@ -368,6 +379,93 @@ describe('what a close leaves behind', () => {
     await play(h, NOON)
     h.coordinator.onTick(NIGHT)
     expect([...h.llms.values()].reduce((n, l) => n + l.closes, 0)).toBe(1)
+  })
+})
+
+// A fresh town starts at 00:00. The curfew closed 22 scenes in one rehearsal's first 131 ticks,
+// every one of them a line long: the opener opened what the same tick's sweep killed.
+describe('the night is a time of day, not an ending', () => {
+  it('leaves a scene open through nightfall, and the lines keep coming', async () => {
+    const h = harness({ script: () => (_a, n) => fromCorpus(n, { leave: false }) })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    h.coordinator.onTick(NIGHT)
+    await flush()
+    expect(h.coordinator.open(), 'the hour closes nothing').toHaveLength(1)
+    const before = h.coordinator.open()[0]!.thread.length
+    await h.coordinator.takeFloor(h.coordinator.open()[0]!.floor!, NIGHT + 1)
+    expect(h.coordinator.open()[0]!.thread.length).toBeGreaterThan(before)
+  })
+
+  it('opens a scene after dark, because that is what a late night is', () => {
+    const h = harness({})
+    expect(h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)).not.toBeNull()
+  })
+
+  it('opens nothing for a mind whose only listener is in bed', () => {
+    const h = harness({})
+    h.emitNext('agent_slept', { agentId: OMAR })
+    h.loop.step()
+    expect(h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)).toBeNull()
+  })
+
+  it('drops the line of a mouth that went to bed while the provider was thinking', async () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: SALMA, name: 'Salma', x: 5 },
+      ],
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    const asking = h.coordinator.takeFloor(OMAR, NIGHT)
+    h.emitNext('agent_slept', { agentId: OMAR })
+    h.loop.step()
+    h.coordinator.onTick(NIGHT + 1)
+    await asking
+    const scene = h.coordinator.open()[0]
+    expect(scene?.participants, 'a sleeper is nobody in the talk').toEqual([NADIA, SALMA])
+    expect(
+      scene?.thread.map((l) => l.agentId),
+      'and said nothing in it',
+    ).toEqual([NADIA])
+  })
+
+  it('tells the floor-holder the hour and what its body has left', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    await h.coordinator.takeFloor(OMAR, NIGHT)
+    const ask = h.llms.get(OMAR)!.asks[0]
+    expect(ask?.tick).toBe(NIGHT)
+    expect(ask?.energy, 'read off the body, not guessed').toBe(
+      h.loop.state.agents[OMAR]!.needs.energy,
+    )
+  })
+
+  it('lets a mind told it is late and tired take the exit it always had', async () => {
+    const h = harness({
+      // Nobody made them go; they read the hour and the weariness and answered it.
+      script: () => (a, n) => fromCorpus(n, { leave: a.tick >= NIGHT && a.energy < 45 }),
+    })
+    h.emitNext('needs_changed', { id: OMAR, changes: [{ need: 'energy', delta: -80 }] })
+    h.emitNext('needs_changed', { id: NADIA, changes: [{ need: 'energy', delta: -80 }] })
+    h.loop.step()
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    await play(h, NIGHT)
+    expect(h.coordinator.open()).toHaveLength(0)
+    expect(closeReasonOf(h)).toBe('left')
+  })
+
+  it('does not push out a tired mind that wants to keep talking', async () => {
+    const h = harness({ script: () => (_a, n) => fromCorpus(n, { leave: false }) })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    for (let i = 0; i < 4; i++) {
+      h.coordinator.onTick(NIGHT + i)
+      await flush()
+      const floor = h.coordinator.open()[0]?.floor
+      expect(floor, `still talking at hour ${22 + i}`).toBeTruthy()
+      await h.coordinator.takeFloor(floor!, NIGHT + i)
+    }
+    expect(h.coordinator.open(), 'the night owls are still at it').toHaveLength(1)
   })
 })
 
