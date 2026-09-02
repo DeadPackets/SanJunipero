@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { BOND_RECENT_ACTS, BondsResponseSchema, DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, BOND_RECENT_ACTS, BondsResponseSchema, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { toEvent, type EventRow } from './http.js'
@@ -48,7 +48,7 @@ describe('★ the bonds body has a ceiling that does not depend on the town’s 
               name: `A${i}`,
               x: (i * 5) % 60,
               y: (i * 7) % 60,
-              ageDays: 7300,
+              ageDays: ADULT_AGE_DAYS,
             })
           }
         for (let k = 0; k < 4; k++) {

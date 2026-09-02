@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  DAYS_PER_SEASON,
+  DAYS_PER_YEAR,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type AgentBody, type TileId, type WorldState } from '../state.js'
@@ -26,17 +32,24 @@ const map = (): TileId[][] => grid(12)
 
 // Minute 30 on purpose: no hour boundary, so nothing but this law runs in the tick under test.
 const at = (day: number, hour: number): number => day * MINUTES_PER_DAY + hour * 60 + 30
-const SPRING_DAY = at(10, 12)
-const SUMMER_DAY = at(100, 12)
-const AUTUMN_DUSK = at(200, 19)
-const WINTER_NIGHT = at(273, 22)
+// Counted in seasons, not in days: the year is four weeks long and these rows are about which
+// season a tick falls in, never about which numbered day it is.
+const midSeason = (index: number): number => index * DAYS_PER_SEASON + 3
+const SPRING_DAY = at(midSeason(0), 12)
+const SUMMER_DAY = at(midSeason(1), 12)
+const AUTUMN_DUSK = at(midSeason(2), 19)
+const WINTER_NIGHT = at(midSeason(3), 22)
 
 function bodyAt(tick: number, config = CFG, extra: Partial<AgentBody> = {}): WorldState {
   let s = genesisState(config, map())
   s = fold(s, ev('tick_advanced', {}, tick - 1), config)
   s = fold(
     s,
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick - 1),
+    ev(
+      'agent_spawned',
+      { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 30 * DAYS_PER_YEAR },
+      tick - 1,
+    ),
     config,
   )
   const a1 = { ...s.agents.a1!, ...extra, needs: { ...s.agents.a1!.needs, ...(extra.needs ?? {}) } }
@@ -66,18 +79,18 @@ const skyOf = (tick: number, kind: string): WorldState => ({
 describe('ambientTempAt: a deterministic table, never a roll', () => {
   it('returns the ratified band for every season and phase', () => {
     const table: [number, number][] = [
-      [at(10, 12), 14],
-      [at(10, 6), 9],
-      [at(10, 22), 5],
-      [at(100, 12), 26],
-      [at(100, 6), 20],
-      [at(100, 22), 15],
-      [at(200, 12), 10],
-      [at(200, 19), 6],
-      [at(200, 22), 2],
-      [at(273, 12), -4],
-      [at(273, 5), -8],
-      [at(273, 22), -12],
+      [at(midSeason(0), 12), 14],
+      [at(midSeason(0), 6), 9],
+      [at(midSeason(0), 22), 5],
+      [at(midSeason(1), 12), 26],
+      [at(midSeason(1), 6), 20],
+      [at(midSeason(1), 22), 15],
+      [at(midSeason(2), 12), 10],
+      [at(midSeason(2), 19), 6],
+      [at(midSeason(2), 22), 2],
+      [at(midSeason(3), 12), -4],
+      [at(midSeason(3), 5), -8],
+      [at(midSeason(3), 22), -12],
     ]
     for (const [tick, expected] of table) {
       expect([tick, ambientTempAt(skyOf(tick, 'sunny'), CFG)]).toEqual([tick, expected])

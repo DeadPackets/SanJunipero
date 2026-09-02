@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  stateHash,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState } from './state.js'
 import { fold } from './fold.js'
 
@@ -10,12 +16,15 @@ const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => 
   payload,
 })
 const spawn = (id: string, x = 0, y = 0) =>
-  ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: 7300 })
+  ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS })
 
 describe('fold', () => {
   it('spawns, moves, and changes needs', () => {
     let s = genesisState(DEFAULT_CONFIG)
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
     s = fold(s, ev(2, 'agent_moved', { id: 'a1', x: 4, y: 3 }))
     s = fold(s, ev(3, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -30 }] }))
     expect(s.agents.a1).toMatchObject({ x: 4, y: 3, needs: { hunger: 70 } })
@@ -72,7 +81,7 @@ describe('fold', () => {
     let s = genesisState(DEFAULT_CONFIG)
     const branches: SimEvent[] = [
       ev(1, 'tick_advanced', {}, 5),
-      ev(2, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev(2, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       ev(3, 'agent_moved', { id: 'a1', x: 2, y: 2 }),
       ev(4, 'needs_changed', { id: 'a1', changes: [{ need: 'social', delta: -3 }] }),
     ]

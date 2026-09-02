@@ -2,6 +2,7 @@
 // houses until the town crosses into ring 2. Scripted policies only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   TOWN_SQUARE,
@@ -85,7 +86,7 @@ function runTown(seed = 'claim-seam'): Run {
             name: id,
             x: TOWN_SQUARE.x + i + 1,
             y: TOWN_SQUARE.y + 1,
-            ageDays: 7300,
+            ageDays: ADULT_AGE_DAYS,
           })
         })
       }

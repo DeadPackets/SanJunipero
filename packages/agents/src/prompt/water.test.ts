@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, type TickLoop, type TileId, type WorldState } from '@sj/engine'
-import { DEFAULT_CONFIG, T_GRASS, T_WATER } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, T_GRASS, T_WATER } from '@sj/shared'
 import { perceptionToProse, placesKnownLine } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import { lastTurnLine, wantedWater } from '../runtime/agentRuntime.js'
@@ -37,7 +37,7 @@ function valley(at: { x: number; y: number }, opts: { bucket?: boolean } = {}): 
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), DEFAULT_CONFIG)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: at.x, y: at.y, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS })
   if (opts.bucket === true) {
     put('item_spawned', { id: BUCKET, kind: 'bucket', qty: 1, loc: { t: 'agent', id: AGENT } })
   }
@@ -154,9 +154,7 @@ describe('the water a body can and cannot reach is said before the turn is spent
   it('a cast at dry ground walks to the water instead of coming back a reason', async () => {
     const t = valley(BELOW_THE_END)
     expect(proseFor(t)).not.toContain('water')
-    expect(await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })).toBe(
-      'the world allowed it',
-    )
+    expect(await refusal(t, { verb: 'fish', params: { x: 2, y: 71 } })).toBe('the world allowed it')
     for (let i = 0; i < 200 && t.loop.state.agents[AGENT]!.activity !== null; i++) t.step()
     expect(t.bridge.waterAtHand(AGENT)).toBe(true)
   })

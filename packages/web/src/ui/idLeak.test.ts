@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { CHRONICLE_TYPES, type SimEvent, chronicleLine, structureTitle } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  CHRONICLE_TYPES,
+  type SimEvent,
+  chronicleLine,
+  structureTitle,
+} from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { describeEvent } from './chronicleFormat.js'
 import { chronicleLabel } from './importantFeed.js'
@@ -56,7 +62,7 @@ const WORLD: WorldState = {
       hp: 100,
       injuries: [],
       ill: false,
-      ageDays: 30 * 364,
+      ageDays: 30 * DAYS_PER_YEAR,
       skills: {},
       activity: null,
       collapsedSinceTick: null,

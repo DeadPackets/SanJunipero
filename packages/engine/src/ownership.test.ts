@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { RngStream } from './rng.js'
@@ -22,7 +22,10 @@ function world(...agents: { id: string; x: number; y: number }[]): WorldState {
     ROWS.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   for (const a of agents)
-    s = fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: ADULT_AGE_DAYS }),
+    )
   return s
 }
 

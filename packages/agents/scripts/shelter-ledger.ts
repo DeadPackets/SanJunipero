@@ -1,6 +1,12 @@
 // Offline, $0. What the founding valley holds against how many bodies there are — the one
 // arithmetic that decides whether a run can watch a town answer the cold at all.
-import { DEFAULT_CONFIG, FOUNDER_IDS, isRoofedKind, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  FOUNDER_IDS,
+  isRoofedKind,
+  type SimEvent,
+} from '@sj/shared'
 import {
   buildTicks,
   fold,
@@ -17,7 +23,11 @@ let seq = 0
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
 for (const e of g.events) s = fold(s, ev(e.type, e.payload), CFG)
 for (const [i, f] of FOUNDER_IDS.entries()) {
-  s = fold(s, ev('agent_spawned', { id: f, name: f, x: 60 + i, y: 90, ageDays: 7300 }), CFG)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: f, name: f, x: 60 + i, y: 90, ageDays: ADULT_AGE_DAYS }),
+    CFG,
+  )
 }
 
 for (const st of Object.values(s.structures).sort((a, b) => a.id.localeCompare(b.id))) {

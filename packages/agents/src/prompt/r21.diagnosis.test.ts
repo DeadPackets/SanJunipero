@@ -450,13 +450,18 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
 
   // A body beside walls of the kind it means to raise resumes them, and resuming spends nothing.
   it('★ walls within reach are not a refusal any more — they are the job', () => {
-    const s = genesisTown()
-    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'house' })
+    // Every house stands now (D1), so the walls a body can join are the cottage's: put her at
+    // its door, which is where a founder who means to raise it would be standing.
+    const base = genesisTown()
+    const cottage = Object.values(base.structures).find((st) => st.kind === 'cottage')!
+    const door = doorTile(base, cottage)!
+    const s = fold(base, ev('agent_moved', { id: 'amara', x: door.x, y: door.y }), CFG)
+    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'cottage' })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
     // No `structure_planned`: she joined what stood rather than claiming fresh ground.
     expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
     const started = r.ok ? (r.events[0]!.payload as { duration: number }) : { duration: -1 }
-    expect(started.duration, 'a whole house, not the roof that is missing').toBeLessThan(2880)
+    expect(started.duration, 'a whole cottage, not the roof that is missing').toBeLessThan(4320)
   })
 
   it('the refusals that were already honest are left exactly as they were', () => {

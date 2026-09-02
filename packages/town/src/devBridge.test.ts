@@ -1,7 +1,7 @@
 // @slow — the town a viewer opens can cross its own river. Scripted policies, no LLM, $0.
 // The channel is three tiles wide at every row and the deck recipe spans two, so a spit is laid.
 import { describe, expect, it } from 'vitest'
-import { RIVER_HALF, riverLocalDx, stateHash } from '@sj/shared'
+import { ADULT_AGE_DAYS, RIVER_HALF, riverLocalDx, stateHash } from '@sj/shared'
 import {
   BRIDGE_KIND,
   bridgeAt,
@@ -33,7 +33,7 @@ function builderWorld(rings: number): WorldState {
       seq: 1,
       tick: 1,
       type: 'agent_spawned',
-      payload: { id: 'wright', name: 'Wright', x: 0, y: 0, ageDays: 7300 },
+      payload: { id: 'wright', name: 'Wright', x: 0, y: 0, ageDays: ADULT_AGE_DAYS },
     },
     SHOWCASE_CONFIG,
   )

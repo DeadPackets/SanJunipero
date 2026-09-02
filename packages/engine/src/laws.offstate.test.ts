@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { effectiveConfig } from './laws.js'
@@ -38,7 +44,11 @@ describe('§19 off-state: reproduction.enabled', () => {
       ['a1', 'f'],
       ['a2', 'm'],
     ] as const) {
-      s = fold(s, ev('agent_spawned', { id, name: id, x: 4, y: 6, ageDays: 30 * 364, sex }), config)
+      s = fold(
+        s,
+        ev('agent_spawned', { id, name: id, x: 4, y: 6, ageDays: 30 * DAYS_PER_YEAR, sex }),
+        config,
+      )
       s = fold(s, ev('agent_slept', { agentId: id }), config)
     }
     s = fold(
@@ -90,7 +100,7 @@ describe('§19 off-state: aging.deathOfOldAgeEnabled', () => {
   const ancient = (config: SimConfig): WorldState =>
     fold(
       genesisState(config, MAP()),
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 90 * 364 }),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 90 * DAYS_PER_YEAR }),
       config,
     )
 
@@ -98,7 +108,7 @@ describe('§19 off-state: aging.deathOfOldAgeEnabled', () => {
     const res = tickAt(state, MINUTES_PER_DAY, config)
     expect(res.events.map((e) => e.type)).toContain('agent_aged')
     expect(res.events.some((e) => e.type === 'agent_died')).toBe(false)
-    expect(res.state.agents.a1!.ageDays).toBe(90 * 364 + 1)
+    expect(res.state.agents.a1!.ageDays).toBe(90 * DAYS_PER_YEAR + 1)
   }
 
   it('on, the old die', () => {
@@ -184,8 +194,16 @@ describe('§19 off-state: occlusion.enabled', () => {
   // a1 inside a complete house; a2 four tiles south in the open, well inside earshot 8.
   function acrossAWall(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }), config)
-    s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 8, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 8, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     s = fold(
       s,
       ev('structure_planned', {
@@ -248,8 +266,16 @@ describe('§19 off-state: occlusion.enabled', () => {
 describe('§19 off-state: ownership.enabled', () => {
   function twoAndSomeBread(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: 7300 }), config)
-    s = fold(s, ev('agent_spawned', { id: 'a2', name: 'Omar', x: 3, y: 2, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a2', name: 'Omar', x: 3, y: 2, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     return fold(
       s,
       ev('item_spawned', {
@@ -297,7 +323,11 @@ describe('§19 off-state: ownership.enabled', () => {
 describe('§19 off-state: inscription.enabled', () => {
   function stone(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 6, y: 2, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 6, y: 2, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     s = fold(
       s,
       ev('structure_planned', {
@@ -348,7 +378,11 @@ describe('§19 off-state: inscription.enabled', () => {
 describe('§19: the effective config reaches the verb and perception seams', () => {
   it('a law flip changes what submitIntent and composePerception do, with the base config unchanged', () => {
     let s = genesisState(ON, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: 7300 }), ON)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
+      ON,
+    )
     s = fold(
       s,
       ev('item_spawned', {

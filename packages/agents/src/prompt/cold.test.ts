@@ -10,6 +10,7 @@ import {
   type WorldState,
 } from '@sj/engine'
 import {
+  DAYS_PER_YEAR,
   DAYS_PER_SEASON,
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
@@ -54,7 +55,7 @@ function town(
         name: id,
         x: door.x,
         y: door.y,
-        ageDays: 30 * 364,
+        ageDays: 30 * DAYS_PER_YEAR,
         sex: 'f',
       }),
       CFG,
