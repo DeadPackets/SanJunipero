@@ -137,7 +137,7 @@ Every gate task (7, 10, 15, 19) prints this table for its rehearsal beside the t
 | Invention attempts per mind-day | 0.12 | 0.5 | 1 |
 | Laws ratified per week | 0 | n/a | 1 or more |
 | Identifiable moments in the director's top five | 1 of 15 | n/a | 3 of 5 |
-| Cost per watched day, 12 minds | $10.4 projected | under $9 | under $9 |
+| Cost per sim-day, 12 minds (a watched day is 30 sim-days at 1x) | $0.54 (world two scaled) | under $0.30 | under $0.30 |
 | Cast hallucinations per 100 scene lines | unmeasured | 0 | 0 |
 
 ---
