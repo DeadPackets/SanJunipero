@@ -10,6 +10,7 @@ import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
+import { createMomentEmotes, type MomentEmoteLayer } from './momentEmotes.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
@@ -75,6 +76,7 @@ export function StageMount({
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
     let acts: ActLayer | null = null
+    let moments: MomentEmoteLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
@@ -139,6 +141,7 @@ export function StageMount({
         bubbles = createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
+        moments = createMomentEmotes(s, store, book)
         atmosphere = createAtmosphere(s)
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
@@ -151,10 +154,6 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
-        // The track over a head is the act layer's number, drawn by the character layer that
-        // owns the slot it wraps. Same shape as `anchorOf`, and for the same reason.
-        const actLayer = acts
-        s.actFraction = (agentId) => actLayer.fractionOf(agentId)
         interior = createInteriorScene(s, store, book, selectAgent)
         s.interior = interior
         interiorRef.current = interior
@@ -186,6 +185,7 @@ export function StageMount({
           s.sortDepth() // one painter's order for the whole frame, after every box is published
           bubbles?.tick(now)
           acts?.tick()
+          moments?.tick(now)
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
@@ -232,6 +232,7 @@ export function StageMount({
       chars?.destroy()
       bubbles?.destroy()
       acts?.destroy()
+      moments?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
       smoke?.destroy()

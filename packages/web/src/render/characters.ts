@@ -520,17 +520,13 @@ export function createCharacterLayer(
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
-      // ★ 7A AT REST, 7M-B WHILE A JOB RUNS. The slot holds the one glyph the priority table
-      // picks; the track wraps that same slot exactly while there is an act to report and goes
-      // when it does. `actFraction` is last frame's — the act layer places its chips against
-      // these very sprites, so it cannot run before them, and a world tick is two seconds.
+      // ★ ONE SLOT, ONE GLYPH. The seven progress blocks that used to wrap it are gone: work is
+      // a word and a one-pixel bar under the feet, where the word already was.
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)
-      const running = emotesHidden ? null : (scene.actFraction?.(a.id) ?? null)
-      e.overhead.setTrack(running)
-      e.overhead.node.visible = row !== null || running !== null
+      e.overhead.node.visible = row !== null
       // ONE placement rule for every label in the product, and the layer applies it: the plate
       // is welded to the feet and only leaves them when the view has no room down there. Said
       // every frame, because the body it names walks.
