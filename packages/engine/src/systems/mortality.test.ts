@@ -5,7 +5,7 @@ import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
-import { DEATH_CAUSES, dominantDrain, type DeathCause } from './mortality.js'
+import { DEATH_CAUSES, dominantDrain, graveTile, type DeathCause } from './mortality.js'
 import { ev, grid, roundTrips } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({
@@ -353,6 +353,36 @@ describe('a grave where the life ended', () => {
       CFG,
     )
     const g = graveOf(tickOnce(nearlyDead(s)).state)!
+    expect({ x: g.x, y: g.y }).toEqual({ x: 3, y: 3 })
+  })
+
+  it('is never cut into a bridge deck: a body that dies mid-crossing is buried on the bank', () => {
+    const wet = map()
+    wet[2]![2] = 2
+    wet[3]![2] = 2
+    let s = fold(
+      genesisState(CFG, wet),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev('structure_planned', {
+        id: 'structure_9',
+        kind: 'bridge',
+        x: 2,
+        y: 2,
+        w: 1,
+        h: 2,
+        maxHp: 20,
+        flammable: false,
+        builderId: 'a1',
+      }),
+      CFG,
+    )
+    s = fold(s, ev('structure_completed', { id: 'structure_9' }), CFG)
+    expect(graveTile(s, 2, 3)).not.toEqual({ x: 2, y: 3 })
+    const g = graveOf(tickOnce(nearlyDead(afflict(s, 'illness', 2, 0))).state)!
     expect({ x: g.x, y: g.y }).toEqual({ x: 3, y: 3 })
   })
 
