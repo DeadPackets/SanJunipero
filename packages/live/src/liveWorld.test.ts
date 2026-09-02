@@ -97,6 +97,11 @@ const TWO: MindSpec[] = [
   },
 ]
 
+/** Every method the real client offers, and no private field. A stand-in typed as this owes the
+ *  seam an answer for each one: a method the client grows and this rig does not is a mind that
+ *  dies mid-turn on a `TypeError`, and the whole file reads as a town of silent bodies. */
+type FakeClient = { [K in keyof LlmClient]: LlmClient[K] }
+
 /** A model that never leaves the process: it answers each schema with the first canned value that
  *  parses. `LlmClient`'s real cost accounting is covered by `agents/src/llm/client.test.ts`. */
 function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): LlmClient {
@@ -114,7 +119,7 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     { rulings: [] }, // the recognizer's classification
     {},
   ]
-  return {
+  const client: FakeClient = {
     async object<T>(o: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }) {
       for (const c of canned) {
         const parsed = o.schema.safeParse(c)
@@ -132,10 +137,13 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     noteTurnOutcome: (outcome: { acted: boolean; spoke: boolean; planContinued: boolean }) => {
       insertTurnOutcome(db, { agentId, provider: null, ...outcome })
     },
-    forCaller() {
-      return this
-    },
-  } as unknown as LlmClient
+    // Amends the ledger row the real client wrote for the call. This rig writes no rows, so
+    // there is nothing to amend.
+    noteCallBill: () => {},
+    requestBody: () => ({}) as ReturnType<LlmClient['requestBody']>,
+    forCaller: () => client as unknown as LlmClient,
+  }
+  return client as unknown as LlmClient
 }
 
 // The tile the SCRIPTED patrol walks to on this same map, so the act a mind chooses here is one
