@@ -582,6 +582,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
         dreamLlm: (id) => makeClient('dream', id),
+        sceneClient: (id) => makeClient('scene', id),
         mindConfig: { ...STREAM_MIND_CONFIG, idleGapTicks: idleGapTicks(), ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
