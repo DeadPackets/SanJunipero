@@ -2,6 +2,7 @@ import {
   BOND_VALENCE,
   decayWarmth,
   MINUTES_PER_DAY,
+  namedParams,
   nightStartTick,
   REFLECTION_SETTLE_MS,
   sanitizeSpokenText,
@@ -50,8 +51,8 @@ import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../me
 import { promptText } from '../memory/gist.js'
 import {
   isBlankAnswer,
-  MIND_TURN_WIRE,
   parseTurnWithRepair,
+  StrictTurnSchema,
   reconsiderTick,
   turnSpeaks,
   type Turn,
@@ -652,7 +653,7 @@ export class AgentRuntime {
       return fallback()
     }
     if (verdict.kind === 'map')
-      return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
+      return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
     if (verdict.kind === 'impossible') {
       this.#rememberRefusal(description)
       this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
@@ -913,7 +914,7 @@ export class AgentRuntime {
   async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
-        schema: MIND_TURN_WIRE.schema,
+        schema: StrictTurnSchema,
         system: assembled.system,
         messages: assembled.messages,
       })
@@ -930,7 +931,7 @@ export class AgentRuntime {
   async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
     try {
       const { value } = await this.#llm.object({
-        schema: MIND_TURN_WIRE.schema,
+        schema: StrictTurnSchema,
         system: assembled.system,
         messages: [
           ...assembled.messages,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, NO_PARAMS, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -163,6 +163,29 @@ describe('submitIntent', () => {
     expect(r.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
       verb: 'eat',
       params: { itemId: 'item_fish_2' },
+    })
+  })
+
+  // The closed grammar answers every key it did not use with null, and a verdict handed straight
+  // to the world arrives that way. A null is no mark, so the readings below are the same ones.
+  it('reads a params object filled with nulls exactly as one that named nothing', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', { ...NO_PARAMS })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      verb: 'eat',
+      params: { itemId: 'item_bread_1' },
+    })
+    // And the one mark it did name is still read off a body of nulls, under the wrong word.
+    const named = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', {
+      ...NO_PARAMS,
+      targetId: 'item_bread_1',
+    })
+    expect(named.ok).toBe(true)
+    if (!named.ok) return
+    expect(named.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      params: { itemId: 'item_bread_1' },
     })
   })
 

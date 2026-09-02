@@ -1,6 +1,7 @@
 import { openDb } from '@sj/engine/store'
 import { LlmClient, migrateLlmTables, MIND_MODEL } from '@sj/llm'
 import { z } from 'zod'
+import { ClosedIntentParams } from '@sj/shared'
 
 // The never-changing canon block, repeated to ~1.5k tokens so DeepSeek's
 // prefix cache stays warm across adjudications (byte-stable across calls).
@@ -42,7 +43,7 @@ function budget(): void {
 
 const VerdictProbe = z.discriminatedUnion('kind', [
   z
-    .object({ kind: z.literal('map'), verb: z.string(), params: z.record(z.string(), z.unknown()) })
+    .object({ kind: z.literal('map'), verb: z.string(), params: ClosedIntentParams })
     .strict()
     .describe('The town already performs this exact action as a routine verb.'),
   z

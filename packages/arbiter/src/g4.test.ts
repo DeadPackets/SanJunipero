@@ -1,7 +1,7 @@
 // An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import {
   RngStream,
   RngStreams,
@@ -163,7 +163,7 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
 
     // 5. Byte-identical intent resolves Tier-1 map with zero further LLM calls.
     const r2 = await arbiter.adjudicate(INTENT, TAMAR_CTX)
-    expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
+    expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: NO_PARAMS })
     expect(llm.objectCalls).toBe(1)
 
     // 6. Tier-1 execution: submitIntent accepts, the 5-tick pipeline completes the

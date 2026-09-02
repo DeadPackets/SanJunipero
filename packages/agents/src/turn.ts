@@ -1,7 +1,11 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY, type DayPhase } from '@sj/shared'
-import { IntentParamsSchema } from '@sj/engine/verbs'
-import { MIND_TURN_SCHEMA } from '@sj/llm'
+import {
+  ClosedIntentParams,
+  Intent as ClosedIntentSchema,
+  MINUTES_PER_DAY,
+  namedParams,
+  type DayPhase,
+} from '@sj/shared'
 
 // An hour of the day is a plan for today; a day and a phase is an appointment. Without the
 // second shape nothing can be arranged in advance, only remembered or improvised.
@@ -11,12 +15,14 @@ const ReconsiderAtSchema = z.union([
 ])
 export type ReconsiderAt = z.infer<typeof ReconsiderAtSchema>
 
+// The act as the runtime holds it: the same closed grammar with the keys it never asked for
+// already taken off, which is the shape each verb's own `validate` reads.
 export const IntentSchema = z
   .object({
-    verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
-    params: IntentParamsSchema.default({}).describe(
-      'Exactly what the act asks for, named by its keys.',
-    ),
+    verb: ClosedIntentSchema.shape.verb,
+    params: ClosedIntentParams.partial()
+      .default({})
+      .describe('Exactly what the act asks for, named by its keys.'),
   })
   .strict()
 const FreeformSchema = z
@@ -73,24 +79,8 @@ export const TurnSchemaActionRequired = TurnSchema.extend({
     .describe(`${ACT_NOW} If you truly do nothing this turn, answer { verb: 'wait', params: {} }.`),
 })
 
-// The same turn said in the dialect a strict json_schema decoder takes: no key left out, no key it
-// has never heard of. Absence is written as null, and `fromClosed` below takes it back out.
-const closedParams = z
-  .object(
-    Object.fromEntries(
-      Object.entries(IntentParamsSchema.shape).map(([key, field]) => [
-        key,
-        field.unwrap().nullable(),
-      ]),
-    ),
-  )
-  .strict()
-  .describe('Exactly what the act asks for, named by its keys; every other key is null.')
-
-const ClosedIntentSchema = z
-  .object({ verb: IntentSchema.shape.verb, params: closedParams })
-  .strict()
-
+// The turn every mind is asked for: no key left out, no key it has never heard of. Absence is
+// written as null, and `fromClosed` below takes it back out for the world.
 export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
   action: z
     .union([ClosedIntentSchema, FreeformSchema])
@@ -98,19 +88,14 @@ export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
   plan: z.array(ClosedIntentSchema).max(12).nullable().describe(A_PLAN),
 })
 
-// A param answered null is a param the act never asked for. Every other null the loose schema
-// already reads as absence, so nothing else moves.
 const askedFor = (step: unknown): unknown => {
   if (step === null || typeof step !== 'object') return step
   const { params, ...rest } = step as { params?: unknown }
   if (params === null || typeof params !== 'object') return step
-  return {
-    ...rest,
-    params: Object.fromEntries(Object.entries(params).filter(([, v]) => v !== null)),
-  }
+  return { ...rest, params: namedParams(params as Record<string, unknown>) }
 }
 
-function fromClosed(raw: unknown): unknown {
+export function fromClosed(raw: unknown): unknown {
   if (raw === null || typeof raw !== 'object') return raw
   const turn = { ...raw } as { action?: unknown; plan?: unknown }
   if ('action' in turn) turn.action = askedFor(turn.action)
@@ -118,22 +103,9 @@ function fromClosed(raw: unknown): unknown {
   return turn
 }
 
-/** Both dialects a mind can be asked in, each with the reader that puts its answer back into the
- *  turn the runtime knows. Asked and read as one thing, so the two can never be mismatched. */
-export const TURN_WIRE: Record<
-  'loose' | 'strict',
-  { schema: z.ZodType; toLoose: (raw: unknown) => unknown }
-> = {
-  loose: { schema: TurnSchemaActionRequired, toLoose: (raw) => raw },
-  strict: { schema: StrictTurnSchema, toLoose: fromClosed },
-}
-
-/** The dialect the pinned mind is asked in. */
-export const MIND_TURN_WIRE = TURN_WIRE[MIND_TURN_SCHEMA]
-
-/** A mind's answer, in whichever dialect it was asked for, read as the turn the runtime knows. */
+/** A mind's answer, in the closed dialect it was asked for, read as the turn the runtime knows. */
 export const readMindTurn = (raw: unknown): z.ZodSafeParseResult<Turn> =>
-  TurnSchemaActionRequired.safeParse(MIND_TURN_WIRE.toLoose(raw))
+  TurnSchemaActionRequired.safeParse(fromClosed(raw))
 
 export type Turn = z.infer<typeof TurnSchema>
 

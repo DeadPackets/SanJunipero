@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { IntentParamsSchema } from '@sj/engine/verbs'
+import { CLOSED_KEYS, NO_PARAMS } from '@sj/shared'
+import { strictModeFaults } from '@sj/shared/testutil'
 import { ExpressiveParams } from './expressive.js'
 import {
   OutcomeEffectSchema,
@@ -37,7 +38,11 @@ const validRecipe: Recipe = {
   canon: ['fire'],
 }
 
-const validMap = { kind: 'map' as const, verb: 'craft', params: { recipe: 'recipe:boil_salt' } }
+const validMap = {
+  kind: 'map' as const,
+  verb: 'craft',
+  params: { ...NO_PARAMS, recipe: 'recipe:boil_salt' },
+}
 const validAttempt = {
   kind: 'attempt' as const,
   recipe: validRecipe,
@@ -91,25 +96,42 @@ describe('VerdictSchema', () => {
     const mapBranch = emitted.oneOf.find((b) => b.properties.kind.const === 'map')!
     const named = Object.keys(mapBranch.properties.params?.properties ?? {})
     // Everything the turn caller can name, the arbiter can map to.
-    for (const key of Object.keys(IntentParamsSchema.shape)) expect(named).toContain(key)
+    expect(named).toEqual([...CLOSED_KEYS])
     // The arbiter's own expressive verb takes `targetId`, which is in that set.
     for (const key of Object.keys(ExpressiveParams.shape)) expect(named).toContain(key)
   })
 
-  it('stays loose, so a verb minted at runtime can be handed a parameter nobody has written down', () => {
-    const v = VerdictSchema.parse({
-      kind: 'map',
-      verb: 'express:hum',
-      params: { whittledFrom: 'ash' },
-    })
+  it('maps to a grammar a strict decoder can be handed, in either direction', () => {
+    // The map branch only: the attempt branch's recipe still carries two optional fields the
+    // engine's own item state names the same way, and widening those is not a params change.
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(VerdictSchema, { io }) as unknown as { oneOf: unknown[] }
+      const mapBranch = emitted.oneOf.find(
+        (b) => (b as { properties: { kind: { const: string } } }).properties.kind.const === 'map',
+      )
+      expect(strictModeFaults(mapBranch), io).toEqual([])
+    }
+  })
+
+  it('takes any verb the town mints, and only the keys the grammar names', () => {
+    const v = VerdictSchema.parse({ kind: 'map', verb: 'express:hum', params: NO_PARAMS })
     expect(v.kind).toBe('map')
-    if (v.kind === 'map') expect(v.params.whittledFrom).toBe('ash')
+    expect(
+      VerdictSchema.safeParse({
+        kind: 'map',
+        verb: 'express:hum',
+        params: { ...NO_PARAMS, whittledFrom: 'ash' },
+      }).success,
+    ).toBe(false)
+    expect(VerdictSchema.safeParse({ kind: 'map', verb: 'express:hum', params: {} }).success).toBe(
+      false,
+    )
   })
 
   it('rejects an extra key via strict', () => {
-    expect(() => VerdictSchema.parse({ kind: 'map', verb: 'x', params: {}, bogus: 1 })).toThrow(
-      /bogus/,
-    )
+    expect(() =>
+      VerdictSchema.parse({ kind: 'map', verb: 'x', params: NO_PARAMS, bogus: 1 }),
+    ).toThrow(/bogus/)
   })
 
   it('rejects an unknown kind (closed union)', () => {

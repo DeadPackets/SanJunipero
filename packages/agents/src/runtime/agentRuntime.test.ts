@@ -17,6 +17,7 @@ import {
 } from '@sj/engine'
 import {
   MINUTES_PER_DAY,
+  NO_PARAMS,
   REFLECTION_SETTLE_MS,
   SimConfigSchema,
   stateHash,
@@ -149,12 +150,25 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false) {
   return { config, terrain, engineDb, store, rng, state }
 }
 
-// The required-action schema: a fixture that names no act is answering the old shape, and the
-// real contract now is "name wait when nothing new begins" — added here once, not at 20 sites.
-const askedShape = (r: unknown): unknown =>
-  r !== null && typeof r === 'object' && 'thought' in r && !('action' in r)
-    ? { ...r, action: { verb: 'wait', params: {} } }
-    : r
+// The closed schema a mind is asked in: every field present, every param key answered, and a
+// fixture that names no act saying `wait` out loud. Added here once, not at 20 fixture sites.
+const NOTHING_SAID = { speech: null, plan: null, journal: null, recall: null, reconsider_at: null }
+const closedAct = (a: unknown): unknown =>
+  a !== null && typeof a === 'object' && 'verb' in a
+    ? {
+        verb: (a as { verb: string }).verb,
+        params: { ...NO_PARAMS, ...(a as { params?: object }).params },
+      }
+    : a
+const askedShape = (r: unknown): unknown => {
+  if (r === null || typeof r !== 'object' || !('thought' in r)) return r
+  const turn = { ...NOTHING_SAID, ...r } as { action?: unknown; plan?: unknown }
+  return {
+    ...turn,
+    action: closedAct(turn.action ?? { verb: 'wait' }),
+    plan: Array.isArray(turn.plan) ? turn.plan.map(closedAct) : (turn.plan ?? null),
+  }
+}
 
 function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockLanguageModelV4 {
   let i = 0

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { CAPABILITIES } from '../prompt/rulesOfBeing.js'
-import { MIND_TURN_WIRE, TurnSchema } from '../turn.js'
+import { StrictTurnSchema, TurnSchema } from '../turn.js'
 import {
   PREFLIGHT_BAR,
   PREFLIGHT_CALLS,
@@ -80,7 +80,7 @@ describe('the provider pre-flight asks the real question', () => {
   // provider that blanks only under the required action would pass a probe asked the lax way.
   it('asks with the shape the runtime asks with, in which the act is required', () => {
     const json = JSON.stringify(
-      z.toJSONSchema(MIND_TURN_WIRE.schema, { io: 'input', unrepresentable: 'any' }),
+      z.toJSONSchema(StrictTurnSchema, { io: 'input', unrepresentable: 'any' }),
     )
     expect((JSON.parse(json) as { required: string[] }).required).toContain('action')
   })

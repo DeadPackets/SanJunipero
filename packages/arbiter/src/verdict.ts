@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IntentParamsSchema } from '@sj/engine/verbs'
+import { ClosedIntentParams } from '@sj/shared'
 
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
@@ -83,11 +83,11 @@ export const ImpossibleClassSchema = z.enum([
   'insufficient_materials',
 ])
 
-// `params` names its keys rather than using `z.record`, whose `propertyNames` a grammar-
-// constrained decoder refuses. Loose, so a verb minted at runtime can still take a new key.
+// The verb the court maps to is a free word, so a minted one can be named here; its params are
+// the closed grammar every act shares, which is what a strict decoder can be handed.
 export const VerdictSchema = z.discriminatedUnion('kind', [
   z
-    .object({ kind: z.literal('map'), verb: z.string().min(1), params: IntentParamsSchema })
+    .object({ kind: z.literal('map'), verb: z.string().min(1), params: ClosedIntentParams })
     .strict(),
   z
     .object({ kind: z.literal('attempt'), recipe: RecipeSchema, summary: z.string().min(1) })
