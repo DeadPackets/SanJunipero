@@ -282,6 +282,9 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
     ...(charter.skillCheck === undefined
       ? {}
       : { skill: { track: charter.skillCheck.track, xp: 10 } }),
+    // What the charter already knew, carried into the engine so registration binds this verb's
+    // object as the built-in rows are bound. Every path to a live minted verb comes through here.
+    reads: charter.reads,
     rngStream: charter.id,
   }
 }
