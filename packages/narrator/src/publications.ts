@@ -53,6 +53,7 @@ export function timelapseCaptions(
 
 // The public-record boundary: `structure_completed` and `crop_harvested` carry no person, so
 // building is attributed via `structure_planned.builderId` and harvests via `action_completed`.
+// `agent_moved` is out: one row per tile crossed is a life told as footsteps.
 export const PUBLIC_EVENT_TYPES = [
   'agent_spoke',
   'action_completed',
@@ -61,21 +62,17 @@ export const PUBLIC_EVENT_TYPES = [
   'agent_injured',
   'agent_recovered',
   'skill_gained',
-  'agent_moved',
   'agent_slept',
   'agent_woke',
   'agent_collapsed',
 ] as const
 
+/** A biography is one prompt: a long life is read from its most recent lines. */
+export const PUBLIC_RECORD_LIMIT = 400
+
 type P = Record<string, unknown>
 
 const strOr = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback)
-
-const publicAgentOf = (type: string, p: P): string | null => {
-  if (type === 'agent_moved') return typeof p.id === 'string' ? p.id : null
-  if (type === 'structure_planned') return typeof p.builderId === 'string' ? p.builderId : null
-  return typeof p.agentId === 'string' ? p.agentId : null
-}
 
 export function publicRecordText(ev: SimEvent): string {
   const p = (ev.payload ?? {}) as P
@@ -94,8 +91,6 @@ export function publicRecordText(ev: SimEvent): string {
       return 'was seen back on their feet'
     case 'skill_gained':
       return `grew skilled at ${strOr(p.skill, 'a craft')}`
-    case 'agent_moved':
-      return 'was seen about the settlement'
     case 'agent_slept':
       return 'was seen retiring to sleep'
     case 'agent_woke':
@@ -118,25 +113,26 @@ export function collectPublicRecord(
   const rows = world
     .prepare(
       `SELECT seq, tick, type, payload FROM events
-       WHERE tick <= ? AND type IN (${PUBLIC_EVENT_TYPES.map(() => '?').join(',')}) ORDER BY seq`,
+       WHERE tick <= ? AND type IN (${PUBLIC_EVENT_TYPES.map(() => '?').join(',')})
+         AND coalesce(json_extract(payload, '$.agentId'), json_extract(payload, '$.builderId')) = ?
+       ORDER BY seq DESC LIMIT ?`,
     )
-    .all(maxTick, ...PUBLIC_EVENT_TYPES) as {
+    .all(maxTick, ...PUBLIC_EVENT_TYPES, agentId, PUBLIC_RECORD_LIMIT) as {
     seq: number
     tick: number
     type: string
     payload: string
   }[]
-  const out: PublicRecord[] = []
-  for (const r of rows) {
-    const payload = JSON.parse(r.payload) as P
-    if (publicAgentOf(r.type, payload) !== agentId) continue
-    out.push({
-      eventSeq: r.seq,
-      day: Math.floor(r.tick / MINUTES_PER_DAY),
-      text: publicRecordText({ seq: r.seq, tick: r.tick, type: r.type, payload }),
-    })
-  }
-  return out
+  return rows.reverse().map((r) => ({
+    eventSeq: r.seq,
+    day: Math.floor(r.tick / MINUTES_PER_DAY),
+    text: publicRecordText({
+      seq: r.seq,
+      tick: r.tick,
+      type: r.type,
+      payload: JSON.parse(r.payload) as P,
+    }),
+  }))
 }
 
 const framingViolated = (bio: { title: string; body: string }): boolean =>

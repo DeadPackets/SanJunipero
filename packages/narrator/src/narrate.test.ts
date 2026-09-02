@@ -310,3 +310,61 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
     expect(milestones.map((m) => m.kind)).not.toContain('first_house')
   })
 })
+
+// `first_*_souls` compares a count of the living to 10/25/50, and a town does not reach ten
+// in one night's births.
+describe('narrateDay: the souls are counted from the world in reach', () => {
+  // The scripted chapter names nobody: this town's roll is Soul 0..n, and a stranger in the
+  // prose is a different test's subject.
+  const quietLlm: NarratorLlm = {
+    ...scriptedLlm([1]),
+    summarizeChapter: vi.fn(async () => ({
+      title: 'The Count',
+      text: 'The town woke and counted itself.',
+      citations: [1],
+    })),
+  }
+
+  const townOf = (n: number) => ({
+    config: SimConfigSchema.parse({}),
+    state: {
+      agents: Object.fromEntries(
+        Array.from({ length: n }, (_a, i) => [
+          `a${i}`,
+          { id: `a${i}`, name: `Soul ${i}`, alive: true },
+        ]),
+      ),
+      structures: {},
+      pairNights: {},
+    } as never,
+  })
+
+  it('★ marks the tenth soul on a day nobody was born', async () => {
+    const { milestones } = await narrateDay({
+      store: memStore(),
+      llm: quietLlm,
+      events: [ev(1, 4320, 'agent_spoke', { agentId: 'a0', text: 'We are many.', x: 3, y: 3 })],
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      world: townOf(12),
+    })
+    const kinds = milestones.map((m) => m.kind)
+    expect(kinds).toContain('first_ten_souls')
+    expect(kinds).not.toContain('first_twenty_five_souls')
+  })
+
+  it("★ and the day's own birth is counted where it lands, not before it", async () => {
+    const { milestones } = await narrateDay({
+      store: memStore(),
+      llm: quietLlm,
+      events: [
+        ev(1, 4320, 'agent_spoke', { agentId: 'a0', text: 'Nine of us.', x: 3, y: 3 }),
+        ev(2, 4330, 'agent_born', { agentId: 'a9' }),
+      ],
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      world: townOf(10), // ten alive as the day ends — nine as it began
+    })
+    expect(milestones.find((m) => m.kind === 'first_ten_souls')!.eventSeq).toBe(2)
+  })
+})

@@ -5,6 +5,7 @@ import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
 import type { ImageClient, Candidate } from './imageClient.js'
+import { AnomalyStopError, PER_ASSET_STOP_USD } from './spendLedger.js'
 import { CRITERIA, deriveOverall, type VisionCriteria } from './visionQa/verdict.js'
 import type { VisionJudgeFn } from './visionQa/visionJudge.js'
 
@@ -167,6 +168,20 @@ describe('createForge().commission', () => {
     expect(rec.status).toBe('ready')
     expect(rec.attempts).toBe(1)
     expect(calls).toBe(2)
+  })
+  it('★ an anomaly stop reaches the caller instead of becoming a quiet placeholder', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const png = await goodPng()
+    const client: ImageClient = {
+      async generateCandidates() {
+        return [{ png, model: 'fake', costUsd: PER_ASSET_STOP_USD + 1 }]
+      },
+    }
+    const forge = createForge({ client, judge: scriptedJudge([9]), codex, refs: [] })
+    await expect(
+      forge.commission('a runaway bill', { w: 1, h: 1 }, 'item', 'relic'),
+    ).rejects.toBeInstanceOf(AnomalyStopError)
+    expect(codex.listSince(0)).toHaveLength(0)
   })
   it('mechanical-gate failures never reach the eye', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
