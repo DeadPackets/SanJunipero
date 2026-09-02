@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest'
 import { stateHash } from '@sj/shared'
 import { fold } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState } from './devWorld.js'
-import { FOUNDERS } from './founders.js'
+import { foundersFor, townStructuresFor } from './founders.js'
 import { type Run, type Seen, runFoundersWorld } from './testutil.js'
 
 /** Three sim days, so a night is a thing this test has seen three of. */
 const TICKS = 4320
 const RINGS = 3
+// The twelve, seated: the fixture's five carry coordinates for another map.
+const FOUNDERS = foundersFor(townStructuresFor('showcase', RINGS))
 
 function runDevWorld(interiors: boolean, ticks = TICKS): Run {
   return runFoundersWorld({ interiors, holdings: true }, ticks, RINGS)

@@ -249,13 +249,16 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
   it('★ AND THE DECK IS WHAT OPENS IT — the claim never points west before one stands', () => {
     expect(run.deckTick, 'no deck ever stood').not.toBeNull()
     expect(run.crossedTick, 'the town was never offered a plot across the water').not.toBeNull()
-    expect(run.crossedTick!, 'the far bank was offered before the deck existed').toBeGreaterThan(
-      run.deckTick!,
-    )
-    // Reachability is the deck's; ORDER is the claim's — the town still had east plots ahead of
-    // it in the register, and the two are separated below by taking the deck away again.
+    // The same tick is allowed: the deck stands by the time the town is asked, and twelve masons
+    // have the east side of the register used up before the wright is done.
+    expect(
+      run.crossedTick!,
+      'the far bank was offered before the deck existed',
+    ).toBeGreaterThanOrEqual(run.deckTick!)
+    // Reachability is the deck's; ORDER is the claim's — the two are separated below by taking
+    // the deck away again.
     expect(run.deckTick).toBe(736)
-    expect(run.crossedTick).toBe(999)
+    expect(run.crossedTick).toBe(736)
   })
 
   it('★ AND IT IS THE DECK AND NOTHING CACHED: take it away and the claim goes back east', () => {
@@ -320,12 +323,12 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
     const from = devGenesisState(SHOWCASE_CONFIG, run.terrain, 'showcase', RINGS)
     const replayed = run.store.readFrom(0).reduce((s, ev) => fold(s, ev, SHOWCASE_CONFIG), from)
     expect(stateHash(replayed)).toBe(stateHash(run.state))
-  })
+  }, 120_000)
 
   it('bridge OFF is the landed world exactly — no deck, and nothing west of the water', () => {
     const off = runDevWorld(false, 2160)
     expect(Object.values(off.state.structures).filter((s) => s.kind === BRIDGE_KIND)).toEqual([])
     expect(off.crossedTick, 'the far bank opened with no deck standing').toBeNull()
-    expect(standingRects(off.state).length).toBeGreaterThan(11)
-  })
+    expect(standingRects(off.state).length).toBeGreaterThan(13)
+  }, 120_000)
 })

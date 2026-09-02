@@ -396,14 +396,14 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
   })
 
-  // Sound, this village handed five founders 21 bodies' worth of floor before the first tick —
-  // 4.2x — so the only want this project models was answered at tick zero.
+  // Sound, this village handed twelve founders 25 bodies' worth of floor before the first tick —
+  // 2.1x — so the only want this project models was answered at tick zero.
   it('★ puts the founding valley below 1.0, which sound it never was', () => {
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
-    expect(led.bodies).toBe(5)
+    expect(led.bodies).toBe(12)
     expect(led.roofs).toBe(2) // the storehouse and the cabin
     expect(led.slots).toBe(4)
-    expect(led.per).toBe(0.8)
+    expect(led.per).toBeCloseTo(1 / 3, 5)
     expect(led.per, 'the founding cannot host the want it means to measure').toBeLessThan(1)
 
     // WHAT IT WAS. Put every roof back on and the same arithmetic gives the old town.
@@ -416,12 +416,12 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
       )
     }
     const before = shelterLedger(sound, CFG)
-    expect(before).toMatchObject({ roofs: 9, slots: 21, bodies: 5 })
-    expect(before.per).toBeCloseTo(4.2, 5)
+    expect(before).toMatchObject({ roofs: 11, slots: 25, bodies: 12 })
+    expect(before.per).toBeCloseTo(25 / 12, 5)
 
-    // And it was never the five OWNED houses that did it — structure ownership is not even in
-    // the perception packet. Delete all five and the village still holds eleven against five.
-    expect(21 - 5 * 2).toBe(11)
+    // And it was never the seven OWNED houses that did it — structure ownership is not even in
+    // the perception packet. Delete all seven and the village still holds eleven.
+    expect(25 - 7 * 2).toBe(11)
   })
 
   // 0.8 and not lower: every roof that comes down has to be one a pair of hands can put back, and

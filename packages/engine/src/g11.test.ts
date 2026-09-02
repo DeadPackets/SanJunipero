@@ -77,23 +77,23 @@ function genesisTown(config: SimConfig = CFG): {
 // ------------------------------------------------------------------ the 128x128 town
 
 describe('G11a-M1: the genesis town folds, and it is the size the world says it is', () => {
-  it('a hundred and twenty-eight tiles on a side, eleven roofs, a herd and the standing bushes', () => {
+  it('a hundred and twenty-eight tiles on a side, thirteen roofs, a herd and the standing bushes', () => {
     const { state } = genesisTown()
     expect(state.terrain.length).toBe(CFG.world.size.h)
     expect(state.terrain[0]!.length).toBe(CFG.world.size.w)
     expect(state.terrain.every((row) => row.length === CFG.world.size.w)).toBe(true)
 
     const structures = Object.values(state.structures)
-    expect(structures).toHaveLength(11)
-    // Eleven buildings, four of them still roofed: the village was abandoned and the other seven
-    // stand as walls a pair of hands can finish. Sound, this valley held 21 bodies against five.
+    expect(structures).toHaveLength(13)
+    // Thirteen buildings, four of them still roofed: the village was abandoned and the other nine
+    // stand as walls a pair of hands can finish. Sound, this valley held 25 bodies against twelve.
     expect(
       structures
         .filter((s) => s.stage === 'complete')
         .map((s) => s.kind)
         .sort(),
     ).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
-    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
+    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(7)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
 

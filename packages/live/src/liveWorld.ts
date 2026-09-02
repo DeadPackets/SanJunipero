@@ -212,9 +212,9 @@ const LIVE_BACKFILL_REAL_SECONDS = 60
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
-/** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
- *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
-const LIVE_MAX_MINDS_PER_FOUNDER = 3
+/** The population ceiling: nothing else in the world stops the town growing, and every mind is
+ *  another live bill. Twelve founders, four travellers, four births. `SJ_MAX_MINDS`. */
+const LIVE_MAX_MINDS = 20
 
 function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
@@ -345,10 +345,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = Math.max(
-    opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER,
-    founders.length,
-  )
+  const maxMinds = Math.max(opts.maxMinds ?? LIVE_MAX_MINDS, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })

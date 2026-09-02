@@ -8,7 +8,14 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { paletteSwatchPng } from '../src/referenceSheet.js'
 import { PALETTE_WORDS, SWATCH_CLAUSE } from '@sj/forge/gen'
-import { decodePng, encodePng, encodeWebp, type RawImage } from '../src/post/raw.js'
+import type { CharacterAtlasManifest } from '@sj/shared'
+import {
+  decodePng,
+  downscaleNearest,
+  encodePng,
+  encodeWebp,
+  type RawImage,
+} from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   CELL_V2,
@@ -324,8 +331,58 @@ function refuseFailing(
 const ATTEMPTS = Math.max(1, Number(process.env.CAST_ATTEMPTS ?? '3'))
 const MASTER_MIN_PITCH = 6
 
+// Omar's committed sheet stands in for his master when he is not in the run: the same two
+// figures, put back on magenta at the raw's scale, so a run of newcomers pays nothing for it.
+async function committedProportionRef(id: string): Promise<Buffer | null> {
+  const dir = join(CAST_CONTENT_DIR, id)
+  if (!existsSync(join(dir, 'atlas.webp'))) return null
+  const atlas = await decodePng(readFileSync(join(dir, 'atlas.webp')))
+  const cells = (
+    JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as CharacterAtlasManifest
+  ).cells
+  const figure = (name: string): RawImage => {
+    const r = cells[name]!
+    const out: RawImage = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
+    for (let y = 0; y < r.h; y++) {
+      const s = ((r.y + y) * atlas.width + r.x) * 4
+      out.data.set(atlas.data.subarray(s, s + r.w * 4), y * r.w * 4)
+    }
+    // Back up to the factor the cell was cut on, so the visible pixels read as the raw's did.
+    const t = trimToFigure(out)
+    return downscaleNearest(t, t.width * RAW_FACTOR, t.height * RAW_FACTOR)
+  }
+  const se = figure('idle-se'),
+    ne = figure('idle-ne')
+  const gap = Math.round(Math.max(se.width, ne.width) * 0.5)
+  const pair: RawImage = {
+    width: se.width + gap + ne.width,
+    height: Math.max(se.height, ne.height),
+    data: new Uint8ClampedArray((se.width + gap + ne.width) * Math.max(se.height, ne.height) * 4),
+  }
+  for (const [img, ox] of [
+    [se, 0],
+    [ne, se.width + gap],
+  ] as const) {
+    const oy = pair.height - img.height
+    for (let y = 0; y < img.height; y++)
+      pair.data.set(
+        img.data.subarray(y * img.width * 4, (y + 1) * img.width * 4),
+        ((oy + y) * pair.width + ox) * 4,
+      )
+  }
+  return encodePng(onMagenta(pair))
+}
+/** 2048 / 256: the whole factor a master's figure is cut down by on its way into a cell. */
+const RAW_FACTOR = GEN_PX / CHAR_CELL_PX
+
 const summary: string[] = []
-let proportionRef: Buffer | null = null
+let proportionRef: Buffer | null = RUN.some((c) => c.id === PROPORTION_ANCHOR_ID)
+  ? null
+  : await committedProportionRef(PROPORTION_ANCHOR_ID)
+if (proportionRef !== null) {
+  writeFileSync(`${S}/proportion-ref.png`, proportionRef)
+  console.log(`proportion reference: ${PROPORTION_ANCHOR_ID}'s committed sheet`)
+}
 
 async function runCharacter(m: CastMember): Promise<void> {
   const DIR = `${S}/cast/${m.id}`

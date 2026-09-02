@@ -1,6 +1,7 @@
 import {
   CITY_ANCHOR_DEFAULT,
   FOUNDER_IDS,
+  FOUNDER_SEATS,
   expandItemKinds,
   isRoofedKind,
   makeCityTemplate,
@@ -166,10 +167,10 @@ export function makeGenesisWorld(
     if (stood > 0) events.push({ type: 'structure_progressed', payload: { id, ticks: stood } })
   })
 
-  // The kind is READ from the template, never retyped here.
-  const houseIdByOwner = new Map<string, string>()
+  // The roof is READ off the template by the name its seat carries, never retyped here.
+  const roofIdByName = new Map<string, string>()
   template.structures.forEach((s, i) => {
-    if (s.kind === 'house' && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)
+    if (s.name !== undefined) roofIdByName.set(s.name, structureIdByIndex[i]!)
   })
   const storehouseIndex = template.structures.findIndex((s) => s.kind === 'storehouse')
   if (storehouseIndex < 0) throw new Error('genesis: the city template has no storehouse to stock')
@@ -189,9 +190,9 @@ export function makeGenesisWorld(
   }
 
   for (const founder of FOUNDER_IDS) {
-    const houseId = houseIdByOwner.get(founder)
-    if (houseId === undefined) throw new Error(`genesis: no house for founder ${founder}`)
-    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, houseId, founder)
+    const roofId = roofIdByName.get(FOUNDER_SEATS[founder])
+    if (roofId === undefined) throw new Error(`genesis: no roof for founder ${founder}`)
+    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, roofId, founder)
   }
   for (const item of STOREHOUSE_STOCK)
     spawnItem(item.kind, item.qty, structureIdByIndex[storehouseIndex]!)
