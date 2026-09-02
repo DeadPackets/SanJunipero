@@ -50,6 +50,20 @@ describe('what the town has learned to do', () => {
     expect(a.system).toContain(`${SPEECH_RULES}\n\n---\n\n${block}\n\n---\n\nName: Tamar`)
   })
 
+  // Measured 2026-09-02 by the repo's own estimate: +149 tokens at five verbs, +543 at twenty.
+  it('costs under forty tokens a verb at twenty verbs, head included', () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => ({
+      ...wager,
+      id: `recipe:wager_${i}`,
+      name: `Wager a Thing ${i}`,
+    }))
+    const est = (s: string): number => Math.ceil(s.length / 4)
+    const base = est(assemblePrompt(fixtureBlocks()).system)
+    const delta = est(assemblePrompt(fixtureBlocks({ roster: twenty })).system) - base
+    expect(delta).toBeGreaterThan(0)
+    expect(delta).toBeLessThanOrEqual(20 * 40)
+  })
+
   it('costs a town that has minted nothing not one byte', () => {
     const none = assemblePrompt(fixtureBlocks()).system
     expect(assemblePrompt(fixtureBlocks({ roster: [] })).system).toBe(none)
