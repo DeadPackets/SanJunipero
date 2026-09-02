@@ -111,6 +111,18 @@ export type StakeScore = { sceneId: string | null; agentIds: string[]; score: nu
 // llm/src/pins.ts callers: 'turn' | 'scene' | 'scene.close' (prose pin) | 'arbiter' | 'council' | 'law.compile'
 ```
 
+## The balance table (printed by every gate rehearsal, from `docs/superpowers/specs/v2/evidence/analyze.py`)
+
+Owner, 2026-09-02: "I want a balance % of Survival and Social in V1 and the expected balance in V2, because there might be tuning I want to do." Three lenses, V1 measured on world two, V2 targets assumed until measured:
+
+| Lens | Class | V1 | V2 phase 2 | V2 phase 4 |
+|---|---|---|---|---|
+| Thought main concern | survival / work / people / wonder | 53 / 35 / 7 / 5 | 25 / 35 / 30 / 10 | 15 / 30 / 35 / 20 |
+| Accepted acts | survival / move+carry / making / notes / social / invention | 37 / 42 / 5 / 16 / 1 / 0.1 | 25 / 35 / 10 / 10 / 15 / 5 | 15 / 25 / 20 / 5 / 25 / 10 |
+| Waking hours (of 15) | idle / scenes / work+carry / walk / eat+tend | 12.7 / 0.3 / 1.4 / 0.7 / 0.2 | 8 / 2 / 3 / 1.5 / 0.5 | 6 / 2.5 / 4 / 1.5 / 0.5 |
+
+Every gate task (7, 10, 15, 19) prints this table for its rehearsal beside the targets, so tuning is a dial change and a 25-minute run.
+
 ## Rehearsal targets (measured per sim-day on a spare port, never on production)
 
 | Target | Baseline | Phase 2 gate | Phase 4 gate |
