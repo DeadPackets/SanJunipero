@@ -16,6 +16,7 @@ import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
 import { createSmoke, type SmokeLayer } from './smoke.js'
+import { createClouds, type CloudLayer } from './clouds.js'
 import { createVignette, type Vignette } from './vignette.js'
 import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
@@ -82,6 +83,7 @@ export function StageMount({
     let ambient: AmbientDirector | null = null
     let lightPools: LightPools | null = null
     let smoke: SmokeLayer | null = null
+    let clouds: CloudLayer | null = null
     let vignette: Vignette | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
@@ -147,6 +149,7 @@ export function StageMount({
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
         smoke = createSmoke(s, store)
+        clouds = createClouds(s, store)
         vignette = createVignette(s.app) // last onto app.stage: over the weather
         sceneRef.current = s
         const charLayer = chars
@@ -190,6 +193,7 @@ export function StageMount({
           ambient?.tick(dt)
           lightPools?.tick(dt)
           smoke?.tick(dt)
+          clouds?.tick(dt)
           vignette?.tick()
           const state = store.getState()
           if (state !== null) {
@@ -236,6 +240,7 @@ export function StageMount({
       ambient?.destroy()
       lightPools?.destroy()
       smoke?.destroy()
+      clouds?.destroy()
       vignette?.destroy()
       weather?.destroy()
       atmosphere?.destroy()
