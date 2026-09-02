@@ -154,8 +154,8 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
     return { ...s, tick: START - 1 }
   }
 
-  it('bills the derived rate — 0.6 of hunger — on every living body, every tick', () => {
-    expect(thirstDecayPerTick(CFG)).toBeCloseTo(CFG.needs.hungerDecayPerTick * 0.6, 12)
+  it('bills the derived rate — 0.4 of hunger — on every living body, every tick', () => {
+    expect(thirstDecayPerTick(CFG)).toBeCloseTo(CFG.needs.hungerDecayPerTick * 0.4, 12)
     const s = spawn(genesisState(CFG, MAP()), CFG, { id: 'dry', x: 5, y: 5 })
     const out = pass({ ...s, tick: START - 1 }, CFG, START)
     const billed = out.events.flatMap(changesOf).filter((c) => c.need === 'thirst')
@@ -187,7 +187,13 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
       mortality: { ...CFG.mortality, drainPerTick: { ...CFG.mortality.drainPerTick, fatigue: 0 } },
     }
     const expected = scheduledDeathTick(dry, START)
-    const { log } = runUntil(parched(dry), dry, START, expected - START + 60, (st) => !st.agents.dry!.alive)
+    const { log } = runUntil(
+      parched(dry),
+      dry,
+      START,
+      expected - START + 60,
+      (st) => !st.agents.dry!.alive,
+    )
     const death = died(log, 'dry')
     expect(death).toBeDefined()
     noteCause(death!.payload)

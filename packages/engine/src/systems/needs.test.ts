@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { DAYS_PER_YEAR, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
@@ -226,7 +226,7 @@ describe('winter scarcity: hunger', () => {
 
 // Age is not only a number on the body: an old frame gives out sooner each waking hour.
 describe('elder energy', () => {
-  const YEAR = 364 // DAYS_PER_YEAR
+  const YEAR = DAYS_PER_YEAR
   const BASE = CFG.needs.energyDecayAwakePerTick
 
   const energyDeltaAt = (ageDays: number, config = CFG): number => {

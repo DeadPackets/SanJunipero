@@ -5,6 +5,7 @@ import {
   CHUNK_TILES,
   chunkOf,
   chunksTouched,
+  DAYS_PER_YEAR,
   MINUTES_PER_DAY,
   SimConfigSchema,
   stateHash,
@@ -85,14 +86,24 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
 
     const structures = Object.values(state.structures)
     expect(structures).toHaveLength(11)
-    // Eleven buildings, four of them still roofed: the village was abandoned and the other seven
-    // stand as walls a pair of hands can finish. Sound, this valley held 21 bodies against five.
+    // Eleven buildings, nine of them roofed: every founder wakes indoors (D1), and the two the
+    // village left as walls are the pair nobody owns, for a pair of hands to finish together.
     expect(
       structures
         .filter((s) => s.stage === 'complete')
         .map((s) => s.kind)
         .sort(),
-    ).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
+    ).toEqual([
+      'cabin',
+      'fire_pit',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'storehouse',
+      'well',
+    ])
     expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
@@ -447,7 +458,15 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     const door = doorTile(s, s.structures[HOUSE.id]!)!
     s = fold(
       s,
-      ev('agent_spawned', { id: 'ada', name: 'ada', x: door.x, y: door.y, ageDays: 7300 }),
+      // Thirty, not the fixture's old 7 300 days: on a 28-day year that number is an elder, and
+      // an elder pays the 1.2x energy toll this row exists to show a competent body clearing.
+      ev('agent_spawned', {
+        id: 'ada',
+        name: 'ada',
+        x: door.x,
+        y: door.y,
+        ageDays: 30 * DAYS_PER_YEAR,
+      }),
       CFG,
     )
     s = fold(s, ev('agent_entered', { agentId: 'ada', structureId: HOUSE.id }), CFG)

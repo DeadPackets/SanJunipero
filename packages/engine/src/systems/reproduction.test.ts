@@ -64,7 +64,7 @@ function world(ids: string[], config = CFG, box = HOUSE, opts: WorldOpts = {}): 
         name: id,
         x: box.x,
         y: box.y,
-        ageDays: opts.ages?.[id] ?? 7300,
+        ageDays: opts.ages?.[id] ?? 30 * DAYS_PER_YEAR,
         ...(opts.sexes?.[id] === undefined ? {} : { sex: opts.sexes[id] }),
       }),
       config,
@@ -267,9 +267,11 @@ describe('conception', () => {
   })
 
   it('does not fire outside the mother’s fertile years', () => {
-    expect(conceptions(couple(CFG, { ages: { a1: 15 * 364 } }), CONCEIVES)).toEqual([])
-    expect(conceptions(couple(CFG, { ages: { a1: 46 * 364 } }), CONCEIVES)).toEqual([])
-    expect(conceptions(couple(CFG, { ages: { a1: 16 * 364 } }), CONCEIVES)).toHaveLength(1)
+    expect(conceptions(couple(CFG, { ages: { a1: 15 * DAYS_PER_YEAR } }), CONCEIVES)).toEqual([])
+    expect(conceptions(couple(CFG, { ages: { a1: 46 * DAYS_PER_YEAR } }), CONCEIVES)).toEqual([])
+    expect(conceptions(couple(CFG, { ages: { a1: 16 * DAYS_PER_YEAR } }), CONCEIVES)).toHaveLength(
+      1,
+    )
   })
 
   it('never stacks a second pregnancy on the first', () => {

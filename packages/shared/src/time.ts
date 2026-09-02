@@ -1,9 +1,12 @@
 export const TICK_REAL_MS = 2000
 export const MINUTES_PER_DAY = 1440
-export const DAYS_PER_SEASON = 91
-export const DAYS_PER_YEAR = 364
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]
+// A year is four weeks: a life a viewer can watch to its end, and a winter every fourth week.
+export const DAYS_PER_YEAR = 28
+// Derived, never typed: `simTimeFromTick` indexes SEASONS by it, so a year that is not four
+// seasons long is a season the calendar cannot name.
+export const DAYS_PER_SEASON = DAYS_PER_YEAR / SEASONS.length
 
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 

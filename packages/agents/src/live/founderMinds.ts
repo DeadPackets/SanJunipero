@@ -1,5 +1,6 @@
 // One cast shared by every probe on the founding valley; it lives in `src/` because the served
 // live world imports it too, and `scripts/` is outside every package's `include`.
+import { DAYS_PER_YEAR } from '@sj/shared'
 import type { PersonalityDoc } from '../personality.js'
 import type { IdentityCore } from '../prompt/assemble.js'
 import type { MindSpec } from './liveMinds.js'
@@ -40,7 +41,7 @@ export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'amara',
     sex: 'f',
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     identity: {
       name: 'Amara',
       age: 34,
@@ -81,7 +82,7 @@ export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'yusuf',
     sex: 'm',
-    ageDays: 41 * 364,
+    ageDays: 41 * DAYS_PER_YEAR,
     identity: {
       name: 'Yusuf',
       age: 41,
@@ -117,7 +118,7 @@ export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'nadia',
     sex: 'f',
-    ageDays: 29 * 364,
+    ageDays: 29 * DAYS_PER_YEAR,
     identity: {
       name: 'Nadia',
       age: 29,
@@ -154,7 +155,7 @@ export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'omar',
     sex: 'm',
-    ageDays: 46 * 364,
+    ageDays: 46 * DAYS_PER_YEAR,
     identity: {
       name: 'Omar',
       age: 46,
@@ -190,7 +191,7 @@ export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'salma',
     sex: 'f',
-    ageDays: 26 * 364,
+    ageDays: 26 * DAYS_PER_YEAR,
     identity: {
       name: 'Salma',
       age: 26,

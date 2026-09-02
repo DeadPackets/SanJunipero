@@ -1,4 +1,10 @@
-import { tickToMoment, type AssetRecord, type BondsResponse, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  tickToMoment,
+  type AssetRecord,
+  type BondsResponse,
+  type SimEvent,
+} from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { moodOf, portraitUrl, type Expression, type MoodView } from '../../render/mood.js'
 import { substanceOf } from '../becoming.js'
@@ -43,7 +49,7 @@ export const EARSHOT_TILES = 8
 const SUBSTANCE_BOND_LEVEL: BondLevel = 'acquaintances'
 
 const ageWordsOf = (ageDays: number): RosterRow2['ageWords'] => {
-  const years = Math.floor(ageDays / 364)
+  const years = Math.floor(ageDays / DAYS_PER_YEAR)
   return years < 18 ? 'young' : years < 60 ? 'grown' : 'elder'
 }
 

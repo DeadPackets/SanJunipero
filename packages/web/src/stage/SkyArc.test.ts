@@ -86,7 +86,7 @@ describe('the curve the token is placed on', () => {
 describe('the words beside the road', () => {
   it('carries the day and the season, in capitals the pixel face can set', () => {
     expect(dayWord(at(15, 57))).toBe('DAY 0 · SPRING')
-    expect(dayWord(12 * MINUTES_PER_DAY)).toBe('DAY 12 · SPRING')
+    expect(dayWord(12 * MINUTES_PER_DAY)).toBe('DAY 12 · SUMMER')
   })
 
   it('names the weather and the temperature it actually is', () => {

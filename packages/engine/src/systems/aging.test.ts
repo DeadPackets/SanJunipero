@@ -30,6 +30,25 @@ describe('ageBand', () => {
     expect(ageBand(CFG, 60 * DAYS_PER_YEAR - 1)).toBe('adult')
     expect(ageBand(CFG, 60 * DAYS_PER_YEAR)).toBe('elder')
   })
+
+  // A year is four weeks now, so a life a viewer can watch is measured in months of sim, not
+  // years of it. The bands read the same words; the days behind them are the ones pinned here.
+  it('reads a 28-day year: a child until day 448, an elder from day 1,680', () => {
+    expect(DAYS_PER_YEAR).toBe(28)
+    expect(CFG.aging.childUntilYears * DAYS_PER_YEAR).toBe(448)
+    expect(ageBand(CFG, 447)).toBe('child')
+    expect(ageBand(CFG, 448)).toBe('adult')
+    expect(CFG.aging.elderFromYears * DAYS_PER_YEAR).toBe(1680)
+    expect(ageBand(CFG, 1679)).toBe('adult')
+    expect(ageBand(CFG, 1680)).toBe('elder')
+  })
+
+  // The roll is per DAY and the shorter year does not touch it: an elder's odds on any given
+  // midnight are what they always were, so old age arrives after the same count of sunrises.
+  it('leaves the natural-death chance per day exactly where it was', () => {
+    expect(CFG.aging.naturalDeathBaseChancePerDay).toBe(0.0005)
+    expect(CFG.aging.naturalDeathChancePerYearOver).toBe(0.0002)
+  })
 })
 
 describe('fold: agent_aged', () => {

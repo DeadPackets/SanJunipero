@@ -745,7 +745,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     weather: { hourlyChangeChance: 0 },
     mystery: { chancePerDay: 0 },
   })
-  const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
+  const AUTUMN_DUSK = (2 * DAYS_PER_SEASON + 3) * MINUTES_PER_DAY + 19 * 60 + 30
 
   const carrying = (kinds: string[], s = makeWorld()): WorldState => {
     let out = s
