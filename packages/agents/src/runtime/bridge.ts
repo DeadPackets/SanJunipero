@@ -3,6 +3,8 @@ import {
   ambientTempAt,
   composePerception,
   groundForBuilding,
+  hears,
+  townSquareOf,
   unfinishedWork,
   type StandingWalls,
   FORAGEABLE_YIELD,
@@ -31,6 +33,8 @@ import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // How far off a body still picks water out of the middle distance.
 const WATER_VISTA_RADIUS = 40
+// The plaza is 16 tiles across from its north-west corner; a crowd on it is a crowd at the square.
+const SQUARE_RADIUS = 16
 
 // A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
 // floor is the longest an awake mind can go without a turn; 10% covers the tick it lands on.
@@ -214,6 +218,41 @@ export class EngineBridge {
   // an announcement, and a caller that has already changed the rulebook cannot be told "no".
   announce(type: string, payload: Record<string, unknown>): void {
     this.#announcements.push({ type, payload })
+  }
+
+  /** Who would hear this body speak from where it stands, itself excluded. The scene's own
+   *  membership test, so the ear that opens a scene and the ear that leaves one read one rule. */
+  earshot(agentId: string): string[] {
+    const state = this.#loop.state
+    const speaker = state.agents[agentId]
+    if (speaker?.alive !== true) return []
+    const spoken = {
+      x: speaker.x,
+      y: speaker.y,
+      ...(speaker.insideId === undefined ? {} : { insideId: speaker.insideId }),
+    }
+    return Object.keys(state.agents)
+      .sort()
+      .filter((id) => id !== agentId && state.agents[id]!.alive)
+      .filter((id) => hears(state, this.#simConfig, spoken, id))
+  }
+
+  /** Everyone who has sung, danced or mourned on the plaza inside the recent window. A crowd
+   *  the town can see is what turns two people talking into a gathering. */
+  expressersAtSquare(radius = SQUARE_RADIUS): string[] {
+    const square = townSquareOf(this.#loop.state)
+    if (square === null) return []
+    const seen = new Set<string>()
+    for (const ev of this.#recentEvents()) {
+      if (ev.type !== 'agent_expressed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown; x?: unknown; y?: unknown }
+      if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+      if (!p.verb.startsWith('express:')) continue
+      if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+      if (Math.abs(p.x - square.x) > radius || Math.abs(p.y - square.y) > radius) continue
+      seen.add(p.agentId)
+    }
+    return [...seen].sort()
   }
 
   submit(

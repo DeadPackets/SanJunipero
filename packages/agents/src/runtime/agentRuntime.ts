@@ -63,13 +63,14 @@ import {
   decideWake,
   disarmBodyAlarm,
   rearmBodyAlarm,
-  rearmConversationWindow,
   DEFAULT_MIND_CONFIG,
   type MindClock,
   type MindConfig,
   type PlanState,
   type WakeReason,
 } from '../wake.js'
+import type { SceneCoordinator } from '../scene/coordinator.js'
+import type { Scene } from '../scene/scene.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
@@ -244,13 +245,15 @@ export type RuntimeSnapshot = {
   spoken?: string[] | undefined
   still?: Stillness | null | undefined
   company?: (Company & { id: string })[] | undefined
+  /** The scene this mind is standing in, if any. Every participant carries the whole thing, and
+   *  a restore keys it by id, so one scene comes back once however many minds saved it. */
+  scene?: Scene | null | undefined
 }
 
 function freshClock(): MindClock {
   return {
     lastTurnTick: null,
     reconsiderAtTick: null,
-    conversationUntilTick: 0,
     dozeUntilTick: 0,
     alarmArmed: {},
     morningWokeDay: null,
@@ -272,6 +275,7 @@ export class AgentRuntime {
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
+  readonly #scenes: SceneCoordinator | null
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
@@ -330,6 +334,8 @@ export class AgentRuntime {
     dreamLlm?: DreamLlm | undefined
     onThought?: ((t: { tick: number; agentId: string; text: string }) => void) | undefined
     adjudicator?: Adjudicator | undefined
+    /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
+    scenes?: SceneCoordinator | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -342,6 +348,7 @@ export class AgentRuntime {
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
     this.#adjudicator = deps.adjudicator ?? null
+    this.#scenes = deps.scenes ?? null
   }
 
   start(agentId: string): void {
@@ -400,6 +407,7 @@ export class AgentRuntime {
       spoken: [...this.#spoken],
       still: this.#still,
       company: [...this.#company].map(([id, c]) => ({ id, ...c })),
+      scene: this.#scenes?.sceneFor(this.#agentId) ?? null,
     }
   }
 
@@ -425,6 +433,7 @@ export class AgentRuntime {
     this.#spoken = [...(s.spoken ?? [])]
     this.#still = s.still ?? null
     this.#company = new Map((s.company ?? []).map(({ id, ...c }) => [id, { ...c }]))
+    this.#scenes?.adopt(s.scene)
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -458,6 +467,12 @@ export class AgentRuntime {
     return this.#reflectionInFlight
   }
 
+  /** How warm this mind stands toward another. The only tie the runtime keeps itself, and what
+   *  breaks a tie for the floor when two people have said the same amount. */
+  warmthToward(otherId: string): number {
+    return this.#company.get(otherId)?.warmth ?? 0
+  }
+
   #onTick(tick: number): void {
     if (!this.#started) return
     // `intent.ts` refuses the dead every verb, so a corpse that still woke spent its turn on a
@@ -479,7 +494,7 @@ export class AgentRuntime {
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
     this.#answerWakeOwed(packet)
-    rearmConversationWindow(this.#config, packet, this.#clock, tick)
+    this.#scenes?.onTick(tick)
     this.#handleNight(tick, packet)
     // Morning is consumed by an actual rise, not by the reason firing: a body
     // seen awake in daylight has had its morning.
@@ -487,14 +502,37 @@ export class AgentRuntime {
       this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
     }
     if (this.#turnInFlight) return
-    const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan)
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
+    const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan, floor)
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
+    if (reason === 'floor') {
+      void this.#takeFloor(tick)
+      return
+    }
     if (reason !== null) {
       if (packet.self.asleep) {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
       }
       void this.#startTurn(reason)
+    }
+  }
+
+  // A scene line, under the same in-flight guard an ordinary turn runs under, so a mind never
+  // holds two moments at once. What it costs is one call, and only the floor-holder makes it.
+  async #takeFloor(tick: number): Promise<void> {
+    if (this.#turnInFlight || this.#scenes === null) return
+    this.#turnInFlight = true
+    try {
+      await this.#scenes.takeFloor(this.#agentId, tick)
+      this.#clock.lastTurnTick = tick
+      this.#stats.turns += 1
+    } catch (err) {
+      this.#llm.alert('scene_crash', messageOf(err))
+      this.#doze(tick, err)
+    } finally {
+      this.#turnInFlight = false
     }
   }
 
@@ -577,6 +615,8 @@ export class AgentRuntime {
       if (typeof text === 'string') {
         this.#spoken.push(sanitizeSpokenText(text))
         if (this.#spoken.length > OWN_WORDS_SHOWN) this.#spoken.shift()
+        // A word anyone heard, said by a mind in no scene, is a scene starting.
+        this.#scenes?.noteSpoken(this.#agentId, text, this.#bridge.currentTick())
       }
       if (this.#still !== null) this.#still = { ...this.#still, spoke: true }
       return

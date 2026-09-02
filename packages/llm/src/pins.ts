@@ -158,6 +158,8 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   council: ON_RULING,
   'law.compile': ON_RULING,
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
+  // Two sentences and a short list of ties, once per scene. Prose, so it takes the prose pin.
+  'scene.close': { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 600 },
   narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000 },
   naming: ON_DEEPSEEK,
   voice: ON_DEEPSEEK,

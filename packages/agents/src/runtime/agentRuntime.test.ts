@@ -2004,7 +2004,7 @@ describe('every turn row says what bought it', () => {
     'salient_perception',
     'plan_blocked',
     'plan_done',
-    'conversation_beat',
+    'floor',
     'reconsider',
     'boredom',
     'morning',
