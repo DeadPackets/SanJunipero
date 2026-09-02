@@ -197,6 +197,7 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
     'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
   you_recovered: 'The sickness lifts. Your head clears and your strength begins to come back.',
   you_were_tended: 'Someone has cared for your hurts; the pain eases under their hands.',
+  you_lost_them: 'You were following someone and lost them; your legs have stopped.',
   fire_ignited: 'Smoke stings your nose. Something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
@@ -612,8 +613,16 @@ function coldHearthLine(packet: PerceptionPacket, world?: ProseWorld): string {
   return `${line} The nearest ${sourcePhrase(at.from, FUEL_ITEM)} is at (${at.x}, ${at.y}).`
 }
 
-/** A place a mind carries in its head: what it is called, if anything, and where it stands. */
-export type KnownPlace = { id: string; kind: string; x: number; y: number; name?: string }
+/** A place a mind carries in its head: what it is called, if anything, and where it stands.
+ *  A landmark nobody built is `natural`, and the block never lets the town's roofs crowd it out. */
+export type KnownPlace = {
+  id: string
+  kind: string
+  x: number
+  y: number
+  name?: string
+  natural?: boolean
+}
 
 // One spelling of a place for the whole prompt: a named one is called by its name, an unnamed
 // one is only ever pointed at. `words` keeps a lamp_post from reaching a mind with the underscore.
@@ -646,19 +655,25 @@ const howFar = (d: number): string =>
 // same way, or a mind is given two vocabularies for one valley.
 const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))} ${bearing(dx, dy)}`
 
-// A whole town read back every turn is a page of standing facts. The nearest dozen is what a
-// person holds in their head anyway.
-const PLACES_SHOWN = 12
+// A whole town read back every turn is a page of standing facts. Genesis raises twelve roofs and
+// the valley has three landmarks, so a founder's whole world fits with a slot to spare.
+const PLACES_SHOWN = 16
 
 /** Where this mind could go without seeing it first: everything it knows of that is not already
- *  in front of it, nearest first. The block a mind names a place out of. */
+ *  in front of it, landmarks first and then nearest first. A town of twelve roofs is twelve
+ *  nearer things than the river, and sorting on distance alone drops the valley off the page. */
 export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket): string {
   const inSight = new Set(packet.visible.structures.map((s) => s.id))
   const { x, y } = packet.self
   const lines = places
     .filter((p) => !inSight.has(p.id))
     .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
-    .sort((a, b) => a.d - b.d || (a.p.id < b.p.id ? -1 : 1))
+    .sort(
+      (a, b) =>
+        Number(b.p.natural ?? false) - Number(a.p.natural ?? false) ||
+        a.d - b.d ||
+        (a.p.id < b.p.id ? -1 : 1),
+    )
     .slice(0, PLACES_SHOWN)
     .map(({ p }) => `${placeSaid(p)} (${p.id}), ${wayTo(p.x - x, p.y - y)}`)
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`

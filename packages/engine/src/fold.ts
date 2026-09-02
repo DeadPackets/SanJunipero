@@ -103,6 +103,7 @@ import {
   TileChanged,
   TrafficDecayed,
   WalkParams,
+  WalkReaimed,
   WeatherChanged,
   WildlifeChanged,
   WorldGrown,
@@ -582,6 +583,23 @@ export function fold(
         params: p.params,
         ...(path ? { path } : {}),
         ...(p.then ? { then: p.then } : {}),
+      }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
+    }
+    case 'walk_reaimed': {
+      const p = WalkReaimed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a?.activity) throw new Error(`walk_reaimed for idle agent ${p.agentId}`)
+      const path = findPath(state, a, p, config)
+      if (!path) throw new Error(`walk_reaimed with no path for ${p.agentId}`)
+      // The params carry the new mark too: everything that reads where these legs are going —
+      // the packet's own arrow, the short-of-the-mark test — reads it out of them.
+      const activity = {
+        ...a.activity,
+        path,
+        ticksRemaining: p.ticks,
+        chase: p.chase,
+        params: { ...a.activity.params, x: p.x, y: p.y },
       }
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
     }

@@ -100,6 +100,9 @@ export type AgentBody = {
     // The act these legs were set going for, run the moment they arrive. Absent unless the
     // world composed the walk itself, so a town that never composed one hashes as it always did.
     then?: { verb: string; params: Record<string, unknown> }
+    // How long these legs have been following somebody, how many ticks running the gap has
+    // widened, and what it was last tick. Absent on every walk that is not a chase.
+    chase?: { ticks: number; grew: number; gap: number }
   }
   collapsedSinceTick: number | null
   zeroHungerSinceTick: number | null

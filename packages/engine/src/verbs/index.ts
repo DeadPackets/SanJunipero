@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { FAUNA_YIELD, type FaunaKind } from '../data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from '../data/forageables.js'
-import { WalkParams, WalkToPlace } from '../events.def.js'
+import { WalkParams, WalkToPerson, WalkToPlace, WalkToThing } from '../events.def.js'
 import {
   FISH_KIND,
   FORAGE_KIND,
@@ -71,6 +71,7 @@ import {
   sanitizeSpokenText,
   simTimeFromTick,
   structureGlowRadius,
+  visionRadiusAt,
   type SimConfig,
 } from '@sj/shared'
 
@@ -291,9 +292,69 @@ function featureDestination(
   return 'refusal' in to ? { refusal: `there is no way to ${f.name} from this side` } : to
 }
 
-/** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
- *  it that this body can actually reach; the refusal comes from here too, so the seam that
- *  settles the act and the test that judges it can never disagree. */
+/** Whether this body's eyes reach that tile: the same horizon and the same light the packet is
+ *  built on, so a mark a mind can name is exactly a mark it was shown. */
+function withinSight(state: WorldState, config: SimConfig, a: AgentBody, at: Point): boolean {
+  return (
+    Math.hypot(at.x - a.x, at.y - a.y) <= visionRadiusAt(state, a, at.x, at.y, state.tick, config)
+  )
+}
+
+/** Where a walk after a person ends: ground beside them this body can reach. They move, so this
+ *  is asked again every tick the chase runs, and only ever off where they are standing now. */
+function personDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  targetId: string,
+): Point | { refusal: string } {
+  if (targetId === agentId) return { refusal: 'you are already where you are' }
+  const target = state.agents[targetId]
+  const a = state.agents[agentId]!
+  if (!target?.alive) return { refusal: 'there is no one by that name to walk to' }
+  if (!sameInterior(state, agentId, targetId) || !withinSight(state, config, a, target)) {
+    return { refusal: 'you cannot see them from here' }
+  }
+  const ctx = pathCtx(state, config)
+  const ring: Point[] = []
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const p = { x: target.x + dx, y: target.y + dy }
+      if (p.x === a.x && p.y === a.y) return p
+      if (isPassable(state, p.x, p.y, ctx)) ring.push(p)
+    }
+  }
+  const to = nearestReachable(state, config, a, ring)
+  return 'refusal' in to ? { refusal: 'there is no way to them from here' } : to
+}
+
+/** Where a walk after a thing ends: the spot `take` will lift it from. `take`'s own validate is
+ *  the judge, asked from each candidate tile, so the walk and the taking cannot drift apart. */
+function thingDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  itemId: string,
+): Point | { refusal: string } {
+  const item = state.items[itemId]
+  const a = state.agents[agentId]!
+  if (item === undefined) return { refusal: 'there is no such thing to walk to' }
+  if (item.loc.t === 'agent') {
+    return { refusal: item.loc.id === agentId ? 'you are holding that' : 'someone is holding that' }
+  }
+  const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+  const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : s
+  if (at === undefined) return { refusal: 'there is no such thing to walk to' }
+  if (!withinSight(state, config, a, at)) return { refusal: 'you cannot see it from here' }
+  const lift = (from: Point): boolean =>
+    VERBS.take!.validate(bodyAt(state, agentId, from), config, agentId, { itemId }) === null
+  const spot = standingSpotFor(state, config, a, at, lift, pathCtx(state, config))
+  return spot ?? { refusal: 'there is no way to it from here' }
+}
+
+/** Where a walk ends, from any of the four ways of naming it. A named mark resolves to open
+ *  ground beside it that this body can actually reach; the refusal comes from here too, so the
+ *  seam that settles the act and the test that judges it can never disagree. */
 export function walkDestination(
   state: WorldState,
   config: SimConfig,
@@ -321,6 +382,10 @@ export function walkDestination(
     if (findPath(state, a, to, config) !== null) return to
     return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
   }
+  const person = WalkToPerson.safeParse(params)
+  if (person.success) return personDestination(state, config, agentId, person.data.targetId)
+  const thing = WalkToThing.safeParse(params)
+  if (thing.success) return thingDestination(state, config, agentId, thing.data.itemId)
   const named = WalkToPlace.safeParse(params)
   if (!named.success) return { refusal: 'a walk needs a place to end' }
   // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
@@ -2370,6 +2435,63 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
     return [{ type: 'action_interrupted', payload: { agentId, reason: 'blocked' } }]
   }
   return [{ type: 'action_progressed', payload: { agentId, ticks: 1 } }, ...moves]
+}
+
+// Half a sim-hour. A body crosses the whole valley in about twenty-six ticks at three tiles a
+// tick, so this is one crossing and a little more: you may follow somebody across the town once.
+const CHASE_MAX_TICKS = 30
+// Two widening ticks is somebody stepping round a wall. Three running is somebody leaving.
+const CHASE_GIVE_UP_GROWTH = 3
+
+/** What the mind is told when it stops following: a sentence, not a machinery word. */
+export const WALK_LOST_THEM = 'you lost them'
+
+/** One tick of a walk that named a person. They move, so the legs are re-aimed at where they
+ *  are standing now; the walk ends the moment this body is beside them, and is given up when
+ *  the following has run long enough or the gap has widened three ticks running.
+ *  Null whenever this walk is not a chase, and then the ordinary step runs instead. */
+export function chaseStep(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+): PendingEvent[] | null {
+  const a = state.agents[agentId]
+  const act = a?.activity
+  if (!a || act?.verb !== 'walk') return null
+  const targetId = act.params.targetId
+  // A body that cannot stand cannot follow anybody: a crawl keeps the one tile and the price in
+  // ticks it always had, and the ordinary step below is what charges it.
+  if (typeof targetId !== 'string' || isCrawl(state, agentId)) return null
+  const target = state.agents[targetId]
+  const lost: PendingEvent[] = [
+    { type: 'action_interrupted', payload: { agentId, reason: WALK_LOST_THEM } },
+  ]
+  if (!target?.alive) return lost
+  const gap = Math.max(Math.abs(a.x - target.x), Math.abs(a.y - target.y))
+  // Beside them is the whole of the point, whatever the clock still says. The clock is run down
+  // rather than the act completed here, so a composed walk still runs the act it was set going for.
+  if (gap <= 1) {
+    return [{ type: 'action_progressed', payload: { agentId, ticks: act.ticksRemaining } }]
+  }
+  const was = act.chase ?? { ticks: 0, grew: 0, gap }
+  const chase = { ticks: was.ticks + 1, grew: gap > was.gap ? was.grew + 1 : 0, gap }
+  if (chase.ticks > CHASE_MAX_TICKS || chase.grew >= CHASE_GIVE_UP_GROWTH) return lost
+  const to = personDestination(state, config, agentId, targetId)
+  if ('refusal' in to) return lost
+  const path = findPath(state, a, to, config)
+  if (path === null || path.length === 0) return lost
+  // The legs take their stride off the body's own speed rather than off a clock. A chase has no
+  // honest clock: the route is thrown away and laid again every tick, so nothing counts down and
+  // the only ways out are being beside them and giving up, both above.
+  const stride = Math.min(path.length, tilesPerTick(state, config, agentId))
+  const moves: PendingEvent[] = []
+  for (const [nx, ny] of path.slice(0, stride)) {
+    if (!isPassable(state, nx, ny)) break
+    moves.push({ type: 'agent_moved', payload: { id: agentId, x: nx, y: ny } })
+  }
+  if (moves.length === 0) return lost
+  const ticks = Math.max(walkTicks(path.length, tilesPerTick(state, config, agentId)), 1)
+  return [{ type: 'walk_reaimed', payload: { agentId, x: to.x, y: to.y, ticks, chase } }, ...moves]
 }
 
 // Their surface stays part of `verbs`.
