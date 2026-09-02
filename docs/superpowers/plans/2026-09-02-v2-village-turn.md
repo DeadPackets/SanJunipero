@@ -368,3 +368,79 @@ Packages: `web`. Depends on nothing; can run with Tasks 16-17. Invoke the four U
 ### Task 19: Final gate and handover
 
 Controller task. Merge Tasks 16-18. `pnpm check` green. Rehearsal on port 8099: `SPEED=2 SJ_MAX_MINDS=20 pnpm rehearse 50`, measured against the phase 4 column, plus a 5-minute headless desk watch (cuts ≥ 3, pixel change ≥ 5% per 30 s). Fast-forward `main`. Present the owner with the measured table, the rehearsal transcript highlights, a K24 backup plan for the v1 world, and ask for the go to deploy v2 as a fresh Day 0 world.
+
+---
+
+# Amendments (2026-09-02, from the phase 1 gate onward)
+
+Every amendment below is backed by a measurement from a live rehearsal. The evidence lives in
+`.superpowers/sdd/2026-09-02-v2-village-turn/progress.md`.
+
+## Tasks added
+
+| # | Task | Why, measured |
+|---|---|---|
+| 21 | The bubble is a line, not a page | six defects made every frame illegible: a 240-char line had a 4.5 s read window at 53 chars/s |
+| 22 | The prompt's bill, itemised | no record existed of *why* an LLM call happened |
+| 23 | The act finds its object, the memory keeps what worked | 283 of 402 refusals were one shape; all 402 action memories were failures |
+| 24 | A walk names a place, a person, or a thing | 94% of walks named a raw coordinate; a mind could not walk to a person at all |
+| 25 | The true wake reason, the true cause of a refusal | the wake instrument recorded only the first matching reason; a refusal named the wrong obstacle |
+| 26 | Name it, do not number it | the prose hands a mind coordinates for everything nameable |
+| 27 | Acts take time | 30 of 37 verbs last one sim-minute; a mind acts 5.7% of its waking life |
+
+Task 8 is split: **8a** the scene, the floor and the exits (logic, LLM behind a fake, spends
+nothing); **8b** the scene prompt and one real scene. Nine interlocking items in one lane produce
+a report the reviewer cannot review.
+
+## Rulings that change the plan as written
+
+**Scenes are not the cost lever.** They reach ~2 h of a 15 h waking day, so free talk saves at
+most ~13% of calls, and at watchable pacing they may cost more than they save. Task 8's cost
+justification is struck. Scenes are built for the conversation and budgeted as a line item.
+
+**Duration is a rulebook field, never an intent field.** `durationTicks` already exists on minted
+verbs, so it needs no key; a mind naming its own duration would need one *and* hand a model with
+no sense of how long fishing takes the power to freeze the town. The arbiter picks a **word** from
+a closed set — `moment 2 · minutes 10 · half_hour 30 · hour 60 · morning 240 · day 600` — and the
+engine expands it. The built-in table is written by hand and given to the arbiter as calibration,
+because the recipe path never mentioned duration at all and the expressive path gave one bare
+line with no examples. A single act may not exceed a day; longer horizons belong to objects.
+
+**Phase 3 gains departure, and reproduction moves last.** Births plus arrivals with nobody leaving
+is unbounded population, and population is the one cost that scales linearly — now in art spend as
+well as calls. Departure is a chosen act: for love, by exile under a law, or out of restlessness.
+Population is bounded by a live-mind cap and by gestation, never by tuning the 1-in-5.
+
+**Generated people are in scope for v2** (owner ruling). Today `CAST_IDS` is a closed sixteen and
+`discoveryArt.ts` already commissions art at runtime, off the tick, fire-and-forget — it was
+simply never pointed at people. Traits keep their deterministic inheritance; the **voice card** is
+minted at coming of age, not at birth, from traits plus both parents' cards plus the childhood the
+event log already holds. A stranger is the same mint with the road as parent. The card lands as a
+folded event so a replay reproduces the same person; art stays off-log. ~$1.15 art + ~$0.05 card.
+
+**The cost target is per resident-day, not per town-day.** At $0.025 per mind-day, "$0.30 a day"
+is exactly twelve minds. A routine tier would buy cheapness by making some residents not really
+people, which is the opposite of the founding sentence.
+
+**Phase 4 gates on adoption, not attempts.** Invention attempts per mind-day is the one number a
+single prompt line moves overnight. The vision's number is a minted verb used by a mind other than
+its inventor, a recipe cooked twice, a custom followed. Attempts stay as a diagnostic.
+
+**Replay is a missing feature, not a broken one.** `scrub` returns one state at one tick, by
+design. A moment becomes one immutable HTTP document — snapshot plus one delta per tick — played
+by a clock the viewer owns, cached forever because a deterministic log makes it immutable.
+Comparing the folded state hash against the stored one gives a determinism alarm in production for
+free. The two devices the owner loved in the Alive mock — an icon over a head, a status under a
+body — are **live** features that every replay then inherits; they are not replay devices. Export
+renders each moment once, server-side and headless, to GIF and MP4 behind a link with an og card.
+Never in the browser.
+
+## Queued findings, each with its measurement
+
+| finding | cost |
+|---|---|
+| 20% of walks aim at the tile the mind already stands on | ~27 of 135 coordinate walks |
+| The call log records tokens but not the response text | both largest defects were "what the model emits" |
+| `.stage-cue` `left: 50%` clamp — the moment cue and shot caption share it | latent |
+| A new town opens at 00:00, in the dark | first impression |
+| `wantedWater` reads prose for a substring | fixed once; the pattern remains |
