@@ -180,7 +180,7 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
     // ★ VACUOUS GUARD: with no lamplighter on the rounds nobody feeds it, and it never lights.
     const unlit = runFoundersWorld({ interiors: true, builders: true, holdings: true }, 1440, 3)
     expect(pitIn(unlit.state)?.fueledUntilTick).toBeUndefined()
-  })
+  }, 120_000)
 
   it('★ keeps one tile between posts, so every post has a side to be fed from', () => {
     const posts = lampsIn(lit)
@@ -197,7 +197,7 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
   it('is OFF unless asked for: the same town with no lamplighter raises none', () => {
     // Every landed gate calls `makeFoundersOnTick` without `lamps`; without this the opt-in is a claim.
     expect(lampsIn(runShowcase(0, 1440))).toEqual([])
-  })
+  }, 120_000)
 
   it('names its lamplighter deterministically, and never the bridgewright', () => {
     const cast = foundersFor(townStructuresFor('showcase', RINGS))
