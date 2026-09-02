@@ -14,9 +14,10 @@ const HOUSE = 'structure_house'
 const STORE = 'structure_store'
 const OTHER = 'structure_other'
 
-type Shelved = { id: string; kind: string; qty: number; into: string }
+// `into` names the shelf a thing stands on; without one it is in the hands.
+type Placed = { id: string; kind: string; qty: number; into?: string; owner?: string }
 
-function town(shelved: Shelved[] = []): EngineBridge {
+function town(placed: Placed[] = []): EngineBridge {
   const config = DEFAULT_CONFIG
   const terrain: TileId[][] = Array.from({ length: 32 }, () =>
     Array.from({ length: 32 }, (): TileId => 0),
@@ -46,13 +47,13 @@ function town(shelved: Shelved[] = []): EngineBridge {
   raise(HOUSE, 'house', 2, AGENT)
   raise(STORE, 'storehouse', 12, '')
   raise(OTHER, 'house', 22, 'omar')
-  for (const s of shelved) {
+  for (const p of placed) {
     put('item_spawned', {
-      id: s.id,
-      kind: s.kind,
-      qty: s.qty,
-      loc: { t: 'structure', id: s.into },
-      owner: AGENT,
+      id: p.id,
+      kind: p.kind,
+      qty: p.qty,
+      loc: p.into === undefined ? { t: 'agent', id: AGENT } : { t: 'structure', id: p.into },
+      owner: p.owner ?? AGENT,
     })
   }
   const { bridge } = wireTown({ state, store, seed: 'put-away', startTick: 720 })
@@ -64,6 +65,33 @@ const proseFor = (bridge: EngineBridge): string =>
     isWalkable: (x, y) => bridge.isWalkable(x, y),
     isEdible: (kind) => bridge.isEdible(kind),
   })
+
+describe('the satchel is read out once, grouped by kind', () => {
+  const notes = (n: number): Placed[] =>
+    Array.from({ length: n }, (_, i) => ({ id: `item_${131 + i}`, kind: 'note', qty: 1 }))
+
+  it('twelve notes are one tally and one mark, not twelve sentences', () => {
+    const said = proseFor(town(notes(12)))
+    expect(said).toContain('Your hands hold note ×12 (item_131…)')
+    expect(said).not.toContain('You are carrying')
+    expect(said).not.toContain('item_132')
+  })
+
+  it('a single thing keeps its own mark, with nothing trailing it', () => {
+    const said = proseFor(town([{ id: 'item_9', kind: 'bucket', qty: 1 }]))
+    expect(said).toContain('Your hands hold bucket ×1 (item_9);')
+  })
+
+  it("another's thing is a tally of its own, and still says whose it is", () => {
+    const said = proseFor(
+      town([
+        { id: 'item_1', kind: 'bread', qty: 1 },
+        { id: 'item_2', kind: 'bread', qty: 1, owner: 'omar' },
+      ]),
+    )
+    expect(said).toContain("Your hands hold bread ×1 (item_1), bread ×1 (item_2; Omar's)")
+  })
+})
 
 describe('the shelves a mind knows it has', () => {
   it('says its own roof first, the town store after, and never a neighbour’s house', () => {

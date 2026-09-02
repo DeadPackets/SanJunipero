@@ -738,6 +738,31 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
   return `${i.qty} ${i.kind} (${i.id})`
 }
 
+// A tally of a kind and how many, which is how a shelf reads and how a satchel reads.
+const tally = (t: { kind: string; qty: number }): string => `${t.kind} ×${t.qty}`
+
+/** The satchel as a tally: one entry per kind, one mark per entry, and an ellipsis where more of
+ *  the same are behind it. Twelve notes were twelve sentences twice a turn, which was 36% of the
+ *  volatile prose in world two. A thing somebody else owns or a thing that is turning keeps its
+ *  own entry, so nothing a claim says is lost to the grouping. */
+function heldPhrase(held: PerceptionItem[]): string {
+  type Group = { kind: string; qty: number; id: string; claim: string; more: boolean }
+  const groups = new Map<string, Group>()
+  for (const i of held) {
+    const claim = claimPhrase(i)
+    const at = groups.get(`${i.kind}${claim}`)
+    if (at === undefined) {
+      groups.set(`${i.kind}${claim}`, { kind: i.kind, qty: i.qty, id: i.id, claim, more: false })
+    } else {
+      at.qty += i.qty
+      at.more = true
+    }
+  }
+  return [...groups.values()]
+    .map((g) => `${tally(g)} (${g.id}${g.more ? '…' : ''}${g.claim})`)
+    .join(', ')
+}
+
 /** Whether these hands are at water, off the same test `drink`, `fill` and `fish` are refused
  *  by. Block 1 teaches all three as "standing beside water" and nothing said whether this body
  *  was: 105 of run B's 236 refusals were minds reaching for water on dry ground (rehearsal5). */
@@ -784,10 +809,7 @@ function affordanceLines(packet: PerceptionPacket): string[] {
   const atHand = new Set(packet.reach?.atHand ?? [])
   const near = packet.visible.items.filter((i) => atHand.has(i.id))
   const held = packet.self.inventory
-  let hands =
-    held.length === 0
-      ? 'Your hands are empty'
-      : `Your hands hold ${held.map(itemPhrase).join(', ')}`
+  let hands = held.length === 0 ? 'Your hands are empty' : `Your hands hold ${heldPhrase(held)}`
   // No `reach` at all is a packet composed before the block existed: it says nothing about
   // reach rather than claiming there is none.
   if (packet.reach !== undefined) {
@@ -799,9 +821,6 @@ function affordanceLines(packet: PerceptionPacket): string[] {
   lines.push(`${hands}.`)
   return lines
 }
-
-// A tally of a kind and how many, which is how a shelf reads and how a satchel reads.
-const tally = (t: { kind: string; qty: number }): string => `${t.kind} ×${t.qty}`
 
 // Roughly a token per 3.3 characters. A store is a standing fact said every turn, so a full
 // storehouse is capped at a phrase rather than a page.
@@ -1020,10 +1039,6 @@ export function perceptionToProse(
 
   for (const n of packet.visible.forageables ?? []) {
     lines.push(`You see ${n.prose} (${n.id}) at (${n.x}, ${n.y}).`)
-  }
-
-  for (const it of packet.self.inventory) {
-    lines.push(`You are carrying ${itemPhrase(it)}${claimPhrase(it)}.`)
   }
 
   for (const s of packet.stores ?? []) if (s.items.length > 0) lines.push(storeLine(s))

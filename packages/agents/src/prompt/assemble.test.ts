@@ -392,7 +392,7 @@ describe('perceptionToProse', () => {
       },
     })
     expect(prose).toContain("basket (item_3) at (12, 10); Rahel's, marked by Yusuf")
-    expect(prose).toContain("carrying 1 plank (item_9); Bex's")
+    expect(prose).toContain("hold plank ×1 (item_9; Bex's)")
   })
 
   it('leaves an unclaimed thing exactly as it always read', () => {
@@ -512,8 +512,7 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('carrying')
-    expect(prose).toContain('3 bread')
+    expect(prose).toContain('Your hands hold bread ×3 (b1)')
   })
 
   it('renders collapse and severe hunger', () => {

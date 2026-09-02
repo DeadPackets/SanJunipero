@@ -227,7 +227,7 @@ describe('food that is turning', () => {
     const packet = bridge.perception('amara')
     const carried = packet.self.inventory.find((i) => i.id === 'item_fresh_fish')
     expect(carried?.spoiling).toBe(true)
-    expect(proseFor(bridge, 'amara')).toContain('1 fish (item_fresh_fish); it is turning')
+    expect(proseFor(bridge, 'amara')).toContain('fish ×1 (item_fresh_fish; it is turning)')
   })
 })
 

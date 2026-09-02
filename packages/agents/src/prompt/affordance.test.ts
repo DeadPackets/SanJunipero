@@ -140,7 +140,7 @@ describe('the affordance block says what the validators would otherwise refuse',
     )
     for (let i = 0; i < 20; i++) t.step()
     expect(proseFor(t.bridge)).toContain(
-      `Your hands hold 1 bread (${BREAD}); nothing else is close enough for them to touch.`,
+      `Your hands hold bread ×1 (${BREAD}); nothing else is close enough for them to touch.`,
     )
   })
 
