@@ -459,7 +459,7 @@ export function createCharacterLayer(
     const nowTick = store.getTick()
     // An open scene turns its cast toward each other and puts the ring under whoever has it.
     const open = store.getScene()
-    const cast = open !== null && open.open ? open.participants : null
+    const cast = open?.open === true ? open.participants : null
     const heard = talk.voices()
     const inScene = new Set(cast ?? [])
     const floor = cast === null ? null : floorHolder(cast, heard)
