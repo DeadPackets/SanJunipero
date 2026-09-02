@@ -10,6 +10,7 @@ import { AgentRuntime, type RuntimeSnapshot } from '../runtime/agentRuntime.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { wireArbiter, type SeamArbiter } from '../runtime/arbiterSeam.js'
 import { SceneCoordinator, type SceneMind } from '../scene/coordinator.js'
+import { makeSceneLlm } from '../scene/sceneLlm.js'
 import { MemoryStore } from '../memory/store.js'
 import { TieStore } from '../memory/ties.js'
 import type { MindConfig } from '../wake.js'
@@ -76,9 +77,10 @@ export type BootMindsOpts = {
   restoring?: ReadonlyMap<string, RuntimeSnapshot>
   /** Adjudication and codification, injected because agents may not import the arbiter. */
   arbiter?: SeamArbiter
-  /** The scene turn and the scene close, per mind. Absent, no scene ever opens and every mind
-   *  talks the way it did before there were scenes. Task 8b supplies the real one. */
-  sceneLlm?: (agentId: string) => SceneMind['llm']
+  /** What a mind pays a scene line with. Absent, no scene ever opens and every mind talks the
+   *  way it did before there were scenes. The voice is built here, from what only this function
+   *  holds: the persona, the mind's own personality store, and the living cast. */
+  sceneClient?: (agentId: string) => LlmClient
 }
 
 /** `init` on a mind that already has version 1 writes a second one and `current()` then reads
@@ -98,23 +100,40 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   const runtimes = new Map<string, AgentRuntime>()
   const cast = new Map<string, MindSpec>()
   const minds = new Map<string, SceneMind>()
-  const sceneLlm = opts.sceneLlm
+  const sceneClient = opts.sceneClient
   const scenes =
-    sceneLlm === undefined
+    sceneClient === undefined
       ? null
       : new SceneCoordinator({
           bridge: opts.bridge,
           mindFor: (id) => minds.get(id) ?? null,
         })
+  // The closed roll a scene line is held to. Read per line, never snapshot: `cast` keeps the
+  // dead for a newborn to read its parents from, and a birth adds to it mid-scene.
+  const livingCast = (): { id: string; name: string }[] =>
+    [...cast.values()]
+      .filter((s) => opts.bridge.isAlive(s.id))
+      .map((s) => ({ id: s.id, name: s.identity.name }))
+  // The same function object the ordinary turn renders its roster from, so both prompts send
+  // one prefix and share its cache.
+  const roster = opts.arbiter?.roster
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
     if (!hasPersonality(db, spec.id))
       personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
-    if (sceneLlm !== undefined) {
+    if (sceneClient !== undefined) {
       const mem = new MemoryStore(db, spec.id, opts.embedder)
       minds.set(spec.id, {
-        llm: sceneLlm(spec.id),
+        llm: makeSceneLlm(sceneClient(spec.id), {
+          identity: spec.identity,
+          personality: () => ({
+            doc: personality.current().doc,
+            autobiography: mem.autobiography(),
+          }),
+          ...(roster === undefined ? {} : { roster }),
+          livingCast,
+        }),
         ties: new TieStore(db, spec.id),
         remember: async (m) => {
           await mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS })
