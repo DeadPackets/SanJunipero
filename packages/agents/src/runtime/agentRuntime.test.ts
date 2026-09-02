@@ -100,7 +100,16 @@ function baseDoc(): PersonalityDoc {
 const FAR_PLACE_ID = 'structure_2'
 const FAR_PLACE_NAME = 'the old farmhouse'
 
-function buildWorld(simConfig?: SimConfig, knownAfar = false) {
+// Cold fire pits either side of the body, and an armful of wood in its hands: everything
+// `stoke` wants except the mark, which is the whole point of the rows that ask for it.
+const FIRE_IDS = ['structure_fire_1', 'structure_fire_2']
+const FIRE_AT = [
+  { x: 3, y: 4 },
+  { x: 2, y: 3 },
+]
+const WOOD_ID = 'item_wood'
+
+function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -148,6 +157,22 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false) {
     })
     emit('structure_completed', { id: FAR_PLACE_ID })
     emit('places_seen', { agentId: AGENT, structureIds: [FAR_PLACE_ID] })
+  }
+  for (let i = 0; i < hearths; i++) {
+    emit('structure_planned', {
+      id: FIRE_IDS[i]!,
+      kind: 'fire_pit',
+      ...FIRE_AT[i]!,
+      w: 1,
+      h: 1,
+      maxHp: 50,
+      flammable: true,
+      builderId: AGENT,
+    })
+    emit('structure_completed', { id: FIRE_IDS[i]! })
+  }
+  if (hearths > 0) {
+    emit('item_spawned', { id: WOOD_ID, kind: 'wood', qty: 3, loc: { t: 'agent', id: AGENT } })
   }
   return { config, terrain, engineDb, store, rng, state }
 }
@@ -349,8 +374,9 @@ async function setup(opts: {
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
+  hearths?: number
 }) {
-  const world = buildWorld(opts.simConfig, opts.knownAfar)
+  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -1087,6 +1113,64 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const liveHash = stateHash(loop.state)
     const replayed = replayFromGenesis(world.store, world.config, world.terrain)
     expect(stateHash(replayed)).toBe(liveHash)
+  })
+
+  // 98 of the gate's 402 refusals were this act, named with its fire left null. The world has
+  // no reading of its own for `stoke`, so a started act is proof the seam filled the mark.
+  it('fills the fire an act left null before the world is asked', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'The fire wants feeding.',
+          action: { verb: 'stoke', params: { structureId: null } },
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      hearths: 1,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('stoke'), 100)
+    const started = world.engineDb
+      .prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq")
+      .all() as { payload: string }[]
+    const stoked = started
+      .map((r) => JSON.parse(r.payload) as { verb: string; params: { structureId?: string } })
+      .find((p) => p.verb === 'stoke')
+    expect(stoked?.params.structureId).toBe(FIRE_IDS[0])
+  })
+
+  it('leaves the fire null when two are within reach, so the mind is asked which', async () => {
+    const blank = {
+      thought: 'A fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { world, loop, runtime, agentDb } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      // A second pit on the body's other side: two readings, and no act may pick between them.
+      hearths: 2,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    // The one candidate is what buys the mind out of the retry; two do not, and no fire is
+    // guessed at either — the act simply never reaches the world.
+    expect(prompts.length).toBe(2)
+    expect(alertKinds(agentDb)).toContain('empty_act_detail')
+    expect(startedVerbs(world.engineDb)).not.toContain('stoke')
+  })
+
+  it('spends no second call on the one fire it could only have meant', async () => {
+    const blank = {
+      thought: 'The fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND, hearths: 1 })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).toContain('act_detail_filled_in')
   })
 
   it('does not execute the next plan item when the head is rejected', async () => {

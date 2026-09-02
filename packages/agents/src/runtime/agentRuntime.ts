@@ -73,6 +73,7 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
+import { bindObvious, hasOneReading } from './bindObvious.js'
 import {
   buildAgentCtx,
   humanizeIntent,
@@ -476,8 +477,8 @@ export class AgentRuntime {
         : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     this.#noteCompany(packet, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
-    void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
-    this.#pumpPlan(packet.self.activity)
+    void this.#submitPendingIfIdle(packet).catch(this.#sink('submit_crash'))
+    this.#pumpPlan(packet)
     this.#answerWakeOwed(packet)
     rearmConversationWindow(this.#config, packet, this.#clock, tick)
     this.#handleNight(tick, packet)
@@ -519,10 +520,11 @@ export class AgentRuntime {
 
   // Submit the queue head only when the agent is idle. A rejected head is handled
   // synchronously during the drain, before `#pumpPlan` ever runs.
-  #pumpPlan(activity: string | null): void {
+  #pumpPlan(packet: PerceptionPacket): void {
     if (this.#plan.lastResult !== 'running') return
     // A held direct action outranks the plan: the queue waits its turn.
     if (this.#pendingIntent !== null || this.#pendingInFlight) return
+    const activity = packet.self.activity
     if (this.#planHeadInFlight) {
       if (activity !== null) return
       this.#plan.queue.shift()
@@ -534,7 +536,7 @@ export class AgentRuntime {
     }
     if (activity === null) {
       this.#planHeadInFlight = true
-      const head = this.#plan.queue[0]!
+      const head = this.#bound(this.#plan.queue[0]!, packet)
       void this.#bridge.submit(this.#agentId, head, (res) => {
         this.#onPlanHeadResult(res, head)
       })
@@ -604,16 +606,17 @@ export class AgentRuntime {
     }
   }
 
-  #submitPendingIfIdle(activity: string | null): Promise<void> {
+  #submitPendingIfIdle(packet: PerceptionPacket): Promise<void> {
     if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
-    if (activity !== null) return Promise.resolve()
-    const intent = this.#pendingIntent
+    if (packet.self.activity !== null) return Promise.resolve()
+    const held = this.#pendingIntent
+    const intent = this.#bound(held, packet)
     this.#pendingInFlight = true
     return this.#bridge
       .submit(this.#agentId, intent, (res) => {
         this.#pendingInFlight = false
         this.#noteAccepted(intent, res)
-        if (this.#pendingIntent !== intent) return
+        if (this.#pendingIntent !== held) return
         if (res.ok) {
           this.#pendingIntent = null
           return
@@ -645,7 +648,14 @@ export class AgentRuntime {
   // discarding, until accepted or superseded by a newer turn's action.
   #holdIntent(intent: Intent): Promise<void> {
     this.#pendingIntent = intent
-    return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+    return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId))
+  }
+
+  // The one seam every act of this mind's crosses on its way to the world. An act that named
+  // its verb and left the key it reads blank is read the way a person would read it, against
+  // the body's own moment — a held intent may have waited ticks for the hands to come free.
+  #bound(intent: Intent, packet: PerceptionPacket): Intent {
+    return { verb: intent.verb, params: bindObvious(intent.verb, intent.params, packet) }
   }
 
   // A try at something new goes to the arbiter, not to the verb registry. An unreachable
@@ -902,7 +912,9 @@ export class AgentRuntime {
         (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
-        (verb) => this.#bridge.actHasOneReading(this.#agentId, verb),
+        // Both readings, because the seam below fills in acts the world has no reading for:
+        // asking again for a word this mind had no choice about is a call paid for nothing.
+        (verb) => hasOneReading(verb, packet) || this.#bridge.actHasOneReading(this.#agentId, verb),
       )
     } catch (err) {
       this.#doze(tick, err)
@@ -1052,7 +1064,7 @@ export class AgentRuntime {
       this.#plan.size = turn.plan.length
       this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
       this.#planHeadInFlight = false
-      this.#pumpPlan(this.#bridge.perception(this.#agentId).self.activity)
+      this.#pumpPlan(this.#bridge.perception(this.#agentId))
     }
 
     if (turn.journal) {

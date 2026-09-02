@@ -50,6 +50,18 @@ const OBJECT: Record<string, { key: string; candidates: (p: PerceptionPacket) =>
   read: { key: 'itemId', candidates: (p) => held(p, (i) => i.kind === 'note') },
 }
 
+/** The one thing in sight this act's blank object could have meant, and the word that names it. */
+function loneReading(
+  verb: string,
+  params: Record<string, unknown>,
+  packet: PerceptionPacket,
+): { key: string; id: string } | null {
+  const object = OBJECT[verb]
+  if (object === undefined || !isBlank(params[object.key])) return null
+  const [only, ...rest] = object.candidates(packet)
+  return only !== undefined && rest.length === 0 ? { key: object.key, id: only } : null
+}
+
 /** A person told "stoke the fire" beside exactly one fire does not ask which fire. Where the act
  *  named its verb and left the key it reads blank, and the packet holds exactly one thing that
  *  key could mean, read it in. Two things mean the mind must name one, and that refusal is right.
@@ -59,10 +71,14 @@ export function bindObvious<P extends Record<string, unknown>>(
   params: P,
   packet: PerceptionPacket,
 ): P {
-  const object = OBJECT[verb]
-  if (object === undefined || !isBlank(params[object.key])) return params
-  const [only, ...rest] = object.candidates(packet)
-  return only !== undefined && rest.length === 0 ? { ...params, [object.key]: only } : params
+  const read = loneReading(verb, params, packet)
+  return read === null ? params : { ...params, [read.key]: read.id }
+}
+
+/** Whether an act that named nothing has exactly one reading here. Asked before the decode
+ *  retry, so a mind is not billed a second call for a word it had no choice about. */
+export function hasOneReading(verb: string, packet: PerceptionPacket): boolean {
+  return loneReading(verb, {}, packet) !== null
 }
 
 /** The verbs a blank object is read in for, named so a test can hold the list to the refusals
