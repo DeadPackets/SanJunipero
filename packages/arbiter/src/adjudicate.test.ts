@@ -4,16 +4,18 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
-import { EMBEDDING_DIM, FORBIDDEN_FRAMING, NO_PARAMS } from '@sj/shared'
+import { EMBEDDING_DIM, FORBIDDEN_FRAMING, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import {
   FALLBACK_IMPOSSIBLE,
   isDecodeDebris,
   makeArbiter,
+  RETIRED_REASON,
   type AgentCtx,
   type Arbiter,
 } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
+import { RulebookStore } from './rulebook.js'
 import { CodexStore } from './codex.js'
 import { RulingsStore } from './rulings.js'
 import { makeArbiterRig, ScriptedLlm, TAMAR_CTX } from './testutil/scriptedLlm.js'
@@ -882,6 +884,69 @@ describe('retrieval efficiency', () => {
 
     await arbiter.adjudicate('I chart the river shallows', TAMAR_CTX)
     expect(embeds).toBe(2)
+  })
+})
+
+// The registry stays the size of what the town does: a word nobody has used in fourteen days
+// goes, and a fresh ruling that says what a charter already says is that charter.
+describe('retirement and merge keep the rulebook small', () => {
+  const DAY = MINUTES_PER_DAY
+  // Its own id: `recipe:basket` is minted by an earlier test and the registry is global.
+  const weaveReedBasket = {
+    recipe: { ...basketRecipe, id: 'recipe:weave_reed_basket', name: 'Weave Reed Basket' },
+    summary: 'Weave reeds into a basket.',
+  }
+
+  it('retires a minted verb unused for fourteen days, row kept and word unregistered', async () => {
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { db, arbiter } = await makeArbiterRig({ llm })
+    arbiter.codify(
+      { recipe: { ...basketRecipe, id: 'recipe:retire_me', name: 'Retire Me' }, summary: 'x' },
+      CODIFY_CREDIT,
+    )
+    expect(arbiter.retireUnused(100 + 13 * DAY)).toEqual([])
+    expect(VERBS['recipe:retire_me']).toBeDefined()
+
+    arbiter.noteUsed('recipe:retire_me', 100 + 10 * DAY)
+    expect(arbiter.retireUnused(100 + 20 * DAY)).toEqual([])
+
+    expect(arbiter.retireUnused(100 + 25 * DAY)).toEqual(['recipe:retire_me'])
+    expect(VERBS['recipe:retire_me']).toBeUndefined()
+    const row = new RulebookStore(db).byId('recipe:retire_me')!
+    expect(row.revertedReason).toBe(RETIRED_REASON)
+    expect(arbiter.roster()).toEqual([])
+  })
+
+  it('maps a fresh ruling onto the charter it restates, instead of minting a second name', async () => {
+    const twin: Verdict = {
+      kind: 'attempt',
+      recipe: {
+        ...basketRecipe,
+        id: 'recipe:reed_basket',
+        name: 'Weave a Reed Basket',
+        rngStream: 'recipe:reed_basket',
+      },
+      summary: 'Weave the reeds into a basket.',
+    }
+    const llm = new ScriptedLlm(() => twin)
+    const { db, arbiter } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    arbiter.codify(weaveReedBasket, CODIFY_CREDIT)
+
+    const verdict = await arbiter.adjudicate('I make a basket out of the reeds', TAMAR_CTX)
+    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:weave_reed_basket', params: NO_PARAMS })
+    expect(new RulebookStore(db).byId('recipe:reed_basket')).toBeNull()
+    // And the map is the precedent, so the next rephrasing costs no call at all.
+    const stored = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
+    expect((JSON.parse(stored.verdict_json) as Verdict).kind).toBe('map')
+    unregisterVerb('recipe:weave_reed_basket')
+  })
+
+  it('leaves a ruling that says something new to be minted', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { arbiter } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    arbiter.codify(weaveReedBasket, CODIFY_CREDIT)
+    expect(await arbiter.adjudicate('I twist the reeds into rope', TAMAR_CTX)).toEqual(ropeVerdict)
+    unregisterVerb('recipe:weave_reed_basket')
   })
 })
 

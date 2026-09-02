@@ -1,9 +1,11 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import { registerVerb, VERBS } from '@sj/engine'
+import { registerVerb, unregisterVerb, VERBS } from '@sj/engine'
 import {
   CLOSED_KEYS,
+  cosine,
   FORBIDDEN_FRAMING,
+  MINUTES_PER_DAY,
   NO_PARAMS,
   type DiscoveryCredit,
   type DiscoveryKind,
@@ -32,8 +34,14 @@ import { RulingsStore } from './rulings.js'
 import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
 
 // At or above this cosine the stored ruling is returned verbatim, so a rephrasing of an
-// already-ruled intent resolves to identical physics with zero LLM calls.
+// already-ruled intent resolves to identical physics with zero LLM calls. The same bar decides
+// that a fresh ruling is a second name for a charter the town already has.
 export const SIMILARITY_SHORT_CIRCUIT = 0.92
+
+// A minted verb nobody has begun in this long is retired: the row stays, the word goes, and
+// the roster every mind reads stays the size of what the town actually does.
+export const RETIREMENT_DAYS = 14
+export const RETIRED_REASON = 'unused for fourteen days'
 
 // Impossible classes that depend on who asked (skills, inventory) must never
 // become global precedent; only context-independent classes short-circuit.
@@ -197,6 +205,10 @@ export type Arbiter = {
   codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
   // Every active minted verb as a prompt lists it, in rulebook order.
   roster(): RosterEntry[]
+  // A body began this minted act at this tick, so it is not for retiring yet.
+  noteUsed(verb: string, tick: number): void
+  // Retires every minted verb unused for RETIREMENT_DAYS; returns the words that went.
+  retireUnused(tick: number): string[]
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -245,6 +257,28 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     // hooked only codify() would leave the town inventing a name for dancing with no trace.
     deps.onCodified?.({ recipeId: row.id, name: row.name, kind: 'word', makes: [], credit })
     return row.id
+  }
+
+  // A fresh attempt that says what an active charter already says is that charter, not a
+  // second name for it. Charter vectors are cached per gloss; a town has few.
+  const charterVectors = new Map<string, Float32Array>()
+  async function charterTwin(v: { recipe: Recipe; summary: string }): Promise<string | null> {
+    const charters = rulebook
+      .allActive()
+      .map((row): unknown => JSON.parse(row.recipeJson))
+      .filter((p) => !isExpressiveRow(p)) as VerbCharter[]
+    if (charters.length === 0) return null
+    const asked = await deps.embedder.embed(`${v.recipe.name}. ${v.summary}`)
+    for (const c of charters) {
+      const key = `${c.id}|${c.gloss}`
+      let vec = charterVectors.get(key)
+      if (vec === undefined) {
+        vec = await deps.embedder.embed(`${c.name}. ${c.gloss}`)
+        charterVectors.set(key, vec)
+      }
+      if (cosine(asked, vec) >= SIMILARITY_SHORT_CIRCUIT) return c.id
+    }
+    return null
   }
 
   function roster(): RosterEntry[] {
@@ -395,6 +429,13 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
         if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
+        if (r.value.kind === 'attempt') {
+          const twin = await charterTwin(r.value)
+          if (twin !== null) {
+            value = { kind: 'map', verb: twin, params: NO_PARAMS }
+            break
+          }
+        }
         // An attempt that leaks the machinery is invalid — retry (finding 12).
         if (framingTainted(r.value)) continue
         // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
@@ -449,6 +490,19 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     roster,
+
+    noteUsed(verb, tick) {
+      rulebook.touch(verb, tick)
+    },
+
+    retireUnused(tick) {
+      const stale = rulebook.unusedSince(tick - RETIREMENT_DAYS * MINUTES_PER_DAY)
+      for (const row of stale) {
+        rulebook.revert(row.recipeId, RETIRED_REASON, tick)
+        unregisterVerb(row.verb)
+      }
+      return stale.map((row) => row.verb)
+    },
 
     sanity(recipe, agentCtx) {
       return recipeSanityRefusal(recipe, codifiedVocabulary(agentCtx))

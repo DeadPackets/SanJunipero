@@ -54,9 +54,15 @@ export function migrateArbiterTables(db: Database.Database): void {
       verb TEXT NOT NULL,
       tick INTEGER NOT NULL,
       reverted_at_tick INTEGER,
-      reverted_reason TEXT
+      reverted_reason TEXT,
+      last_used_tick INTEGER
     );
   `)
+  // Pre-retirement DBs: a row with no use on record is as old as its minting.
+  const rulebookCols = db.prepare('PRAGMA table_info(rulebook)').all() as { name: string }[]
+  if (!rulebookCols.some((c) => c.name === 'last_used_tick')) {
+    db.exec('ALTER TABLE rulebook ADD COLUMN last_used_tick INTEGER')
+  }
   // The construct registry and its ops-plane record. Agent-invisible by construction: these
   // tables live in the arbiter's database, never in the world's.
   db.exec(`
