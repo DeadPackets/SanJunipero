@@ -188,9 +188,13 @@ describe('GATE G2: 3-day scripted world run', () => {
     // Ownership: the Builder owns the house he raised, and the Fisher owns what he pulled out.
     const house = Object.values(state.structures).find((s) => s.kind === 'house')!
     expect(house.owner).toBe(BUILDER)
-    const caught = Object.values(state.items).filter((i) => i.kind === 'fish')
+    // Read off the catch, not off the larder: since the ground halves a shelf life, a
+    // three-day run can end with every fish it ever caught already turned.
+    const caught = evs.filter(
+      (e) => e.type === 'item_spawned' && (e.payload as Payload).kind === 'fish',
+    )
     expect(caught.length).toBeGreaterThan(0)
-    for (const f of caught) expect(f.owner).toBe(FISHER)
+    for (const f of caught) expect((f.payload as Payload).owner).toBe(FISHER)
     expect(evs.some((e) => e.type === 'item_owner_changed')).toBe(true)
 
     // The bed law: the Builder steps through his own door and lies down inside it.

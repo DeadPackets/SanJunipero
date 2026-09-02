@@ -3,6 +3,7 @@ import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { composePerception } from './perception.js'
+import { spoilDeadline } from './systems/spoilage.js'
 import { ev, grid } from './testutil/world.js'
 
 // Where a mind's things are when they are not in its hands: the shelves it may use, and what
@@ -102,6 +103,25 @@ describe('the stores a mind may put things in', () => {
     expect(p.stores).toEqual([
       { structureId: 'store_1', kind: 'storehouse', name: 'the long barn', items: [] },
     ])
+  })
+})
+
+// Bread keeps six days, and `spoilage.groundMultiplier` is a half.
+describe('the ground is no place to keep food', () => {
+  const BREAD = { spawnDay: 0, days: 6 }
+  const loaf = (s: WorldState, loc: unknown): WorldState =>
+    put(s, ev('item_spawned', { id: 'loaf', kind: 'bread', qty: 1, loc, spoilage: BREAD }))
+  const deadlineOf = (s: WorldState): number | null =>
+    spoilDeadline(s, s.items.loaf!, DEFAULT_CONFIG)
+
+  it('halves the days of a loaf set down outdoors', () => {
+    expect(deadlineOf(loaf(town(), { t: 'tile', x: 4, y: 4 }))).toBe(3)
+  })
+
+  it('leaves a loaf on a shelf and a loaf in the hands exactly as they were', () => {
+    expect(deadlineOf(loaf(town(), { t: 'structure', id: 'house_1' }))).toBe(6)
+    expect(deadlineOf(loaf(town(), { t: 'agent', id: 'a1' }))).toBe(6)
+    expect(deadlineOf(loaf(town(), { t: 'structure', id: 'store_1' }))).toBe(12)
   })
 })
 

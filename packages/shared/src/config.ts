@@ -385,6 +385,8 @@ const SpoilageSchema = z
       .record(z.string(), z.number())
       .default({ fish: 2, berries: 3, rabbit_meat: 3, venison: 4, bread: 6, wheat: 60 }),
     storehouseMultiplier: z.number().default(2),
+    // What the open air costs a thing left lying on it, against a roof of any kind.
+    groundMultiplier: z.number().default(0.5),
     preservingKinds: z.array(z.string()).default(['storehouse']),
   })
   .strict()

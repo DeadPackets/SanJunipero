@@ -63,7 +63,8 @@ you know it for good and can go back to it from anywhere.
 
 What you carry stays with you until you part with it. You may drop it and it
 rests on the ground where you stand, or stow it in a building you stand beside
-or stand within, and it waits there. You may also keep it, eat it if it is
+or stand within. What lies on the ground is anyone's and spoils fast; your
+house and the storehouse keep things. You may also keep it, eat it if it is
 food, or give it to a person standing beside you.
 
 And some things are someone's; all can see whose. A thing you make or gather

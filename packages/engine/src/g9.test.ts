@@ -384,7 +384,7 @@ describe('G9a-5: a shelf buys time', () => {
     s = apply(s, CFG, VERBS.stow!.onComplete(s, CFG, 'cook', params, RNG))
     expect(s.items.item_2!.owner).toBe('cook') // shelving is not giving
 
-    expect(spoilDeadline(s, s.items.item_1!, CFG)).toBe(2)
+    expect(spoilDeadline(s, s.items.item_1!, CFG)).toBe(2 * CFG.spoilage.groundMultiplier)
     expect(spoilDeadline(s, s.items.item_2!, CFG)).toBe(2 * CFG.spoilage.storehouseMultiplier)
 
     const day2 = pass(s, CFG, 2)

@@ -209,10 +209,13 @@ describe('perception smells it coming', () => {
   const perceive = (s: WorldState, config = DEFAULT_CONFIG) =>
     composePerception(s, config, 'a1', [])
 
-  it('flags a fish only on its final day', () => {
-    const s = withFood(world(), 'fish', { t: 'tile', x: 1, y: 1 })
-    expect(perceive(s).visible.items[0]).not.toHaveProperty('spoiling')
-    expect(perceive({ ...s, tick: MINUTES_PER_DAY }).visible.items[0]!.spoiling).toBe(true)
+  // Six days of bread on the open ground is three, so the last of them is day two.
+  it('flags a loaf on the ground only on its final day, which the ground brings forward', () => {
+    const s = withFood(world(), 'bread', { t: 'tile', x: 1, y: 1 })
+    expect(perceive({ ...s, tick: MINUTES_PER_DAY }).visible.items[0]).not.toHaveProperty(
+      'spoiling',
+    )
+    expect(perceive({ ...s, tick: 2 * MINUTES_PER_DAY }).visible.items[0]!.spoiling).toBe(true)
   })
 
   it('flags the fish in your own hands too', () => {

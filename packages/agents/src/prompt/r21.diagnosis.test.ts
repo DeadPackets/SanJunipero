@@ -378,7 +378,10 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(CAPABILITIES).toContain('give kind, the thing to raise')
     expect(CAPABILITIES).toContain('give recipe, the name of what you shape')
     // Not one buildable kind, and only the two recipes whose product another verb needs in hand.
-    for (const noun of [...buildable, 'plank', 'cloth', 'stew']) {
+    // `house` and `storehouse` are the exception: both are named as the places a thing keeps,
+    // which is a rule of being about the ground and not a vocabulary for raising anything.
+    const keepers = new Set(['house', 'storehouse'])
+    for (const noun of [...buildable.filter((k) => !keepers.has(k)), 'plank', 'cloth', 'stew']) {
       expect(CAPABILITIES.includes(noun)).toBe(false)
     }
     expect(CAPABILITIES).toContain('the garment you hold')
