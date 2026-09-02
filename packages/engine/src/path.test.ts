@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -8,6 +9,7 @@ import {
   findPath,
   isPassable,
   searchPath,
+  searchToward,
   stepCostAt,
   terrainCostFor,
   TERRAIN_COST,
@@ -728,5 +730,39 @@ describe('build: planning a bridge', () => {
     s = fold(s, ev(60, 'agent_moved', { id: 'a1', x: 3, y: 1 }), BRIDGE3)
     const r = submitIntent(s, BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 4, y: 1 })
     expect(r.ok).toBe(true)
+  })
+})
+
+// The open list is a binary heap keyed on the same total order the linear min-scan used —
+// (f, then y, then x) — so every route it hands back has to be byte-for-byte the old one.
+describe('the open list is a heap, and it moves not one tile of any route', () => {
+  it('reproduces the routes the linear min-scan returned, to the digit', () => {
+    const s = genesisState(DEFAULT_CONFIG, makeFixtureMap())
+    const marks = [
+      { x: 60, y: 60 },
+      { x: 5, y: 5 },
+      { x: 33, y: 4 },
+      { x: 4, y: 58 },
+      { x: 45, y: 31 },
+    ]
+    const routes: unknown[] = []
+    for (let fy = 2; fy < 64; fy += 5) {
+      for (let fx = 4; fx < 61; fx += 7) {
+        for (const to of marks) {
+          routes.push(findPath(s, { x: fx, y: fy }, to, DEFAULT_CONFIG))
+          // The drained-open branch, which is the quadratic one the heap is here for.
+          routes.push(searchToward(s, { x: fx, y: fy }, to, DEFAULT_CONFIG))
+        }
+      }
+    }
+    const maze = genesisState(DEFAULT_CONFIG, serpentineMaze())
+    for (const cap of [50, 200, 1000, 6000]) {
+      routes.push(searchPath(maze, MAZE_FROM, MAZE_TO, withMaxNodes(DEFAULT_CONFIG, cap)))
+    }
+    expect(routes.filter((r) => r !== null).length).toBeGreaterThan(500)
+    // Recorded off the linear min-scan this heap replaced, at c2d94368.
+    expect(createHash('sha256').update(JSON.stringify(routes)).digest('hex')).toBe(
+      '15cfbaaa4fa96e14f976dfd89c41d675fb74c41f8aa247bc7ad026d605e7a24e',
+    )
   })
 })

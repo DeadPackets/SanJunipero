@@ -140,6 +140,42 @@ function closerToGoal(a: Node, b: Node): boolean {
   return a.h < b.h || (a.h === b.h && (a.y < b.y || (a.y === b.y && a.x < b.x)))
 }
 
+// The (y, x) tie-break is what makes the frontier the same on every machine.
+function cheaper(a: Node, b: Node): boolean {
+  return a.f < b.f || (a.f === b.f && (a.y < b.y || (a.y === b.y && a.x < b.x)))
+}
+
+// A binary heap, not a scan: a search that drains its open list expands thousands of nodes, and
+// picking the minimum by walking the array makes that quadratic.
+function heapPush(heap: Node[], node: Node): void {
+  let i = heap.length
+  heap.push(node)
+  while (i > 0) {
+    const p = (i - 1) >> 1
+    if (!cheaper(node, heap[p]!)) break
+    heap[i] = heap[p]!
+    i = p
+  }
+  heap[i] = node
+}
+
+function heapPop(heap: Node[]): Node {
+  const top = heap[0]!
+  const last = heap.pop()!
+  if (heap.length === 0) return top
+  let i = 0
+  for (;;) {
+    const l = 2 * i + 1
+    if (l >= heap.length) break
+    const c = l + 1 < heap.length && cheaper(heap[l + 1]!, heap[l]!) ? l + 1 : l
+    if (!cheaper(heap[c]!, last)) break
+    heap[i] = heap[c]!
+    i = c
+  }
+  heap[i] = last
+  return top
+}
+
 // One walk is searched by `validate` and again by `duration` over the same immutable world, so
 // the answer is kept against the identity of that world and the config it was judged under.
 const memo = new WeakMap<WorldState, { config: SimConfig; key: string; found: PathSearch | null }>()
@@ -205,13 +241,7 @@ function runSearch(
   let frontier = start
 
   while (open.length > 0) {
-    let mi = 0
-    for (let i = 1; i < open.length; i++) {
-      const a = open[i]!,
-        b = open[mi]!
-      if (a.f < b.f || (a.f === b.f && (a.y < b.y || (a.y === b.y && a.x < b.x)))) mi = i
-    }
-    const cur = open.splice(mi, 1)[0]!
+    const cur = heapPop(open)
     const ck = key(cur.x, cur.y)
     if (closed.has(ck)) continue
     closed.add(ck)
@@ -225,7 +255,7 @@ function runSearch(
       if (known && known.g <= g) continue
       const node: Node = { x: nx, y: ny, g, h: h(nx, ny), f: g + h(nx, ny), parent: cur }
       best.set(key(nx, ny), node)
-      open.push(node)
+      heapPush(open, node)
       if (closerToGoal(node, frontier)) frontier = node
     }
     // Spent the budget: walk as far toward the goal as the search actually got. An empty
