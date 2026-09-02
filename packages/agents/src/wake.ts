@@ -104,7 +104,8 @@ export function decideWake(
 
 /** Every reason true at this tick, the deciding one first. What follows the head bought nothing
  *  — it is what a histogram of winners alone cannot see, and `salient_perception` at 82% of the
- *  gate's calls was mostly a mind with nothing left to do that someone also walked past.
+ *  gate's calls was mostly a mind with nothing left to do that someone also walked past. It is
+ *  read on two rungs now: felt is immediate, noticed waits for the idle gap.
  *
  *  A reason gated behind a `return` still ends the list: the backoff, the retry rung and the idle
  *  floor each stop the ladder, and what they stop was never going to be returned either. */
@@ -149,15 +150,19 @@ export function wakeReasons(
 
   const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
 
-  // Floor-exempt: physical rousing and immediate surprises.
+  // Floor-exempt: physical rousing, and whatever happened TO this body.
+  const felt = packet.feltEvents.length > 0
   if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
-  if (salientPerception(packet, clock.prevVisibleIds)) reasons.push('salient_perception')
+  if (felt) reasons.push('salient_perception')
   if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
-
-  if (plan.lastResult === 'done' && sinceLast >= cfg.idleGapTicks) reasons.push('plan_done')
 
   if (sinceLast < cfg.idleGapTicks) return reasons
 
+  // Merely noticed: a word overheard, a face arriving or going. The scene machine is what
+  // answers speech now — a mind spoken to becomes a participant and gets the floor, which is
+  // gap-exempt — so hearing one buys a turn no sooner than an idle mind's own pacing allows.
+  if (!felt && noticed(packet, clock.prevVisibleIds)) reasons.push('salient_perception')
+  if (plan.lastResult === 'done') reasons.push('plan_done')
   if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) reasons.push('reconsider')
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) reasons.push('boredom')
 
@@ -203,9 +208,11 @@ export function disarmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClo
   for (const key of ringing(cfg, body)) clock.alarmArmed[key] = false
 }
 
-function salientPerception(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
+// What this mind only noticed, as against what happened to it. A word carries no claim on the
+// hearer: an audience of ten around a twelve-line scene would otherwise buy 120 turns at
+// $0.00079 apiece to overhear one that cost $0.00017 a line.
+function noticed(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
   if (packet.heard.length > 0) return true
-  if (packet.feltEvents.length > 0) return true
   const ids = packet.visible.agents.map((a) => a.id)
   if (ids.length !== prevVisibleIds.length) return true
   const seen = new Set(ids)

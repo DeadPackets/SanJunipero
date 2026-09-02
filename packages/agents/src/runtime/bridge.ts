@@ -237,6 +237,25 @@ export class EngineBridge {
       .filter((id) => hears(state, this.#simConfig, spoken, id))
   }
 
+  /** The closest of these bodies to this one, by the block distance the rest of the world
+   *  measures with. Ties by id, so two people equally near never decide it differently twice. */
+  nearestOf(agentId: string, candidates: readonly string[]): string | null {
+    const state = this.#loop.state
+    const self = state.agents[agentId]
+    if (self === undefined) return null
+    let best: string | null = null
+    let bestD = Infinity
+    for (const id of [...candidates].sort()) {
+      const other = state.agents[id]
+      if (other === undefined) continue
+      const d = Math.abs(other.x - self.x) + Math.abs(other.y - self.y)
+      if (d >= bestD) continue
+      bestD = d
+      best = id
+    }
+    return best
+  }
+
   /** Everyone who has sung, danced or mourned on the plaza inside the recent window. A crowd
    *  the town can see is what turns two people talking into a gathering. */
   expressersAtSquare(radius = SQUARE_RADIUS): string[] {

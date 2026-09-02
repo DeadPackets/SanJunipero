@@ -10,7 +10,7 @@ import { TieStore } from '../memory/ties.js'
 import { SceneCoordinator, type SceneMind } from './coordinator.js'
 import {
   FLOOR_TIMEOUT_MS,
-  LINE_CAP,
+  lineCapFor,
   type SceneAsk,
   type SceneClose,
   type SceneLlm,
@@ -21,8 +21,10 @@ import {
 const NADIA = 'nadia'
 const OMAR = 'omar'
 const SALMA = 'salma'
+const YUSUF = 'yusuf'
 const NOON = 12 * 60
 const NIGHT = 22 * 60
+const LINE_CAP = lineCapFor(2)
 
 // A recorded answer, dressed in the fields no recording carries.
 function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
@@ -30,6 +32,7 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
   return {
     thought: line.thought,
     speech: line.speech,
+    to: null,
     gesture: null,
     move: line.move,
     stance: null,
@@ -178,7 +181,7 @@ const sceneEvents = (db: Database.Database): SimEvent[] =>
   }))
 
 describe('a scene opens on a word somebody heard', () => {
-  it('opens with everyone in earshot and nobody out of it', () => {
+  it('opens on the two who engaged and nobody out of earshot', () => {
     const h = harness({
       who: [
         { id: NADIA, name: 'Nadia', x: 3 },
@@ -188,7 +191,22 @@ describe('a scene opens on a word somebody heard', () => {
     })
     const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
     expect(scene?.participants).toEqual([NADIA, OMAR])
-    expect(scene?.floor, 'the line named Omar').toBe(OMAR)
+    expect(scene?.audience, 'Salma is a valley away').toEqual([])
+    expect(scene?.floor, 'the line addressed Omar').toBe(OMAR)
+    expect(scene?.anchor, 'and Nadia opened it').toBe(NADIA)
+  })
+
+  it('answers the nearest mind when the word addressed nobody', () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 10 },
+        { id: SALMA, name: 'Salma', x: 4 },
+      ],
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Is anyone about?', NOON)
+    expect(scene?.participants, 'Salma is one pace off and Omar seven').toEqual([NADIA, SALMA])
+    expect(scene?.audience).toEqual([OMAR])
   })
 
   it('does not open a second scene for a mind already in one', () => {
@@ -206,6 +224,85 @@ describe('a scene opens on a word somebody heard', () => {
       ],
     })
     expect(h.coordinator.noteSpoken(NADIA, 'Anyone?', NOON)).toBeNull()
+  })
+})
+
+describe('a scene is who engaged, not who stood nearby', () => {
+  const LAYLA = 'layla'
+  const TAREK = 'tarek'
+  const SQUARE = [
+    { id: NADIA, name: 'Nadia', x: 3 },
+    { id: OMAR, name: 'Omar', x: 4 },
+    { id: SALMA, name: 'Salma', x: 5 },
+    { id: YUSUF, name: 'Yusuf', x: 6 },
+    { id: LAYLA, name: 'Layla', x: 7 },
+    { id: TAREK, name: 'Tarek', x: 8 },
+  ]
+  // Nothing in these lines addresses anybody, so nobody is pulled off the audience by accident.
+  const plain = () => (_a: SceneAsk, n: number) =>
+    fromCorpus(0, { speech: `Line number ${n}.`, leave: false })
+
+  it('opens two out of six and leaves four listening', () => {
+    const h = harness({ who: SQUARE, script: plain })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)!
+    expect(scene.participants, 'a good morning is not a summons').toHaveLength(2)
+    expect(scene.audience).toEqual([LAYLA, SALMA, TAREK, YUSUF])
+  })
+
+  it('never grows one scene of six out of a full square', async () => {
+    const h = harness({ who: SQUARE, script: plain })
+    h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)
+    let widest = 0
+    for (let i = 0; i < LINE_CAP + 4; i++) {
+      const scene = h.coordinator.open()[0]
+      if (scene?.floor === undefined || scene.floor === null) break
+      widest = Math.max(widest, scene.participants.length)
+      await h.coordinator.takeFloor(scene.floor, NOON + i)
+    }
+    expect(widest, 'two to four, never the whole square').toBeLessThanOrEqual(4)
+  })
+
+  it('leaves an audience member taking ordinary turns, and pays them a memory at close', async () => {
+    const h = harness({
+      who: SQUARE,
+      script: () => () => fromCorpus(0, { speech: null }),
+      closer: () => ({ summary: 'Nadia and Omar counted the planks.', deltas: [] }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)
+    for (const id of [SALMA, YUSUF, LAYLA, TAREK]) {
+      expect(h.coordinator.sceneFor(id), `${id} is free to take its own turn`).toBeNull()
+    }
+    await play(h, NOON)
+    expect(h.remembered.map((r) => r.agentId).sort(), 'the town can gossip about it').toEqual(
+      [LAYLA, NADIA, OMAR, SALMA, TAREK, YUSUF].sort(),
+    )
+    expect(
+      h.minds.get(SALMA)!.ties.open(),
+      'overhearing makes no promise and owes no debt',
+    ).toHaveLength(0)
+  })
+
+  it('makes a word said inside an open scene a line of that scene', () => {
+    const h = harness({ who: SQUARE, script: plain })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)!
+    const joined = h.coordinator.noteSpoken(SALMA, 'The well is dry again.', NOON + 1)
+    expect(joined?.id, 'no second scene opened over the top of it').toBe(scene.id)
+    expect(h.coordinator.open(), 'still one talk on this square').toHaveLength(1)
+    expect(scene.participants).toContain(SALMA)
+    expect(scene.audience).not.toContain(SALMA)
+    expect(scene.thread.map((l) => l.presence)).toEqual([undefined, 'joined', undefined])
+  })
+
+  it('draws a bystander in when the floor-holder names one', async () => {
+    const h = harness({
+      who: SQUARE,
+      script: () => (_a, n) =>
+        fromCorpus(0, { speech: `Salma, you saw it.`, to: null, leave: n > 0 }),
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)!
+    await h.coordinator.takeFloor(scene.floor!, NOON)
+    expect(scene.participants, 'named, so she is in it').toContain(SALMA)
+    expect(scene.floor, 'and the floor is hers').toBe(SALMA)
   })
 })
 
@@ -246,12 +343,22 @@ describe('only the floor-holder pays', () => {
 describe('every way a scene ends', () => {
   const silent = (): SceneTurn => fromCorpus(0, { speech: null, leave: false })
 
-  it('two passes end it, and one does not', async () => {
+  it('a pass hands the floor back to the anchor, and the anchor’s own pass ends it', async () => {
     const h = harness({ script: () => () => silent() })
-    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
-    await h.coordinator.takeFloor(h.coordinator.open()[0]!.floor!, NOON)
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    await h.coordinator.takeFloor(scene.floor!, NOON)
     expect(h.coordinator.open()[0]?.passes, 'one silence is not an ending').toBe(1)
-    await h.coordinator.takeFloor(h.coordinator.open()[0]!.floor!, NOON + 1)
+    expect(h.coordinator.open()[0]?.floor, 'it goes back to whoever opened it').toBe(NADIA)
+    await h.coordinator.takeFloor(NADIA, NOON + 1)
+    expect(h.coordinator.open()).toHaveLength(0)
+    expect(closeReasonOf(h)).toBe('ended')
+  })
+
+  it('closes rather than loops when the anchor is already holding the floor', async () => {
+    const h = harness({ script: () => () => silent() })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Anyone about?', NOON)!
+    scene.floor = scene.anchor
+    await h.coordinator.takeFloor(NADIA, NOON)
     expect(h.coordinator.open()).toHaveLength(0)
     expect(closeReasonOf(h)).toBe('ended')
   })
@@ -286,13 +393,33 @@ describe('every way a scene ends', () => {
     expect(closeReasonOf(h)).toBe('left')
   })
 
-  it('the body walking a mind out of the talk ends it', async () => {
+  it('the body walking a mind out of the talk ends it when two were talking', async () => {
     const h = harness({})
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
     h.coordinator.leave(OMAR, NIGHT + 1)
     await flush()
     expect(h.coordinator.open()).toHaveLength(0)
     expect(closeReasonOf(h)).toBe('left')
+  })
+
+  // One body's alarm is that body's business. Above two it drops the one and the rest talk on.
+  it('drops one mind rather than closing a talk that still has enough mouths', async () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: SALMA, name: 'Salma', x: 5 },
+      ],
+      script: () => (_a, n) => fromCorpus(0, { speech: `Line ${n}.`, leave: false }),
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Good morning.', NOON)!
+    h.coordinator.noteSpoken(SALMA, 'The well is dry.', NOON + 1)
+    expect(scene.participants).toEqual([NADIA, OMAR, SALMA])
+    h.coordinator.leave(OMAR, NOON + 2)
+    await flush()
+    expect(h.coordinator.open(), 'two are left, so the talk goes on').toHaveLength(1)
+    expect(scene.participants).toEqual([NADIA, SALMA])
+    expect(scene.thread.at(-1)?.presence).toBe('left')
   })
 
   it('twelve lines cap it, and the tenth is told to wrap up', async () => {
@@ -310,7 +437,7 @@ describe('every way a scene ends', () => {
     expect(asks.find((a) => a.scene.thread.length === 9)?.wrapUp, 'the tenth line').toBe(true)
   })
 
-  it('a stall is a pass, and two of them close it as a timeout', async () => {
+  it('a stall is not a pass, and two of them close it as a timeout', async () => {
     let clock = 0
     const h = harness({ script: () => () => 'stall', now: () => clock })
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
@@ -319,14 +446,16 @@ describe('every way a scene ends', () => {
     clock += FLOOR_TIMEOUT_MS
     h.coordinator.onTick(NOON + 1)
     const scene = h.coordinator.open()[0]
-    expect(scene?.passes, 'one stall is one pass').toBe(1)
-    expect(scene?.floor, 'and the floor moved on').not.toBe(first)
+    expect(scene?.passes, 'nobody chose that silence').toBe(0)
+    expect(scene?.timeouts).toBe(1)
+    expect(scene?.floor, 'the floor went back to the anchor').toBe(NADIA)
     void h.coordinator.takeFloor(scene!.floor!, NOON + 1)
     clock += FLOOR_TIMEOUT_MS
     h.coordinator.onTick(NOON + 2)
     await flush()
     expect(h.coordinator.open()).toHaveLength(0)
     expect(closeReasonOf(h)).toBe('timeout')
+    expect(h.calls.get(NADIA), 'and nobody was asked twice for one line').toBe(1)
   })
 })
 
@@ -416,18 +545,18 @@ describe('the night is a time of day, not an ending', () => {
         { id: SALMA, name: 'Salma', x: 5 },
       ],
     })
-    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)!
+    h.coordinator.noteSpoken(SALMA, 'I am here too.', NIGHT)
     const asking = h.coordinator.takeFloor(OMAR, NIGHT)
     h.emitNext('agent_slept', { agentId: OMAR })
     h.loop.step()
     h.coordinator.onTick(NIGHT + 1)
     await asking
-    const scene = h.coordinator.open()[0]
-    expect(scene?.participants, 'a sleeper is nobody in the talk').toEqual([NADIA, SALMA])
+    expect(scene.participants, 'a sleeper is nobody in the talk').toEqual([NADIA, SALMA])
     expect(
-      scene?.thread.map((l) => l.agentId),
+      scene.thread.filter((l) => l.presence === undefined).map((l) => l.agentId),
       'and said nothing in it',
-    ).toEqual([NADIA])
+    ).toEqual([NADIA, SALMA])
   })
 
   it('tells the floor-holder the hour and what its body has left', async () => {

@@ -52,9 +52,8 @@ export { ensureChildren, needsHousehold } from './live/ensureChild.js'
 export { DEFAULT_MIND_CONFIG, type MindConfig } from './wake.js'
 export { SceneCoordinator, type SceneMind } from './scene/coordinator.js'
 export {
-  LINE_CAP,
   SceneTurnSchema,
-  WRAP_CUE_LINE,
+  lineCapFor,
   sceneId,
   type Move,
   type Scene,

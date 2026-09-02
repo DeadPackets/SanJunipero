@@ -63,6 +63,7 @@ function ask(overrides: Partial<SceneAsk> = {}): SceneAsk {
       { id: 'tamar', name: 'Tamar' },
       { id: 'yusuf', name: 'Yusuf' },
     ],
+    audience: [],
     ties: [],
     thread: [line('yusuf', 'Four days of bread, you said.')],
     wrapUp: false,
@@ -105,6 +106,7 @@ function client(model: MockLanguageModelV4, caller = 'scene'): LlmClient {
 const TURN = JSON.stringify({
   thought: 'He is counting wrong again.',
   speech: 'Three, and I counted this morning.',
+  to: null,
   gesture: null,
   move: 'press',
   stance: null,
@@ -149,6 +151,88 @@ describe('the scene block', () => {
   it('names who is standing here, and never the mind itself', () => {
     expect(block()).toContain('Standing with you: Yusuf.')
     expect(block()).not.toContain('Standing with you: Tamar')
+  })
+
+  it('names the audience apart from the cast, and offers `to`', () => {
+    const text = block(ask({ audience: [{ id: 'nadia', name: 'Nadia' }] }))
+    expect(text).toContain('Within earshot and not in the talk: Nadia.')
+    expect(text).not.toContain('Standing with you: Nadia')
+    expect(block()).toContain('Put in "to" the one name you are speaking to')
+  })
+
+  it('names one silent mind in the run cue rather than asking for somebody', () => {
+    const text = block(
+      ask({
+        cast: [
+          { id: 'tamar', name: 'Tamar' },
+          { id: 'yusuf', name: 'Yusuf' },
+          { id: 'nadia', name: 'Nadia' },
+        ],
+      }),
+    )
+    expect(text).toContain('Not a word yet from Nadia.')
+    expect(text).toContain('Answer Nadia, or say nothing at all')
+    expect(text).not.toContain('Answer them,')
+  })
+
+  it('says an arrival and a going as lines of the thread', () => {
+    const thread = [
+      line('yusuf', 'Four days of bread, you said.'),
+      { ...line('nadia', ''), presence: 'joined' as const },
+      { ...line('yusuf', ''), presence: 'left' as const },
+    ]
+    const text = block(ask({ thread }))
+    expect(text).toContain('Nadia joins.')
+    expect(text).toContain('Yusuf leaves.')
+    expect(text).not.toContain('Nadia: ""')
+  })
+})
+
+// A live run measured the scene path at 84.9% cache read and $0.00017 a line, a fifth of an
+// ordinary turn. The roster is the one block a join rewrites, so it sits BELOW the thread: the
+// thread only ever grows at its end, and everything above it stays byte-for-byte.
+describe('a join does not throw the cached prefix away', () => {
+  const THREAD = [
+    line('yusuf', 'Four days of bread, you said, and it was three.'),
+    line('tamar', 'I counted them out on the step.', 'he never listens'),
+    line('yusuf', 'Then somebody else took one.'),
+  ]
+  const before = ask({ thread: THREAD, audience: [{ id: 'nadia', name: 'Nadia' }] })
+  const after = ask({
+    thread: [...THREAD, { ...line('nadia', ''), presence: 'joined' as const }],
+    cast: [
+      { id: 'tamar', name: 'Tamar' },
+      { id: 'yusuf', name: 'Yusuf' },
+      { id: 'nadia', name: 'Nadia' },
+    ],
+    audience: [],
+  })
+
+  const common = (a: string, b: string): number => {
+    let i = 0
+    while (i < a.length && i < b.length && a[i] === b[i]) i++
+    return i
+  }
+
+  it('leaves every byte before the thread exactly where it was', () => {
+    const a = block(before)
+    const b = block(after)
+    const head = a.slice(0, a.indexOf('What has been said'))
+    expect(head.length).toBeGreaterThan(0)
+    expect(b.startsWith(head), 'the answer contract, the cast law, ties and want all hold').toBe(
+      true,
+    )
+  })
+
+  it('holds the shared prefix through the thread the join did not touch', () => {
+    const a = block(before)
+    const b = block(after)
+    // Everything up to and including "Then somebody else took one." is common; only the arrival
+    // line and the roster under it are re-read.
+    expect(common(a, b)).toBeGreaterThan(a.indexOf('Then somebody else took one.'))
+    expect(common(a, b) / a.length, 'four fifths of the block survives a join').toBeGreaterThan(
+      0.75,
+    )
   })
 
   it('shows the last six lines only', () => {
