@@ -67,11 +67,41 @@ export const EARSHOT_TILES: number = DEFAULT_CONFIG.movement.earshotRadius
 
 type Voice = { agentId: string; x: number; y: number; atMs: number }
 
+/** Who holds the floor of a scene: the last of `ids` to have said anything. The floor PASSES,
+ *  it never lapses — a silence in a scene is still that speaker's turn, not nobody's. */
+export function floorHolder(ids: readonly string[], voices: readonly Voice[]): string | null {
+  const cast = new Set(ids)
+  for (let i = voices.length - 1; i >= 0; i--) {
+    const id = voices[i]!.agentId
+    if (cast.has(id)) return id
+  }
+  return null
+}
+
+/** Who a body turns to while a scene runs: everyone faces the floor, and the floor faces
+ *  whoever held it before them. Null before anybody has spoken — a facing nobody has earned
+ *  is a body swivelling on its own. */
+export function faceInScene(
+  agentId: string,
+  ids: readonly string[],
+  voices: readonly Voice[],
+): string | null {
+  const floor = floorHolder(ids, voices)
+  if (floor === null) return null
+  if (agentId !== floor) return floor
+  return floorHolder(
+    ids.filter((id) => id !== floor),
+    voices,
+  )
+}
+
 export type Conversation = {
   heard(v: Voice): void
   /** Who this speaker is answering: the last OTHER voice heard within earshot of where they are
    *  standing now, or null when they are talking to the air. */
   partnerOf(agentId: string, x: number, y: number, nowMs: number): string | null
+  /** The voice log itself, so the floor rules above can be asked of it without a second one. */
+  voices(): readonly Voice[]
 }
 
 export function createConversation(): Conversation {
@@ -91,5 +121,6 @@ export function createConversation(): Conversation {
       }
       return null
     },
+    voices: () => voices,
   }
 }

@@ -27,7 +27,7 @@ import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { useStageCue } from './ui/stageCue.js'
+import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
@@ -76,6 +76,10 @@ export function App() {
   const { autoCut, toggle: toggleDirector } = useAutoCut()
   // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
   const moment = useStageCue(store)
+  // ...and what the town is DOING. One owner for the scene's eight-second hold, so the line and
+  // the camera can never disagree about whether the summary is still up.
+  const stage = useSceneStage(store)
+  const sceneCue = sceneCueFor(stage, store.getState()?.agents)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -339,12 +343,13 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
-      <DirectorCue text={cue} moment={moment} />
+      <DirectorCue text={cue} moment={moment} scene={sceneCue} />
       {route.broadcast && <LowerThird store={store} />}
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
         store={store}
         scene={scene}
+        stage={stage}
         autoCut={autoCut}
         pinned={following}
         onCue={setCue}

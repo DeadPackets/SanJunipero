@@ -1201,7 +1201,10 @@ body {
 .stage-cue {
   position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
-  max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
+  /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
+     room that thing takes, so the reading width is the same line to line. */
+  --cue-aside: 0px;
+  max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
@@ -1217,6 +1220,44 @@ body {
   letter-spacing: 0.04em; text-transform: none;
 }
 .stage-cue-glyph { display: block; flex: none; image-rendering: pixelated; }
+
+/* A scene is not news: it stands for as long as the room is talking, so it is a struck stamp
+   and a sentence, never a caption shouted in capitals for a minute at a time. */
+/* A stamp and a sentence, set like a chyron: `balance` shrinks a flex item to equalise its
+   lines, which on a phone left the sentence 112px wide with 100px of slot empty each side.
+   The sentence is body text — `pretty`, ranged left, its first line on the stamp's baseline. */
+.stage-cue[data-scene='on'] {
+  display: flex; align-items: baseline; justify-content: center; gap: var(--s-4);
+  letter-spacing: 0.04em; text-transform: none;
+  text-align: start; text-wrap: pretty;
+  /* A WIDTH, not only a cap: `left: 50%` with no `right` leaves shrink-to-fit half the stage to
+     work in, and on a phone that clamped the sentence to 117px. `max-width` still does the
+     capping — the two rules above compose. */
+  width: calc(100% - 2 * var(--mark-inset));
+  /* The stamp's own room, so the sentence keeps its 60ch: inside it, a 51-character topic
+     wrapped onto two lines while there was a third of the slot standing empty. */
+  --cue-aside: calc(3 * var(--s-8));
+}
+.stage-scene-stamp {
+  position: relative; flex: none;
+  /* the extra 2px at the foot is the stakes rule's own room, so the word never sits on it */
+  padding: var(--s-2) var(--s-3) calc(var(--s-2) + var(--s-1));
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cream-quiet); background: var(--deep);
+  box-shadow: var(--frame); text-shadow: none;
+}
+/* What is at stake, MEASURED rather than counted — the rule runs the fraction of the stamp the
+   scene is worth, in the ink the band already chose. Colour is never the only channel. */
+.stage-scene-stamp::after {
+  content: ''; position: absolute; left: 0; bottom: 0;
+  width: calc(var(--stakes, 0) * 100%); height: var(--s-1);
+  background: currentColor;
+}
+/* 6.92:1 and 5.56:1 on --deep. A closed scene keeps neither: stakes is a live pressure, and a
+   summary has none left. */
+.stage-scene-stamp[data-stakes='warm'] { color: var(--honey); }
+.stage-scene-stamp[data-stakes='hot'] { color: var(--ember); }
 
 .stage-exit {
   position: absolute; z-index: 25;
@@ -1236,7 +1277,7 @@ body {
 
 /* Once the signpost has a corner, the cue may not reach it. */
 @media (min-width: 700px) {
-  .stage-cue { max-width: min(60ch, calc(100% - 320px)); }
+  .stage-cue { max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 320px)); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1745,7 +1786,8 @@ body {
   .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
-  .bond-detail, .fps-overlay, .stage-plate, .signpost-arm, .help-button, .thoughts-button {
+  .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
+  .thoughts-button {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }

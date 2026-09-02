@@ -2,6 +2,7 @@ import {
   SimConfigSchema,
   type AssetRecord,
   type ServerMsg,
+  type ServerScene,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -15,6 +16,9 @@ const RECENT_EVENTS_CAP = 400
 
 type ViewMode = { live: true } | { live: false; tick: number }
 type Thought = { agentId: string; tick: number; text: string }
+/** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
+ *  which is the Pixi handle and has nothing to do with this. */
+export type TownScene = ServerScene['scene']
 // Law flips are kept whole, outside the capped delta ring: a town's legal history
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
@@ -39,6 +43,9 @@ export type WorldStore = {
    *  into the log is reused the moment it is trimmed, so a reader counts from here. */
   thoughtsSeq: () => number
   recentEvents: () => SimEvent[]
+  /** The scene the town is holding, open or just closed. The closing frame carries the summary,
+   *  so it is KEPT rather than cleared — whoever shows it decides how long it stands. */
+  getScene: () => TownScene | null
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** The world log's head as the server last reported it — the signal a read model refetches on,
@@ -65,6 +72,7 @@ export function createWorldStore(): WorldStore {
   const thoughts: Thought[] = []
   const latest = new Map<string, { tick: number; text: string }>()
   const events: SimEvent[] = []
+  let scene: TownScene | null = null
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
@@ -97,6 +105,7 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
+    getScene: () => scene,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -166,6 +175,9 @@ export function createWorldStore(): WorldStore {
         case 'assets':
           records.push(...msg.records)
           assetsSeq += msg.records.length
+          break
+        case 'scene':
+          scene = msg.scene
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

@@ -1,5 +1,5 @@
 import { chronicleGlyph } from '../ui/importantFeed.js'
-import { CUE_ICON_PX, type StageCue } from '../ui/stageCue.js'
+import { CUE_ICON_PX, STAKES_MAX, type SceneCue, type StageCue } from '../ui/stageCue.js'
 
 const GLYPH_GRID = 8
 
@@ -22,14 +22,49 @@ function CueGlyph({ icon }: { icon: string }) {
   )
 }
 
-/** The slot says what just HAPPENED while there is something, and what the shot is otherwise:
- *  a moment outranks a caption, and there is only ever one line here. */
-export function DirectorCue({ text, moment }: { text: string | null; moment: StageCue | null }) {
+/** The kind, struck like a stamp, with what is at stake measured along its foot. Two channels
+ *  and one gesture: the ink says how hot and the rule says how hot, so neither is alone. */
+function SceneStamp({ kind, stakes, band }: SceneCue) {
+  return (
+    <span
+      className="stage-scene-stamp"
+      data-stakes={band}
+      style={stakes === null ? undefined : { ['--stakes' as string]: stakes / STAKES_MAX }}
+    >
+      {kind}
+      {stakes !== null && (
+        <span className="stage-sr">
+          , {stakes} of {STAKES_MAX} at stake
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The slot says what just HAPPENED while there is something, what the town is DOING while a
+ *  scene runs, and what the shot is otherwise. There is only ever one line here. */
+export function DirectorCue({
+  text,
+  moment,
+  scene,
+}: {
+  text: string | null
+  moment: StageCue | null
+  scene: SceneCue | null
+}) {
   if (moment !== null) {
     return (
       <p className="stage-cue" data-moment="on">
         <CueGlyph icon={moment.icon} />
         {moment.text}
+      </p>
+    )
+  }
+  if (scene !== null) {
+    return (
+      <p className="stage-cue" data-scene="on">
+        <SceneStamp {...scene} />
+        {scene.text}
       </p>
     )
   }

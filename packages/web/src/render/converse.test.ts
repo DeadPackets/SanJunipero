@@ -10,10 +10,13 @@ import {
   REPLY_WINDOW_MS,
   TYPE_CHARS_PER_S,
   createConversation,
+  faceInScene,
   fateOfPriorLine,
+  floorHolder,
   thoughtsToEnd,
   typedChars,
   typingMs,
+  type Voice,
 } from './converse.js'
 
 // ★ Two people spoke and the town showed two paragraph slabs, neither facing the other, the
@@ -155,5 +158,82 @@ describe('★ one live thought a mind, and two on screen', () => {
     const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
     expect(SRC).toContain('for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now')
     expect(SRC).toContain('const live = bubbles.filter((b) => b.isThought)')
+  })
+})
+
+const voice = (agentId: string, atMs: number): Voice => ({ agentId, x: 0, y: 0, atMs })
+
+// ★ A scene has a FLOOR and the frame does not carry it: the coordinator says who is in the
+// room, not who is talking. It is read off the same voice log a partner is read off.
+describe('★ the floor passes between the people in a scene', () => {
+  const CAST = ['amara', 'salma']
+
+  it('gives it to the last of the cast to speak', () => {
+    expect(floorHolder(CAST, [voice('amara', 1)])).toBe('amara')
+    expect(floorHolder(CAST, [voice('amara', 1), voice('salma', 2)])).toBe('salma')
+    expect(floorHolder(CAST, [voice('amara', 1), voice('salma', 2), voice('amara', 3)])).toBe(
+      'amara',
+    )
+  })
+
+  it('★ follows the exchange as it alternates, line by line', () => {
+    const said: Voice[] = []
+    const held: (string | null)[] = []
+    for (const [i, who] of ['amara', 'salma', 'amara', 'salma'].entries()) {
+      said.push(voice(who, i))
+      held.push(floorHolder(CAST, said))
+    }
+    expect(held).toEqual(['amara', 'salma', 'amara', 'salma'])
+  })
+
+  it('ignores a voice from outside the room, however recent', () => {
+    expect(floorHolder(CAST, [voice('amara', 1), voice('yusuf', 9)])).toBe('amara')
+  })
+
+  it('holds it through a silence — a pause is still that speaker’s turn', () => {
+    expect(floorHolder(CAST, [voice('amara', 0)])).toBe('amara')
+  })
+
+  it('gives it to nobody before anybody has spoken', () => {
+    expect(floorHolder(CAST, [])).toBe(null)
+    expect(floorHolder([], [voice('amara', 1)])).toBe(null)
+  })
+
+  it('is asked of the one voice log the layer already keeps', () => {
+    const talk = createConversation()
+    talk.heard(voice('amara', 1))
+    expect(floorHolder(['amara'], talk.voices())).toBe('amara')
+  })
+})
+
+describe('★ the room looks at whoever has the floor', () => {
+  const CAST = ['amara', 'salma', 'nadir']
+
+  it('turns everybody else toward the speaker', () => {
+    const said = [voice('amara', 1), voice('salma', 2)]
+    expect(faceInScene('amara', CAST, said)).toBe('salma')
+    expect(faceInScene('nadir', CAST, said)).toBe('salma')
+  })
+
+  it('★ turns the speaker toward whoever held it before them', () => {
+    expect(faceInScene('salma', CAST, [voice('amara', 1), voice('salma', 2)])).toBe('amara')
+    // three-way: the speaker answers the last OTHER voice, never the last of their own
+    const said = [voice('amara', 1), voice('nadir', 2), voice('salma', 3)]
+    expect(faceInScene('salma', CAST, said)).toBe('nadir')
+  })
+
+  it('leaves a body facing where it was until the room has said something', () => {
+    expect(faceInScene('amara', CAST, [])).toBe(null)
+    // the first speaker has nobody to answer yet
+    expect(faceInScene('amara', CAST, [voice('amara', 1)])).toBe(null)
+  })
+
+  it('★ the character layer turns its bodies by this rule and rings the one holding it', () => {
+    const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('faceInScene(a.id, cast!, heard)')
+    expect(SRC).toContain('floorHolder(cast, heard)')
+    // 1px of honey, on the ground point rather than on the bobbing body
+    expect(SRC).toContain('ring.stroke({ width: 1, color: FLOOR_RING_INK })')
+    expect(SRC).toContain('e.ring.position.set(sx, sy)')
   })
 })

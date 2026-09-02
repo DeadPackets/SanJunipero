@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { cameraClaim } from './DirectorMode.js'
+import type { SceneStage } from './stageCue.js'
 import {
   CUT_MIN_MS,
   QUIET_TURN_TICKS,
@@ -120,7 +122,9 @@ describe('★ the director does not cut to a mind the street cannot show', () =>
   it('★ DirectorMode reads indoors off the layer that draws the street', () => {
     const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
     expect(SRC).toContain('rendersOnMap')
-    expect(SRC).toMatch(/subjectFor\([\s\S]*?indoors,?\s*\)/)
+    expect(SRC).toMatch(/subjectFor\([\s\S]*?indoorsIn\(store\.getState\(\)\),?\s*\)/)
+    // and the cut and the scene claim ask the ONE question, so they cannot disagree
+    expect(SRC).toContain('indoorsIn(state)')
   })
 })
 
@@ -144,5 +148,81 @@ describe('DirectorMode reads the heat window through the one endpoint layer', ()
     expect(subjectFor([], null, 1000, ['amara', 'omar'])).toBe(
       quietSubject(['amara', 'omar'], 1000),
     )
+  })
+})
+
+// ★ WHO THE CAMERA ANSWERS TO. Three claimants now, and the ladder has to be written down: a
+// scene outranks the heat director, and a viewer's own hand outranks both.
+describe('★ the camera’s ladder of claims', () => {
+  const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
+  const NOBODY_INSIDE = new Set<string>()
+  const open = (participants: string[]): SceneStage => ({
+    scene: {
+      id: 'sc_1',
+      kind: 'talk',
+      participants,
+      topic: 'the well',
+      stakes: 4,
+      open: true,
+    },
+    phase: 'open',
+  })
+
+  it('★ an open scene outranks the auto director', () => {
+    const claim = cameraClaim(null, open(['amara', 'salma']), NOBODY_INSIDE, 'yusuf')
+    expect(claim).toEqual({ by: 'scene', cast: ['amara', 'salma'] })
+  })
+
+  it('★ a closed one gives the cut back', () => {
+    expect(cameraClaim(null, null, NOBODY_INSIDE, 'yusuf')).toEqual({ by: 'cut', agentId: 'yusuf' })
+  })
+
+  it('★ an all-indoors scene takes nobody, and the shot HOLDS rather than cutting', () => {
+    const inside = new Set(['amara', 'salma'])
+    expect(cameraClaim(null, open(['amara', 'salma']), inside, 'yusuf')).toEqual({ by: 'hold' })
+  })
+
+  it('frames the ones the map does draw when only some of them are inside', () => {
+    const claim = cameraClaim(null, open(['amara', 'salma']), new Set(['salma']), null)
+    expect(claim).toEqual({ by: 'scene', cast: ['amara'] })
+  })
+
+  it('★ a viewer following somebody outranks every automation, scene included', () => {
+    const claim = cameraClaim('omar', open(['amara', 'salma']), NOBODY_INSIDE, 'yusuf')
+    expect(claim).toEqual({ by: 'pinned', agentId: 'omar' })
+  })
+
+  it('falls back to the town when nobody has a claim on it', () => {
+    expect(cameraClaim(null, null, NOBODY_INSIDE, null)).toEqual({ by: 'town' })
+  })
+
+  it('★ the summary keeps the room in frame: the shot releases after it, not on the close', () => {
+    const summary: SceneStage = {
+      scene: { ...open(['amara', 'salma']).scene, open: false, summary: 'They agreed.' },
+      phase: 'summary',
+    }
+    expect(cameraClaim(null, summary, NOBODY_INSIDE, 'yusuf')).toEqual({
+      by: 'scene',
+      cast: ['amara', 'salma'],
+    })
+  })
+
+  it('★ the round stands down while a scene holds the shot, and no cut lands', () => {
+    // the cut chooser returns before it reads the heat, so `lastCutRef` never moves either
+    expect(SRC).toContain("if (claimBy === 'scene' || claimBy === 'hold') return")
+    expect(SRC).toMatch(/\}, \[store, autoCut, claimBy, heat, beat\]\)/)
+  })
+
+  it('★ a held shot moves the camera nowhere at all', () => {
+    expect(SRC).toMatch(/if \(claimBy === 'hold'\) return/)
+  })
+
+  it('★ the scene shot is re-cut every frame, so it follows the room as it shifts', () => {
+    expect(SRC).toContain('scene.setZoom(opening.stop)')
+    expect(SRC).toMatch(/scene\.setFollow\(\(\) => \{\s*const shot = where\(\)/)
+  })
+
+  it('★ a hand on the camera stands the scene down with the director, for the same 20s', () => {
+    expect(SRC).toContain('autoCut ? stage : null')
   })
 })

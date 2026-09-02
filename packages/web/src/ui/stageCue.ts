@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { agentName, chronicleIcon, type SimEvent } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { agentName, chronicleIcon, type NameIndex, type SceneKind, type SimEvent } from '@sj/shared'
+import type { TownScene, WorldStore } from '../state/worldStore.js'
 import { chronicleLabel } from './importantFeed.js'
 
 // What the stage says out loud. Everything the town DECIDED used to reach the paper only, which
@@ -56,6 +56,92 @@ export function cueFor(ev: SimEvent, state: Parameters<typeof chronicleLabel>[1]
   }
   const text = chronicleLabel(ev, state)
   return text === null ? null : { text, icon: chronicleIcon(ev.type), bodies }
+}
+
+// ── THE SCENE IN THE SAME SLOT ─────────────────────────────────────────────────────────────
+// A moment is news and is gone in six seconds; a scene is what the town is DOING and stands for
+// as long as it runs. Both belong in the one line under the town, so both live here.
+
+/** How long the summary stands after a scene closes, before the slot goes back to the shot. */
+export const SCENE_SUMMARY_MS = 8000
+
+/** Open, or standing on its own summary. A scene the slot has finished with is `null` instead. */
+export type SceneStage = { scene: TownScene; phase: 'open' | 'summary' }
+
+/** What the slot is holding, given the last frame and the id the hold has already run out on.
+ *  A close with nothing to say clears at once — an empty line is not a summary. */
+export function sceneStageOf(scene: TownScene | null, clearedId: string | null): SceneStage | null {
+  if (scene === null) return null
+  if (scene.open) return { scene, phase: 'open' }
+  if (scene.id === clearedId) return null
+  return scene.summary === undefined || scene.summary.trim() === ''
+    ? null
+    : { scene, phase: 'summary' }
+}
+
+/** The one owner of the eight-second hold: the cue prints off it and the camera lets go on it,
+ *  so the shot cannot release while the summary is still on screen. */
+export function useSceneStage(store: WorldStore): SceneStage | null {
+  const scene = useSyncExternalStore(store.subscribe, store.getScene)
+  const [cleared, setCleared] = useState<string | null>(null)
+  useEffect(() => {
+    if (scene === null || scene.open) return
+    const timer = setTimeout(() => {
+      setCleared(scene.id)
+    }, SCENE_SUMMARY_MS)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [scene])
+  return sceneStageOf(scene, cleared)
+}
+
+/** Three bands, because a viewer reads a band and counts a number. Under four is the town
+ *  talking; eight and over is the alarm colour, and it has to be worth it. */
+export type StakesBand = 'quiet' | 'warm' | 'hot'
+export const STAKES_WARM = 4
+export const STAKES_HOT = 8
+export const STAKES_MAX = 10
+
+export function stakesBand(stakes: number): StakesBand {
+  if (stakes >= STAKES_HOT) return 'hot'
+  return stakes >= STAKES_WARM ? 'warm' : 'quiet'
+}
+
+/** Who is in it, in the town's own words. Two names read as names and so do three; past that
+ *  the line is longer than the thing it is introducing. */
+export function sceneNames(participants: readonly string[], agents: NameIndex | undefined): string {
+  const names = participants.map((id) => agentName(agents, id))
+  if (names.length === 0) return ''
+  if (names.length > 3) return `${names[0]!} & ${names.length - 1} others`
+  const last = names[names.length - 1]!
+  return names.length === 1 ? last : `${names.slice(0, -1).join(', ')} & ${last}`
+}
+
+export type SceneCue = {
+  kind: SceneKind
+  /** what is happening and who it is happening between, or the summary once it has closed */
+  text: string
+  /** 0–10 while it runs. Null once it is over: stakes is a live pressure, not a verdict. */
+  stakes: number | null
+  band: StakesBand
+}
+
+export function sceneCueFor(
+  stage: SceneStage | null,
+  agents: NameIndex | undefined,
+): SceneCue | null {
+  if (stage === null) return null
+  const { scene } = stage
+  if (stage.phase === 'summary') {
+    return { kind: scene.kind, text: scene.summary!.trim(), stakes: null, band: 'quiet' }
+  }
+  const who = sceneNames(scene.participants, agents)
+  const topic = scene.topic === null ? '' : scene.topic.trim()
+  const text = [topic, who].filter((part) => part !== '').join(' · ')
+  return text === ''
+    ? null
+    : { kind: scene.kind, text, stakes: scene.stakes, band: stakesBand(scene.stakes) }
 }
 
 /** One at a time: the slot is one line, and a second moment replaces the first rather than

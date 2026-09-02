@@ -936,6 +936,10 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
         line: /^\{ phase: e\.gait\.phase, bob: scene\.wantsMotion\(\) \},$/,
       },
       { what: 'a crowd re-forming into its rank', line: /^const t = scene\.wantsMotion\(\)$/ },
+      {
+        what: 'the floor ring fading as a scene passes the floor',
+        line: /^const wantsMotion = scene\.wantsMotion\(\)$/,
+      },
     ]
     const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'characters.ts'), 'utf8')
     const sites = src

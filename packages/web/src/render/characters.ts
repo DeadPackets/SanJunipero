@@ -25,7 +25,8 @@ import {
 } from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
 import { statusOf } from '../ui/status.js'
-import { createConversation } from './converse.js'
+import { createConversation, faceInScene, floorHolder } from './converse.js'
+import { progress } from '../ui/motion.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -61,6 +62,12 @@ import {
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
+/** The floor of a scene, drawn on the ground the speaker is standing on: 2:1 like the tile, and
+ *  a shade wider than the 20×8 contact shadow so it reads as a ring and not as an outline. */
+const FLOOR_RING_RX = 12
+const FLOOR_RING_RY = 6
+const FLOOR_RING_INK = 0xf2c879 // --honey, the one accent
+
 /** The movement law's defaults, restated for a world whose snapshot has not arrived; `charAnim.test.ts` asserts these are what `shared/src/config.ts` defaults to. */
 export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 3, debuff: 2 } as const
 
@@ -70,6 +77,12 @@ type Sheet = { art: CharArt; texture: Texture | null }
 type CharEntry = {
   sprite: Sprite
   shadow: Sprite
+  /** the honey ring that says this body holds the floor, and the fade it is part-way through */
+  ring: Graphics
+  ringA: number
+  ringFrom: number
+  ringWant: number
+  ringSinceMs: number
   overhead: Overhead
   /** the kind the slot is drawing, so the atlas is cut once and not once a frame */
   glyphKind: EmoteKind | null
@@ -331,9 +344,17 @@ export function createCharacterLayer(
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
     shadow.eventMode = 'none'
+    const ring = new Graphics()
+    ring.ellipse(0, 0, FLOOR_RING_RX, FLOOR_RING_RY)
+    ring.stroke({ width: 1, color: FLOOR_RING_INK })
+    ring.eventMode = 'none'
+    ring.alpha = 0
+    ring.visible = false
     // each companion to the layer it belongs in: a contact shadow under every body, the
     // overhead slot and the plate over every body. None competes with the depth sort any more.
+    // The ring is a mark on the GROUND, so it goes in with the other ground decals.
     scene.layers.shadow.addChild(shadow)
+    scene.layers.groundDecal.addChild(ring)
     scene.layers.entities.addChild(sprite)
     // ★ ONE SLOT over the head, and the track wraps it exactly while a job runs.
     const overhead = createOverhead(scene.layers.worldText)
@@ -350,6 +371,11 @@ export function createCharacterLayer(
     const e2: CharEntry = {
       sprite,
       shadow,
+      ring,
+      ringA: 0,
+      ringFrom: 0,
+      ringWant: 0,
+      ringSinceMs: now,
       overhead,
       glyphKind: null,
       hovered: false,
@@ -431,6 +457,12 @@ export function createCharacterLayer(
       }
     }
     const nowTick = store.getTick()
+    // An open scene turns its cast toward each other and puts the ring under whoever has it.
+    const open = store.getScene()
+    const cast = open?.open === true ? open.participants : null
+    const heard = talk.voices()
+    const inScene = new Set(cast ?? [])
+    const floor = cast === null ? null : floorHolder(cast, heard)
     const live = new Set<string>()
     // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
     // who else is there and every position must settle before any of them is drawn.
@@ -454,8 +486,14 @@ export function createCharacterLayer(
       const walking = e.path.length > 1 && nowMs < e.path[e.path.length - 1]!.atMs
       // while walking, face the current leg; the event-time facing stays as the
       // idle orientation after arrival
+      // A scene outranks the exchange rule: it says who the room is listening to, where
+      // `partnerOf` can only guess from earshot.
+      const toward = inScene.has(a.id) ? faceInScene(a.id, cast!, heard) : null
       if (walking) e.facing = legFacing(e.path) ?? e.facing
-      else if (statusOf(a, nowTick) === 'talking') {
+      else if (toward !== null) {
+        const at = state.agents[toward]
+        if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      } else if (statusOf(a, nowTick) === 'talking') {
         // Turned toward whoever they are answering: two talkers facing where they last walked
         // read as two people, not as an exchange.
         const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
@@ -490,6 +528,7 @@ export function createCharacterLayer(
 
     // ── pass two: the rank, then everything that hangs off a body's position ────────────────
     const ranks = crowdOffsets(standing)
+    const wantsMotion = scene.wantsMotion()
     for (const { a, e, pos, bobY } of drawing) {
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
@@ -518,6 +557,19 @@ export function createCharacterLayer(
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
+      // On the ground, not on the body: the ring takes the shadow's point, so an idle bob
+      // does not lift it off the tile.
+      e.ring.position.set(sx, sy)
+      const hasFloor = a.id === floor ? 1 : 0
+      if (hasFloor !== e.ringWant) {
+        e.ringFrom = e.ringA
+        e.ringWant = hasFloor
+        e.ringSinceMs = nowMs
+      }
+      const fade = wantsMotion ? progress('reveal', e.ringSinceMs, nowMs) : 1
+      e.ringA = e.ringFrom + (hasFloor - e.ringFrom) * fade
+      e.ring.alpha = e.ringA
+      e.ring.visible = e.ringA > 0
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
@@ -542,6 +594,7 @@ export function createCharacterLayer(
       if (!live.has(agentId)) {
         e.sprite.destroy()
         e.shadow.destroy()
+        e.ring.destroy()
         e.overhead.destroy()
         entries.delete(agentId)
         sheets.delete(agentId)
@@ -568,6 +621,7 @@ export function createCharacterLayer(
       for (const e of entries.values()) {
         e.sprite.destroy()
         e.shadow.destroy()
+        e.ring.destroy()
         e.overhead.destroy()
       }
       entries.clear()
