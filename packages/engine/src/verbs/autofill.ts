@@ -2,34 +2,7 @@ import type { SimConfig } from '@sj/shared'
 import type { Item, WorldState } from '../state.js'
 import { words } from './build.js'
 import { bodyAt, nearestWater, VERBS } from './index.js'
-
-type CandidateSource = (state: WorldState, agentId: string) => string[]
-
-function heldItemIds(state: WorldState, agentId: string): string[] {
-  return Object.keys(state.items).filter((id) => {
-    const loc = state.items[id]!.loc
-    return loc.t === 'agent' && loc.id === agentId
-  })
-}
-
-// A mind that names the verb and leaves its object blank has still chosen the act (K20). Where
-// the world offers exactly one thing that verb would accept, reading it in beats refusing it.
-const OBJECT_PARAM: Record<string, { key: string; candidates: CandidateSource }> = {
-  eat: { key: 'itemId', candidates: heldItemIds },
-  drink: { key: 'itemId', candidates: heldItemIds },
-  drop: { key: 'itemId', candidates: heldItemIds },
-  wear: { key: 'itemId', candidates: heldItemIds },
-  kindle: { key: 'itemId', candidates: heldItemIds },
-  snuff: { key: 'itemId', candidates: heldItemIds },
-  fill: { key: 'itemId', candidates: heldItemIds },
-  read: { key: 'itemId', candidates: heldItemIds },
-  stow: { key: 'itemId', candidates: heldItemIds },
-  take: { key: 'itemId', candidates: (state) => Object.keys(state.items).sort() },
-  enter: { key: 'structureId', candidates: (state) => Object.keys(state.structures) },
-  // 98 of the phase 1 gate's 402 refusals were this act with its fire left null, the largest
-  // bucket by far. `stoke.validate` already asks stokeable, complete, in reach and fuel in hand.
-  stoke: { key: 'structureId', candidates: (state) => Object.keys(state.structures) },
-}
+import { objectBindingFor } from './objectParam.js'
 
 function isBlank(raw: unknown): boolean {
   return raw === null || raw === undefined || (typeof raw === 'string' && raw.trim().length === 0)
@@ -71,7 +44,7 @@ export function loneCandidateFor(
   verb: string,
   params: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const spec = OBJECT_PARAM[verb]
+  const spec = objectBindingFor(verb)
   const fits = readingsOf(state, config, agentId, verb, params)
   if (spec === undefined || fits.length !== 1) return null
   return { ...params, [spec.key]: fits[0] }
@@ -85,7 +58,7 @@ function readingsOf(
   verb: string,
   params: Record<string, unknown>,
 ): string[] {
-  const spec = OBJECT_PARAM[verb]
+  const spec = objectBindingFor(verb)
   const def = VERBS[verb]
   if (spec === undefined || def === undefined) return []
   if (state.agents[agentId] === undefined || !isBlank(params[spec.key])) return []
@@ -112,7 +85,7 @@ export function soleObstacle(
   verb: string,
   params: Record<string, unknown>,
 ): string | null {
-  const spec = OBJECT_PARAM[verb]
+  const spec = objectBindingFor(verb)
   const def = VERBS[verb]
   if (spec === undefined || def === undefined) return null
   if (state.agents[agentId] === undefined || !isBlank(params[spec.key])) return null

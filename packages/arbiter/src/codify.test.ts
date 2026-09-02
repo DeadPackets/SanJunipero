@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import type Database from 'better-sqlite3'
+import type { LlmClient } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   ADULT_AGE_DAYS,
   DURATION_TICKS,
+  NO_PARAMS,
   SimConfigSchema,
   type SimConfig,
   type SimEvent,
@@ -13,6 +17,7 @@ import {
   genesisState,
   skillLevel,
   submitIntent,
+  unregisterVerb,
   type WorldState,
 } from '@sj/engine'
 import { openArbiterDb } from './schema.js'
@@ -23,7 +28,8 @@ import type { Recipe } from './verdict.js'
 import { charterFromAttempt } from './charter.js'
 import { codify, emitOutcomeEffects, isExpertCharter, verbFromCharter } from './codify.js'
 import { productsOf } from './sanity.js'
-import type { Codified } from './adjudicate.js'
+import { makeArbiter, type Codified } from './adjudicate.js'
+import { ScriptedLlm } from './testutil/scriptedLlm.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const CREDIT_FIXTURE = { agentId: 'a1', intent: 'i try to boil the river water down' }
@@ -834,5 +840,115 @@ describe('codify reports the mint — once, and only for a new one', () => {
     deps.review.revertByRecipe(SALT.id, 'admin test', 10)
     codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
     expect(seen).toHaveLength(1)
+  })
+})
+
+// The gate phase 4 is set on, in miniature. Until a minted verb carried its charter's `reads`
+// into the engine, this was a refusal and a second call to repair the refusal — every word the
+// court has ever coined born in the state `stoke` was in.
+describe('★ a minted verb binds its object the way a built-in one does', () => {
+  const blessHearth: Recipe = {
+    id: 'recipe:bless_hearth',
+    name: 'Bless the Hearth',
+    takes: 'minutes',
+    costs: [],
+    requires: [],
+    outcomeTable: [
+      {
+        weight: 1,
+        success: true,
+        label: 'The hearth is blessed, and the room goes quiet for it.',
+        effects: [{ op: 'mark', on: 'structure', key: 'blessed', value: 'by a neighbour' }],
+      },
+    ],
+    rngStream: 'recipe:bless_hearth',
+    canon: ['fire'],
+  }
+
+  const wagerStake: Recipe = {
+    ...blessHearth,
+    id: 'recipe:wager_stake',
+    name: 'Wager a Stake',
+    rngStream: 'recipe:wager_stake',
+    outcomeTable: [
+      {
+        weight: 1,
+        success: true,
+        label: 'The stake changes hands.',
+        effects: [{ op: 'transfer', to: 'target' }],
+      },
+    ],
+  }
+
+  function mint(recipe: Recipe): Database.Database {
+    const db = openArbiterDb(':memory:')
+    const codex = new CodexStore(db)
+    codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    codify({ recipe, summary: SUMMARY }, CREDIT_FIXTURE, {
+      rulebook: new RulebookStore(db),
+      review: new ReviewStore(db),
+      codex,
+      tick: 200,
+    })
+    return db
+  }
+
+  // Two bodies at one hearth: the inventor, and the neighbour who never named it.
+  function atTheHearth(): WorldState {
+    return fold(
+      burningFireAdjacent(),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 7, y: 5, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
+  }
+
+  afterEach(() => {
+    unregisterVerb('recipe:bless_hearth')
+    unregisterVerb('recipe:wager_stake')
+  })
+
+  const blesses = (agentId: string): Record<string, unknown> | undefined => {
+    const r = submitIntent(atTheHearth(), CFG, agentId, 'recipe:bless_hearth', { ...NO_PARAMS })
+    return r.ok
+      ? (r.events.find((e) => e.type === 'action_started')?.payload as Record<string, unknown>)
+      : undefined
+  }
+
+  it('reads the one hearth in for a second mind that left the object blank', () => {
+    mint(blessHearth)
+    expect(blesses('a2')).toMatchObject({
+      agentId: 'a2',
+      verb: 'recipe:bless_hearth',
+      params: { structureId: 's1' },
+    })
+  })
+
+  // The row is derived, so it must be derived again on the way back up. A verb that survived the
+  // restart without its row would be refused on the first blank object after it.
+  it('and the row survives the round trip through the rulebook', async () => {
+    const db = mint(blessHearth)
+    unregisterVerb('recipe:bless_hearth') // the in-memory registry forgets; the db remembers
+    expect(blesses('a2')).toBeUndefined()
+
+    makeArbiter({
+      db,
+      llm: new ScriptedLlm(() => null) as unknown as LlmClient,
+      embedder: await FakeEmbedder.create(),
+      tick: () => 300,
+    })
+    expect(blesses('a2')).toMatchObject({ params: { structureId: 's1' } })
+  })
+
+  // Which thing and which person is two questions, and one row answers one of them. A charter
+  // reading two marks gets none, and refuses in its own words the way `give` does.
+  it('leaves a minted verb that reads two marks to refuse', () => {
+    mint(wagerStake)
+    expect(
+      charterFromAttempt({ recipe: wagerStake, summary: SUMMARY }, CREDIT_FIXTURE).reads,
+    ).toEqual(['itemId', 'targetId'])
+    expect(submitIntent(atTheHearth(), CFG, 'a2', 'recipe:wager_stake', { ...NO_PARAMS })).toEqual({
+      ok: false,
+      reason: 'name itemId, the thing it is for',
+    })
   })
 })

@@ -51,6 +51,7 @@ import {
   type PendingEvent,
 } from './common.js'
 import { buildTicks, buildableRecipe, craftRoutes, shortOf, type SeedRecipe } from './craft.js'
+import { bindObjectParam, unbindObjectParam } from './objectParam.js'
 import {
   CITY_HEARTH_KIND,
   MINUTES_PER_DAY,
@@ -73,6 +74,7 @@ import {
   structureGlowRadius,
   ticksFor,
   visionRadiusAt,
+  type ClosedKey,
   type DurationWord,
   type SimConfig,
 } from '@sj/shared'
@@ -167,6 +169,9 @@ export type VerbDef = {
     params: Record<string, unknown>,
   ): Record<string, unknown>
   skill?: { track: string; xp: number }
+  /** The closed keys a minted verb's charter reads, carried so registration can bind its object
+   *  the way the built-in rows do. Built-ins leave it absent: their rows are hand-tuned. */
+  reads?: readonly ClosedKey[]
   rngStream?: string
 }
 
@@ -2433,14 +2438,17 @@ export const VERBS: Record<string, VerbDef> = {
   attack,
 }
 
-// Hot-registration seam: codified recipe verbs join the live registry by kind id.
+// Hot-registration seam: codified recipe verbs join the live registry by kind id, and bring
+// the binding row that keeps a first blank-object use from being refused.
 export function registerVerb(def: VerbDef): void {
   if (VERBS[def.kind]) throw new Error(`already registered: ${def.kind}`)
   VERBS[def.kind] = def
+  if (def.reads !== undefined) bindObjectParam(def.kind, def.reads)
 }
 
 export function unregisterVerb(kind: string): void {
   delete VERBS[kind] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- a registry key removal
+  unbindObjectParam(kind)
 }
 
 /** On a plot there is no coordinate to look the walls up by, so it is the walls this body began

@@ -1,10 +1,18 @@
-import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, NO_PARAMS, namedParams, type SimEvent } from '@sj/shared'
+import { afterEach, describe, it, expect } from 'vitest'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  NO_PARAMS,
+  namedParams,
+  stateHash,
+  type ClosedKey,
+  type SimEvent,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { VERBS } from './verbs/index.js'
+import { registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1
@@ -236,6 +244,106 @@ describe('the refusal names what is actually in the way', () => {
     for (const said of [refuse(cold, 'stoke'), refuse(dry, 'fill')]) {
       expect([said, /[{}]/.test(said ?? '')]).toEqual([said, false])
     }
+  })
+})
+
+// Nothing wrote to the table at runtime, so every word the arbiter has ever minted was born in
+// the state `stoke` was in: refused on its first blank object, and charged a repair call for it.
+describe('a minted verb brings its own row', () => {
+  const MINTED = ['recipe:bless', 'recipe:wager', 'recipe:hail']
+  afterEach(() => {
+    for (const kind of MINTED) unregisterVerb(kind)
+  })
+
+  // Shaped as `verbFromCharter` shapes one: it reads the keys its charter named, and judges each
+  // of them the way the tier-1 verbs do — a thing in these hands, a building at this elbow.
+  const minted = (kind: string, reads: ClosedKey[]): VerbDef => ({
+    kind,
+    reads,
+    validate(state, _config, agentId, params) {
+      for (const key of reads) {
+        const id = params[key]
+        if (typeof id !== 'string') return `name ${key}, the thing it is for`
+        if (key === 'itemId') {
+          const loc = state.items[id]?.loc
+          if (loc?.t !== 'agent' || loc.id !== agentId) return 'not in your hands'
+        }
+        if (key === 'structureId' && state.structures[id] === undefined)
+          return 'you must be beside it'
+        if (key === 'targetId' && state.agents[id]?.alive !== true) return 'no one there'
+      }
+      return null
+    },
+    duration: () => 1,
+    onComplete: () => [],
+  })
+
+  const neighbour = (s: WorldState, x: number, y: number): WorldState =>
+    fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x, y, ageDays: ADULT_AGE_DAYS }))
+
+  it('reads in the one thing held, and asks when two of them fit', () => {
+    registerVerb(minted('recipe:bless', ['itemId']))
+    const one = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(fill(one, 'recipe:bless')).toEqual({ itemId: 'item_bread_1' })
+    expect(fill(holding(one, 'item_fish_2', 'fish'), 'recipe:bless')).toBeNull()
+  })
+
+  // The phase 4 gate in miniature: a word one mind coined, used by another that named no object.
+  it('reads in the one building for a second mind that left the object blank', () => {
+    registerVerb(minted('recipe:bless', ['structureId']))
+    const s = neighbour(withFire(withAgent(world(), 2, 2), 'structure_fire_1', 2, 3), 3, 3)
+    expect(loneCandidateFor(s, DEFAULT_CONFIG, 'a2', 'recipe:bless', {})).toEqual({
+      structureId: 'structure_fire_1',
+    })
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a2', 'recipe:bless', { ...NO_PARAMS })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.events.find((e) => e.type === 'action_started')!.payload).toMatchObject({
+      agentId: 'a2',
+      params: { structureId: 'structure_fire_1' },
+    })
+  })
+
+  // Which thing and which person is two questions, and a row can answer one. It gets none, and
+  // refuses in its own words the way `give` does.
+  it('leaves a verb that reads two marks to refuse', () => {
+    registerVerb(minted('recipe:wager', ['itemId', 'targetId']))
+    const s = neighbour(holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread'), 2, 1)
+    expect(fill(s, 'recipe:wager')).toBeNull()
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'recipe:wager', {})).toEqual({
+      ok: false,
+      reason: 'name itemId, the thing it is for',
+    })
+  })
+
+  it('never reads in a person, however alone in the valley they are', () => {
+    registerVerb(minted('recipe:hail', ['targetId']))
+    const s = neighbour(withAgent(world(), 1, 1), 2, 1)
+    expect(fill(s, 'recipe:hail')).toBeNull()
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'recipe:hail', {})).toEqual({
+      ok: false,
+      reason: 'name targetId, the thing it is for',
+    })
+  })
+
+  // A verb retires after fourteen unused days, and a row outliving its verb would answer for a
+  // word the town no longer has.
+  it('loses the row when the verb goes', () => {
+    const held = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    registerVerb(minted('recipe:bless', ['itemId']))
+    expect(fill(held, 'recipe:bless')).toEqual({ itemId: 'item_bread_1' })
+    unregisterVerb('recipe:bless')
+    // The same word coined again, this time reading nothing: a surviving row would still bind.
+    registerVerb(minted('recipe:bless', []))
+    expect(fill(held, 'recipe:bless')).toBeNull()
+  })
+
+  it('is derived state: minting one moves nothing in the world', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    const before = stateHash(s)
+    registerVerb(minted('recipe:bless', ['itemId']))
+    expect(fill(s, 'recipe:bless')).toEqual({ itemId: 'item_bread_1' })
+    expect(stateHash(s)).toBe(before)
   })
 })
 
