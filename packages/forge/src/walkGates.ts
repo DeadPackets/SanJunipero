@@ -53,7 +53,7 @@ export const MAGENTA_RESIDUE_MAX = 20
 export function magentaResidue(img: RawImage): number {
   let n = 0
   for (let i = 0; i < img.data.length; i += 4) {
-    if (img.data[i + 3]! === 0) continue
+    if (img.data[i + 3] === 0) continue
     const r = img.data[i]!,
       g = img.data[i + 1]!,
       b = img.data[i + 2]!
@@ -81,7 +81,7 @@ export function torsoHistogram(img: RawImage): Float64Array {
   for (let y = b.y0 + third; y < b.y0 + 2 * third; y++)
     for (let x = b.x0; x <= b.x1; x++) {
       const i = (y * img.width + x) * 4
-      if (img.data[i + 3]! === 0) continue
+      if (img.data[i + 3] === 0) continue
       h[bin(img.data[i]!) * BINS * BINS + bin(img.data[i + 1]!) * BINS + bin(img.data[i + 2]!)]! +=
         1
       n++

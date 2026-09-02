@@ -714,7 +714,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
 
     const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
     expect(verdict).toEqual(withNext)
-    arbiter.codify(withNext as { recipe: Recipe; summary: string }, CODIFY_CREDIT)
+    arbiter.codify(withNext, CODIFY_CREDIT)
 
     const codex = new CodexStore(db)
     expect(codex.known()).toContain('smoking_food')

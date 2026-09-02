@@ -21,7 +21,7 @@ const config: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
   mapGrowth: { enabled: false },
 })
-const genesis = devGenesisState(config, devTerrain('showcase', 1), 'showcase', 1) as WorldState
+const genesis = devGenesisState(config, devTerrain('showcase', 1), 'showcase', 1)
 
 const AGENT = 'p'
 const store = new EventStore(openDb(':memory:'))

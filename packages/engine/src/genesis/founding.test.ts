@@ -36,6 +36,6 @@ describe('the village its founders raised', () => {
 
     expect(s.agents.amara?.knownPlaces).toContain(storehouse.id)
     const replayed = replayLatest(store, config, genesis.terrain, 'g6')
-    expect(replayed?.state.agents.amara?.knownPlaces).toEqual(s.agents.amara?.knownPlaces)
+    expect(replayed.state.agents.amara?.knownPlaces).toEqual(s.agents.amara?.knownPlaces)
   })
 })

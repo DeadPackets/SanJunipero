@@ -55,7 +55,7 @@ import { CodexStore } from '../../arbiter/src/codex.js'
 import { ConstructStore } from '../../arbiter/src/constructStore.js'
 import { runConstructPass } from '../../arbiter/src/constructs.js'
 import { migrateArbiterTables } from '../../arbiter/src/schema.js'
-import type { Recipe } from '../../arbiter/src/verdict.js'
+import type { AttemptVerdict } from '../../arbiter/src/charter.js'
 import { UNNAMED_CONSTRUCT_COPY } from '@sj/shared'
 import { makeNarratorLlm } from '../../narrator/src/llm/narratorLlm.js'
 import { ChapterRenderError, narrateDay } from '../../narrator/src/narrate.js'
@@ -830,8 +830,8 @@ async function main(): Promise<void> {
       })
       return verdict
     },
-    codify: (recipe: { id: string }, credit: DiscoveryCredit) =>
-      arbiter.codify(recipe as Recipe, credit),
+    codify: (attempt: { recipe: { id: string }; summary: string }, credit: DiscoveryCredit) =>
+      arbiter.codify(attempt as AttemptVerdict, credit),
   }
   seam = watched
   for (const runtime of runtimes.values()) wireArbiter(runtime, watched)

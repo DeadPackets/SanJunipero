@@ -668,7 +668,8 @@ export class AgentRuntime {
       )
     } catch (err) {
       this.#llm.alert('adjudicate_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
     if (verdict.kind === 'map')
       return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
@@ -679,7 +680,10 @@ export class AgentRuntime {
       return
     }
     // Adjudicate once, physics forever.
-    if (this.#codify === null) return fallback()
+    if (this.#codify === null) {
+      fallback()
+      return
+    }
     let verb: string
     try {
       verb = this.#codify(verdict, {
@@ -689,7 +693,8 @@ export class AgentRuntime {
       }).verb
     } catch (err) {
       this.#llm.alert('codify_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
     return this.#holdIntent({ verb, params: {} })
   }
