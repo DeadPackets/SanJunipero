@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
@@ -12,6 +12,7 @@ import {
   retryBackoffMs,
   servedProvider,
 } from './client.js'
+import { limiterFor, resetLimiters } from './rateLimiter.js'
 import {
   FALLBACK_MODELS,
   MIND_MODEL,
@@ -56,6 +57,10 @@ const alertsOf = (db: Database.Database, kind: string): string[] =>
   (db.prepare('SELECT detail FROM alerts WHERE kind = ?').all(kind) as { detail: string }[]).map(
     (a) => a.detail,
   )
+
+// The admission gates live for the process, so one test's refusal would otherwise hold the next
+// test's calls behind its cool-down.
+beforeEach(resetLimiters)
 
 describe('migrateLlmTables', () => {
   it('is idempotent', () => {
@@ -1079,14 +1084,14 @@ describe('a stalled request is bounded (T37b)', () => {
 
 // ★ 201 rate-limited turn calls and 38 gists in the live ledger came in failure pairs 5.5 s
 // apart: the retry re-asked inside the window that had just refused it, and paid for both.
-describe('a re-ask waits out the window it was refused in', () => {
-  const refused = new APICallError({
-    message: 'Provider returned error',
-    url: 'https://openrouter.ai/api/v1/chat/completions',
-    requestBodyValues: {},
-    statusCode: 429,
-  })
+const refused = new APICallError({
+  message: 'Provider returned error',
+  url: 'https://openrouter.ai/api/v1/chat/completions',
+  requestBodyValues: {},
+  statusCode: 429,
+})
 
+describe('a re-ask waits out the window it was refused in', () => {
   const answeringAfter = (fail: Error): MockLanguageModelV4 => {
     let n = 0
     return new MockLanguageModelV4({
@@ -1151,7 +1156,8 @@ describe('a re-ask waits out the window it was refused in', () => {
     return new MockLanguageModelV4({
       doGenerate: () => {
         sent += 1
-        if (sent > n) throw new Error(`re-asked ${sent} times, more than the ${n} it was pinned for`)
+        if (sent > n)
+          throw new Error(`re-asked ${sent} times, more than the ${n} it was pinned for`)
         return Promise.reject(refused)
       },
     })
@@ -1227,5 +1233,107 @@ describe('a re-ask waits out the window it was refused in', () => {
     expect(Date.now() - started, 'no wait it could not afford').toBeLessThan(1_000)
     expect(rows(db), 'the retry it had no time for was never made').toHaveLength(1)
     expect(alertsOf(db, 'llm_call_failed')[0]).toContain('test: 1 attempt(s) failed')
+  })
+})
+
+// ★ r3: 27-35% of turn attempts were refused at the door because five minds, their reflections
+// and the court all fired into one back end's per-key concurrency with nothing coordinating them.
+describe('the fleet meets the provider through one gate', () => {
+  const holding = (): { model: MockLanguageModelV4; live: () => number; open: () => void } => {
+    let live = 0
+    const gates: (() => void)[] = []
+    return {
+      live: () => live,
+      open: () => {
+        for (const g of gates.splice(0)) g()
+      },
+      model: new MockLanguageModelV4({
+        doGenerate: async () => {
+          live += 1
+          await new Promise<void>((resolve) => gates.push(resolve))
+          live -= 1
+          return {
+            content: [{ type: 'text' as const, text: 'ok' }],
+            finishReason: { unified: 'stop' as const, raw: undefined },
+            usage: {
+              inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: undefined },
+              outputTokens: { total: 1, text: 1, reasoning: 0 },
+            },
+            warnings: [],
+          }
+        },
+      }),
+    }
+  }
+
+  it('never lets more minds at the back end at once than the cap allows', async () => {
+    const db = openDb()
+    const held = holding()
+    const asks = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+        messages: [{ role: 'user', content: 'u' }],
+      }),
+    )
+    await vi.waitFor(() => {
+      expect(held.live()).toBe(4)
+    })
+    expect(held.live(), 'two of the six are queued, not refused').toBe(4)
+    held.open()
+    await vi.waitFor(() => {
+      expect(held.live()).toBe(2)
+    })
+    held.open()
+    await Promise.all(asks)
+    expect(rows(db)).toHaveLength(6)
+  })
+
+  it('gives up unsent rather than bill a wait it has no patience for', async () => {
+    const db = openDb()
+    const held = holding()
+    const blocking = ['a', 'b', 'c', 'd'].map((id) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+        messages: [{ role: 'user', content: 'u' }],
+      }),
+    )
+    await vi.waitFor(() => {
+      expect(held.live()).toBe(4)
+    })
+    const late = new LlmClient({
+      model: held.model,
+      db,
+      caller: 'turn',
+      agentId: 'e',
+      maxQueueWaitMs: 20,
+    }).text({ messages: [{ role: 'user', content: 'u' }] })
+    await expect(late).rejects.toThrow('no slot on')
+    expect(rows(db), 'four sent, and the fifth never reached the provider').toHaveLength(0)
+    expect(alertsOf(db, 'llm_call_failed')[0]).toContain('turn: 1 attempt(s)')
+    held.open()
+    await Promise.all(blocking)
+  })
+
+  // The gate's state is worth one line to the operator, not one line per call: a pin stuck at
+  // single file is 5 minds taking turns, and no ledger column says so.
+  it('files one alert, not one per call, when the pin has gone single-file', async () => {
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      const gate = limiterFor(PROVIDER_ORDER.join(','))
+      for (let i = 0; i < 3; i++) {
+        await gate.run(() => Promise.reject(refused), 0).catch(() => null)
+        await vi.advanceTimersByTimeAsync(2_000)
+      }
+      expect(gate.state().cap).toBe(1)
+      await vi.advanceTimersByTimeAsync(60_000)
+      for (let i = 0; i < 3; i++) {
+        await new LlmClient({ model: mockModel([{ text: 'ok' }]), db, caller: 'turn' }).text({
+          messages: [{ role: 'user', content: 'u' }],
+        })
+      }
+      expect(alertsOf(db, 'llm_rate_pinned')).toHaveLength(1)
+      expect(alertsOf(db, 'llm_rate_pinned')[0]).toContain('one call at a time')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

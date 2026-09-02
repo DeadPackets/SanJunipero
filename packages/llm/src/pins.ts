@@ -93,6 +93,8 @@ export type CallSettings = {
   // Re-asks after a BURST LIMIT only, which is refused in milliseconds and bills nothing. A stall
   // is not patient the same way: re-asking a 295 s bound this often would block for 20 minutes.
   rateLimitRetries?: number
+  // How long this caller queues at the back end's admission gate before giving its ask up unsent.
+  maxQueueWaitMs?: number
 }
 
 // Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
@@ -103,7 +105,7 @@ const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
 // Rehearsal r3: all 21 refused reflection attempts were Wafer 429s, and every one had a mind call
 // ANSWER within 5 s of it — a burst to wait out, not an outage. Six of these must land in a row
 // before the night writes its gists, so two attempts left 1 night in 10 getting that far.
-const WAITS_OUT_A_BURST = { rateLimitRetries: 3 }
+const WAITS_OUT_A_BURST = { rateLimitRetries: 3, maxQueueWaitMs: 60_000 }
 
 // A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone where
 // reasoning is off, the whole output where it stays on. On GLM it can never be off, so each of
@@ -111,7 +113,9 @@ const WAITS_OUT_A_BURST = { rateLimitRetries: 3 }
 const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // GLM's own turn p99 is 287 output tokens, preamble included. Temperature 1 is the sampling
   // the bake-off measured its voice and its 100% named-object act rate at.
-  turn: { ...ON_GLM, maxOutputTokens: 600, temperature: 1 },
+  // One call ahead of you drains in Wafer's 14.7 s p95 and an idle turn is 60 s apart, so 20 s of
+  // queue covers a wait one deep; past that the mind is standing still and gives the ask up.
+  turn: { ...ON_GLM, maxQueueWaitMs: 20_000, maxOutputTokens: 600, temperature: 1 },
   // 700 truncated the ledger writes and 1500 cleared the longest of them; +174 for the preamble.
   reflection: { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 1750 },
   // Sized around a thinking preamble larger than this model's, so neither of these moves.

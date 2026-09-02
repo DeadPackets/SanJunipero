@@ -1,5 +1,4 @@
 import {
-  APICallError,
   generateText,
   NoObjectGeneratedError,
   Output,
@@ -32,6 +31,7 @@ import {
   type ReasoningSetting,
 } from './pins.js'
 import { jsonOrNothing, repairToSchema } from './repair.js'
+import { limiterFor, rateLimited, RateLimitWaitError, type AdaptiveLimiter } from './rateLimiter.js'
 
 export type { ReasoningSetting }
 
@@ -143,6 +143,7 @@ export type LlmClientOpts = {
   maxRetries?: number
   // Without it a stalled response hangs the caller for ever, with the retries queued behind it.
   requestTimeoutMs?: number
+  maxQueueWaitMs?: number
   budgetUsd?: number
   maxOutputTokens?: number
   temperature?: number
@@ -180,12 +181,8 @@ const DEFAULT_MAX_RETRIES = 1
 // refusal and jittered, so a fleet of minds refused together does not re-ask together.
 const RATE_LIMIT_WAIT_MS = 2_000
 
-// OpenRouter reports a saturated back end as a 429, and on a 200-with-error-body only in words.
-function rateLimited(err: unknown): boolean {
-  if (APICallError.isInstance(err) && err.statusCode === 429) return true
-  const text = err instanceof Error ? err.message : String(err)
-  return /\b429\b|rate[ _-]?limit|too many requests/i.test(text)
-}
+// How long a caller with no pinned patience will queue behind the gate before giving its tick up.
+const DEFAULT_QUEUE_WAIT_MS = 15_000
 
 /** How long to wait before re-asking; nothing at all unless the refusal was a rate limit.
  *  Public so a test can prove the shape without waiting it out. */
@@ -212,6 +209,8 @@ export class LlmClient {
   private readonly maxRetries: number
   private readonly rateLimitRetries: number
   private readonly requestTimeoutMs: number
+  private readonly maxQueueWaitMs: number
+  private readonly limiter: AdaptiveLimiter
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
   private readonly temperature: number | undefined
@@ -236,6 +235,10 @@ export class LlmClient {
     // An explicit count is the caller saying exactly how many; only the default defers to the pin.
     this.rateLimitRetries = opts.maxRetries ?? pinned.rateLimitRetries ?? this.maxRetries
     this.requestTimeoutMs = opts.requestTimeoutMs ?? requestTimeoutMsFor(opts.caller)
+    this.maxQueueWaitMs = opts.maxQueueWaitMs ?? pinned.maxQueueWaitMs ?? DEFAULT_QUEUE_WAIT_MS
+    // One gate per back end, not per caller and not per model: what refuses these calls is the
+    // key's concurrency at that back end, shared by every mind and every pass in the process.
+    this.limiter = limiterFor(this.providerOrder.join(','))
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.temperature = opts.temperature ?? pinned.temperature
@@ -439,86 +442,22 @@ export class LlmClient {
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
     let attempt = 0
+    // One patience for the whole call, not one per attempt: a budget the retries each spent in
+    // full would multiply the two waits together.
+    const queueUntil = Date.now() + this.maxQueueWaitMs
     // The outer bound is whichever budget is larger; which one this failure may spend is decided
     // against the error itself, below.
     for (; attempt <= Math.max(this.maxRetries, this.rateLimitRetries); attempt++) {
-      const start = performance.now()
-      let facts: StepFacts = {}
-      const note: Note = (f) => {
-        facts = f
-      }
       try {
-        const value = await exec(model, note)
-        const served = facts.servedModel ?? modelName
-        const tokens = tokensOf(facts.usage)
-        const { inputTokens, outputTokens, cacheReadTokens } = tokens
-        const provider = facts.provider ?? null
-        const reported = facts.reportedCostUsd ?? null
-        const computed = computeCostUsd(
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          served,
-          provider,
+        return await this.limiter.run(
+          () => this.attemptOnce(model, modelName, exec),
+          Math.max(0, queueUntil - Date.now()),
         )
-        const costUsd = bookCostUsd(this.db, {
-          agentId: this.agentId,
-          computed,
-          reported,
-          served,
-          provider,
-        })
-        insertLlmCall(
-          this.db,
-          this.llmCallRow({
-            model: served,
-            provider,
-            generationId: facts.generationId ?? null,
-            ...tokens,
-            costUsd,
-            estimatedCostUsd: computed.costUsd,
-            reportedCostUsd: reported,
-            latencyMs: performance.now() - start,
-            finishReason: facts.finishReason ?? null,
-            error: null,
-          }),
-        )
-        this.warnIfTruncated(facts.finishReason)
-        return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
-        // Priced here rather than through `bookCostUsd`: a dead call was still billed, has no
-        // reported cost to reconcile against, and an unattributed route would alert every time.
-        const dead = NoObjectGeneratedError.isInstance(err) ? err : null
-        const served = dead?.response?.modelId ?? facts.servedModel ?? modelName
-        const provider =
-          dead === null ? (facts.provider ?? null) : servedProvider(dead.response, undefined)
-        const finishReason = dead?.finishReason ?? facts.finishReason ?? null
-        const tokens = tokensOf(dead?.usage ?? facts.usage)
-        const { inputTokens, outputTokens, cacheReadTokens } = tokens
-        const deadCost = computeCostUsd(
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          served,
-          provider,
-        ).costUsd
-        insertLlmCall(
-          this.db,
-          this.llmCallRow({
-            model: served,
-            provider,
-            generationId: facts.generationId ?? null,
-            ...tokens,
-            costUsd: deadCost,
-            estimatedCostUsd: deadCost,
-            reportedCostUsd: null,
-            latencyMs: performance.now() - start,
-            finishReason,
-            error: err instanceof Error ? err.message : String(err),
-          }),
-        )
-        this.warnIfTruncated(finishReason)
+        // Nothing was sent, so there is nothing to re-ask: another attempt only re-joins the
+        // queue this one already timed out in.
+        if (err instanceof RateLimitWaitError) break
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err
@@ -529,6 +468,9 @@ export class LlmClient {
         // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
         if (wait > this.requestTimeoutMs) break
         if (wait > 0) await sleep(wait)
+      } finally {
+        const pinned = this.limiter.pinnedAlert()
+        if (pinned !== null) this.alert('llm_rate_pinned', pinned)
       }
     }
     this.alert(
@@ -538,6 +480,86 @@ export class LlmClient {
         (lastError instanceof Error ? lastError.message : String(lastError)),
     )
     throw lastError
+  }
+
+  /** One ask, ledgered whichever way it ends. Every row `llm_calls` carries is written here. */
+  private async attemptOnce<T>(
+    model: LanguageModel,
+    modelName: string,
+    exec: (model: LanguageModel, note: Note) => Promise<T>,
+  ): Promise<{ value: T; usage: LlmUsage }> {
+    const start = performance.now()
+    let facts: StepFacts = {}
+    const note: Note = (f) => {
+      facts = f
+    }
+    try {
+      const value = await exec(model, note)
+      const served = facts.servedModel ?? modelName
+      const tokens = tokensOf(facts.usage)
+      const { inputTokens, outputTokens, cacheReadTokens } = tokens
+      const provider = facts.provider ?? null
+      const reported = facts.reportedCostUsd ?? null
+      const computed = computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider)
+      const costUsd = bookCostUsd(this.db, {
+        agentId: this.agentId,
+        computed,
+        reported,
+        served,
+        provider,
+      })
+      insertLlmCall(
+        this.db,
+        this.llmCallRow({
+          model: served,
+          provider,
+          generationId: facts.generationId ?? null,
+          ...tokens,
+          costUsd,
+          estimatedCostUsd: computed.costUsd,
+          reportedCostUsd: reported,
+          latencyMs: performance.now() - start,
+          finishReason: facts.finishReason ?? null,
+          error: null,
+        }),
+      )
+      this.warnIfTruncated(facts.finishReason)
+      return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
+    } catch (err) {
+      // Priced here rather than through `bookCostUsd`: a dead call was still billed, has no
+      // reported cost to reconcile against, and an unattributed route would alert every time.
+      const dead = NoObjectGeneratedError.isInstance(err) ? err : null
+      const served = dead?.response?.modelId ?? facts.servedModel ?? modelName
+      const provider =
+        dead === null ? (facts.provider ?? null) : servedProvider(dead.response, undefined)
+      const finishReason = dead?.finishReason ?? facts.finishReason ?? null
+      const tokens = tokensOf(dead?.usage ?? facts.usage)
+      const { inputTokens, outputTokens, cacheReadTokens } = tokens
+      const deadCost = computeCostUsd(
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        served,
+        provider,
+      ).costUsd
+      insertLlmCall(
+        this.db,
+        this.llmCallRow({
+          model: served,
+          provider,
+          generationId: facts.generationId ?? null,
+          ...tokens,
+          costUsd: deadCost,
+          estimatedCostUsd: deadCost,
+          reportedCostUsd: null,
+          latencyMs: performance.now() - start,
+          finishReason,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      )
+      this.warnIfTruncated(finishReason)
+      throw err
+    }
   }
 
   private llmCallRow(call: Omit<LlmCallInsert, 'agentId' | 'caller' | 'ok'>): LlmCallInsert {
