@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { FOLD_TYPES, mountDataApi } from './api.js'
@@ -119,7 +119,7 @@ describe('★ the read API reads the tick, not the history', () => {
       snapshotEveryTicks: 1000,
       onTick: ({ tick, emit }) => {
         if (tick === 1)
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 1, y: 1, ageDays: 7300 })
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
         emit('agent_spoke', { agentId: 'alice', x: 1, y: 1, text: 'hello' })
       },
     })

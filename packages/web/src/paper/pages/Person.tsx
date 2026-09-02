@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { SOMEONE, agentName, bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
+import { DAYS_PER_YEAR, SOMEONE, agentName, bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
@@ -40,7 +40,7 @@ const journalStamp = (row: JournalRow): string =>
   row.kind === 'dream' ? `Day ${row.day}, a dream` : `Day ${row.day}`
 
 function ageBand(ageDays: number): string {
-  const years = Math.floor(ageDays / 364)
+  const years = Math.floor(ageDays / DAYS_PER_YEAR)
   if (years < 18) return 'young'
   if (years < 60) return 'grown'
   return 'elder'

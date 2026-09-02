@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -50,7 +51,11 @@ function patch(
     CFG,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+    CFG,
+  )
   return fold(s, ev('forageable_spawned', { id: 'node_1', kind, x: at[0], y: at[1], stock }), CFG)
 }
 
@@ -196,7 +201,7 @@ describe('forageables: what a body can see of them', () => {
       seen(
         fold(
           genesisState(CFG, [[0]]),
-          ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+          ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
           CFG,
         ),
       ),

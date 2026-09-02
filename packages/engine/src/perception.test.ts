@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
@@ -21,7 +27,8 @@ function makeWorld(agents: { id: string; x: number; y: number }[]): WorldState {
   for (const a of agents)
     s = fold(
       s,
-      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      // A grown adult, counted in this world's four-week years: 7 300 days is an elder here.
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 30 * DAYS_PER_YEAR }),
       DEFAULT_CONFIG,
     )
   return { ...s, tick: NOON }
@@ -254,7 +261,7 @@ describe('composePerception: packet shape', () => {
 
 // You cannot read a birthday off a face, but you can tell a child from an old woman.
 describe('composePerception: age reads off the body', () => {
-  const YEAR = 364 // DAYS_PER_YEAR
+  const YEAR = DAYS_PER_YEAR
   const withAge = (ageDays: number): WorldState => {
     const s = makeWorld([
       { id: 'a', x: 0, y: 0 },
@@ -576,7 +583,7 @@ describe('composePerception: ownership prose', () => {
     ])
     s = fold(
       s,
-      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: ADULT_AGE_DAYS }),
       DEFAULT_CONFIG,
     )
     s = fold(

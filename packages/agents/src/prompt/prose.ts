@@ -24,6 +24,7 @@ type PerceptionItem = {
   // Present only on the last day a thing can still be eaten. The engine has composed it since
   // spoilage landed; `reconcile` dropped it, so no mind was ever told its fish was going over.
   spoiling?: true
+  marks?: Record<string, string>
   loc:
     | { t: 'tile'; x: number; y: number }
     | { t: 'agent'; id: string }
@@ -35,7 +36,21 @@ type PerceptionItem = {
 type PerceptionSeen =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
-  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
+  | {
+      kind: 'expression'
+      actorName: string
+      verb: string
+      sense: 'sight' | 'sound'
+      // What a minted act looks or sounds like, in the words its charter gave it.
+      label?: string
+    }
+  | {
+      kind: 'discovery'
+      inventorName: string
+      pronoun: 'he' | 'she'
+      name: string
+      saying?: string
+    }
 
 type PerceptionAgent = {
   id: string
@@ -49,6 +64,8 @@ type PerceptionAgent = {
   worn?: string
   // How the body looks when it looks bad, already in words. Absent on a well one.
   condition?: string
+  // Tags a minted verb left on the body, readable by anyone who can see it.
+  marks?: Record<string, string>
 }
 
 type PerceptionStructure = {
@@ -77,6 +94,7 @@ type PerceptionStructure = {
   hearth?: 'lit' | 'cold'
   // There is a bed in it. Absent on a roof with nothing but a floor under it.
   bed?: true
+  marks?: Record<string, string>
 }
 
 type PerceptionCrop = {
@@ -319,7 +337,16 @@ function claimPhrase(i: PerceptionItem): string {
   if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
   if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
   if (i.spoiling === true) parts.push('it is turning')
-  return parts.length === 0 ? '' : `; ${parts.join(', ')}`
+  return `${parts.length === 0 ? '' : `; ${parts.join(', ')}`}${markedPhrase(i.marks)}`
+}
+
+// What a minted verb wrote on a thing, as read by anyone who can see it: "marked: debt two planks".
+function markedPhrase(marks: Record<string, string> | undefined): string {
+  if (marks === undefined) return ''
+  return Object.keys(marks)
+    .sort()
+    .map((k) => `; marked: ${k} ${marks[k]}`)
+    .join('')
 }
 
 // What a thing costs, in the words a refusal already uses for it. `inputName` turns the two
@@ -919,7 +946,7 @@ export function perceptionToProse(
     // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
     // ailing is a body nobody tends, and the live run tended nobody at all.
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
-    const where = `(${a.x}, ${a.y})${dressed}${ails}`
+    const where = `(${a.x}, ${a.y})${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
     if (a.collapsed)
@@ -964,7 +991,7 @@ export function perceptionToProse(
     lines.push(
       `${opening(placeSaid(s))} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
         approach
-      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`,
+      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}${markedPhrase(s.marks)}`,
     )
   }
 
@@ -997,11 +1024,16 @@ export function perceptionToProse(
     if (s.kind === 'item_taken')
       lines.push(`You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.`)
     else if (s.kind === 'expression') {
+      const doing = s.label ?? s.verb
       lines.push(
         s.sense === 'sound'
-          ? `You hear ${s.actorName} ${s.verb}.`
-          : `You watch ${s.actorName} ${s.verb}.`,
+          ? `You hear ${s.actorName} ${doing}.`
+          : `You watch ${s.actorName} ${doing}.`,
       )
+    } else if (s.kind === 'discovery') {
+      // The saying is the inventor's own words for the attempt, reported: "he said he would…".
+      const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.pronoun} would ${s.saying}`
+      lines.push(`${s.inventorName} has worked out ${s.name}${why}.`)
     } else lines.push(s.prose)
   }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, T_WATER, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  T_WATER,
+  type SimConfig,
+} from '@sj/shared'
 import { openDb } from './db.js'
 import { GENESIS_BUILDER_ID } from './genesis/world.js'
 import { doorTile } from './interiors.js'
@@ -48,7 +54,7 @@ function plant(
 }
 
 function spawn(s: WorldState, id: string, x: number, y: number, config = CFG): WorldState {
-  return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
+  return fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), config)
 }
 
 const knownOf = (s: WorldState, id: string): string[] => s.agents[id]?.knownPlaces ?? []
@@ -296,12 +302,12 @@ describe('★ a place is called what is written on it', () => {
     expect(s.structures.structure_1!.name).toBe('Second Name')
   })
 
-  it("and the town's own eleven all arrive named, no two alike", async () => {
+  it("and the town's own thirteen all arrive named, no two alike", async () => {
     const { makeCityTemplate } = await import('@sj/shared')
     const named = makeCityTemplate({ x: 40, y: 40 }).structures.map((s) => s.name)
-    expect(named).toHaveLength(11)
+    expect(named).toHaveLength(13)
     expect(named.every((n) => typeof n === 'string' && n.length > 0)).toBe(true)
-    expect(new Set(named).size).toBe(11)
+    expect(new Set(named).size).toBe(13)
   })
 })
 

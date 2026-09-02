@@ -1,7 +1,14 @@
 // An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  NO_PARAMS,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import {
   RngStream,
   RngStreams,
@@ -36,7 +43,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -77,7 +84,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function makeWorld(): WorldState {
   let s = fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
   s = fold(
@@ -156,7 +163,7 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
 
     // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
     expect(VERBS['recipe:boil_salt']).toBeUndefined()
-    const { verb } = arbiter.codify(r1.recipe, CODIFY_CREDIT)
+    const { verb } = arbiter.codify(r1, CODIFY_CREDIT)
     expect(verb).toBe('recipe:boil_salt')
     expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
     expect(VERBS['recipe:boil_salt']).toBeDefined()

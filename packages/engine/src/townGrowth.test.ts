@@ -2,6 +2,7 @@
 // houses until the town crosses into ring 2. Scripted policies only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   TOWN_SQUARE,
@@ -85,7 +86,7 @@ function runTown(seed = 'claim-seam'): Run {
             name: id,
             x: TOWN_SQUARE.x + i + 1,
             y: TOWN_SQUARE.y + 1,
-            ageDays: 7300,
+            ageDays: ADULT_AGE_DAYS,
           })
         })
       }
@@ -233,7 +234,7 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
         T_ROAD,
       )
     }
-    expect(all.length).toBe(built.length + 11)
+    expect(all.length).toBe(built.length + 13)
     expect(tiles).toBeGreaterThan(4 * built.length)
     // The two off-plot ones are the well and the fire pit. They stand in the square, and block
     // (0,0) is never platted — so they have no plot and no frontage, by construction.

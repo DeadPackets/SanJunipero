@@ -134,6 +134,46 @@ describe('codex', () => {
   })
 })
 
+// The ladder was a ceiling: five authored rungs and no way to add a sixth.
+describe('the codex grows as it is climbed', () => {
+  it('learn() earns an unearned rung, and the frontier moves past it', () => {
+    const store = seededStore()
+    store.insert({
+      id: 'glazing',
+      era: 'arrangement',
+      name: 'Glazing',
+      prerequisiteId: 'pottery',
+      known: false,
+    })
+    store.insert({
+      id: 'tiling',
+      era: 'arrangement',
+      name: 'Tiling',
+      prerequisiteId: 'glazing',
+      known: false,
+    })
+    expect(store.frontier()).toEqual(['glazing'])
+    store.learn(['glazing', 'never_heard_of'])
+    expect(store.known()).toContain('glazing')
+    expect(store.frontier()).toEqual(['tiling'])
+  })
+
+  it('propose() hangs a new unearned rung off a rung the codex has, and refuses the rest', () => {
+    const store = seededStore()
+    expect(store.propose({ id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'fire' })).toBe(
+      true,
+    )
+    expect(store.frontier()).toContain('salt_curing')
+    expect(store.withinAdjacency(['salt_curing'])).toBe(true)
+    // Same era as what it hangs off, and never twice.
+    expect(store.propose({ id: 'salt_curing', name: 'Again', prerequisiteId: 'fire' })).toBe(false)
+    expect(store.propose({ id: 'ghost', name: 'Ghost', prerequisiteId: 'no_such_rung' })).toBe(
+      false,
+    )
+    expect(store.frontier()).not.toContain('ghost')
+  })
+})
+
 describe('codex known-column migration', () => {
   it('adds the known column (default 1) to a pre-existing codex table and keeps old rows behaving', async () => {
     const { openDb } = await import('@sj/engine/store')

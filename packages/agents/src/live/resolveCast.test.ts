@@ -2,7 +2,7 @@
 // moment the process restarts.
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { DAYS_PER_YEAR, MINUTES_PER_DAY } from '@sj/shared'
 import type { PersonalityDoc } from '../personality.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { MindSpec } from './liveMinds.js'
@@ -22,7 +22,7 @@ const founder = (id: string, sex: 'f' | 'm'): MindSpec => ({
   id,
   identity: { ...tamarIdentity, name: id },
   personality: doc,
-  ageDays: 34 * 364,
+  ageDays: 34 * DAYS_PER_YEAR,
   sex,
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -24,7 +24,7 @@ function makeWorld(
   for (const a of agents)
     s = fold(
       s,
-      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: ADULT_AGE_DAYS }),
       config,
     )
   return s
@@ -749,22 +749,6 @@ describe('verb: attack', () => {
   })
 })
 
-describe('verb: experiment (stub)', () => {
-  it('always returns the stub rejection, and it leaves a door open (T18)', () => {
-    const expected =
-      'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
-    expect(
-      submitIntent(makeWorld(), CFG, 'a1', 'experiment', {
-        description: 'boil river water for salt',
-      }),
-    ).toEqual({ ok: false, reason: expected })
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'experiment', {})).toEqual({
-      ok: false,
-      reason: expected,
-    })
-  })
-})
-
 describe('eat rulings (Task 12)', () => {
   it('accepts config-crop kinds in addition to FOOD_KINDS', () => {
     let s = makeWorld()
@@ -814,16 +798,7 @@ describe('eat rulings (Task 12)', () => {
 
 describe('verb registry (Task 12)', () => {
   it('registers the new verbs', () => {
-    for (const k of [
-      'speak',
-      'give',
-      'take',
-      'write',
-      'read',
-      'teach',
-      'attack',
-      'experiment',
-    ] as const) {
+    for (const k of ['speak', 'give', 'take', 'write', 'read', 'teach', 'attack'] as const) {
       expect(VERBS[k]!.kind).toBe(k)
     }
   })

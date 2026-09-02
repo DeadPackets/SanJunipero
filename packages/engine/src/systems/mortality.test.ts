@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'
@@ -28,7 +34,7 @@ const map = (): TileId[][] => grid(16)
 function body(config = CFG): WorldState {
   return fold(
     genesisState(config, map()),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
     config,
   )
 }
@@ -141,12 +147,12 @@ describe('fold: the afflicted body', () => {
 describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
   it('drains drainPerTick x severity, to the digit', () => {
     const r = tickOnce(afflict(body(), 'illness', 2, 0))
-    expect(hpDeltas(r)).toEqual([-0.16])
+    expect(hpDeltas(r)).toEqual([-0.08])
   })
 
   it('sums every affliction into one hp_changed', () => {
     const s = afflict(afflict(body(), 'illness', 2, 0), 'poison', 1, 0)
-    expect(hpDeltas(tickOnce(s))).toEqual([-(0.08 * 2 + 0.12)])
+    expect(hpDeltas(tickOnce(s))).toEqual([-(0.04 * 2 + 0.08)])
   })
 
   it('adds the hunger drain when the belly is empty, and not before', () => {
@@ -278,13 +284,13 @@ describe('death has a cause', () => {
 
   it('breaks equal drains by seniority, then by the order of the cause list', () => {
     // The pair the tiebreak needs: two kinds whose drains are the same number, to the bit.
-    expect(CFG.mortality.drainPerTick.fatigue * 2).toBe(CFG.mortality.drainPerTick.illness)
+    expect(CFG.mortality.drainPerTick.fatigue).toBe(CFG.mortality.drainPerTick.illness)
     const older = (first: string, fs: number, second: string, ss: number) =>
       nearlyDead(afflict(afflict(body(), first, fs, 5), second, ss, 40))
-    expect(died(tickOnce(older('fatigue', 2, 'illness', 1)))).toMatchObject({ cause: 'fatigue' })
-    expect(died(tickOnce(older('illness', 1, 'fatigue', 2)))).toMatchObject({ cause: 'illness' })
+    expect(died(tickOnce(older('fatigue', 1, 'illness', 1)))).toMatchObject({ cause: 'fatigue' })
+    expect(died(tickOnce(older('illness', 1, 'fatigue', 1)))).toMatchObject({ cause: 'illness' })
     // Same drain, same onset: 'illness' precedes 'fatigue' in DEATH_CAUSES.
-    const tied = nearlyDead(afflict(afflict(body(), 'fatigue', 2, 5), 'illness', 1, 5))
+    const tied = nearlyDead(afflict(afflict(body(), 'fatigue', 1, 5), 'illness', 1, 5))
     expect(died(tickOnce(tied))).toMatchObject({ cause: 'illness' })
   })
 
@@ -362,7 +368,7 @@ describe('a grave where the life ended', () => {
     wet[3]![2] = 2
     let s = fold(
       genesisState(CFG, wet),
-      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
     s = fold(

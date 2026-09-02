@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, stateHash, thirstDecayPerTick, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  SimConfigSchema,
+  stateHash,
+  thirstDecayPerTick,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { submitIntent } from '../intent.js'
@@ -24,7 +30,7 @@ function map(): TileId[][] {
 function body(config = CFG, x = 3, y = 4): WorldState {
   return fold(
     genesisState(config, map()),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }),
     config,
   )
 }
@@ -52,8 +58,8 @@ describe('thirst: absent means full', () => {
     expect(composePerception(clean, CFG, 'a1', []).self.body.thirst).toBe(100)
   })
 
-  it('decays at 0.6x the hunger rate, per tick, and not at all when the world says so', () => {
-    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * 0.6)
+  it('decays at 0.4x the hunger rate, per tick, and not at all when the world says so', () => {
+    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * 0.4)
     expect(thirsts(tickOnce(body()))).toEqual([-DECAY])
     expect(tickOnce(body()).state.agents.a1!.thirst).toBe(100 - DECAY)
     expect(thirsts(tickOnce(body(OFF), OFF))).toEqual([])

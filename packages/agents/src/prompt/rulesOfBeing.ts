@@ -1,3 +1,5 @@
+import type { RosterEntry } from '@sj/shared'
+
 // The rule-of-being every agent shares, and the head of block 1: second person and fully
 // diegetic, a soul waking in the valley, never naming the machinery behind the agent.
 export const RULES_OF_BEING = `You are a living person in the valley of San Junipero.
@@ -82,7 +84,24 @@ the whole moment so that you do nothing else with it and what comes back
 reaches you a moment later; reconsider_at, a clock time such as 08:30 when you
 mean to return to your thoughts.
 
-What you cannot do yet, the world will show you, and you will learn.`
+Anything you can name, you may try; the world answers with what it took.`
+
+// What the town has minted since the static rules were written, one line a verb. Empty text
+// when nothing is minted, so a town that has invented nothing pays no bytes for the block.
+export const ROSTER_HEAD =
+  'What the town has learned to do. Name each act by its exact word, and give it what it asks:'
+
+// Forty tokens a verb: the gloss is capped where the charter is minted, the name here.
+const ROSTER_NAME_MAX_CHARS = 30
+
+export function renderRoster(entries: readonly RosterEntry[]): string {
+  if (entries.length === 0) return ''
+  const lines = entries.map((e) => {
+    const give = e.reads.length === 0 ? '' : `, give ${e.reads.join(', ')}`
+    return `${e.name.slice(0, ROSTER_NAME_MAX_CHARS)}: ${e.gloss}. Name it ${e.id}${give}`
+  })
+  return [ROSTER_HEAD, ...lines].join('\n')
+}
 
 // Block 1's third static part: humanizer rules as advice to a person, never a style guide.
 // It spends no em dash itself — spending one while forbidding it is a demonstration, not a rule.

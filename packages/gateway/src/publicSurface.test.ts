@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { CLOSE_BAD_HELLO, DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
+import { ADULT_AGE_DAYS, CLOSE_BAD_HELLO, DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
@@ -63,7 +63,7 @@ function makeWorld(dbPath: string) {
     snapshotEveryTicks: 5,
     onTick: ({ tick, emit }) => {
       if (tick === 1)
-        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
       if (tick > 1) emit('agent_moved', { id: 'walker', x: (tick - 1) % 8, y: 0 })
     },
   })

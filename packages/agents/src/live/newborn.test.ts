@@ -8,7 +8,7 @@ import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, RngStreams, TickLoop, type TickHandler, type TileId } from '@sj/engine'
-import { MINUTES_PER_DAY, SimConfigSchema } from '@sj/shared'
+import { DAYS_PER_YEAR, MINUTES_PER_DAY, SimConfigSchema } from '@sj/shared'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { openAgentDb } from '../memory/schema.js'
@@ -44,7 +44,7 @@ function specFor(id: string, sex: 'f' | 'm'): MindSpec {
     id,
     identity: { ...tamarIdentity, name: id },
     personality: doc,
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     sex,
   }
 }

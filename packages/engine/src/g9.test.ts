@@ -2,6 +2,7 @@
 // runs on the REAL coSleepNightsToPartner: 3; only gestation and the conception roll are forced.
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_YEAR,
   MINUTES_PER_DAY,
   SPAWN_AGE_YEARS,
@@ -71,7 +72,7 @@ function spawn(s: WorldState, config: SimConfig, a: Spawn): WorldState {
       name: a.id,
       x: a.x,
       y: a.y,
-      ageDays: a.ageDays ?? 7300,
+      ageDays: a.ageDays ?? ADULT_AGE_DAYS,
       ...(a.sex === undefined ? {} : { sex: a.sex }),
     }),
     config,
@@ -178,7 +179,7 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
     expect(p.fatherId).toBe('bex')
 
     const child = delivery.state.agents[p.id]!
-    // Born at twelve on this world's 364-day calendar; the same midnight's aging pass
+    // Born at twelve on this world's four-week calendar; the same midnight's aging pass
     // then gives her the day she was born in, like everyone else.
     expect(Math.floor(child.ageDays / DAYS_PER_YEAR)).toBe(SPAWN_AGE_YEARS)
     expect(child.ageDays).toBe(SPAWN_AGE_YEARS * DAYS_PER_YEAR + 1)
@@ -579,7 +580,7 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
         if (tick === 1) {
           record('structure_planned', { ...HOUSE, maxHp: 50, flammable: true, builderId: 'script' })
           record('structure_completed', { id: HOUSE.id })
-          record('agent_spawned', { id: 'ada', name: 'ada', x: 4, y: 6, ageDays: 7300 })
+          record('agent_spawned', { id: 'ada', name: 'ada', x: 4, y: 6, ageDays: ADULT_AGE_DAYS })
           record('agent_entered', { agentId: 'ada', structureId: HOUSE.id })
           record('agent_slept', { agentId: 'ada' })
           record('item_spawned', {

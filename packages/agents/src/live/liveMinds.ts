@@ -11,6 +11,8 @@ import type { EngineBridge } from '../runtime/bridge.js'
 import { wireArbiter, type SeamArbiter } from '../runtime/arbiterSeam.js'
 import type { MindConfig } from '../wake.js'
 
+export type Kin = { id: string; relation: 'partner' | 'parent' | 'child' }
+
 /** One person, before there is a body for them. The shape `founderMinds.ts` already speaks. */
 export type MindSpec = {
   id: string
@@ -20,6 +22,9 @@ export type MindSpec = {
   sex: 'f' | 'm'
   /** The sim day this person's first personality is stamped with. Founders have none. */
   bornDay?: number
+  /** Declared in the persona so a kin tie can be seeded from it; a body born in the world
+   *  gets its kin from the birth instead. */
+  kin?: readonly Kin[]
 }
 
 export type BootedMinds = {

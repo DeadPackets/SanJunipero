@@ -344,7 +344,7 @@ describe('★ two bodies raise one building — the second pair of hands joins t
 
   it('★ walls already up need no plot: joining them survives a town with nowhere left to lay one', () => {
     const { s } = aWallAndTwoBodies()
-    const short: WorldState = { ...s, terrain: s.terrain.slice(0, 95) }
+    const short: WorldState = { ...s, terrain: s.terrain.map((row) => row.slice(0, 97)) }
     // NON-VACUITY: on this world the town cannot lay a fresh plot at all.
     const claim = claimInWorld(short, { along: 2, deep: 2 })!
     expect(layBlock(short, TOWN_SQUARE, claim.block)).toBe('off the map')
@@ -360,15 +360,12 @@ describe('★ two bodies raise one building — the second pair of hands joins t
   })
 
   it('★ finished walls are not a site: a body beside a standing house still gets its own ground', () => {
-    // The valley's own houses stand roofless now, so this test puts a roof on one: the claim is
-    // about a FINISHED building, and there has to be one for it to be about anything.
-    const roofless = Object.values(genesisTown().structures).find(
-      (x) => x.kind === 'house' && x.stage === 'construction',
+    // Every founder's house stands (D1), so the finished building this claim is about is
+    // already here and the test does not have to raise one.
+    const base = genesisTown()
+    const done = Object.values(base.structures).find(
+      (x) => x.kind === 'house' && x.stage === 'complete',
     )!
-    const base = apply(genesisTown(), [
-      { type: 'structure_completed', payload: { id: roofless.id } },
-    ])
-    const done = base.structures[roofless.id]!
     expect(done.stage).toBe('complete')
     const s = withBuilder(base, 'd', { x: done.x - 1, y: done.y - 1 })
     expect(isAdjacentToRect(s.agents.d!.x, s.agents.d!.y, done)).toBe(true)
@@ -419,7 +416,7 @@ describe('★ the town grows only where the lattice lets it', () => {
   it('twelve agent builds fill ring 1 and cross into ring 2, with the floor intact', () => {
     const s = raiseThrough(12)
     const rects = standingRects(s)
-    expect(rects).toHaveLength(11 + 12)
+    expect(rects).toHaveLength(13 + 12)
     // Nothing overlaps, and nothing comes closer than the grammar's floor.
     const seen = new Set<string>()
     for (const r of rects)
@@ -436,9 +433,9 @@ describe('★ the town grows only where the lattice lets it', () => {
         closest = Math.min(closest, Math.hypot(p.sx - q.sx, p.sy - q.sy))
       }
     expect(closest).toBeGreaterThanOrEqual(MIN_SEP)
-    // The twelfth is the one that crossed: it stands on a block two rings out.
-    expect(claimInWorld(genesisTown(), { along: 2, deep: 2 })!.rings).toBe(1)
-    expect(claimInWorld(raiseThrough(11), { along: 2, deep: 2 })!.rings).toBe(2)
+    // The tenth is the one that crossed: it stands on a block two rings out.
+    expect(claimInWorld(raiseThrough(8), { along: 2, deep: 2 })!.rings).toBe(1)
+    expect(claimInWorld(raiseThrough(9), { along: 2, deep: 2 })!.rings).toBe(2)
   })
 
   it('replays identically: the same builds in the same order reach the same town', () => {
@@ -821,7 +818,9 @@ describe('★ help must help — what a second pair of hands buys the calendar',
         [{ type: 'action_interrupted', payload: { agentId: 'h0', reason: 'rest' } }],
         NIGHT,
       )
-      const site = Object.values(w.structures).find((x) => x.stage === 'construction')!
+      const site = Object.values(w.structures).find(
+        (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+      )!
       expect(site.progressTicks).toBeLessThanOrEqual(HOUSE_TICKS)
       const again = submitIntent({ ...w, tick: NOON }, FAST, 'h0', 'build', { kind: 'house' })
       expect(again.ok, again.ok ? '' : again.reason).toBe(true)

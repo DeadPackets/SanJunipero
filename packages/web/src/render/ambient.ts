@@ -12,6 +12,7 @@ import { setEntityScaleMul } from './entities.js'
 import { phaseOf } from './charAnim.js'
 import { crownOffsetPx, windNow } from './wind.js'
 import { isGrave, toneReducer } from './tone.js'
+import { CUE_TYPES, bodiesOf } from '../ui/stageCue.js'
 
 // the smoke itself is smoke.ts's; these two are the material it is drawn in
 export const SMOKE_MAX_ALPHA = 0.42
@@ -184,10 +185,16 @@ export function createAmbient(
           at: t,
         })
       }
+      // ★ The same bounce a finished building takes, on whoever a moment happened to: the cue
+      // slot names it and the two bodies say it was them.
+      if (CUE_TYPES.includes(ev.type)) {
+        for (const id of bodiesOf(ev)) bodyBounces.push({ id, at: t })
+      }
     }
   })
 
   const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
+  const bodyBounces: { id: string; at: number }[] = []
   let fxState: WorldState | null = null
   const working: string[] = [] // the bodies a work verb is squashing, refreshed with the world
 
@@ -302,6 +309,15 @@ export function createAmbient(
     if (!grave && !still && layers.chars !== undefined) {
       const k = 1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000)))
       for (const id of working) layers.chars.setScaleMulY(id, k)
+    }
+
+    // After the work squash, so a moment lands on a working body too: the news outranks the job.
+    for (let i = bodyBounces.length - 1; i >= 0; i--) {
+      const b = bodyBounces[i]!
+      const p = (t - b.at) / BOUNCE_MS
+      const done = still || p >= 1 || p < 0
+      layers.chars?.setScaleMulY(b.id, done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p))
+      if (done) bodyBounces.splice(i, 1)
     }
 
     if (!grave && !still) {

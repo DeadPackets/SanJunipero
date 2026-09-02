@@ -12,7 +12,7 @@ const DAY_12 = 12 * MINUTES_PER_DAY + 9 * 60 + 40
 
 describe('the stamp says the day, the season, the time and where the picture came from', () => {
   it('reads DAY n · SEASON · HH:MM · LIVE', () => {
-    expect(stampText(DAY_12, 'LIVE')).toBe('DAY 12 · SPRING · 09:40 · LIVE')
+    expect(stampText(DAY_12, 'LIVE')).toBe('DAY 12 · SUMMER · 09:40 · LIVE')
   })
 
   it('pads the clock, so the corner never jitters between 9:40 and 10:40', () => {

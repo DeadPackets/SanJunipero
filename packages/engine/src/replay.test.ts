@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, stateHash } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, stateHash } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
@@ -13,7 +13,7 @@ function seedStore(): { store: EventStore; live: ReturnType<typeof genesisState>
   const emit = (tick: number, type: string, payload: unknown) => {
     live = fold(live, store.append(tick, type, payload))
   }
-  emit(0, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 })
+  emit(0, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
   emit(1, 'tick_advanced', {})
   emit(1, 'agent_moved', { id: 'a1', x: 2, y: 1 })
   emit(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -5 }] })

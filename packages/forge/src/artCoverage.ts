@@ -1,6 +1,6 @@
 // The coverage law, extended from structures to items and to the cast. It reads the CODEX, not
 // the renderer: `makePlaceholder` answers every class, so "did something draw?" passes forever.
-import { FOOD_KINDS, FOUNDER_IDS, expandItemKinds, type SimConfig } from '@sj/shared'
+import { CAST_IDS, FOOD_KINDS, expandItemKinds, type SimConfig } from '@sj/shared'
 import { LIBRARY, libraryEntry } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
 import { characterKind } from './castArt.js'
@@ -64,10 +64,11 @@ export function itemArtCoverage(registered: readonly string[]): Coverage {
 
 // ── the cast ────────────────────────────────────────────────────────────────────────────────
 
-/** Every codex kind the cast must answer to: one packed sheet per founder. The renderer looks
- *  a villager up by `character:<agentId>` and falls through to the placeholder on a miss. */
+/** Every codex kind the cast must answer to: one packed sheet per founder and per traveller.
+ *  The renderer looks a villager up by `character:<agentId>` and falls through to the
+ *  placeholder on a miss. */
 export function requiredCastKinds(): string[] {
-  return FOUNDER_IDS.map(characterKind).sort()
+  return CAST_IDS.map(characterKind).sort()
 }
 
 /** `registered` is the codex `kind` column of every ready class-`rig-part` record. */

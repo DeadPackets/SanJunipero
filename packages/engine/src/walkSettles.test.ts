@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
@@ -17,7 +17,10 @@ function world(rows: string[], at: { x: number; y: number }): WorldState {
     DEFAULT_CONFIG,
     rows.map((row) => Array.from(row).map((c) => CHAR[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: AGENT, name: AGENT, x: at.x, y: at.y, ageDays: 7300 }))
+  return fold(
+    s,
+    ev('agent_spawned', { id: AGENT, name: AGENT, x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const OPEN = ['........', '........', '........', '........']

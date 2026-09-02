@@ -1,10 +1,11 @@
 import type Database from 'better-sqlite3'
+import { z } from 'zod'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { makeArbiter, type AgentCtx, type Arbiter } from '../adjudicate.js'
 import { CodexStore, type CodexEntry } from '../codex.js'
 import { openArbiterDb } from '../schema.js'
-import { StrictVerdictSchema } from '../verdict.js'
+import { StrictVerdictSchema, VerdictSchema } from '../verdict.js'
 
 function emptyUsage(): LlmUsage {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
@@ -12,25 +13,31 @@ function emptyUsage(): LlmUsage {
 
 export type ScriptedCall = { intent: string; system: string; user: string }
 
-// A script writes the verdict the town keeps; the court is asked in the strict dialect, where
-// absence is written null. The inverse of `readRuling`, so a script never spells the nulls out.
-function strictDialect(value: unknown): unknown {
-  const v = value as { kind?: string; recipe?: Record<string, unknown> }
-  if (v.kind !== 'attempt' || v.recipe === undefined) return value
-  const rows = v.recipe.outcomeTable as { effects: Record<string, unknown>[] }[]
-  return {
-    ...v,
-    recipe: {
-      ...v.recipe,
-      skillCheck: v.recipe.skillCheck ?? null,
-      outcomeTable: rows.map((row) => ({
-        ...row,
-        effects: row.effects.map((e) =>
-          e.op === 'spawn_item' ? { ...e, durability: e.durability ?? null } : e,
-        ),
-      })),
-    },
+type AnyZod = z.ZodType
+type AnyShape = z.ZodObject<Record<string, AnyZod>>
+
+/** A verdict the town keeps, written in the dialect the court answers in: every key the schema
+ *  names, absence written null. Derived like the dialect itself, so a script never spells one out. */
+export function strictDialect(value: unknown, schema: AnyZod = VerdictSchema): unknown {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return strictDialect(value, (schema as z.ZodOptional<AnyZod>).unwrap())
+  if (type === 'array')
+    return Array.isArray(value)
+      ? value.map((v) => strictDialect(v, (schema as z.ZodArray<AnyZod>).element))
+      : value
+  if (type === 'union') {
+    const option = (schema as z.ZodUnion<[AnyZod]>).options.find((o) => o.safeParse(value).success)
+    return option === undefined ? value : strictDialect(value, option)
   }
+  if (type !== 'object' || value === null || typeof value !== 'object') return value
+  const named = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries((schema as AnyShape).shape).map(([key, field]) => [
+      key,
+      named[key] === undefined ? null : strictDialect(named[key], field),
+    ]),
+  )
 }
 
 // Never talks to a provider: answers from a script, counts the calls, and keeps every prompt

@@ -2,7 +2,8 @@ import { Assets, Container, Graphics, Texture } from 'pixi.js'
 import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
-import { createWorldLabel } from './worldLabel.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { PRIOR_ALPHA, PRIOR_HOLD_MS, fateOfPriorLine, typedChars } from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -140,15 +141,23 @@ export function speakerWash(rgb: number): number {
   return over(0xffffff, (lift(r) << 16) | (lift(g) << 8) | lift(b), SPEAKER_WASH)
 }
 
+/** How far a box floats over the head it belongs to. */
+export const BUBBLE_LIFT_PX = 18
+
 /** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
  *  of speech and it read as a town where only three people ever talk; the placer already drops
- *  what it cannot fit. One pass, no sort — this ran per frame. */
+ *  what it cannot fit. One pass, no sort — this ran per frame.
+ *
+ *  ★ Take each SPEAKER's own feet, never the anchor a box floats from: culling on that point
+ *  put a "…" on anybody standing in the top 70 world px of the view. */
 export function inViewSpeakers(
   want: readonly { id: string; sx: number; sy: number }[],
   view: Rect,
 ): Set<string> {
   const out = new Set<string>()
-  for (const b of want) if (rectInView(b.sx, b.sy, b.sx, b.sy, view, 0)) out.add(b.id)
+  for (const b of want) {
+    if (rectInView(b.sx, b.sy - CHAR_TARGET_PX, b.sx, b.sy, view, 0)) out.add(b.id)
+  }
   return out
 }
 
@@ -216,6 +225,13 @@ type Bubble = {
   box: Container
   glyph: Graphics
   tail: Graphics
+  /** the whole line, and how much of it has been set — the box is cut to the WHOLE line, so a
+   *  reveal never moves the paper it is written on */
+  label: WorldLabel
+  full: string
+  typed: number
+  /** when this line stopped being the one being said, or null while it still is */
+  dimMs: number | null
   /** the paper this one was drawn on, so a tail redrawn later matches its own box */
   fill: number
   w: number
@@ -290,6 +306,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     box: Container
     glyph: Graphics
     tail: Graphics
+    label: WorldLabel
+    full: string
+    typed: number
     fill: number
     w: number
     h: number
@@ -302,7 +321,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       text.slice(0, SPEECH_MAX_CHARS),
       wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX),
     )
-    const label = createWorldLabel(lines.join('\n'), {
+    // Cut to the WHOLE line, then set to what has been typed: a box that grew with its own
+    // sentence would move the paper under the reader.
+    const full = lines.join('\n')
+    const label = createWorldLabel(full, {
       fontFamily: face.family,
       fontSize: face.size,
       fill: isThought ? THOUGHT_INK : SPEECH_INK,
@@ -311,6 +333,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     })
     const w = Math.ceil(label.width) + 2 * BUBBLE_PAD
     const h = Math.ceil(label.height) + 2 * BUBBLE_PAD
+    // A thought is not spoken, so it is not typed either.
+    const typed = isThought ? full.length : 0
+    if (typed !== full.length) label.text = ''
 
     // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Different paper, a dotted rim
     // and no tail at all — shape and paper, not `alpha: 0.55`.
@@ -337,7 +362,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const glyph = glyphNode(isThought)
     glyph.visible = false
     node.addChild(box, glyph)
-    return { node, box, glyph, tail, fill, w, h }
+    return { node, box, glyph, tail, label, full, typed, fill, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
@@ -345,6 +370,16 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const state = store.getState()
     if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
+    if (!isThought) {
+      for (const b of bubbles) {
+        const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)
+        if (fate === 'end') b.dieMs = now
+        else if (fate === 'dim') {
+          b.dimMs = now
+          b.dieMs = now + PRIOR_HOLD_MS
+        }
+      }
+    }
     const built = build(agentId, text, isThought)
     scene.layers.bubbles.addChild(built.node)
     fadeArtIn(built.node) // NOTHING POPS IN — speech included
@@ -354,6 +389,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       bornMs: now,
       dieMs: now + bubbleLife(text),
       isThought,
+      dimMs: null,
       side: 'above',
     })
   }
@@ -384,6 +420,15 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
           b.node.destroy({ children: true })
           bubbles.splice(i, 1)
+          continue
+        }
+        // Set only when the count moves: 28 texture rebuilds a second, not one a frame.
+        if (b.typed < b.full.length) {
+          const n = typedChars(b.full.length, nowMs - b.bornMs)
+          if (n !== b.typed) {
+            b.typed = n
+            b.label.text = b.full.slice(0, n)
+          }
         }
       }
       // Where each one WANTS to be, then one placement pass over the whole live set: a bubble
@@ -397,9 +442,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const drift = b.isThought
           ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs)
           : 0
-        return { id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift }
+        return { id: String(i), sx, sy, drift }
       })
       const view = scene.viewRect()
+      // The SPEAKER, not the box that floats over them: the lift belongs to the placement below.
       const seen = inViewSpeakers(at, view)
       const want = at.map((p, i) => {
         const b = bubbles[i]!
@@ -407,7 +453,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         b.box.visible = shown
         b.glyph.visible = !shown
         return {
-          ...p,
+          id: p.id,
+          sx: p.sx,
+          sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift,
           size: shown ? { w: b.w * inv, h: b.h * inv } : { w: GLYPH_W * inv, h: GLYPH_H * inv },
         }
       })
@@ -421,7 +469,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         if (!b.node.visible) continue
         // the last frames fade; the fade-in is a rAF on the node and is left alone once done
         const leaving = bubbleAlpha(b.dieMs - nowMs)
-        if (leaving < 1) b.node.alpha = leaving
+        const dim = b.dimMs === null ? 1 : PRIOR_ALPHA
+        if (leaving < 1 || dim < 1) b.node.alpha = Math.min(dim, leaving)
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {

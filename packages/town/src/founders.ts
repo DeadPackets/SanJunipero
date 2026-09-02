@@ -1,6 +1,14 @@
 // Deterministic: no Math.random, policies are pure functions of perception, timeline tick-keyed.
 // A body decides only while `activity` is unset — `submitIntent` discards an intent taken during one.
-import { doorFrontTile, nextDawnTick, T_PATH, T_ROAD, type SimConfig } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  doorFrontTile,
+  founderSeat,
+  nextDawnTick,
+  T_PATH,
+  T_ROAD,
+  type SimConfig,
+} from '@sj/shared'
 import {
   BRIDGE_KIND,
   awakeEnergyDecay,
@@ -38,12 +46,14 @@ export type FounderDef = {
   patrol: [{ x: number; y: number }, { x: number; y: number }]
 }
 
-// map fixture: river x<=3, forest x>=61, grass between (engine makeFixtureMap)
+// The frozen fixture's five bodies at their fixture coordinates: river x<=3, forest x>=61,
+// grass between (engine makeFixtureMap). Every landed gate folds exactly these, so the seven
+// who joined the founding are on `FOUNDER_ROSTER` below and never on this map.
 export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'omar',
     name: 'Omar',
-    ageDays: 24 * 364,
+    ageDays: 24 * DAYS_PER_YEAR,
     spawn: { x: 6, y: 32 },
     patrol: [
       { x: 6, y: 32 },
@@ -53,7 +63,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'amara',
     name: 'Amara',
-    ageDays: 35 * 364,
+    ageDays: 35 * DAYS_PER_YEAR,
     spawn: { x: 21, y: 23 },
     patrol: [
       { x: 21, y: 23 },
@@ -63,7 +73,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'yusuf',
     name: 'Yusuf',
-    ageDays: 55 * 364,
+    ageDays: 55 * DAYS_PER_YEAR,
     spawn: { x: 34, y: 24 },
     patrol: [
       { x: 34, y: 24 },
@@ -73,7 +83,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'nadia',
     name: 'Nadia',
-    ageDays: 26 * 364,
+    ageDays: 26 * DAYS_PER_YEAR,
     spawn: { x: 26, y: 20 },
     patrol: [
       { x: 26, y: 20 },
@@ -83,13 +93,27 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'salma',
     name: 'Salma',
-    ageDays: 45 * 364,
+    ageDays: 45 * DAYS_PER_YEAR,
     spawn: { x: 28, y: 26 },
     patrol: [
       { x: 28, y: 26 },
       { x: 28, y: 18 },
     ],
   },
+]
+
+export type FounderBody = Pick<FounderDef, 'id' | 'name' | 'ageDays'>
+
+/** The whole founding, seated by `FOUNDER_SEATS` in `foundersFor`. */
+export const FOUNDER_ROSTER: readonly FounderBody[] = [
+  ...FOUNDERS.map(({ id, name, ageDays }) => ({ id, name, ageDays })),
+  { id: 'farida', name: 'Farida', ageDays: 37 * DAYS_PER_YEAR },
+  { id: 'bashir', name: 'Bashir', ageDays: 39 * DAYS_PER_YEAR },
+  { id: 'kamal', name: 'Kamal', ageDays: 54 * DAYS_PER_YEAR },
+  { id: 'leyla', name: 'Leyla', ageDays: 51 * DAYS_PER_YEAR },
+  { id: 'tariq', name: 'Tariq', ageDays: 22 * DAYS_PER_YEAR },
+  { id: 'halim', name: 'Halim', ageDays: 67 * DAYS_PER_YEAR },
+  { id: 'dilara', name: 'Dilara', ageDays: 33 * DAYS_PER_YEAR },
 ]
 
 export type TownStructure = { id: string; kind: string; x: number; y: number; w: number; h: number }
@@ -494,9 +518,13 @@ export type FoundersOpts = {
   minds?: boolean
 }
 
+/** The roof a body owns, or the one its seat names: a partner sleeps in a house that is not in
+ *  their name, and the cottage row is in nobody's. */
 export function homeOf(state: WorldState, agentId: string): Structure | null {
+  const seat = founderSeat(agentId)
   for (const s of Object.values(state.structures)) {
-    if (s.owner === agentId && s.stage === 'complete') return s
+    if ((s.owner === agentId || (seat !== null && s.name === seat)) && s.stage === 'complete')
+      return s
   }
   return null
 }
@@ -518,13 +546,15 @@ function wellsideTile(structures: readonly DevStructure[]): { x: number; y: numb
   return { x: d.dx, y: d.dy }
 }
 
-/** Each founder starts at their own door, so the first frame reads as five households. */
+/** Each founder starts at their own door, so the first frame reads as households. A town with
+ *  no named roofs is the frozen fixture, which keeps its own five bodies at their own coordinates. */
 export function foundersFor(structures: readonly DevStructure[]): readonly FounderDef[] {
-  const byOwner = new Map(structures.filter((s) => s.owner !== null).map((s) => [s.owner!, s]))
+  const byName = new Map(structures.filter((s) => s.name !== undefined).map((s) => [s.name!, s]))
+  if (byName.size === 0) return FOUNDERS
   const wellside = wellsideTile(structures)
-  return FOUNDERS.map((f) => {
-    const home = byOwner.get(f.id)
-    if (home === undefined) return f
+  return FOUNDER_ROSTER.map((f) => {
+    const home = byName.get(founderSeat(f.id) ?? '')
+    if (home === undefined) throw new Error(`foundersFor: no roof in this town for ${f.id}`)
     // A hand-computed south-centre is wrong once buildings turn; this is the tile `doorTile` picks.
     const d = doorFrontTile({
       kind: home.kind,
@@ -537,9 +567,7 @@ export function foundersFor(structures: readonly DevStructure[]): readonly Found
       furnishings: [],
     })
     const spawn = { x: d.dx, y: d.dy }
-    // Both ends of the patrol move into this town or neither does: a spawn relocated while the
-    // far waypoint keeps its fixture coordinate makes a leg that outlasts the legs.
-    return { ...f, spawn, patrol: [spawn, wellside ?? f.patrol[1]] as FounderDef['patrol'] }
+    return { ...f, spawn, patrol: [spawn, wellside ?? spawn] }
   })
 }
 

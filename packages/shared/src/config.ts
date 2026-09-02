@@ -2,9 +2,9 @@ import { z } from 'zod'
 
 const NeedsSchema = z
   .object({
-    // World one: nobody ate after tick 455 and 100/0.035 put the first body on the ground at
-    // tick 2715, day 2. At 0.021 an empty stomach takes 4524 ticks to fall — past day 3.
-    hungerDecayPerTick: z.number().default(0.021),
+    // D1, survival is a backdrop: a full stomach empties in 6.9 sim-days and a loaf is four of
+    // them, so hunger is a thread through a week and not the clock every turn is set by.
+    hungerDecayPerTick: z.number().default(0.01),
     energyDecayAwakePerTick: z.number().default(0.093),
     energyRegenAsleepPerTick: z.number().default(0.25),
     // Only ever a bonus, and what it shortens is the SHORT sleep: a full night fills the bar from
@@ -16,7 +16,8 @@ const NeedsSchema = z
     warmthEqualizeFactorPerTick: z.number().default(0.05),
     debuffThreshold: z.number().default(30),
     collapseThreshold: z.number().default(5),
-    deathAfterZeroHungerTicks: z.number().default(2880),
+    // Four days of hungry drama before a death, so somebody can still be the one who fed them.
+    deathAfterZeroHungerTicks: z.number().default(5760),
     eatRestoreHunger: z.number().default(60),
   })
   .strict()
@@ -105,8 +106,9 @@ const WeatherSchema = z
     nightTempDelta: z.number().default(-6),
     rainTempDelta: z.number().default(-4),
     snowOnlyIn: z.string().default('winter'),
-    // A founding week has no roofs, no woodpile and no habits yet; the sky waits for them.
-    harshFromDay: z.number().int().default(7),
+    // Three founding weeks have no roofs, no woodpile and no habits yet; the sky waits for them,
+    // and lands on the first winter of the 28-day year exactly.
+    harshFromDay: z.number().int().default(21),
     // Rare drama: at 0.02 three storm days burned 27 of 42 houses.
     stormLightningFireChance: z.number().default(0.001),
   })
@@ -363,7 +365,8 @@ const ReproductionSchema = z
     coSleepNightsToPartner: z.number().int().default(3),
     partnerWindowDays: z.number().int().default(7),
     conceptionChancePerNight: z.number().default(0.2),
-    gestationDays: z.number().int().default(72),
+    // Twenty days against the 28-day year: a pregnancy is most of a year here, as it is anywhere.
+    gestationDays: z.number().int().default(20),
     fertileYears: z
       .object({
         from: z.number().int().default(16),
@@ -434,8 +437,9 @@ const MortalitySchema = z
         // At 0.05 a grave wound killed in 4.8 hours — less time than it takes to be seen across a meadow
         // and walked to. 0.025 gives every tier a window longer than that walk.
         injury: z.number().default(0.025),
-        poison: z.number().default(0.12),
-        illness: z.number().default(0.08),
+        // Halved for D1: dying of either takes days, so tending is a thing somebody has time to do.
+        poison: z.number().default(0.08),
+        illness: z.number().default(0.04),
         fatigue: z.number().default(0.04),
       })
       .strict()
@@ -463,12 +467,12 @@ const IllnessSchema = z
   })
   .strict()
 
-// Deviation 2: the spec writes the decay as "0.6 x hunger rate", which is a derivation and
-// not a literal — so it is stored as the factor and derived once, by thirstDecayPerTick.
+// Deviation 2: the spec writes the decay as a share of the hunger rate, which is a derivation
+// and not a literal — so it is stored as the factor and derived once, by thirstDecayPerTick.
 const ThirstSchema = z
   .object({
     enabled: z.boolean().default(true),
-    decayFactorOfHunger: z.number().default(0.6),
+    decayFactorOfHunger: z.number().default(0.4),
     drinkRestore: z.number().default(60),
     waterskinCharges: z.number().int().positive().default(4),
   })
@@ -543,7 +547,8 @@ const WarmthSchema = z
   .object({
     enabled: z.boolean().default(true),
     comfortBand: z.number().default(8),
-    exposureDecayPerTick: z.number().default(0.15),
+    // A whole night out of doors spends 58 of the 100 a body has: uncomfortable, not lethal.
+    exposureDecayPerTick: z.number().default(0.08),
     // The cold's share of the awake energy decay, billed ON TOP of it — not a factor on it.
     coldEnergyDrainShare: z.number().default(0.5),
     heatRadius: z.number().default(2),
@@ -727,7 +732,7 @@ export function isBeddedKind(config: SimConfig, kind: string): boolean {
   return config.structures.recipes[kind]?.bed === true
 }
 
-// The one derivation of the slower clock: 0.021/tick at defaults, 0.6x hunger.
+// The one derivation of the slower clock: 0.010/tick at defaults, 0.4x hunger.
 export function thirstDecayPerTick(config: SimConfig): number {
   return config.needs.hungerDecayPerTick * config.thirst.decayFactorOfHunger
 }

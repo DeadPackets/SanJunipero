@@ -72,6 +72,8 @@ import {
   ItemSpoiled,
   ItemTaken,
   ItemUnequipped,
+  Marked,
+  PlaceNamed,
   StructureFueled,
   ConfigChanged,
   FaunaKilled,
@@ -268,6 +270,34 @@ export function fold(
     case 'discovery_made': {
       DiscoveryMade.parse(event.payload)
       return state
+    }
+    case 'marked': {
+      const p = Marked.parse(event.payload)
+      if (p.on === 'agent') {
+        const a = state.agents[p.id]
+        if (!a) throw new Error(`marked for unknown agent ${p.id}`)
+        const marks = { ...a.marks, [p.key]: p.value }
+        return { ...state, agents: { ...state.agents, [p.id]: { ...a, marks } } }
+      }
+      if (p.on === 'structure') {
+        const s = state.structures[p.id]
+        if (!s) throw new Error(`marked for unknown structure ${p.id}`)
+        const marks = { ...s.marks, [p.key]: p.value }
+        return { ...state, structures: { ...state.structures, [p.id]: { ...s, marks } } }
+      }
+      const item = state.items[p.id]
+      if (!item) throw new Error(`marked for unknown item ${p.id}`)
+      const marks = { ...item.marks, [p.key]: p.value }
+      return { ...state, items: { ...state.items, [p.id]: { ...item, marks } } }
+    }
+    case 'place_named': {
+      const p = PlaceNamed.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`place_named for unknown structure ${p.structureId}`)
+      return {
+        ...state,
+        structures: { ...state.structures, [p.structureId]: { ...s, name: p.name } },
+      }
     }
     case 'item_worn': {
       const p = ItemWorn.parse(event.payload)
@@ -675,7 +705,7 @@ export function fold(
             alive: true,
             asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
-            // Twelve years on this world's calendar, which is 364 days long — not 365.
+            // Twelve years on this world's calendar, whose year is four weeks long.
             hp: config.health.maxHp,
             injuries: [],
             ill: false,

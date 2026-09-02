@@ -27,6 +27,7 @@ import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
+import { useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
@@ -72,7 +73,9 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, toggle: toggleDirector } = useAutoCut(route.broadcast)
+  const { autoCut, toggle: toggleDirector } = useAutoCut()
+  // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
+  const moment = useStageCue(store)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -239,6 +242,14 @@ export function App() {
     scene?.bubbles?.setThoughts(thoughts)
   }, [scene, thoughts])
 
+  // ONE label over the thing a viewer picked: the nameplate. The canvas layers read the pick
+  // off the handle and stand down for it.
+  useEffect(() => {
+    if (scene === null) return
+    // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
+    scene.pickedId = subject?.id ?? null
+  }, [scene, subject])
+
   const toggleThoughts = useCallback(() => {
     const next = thoughts === 'hidden' ? 'shown' : 'hidden'
     setThoughts(next)
@@ -328,7 +339,7 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
-      <DirectorCue text={cue} />
+      <DirectorCue text={cue} moment={moment} />
       {route.broadcast && <LowerThird store={store} />}
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode

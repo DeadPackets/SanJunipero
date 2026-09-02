@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
+import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -46,7 +46,7 @@ const TWO: MindSpec[] = [
   {
     id: 'amara',
     sex: 'f',
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     identity: {
       name: 'Amara',
       age: 34,
@@ -71,7 +71,7 @@ const TWO: MindSpec[] = [
   {
     id: 'omar',
     sex: 'm',
-    ageDays: 46 * 364,
+    ageDays: 46 * DAYS_PER_YEAR,
     identity: {
       name: 'Omar',
       age: 46,
@@ -184,7 +184,7 @@ const SMOKE_RECIPE = {
       weight: 1,
       success: true,
       label: 'The fish darkens and firms in the smoke.',
-      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1 }],
     },
   ],
   rngStream: 'recipe:smoke_fish',
@@ -274,6 +274,7 @@ async function liveWorld(opts: {
   useArbiter?: boolean
   /** Where the day's chapter is written. Absent, no day is narrated. */
   narratorDbPath?: string
+  log?: (line: string) => void
 }): Promise<{
   world: DevWorld
   cast: LiveCast
@@ -310,7 +311,7 @@ async function liveWorld(opts: {
         ...(opts.spendAlertRealMinutes === undefined
           ? {}
           : { spendAlertRealMinutes: opts.spendAlertRealMinutes }),
-        log: () => {},
+        log: opts.log ?? (() => {}),
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
@@ -358,6 +359,15 @@ function thoughtTexts(dir: string): string[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
     return thoughtsSince(db, 0).map((t) => t.text)
+  } finally {
+    db.close()
+  }
+}
+
+function thinkers(dir: string): Set<string> {
+  const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
+  try {
+    return new Set(thoughtsSince(db, 0).map((t) => t.agentId))
   } finally {
     db.close()
   }
@@ -966,6 +976,29 @@ describe("★ a mind's memory across a resume", () => {
   })
 })
 
+describe('★ the founding of twelve, under a flat cap of twenty', () => {
+  it("boots a mind for every founder, and the ceiling is the town's and not a multiple of the cast", async () => {
+    const dir = tmp()
+    const lines: string[] = []
+    const { world, opsDb } = await liveWorld({
+      dir,
+      minds: [...FOUNDER_MINDS],
+      log: (l) => lines.push(l),
+    })
+    await run(world, 4)
+
+    expect(lines.find((l) => l.startsWith('stream: LIVE'))).toContain('12 of at most 20 minds')
+    expect(alertsOf(opsDb, 'cast_at_max_minds')).toEqual([])
+    expect(
+      eventsOf(dir, 'agent_spawned')
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual([...FOUNDER_IDS].sort())
+    // Every one of the twelve took a turn: a body with no mind behind it stands still for ever.
+    expect([...thinkers(dir)].sort()).toEqual([...FOUNDER_IDS].sort())
+  }, 60_000)
+})
+
 describe('★ what the first live boot broke', () => {
   it('the fresh wipe runs BEFORE the cast opens anything, so the ledger is still on disk', async () => {
     const dir = tmp()
@@ -1140,11 +1173,12 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // The failure was recorded where an operator looks...
     const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
     expect(alerts.length).toBeGreaterThan(0)
-    // ...and the intent still reached the world as `experiment`, which never starts an activity
-    // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
-    expect(
-      memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')),
-    ).toBe(true)
+    // ...and the mind was told only that the try did not begin: no verb the world lacks, no
+    // machinery word, reached its memory.
+    for (const text of memoriesOf(dir, 'amara')) {
+      expect(text).not.toContain('unknown verb')
+      expect(text).not.toContain('experiment')
+    }
     // A god that fell over must not have minted law on the way down.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)

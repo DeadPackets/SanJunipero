@@ -97,7 +97,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_GIT_SHA` | unset | Stamped into `/admin/export`'s manifest. Without it a replay cannot know which code folded the events. |
 | `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
-| `SJ_MAX_MINDS` | founders x 3 (`15`) | How many minds the town may hold. A birth past it is folded into the world with no mind booted for it. |
+| `SJ_MAX_MINDS` | `20` | How many minds the town may hold, never fewer than the twelve founders. A birth past it is folded into the world with no mind booted for it. |
 | `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives. **Inside the volume — moving it moves it out.** |
 | `SJ_MODELS_DIR` | `/app/data/models` | Where the memory embedder's model is cached. **Leave it unset.** The `Dockerfile` copies `packages/` only, so the model is not in the image — but `compose.yaml` mounts the named volume `town-models` at exactly the path the code defaults to, so the first `SJ_LIVE=1` boot pulls it from the HuggingFace CDN once and every recreate reuses it. **Never point it inside `/app/packages/town/data`**: that is the `town-data` volume, and `SJ_FRESH=1` empties it. |
 | `LITESTREAM_*` | — | Continuous backup; only read under `--profile backup`. |

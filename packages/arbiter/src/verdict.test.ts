@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { CLOSED_KEYS, NO_PARAMS } from '@sj/shared'
 import { strictModeFaults } from '@sj/shared/testutil'
+import { strictDialect } from './testutil/scriptedLlm.js'
 import { ExpressiveParams } from './expressive.js'
 import {
   OutcomeEffectSchema,
@@ -27,7 +28,7 @@ const validRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -130,6 +131,19 @@ describe('VerdictSchema', () => {
     )
   })
 
+  it('an attempt may propose the next rung, in the closed shape and no other', () => {
+    const unlocks = { id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'fire' }
+    const v = VerdictSchema.parse({ ...validAttempt, unlocks })
+    expect(v.kind === 'attempt' ? v.unlocks : null).toEqual(unlocks)
+    expect(
+      VerdictSchema.safeParse({ ...validAttempt, unlocks: { ...unlocks, id: 'Salt Curing' } })
+        .success,
+    ).toBe(false)
+    expect(
+      VerdictSchema.safeParse({ ...validAttempt, unlocks: { ...unlocks, era: 'works' } }).success,
+    ).toBe(false)
+  })
+
   it('rejects an extra key via strict', () => {
     expect(() =>
       VerdictSchema.parse({ kind: 'map', verb: 'x', params: NO_PARAMS, bogus: 1 }),
@@ -154,72 +168,43 @@ describe('StrictVerdictSchema', () => {
     }
   })
 
-  it('★ carries the two fields the live recipe leaves out, required and nullable', () => {
-    const wire = {
-      verdict: {
-        ...validAttempt,
-        recipe: {
-          ...validRecipe,
-          skillCheck: null,
-          outcomeTable: validRecipe.outcomeTable.map((r) => ({
-            ...r,
-            effects: r.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
-          })),
-        },
-      },
-    }
+  it('★ carries every field the live verdict leaves out, required and nullable', () => {
+    const wire = { verdict: strictDialect(validAttempt) }
     expect(StrictVerdictSchema.safeParse(wire).success).toBe(true)
-    // Leaving either one out is what the decoder cannot do, so the schema must not accept it.
-    const noSkillCheck = { verdict: { ...validAttempt, recipe: { ...validRecipe } } }
-    expect(StrictVerdictSchema.safeParse(noSkillCheck).success).toBe(false)
+    // Each of them written null, none of them left out — which is what the decoder cannot do.
+    const recipe = (wire.verdict as { recipe: Record<string, unknown> }).recipe
+    expect(recipe.skillCheck).toBeNull()
+    expect((wire.verdict as { unlocks: unknown }).unlocks).toBeNull()
+    expect(StrictVerdictSchema.safeParse({ verdict: validAttempt }).success).toBe(false)
   })
 })
 
 describe('readRuling', () => {
   it('★ reads the strict dialect back as the verdict the town keeps: null is absent', () => {
-    const verdict = readRuling({
-      verdict: {
-        ...validAttempt,
-        recipe: {
-          ...validRecipe,
-          skillCheck: null,
-          outcomeTable: validRecipe.outcomeTable.map((r) => ({
-            ...r,
-            effects: r.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
-          })),
-        },
-      },
-    })
+    const verdict = readRuling({ verdict: strictDialect(validAttempt) })
+    expect(verdict).toEqual(validAttempt)
     if (verdict?.kind !== 'attempt') throw new Error('not an attempt')
     expect('skillCheck' in verdict.recipe).toBe(false)
+    expect('unlocks' in verdict).toBe(false)
     expect('durability' in verdict.recipe.outcomeTable[0]!.effects[0]!).toBe(false)
   })
 
-  it('★ keeps a skill check and a durability the court did name', () => {
-    const verdict = readRuling({
-      verdict: {
-        ...validAttempt,
-        recipe: {
-          ...validRecipe,
-          skillCheck: { track: 'cooking', difficulty: 4 },
-          outcomeTable: [
-            {
-              ...validRecipe.outcomeTable[0]!,
-              effects: [{ op: 'spawn_item', kind: 'knife', qty: 1, to: 'agent', durability: 30 }],
-            },
-          ],
-        },
+  it('★ keeps a skill check, a durability and an unlock the court did name', () => {
+    const named = {
+      ...validAttempt,
+      unlocks: { id: 'salting', name: 'Salting', prerequisiteId: 'fire' },
+      recipe: {
+        ...validRecipe,
+        skillCheck: { track: 'cooking', difficulty: 4 },
+        outcomeTable: [
+          {
+            ...validRecipe.outcomeTable[0]!,
+            effects: [{ op: 'spawn_item' as const, kind: 'knife', qty: 1, durability: 30 }],
+          },
+        ],
       },
-    })
-    if (verdict?.kind !== 'attempt') throw new Error('not an attempt')
-    expect(verdict.recipe.skillCheck).toEqual({ track: 'cooking', difficulty: 4 })
-    expect(verdict.recipe.outcomeTable[0]!.effects[0]).toEqual({
-      op: 'spawn_item',
-      kind: 'knife',
-      qty: 1,
-      to: 'agent',
-      durability: 30,
-    })
+    }
+    expect(readRuling({ verdict: strictDialect(named) })).toEqual(named)
   })
 
   it('★ refuses an answer off the union, wrapped or bare', () => {
@@ -242,9 +227,14 @@ describe('readRuling', () => {
 // derivation is what makes the sample pass without a second edit in verdict.ts.
 describe('the strict dialect covers every effect the town can emit', () => {
   const samples: Record<string, Record<string, unknown>> = {
-    spawn_item: { op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' },
+    spawn_item: { op: 'spawn_item', kind: 'salt', qty: 1 },
     gain_skill: { op: 'gain_skill', track: 'cooking', xp: 10 },
     hp_delta: { op: 'hp_delta', delta: -3 },
+    mark: { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+    witness: { op: 'witness', label: 'She dances by the fire.', sense: 'sight' },
+    name_place: { op: 'name_place', text: 'The Two Waters' },
+    transfer: { op: 'transfer', to: 'target' },
+    need_delta: { op: 'need_delta', need: 'social', delta: 5 },
     none: { op: 'none' },
   }
   const ops = OutcomeEffectSchema.options.map((o) => (o.shape.op as z.ZodLiteral<string>).value)
@@ -254,30 +244,19 @@ describe('the strict dialect covers every effect the town can emit', () => {
   })
 
   it.each(ops)('★ %s survives the round trip null-filled', (op) => {
-    const option = OutcomeEffectSchema.options.find(
-      (o) => (o.shape.op as z.ZodLiteral<string>).value === op,
-    )!
-    const sample = samples[op]!
-    // Every key the op has, answered null, then the sample over the top: exactly what the
-    // decoder is handed when the court leaves an optional field out.
-    const nullFilled = {
-      ...Object.fromEntries(Object.keys(option.shape).map((k) => [k, null])),
-      ...sample,
-    }
-    const wire = {
-      verdict: {
-        ...validAttempt,
-        recipe: {
-          ...validRecipe,
-          skillCheck: null,
-          outcomeTable: [{ ...validRecipe.outcomeTable[0]!, effects: [nullFilled] }],
-        },
+    const attempt = {
+      ...validAttempt,
+      recipe: {
+        ...validRecipe,
+        outcomeTable: [{ ...validRecipe.outcomeTable[0]!, effects: [samples[op]!] }],
       },
     }
+    // Written the way the decoder answers — every key the op names, absence written null.
+    const wire = { verdict: strictDialect(attempt) }
     expect(StrictVerdictSchema.safeParse(wire).success, op).toBe(true)
     const verdict = readRuling(wire)
     if (verdict?.kind !== 'attempt') throw new Error(`${op}: not an attempt`)
-    expect(verdict.recipe.outcomeTable[0]!.effects[0], op).toEqual(sample)
+    expect(verdict.recipe.outcomeTable[0]!.effects[0], op).toEqual(samples[op])
   })
 })
 
@@ -308,10 +287,34 @@ describe('RecipeSchema', () => {
 })
 
 describe('OutcomeEffectSchema', () => {
-  it('rejects spawn_item missing the to field', () => {
+  it('takes spawn_item with only what the contract names, and refuses the old to field', () => {
     expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1 }).success).toBe(
-      false,
+      true,
     )
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' })
+        .success,
+    ).toBe(false)
+  })
+
+  it('takes the contract’s five grounding ops, each with its closed fields', () => {
+    for (const effect of [
+      { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+      { op: 'witness', label: 'raises a cup to the room', sense: 'sight' },
+      { op: 'witness', label: 'calls the row', sense: 'sound', radius: 6 },
+      { op: 'name_place', text: "the Widow's Well" },
+      { op: 'transfer', to: 'target' },
+      { op: 'need_delta', need: 'social', delta: 10 },
+    ]) {
+      expect(OutcomeEffectSchema.safeParse(effect).success, JSON.stringify(effect)).toBe(true)
+    }
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'mark', on: 'town', key: 'k', value: 'v' }).success,
+    ).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'transfer', to: 'self' }).success).toBe(false)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'need_delta', need: 'hunger', delta: 10 }).success,
+    ).toBe(false)
   })
 
   it('rejects an unknown op — the whitelist is closed', () => {
@@ -321,20 +324,17 @@ describe('OutcomeEffectSchema', () => {
 
 describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', () => {
   it('caps spawn_item qty at 20', () => {
-    expect(
-      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20, to: 'agent' })
-        .success,
-    ).toBe(true)
-    expect(
-      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21, to: 'agent' })
-        .success,
-    ).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20 }).success).toBe(
+      true,
+    )
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21 }).success).toBe(
+      false,
+    )
     expect(
       OutcomeEffectSchema.safeParse({
         op: 'spawn_item',
         kind: 'salt',
         qty: 1_000_000_000,
-        to: 'agent',
       }).success,
     ).toBe(false)
   })

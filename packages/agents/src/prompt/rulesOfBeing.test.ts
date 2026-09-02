@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   FORBIDDEN_FRAMING,
   MINUTES_PER_DAY,
@@ -97,6 +98,16 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
     expect(block1()).not.toContain('Every act carries what it asks for')
   })
 
+  // Nothing in the prompt said "you may invent"; the old closing line said the opposite.
+  it('closes with the invitation, not the old promise of a lesson', () => {
+    expect(
+      CAPABILITIES.endsWith(
+        'Anything you can name, you may try; the world answers with what it took.',
+      ),
+    ).toBe(true)
+    expect(CAPABILITIES).not.toContain('the world will show you')
+  })
+
   // A shared block that hands every mind the same example makes five copies of one actor.
   it('names no founder', () => {
     for (const founder of ['Omar', 'Salma', 'Nadia', 'Amara', 'Yusuf']) {
@@ -175,7 +186,11 @@ describe('★ block 1 tells the truth about sleep', () => {
       CFG,
     )
     s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }), CFG)
-    s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     if (opts.indoors) {
       s = fold(s, ev(4, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     }
@@ -221,9 +236,10 @@ describe('the shared calendar', () => {
   const at = (tick: number): string => calendarLine(simTimeFromTick(tick))
 
   it('names the day, the part of the day and the season, in that order', () => {
-    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, early spring.')
-    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, late winter.')
-    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, mid autumn.')
+    // A season is a week now, so day 12 falls late in the first summer, not early in spring.
+    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, late summer.')
+    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, early autumn.')
+    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, late winter.')
   })
 
   it('reaches every turn through the moment prose, ahead of everything else in it', () => {
@@ -231,9 +247,9 @@ describe('the shared calendar', () => {
       ...quietMeadowPacket,
       time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
     })
-    expect(prose.startsWith('It is day 12, dusk, early spring.')).toBe(true)
+    expect(prose.startsWith('It is day 12, dusk, late summer.')).toBe(true)
     const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
-    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, early spring')
+    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, late summer')
   })
 
   it('is a fact and nothing more — no machinery, no counsel, no taxonomy', () => {

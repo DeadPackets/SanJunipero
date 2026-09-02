@@ -38,11 +38,12 @@ export type VerbCharter = {
   id: string                       // 'recipe:smoke_fish' | 'express:toast' | 'act:wager'
   name: string; gloss: string      // "wager: stake a thing on a claim, to one person"
   reads: ClosedKey[]
-  durationTicks: number; energyCost: number
+  durationTicks: number
   requires: RecipeRequirement[]; costs: { kind: string; qty: number }[]
   outcomes: OutcomeRow[]
   unlocks?: { id: string; name: string; prerequisiteId: string }
-  inventor: { agentId: string; saying: string }
+  inventor: { agentId: string; saying: string }   // saying = the mind's own words for the attempt, never its private thought
+  skillCheck?: { track: string; difficulty: number }; canon: string[]
 }
 export type OutcomeEffect =
   | { op: 'spawn_item'; kind: string; qty: number; durability?: number }

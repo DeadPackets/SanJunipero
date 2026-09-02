@@ -15,7 +15,9 @@ const { SHOWCASE_CONFIG, devGenesisState, devTerrain } = await import('./devWorl
 const { showcaseDeck } = await import('./showcaseMap.js')
 const { foundersFor, makeFoundersOnTick, townStructuresFor } = await import('./founders.js')
 
-const TICKS = 600
+// 400, not 600: at tick 424 the eldest of the twelve tires between two errands and the patrol
+// is rightly reached, which is the second row's business and not this one's.
+const TICKS = 400
 const RINGS = 1
 const LAMPS = 8
 
@@ -81,7 +83,7 @@ describe('★ the scripted tick composes a perception only when it uses one', ()
     // the run does real work, so a packet count of zero is not "nothing happened"
     expect(streamRun()).toBeGreaterThan(1)
     // MEASURED on this fixture: 28 packets built and thrown away when it was composed above the
-    // `??` chain. The patrol policy is never reached in these 600 ticks.
+    // `??` chain. The patrol policy is never reached in these 400 ticks.
     expect(counted.mock.calls.length).toBe(0)
   })
 

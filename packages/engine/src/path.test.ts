@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -410,7 +416,11 @@ describe('the A* node budget', () => {
   it('walk accepts the cut-short target and perception says the way is unclear', () => {
     const tight = withMaxNodes(DEFAULT_CONFIG, 200)
     let s = genesisState(tight, serpentineMaze())
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      tight,
+    )
     expect(composePerception(s, tight, 'a1', []).wayUnclear).toBeUndefined()
 
     const r = submitIntent(s, tight, 'a1', 'walk', MAZE_TO)
@@ -431,7 +441,7 @@ describe('the A* node budget', () => {
     let open = genesisState(UNBOUNDED, serpentineMaze())
     open = fold(
       open,
-      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
       UNBOUNDED,
     )
     const whole = searchPath(open, MAZE_FROM, MAZE_TO, UNBOUNDED)!
@@ -452,7 +462,11 @@ describe('the A* node budget', () => {
   it('stays unclear once the legs are moving: the stored route is the answer', () => {
     const tight = withMaxNodes(DEFAULT_CONFIG, 200)
     let s = genesisState(tight, serpentineMaze())
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      tight,
+    )
     const partial = searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path
     s = fold(
       s,
@@ -591,7 +605,11 @@ describe('build: planning a bridge', () => {
       config,
       rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     return fold(
       s,
       ev(2, 'item_spawned', {

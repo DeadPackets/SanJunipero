@@ -185,8 +185,10 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   let dispatched: unknown = null
   router.route('GET', '/api/dispatches', (_req, res) => {
     const written =
-      readOrEmpty<{ id: number | null }>(deps.narratorDb, 'SELECT MAX(id) AS id FROM publications')[0]
-        ?.id ?? 0
+      readOrEmpty<{ id: number | null }>(
+        deps.narratorDb,
+        'SELECT MAX(id) AS id FROM publications',
+      )[0]?.id ?? 0
     if (written !== dispatchedAt || dispatched === null) {
       dispatchedAt = written
       const db = deps.narratorDb

@@ -10,7 +10,13 @@ import {
   submitIntent,
   type WorldState,
 } from '@sj/engine'
-import { CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, type SimEvent } from '@sj/shared'
+import {
+  CITY_ANCHOR_DEFAULT,
+  DEFAULT_CONFIG,
+  FOUNDER_IDS,
+  FOUNDER_SEATS,
+  type SimEvent,
+} from '@sj/shared'
 import { makeablesLine, perceptionToProse, type PerceptionPacket } from './prose.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 
@@ -26,15 +32,19 @@ const MORNING_TICK = 420
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
 
-// The genesis town with its five founders each at their own doorway — the exact opening
-// position `g11-deepworld.ts` builds before the first turn is asked for.
+// The five doorways the diagnosis was taken at. The seven who joined the founding since are
+// spawned below and take no part in the numbers, which are a record of that morning.
+const FIVE = FOUNDER_IDS.slice(0, 5)
+
+// The genesis town with its founders each at their own doorway — the exact opening position
+// `g11-deepworld.ts` builds before the first turn is asked for.
 function genesisTown(): WorldState {
   const g = makeGenesisWorld(CFG)
   let s = genesisState(CFG, g.terrain)
   for (const e of g.events) s = fold(s, ev(e.type, e.payload), CFG)
   for (const id of FOUNDER_IDS) {
-    const house = Object.values(s.structures).find((st) => st.kind === 'house' && st.owner === id)
-    const door = house === undefined ? null : doorTile(s, house)
+    const roof = Object.values(s.structures).find((st) => st.name === FOUNDER_SEATS[id])
+    const door = roof === undefined ? null : doorTile(s, roof)
     if (door === null) throw new Error(`no doorway for ${id}`)
     s = fold(s, ev('agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: 10000 }), CFG)
   }
@@ -103,7 +113,7 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
       { x: 59, y: 92 },
       { x: 71, y: 96 },
     ]
-    const nearest = FOUNDER_IDS.map((id) => {
+    const nearest = FIVE.map((id) => {
       const d = authored.map((b) => walk(s, id, b.x, b.y)).filter((n): n is number => n !== null)
       return Math.min(...d)
     })
@@ -116,10 +126,8 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
   it('R14: the town keeps its own meadow, and the far bank is still a bridge away', () => {
     const s = genesisTown()
     // Every founder is a quarter-hour from a bush and from herbs, across two blocks now.
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([
-      10, 11, 13, 13, 10,
-    ])
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([11, 12, 13, 15, 8])
+    expect(FIVE.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([10, 11, 13, 13, 10])
+    expect(FIVE.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([11, 12, 13, 15, 8])
     // And nothing over the water moved: the west bank answers a capped search, as it always did.
     for (const [x, y] of [
       [45, 62],
@@ -154,7 +162,7 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
   it('no animal worth eating is in sight on the first morning, and none was brought nearer', () => {
     const s = genesisTown()
     // Three of the five wake with something alive in view, but that is a hunt and not a meal.
-    const inSight = FOUNDER_IDS.map((id) =>
+    const inSight = FIVE.map((id) =>
       composePerception(s, CFG, id, [])
         .visible.fauna.map((f) => f.kind)
         .sort(),
@@ -174,7 +182,7 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     // `forage` wants a nodeId, and a mark is known only once a body stands beside the thing.
     expect(CFG.movement.sightRadius).toBe(12)
     const s = genesisTown()
-    for (const id of FOUNDER_IDS) {
+    for (const id of FIVE) {
       const seen = composePerception(s, CFG, id, []).visible.forageables
       expect(seen.length).toBeGreaterThanOrEqual(2)
       // And what a mind is handed is a phrase and a mark, not a count of what is left in it.
@@ -384,7 +392,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(CAPABILITIES).toContain('the garment you hold')
     expect(CAPABILITIES).toContain('the torch or lamp you hold')
     const s = genesisTown()
-    const everyProse = FOUNDER_IDS.map((id) => proseFor(s, id)).join(' ')
+    const everyProse = FIVE.map((id) => proseFor(s, id)).join(' ')
     // The id is READ from the world, not retyped: a template edit renumbers the mints. A named
     // place is called by its name now, so the sentence opens with what the town calls it.
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
@@ -421,7 +429,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     [
       'build',
       { kind: 'cottage' },
-      'the town keeps ground for a cottage — go and stand at (100, 88)',
+      'the town keeps ground for a cottage — go and stand at (94, 94)',
     ],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (67, 75)'],
     [
@@ -450,13 +458,18 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
 
   // A body beside walls of the kind it means to raise resumes them, and resuming spends nothing.
   it('★ walls within reach are not a refusal any more — they are the job', () => {
-    const s = genesisTown()
-    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'house' })
+    // Every seated roof stands now (D1), so the walls a body can join are the farmhouse's: put
+    // her at its door, which is where a founder who means to raise it would be standing.
+    const base = genesisTown()
+    const farmhouse = Object.values(base.structures).find((st) => st.kind === 'farmhouse')!
+    const door = doorTile(base, farmhouse)!
+    const s = fold(base, ev('agent_moved', { id: 'amara', x: door.x, y: door.y }), CFG)
+    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'farmhouse' })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
     // No `structure_planned`: she joined what stood rather than claiming fresh ground.
     expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
     const started = r.ok ? (r.events[0]!.payload as { duration: number }) : { duration: -1 }
-    expect(started.duration, 'a whole house, not the roof that is missing').toBeLessThan(2880)
+    expect(started.duration, 'a whole farmhouse, not the roof that is missing').toBeLessThan(5760)
   })
 
   it('the refusals that were already honest are left exactly as they were', () => {
@@ -497,7 +510,7 @@ describe('R21 — the shape of the founding site, so the abundance pass has a ba
   it('five doorways, and the anchor the template was laid from', () => {
     const s = genesisTown()
     expect(CITY_ANCHOR_DEFAULT).toEqual({ x: 43, y: 56 })
-    expect(FOUNDER_IDS.map((id) => [s.agents[id]!.x, s.agents[id]!.y])).toEqual([
+    expect(FIVE.map((id) => [s.agents[id]!.x, s.agents[id]!.y])).toEqual([
       [81, 68],
       [67, 75],
       [81, 99],

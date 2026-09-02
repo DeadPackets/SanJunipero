@@ -9,7 +9,7 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema } from '@sj/shared'
 import { perceptionToProse } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
@@ -32,7 +32,7 @@ function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 8, y: 8, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 8, y: 8, ageDays: ADULT_AGE_DAYS })
   put('item_spawned', { id: 'item_1', kind: 'knife', qty: 1, loc: { t: 'agent', id: AGENT } })
   put('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 9, y: 8 })
   put('forageable_spawned', { id: 'node_1', kind: 'berry_bush', x: 7, y: 8, stock: 3 })

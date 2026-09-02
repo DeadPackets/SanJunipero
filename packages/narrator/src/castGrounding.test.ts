@@ -69,7 +69,7 @@ describe('the chronicle may name nobody the world has not got', () => {
   })
 
   // Both verbatim from run r3: cast_leak dropped real sentences over "Nadias" and "The".
-  it("a possessive of a cast name is that name, not a stranger ending in s", () => {
+  it('a possessive of a cast name is that name, not a stranger ending in s', () => {
     expect(
       namesOutsideRoll("The rain fell on Nadia\u2019s roof, and spared Yusuf's beside it.", ROLL),
     ).toEqual([])

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   dayPhaseFromTick,
   nextDawnTick,
   glowRadiusFor,
@@ -45,7 +46,7 @@ const NOON = 12 * 60
 const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, id: string, x: number, y: number): WorldState =>
-  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), CFG)
+  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), CFG)
 
 const give = (s: WorldState, id: string, itemId: string, kind: string, qty = 1): WorldState =>
   fold(s, ev('item_spawned', { id: itemId, kind, qty, loc: { t: 'agent', id } }), CFG)

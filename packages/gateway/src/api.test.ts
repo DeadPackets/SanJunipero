@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
@@ -70,10 +70,10 @@ describe('observer data apis', () => {
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
-          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 3, ageDays: 7300 })
-          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: 7300 })
-          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 5, y: 5, ageDays: 7300 })
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 3, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 5, y: 5, ageDays: ADULT_AGE_DAYS })
         }
         if (tick === 2) {
           emit('agent_spoke', { agentId: 'alice', text: 'Morning.', x: 0, y: 0 })
@@ -249,14 +249,16 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([])
   })
 
-  // bob is 2 for speaking and 6 for the house he PLANNED and the town completed at tick 40 —
-  // `structure_completed {id}` names no person, and the plan is where the town keeps one.
+  // bob is 12 for two lines, 6 for the house he PLANNED and the town completed at tick 40 —
+  // `structure_completed {id}` names no person, and the plan is where the town keeps one — and 8
+  // for standing three tiles from Alice while both of them spoke. Cara shouted from twenty tiles
+  // out, so her line is a line and not a scene.
   it('heat: per-agent 60-tick windows from the stub scorer', async () => {
     expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
-      { fromTick: 0, toTick: 59, agentId: 'alice', score: 4 },
-      { fromTick: 0, toTick: 59, agentId: 'bob', score: 8 },
-      { fromTick: 0, toTick: 59, agentId: 'cara', score: 2 },
-      { fromTick: 60, toTick: 119, agentId: 'bob', score: 2 },
+      { fromTick: 0, toTick: 59, agentId: 'alice', score: 20 },
+      { fromTick: 0, toTick: 59, agentId: 'bob', score: 20 },
+      { fromTick: 0, toTick: 59, agentId: 'cara', score: 6 },
+      { fromTick: 60, toTick: 119, agentId: 'bob', score: 6 },
       { fromTick: 60, toTick: 119, agentId: 'dan', score: 20 },
     ])
   })

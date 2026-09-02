@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import {
   RngStream,
   VERBS,
@@ -14,12 +14,16 @@ import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
-import { codify, emitOutcomeEffects, isExpertRecipe, verbFromRecipe } from './codify.js'
+import { charterFromAttempt } from './charter.js'
+import { codify, emitOutcomeEffects, isExpertCharter, verbFromCharter } from './codify.js'
 import { productsOf } from './sanity.js'
 import type { Codified } from './adjudicate.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const CREDIT_FIXTURE = { agentId: 'a1', intent: 'i try to boil the river water down' }
+const SUMMARY = 'Boil river water until only salt remains.'
+const asVerb = (recipe: Recipe) =>
+  verbFromCharter(charterFromAttempt({ recipe, summary: SUMMARY }, CREDIT_FIXTURE))
 
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
@@ -33,7 +37,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -57,7 +61,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function agentState(): WorldState {
   return fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
 }
@@ -98,10 +102,67 @@ function twoWoodStacks(): WorldState {
   return s
 }
 
+describe('the charter a ruling becomes', () => {
+  const inventor = { agentId: 'a1', intent: 'boil it down', saying: 'The fish will not keep.' }
+
+  it('carries the physics, the gloss and the inventor off an attempt verdict', () => {
+    const charter = charterFromAttempt({ recipe: boilSaltRecipe, summary: SUMMARY }, inventor)
+    expect(charter).toEqual({
+      id: 'recipe:boil_salt',
+      name: 'Boil River Water for Salt',
+      gloss: SUMMARY,
+      reads: [],
+      durationTicks: 5,
+      requires: boilSaltRecipe.requires,
+      costs: [],
+      outcomes: boilSaltRecipe.outcomeTable,
+      inventor: { agentId: 'a1', saying: 'The fish will not keep.' },
+      skillCheck: { track: 'cooking', difficulty: 2 },
+      canon: ['fire', 'pottery'],
+    })
+  })
+
+  it('keeps a proposed rung, and an empty saying for a mind that had no thought', () => {
+    const unlocks = { id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'cooking' }
+    const charter = charterFromAttempt(
+      { recipe: boilSaltRecipe, summary: SUMMARY, unlocks },
+      { agentId: 'a1', intent: 'boil it down' },
+    )
+    expect(charter.unlocks).toEqual(unlocks)
+    expect(charter.inventor.saying).toBe('')
+  })
+
+  it('caps the gloss at a word boundary, so a roster line stays short', () => {
+    const long =
+      'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen'
+    const charter = charterFromAttempt({ recipe: boilSaltRecipe, summary: long }, inventor)
+    expect(charter.gloss.length).toBeLessThanOrEqual(50)
+    expect(charter.gloss.endsWith(' ten')).toBe(true)
+  })
+
+  it('is what the rulebook row holds, saying and all', () => {
+    const db = openArbiterDb(':memory:')
+    const rulebook = new RulebookStore(db)
+    const codex = new CodexStore(db)
+    codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
+    const recipe = { ...boilSaltRecipe, id: 'recipe:salt_row', name: 'Salt Row' }
+    codify({ recipe, summary: SUMMARY }, inventor, {
+      rulebook,
+      review: new ReviewStore(db),
+      codex,
+      tick: 9,
+    })
+    const stored = JSON.parse(rulebook.byId('recipe:salt_row')!.recipeJson) as unknown
+    expect(stored).toEqual(charterFromAttempt({ recipe, summary: SUMMARY }, inventor))
+    expect(VERBS['recipe:salt_row']!.rngStream).toBe('recipe:salt_row')
+  })
+})
+
 describe('codify', () => {
-  describe('verbFromRecipe', () => {
+  describe('verbFromCharter', () => {
     it('maps the recipe onto the VerbDef shape (kind, skill, rngStream, duration)', () => {
-      const def = verbFromRecipe(boilSaltRecipe)
+      const def = asVerb(boilSaltRecipe)
       expect(def.kind).toBe('recipe:boil_salt')
       expect(def.skill).toEqual({ track: 'cooking', xp: 10 })
       expect(def.rngStream).toBe('recipe:boil_salt')
@@ -109,19 +170,19 @@ describe('codify', () => {
     })
 
     it('validate rejects a position with no adjacent fire', () => {
-      const def = verbFromRecipe(boilSaltRecipe)
+      const def = asVerb(boilSaltRecipe)
       expect(def.validate(agentState(), CFG, 'a1', {})).toBe('you need a fire nearby')
     })
 
     it('validate passes an adjacent burning structure', () => {
-      const def = verbFromRecipe(boilSaltRecipe)
+      const def = asVerb(boilSaltRecipe)
       expect(def.validate(burningFireAdjacent(), CFG, 'a1', {})).toBeNull()
     })
   })
 
   describe('onComplete', () => {
     it('rolls the success row and emits one item_spawned with a hand-computed id', () => {
-      const def = verbFromRecipe(boilSaltRecipe)
+      const def = asVerb(boilSaltRecipe)
       const state = burningFireAdjacent()
       const nextId = state.counters.nextEntityId
       const events = def.onComplete(state, CFG, 'a1', {}, RngStream.from([0, 0, 0, 0]))
@@ -142,7 +203,7 @@ describe('codify', () => {
 
   describe('onStart', () => {
     it('consumes a cost across stacks in order until met', () => {
-      const def = verbFromRecipe({ ...boilSaltRecipe, costs: [{ kind: 'wood', qty: 2 }] })
+      const def = asVerb({ ...boilSaltRecipe, costs: [{ kind: 'wood', qty: 2 }] })
       const events = def.onStart!(twoWoodStacks(), CFG, 'a1', {})
       expect(events).toEqual([
         { type: 'item_qty_changed', payload: { id: 'item_1', delta: -1 } },
@@ -151,7 +212,7 @@ describe('codify', () => {
     })
 
     it('bails without deducting anything when any cost is short', () => {
-      const def = verbFromRecipe({
+      const def = asVerb({
         ...boilSaltRecipe,
         costs: [
           { kind: 'wood', qty: 2 },
@@ -164,7 +225,7 @@ describe('codify', () => {
 
   describe('validate costs', () => {
     it('rejects when the agent holds less than a cost demands', () => {
-      const def = verbFromRecipe({
+      const def = asVerb({
         ...boilSaltRecipe,
         requires: [],
         costs: [{ kind: 'wood', qty: 7 }],
@@ -175,7 +236,7 @@ describe('codify', () => {
     })
 
     it('passes when every cost is covered across stacks', () => {
-      const def = verbFromRecipe({
+      const def = asVerb({
         ...boilSaltRecipe,
         requires: [],
         costs: [{ kind: 'wood', qty: 6 }],
@@ -192,7 +253,7 @@ describe('codify', () => {
 
       // difficulty 2: engine level 10 → factor 0.9, success wins while
       // roll <= 0.9/1.9 ≈ 0.474; the old sqrt level 4 → factor 0.6 loses at 0.45.
-      const def = verbFromRecipe(boilSaltRecipe)
+      const def = asVerb(boilSaltRecipe)
       const rng = { next: () => 0.45 } as unknown as RngStream
       const events = def.onComplete(state, CFG, 'a1', {}, rng)
       expect(events.some((e) => e.type === 'item_spawned')).toBe(true)
@@ -216,12 +277,71 @@ describe('codify', () => {
       expect(emitOutcomeEffects(agentState(), 'a1', [{ op: 'none' }])).toEqual([])
     })
 
+    // The five grounding ops, each to the one engine event that folds it.
+    it('grounds mark, witness, name_place, transfer and need_delta in engine events', () => {
+      const params = { targetId: 'a2', itemId: 'item_1', structureId: 's1' }
+      const state = burningFireAdjacent()
+      expect(
+        emitOutcomeEffects(
+          state,
+          'a1',
+          [
+            { op: 'mark', on: 'self', key: 'oath', value: 'sworn' },
+            { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+            { op: 'mark', on: 'item', key: 'promised', value: 'to a2' },
+            { op: 'mark', on: 'structure', key: 'keeper', value: 'a1' },
+            { op: 'witness', label: 'raises a cup to the room', sense: 'sight', radius: 6 },
+            { op: 'name_place', text: 'the Old Hearth' },
+            { op: 'transfer', to: 'target' },
+            { op: 'need_delta', need: 'social', delta: 10 },
+          ],
+          { params, verb: 'recipe:toast' },
+        ),
+      ).toEqual([
+        { type: 'marked', payload: { on: 'agent', id: 'a1', key: 'oath', value: 'sworn' } },
+        { type: 'marked', payload: { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' } },
+        { type: 'marked', payload: { on: 'item', id: 'item_1', key: 'promised', value: 'to a2' } },
+        { type: 'marked', payload: { on: 'structure', id: 's1', key: 'keeper', value: 'a1' } },
+        {
+          type: 'agent_expressed',
+          payload: {
+            agentId: 'a1',
+            verb: 'recipe:toast',
+            x: 5,
+            y: 5,
+            sense: 'sight',
+            label: 'raises a cup to the room',
+            radius: 6,
+          },
+        },
+        {
+          type: 'place_named',
+          payload: { structureId: 's1', name: 'the Old Hearth', byId: 'a1' },
+        },
+        { type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a2' } },
+        {
+          type: 'needs_changed',
+          payload: { id: 'a1', changes: [{ need: 'social', delta: 10 }] },
+        },
+      ])
+    })
+
+    it('skips an effect whose mark the act never named, rather than inventing one', () => {
+      expect(
+        emitOutcomeEffects(agentState(), 'a1', [
+          { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+          { op: 'transfer', to: 'target' },
+          { op: 'name_place', text: 'x' },
+        ]),
+      ).toEqual([])
+    })
+
     it('emits distinct ids for an outcome row with multiple spawn_item effects', () => {
       const state = agentState()
       const nextId = state.counters.nextEntityId
       const events = emitOutcomeEffects(state, 'a1', [
-        { op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' },
-        { op: 'spawn_item', kind: 'clay', qty: 2, to: 'agent' },
+        { op: 'spawn_item', kind: 'salt', qty: 1 },
+        { op: 'spawn_item', kind: 'clay', qty: 2 },
       ])
       expect(events).toEqual([
         {
@@ -237,6 +357,65 @@ describe('codify', () => {
             loc: { t: 'agent', id: 'a1' },
           },
         },
+      ])
+    })
+  })
+
+  // A verb whose effects point at a person, a thing or a place reads that key, and the act is
+  // refused in the tier-1 verbs' own words until the key names something that fits.
+  describe('a charter that reads keys', () => {
+    const wager: Recipe = {
+      ...boilSaltRecipe,
+      id: 'recipe:wager',
+      name: 'Wager a Thing',
+      skillCheck: undefined,
+      requires: [],
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'The stake changes hands.',
+          effects: [
+            { op: 'transfer', to: 'target' },
+            { op: 'mark', on: 'target', key: 'owed', value: 'a wager' },
+          ],
+        },
+      ],
+    }
+    const def = asVerb(wager)
+    function twoBodies(): WorldState {
+      let s = twoWoodStacks()
+      s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 6, y: 5, ageDays: 7300 }), CFG)
+      s = fold(s, ev('agent_spawned', { id: 'far', name: 'far', x: 20, y: 20, ageDays: 7300 }), CFG)
+      return s
+    }
+
+    it('reads itemId and targetId, in the grammar’s order', () => {
+      expect(charterFromAttempt({ recipe: wager, summary: 'x' }, CREDIT_FIXTURE).reads).toEqual([
+        'itemId',
+        'targetId',
+      ])
+    })
+
+    it('refuses until both are named and fit', () => {
+      const s = twoBodies()
+      expect(def.validate(s, CFG, 'a1', {})).toBe('name itemId, the thing it is for')
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_9', targetId: 'a2' })).toBe(
+        'not in your hands',
+      )
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'far' })).toBe('too far away')
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a1' })).toBe(
+        'that is yourself',
+      )
+      expect(def.validate(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a2' })).toBeNull()
+    })
+
+    it('and hands the keys it read to the effects', () => {
+      const params = { itemId: 'item_1', targetId: 'a2' }
+      const events = def.onComplete(twoBodies(), CFG, 'a1', params, { next: () => 0 } as never)
+      expect(events).toEqual([
+        { type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a2' } },
+        { type: 'marked', payload: { on: 'agent', id: 'a2', key: 'owed', value: 'a wager' } },
       ])
     })
   })
@@ -262,14 +441,14 @@ describe('codify', () => {
       state: WorldState,
       config = CFG,
     ): Record<string, unknown> | undefined =>
-      verbFromRecipe(recipe)
+      asVerb(recipe)
         .onComplete(state, config, 'a1', {}, alwaysWins)
         .find((e) => e.type === 'item_spawned')?.payload as Record<string, unknown> | undefined
 
     it('reads difficulty against the expert threshold', () => {
-      expect(isExpertRecipe(expertRecipe, CFG)).toBe(true)
-      expect(isExpertRecipe(boilSaltRecipe, CFG)).toBe(false) // difficulty 2
-      expect(isExpertRecipe({ ...boilSaltRecipe, skillCheck: undefined }, CFG)).toBe(false)
+      expect(isExpertCharter(expertRecipe, CFG)).toBe(true)
+      expect(isExpertCharter(boilSaltRecipe, CFG)).toBe(false) // difficulty 2
+      expect(isExpertCharter({ ...boilSaltRecipe, skillCheck: undefined }, CFG)).toBe(false)
     })
 
     it('marks an expert recipe worked by an expert hand', () => {
@@ -304,7 +483,7 @@ describe('codify', () => {
           weight: 1,
           success: true,
           label: 'A fish.',
-          effects: [{ op: 'spawn_item', kind: 'fish', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'fish', qty: 1 }],
         },
       ],
     }
@@ -325,7 +504,7 @@ describe('codify', () => {
     }
 
     const wearEvents = (s: WorldState, config = CFG) =>
-      verbFromRecipe(rodRecipe)
+      asVerb(rodRecipe)
         .onComplete(s, config, 'a1', {}, alwaysWins)
         .filter((e) => e.type === 'item_worn' || e.type === 'item_broke')
 
@@ -334,7 +513,7 @@ describe('codify', () => {
       const nextId = state.counters.nextEntityId
       expect(
         emitOutcomeEffects(state, 'a1', [
-          { op: 'spawn_item', kind: 'rod', qty: 1, to: 'agent', durability: 40 },
+          { op: 'spawn_item', kind: 'rod', qty: 1, durability: 40 },
         ]),
       ).toEqual([
         {
@@ -412,8 +591,18 @@ describe('codify', () => {
         rngStream: 'recipe:salt_idem',
       }
 
-      const first = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 200 })
-      const second = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 300 })
+      const first = codify({ recipe, summary: SUMMARY }, CREDIT_FIXTURE, {
+        rulebook,
+        review,
+        codex,
+        tick: 200,
+      })
+      const second = codify({ recipe, summary: SUMMARY }, CREDIT_FIXTURE, {
+        rulebook,
+        review,
+        codex,
+        tick: 300,
+      })
 
       expect(second).toEqual(first)
       const rows = db
@@ -436,16 +625,25 @@ describe('codify', () => {
         rngStream: 'recipe:salt_revive',
       }
 
-      const { ruleId } = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 200 })
-      review.revertByRecipe('recipe:salt_revive', 'physics wrong', 250)
-      expect(rulebook.byId('recipe:salt_revive')!.revertedAtTick).toBe(250)
-
-      const revived = codify({ ...recipe, durationTicks: 7 }, CREDIT_FIXTURE, {
+      const { ruleId } = codify({ recipe, summary: SUMMARY }, CREDIT_FIXTURE, {
         rulebook,
         review,
         codex,
-        tick: 300,
+        tick: 200,
       })
+      review.revertByRecipe('recipe:salt_revive', 'physics wrong', 250)
+      expect(rulebook.byId('recipe:salt_revive')!.revertedAtTick).toBe(250)
+
+      const revived = codify(
+        { recipe: { ...recipe, durationTicks: 7 }, summary: SUMMARY },
+        CREDIT_FIXTURE,
+        {
+          rulebook,
+          review,
+          codex,
+          tick: 300,
+        },
+      )
       expect(revived.ruleId).toBe(ruleId)
 
       const row = rulebook.byId('recipe:salt_revive')!
@@ -467,12 +665,16 @@ describe('codify', () => {
       const codex = new CodexStore(db)
       codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
       codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
-      const { ruleId, verb } = codify(boilSaltRecipe, CREDIT_FIXTURE, {
-        rulebook,
-        review,
-        codex,
-        tick: 200,
-      })
+      const { ruleId, verb } = codify(
+        { recipe: boilSaltRecipe, summary: SUMMARY },
+        CREDIT_FIXTURE,
+        {
+          rulebook,
+          review,
+          codex,
+          tick: 200,
+        },
+      )
       expect(ruleId).toBeTypeOf('number')
       expect(verb).toBe('recipe:boil_salt')
       expect(rulebook.byId('recipe:boil_salt')).not.toBeNull()
@@ -494,7 +696,6 @@ describe('productsOf — what a recipe unlocked', () => {
           op: 'spawn_item' as const,
           kind,
           qty: 1,
-          to: 'agent' as const,
         })),
       },
       { weight: 3, success: false, label: 'it leaks', effects: [{ op: 'none' as const }] },
@@ -525,6 +726,38 @@ describe('productsOf — what a recipe unlocked', () => {
         ],
       }),
     ).toEqual([])
+  })
+})
+
+describe('codify climbs the ladder', () => {
+  it('earns the rung the craft rests on and proposes the next one, unearned', () => {
+    const db = openArbiterDb(':memory:')
+    const codex = new CodexStore(db)
+    codex.insert({ id: 'cooking', era: 'handwork', name: 'Cooking', prerequisiteId: null })
+    codex.insert({
+      id: 'food_preserving',
+      era: 'arrangement',
+      name: 'Keeping food past its week',
+      prerequisiteId: 'cooking',
+      known: false,
+    })
+    expect(codex.frontier()).toEqual(['food_preserving'])
+    codify(
+      {
+        recipe: {
+          ...boilSaltRecipe,
+          id: 'recipe:smoke_fish_ladder',
+          name: 'Smoke Fish Ladder',
+          canon: ['food_preserving'],
+        },
+        summary: 'Hang the catch in smoke so it keeps.',
+        unlocks: { id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'food_preserving' },
+      },
+      CREDIT_FIXTURE,
+      { rulebook: new RulebookStore(db), review: new ReviewStore(db), codex, tick: 1 },
+    )
+    expect(codex.known()).toContain('food_preserving')
+    expect(codex.frontier()).toEqual(['salt_curing'])
   })
 })
 
@@ -567,7 +800,7 @@ describe('codify reports the mint — once, and only for a new one', () => {
     const seen: Codified[] = []
     const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
     const SALT = salt()
-    codify(SALT, CREDIT, deps)
+    codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
     expect(seen).toHaveLength(1)
     expect(seen[0]).toEqual({
       recipeId: SALT.id,
@@ -582,8 +815,8 @@ describe('codify reports the mint — once, and only for a new one', () => {
     const seen: Codified[] = []
     const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
     const SALT = salt()
-    codify(SALT, CREDIT, deps)
-    codify(SALT, CREDIT, deps)
+    codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
+    codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
     expect(seen).toHaveLength(1)
   })
 
@@ -591,9 +824,9 @@ describe('codify reports the mint — once, and only for a new one', () => {
     const seen: Codified[] = []
     const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
     const SALT = salt()
-    codify(SALT, CREDIT, deps)
+    codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
     deps.review.revertByRecipe(SALT.id, 'admin test', 10)
-    codify(SALT, CREDIT, deps)
+    codify({ recipe: SALT, summary: SUMMARY }, CREDIT, deps)
     expect(seen).toHaveLength(1)
   })
 })

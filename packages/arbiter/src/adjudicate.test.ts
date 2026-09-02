@@ -4,16 +4,18 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { unregisterVerb, VERBS } from '@sj/engine'
-import { EMBEDDING_DIM, FORBIDDEN_FRAMING, NO_PARAMS } from '@sj/shared'
+import { EMBEDDING_DIM, FORBIDDEN_FRAMING, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import {
   FALLBACK_IMPOSSIBLE,
   isDecodeDebris,
   makeArbiter,
+  RETIRED_REASON,
   type AgentCtx,
   type Arbiter,
 } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
+import { RulebookStore } from './rulebook.js'
 import { CodexStore } from './codex.js'
 import { RulingsStore } from './rulings.js'
 import { makeArbiterRig, ScriptedLlm, TAMAR_CTX } from './testutil/scriptedLlm.js'
@@ -35,7 +37,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -65,7 +67,7 @@ const basketRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The reeds weave into a tight basket.',
-      effects: [{ op: 'spawn_item', kind: 'basket', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'basket', qty: 1 }],
     },
   ],
   rngStream: 'recipe:basket',
@@ -89,7 +91,7 @@ const ropeRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The reeds twist into a strong rope.',
-      effects: [{ op: 'spawn_item', kind: 'rope', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'rope', qty: 1 }],
     },
   ],
   rngStream: 'recipe:rope',
@@ -199,7 +201,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { arbiter } = await makeArbiterRig({ llm })
 
-    arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
+    arbiter.codify(boilSaltVerdict, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('I try to boil river water for salt', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: NO_PARAMS })
@@ -416,7 +418,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('weave reeds to basket', basketVerdict, 100)
-    arbiter.codify(basketRecipe, CODIFY_CREDIT)
+    arbiter.codify(basketVerdict, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('basket weave reeds', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: NO_PARAMS })
@@ -428,7 +430,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', ropeVerdict, 100)
-    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
+    arbiter.codify(ropeVerdict, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
@@ -533,7 +535,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: NO_PARAMS }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
-    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
+    arbiter.codify(ropeVerdict, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
@@ -547,7 +549,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter } = await makeArbiterRig({ llm })
     const review = new ReviewStore(db)
 
-    const { ruleId } = arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
+    const { ruleId } = arbiter.codify(boilSaltVerdict, CODIFY_CREDIT)
     expect(review.pending()).toHaveLength(1)
 
     arbiter.revert('recipe:boil_salt', 'physics wrong')
@@ -590,7 +592,7 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
         weight: 3,
         success: true,
         label: 'The fish darken and firm in the smoke.',
-        effects: [{ op: 'spawn_item', kind: 'smoked fish', qty: 2, to: 'agent' }],
+        effects: [{ op: 'spawn_item', kind: 'smoked fish', qty: 2 }],
       },
       {
         weight: 1,
@@ -700,6 +702,31 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     if (verdict.kind === 'attempt') expect(verdict.recipe.canon).toEqual(['smoking_food'])
     // The deterministic gate agrees with the context it was given.
     expect(new CodexStore(db).withinAdjacency(['smoking_food'])).toBe(true)
+  })
+
+  it('★ the ladder grows: a codified attempt earns its rung and the court is shown the next', async () => {
+    const withNext: Verdict = {
+      ...smokedFish,
+      unlocks: { id: 'smoke_house', name: 'A smokehouse', prerequisiteId: 'smoking_food' },
+    }
+    const llm = new ScriptedLlm(() => withNext)
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+    expect(verdict).toEqual(withNext)
+    arbiter.codify(withNext as { recipe: Recipe; summary: string }, CODIFY_CREDIT)
+
+    const codex = new CodexStore(db)
+    expect(codex.known()).toContain('smoking_food')
+    expect(codex.frontier()).toContain('smoke_house')
+    await arbiter.adjudicate('I raise a shed for the smoke', esenCtx)
+    expect(llm.lastSystem).toContain(
+      'The town currently knows: fire, pottery, weaving, fishing, smoking_food',
+    )
+    expect(llm.lastSystem).toMatch(
+      /Within reach, though nobody here has done it yet: [^\n]*smoke_house/,
+    )
+    unregisterVerb('recipe:smoked_fish')
   })
 
   it('still refuses a rung two steps out, so the frontier widens nothing', async () => {
@@ -860,7 +887,111 @@ describe('retrieval efficiency', () => {
   })
 })
 
+// The registry stays the size of what the town does: a word nobody has used in fourteen days
+// goes, and a fresh ruling that says what a charter already says is that charter.
+describe('retirement and merge keep the rulebook small', () => {
+  const DAY = MINUTES_PER_DAY
+  // Its own id: `recipe:basket` is minted by an earlier test and the registry is global.
+  const weaveReedBasket = {
+    recipe: { ...basketRecipe, id: 'recipe:weave_reed_basket', name: 'Weave Reed Basket' },
+    summary: 'Weave reeds into a basket.',
+  }
+
+  it('retires a minted verb unused for fourteen days, row kept and word unregistered', async () => {
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { db, arbiter } = await makeArbiterRig({ llm })
+    arbiter.codify(
+      { recipe: { ...basketRecipe, id: 'recipe:retire_me', name: 'Retire Me' }, summary: 'x' },
+      CODIFY_CREDIT,
+    )
+    expect(arbiter.retireUnused(100 + 13 * DAY)).toEqual([])
+    expect(VERBS['recipe:retire_me']).toBeDefined()
+
+    arbiter.noteUsed('recipe:retire_me', 100 + 10 * DAY)
+    expect(arbiter.retireUnused(100 + 20 * DAY)).toEqual([])
+
+    expect(arbiter.retireUnused(100 + 25 * DAY)).toEqual(['recipe:retire_me'])
+    expect(VERBS['recipe:retire_me']).toBeUndefined()
+    const row = new RulebookStore(db).byId('recipe:retire_me')!
+    expect(row.revertedReason).toBe(RETIRED_REASON)
+    expect(arbiter.roster()).toEqual([])
+  })
+
+  it('maps a fresh ruling onto the charter it restates, instead of minting a second name', async () => {
+    const twin: Verdict = {
+      kind: 'attempt',
+      recipe: {
+        ...basketRecipe,
+        id: 'recipe:reed_basket',
+        name: 'Weave a Reed Basket',
+        rngStream: 'recipe:reed_basket',
+      },
+      summary: 'Weave the reeds into a basket.',
+    }
+    const llm = new ScriptedLlm(() => twin)
+    const { db, arbiter } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    arbiter.codify(weaveReedBasket, CODIFY_CREDIT)
+
+    const verdict = await arbiter.adjudicate('I make a basket out of the reeds', TAMAR_CTX)
+    expect(verdict).toEqual({ kind: 'map', verb: 'recipe:weave_reed_basket', params: NO_PARAMS })
+    expect(new RulebookStore(db).byId('recipe:reed_basket')).toBeNull()
+    // And the map is the precedent, so the next rephrasing costs no call at all.
+    const stored = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
+    expect((JSON.parse(stored.verdict_json) as Verdict).kind).toBe('map')
+    unregisterVerb('recipe:weave_reed_basket')
+  })
+
+  it('leaves a ruling that says something new to be minted', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { arbiter } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    arbiter.codify(weaveReedBasket, CODIFY_CREDIT)
+    expect(await arbiter.adjudicate('I twist the reeds into rope', TAMAR_CTX)).toEqual(ropeVerdict)
+    unregisterVerb('recipe:weave_reed_basket')
+  })
+})
+
+describe('the roster the town is told', () => {
+  it('lists every active minted verb, a craft with its gloss and a word with its emote', async () => {
+    const llm = new ScriptedLlm(() => ({
+      word: 'toast',
+      sense: 'sound',
+      durationTicks: 2,
+      energyCost: 1,
+      targeted: true,
+      emote: 'raises a cup to someone',
+    }))
+    const { arbiter } = await makeArbiterRig({ llm })
+    expect(arbiter.roster()).toEqual([])
+
+    arbiter.codify(
+      {
+        recipe: { ...basketRecipe, id: 'recipe:roster_basket', name: 'Roster Basket' },
+        summary: 'Weave reeds into a basket.',
+      },
+      CODIFY_CREDIT,
+    )
+    await arbiter.adjudicate('I sing a toast to Omar', TAMAR_CTX)
+    expect(arbiter.roster()).toEqual([
+      {
+        id: 'recipe:roster_basket',
+        name: 'Roster Basket',
+        gloss: 'Weave reeds into a basket.',
+        reads: [],
+      },
+      { id: 'express:toast', name: 'toast', gloss: 'raises a cup to someone', reads: ['targetId'] },
+    ])
+    // And the court is shown it on the next novel ask.
+    await arbiter.adjudicate('I chart the river shallows', TAMAR_CTX)
+    expect(llm.lastSystem).toContain('recipe:roster_basket (nothing) — Weave reeds into a basket.')
+
+    arbiter.revert('recipe:roster_basket', 'test')
+    expect(arbiter.roster().map((e) => e.id)).toEqual(['express:toast'])
+    unregisterVerb('express:toast')
+  })
+})
+
 describe('rulebook rehydration on construction', () => {
+  const REHYDRATE_SUMMARY = 'Weave reeds into a basket.'
   const rehydrateRecipe: Recipe = {
     ...basketRecipe,
     id: 'recipe:rehydrate_basket',
@@ -878,8 +1009,8 @@ describe('rulebook rehydration on construction', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm })
 
-    arbiter.codify(rehydrateRecipe, CODIFY_CREDIT)
-    arbiter.codify(revertedRecipe, CODIFY_CREDIT)
+    arbiter.codify({ recipe: rehydrateRecipe, summary: REHYDRATE_SUMMARY }, CODIFY_CREDIT)
+    arbiter.codify({ recipe: revertedRecipe, summary: REHYDRATE_SUMMARY }, CODIFY_CREDIT)
     arbiter.revert('recipe:rehydrate_gone', 'physics wrong')
     // Simulate restart: the in-memory registry forgets, the db remembers.
     unregisterVerb('recipe:rehydrate_basket')
