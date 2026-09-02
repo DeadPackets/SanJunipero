@@ -53,10 +53,17 @@ const dropped = (
 ): WorldState =>
   put(s, ev('item_spawned', { id, kind, qty, loc: { t: 'tile', x: at.x, y: at.y }, owner }))
 
-const shelved = (s: WorldState, id: string, kind: string, qty: number, into: string): WorldState =>
-  put(s, ev('item_spawned', { id, kind, qty, loc: { t: 'structure', id: into }, owner: 'a1' }))
+const shelved = (
+  s: WorldState,
+  id: string,
+  kind: string,
+  qty: number,
+  into: string,
+  owner = 'a1',
+): WorldState =>
+  put(s, ev('item_spawned', { id, kind, qty, loc: { t: 'structure', id: into }, owner }))
 
-/** A house of a1's at (2, 2), the town storehouse at (20, 2), and a stranger's house at (26, 2). */
+/** A house of a1's at (2, 2), the town storehouse at (20, 2), and a2's house at (26, 2). */
 function town(): WorldState {
   let s = spawn(world(), 'a1', 4, 5)
   s = spawn(s, 'a2', 28, 5)
@@ -72,7 +79,7 @@ describe('the stores a mind may put things in', () => {
     s = shelved(s, 'item_1', 'plank', 3, 'house_1')
     s = shelved(s, 'item_2', 'bread', 2, 'house_1')
     s = shelved(s, 'item_3', 'wood', 60, 'store_1')
-    s = shelved(s, 'item_4', 'fish', 1, 'house_2')
+    s = shelved(s, 'item_4', 'fish', 1, 'house_2', 'a2')
     const p = composePerception(s, DEFAULT_CONFIG, 'a1', [])
     expect(p.stores).toEqual([
       {
@@ -94,6 +101,49 @@ describe('the stores a mind may put things in', () => {
     const p = composePerception(s, DEFAULT_CONFIG, 'a1', [])
     expect(p.visible.structures).toEqual([])
     expect(p.stores.map((st) => st.structureId)).toEqual(['house_1', 'store_1'])
+  })
+
+  // Since Task 4 a couple's house carries one partner's name and the old cottage carries
+  // nobody's. Where a founder lives is told by where their kit is, which is what genesis seats.
+  it('names the roof it lives under, and whose name is on it', () => {
+    let s = spawn(world(), 'a1', 4, 5)
+    s = spawn(s, 'a2', 8, 5)
+    s = structure(s, 'house_2', 'house', { x: 10, y: 2 }, { owner: 'a2' })
+    s = shelved(s, 'item_1', 'bucket', 1, 'house_2')
+    const p = composePerception(s, DEFAULT_CONFIG, 'a1', [])
+    expect(p.stores).toEqual([
+      {
+        structureId: 'house_2',
+        kind: 'house',
+        ownerName: 'a2',
+        yours: true,
+        items: [{ kind: 'bucket', qty: 1 }],
+      },
+    ])
+  })
+
+  it('names a roof nobody owns that its own things are in', () => {
+    let s = spawn(world(), 'a1', 4, 5)
+    s = structure(s, 'cottage_1', 'cottage', { x: 10, y: 2 })
+    s = shelved(s, 'item_1', 'bucket', 1, 'cottage_1')
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', []).stores).toEqual([
+      {
+        structureId: 'cottage_1',
+        kind: 'cottage',
+        yours: true,
+        items: [{ kind: 'bucket', qty: 1 }],
+      },
+    ])
+  })
+
+  // Everybody's grain is in it, and it is nobody's roof: "the storehouse", never "your storehouse".
+  it('never calls the town store its own, however much of its own is on the shelves', () => {
+    const s = shelved(town(), 'item_1', 'wood', 60, 'store_1')
+    const store = composePerception(s, DEFAULT_CONFIG, 'a1', []).stores.find(
+      (st) => st.structureId === 'store_1',
+    )
+    expect(store).toMatchObject({ kind: 'storehouse' })
+    expect(store).not.toHaveProperty('yours')
   })
 
   it('carries a name where the walls have one', () => {
@@ -144,6 +194,15 @@ describe('what is piling up on your own doorstep', () => {
     ])
     const far = dropped(town(), 'item_1', 'plank', 4, { x: 6, y: 6 })
     expect(composePerception(far, DEFAULT_CONFIG, 'a1', []).self.doorstep).toBeUndefined()
+  })
+
+  // house_2 is a2's, at (26, 2), and a1 lives in it: its doorstep is a1's doorstep.
+  it('counts the heap by the wall of the roof it lives under, whoever owns it', () => {
+    let s = shelved(town(), 'item_kit', 'bucket', 1, 'house_2')
+    s = dropped(s, 'item_1', 'plank', 3, { x: 28, y: 4 })
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', []).self.doorstep).toEqual([
+      { kind: 'plank', qty: 3 },
+    ])
   })
 
   it("counts nothing of another's, and nothing by another's wall", () => {

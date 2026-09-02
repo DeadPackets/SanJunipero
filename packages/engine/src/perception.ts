@@ -13,7 +13,7 @@ import {
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { hears } from './earshot.js'
-import { doorTile, insideOf, roomIsFull } from './interiors.js'
+import { doorTile, insideOf, isYourRoof, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
 import {
@@ -204,6 +204,8 @@ export type PerceivedStore = {
   structureId: string
   kind: string
   name?: string
+  // Absent on a roof of this mind's own and on the town's store, which belongs to nobody.
+  ownerName?: string
   yours?: true
   items: { kind: string; qty: number }[]
 }
@@ -556,6 +558,11 @@ function perceiveInventory(lens: Lens): InventoryItem[] {
     .map((i) => ({ ...i, ...itemMarks(lens, i) }))
 }
 
+// The town's own store belongs to nobody and holds everybody's things, so it is never one of
+// the roofs that are yours, however much of yours stands on its shelves.
+const isTownStore = (config: SimConfig, s: Structure): boolean =>
+  s.owner === undefined && config.spoilage.preservingKinds.includes(s.kind)
+
 // Two tiles out from the wall is the ground a thing is set down on rather than carried in, and
 // three of them is a heap rather than a thing you put down for a moment.
 const DOORSTEP_REACH = 2
@@ -571,18 +578,18 @@ const withinOfRect = (
 
 /** What this mind has left lying on the ground by its own walls. Owner, 2026-09-02: "agents
  *  just end up leaving things in front of their houses". Absent until it is a heap. */
-function perceiveDoorstep(lens: Lens): { kind: string; qty: number }[] | undefined {
+function perceiveDoorstep(
+  lens: Lens,
+  yours: Structure[],
+): { kind: string; qty: number }[] | undefined {
   const { state, self } = lens
-  const mine = Object.values(state.structures).filter(
-    (s) => s.owner === self.id && s.stage === 'complete',
-  )
-  if (mine.length === 0) return undefined
+  if (yours.length === 0) return undefined
   const kinds = new Map<string, number>()
   let heaped = 0
   for (const id of Object.keys(state.items).sort()) {
     const i = state.items[id]!
     if (!isTileItem(i) || i.owner !== self.id) continue
-    if (!mine.some((s) => withinOfRect(i.loc.x, i.loc.y, s, DOORSTEP_REACH))) continue
+    if (!yours.some((s) => withinOfRect(i.loc.x, i.loc.y, s, DOORSTEP_REACH))) continue
     kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
     heaped += i.qty
   }
@@ -592,10 +599,10 @@ function perceiveDoorstep(lens: Lens): { kind: string; qty: number }[] | undefin
     .map(([kind, qty]) => ({ kind, qty }))
 }
 
-/** The shelves this mind may use — the roofs it owns, and the town's own store, which is the
- *  one public building that keeps what is left in it — and what each holds, most of it first. */
-function perceiveStores(lens: Lens): PerceivedStore[] {
-  const { state, config, self } = lens
+/** The shelves this mind may use — the roofs that are its own, and the town's own store, which
+ *  is the one public building that keeps what is left in it — most of a kind first. */
+function perceiveStores(lens: Lens, yours: Structure[]): PerceivedStore[] {
+  const { state, config } = lens
   const inside = new Map<string, Map<string, number>>()
   for (const id of Object.keys(state.items).sort()) {
     const i = state.items[id]!
@@ -604,22 +611,27 @@ function perceiveStores(lens: Lens): PerceivedStore[] {
     kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
     inside.set(i.loc.id, kinds)
   }
+  const mine = new Set(yours.map((s) => s.id))
   const stores: PerceivedStore[] = []
   for (const s of Object.values(state.structures).sort(byId)) {
-    const yours = s.owner === self.id
-    const townsOwn = s.owner === undefined && config.spoilage.preservingKinds.includes(s.kind)
-    if (s.stage !== 'complete' || (!yours && !townsOwn)) continue
+    const isYours = mine.has(s.id)
+    const townsOwn = isTownStore(config, s)
+    if (s.stage !== 'complete' || (!isYours && !townsOwn)) continue
+    // Whose walls they are, when they are not this mind's own: a body sleeping under a
+    // partner's roof has to be able to call the shelf theirs.
+    const owner = s.owner === undefined || s.owner === lens.self.id ? undefined : s.owner
     stores.push({
       structureId: s.id,
       kind: s.kind,
       ...named(s),
-      ...(yours ? { yours: true as const } : {}),
+      ...(isYours ? { yours: true as const } : {}),
+      ...(owner === undefined ? {} : { ownerName: lens.nameOf(owner) }),
       items: [...(inside.get(s.id) ?? new Map<string, number>())]
         .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
         .map(([kind, qty]) => ({ kind, qty })),
     })
   }
-  // Your own roofs first: the shelf a mind reaches for is the one it owns.
+  // The roofs that are yours first: the shelf a mind reaches for is the one it lives under.
   return stores.sort((a, b) => Number(b.yours ?? false) - Number(a.yours ?? false))
 }
 
@@ -769,7 +781,12 @@ export function composePerception(
       ? { x: walkTo.x, y: walkTo.y }
       : undefined
 
-  const doorstep = perceiveDoorstep(lens)
+  // One reading of "the roofs that are yours" for the whole packet, so the shelf a mind is
+  // shown and the doorstep it is told about cannot come from two different rules.
+  const yourRoofs = Object.values(state.structures).filter(
+    (s) => isYourRoof(state, agentId, s) && !isTownStore(config, s),
+  )
+  const doorstep = perceiveDoorstep(lens, yourRoofs)
 
   const visible = {
     agents: perceiveAgents(lens),
@@ -807,7 +824,7 @@ export function composePerception(
     ...(isMapRim(state, self.x, self.y) ? { atRim: true as const } : {}),
     visible,
     reach: perceiveReach(lens, visible),
-    stores: perceiveStores(lens),
+    stores: perceiveStores(lens, yourRoofs),
     heard: perceiveHeard(lens, recentEvents),
     seen: perceiveSeen(lens, recentEvents),
     feltEvents,

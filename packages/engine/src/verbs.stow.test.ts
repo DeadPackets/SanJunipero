@@ -231,4 +231,22 @@ describe('verb: stow, from across the square', () => {
     expect(s.agents.a1!.knownPlaces ?? []).toEqual([])
     expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
   })
+
+  // A couple's house carries one partner's name; the other partner still lives there, which the
+  // world knows because their kit is in it.
+  it('walks to the roof it lives under, whoever the walls belong to', () => {
+    let s = withHolder(world('complete', 'house', 'a2'), 6, 5)
+    s = fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_kit',
+        kind: 'bucket',
+        qty: 1,
+        loc: { t: 'structure', id: 'structure_1' },
+        owner: 'a1',
+      }),
+    )
+    expect(s.agents.a1!.knownPlaces ?? []).toEqual([])
+    expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
+  })
 })

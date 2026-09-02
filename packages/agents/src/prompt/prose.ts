@@ -84,6 +84,8 @@ type PerceptionStore = {
   structureId: string
   kind: string
   name?: string
+  // Whose walls they are, when they are not this mind's own. Absent on the town's store.
+  ownerName?: string
   yours?: true
   items: { kind: string; qty: number }[]
 }
@@ -743,10 +745,8 @@ function itemPhrase(i: { qty: number; kind: string; id: string }): string {
 // A tally of a kind and how many, which is how a shelf reads and how a satchel reads.
 const tally = (t: { kind: string; qty: number }): string => `${t.kind} ×${t.qty}`
 
-/** The satchel as a tally: one entry per kind, one mark per entry, and an ellipsis where more of
- *  the same are behind it. Twelve notes were twelve sentences twice a turn, which was 36% of the
- *  volatile prose in world two. A thing somebody else owns or a thing that is turning keeps its
- *  own entry, so nothing a claim says is lost to the grouping. */
+/** The satchel as a tally: one entry per kind, one mark, an ellipsis where more are behind it.
+ *  A thing owned by another or turning keeps its own entry, so no claim is lost to the grouping. */
 function heldPhrase(held: PerceptionItem[]): string {
   type Group = { kind: string; qty: number; id: string; claim: string; more: boolean }
   const groups = new Map<string, Group>()
@@ -844,7 +844,8 @@ export function doorstepLine(packet: PerceptionPacket, saidAtTick: number | null
 /** What one shelf holds, capped. The tail of a long one is a count of kinds: a mind deciding
  *  where to put a plank needs to know the barn is full, not to read the barn. */
 function storeLine(s: PerceptionStore): string {
-  const said = s.name ?? `${s.yours === true ? 'your' : 'the'} ${words(s.kind)}`
+  const whose = s.ownerName === undefined ? (s.yours === true ? 'your' : 'the') : `${s.ownerName}'s`
+  const said = s.name ?? `${whose} ${words(s.kind)}`
   const say = (n: number): string => {
     const left = s.items.length - n
     const tail = left === 0 ? '' : `, and ${left} other ${left === 1 ? 'kind' : 'kinds'}`

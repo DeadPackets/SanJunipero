@@ -147,12 +147,25 @@ describe('the shelves a mind knows it has', () => {
         { id: 'item_1', kind: 'plank', qty: 3, into: HOUSE },
         { id: 'item_2', kind: 'bread', qty: 2, into: HOUSE },
         { id: 'item_3', kind: 'wood', qty: 60, into: STORE },
-        { id: 'item_4', kind: 'fish', qty: 1, into: OTHER },
+        { id: 'item_4', kind: 'fish', qty: 1, into: OTHER, owner: 'omar' },
       ]),
     )
     expect(said).toContain('Your house holds plank ×3, bread ×2.')
     expect(said).toContain('The storehouse holds wood ×60.')
     expect(said).not.toContain('fish')
+  })
+
+  // A couple's house carries one partner's name. The one who sleeps under it reads the shelf
+  // and calls the walls by the name that is on them.
+  it("calls a roof it lives under by its owner's name", () => {
+    const said = proseFor(
+      town([
+        { id: 'item_1', kind: 'bucket', qty: 1, into: OTHER },
+        { id: 'item_2', kind: 'bread', qty: 2, into: OTHER },
+      ]),
+    )
+    expect(said).toContain("Omar's house holds bread ×2, bucket ×1.")
+    expect(said).not.toContain('Your house holds')
   })
 
   it('says nothing about a shelf standing empty', () => {

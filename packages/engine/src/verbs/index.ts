@@ -12,15 +12,15 @@ import {
 } from '../food.js'
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
-import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
 import {
-  findPath,
-  isPassable,
-  pathCtx,
-  searchToward,
-  type PathCtx,
-  type Point,
-} from '../path.js'
+  doorTile,
+  isYourRoof,
+  occupantsOf,
+  perimeter,
+  roomIsFull,
+  sameInterior,
+} from '../interiors.js'
+import { findPath, isPassable, pathCtx, searchToward, type PathCtx, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -330,8 +330,8 @@ export function walkDestination(
   if (natural !== null) return featureDestination(state, config, a, natural.at, natural.feature)
   const s = state.structures[named.data.structureId]
   // Known, not merely standing: a mark a mind was never shown is a place it cannot name — save
-  // for a roof of its own, which nobody has to be shown the way to.
-  if (s === undefined || !((a.knownPlaces ?? []).includes(s.id) || s.owner === agentId))
+  // for a roof of its own, which nobody has to be shown the way home to.
+  if (s === undefined || !((a.knownPlaces ?? []).includes(s.id) || isYourRoof(state, agentId, s)))
     return { refusal: 'you know no such place' }
   // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
   // measures against are picked off the same tiles in the same order.
