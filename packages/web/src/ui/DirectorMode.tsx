@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
+import { rendersOnMap } from '../render/characters.js'
 import { agentName, type HeatWindow } from '@sj/shared'
 import { CUT_MIN_MS, subjectFor } from './directorCut.js'
 import { useEndpointFor, useFeed } from './useEndpoint.js'
@@ -64,11 +65,17 @@ export function DirectorMode({
     }
     if (!heat.loaded) return
     // read here, never subscribed to — the town changing must not turn the round
-    const living = Object.values(store.getState()?.agents ?? {})
-      .filter((a) => a.alive)
-      .map((a) => a.id)
-      .sort()
-    const next = subjectFor(heat.data ?? NO_HEAT, followedRef.current, store.getTick(), living)
+    const living = Object.values(store.getState()?.agents ?? {}).filter((a) => a.alive)
+    const people = living.map((a) => a.id).sort()
+    // the character layer's own answer to "does the exterior view draw this body"
+    const indoors = new Set(living.filter((a) => !rendersOnMap(a)).map((a) => a.id))
+    const next = subjectFor(
+      heat.data ?? NO_HEAT,
+      followedRef.current,
+      store.getTick(),
+      people,
+      indoors,
+    )
     const now = performance.now()
     if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
       followedRef.current = next
