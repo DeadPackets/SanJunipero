@@ -116,6 +116,14 @@ describe('the satchel is read out once, grouped by kind', () => {
     expect(said).not.toContain('item_132')
   })
 
+  // Roughly a token per 3.3 characters. The twelve sentences and the twelve-item list this
+  // replaced ran to 723 characters, 219 tokens, said twice in every turn.
+  it('costs a tenth of what the list and the sentences cost', () => {
+    const said = proseFor(town(notes(12)))
+    const hands = said.split(/(?<=\.)\s+/).find((s) => s.startsWith('Your hands hold'))!
+    expect(hands.length / 3.3).toBeLessThan(30)
+  })
+
   it('a single thing keeps its own mark, with nothing trailing it', () => {
     const said = proseFor(town([{ id: 'item_9', kind: 'bucket', qty: 1 }]))
     expect(said).toContain('Your hands hold bucket ×1 (item_9);')
