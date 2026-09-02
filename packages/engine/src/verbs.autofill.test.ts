@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, NO_PARAMS, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, NO_PARAMS, namedParams, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
+import { VERBS } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1
@@ -196,5 +197,31 @@ describe('submitIntent', () => {
       ok: false,
       reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
     })
+  })
+})
+
+// The seam proved for the whole registry, not for `eat` alone: each verb parses a `.strict()`
+// schema of its own keys, so the thirteen must be stripped before any of them sees them.
+describe('every registered verb across the closed-params seam', () => {
+  const NAMED: Record<string, unknown> = { itemId: 'item_bread_1', x: 1, y: 1, kind: 'bread' }
+
+  it('reads the stripped answer exactly as the sparse one the world has always passed', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    expect(Object.keys(VERBS).length).toBeGreaterThan(30)
+    for (const [verb, def] of Object.entries(VERBS)) {
+      expect(namedParams({ ...NO_PARAMS, ...NAMED }), verb).toEqual(NAMED)
+      expect(
+        def.validate(s, DEFAULT_CONFIG, 'a1', namedParams({ ...NO_PARAMS, ...NAMED })),
+        verb,
+      ).toEqual(def.validate(s, DEFAULT_CONFIG, 'a1', NAMED))
+    }
+  })
+
+  it('is refused by most of them with the nulls left on, so the stripping is load-bearing', () => {
+    const s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    const refused = Object.values(VERBS).filter(
+      (def) => def.validate(s, DEFAULT_CONFIG, 'a1', { ...NO_PARAMS, ...NAMED }) !== null,
+    )
+    expect(refused.length).toBeGreaterThan(20)
   })
 })

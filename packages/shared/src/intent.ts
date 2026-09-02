@@ -1,9 +1,7 @@
 import { z } from 'zod'
 
-/** Keys are grammar, verbs are lexicon. The verb is a free word, so a mind can mint one and the
- *  town can keep it; the thirteen cases below are the only slots any act — native or minted —
- *  names its object in. A verb that wants a fourteenth takes it in `text` or `description` and
- *  reads the words itself, the way `speak`, `write` and `inscribe` already do. */
+/** The only slots any act names its object in. A verb wanting a fourteenth takes it in `text`
+ *  or `description` and reads the words itself, the way `speak` and `inscribe` already do. */
 export const CLOSED_KEYS = [
   'x',
   'y',
@@ -25,9 +23,8 @@ const num = z.number().nullable()
 // The world refuses a blank word a beat later, so the decoder is told up front.
 const str = z.string().min(1).nullable()
 
-// Every key present, every key nullable, no key beyond these: the object a grammar-constrained
-// decoder can compile. No `.default()` anywhere — the ai SDK emits this schema at `io: 'input'`,
-// where a default drops its key out of `required` and gives back the open object this replaces.
+// No `.default()` anywhere: the ai SDK emits this schema at `io: 'input'`, where a default drops
+// its key out of `required` and gives back the open object this replaces. `NO_PARAMS` is instead.
 export const ClosedIntentParams = z
   .object({
     x: num,
@@ -57,8 +54,11 @@ export const Intent = z
   .strict()
 export type Intent = z.infer<typeof Intent>
 
-/** An act that names nothing: every key answered null. The one place the closed shape's default
- *  lives, since a `.default()` on the schema itself would unmake the grammar it emits. */
+// Named here rather than at the schema: the turn's output ceiling is sized against this many
+// steps of the closed grammar, and the two must not drift (llm/pins.test).
+export const PLAN_MAX_STEPS = 12
+
+/** An act that names nothing: every key answered null. */
 export const NO_PARAMS: ClosedIntentParams = Object.freeze(
   Object.fromEntries(CLOSED_KEYS.map((key) => [key, null])),
 ) as ClosedIntentParams

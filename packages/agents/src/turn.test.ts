@@ -205,13 +205,18 @@ describe('the closed turn a strict json_schema decoder can be handed', () => {
     expect(strictModeFaults(z.toJSONSchema(TurnSchema, { io: 'output' })).length).toBeGreaterThan(0)
   })
 
-  it('round-trips every parameter every registered verb reads', () => {
+  it('round-trips every parameter every registered verb reads, into the shape it parses', () => {
     for (const [verbSchema, keys] of enginePlaces) {
       const asked = Object.fromEntries(keys.map((k) => [k, sample(k)]))
       const strict = strictTurn('act', { ...allNull(), ...asked })
       expect(StrictTurnSchema.safeParse(strict).success, verbSchema).toBe(true)
       const turn = TurnSchemaActionRequired.parse(fromClosed(strict))
       expect(turn.action, verbSchema).toEqual({ verb: 'act', params: asked })
+      // Each verb parses a `.strict()` schema of its own keys, so what comes back through the
+      // seam must satisfy it and the null-filled answer must not.
+      const shape = (engine as unknown as Record<string, z.ZodObject>)[verbSchema]!
+      expect(shape.safeParse(asked).success, verbSchema).toBe(true)
+      expect(shape.safeParse({ ...allNull(), ...asked }).success, verbSchema).toBe(false)
     }
   })
 

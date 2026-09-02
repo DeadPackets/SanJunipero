@@ -4,6 +4,7 @@ import {
   Intent as ClosedIntentSchema,
   MINUTES_PER_DAY,
   namedParams,
+  PLAN_MAX_STEPS,
   type DayPhase,
 } from '@sj/shared'
 
@@ -47,7 +48,7 @@ export const TurnSchema = z
       .nullish()
       .describe('Words you say aloud. Anyone within earshot hears them.'),
     action: z.union([IntentSchema, FreeformSchema]).nullish().describe(ACT_NOW),
-    plan: z.array(IntentSchema).max(12).nullish().describe(A_PLAN),
+    plan: z.array(IntentSchema).max(PLAN_MAX_STEPS).nullish().describe(A_PLAN),
     journal: z
       .string()
       .min(1)
@@ -85,7 +86,7 @@ export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
   action: z
     .union([ClosedIntentSchema, FreeformSchema])
     .describe(`${ACT_NOW} If you truly do nothing this turn, answer verb 'wait' and no params.`),
-  plan: z.array(ClosedIntentSchema).max(12).nullable().describe(A_PLAN),
+  plan: z.array(ClosedIntentSchema).max(PLAN_MAX_STEPS).nullable().describe(A_PLAN),
 })
 
 const askedFor = (step: unknown): unknown => {
@@ -95,6 +96,8 @@ const askedFor = (step: unknown): unknown => {
   return { ...rest, params: namedParams(params as Record<string, unknown>) }
 }
 
+// With `namedParams` on a map verdict, the only place a closed answer's nulls come off: each
+// verb's `validate` parses a `.strict()` schema of its own keys, which a null-filled one fails.
 export function fromClosed(raw: unknown): unknown {
   if (raw === null || typeof raw !== 'object') return raw
   const turn = { ...raw } as { action?: unknown; plan?: unknown }

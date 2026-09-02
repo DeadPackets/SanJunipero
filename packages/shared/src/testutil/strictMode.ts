@@ -1,6 +1,5 @@
 /** What a strict Structured Outputs decoder demands of every object it is handed. The live 400
- *  named the first two by hand: "'required' ... including every key in properties. Missing 'x'".
- *  Returns one line per fault, so a failing assertion says which key in which object. */
+ *  named the first two by hand: "'required' ... including every key in properties. Missing 'x'". */
 export function strictModeFaults(node: unknown, path = '$'): string[] {
   if (Array.isArray(node)) return node.flatMap((n, i) => strictModeFaults(n, `${path}[${i}]`))
   if (node === null || typeof node !== 'object') return []
