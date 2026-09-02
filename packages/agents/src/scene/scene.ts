@@ -56,6 +56,11 @@ export type SceneAsk = {
   thread: SceneLine[]
   /** The tenth line and after: say the thing you came to say, the scene is ending. */
   wrapUp: boolean
+  /** The tick this line is said on. The mind is told the hour it reads to, because nothing
+   *  closes a talk for being late any more. */
+  tick: number
+  /** What this body has left in it, 0–100. Said as weariness, never as a number. */
+  energy: number
 }
 
 export type TieKind =
@@ -91,6 +96,9 @@ export type SceneLlm = {
 export const LINE_CAP = 12
 export const WRAP_CUE_LINE = 10
 export const CLOSING_PASSES = 2
+/** A talk needs somebody to answer. The opener and the tick sweep count to the same number, so
+ *  no scene can open under a rule the same tick would close it under. */
+export const TALKERS_NEEDED = 2
 /** Wall clock, not ticks: a mind that never answers is a provider stall, not a slow hour. */
 export const FLOOR_TIMEOUT_MS = 30_000
 

@@ -578,6 +578,9 @@ export class AgentRuntime {
     // The body's own reflex, and it costs the mind nothing. The legs are left out of it: a walk
     // is how a hungry body reaches food, so breaking one off takes the road away too.
     if (reason === 'body_alarm' && working) this.#breakOff(packet.self.activity!)
+    // A mouth mid-sentence is hands at work: the same alarm takes this mind off the floor, and
+    // the talk ends where the body gave out rather than running on to the cap.
+    if (reason === 'body_alarm' && floor.holdsFloor) this.#scenes?.leave(this.#agentId, tick)
     if (reason !== null) {
       if (packet.self.asleep) {
         this.#wakeOwed = true

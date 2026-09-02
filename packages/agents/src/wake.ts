@@ -123,8 +123,13 @@ export function wakeReasons(
   // than sleep, and it must not hold a mind still through the one thing sleep does not.
   const rousing = packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))
 
+  // Holding the floor is hands at work, and the body breaks off both the same way. Nothing
+  // closes a talk for being late any more, so this is the only thing that reaches a mouth
+  // running down: merely tired keeps talking, genuinely failing goes.
+  const failing = floor.holdsFloor && bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)
+
   // A listener takes no turn at all — that is what makes hearing free.
-  if (floor.inScene && !packet.self.asleep && !rousing) {
+  if (floor.inScene && !packet.self.asleep && !rousing && !failing) {
     return floor.holdsFloor ? ['floor'] : []
   }
 

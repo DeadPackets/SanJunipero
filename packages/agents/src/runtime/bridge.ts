@@ -287,6 +287,18 @@ export class EngineBridge {
     return this.#loop.state.agents[agentId]?.alive === true
   }
 
+  // `asleep` is only ever set by the sleep verb, so a body in bed put itself there. A scene
+  // reads this and never the hour: going to bed is a fact about people.
+  isAwake(agentId: string): boolean {
+    return this.#loop.state.agents[agentId]?.asleep === false
+  }
+
+  /** What this body has left in it, 0–100. The one body fact a scene line carries: a mind still
+   *  talking at midnight is told how tired it is, and answers that for itself. */
+  energyOf(agentId: string): number {
+    return this.#loop.state.agents[agentId]?.needs.energy ?? 100
+  }
+
   // World answers for perception prose: open ground and food kinds, straight
   // from the engine's own path and verb semantics.
   isWalkable(x: number, y: number): boolean {

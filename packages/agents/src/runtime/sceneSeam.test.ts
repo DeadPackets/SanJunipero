@@ -89,7 +89,7 @@ function baseDoc(): PersonalityDoc {
   }
 }
 
-async function twoMinds(opts: { speech: string }) {
+async function twoMinds(opts: { speech: string; mindConfig?: Partial<MindConfig> }) {
   const config = simConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -113,7 +113,14 @@ async function twoMinds(opts: { speech: string }) {
     },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
-  const handler = bridge.wrapTickHandler(() => {})
+  let queued: { type: string; payload: unknown }[] = []
+  const handler = bridge.wrapTickHandler(({ emit }) => {
+    for (const q of queued) emit(q.type, q.payload)
+    queued = []
+  })
+  const emitNext = (type: string, payload: unknown): void => {
+    queued.push({ type, payload })
+  }
 
   const embedder = await FakeEmbedder.create()
   const turnCalls = new Map<string, { n: number }>()
@@ -156,13 +163,13 @@ async function twoMinds(opts: { speech: string }) {
       identity: { ...tamarIdentity, name: id === NADIA ? 'Nadia' : 'Omar' },
       personality,
       bridge,
-      config: FAST,
+      config: { ...FAST, ...opts.mindConfig },
       scenes: coordinator,
     })
     runtime.start(id)
     runtimes.set(id, runtime)
   }
-  return { loop, bridge, coordinator, turnCalls, sceneCalls, runtimes, minds }
+  return { loop, bridge, coordinator, turnCalls, sceneCalls, runtimes, minds, emitNext }
 }
 
 const flush = (): Promise<void> => new Promise((r) => setImmediate(r))
@@ -193,6 +200,21 @@ describe('the runtime hands its mind to a scene', () => {
     expect(h.sceneCalls.get(NADIA) ?? 0, 'Nadia listened for free until the floor came back').toBe(
       0,
     )
+  })
+
+  // Nothing closes a talk for being late any more, so this is the last thing that can reach a
+  // mouth still going while the body behind it gives out.
+  it('lets a body alarm end the night of the mind holding the floor', async () => {
+    const h = await twoMinds({
+      speech: 'Omar. Six planks, you said.',
+      mindConfig: { bodyAlarm: { hunger: 0, energy: 10, warmth: 0, thirst: 0, affliction: 1 } },
+    })
+    await stepUntil(h.loop, () => (h.sceneCalls.get(OMAR) ?? 0) > 0)
+    const holder = h.coordinator.open()[0]?.floor
+    expect(holder, 'somebody is holding the floor').toBeTruthy()
+    h.emitNext('needs_changed', { id: holder!, changes: [{ need: 'energy', delta: -96 }] })
+    await stepUntil(h.loop, () => h.coordinator.open().length === 0, 10)
+    expect(h.coordinator.open(), 'the body took them out of the talk').toHaveLength(0)
   })
 
   it('carries the open scene through a snapshot and puts it back once', async () => {
