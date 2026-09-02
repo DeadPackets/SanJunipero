@@ -26,7 +26,8 @@ export const CLOUD_WRAP_PX = 1400
 export function cloudAt(i: number, n: number, driftPx: number): { x: number; y: number } {
   const lane = phaseOf(`cloud:${i}`)
   const start = (i / n) * CLOUD_WRAP_PX
-  const x = (((start + driftPx) % CLOUD_WRAP_PX) + CLOUD_WRAP_PX) % CLOUD_WRAP_PX - CLOUD_WRAP_PX / 2
+  const x =
+    ((((start + driftPx) % CLOUD_WRAP_PX) + CLOUD_WRAP_PX) % CLOUD_WRAP_PX) - CLOUD_WRAP_PX / 2
   // The lane spreads them across the ground; the same hash keeps them there between frames.
   return { x, y: (lane / (Math.PI * 2)) * CLOUD_WRAP_PX - CLOUD_WRAP_PX / 2 }
 }

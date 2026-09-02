@@ -191,8 +191,8 @@ function sameIntent(text: string): string {
 
 // The spoken reason behind a discovery is the mind's own words for the attempt, reported as
 // "he said he would <saying>": first person stripped, flattened as speech is, and short.
-export const SAYING_MAX_CHARS = 120
-export function spokenReason(intent: string): string {
+const SAYING_MAX_CHARS = 120
+function spokenReason(intent: string): string {
   const said = sanitizeSpokenText(intent)
     .replace(/^i (?:try|want|attempt|mean|am going) to /i, '')
     .replace(/^i (?:will |shall )?/i, '')
@@ -669,7 +669,8 @@ export class AgentRuntime {
       )
     } catch (err) {
       this.#llm.alert('adjudicate_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
     if (verdict.kind === 'map')
       return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
@@ -680,7 +681,10 @@ export class AgentRuntime {
       return
     }
     // Adjudicate once, physics forever.
-    if (this.#codify === null) return fallback()
+    if (this.#codify === null) {
+      fallback()
+      return
+    }
     let verb: string
     try {
       verb = this.#codify(verdict, {
@@ -690,7 +694,8 @@ export class AgentRuntime {
       }).verb
     } catch (err) {
       this.#llm.alert('codify_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
     return this.#holdIntent({ verb, params: {} })
   }

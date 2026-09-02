@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { IDLE_HANDBACK_MS, director } from './autoCut.js'
-import { DIRECTOR_ZOOM, DIRECTOR_ZOOM_WIDE, WIDE_VIEWPORT_PX, directorZoom } from './DirectorMode.js'
+import {
+  DIRECTOR_ZOOM,
+  DIRECTOR_ZOOM_WIDE,
+  WIDE_VIEWPORT_PX,
+  directorZoom,
+} from './DirectorMode.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 

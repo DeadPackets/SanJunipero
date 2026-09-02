@@ -8,11 +8,11 @@ export const WALK_CELLS = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passi
 
 /** Measured over sixteen shipped sheets: a healthy row spreads 5–15 px (a contact pose dips
  *  the figure a few pixels below its idle); the defect measured 29 and 34. */
-export const WALK_HEIGHT_SPREAD_MAX = 18
+const WALK_HEIGHT_SPREAD_MAX = 18
 
 /** A front-facing frame keeps at least this share of the row's fullest head. Healthy front
  *  rows measure 0.61 and up; the back of a head measured 0.35. */
-export const HEAD_SKIN_SHARE_MIN = 0.5
+const HEAD_SKIN_SHARE_MIN = 0.5
 
 // The palette's three skin tones; the fringe over a face is hair, and hair is none of these.
 const SKIN: readonly [number, number, number][] = [
@@ -27,13 +27,13 @@ const isSkin = (r: number, g: number, b: number): boolean =>
     ([sr, sg, sb]) => Math.abs(r - sr) + Math.abs(g - sg) + Math.abs(b - sb) <= SKIN_TOLERANCE,
   )
 
-export function figureHeight(img: RawImage): number {
+function figureHeight(img: RawImage): number {
   const b = opaqueBbox(img)
   return b === null ? 0 : b.y1 - b.y0 + 1
 }
 
 /** Skin pixels in the head band — the top third of the figure's own bounding box. */
-export function headSkinPixels(img: RawImage): number {
+function headSkinPixels(img: RawImage): number {
   const b = opaqueBbox(img)
   if (b === null) return 0
   const band = Math.round((b.y1 - b.y0 + 1) / 3)
@@ -53,7 +53,7 @@ export const MAGENTA_RESIDUE_MAX = 20
 export function magentaResidue(img: RawImage): number {
   let n = 0
   for (let i = 0; i < img.data.length; i += 4) {
-    if (img.data[i + 3]! === 0) continue
+    if (img.data[i + 3] === 0) continue
     const r = img.data[i]!,
       g = img.data[i + 1]!,
       b = img.data[i + 2]!
@@ -72,7 +72,7 @@ export const TORSO_DRIFT_MAX = 0.8
 const BINS = 4
 const bin = (v: number): number => Math.min(BINS - 1, Math.floor((v / 256) * BINS))
 
-export function torsoHistogram(img: RawImage): Float64Array {
+function torsoHistogram(img: RawImage): Float64Array {
   const h = new Float64Array(BINS * BINS * BINS)
   const b = opaqueBbox(img)
   if (b === null) return h
@@ -81,7 +81,7 @@ export function torsoHistogram(img: RawImage): Float64Array {
   for (let y = b.y0 + third; y < b.y0 + 2 * third; y++)
     for (let x = b.x0; x <= b.x1; x++) {
       const i = (y * img.width + x) * 4
-      if (img.data[i + 3]! === 0) continue
+      if (img.data[i + 3] === 0) continue
       h[bin(img.data[i]!) * BINS * BINS + bin(img.data[i + 1]!) * BINS + bin(img.data[i + 2]!)]! +=
         1
       n++

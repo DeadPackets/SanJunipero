@@ -236,7 +236,7 @@ describe('a collapse has a road out of it', () => {
     let s = downed()
     const far = submitIntent(s, CFG, 'a1', 'walk', { x: 9, y: 9 })
     expect(far.ok).toBe(false)
-    expect(far.ok === false && far.reason).toMatch(/drag yourself/)
+    expect(!far.ok && far.reason).toMatch(/drag yourself/)
 
     const near = submitIntent(s, CFG, 'a1', 'walk', { x: 5, y: 4 })
     expect(near.ok).toBe(true)
@@ -295,7 +295,7 @@ describe('a collapse has a road out of it', () => {
     for (const verb of ['build', 'chop', 'take', 'give']) {
       const r = submitIntent(s, CFG, 'a1', verb, {})
       expect([verb, r.ok]).toEqual([verb, false])
-      expect(r.ok === false && r.reason).toBe('collapsed and unable to act')
+      expect(!r.ok && r.reason).toBe('collapsed and unable to act')
     }
   })
 })

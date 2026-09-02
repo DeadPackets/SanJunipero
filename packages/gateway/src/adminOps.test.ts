@@ -173,7 +173,9 @@ describe('the operator channel refuses everyone else', () => {
     const reply = await new Promise<string>((resolve, reject) => {
       let text = ''
       sock.on('data', (c: Buffer) => (text += c.toString()))
-      sock.on('end', () => resolve(text))
+      sock.on('end', () => {
+        resolve(text)
+      })
       sock.on('error', reject)
       sock.write('GET //x:99999/admin/clock HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n')
     })

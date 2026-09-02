@@ -76,9 +76,7 @@ describe('★ it rises, then fades, and is gone at 1.8 s', () => {
     expect(half).toBeLessThan(-MOMENT_EMOTE_RISE_PX / 2) // past halfway at half the time
     expect(emoteRise(MOMENT_EMOTE_RISE_MS)?.dy).toBeCloseTo(-MOMENT_EMOTE_RISE_PX)
     // ...and it has settled by the time the fade starts, so nothing fades while still moving
-    expect(emoteRise(MOMENT_EMOTE_MS - MOMENT_EMOTE_FADE_MS)?.dy).toBeCloseTo(
-      -MOMENT_EMOTE_RISE_PX,
-    )
+    expect(emoteRise(MOMENT_EMOTE_MS - MOMENT_EMOTE_FADE_MS)?.dy).toBeCloseTo(-MOMENT_EMOTE_RISE_PX)
     let last = 1
     for (let t = 0; t < MOMENT_EMOTE_MS; t += 13) {
       const dy = emoteRise(t)!.dy
@@ -126,7 +124,13 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     const book = { get: () => Promise.resolve(Texture.EMPTY) } as unknown as TextureBook
     const layer = createMomentEmotes(scene, store, book)
     // the layer parents its marks under one node of its own
-    return { emit: (e) => { handler([e]) }, layer, sprites: () => overlay.children[0]!.children }
+    return {
+      emit: (e) => {
+        handler([e])
+      },
+      layer,
+      sprites: () => overlay.children[0]!.children,
+    }
   }
 
   it('★ spawns one per involved body, and both are gone after MOMENT_EMOTE_MS', async () => {

@@ -250,7 +250,9 @@ describe('what a stranger cannot do to the town', () => {
     const reply = new Promise<string>((resolve, reject) => {
       let text = ''
       sock.on('data', (c: Buffer) => (text += c.toString()))
-      sock.on('end', () => resolve(text))
+      sock.on('end', () => {
+        resolve(text)
+      })
       sock.on('error', reject)
     })
     sock.write('GET //x:99999/ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n')

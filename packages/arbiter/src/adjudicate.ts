@@ -443,7 +443,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (framingTainted(ruling)) continue
         // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
-        if (ruling.kind === 'attempt' && recipeSanityRefusal(ruling.recipe, vocab) !== null) continue
+        if (ruling.kind === 'attempt' && recipeSanityRefusal(ruling.recipe, vocab) !== null)
+          continue
         // An impossible whose own reason argues the other way — retry, never launder.
         if (impossibleSelfContradicts(ruling)) {
           contradicted = true

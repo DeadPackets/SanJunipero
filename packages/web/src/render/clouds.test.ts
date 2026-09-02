@@ -33,7 +33,7 @@ describe('★ cloud shadows drift with the town’s own wind', () => {
     }
     // ...and a wind blowing the other way carries them back, once the wrap is unwound
     const step = (a: number, b: number): number =>
-      (((b - a + CLOUD_WRAP_PX / 2) % CLOUD_WRAP_PX) + CLOUD_WRAP_PX) % CLOUD_WRAP_PX -
+      ((((b - a + CLOUD_WRAP_PX / 2) % CLOUD_WRAP_PX) + CLOUD_WRAP_PX) % CLOUD_WRAP_PX) -
       CLOUD_WRAP_PX / 2
     const back = at(-40)
     for (let i = 0; i < CLOUD_COUNT; i++) {
@@ -58,7 +58,9 @@ describe('★ cloud shadows drift with the town’s own wind', () => {
   })
 
   it('spreads them out: no two blobs sit on one lane or start on one spot', () => {
-    const lanes = new Set(Array.from({ length: CLOUD_COUNT }, (_, i) => cloudAt(i, CLOUD_COUNT, 0).y))
+    const lanes = new Set(
+      Array.from({ length: CLOUD_COUNT }, (_, i) => cloudAt(i, CLOUD_COUNT, 0).y),
+    )
     expect(lanes.size).toBe(CLOUD_COUNT)
     const starts = new Set(
       Array.from({ length: CLOUD_COUNT }, (_, i) => cloudAt(i, CLOUD_COUNT, 0).x),

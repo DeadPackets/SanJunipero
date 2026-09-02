@@ -65,7 +65,7 @@ export const REPLY_WINDOW_MS = 12_000
  *  transcribed, so it cannot go stale the way a written 8 would. */
 export const EARSHOT_TILES: number = DEFAULT_CONFIG.movement.earshotRadius
 
-export type Voice = { agentId: string; x: number; y: number; atMs: number }
+type Voice = { agentId: string; x: number; y: number; atMs: number }
 
 export type Conversation = {
   heard(v: Voice): void

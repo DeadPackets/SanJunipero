@@ -7,10 +7,10 @@ export const IDLE_HANDBACK_MS = 20_000
 const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const
 
 export type Director = {
-  get(): boolean
-  subscribe(cb: () => void): () => void
+  get: () => boolean
+  subscribe: (cb: () => void) => () => void
   /** the D key, and the only thing that arms or disarms the director for good */
-  toggle(): void
+  toggle: () => void
 }
 
 /** A store rather than hook state, with the listeners on the first subscriber: App holds the

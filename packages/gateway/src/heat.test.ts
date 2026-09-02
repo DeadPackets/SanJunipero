@@ -246,10 +246,9 @@ describe('heat stub', () => {
         score([spoke(1, 1, 'amara', 0, 0), spoke(2, 2, 'amara', 0, 0)]).map((w) => w.score),
       ).toEqual([12])
       expect(
-        score([
-          spoke(1, 1, 'amara', 0, 0),
-          spoke(2, 2, 'yusuf', SCENE_EARSHOT_TILES + 1, 0),
-        ]).map((w) => w.score),
+        score([spoke(1, 1, 'amara', 0, 0), spoke(2, 2, 'yusuf', SCENE_EARSHOT_TILES + 1, 0)]).map(
+          (w) => w.score,
+        ),
       ).toEqual([6, 6])
     })
 

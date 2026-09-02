@@ -93,7 +93,9 @@ describe('★ what a new line does to the lines already in the air', () => {
 
   it('★ the layer applies it to every live bubble on every spoken line', () => {
     const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
-    expect(SRC).toContain('const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)')
+    expect(SRC).toContain(
+      'const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)',
+    )
     expect(SRC).toContain("if (fate === 'end') b.dieMs = now")
   })
 })
@@ -353,7 +355,9 @@ describe('★ everybody the camera can see speaks out loud', () => {
 
     it('★ keeps a speaker whose whole body is in the picture, however near the top edge', () => {
       for (const feetY of [0, 1, 20, 51, 52, 70, 450, 899]) {
-        expect(inViewSpeakers([feet('a', 700, feetY)], VIEW).has('a'), `feet at ${feetY}`).toBe(true)
+        expect(inViewSpeakers([feet('a', 700, feetY)], VIEW).has('a'), `feet at ${feetY}`).toBe(
+          true,
+        )
       }
     })
 
@@ -361,9 +365,9 @@ describe('★ everybody the camera can see speaks out loud', () => {
       // feet one pixel above the top edge, so even the heels are out of frame
       expect(inViewSpeakers([feet('above', 700, -1)], VIEW).has('above')).toBe(false)
       // ...and one whose head has just cleared the bottom edge
-      expect(inViewSpeakers([feet('below', 700, 900 + CHAR_TARGET_PX + 1)], VIEW).has('below')).toBe(
-        false,
-      )
+      expect(
+        inViewSpeakers([feet('below', 700, 900 + CHAR_TARGET_PX + 1)], VIEW).has('below'),
+      ).toBe(false)
       expect(inViewSpeakers([feet('crown', 700, 900 + CHAR_TARGET_PX)], VIEW).has('crown')).toBe(
         true,
       )

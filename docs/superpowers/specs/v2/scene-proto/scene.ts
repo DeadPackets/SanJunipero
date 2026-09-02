@@ -4,7 +4,10 @@ import { writeFileSync } from 'node:fs'
 import { z } from 'zod'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { openDb } from '/home/ubuntu/workspace/SanJunipero/packages/engine/src/db.js'
-import { LlmClient, migrateLlmTables } from '/home/ubuntu/workspace/SanJunipero/packages/llm/src/index.js'
+import {
+  LlmClient,
+  migrateLlmTables,
+} from '/home/ubuntu/workspace/SanJunipero/packages/llm/src/index.js'
 import { FOUNDER_MINDS } from '/home/ubuntu/workspace/SanJunipero/packages/agents/src/live/founderMinds.js'
 import {
   RULES_OF_BEING,
@@ -137,7 +140,8 @@ type Register = 'plain' | 'wants' | 'director' | 'invention'
 
 const EXIT_RULE: Record<Register, string> = {
   plain: 'Leave when you have nothing more worth saying. Otherwise stay and answer.',
-  wants: 'The scene ends when one of you has won the point, or when it boils over. Leave then, not before.',
+  wants:
+    'The scene ends when one of you has won the point, or when it boils over. Leave then, not before.',
   director: 'Leave when you have nothing more worth saying. Otherwise stay and answer.',
   invention:
     'The scene ends once the two of you have settled what the thing is and what it is called. Leave then.',
@@ -212,7 +216,8 @@ function userFor(opts: {
     )
   }
   if (escalated) parts.push('That last one landed hard.')
-  if (register === 'invention') parts.push(recent.length === 0 ? INVENTION_OPENER : INVENTION_ANSWER)
+  if (register === 'invention')
+    parts.push(recent.length === 0 ? INVENTION_OPENER : INVENTION_ANSWER)
   parts.push(EXIT_RULE[register])
   parts.push(
     register === 'wants'
@@ -245,7 +250,10 @@ migrateLlmTables(db)
 
 type Route = { label: string; client: LlmClient }
 
-const glm: Route = { label: 'glm-5.3-flash (Wafer/DeepInfra)', client: new LlmClient({ db, caller: 'turn', budgetUsd: CAP_USD }) }
+const glm: Route = {
+  label: 'glm-5.3-flash (Wafer/DeepInfra)',
+  client: new LlmClient({ db, caller: 'turn', budgetUsd: CAP_USD }),
+}
 
 function viaOpenRouter(label: string, modelId: string, order: string[]): Route {
   const key = process.env.OPENROUTER_API_KEY
@@ -269,7 +277,11 @@ async function askTurn<T>(
   schema: z.ZodType<T>,
 ): Promise<T> {
   try {
-    const r = await route.client.object({ system, messages: [{ role: 'user', content: user }], schema })
+    const r = await route.client.object({
+      system,
+      messages: [{ role: 'user', content: user }],
+      schema,
+    })
     spent += r.usage.costUsd
     return r.value
   } catch {
@@ -395,7 +407,9 @@ async function main(): Promise<void> {
         if (only !== undefined && only !== `${register}:${seed.id}`) continue
         const s = await runScene(seed, register, glm)
         scenes.push(s)
-        console.log(`${register}/${seed.id} ${s.lines.length} lines ${(s.ms / 1000).toFixed(1)}s $${s.costUsd.toFixed(5)} — ${s.exit}`)
+        console.log(
+          `${register}/${seed.id} ${s.lines.length} lines ${(s.ms / 1000).toFixed(1)}s $${s.costUsd.toFixed(5)} — ${s.exit}`,
+        )
       }
     }
   } else {
@@ -404,7 +418,9 @@ async function main(): Promise<void> {
     const seed = SEEDS.find((s) => s.id === seedId)!
     const s = await runScene(seed, register as Register, route)
     scenes.push(s)
-    console.log(`${register}/${seed.id} ${modelId} ${s.lines.length} lines ${(s.ms / 1000).toFixed(1)}s $${s.costUsd.toFixed(5)} — ${s.exit}`)
+    console.log(
+      `${register}/${seed.id} ${modelId} ${s.lines.length} lines ${(s.ms / 1000).toFixed(1)}s $${s.costUsd.toFixed(5)} — ${s.exit}`,
+    )
   }
   writeFileSync(OUT, JSON.stringify({ scenes, totalCostUsd: spent }, null, 2))
   console.log(`total $${spent.toFixed(5)} -> ${OUT}`)
