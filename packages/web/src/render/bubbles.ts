@@ -47,11 +47,11 @@ export const SPEECH_MS_BASE = 3500
 export const SPEECH_MS_PER_CHAR = 40
 const THOUGHT_DRIFT_PX = 2
 
-/** ★ NOTHING IS CUT. The box wrapped at 210 world px — thirteen characters a line in Press
- *  Start 2P at 16px — and stopped at two lines, so a spoken line arrived as "Sit down, Sa…" and
- *  the other sixty-six characters were never seen by anyone. Double the width, no line ceiling,
- *  and the SANITIZER's own bound is the only one left: an utterance reaches this layer already
- *  cut to `SPEECH_MAX_CHARS`, and the box grows to whatever came. */
+/** ★ NOTHING IS CUT AT THE EVENT. The box wrapped at 210 world px — thirteen characters a line
+ *  in Press Start 2P at 16px — and stopped at two lines, so a spoken line arrived as "Sit down,
+ *  Sa…" and the other sixty-six characters were never seen by anyone. Double the width, and the
+ *  Chronicle keeps every character an utterance came with; `BUBBLE_MAX_LINES` cuts the DRAWING
+ *  only. */
 export const BUBBLE_MAX_PX = 420
 export const BUBBLE_FONT_PX = faceFor('speech').size
 export const BUBBLE_LINE_H = Math.max(WORLD_TEXT_LINE_H, BUBBLE_FONT_PX + 4)
@@ -93,6 +93,18 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
   }
   if (line.length > 0) lines.push(line)
   return lines
+}
+
+/** ★ A BUBBLE IS A LINE, NOT A PAGE. 240 characters wrapped to eleven of them and stood a slab
+ *  over a third of the frame that nobody could read before it went. Three lines are drawn; the
+ *  rest is on the paper, which is where a viewer goes to read a speech twice. */
+export const BUBBLE_MAX_LINES = 3
+
+export function capLines(lines: readonly string[], maxChars: number): string[] {
+  if (lines.length <= BUBBLE_MAX_LINES) return [...lines]
+  const kept = lines.slice(0, BUBBLE_MAX_LINES)
+  kept[BUBBLE_MAX_LINES - 1] = `${kept[BUBBLE_MAX_LINES - 1]!.slice(0, maxChars - 1).trimEnd()}…`
+  return kept
 }
 
 const TINT_BUCKET_BITS = 3
@@ -317,10 +329,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     node.eventMode = 'none' // bubbles float over heads — never block a character click
     const role = isThought ? 'thought' : 'speech'
     const face = faceFor(role)
-    const lines = wrapBubble(
-      text.slice(0, SPEECH_MAX_CHARS),
-      wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX),
-    )
+    const wrapAt = wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX)
+    const lines = capLines(wrapBubble(text.slice(0, SPEECH_MAX_CHARS), wrapAt), wrapAt)
     // Cut to the WHOLE line, then set to what has been typed: a box that grew with its own
     // sentence would move the paper under the reader.
     const full = lines.join('\n')

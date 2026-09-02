@@ -5,7 +5,9 @@ import {
   bubbleAlpha,
   onLeash,
   BUBBLE_FONT_PX,
+  BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
+  capLines,
   GLYPH_ZOOM,
   SPEAKER_TINT,
   SPEECH_MAX_CHARS,
@@ -161,6 +163,51 @@ describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
 
   it('leaves a short line alone', () => {
     expect(wrapBubble('the iron sings today', 24)).toEqual(['the iron sings today'])
+  })
+})
+
+// ★ D2 — 240 characters wrapped to eleven lines and stood a slab over a third of a 1440px frame.
+// The utterance still reaches the Chronicle whole; the DRAWING stops at three lines.
+describe('★ the bubble draws three lines, and says so', () => {
+  const SPEECH =
+    'the fish are biting well this morning by the river and the light is good on the water and nobody has come down to see any of it with me'
+
+  it('★ keeps a box of three lines or fewer exactly as it was wrapped', () => {
+    expect(BUBBLE_MAX_LINES).toBe(3)
+    for (const said of ['the iron sings today', 'the fish are biting well this morning']) {
+      const lines = wrapBubble(said, 24)
+      expect(capLines(lines, 24)).toEqual(lines)
+    }
+  })
+
+  it('★ keeps the first three and ends the third in one ellipsis', () => {
+    const lines = wrapBubble(SPEECH, 24)
+    expect(lines.length).toBeGreaterThan(BUBBLE_MAX_LINES)
+    const shown = capLines(lines, 24)
+    expect(shown).toHaveLength(BUBBLE_MAX_LINES)
+    expect(shown.slice(0, 2)).toEqual(lines.slice(0, 2))
+    expect(shown[2]!.endsWith('…')).toBe(true)
+    expect(shown.filter((l) => l.includes('…'))).toHaveLength(1)
+  })
+
+  it('★ the ellipsis replaces trailing characters rather than overflowing the box', () => {
+    for (const width of [10, 16, 24, WRAP_CHARS]) {
+      for (const l of capLines(wrapBubble(SPEECH, width), width))
+        expect(l.length, `${width}`).toBeLessThanOrEqual(width)
+    }
+  })
+
+  it('★ a thought is quieter, not longer: the same three lines', () => {
+    const face = faceFor('thought')
+    const at = wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX)
+    expect(capLines(wrapBubble(SPEECH, at), at)).toHaveLength(BUBBLE_MAX_LINES)
+  })
+
+  it('★ the layer cuts the DRAWING, never the line it was handed', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('capLines(wrapBubble(text.slice(0, SPEECH_MAX_CHARS), wrapAt), wrapAt)')
+    // and the event that carries it away is untouched: `spawn` is handed the whole `text`
+    expect(SRC).toContain('spawnSpeech: (agentId, text) => {')
   })
 })
 
