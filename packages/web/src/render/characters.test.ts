@@ -178,12 +178,16 @@ function makeStore(agents: MutableAgents): {
   store: WorldStore
   emit: (evts: SimEvent[]) => void
   setScene: (s: TownScene | null) => void
+  setMoving: (v: boolean) => void
 } {
   const handlers = new Set<(evts: SimEvent[]) => void>()
   let scene: TownScene | null = null
+  let moving = true
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
-    getMode: () => ({ live: true as const }),
+    getMode: () =>
+      moving ? { live: true as const } : { live: false as const, replaying: false, tick: 0 },
+    timeMoving: () => moving,
     getTick: () => 0,
     latestThought: () => null,
     thoughtsLog: () => [],
@@ -202,6 +206,9 @@ function makeStore(agents: MutableAgents): {
     store,
     setScene: (s) => {
       scene = s
+    },
+    setMoving: (v) => {
+      moving = v
     },
     emit: (evts) => {
       for (const fn of handlers) fn(evts)
@@ -464,9 +471,10 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
     layer: ReturnType<typeof createCharacterLayer>
     emit: (evts: SimEvent[]) => void
     at: (ms: number, evts?: SimEvent[]) => void
+    setMoving: (v: boolean) => void
   }> {
     const scene = makeScene()
-    const { store, emit } = makeStore(agents)
+    const { store, emit, setMoving } = makeStore(agents)
     ;(store as unknown as { getConfig: () => unknown }).getConfig = () => config
     const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
     await Promise.resolve()
@@ -479,11 +487,32 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
       if (evts !== undefined) emit(evts)
       layer.tick(ms)
     }
-    return { scene, layer, emit, at }
+    return { scene, layer, emit, at, setMoving }
   }
 
   const moved = (id: string, x: number, y: number, tick: number): SimEvent =>
     ({ type: 'agent_moved', tick, payload: { id, x, y } }) as unknown as SimEvent
+
+  // ★ The guard used to ask "is this live?". A replay is not live and its bodies must still walk;
+  // only a STILL scrub is a fact to be drawn where the record put it.
+  it('★ a replay walks a body, and only a still scrub drops it on the record tile', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const { scene, at, setMoving } = await rig(agents)
+      agents.nadia!.x = 1
+      at(400, [moved('nadia', 1, 0, 1)])
+      agents.nadia!.x = 2
+      at(800, [moved('nadia', 2, 0, 2)])
+      agents.nadia!.x = 3
+      at(1200, [moved('nadia', 3, 0, 3)])
+      // time is moving: the body is on its way to the tile the record already names
+      expect(drawnTile(scene, 'nadia').x).toBeLessThan(3)
+
+      setMoving(false)
+      at(1200)
+      expect(drawnTile(scene, 'nadia').x).toBeCloseTo(3, 3)
+    })()
+  })
 
   it('★ a body that stood still for a minute does NOT spend four seconds on its next tile', () => {
     return (async () => {

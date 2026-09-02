@@ -159,6 +159,53 @@ describe('connectObservatory link status', () => {
     expect(store.getMode()).toEqual({ live: true })
   })
 
+  /** The same reqId ladder a scrub climbs: an answer for a moment the viewer has left is stale
+   *  whichever frame carries it. */
+  it('★ asks for a replay, and drops one answered after the viewer went back to now', () => {
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+
+    handle.replay(7)
+    expect(sock.sent.at(-1)).toBe('{"t":"replay","from":7,"reqId":1}')
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 7, seq: 3, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 7 })
+
+    handle.goLive()
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 7, seq: 3, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 7 })
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    expect(store.getMode()).toEqual({ live: true })
+  })
+
+  /** `sj:lastSeenTick` is what decides whether the next visit is offered a digest of the days it
+   *  missed. A replayed minute is one this viewer is watching, not one it slept through. */
+  it('★ never stores a replayed minute as the last minute this viewer saw', () => {
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem })
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    setItem.mockClear()
+
+    handle.replay(1)
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 1, seq: 0, state: SNAPSHOT.state }),
+    })
+    const adv = { seq: 1, tick: 1, type: 'tick_advanced', payload: {} }
+    sock.onmessage?.({ data: JSON.stringify({ t: 'tick', tick: 1, seq: 1, events: [adv] }) })
+    expect(store.getTick(), 'the replayed minute did land').toBe(1)
+    expect(setItem).not.toHaveBeenCalled()
+  })
+
   it('a deliberate close() never reports reconnecting', () => {
     const statuses: string[] = []
     const handle = connectObservatory({

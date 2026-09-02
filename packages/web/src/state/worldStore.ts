@@ -14,7 +14,9 @@ const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
 const RECENT_EVENTS_CAP = 400
 
-type ViewMode = { live: true } | { live: false; tick: number }
+/** Three states, not two: LIVE, a STILL scrub pinned to one minute, and a REPLAY walking the
+ *  past forward. A replay is not live — it never moves the live watermark — but its time moves. */
+type ViewMode = { live: true } | { live: false; replaying: boolean; tick: number }
 type Thought = { agentId: string; tick: number; text: string }
 /** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
  *  which is the Pixi handle and has nothing to do with this. */
@@ -32,6 +34,9 @@ type Trouble = 'reload' | 'resnapshot'
 export type WorldStore = {
   getState: () => WorldState | null
   getMode: () => ViewMode
+  /** Is the clock on screen advancing? The question every reader that folds a delta or walks a
+   *  body is really asking — live and replaying both answer yes, a still scrub answers no. */
+  timeMoving: () => boolean
   /** The operator has stopped the world clock. The town is still served; it is not moving. */
   getPaused: () => boolean
   getTick: () => number
@@ -77,6 +82,7 @@ export function createWorldStore(): WorldStore {
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
+  const timeMoving = (): boolean => mode.live || mode.replaying
 
   // Every subscriber pass is a full entity sync, so a burst is coalesced onto the next frame.
   // Off a browser there is no frame to wait for and the pass stays synchronous.
@@ -98,6 +104,7 @@ export function createWorldStore(): WorldStore {
   return {
     getState: () => state,
     getMode: () => mode,
+    timeMoving,
     getPaused: () => paused,
     getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
     liveEdge: () => liveEdge,
@@ -136,8 +143,8 @@ export function createWorldStore(): WorldStore {
           // sends: refolding an event this state already has throws, and the town stops.
           if (msg.seq <= logSeq) return null
           logSeq = msg.seq
-          // deltas only advance the live view; while scrubbed the past moment stays still
-          if (mode.live && state !== null && config !== null) {
+          // deltas advance whatever clock is moving; while scrubbed the past moment stays still
+          if (timeMoving() && state !== null && config !== null) {
             // Folded aside first: a throw halfway through must not leave half a town on screen.
             let next = state
             try {
@@ -146,6 +153,8 @@ export function createWorldStore(): WorldStore {
               return 'resnapshot'
             }
             state = next
+            // The replay's own playhead, so every reader of `mode.tick` follows the past forward.
+            if (!mode.live) mode = { live: false, replaying: true, tick: next.tick }
             for (const ev of msg.events) {
               if (ev.type !== 'config_changed') continue
               const p = ev.payload as { path?: unknown; value?: unknown }
@@ -163,7 +172,14 @@ export function createWorldStore(): WorldStore {
           break
         case 'scrubbed':
           state = msg.state as WorldState
-          mode = { live: false, tick: msg.tick }
+          mode = { live: false, replaying: false, tick: msg.tick }
+          break
+        case 'replaying':
+          // The log head goes BACK to where this state was taken: the recorded deltas that follow
+          // carry their own old seqs, and the guard above must read them as the rise they are.
+          logSeq = msg.seq
+          state = msg.state as WorldState
+          mode = { live: false, replaying: true, tick: msg.tick }
           break
         case 'thought':
           thoughtsSeq++

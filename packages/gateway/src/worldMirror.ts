@@ -29,6 +29,7 @@ export class WorldMirror {
   #selSnapAtOrBefore
   #selEventsFrom
   #selEventsRange
+  #selEventsTicks
 
   constructor(opts: { db: Database.Database; config: SimConfig; terrain: TileId[][] }) {
     this.#config = opts.config
@@ -43,6 +44,11 @@ export class WorldMirror {
     )
     this.#selEventsRange = db.prepare(
       'SELECT seq, tick, type, payload FROM events WHERE seq > ? AND tick <= ? ORDER BY seq',
+    )
+    // Bounded by TICK, not by seq: a replay reading a minute out of an old week would otherwise
+    // scan every row that follows it. This one rides idx_events_tick.
+    this.#selEventsTicks = db.prepare(
+      'SELECT seq, tick, type, payload FROM events WHERE tick > ? AND tick <= ? ORDER BY seq',
     )
 
     const snap = this.#selLatestSnap.get() as SnapRow | undefined
@@ -78,16 +84,37 @@ export class WorldMirror {
   }
 
   stateAt(tick: number): WorldState {
+    return this.snapshotAt(tick).state
+  }
+
+  /** The world at `tick` AND the log head that produced it — what a replay adopts so the deltas
+   *  after it read as an ordinary rising stream. */
+  snapshotAt(tick: number): { state: WorldState; seq: number } {
     if (tick > this.#state.tick)
       throw new RangeError(`stateAt(${tick}): beyond live tick ${this.#state.tick}`)
     const snap = this.#selSnapAtOrBefore.get(tick) as SnapRow | undefined
     let state = snap
       ? (JSON.parse(snap.state) as WorldState)
       : genesisState(this.#config, this.#terrain)
-    const fromSeq = snap ? snap.seq : 0
-    for (const row of this.#selEventsRange.all(fromSeq, tick) as EvRow[]) {
-      state = fold(state, parseEv(row), this.#config)
+    let seq = snap ? snap.seq : 0
+    for (const row of this.#selEventsRange.all(seq, tick) as EvRow[]) {
+      const ev = parseEv(row)
+      state = fold(state, ev, this.#config)
+      seq = ev.seq
     }
-    return state
+    return { state, seq }
+  }
+
+  /** The recorded minutes in `(afterTick, throughTick]`, grouped the way `poll` groups a live
+   *  one. Read, never folded: a replay hands the fold back to the viewer. */
+  eventsBetween(afterTick: number, throughTick: number): { tick: number; events: SimEvent[] }[] {
+    const groups: { tick: number; events: SimEvent[] }[] = []
+    for (const row of this.#selEventsTicks.all(afterTick, throughTick) as EvRow[]) {
+      const ev = parseEv(row)
+      const last = groups[groups.length - 1]
+      if (last?.tick === ev.tick) last.events.push(ev)
+      else groups.push({ tick: ev.tick, events: [ev] })
+    }
+    return groups
   }
 }

@@ -477,8 +477,8 @@ export function createCharacterLayer(
       if (!rendersOnMap(a)) continue
       live.add(a.id)
       const e = ensure(a.id, a.x, a.y)
-      // scrubbed views teleport: past positions are facts, not animation
-      if (!store.getMode().live) {
+      // a still view teleports: a pinned position is a fact, not animation. A replay walks.
+      if (!store.timeMoving()) {
         e.path = [{ x: a.x, y: a.y, atMs: nowMs }]
       }
       e.path = prunePath(e.path, nowMs)
