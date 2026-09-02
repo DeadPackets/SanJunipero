@@ -180,8 +180,14 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
   }
 
   it('a body denied water dies on that tick, and the death is named for the thirst', () => {
-    const expected = scheduledDeathTick(CFG, START)
-    const { log } = runUntil(parched(), CFG, START, expected - START + 60, (st) => !st.agents.dry!.alive)
+    // Fatigue and dawn mending silenced: over a day-long thirst road each would move the tick.
+    const dry = {
+      ...CFG,
+      health: { ...CFG.health, recoveryHpPerDay: 0 },
+      mortality: { ...CFG.mortality, drainPerTick: { ...CFG.mortality.drainPerTick, fatigue: 0 } },
+    }
+    const expected = scheduledDeathTick(dry, START)
+    const { log } = runUntil(parched(dry), dry, START, expected - START + 60, (st) => !st.agents.dry!.alive)
     const death = died(log, 'dry')
     expect(death).toBeDefined()
     noteCause(death!.payload)
