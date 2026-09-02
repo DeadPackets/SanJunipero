@@ -253,6 +253,53 @@ export const DiscoveryMade = z
     makes: z.array(z.string().min(1)),
   })
   .strict()
+// A scene is the agents' own bookkeeping; the world only witnesses that one happened. All three
+// fold to nothing, the way a discovery does.
+export const SceneOpened = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation']),
+    participants: z.array(z.string().min(1)),
+    topic: z.string().nullable(),
+    stakes: z.number().int().min(0).max(10),
+  })
+  .strict()
+export const SceneLineSaid = z
+  .object({
+    id: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string(),
+    move: z.enum(['press', 'give_way', 'deflect', 'tease', 'none']),
+  })
+  .strict()
+export const SceneClosed = z
+  .object({
+    id: z.string().min(1),
+    summary: z.string(),
+    deltas: z.array(
+      z
+        .object({
+          agentId: z.string().min(1),
+          personId: z.string().min(1),
+          kind: z.enum([
+            'promise',
+            'debt',
+            'slight',
+            'grudge',
+            'attraction',
+            'secret',
+            'alliance',
+            'kin',
+          ]),
+          text: z.string(),
+          settled: z.literal(true).optional(),
+        })
+        .strict(),
+    ),
+    closeReason: z.enum(['ended', 'left', 'night', 'capped', 'timeout']),
+  })
+  .strict()
+
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 // `cause` stays a free string so every recorded log still parses; DEATH_CAUSES is the
 // vocabulary emitters are held to.

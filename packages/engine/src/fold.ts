@@ -47,6 +47,9 @@ import {
   AgentSpoke,
   AgentSpawned,
   AgentTended,
+  SceneOpened,
+  SceneLineSaid,
+  SceneClosed,
   AgentWoke,
   CoSlept,
   CropGrew,
@@ -269,6 +272,19 @@ export function fold(
     // the verb registry and not in the state. That is also why no golden can move.
     case 'discovery_made': {
       DiscoveryMade.parse(event.payload)
+      return state
+    }
+    // A scene lives in the minds that are having it; the world only witnesses that it happened.
+    case 'scene_opened': {
+      SceneOpened.parse(event.payload)
+      return state
+    }
+    case 'scene_line': {
+      SceneLineSaid.parse(event.payload)
+      return state
+    }
+    case 'scene_closed': {
+      SceneClosed.parse(event.payload)
       return state
     }
     case 'marked': {

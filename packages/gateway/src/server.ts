@@ -14,6 +14,7 @@ import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
+import { makeSceneRelay } from './scenes.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
@@ -368,6 +369,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   })
 
   // ── poll pump ──
+  const sceneFrames = makeSceneRelay()
   let lastThoughtId = 0
   let lastAssetSeq = 0
   let observerSeen = false
@@ -388,6 +390,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     for (const g of groups) {
       const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
+      for (const frame of sceneFrames(g.events)) hub.broadcast(JSON.stringify(frame))
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {

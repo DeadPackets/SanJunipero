@@ -9,9 +9,15 @@ import { makeReflectionLlm } from '../reflection.js'
 import { AgentRuntime, type RuntimeSnapshot } from '../runtime/agentRuntime.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { wireArbiter, type SeamArbiter } from '../runtime/arbiterSeam.js'
+import { SceneCoordinator, type SceneMind } from '../scene/coordinator.js'
+import { MemoryStore } from '../memory/store.js'
+import { TieStore } from '../memory/ties.js'
 import type { MindConfig } from '../wake.js'
 
 export type Kin = { id: string; relation: 'partner' | 'parent' | 'child' }
+
+// A scene's own summary is tagged by the scene, not by a cue reader.
+const EMPTY_SCENE_TAGS = { people: [], place: null, objects: [], topics: [] }
 
 /** One person, before there is a body for them. The shape `founderMinds.ts` already speaks. */
 export type MindSpec = {
@@ -29,6 +35,8 @@ export type MindSpec = {
 
 export type BootedMinds = {
   runtimes: Map<string, AgentRuntime>
+  /** The world's one scene coordinator, or null when nothing supplied a scene LLM. */
+  scenes: SceneCoordinator | null
   /** Who is in the town, by id — the founders plus everyone born since. A newborn's parents
    *  are read from here, so it grows as `add` is called. */
   cast: ReadonlyMap<string, MindSpec>
@@ -68,6 +76,9 @@ export type BootMindsOpts = {
   restoring?: ReadonlyMap<string, RuntimeSnapshot>
   /** Adjudication and codification, injected because agents may not import the arbiter. */
   arbiter?: SeamArbiter
+  /** The scene turn and the scene close, per mind. Absent, no scene ever opens and every mind
+   *  talks the way it did before there were scenes. Task 8b supplies the real one. */
+  sceneLlm?: (agentId: string) => SceneMind['llm']
 }
 
 /** `init` on a mind that already has version 1 writes a second one and `current()` then reads
@@ -86,11 +97,32 @@ export function hasPersonality(db: Database.Database, agentId: string): boolean 
 export function bootMinds(opts: BootMindsOpts): BootedMinds {
   const runtimes = new Map<string, AgentRuntime>()
   const cast = new Map<string, MindSpec>()
+  const minds = new Map<string, SceneMind>()
+  const sceneLlm = opts.sceneLlm
+  const scenes =
+    sceneLlm === undefined
+      ? null
+      : new SceneCoordinator({
+          bridge: opts.bridge,
+          mindFor: (id) => minds.get(id) ?? null,
+        })
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
     if (!hasPersonality(db, spec.id))
       personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
+    if (sceneLlm !== undefined) {
+      const mem = new MemoryStore(db, spec.id, opts.embedder)
+      minds.set(spec.id, {
+        llm: sceneLlm(spec.id),
+        ties: new TieStore(db, spec.id),
+        remember: async (m) => {
+          await mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS })
+        },
+        // Warmth lives in each runtime's own company map; a scene reads it through the runtime.
+        warmth: (otherId) => runtimes.get(spec.id)?.warmthToward(otherId) ?? 0,
+      })
+    }
     const runtime = new AgentRuntime({
       db,
       llm: opts.turnLlm(spec.id),
@@ -104,6 +136,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         : { reflectionLlm: makeReflectionLlm(opts.reflectionLlm(spec.id)) }),
       ...(opts.dreamLlm === undefined ? {} : { dreamLlm: makeDreamLlm(opts.dreamLlm(spec.id)) }),
       ...(opts.onThought === undefined ? {} : { onThought: opts.onThought }),
+      ...(scenes === null ? {} : { scenes }),
     })
     runtime.start(spec.id)
     const was = opts.restoring?.get(spec.id)
@@ -115,6 +148,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   for (const spec of opts.minds) boot(spec)
   return {
     runtimes,
+    scenes,
     cast,
     alive: () => [...cast.keys()].filter((id) => opts.bridge.isAlive(id)).length,
     add: boot,
