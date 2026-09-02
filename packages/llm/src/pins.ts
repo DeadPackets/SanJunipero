@@ -5,6 +5,13 @@ export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
 // Two homes since the 2026-09-01 bake-off: DeepInfra cleared 60/60 acts under 8-way concurrency
 // with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
 export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
+// Which dialect of the Turn a mind is asked for. OpenAI's strict json_schema cannot express the
+// loose Intent params — every key must sit in `required` and no other key may exist — so a mind
+// pinned there asks for the closed shape and the runtime reads it back (agents/turn.ts). Derived
+// from the pin above rather than set beside it: two lines that must agree are one that gets missed.
+export const MIND_TURN_SCHEMA: 'loose' | 'strict' = MIND_MODEL.startsWith('openai/')
+  ? 'strict'
+  : 'loose'
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const

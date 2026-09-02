@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MINUTES_PER_DAY, type DayPhase } from '@sj/shared'
 import { IntentParamsSchema } from '@sj/engine/verbs'
+import { MIND_TURN_SCHEMA } from '@sj/llm'
 
 // An hour of the day is a plan for today; a day and a phase is an appointment. Without the
 // second shape nothing can be arranged in advance, only remembered or improvised.
@@ -18,6 +19,12 @@ export const IntentSchema = z
     ),
   })
   .strict()
+const FreeformSchema = z
+  .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
+  .strict()
+const ACT_NOW =
+  'One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.'
+const A_PLAN = 'Up to twelve acts your body carries out one after another while your mind rests.'
 // Every optional field takes null as well as absence, and not via `.transform()`, which
 // `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
 export const TurnSchema = z
@@ -33,22 +40,8 @@ export const TurnSchema = z
       .min(1)
       .nullish()
       .describe('Words you say aloud. Anyone within earshot hears them.'),
-    action: z
-      .union([
-        IntentSchema,
-        z
-          .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
-          .strict(),
-      ])
-      .nullish()
-      .describe(
-        'One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.',
-      ),
-    plan: z
-      .array(IntentSchema)
-      .max(12)
-      .nullish()
-      .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
+    action: z.union([IntentSchema, FreeformSchema]).nullish().describe(ACT_NOW),
+    plan: z.array(IntentSchema).max(12).nullish().describe(A_PLAN),
     journal: z
       .string()
       .min(1)
@@ -76,16 +69,71 @@ export const TurnSchema = z
 // { verb: 'wait' } out loud. Measures whether banning the shrug creates real acts or renames it.
 export const TurnSchemaActionRequired = TurnSchema.extend({
   action: z
-    .union([
-      IntentSchema,
-      z
-        .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
-        .strict(),
-    ])
-    .describe(
-      "One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new. If you truly do nothing this turn, answer { verb: 'wait', params: {} }.",
-    ),
+    .union([IntentSchema, FreeformSchema])
+    .describe(`${ACT_NOW} If you truly do nothing this turn, answer { verb: 'wait', params: {} }.`),
 })
+
+// The same turn said in the dialect a strict json_schema decoder takes: no key left out, no key it
+// has never heard of. Absence is written as null, and `fromClosed` below takes it back out.
+const closedParams = z
+  .object(
+    Object.fromEntries(
+      Object.entries(IntentParamsSchema.shape).map(([key, field]) => [
+        key,
+        field.unwrap().nullable(),
+      ]),
+    ),
+  )
+  .strict()
+  .describe('Exactly what the act asks for, named by its keys; every other key is null.')
+
+const ClosedIntentSchema = z
+  .object({ verb: IntentSchema.shape.verb, params: closedParams })
+  .strict()
+
+export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
+  action: z
+    .union([ClosedIntentSchema, FreeformSchema])
+    .describe(`${ACT_NOW} If you truly do nothing this turn, answer verb 'wait' and no params.`),
+  plan: z.array(ClosedIntentSchema).max(12).nullable().describe(A_PLAN),
+})
+
+// A param answered null is a param the act never asked for. Every other null the loose schema
+// already reads as absence, so nothing else moves.
+const askedFor = (step: unknown): unknown => {
+  if (step === null || typeof step !== 'object') return step
+  const { params, ...rest } = step as { params?: unknown }
+  if (params === null || typeof params !== 'object') return step
+  return {
+    ...rest,
+    params: Object.fromEntries(Object.entries(params).filter(([, v]) => v !== null)),
+  }
+}
+
+function fromClosed(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const turn = { ...raw } as { action?: unknown; plan?: unknown }
+  if ('action' in turn) turn.action = askedFor(turn.action)
+  if (Array.isArray(turn.plan)) turn.plan = turn.plan.map(askedFor)
+  return turn
+}
+
+/** Both dialects a mind can be asked in, each with the reader that puts its answer back into the
+ *  turn the runtime knows. Asked and read as one thing, so the two can never be mismatched. */
+export const TURN_WIRE: Record<
+  'loose' | 'strict',
+  { schema: z.ZodType; toLoose: (raw: unknown) => unknown }
+> = {
+  loose: { schema: TurnSchemaActionRequired, toLoose: (raw) => raw },
+  strict: { schema: StrictTurnSchema, toLoose: fromClosed },
+}
+
+/** The dialect the pinned mind is asked in. */
+export const MIND_TURN_WIRE = TURN_WIRE[MIND_TURN_SCHEMA]
+
+/** A mind's answer, in whichever dialect it was asked for, read as the turn the runtime knows. */
+export const readMindTurn = (raw: unknown): z.ZodSafeParseResult<Turn> =>
+  TurnSchemaActionRequired.safeParse(MIND_TURN_WIRE.toLoose(raw))
 
 export type Turn = z.infer<typeof TurnSchema>
 
@@ -152,9 +200,9 @@ export async function parseTurnWithRepair(
   alert: (kind: string, detail: string) => void,
   hasOneReading?: ActHasOneReading,
 ): Promise<Turn> {
-  const first = TurnSchemaActionRequired.safeParse(raw)
+  const first = readMindTurn(raw)
   if (!first.success) {
-    const second = TurnSchemaActionRequired.safeParse(await repair(z.prettifyError(first.error)))
+    const second = readMindTurn(await repair(z.prettifyError(first.error)))
     if (second.success) return waitIsRest(second.data)
     alert('turn_fallback', z.prettifyError(second.error))
     return FALLBACK_TURN
@@ -170,7 +218,7 @@ export async function parseTurnWithRepair(
     alert('act_detail_filled_in', `${empty} has one candidate and was read as that`)
     return rested
   }
-  const again = TurnSchemaActionRequired.safeParse(
+  const again = readMindTurn(
     await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
   )
   if (again.success) {

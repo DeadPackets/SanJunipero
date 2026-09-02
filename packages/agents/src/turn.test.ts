@@ -6,9 +6,14 @@ import { IntentParamsSchema } from '@sj/engine/verbs'
 import {
   FALLBACK_TURN,
   IntentSchema,
+  MIND_TURN_WIRE,
+  StrictTurnSchema,
+  TURN_WIRE,
   TurnSchema,
+  TurnSchemaActionRequired,
   actWithoutItsDetail,
   parseTurnWithRepair,
+  readMindTurn,
   reconsiderTick,
 } from './turn.js'
 
@@ -156,6 +161,92 @@ describe('IntentSchema.params emits a grammar a constrained decoder can compile'
     expect(
       IntentSchema.parse({ verb: 'build', params: { kind: 'house', x: 1, y: 2 } }).params,
     ).toEqual({ kind: 'house', x: 1, y: 2 })
+  })
+})
+
+// What OpenAI's strict Structured Outputs demands of every object it is handed. The live 400
+// named the first two by hand: "'required' ... including every key in properties. Missing 'x'".
+function strictModeFaults(node: unknown, path = '$'): string[] {
+  if (Array.isArray(node)) return node.flatMap((n, i) => strictModeFaults(n, `${path}[${i}]`))
+  if (node === null || typeof node !== 'object') return []
+  const o = node as Record<string, unknown>
+  const faults: string[] = []
+  if (o.properties !== undefined) {
+    const required = Array.isArray(o.required) ? (o.required as string[]) : []
+    for (const key of Object.keys(o.properties as object)) {
+      if (!required.includes(key)) faults.push(`${path}: ${key} is optional`)
+    }
+    if (o.additionalProperties !== false) faults.push(`${path}: additionalProperties is not false`)
+  }
+  for (const keyword of ['propertyNames', 'default']) {
+    if (keyword in o) faults.push(`${path}: ${keyword}`)
+  }
+  return [...faults, ...Object.entries(o).flatMap(([k, v]) => strictModeFaults(v, `${path}.${k}`))]
+}
+
+const PARAM_KEYS = Object.keys(IntentParamsSchema.shape)
+const allNull = (): Record<string, unknown> => Object.fromEntries(PARAM_KEYS.map((k) => [k, null]))
+const strictTurn = (verb: string, params: Record<string, unknown>): Record<string, unknown> => ({
+  thought: 'the well is low; I should fetch water before noon',
+  speech: null,
+  action: { verb, params },
+  plan: null,
+  journal: null,
+  recall: null,
+  importance: 4,
+  reconsider_at: null,
+})
+// A number where the verb wants one, a word everywhere else.
+const sample = (key: string): string | number => (key === 'x' || key === 'y' ? 3 : `${key}-1`)
+
+describe('the closed turn a strict json_schema decoder can be handed', () => {
+  it('asks for every key the loose params name, and takes no other', () => {
+    expect(StrictTurnSchema.safeParse(strictTurn('sleep', allNull())).success).toBe(true)
+    for (const key of PARAM_KEYS) {
+      const { [key]: _left, ...missing } = allNull()
+      expect(StrictTurnSchema.safeParse(strictTurn('sleep', missing)).success, key).toBe(false)
+    }
+    const extra = { ...allNull(), whittledFrom: 'ash' }
+    expect(StrictTurnSchema.safeParse(strictTurn('recipe:spoon', extra)).success).toBe(false)
+  })
+
+  it('emits a schema OpenAI strict mode accepts, where the loose one is refused', () => {
+    expect(strictModeFaults(z.toJSONSchema(StrictTurnSchema, { io: 'output' }))).toEqual([])
+    // The refusal this exists to answer: the shipped schema leaves every param key optional.
+    expect(strictModeFaults(z.toJSONSchema(TurnSchema, { io: 'output' })).length).toBeGreaterThan(0)
+  })
+
+  it('round-trips every parameter every registered verb reads', () => {
+    for (const [verbSchema, keys] of enginePlaces) {
+      const asked = Object.fromEntries(keys.map((k) => [k, sample(k)]))
+      const strict = strictTurn('act', { ...allNull(), ...asked })
+      expect(StrictTurnSchema.safeParse(strict).success, verbSchema).toBe(true)
+      const turn = TurnSchemaActionRequired.parse(TURN_WIRE.strict.toLoose(strict))
+      expect(turn.action, verbSchema).toEqual({ verb: 'act', params: asked })
+    }
+  })
+
+  it('reads an act that asks for nothing, and a plan of them, as nothing named', () => {
+    const strict = {
+      ...strictTurn('sleep', allNull()),
+      plan: [{ verb: 'wake', params: allNull() }],
+    }
+    const turn = TurnSchemaActionRequired.parse(TURN_WIRE.strict.toLoose(strict))
+    expect(turn.action).toEqual({ verb: 'sleep', params: {} })
+    expect(turn.plan).toEqual([{ verb: 'wake', params: {} }])
+  })
+
+  it('pairs each dialect with the reader that takes its answers', () => {
+    for (const [name, wire] of Object.entries(TURN_WIRE)) {
+      const answer = name === 'strict' ? strictTurn('sleep', allNull()) : validTurn
+      expect(wire.schema.safeParse(answer).success, name).toBe(true)
+      expect(TurnSchemaActionRequired.safeParse(wire.toLoose(answer)).success, name).toBe(true)
+    }
+  })
+
+  it('leaves the pin at loose, so a mind on GLM is asked and read exactly as it was', () => {
+    expect(MIND_TURN_WIRE).toBe(TURN_WIRE.loose)
+    expect(readMindTurn(validTurn).success).toBe(true)
   })
 })
 
