@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOUNDER_IDS, makeCityTemplate } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, makeCityTemplate } from '@sj/shared'
 import type { Structure, TileId, WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { AT_RADIUS_TILES, TERRAIN_WORDS, placeOf, structureWords } from './place.js'
@@ -42,7 +42,7 @@ function world(
       hp: 100,
       injuries: [],
       ill: false,
-      ageDays: 30 * 364,
+      ageDays: 30 * DAYS_PER_YEAR,
       skills: {},
       activity: null,
       collapsedSinceTick: null,

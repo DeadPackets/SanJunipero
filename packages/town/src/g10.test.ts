@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import {
+  ADULT_AGE_DAYS,
   BondsResponseSchema,
   DEFAULT_CONFIG,
   MomentsResponseSchema,
@@ -51,9 +52,9 @@ function scriptedWorld(dbPath: string): Database.Database {
     snapshotEveryTicks: 25,
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
-        emit('agent_spawned', { id: 'amara', name: 'Amara', x: 2, y: 2, ageDays: 7300 })
-        emit('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 2, y: 3, ageDays: 7300 })
-        emit('agent_spawned', { id: 'nadia', name: 'Nadia', x: 9, y: 9, ageDays: 7300 })
+        emit('agent_spawned', { id: 'amara', name: 'Amara', x: 2, y: 2, ageDays: ADULT_AGE_DAYS })
+        emit('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 2, y: 3, ageDays: ADULT_AGE_DAYS })
+        emit('agent_spawned', { id: 'nadia', name: 'Nadia', x: 9, y: 9, ageDays: ADULT_AGE_DAYS })
       }
       if (tick === 4) {
         emit('structure_planned', {

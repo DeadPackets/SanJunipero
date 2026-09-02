@@ -49,7 +49,7 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
 
 describe('decideWake — one case per reason', () => {
   const cases: [string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null][] = [
-    ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
+    ['body_alarm', withNeeds(14, 78, 71), clk(), 10, pln(), 'body_alarm'],
     [
       'salient_perception (heard speech)',
       conversationPacket,
@@ -92,7 +92,7 @@ describe('decideWake — priority and floor', () => {
         ...conversationPacket.self,
         body: {
           ...conversationPacket.self.body,
-          needs: { ...conversationPacket.self.body.needs, hunger: 20 },
+          needs: { ...conversationPacket.self.body.needs, hunger: 10 },
         },
       },
     }
@@ -203,7 +203,7 @@ describe('decideWake — asleep gate', () => {
         ...asleep().self,
         body: {
           ...quietMeadowPacket.self.body,
-          needs: { ...quietMeadowPacket.self.body.needs, energy: 10 },
+          needs: { ...quietMeadowPacket.self.body.needs, energy: 9 },
         },
       },
     }
@@ -254,26 +254,26 @@ describe('decideWake — hysteresis', () => {
       return decideWake(cfg, withNeeds(hunger, 78, 71), clock, tick, pln())
     }
 
-    expect(run(24, 10)).toBe('body_alarm')
-    disarmBodyAlarm(cfg, { needs: { hunger: 24, energy: 78, warmth: 71 } }, clock)
+    expect(run(14, 10)).toBe('body_alarm')
+    disarmBodyAlarm(cfg, { needs: { hunger: 14, energy: 78, warmth: 71 } }, clock)
 
-    expect(run(24, 11)).toBe(null)
+    expect(run(14, 11)).toBe(null)
 
-    // 26 is above threshold but below the 35 re-arm point: still quiet.
-    expect(run(26, 12)).toBe(null)
-    expect(run(24, 13)).toBe(null)
+    // 16 is above threshold but below the 25 re-arm point: still quiet.
+    expect(run(16, 12)).toBe(null)
+    expect(run(14, 13)).toBe(null)
 
-    // 36 > 25 + 10: climbs past the re-arm point, but healthy → no wake.
-    expect(run(36, 14)).toBe(null)
-    expect(run(24, 15)).toBe('body_alarm')
+    // 26 > 15 + 10: climbs past the re-arm point, but healthy → no wake.
+    expect(run(26, 14)).toBe(null)
+    expect(run(14, 15)).toBe('body_alarm')
   })
 
   it('a turn at a level between threshold and re-arm point must not disarm the alarm', () => {
-    // Regression: hunger 30 lies in (25, 35]; a turn snapshot there used to
-    // permanently disarm body_alarm because 30 is not > threshold + hysteresis.
+    // Regression: hunger 20 lies in (15, 25]; a turn snapshot there used to
+    // permanently disarm body_alarm because 20 is not > threshold + hysteresis.
     const clock = clk()
-    disarmBodyAlarm(cfg, { needs: { hunger: 30, energy: 78, warmth: 71 } }, clock)
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 10, pln())).toBe('body_alarm')
+    disarmBodyAlarm(cfg, { needs: { hunger: 20, energy: 78, warmth: 71 } }, clock)
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 10, pln())).toBe('body_alarm')
   })
 })
 
@@ -346,10 +346,10 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
 describe('decideWake — doze backoff', () => {
   it('suppresses every reason, floor-exempt ones included, until dozeUntilTick', () => {
     const clock = clk({ dozeUntilTick: 50 })
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 49, pln())).toBe(null)
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 49, pln())).toBe(null)
     expect(decideWake(cfg, conversationPacket, clock, 49, pln())).toBe(null)
     expect(decideWake(cfg, pkt(), clock, 49, pln({ lastResult: 'blocked' }))).toBe(null)
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 50, pln())).toBe('body_alarm')
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 50, pln())).toBe('body_alarm')
   })
 })
 

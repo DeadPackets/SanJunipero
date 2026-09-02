@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent, scanForDirective } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent, scanForDirective } from '@sj/shared'
 import {
   buildTicks,
   composePerception,
@@ -89,7 +89,10 @@ describe('★ the packet carries how far up the walls are', () => {
     )
     if (progress > 0)
       s = fold(s, ev(2, 'structure_progressed', { id: 'structure_1', ticks: progress }))
-    return fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
+    return fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
   }
 
   const seen = (s: WorldState) =>
@@ -117,15 +120,17 @@ describe('★ the packet carries how far up the walls are', () => {
     const g = makeGenesisWorld(CFG)
     let s = genesisState(CFG, g.terrain)
     for (const e of g.events) s = fold(s, ev(1, e.type, e.payload), CFG)
-    const house = Object.values(s.structures).find((x) => x.kind === 'house')!
+    // The farmhouse, not a founder's house: every seated roof stands now (D1), and the one the
+    // village left down is the one nobody sleeps in.
+    const farmhouse = Object.values(s.structures).find((x) => x.kind === 'farmhouse')!
     s = fold(
       s,
       ev(2, 'agent_spawned', {
         id: 'a1',
         name: 'a1',
-        x: house.x,
-        y: house.y + house.h,
-        ageDays: 7300,
+        x: farmhouse.x,
+        y: farmhouse.y + farmhouse.h,
+        ageDays: ADULT_AGE_DAYS,
       }),
       CFG,
     )
@@ -342,7 +347,7 @@ describe('* walls already standing are a place the world can name', () => {
     }
     return fold(
       s,
-      ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
   }

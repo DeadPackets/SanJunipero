@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CITY_ANCHOR_DEFAULT,
   DEFAULT_CONFIG,
   FOUNDER_IDS,
@@ -115,9 +116,9 @@ describe('makeGenesisWorld: the town', () => {
     for (const p of planned) expect(p.builderId).toBe(GENESIS_BUILDER_ID)
   })
 
-  // Two buildings still have their roofs and the other nine stand as walls three quarters up.
-  // Sound, the valley held 25 bodies against a cast of 12, which is what puts a want in the founding.
-  it('plants every building, and stands nine of them roofless', () => {
+  // Every founder wakes under a whole roof (D1), the three in the old cottage too. What the
+  // village left unfinished is the farmhouse nobody sleeps in — the first thing to raise together.
+  it('plants every building, and stands one of them roofless', () => {
     const s = foldAll()
     const all = Object.values(s.structures)
     expect(all.length).toBe(makeCityTemplate().structures.length)
@@ -129,8 +130,21 @@ describe('makeGenesisWorld: the town', () => {
       .filter((x) => x.stage === 'construction')
       .map((x) => x.kind)
       .sort()
-    expect(sound).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
-    expect(fallen).toEqual(['cottage', 'farmhouse', ...Array<string>(7).fill('house')])
+    expect(sound).toEqual([
+      'cabin',
+      'cottage',
+      'fire_pit',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'storehouse',
+      'well',
+    ])
+    expect(fallen).toEqual(['farmhouse'])
   })
 
   // A roofless building nobody can carry on is a thing that looks like an answer and refuses in
@@ -212,17 +226,20 @@ describe('makeGenesisWorld: the town', () => {
       ])
       const roof = Object.values(s.structures).find((x) => x.name === FOUNDER_SEATS[id])!
       for (const item of kit) expect(item.loc).toEqual({ t: 'structure', id: roof.id })
-      expect(kit.find((i) => i.kind === 'bread')!.qty).toBe(3)
+      expect(kit.find((i) => i.kind === 'bread')!.qty).toBe(6)
     }
     const store = Object.values(s.structures).find((x) => x.kind === 'storehouse')!
     const stock = Object.values(s.items).filter(
       (i) => i.loc.t === 'structure' && i.loc.id === store.id && i.owner === undefined,
     )
     expect(Object.fromEntries(stock.map((i) => [i.kind, i.qty]))).toEqual({
-      wood: 20,
-      stone: 12,
-      rope: 4,
-      cloth: 4,
+      wood: 60,
+      stone: 24,
+      rope: 8,
+      cloth: 8,
+      bread: 20,
+      fish: 10,
+      seed_pouch: 3,
     })
   })
 
@@ -327,7 +344,7 @@ describe('the ford: one reach where the channel runs two wide', () => {
         seq: 9000,
         tick: 0,
         type: 'agent_spawned',
-        payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: 7300 },
+        payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: ADULT_AGE_DAYS },
       },
       DEFAULT_CONFIG,
     )
@@ -454,7 +471,8 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
     }
     expect(() => roofFell(withHut, 'hut')).toThrow(/nobody could finish/)
     expect(roofFell(CFG, 'cabin'), 'the cabin stands').toBe(false)
-    expect(roofFell(CFG, 'cottage'), 'and a cottage does not').toBe(true)
+    expect(roofFell(CFG, 'cottage'), 'the cottage row wakes under a whole roof').toBe(false)
+    expect(roofFell(CFG, 'farmhouse'), 'and the farmhouse does not').toBe(true)
   })
 
   // Reachability proved by walking it, not by eye: the pathfinder the world uses, from the door
@@ -503,7 +521,13 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
         seq: 9103,
         tick: NIGHT,
         type: 'agent_spawned',
-        payload: { id: 'walker', name: 'Walker', x: starts[0]!.x, y: starts[0]!.y, ageDays: 7300 },
+        payload: {
+          id: 'walker',
+          name: 'Walker',
+          x: starts[0]!.x,
+          y: starts[0]!.y,
+          ageDays: ADULT_AGE_DAYS,
+        },
       },
       CFG,
     )

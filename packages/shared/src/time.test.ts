@@ -4,6 +4,8 @@ import {
   dayPhaseFromTick,
   nextDawnTick,
   DAWN_HOUR,
+  DAYS_PER_SEASON,
+  DAYS_PER_YEAR,
   MINUTES_PER_DAY,
 } from './time.js'
 
@@ -60,13 +62,15 @@ describe('simTimeFromTick', () => {
     expect(t.hour).toBe(12)
     expect(t.isNight).toBe(false)
   })
-  it('day 92 is summer day 1', () => {
-    const t = simTimeFromTick(91 * MINUTES_PER_DAY)
+  it('day 8 is summer day 1: a season is a week', () => {
+    expect(DAYS_PER_SEASON).toBe(7)
+    const t = simTimeFromTick(DAYS_PER_SEASON * MINUTES_PER_DAY)
     expect(t.season).toBe('summer')
     expect(t.dayOfSeason).toBe(1)
   })
-  it('day 365 is year 1 spring day 1', () => {
-    const t = simTimeFromTick(364 * MINUTES_PER_DAY)
+  it('day 29 is year 1 spring day 1: a year is four weeks', () => {
+    expect(DAYS_PER_YEAR).toBe(28)
+    const t = simTimeFromTick(DAYS_PER_YEAR * MINUTES_PER_DAY)
     expect(t.year).toBe(1)
     expect(t.season).toBe('spring')
     expect(t.dayOfSeason).toBe(1)

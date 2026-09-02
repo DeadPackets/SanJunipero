@@ -2,6 +2,7 @@
 // Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -38,7 +39,7 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState =>
-  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
+  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), config)
 
 const give = (
   s: WorldState,

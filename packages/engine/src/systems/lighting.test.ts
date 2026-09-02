@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, nextDawnTick, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, nextDawnTick, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
@@ -28,7 +28,7 @@ function bodyAt(tick: number, config = CFG): WorldState {
   s = fold(s, ev('tick_advanced', {}, tick), config)
   return fold(
     s,
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS }, tick),
     config,
   )
 }

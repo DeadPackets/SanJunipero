@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   EventEnvelope,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -40,7 +41,11 @@ const STORM_HOUR = MINUTES_PER_DAY * SimConfigSchema.parse({}).weather.harshFrom
 
 function rowWorld(config = CFG): WorldState {
   let s = genesisState(config)
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
   const all = [
     ...house('structure_1', 2, 2),
     ...house('structure_2', 4, 2),
@@ -202,7 +207,11 @@ describe('fire: burn damage and burnout', () => {
 
   function loneHouse(): WorldState {
     let s = genesisState(fast)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), fast)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      fast,
+    )
     for (const e of house('structure_1', 2, 2)) s = fold(s, e, fast)
     return atTick(s, 1)
   }

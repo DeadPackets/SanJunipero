@@ -2,6 +2,7 @@
 // The engine locates the town by reading the authored `TOWN_SQUARE` less `state.origin`.
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CITY_GROUND,
   TOWN_SQUARE,
   T_ROAD,
@@ -263,7 +264,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
         fold(s, { seq: ++n, tick: 1, type, payload }, cfg)
       const body = (s: WorldState, id: string, at: { x: number; y: number }): WorldState =>
         put(
-          put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: 7300 }),
+          put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS }),
           'item_spawned',
           { id: `item_wood_${id}`, kind: 'wood', qty: 99, loc: { t: 'agent', id } },
         )

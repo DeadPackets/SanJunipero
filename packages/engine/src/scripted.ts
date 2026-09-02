@@ -1,4 +1,4 @@
-import { isRoofedKind, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, isRoofedKind, type SimConfig } from '@sj/shared'
 import { composePerception, type PerceptionPacket } from './perception.js'
 import { doorTile } from './interiors.js'
 import { submitIntent } from './intent.js'
@@ -207,15 +207,36 @@ function scriptedTimeline(
   // Sexes ride the reproduction flag: a fixture with it off spawns the earlier bodies exactly.
   const sex = (s: 'f' | 'm'): { sex?: 'f' | 'm' } => (config.reproduction.enabled ? { sex: s } : {})
   if (tick === 1) {
-    emit('agent_spawned', { id: FARMER, name: 'Farmer', x: 26, y: 21, ageDays: 7300, ...sex('f') })
-    emit('agent_spawned', { id: FISHER, name: 'Fisher', x: 4, y: 32, ageDays: 7300, ...sex('m') })
-    emit('agent_spawned', { id: IDLER, name: 'Idler', x: 5, y: 32, ageDays: 7300, ...sex('m') })
+    emit('agent_spawned', {
+      id: FARMER,
+      name: 'Farmer',
+      x: 26,
+      y: 21,
+      ageDays: ADULT_AGE_DAYS,
+      ...sex('f'),
+    })
+    emit('agent_spawned', {
+      id: FISHER,
+      name: 'Fisher',
+      x: 4,
+      y: 32,
+      ageDays: ADULT_AGE_DAYS,
+      ...sex('m'),
+    })
+    emit('agent_spawned', {
+      id: IDLER,
+      name: 'Idler',
+      x: 5,
+      y: 32,
+      ageDays: ADULT_AGE_DAYS,
+      ...sex('m'),
+    })
     emit('agent_spawned', {
       id: BUILDER,
       name: 'Builder',
       x: 30,
       y: 22,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
       ...sex('f'),
     })
     emit('structure_planned', {
@@ -281,7 +302,7 @@ function scriptedTimeline(
       name: 'Thief',
       x: THIEF_POST.x,
       y: THIEF_POST.y,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
       ...sex('m'),
     })
     emit('agent_spawned', {
@@ -289,7 +310,7 @@ function scriptedTimeline(
       name: 'Keeper',
       x: WATCH_POST.x,
       y: WATCH_POST.y,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
       ...sex('f'),
     })
     emit('item_spawned', {
@@ -370,8 +391,7 @@ export function makeScriptedOnTick(
       if (builder.needs.energy < 30)
         emit('needs_changed', { id: BUILDER, changes: [{ need: 'energy', delta: 70 }] })
       const holdsFood = Object.values(getState().items).some(
-        (i) =>
-          i.loc.t === 'agent' && i.loc.id === BUILDER && isFoodKind(config, i.kind),
+        (i) => i.loc.t === 'agent' && i.loc.id === BUILDER && isFoodKind(config, i.kind),
       )
       if (builder.needs.hunger < 60 && holdsFood)
         emit('action_interrupted', { agentId: BUILDER, reason: 'rest' })

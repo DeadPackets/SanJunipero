@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { DEFAULT_CONFIG, ServerMsg, stateHash, PROTOCOL_VERSION } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, ServerMsg, stateHash, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb } from '@sj/forge'
@@ -27,7 +27,7 @@ function makeWorld(dbPath: string) {
     snapshotEveryTicks: 5,
     onTick: ({ tick, emit }) => {
       if (tick === 1)
-        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
       if (tick > 1) emit('agent_moved', { id: 'walker', x: (tick - 1) % 8, y: 0 })
     },
   })

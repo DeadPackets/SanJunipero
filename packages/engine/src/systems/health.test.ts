@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
@@ -22,7 +22,7 @@ function makeWorld(
   for (const a of agents)
     s = fold(
       s,
-      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: ADULT_AGE_DAYS }),
       config,
     )
   return s

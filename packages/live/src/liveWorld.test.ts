@@ -9,7 +9,7 @@ import Database from 'better-sqlite3'
 import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -46,7 +46,7 @@ const TWO: MindSpec[] = [
   {
     id: 'amara',
     sex: 'f',
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     identity: {
       name: 'Amara',
       age: 34,
@@ -71,7 +71,7 @@ const TWO: MindSpec[] = [
   {
     id: 'omar',
     sex: 'm',
-    ageDays: 46 * 364,
+    ageDays: 46 * DAYS_PER_YEAR,
     identity: {
       name: 'Omar',
       age: 46,

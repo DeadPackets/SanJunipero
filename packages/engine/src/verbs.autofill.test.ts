@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, NO_PARAMS, namedParams, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, NO_PARAMS, namedParams, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -20,7 +20,7 @@ function world(rows: string[] = OPEN): WorldState {
 }
 
 function withAgent(s: WorldState, x: number, y: number): WorldState {
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }))
+  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }))
 }
 
 function holding(s: WorldState, id: string, kind: string, charges?: number): WorldState {

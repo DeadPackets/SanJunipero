@@ -360,15 +360,12 @@ describe('★ two bodies raise one building — the second pair of hands joins t
   })
 
   it('★ finished walls are not a site: a body beside a standing house still gets its own ground', () => {
-    // The valley's own houses stand roofless now, so this test puts a roof on one: the claim is
-    // about a FINISHED building, and there has to be one for it to be about anything.
-    const roofless = Object.values(genesisTown().structures).find(
-      (x) => x.kind === 'house' && x.stage === 'construction',
+    // Every founder's house stands (D1), so the finished building this claim is about is
+    // already here and the test does not have to raise one.
+    const base = genesisTown()
+    const done = Object.values(base.structures).find(
+      (x) => x.kind === 'house' && x.stage === 'complete',
     )!
-    const base = apply(genesisTown(), [
-      { type: 'structure_completed', payload: { id: roofless.id } },
-    ])
-    const done = base.structures[roofless.id]!
     expect(done.stage).toBe('complete')
     const s = withBuilder(base, 'd', { x: done.x - 1, y: done.y - 1 })
     expect(isAdjacentToRect(s.agents.d!.x, s.agents.d!.y, done)).toBe(true)
@@ -821,7 +818,9 @@ describe('★ help must help — what a second pair of hands buys the calendar',
         [{ type: 'action_interrupted', payload: { agentId: 'h0', reason: 'rest' } }],
         NIGHT,
       )
-      const site = Object.values(w.structures).find((x) => x.stage === 'construction')!
+      const site = Object.values(w.structures).find(
+        (x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID,
+      )!
       expect(site.progressTicks).toBeLessThanOrEqual(HOUSE_TICKS)
       const again = submitIntent({ ...w, tick: NOON }, FAST, 'h0', 'build', { kind: 'house' })
       expect(again.ok, again.ok ? '' : again.reason).toBe(true)

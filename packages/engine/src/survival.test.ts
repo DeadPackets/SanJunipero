@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
@@ -27,7 +27,11 @@ const SPRING_DAY = at(1, 12)
 function world(tick: number, extra: Partial<AgentBody> = {}, id = 'a1'): WorldState {
   let s = genesisState(CFG, map())
   s = fold(s, ev('tick_advanced', {}, tick - 1), CFG)
-  s = fold(s, ev('agent_spawned', { id, name: id, x: 4, y: 4, ageDays: 7300 }, tick - 1), CFG)
+  s = fold(
+    s,
+    ev('agent_spawned', { id, name: id, x: 4, y: 4, ageDays: ADULT_AGE_DAYS }, tick - 1),
+    CFG,
+  )
   const a = {
     ...s.agents[id]!,
     ...extra,
@@ -94,11 +98,12 @@ describe('the teeth: how long a body has, in ticks it can count', () => {
   const toCollapse = (100 - CFG.needs.collapseThreshold) / decay
   const toEmpty = 100 / decay
 
-  it('a body that never eats stays on its feet for three in-game days, not two', () => {
-    // World one: 100 / 0.035 put Amara on the ground at tick 2715, in-game day 2.
+  it('a body that never eats stays on its feet for six in-game days, not two', () => {
+    // World one: 100 / 0.035 put Amara on the ground at tick 2715, in-game day 2. D1 put the
+    // same fall a week out, so a hungry body is a thread a town has time to notice and pull.
     expect(2715).toBeLessThan(3 * DAY)
-    expect(toCollapse).toBeGreaterThan(3 * DAY)
-    expect(Math.round(toCollapse)).toBe(4524)
+    expect(toCollapse).toBeGreaterThan(6 * DAY)
+    expect(Math.round(toCollapse)).toBe(9500)
   })
 
   it('and it is a whole day past the fall before the drain has taken the body', () => {
@@ -176,7 +181,7 @@ describe('a collapse has a road out of it', () => {
     let s = downed()
     s = fold(
       s,
-      ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: 7300 }, s.tick),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 4, ageDays: ADULT_AGE_DAYS }, s.tick),
       CFG,
     )
     s = fold(
@@ -323,7 +328,8 @@ describe('the world-one profile, rerun', () => {
   it('but a body that never eats at all still dies, because that is not a rate problem', () => {
     // The honest limit of retuning: world one's founders ate nothing for 11,681 ticks. No
     // survivable number saves that. What saves them is being warned, and being helped up.
-    expect(run(sleeper(), 5 * DAY).agents.a1!.alive).toBe(false)
+    // D1 buys a week and a half before the grave; it does not buy forever.
+    expect(run(sleeper(), 10 * DAY).agents.a1!.alive).toBe(false)
   })
 })
 

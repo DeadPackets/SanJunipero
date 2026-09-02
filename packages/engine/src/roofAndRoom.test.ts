@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   isBeddedKind,
   isHearthKind,
@@ -60,7 +61,10 @@ function withBuilding(s: WorldState, kind: string, id = 'structure_1'): WorldSta
 
 function withAgentAtDoor(s: WorldState, id: string): WorldState {
   const door = doorTile(s, s.structures.structure_1!)!
-  return fold(s, ev(10, 'agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: 7300 }))
+  return fold(
+    s,
+    ev(10, 'agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const enter = (s: WorldState, id: string): ReturnType<typeof submitIntent> =>
@@ -127,12 +131,15 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
         builderId: 'g',
       }),
     )
-    site = fold(site, ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 3, y: 3, ageDays: 7300 }))
+    site = fold(
+      site,
+      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 3, y: 3, ageDays: ADULT_AGE_DAYS }),
+    )
     expect(enter(site, 'a1')).toMatchObject({ ok: false, reason: 'it is not finished' })
 
     const far = fold(
       withBuilding(world(), 'cottage'),
-      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: 7300 }),
+      ev(10, 'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: ADULT_AGE_DAYS }),
     )
     expect(enter(far, 'a1')).toMatchObject({ ok: false, reason: 'not close enough to the door' })
   })
@@ -351,7 +358,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
           name: `b${i}`,
           x: 60 + i,
           y: 90,
-          ageDays: 7300,
+          ageDays: ADULT_AGE_DAYS,
         }),
         CFG,
       )
@@ -396,36 +403,26 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
   })
 
-  // Sound, this village handed twelve founders 25 bodies' worth of floor before the first tick —
-  // 2.1x — so the only want this project models was answered at tick zero.
-  it('★ puts the founding valley below 1.0, which sound it never was', () => {
+  // D1 answers this one at tick zero and means to: survival is the backdrop, so nobody has to
+  // earn a bed, and no day is spent on the cold that could have been spent on each other.
+  it('★ puts the founding valley above 1.0, because the roof is no longer the want', () => {
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
     expect(led.bodies).toBe(12)
-    expect(led.roofs).toBe(2) // the storehouse and the cabin
-    expect(led.slots).toBe(4)
-    expect(led.per).toBeCloseTo(1 / 3, 5)
-    expect(led.per, 'the founding cannot host the want it means to measure').toBeLessThan(1)
+    expect(led.roofs).toBe(10) // the storehouse, the cabin, the cottage, and seven houses
+    expect(led.slots).toBe(21)
+    expect(led.per).toBe(1.75)
+    expect(led.per, 'a founder wakes indoors on the first morning').toBeGreaterThan(1)
 
-    // WHAT IT WAS. Put every roof back on and the same arithmetic gives the old town.
-    let sound = genesisTown(FOUNDER_IDS.length)
-    for (const st of Object.values(sound.structures)) {
-      if (st.stage !== 'construction') continue
-      sound = fold(
-        sound,
-        ev(500 + Number(st.id.split('_')[1]), 'structure_completed', { id: st.id }),
-      )
-    }
-    const before = shelterLedger(sound, CFG)
-    expect(before).toMatchObject({ roofs: 11, slots: 25, bodies: 12 })
-    expect(before.per).toBeCloseTo(25 / 12, 5)
-
-    // And it was never the seven OWNED houses that did it — structure ownership is not even in
-    // the perception packet. Delete all seven and the village still holds eleven.
-    expect(25 - 7 * 2).toBe(11)
+    // What is left to raise is the farmhouse nobody sleeps in: a shared project, not a shortage.
+    const sites = Object.values(genesisTown(FOUNDER_IDS.length).structures)
+      .filter((st) => st.stage === 'construction')
+      .map((st) => st.kind)
+      .sort()
+    expect(sites).toEqual(['farmhouse'])
   })
 
-  // 0.8 and not lower: every roof that comes down has to be one a pair of hands can put back, and
-  // the only other 2-slot kinds are the cabin and the storehouse, both exactly a house's mass.
+  // Every roof left down has to be one a pair of hands can put back, and the only other 2-slot
+  // kinds are the cabin and the storehouse, both exactly a house's mass.
   it('is the floor reachable without standing up a wall nobody could finish', () => {
     for (const st of Object.values(genesisTown(0).structures)) {
       if (st.stage !== 'construction') continue
@@ -440,9 +437,9 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     }
   })
 
-  it('is the thing a run has to get below 1.0 before it can watch a town answer the cold', () => {
+  it('still counts the floor against the bodies, whatever the cast grows to', () => {
     expect(shelterLedger(genesisTown(30), CFG).per).toBeLessThan(1)
-    expect(shelterLedger(genesisTown(4), CFG).per).toBe(1)
-    expect(shelterLedger(genesisTown(2), CFG).per).toBe(2)
+    expect(shelterLedger(genesisTown(4), CFG).per).toBe(5.25)
+    expect(shelterLedger(genesisTown(2), CFG).per).toBe(10.5)
   })
 })

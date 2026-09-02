@@ -817,10 +817,14 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('respects the doze backoff even when body_alarm keeps firing during an outage', async () => {
     // 25 ticks at a 20-tick backoff holds two attempts and no more. Without the backoff a
-    // ringing alarm would doze the mind every tick.
+    // ringing alarm would doze the mind every tick. The rung is set above this body's hunger
+    // rather than left at the default: D1 put that default under the 30 the fixture starts at.
     const { loop, runtime } = await setup({
       model: throwingModel(),
-      mindConfig: { dozeTicks: 20 },
+      mindConfig: {
+        dozeTicks: 20,
+        bodyAlarm: { hunger: 40, energy: 10, warmth: 20, thirst: 25, affliction: 1 },
+      },
     })
     for (let i = 0; i < 25; i++) {
       loop.step()

@@ -14,7 +14,7 @@ import {
   VERBS,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, NO_PARAMS, stateHash, type SimEvent } from '@sj/shared'
 import {
   makeArbiter,
   wordTainted,
@@ -95,7 +95,7 @@ function world(): WorldState {
         seq: 1,
         tick: 0,
         type: 'agent_spawned',
-        payload: { id, name, x: 20, y: 20, ageDays: 7300 },
+        payload: { id, name, x: 20, y: 20, ageDays: ADULT_AGE_DAYS },
       },
       DEFAULT_CONFIG,
     )

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
@@ -16,7 +16,7 @@ function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop
   return ({ tick, emit }) => {
     if (tick === 1)
       for (let i = 0; i < 5; i++)
-        emit('agent_spawned', { id: `a${i}`, name: `a${i}`, x: i, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: `a${i}`, name: `a${i}`, x: i, y: 0, ageDays: ADULT_AGE_DAYS })
     if (tick > 1) {
       const mover = `a${rng.get('walk').int(5)}`
       emit('agent_moved', { id: mover, x: rng.get('walk').int(128), y: rng.get('walk').int(128) })

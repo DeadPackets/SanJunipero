@@ -8,6 +8,7 @@ import { GAMIFICATION_BAN } from './townStats.js'
 import { RosterListView } from '../paper/pages/RosterList.js'
 import { rosterRows2 } from './roster/rosterRow.js'
 import type { WorldState } from '@sj/engine/state'
+import { DAYS_PER_YEAR } from '@sj/shared'
 import {
   BANNED_STATUS_LITERALS,
   CONDITIONS,
@@ -83,7 +84,7 @@ describe('the duplicate, as a test', () => {
           y: 3,
           alive: true,
           asleep: true,
-          ageDays: 35 * 364,
+          ageDays: 35 * DAYS_PER_YEAR,
           needs: { hunger: 80, energy: 40, warmth: 80, social: 80 },
           hp: 100,
           injuries: [],

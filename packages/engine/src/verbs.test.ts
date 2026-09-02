@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
@@ -47,7 +48,10 @@ function makeWorld(rows: string[] = ['........', '........', '........', '......
     DEFAULT_CONFIG,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
+  return fold(
+    s,
+    ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const testVerb: VerbDef = {
@@ -317,7 +321,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     it('a loaf in another pair of hands is not within anybody else’s reach', () => {
       const s = fold(
         at({ t: 'tile', x: 1, y: 0 }),
-        ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }),
+        ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: ADULT_AGE_DAYS }),
       )
       const held = fold(s, ev(4, 'item_moved', { id: 'item_1', loc: { t: 'agent', id: 'a2' } }))
       expect(submitIntent(held, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' })).toEqual({
@@ -383,8 +387,16 @@ describe("tend: an hour of another body's hands", () => {
       CFG,
       ['....', '....', '....', '....'].map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
-    s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, hp: 50 } } }
   }
   const complete = (s: WorldState, params: Record<string, unknown>) =>
@@ -476,7 +488,11 @@ describe('verb: pave', () => {
       config,
       rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     if (qty === 0) return s
     return fold(
       s,
@@ -745,7 +761,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     weather: { hourlyChangeChance: 0 },
     mystery: { chancePerDay: 0 },
   })
-  const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
+  const AUTUMN_DUSK = (2 * DAYS_PER_SEASON + 3) * MINUTES_PER_DAY + 19 * 60 + 30
 
   const carrying = (kinds: string[], s = makeWorld()): WorldState => {
     let out = s
@@ -874,7 +890,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
 
     const onlooker = fold(
       worn,
-      ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: 7300 }),
+      ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
     const seen = composePerception(onlooker, CFG, 'a2', []).visible.agents.find(
@@ -909,7 +925,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
     s = { ...s, tick }
     s = fold(
       s,
-      ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       config,
     )
     const kit: [string, string][] = [

@@ -31,8 +31,13 @@ import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs/index.js'
 import { changesOf } from './testutil/world.js'
 // Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
-// witness, regrowth and desire paths are all live on the 3-day run.
-const G2_CONFIG = SimConfigSchema.parse({})
+// witness, regrowth and desire paths are all live on the 3-day run. Two dials are held at their
+// pre-D1 speed: D1 put a stomach on a week's clock and a poisoning on a day and a half, and this
+// gate measures the machinery a dying body sets off — collapse, cause, grave — inside three days.
+const G2_CONFIG = SimConfigSchema.parse({
+  needs: { hungerDecayPerTick: 0.021 },
+  mortality: { drainPerTick: { poison: 0.12 } },
+})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days

@@ -53,7 +53,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'omar',
     name: 'Omar',
-    ageDays: 24 * 364,
+    ageDays: 24 * DAYS_PER_YEAR,
     spawn: { x: 6, y: 32 },
     patrol: [
       { x: 6, y: 32 },
@@ -63,7 +63,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'amara',
     name: 'Amara',
-    ageDays: 35 * 364,
+    ageDays: 35 * DAYS_PER_YEAR,
     spawn: { x: 21, y: 23 },
     patrol: [
       { x: 21, y: 23 },
@@ -73,7 +73,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'yusuf',
     name: 'Yusuf',
-    ageDays: 55 * 364,
+    ageDays: 55 * DAYS_PER_YEAR,
     spawn: { x: 34, y: 24 },
     patrol: [
       { x: 34, y: 24 },
@@ -83,7 +83,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'nadia',
     name: 'Nadia',
-    ageDays: 26 * 364,
+    ageDays: 26 * DAYS_PER_YEAR,
     spawn: { x: 26, y: 20 },
     patrol: [
       { x: 26, y: 20 },
@@ -93,7 +93,7 @@ export const FOUNDERS: readonly FounderDef[] = [
   {
     id: 'salma',
     name: 'Salma',
-    ageDays: 45 * 364,
+    ageDays: 45 * DAYS_PER_YEAR,
     spawn: { x: 28, y: 26 },
     patrol: [
       { x: 28, y: 26 },
