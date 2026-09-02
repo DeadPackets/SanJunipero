@@ -177,8 +177,8 @@ describe('★ the read path holds answers, not the log', () => {
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
     expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)
 
-    // The running map is the whole town's drama; what is SENT is the last sim-day, so the body
-    // is bounded by the population and not by the town's age.
+    // What is SENT is the last sim-day, so the body is bounded by the population and not by the
+    // town's age — and so is the map behind it, which `readFold` prunes to the same horizon.
     const oldest = Math.min(...heat.map((w) => w.fromTick))
     const live = mirror.state().tick
     expect(oldest, 'nothing older than the horizon is sent').toBeGreaterThanOrEqual(
@@ -188,9 +188,10 @@ describe('★ the read path holds answers, not the log', () => {
       heat.length,
       'one window per agent per 60 ticks of the horizon, at most',
     ).toBeLessThanOrEqual(Math.ceil(HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 1) * AGENTS)
-    expect(f.heat, 'the MAP is still the whole town, not only what is sent').toBeGreaterThan(
-      heat.length * 4,
-    )
+    expect(
+      f.heat,
+      '★ the MAP is pruned to the horizon it serves, not kept for the life of the process',
+    ).toBeLessThanOrEqual((HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 2) * AGENTS)
 
     // ── the property: what is retained counts ANSWERS, never events ────────────────────────
     expect(

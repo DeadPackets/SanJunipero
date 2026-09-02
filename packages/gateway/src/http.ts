@@ -10,6 +10,16 @@ export function frameText(d: RawData): string {
   return Buffer.from(d).toString('utf8')
 }
 
+/** A request target as a URL, or null when it is not one. `//x:99999/` is a target llhttp accepts
+ *  and `URL` refuses, and unguarded that throw is an uncaughtException in a bare listener. */
+export const parseTarget = (target: string | undefined): URL | null => {
+  try {
+    return new URL(target ?? '/', 'http://localhost')
+  } catch {
+    return null
+  }
+}
+
 export const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
   res.writeHead(status, { 'content-type': 'application/json' })
   res.end(JSON.stringify(body))

@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import { connect as netConnect } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -162,6 +163,21 @@ describe('the operator channel refuses everyone else', () => {
 
   it('a wrong method on an ops route is 405, and an unknown one is still 404', async () => {
     expect((await call('/admin/pause')).status).toBe(405)
+    expect((await call('/admin/nothing')).status).toBe(404)
+  })
+
+  /** The proxy forwards a public `/admin/*` target here verbatim, and `URL` refuses some of
+   *  what llhttp accepts — unguarded that throw is the tick thread. */
+  it('★ a request target the URL parser refuses is 400, not the end of the process', async () => {
+    const sock = netConnect(port, '127.0.0.1')
+    const reply = await new Promise<string>((resolve, reject) => {
+      let text = ''
+      sock.on('data', (c: Buffer) => (text += c.toString()))
+      sock.on('end', () => resolve(text))
+      sock.on('error', reject)
+      sock.write('GET //x:99999/admin/clock HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n')
+    })
+    expect(reply).toContain('400')
     expect((await call('/admin/nothing')).status).toBe(404)
   })
 })

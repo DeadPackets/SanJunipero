@@ -81,9 +81,12 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   // The agent-db sweep behind `/api/timeline/marks` is memoised on the DAY instead — see below.
   const cache = makeSeqCache(() => deps.mirror.seq())
   const placeholders = CHRONICLE_TYPES.map(() => '?').join(', ')
+  // Newest first with a LIMIT, then reversed: a stranger picks the window, and every distinct
+  // pair is a cache miss, so an unbounded miss is an O(history) scan on the tick thread.
   const selWeighted = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events
-     WHERE type IN (${placeholders}) AND tick BETWEEN ? AND ? ORDER BY tick, seq`,
+     WHERE type IN (${placeholders}) AND tick BETWEEN ? AND ?
+     ORDER BY tick DESC, seq DESC LIMIT ${CHRONICLE_MAX}`,
   )
 
   const lookup = (): ChronicleLookup => {
@@ -121,12 +124,14 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
     cache.value(`chronicle:${fromTick}:${toTick}`, () => {
       const look = lookup()
-      const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as {
-        seq: number
-        tick: number
-        type: string
-        payload: string
-      }[]
+      const rows = (
+        selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as {
+          seq: number
+          tick: number
+          type: string
+          payload: string
+        }[]
+      ).reverse()
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
         const label = chronicleLine(toEvent(r), look)
@@ -173,14 +178,17 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
-  // Memoised on the world DAY, not `mirror.seq()`: nothing here changes between day boundaries,
-  // and a seq-keyed memo would rescan six tables on every pump.
-  let dispatchedDay = -1
+  // Memoised on the newest publication, not `mirror.seq()` and not the world DAY: nothing here
+  // changes until the narrator writes, and it writes SECONDS into the day a day-keyed memo has
+  // already captured — which showed day N's paper only once day N+2 began.
+  let dispatchedAt = -1
   let dispatched: unknown = null
   router.route('GET', '/api/dispatches', (_req, res) => {
-    const day = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
-    if (day !== dispatchedDay || dispatched === null) {
-      dispatchedDay = day
+    const written =
+      readOrEmpty<{ id: number | null }>(deps.narratorDb, 'SELECT MAX(id) AS id FROM publications')[0]
+        ?.id ?? 0
+    if (written !== dispatchedAt || dispatched === null) {
+      dispatchedAt = written
       const db = deps.narratorDb
       dispatched = {
         papers: readOrEmpty(

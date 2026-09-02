@@ -102,8 +102,9 @@ export function shareRouteAgent(pathname: string): string | null {
 }
 
 export function shareRouteDay(pathname: string, liveTick: number): number | null {
+  const live = Math.floor(liveTick / MINUTES_PER_DAY)
   const segs = pathname.split('/').filter(Boolean)
-  if (segs.length === 0) return Math.floor(liveTick / MINUTES_PER_DAY)
+  if (segs.length === 0) return live
   if (segs[0] !== 'moment') return null
   if (segs.length === 2) return null // `/moment/:id` names a scene, and a scene names its own day
   if (segs.length !== 3) return null
@@ -114,7 +115,8 @@ export function shareRouteDay(pathname: string, liveTick: number): number | null
   } catch {
     return null
   }
-  return Number.isNaN(momentToTick(day, time)) ? null : day
+  // A day the town has not lived is no page, and its tags would point at a card that 404s.
+  return Number.isNaN(momentToTick(day, time)) || day > live ? null : day
 }
 
 export function shareRouteScene(pathname: string): number | null {
@@ -248,19 +250,22 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
   router.route('GET', '/card/moment/:day/:time', (_req, res, params) => {
     const asked = splitExt(params.time ?? '')
     const day = Number(/^(?:day)?(\d+)$/.exec(params.day ?? '')?.[1] ?? NaN)
-    if (asked === null || Number.isNaN(momentToTick(day, asked.name))) {
+    const live = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
+    // A day the town has not lived is not a card, and every day beyond it is 43 ms of sharp a
+    // stranger can ask for. The minute is checked and then dropped: one card per day, so the
+    // 1440 minutes of a day share one raster instead of filling the memo with near-copies.
+    if (asked === null || Number.isNaN(momentToTick(day, asked.name)) || day > live) {
       failCard(res, 404, 'not found')
       return
     }
     const read = readDay(deps, day)
-    const live = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
     sendCard(
       res,
       asked.png,
       renderShareCard({
         day: read.day,
         title: read.title,
-        subtitle: `${asked.name} · ${read.subtitle}`,
+        subtitle: read.subtitle,
         heat: readHeat(deps, day),
       }),
       day < live ? CACHE_CLOSED : CACHE_LIVE,

@@ -37,7 +37,7 @@ describe('SocketHub', () => {
     expect(hub.laggingCount()).toBe(1)
   })
 
-  it('drained lagging socket gets onResync() first, then the current delta, and lagging clears', () => {
+  it('drained lagging socket is resynced by resyncDrained(), and lagging clears', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
     hub.add(s, () => 'SNAP')
@@ -45,11 +45,11 @@ describe('SocketHub', () => {
     expect(s.sent).toEqual([])
     s.bufferedAmount = 0
     expect(s.bufferedAmount).toBeLessThan(RESUME_BELOW)
+    hub.resyncDrained()
+    expect(s.sent).toEqual(['SNAP'])
+    expect(hub.laggingCount()).toBe(0)
     hub.broadcast('b')
     expect(s.sent).toEqual(['SNAP', 'b'])
-    expect(hub.laggingCount()).toBe(0)
-    hub.broadcast('c')
-    expect(s.sent).toEqual(['SNAP', 'b', 'c'])
   })
 
   it('still-buffered lagging socket keeps dropping', () => {
@@ -58,9 +58,29 @@ describe('SocketHub', () => {
     hub.add(s, () => 'SNAP')
     hub.broadcast('a')
     s.bufferedAmount = RESUME_BELOW + 1 // not drained enough
+    hub.resyncDrained()
     hub.broadcast('b')
     expect(s.sent).toEqual([])
     expect(hub.laggingCount()).toBe(1)
+  })
+
+  /** BUG-70: the snapshot is built from mirror state that has ALREADY folded the pump's groups,
+   *  so a resync interleaved with them made the client refold applied events and freeze. */
+  it('★ a resynced viewer is never sent a delta its snapshot already contains', () => {
+    const hub = new SocketHub()
+    const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
+    let folded = 0 // the mirror's seq, which the snapshot reads live
+    hub.add(s, () => `SNAP@${folded}`)
+
+    folded = 1
+    hub.broadcast('tick1') // lagging: dropped
+    s.bufferedAmount = 0
+
+    hub.resyncDrained() // the pump resyncs BEFORE it folds tick2
+    folded = 2
+    hub.broadcast('tick2')
+
+    expect(s.sent).toEqual(['SNAP@1', 'tick2'])
   })
 
   it('closed socket is skipped and removed on next broadcast', () => {
@@ -106,7 +126,7 @@ describe('★ the stream says when a viewer falls behind', () => {
     expect(lines).toHaveLength(1)
 
     s.bufferedAmount = 0
-    hub.broadcast('d')
+    hub.resyncDrained()
     expect(lines).toHaveLength(2)
     expect(lines[1]).toContain('caught up')
     expect(lines[1]).toContain('0 of 1 viewers lagging')

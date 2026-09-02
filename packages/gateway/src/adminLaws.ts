@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { z } from 'zod'
 import { TOGGLABLE_PATHS } from '@sj/engine'
 import { reportOnce } from './degraded.js'
-import { sendJson } from './http.js'
+import { parseTarget, sendJson } from './http.js'
 
 const ADMIN_LAWS_PATH = '/admin/laws'
 const DEFAULT_ADMIN_HOST = '127.0.0.1'
@@ -103,7 +103,11 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
   const routes: readonly AdminRoute[] = [laws, ...(opts.routes ?? [])]
 
   return createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
+    const url = parseTarget(req.url)
+    if (url === null) {
+      sendJson(res, { error: 'bad request' }, 400)
+      return
+    }
     for (const route of routes) {
       const params = match(route, url.pathname)
       if (params === null) continue

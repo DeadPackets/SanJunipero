@@ -12,7 +12,7 @@ import {
 import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
-import { OPEN, SocketHub } from './hub.js'
+import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
@@ -26,7 +26,7 @@ import { mountShareCard, shareMeta } from './shareCard.js'
 import { mountCrawlerRoutes } from './crawler.js'
 import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
-import { frameText, notFound, sendJson } from './http.js'
+import { frameText, notFound, parseTarget, sendJson } from './http.js'
 import type { RouteHandler, Router } from './router.js'
 
 export type GatewayOpts = {
@@ -139,7 +139,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   )
 
   const httpServer = createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
+    const url = parseTarget(req.url)
+    if (url === null) {
+      sendJson(res, { error: 'bad request' }, 400)
+      return
+    }
     if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
       proxyAdmin(req, res)
       return
@@ -256,6 +260,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
+    // Before the capacity check: a socket refused at capacity is still read from while it closes,
+    // and an oversize frame on it emits an 'error' that throws out of the socket server unlistened.
+    sock.on('error', () => {
+      sock.terminate()
+    })
     // `wss.clients` already holds the arriving socket, hence `>`. Counted here rather than off
     // the hub, which a socket joins only after a valid hello.
     if (wss.clients.size > maxViewers) {
@@ -267,11 +276,14 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (!greeted) sock.close(CLOSE_BAD_HELLO)
     }, HELLO_DEADLINE_MS)
     let scrubAt = 0 // last answered scrub, for coalescing
+    let liveAt = 0 // last answered `live`, on its own clock: a drag ends with one of them
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
+      // A ~120 KB reply to a viewer already a megabyte behind is memory nobody will ever read.
+      if (sock.bufferedAmount > MAX_BUFFERED) return
       if (!takeScrubBudget()) {
         sock.send(busyScrubJson(req.reqId))
         return
@@ -338,6 +350,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           if (next !== null && sock.readyState === OPEN) answerScrub(next)
         }, SCRUB_MIN_MS - since)
       } else if (msg.t === 'live') {
+        // A full snapshot per 40-byte frame, otherwise: the same floor a scrub gets, on its own
+        // clock so ending a drag is never the ask that gets dropped.
+        const now = Date.now()
+        if (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
+        liveAt = now
         sock.send(snapshotJson())
       }
     })
@@ -347,10 +364,6 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       removers.get(sock)?.()
       removers.delete(sock)
       opts.onViewers?.(hub.size())
-    })
-    // A viewer's connection dying mid-frame must not throw out of the socket server.
-    sock.on('error', () => {
-      sock.terminate()
     })
   })
 
@@ -366,6 +379,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       snapJson = null
       hub.broadcast(JSON.stringify({ t: 'paused', paused: wasPaused }))
     }
+    hub.resyncDrained() // before the poll folds: a snapshot must predate the deltas after it
     const groups = mirror.poll()
     if (groups.length > 0) {
       snapJson = null

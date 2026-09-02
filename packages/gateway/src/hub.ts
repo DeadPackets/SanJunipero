@@ -47,13 +47,20 @@ export class SocketHub {
           continue
         }
         m.sock.send(json)
-      } else if (m.sock.bufferedAmount < RESUME_BELOW) {
-        m.sock.send(m.onResync())
-        m.lagging = false
-        this.#say('caught up and was resynced', m.sock.bufferedAmount)
-        m.sock.send(json)
       }
-      // else: still lagging → drop
+      // else: still lagging → drop until `resyncDrained` clears it
+    }
+  }
+
+  /** Resync every viewer that has drained. Called BEFORE new events are folded, so the snapshot
+   *  cannot already contain the deltas that follow it — refolding those freezes the client. */
+  resyncDrained(): void {
+    for (const m of this.#members) {
+      if (!m.lagging || m.sock.readyState !== OPEN) continue
+      if (m.sock.bufferedAmount >= RESUME_BELOW) continue
+      m.sock.send(m.onResync())
+      m.lagging = false
+      this.#say('caught up and was resynced', m.sock.bufferedAmount)
     }
   }
 
