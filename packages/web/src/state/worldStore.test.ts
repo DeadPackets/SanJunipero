@@ -157,6 +157,26 @@ describe('worldStore', () => {
     expect(store.assetRecords()).toHaveLength(3)
   })
 
+  it('★ holds the scene the town is in, and keeps the closing frame that carries the summary', () => {
+    const store = createWorldStore()
+    expect(store.getScene()).toBe(null)
+    const open = {
+      id: 'sc_1',
+      kind: 'quarrel' as const,
+      participants: ['amara', 'salma'],
+      topic: 'the well',
+      stakes: 9,
+      open: true,
+    }
+    store.applyServer({ t: 'scene', scene: open })
+    expect(store.getScene()).toEqual(open)
+
+    // The close is not a clear: whoever shows the summary decides how long it stands.
+    store.applyServer({ t: 'scene', scene: { ...open, open: false, summary: 'They agreed.' } })
+    expect(store.getScene()?.open).toBe(false)
+    expect(store.getScene()?.summary).toBe('They agreed.')
+  })
+
   it('onEvents fires per delta and recentEvents keeps the last 400', () => {
     const store = createWorldStore()
     store.applyServer(makeSnapshot())
