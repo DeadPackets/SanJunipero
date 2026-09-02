@@ -146,7 +146,9 @@ describe('runChaos exploit corpus', () => {
     const llm = new ScriptedLlm(({ intent }) => exploitVerdict(intent))
     const { arbiter } = await makeRig(llm)
 
-    expect(() => arbiter.codify(EXPLOIT_RECIPE, CODIFY_CREDIT)).toThrow(/beyond adjacency/)
+    expect(() =>
+      arbiter.codify({ recipe: EXPLOIT_RECIPE, summary: 'an exploit' }, CODIFY_CREDIT),
+    ).toThrow(/beyond adjacency/)
   })
 
   it('lets through only an attempt whose canon is within adjacency', async () => {

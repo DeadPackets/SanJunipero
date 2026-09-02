@@ -28,7 +28,7 @@ export type Adjudicator = (intent: string, ctx: AgentCtx) => Promise<Verdict>
 /** Who worked it out, and the words they used. The arbiter never knows who is asking at
  *  codify time; the runtime always does, so the credit is threaded rather than guessed. */
 export type Codifier = (
-  recipe: { id: string },
+  attempt: { recipe: { id: string }; summary: string },
   credit: DiscoveryCredit,
 ) => { ruleId: number; verb: string }
 

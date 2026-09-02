@@ -1,12 +1,13 @@
 import { crafterStamp, RECIPE_TILE_IDS, registerVerb, shortOf, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
 import type { DiscoveryCredit, SimConfig } from '@sj/shared'
+import { charterFromAttempt, type AttemptVerdict, type VerbCharter } from './charter.js'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
 import { productsOf, recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
-import type { OutcomeEffect, Recipe } from './verdict.js'
+import type { OutcomeEffect } from './verdict.js'
 import type { Codified } from './adjudicate.js'
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
@@ -46,11 +47,14 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
   return false
 }
 
-// A recipe hard enough to be worth a specialist's name on the result.
-export function isExpertRecipe(recipe: Recipe, config: SimConfig): boolean {
+// A craft hard enough to be worth a specialist's name on the result.
+export function isExpertCharter(
+  charter: { skillCheck?: { difficulty: number } | undefined },
+  config: SimConfig,
+): boolean {
   return (
-    recipe.skillCheck !== undefined &&
-    recipe.skillCheck.difficulty >= config.crafting.expertDifficulty
+    charter.skillCheck !== undefined &&
+    charter.skillCheck.difficulty >= config.crafting.expertDifficulty
   )
 }
 
@@ -96,11 +100,11 @@ function wearTools(
   state: WorldState,
   config: SimConfig,
   agentId: string,
-  recipe: Recipe,
+  charter: VerbCharter,
 ): PendingEvent[] {
   if (!config.tools.wearEnabled) return []
   const events: PendingEvent[] = []
-  for (const req of recipe.requires) {
+  for (const req of charter.requires) {
     if (req.type !== 'held_item') continue
     let remaining = req.qty
     for (const stack of heldStacks(state, agentId, req.kind)) {
@@ -116,14 +120,14 @@ function wearTools(
   return events
 }
 
-export function verbFromRecipe(recipe: Recipe): VerbDef {
+export function verbFromCharter(charter: VerbCharter): VerbDef {
   return {
-    kind: recipe.id,
+    kind: charter.id,
     validate(state, _config, agentId) {
-      for (const cost of recipe.costs) {
+      for (const cost of charter.costs) {
         if (heldQty(state, agentId, cost.kind) < cost.qty) return shortOf(cost.kind)
       }
-      for (const req of recipe.requires) {
+      for (const req of charter.requires) {
         switch (req.type) {
           case 'held_item': {
             if (heldQty(state, agentId, req.kind) < req.qty)
@@ -149,16 +153,16 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
       return null
     },
     duration() {
-      return recipe.durationTicks
+      return charter.durationTicks
     },
     onStart(state, _config, agentId) {
       // Mirrors the engine craft verb: re-check sufficiency at consumption time
       // so a stack that shrank since validate never yields a discounted craft.
-      for (const cost of recipe.costs) {
+      for (const cost of charter.costs) {
         if (heldQty(state, agentId, cost.kind) < cost.qty) return []
       }
       const events: PendingEvent[] = []
-      for (const cost of recipe.costs) {
+      for (const cost of charter.costs) {
         let remaining = cost.qty
         for (const stack of heldStacks(state, agentId, cost.kind)) {
           if (remaining <= 0) break
@@ -170,31 +174,38 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
       return events
     },
     onComplete(state, config, agentId, _params, rng) {
-      const skillCheck = recipe.skillCheck
+      const skillCheck = charter.skillCheck
       const level = skillCheck ? skillLevel(state, agentId, skillCheck.track, config) : 0
       const factor = skillCheck ? skillFactor(level, skillCheck.difficulty) : 1
-      const row = rollOutcomeTable(recipe.outcomeTable, rng, factor)
+      const row = rollOutcomeTable(charter.outcomes, rng, factor)
       const mark =
-        skillCheck && isExpertRecipe(recipe, config)
+        skillCheck && isExpertCharter(charter, config)
           ? crafterStamp(state, config, agentId, skillCheck.track)
           : {}
-      return [
+      const events = [
         ...emitOutcomeEffects(state, agentId, row.effects, {
           ...(config.ownership.enabled ? { owner: agentId } : {}),
           ...mark,
         }),
-        ...wearTools(state, config, agentId, recipe),
+        ...wearTools(state, config, agentId, charter),
       ]
+      if (charter.energyCost > 0) {
+        events.push({
+          type: 'needs_changed',
+          payload: { id: agentId, changes: [{ need: 'energy', delta: -charter.energyCost }] },
+        })
+      }
+      return events
     },
-    ...(recipe.skillCheck === undefined
+    ...(charter.skillCheck === undefined
       ? {}
-      : { skill: { track: recipe.skillCheck.track, xp: 10 } }),
-    rngStream: recipe.rngStream,
+      : { skill: { track: charter.skillCheck.track, xp: 10 } }),
+    rngStream: charter.id,
   }
 }
 
 export function codify(
-  recipe: Recipe,
+  attempt: AttemptVerdict,
   credit: DiscoveryCredit,
   deps: {
     rulebook: RulebookStore
@@ -204,6 +215,7 @@ export function codify(
     onCodified?: (d: Codified) => void
   },
 ): { ruleId: number; verb: string } {
+  const recipe = attempt.recipe
   // Belt and suspenders: even a caller who bypasses adjudicate must not be
   // able to codify a recipe the codex has not earned.
   if (!deps.codex.withinAdjacency(recipe.canon)) {
@@ -215,28 +227,29 @@ export function codify(
   // caller: a verdict word, a truncated id and an entity id are wrong on their face.
   const unsound = recipeSanityRefusal(recipe)
   if (unsound !== null) throw new Error(`cannot codify ${recipe.id}: ${unsound}`)
-  const existing = deps.rulebook.byId(recipe.id)
+  const charter = charterFromAttempt(attempt, credit)
+  const existing = deps.rulebook.byId(charter.id)
   if (existing) {
     // Active row is a no-op; a reverted one is reactivated so the review queue's re-open path
     // stays reachable, since UNIQUE(recipe_id) forbids a second insert either way.
     if (existing.revertedAtTick !== null) {
-      deps.rulebook.reactivate(recipe, deps.tick)
-      if (!VERBS[recipe.id]) registerVerb(verbFromRecipe(recipe))
-      deps.review.queue(existing.id, recipe.id, deps.tick)
+      deps.rulebook.reactivate(charter, deps.tick)
+      if (!VERBS[charter.id]) registerVerb(verbFromCharter(charter))
+      deps.review.queue(existing.id, charter.id, deps.tick)
     }
-    return { ruleId: existing.id, verb: recipe.id }
+    return { ruleId: existing.id, verb: charter.id }
   }
-  const ruleId = deps.rulebook.insert(recipe, deps.tick)
-  registerVerb(verbFromRecipe(recipe))
-  deps.review.queue(ruleId, recipe.id, deps.tick)
+  const ruleId = deps.rulebook.insert(charter, deps.tick)
+  registerVerb(verbFromCharter(charter))
+  deps.review.queue(ruleId, charter.id, deps.tick)
   // First insert only. A reactivation above is an operator re-opening a reverted rule, and the
   // admin is not its inventor — the original event is already in the log and stays there.
   deps.onCodified?.({
-    recipeId: recipe.id,
-    name: recipe.name,
+    recipeId: charter.id,
+    name: charter.name,
     kind: 'craft',
     makes: productsOf(recipe),
     credit,
   })
-  return { ruleId, verb: recipe.id }
+  return { ruleId, verb: charter.id }
 }

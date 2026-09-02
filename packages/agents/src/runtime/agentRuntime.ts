@@ -665,7 +665,11 @@ export class AgentRuntime {
     if (this.#codify === null) return fallback()
     let verb: string
     try {
-      verb = this.#codify(verdict.recipe, { agentId: this.#agentId, intent: description }).verb
+      verb = this.#codify(verdict, {
+        agentId: this.#agentId,
+        intent: description,
+        saying: this.#lastThought,
+      }).verb
     } catch (err) {
       this.#llm.alert('codify_failed', messageOf(err))
       return fallback()

@@ -55,8 +55,8 @@ import {
   makeArbiter,
   openArbiterDb,
   runConstructPass,
+  type AttemptVerdict,
   type Codified,
-  type Recipe,
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import {
@@ -549,6 +549,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
                     kind: d.kind,
                     byId: d.credit.agentId,
                     intent: d.credit.intent,
+                    ...(d.credit.saying ? { saying: d.credit.saying } : {}),
                     makes: d.makes,
                   })
                   art.onDiscovery({ name: d.name, makes: d.makes })
@@ -556,7 +557,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               })
               return {
                 adjudicate: (...args) => built.adjudicate(...args),
-                codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
+                codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
               }
             })())
 

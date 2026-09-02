@@ -199,7 +199,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { arbiter } = await makeArbiterRig({ llm })
 
-    arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
+    arbiter.codify(boilSaltVerdict, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('I try to boil river water for salt', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: NO_PARAMS })
@@ -416,7 +416,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('weave reeds to basket', basketVerdict, 100)
-    arbiter.codify(basketRecipe, CODIFY_CREDIT)
+    arbiter.codify(basketVerdict, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('basket weave reeds', TAMAR_CTX)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: NO_PARAMS })
@@ -428,7 +428,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', ropeVerdict, 100)
-    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
+    arbiter.codify(ropeVerdict, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
@@ -533,7 +533,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: NO_PARAMS }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
-    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
+    arbiter.codify(ropeVerdict, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
@@ -547,7 +547,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter } = await makeArbiterRig({ llm })
     const review = new ReviewStore(db)
 
-    const { ruleId } = arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
+    const { ruleId } = arbiter.codify(boilSaltVerdict, CODIFY_CREDIT)
     expect(review.pending()).toHaveLength(1)
 
     arbiter.revert('recipe:boil_salt', 'physics wrong')
@@ -861,6 +861,7 @@ describe('retrieval efficiency', () => {
 })
 
 describe('rulebook rehydration on construction', () => {
+  const REHYDRATE_SUMMARY = 'Weave reeds into a basket.'
   const rehydrateRecipe: Recipe = {
     ...basketRecipe,
     id: 'recipe:rehydrate_basket',
@@ -878,8 +879,8 @@ describe('rulebook rehydration on construction', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm })
 
-    arbiter.codify(rehydrateRecipe, CODIFY_CREDIT)
-    arbiter.codify(revertedRecipe, CODIFY_CREDIT)
+    arbiter.codify({ recipe: rehydrateRecipe, summary: REHYDRATE_SUMMARY }, CODIFY_CREDIT)
+    arbiter.codify({ recipe: revertedRecipe, summary: REHYDRATE_SUMMARY }, CODIFY_CREDIT)
     arbiter.revert('recipe:rehydrate_gone', 'physics wrong')
     // Simulate restart: the in-memory registry forgets, the db remembers.
     unregisterVerb('recipe:rehydrate_basket')

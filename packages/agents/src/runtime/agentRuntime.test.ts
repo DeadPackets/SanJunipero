@@ -1738,7 +1738,7 @@ describe('arbiter wiring expansion (T20)', () => {
         recipe: { id: RECIPE_VERB },
         summary: 'Weave reeds into a mat.',
       }),
-      codify: (recipe) => {
+      codify: ({ recipe }) => {
         codified.push(recipe.id)
         registerVerb({
           kind: RECIPE_VERB,
@@ -1772,7 +1772,7 @@ describe('arbiter wiring expansion (T20)', () => {
         asked = intent
         return { kind: 'attempt', recipe: { id: RECIPE_VERB }, summary: 'Weave reeds into a mat.' }
       },
-      codify: (recipe, credit) => {
+      codify: ({ recipe }, credit) => {
         calls.push({ recipeId: recipe.id, credit })
         registerVerb({
           kind: RECIPE_VERB,
@@ -1791,7 +1791,7 @@ describe('arbiter wiring expansion (T20)', () => {
     await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
 
     expect(calls).toHaveLength(1)
-    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT })
+    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT, saying: 'A mat.' })
     // The SAME words the arbiter was asked, never a paraphrase.
     expect(calls[0]!.credit!.intent).toBe(asked)
   })

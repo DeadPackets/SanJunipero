@@ -11,8 +11,9 @@ import {
   type RulingVocabulary,
 } from '@sj/shared'
 import { CANON } from './canon.js'
+import type { AttemptVerdict, VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
-import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
+import { codify as codifyAttempt, verbFromCharter } from './codify.js'
 import {
   assembleExpressivePrompt,
   ExpressiveRulingSchema,
@@ -192,7 +193,7 @@ export type ArbiterDeps = {
 
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
-  codify(recipe: Recipe, credit: DiscoveryCredit): { ruleId: number; verb: string }
+  codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -214,7 +215,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     registerVerb(
       isExpressiveRow(parsed)
         ? expressiveVerbFromRuling(parsed.name, parsed)
-        : verbFromRecipe(parsed as Recipe),
+        : verbFromCharter(parsed as VerbCharter),
     )
   }
 
@@ -252,7 +253,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       knownRecipeIds.add(row.recipeId)
       const parsed: unknown = JSON.parse(row.recipeJson)
       if (isExpressiveRow(parsed)) continue
-      for (const r of (parsed as Recipe).outcomeTable) {
+      for (const r of (parsed as VerbCharter).outcomes) {
         for (const e of r.effects) if (e.op === 'spawn_item') knownProducts.add(e.kind)
       }
     }
@@ -417,8 +418,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       return verdict
     },
 
-    codify(recipe, credit) {
-      return codifyRecipe(recipe, credit, {
+    codify(attempt, credit) {
+      return codifyAttempt(attempt, credit, {
         rulebook,
         review,
         codex,

@@ -226,8 +226,8 @@ export const AgentExpressed = z
     insideId: z.string().optional(),
   })
   .strict()
-// `byId` is the inventor, `intent` the words they used, `makes` the item kinds the new verb can
-// produce (empty for a coined word). The tick is the envelope's.
+// `byId` is the inventor, `intent` the words they used, `saying` the thought behind the ask,
+// `makes` the item kinds the new verb can produce (empty for a coined word). The tick is the envelope's.
 export const DiscoveryMade = z
   .object({
     recipeId: z.string().min(1),
@@ -235,6 +235,7 @@ export const DiscoveryMade = z
     kind: z.enum(['craft', 'word']),
     byId: z.string().min(1),
     intent: z.string().min(1),
+    saying: z.string().min(1).optional(),
     makes: z.array(z.string().min(1)),
   })
   .strict()
