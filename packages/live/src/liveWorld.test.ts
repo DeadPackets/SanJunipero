@@ -184,7 +184,7 @@ const SMOKE_RECIPE = {
       weight: 1,
       success: true,
       label: 'The fish darkens and firms in the smoke.',
-      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1 }],
     },
   ],
   rngStream: 'recipe:smoke_fish',
@@ -1173,11 +1173,12 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // The failure was recorded where an operator looks...
     const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
     expect(alerts.length).toBeGreaterThan(0)
-    // ...and the intent still reached the world as `experiment`, which never starts an activity
-    // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
-    expect(
-      memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')),
-    ).toBe(true)
+    // ...and the mind was told only that the try did not begin: no verb the world lacks, no
+    // machinery word, reached its memory.
+    for (const text of memoriesOf(dir, 'amara')) {
+      expect(text).not.toContain('unknown verb')
+      expect(text).not.toContain('experiment')
+    }
     // A god that fell over must not have minted law on the way down.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)

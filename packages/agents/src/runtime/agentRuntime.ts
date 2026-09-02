@@ -5,6 +5,7 @@ import {
   namedParams,
   nightStartTick,
   REFLECTION_SETTLE_MS,
+  type RosterEntry,
   sanitizeSpokenText,
   simTimeFromTick,
   stateHash,
@@ -166,15 +167,14 @@ export const wantedWater = (lastOutcome: string | null): boolean =>
 // A freeform intent has no verb to name, only the words the mind used.
 export const TRIED_FREEFORM = 'what you tried'
 
-// The second ask inside the window is answered from the mind's own history, not from the god.
-// It names the repetition and nothing else: a mind's own past is not a hint.
-export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
+// What a mind is told when the court could not be reached or the ruling could not be made law:
+// no verb of the world's and no machinery word, only a try that did not begin.
+export const CANNOT_BEGIN = 'you turn it over and cannot begin it now'
 
-// Sim minutes: long enough to cover a loop, short enough that a changed town gets asked again.
+// A refusal with a context-dependent class is never short-circuited by precedent, so the same
+// ask every turn would be a full ruling every turn. Inside this window the mind's own refusal
+// answers, silently: no call, no new memory.
 export const REFUSAL_MEMORY_TICKS = 240
-
-// How many refused intents a mind carries. Bounded because it is per-mind state held for the
-// life of the process, not because 16 is special.
 const REFUSAL_MEMORY_SIZE = 16
 
 // Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
@@ -185,6 +185,17 @@ function sameIntent(text: string): string {
     .trim()
     .replace(/\s+/g, ' ')
     .replace(/[.,!?;:]+$/, '')
+}
+
+// The spoken reason behind a discovery is the mind's own words for the attempt, reported as
+// "he said he would <saying>": first person stripped, flattened as speech is, and short.
+export const SAYING_MAX_CHARS = 120
+export function spokenReason(intent: string): string {
+  const said = sanitizeSpokenText(intent)
+    .replace(/^i (?:try|want|attempt|mean|am going) to /i, '')
+    .replace(/^i (?:will |shall )?/i, '')
+    .replace(/[.!]+$/, '')
+  return said.length <= SAYING_MAX_CHARS ? said : said.slice(0, SAYING_MAX_CHARS).trimEnd()
 }
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
@@ -261,6 +272,7 @@ export class AgentRuntime {
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
+  #roster: (() => RosterEntry[]) | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -274,8 +286,8 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, and when. Read before the god is asked again.
-  #refusedIntents = new Map<string, number>()
+  // What this mind has already been refused, when, and why. Read before the god is asked again.
+  #refusedIntents = new Map<string, { tick: number; reason: string }>()
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
@@ -416,6 +428,7 @@ export class AgentRuntime {
   useArbiter(arbiter: SeamArbiter): void {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
+    this.#roster = arbiter.roster ?? null
   }
 
   stop(): void {
@@ -605,7 +618,7 @@ export class AgentRuntime {
         this.#pendingIntent = null
         if (isBodyNoOp(res.reason, intent.verb)) return
         if (this.#reroutesUnknownVerb(res.reason)) {
-          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(
+          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params), false).catch(
             this.#sink('adjudicate_crash'),
           )
           return
@@ -631,15 +644,17 @@ export class AgentRuntime {
     return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
   }
 
-  // A try at something new goes to the arbiter, not to the verb registry. The
-  // world stays the fallback: an unreachable arbiter must never eat the turn.
-  async #adjudicateFreeform(description: string): Promise<void> {
-    const fallback = (): Promise<void> =>
-      this.#holdIntent({ verb: 'experiment', params: { description } })
-    // The same idea inside the window, answered from this mind's own history at no call. The
-    // memory it leaves differs from the first refusal, or the mind learns nothing.
-    if (this.#alreadyRefused(description)) {
-      await this.#writeActionMemory(REPEATED_REFUSAL)
+  // A try at something new goes to the arbiter, not to the verb registry. An unreachable
+  // arbiter must never eat the turn, and never reach the mind in its own words either: the
+  // try simply did not begin. `said` is whether the words are the mind's own (freeform, or an
+  // experiment's description) rather than a verb flattened on its way back from the world.
+  async #adjudicateFreeform(description: string, said: boolean): Promise<void> {
+    const fallback = (): void => {
+      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, CANNOT_BEGIN)
+    }
+    const refused = this.#refusedIntents.get(sameIntent(description))
+    if (refused !== undefined && this.#bridge.currentTick() - refused.tick < REFUSAL_MEMORY_TICKS) {
+      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, refused.reason)
       return
     }
     let verdict
@@ -655,17 +670,20 @@ export class AgentRuntime {
     if (verdict.kind === 'map')
       return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
     if (verdict.kind === 'impossible') {
-      this.#rememberRefusal(description)
+      this.#rememberRefusal(description, verdict.reason)
       this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
-    // Adjudicate once, physics forever. With no codifier wired the attempt still reaches the
-    // world rather than vanishing.
+    // Adjudicate once, physics forever.
     if (this.#codify === null) return fallback()
     let verb: string
     try {
-      verb = this.#codify(verdict.recipe, { agentId: this.#agentId, intent: description }).verb
+      verb = this.#codify(verdict, {
+        agentId: this.#agentId,
+        intent: description,
+        ...(said ? { saying: spokenReason(description) } : {}),
+      }).verb
     } catch (err) {
       this.#llm.alert('codify_failed', messageOf(err))
       return fallback()
@@ -673,15 +691,10 @@ export class AgentRuntime {
     return this.#holdIntent({ verb, params: {} })
   }
 
-  #alreadyRefused(description: string): boolean {
-    const at = this.#refusedIntents.get(sameIntent(description))
-    return at !== undefined && this.#bridge.currentTick() - at < REFUSAL_MEMORY_TICKS
-  }
-
-  #rememberRefusal(description: string): void {
+  #rememberRefusal(description: string, reason: string): void {
     const key = sameIntent(description)
     this.#refusedIntents.delete(key)
-    this.#refusedIntents.set(key, this.#bridge.currentTick())
+    this.#refusedIntents.set(key, { tick: this.#bridge.currentTick(), reason })
     // Insertion-ordered, so the first key is the oldest.
     while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
       this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
@@ -702,7 +715,7 @@ export class AgentRuntime {
     this.#clearPlanQueue()
     this.#plan.lastResult = 'blocked'
     if (this.#reroutesUnknownVerb(res.reason)) {
-      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
+      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params), false).catch(
         this.#sink('adjudicate_crash'),
       )
       return
@@ -825,6 +838,7 @@ export class AgentRuntime {
 
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
+      ...(this.#roster === null ? {} : { roster: this.#roster() }),
       identity: this.#identity,
       personality: {
         doc: this.#personality.current().doc,
@@ -998,7 +1012,7 @@ export class AgentRuntime {
             ? turn.action.params.description
             : null
       if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
-        await this.#adjudicateFreeform(attempt)
+        await this.#adjudicateFreeform(attempt, true)
       } else {
         const intent: Intent =
           'freeform' in turn.action

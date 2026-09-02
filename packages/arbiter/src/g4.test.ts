@@ -43,7 +43,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -163,7 +163,7 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
 
     // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
     expect(VERBS['recipe:boil_salt']).toBeUndefined()
-    const { verb } = arbiter.codify(r1.recipe, CODIFY_CREDIT)
+    const { verb } = arbiter.codify(r1, CODIFY_CREDIT)
     expect(verb).toBe('recipe:boil_salt')
     expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
     expect(VERBS['recipe:boil_salt']).toBeDefined()

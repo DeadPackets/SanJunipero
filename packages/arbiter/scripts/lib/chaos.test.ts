@@ -23,7 +23,7 @@ const EXPLOIT_RECIPE: Recipe = {
       weight: 1,
       success: true,
       label: 'A gun appears in your hands.',
-      effects: [{ op: 'spawn_item', kind: 'gun', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'gun', qty: 1 }],
     },
   ],
   rngStream: 'recipe:gunpowder',
@@ -43,7 +43,7 @@ const EARNED_RECIPE: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
   ],
   rngStream: 'recipe:boil_salt',
@@ -146,7 +146,9 @@ describe('runChaos exploit corpus', () => {
     const llm = new ScriptedLlm(({ intent }) => exploitVerdict(intent))
     const { arbiter } = await makeRig(llm)
 
-    expect(() => arbiter.codify(EXPLOIT_RECIPE, CODIFY_CREDIT)).toThrow(/beyond adjacency/)
+    expect(() =>
+      arbiter.codify({ recipe: EXPLOIT_RECIPE, summary: 'an exploit' }, CODIFY_CREDIT),
+    ).toThrow(/beyond adjacency/)
   })
 
   it('lets through only an attempt whose canon is within adjacency', async () => {

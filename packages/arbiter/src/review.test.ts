@@ -21,7 +21,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -82,7 +82,7 @@ describe('ReviewStore', () => {
   it('codify auto-queues a pending review for every codified rule', () => {
     const { review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -112,7 +112,7 @@ describe('ReviewStore', () => {
   it('revert tombstones the rulebook, unregisters the verb, and marks the row reverted', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -134,7 +134,7 @@ describe('ReviewStore', () => {
   it('★ and a restart does not bring it back: the boot loop reads only what is still active', () => {
     const { review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -147,7 +147,7 @@ describe('ReviewStore', () => {
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -167,7 +167,7 @@ describe('ReviewStore', () => {
   it('approve throws on a tombstoned rule', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )

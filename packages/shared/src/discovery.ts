@@ -6,9 +6,10 @@ export const DISCOVERY_EVENT = 'discovery_made'
  *  learning to name an act that changes nothing. Both are somebody working something out. */
 export type DiscoveryKind = 'craft' | 'word'
 
-/** Who worked it out, and the words they used. Travels from the runtime to the arbiter and
- *  back out onto the event, because the arbiter itself never knows who is asking at codify. */
-export type DiscoveryCredit = { agentId: string; intent: string }
+/** Who worked it out, the words they used, and the thought behind the ask. Travels from the
+ *  runtime to the arbiter and back out onto the event, because the arbiter itself never knows
+ *  who is asking at codify. */
+export type DiscoveryCredit = { agentId: string; intent: string; saying?: string }
 
 /** One row of the archive, as the gateway serves it. `by` is resolved to a NAME here because
  *  an id is not a credit. */

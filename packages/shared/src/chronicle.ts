@@ -112,6 +112,9 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'item_qty_changed',
   'item_text_changed',
   'item_taken',
+  // What a minted verb leaves behind is the town's to read off the thing, not the record's.
+  'marked',
+  'place_named',
   'crop_planted',
   'crop_grew',
   'crop_withered',

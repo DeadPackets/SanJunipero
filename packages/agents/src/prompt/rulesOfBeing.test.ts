@@ -98,6 +98,16 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
     expect(block1()).not.toContain('Every act carries what it asks for')
   })
 
+  // Nothing in the prompt said "you may invent"; the old closing line said the opposite.
+  it('closes with the invitation, not the old promise of a lesson', () => {
+    expect(
+      CAPABILITIES.endsWith(
+        'Anything you can name, you may try; the world answers with what it took.',
+      ),
+    ).toBe(true)
+    expect(CAPABILITIES).not.toContain('the world will show you')
+  })
+
   // A shared block that hands every mind the same example makes five copies of one actor.
   it('names no founder', () => {
     for (const founder of ['Omar', 'Salma', 'Nadia', 'Amara', 'Yusuf']) {

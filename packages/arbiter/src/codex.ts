@@ -55,6 +55,24 @@ export class CodexStore {
     return rows.map((r) => r.id)
   }
 
+  // A rung is earned the moment a craft resting on it is codified.
+  learn(ids: string[]): void {
+    const mark = this.db.prepare('UPDATE codex SET known = 1 WHERE id = ?')
+    for (const id of ids) mark.run(id)
+  }
+
+  // The court's proposed next rung: unearned, hung off a rung the codex already has. A
+  // prerequisite the codex has never heard of is a made-up id, and the proposal is dropped.
+  propose(rung: { id: string; name: string; prerequisiteId: string }): boolean {
+    const parent = this.db.prepare('SELECT era FROM codex WHERE id = ?').get(rung.prerequisiteId) as
+      | { era: Era }
+      | undefined
+    if (parent === undefined) return false
+    if (this.db.prepare('SELECT 1 FROM codex WHERE id = ?').get(rung.id) !== undefined) return false
+    this.insert({ ...rung, era: parent.era, known: false })
+    return true
+  }
+
   withinAdjacency(recipeCanon: string[]): boolean {
     if (recipeCanon.length === 0) return false
     const known = new Set(this.known())

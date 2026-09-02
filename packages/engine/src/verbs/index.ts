@@ -13,14 +13,7 @@ import {
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
 import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
-import {
-  findPath,
-  isPassable,
-  pathCtx,
-  searchToward,
-  type PathCtx,
-  type Point,
-} from '../path.js'
+import { findPath, isPassable, pathCtx, searchToward, type PathCtx, type Point } from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -109,7 +102,6 @@ export type VerbKind =
   | 'inscribe'
   | 'teach'
   | 'attack'
-  | 'experiment'
 
 export type VerbDef = {
   kind: string
@@ -2254,16 +2246,6 @@ const attack: VerbDef = makeVerb({
   rngStream: 'combat',
 })
 
-const experiment: VerbDef = makeVerb({
-  kind: 'experiment',
-  validate() {
-    return 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
-  },
-  onComplete() {
-    return []
-  },
-})
-
 export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
@@ -2302,7 +2284,6 @@ export const VERBS: Record<string, VerbDef> = {
   inscribe,
   teach,
   attack,
-  experiment,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id.
