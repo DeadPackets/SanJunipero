@@ -9,7 +9,6 @@ export type VerbCharter = {
   gloss: string
   reads: ClosedKey[]
   durationTicks: number
-  energyCost: number
   requires: RecipeRequirement[]
   costs: { kind: string; qty: number }[]
   outcomes: OutcomeRow[]
@@ -62,7 +61,6 @@ export function charterFromAttempt(attempt: AttemptVerdict, credit: DiscoveryCre
     gloss: capGloss(attempt.summary),
     reads: readsOf(r.outcomeTable),
     durationTicks: r.durationTicks,
-    energyCost: 0,
     requires: r.requires,
     costs: r.costs,
     outcomes: r.outcomeTable,

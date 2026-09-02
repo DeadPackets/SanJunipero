@@ -269,7 +269,7 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
         skillCheck && isExpertCharter(charter, config)
           ? crafterStamp(state, config, agentId, skillCheck.track)
           : {}
-      const events = [
+      return [
         ...emitOutcomeEffects(state, agentId, row.effects, {
           stamp: { ...(config.ownership.enabled ? { owner: agentId } : {}), ...mark },
           params,
@@ -277,13 +277,6 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
         }),
         ...wearTools(state, config, agentId, charter),
       ]
-      if (charter.energyCost > 0) {
-        events.push({
-          type: 'needs_changed',
-          payload: { id: agentId, changes: [{ need: 'energy', delta: -charter.energyCost }] },
-        })
-      }
-      return events
     },
     ...(charter.skillCheck === undefined
       ? {}

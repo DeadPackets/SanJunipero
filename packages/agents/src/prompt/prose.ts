@@ -1031,7 +1031,8 @@ export function perceptionToProse(
           : `You watch ${s.actorName} ${doing}.`,
       )
     } else if (s.kind === 'discovery') {
-      const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.saying}`
+      // The saying is the inventor's own words for the attempt, reported: "he said he would…".
+      const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.pronoun} would ${s.saying}`
       lines.push(`${s.inventorName} has worked out ${s.name}${why}.`)
     } else lines.push(s.prose)
   }

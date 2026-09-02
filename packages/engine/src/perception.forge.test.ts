@@ -75,9 +75,9 @@ describe('a discovery is told within earshot', () => {
       makes: ['smoked fish'],
     })
 
-  it('reaches a neighbour, with the inventor’s own why', () => {
+  it('reaches a neighbour, with the inventor’s own words for the attempt', () => {
     const packet = composePerception(town(), DEFAULT_CONFIG, 'a', [
-      worked('The catch will not keep past the week.'),
+      worked('hang the catch over green wood so it keeps'),
     ])
     expect(packet.seen).toEqual([
       {
@@ -85,7 +85,7 @@ describe('a discovery is told within earshot', () => {
         inventorName: 'Omar',
         pronoun: 'he',
         name: 'smoking fish over green wood',
-        saying: 'The catch will not keep past the week.',
+        saying: 'hang the catch over green wood so it keeps',
       },
     ])
   })

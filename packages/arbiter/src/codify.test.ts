@@ -113,7 +113,6 @@ describe('the charter a ruling becomes', () => {
       gloss: SUMMARY,
       reads: [],
       durationTicks: 5,
-      energyCost: 0,
       requires: boilSaltRecipe.requires,
       costs: [],
       outcomes: boilSaltRecipe.outcomeTable,

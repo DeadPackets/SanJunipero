@@ -140,8 +140,8 @@ describe('a discovery a neighbour made', () => {
           },
         ],
       })
-    expect(told('the catch would not keep past the week')).toContain(
-      'Omar has worked out smoking fish over green wood: he said the catch would not keep past the week.',
+    expect(told('hang the catch over green wood so it keeps')).toContain(
+      'Omar has worked out smoking fish over green wood: he said he would hang the catch over green wood so it keeps.',
     )
     expect(told()).toContain('Omar has worked out smoking fish over green wood.')
   })

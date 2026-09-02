@@ -29,7 +29,10 @@ import { EngineBridge } from './bridge.js'
 import {
   AgentRuntime,
   CRAFT_HINT,
+  CANNOT_BEGIN,
   OPAQUE_REFUSAL,
+  REFUSAL_MEMORY_TICKS,
+  TRIED_FREEFORM,
   reflectionOffsetTicks,
   refusalMemoryText,
 } from './agentRuntime.js'
@@ -1457,32 +1460,37 @@ describe('arbiter seam (T19)', () => {
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
   })
 
-  // The court, not the mind's own past, answers a repeated ask: its precedent path already
-  // returns a stored ruling at no call, and a refusal is one memory, never a repeated line.
-  it('asks the god every time, and each refusal is one memory of importance 3', async () => {
+  // A refusal with a context-dependent class is never a precedent, so without a window the same
+  // ask every turn is a full ruling every turn. Inside it the refusal answers silently.
+  it('★ the same idea inside the window costs one call and leaves one memory of importance 3', async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {
       calls += 1
       return {
         kind: 'impossible',
         reason: 'the reeds will not hold that shape',
-        class: 'physically_impossible',
+        class: 'insufficient_materials',
       }
     }
-    const { loop, agentDb } = await setup({
-      model: turnModel([freeformTurn, freeformTurn]),
-      mindConfig: FAST_MIND,
-      adjudicator,
-    })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
+    const { model, prompts } = capturingModel([
+      freeformTurn,
+      { ...freeformTurn, action: { freeform: 'Weave reeds into a basket.' } },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 3, 400)
 
-    expect(calls).toBe(2)
+    expect(calls).toBe(1)
     const memories = memoriesOfKind(agentDb, 'action')
     expect(memories.map((m) => m.text)).toEqual([
       'You realize you cannot: the reeds will not hold that shape',
-      'You realize you cannot: the reeds will not hold that shape',
     ])
-    expect(memories.map((m) => m.importance)).toEqual([3, 3])
+    expect(memories.map((m) => m.importance)).toEqual([3])
+    // The second ask is still answered, from the mind's own refusal, in the next turn's line.
+    expect(saidOn(prompts, 2)).toContain(
+      `Last turn: ${TRIED_FREEFORM} did not take — the reeds will not hold that shape.`,
+    )
+    expect(REFUSAL_MEMORY_TICKS).toBe(240)
   })
 
   it('★ ANTI-VACUITY: a DIFFERENT idea still reaches the god, and so does the same one later', async () => {
@@ -1550,21 +1558,23 @@ describe('arbiter seam (T19)', () => {
     )
   })
 
-  it('falls back to the world when the adjudicator throws, and says so in an alert', async () => {
+  // ★ One-way glass: a god that fell over must not reach the mind as a verb the world lacks.
+  it('★ when the adjudicator throws, the try did not begin: an alert, no memory, no machinery', async () => {
     const adjudicator: Adjudicator = async () => {
       throw new Error('the arbiter is unreachable')
     }
-    const { loop, agentDb } = await setup({
-      model: turnModel([freeformTurn]),
-      mindConfig: FAST_MIND,
-      adjudicator,
-    })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    const { model, prompts } = capturingModel([freeformTurn, BENIGN_TURN])
+    const { loop, agentDb } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
-      `You realize you cannot: ${OPAQUE_REFUSAL}`,
-    )
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
+    expect(memoriesOfKind(agentDb, 'action')).toEqual([])
+    const next = saidOn(prompts, 1)
+    expect(next).toContain(`Last turn: ${TRIED_FREEFORM} did not take — ${CANNOT_BEGIN}.`)
+    for (const text of [next, ...memoriesOfKind(agentDb, 'action').map((m) => m.text)]) {
+      expect(text).not.toContain('unknown verb')
+      expect(text).not.toContain('experiment')
+    }
   })
 
   // CAPABILITIES offers `experiment` as well as freeform, so a mind may name
@@ -1775,28 +1785,26 @@ describe('arbiter wiring expansion (T20)', () => {
     await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
 
     expect(calls).toHaveLength(1)
-    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT, saying: 'A mat.' })
+    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT, saying: INTENT })
     // The SAME words the arbiter was asked, never a paraphrase.
     expect(calls[0]!.credit!.intent).toBe(asked)
   })
 
-  it('falls back to the world when an attempt arrives with no way to codify it', async () => {
+  it('an attempt with no way to codify it did not begin: no memory, and no verb the world lacks', async () => {
     const adjudicator: Adjudicator = async () => ({
       kind: 'attempt',
       recipe: { id: RECIPE_VERB },
       summary: 'Weave reeds into a mat.',
     })
-    const { loop, agentDb } = await setup({
-      model: turnModel([
-        { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
-      ]),
-      mindConfig: FAST_MIND,
-      adjudicator,
-    })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
-      `You realize you cannot: ${OPAQUE_REFUSAL}`,
-    )
+    const { model, prompts } = capturingModel([
+      { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb, world } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
+    expect(memoriesOfKind(agentDb, 'action')).toEqual([])
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+    expect(saidOn(prompts, 1)).toContain(`did not take — ${CANNOT_BEGIN}.`)
   })
 })
 
