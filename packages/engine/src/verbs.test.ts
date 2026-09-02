@@ -72,6 +72,7 @@ const TIER1 = [
   'walk',
   'sleep',
   'wake',
+  'stop',
   'enter',
   'exit',
   'eat',

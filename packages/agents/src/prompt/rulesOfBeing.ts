@@ -22,6 +22,7 @@ export const CAPABILITIES = `What your hands and voice can do. Name each act by 
 walk: name it walk; give the mark of what you are going to and your legs find their own way and set you down beside it, however far off it lies: structureId for any place you know, a roof or a landmark alike, written as it stands among the places you know; targetId for a person you can see, and your legs follow them while they move, until you are beside them or they are lost; itemId for a thing you can see lying there, and you end within reach of it. Or give x and y as two numbers for a patch of ground with no name, which carry you no further than the numbers themselves
 sleep: name it sleep when weary; a roof over you is what it takes, unless you are worn down so far that the bare ground will do
 wake: name it wake to rise from sleep; nothing more is needed
+stop: name it stop to take your hands off the work you are in the middle of and stand free of it; nothing more is needed. What was half done stays half done, and what you had already made is yours to keep
 enter: name it enter; give structureId, the mark of the building whose doorway you stand beside
 exit: name it exit to step back out under the sky; nothing more is needed
 eat: name it eat; give itemId, the mark of the food you hold

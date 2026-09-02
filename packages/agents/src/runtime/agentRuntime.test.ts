@@ -4,6 +4,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModel } from 'ai'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
+  ACT_SET_DOWN,
   createWorldTick,
   fold,
   genesisState,
@@ -16,6 +17,7 @@ import {
   type TileId,
 } from '@sj/engine'
 import {
+  DURATION_TICKS,
   NO_PARAMS,
   REFLECTION_SETTLE_MS,
   SimConfigSchema,
@@ -28,6 +30,8 @@ import {
 import { EngineBridge } from './bridge.js'
 import {
   AgentRuntime,
+  BODY_WOULD_NOT_GO_ON,
+  brokeOffLine,
   CRAFT_HINT,
   CANNOT_BEGIN,
   OPAQUE_REFUSAL,
@@ -2299,7 +2303,7 @@ describe('★ an empty vessel is a want for water, though it names none', () => 
 // call. A database too busy to take a row would have thrown away an answer already paid for.
 describe('★ a ledger that cannot write does not cost the town a paid turn', () => {
   it('still acts on the answer, and says the ledger failed', async () => {
-    const { world, loop, agentDb, runtime } = await setup({
+    const { loop, agentDb, runtime } = await setup({
       model: turnModel([
         { thought: 'I should fetch some bread.', importance: 5, speech: 'Bread, then.' },
       ]),
@@ -2313,6 +2317,147 @@ describe('★ a ledger that cannot write does not cost the town a paid turn', ()
       .map((r) => (r as { kind: string }).kind)
     expect(kinds).toContain('ledger_write_failed')
     expect(runtime.stats().turns).toBeGreaterThan(0)
-    world.store.close?.()
+  })
+})
+
+// Task 27 measured the trap: a fisher on a 240-tick cast collapsed 15 times in three sim-days,
+// because `submitIntent` refuses every verb to busy hands and nothing could end an act early.
+// A minted vigil or mourning may run a whole day, which is twenty real minutes of being stuck.
+describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
+  const MOURN = 'express:mourn'
+  const MOURN_TURN = {
+    thought: 'I will keep the day for her.',
+    action: { verb: MOURN, params: {} },
+    importance: 8,
+  }
+  // Only hunger rings, and it rings at 20 — the fixture body starts at 30 and loses half a
+  // point a tick, so the alarm lands twenty ticks into an act six hundred ticks long.
+  const HUNGER_RINGS: Partial<MindConfig> = {
+    idleGapTicks: 0,
+    boredomTicks: 10_000,
+    bodyAlarm: { hunger: 20, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
+  }
+  const QUIET_SKY = SimConfigSchema.parse({
+    needs: { hungerDecayPerTick: 0.5 },
+    structures: { sleepIndoorsOnly: false },
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+
+  const interrupts = (db: Database.Database): { agentId: string; reason: string }[] =>
+    (
+      db
+        .prepare("SELECT payload FROM events WHERE type = 'action_interrupted' ORDER BY seq")
+        .all() as { payload: string }[]
+    ).map((r) => JSON.parse(r.payload) as { agentId: string; reason: string })
+
+  const wakeReasonsLogged = (db: Database.Database): (string | null)[] =>
+    (
+      db.prepare("SELECT wake_reason FROM llm_calls WHERE caller = 'turn' ORDER BY id").all() as {
+        wake_reason: string | null
+      }[]
+    ).map((r) => r.wake_reason)
+
+  const mournsForADay = (): void => {
+    registerVerb({
+      kind: MOURN,
+      validate: () => null,
+      duration: () => DURATION_TICKS.day,
+      onComplete: () => [],
+    })
+  }
+
+  afterEach(() => {
+    unregisterVerb(MOURN)
+  })
+
+  it('★ a body alarm takes the hands off a DAY-LONG act, and the turn that follows is the alarm’s', async () => {
+    mournsForADay()
+    const { model, prompts } = capturingModel([MOURN_TURN, BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime, world, agentDb } = await setup({
+      model,
+      mindConfig: HUNGER_RINGS,
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(
+      loop,
+      () => runtime.stats().turns >= 2 && interrupts(world.engineDb).length > 0,
+      200,
+    )
+
+    expect(startedVerbs(world.engineDb)).toContain(MOURN)
+    // Twenty real minutes is what a day-long act costs a mind that cannot put it down.
+    expect(DURATION_TICKS.day * TICK_REAL_MS).toBe(20 * 60 * 1000)
+    expect(loop.tick).toBeLessThan(DURATION_TICKS.day)
+    expect(loop.state.agents[AGENT]!.activity).toBeNull()
+    expect(interrupts(world.engineDb)).toEqual([{ agentId: AGENT, reason: ACT_SET_DOWN }])
+    expect(completedVerbs(world.engineDb)).not.toContain(MOURN)
+    // The mind never asked; the hands came off, and the very next turn is the one the alarm rang.
+    expect(wakeReasonsLogged(agentDb)[1]).toBe('body_alarm')
+    expect(saidOn(prompts, 1)).toContain(
+      `Last turn: you broke off mourning — ${BODY_WOULD_NOT_GO_ON}.`,
+    )
+    // Said once. The next turn opens on a body standing free, with nothing to explain.
+    await stepUntil(loop, () => runtime.stats().turns >= 3, 200)
+    expect(saidOn(prompts, 2)).not.toContain('Last turn:')
+  })
+
+  it('the mind’s own stop ends the act and nothing else', async () => {
+    mournsForADay()
+    const { model, prompts } = capturingModel([
+      MOURN_TURN,
+      { thought: 'Enough of that.', action: { verb: 'stop', params: {} }, importance: 3 },
+      BENIGN_TURN,
+    ])
+    // Boredom drives the second turn, and no rung rings at all: nothing here is the body's doing.
+    const { loop, runtime, world, agentDb } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, boredomTicks: 5 },
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(
+      loop,
+      () => runtime.stats().turns >= 3 && interrupts(world.engineDb).length > 0,
+      300,
+    )
+
+    expect(interrupts(world.engineDb)).toEqual([{ agentId: AGENT, reason: ACT_SET_DOWN }])
+    expect(loop.state.agents[AGENT]!.activity).toBeNull()
+    expect(completedVerbs(world.engineDb)).not.toContain(MOURN)
+    expect(wakeReasonsLogged(agentDb)).not.toContain('body_alarm')
+    // Nothing else: no refusal remembered, and no sentence for the mind to read back.
+    expect(
+      memoriesOfKind(agentDb, 'action').every((m) => !m.text.includes('You realize you cannot')),
+    ).toBe(true)
+    expect(saidOn(prompts, 2)).not.toContain('Last turn:')
+  })
+
+  // The line names the act as it was happening, so a coined verb reads as a thing being done
+  // rather than as the slug it is stored under.
+  it('says what was broken off in the words the act was happening in', () => {
+    expect(brokeOffLine('fish', 'why')).toBe('Last turn: you broke off fishing — why.')
+    expect(brokeOffLine(MOURN, 'why')).toContain('you broke off mourning')
+    expect(brokeOffLine('recipe:plank', 'why')).toContain('you broke off making plank')
+    expect(brokeOffLine('stow', 'why')).toContain('stowing')
+    expect(brokeOffLine('inscribe', 'why')).toContain('inscribing')
+  })
+
+  it('leaves the legs alone: a hungry body walking to its food is not stopped', async () => {
+    const { model } = capturingModel([
+      {
+        thought: 'The storehouse.',
+        action: { verb: 'walk', params: { x: 20, y: 20 } },
+        importance: 4,
+      },
+      BENIGN_TURN,
+    ])
+    const { loop, runtime, world } = await setup({
+      model,
+      mindConfig: HUNGER_RINGS,
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(interrupts(world.engineDb).map((i) => i.reason)).not.toContain(ACT_SET_DOWN)
   })
 })
