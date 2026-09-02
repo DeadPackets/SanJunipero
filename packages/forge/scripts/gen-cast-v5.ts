@@ -42,7 +42,14 @@ import { trimToFigure } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
 import { alphaBinaryGate, paletteDistance, soleSilhouetteGate } from '../src/pixelGates.js'
 import { quantize } from '../src/post/quantize.js'
-import { MAGENTA_RESIDUE_MAX, WALK_CELLS, magentaResidue, walkRowGate } from '../src/walkGates.js'
+import {
+  MAGENTA_RESIDUE_MAX,
+  TORSO_DRIFT_MAX,
+  WALK_CELLS,
+  magentaResidue,
+  torsoDrift,
+  walkRowGate,
+} from '../src/walkGates.js'
 import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL, PROPORTION_CLAUSE } from './character.js'
@@ -487,7 +494,19 @@ async function runCharacter(m: CastMember): Promise<void> {
       p === 'passing'
         ? []
         : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
-    return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
+    // A coat that changes colour for one frame flickers at 8 fps; judged here so the next
+    // candidate is drawn, not at the end when the whole sheet is refused.
+    const drift = f === 'se' ? torsoDrift(hi, idleHi.se) : 0
+    const coat: GateFailure[] =
+      drift > TORSO_DRIFT_MAX
+        ? [{ gate: 'torso-drift', a: key, b: 'se/idle', value: drift, limit: TORSO_DRIFT_MAX }]
+        : []
+    return {
+      key,
+      hi,
+      gate,
+      failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance, ...coat],
+    }
   }
   const identityBroken = (c: FrameCand): boolean =>
     c.failures.some((x) => x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55))

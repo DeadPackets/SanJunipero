@@ -31,7 +31,7 @@ import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
-import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
+import { StrictVerdictSchema, readRuling, type Recipe, type Verdict } from './verdict.js'
 
 // At or above this cosine the stored ruling is returned verbatim, so a rephrasing of an
 // already-ruled intent resolves to identical physics with zero LLM calls. The same bar decides
@@ -424,30 +424,32 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       let value: Verdict | null = null
       let contradicted = false
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
-        const r = await deps.llm.object({ schema: VerdictSchema, system, messages })
+        const answer = await deps.llm.object({ schema: StrictVerdictSchema, system, messages })
         contradicted = false
+        // The court answers in the strict dialect; anything off it is not a ruling — retry.
+        const ruling = readRuling(answer.value)
+        if (ruling === null) continue
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
-        if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
-        if (r.value.kind === 'attempt') {
-          const twin = await charterTwin(r.value)
+        if (ruling.kind === 'map' && !VERBS[ruling.verb]) continue
+        if (ruling.kind === 'attempt') {
+          const twin = await charterTwin(ruling)
           if (twin !== null) {
             value = { kind: 'map', verb: twin, params: NO_PARAMS }
             break
           }
         }
         // An attempt that leaks the machinery is invalid — retry (finding 12).
-        if (framingTainted(r.value)) continue
+        if (framingTainted(ruling)) continue
         // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
-        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null)
-          continue
+        if (ruling.kind === 'attempt' && recipeSanityRefusal(ruling.recipe, vocab) !== null) continue
         // An impossible whose own reason argues the other way — retry, never launder.
-        if (impossibleSelfContradicts(r.value)) {
+        if (impossibleSelfContradicts(ruling)) {
           contradicted = true
           continue
         }
-        value = r.value
+        value = ruling
       }
       if (value === null) {
         if (contradicted) {

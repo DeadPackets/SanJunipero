@@ -141,6 +141,73 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
 ])
 export type Verdict = z.infer<typeof VerdictSchema>
 
+type AnyZod = z.ZodType
+type AnyShape = z.ZodObject<Record<string, AnyZod>>
+
+// The ruling model's decoder takes only an object at the root, refuses `oneOf`, and refuses an
+// optional key. Derived, so an op or a field added to the verdict is in the dialect that day.
+function strictly(schema: AnyZod): AnyZod {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return strictly((schema as z.ZodOptional<AnyZod>).unwrap()).nullable()
+  if (type === 'array') {
+    const array = schema as z.ZodArray<AnyZod>
+    // Carried over rather than dropped, so `minItems` still reaches the decoder.
+    const checks = (array.def.checks ?? []) as z.core.$ZodCheck<unknown[]>[]
+    return z.array(strictly(array.element)).check(...checks)
+  }
+  // Both union kinds report `union`; rebuilding either as a plain one is what turns oneOf to anyOf.
+  if (type === 'union') return z.union((schema as z.ZodUnion<[AnyZod]>).options.map(strictly))
+  if (type !== 'object') return schema
+  const shape = (schema as AnyShape).shape
+  return z
+    .object(Object.fromEntries(Object.entries(shape).map(([k, v]) => [k, strictly(v)])))
+    .strict()
+}
+
+export const StrictVerdictSchema = z.object({ verdict: strictly(VerdictSchema) }).strict()
+
+/** Null stood in for absence and comes off here — but only where the town's own schema says the
+ *  key may be absent, so a params key answered null stays null. Walks value and schema together. */
+function withoutNulls(value: unknown, schema: AnyZod): unknown {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return withoutNulls(value, (schema as z.ZodOptional<AnyZod>).unwrap())
+  if (type === 'array')
+    return Array.isArray(value)
+      ? value.map((v) => withoutNulls(v, (schema as z.ZodArray<AnyZod>).element))
+      : value
+  if (type === 'union') {
+    for (const option of (schema as z.ZodUnion<[AnyZod]>).options) {
+      const stripped = withoutNulls(value, option)
+      if (option.safeParse(stripped).success) return stripped
+    }
+    return value
+  }
+  if (type !== 'object' || value === null || typeof value !== 'object') return value
+  const shape = (schema as AnyShape).shape
+  const out: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(value)) {
+    const field = shape[key]
+    if (field === undefined) {
+      out[key] = v
+      continue
+    }
+    if (v === null && field.def.type === 'optional') continue
+    out[key] = withoutNulls(v, field)
+  }
+  return out
+}
+
+/** The court's answer in the dialect it was asked for, read as the verdict the town keeps, or
+ *  null off the union. */
+export function readRuling(raw: unknown): Verdict | null {
+  const wrapped = StrictVerdictSchema.safeParse(raw)
+  if (!wrapped.success) return null
+  const read = VerdictSchema.safeParse(withoutNulls(wrapped.data.verdict, VerdictSchema))
+  return read.success ? read.data : null
+}
+
 export function skillFactor(level: number, difficulty: number): number {
   return Math.min(0.95, Math.max(0.05, 0.5 + 0.05 * (level - difficulty)))
 }

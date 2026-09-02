@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { CLOSED_KEYS, NO_PARAMS } from '@sj/shared'
 import { strictModeFaults } from '@sj/shared/testutil'
+import { strictDialect } from './testutil/scriptedLlm.js'
 import { ExpressiveParams } from './expressive.js'
 import {
   OutcomeEffectSchema,
   OutcomeTableSchema,
   RecipeSchema,
+  StrictVerdictSchema,
   VerdictSchema,
+  readRuling,
   rollOutcomeTable,
   skillFactor,
   type OutcomeRow,
@@ -149,6 +152,111 @@ describe('VerdictSchema', () => {
 
   it('rejects an unknown kind (closed union)', () => {
     expect(VerdictSchema.safeParse({ kind: 'nuke' }).success).toBe(false)
+  })
+})
+
+// Measured live 2026-09-02 against the pinned ruling model: it refuses a schema whose root is
+// not an object ('got type: "None"') and refuses `oneOf` anywhere ("'oneOf' is not permitted"),
+// on top of the optional-key rule `strictModeFaults` already knows.
+describe('StrictVerdictSchema', () => {
+  it('★ is the dialect a strict decoder takes: object at the root, no oneOf, no optional key', () => {
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(StrictVerdictSchema, { io }) as { type?: string }
+      expect(emitted.type, io).toBe('object')
+      expect(JSON.stringify(emitted), io).not.toContain('oneOf')
+      expect(strictModeFaults(emitted), io).toEqual([])
+    }
+  })
+
+  it('★ carries every field the live verdict leaves out, required and nullable', () => {
+    const wire = { verdict: strictDialect(validAttempt) }
+    expect(StrictVerdictSchema.safeParse(wire).success).toBe(true)
+    // Each of them written null, none of them left out — which is what the decoder cannot do.
+    const recipe = (wire.verdict as { recipe: Record<string, unknown> }).recipe
+    expect(recipe.skillCheck).toBeNull()
+    expect((wire.verdict as { unlocks: unknown }).unlocks).toBeNull()
+    expect(StrictVerdictSchema.safeParse({ verdict: validAttempt }).success).toBe(false)
+  })
+})
+
+describe('readRuling', () => {
+  it('★ reads the strict dialect back as the verdict the town keeps: null is absent', () => {
+    const verdict = readRuling({ verdict: strictDialect(validAttempt) })
+    expect(verdict).toEqual(validAttempt)
+    if (verdict?.kind !== 'attempt') throw new Error('not an attempt')
+    expect('skillCheck' in verdict.recipe).toBe(false)
+    expect('unlocks' in verdict).toBe(false)
+    expect('durability' in verdict.recipe.outcomeTable[0]!.effects[0]!).toBe(false)
+  })
+
+  it('★ keeps a skill check, a durability and an unlock the court did name', () => {
+    const named = {
+      ...validAttempt,
+      unlocks: { id: 'salting', name: 'Salting', prerequisiteId: 'fire' },
+      recipe: {
+        ...validRecipe,
+        skillCheck: { track: 'cooking', difficulty: 4 },
+        outcomeTable: [
+          {
+            ...validRecipe.outcomeTable[0]!,
+            effects: [{ op: 'spawn_item' as const, kind: 'knife', qty: 1, durability: 30 }],
+          },
+        ],
+      },
+    }
+    expect(readRuling({ verdict: strictDialect(named) })).toEqual(named)
+  })
+
+  it('★ refuses an answer off the union, wrapped or bare', () => {
+    expect(readRuling({ verdict: { kind: 'nuke' } })).toBeNull()
+    expect(readRuling({ kind: 'map', verb: 'walk', params: NO_PARAMS })).toBeNull()
+  })
+
+  // A params key answered null is the act naming nothing there, not a key to drop: the closed
+  // grammar requires all thirteen, so the round trip has to keep them.
+  it('★ keeps the nulls the closed grammar requires while dropping the ones that mean absence', () => {
+    const verdict = readRuling({
+      verdict: { kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 3, y: 4 } },
+    })
+    expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { ...NO_PARAMS, x: 3, y: 4 } })
+  })
+})
+
+// The dialect is derived from `OutcomeEffectSchema`, never restated, so an op added to the town's
+// effects is in it the same day. This test fails on a new op until it is sampled here — and the
+// derivation is what makes the sample pass without a second edit in verdict.ts.
+describe('the strict dialect covers every effect the town can emit', () => {
+  const samples: Record<string, Record<string, unknown>> = {
+    spawn_item: { op: 'spawn_item', kind: 'salt', qty: 1 },
+    gain_skill: { op: 'gain_skill', track: 'cooking', xp: 10 },
+    hp_delta: { op: 'hp_delta', delta: -3 },
+    mark: { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+    witness: { op: 'witness', label: 'She dances by the fire.', sense: 'sight' },
+    name_place: { op: 'name_place', text: 'The Two Waters' },
+    transfer: { op: 'transfer', to: 'target' },
+    need_delta: { op: 'need_delta', need: 'social', delta: 5 },
+    none: { op: 'none' },
+  }
+  const ops = OutcomeEffectSchema.options.map((o) => (o.shape.op as z.ZodLiteral<string>).value)
+
+  it('★ every op in the union has a sample here', () => {
+    expect([...ops].sort()).toEqual(Object.keys(samples).sort())
+  })
+
+  it.each(ops)('★ %s survives the round trip null-filled', (op) => {
+    const attempt = {
+      ...validAttempt,
+      recipe: {
+        ...validRecipe,
+        outcomeTable: [{ ...validRecipe.outcomeTable[0]!, effects: [samples[op]!] }],
+      },
+    }
+    // Written the way the decoder answers — every key the op names, absence written null.
+    const wire = { verdict: strictDialect(attempt) }
+    expect(StrictVerdictSchema.safeParse(wire).success, op).toBe(true)
+    const verdict = readRuling(wire)
+    if (verdict?.kind !== 'attempt') throw new Error(`${op}: not an attempt`)
+    expect(verdict.recipe.outcomeTable[0]!.effects[0], op).toEqual(samples[op])
   })
 })
 

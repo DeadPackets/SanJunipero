@@ -1,15 +1,44 @@
 import type Database from 'better-sqlite3'
+import { z } from 'zod'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { makeArbiter, type AgentCtx, type Arbiter } from '../adjudicate.js'
 import { CodexStore, type CodexEntry } from '../codex.js'
 import { openArbiterDb } from '../schema.js'
+import { StrictVerdictSchema, VerdictSchema } from '../verdict.js'
 
 function emptyUsage(): LlmUsage {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
 }
 
 export type ScriptedCall = { intent: string; system: string; user: string }
+
+type AnyZod = z.ZodType
+type AnyShape = z.ZodObject<Record<string, AnyZod>>
+
+/** A verdict the town keeps, written in the dialect the court answers in: every key the schema
+ *  names, absence written null. Derived like the dialect itself, so a script never spells one out. */
+export function strictDialect(value: unknown, schema: AnyZod = VerdictSchema): unknown {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return strictDialect(value, (schema as z.ZodOptional<AnyZod>).unwrap())
+  if (type === 'array')
+    return Array.isArray(value)
+      ? value.map((v) => strictDialect(v, (schema as z.ZodArray<AnyZod>).element))
+      : value
+  if (type === 'union') {
+    const option = (schema as z.ZodUnion<[AnyZod]>).options.find((o) => o.safeParse(value).success)
+    return option === undefined ? value : strictDialect(value, option)
+  }
+  if (type !== 'object' || value === null || typeof value !== 'object') return value
+  const named = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries((schema as AnyShape).shape).map(([key, field]) => [
+      key,
+      named[key] === undefined ? null : strictDialect(named[key], field),
+    ]),
+  )
+}
 
 // Never talks to a provider: answers from a script, counts the calls, and keeps every prompt
 // it was handed so a glass scan can run over all of the suite's traffic.
@@ -37,10 +66,9 @@ export class ScriptedLlm {
         .split('\n')
         .at(-1)
         ?.replace(/^Intent: /, '') ?? ''
-    return Promise.resolve({
-      value: this.respond({ intent, system: opts.system, user }),
-      usage: emptyUsage(),
-    })
+    const value = this.respond({ intent, system: opts.system, user })
+    const wire = opts.schema === StrictVerdictSchema ? { verdict: strictDialect(value) } : value
+    return Promise.resolve({ value: wire, usage: emptyUsage() })
   }
 
   text(): Promise<{ text: string; usage: LlmUsage }> {
