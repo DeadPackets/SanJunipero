@@ -1,56 +1,71 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 /** How long the camera waits after the last input before the director takes it back. */
-const IDLE_HANDBACK_MS = 20_000
+export const IDLE_HANDBACK_MS = 20_000
 
-/** The state is the BOOLEAN, never the moment of the last input: App holds the Pixi scene,
- *  and a timestamp in state would re-render the whole tree on every keystroke.
+/** A hand on the camera: a pan, a zoom, a click, a key. */
+const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const
+
+export type Director = {
+  get(): boolean
+  subscribe(cb: () => void): () => void
+  /** the D key, and the only thing that arms or disarms the director for good */
+  toggle(): void
+}
+
+/** The director is armed for every viewer, desk and stream alike: a town nobody is steering is
+ *  a town the camera has to find the story in. Any input hands it back for `IDLE_HANDBACK_MS`,
+ *  which is long enough to look at something and short enough that the show resumes.
  *
- *  `armed` is who the director is FOR. A broadcast has no operator and no hand on it, so it is
- *  cut for a viewer who is only watching; a person at a desk came to look for themselves, and a
- *  camera that took itself back twenty seconds after every click was taking the town off them. */
-export function useAutoCut(armed: boolean): { autoCut: boolean; toggle: () => void } {
-  const [autoCut, setAutoCut] = useState(armed)
-  // What the viewer last ASKED for, which is what an idle camera is handed back to. A ref, not
-  // state: it decides nothing about this render, it only outlives it.
-  const armedRef = useRef(armed)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+ *  A store rather than hook state, and the listeners land on the first subscriber: App holds
+ *  the Pixi scene, and a timestamp in the tree would re-render all of it on every keystroke. */
+export function director(target: EventTarget): Director {
+  let armed = true
+  let cutting = true
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const subs = new Set<() => void>()
 
-  const hold = useCallback(() => {
-    if (!armedRef.current) return // nothing to hold off, and no re-render to spend on saying so
-    setAutoCut(false)
-    if (timerRef.current !== null) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
-      setAutoCut(true)
+  const publish = (next: boolean): void => {
+    if (next === cutting) return
+    cutting = next
+    for (const cb of subs) cb()
+  }
+  const stopTimer = (): void => {
+    if (timer !== null) clearTimeout(timer)
+    timer = null
+  }
+  const hold = (): void => {
+    if (!armed) return
+    publish(false)
+    stopTimer()
+    timer = setTimeout(() => {
+      publish(true)
     }, IDLE_HANDBACK_MS)
-  }, [])
-
-  // The address bar can turn the stream frame on without a remount, and both of the above are
-  // read once. Browser-back across a broadcast link left the director in the old mode forever.
-  useEffect(() => {
-    armedRef.current = armed
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the route IS the external system this follows; nothing else can tell the hook the frame changed.
-    setAutoCut(armed)
-  }, [armed])
-
-  useEffect(() => {
-    window.addEventListener('pointerdown', hold)
-    window.addEventListener('keydown', hold)
-    window.addEventListener('wheel', hold, { passive: true })
-    return () => {
-      window.removeEventListener('pointerdown', hold)
-      window.removeEventListener('keydown', hold)
-      window.removeEventListener('wheel', hold)
-      if (timerRef.current !== null) clearTimeout(timerRef.current)
-    }
-  }, [hold])
+  }
 
   return {
-    autoCut,
-    toggle: () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current)
-      armedRef.current = !armedRef.current
-      setAutoCut(armedRef.current)
+    get: () => cutting,
+    subscribe(cb) {
+      subs.add(cb)
+      if (subs.size === 1) {
+        for (const e of HAND_ON_CAMERA) target.addEventListener(e, hold, { passive: true })
+      }
+      return () => {
+        subs.delete(cb)
+        if (subs.size > 0) return
+        for (const e of HAND_ON_CAMERA) target.removeEventListener(e, hold)
+        stopTimer()
+      }
+    },
+    toggle() {
+      stopTimer()
+      armed = !armed
+      publish(armed)
     },
   }
+}
+
+export function useAutoCut(): { autoCut: boolean; toggle: () => void } {
+  const [d] = useState(() => director(window))
+  return { autoCut: useSyncExternalStore(d.subscribe, d.get), toggle: d.toggle }
 }

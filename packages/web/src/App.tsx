@@ -72,7 +72,7 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, toggle: toggleDirector } = useAutoCut(route.broadcast)
+  const { autoCut, toggle: toggleDirector } = useAutoCut()
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
