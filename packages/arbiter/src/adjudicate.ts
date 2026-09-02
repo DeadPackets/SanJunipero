@@ -7,6 +7,7 @@ import {
   NO_PARAMS,
   type DiscoveryCredit,
   type DiscoveryKind,
+  type RosterEntry,
   scanRulingForGlassLeak,
   type RulingVocabulary,
 } from '@sj/shared'
@@ -194,6 +195,8 @@ export type ArbiterDeps = {
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
   codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
+  // Every active minted verb as a prompt lists it, in rulebook order.
+  roster(): RosterEntry[]
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -242,6 +245,22 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     // hooked only codify() would leave the town inventing a name for dancing with no trace.
     deps.onCodified?.({ recipeId: row.id, name: row.name, kind: 'word', makes: [], credit })
     return row.id
+  }
+
+  function roster(): RosterEntry[] {
+    return rulebook.allActive().map((row) => {
+      const parsed: unknown = JSON.parse(row.recipeJson)
+      if (isExpressiveRow(parsed)) {
+        return {
+          id: parsed.id,
+          name: parsed.name,
+          gloss: parsed.emote,
+          reads: parsed.targeted ? ['targetId'] : [],
+        }
+      }
+      const c = parsed as VerbCharter
+      return { id: c.id, name: c.name, gloss: c.gloss, reads: c.reads }
+    })
   }
 
   // What the rulebook already makes, read fresh each time: a second waterskin is only a
@@ -366,6 +385,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         precedent,
         intent,
         ...(deps.vocabulary === undefined ? {} : { materials: deps.vocabulary }),
+        learned: roster(),
       })
       let value: Verdict | null = null
       let contradicted = false
@@ -427,6 +447,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         ...(deps.onCodified === undefined ? {} : { onCodified: deps.onCodified }),
       })
     },
+
+    roster,
 
     sanity(recipe, agentCtx) {
       return recipeSanityRefusal(recipe, codifiedVocabulary(agentCtx))

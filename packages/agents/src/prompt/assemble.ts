@@ -1,9 +1,9 @@
 // Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
-import { sanitizeSpokenText } from '@sj/shared'
+import { sanitizeSpokenText, type RosterEntry } from '@sj/shared'
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
-import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
+import { CAPABILITIES, renderRoster, SPEECH_RULES } from './rulesOfBeing.js'
 
 export type IdentityCore = {
   name: string
@@ -31,6 +31,9 @@ export type Underway = { what: string; step: number; of: number }
 
 export type PromptBlocks = {
   rulesOfBeing: string // block 1 — never changes, identical for all agents
+  // What the town has minted, identical for all agents; changes only when a verb is minted or
+  // retired, so it sits after the static rules and before anything that is one mind's own.
+  roster?: readonly RosterEntry[]
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
   journal: JournalEntry[] // the mind's own book — changes only when it writes in it
@@ -159,10 +162,12 @@ function renderScene(scene: PromptBlocks['scene']): string {
 function renderSystem(blocks: PromptBlocks): string {
   // Rules of being + capabilities are static and identical for every agent;
   // identity and personality complete the byte-stable system prefix.
+  const roster = renderRoster(blocks.roster ?? [])
   return [
     blocks.rulesOfBeing,
     CAPABILITIES,
     SPEECH_RULES,
+    ...(roster.length === 0 ? [] : [roster]),
     renderIdentity(blocks.identity),
     renderPersonality(blocks.personality),
   ].join(BLOCK_DELIM)

@@ -860,6 +860,46 @@ describe('retrieval efficiency', () => {
   })
 })
 
+describe('the roster the town is told', () => {
+  it('lists every active minted verb, a craft with its gloss and a word with its emote', async () => {
+    const llm = new ScriptedLlm(() => ({
+      word: 'toast',
+      sense: 'sound',
+      durationTicks: 2,
+      energyCost: 1,
+      targeted: true,
+      emote: 'raises a cup to someone',
+    }))
+    const { arbiter } = await makeArbiterRig({ llm })
+    expect(arbiter.roster()).toEqual([])
+
+    arbiter.codify(
+      {
+        recipe: { ...basketRecipe, id: 'recipe:roster_basket', name: 'Roster Basket' },
+        summary: 'Weave reeds into a basket.',
+      },
+      CODIFY_CREDIT,
+    )
+    await arbiter.adjudicate('I sing a toast to Omar', TAMAR_CTX)
+    expect(arbiter.roster()).toEqual([
+      {
+        id: 'recipe:roster_basket',
+        name: 'Roster Basket',
+        gloss: 'Weave reeds into a basket.',
+        reads: [],
+      },
+      { id: 'express:toast', name: 'toast', gloss: 'raises a cup to someone', reads: ['targetId'] },
+    ])
+    // And the court is shown it on the next novel ask.
+    await arbiter.adjudicate('I chart the river shallows', TAMAR_CTX)
+    expect(llm.lastSystem).toContain('recipe:roster_basket (nothing) — Weave reeds into a basket.')
+
+    arbiter.revert('recipe:roster_basket', 'test')
+    expect(arbiter.roster().map((e) => e.id)).toEqual(['express:toast'])
+    unregisterVerb('express:toast')
+  })
+})
+
 describe('rulebook rehydration on construction', () => {
   const REHYDRATE_SUMMARY = 'Weave reeds into a basket.'
   const rehydrateRecipe: Recipe = {

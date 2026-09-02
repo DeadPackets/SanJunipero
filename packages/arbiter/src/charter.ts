@@ -27,7 +27,7 @@ export type AttemptVerdict = {
 
 // The roster line a charter becomes is capped at forty tokens, and the gloss is the part of
 // it a model wrote.
-export const GLOSS_MAX_CHARS = 90
+export const GLOSS_MAX_CHARS = 50
 
 export function capGloss(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim()

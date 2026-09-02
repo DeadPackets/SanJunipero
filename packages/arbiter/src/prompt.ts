@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@sj/llm'
+import type { RosterEntry } from '@sj/shared'
 
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
@@ -23,6 +24,8 @@ export type AdjudicationBlocks = {
   // The words for stuff. Every material and building the recipe may name has to be on the
   // page, or the ruling is thrown away unread.
   materials?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
+  // What the town has minted since the roster above was written: routines a map may name.
+  learned?: readonly RosterEntry[]
   intent: string
 }
 
@@ -143,10 +146,20 @@ function renderMaterials(m: AdjudicationBlocks['materials']): string {
   ].join('\n')
 }
 
+// Read off the rulebook, so it moves only when a verb is minted or retired; a rephrasing of a
+// minted act maps to it instead of minting a second name for the same thing.
+function renderLearned(learned: readonly RosterEntry[] | undefined): string {
+  if (learned === undefined || learned.length === 0) return ''
+  const lines = learned.map(
+    (e) => `${e.id} (${e.reads.length === 0 ? 'nothing' : e.reads.join(', ')}) — ${e.gloss}`,
+  )
+  return `\nWhat the town has learned to do since, each one a routine a "map" may name:\n${lines.join('\n')}`
+}
+
 export function assembleAdjudicationPrompt(
   blocks: AdjudicationBlocks,
 ): AssembledAdjudicationPrompt {
-  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}${renderMaterials(blocks.materials)}\n\n${ADJUDICATION_INSTRUCTION}`
+  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}${renderMaterials(blocks.materials)}\n\n${ADJUDICATION_INSTRUCTION}${renderLearned(blocks.learned)}`
   const user = renderUser(blocks)
   const messages: LlmMessage[] = [{ role: 'user', content: user }]
   return { system, messages, estTokens: estTokens(`${system}${user}`) }

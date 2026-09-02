@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { FORBIDDEN_FRAMING, type RosterEntry } from '@sj/shared'
 import { VERBS } from '@sj/engine'
 import { assembleAdjudicationPrompt, type AdjudicationBlocks } from './prompt.js'
 
@@ -160,6 +160,34 @@ describe('the roster of routines a map may name', () => {
     const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I forage for twigs.' }))
     expect(a.system).toBe(b.system)
     expect(a.messages[0]!.content).not.toContain('walk (x, y)')
+  })
+})
+
+// Minted verbs never reached the court: a rephrasing of a minted act was a second name for
+// the same thing, refused by sanity, instead of a map to the verb the town already has.
+describe('what the town has learned to do, as the court reads it', () => {
+  const learned: RosterEntry[] = [
+    { id: 'recipe:smoke_fish', name: 'Smoke Fish', gloss: 'Hang the catch in smoke', reads: [] },
+    {
+      id: 'recipe:wager',
+      name: 'Wager a Thing',
+      gloss: 'Stake a thing on a claim',
+      reads: ['itemId', 'targetId'],
+    },
+  ]
+
+  it('lists each minted verb with the keys it reads, after the authored roster', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks({ learned }))
+    expect(system).toContain('recipe:smoke_fish (nothing) — Hang the catch in smoke')
+    expect(system).toContain('recipe:wager (itemId, targetId) — Stake a thing on a claim')
+    expect(system.indexOf('recipe:wager')).toBeGreaterThan(system.indexOf('walk (x, y)'))
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('is empty text when nothing is minted, so the prefix reads as it always did', () => {
+    const none = assembleAdjudicationPrompt(fixtureBlocks()).system
+    expect(assembleAdjudicationPrompt(fixtureBlocks({ learned: [] })).system).toBe(none)
+    expect(none).not.toContain('learned to do since')
   })
 })
 

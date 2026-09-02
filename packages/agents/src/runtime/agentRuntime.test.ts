@@ -23,6 +23,7 @@ import {
   stateHash,
   TICK_REAL_MS,
   type DiscoveryCredit,
+  type RosterEntry,
   type SimConfig,
 } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
@@ -42,6 +43,7 @@ import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { splitSentences } from '../prompt/assemble.js'
+import { ROSTER_HEAD, SPEECH_RULES } from '../prompt/rulesOfBeing.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { ReflectionLlm } from '../reflection.js'
 import type { DreamLlm } from '../dream.js'
@@ -1813,6 +1815,42 @@ describe('arbiter wiring expansion (T20)', () => {
     expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
       'You lack the knowledge to attempt this.',
     )
+  })
+})
+
+describe('what the town has learned reaches every mind', () => {
+  it('a verb minted between two turns is in the next prompt, after the static rules', async () => {
+    const minted: RosterEntry[] = []
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    wireArbiter(runtime, {
+      adjudicate: async () => ({
+        kind: 'impossible',
+        reason: 'no',
+        class: 'physically_impossible',
+      }),
+      codify: () => ({ ruleId: 1, verb: 'recipe:x' }),
+      roster: () => minted,
+    })
+    await stepUntil(loop, () => prompts.length >= 1, 200)
+    const systemOn = (turn: number): string =>
+      prompts[turn]!.filter((m) => m.role === 'system')
+        .map((m) => m.text)
+        .join('\n')
+    expect(systemOn(0)).not.toContain(ROSTER_HEAD)
+
+    minted.push({
+      id: 'recipe:smoke_fish',
+      name: 'Smoke Fish Over Green Wood',
+      gloss: 'Hang the catch in green-wood smoke so it keeps',
+      reads: [],
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
+    const second = systemOn(1)
+    expect(second).toContain(ROSTER_HEAD)
+    expect(second).toContain('Name it recipe:smoke_fish')
+    expect(second.indexOf(ROSTER_HEAD)).toBeGreaterThan(second.indexOf(SPEECH_RULES))
+    expect(second.indexOf(ROSTER_HEAD)).toBeLessThan(second.indexOf('Name: Tamar'))
   })
 })
 

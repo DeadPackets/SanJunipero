@@ -58,6 +58,10 @@ export type Intent = z.infer<typeof Intent>
 // steps of the closed grammar, and the two must not drift (llm/pins.test).
 export const PLAN_MAX_STEPS = 12
 
+/** One verb the town has minted, as every prompt lists it: the word to name it by, what it
+ *  does in a line, and which of the closed keys an act of it must name. */
+export type RosterEntry = { id: string; name: string; gloss: string; reads: ClosedKey[] }
+
 /** An act that names nothing: every key answered null. */
 export const NO_PARAMS: ClosedIntentParams = Object.freeze(
   Object.fromEntries(CLOSED_KEYS.map((key) => [key, null])),

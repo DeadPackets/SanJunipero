@@ -137,8 +137,8 @@ describe('the charter a ruling becomes', () => {
     const long =
       'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen'
     const charter = charterFromAttempt({ recipe: boilSaltRecipe, summary: long }, inventor)
-    expect(charter.gloss.length).toBeLessThanOrEqual(90)
-    expect(charter.gloss.endsWith('fifteen')).toBe(true)
+    expect(charter.gloss.length).toBeLessThanOrEqual(50)
+    expect(charter.gloss.endsWith(' ten')).toBe(true)
   })
 
   it('is what the rulebook row holds, saying and all', () => {

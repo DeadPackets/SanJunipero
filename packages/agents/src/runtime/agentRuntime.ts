@@ -5,6 +5,7 @@ import {
   namedParams,
   nightStartTick,
   REFLECTION_SETTLE_MS,
+  type RosterEntry,
   sanitizeSpokenText,
   simTimeFromTick,
   stateHash,
@@ -261,6 +262,7 @@ export class AgentRuntime {
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
+  #roster: (() => RosterEntry[]) | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -416,6 +418,7 @@ export class AgentRuntime {
   useArbiter(arbiter: SeamArbiter): void {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
+    this.#roster = arbiter.roster ?? null
   }
 
   stop(): void {
@@ -829,6 +832,7 @@ export class AgentRuntime {
 
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
+      ...(this.#roster === null ? {} : { roster: this.#roster() }),
       identity: this.#identity,
       personality: {
         doc: this.#personality.current().doc,
