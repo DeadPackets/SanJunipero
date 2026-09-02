@@ -76,10 +76,6 @@ export class SceneCoordinator {
     return null
   }
 
-  holdsFloor(agentId: string): boolean {
-    return this.sceneFor(agentId)?.floor === agentId
-  }
-
   /** Put a scene back after a restore. Keyed by id, so twelve minds restoring the same scene
    *  converge on one — the id is derived from the opening tick and the cast, not from a counter. */
   adopt(scene: Scene | null | undefined): void {

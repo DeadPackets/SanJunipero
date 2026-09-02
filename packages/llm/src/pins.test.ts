@@ -73,7 +73,7 @@ it('an unpriced or unattributed route books at the ceiling, never at the pinned 
 it('★ no caller on the GLM half asks for a reasoning setting — that model refuses all of them', () => {
   for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight'])
     expect(callSettingsFor(caller).reasoning, caller).toBeUndefined()
-  for (const caller of ['semantic', 'constructs'])
+  for (const caller of ['semantic', 'constructs', 'scene.close'])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ enabled: false })
   // The court is off that half of the fleet and its model takes the dial.
   for (const caller of RULING_CALLERS)
@@ -101,6 +101,8 @@ it('★ the fleet: which model and which back end answers for each caller', () =
     voice: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     semantic: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     constructs: [PROSE_MODEL, PROSE_PROVIDER_ORDER],
+    // Two sentences and a short list of ties: prose, so it takes the prose pin.
+    'scene.close': [PROSE_MODEL, PROSE_PROVIDER_ORDER],
     // No act and no schema, so the act-null ban frees it for the cheaper back end.
     'reflection.gist': [PROSE_MODEL, GIST_PROVIDER_ORDER],
   }
