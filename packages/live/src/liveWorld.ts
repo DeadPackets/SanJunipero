@@ -722,7 +722,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             store.readTypeFrom(recognizedThroughSeq, t),
           ).sort((a, b) => a.seq - b.seq)
           recognizedThroughSeq = store.lastSeq()
-          recognizerEvents.push(...fresh)
+          // One at a time: the first pass on a resumed town is the whole log, and a spread
+          // that wide overflows the argument stack.
+          for (const ev of fresh) recognizerEvents.push(ev)
           void runConstructPass({
             events: recognizerEvents,
             baseConfig: config,

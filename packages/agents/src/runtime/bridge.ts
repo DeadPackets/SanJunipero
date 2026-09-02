@@ -178,7 +178,7 @@ export class EngineBridge {
       this.#queue = []
       // A promise cannot be un-resolved, and the tick rolls back on a throw — so nothing is
       // settled until the transaction that made it true has committed.
-      const settled: SubmitResult[] = []
+      const settled: [QueuedSubmit, SubmitResult][] = []
       try {
         for (const item of queue) {
           const result = submitIntent(
@@ -189,7 +189,7 @@ export class EngineBridge {
             item.intent.params,
           )
           if (result.ok) for (const event of result.events) ctx.emit(event.type, event.payload)
-          settled.push(result.ok ? { ok: true } : { ok: false, reason: result.reason })
+          settled.push([item, result.ok ? { ok: true } : { ok: false, reason: result.reason }])
         }
         world(ctx)
       } catch (err) {
@@ -197,7 +197,7 @@ export class EngineBridge {
         for (const item of queue) this.#tell(item, { ok: false, reason: ROLLED_BACK })
         throw err
       }
-      for (const [i, item] of queue.entries()) this.#tell(item, settled[i]!)
+      for (const [item, result] of settled) this.#tell(item, result)
       for (const cb of this.#tickCallbacks) cb(ctx.tick)
     }
   }
@@ -228,10 +228,7 @@ export class EngineBridge {
   drain(reason = 'the moment passes'): number {
     const queue = this.#queue
     this.#queue = []
-    for (const item of queue) {
-      item.onResult?.({ ok: false, reason })
-      item.resolve({ ok: false, reason })
-    }
+    for (const item of queue) this.#tell(item, { ok: false, reason })
     return queue.length
   }
 
