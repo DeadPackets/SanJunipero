@@ -57,6 +57,9 @@ export const CHRONICLE_ICONS: Record<string, string> = {
 // cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   // The quiet acts, named one by one (addendum §12).
+  // A chase re-aims at whoever it follows every tick it runs: the walk is the story, not the
+  // legs correcting themselves inside it.
+  'walk_reaimed',
   'agent_drank',
   'item_filled',
   'item_equipped',
