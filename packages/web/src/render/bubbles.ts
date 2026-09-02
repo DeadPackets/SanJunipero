@@ -3,7 +3,7 @@ import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
-import { PRIOR_ALPHA, PRIOR_HOLD_MS, fateOfPriorLine, typedChars } from './converse.js'
+import { PRIOR_ALPHA, PRIOR_HOLD_MS, fateOfPriorLine, typedChars, typingMs } from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -42,9 +42,10 @@ import type { Scene } from './scene.js'
 export { SPEECH_MAX_CHARS } from '@sj/shared'
 
 export const SPEECH_MS_BASE = 3500
-/** A longer line is held longer, all the way to the ceiling: 240 characters is about forty
- *  words, and forty words at a comfortable reading pace is the 13s this adds up to. */
-export const SPEECH_MS_PER_CHAR = 40
+/** ★ A READ WINDOW THAT EXISTS. Life was 3500ms + 40 a character of the WHOLE utterance, which
+ *  left 4.5s to read the 240 the ceiling allows — 53 characters a second, against a human rate
+ *  near 18. It is bought per SHOWN character now, and the typing is paid for on top of it. */
+export const READ_MS_PER_CHAR = 55
 const THOUGHT_DRIFT_PX = 2
 
 /** ★ NOTHING IS CUT AT THE EVENT. The box wrapped at 210 world px — thirteen characters a line
@@ -66,8 +67,11 @@ export const BUBBLE_FADE_MS = MOTION.reveal.ms
  *  5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
 const SPEAKER_WASH = 0.5
 
-export function bubbleLife(text: string): number {
-  return SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * Math.min(text.length, SPEECH_MAX_CHARS)
+/** How long a box holding `shown` stands: long enough to type it, then long enough to read it.
+ *  A thought is not spoken, so it is not typed either. */
+export function bubbleLife(shown: string, isThought = false): number {
+  const typing = isThought ? 0 : typingMs(shown.length)
+  return typing + SPEECH_MS_BASE + READ_MS_PER_CHAR * shown.length
 }
 
 export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
@@ -397,7 +401,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       agentId,
       ...built,
       bornMs: now,
-      dieMs: now + bubbleLife(text),
+      dieMs: now + bubbleLife(built.full, isThought),
       isThought,
       dimMs: null,
       side: 'above',

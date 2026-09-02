@@ -9,10 +9,10 @@ import {
   BUBBLE_MAX_PX,
   capLines,
   GLYPH_ZOOM,
+  READ_MS_PER_CHAR,
   SPEAKER_TINT,
   SPEECH_MAX_CHARS,
   SPEECH_MS_BASE,
-  SPEECH_MS_PER_CHAR,
   WRAP_CHARS,
   bubbleLife,
   bubbleShown,
@@ -29,12 +29,30 @@ import { CHAR_TARGET_PX } from './charAnim.js'
 import { fateOfPriorLine, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
 
-describe('bubbleLife', () => {
-  it('is base plus per-char for short text', () => {
-    expect(bubbleLife('hi')).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * 2)
+// ★ D3 — 240 characters took 8.6s to type and died 13.1s in, leaving 4.5 seconds to read them:
+// 53 characters a second, where a person reads about 18. The window is bought, not left over.
+describe('★ bubbleLife buys a read window out of what is SHOWN', () => {
+  it('is the typing, then the base, then a read window per shown character', () => {
+    expect(READ_MS_PER_CHAR).toBe(55)
+    expect(bubbleLife('hi')).toBe(typingMs(2) + SPEECH_MS_BASE + READ_MS_PER_CHAR * 2)
   })
-  it('clamps at SPEECH_MAX_CHARS', () => {
-    expect(bubbleLife('x'.repeat(500))).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS)
+
+  it('★ a thought is not typed, so it pays for reading only', () => {
+    const thought = 'cold stays outside where it belongs'
+    expect(bubbleLife(thought, true)).toBe(
+      SPEECH_MS_BASE + READ_MS_PER_CHAR * thought.length,
+    )
+    expect(bubbleLife(thought, true)).toBeLessThan(bubbleLife(thought))
+  })
+
+  it('★ the read window is never squeezed by the typing, at the longest box there is', () => {
+    // the most a three-line box can hold: three full lines and the two breaks between them
+    const shown = capLines(wrapBubble('x '.repeat(400), WRAP_CHARS), WRAP_CHARS).join('\n')
+    expect(shown.split('\n')).toHaveLength(BUBBLE_MAX_LINES)
+    expect(shown.length).toBeGreaterThan(3 * WRAP_CHARS - 4)
+    expect(bubbleLife(shown) - typingMs(shown.length)).toBeGreaterThanOrEqual(
+      READ_MS_PER_CHAR * shown.length,
+    )
   })
 
   it('★ always outlasts its own typing, so no line dies half-said', () => {
@@ -141,11 +159,8 @@ describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
     expect(wrapBubble(long).join(' ')).toBe(long)
   })
 
-  it("holds a longer line longer, up to the sanitizer's own ceiling", () => {
+  it('holds a longer line longer', () => {
     expect(bubbleLife('x'.repeat(200))).toBeGreaterThan(bubbleLife('x'.repeat(40)))
-    expect(bubbleLife('x'.repeat(SPEECH_MAX_CHARS + 100))).toBe(
-      SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS,
-    )
   })
 
   it('is about twice the width the box used to wrap at', () => {
