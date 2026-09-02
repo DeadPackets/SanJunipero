@@ -27,6 +27,7 @@ import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
+import { useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
@@ -73,6 +74,8 @@ export function App() {
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
   const { autoCut, toggle: toggleDirector } = useAutoCut()
+  // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
+  const moment = useStageCue(store)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -336,7 +339,7 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
-      <DirectorCue text={cue} />
+      <DirectorCue text={cue} moment={moment} />
       {route.broadcast && <LowerThird store={store} />}
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
