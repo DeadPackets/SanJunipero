@@ -125,15 +125,19 @@ function readWorld(path: string): Pick<RunManifest, 'world' | 'tick' | 'events'>
 export async function writeRunTar(out: Writable, opts: ExportOpts): Promise<RunManifest> {
   const now = Date.now()
   const files: RunManifest['files'] = []
-  const world = readWorld(opts.worldDbPath)
   const scratch = await mkdtemp(join(tmpdir(), 'sj-run-'))
   try {
-    const putDb = async (path: string, source: string): Promise<void> => {
-      const snap = await snapshotDb(source, join(scratch, `${files.length}.db`))
+    const snapOf = (source: string): Promise<string> =>
+      snapshotDb(source, join(scratch, `${files.length}.db`))
+    const putSnapshot = async (path: string, snap: string): Promise<void> => {
       files.push({ path, bytes: await writeFileEntry(out, ROOT + path, snap, now) })
+      await rm(snap, { force: true }) // peak disk is one database, not the whole run
     }
 
-    await putDb('world.db', opts.worldDbPath)
+    // Read from the copy that ships, not from a live world that has ticked past it.
+    const worldSnap = await snapOf(opts.worldDbPath)
+    const world = readWorld(worldSnap)
+    await putSnapshot('world.db', worldSnap)
     let minds: string[] = []
     try {
       minds = readdirSync(opts.mindsDir)
@@ -142,7 +146,8 @@ export async function writeRunTar(out: Writable, opts: ExportOpts): Promise<RunM
     } catch {
       /* a scripted stream has no minds directory */
     }
-    for (const name of minds) await putDb(`minds/${name}`, join(opts.mindsDir, name))
+    for (const name of minds)
+      await putSnapshot(`minds/${name}`, await snapOf(join(opts.mindsDir, name)))
 
     const config = Buffer.from(JSON.stringify(opts.config, null, 2))
     files.push({ path: 'config.json', bytes: config.length })
