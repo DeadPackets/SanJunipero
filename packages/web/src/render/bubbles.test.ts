@@ -183,25 +183,26 @@ describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
 
 // ★ D2 — 240 characters wrapped to eleven lines and stood a slab over a third of a 1440px frame.
 // The utterance still reaches the Chronicle whole; the DRAWING stops at three lines.
-describe('★ the bubble draws three lines, and says so', () => {
+describe('★ the bubble draws four lines, and says so', () => {
   const SPEECH =
     'the fish are biting well this morning by the river and the light is good on the water and nobody has come down to see any of it with me'
 
-  it('★ keeps a box of three lines or fewer exactly as it was wrapped', () => {
-    expect(BUBBLE_MAX_LINES).toBe(3)
+  it('★ keeps a box of four lines or fewer exactly as it was wrapped', () => {
+    // Four holds the median spoken line of the gate rehearsal whole; three cut 68% of them.
+    expect(BUBBLE_MAX_LINES).toBe(4)
     for (const said of ['the iron sings today', 'the fish are biting well this morning']) {
       const lines = wrapBubble(said, 24)
       expect(capLines(lines, 24)).toEqual(lines)
     }
   })
 
-  it('★ keeps the first three and ends the third in one ellipsis', () => {
+  it('★ keeps the first four and ends the last in one ellipsis', () => {
     const lines = wrapBubble(SPEECH, 24)
     expect(lines.length).toBeGreaterThan(BUBBLE_MAX_LINES)
     const shown = capLines(lines, 24)
     expect(shown).toHaveLength(BUBBLE_MAX_LINES)
-    expect(shown.slice(0, 2)).toEqual(lines.slice(0, 2))
-    expect(shown[2]!.endsWith('…')).toBe(true)
+    expect(shown.slice(0, -1)).toEqual(lines.slice(0, BUBBLE_MAX_LINES - 1))
+    expect(shown.at(-1)!.endsWith('…')).toBe(true)
     expect(shown.filter((l) => l.includes('…'))).toHaveLength(1)
   })
 

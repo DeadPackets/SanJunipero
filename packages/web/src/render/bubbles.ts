@@ -114,9 +114,11 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
 }
 
 /** ★ A BUBBLE IS A LINE, NOT A PAGE. 240 characters wrapped to eleven of them and stood a slab
- *  over a third of the frame that nobody could read before it went. Three lines are drawn; the
- *  rest is on the paper, which is where a viewer goes to read a speech twice. */
-export const BUBBLE_MAX_LINES = 3
+ *  over a third of the frame that nobody could read before it went. The rest is on the paper,
+ *  which is where a viewer goes to read a speech twice.
+ *  Four, not three: the gate rehearsal's 348 spoken lines have a median of 92 characters, which
+ *  three lines cut and four hold whole. Three elided 68% of everything said. */
+export const BUBBLE_MAX_LINES = 4
 
 export function capLines(lines: readonly string[], maxChars: number): string[] {
   if (lines.length <= BUBBLE_MAX_LINES) return [...lines]
