@@ -558,3 +558,30 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
     expect(before).not.toBe('')
   })
 })
+
+// Perception reports that a thing was done and never that it was done to you, and only the
+// second is what a mind's affection is fed by.
+describe('★ an expression aimed at one body', () => {
+  it('names whoever aimed it here, and not whoever only did it nearby', () => {
+    const { bridge, store, loop } = ownedWorld()
+    const expressed = (agentId: string, verb: string, targetId?: string): void => {
+      store.append(loop.tick, 'agent_expressed', {
+        agentId,
+        verb,
+        ...(targetId === undefined ? {} : { targetId }),
+        x: 4,
+        y: 3,
+        sense: 'sight',
+      })
+    }
+    expressed('bex', 'express:comfort', AGENT)
+    expressed('cass', 'express:mourn')
+    expressed('cass', 'express:sing', 'bex')
+    // A minted act that is not an expression reaches nobody's affection.
+    expressed('bex', 'dig_channel', AGENT)
+
+    expect(bridge.expressedAt(AGENT)).toEqual(['bex'])
+    expect(bridge.expressedAt('bex')).toEqual(['cass'])
+    expect(bridge.expressedAt('cass')).toEqual([])
+  })
+})

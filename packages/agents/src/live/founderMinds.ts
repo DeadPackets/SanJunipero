@@ -78,6 +78,7 @@ export const FOUNDER_MINDS: Mind[] = [
       ['what is counted keeps'],
       'watchful',
     ),
+    wantBias: { esteem: 1.5 },
   },
   {
     id: 'yusuf',
@@ -114,6 +115,7 @@ export const FOUNDER_MINDS: Mind[] = [
       ['a job done once is a job done'],
       'even',
     ),
+    wantBias: { esteem: 1.5 },
   },
   {
     id: 'nadia',
@@ -187,6 +189,7 @@ export const FOUNDER_MINDS: Mind[] = [
       ['a hand does more than a remedy'],
       'attentive',
     ),
+    wantBias: { esteem: 1.5 },
   },
   {
     id: 'salma',
@@ -312,6 +315,7 @@ export const FOUNDER_MINDS: Mind[] = [
       },
     },
     kin: [{ id: 'farida', relation: 'partner' }],
+    wantBias: { belonging: 1.5 },
   },
   {
     id: 'kamal',
@@ -362,6 +366,7 @@ export const FOUNDER_MINDS: Mind[] = [
       { id: 'leyla', relation: 'partner' },
       { id: 'tariq', relation: 'child' },
     ],
+    wantBias: { esteem: 1.5 },
   },
   {
     id: 'leyla',
@@ -412,6 +417,7 @@ export const FOUNDER_MINDS: Mind[] = [
       { id: 'kamal', relation: 'partner' },
       { id: 'tariq', relation: 'child' },
     ],
+    wantBias: { curiosity: 1.5 },
   },
   {
     id: 'tariq',
@@ -457,6 +463,7 @@ export const FOUNDER_MINDS: Mind[] = [
       { id: 'kamal', relation: 'parent' },
       { id: 'leyla', relation: 'parent' },
     ],
+    wantBias: { legacy: 1.5 },
   },
   {
     id: 'halim',
@@ -499,6 +506,7 @@ export const FOUNDER_MINDS: Mind[] = [
       },
     },
     kin: [{ id: 'dilara', relation: 'child' }],
+    wantBias: { legacy: 1.5 },
   },
   {
     id: 'dilara',
@@ -545,5 +553,6 @@ export const FOUNDER_MINDS: Mind[] = [
       },
     },
     kin: [{ id: 'halim', relation: 'parent' }],
+    wantBias: { esteem: 1.5 },
   },
 ]

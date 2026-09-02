@@ -44,6 +44,7 @@ import {
   standingWallsLine,
   stasisLine,
   stillnessAt,
+  wantLine,
   type Stillness,
   worldDay,
   type PerceptionPacket,
@@ -52,6 +53,7 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import type { TieStore } from '../memory/ties.js'
+import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '../memory/wants.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
@@ -342,6 +344,8 @@ export class AgentRuntime {
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
+  readonly #wantBias: WantBias
+  readonly #partners: ReadonlySet<string>
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
@@ -390,6 +394,11 @@ export class AgentRuntime {
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
+  #wants: WantStore | null = null
+  // How many places this mind knew, and how many of them carry its own name, when it last
+  // looked. Null until the first look, or a resume would read its whole map as new ground.
+  #knownPlaceCount: number | null = null
+  #namedForMeCount: number | null = null
 
   constructor(deps: {
     db: Database.Database
@@ -406,6 +415,10 @@ export class AgentRuntime {
     /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
     scenes?: SceneCoordinator | undefined
     ties?: RuntimeTies | undefined
+    /** How much faster than everybody else this mind feels a want, off its voice card. */
+    wantBias?: WantBias | undefined
+    /** Whoever this mind is partnered to. A talk one of them is in feeds affection. */
+    partners?: readonly string[] | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -420,12 +433,18 @@ export class AgentRuntime {
     this.#adjudicator = deps.adjudicator ?? null
     this.#scenes = deps.scenes ?? null
     this.#ties = deps.ties ?? null
+    this.#wantBias = deps.wantBias ?? {}
+    this.#partners = new Set(deps.partners ?? [])
   }
 
   start(agentId: string): void {
     if (this.#started) this.stop()
     this.#agentId = agentId
     this.#mem = new MemoryStore(this.#db, agentId, this.#embedder)
+    this.#wants = new WantStore(this.#db, agentId, this.#wantBias)
+    this.#wants.begin(this.#bridge.currentTick())
+    this.#knownPlaceCount = null
+    this.#namedForMeCount = null
     this.#dayLog = []
     this.#prevMomentSentences = new Set()
     this.#clock = freshClock()
@@ -564,6 +583,7 @@ export class AgentRuntime {
         : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     this.#noteCompany(packet, tick)
     this.#noteFinishedActs()
+    this.#feedWants(packet, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
@@ -690,6 +710,27 @@ export class AgentRuntime {
       if (!this.#heardKeys.has(key)) them.warmth += BOND_VALENCE.friend
     }
     this.#heardKeys = keys
+  }
+
+  /** Everything this tick answered a want with. Feeding is idempotent — it sets the want back
+   *  to nothing — so a talk that runs an hour keeps belonging at nothing for that hour. */
+  #feedWants(packet: PerceptionPacket, tick: number): void {
+    const fed = new Set<WantOccasion>(occasionsInPacket(packet, this.#identity.name))
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    if (scene !== null) {
+      fed.add('scene')
+      if (scene.participants.some((id) => id !== this.#agentId && this.#partners.has(id)))
+        fed.add('partner_scene')
+    }
+    if (this.#bridge.expressedAt(this.#agentId).length > 0) fed.add('expressed_at')
+    const places = this.#bridge.knownPlaces(this.#agentId)
+    const named = places.filter((p) => p.name?.includes(this.#identity.name) === true).length
+    if (this.#knownPlaceCount !== null && places.length > this.#knownPlaceCount)
+      fed.add('new_place')
+    if (this.#namedForMeCount !== null && named > this.#namedForMeCount) fed.add('named_building')
+    this.#knownPlaceCount = places.length
+    this.#namedForMeCount = named
+    if (fed.size > 0) this.#book(() => this.#wants?.feed(fed, tick))
   }
 
   // What the WORLD took, not what the model wrote: the words are sanitized the way the verb
@@ -827,6 +868,10 @@ export class AgentRuntime {
       fallback()
       return
     }
+    // One moment answers two wants: the town credits this mind with the word, and keeps it.
+    this.#book(() =>
+      this.#wants?.feed(['discovery_credit', 'verb_codified'], this.#bridge.currentTick()),
+    )
     return this.#holdIntent({ verb, params: {} })
   }
 
@@ -860,6 +905,10 @@ export class AgentRuntime {
   #noteFinishedActs(): void {
     for (const done of this.#bridge.completedSince(this.#agentId, this.#lastActSeq)) {
       this.#lastActSeq = done.seq
+      // Being taught from is the plainest way a mind is relied on, and the teacher is the only
+      // one of the two who can see it happen.
+      if (done.verb === 'teach')
+        this.#book(() => this.#wants?.feed(['taught'], this.#bridge.currentTick()))
       void this.#writeActionMemory(actionMemoryText(done.verb), actImportance(done.verb)).catch(
         this.#sink('memory_write_failed'),
       )
@@ -982,6 +1031,7 @@ export class AgentRuntime {
       doorstep,
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
+      wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]
       .filter((p) => p.length > 0)
       .join(' ')

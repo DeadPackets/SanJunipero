@@ -2465,3 +2465,49 @@ describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
     expect(interrupts(world.engineDb).map((i) => i.reason)).not.toContain(ACT_SET_DOWN)
   })
 })
+
+// Phase 1 left minds fed, warm and wanting nothing. The morning line is the one place a want
+// reaches the mind, and it has to reach it once a day and nowhere else.
+describe('★ the morning line names what this mind wants', () => {
+  const STILL_BODY = SimConfigSchema.parse({
+    needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+    structures: { sleepIndoorsOnly: false },
+  })
+
+  function wakeReasonsBilled(db: Database.Database): (string | null)[] {
+    return (
+      db.prepare("SELECT wake_reason FROM llm_calls WHERE caller = 'turn' ORDER BY id").all() as {
+        wake_reason: string | null
+      }[]
+    ).map((r) => r.wake_reason)
+  }
+
+  it('reaches the mind on the morning wake and on no other turn', async () => {
+    const { model, prompts } = capturingModel([
+      { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      simConfig: STILL_BODY,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 800)
+
+    const carried = prompts
+      .map((_, i) => i)
+      .filter((i) => saidOn(prompts, i).includes('Today you most want'))
+    const mornings = wakeReasonsBilled(agentDb)
+      .map((reason, i) => ({ reason, i }))
+      .filter((r) => r.reason === 'morning')
+      .map((r) => r.i)
+
+    expect(mornings.length).toBe(1)
+    expect(carried).toEqual(mornings)
+    // Nothing fed a want overnight, so the seven stand level and the contract's order decides.
+    expect(saidOn(prompts, carried[0]!)).toContain(
+      'Today you most want belonging; who could give you that?',
+    )
+  })
+})

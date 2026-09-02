@@ -274,6 +274,21 @@ export class EngineBridge {
     return [...seen].sort()
   }
 
+  /** Whoever aimed an `express:*` at this body inside the recent window. Perception reports
+   *  that a thing was done, never that it was done to you, and only the second feeds a want. */
+  expressedAt(agentId: string): string[] {
+    const at = new Set<string>()
+    for (const ev of this.#recentEvents()) {
+      if (ev.type !== 'agent_expressed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown; targetId?: unknown }
+      if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+      if (!p.verb.startsWith('express:') || p.agentId === agentId) continue
+      if (p.targetId !== agentId) continue
+      at.add(p.agentId)
+    }
+    return [...at].sort()
+  }
+
   submit(
     agentId: string,
     intent: Intent,
