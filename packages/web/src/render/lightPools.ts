@@ -157,8 +157,9 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
 
   const sync = (state: WorldState): void => {
     const records = store.assetRecords()
-    if (store.assetsSeq() !== syncedAssets) points.clear()
-    syncedAssets = store.assetsSeq()
+    const seq = store.assetsSeq()
+    if (seq !== syncedAssets) points.clear()
+    syncedAssets = seq
     for (const s of Object.values(state.structures)) {
       if (points.get(s.id)?.kind !== s.kind)
         points.set(s.id, {

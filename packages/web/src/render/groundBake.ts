@@ -28,7 +28,7 @@ import {
 } from './groundField.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { furrowLines, HEADLAND_COLOR, KERB_COLOR, patchOutline, type Tile } from './patches.js'
-import type { TextureBook } from './textures.js'
+import { artOptional, type TextureBook } from './textures.js'
 import { tileKind } from './tileset.js'
 
 // A grid of fixed-size chunks, not one texture the size of the field: a whole-map bake grows as
@@ -274,9 +274,7 @@ export function createGroundBaker(
           if (gen !== generation) return
           for (const held of live.values()) drawChunk(held.rect, held.tex, offsetX, offsetY)
         })
-        .catch(() => {
-          /* art is optional — the flat diamonds already rendered */
-        })
+        .catch(artOptional)
     },
     setView(next) {
       drain(BAKES_PER_FRAME)

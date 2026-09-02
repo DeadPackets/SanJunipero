@@ -117,7 +117,6 @@ describe('route', () => {
 
   // A truncated share link reaches the app shell, and the first render parses it.
   it('★ reads a mangled escape as no address rather than blanking the app', () => {
-    expect(() => parseRoute('/agent/%E0', '')).not.toThrow()
     expect(parseRoute('/agent/%E0', '').agentId).toBeNull()
     expect(parseRoute('/moment/4/%E0', '').moment).toBeNull()
   })

@@ -24,7 +24,7 @@ const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
 
 export function keyOpensBy(storage: Pick<Storage, 'getItem'> | null): boolean {
   try {
-    return (storage?.getItem(BONDS_KEY_SHUT) ?? null) === null
+    return storage?.getItem(BONDS_KEY_SHUT) == null
   } catch {
     return true // storage throws in a sandboxed frame; an unrememberable viewer gets the legend
   }

@@ -45,10 +45,13 @@ export function StageMount({
   const interiorRef = useRef<InteriorScene | null>(null)
   // read in the Pixi callbacks, never subscribed to — a follow change must not remount Pixi
   const onInteriorRef = useRef(onInterior)
+  // eslint-disable-next-line react-hooks/refs -- Pixi holds this across renders it does not join; an effect would hand it a prop one frame stale.
   onInteriorRef.current = onInterior
   const onPickRef = useRef(onPick)
+  // eslint-disable-next-line react-hooks/refs -- as above
   onPickRef.current = onPick
   const onGroundRef = useRef(onGround)
+  // eslint-disable-next-line react-hooks/refs -- as above
   onGroundRef.current = onGround
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -195,8 +198,7 @@ export function StageMount({
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
           if (said > seenThoughts) {
-            const log = store.thoughtsLog()
-            for (const t of log.slice(Math.max(0, log.length - (said - seenThoughts))))
+            for (const t of store.thoughtsLog().slice(seenThoughts - said))
               bubbles?.spawnThought(t.agentId, t.text)
             seenThoughts = said
           }
@@ -206,8 +208,7 @@ export function StageMount({
         onScene?.(s)
       })
       .catch(() => {
-        // No WebGL, no WebGPU, a context lost mid-build: without this the card sits on
-        // "Looking for the town…" forever and never says why.
+        // No WebGL, no WebGPU, or a context lost mid-build.
         if (disposed) return
         firstFrameStuck(FIRST_FRAME_COPY.blind)
         scene?.destroy()

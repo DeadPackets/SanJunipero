@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { sessionStore } from './storage.js'
 import { adminToken } from './lawsModel.js'
 import { keyOpensBy, rememberKey } from './relationGraph.js'
 
 describe('★ site data blocked', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('★ hands back nothing instead of throwing out of the first render', () => {
     Object.defineProperty(globalThis, 'sessionStorage', {
       configurable: true,

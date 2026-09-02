@@ -295,7 +295,7 @@ export function createInteriorScene(
         floorArt.poly(floorPolyOf(roomTiles))
         floorArt.fill({ texture: t, matrix: materialMatrix('interior-floor', 0) })
         floorArt.visible = true
-      })
+      }, artOptional)
     }
     floor.clear()
     drawFloorBase(floor, roomTiles, url === null ? ROOM_SHELL_PAINT.floor : null)

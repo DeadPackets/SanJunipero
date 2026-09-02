@@ -126,15 +126,7 @@ describe('connectObservatory link status', () => {
     const store = createWorldStore()
     connectObservatory({ url: 'ws://test/ws', store })
     FakeWebSocket.instances[0]!.open()
-    const snapshot = {
-      t: 'snapshot',
-      tick: 0,
-      seq: 1,
-      state: {},
-      config: { mystery: 1 },
-      laws: {},
-      live: true,
-    }
+    const snapshot = { ...SNAPSHOT, config: { mystery: 1 } }
     FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(snapshot) })
     expect(reload).toHaveBeenCalledTimes(1)
   })
