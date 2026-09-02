@@ -24,6 +24,7 @@ import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
+import { typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
 
 describe('bubbleLife', () => {
@@ -32,6 +33,12 @@ describe('bubbleLife', () => {
   })
   it('clamps at SPEECH_MAX_CHARS', () => {
     expect(bubbleLife('x'.repeat(500))).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS)
+  })
+
+  it('★ always outlasts its own typing, so no line dies half-said', () => {
+    for (const len of [1, 13, 40, 120, SPEECH_MAX_CHARS]) {
+      expect(bubbleLife('x'.repeat(len)), `${len} chars`).toBeGreaterThan(typingMs(len))
+    }
   })
 })
 

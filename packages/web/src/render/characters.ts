@@ -24,6 +24,8 @@ import {
   type Overhead,
 } from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
+import { statusOf } from '../ui/status.js'
+import { createConversation } from './converse.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -215,6 +217,8 @@ export function createCharacterLayer(
   let lastAssetsSeq = store.assetsSeq()
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
+  /** Who is answering whom, so a talker turns to their partner rather than out to sea. */
+  const talk = createConversation()
   /** ONE clock for the whole town: the world ticks for everybody at once, so a per-body
    *  estimate would be five noisy copies of one number. */
   let clock: TickClock = initialTickClock()
@@ -388,6 +392,11 @@ export function createCharacterLayer(
       debuff: conf?.movement.debuffTilesPerTick ?? MOVEMENT_FALLBACK.debuff,
     }
     for (const ev of evts) {
+      if (ev.type === 'agent_spoke') {
+        const s = ev.payload as { agentId: string; x: number; y: number }
+        talk.heard({ agentId: s.agentId, x: s.x, y: s.y, atMs: now })
+        continue
+      }
       if (ev.type !== 'agent_moved') continue
       const p = ev.payload as { id: string; x: number; y: number }
       const e = entries.get(p.id)
@@ -447,6 +456,13 @@ export function createCharacterLayer(
       // while walking, face the current leg; the event-time facing stays as the
       // idle orientation after arrival
       if (walking) e.facing = legFacing(e.path) ?? e.facing
+      else if (statusOf(a, nowTick) === 'talking') {
+        // ★ A body in a conversation turns to whoever it is answering. Two people spoke and both
+        // kept facing wherever they last walked, so nothing said the lines were one exchange.
+        const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
+        const at = partner === null ? undefined : state.agents[partner]
+        if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      }
       const sheet = sheets.get(a.id)
       const pose = charPose(
         {

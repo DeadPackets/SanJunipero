@@ -2,7 +2,8 @@ import { Assets, Container, Graphics, Texture } from 'pixi.js'
 import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
-import { createWorldLabel } from './worldLabel.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { PRIOR_ALPHA, PRIOR_HOLD_MS, typedChars } from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -227,6 +228,13 @@ type Bubble = {
   box: Container
   glyph: Graphics
   tail: Graphics
+  /** the whole line, and how much of it has been set — the box is cut to the WHOLE line, so a
+   *  reveal never moves the paper it is written on */
+  label: WorldLabel
+  full: string
+  typed: number
+  /** when this line stopped being the one being said, or null while it still is */
+  dimMs: number | null
   /** the paper this one was drawn on, so a tail redrawn later matches its own box */
   fill: number
   w: number
@@ -301,6 +309,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     box: Container
     glyph: Graphics
     tail: Graphics
+    label: WorldLabel
+    full: string
+    typed: number
     fill: number
     w: number
     h: number
@@ -313,7 +324,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       text.slice(0, SPEECH_MAX_CHARS),
       wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX),
     )
-    const label = createWorldLabel(lines.join('\n'), {
+    // ★ THE BOX IS CUT TO THE WHOLE LINE and the words arrive inside it. Measured whole, then
+    // set to what has been typed: a box that grew with its sentence would move under the reader.
+    const full = lines.join('\n')
+    const label = createWorldLabel(full, {
       fontFamily: face.family,
       fontSize: face.size,
       fill: isThought ? THOUGHT_INK : SPEECH_INK,
@@ -322,6 +336,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     })
     const w = Math.ceil(label.width) + 2 * BUBBLE_PAD
     const h = Math.ceil(label.height) + 2 * BUBBLE_PAD
+    // A thought is not spoken, so it is not typed either.
+    const typed = isThought ? full.length : 0
+    if (typed !== full.length) label.text = ''
 
     // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Different paper, a dotted rim
     // and no tail at all — shape and paper, not `alpha: 0.55`.
@@ -348,7 +365,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const glyph = glyphNode(isThought)
     glyph.visible = false
     node.addChild(box, glyph)
-    return { node, box, glyph, tail, fill, w, h }
+    return { node, box, glyph, tail, label, full, typed, fill, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
@@ -356,6 +373,16 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const state = store.getState()
     if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
+    // ★ THE LINE BEFORE THIS ONE STAYS, so a viewer reads the two of them as one exchange: it
+    // dims and is held for `PRIOR_HOLD_MS`, and lets go the moment a third line lands.
+    if (!isThought) {
+      for (const b of bubbles) if (!b.isThought && b.dimMs !== null) b.dieMs = now
+      for (const b of bubbles) {
+        if (b.isThought || b.dimMs !== null || b.agentId === agentId) continue
+        b.dimMs = now
+        b.dieMs = now + PRIOR_HOLD_MS
+      }
+    }
     const built = build(agentId, text, isThought)
     scene.layers.bubbles.addChild(built.node)
     fadeArtIn(built.node) // NOTHING POPS IN — speech included
@@ -365,6 +392,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       bornMs: now,
       dieMs: now + bubbleLife(text),
       isThought,
+      dimMs: null,
       side: 'above',
     })
   }
@@ -395,6 +423,15 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
           b.node.destroy({ children: true })
           bubbles.splice(i, 1)
+          continue
+        }
+        // ★ THE LINE TYPES IN. Set only when the count moves, which is 28 times a second at most.
+        if (b.typed < b.full.length) {
+          const n = typedChars(b.full.length, nowMs - b.bornMs)
+          if (n !== b.typed) {
+            b.typed = n
+            b.label.text = b.full.slice(0, n)
+          }
         }
       }
       // Where each one WANTS to be, then one placement pass over the whole live set: a bubble
@@ -435,7 +472,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         if (!b.node.visible) continue
         // the last frames fade; the fade-in is a rAF on the node and is left alone once done
         const leaving = bubbleAlpha(b.dieMs - nowMs)
-        if (leaving < 1) b.node.alpha = leaving
+        const dim = b.dimMs === null ? 1 : PRIOR_ALPHA
+        if (leaving < 1 || dim < 1) b.node.alpha = Math.min(dim, leaving)
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {
