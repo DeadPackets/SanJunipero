@@ -170,8 +170,9 @@ function renderScene(scene: PromptBlocks['scene']): string {
 function renderCustoms(names: readonly string[]): string {
   if (names.length === 0) return ''
   const said = names.map((n) => `the ${n}`)
-  const last = said.pop()!
-  return `The town has taken to ${said.length === 0 ? last : `${said.join(', ')} and ${last}`}.`
+  const head = said.slice(0, -1).join(', ')
+  const tail = said.slice(-1).join('')
+  return `The town has taken to ${head === '' ? tail : `${head} and ${tail}`}.`
 }
 
 // Rules of being + capabilities are static and identical for every agent, and the cache keeps
