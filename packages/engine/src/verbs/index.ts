@@ -625,6 +625,9 @@ const walk: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
+    // 90 of rehearsal 7's 360 walks were this: a body setting off for the tile under its own
+    // feet. `settled` turns it into the no-time act it is rather than a journey of length zero.
+    if (a.x === to.x && a.y === to.y) return 'you are already standing there'
     if (isCrawl(state, agentId) && (Math.abs(to.x - a.x) > 1 || Math.abs(to.y - a.y) > 1)) {
       return 'you can only drag yourself to a tile you could touch'
     }
@@ -632,6 +635,15 @@ const walk: VerbDef = makeVerb({
     // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'
     return null
+  },
+  // The case the contract on `settled` is written from: a walk to the tile underfoot. Read off
+  // the act's own two numbers, which the seam has already settled a named place down to — the
+  // fold lays the path again from those, and a second reading of the name can answer elsewhere.
+  settled(state, _config, agentId, params) {
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return false
+    const p = WalkParams.safeParse(params)
+    return p.success && a.x === p.data.x && a.y === p.data.y
   },
   duration(state, config, agentId, params) {
     const p = WalkParams.parse(params)

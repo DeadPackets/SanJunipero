@@ -40,20 +40,32 @@ describe('★ a walk that has nowhere to go', () => {
   // ★ 63 of rehearsal 5's refusals were a mind asked to walk to the tile under its own feet,
   // mostly because faster legs got it there before its picture of itself caught up. Refusing
   // spends the turn and teaches nothing; the body is already where it was sent.
+  // It used to take the tick a journey takes, and the body was busy for it — 90 of rehearsal 7's
+  // 360 walks, each one a turn where nothing else could be asked of the hands. `settled` is the
+  // hook written for exactly this, and its own contract names this walk as the example.
   it('★ to the tile under your own feet is a walk that is simply over', () => {
-    let state = start(world(OPEN, { x: 3, y: 2 }), { x: 3, y: 2 })
+    const go = submitIntent(world(OPEN, { x: 3, y: 2 }), DEFAULT_CONFIG, AGENT, 'walk', {
+      x: 3,
+      y: 2,
+    })
+    expect(go.ok, go.ok ? '' : go.reason).toBe(true)
+    if (!go.ok) throw new Error(go.reason)
+    // Begun and over in the same breath, so the body is never busy with it.
+    expect(go.events.map((e) => e.type)).toEqual(['action_started', 'action_completed'])
+    expect((go.events[0]!.payload as { duration: number }).duration).toBe(0)
+
+    let state = go.events.reduce(
+      (s, e) => fold(s, ev(e.type, e.payload), DEFAULT_CONFIG),
+      world(OPEN, { x: 3, y: 2 }),
+    )
     const worldTick = createWorldTick(DEFAULT_CONFIG, new RngStreams('walk-settles'))
-    const types: string[] = []
-    for (let i = 0; i < 60 && state.agents[AGENT]!.activity !== null; i++) {
-      const out = worldTick({ ...state, tick: state.tick + 1 })
-      state = out.state
-      types.push(...out.events.map((e) => e.type))
-    }
     const body = state.agents[AGENT]!
     expect({ x: body.x, y: body.y }).toEqual({ x: 3, y: 2 })
-    expect(body.activity).toBe(null)
-    expect(types).toContain('action_completed')
-    expect(types).not.toContain('action_interrupted')
+    expect(body.activity, 'the hands are free on the same turn').toBe(null)
+    // And nothing is left for the tick loop to interrupt or finish.
+    const out = worldTick({ ...state, tick: state.tick + 1 })
+    state = out.state
+    expect(out.events.map((e) => e.type)).not.toContain('action_interrupted')
   })
 
   // ★ World A's Nadia ended on array column 75, the last one the map has, and spent 36 of her

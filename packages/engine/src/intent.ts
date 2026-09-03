@@ -84,17 +84,22 @@ export function submitIntent(
   let p = asRead(def, params)
   // A named place settles to its tile before anybody judges the act, so validate, duration and
   // the fold read the same two numbers; one it cannot settle is left for validate to refuse.
-  if (verb === 'walk') {
-    const to = walkDestination(state, config, agentId, p)
-    if (!('refusal' in to)) p = { ...p, ...to }
+  const settleWalk = (act: Record<string, unknown>): Record<string, unknown> => {
+    if (verb !== 'walk') return act
+    const to = walkDestination(state, config, agentId, act)
+    return 'refusal' in to ? act : { ...act, ...to }
   }
+  p = settleWalk(p)
   const first = def.validate(state, config, agentId, p)
   if (first !== null) {
     // The mind chose the verb; its whole answer is read the way a person would read it (K20) —
     // a mark under a key this verb never reads is still one — and two equal fits are asked back about.
     const read = readAsPerson(state, config, agentId, verb, params)
     if (read !== null && 'refusal' in read) return { ok: false, reason: read.refusal }
-    if (read !== null) p = asRead(def, read.params)
+    // Settled again, because a reading hands back the name a mind wrote and not the tile the
+    // first pass found: without this, validate, `settled`, duration and the fold read a walk
+    // that has no two numbers at all.
+    if (read !== null) p = settleWalk(asRead(def, read.params))
     const refusal = read === null ? first : def.validate(state, config, agentId, p)
     // Asked for a thing the world already holds — asleep and told to sleep, inside the roof it
     // is told to enter. The act is over rather than wrong, and ends in the breath it began.
