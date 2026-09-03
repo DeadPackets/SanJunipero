@@ -7,7 +7,13 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
-import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
+import {
+  LlmClient,
+  insertAlert,
+  insertTurnOutcome,
+  migrateLlmTables,
+  PROVIDER_ORDER,
+} from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
@@ -800,7 +806,7 @@ describe('★ the money, inside the served world', () => {
     const mix = alertsOf(opsDb, 'llm_provider_off_allow_list')
     expect(mix.length, 'the routing left the pin and nobody was told').toBeGreaterThan(0)
     expect(mix[0]).toContain('Baidu 1')
-    expect(mix[0]).toContain('[Wafer, DeepInfra]')
+    expect(mix[0]).toContain(`[${PROVIDER_ORDER.join(', ')}]`)
     expect(mix[0]).toContain('$0.0100')
     expect(stops, 'a leaked back end must never stop a town').toHaveLength(0)
   }, 40_000)
