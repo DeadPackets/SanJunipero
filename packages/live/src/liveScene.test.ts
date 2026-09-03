@@ -9,7 +9,7 @@ import Database from 'better-sqlite3'
 import { insertAlert, insertTurnOutcome, type LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { DAYS_PER_YEAR, NO_PARAMS } from '@sj/shared'
-import type { MindSpec } from '@sj/agents'
+import { SceneTurnSchema, type MindSpec } from '@sj/agents'
 import { foundersFor, startDevWorld, townStructuresFor, type DevWorld } from '@sj/town'
 import { createLiveCast } from './liveWorld.js'
 
@@ -75,6 +75,7 @@ const turnAnswer = (speaking: boolean): unknown => ({
 const SCENE_TURN = {
   thought: 'Something to answer.',
   speech: SCENE_LINE,
+  to: null,
   gesture: null,
   move: 'none',
   stance: null,
@@ -83,6 +84,10 @@ const SCENE_TURN = {
   importance: 5,
 }
 const SCENE_CLOSE = { summary: 'They talked at the well.', ties: [] }
+
+// A strict schema and a hand-written answer drift apart in silence: one missing key fails the
+// parse, the floor-holder never speaks, and it reads as a scene nobody happened to answer.
+SceneTurnSchema.parse(SCENE_TURN)
 
 const ANSWERS: Record<string, unknown[]> = {
   scene: [SCENE_TURN],
