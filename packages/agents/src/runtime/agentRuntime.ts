@@ -1,5 +1,6 @@
 import {
   BOND_VALENCE,
+  dayPhaseFromTick,
   decayWarmth,
   MINUTES_PER_DAY,
   namedParams,
@@ -40,6 +41,7 @@ import {
   valleyExtentLine,
   absenceLine,
   type Company,
+  gatheringLine,
   type ProseWorld,
   standingWallsLine,
   stasisLine,
@@ -324,6 +326,7 @@ function freshClock(): MindClock {
     dozeUntilTick: 0,
     alarmArmed: {},
     morningWokeDay: null,
+    gatheringDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
   }
@@ -598,7 +601,11 @@ export class AgentRuntime {
     if (this.#turnInFlight) return
     const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
     const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
-    const wake = wakeReasons(this.#config, packet, this.#clock, tick, this.#plan, floor)
+    // Read only at dusk: it is a query per mind per tick, and the gathering rung is the one
+    // thing that reads it.
+    const belonging =
+      dayPhaseFromTick(tick) === 'dusk' ? (this.#wants?.levelOf('belonging', tick) ?? 0) : 0
+    const wake = wakeReasons(this.#config, packet, this.#clock, tick, this.#plan, floor, belonging)
     const reason = wake[0] ?? null
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
     if (reason === 'floor') {
@@ -612,6 +619,9 @@ export class AgentRuntime {
     // others keep it, and it ends only where too few of them are left to answer each other.
     if (reason === 'body_alarm' && floor.holdsFloor) this.#scenes?.leave(this.#agentId, tick)
     if (reason !== null) {
+      // Latched on the turn, not on the reason: a dusk the mind was never billed for is a dusk
+      // it has not had.
+      if (wake.includes('gathering')) this.#clock.gatheringDay = Math.floor(tick / MINUTES_PER_DAY)
       if (packet.self.asleep) {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
@@ -1031,6 +1041,7 @@ export class AgentRuntime {
       doorstep,
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
+      gatheringLine(packet, tick),
       wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]
       .filter((p) => p.length > 0)

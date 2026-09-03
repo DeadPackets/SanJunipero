@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
 import { IntentSchema } from './turn.js'
 import type { PerceptionPacket } from './prompt/prose.js'
 
@@ -16,6 +16,8 @@ export type MindConfig = {
   napTicks: number
   dreamChance: number
   ambientK: number
+  // How high `belonging` has to stand before the dusk fire is worth a turn of its own.
+  gatheringWant: number
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
@@ -31,6 +33,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   napTicks: 120,
   dreamChance: 0.35,
   ambientK: 6,
+  gatheringWant: 60,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }
@@ -60,6 +63,8 @@ export type MindClock = {
   // yet still rings, so a clock added after a mind woke up needs no migration.
   alarmArmed: Partial<Record<string, boolean>>
   morningWokeDay: number | null
+  // The day this mind last spent a turn on the dusk fire. Null is a mind that never has.
+  gatheringDay: number | null
   wakeRetryAtTick: number
   prevVisibleIds: string[]
 }
@@ -83,6 +88,7 @@ export type WakeReason =
   | 'reconsider'
   | 'boredom'
   | 'morning'
+  | 'gathering'
 
 /** Where this mind stands in an open scene. A scene holds the talk now, so it outranks every
  *  other reason while it is open: a floor-holder who woke for a plan would never answer. */
@@ -98,8 +104,9 @@ export function decideWake(
   tick: number,
   plan: PlanState,
   floor: FloorState = NO_SCENE,
+  belonging = 0,
 ): WakeReason | null {
-  return wakeReasons(cfg, packet, clock, tick, plan, floor)[0] ?? null
+  return wakeReasons(cfg, packet, clock, tick, plan, floor, belonging)[0] ?? null
 }
 
 /** Every reason true at this tick, the deciding one first. What follows the head bought nothing
@@ -116,6 +123,7 @@ export function wakeReasons(
   tick: number,
   plan: PlanState,
   floor: FloorState = NO_SCENE,
+  belonging = 0,
 ): WakeReason[] {
   // Backoff after a failed turn: even floor-exempt reasons wait it out.
   if (tick < clock.dozeUntilTick) return []
@@ -155,6 +163,9 @@ export function wakeReasons(
   if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
   if (felt) reasons.push('salient_perception')
   if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
+  // Above the gate on purpose, and affordable there because a scene resets belonging to 0: a
+  // mind with company never reaches the threshold, so the rung is only ever billed to the lonely.
+  if (gatheringDue(cfg, clock, tick, belonging)) reasons.push('gathering')
 
   if (sinceLast < cfg.idleGapTicks) return reasons
 
@@ -167,6 +178,16 @@ export function wakeReasons(
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) reasons.push('boredom')
 
   return reasons
+}
+
+// Once per mind per dusk. The want is true for all 120 dusk ticks, so what makes it one turn is
+// `gatheringDay`, latched by the runtime the way `morningWokeDay` is — on a turn actually bought.
+function gatheringDue(cfg: MindConfig, clock: MindClock, tick: number, belonging: number): boolean {
+  return (
+    belonging > cfg.gatheringWant &&
+    dayPhaseFromTick(tick) === 'dusk' &&
+    clock.gatheringDay !== Math.floor(tick / MINUTES_PER_DAY)
+  )
 }
 
 // Every rung the body is failing on right now, need and affliction alike, as alarm keys.
