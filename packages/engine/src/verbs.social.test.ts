@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, WANTS_DISCOVERING, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -463,11 +463,13 @@ describe('verb: teach', () => {
     })
   })
 
+  // A craft nobody in the valley has a word for is a proposal, and the refusal leaves the door
+  // open on the clause the runtime routes to the court on.
   it('rejects tracks that are not configured skills', () => {
     const s = patchAgent(makeWorld(), 'a1', { skills: { farming: 100 } })
     expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a2', track: 'alchemy' })).toEqual({
       ok: false,
-      reason: 'no such skill: alchemy',
+      reason: `no such skill: alchemy — ${WANTS_DISCOVERING}`,
     })
     expect(s.agents.a2!.skills.alchemy).toBeUndefined()
   })

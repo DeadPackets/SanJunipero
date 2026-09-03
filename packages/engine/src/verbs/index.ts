@@ -74,6 +74,7 @@ import {
   structureGlowRadius,
   ticksFor,
   visionRadiusAt,
+  WANTS_DISCOVERING,
   type ClosedKey,
   type DurationWord,
   type SimConfig,
@@ -1339,7 +1340,7 @@ const plant: VerbDef = makeVerb({
     const p = PlantParams.safeParse(params)
     if (!p.success) return 'planting needs ground and a seed to sow'
     if (tileAt(state, p.data.x, p.data.y) !== 6) return 'crops need farmland'
-    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind}`
+    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind} — ${WANTS_DISCOVERING}`
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to plant'
     for (const c of Object.values(state.crops)) {
       if (!c.withered && c.x === p.data.x && c.y === p.data.y) return 'that plot is already planted'
@@ -1682,7 +1683,12 @@ const build: VerbDef = makeVerb({
   validate(state, config, agentId, params) {
     const kind = (params as { kind?: unknown }).kind
     if (typeof kind !== 'string') return BUILD_NEEDS_A_THING_AND_A_PLACE
-    if (buildableRecipe(config, kind) === null) return `cannot build a ${kind}`
+    // A row that exists with no inputs is a thing the world places and nobody builds — a grave.
+    // Only a name the config has never heard of is a proposal the court should hear.
+    if (buildableRecipe(config, kind) === null)
+      return config.structures.recipes[kind] === undefined
+        ? `cannot build a ${kind} — ${WANTS_DISCOVERING}`
+        : `cannot build a ${kind}`
     const plotted = buildIsPlotted(state, config, kind)
     const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
     // ★ THE LOUD HALF. The prompt tells a mind that a roof goes where the town has ground for
@@ -1824,7 +1830,7 @@ function chosenRoute(
   // the craft not existing look the same from here, so name both ways out.
   if (routes.length === 0) {
     return {
-      refusal: `no such recipe: ${name} — perhaps someone nearby knows how, or it wants discovering.`,
+      refusal: `no such recipe: ${name} — ${WANTS_DISCOVERING}`,
     }
   }
   let asNamed: string | null = null
@@ -2380,7 +2386,8 @@ const teach: VerbDef = makeVerb({
       far: 'not adjacent to teach',
     })
     if (bad) return bad
-    if (!config.skills.tracks.includes(p.data.track)) return `no such skill: ${p.data.track}`
+    if (!config.skills.tracks.includes(p.data.track))
+      return `no such skill: ${p.data.track} — ${WANTS_DISCOVERING}`
     if ((state.agents[agentId]!.skills[p.data.track] ?? 0) === 0) return 'nothing to teach'
     return null
   },

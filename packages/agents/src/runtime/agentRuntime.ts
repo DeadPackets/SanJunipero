@@ -13,6 +13,7 @@ import {
   TICK_REAL_MS,
   verbPhraseGerund,
   verbPhrasePast,
+  WANTS_DISCOVERING,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
@@ -808,7 +809,7 @@ export class AgentRuntime {
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
         if (isBodyNoOp(res.reason, intent.verb)) return
-        if (this.#reroutesUnknownVerb(res.reason)) {
+        if (this.#reroutesToTheCourt(res.reason)) {
           void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params), false).catch(
             this.#sink('adjudicate_crash'),
           )
@@ -819,10 +820,13 @@ export class AgentRuntime {
       .then(() => undefined)
   }
 
-  // An invented verb is a proposal, not a mistake: it re-enters the turn as freeform words.
+  // A proposal, not a mistake, re-enters the turn as freeform words: a verb the registry has no
+  // word for, or a name the town has no concept of — an unbuildable kind, an unknown recipe,
+  // crop or skill. A refusal about a mark that merely missed is neither, and is recorded.
   // Once per turn, or an unwired arbiter would loop on itself.
-  #reroutesUnknownVerb(reason: string): boolean {
-    if (!reason.startsWith('unknown verb:')) return false
+  #reroutesToTheCourt(reason: string): boolean {
+    const proposes = reason.startsWith('unknown verb:') || reason.includes(WANTS_DISCOVERING)
+    if (!proposes) return false
     if (this.#adjudicator === null || this.#reframedThisTurn) return false
     this.#reframedThisTurn = true
     return true
@@ -944,7 +948,7 @@ export class AgentRuntime {
     }
     this.#clearPlanQueue()
     this.#plan.lastResult = 'blocked'
-    if (this.#reroutesUnknownVerb(res.reason)) {
+    if (this.#reroutesToTheCourt(res.reason)) {
       void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params), false).catch(
         this.#sink('adjudicate_crash'),
       )

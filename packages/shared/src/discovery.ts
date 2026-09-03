@@ -2,6 +2,11 @@ import { z } from 'zod'
 
 export const DISCOVERY_EVENT = 'discovery_made'
 
+/** The clause a refusal carries when the town has no concept of the name the mind wrote — an
+ *  unbuildable kind, an unknown recipe, crop or skill. A name that missed is a mistake; a name
+ *  the world has no such thing as is a proposal, and this is the one word the runtime routes on. */
+export const WANTS_DISCOVERING = 'perhaps someone nearby knows how, or it wants discovering.'
+
 /** A craft is a Recipe that makes or does something. A word is an expressive verb — the town
  *  learning to name an act that changes nothing. Both are somebody working something out. */
 export type DiscoveryKind = 'craft' | 'word'

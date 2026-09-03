@@ -1882,6 +1882,38 @@ describe('arbiter wiring expansion (T20)', () => {
     )
   })
 
+  // ★ THE INVENTION CHANNEL. Rehearsal 6 (2026-09-03): 631 acts, 11 rulings, and not one of
+  // verdict `attempt` — because this gate read only `unknown verb:`, so a mind that reached for
+  // a thing the town had no concept of was told no by the registry and never by a god. Four
+  // `wants discovering` refusals were raised that run and the court heard none of them.
+  it('★ sends a kind the town has no concept of to the arbiter, not to the refusal book', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'a granary wants a floor off the ground',
+        class: 'physically_impossible',
+      }
+    }
+    const unknownKindTurn = {
+      thought: 'The grain is spoiling. I will raise a granary.',
+      action: { verb: 'build', params: { kind: 'granary' } },
+      importance: 5,
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([unknownKindTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(seen, "the act reached the court in the mind's own words").toHaveLength(1)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      'You realize you cannot: a granary wants a floor off the ground',
+    )
+  })
+
   it('asks the arbiter once per turn: a second unknown verb falls back to refusal memory', async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {

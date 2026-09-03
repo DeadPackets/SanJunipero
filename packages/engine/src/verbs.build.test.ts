@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, WANTS_DISCOVERING, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -359,6 +359,31 @@ describe('verb: craft', () => {
     const poor = submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'craft', { recipe: 'plank' })
     expect(poor.ok).toBe(false)
     if (!poor.ok) expect(poor.reason).not.toContain('wants discovering')
+  })
+
+  // ★ The clause the runtime routes on. A name the config has never heard of is a proposal for
+  // the court; every other refusal — including a kind the world places and nobody builds — is
+  // a fact about the world, and stays one. Rehearsal 6 raised four of these and the court heard
+  // none of them, because nothing but `unknown verb:` ever reached it.
+  it('★ a kind the town has no concept of leaves the door open; a grave does not', () => {
+    const asked = (kind: string) => submitIntent(makeWorld(), CFG, 'a1', 'build', { kind })
+
+    const granary = asked('granary')
+    expect(granary.ok).toBe(false)
+    if (!granary.ok) {
+      expect(granary.reason).toBe(`cannot build a granary — ${WANTS_DISCOVERING}`)
+    }
+
+    // An empty recipe is a deliberate `no`, not a gap in the town's knowledge: routing it to the
+    // court would ask a god to invent grave-digging every time somebody grieved.
+    const grave = asked('grave')
+    expect(grave.ok).toBe(false)
+    if (!grave.ok) expect(grave.reason).toBe('cannot build a grave')
+
+    // And a kind the town knows perfectly well keeps whatever the world's real objection was.
+    const house = asked('house')
+    expect(house.ok).toBe(false)
+    if (!house.ok) expect(house.reason).not.toContain('wants discovering')
   })
 
   it('plank: consumes 1 wood, yields 2 planks, grants carpentry xp', () => {
