@@ -146,9 +146,26 @@ export const ChronicleEntrySchema = z
     type: z.string().min(1),
     icon: z.string().min(1),
     label: z.string().min(1),
+    /** Who the line is about, so a replay of it can frame them. Absent from an older gateway. */
+    agentIds: z.array(z.string().min(1)).optional(),
   })
   .strict()
 export type ChronicleEntry = z.infer<typeof ChronicleEntrySchema>
+
+/** A shot frames people, not a crowd; past this the camera is looking at the town anyway. */
+export const CHRONICLE_CAST_MAX = 4
+
+/** Who a chronicle line is about. Read off the payload's own ids and kept only where one names
+ *  a person, so a new event type is covered without a second list of payload keys to maintain. */
+export function chronicleCast(ev: SimEvent, isAgent: (id: string) => boolean): string[] {
+  const out: string[] = []
+  for (const v of Object.values(ev.payload as Record<string, unknown>)) {
+    if (typeof v !== 'string' || out.includes(v) || !isAgent(v)) continue
+    out.push(v)
+    if (out.length === CHRONICLE_CAST_MAX) break
+  }
+  return out
+}
 
 export const ChronicleResponseSchema = z.object({ entries: z.array(ChronicleEntrySchema) }).strict()
 export type ChronicleResponse = z.infer<typeof ChronicleResponseSchema>

@@ -11,6 +11,7 @@ import {
   MINUTES_PER_DAY,
   type Moment,
   agentName,
+  chronicleCast,
   chronicleIcon,
   chronicleLine,
   discoveryHeadline,
@@ -26,6 +27,9 @@ import {
   type MilestoneRow,
   type SceneRow,
 } from '@sj/shared/narratorSchema'
+// The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
+// SDK, which a free scripted stream may not import. This module's own imports are types only.
+import { stripFootnotes } from '@sj/narrator/chronicle'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './router.js'
@@ -132,25 +136,37 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
           payload: string
         }[]
       ).reverse()
+      const agents = deps.mirror.state().agents
+      const isAgent = (id: string): boolean => agents[id] !== undefined
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
-        const label = chronicleLine(toEvent(r), look)
+        const ev = toEvent(r)
+        const label = chronicleLine(ev, look)
         if (label === null) continue // a weighted type the formatter has no words for yet
-        entries.push({ seq: r.seq, tick: r.tick, type: r.type, icon: chronicleIcon(r.type), label })
+        entries.push({
+          seq: r.seq,
+          tick: r.tick,
+          type: r.type,
+          icon: chronicleIcon(r.type),
+          label,
+          agentIds: chronicleCast(ev, isAgent),
+        })
       }
 
       // The narrator's firsts join the same stream: same shape, same ordering, one feed.
-      for (const m of readOrEmpty<{ label: string; event_seq: number; tick: number }>(
+      for (const row of readOrEmpty<MilestoneRow>(
         deps.narratorDb,
-        'SELECT label, event_seq, tick FROM milestones ORDER BY id',
+        `SELECT ${MILESTONE_SELECT} FROM milestones ORDER BY id`,
       )) {
+        const m = milestoneFromRow(row)
         if (m.tick < fromTick || m.tick > toTick) continue
         entries.push({
-          seq: Math.max(1, m.event_seq),
+          seq: Math.max(1, m.eventSeq),
           tick: m.tick,
           type: MILESTONE_TYPE,
           icon: MILESTONE_ICON,
           label: m.label,
+          agentIds: m.agentIds,
         })
       }
       entries.sort((a, b) => a.tick - b.tick || a.seq - b.seq)
@@ -168,13 +184,15 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
+  // The `Seen:` footnotes are the narrator's own citation apparatus and a number leak to a
+  // reader. Stripped for display only — `footnoteSeqs` still reads them off the stored text.
   router.route('GET', '/api/chapters', (_req, res) => {
     sendJson(
       res,
       readOrEmpty<ChapterRow>(
         deps.narratorDb,
         'SELECT day, title, text FROM chapters ORDER BY day',
-      ),
+      ).map((c) => ({ ...c, text: stripFootnotes(c.text) })),
     )
   })
 

@@ -7,6 +7,7 @@ import { PageBoundary } from './PageBoundary.js'
 import { dateline } from './stamp.js'
 import { PageBody } from './pages/index.js'
 import type { Thing } from './pages/types.js'
+import type { MomentPlay } from '../ui/replayRun.js'
 import {
   PAGE_TABS,
   PAGE_TITLE,
@@ -37,7 +38,8 @@ export function Paper({
   onClose,
   onSubject,
   onInside,
-  onJump,
+  onScrub,
+  onPlay,
   onLive,
   onMoment,
 }: {
@@ -55,7 +57,8 @@ export function Paper({
   onClose: () => void
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
-  onJump: (tick: number) => void
+  onScrub: (tick: number) => void
+  onPlay: (play: MomentPlay) => void
   onLive: () => void
   onMoment: (id: number | null) => void
 }) {
@@ -249,7 +252,8 @@ export function Paper({
                 gapTicks={gapTicks}
                 onSubject={onSubject}
                 onInside={onInside}
-                onJump={onJump}
+                onScrub={onScrub}
+                onPlay={onPlay}
                 onLive={onLive}
                 onMoment={onMoment}
               />

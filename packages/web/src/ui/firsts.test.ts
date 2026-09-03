@@ -24,7 +24,9 @@ const first = (over: Partial<MilestoneRead> = {}): MilestoneRead => ({
 })
 
 const view = (read: Read<MilestoneRead[]>): string =>
-  renderToStaticMarkup(createElement(FirstsView, { read, viewTick: null, onJump: () => {} }))
+  renderToStaticMarkup(
+    createElement(FirstsView, { read, viewTick: null, edge: 9_000, onPlay: () => {} }),
+  )
 
 describe('the firsts ledger, grouped as the chronicle reads it', () => {
   it('★ puts what the town made itself at the top, and the engine’s own firsts last', () => {
@@ -95,11 +97,12 @@ describe('the Firsts tab', () => {
       createElement(FirstsView, {
         read: { data: [first({ tick: 1500 })], loaded: true, failed: false },
         viewTick: 1500,
-        onJump: () => {},
+        edge: 9_000,
+        onPlay: () => {},
       }),
     )
     expect(html).toMatch(/class="feed-jump"[^>]*aria-current="true"/)
-    expect(html).toContain('Go to this moment.')
+    expect(html).toContain('Watch this moment.')
   })
 
   // A name the town gave itself is printed with the words it came out of, verbatim.

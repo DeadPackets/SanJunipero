@@ -7,6 +7,7 @@ import { editions, type Edition } from '../../ui/dispatches.js'
 import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { firstsByTier } from '../../ui/firsts.js'
+import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
@@ -26,6 +27,7 @@ const GLYPH: Record<string, string> = {
 }
 
 const NO_ENTRIES: ChronicleEntry[] = []
+const NO_CAST: readonly string[] = []
 const NO_EDITIONS: Edition[] = []
 
 type Chapter = { day: number; title: string; text: string }
@@ -55,23 +57,27 @@ function FeedJump({
   tick,
   label,
   icon,
+  cast,
   current,
-  onJump,
+  edge,
+  onPlay,
 }: {
   tick: number
   label: string
   icon: string
+  cast: readonly string[]
   current: boolean
-  onJump: (tick: number) => void
+  edge: number
+  onPlay: (play: MomentPlay) => void
 }) {
   return (
     <button
       type="button"
       className="feed-jump"
       aria-current={current ? 'true' : undefined}
-      aria-label={`${label} ${momentStamp(tick)}. Go to this moment.`}
+      aria-label={`${label} ${momentStamp(tick)}. Watch this moment.`}
       onClick={() => {
-        onJump(tick)
+        onPlay(pointPlay(tick, edge, label, cast))
       }}
     >
       <Glyph icon={icon} />
@@ -112,7 +118,7 @@ function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
   )
 }
 
-function Today({ store, gapTicks, onJump }: PageProps) {
+function Today({ store, gapTicks, onPlay }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
@@ -126,6 +132,7 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   const latest = days[0] ?? null
   const daysAway = gapTicks === null ? 0 : Math.floor(gapTicks / 1440)
   const viewTick = mode.live ? null : mode.tick
+  const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
 
   // A poll landing, a scrub, or the gap notice re-renders this page; the fold behind the feed
   // only changes when the events or the world do.
@@ -182,8 +189,10 @@ function Today({ store, gapTicks, onJump }: PageProps) {
                       tick={e.tick}
                       label={e.label}
                       icon={e.icon}
+                      cast={e.agentIds ?? NO_CAST}
                       current={viewTick === e.tick}
-                      onJump={onJump}
+                      edge={edge}
+                      onPlay={onPlay}
                     />
                   </li>
                 ))}
@@ -219,11 +228,13 @@ function Today({ store, gapTicks, onJump }: PageProps) {
 function FirstLine({
   first,
   current,
-  onJump,
+  edge,
+  onPlay,
 }: {
   first: MilestoneRead
   current: boolean
-  onJump: (tick: number) => void
+  edge: number
+  onPlay: (play: MomentPlay) => void
 }) {
   const quote = first.nameProvenance?.quote ?? null
   return (
@@ -232,8 +243,10 @@ function FirstLine({
         tick={first.tick}
         label={first.label}
         icon={MILESTONE_ICON}
+        cast={first.agentIds}
         current={current}
-        onJump={onJump}
+        edge={edge}
+        onPlay={onPlay}
       />
       {quote !== null && <p className="discovery-quote">“{quote}”</p>}
     </li>
@@ -245,11 +258,13 @@ function FirstLine({
 export function FirstsView({
   read,
   viewTick,
-  onJump,
+  edge,
+  onPlay,
 }: {
   read: Read<MilestoneRead[]>
   viewTick: number | null
-  onJump: (tick: number) => void
+  edge: number
+  onPlay: (play: MomentPlay) => void
 }) {
   const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
 
@@ -269,7 +284,8 @@ export function FirstsView({
                 key={first.kind}
                 first={first}
                 current={viewTick === first.tick}
-                onJump={onJump}
+                edge={edge}
+                onPlay={onPlay}
               />
             ))}
           </ol>
@@ -279,10 +295,13 @@ export function FirstsView({
   )
 }
 
-function Firsts({ store, onJump }: PageProps) {
+function Firsts({ store, onPlay }: PageProps) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
+  const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const read = useFeed(milestonesFeed)
-  return <FirstsView read={read} viewTick={mode.live ? null : mode.tick} onJump={onJump} />
+  return (
+    <FirstsView read={read} viewTick={mode.live ? null : mode.tick} edge={edge} onPlay={onPlay} />
+  )
 }
 
 function Chapters() {

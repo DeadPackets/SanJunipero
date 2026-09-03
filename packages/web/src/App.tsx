@@ -27,6 +27,7 @@ import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
+import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
@@ -39,6 +40,8 @@ import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
 import type { Thing } from './paper/pages/types.js'
 
 type Sheet = { page: PageKey; tab: string }
+
+const NO_CAST: readonly string[] = []
 
 /** Safari throttles history writes to 100 per 30 s, and 8x playback asks for sixteen a second. */
 const ADDRESS_BAR_MS = 500
@@ -65,6 +68,8 @@ export function App() {
   const [sheet, setSheet] = useState<Sheet | null>(() =>
     route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
   )
+  // The moment being replayed, or null for a town at the live edge or held on one still.
+  const [play, setPlay] = useState<MomentPlay | null>(null)
   const [cue, setCue] = useState<string | null>(null)
   const [keysOpen, setKeysOpen] = useState(false)
   const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
@@ -93,13 +98,18 @@ export function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(sock)
 
-    // deep link: once the first snapshot lands, play the town on from the linked moment
+    // deep link: once the first snapshot lands, play the linked moment — the same bounded window
+    // a click gets, so a shared link and a clicked line are the same thing.
     const initial = parseRoute(location.pathname, location.search)
     const offMoment =
       initial.moment === null
         ? null
         : onFirstSnapshot(store, () => {
-            sock.replay(momentToTick(initial.moment!.day, initial.moment!.time))
+            const at = momentToTick(initial.moment!.day, initial.moment!.time)
+            if (!Number.isFinite(at)) return
+            const next = pointPlay(at, store.liveEdge(), '')
+            setPlay(next)
+            sock.replay(next.from)
           })
 
     // A person ringed beside a moment link is not a pasted `/agent/:id`, and an id the town does
@@ -151,28 +161,54 @@ export function App() {
     })
   }, [agentId, store])
 
+  const closePaper = useCallback(() => {
+    setSheet(null)
+  }, [])
+
   // Every viewed moment is shareable: a link copied mid-playback reopens that minute.
-  const goTo = useCallback(
-    (tick: number | null): void => {
-      if (tick === null) handle?.goLive()
-      else handle?.scrub(tick)
-      setRoute((prev) => {
-        const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
-        writeAddress(next, tick === null)
-        return next
-      })
-    },
-    [handle],
-  )
-  const onJump = useCallback(
+  const address = useCallback((tick: number | null): void => {
+    setRoute((prev) => {
+      const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
+      writeAddress(next, tick === null)
+      return next
+    })
+  }, [])
+
+  // SCRUB IS FOR DRAGGING, REPLAY IS FOR CLICKING. A still frame is what a finger on the
+  // filmstrip asks for; every other way into the past is a thing the viewer wants to watch.
+  const onScrub = useCallback(
     (tick: number) => {
-      goTo(tick)
+      setPlay(null) // a hand on the filmstrip has left whatever moment was running
+      handle?.scrub(tick)
+      address(tick)
     },
-    [goTo],
+    [handle, address],
+  )
+  const onPlay = useCallback(
+    (next: MomentPlay) => {
+      // The paper sits at 66% of the screen and dims the town: a replay behind it is invisible.
+      closePaper()
+      setPlay(next)
+      handle?.replay(next.from)
+      address(next.from)
+    },
+    [handle, address, closePaper],
   )
   const onLive = useCallback(() => {
-    goTo(null)
-  }, [goTo])
+    setPlay(null)
+    handle?.goLive()
+    address(null)
+  }, [handle, address])
+
+  // The moment holds its last frame rather than running on into the rest of the day.
+  const onMomentEnd = useCallback(
+    (until: number) => {
+      handle?.scrub(until)
+      address(until)
+    },
+    [handle, address],
+  )
+  useMomentEnd(store, play, onMomentEnd)
 
   const onMoment = useCallback((id: number | null) => {
     setRoute((prev) => {
@@ -185,9 +221,6 @@ export function App() {
   const openPage = (page: PageKey, tab?: string): void => {
     setSheet({ page, tab: tab ?? firstTab(page) })
   }
-  const closePaper = useCallback(() => {
-    setSheet(null)
-  }, [])
 
   const onArm = (arm: Arm): void => {
     setSheet((prev) => (prev?.page === arm ? null : { page: arm, tab: firstTab(arm) }))
@@ -360,6 +393,7 @@ export function App() {
         stage={stage}
         autoCut={autoCut}
         pinned={following}
+        moment={play?.cast ?? NO_CAST}
         onCue={setCue}
       />
       <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
@@ -387,7 +421,8 @@ export function App() {
         onClose={closePaper}
         onSubject={pickSubject}
         onInside={enterInterior}
-        onJump={onJump}
+        onScrub={onScrub}
+        onPlay={onPlay}
         onLive={onLive}
         onMoment={onMoment}
       />

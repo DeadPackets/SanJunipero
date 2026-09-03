@@ -13,6 +13,7 @@ import {
   type MarkSources,
 } from '../../ui/timelineMarks.js'
 import { milestonesFeed } from '../../ui/feeds.js'
+import { pointPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import type { PageProps } from './types.js'
 
@@ -70,6 +71,7 @@ function DayStripView({
   live,
   marks,
   onScrub,
+  onMark,
   onLive,
 }: {
   edge: number
@@ -77,6 +79,7 @@ function DayStripView({
   live: boolean
   marks: readonly Mark[]
   onScrub: (tick: number) => void
+  onMark: (mark: Mark) => void
   onLive: () => void
 }) {
   const span = Math.max(1, edge)
@@ -119,7 +122,8 @@ function DayStripView({
   return (
     <div className="day-strip" role="group" aria-label="The days the town has lived">
       <p className="sheet-note">
-        Drag the strip to replay a day. The stamp reads REPLAY until you come back to now.
+        Drag the strip to hold a minute still, or pick a mark to watch it. The stamp reads REPLAY
+        until you come back to now.
       </p>
       <div className="day-marks">
         {marks.map((mk) => {
@@ -130,9 +134,9 @@ function DayStripView({
               type="button"
               className={`mark ${mk.kind}`}
               style={{ left: markLeft(mk.tick, span) }}
-              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
+              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Watch this moment.`}
               onClick={() => {
-                onScrub(mk.tick)
+                onMark(mk)
               }}
             >
               <MarkGlyph mark={mk} />
@@ -186,7 +190,7 @@ function DayStripView({
   )
 }
 
-export function Days({ store, onJump, onLive }: PageProps) {
+export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
@@ -211,7 +215,10 @@ export function Days({ store, onJump, onLive }: PageProps) {
       live={mode.live}
       marks={marks}
       onScrub={(tick) => {
-        onJump(Math.max(0, Math.min(edge, Math.round(tick))))
+        onScrub(Math.max(0, Math.min(edge, Math.round(tick))))
+      }}
+      onMark={(mk) => {
+        onPlay(pointPlay(mk.tick, edge, mk.words))
       }}
       onLive={onLive}
     />
