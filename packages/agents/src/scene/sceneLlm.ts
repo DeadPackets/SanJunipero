@@ -7,7 +7,7 @@ import type { CallBill, LlmClient } from '@sj/llm'
 import type { PersonalityDoc } from '../personality.js'
 import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import type { Tie } from '../memory/ties.js'
+import { TIE_PHRASE, type Tie } from '../memory/ties.js'
 import {
   SceneTurnSchema,
   TIE_KINDS,
@@ -18,7 +18,6 @@ import {
   type SceneLine,
   type SceneLlm,
   type TieDelta,
-  type TieKind,
 } from './scene.js'
 
 /** What one mind is, for the length of a scene. Read through functions because sleep rewrites
@@ -64,17 +63,6 @@ export function sceneWordCap(voice: IdentityCore['voiceCard']): number {
 const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
 
 Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.`
-
-const TIE_PHRASE: Record<TieKind, string> = {
-  promise: 'a promise',
-  debt: 'a debt',
-  slight: 'a slight',
-  grudge: 'a grudge',
-  attraction: 'an attraction',
-  secret: 'a secret',
-  alliance: 'an alliance',
-  kin: 'kin',
-}
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what there was to say.',
