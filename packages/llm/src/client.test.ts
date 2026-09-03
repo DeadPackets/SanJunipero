@@ -932,7 +932,7 @@ describe('default OpenRouter path extraBody', () => {
   // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
   // the other home. Run D's dear second name is gone; DeepInfra costs half of Wafer.
   it('★ the request body carries exactly the pinned allow-list', () => {
-    expect(PROVIDER_ORDER).toEqual(['DeepInfra', 'Wafer'])
+    expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
       order: PROVIDER_ORDER,
       allow_fallbacks: false,

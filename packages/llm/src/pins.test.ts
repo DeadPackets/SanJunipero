@@ -22,14 +22,14 @@ import {
 
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
-  expect(PROVIDER_ORDER).toEqual(['DeepInfra', 'Wafer'])
+  expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
   expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
   // glm-5.3-flash, only the bare id and a `:batch` variant, so there is no date to pin to.
   for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
-  expect(PRICE_PER_M).toEqual({ input: 0.075, output: 0.25, cacheRead: 0.016 })
+  expect(PRICE_PER_M).toEqual({ input: 0.15, output: 0.5, cacheRead: 0.03 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {

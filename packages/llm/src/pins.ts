@@ -4,14 +4,15 @@
 export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
 // Two homes since the 2026-09-01 bake-off: DeepInfra cleared 60/60 acts under 8-way concurrency
 // with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
-// DeepInfra leads since the 2026-09-03 rehearsal, on price and on refusals both: over 2.96
-// sim-days it answered 610 calls at $0.0000857 each with no failure, while Wafer answered 502 at
-// $0.000350 — 4.1x — and refused 155 more upstream. A refusal is not only a retry: it dozes the
-// mind six ticks, and 21 of them landed on scene lines, which is a conversation stopping
-// mid-floor. Wafer's 51% cache read against DeepInfra's 13% does not close a 4x gap.
-// One order for every mind-facing caller on purpose: `limiterFor` keys on the joined order
-// string, so a second order would open a second admission gate against the same two backends.
-export const PROVIDER_ORDER: string[] = ['DeepInfra', 'Wafer']
+// The order of these two buys nothing: with `allow_fallbacks:false` this list is an ALLOW-LIST
+// and OpenRouter picks inside it. Flipping it 2026-09-03 changed no routing at all — 72 of 72
+// mind calls still went to Wafer — so a real preference needs `only` plus `sort`, not a reorder.
+// Worth doing, and measured: over 2.96 sim-days DeepInfra answered 610 calls at $0.0000857 each
+// and failed none, while Wafer answered 502 at $0.000350 — 4.1x — and refused 155 more upstream.
+// A refusal also dozes the mind six ticks, and 21 landed on scene lines, stopping a conversation
+// mid-floor. Wafer stays first here only because PRICE_PER_M reads this slot and Wafer is who
+// actually serves; changing that ahead of the routing would halve every estimate.
+export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
