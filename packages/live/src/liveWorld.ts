@@ -163,7 +163,12 @@ export type LiveCastOpts = {
   maxMinds?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
    *  client bills a different ledger proves nothing about the stop. */
-  makeClient?: (opsDb: Database.Database, caller: string, agentId?: string) => LlmClient
+  makeClient?: (
+    opsDb: Database.Database,
+    caller: string,
+    agentId?: string,
+    audience?: 'mind' | 'ops',
+  ) => LlmClient
   embedder?: { embed(t: string): Promise<Float32Array> }
   /** For a harness that cannot wait out the boredom floor. Absent in every real run. */
   mindConfig?: Partial<MindConfig>
@@ -396,13 +401,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
   }
 
-  const makeClient = (caller: string, agentId?: string): LlmClient =>
+  const makeClient = (caller: string, agentId?: string, audience?: 'mind' | 'ops'): LlmClient =>
     opts.makeClient !== undefined
-      ? opts.makeClient(opsDb, caller, agentId)
+      ? opts.makeClient(opsDb, caller, agentId, audience)
       : new LlmClient({
           db: opsDb,
           caller,
           ...(agentId === undefined ? {} : { agentId }),
+          ...(audience === undefined ? {} : { audience }),
           allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
           // The per-caller backstop: it stops one caller running away between two reads of the
           // ledger, which the tick watchdog below cannot see.
@@ -745,7 +751,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             events: recognizerEvents,
             baseConfig: config,
             store: new ConstructStore(arb),
-            llm: makeClient('constructs', 'town'),
+            llm: makeClient('constructs', 'town', 'ops'),
             laws: loop.state.laws,
           })
             .then((constructs) => {
@@ -799,7 +805,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             world: { config, state: loop.state },
             semantic: {
               db: opsDb,
-              llm: makeClient('semantic', 'town'),
+              llm: makeClient('semantic', 'town', 'ops'),
               records: transcriptFor(day, events),
             },
             alert: (d) => {
