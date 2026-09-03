@@ -162,6 +162,9 @@ export type LlmClientOpts = {
   transport?: 'response_format' | 'tool'
   // Tool transport only. 'named' forces the turn tool; Z.AI-class endpoints 404 on anything but auto.
   toolChoice?: 'named' | 'auto'
+  // 'ops' is a prompt no mind reads, whose question is made of the ops plane's own words — the
+  // recognisers. Sealed by default, so a caller nobody has thought about yet is a mind's.
+  audience?: 'mind' | 'ops'
 }
 
 type CallTokens = Pick<
@@ -226,6 +229,7 @@ export class LlmClient {
   private readonly transport: 'response_format' | 'tool'
   private readonly toolChoice: 'named' | 'auto'
   private readonly expectedCallCostUsd: number
+  private readonly audience: 'mind' | 'ops'
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
   private model: LanguageModel | undefined
@@ -255,6 +259,7 @@ export class LlmClient {
     this.transport = opts.transport ?? 'response_format'
     this.toolChoice = opts.toolChoice ?? 'named'
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
+    this.audience = opts.audience ?? 'mind'
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
   }
@@ -421,9 +426,10 @@ export class LlmClient {
     )
   }
 
-  // The one door every provider-bound prompt passes through, whichever of the six callers
-  // assembled it: an ops-plane word is cut out here and the row says which caller leaked it.
+  // The one door every mind-bound prompt passes through, whichever of the six callers assembled
+  // it: an ops-plane word is cut out here and the row says which caller leaked it.
   private seal(text: string): string {
+    if (this.audience === 'ops') return text
     return assertNoGlassLeak(text, this.caller, (leaks, where) => {
       this.alert('glass_leak', `${where}: ${leaks.join(', ')} — redacted before the call`)
     })

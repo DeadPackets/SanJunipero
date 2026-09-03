@@ -21,6 +21,23 @@ export type ScriptedResponse = {
   finishReason?: 'stop' | 'length'
 }
 
+/** A scripted model that also keeps what the provider was actually handed, so a test can assert
+ *  on the bytes a real client sent rather than on the prompt its author composed. */
+export function recordingModel(responses: ScriptedResponse[]): {
+  model: MockLanguageModelV4
+  sent: string[]
+} {
+  const inner = mockModel(responses)
+  const sent: string[] = []
+  const model = new MockLanguageModelV4({
+    doGenerate: (opts) => {
+      sent.push(JSON.stringify(opts.prompt))
+      return inner.doGenerate(opts)
+    },
+  })
+  return { model, sent }
+}
+
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
   let next = 0
   return new MockLanguageModelV4({

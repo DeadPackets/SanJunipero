@@ -1,2 +1,2 @@
 export { FakeEmbedder } from './fakeEmbedder.js'
-export { mockModel } from './mockModel.js'
+export { mockModel, recordingModel } from './mockModel.js'

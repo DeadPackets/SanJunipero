@@ -142,6 +142,7 @@ describe('a verdict nobody can read', () => {
     const llm = new LlmClient({
       db,
       caller: 'semantic',
+      audience: 'ops',
       model: mockModel([{ json: noProvenance }, { json: GOOD_VERDICT }]),
     })
     const milestones = await detectSemanticFirsts({
@@ -164,6 +165,7 @@ describe('a verdict nobody can read', () => {
     const llm = new LlmClient({
       db,
       caller: 'semantic',
+      audience: 'ops',
       model: mockModel([{ json: { hits: 'not an array' } }, { json: { wrong: true } }]),
     })
     const milestones = await detectSemanticFirsts({

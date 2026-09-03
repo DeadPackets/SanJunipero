@@ -838,8 +838,8 @@ describe('pessimistic reservation (T21)', () => {
   })
 })
 
-describe('★ the one-way glass, on every prompt the client sends', () => {
-  const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic'] as const
+describe('★ the one-way glass, on every prompt a mind reads', () => {
+  const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter'] as const
 
   const recorder = (): { model: MockLanguageModelV4; sent: string[] } => {
     const sent: string[] = []
@@ -893,6 +893,31 @@ describe('★ the one-way glass, on every prompt the client sends', () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'glass_leak'").get()).toEqual({
       n: 0,
     })
+  })
+
+  it('hands an ops recogniser its own words, because its question is made of them', async () => {
+    const db = openDb()
+    const { model, sent } = recorder()
+    const ask = 'Answer with the id: god_afterlife, multi_day_plan. first_bridge counts.'
+    await new LlmClient({ model, db, caller: 'semantic', audience: 'ops' }).text({
+      system: ask,
+      messages: [{ role: 'user', content: 'god_afterlife' }],
+    })
+    expect(sent[0]).toContain(ask)
+    expect(sent[0]).not.toContain('[redacted]')
+    expect(db.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'glass_leak'").get()).toEqual({
+      n: 0,
+    })
+  })
+
+  it('seals a caller nobody declared, so a new one is a mind’s until it says otherwise', async () => {
+    const db = openDb()
+    const { model, sent } = recorder()
+    await new LlmClient({ model, db, caller: 'a-caller-added-next-year' }).text({
+      system: 'god_afterlife',
+      messages: [{ role: 'user', content: 'hello' }],
+    })
+    expect(sent[0]).not.toContain('god_afterlife')
   })
 })
 
