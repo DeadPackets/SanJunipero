@@ -33,7 +33,10 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   napTicks: 120,
   dreamChance: 0.35,
   ambientK: 6,
-  gatheringWant: 60,
+  // 40 of 100, which a want rising 0.017 a tick from zero reaches in 1.6 sim-days. At 60 a fresh
+  // town saw this fire for nobody until day three, and the first two days are what a new watcher
+  // watches. Belonging resets to zero on any scene, so the lonely gather and then stop firing.
+  gatheringWant: 40,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }

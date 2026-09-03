@@ -610,13 +610,11 @@ describe('★ the dusk gathering: the rung that reads a want', () => {
     const at = (tick: number): WakeReason | null => woke(tick, wants.levelOf('belonging', tick))
 
     expect(at(day(0, DUSK))).toBeNull() // 19.4 — nowhere near it
-    expect(at(day(1, DUSK))).toBeNull() // 43.9
-    expect(at(day(2, DUSK))).toBe('gathering') // 68.3, the first dusk that clears
+    expect(at(day(1, DUSK))).toBe('gathering') // 43.9, the first dusk that clears 40
 
-    wants.feed(['scene'], day(2, DUSK))
-    expect(at(day(3, DUSK))).toBeNull()
-    expect(at(day(4, DUSK))).toBeNull()
-    expect(at(day(5, DUSK))).toBe('gathering')
+    wants.feed(['scene'], day(1, DUSK))
+    expect(at(day(2, DUSK))).toBeNull() // 24.5 — one evening's company bought two days
+    expect(at(day(3, DUSK))).toBe('gathering') // 49.0
     db.close()
   })
 })
